@@ -2712,8 +2712,11 @@ export type Database = {
           context_id: string | null
           created_at: string | null
           difficulty: string | null
+          deadline_at: string | null
+          energy_type: string | null
           epic_id: string | null
           estimated_duration: number | null
+          flexibility: string
           habit_source_id: string | null
           id: string
           image_url: string | null
@@ -2724,6 +2727,7 @@ export type Database = {
           is_recurring: boolean | null
           is_top_three: boolean | null
           location: string | null
+          must_calendar_block: boolean
           notes: string | null
           parent_template_id: string | null
           priority: string | null
@@ -2756,8 +2760,11 @@ export type Database = {
           context_id?: string | null
           created_at?: string | null
           difficulty?: string | null
+          deadline_at?: string | null
+          energy_type?: string | null
           epic_id?: string | null
           estimated_duration?: number | null
+          flexibility?: string
           habit_source_id?: string | null
           id?: string
           image_url?: string | null
@@ -2768,6 +2775,7 @@ export type Database = {
           is_recurring?: boolean | null
           is_top_three?: boolean | null
           location?: string | null
+          must_calendar_block?: boolean
           notes?: string | null
           parent_template_id?: string | null
           priority?: string | null
@@ -2800,8 +2808,11 @@ export type Database = {
           context_id?: string | null
           created_at?: string | null
           difficulty?: string | null
+          deadline_at?: string | null
+          energy_type?: string | null
           epic_id?: string | null
           estimated_duration?: number | null
+          flexibility?: string
           habit_source_id?: string | null
           id?: string
           image_url?: string | null
@@ -2812,6 +2823,7 @@ export type Database = {
           is_recurring?: boolean | null
           is_top_three?: boolean | null
           location?: string | null
+          must_calendar_block?: boolean
           notes?: string | null
           parent_template_id?: string | null
           priority?: string | null
@@ -5546,6 +5558,60 @@ export type Database = {
             columns: ["mentor_id"]
             isOneToOne: false
             referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      planner_events: {
+        Row: {
+          epic_id: string | null
+          event_type: string
+          id: string
+          occurred_at: string
+          payload: Json
+          planner_session_id: string | null
+          proposal_id: string | null
+          source: string
+          task_id: string | null
+          user_id: string
+        }
+        Insert: {
+          epic_id?: string | null
+          event_type: string
+          id?: string
+          occurred_at?: string
+          payload?: Json
+          planner_session_id?: string | null
+          proposal_id?: string | null
+          source?: string
+          task_id?: string | null
+          user_id: string
+        }
+        Update: {
+          epic_id?: string | null
+          event_type?: string
+          id?: string
+          occurred_at?: string
+          payload?: Json
+          planner_session_id?: string | null
+          proposal_id?: string | null
+          source?: string
+          task_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planner_events_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planner_events_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "daily_tasks"
             referencedColumns: ["id"]
           },
         ]

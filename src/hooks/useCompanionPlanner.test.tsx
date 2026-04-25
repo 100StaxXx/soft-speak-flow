@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
   persistCompanionThreadMessages: vi.fn().mockResolvedValue(undefined),
   upsertPlannerPreferences: vi.fn(),
+  insertPlannerEvent: vi.fn(),
   invalidateQueries: vi.fn(),
   addTask: vi.fn(),
   updateTask: vi.fn(),
@@ -46,9 +47,15 @@ vi.mock("@/integrations/supabase/client", () => ({
     functions: {
       invoke: (...args: unknown[]) => mocks.invoke(...args),
     },
-    from: () => ({
-      upsert: (...args: unknown[]) => mocks.upsertPlannerPreferences(...args),
-    }),
+    from: (table: string) =>
+      table === "planner_events"
+        ? {
+          insert: (...args: unknown[]) => mocks.insertPlannerEvent(...args),
+        }
+        : {
+          upsert: (...args: unknown[]) =>
+            mocks.upsertPlannerPreferences(...args),
+        },
   },
 }));
 
@@ -227,6 +234,7 @@ describe("useCompanionPlanner", () => {
     mocks.user = { id: "user-1" };
     mocks.companion = { id: "companion-1" };
     mocks.upsertPlannerPreferences.mockResolvedValue({ error: null });
+    mocks.insertPlannerEvent.mockResolvedValue({ error: null });
     mocks.addTask.mockResolvedValue(undefined);
     mocks.updateTask.mockResolvedValue(undefined);
     mocks.applySubtaskTitlePlan.mockResolvedValue([]);
@@ -1200,6 +1208,72 @@ describe("useCompanionPlanner", () => {
 
     const request = mocks.invoke.mock.calls.at(-1)?.[1];
     expect(request?.body.classificationHint).toBeNull();
+  });
+
+  it("keeps read-only schedule briefings out of planner memory telemetry", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "schedule_read",
+        reply: "Today: therapy at 3 PM.\nTomorrow: open.",
+        plannerContract: {
+          mode: "schedule_read",
+          writePolicy: "read_only",
+          decisionSummary: "Today has one fixed event.",
+          reasonCodes: ["calendar_constraint"],
+          decisionPoint: {
+            label: "No changes needed right now.",
+            action: "none",
+          },
+          clarifyingQuestion: null,
+        },
+        followUpQuestions: [],
+        proposals: [],
+        suggestedReminders: [],
+        structuredResponse: {
+          intent: {
+            intentType: "conversation",
+            timeHorizon: "today",
+            isRecurring: false,
+            shouldCreateQuest: false,
+            shouldPromptCampaign: false,
+          },
+          comingUp: {
+            message: "Today: therapy at 3 PM.\nTomorrow: open.",
+            nextEvent: null,
+            nextBestAction: null,
+            remainingToday: [],
+            tomorrowSummary: "open",
+            missedItems: [],
+          },
+        },
+        memoryUpdates: {},
+        sessionState: {
+          draft: {},
+          openQuestionIds: [],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          lastClassification: "conversation",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
+
+    await act(async () => {
+      await result.current.submitMessage("What do I have coming up?", "text", {
+        starterIntent: "upcoming_start",
+      });
+    });
+
+    expect(mocks.insertPlannerEvent).not.toHaveBeenCalled();
+    expect(mocks.trackInteraction).not.toHaveBeenCalled();
+    expect(result.current.messages.at(-1)?.content).toBe(
+      "Today: therapy at 3 PM.\nTomorrow: open.",
+    );
   });
 
   it("tracks optimizer source, mode, and fallback telemetry when proposals are generated", async () => {

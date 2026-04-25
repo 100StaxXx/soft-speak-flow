@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 interface SpotlightRect {
   top: number;
@@ -37,21 +37,28 @@ const toSpotlightRect = (targetElement: HTMLElement, padding: number): Spotlight
   };
 };
 
+const FOCUSABLE_SELECTOR = [
+  'button:not([disabled])',
+  '[href]',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(",");
+
+const isFocusableElement = (element: HTMLElement): boolean =>
+  element.matches(FOCUSABLE_SELECTOR)
+  && !element.hasAttribute("disabled")
+  && element.tabIndex !== -1;
+
 const getFocusableElements = (root: HTMLElement | null): HTMLElement[] => {
   if (!root) return [];
 
-  return Array.from(
-    root.querySelectorAll<HTMLElement>(
-      [
-        'button:not([disabled])',
-        '[href]',
-        'input:not([disabled])',
-        'select:not([disabled])',
-        'textarea:not([disabled])',
-        '[tabindex]:not([tabindex="-1"])',
-      ].join(",")
-    )
-  ).filter((element) => !element.hasAttribute("disabled") && element.tabIndex !== -1);
+  const descendants = Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+  return [
+    ...(isFocusableElement(root) ? [root] : []),
+    ...descendants,
+  ].filter((element) => isFocusableElement(element));
 };
 
 export const MentorSpotlightGuard = ({
@@ -63,6 +70,8 @@ export const MentorSpotlightGuard = ({
   const [targetElement, setTargetElement] = useState<HTMLElement | null>(null);
   const [panelElement, setPanelElement] = useState<HTMLElement | null>(null);
   const [spotlightRect, setSpotlightRect] = useState<SpotlightRect | null>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const initialFocusAppliedRef = useRef(false);
 
   useEffect(() => {
     if (!active || !targetSelector) {
@@ -165,6 +174,40 @@ export const MentorSpotlightGuard = ({
   }, [active, targetElement]);
 
   useEffect(() => {
+    if (!active || mode !== "spotlight") return;
+
+    previousFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    initialFocusAppliedRef.current = false;
+
+    return () => {
+      initialFocusAppliedRef.current = false;
+      const previousFocus = previousFocusRef.current;
+      previousFocusRef.current = null;
+      if (previousFocus && document.contains(previousFocus)) {
+        previousFocus.focus();
+      }
+    };
+  }, [active, mode]);
+
+  useEffect(() => {
+    if (!active || mode !== "spotlight" || !targetElement || initialFocusAppliedRef.current) {
+      return;
+    }
+
+    const focusFrame = window.requestAnimationFrame(() => {
+      const focusables = [
+        ...getFocusableElements(targetElement),
+        ...getFocusableElements(panelElement),
+      ];
+      focusables[0]?.focus();
+      initialFocusAppliedRef.current = true;
+    });
+
+    return () => window.cancelAnimationFrame(focusFrame);
+  }, [active, mode, panelElement, targetElement]);
+
+  useEffect(() => {
     if (!active || mode !== "spotlight" || !targetElement) return;
 
     const handleTab = (event: KeyboardEvent) => {
@@ -221,61 +264,68 @@ export const MentorSpotlightGuard = ({
   const viewportHeight = window.innerHeight;
 
   return (
-    <div
-      className={`mentor-spotlight-root mentor-spotlight-root--${mode}`}
-      aria-hidden="true"
-      data-mode={mode}
-      data-testid="mentor-spotlight-guard"
-    >
+    <>
       {mode === "spotlight" ? (
-        <>
-          <div
-            className="mentor-spotlight-mask"
-            style={{ top: 0, left: 0, width: "100%", height: `${spotlightRect.top}px` }}
-            {...blockedClickProps}
-          />
-          <div
-            className="mentor-spotlight-mask"
-            style={{
-              top: `${spotlightRect.top}px`,
-              left: 0,
-              width: `${spotlightRect.left}px`,
-              height: `${spotlightRect.height}px`,
-            }}
-            {...blockedClickProps}
-          />
-          <div
-            className="mentor-spotlight-mask"
-            style={{
-              top: `${spotlightRect.top}px`,
-              left: `${spotlightRect.left + spotlightRect.width}px`,
-              width: `${Math.max(0, viewportWidth - (spotlightRect.left + spotlightRect.width))}px`,
-              height: `${spotlightRect.height}px`,
-            }}
-            {...blockedClickProps}
-          />
-          <div
-            className="mentor-spotlight-mask"
-            style={{
-              top: `${spotlightRect.top + spotlightRect.height}px`,
-              left: 0,
-              width: "100%",
-              height: `${Math.max(0, viewportHeight - (spotlightRect.top + spotlightRect.height))}px`,
-            }}
-            {...blockedClickProps}
-          />
-        </>
+        <span className="sr-only" role="status" aria-live="polite">
+          Tutorial highlight active. Use Tab to move between the highlighted action and the mentor guidance.
+        </span>
       ) : null}
-
       <div
-        className={`mentor-spotlight-ring mentor-spotlight-ring--${mode}`}
-        style={{
-          top: `${spotlightRect.top}px`,
-          left: `${spotlightRect.left}px`,
-          width: `${spotlightRect.width}px`,
-          height: `${spotlightRect.height}px`,
-        }}
-      />
-    </div>
+        className={`mentor-spotlight-root mentor-spotlight-root--${mode}`}
+        aria-hidden="true"
+        data-mode={mode}
+        data-testid="mentor-spotlight-guard"
+      >
+        {mode === "spotlight" ? (
+          <>
+            <div
+              className="mentor-spotlight-mask"
+              style={{ top: 0, left: 0, width: "100%", height: `${spotlightRect.top}px` }}
+              {...blockedClickProps}
+            />
+            <div
+              className="mentor-spotlight-mask"
+              style={{
+                top: `${spotlightRect.top}px`,
+                left: 0,
+                width: `${spotlightRect.left}px`,
+                height: `${spotlightRect.height}px`,
+              }}
+              {...blockedClickProps}
+            />
+            <div
+              className="mentor-spotlight-mask"
+              style={{
+                top: `${spotlightRect.top}px`,
+                left: `${spotlightRect.left + spotlightRect.width}px`,
+                width: `${Math.max(0, viewportWidth - (spotlightRect.left + spotlightRect.width))}px`,
+                height: `${spotlightRect.height}px`,
+              }}
+              {...blockedClickProps}
+            />
+            <div
+              className="mentor-spotlight-mask"
+              style={{
+                top: `${spotlightRect.top + spotlightRect.height}px`,
+                left: 0,
+                width: "100%",
+                height: `${Math.max(0, viewportHeight - (spotlightRect.top + spotlightRect.height))}px`,
+              }}
+              {...blockedClickProps}
+            />
+          </>
+        ) : null}
+
+        <div
+          className={`mentor-spotlight-ring mentor-spotlight-ring--${mode}`}
+          style={{
+            top: `${spotlightRect.top}px`,
+            left: `${spotlightRect.left}px`,
+            width: `${spotlightRect.width}px`,
+            height: `${spotlightRect.height}px`,
+          }}
+        />
+      </div>
+    </>
   );
 };

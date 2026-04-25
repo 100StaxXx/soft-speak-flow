@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { MentorSpotlightGuard } from "./MentorSpotlightGuard";
 
@@ -17,6 +17,32 @@ describe("MentorSpotlightGuard", () => {
     );
 
     expect(screen.getByTestId("mentor-spotlight-guard")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Tutorial highlight active");
+  });
+
+  it("focuses the highlighted action and restores previous focus on cleanup", async () => {
+    document.body.innerHTML = `
+      <button data-testid="previous-focus">before</button>
+      <button data-tour="add-quest-fab" style="position:fixed;left:20px;top:20px;width:40px;height:40px;">+</button>
+      <section data-tutorial="mentor-dialogue-panel"><button>panel</button></section>
+    `;
+    const previousFocus = screen.getByTestId("previous-focus");
+    const target = document.querySelector('[data-tour="add-quest-fab"]') as HTMLElement;
+    previousFocus.focus();
+
+    const { unmount } = render(
+      <MentorSpotlightGuard
+        active
+        targetSelector='[data-tour="add-quest-fab"]'
+      />
+    );
+
+    await waitFor(() => {
+      expect(target).toHaveFocus();
+    });
+
+    unmount();
+    expect(previousFocus).toHaveFocus();
   });
 
   it("blocks pointer interactions on masks", () => {

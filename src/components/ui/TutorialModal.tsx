@@ -1,7 +1,9 @@
 import { Button } from "@/components/ui/button";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { LucideIcon, X } from "lucide-react";
+import { useId, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { useFloatingDialogA11y } from "@/hooks/useFloatingDialogA11y";
 
 interface TutorialFeature {
   icon: LucideIcon;
@@ -74,11 +76,40 @@ export function TutorialModal({
   buttonText = "Continue",
   accentColor = "primary",
 }: TutorialModalProps) {
-  if (!open) return null;
-
+  const prefersReducedMotion = useReducedMotion();
+  const titleId = useId();
+  const subtitleId = useId();
+  const primaryActionRef = useRef<HTMLButtonElement>(null);
   const accent =
     ACCENT_STYLE_MAP[accentColor as keyof typeof ACCENT_STYLE_MAP] ??
     ACCENT_STYLE_MAP.primary;
+
+  useFloatingDialogA11y({
+    open,
+    onClose,
+    initialFocusRef: primaryActionRef,
+  });
+
+  if (!open) return null;
+
+  const cardMotion = prefersReducedMotion
+    ? { initial: false, animate: { opacity: 1 }, transition: { duration: 0 } }
+    : {
+      initial: { opacity: 0, y: 40, scale: 0.95 },
+      animate: { opacity: 1, y: 0, scale: 1 },
+      transition: {
+        type: "spring",
+        damping: 25,
+        stiffness: 300,
+      },
+    };
+  const revealMotion = (delay: number) => prefersReducedMotion
+    ? { initial: false, animate: { opacity: 1 }, transition: { duration: 0 } }
+    : {
+      initial: { opacity: 0, y: 10 },
+      animate: { opacity: 1, y: 0 },
+      transition: { delay },
+    };
 
   return (
     <div
@@ -88,20 +119,12 @@ export function TutorialModal({
     >
       <motion.div
         role="dialog"
-        aria-label={title}
-        aria-modal="false"
+        aria-labelledby={titleId}
+        aria-describedby={subtitleId}
         aria-live="polite"
         className="pointer-events-auto mx-auto max-w-sm rounded-3xl border border-border/70 bg-card/90 p-0 shadow-[0_24px_46px_rgba(0,0,0,0.34)] backdrop-blur-2xl overflow-hidden"
       >
-        <motion.div
-          initial={{ opacity: 0, y: 40, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ 
-            type: "spring", 
-            damping: 25, 
-            stiffness: 300 
-          }}
-        >
+        <motion.div {...cardMotion}>
           <button
             type="button"
             onClick={onClose}
@@ -115,9 +138,9 @@ export function TutorialModal({
           <div className="pt-8 pb-4 flex flex-col items-center">
             {/* Soft glow behind icon */}
             <motion.div
-              initial={{ scale: 0.5, opacity: 0 }}
+              initial={prefersReducedMotion ? false : { scale: 0.5, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.1, type: "spring", damping: 15 }}
+              transition={prefersReducedMotion ? { duration: 0 } : { delay: 0.1, type: "spring", damping: 15 }}
               className="relative"
             >
               <div className={cn("absolute inset-0 rounded-full blur-2xl scale-150", accent.glow)} />
@@ -133,17 +156,15 @@ export function TutorialModal({
             
             {/* Title with clean typography */}
             <motion.h2
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 }}
+              id={titleId}
+              {...revealMotion(0.15)}
               className="mt-5 text-xl font-semibold tracking-tight text-foreground"
             >
               {title}
             </motion.h2>
             <motion.p
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
+              id={subtitleId}
+              {...revealMotion(0.2)}
               className="mt-2 text-sm text-muted-foreground text-center px-6 leading-relaxed"
             >
               {subtitle}
@@ -158,9 +179,9 @@ export function TutorialModal({
                 return (
                   <motion.div
                     key={i}
-                    initial={{ opacity: 0, x: -10 }}
+                    initial={prefersReducedMotion ? false : { opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.25 + i * 0.05 }}
+                    transition={prefersReducedMotion ? { duration: 0 } : { delay: 0.25 + i * 0.05 }}
                     className="flex items-center gap-3 px-4 py-3.5"
                   >
                     <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0", accent.featureWrap)}>
@@ -176,9 +197,9 @@ export function TutorialModal({
           {/* Footer hint */}
           {footerHint && (
             <motion.p
-              initial={{ opacity: 0 }}
+              initial={prefersReducedMotion ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 0.4 }}
+              transition={prefersReducedMotion ? { duration: 0 } : { delay: 0.4 }}
               className="px-6 pb-2 text-xs text-muted-foreground text-center"
             >
               {footerHint}
@@ -188,11 +209,10 @@ export function TutorialModal({
           {/* CTA Button (Pill-shaped) */}
           <div className="px-5 pb-6 pt-2">
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.45 }}
+              {...revealMotion(0.45)}
             >
               <Button 
+                ref={primaryActionRef}
                 onClick={onClose}
                 className={cn("w-full h-12 rounded-full text-base shadow-lg transition-all duration-200 active:scale-[0.98]", accent.button)}
               >

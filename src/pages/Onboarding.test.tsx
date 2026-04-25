@@ -192,6 +192,34 @@ describe("Onboarding route guard", () => {
     expect(mocks.navigate).not.toHaveBeenCalled();
   });
 
+  it("shows a recovery action when onboarding gate loading stalls", async () => {
+    vi.useFakeTimers();
+    mocks.profileLoading = true;
+
+    try {
+      renderOnboarding();
+
+      expect(screen.queryByText("We are still loading your setup")).not.toBeInTheDocument();
+
+      act(() => {
+        vi.advanceTimersByTime(12_000);
+      });
+
+      expect(screen.getByText("We are still loading your setup")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Retry loading" }));
+
+      expect(mocks.queryClient.invalidateQueries).toHaveBeenCalledWith({
+        queryKey: ["profile", "user-1"],
+      });
+      expect(mocks.queryClient.invalidateQueries).toHaveBeenCalledWith({
+        queryKey: ["companion", "user-1"],
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("keeps stage 0 egg accounts on onboarding and resumes the final cinematic", () => {
     mocks.profile = {
       onboarding_completed: true,

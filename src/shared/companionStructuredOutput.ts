@@ -14,6 +14,51 @@ export interface CompanionIntentMetadata {
   shouldPromptCampaign: boolean;
 }
 
+export type PlannerContractMode =
+  | "schedule_read"
+  | "suggest_only"
+  | "propose_schedule"
+  | "clarify_first";
+
+export type PlannerContractWritePolicy =
+  | "read_only"
+  | "confirmation_required";
+
+export type PlannerContractDecisionAction =
+  | "confirm_schedule"
+  | "make_lighter"
+  | "answer_clarification"
+  | "open_editor"
+  | "none";
+
+export type PlannerReasonCode =
+  | "calendar_constraint"
+  | "due_today"
+  | "overdue"
+  | "open_window"
+  | "campaign_momentum"
+  | "low_energy_hint"
+  | "busy_day"
+  | "overloaded_day"
+  | "actual_duration_pattern"
+  | "user_preference"
+  | "needs_clarification"
+  | "schedule_validation_warning";
+
+export interface PlannerContractDecisionPoint {
+  label: string;
+  action: PlannerContractDecisionAction;
+}
+
+export interface PlannerContract {
+  mode: PlannerContractMode;
+  writePolicy: PlannerContractWritePolicy;
+  decisionSummary: string;
+  reasonCodes: PlannerReasonCode[];
+  decisionPoint: PlannerContractDecisionPoint;
+  clarifyingQuestion?: string | null;
+}
+
 export type CompanionDayAssessment =
   | "open"
   | "balanced"
@@ -155,6 +200,7 @@ export interface CompanionComingUpStructuredOutput {
 }
 
 export interface CompanionStructuredResponse {
+  plannerContract?: PlannerContract;
   intent: CompanionIntentMetadata;
   planDay?: CompanionPlanDayStructuredOutput | null;
   weeklyPlan?: CompanionWeeklyPlanStructuredOutput | null;

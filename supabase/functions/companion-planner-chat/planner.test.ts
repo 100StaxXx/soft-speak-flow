@@ -6272,7 +6272,7 @@ Deno.test("answers schedule questions with quests and connected calendar events 
   );
 });
 
-Deno.test("schedule questions can return a proposal-backed campaign follow-up when the next move does not exist yet", () => {
+Deno.test("schedule questions keep campaign follow-up suggestions read-only", () => {
   const result = buildPlannerResponse(baseInput({
     message: "What do I have scheduled today?",
     plannerContext: {
@@ -6348,10 +6348,12 @@ Deno.test("schedule questions can return a proposal-backed campaign follow-up wh
     },
   }));
 
-  assertEquals(result.mode, "proposal");
-  assertEquals(result.proposals[0]?.kind, "create_quest");
-  assertEquals(result.structuredResponse?.intent.intentType, "quest");
-  assertEquals(result.structuredResponse?.intent.shouldCreateQuest, true);
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.plannerContract?.mode, "schedule_read");
+  assertEquals(result.plannerContract?.writePolicy, "read_only");
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.structuredResponse?.intent.intentType, "conversation");
+  assertEquals(result.structuredResponse?.intent.shouldCreateQuest, false);
   assertStringIncludes(result.reply, "Today:");
   assertStringIncludes(result.reply, "Therapy");
   assertEquals(
@@ -6360,7 +6362,7 @@ Deno.test("schedule questions can return a proposal-backed campaign follow-up wh
   );
   assertEquals(
     Boolean(result.structuredResponse?.comingUp?.nextBestAction?.proposalId),
-    true,
+    false,
   );
 });
 
@@ -7380,6 +7382,10 @@ Deno.test("upcoming_start returns the today-and-tomorrow digest immediately", ()
   assertEquals(
     result.structuredResponse?.comingUp?.nextBestAction?.title,
     "Prep therapy notes",
+  );
+  assertEquals(
+    result.structuredResponse?.comingUp?.nextBestAction?.proposalId ?? null,
+    null,
   );
 });
 
@@ -8719,21 +8725,14 @@ Deno.test("upcoming_start defines the next step before the next event when recen
     },
   }));
 
-  assertEquals(result.mode, "proposal");
-  assertEquals(result.proposals[0]?.kind, "create_quest");
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.plannerContract?.mode, "schedule_read");
+  assertEquals(result.plannerContract?.writePolicy, "read_only");
+  assertEquals(result.proposals.length, 0);
   assertEquals(
     result.structuredResponse?.comingUp?.nextBestAction
       ?.estimatedDurationMinutes,
     15,
-  );
-  assertEquals(
-    (result.proposals[0]?.payload as { taskDate?: string }).taskDate,
-    "2026-04-18",
-  );
-  assertEquals(
-    (result.proposals[0]?.payload as { scheduledTime?: string | null })
-      .scheduledTime,
-    "10:30",
   );
   assertEquals(
     result.structuredResponse?.comingUp?.nextBestAction?.title,
@@ -8741,7 +8740,7 @@ Deno.test("upcoming_start defines the next step before the next event when recen
   );
   assertEquals(
     Boolean(result.structuredResponse?.comingUp?.nextBestAction?.proposalId),
-    true,
+    false,
   );
   assertStringIncludes(
     result.structuredResponse?.comingUp?.nextBestAction?.reason ?? "",
@@ -8836,7 +8835,7 @@ Deno.test("upcoming_start keeps a campaign follow-up read-only when there is no 
 
   assertEquals(result.mode, "schedule_read");
   assertEquals(result.proposals.length, 0);
-  assertEquals(result.structuredResponse?.intent.intentType, "quest");
+  assertEquals(result.structuredResponse?.intent.intentType, "conversation");
   assertEquals(result.structuredResponse?.intent.shouldCreateQuest, false);
   assertEquals(
     result.structuredResponse?.comingUp?.nextBestAction?.title,
@@ -8926,8 +8925,10 @@ Deno.test("upcoming_start resets the campaign plan before the next event when th
     },
   }));
 
-  assertEquals(result.mode, "proposal");
-  assertEquals(result.proposals[0]?.kind, "adjust_campaign_plan");
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.plannerContract?.mode, "schedule_read");
+  assertEquals(result.plannerContract?.writePolicy, "read_only");
+  assertEquals(result.proposals.length, 0);
   assertEquals(
     result.structuredResponse?.comingUp?.nextBestAction?.title,
     "Adjust Podcast launch",
@@ -8939,7 +8940,7 @@ Deno.test("upcoming_start resets the campaign plan before the next event when th
   );
   assertEquals(
     Boolean(result.structuredResponse?.comingUp?.nextBestAction?.proposalId),
-    true,
+    false,
   );
   assertStringIncludes(
     result.structuredResponse?.comingUp?.nextBestAction?.reason ?? "",

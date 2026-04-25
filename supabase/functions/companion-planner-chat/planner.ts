@@ -34,6 +34,8 @@ import type {
   CompanionDayAssessment,
   CompanionIntentMetadata,
   CompanionMissedItem,
+  PlannerContract,
+  PlannerReasonCode,
   CompanionScheduleItem,
   CompanionStructuredResponse,
   CompanionSuggestedQuest,
@@ -146,6 +148,10 @@ export interface PlannerContextTask {
   notes?: string | null;
   subtaskTitles?: string[];
   difficulty?: string | null;
+  flexibility?: "fixed" | "preferred" | "flexible" | null;
+  energyType?: "deep" | "admin" | "physical" | "errand" | "social" | "creative" | "recovery" | null;
+  mustCalendarBlock?: boolean | null;
+  deadlineAt?: string | null;
   recurrencePattern: string | null;
   recurrenceEndDate?: string | null;
   completed?: boolean | null;
@@ -446,6 +452,7 @@ export interface PlannerBuildInput {
 export interface PlannerBuildResult {
   mode: PlannerResponseMode;
   reply: string;
+  plannerContract?: PlannerContract;
   followUpQuestions: PlannerQuestion[];
   proposals: PlannerProposal[];
   suggestedReminders: PlannerProposal[];
@@ -6383,12 +6390,10 @@ const buildComingUpStructuredOutput = (
     : tomorrowLoad.status === "balanced"
     ? "light"
     : "busy";
-  const hasQuestLikeNextBestAction = Boolean(nextBestAction);
-
   return {
     intent: mapPlannerIntentMetadata(input, classificationHint, {
       forceIntentType: getProposalDrivenIntentType(
-        hasQuestLikeNextBestAction ? "quest" : "conversation",
+        "conversation",
         proposals,
       ),
       shouldCreateQuest: shouldCreateQuestFromProposals(proposals),
@@ -6408,6 +6413,16 @@ const buildComingUpStructuredOutput = (
     dayAdjust: null,
   };
 };
+
+const stripSuggestionProposal = (
+  suggestion: CompanionSuggestedQuest | null,
+): CompanionSuggestedQuest | null =>
+  suggestion
+    ? {
+      ...suggestion,
+      proposalId: null,
+    }
+    : null;
 
 type WindowSuggestedActionState = {
   suggestion: CompanionSuggestedQuest | null;
@@ -6585,38 +6600,13 @@ const buildComingUpResponse = (
     true,
   )[0] ?? null;
   const nextBestActionState = buildComingUpNextBestAction(input, nextEvent);
-  const proposals = nextBestActionState.proposal
-    ? [nextBestActionState.proposal]
-    : [];
   const structuredResponse = buildComingUpStructuredOutput(
     input,
     reply,
     classificationHint,
-    nextBestActionState.suggestion,
-    proposals,
+    stripSuggestionProposal(nextBestActionState.suggestion),
+    [],
   );
-
-  if (nextBestActionState.proposal) {
-    return {
-      mode: "proposal",
-      reply,
-      followUpQuestions: [],
-      proposals,
-      suggestedReminders: [],
-      structuredResponse,
-      memoryUpdates: {
-        preferredTimeOfDay: sessionState.preferredTimeOfDay ??
-          input.plannerContext.plannerMemory?.preferredTimeOfDay ?? null,
-        preferredTimeReason: sessionState.preferredTimeReason ??
-          input.plannerContext.plannerMemory?.preferredTimeReason ?? null,
-        reminderPreference: sessionState.reminderPreference ??
-          (input.plannerContext.plannerMemory?.reminderMinutesBefore
-            ? `${input.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
-            : null),
-      },
-      sessionState,
-    };
-  }
 
   return buildReadOnlyResponse(
     reply,
@@ -6624,6 +6614,279 @@ const buildComingUpResponse = (
     "schedule_read",
     structuredResponse,
   );
+};
+
+const firstSentence = (value: string): string => {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) return "I shaped this around the planner context I have.";
+  const match = normalized.match(/^(.+?[.!?])(?:\s|$)/);
+  return (match?.[1] ?? normalized).slice(0, 220);
+};
+
+const addReasonCode = (
+  reasonCodes: PlannerReasonCode[],
+  code: PlannerReasonCode,
+  condition = true,
+) => {
+  if (condition && !reasonCodes.includes(code)) {
+    reasonCodes.push(code);
+  }
+};
+
+const getPlannerContractMode = (
+  result: PlannerBuildResult,
+): PlannerContract["mode"] => {
+  if (result.followUpQuestions.length > 0) return "clarify_first";
+  if (result.mode === "schedule_read") return "schedule_read";
+  if (result.mode === "proposal") return "propose_schedule";
+  return "suggest_only";
+};
+
+const getPlannerDecisionPoint = (
+  result: PlannerBuildResult,
+): PlannerContract["decisionPoint"] => {
+  if (result.followUpQuestions[0]) {
+    return {
+      label: result.followUpQuestions[0].prompt,
+      action: "answer_clarification",
+    };
+  }
+
+  if (result.proposals.length > 0 || result.suggestedReminders.length > 0) {
+    return {
+      label: "Review and confirm the proposed changes.",
+      action: "confirm_schedule",
+    };
+  }
+
+  return {
+    label: "No changes needed right now.",
+    action: "none",
+  };
+};
+
+const derivePlannerReasonCodes = (
+  result: PlannerBuildResult,
+): PlannerReasonCode[] => {
+  const reasonCodes: PlannerReasonCode[] = [];
+  const structured = result.structuredResponse;
+  const dayAssessment = structured?.planDay?.dayAssessment;
+
+  addReasonCode(reasonCodes, "needs_clarification", result.followUpQuestions.length > 0);
+  addReasonCode(reasonCodes, "calendar_constraint", Boolean(structured?.comingUp?.nextEvent));
+  addReasonCode(reasonCodes, "overdue", Boolean(structured?.comingUp?.missedItems.length));
+  addReasonCode(reasonCodes, "low_energy_hint", dayAssessment === "low_energy");
+  addReasonCode(reasonCodes, "busy_day", dayAssessment === "busy" || dayAssessment === "behind");
+  addReasonCode(reasonCodes, "campaign_momentum", Boolean(
+    structured?.campaignMomentum ||
+      structured?.weeklyPlan?.focusCampaignTitle ||
+      structured?.priorityOverview?.focusCampaignTitle,
+  ));
+  addReasonCode(reasonCodes, "open_window", Boolean(
+    structured?.rightNow?.currentWindow ||
+      result.proposals.some((proposal) => {
+        const payload = proposal.payload as Record<string, unknown>;
+        return typeof payload.scheduledTime === "string" &&
+          payload.scheduledTime.length > 0;
+      }),
+  ));
+  addReasonCode(reasonCodes, "schedule_validation_warning", result.proposals.some((proposal) => {
+    const payload = proposal.payload as Record<string, unknown>;
+    return payload.scheduleValidationStatus === "warning";
+  }));
+
+  if (reasonCodes.length === 0) {
+    addReasonCode(reasonCodes, "user_preference");
+  }
+
+  return reasonCodes;
+};
+
+const buildPlannerContract = (
+  result: PlannerBuildResult,
+): PlannerContract => {
+  const writePolicy: PlannerContract["writePolicy"] =
+    result.proposals.length > 0 || result.suggestedReminders.length > 0
+      ? "confirmation_required"
+      : "read_only";
+  const clarifyingQuestion = result.followUpQuestions[0]?.prompt ?? null;
+
+  return {
+    mode: getPlannerContractMode(result),
+    writePolicy,
+    decisionSummary: firstSentence(
+      result.structuredResponse?.planDay?.message ??
+        result.structuredResponse?.comingUp?.message ??
+        result.structuredResponse?.rightNow?.message ??
+        result.structuredResponse?.dayAdjust?.message ??
+        result.structuredResponse?.priorityOverview?.message ??
+        result.structuredResponse?.weeklyPlan?.message ??
+        result.structuredResponse?.campaignMomentum?.message ??
+        result.reply,
+    ),
+    reasonCodes: derivePlannerReasonCodes(result),
+    decisionPoint: getPlannerDecisionPoint(result),
+    clarifyingQuestion,
+  };
+};
+
+type ScheduleValidationIssue = {
+  code:
+    | "overlaps_calendar"
+    | "overlaps_task"
+    | "outside_waking_hours"
+    | "missing_duration";
+  message: string;
+};
+
+const getProposalPayloadDateTime = (
+  proposal: PlannerProposal,
+): {
+  taskDate: string | null;
+  scheduledTime: string | null;
+  durationMinutes: number | null;
+  taskId: string | null;
+} => {
+  const payload = proposal.payload as Record<string, unknown>;
+  const updates = payload.updates && typeof payload.updates === "object" &&
+      !Array.isArray(payload.updates)
+    ? payload.updates as Record<string, unknown>
+    : {};
+  const taskDate = typeof payload.taskDate === "string"
+    ? payload.taskDate
+    : typeof updates.task_date === "string"
+    ? updates.task_date
+    : null;
+  const scheduledTime = typeof payload.scheduledTime === "string"
+    ? payload.scheduledTime
+    : typeof updates.scheduled_time === "string"
+    ? updates.scheduled_time
+    : null;
+  const durationMinutes = typeof payload.estimatedDuration === "number"
+    ? payload.estimatedDuration
+    : null;
+  const taskId = typeof payload.taskId === "string" ? payload.taskId : null;
+
+  return {
+    taskDate,
+    scheduledTime,
+    durationMinutes,
+    taskId,
+  };
+};
+
+const getEventDateKey = (value: string): string => value.slice(0, 10);
+
+const validateProposalSchedule = (
+  input: PlannerBuildInput,
+  proposal: PlannerProposal,
+): ScheduleValidationIssue[] => {
+  const { taskDate, scheduledTime, durationMinutes, taskId } =
+    getProposalPayloadDateTime(proposal);
+  if (!taskDate || !scheduledTime) return [];
+
+  const issues: ScheduleValidationIssue[] = [];
+  const startMinutes = parseTimeToMinutes(scheduledTime);
+  const duration = durationMinutes ?? 30;
+  if (startMinutes === null) return issues;
+  if (!durationMinutes) {
+    issues.push({
+      code: "missing_duration",
+      message: "No explicit duration was provided, so validation used a 30 minute fallback.",
+    });
+  }
+
+  const endMinutes = startMinutes + duration;
+  const wakeMinutes = parseTimeToMinutes(
+    input.plannerContext.plannerMemory?.wakeTime ?? "08:00",
+  ) ?? 8 * 60;
+  const windDownMinutes = parseTimeToMinutes(
+    input.plannerContext.plannerMemory?.windDownTime ?? "21:00",
+  ) ?? 21 * 60;
+  if (startMinutes < wakeMinutes || endMinutes > windDownMinutes) {
+    issues.push({
+      code: "outside_waking_hours",
+      message: "The proposed block sits outside the user's waking planning window.",
+    });
+  }
+
+  const hasTaskOverlap = [
+    ...input.plannerContext.tasks,
+    ...input.plannerContext.inboxTasks,
+  ].some((task) => {
+    if (task.completed === true || task.id === taskId) return false;
+    if (task.taskDate !== taskDate || !task.scheduledTime) return false;
+    const taskStart = parseTimeToMinutes(task.scheduledTime);
+    if (taskStart === null) return false;
+    const taskEnd = taskStart + getTaskDuration(task);
+    return startMinutes < taskEnd && endMinutes > taskStart;
+  });
+  if (hasTaskOverlap) {
+    issues.push({
+      code: "overlaps_task",
+      message: "The proposed block overlaps an existing Cosmiq quest.",
+    });
+  }
+
+  const hasCalendarOverlap = input.plannerContext.calendarEvents.some((event) => {
+    if (event.isAllDay) return getEventDateKey(event.start) === taskDate;
+    if (getEventDateKey(event.start) !== taskDate) return false;
+    const eventStart = new Date(event.start);
+    const eventEnd = new Date(event.end);
+    const eventStartMinutes = (eventStart.getHours() * 60) +
+      eventStart.getMinutes();
+    const eventEndMinutes = (eventEnd.getHours() * 60) +
+      eventEnd.getMinutes();
+    return startMinutes < eventEndMinutes && endMinutes > eventStartMinutes;
+  });
+  if (hasCalendarOverlap) {
+    issues.push({
+      code: "overlaps_calendar",
+      message: "The proposed block overlaps a connected calendar event.",
+    });
+  }
+
+  return issues;
+};
+
+const withScheduleValidation = (
+  input: PlannerBuildInput,
+  result: PlannerBuildResult,
+): PlannerBuildResult => {
+  if (result.proposals.length === 0) return result;
+
+  return {
+    ...result,
+    proposals: result.proposals.map((proposal) => {
+      const issues = validateProposalSchedule(input, proposal);
+      if (issues.length === 0) return proposal;
+
+      return {
+        ...proposal,
+        payload: {
+          ...proposal.payload,
+          scheduleValidationStatus: "warning",
+          scheduleValidationIssues: issues,
+        },
+      };
+    }),
+  };
+};
+
+const withPlannerContract = (
+  result: PlannerBuildResult,
+): PlannerBuildResult => {
+  const plannerContract = result.plannerContract ?? buildPlannerContract(result);
+  return {
+    ...result,
+    plannerContract,
+    structuredResponse: result.structuredResponse
+      ? {
+        ...result.structuredResponse,
+        plannerContract,
+      }
+      : result.structuredResponse,
+  };
 };
 
 const buildBatchQuestProposals = (
@@ -10418,5 +10681,7 @@ export function buildPlannerResponse(
     };
   })();
 
-  return normalizePlannerBuildResultText(rawResult);
+  return normalizePlannerBuildResultText(
+    withPlannerContract(withScheduleValidation(input, rawResult)),
+  );
 }

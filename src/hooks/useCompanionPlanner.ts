@@ -491,6 +491,17 @@ type PersistedPlannerProposalDecision = {
   status: "confirmed" | "modified" | "rejected";
 };
 
+type PlannerEventType =
+  | "plan_requested"
+  | "briefing_requested"
+  | "suggestion_generated"
+  | "proposal_generated"
+  | "proposal_confirmed"
+  | "proposal_rejected"
+  | "proposal_modified"
+  | "clarification_requested"
+  | "schedule_validation_failed";
+
 const readPersistedPlannerProposalDecision = (
   value: unknown,
 ): PersistedPlannerProposalDecision | null => {
@@ -776,6 +787,29 @@ const extractOptimizerTelemetry = (
   };
 };
 
+const extractPlannerEventEntityIds = (
+  proposal: CompanionPlannerProposal,
+): {
+  taskId: string | null;
+  epicId: string | null;
+} => {
+  const payload = asUnknownRecord(proposal.payload) ?? {};
+  const updates = asUnknownRecord(payload.updates) ?? {};
+
+  return {
+    taskId: typeof payload.taskId === "string"
+      ? payload.taskId
+      : typeof updates.task_id === "string"
+      ? updates.task_id
+      : null,
+    epicId: typeof payload.epicId === "string"
+      ? payload.epicId
+      : typeof payload.epic_id === "string"
+      ? payload.epic_id
+      : null,
+  };
+};
+
 const summarizeProposalGenerationTelemetry = (
   proposals: CompanionPlannerProposal[],
   horizon: PlannerHorizon,
@@ -824,6 +858,34 @@ const summarizeProposalGenerationTelemetry = (
   };
 };
 
+const normalizeTaskFlexibility = (
+  value: string | null | undefined,
+): PlannerContextTask["flexibility"] => {
+  if (value === "fixed" || value === "preferred" || value === "flexible") {
+    return value;
+  }
+
+  return null;
+};
+
+const normalizeTaskEnergyType = (
+  value: string | null | undefined,
+): PlannerContextTask["energyType"] => {
+  if (
+    value === "deep" ||
+    value === "admin" ||
+    value === "physical" ||
+    value === "errand" ||
+    value === "social" ||
+    value === "creative" ||
+    value === "recovery"
+  ) {
+    return value;
+  }
+
+  return null;
+};
+
 const serializeTaskContext = (task: {
   id: string;
   task_text: string;
@@ -836,6 +898,10 @@ const serializeTaskContext = (task: {
   notes?: string | null;
   subtasks?: Array<{ title: string | null } | null> | null;
   difficulty?: string | null;
+  flexibility?: string | null;
+  energy_type?: string | null;
+  must_calendar_block?: boolean | null;
+  deadline_at?: string | null;
   recurrence_pattern: string | null;
   recurrence_end_date?: string | null;
   completed?: boolean | null;
@@ -860,6 +926,10 @@ const serializeTaskContext = (task: {
     .map((subtask) => subtask?.title?.trim() ?? "")
     .filter((title) => title.length > 0),
   difficulty: task.difficulty ?? null,
+  flexibility: normalizeTaskFlexibility(task.flexibility),
+  energyType: normalizeTaskEnergyType(task.energy_type),
+  mustCalendarBlock: task.must_calendar_block ?? null,
+  deadlineAt: task.deadline_at ?? null,
   recurrencePattern: task.recurrence_pattern,
   recurrenceEndDate: task.recurrence_end_date ?? null,
   completed: task.completed ?? null,
@@ -1424,7 +1494,7 @@ export function useCompanionPlanner({
         supabase
           .from("daily_tasks")
           .select(
-            "id, task_text, task_date, category, difficulty, priority, completed, scheduled_time, completed_at, actual_time_spent, contact_id, habit_source_id",
+            "id, task_text, task_date, category, difficulty, priority, flexibility, energy_type, must_calendar_block, deadline_at, completed, scheduled_time, completed_at, actual_time_spent, contact_id, habit_source_id",
           )
           .eq("user_id", user.id)
           .gte("task_date", tasksStartDate)
@@ -1452,7 +1522,7 @@ export function useCompanionPlanner({
       const { data, error } = await supabase
         .from("daily_tasks")
         .select(
-          "id, task_text, task_date, category, difficulty, priority, completed, scheduled_time, completed_at, estimated_duration, actual_time_spent, notes, recurrence_pattern, recurrence_end_date, source, contact_id, habit_source_id, epic_id",
+          "id, task_text, task_date, category, difficulty, priority, flexibility, energy_type, must_calendar_block, deadline_at, completed, scheduled_time, completed_at, estimated_duration, actual_time_spent, notes, recurrence_pattern, recurrence_end_date, source, contact_id, habit_source_id, epic_id",
         )
         .eq("user_id", user.id)
         .eq("completed", true)
@@ -2006,6 +2076,35 @@ export function useCompanionPlanner({
     user?.id,
   ]);
 
+  const recordPlannerEvent = useCallback(async (
+    eventType: PlannerEventType,
+    payload: Record<string, unknown> = {},
+    options?: {
+      proposalId?: string | null;
+      taskId?: string | null;
+      epicId?: string | null;
+    },
+  ) => {
+    if (!user?.id) return;
+
+    const { error } = await supabase
+      .from("planner_events")
+      .insert({
+        user_id: user.id,
+        event_type: eventType,
+        source: "companion_planner",
+        planner_session_id: sessionIdRef.current,
+        proposal_id: options?.proposalId ?? null,
+        task_id: options?.taskId ?? null,
+        epic_id: options?.epicId ?? null,
+        payload: payload as Json,
+      });
+
+    if (error) {
+      console.warn("Failed to record planner event:", error);
+    }
+  }, [user?.id]);
+
   const appendAssistantTurn = useCallback(
     (response: CompanionPlannerResponse) => {
       const assistantMessage = createMessage(
@@ -2449,24 +2548,101 @@ export function useCompanionPlanner({
       ];
       await persistPlannerThreadRows(persistedRows);
 
-      await trackInteraction({
-        interactionType: "companion_planner",
-        inputText: message,
-        detectedIntent: response.sessionState.lastClassification ??
-          classification?.type,
-        aiResponse: {
-          reply: response.reply,
-          questions: response.followUpQuestions.map((question) =>
-            question.field
+      const isReadOnlyBriefing =
+        resolvedStarterIntent === "upcoming_start" ||
+        response.mode === "schedule_read" ||
+        response.plannerContract?.mode === "schedule_read";
+      if (!isReadOnlyBriefing) {
+        const basePlannerEventPayload = {
+          message,
+          starterIntent: resolvedStarterIntent,
+          mode: response.mode,
+          plannerContract: response.plannerContract,
+          proposalCount: response.proposals.length,
+          suggestedReminderCount: response.suggestedReminders.length,
+          questionCount: response.followUpQuestions.length,
+        };
+        await recordPlannerEvent("plan_requested", basePlannerEventPayload);
+        if (response.followUpQuestions.length > 0) {
+          await recordPlannerEvent("clarification_requested", {
+            ...basePlannerEventPayload,
+            questions: response.followUpQuestions.map((question) =>
+              question.field
+            ),
+          });
+        }
+        if (response.proposals.length > 0) {
+          await Promise.all(response.proposals.map((proposal) => {
+            const entityIds = extractPlannerEventEntityIds(proposal);
+            const scheduleValidationStatus =
+              asUnknownRecord(proposal.payload)?.scheduleValidationStatus ??
+                null;
+            return recordPlannerEvent(
+              "proposal_generated",
+              {
+                ...basePlannerEventPayload,
+                proposalKind: proposal.kind,
+                proposalTitle: proposal.title,
+                readyToConfirm: proposal.readyToConfirm,
+                scheduleValidationStatus,
+              },
+              {
+                proposalId: proposal.id,
+                taskId: entityIds.taskId,
+                epicId: entityIds.epicId,
+              },
+            );
+          }));
+          await Promise.all(response.proposals
+            .filter((proposal) =>
+              asUnknownRecord(proposal.payload)?.scheduleValidationStatus ===
+                "warning"
+            )
+            .map((proposal) => {
+              const entityIds = extractPlannerEventEntityIds(proposal);
+              return recordPlannerEvent(
+                "schedule_validation_failed",
+                {
+                  ...basePlannerEventPayload,
+                  proposalKind: proposal.kind,
+                  proposalTitle: proposal.title,
+                  scheduleValidationIssues:
+                    asUnknownRecord(proposal.payload)
+                      ?.scheduleValidationIssues ?? [],
+                },
+                {
+                  proposalId: proposal.id,
+                  taskId: entityIds.taskId,
+                  epicId: entityIds.epicId,
+                },
+              );
+            }));
+        } else if (response.structuredResponse) {
+          await recordPlannerEvent(
+            "suggestion_generated",
+            basePlannerEventPayload,
+          );
+        }
+
+        await trackInteraction({
+          interactionType: "companion_planner",
+          inputText: message,
+          detectedIntent: response.sessionState.lastClassification ??
+            classification?.type,
+          aiResponse: {
+            reply: response.reply,
+            questions: response.followUpQuestions.map((question) =>
+              question.field
+            ),
+            proposalKinds: response.proposals.map((proposal) => proposal.kind),
+          },
+          userAction: "accepted",
+          modifications: summarizeProposalGenerationTelemetry(
+            response.proposals,
+            horizon,
           ),
-          proposalKinds: response.proposals.map((proposal) => proposal.kind),
-        },
-        userAction: "accepted",
-        modifications: summarizeProposalGenerationTelemetry(
-          response.proposals,
-          horizon,
-        ),
-      });
+        });
+      }
     } catch (error) {
       const parsedError = await parseFunctionInvokeError(error);
       const localValidation = requestBody
@@ -2505,6 +2681,7 @@ export function useCompanionPlanner({
     persistPlannerThreadRows,
     plannerContext,
     plannerAISignals,
+    recordPlannerEvent,
     reflectionSignalsQuery.data,
     scheduleInsights,
     sessionState,
@@ -2823,6 +3000,21 @@ export function useCompanionPlanner({
       };
       await persistPlannerMemory(proposal, nextSessionState);
       const optimizerTelemetry = extractOptimizerTelemetry(proposal);
+      const eventEntityIds = extractPlannerEventEntityIds(proposal);
+      await recordPlannerEvent(
+        "proposal_confirmed",
+        {
+          proposalKind: proposal.kind,
+          proposalTitle: proposal.title,
+          statDrivenNeed: strongestPlannerNeed,
+          ...optimizerTelemetry,
+        },
+        {
+          proposalId: proposal.id,
+          taskId: localTaskId ?? eventEntityIds.taskId,
+          epicId: eventEntityIds.epicId,
+        },
+      );
       await trackInteraction({
         interactionType: "companion_planner_confirmation",
         inputText: proposal.title,
@@ -2856,6 +3048,7 @@ export function useCompanionPlanner({
     sessionState,
     persistPlannerMemory,
     persistPlannerThreadRows,
+    recordPlannerEvent,
     shouldQueueWrites,
     autoPublishConfirmedQuestToOutlook,
     strongestPlannerNeed,
@@ -2904,6 +3097,22 @@ export function useCompanionPlanner({
       },
     ]);
     const optimizerTelemetry = extractOptimizerTelemetry(proposal);
+    const eventEntityIds = extractPlannerEventEntityIds(proposal);
+    await recordPlannerEvent(
+      "proposal_rejected",
+      {
+        proposalKind: proposal.kind,
+        proposalTitle: proposal.title,
+        statDrivenNeed: strongestPlannerNeed,
+        decisionOverride: true,
+        ...optimizerTelemetry,
+      },
+      {
+        proposalId: proposal.id,
+        taskId: eventEntityIds.taskId,
+        epicId: eventEntityIds.epicId,
+      },
+    );
     await trackInteraction({
       interactionType: "companion_planner_confirmation",
       inputText: proposal.title,
@@ -2922,6 +3131,7 @@ export function useCompanionPlanner({
     enabled,
     persistPlannerThreadRows,
     proposals,
+    recordPlannerEvent,
     strongestPlannerNeed,
     trackInteraction,
   ]);
@@ -2970,6 +3180,23 @@ export function useCompanionPlanner({
       },
     ]);
     const optimizerTelemetry = extractOptimizerTelemetry(proposal);
+    const eventEntityIds = extractPlannerEventEntityIds(proposal);
+    await recordPlannerEvent(
+      "proposal_modified",
+      {
+        proposalKind: proposal.kind,
+        proposalTitle: proposal.title,
+        statDrivenNeed: strongestPlannerNeed,
+        savedTitle: resolvedTitle,
+        editedExternally: true,
+        ...optimizerTelemetry,
+      },
+      {
+        proposalId: proposal.id,
+        taskId: eventEntityIds.taskId,
+        epicId: eventEntityIds.epicId,
+      },
+    );
     await trackInteraction({
       interactionType: "companion_planner_confirmation",
       inputText: proposal.title,
@@ -2989,6 +3216,7 @@ export function useCompanionPlanner({
     enabled,
     persistPlannerThreadRows,
     proposals,
+    recordPlannerEvent,
     strongestPlannerNeed,
     trackInteraction,
   ]);

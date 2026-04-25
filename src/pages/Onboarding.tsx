@@ -23,6 +23,9 @@ import {
 } from "@/utils/profileOnboarding";
 import { getCompanionEggLabel, getCompanionPreset } from "@/config/companionCatalog";
 import { getStoredCompanionCustomName } from "@/lib/companionName";
+import { trackOnboardingTutorialEvent } from "@/utils/onboardingTutorialTelemetry";
+
+const ONBOARDING_GATE_STALL_MS = 12_000;
 
 export default function Onboarding() {
   const { user, status, signOut } = useAuth();
@@ -35,6 +38,7 @@ export default function Onboarding() {
   const [isDeletingLegacyAccount, setIsDeletingLegacyAccount] = useState(false);
   const [isSelfHealingProfile, setIsSelfHealingProfile] = useState(false);
   const [isShowingJourneyCinematic, setIsShowingJourneyCinematic] = useState(false);
+  const [hasGateLoadTimedOut, setHasGateLoadTimedOut] = useState(false);
   const onboardingData = (profile?.onboarding_data as Record<string, unknown> | null) ?? null;
   const hasCompanion = Boolean(companion);
   const hasPresetCompanion = Boolean(companion?.preset_id);
@@ -84,7 +88,40 @@ export default function Onboarding() {
     setIsDeletingLegacyAccount(false);
     setIsSelfHealingProfile(false);
     setIsShowingJourneyCinematic(false);
+    setHasGateLoadTimedOut(false);
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!user || onboardingGateReady) {
+      setHasGateLoadTimedOut(false);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setHasGateLoadTimedOut(true);
+      trackOnboardingTutorialEvent("onboarding_gate_load_stalled", {
+        userId: user.id,
+        status,
+        profileLoading,
+        companionLoading,
+      });
+    }, ONBOARDING_GATE_STALL_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [companionLoading, onboardingGateReady, profileLoading, status, user?.id]);
+
+  const handleRetryGateLoad = () => {
+    if (!user) return;
+
+    setHasGateLoadTimedOut(false);
+    trackOnboardingTutorialEvent("onboarding_gate_load_retry", {
+      userId: user.id,
+      profileLoading,
+      companionLoading,
+    });
+    void queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
+    void queryClient.invalidateQueries({ queryKey: ["companion", user.id] });
+  };
 
   useEffect(() => {
     if (!user || !onboardingGateReady || onboardingSelfHealAttemptedRef.current) return;
@@ -229,6 +266,30 @@ export default function Onboarding() {
     || isSelfHealingProfile
     || (onboardingGate.isEstablished && !isShowingJourneyCinematic)
   )) {
+    if (hasGateLoadTimedOut && (profileLoading || companionLoading)) {
+      return (
+        <main className="min-h-screen bg-background px-4 py-safe flex items-center justify-center">
+          <section className="max-w-md rounded-[28px] border border-border/70 bg-card/95 p-6 text-card-foreground shadow-2xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+              Connection Check
+            </p>
+            <h1 className="mt-3 text-2xl font-semibold">We are still loading your setup</h1>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              Your onboarding state is taking longer than expected to load. You can retry the profile sync or sign out
+              and come back in cleanly.
+            </p>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <Button type="button" onClick={handleRetryGateLoad}>
+                Retry loading
+              </Button>
+              <Button type="button" variant="outline" onClick={() => signOut()}>
+                Sign out
+              </Button>
+            </div>
+          </section>
+        </main>
+      );
+    }
     return null;
   }
 

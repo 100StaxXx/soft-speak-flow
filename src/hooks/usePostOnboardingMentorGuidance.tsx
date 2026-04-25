@@ -22,6 +22,7 @@ import {
   getGuidedTutorialLocalProgressKey,
 } from "@/utils/guidedTutorial";
 import { safeLocalStorage } from "@/utils/storage";
+import { trackOnboardingTutorialEvent } from "@/utils/onboardingTutorialTelemetry";
 import type {
   CreateQuestSubstepId,
   GuidedMilestoneId,
@@ -137,6 +138,7 @@ const getSafeMilestoneArray = (value: unknown): GuidedMilestoneId[] => {
 const emitTutorialEvent = (eventName: string, detail: Record<string, unknown>) => {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(eventName, { detail }));
+  trackOnboardingTutorialEvent(eventName, detail);
 
   if (import.meta.env.DEV) {
     // Keep diagnostics local to development.

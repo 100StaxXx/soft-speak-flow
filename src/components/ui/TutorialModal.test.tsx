@@ -1,9 +1,10 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { Compass, Sparkles } from "lucide-react";
 import { TutorialModal } from "./TutorialModal";
 
 vi.mock("framer-motion", () => ({
+  useReducedMotion: () => false,
   motion: {
     div: ({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
       <div {...props}>{children}</div>
@@ -31,6 +32,7 @@ describe("TutorialModal", () => {
     );
 
     expect(screen.getByRole("dialog", { name: "Tutorial Title" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Tutorial Title" })).not.toHaveAttribute("aria-modal");
     expect(screen.getByTestId("tutorial-floating-wrapper")).toHaveClass("pointer-events-none");
     expect(screen.getByText("Tutorial Subtitle")).toBeInTheDocument();
     expect(screen.queryByText("Close")).not.toBeInTheDocument();
@@ -54,6 +56,28 @@ describe("TutorialModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  it("focuses the primary action and closes with Escape", async () => {
+    const onClose = vi.fn();
+
+    render(
+      <TutorialModal
+        open
+        onClose={onClose}
+        icon={Compass}
+        title="Tutorial Title"
+        subtitle="Tutorial Subtitle"
+        features={[{ icon: Sparkles, text: "Feature text" }]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Continue" })).toHaveFocus();
+    });
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("does not render when closed", () => {

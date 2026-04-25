@@ -71,6 +71,7 @@ const mocks = vi.hoisted(() => ({
   userCompanionUpdateEq: vi.fn(),
   companionMemoryMaybeSingle: vi.fn(),
   companionMemoryInsert: vi.fn(),
+  prepareCompanionOnboardingJourney: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
   loggerError: vi.fn(),
@@ -169,6 +170,7 @@ vi.mock("sonner", () => ({
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
+    rpc: mocks.prepareCompanionOnboardingJourney,
     from: (table: string) => {
       if (table === "mentors") {
         return {
@@ -485,6 +487,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     mocks.userCompanionUpdateEq.mockReset();
     mocks.companionMemoryMaybeSingle.mockReset();
     mocks.companionMemoryInsert.mockReset();
+    mocks.prepareCompanionOnboardingJourney.mockReset();
     mocks.toastError.mockReset();
     mocks.toastSuccess.mockReset();
     mocks.loggerError.mockReset();
@@ -505,6 +508,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     mocks.userCompanionUpdateEq.mockResolvedValue({ error: null });
     mocks.companionMemoryMaybeSingle.mockResolvedValue({ data: null, error: null });
     mocks.companionMemoryInsert.mockResolvedValue({ error: null });
+    mocks.prepareCompanionOnboardingJourney.mockResolvedValue({ error: null });
     storageMocks.reset();
   });
 
@@ -1015,7 +1019,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
   });
 
   it("shows a finalization-specific toast when companion creation succeeds but onboarding completion fails", async () => {
-    mocks.companionMemoryInsert.mockResolvedValueOnce({ error: { message: "finalization failed" } });
+    mocks.prepareCompanionOnboardingJourney.mockResolvedValueOnce({ error: { message: "finalization failed" } });
 
     renderOnboarding();
     await advanceToQuestionnaire();

@@ -1,8 +1,9 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { PostcardsTutorialModal } from "./PostcardsTutorialModal";
 
 vi.mock("framer-motion", () => ({
+  useReducedMotion: () => false,
   motion: {
     div: ({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
       <div {...props}>{children}</div>
@@ -21,6 +22,7 @@ describe("PostcardsTutorialModal", () => {
     render(<PostcardsTutorialModal open onClose={vi.fn()} />);
 
     expect(screen.getByRole("dialog", { name: "Your Companion's Journey" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Your Companion's Journey" })).not.toHaveAttribute("aria-modal");
     expect(screen.getByTestId("postcards-tutorial-floating-wrapper")).toHaveClass("pointer-events-none");
     expect(screen.getByText("Discover the magic of cosmic postcards")).toBeInTheDocument();
   });
@@ -33,6 +35,18 @@ describe("PostcardsTutorialModal", () => {
     fireEvent.click(screen.getByRole("button", { name: /Begin My Journey/i }));
 
     expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  it("focuses the primary action and closes with Escape", async () => {
+    const onClose = vi.fn();
+    render(<PostcardsTutorialModal open onClose={onClose} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Begin My Journey/i })).toHaveFocus();
+    });
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("does not render when closed", () => {

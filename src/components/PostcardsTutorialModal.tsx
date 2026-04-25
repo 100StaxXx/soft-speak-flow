@@ -1,7 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Mail, Star, BookOpen, Sparkles, X } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { LucideIcon } from "lucide-react";
+import { useId, useRef } from "react";
+import { useFloatingDialogA11y } from "@/hooks/useFloatingDialogA11y";
 
 interface PostcardsTutorialModalProps {
   open: boolean;
@@ -38,7 +40,37 @@ const storyPoints: StoryPoint[] = [
 ];
 
 export function PostcardsTutorialModal({ open, onClose }: PostcardsTutorialModalProps) {
+  const prefersReducedMotion = useReducedMotion();
+  const titleId = useId();
+  const subtitleId = useId();
+  const primaryActionRef = useRef<HTMLButtonElement>(null);
+
+  useFloatingDialogA11y({
+    open,
+    onClose,
+    initialFocusRef: primaryActionRef,
+  });
+
   if (!open) return null;
+
+  const cardMotion = prefersReducedMotion
+    ? { initial: false, animate: { opacity: 1 }, transition: { duration: 0 } }
+    : {
+      initial: { opacity: 0, y: 40, scale: 0.95 },
+      animate: { opacity: 1, y: 0, scale: 1 },
+      transition: {
+        type: "spring",
+        damping: 25,
+        stiffness: 300,
+      },
+    };
+  const revealMotion = (delay: number) => prefersReducedMotion
+    ? { initial: false, animate: { opacity: 1 }, transition: { duration: 0 } }
+    : {
+      initial: { opacity: 0, y: 10 },
+      animate: { opacity: 1, y: 0 },
+      transition: { delay },
+    };
 
   return (
     <div
@@ -48,20 +80,12 @@ export function PostcardsTutorialModal({ open, onClose }: PostcardsTutorialModal
     >
       <motion.div
         role="dialog"
-        aria-label="Your Companion's Journey"
-        aria-modal="false"
+        aria-labelledby={titleId}
+        aria-describedby={subtitleId}
         aria-live="polite"
         className="pointer-events-auto mx-auto max-w-sm rounded-3xl bg-gradient-to-br from-amber-950/90 via-background/95 to-orange-950/80 backdrop-blur-2xl border border-amber-500/20 shadow-2xl shadow-amber-900/30 p-0 overflow-hidden"
       >
-        <motion.div
-          initial={{ opacity: 0, y: 40, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ 
-            type: "spring", 
-            damping: 25, 
-            stiffness: 300 
-          }}
-        >
+        <motion.div {...cardMotion}>
           <button
             type="button"
             onClick={onClose}
@@ -80,11 +104,15 @@ export function PostcardsTutorialModal({ open, onClose }: PostcardsTutorialModal
             ].map((spark, i) => (
               <motion.div
                 key={i}
-                animate={{ 
-                  y: [0, -10, 0],
-                  opacity: [0.3, 0.6, 0.3],
-                }}
-                transition={{ duration: 3 + i * 0.5, repeat: Infinity, ease: "easeInOut", delay: spark.delay }}
+                animate={
+                  prefersReducedMotion
+                    ? { opacity: 0.35 }
+                    : {
+                      y: [0, -10, 0],
+                      opacity: [0.3, 0.6, 0.3],
+                    }
+                }
+                transition={prefersReducedMotion ? { duration: 0 } : { duration: 3 + i * 0.5, repeat: Infinity, ease: "easeInOut", delay: spark.delay }}
                 className="absolute bg-amber-400 rounded-full blur-sm"
                 style={{ 
                   top: spark.top, 
@@ -101,9 +129,9 @@ export function PostcardsTutorialModal({ open, onClose }: PostcardsTutorialModal
           {/* Hero section */}
           <div className="pt-8 pb-4 flex flex-col items-center relative">
             <motion.div
-              initial={{ scale: 0.5, opacity: 0 }}
+              initial={prefersReducedMotion ? false : { scale: 0.5, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.1, type: "spring", damping: 15 }}
+              transition={prefersReducedMotion ? { duration: 0 } : { delay: 0.1, type: "spring", damping: 15 }}
               className="relative"
             >
               <div className="absolute inset-0 bg-amber-500/30 rounded-full blur-2xl scale-150" />
@@ -113,17 +141,15 @@ export function PostcardsTutorialModal({ open, onClose }: PostcardsTutorialModal
             </motion.div>
             
             <motion.h2
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 }}
+              id={titleId}
+              {...revealMotion(0.15)}
               className="mt-5 text-xl font-semibold tracking-tight bg-gradient-to-r from-amber-300 via-orange-300 to-yellow-300 bg-clip-text text-transparent"
             >
               Your Companion's Journey
             </motion.h2>
             <motion.p
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
+              id={subtitleId}
+              {...revealMotion(0.2)}
               className="mt-2 text-sm text-amber-200/60 text-center px-6 leading-relaxed"
             >
               Discover the magic of cosmic postcards
@@ -138,9 +164,9 @@ export function PostcardsTutorialModal({ open, onClose }: PostcardsTutorialModal
                 return (
                   <motion.div
                     key={i}
-                    initial={{ opacity: 0, x: -10 }}
+                    initial={prefersReducedMotion ? false : { opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.25 + i * 0.05 }}
+                    transition={prefersReducedMotion ? { duration: 0 } : { delay: 0.25 + i * 0.05 }}
                     className="flex items-start gap-3 px-4 py-3.5"
                   >
                     <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -163,11 +189,10 @@ export function PostcardsTutorialModal({ open, onClose }: PostcardsTutorialModal
           {/* CTA Button */}
           <div className="px-5 pb-6 pt-2">
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
+              {...revealMotion(0.5)}
             >
               <Button
+                ref={primaryActionRef}
                 onClick={onClose}
                 className="w-full h-12 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-medium text-base shadow-lg shadow-amber-500/25 transition-all duration-200 active:scale-[0.98]"
               >

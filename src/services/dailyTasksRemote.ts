@@ -35,6 +35,10 @@ export interface DailyTask {
   is_bonus: boolean | null;
   created_at: string | null;
   priority: string | null;
+  flexibility: "fixed" | "preferred" | "flexible" | null;
+  energy_type: "deep" | "admin" | "physical" | "errand" | "social" | "creative" | "recovery" | null;
+  must_calendar_block: boolean | null;
+  deadline_at: string | null;
   is_top_three: boolean | null;
   actual_time_spent: number | null;
   ai_generated: boolean | null;

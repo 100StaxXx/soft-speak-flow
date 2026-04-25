@@ -56,6 +56,7 @@ import {
 import type { OnboardingResumeStep } from "@/utils/profileOnboarding";
 import { safeLocalStorage } from "@/utils/storage";
 import { resolveAssignedMentorFromActiveMentors } from "@/config/onboardingMentorAssignments";
+import { trackOnboardingTutorialEvent } from "@/utils/onboardingTutorialTelemetry";
 
 type OnboardingStage = 
   | "prologue" 
@@ -380,6 +381,15 @@ export const StoryOnboarding = ({
   const mentorResultRecoveryNotifiedRef = useRef(false);
   const backdropStage = resolveOnboardingBackdropStage(stage);
 
+  useEffect(() => {
+    trackOnboardingTutorialEvent("onboarding_stage_entered", {
+      userId: user?.id ?? null,
+      stage,
+      mode,
+      resumeStage: resumeState?.stage ?? null,
+    });
+  }, [mode, resumeState?.stage, stage, user?.id]);
+
   const clearMentorRevealTimeout = useCallback(() => {
     if (mentorRevealTimeoutRef.current) {
       clearTimeout(mentorRevealTimeoutRef.current);
@@ -573,8 +583,18 @@ export const StoryOnboarding = ({
         mentorResultRecoveryNotifiedRef.current = true;
         if (mentorCatalogStatus === "ready") {
           toast.error("We couldn't reload your saved guide. Please choose one from the guide list.");
+          trackOnboardingTutorialEvent("onboarding_mentor_resume_recovered", {
+            userId: user?.id ?? null,
+            reason: "saved_mentor_missing",
+            recoveryStage: "mentor-grid",
+          });
         } else {
           toast.error("We couldn't reload the guide catalog. Please retry your guide match.");
+          trackOnboardingTutorialEvent("onboarding_mentor_resume_recovered", {
+            userId: user?.id ?? null,
+            reason: "mentor_catalog_unavailable",
+            recoveryStage: "questionnaire",
+          });
         }
       }
 
@@ -656,6 +676,10 @@ export const StoryOnboarding = ({
       }
     }
 
+    trackOnboardingTutorialEvent("onboarding_faction_saved", {
+      userId: user?.id ?? null,
+      faction: selectedFaction,
+    });
     setStage("questionnaire");
   };
 
@@ -686,6 +710,11 @@ export const StoryOnboarding = ({
     setIsSubmittingQuestionnaire(true);
     setAnswers(questionAnswers);
     setStage(resolveQuestionnaireCompletionStage());
+    trackOnboardingTutorialEvent("onboarding_questionnaire_submitted", {
+      userId: user?.id ?? null,
+      answerCount: questionAnswers.length,
+      hasScheduleArchetype: Boolean(getOnboardingScheduleArchetypeFromAnswers(questionAnswers)),
+    });
 
     try {
       const serializedAnswers = serializeOnboardingAnswers(questionAnswers);
@@ -741,6 +770,14 @@ export const StoryOnboarding = ({
         setMentorExplanation(explanation);
         const scheduleArchetype = getOnboardingScheduleArchetypeFromAnswers(questionAnswers);
         const scheduleArchetypeProfile = getOnboardingScheduleArchetypeProfile(scheduleArchetype);
+        trackOnboardingTutorialEvent("onboarding_mentor_matched", {
+          userId: user?.id ?? null,
+          mentorId: bestMatch.id,
+          mentorSlug: bestMatch.slug,
+          energyPreference: energyPref,
+          usedFallback: assignment.usedFallback,
+          scheduleArchetype,
+        });
         await persistOnboardingProgress("mentor-result", {
           faction,
           questionnaireAnswers: serializedAnswers,
@@ -773,6 +810,12 @@ export const StoryOnboarding = ({
         requestedSlug: assignment.requestedSlug,
         mentorPoolCount: mentorPool.length,
       });
+      trackOnboardingTutorialEvent("onboarding_mentor_match_fallback", {
+        userId: user?.id ?? null,
+        reason: "preassigned_resolution_failed",
+        requestedSlug: assignment.requestedSlug,
+        mentorPoolCount: mentorPool.length,
+      });
       toast.error("We couldn't automatically match a guide. Please pick one from the grid.");
       setStage("mentor-grid");
       persistOnboardingProgressSafely("mentor-grid", {
@@ -781,6 +824,10 @@ export const StoryOnboarding = ({
       });
     } catch (error) {
       onboardingLog.error("Questionnaire completion failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      trackOnboardingTutorialEvent("onboarding_mentor_match_failed", {
+        userId: user?.id ?? null,
         error: error instanceof Error ? error.message : String(error),
       });
       toast.error("We hit a temporary snag matching your guide. Please try again.");
@@ -846,6 +893,11 @@ export const StoryOnboarding = ({
       await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
     }
     
+    trackOnboardingTutorialEvent("onboarding_mentor_confirmed", {
+      userId: user?.id ?? null,
+      mentorId: mentor.id,
+      mentorSlug: mentor.slug,
+    });
     setStage("story-tone");
   };
 
@@ -932,6 +984,14 @@ export const StoryOnboarding = ({
 
     setPendingCompanionSetup(preferences);
     setCompanionSetupStatus("pending");
+    trackOnboardingTutorialEvent("onboarding_companion_setup_started", {
+      userId: user.id,
+      mode,
+      creationMode: preferences.presetId ? "preset" : "ai",
+      presetId: preferences.presetId,
+      storyTone: preferences.storyTone,
+      enterJourneyImmediately,
+    });
     if (enterJourneyImmediately) {
       setCompanionAnimal(selectionDisplayName);
       try {
@@ -957,73 +1017,35 @@ export const StoryOnboarding = ({
       if (onboardingFinalized) return;
       onboardingFinalized = true;
 
-      const existingData = await loadExistingOnboardingData();
-      const { walkthrough_completed: _walkthroughCompleted, guided_tutorial: _guidedTutorial, ...inProgressData } =
-        existingData;
-      const { data: existingFirstMeeting, error: memoryLookupError } = await supabase
-        .from("companion_memories")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("companion_id", companionId)
-        .eq("memory_type", "first_meeting")
-        .maybeSingle();
+      const memoryContext = {
+        title: "Our First Meeting",
+        description: preferences.presetId
+          ? `The day we found your ${eggDisplayName.toLowerCase()}, already carrying the spirit of ${preferences.spiritAnimal}.`
+          : `The day we found your ${eggDisplayName.toLowerCase()}, humming with possibility.`,
+        emotion: "wonder",
+        details: {
+          spiritAnimal: preferences.spiritAnimal,
+          coreElement: preferences.coreElement,
+        },
+      };
 
-      if (memoryLookupError) {
-        throw memoryLookupError;
-      }
-
-      if (!existingFirstMeeting?.id) {
-        const today = new Date().toISOString().split("T")[0];
-        const { error: memoryInsertError } = await supabase
-          .from("companion_memories")
-          .insert({
-            user_id: user.id,
-            companion_id: companionId,
-            memory_type: "first_meeting",
-            memory_date: today,
-            memory_context: {
-              title: "Our First Meeting",
-              description: preferences.presetId
-                ? `The day we found your ${eggDisplayName.toLowerCase()}, already carrying the spirit of ${preferences.spiritAnimal}.`
-                : `The day we found your ${eggDisplayName.toLowerCase()}, humming with possibility.`,
-              emotion: "wonder",
-              details: {
-                spiritAnimal: preferences.spiritAnimal,
-                coreElement: preferences.coreElement,
-              },
-            },
-            referenced_count: 0,
-          });
-
-        if (memoryInsertError) {
-          throw memoryInsertError;
-        }
-      }
-
-      const { error: completionError } = await supabase
-        .from("profiles")
-        .update(
-          isResetMode
-            ? {
-                onboarding_completed: true,
-                onboarding_step: "complete",
-                onboarding_data: {
-                  ...existingData,
-                  walkthrough_completed: true,
-                  story_tone: preferences.storyTone,
-                  progression_reset_required: false,
-                } as any,
-              }
-            : {
-                onboarding_step: "journey-begins",
-                onboarding_data: {
-                  ...inProgressData,
-                  story_tone: preferences.storyTone,
-                  progression_reset_required: false,
-                } as any,
-              },
-        )
-        .eq("id", user.id);
+      const { error: completionError } = await (supabase.rpc as unknown as (
+        functionName: "prepare_companion_onboarding_journey",
+        args: {
+          p_companion_id: string;
+          p_story_tone: string;
+          p_memory_context: Record<string, unknown>;
+          p_complete_onboarding: boolean;
+        },
+      ) => Promise<{ error: { message?: string } | null }>)(
+        "prepare_companion_onboarding_journey",
+        {
+          p_companion_id: companionId,
+          p_story_tone: preferences.storyTone,
+          p_memory_context: memoryContext,
+          p_complete_onboarding: isResetMode,
+        },
+      );
 
       if (completionError) {
         throw completionError;
@@ -1036,6 +1058,13 @@ export const StoryOnboarding = ({
 
       setCompanionAnimal(fallbackName);
       setCompanionSetupStatus("ready");
+      trackOnboardingTutorialEvent("onboarding_companion_setup_ready", {
+        userId: user.id,
+        companionId,
+        recoveredAfterTimeout,
+        elapsedMs: Date.now() - startedAt,
+        mode,
+      });
 
       if (isResetMode) {
         toast.success("Your companion has been reset and reselected.");
@@ -1061,6 +1090,14 @@ export const StoryOnboarding = ({
         return true;
       } catch (error) {
         setCompanionSetupStatus("failed");
+        trackOnboardingTutorialEvent("onboarding_companion_setup_failed", {
+          userId: user.id,
+          companionId,
+          recoveredAfterTimeout,
+          elapsedMs: Date.now() - startedAt,
+          stage: "finalization",
+          error: getErrorMessage(error, "Unknown finalization error"),
+        });
         logger.error("Companion onboarding finalization failed", {
           userId: user.id,
           companionId,
@@ -1156,6 +1193,13 @@ export const StoryOnboarding = ({
         await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
         safeLocalStorage.removeItem(getGuidedTutorialLocalProgressKey(user.id));
         setCompanionSetupStatus("ready");
+        trackOnboardingTutorialEvent("onboarding_companion_setup_ready", {
+          userId: user.id,
+          companionId: latestCompanion.id,
+          recoveredAfterTimeout: false,
+          elapsedMs: Date.now() - startedAt,
+          mode,
+        });
         toast.success(`${preset.displayName} is now your companion form.`);
         safeNavigate(navigate, "/journeys");
         return true;
@@ -1243,6 +1287,12 @@ export const StoryOnboarding = ({
           }
 
           setCompanionSetupStatus("failed");
+          trackOnboardingTutorialEvent("onboarding_companion_setup_failed", {
+            userId: user.id,
+            elapsedMs: Date.now() - startedAt,
+            stage: "timeout_recovery",
+            error: "recovery_window_exhausted",
+          });
           logger.error("Companion recovery failed after timeout", {
             userId: user.id,
             recoveryWindowMs: COMPANION_RECOVERY_DEADLINE_MS,
@@ -1253,6 +1303,12 @@ export const StoryOnboarding = ({
         }
 
         setCompanionSetupStatus("failed");
+        trackOnboardingTutorialEvent("onboarding_companion_setup_failed", {
+          userId: user.id,
+          elapsedMs: Date.now() - startedAt,
+          stage: "creation",
+          error: errorMessage,
+        });
         logger.error("Companion creation failed during onboarding", {
           userId: user.id,
           elapsedMs: Date.now() - startedAt,
@@ -1266,6 +1322,12 @@ export const StoryOnboarding = ({
     } catch (error) {
       setCompanionSetupStatus("failed");
       const errorMessage = getErrorMessage(error, "Something went wrong. Please try again.");
+      trackOnboardingTutorialEvent("onboarding_companion_setup_failed", {
+        userId: user.id,
+        elapsedMs: Date.now() - startedAt,
+        stage: "flow",
+        error: errorMessage,
+      });
       logger.error("Error completing companion onboarding flow", {
         userId: user.id,
         elapsedMs: Date.now() - startedAt,
@@ -1284,6 +1346,7 @@ export const StoryOnboarding = ({
     isMigrationMode,
     isResetMode,
     loadExistingOnboardingData,
+    mode,
     navigate,
     persistJourneyBeginsStep,
     queryClient,
@@ -1358,6 +1421,10 @@ export const StoryOnboarding = ({
       await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
 
       onJourneyCinematicComplete?.();
+      trackOnboardingTutorialEvent("onboarding_completed", {
+        userId: user.id,
+        mode,
+      });
       toast.success("Welcome to Cosmiq! Your journey begins.");
       safeNavigate(navigate, "/journeys");
     } catch (error) {
@@ -1382,6 +1449,10 @@ export const StoryOnboarding = ({
         questionnaireAnswers: serializeOnboardingAnswers(answers),
         story_tone: selectedStoryTone,
       });
+      trackOnboardingTutorialEvent("onboarding_continue_later_saved", {
+        userId: user?.id ?? null,
+        stage: persistedStage,
+      });
     } catch (error) {
       onboardingLog.warn("Failed to continue onboarding later", {
         userId: user?.id,
@@ -1389,6 +1460,11 @@ export const StoryOnboarding = ({
         error: error instanceof Error ? error.message : String(error),
       });
       toast.error("We couldn't save your progress right now. Please try again.");
+      trackOnboardingTutorialEvent("onboarding_continue_later_failed", {
+        userId: user?.id ?? null,
+        stage: persistedStage,
+        error: error instanceof Error ? error.message : String(error),
+      });
       continueLaterInFlightRef.current = false;
       setIsContinuingLater(false);
       return;

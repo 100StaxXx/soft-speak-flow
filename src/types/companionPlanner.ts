@@ -9,6 +9,7 @@ import type {
   CompanionStatProfileSummary,
 } from "@/shared/companionStatSignals";
 import type {
+  PlannerContract,
   CompanionStructuredResponse,
   CompanionSuggestedQuest,
 } from "@/shared/companionStructuredOutput";
@@ -147,6 +148,10 @@ export interface PlannerContextTask {
   notes?: string | null;
   subtaskTitles?: string[];
   difficulty?: string | null;
+  flexibility?: "fixed" | "preferred" | "flexible" | null;
+  energyType?: "deep" | "admin" | "physical" | "errand" | "social" | "creative" | "recovery" | null;
+  mustCalendarBlock?: boolean | null;
+  deadlineAt?: string | null;
   recurrencePattern: string | null;
   recurrenceEndDate?: string | null;
   completed?: boolean | null;
@@ -401,6 +406,7 @@ export interface CompanionPlannerRequest {
 export interface CompanionPlannerResponse {
   mode: CompanionPlannerResponseMode;
   reply: string;
+  plannerContract?: PlannerContract;
   followUpQuestions: CompanionPlannerQuestion[];
   proposals: CompanionPlannerProposal[];
   suggestedReminders: CompanionPlannerProposal[];
