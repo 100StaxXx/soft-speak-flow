@@ -14,12 +14,14 @@ export interface AccountDeletionWarning {
 }
 
 export type AccountDeletionStage = "storage_cleanup" | "relational_cleanup" | "auth_delete";
+export type AccountDeletionFailureReason = "timeout" | "permission" | "storage_api" | "unknown";
 
 export interface AccountDeletionErrorMetadata {
   code?: string;
   status?: number;
   requestId?: string;
   stage?: AccountDeletionStage;
+  failureReason?: AccountDeletionFailureReason;
 }
 
 interface DeleteAccountOptions {
@@ -35,6 +37,7 @@ interface DeleteUserFunctionResponse {
   status?: number;
   requestId?: string;
   stage?: AccountDeletionStage;
+  failureReason?: AccountDeletionFailureReason;
   warnings?: AccountDeletionWarning[];
 }
 
@@ -67,6 +70,12 @@ const isAccountDeletionStage = (value: unknown): value is AccountDeletionStage =
 const getAccountDeletionStage = (value: unknown): AccountDeletionStage | undefined =>
   isAccountDeletionStage(value) ? value : undefined;
 
+const isAccountDeletionFailureReason = (value: unknown): value is AccountDeletionFailureReason =>
+  value === "timeout" || value === "permission" || value === "storage_api" || value === "unknown";
+
+const getAccountDeletionFailureReason = (value: unknown): AccountDeletionFailureReason | undefined =>
+  isAccountDeletionFailureReason(value) ? value : undefined;
+
 const inferAccountDeletionStageFromCode = (code?: string): AccountDeletionStage | undefined => {
   switch (code) {
     case "ACCOUNT_DELETION_STORAGE_CLEANUP_FAILED":
@@ -88,6 +97,11 @@ const getParsedFunctionRequestId = (parsed: ParsedFunctionInvokeError): string |
 
 const getParsedFunctionStage = (parsed: ParsedFunctionInvokeError): AccountDeletionStage | undefined =>
   getAccountDeletionStage(parsed.responsePayload?.stage) ?? inferAccountDeletionStageFromCode(getParsedFunctionCode(parsed));
+
+const getParsedFunctionFailureReason = (
+  parsed: ParsedFunctionInvokeError,
+): AccountDeletionFailureReason | undefined =>
+  getAccountDeletionFailureReason(parsed.responsePayload?.failureReason);
 
 const normalizeWarnings = (raw: unknown): AccountDeletionWarning[] => {
   if (!Array.isArray(raw)) return [];
@@ -117,10 +131,8 @@ const normalizeWarnings = (raw: unknown): AccountDeletionWarning[] => {
 
 export const isAccountDeletionAuthError = (error: unknown): boolean => {
   if (!(error instanceof Error)) return false;
-  const code =
-    error && typeof error === "object" && typeof (error as { code?: unknown }).code === "string"
-      ? (error as { code: string }).code
-      : undefined;
+  const candidate = error as Error & { code?: unknown };
+  const code = typeof candidate.code === "string" ? candidate.code : undefined;
   if (code && ACCOUNT_DELETION_AUTH_CODES.has(code)) {
     return true;
   }
@@ -145,6 +157,7 @@ const createAccountDeletionError = (
   error.status = metadata.status;
   error.requestId = metadata.requestId;
   error.stage = metadata.stage;
+  error.failureReason = metadata.failureReason;
   if (cause !== undefined) {
     error.cause = cause;
   }
@@ -189,12 +202,14 @@ export const getAccountDeletionErrorMetadata = (error: unknown): AccountDeletion
     isAccountDeletionStage(candidate.stage)
       ? candidate.stage
       : inferAccountDeletionStageFromCode(code);
+  const failureReason = getAccountDeletionFailureReason(candidate.failureReason);
 
   return {
     ...(code ? { code } : {}),
     ...(typeof candidate.status === "number" ? { status: candidate.status } : {}),
     ...(typeof candidate.requestId === "string" ? { requestId: candidate.requestId } : {}),
     ...(stage ? { stage } : {}),
+    ...(failureReason ? { failureReason } : {}),
   };
 };
 
@@ -249,6 +264,7 @@ export const deleteCurrentAccount = async ({ queryClient, userId, signOut }: Del
         status: parsedError.status,
         requestId: getParsedFunctionRequestId(parsedError),
         stage: getParsedFunctionStage(parsedError),
+        failureReason: getParsedFunctionFailureReason(parsedError),
       },
       error,
     );
@@ -263,6 +279,7 @@ export const deleteCurrentAccount = async ({ queryClient, userId, signOut }: Del
         status: data?.status,
         requestId: data?.requestId,
         stage: getAccountDeletionStage(data?.stage) ?? inferAccountDeletionStageFromCode(data?.code),
+        failureReason: getAccountDeletionFailureReason(data?.failureReason),
       },
       data,
     );

@@ -35,8 +35,15 @@ const buildMultipartHeaders = (openAIApiKey: string) => ({
   Authorization: `Bearer ${openAIApiKey}`,
 });
 
-const supportsInputFidelity = (model: string): boolean =>
-  model !== "gpt-image-1-mini" && !model.startsWith("gpt-image-1-mini-");
+const supportsInputFidelityOverride = (model: string): boolean => {
+  const normalizedModel = model.toLowerCase();
+  return !(
+    normalizedModel === "gpt-image-2"
+    || normalizedModel.startsWith("gpt-image-2-")
+    || normalizedModel === "gpt-image-1-mini"
+    || normalizedModel.startsWith("gpt-image-1-mini-")
+  );
+};
 
 const buildBaseRequestBody = ({
   prompt,
@@ -204,6 +211,7 @@ const buildEditFormData = ({
   quality,
   userId,
   referenceFiles,
+  includeInputFidelity,
 }: {
   model: string;
   prompt: string;
@@ -211,6 +219,7 @@ const buildEditFormData = ({
   quality?: "medium" | "high";
   userId?: string | null;
   referenceFiles: File[];
+  includeInputFidelity: boolean;
 }): FormData => {
   const formData = new FormData();
   formData.append("model", model);
@@ -221,7 +230,7 @@ const buildEditFormData = ({
     formData.append("quality", quality);
   }
 
-  if (supportsInputFidelity(model)) {
+  if (includeInputFidelity) {
     formData.append("input_fidelity", "high");
   }
 
@@ -254,6 +263,7 @@ const performMultipartEditRequest = async ({
   referenceImages: Array<{ imageUrl: string }>;
 }): Promise<CompanionImageGenerationResult> => {
   const model = resolveCompanionImageModel();
+  let includeInputFidelity = supportsInputFidelityOverride(model);
   const referenceFiles = await Promise.all(
     referenceImages.map((referenceImage, index) =>
       downloadReferenceImageFile({
@@ -272,20 +282,9 @@ const performMultipartEditRequest = async ({
 
   let effectiveSize = size;
   let includeQuality = quality;
-  let response = await requestImage(
-    buildEditFormData({
-      model,
-      prompt,
-      size: effectiveSize,
-      quality: includeQuality,
-      userId,
-      referenceFiles,
-    }),
-  );
 
-  if (!response.ok && response.status === 400 && effectiveSize !== FALLBACK_IMAGE_SIZE) {
-    effectiveSize = FALLBACK_IMAGE_SIZE;
-    response = await requestImage(
+  const requestCurrentImageEdit = async () =>
+    await requestImage(
       buildEditFormData({
         model,
         prompt,
@@ -293,22 +292,37 @@ const performMultipartEditRequest = async ({
         quality: includeQuality,
         userId,
         referenceFiles,
+        includeInputFidelity,
       }),
     );
+
+  const retryWithoutInputFidelityIfRejected = async (currentResponse: Response): Promise<Response> => {
+    if (!currentResponse.ok && currentResponse.status === 400 && includeInputFidelity) {
+      const errorText = await currentResponse.clone().text().catch(() => "");
+      const normalizedErrorText = errorText.toLowerCase();
+      if (
+        normalizedErrorText.includes("input_fidelity")
+        || normalizedErrorText.includes("input fidelity")
+        || normalizedErrorText.includes("inputfidelity")
+      ) {
+        includeInputFidelity = false;
+        return await requestCurrentImageEdit();
+      }
+    }
+
+    return currentResponse;
+  };
+
+  let response = await retryWithoutInputFidelityIfRejected(await requestCurrentImageEdit());
+
+  if (!response.ok && response.status === 400 && effectiveSize !== FALLBACK_IMAGE_SIZE) {
+    effectiveSize = FALLBACK_IMAGE_SIZE;
+    response = await retryWithoutInputFidelityIfRejected(await requestCurrentImageEdit());
   }
 
   if (!response.ok && response.status === 400 && includeQuality) {
     includeQuality = undefined;
-    response = await requestImage(
-      buildEditFormData({
-        model,
-        prompt,
-        size: effectiveSize,
-        quality: includeQuality,
-        userId,
-        referenceFiles,
-      }),
-    );
+    response = await retryWithoutInputFidelityIfRejected(await requestCurrentImageEdit());
   }
 
   const result = await parseImageApiResponse(guardedFetch, response);

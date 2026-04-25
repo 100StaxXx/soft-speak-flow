@@ -26,6 +26,7 @@ ios/App/build*/
 ios/App/App/Config/LocalSecrets.xcconfig
 
 # Editor directories and files
+.claude/worktrees/
 .vscode/*
 !.vscode/extensions.json
 .idea

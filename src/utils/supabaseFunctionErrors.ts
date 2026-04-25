@@ -18,6 +18,7 @@ export interface ParsedFunctionInvokeError {
     code?: string;
     requestId?: string;
     stage?: string;
+    failureReason?: string;
     status?: string;
     retryAfterSeconds?: number;
     upstreamStatus?: number;
@@ -166,6 +167,7 @@ export async function parseFunctionInvokeError(
         const payloadCode = asString(payloadRecord.code);
         const payloadRequestId = asString(payloadRecord.requestId);
         const payloadStage = asString(payloadRecord.stage);
+        const payloadFailureReason = asString(payloadRecord.failureReason);
         const payloadStatus = asString(payloadRecord.status);
         const payloadRetryAfterSeconds =
           asNumber(payloadRecord.retry_after_seconds) ?? asNumber(payloadRecord.retryAfterSeconds);
@@ -180,6 +182,7 @@ export async function parseFunctionInvokeError(
           payloadCode ||
           payloadRequestId ||
           payloadStage ||
+          payloadFailureReason ||
           payloadStatus ||
           payloadRetryAfterSeconds ||
           payloadUpstreamStatus ||
@@ -191,6 +194,7 @@ export async function parseFunctionInvokeError(
             code: payloadCode,
             requestId: payloadRequestId,
             stage: payloadStage,
+            failureReason: payloadFailureReason,
             status: payloadStatus,
             retryAfterSeconds: payloadRetryAfterSeconds,
             upstreamStatus: payloadUpstreamStatus,

@@ -19,7 +19,12 @@ const mocks = vi.hoisted(() => ({
   parseFunctionInvokeError: vi.fn().mockResolvedValue({
     status: 500,
     backendMessage: null,
+    isOffline: false,
+    category: "http",
   }),
+  toUserFacingFunctionError: vi.fn().mockReturnValue(
+    "Unable to send your message. Please try again.",
+  ),
   trackInteraction: vi.fn().mockResolvedValue(undefined),
   legacySubmitMessage: vi.fn().mockResolvedValue(undefined),
   legacyConfirmPendingAction: vi.fn().mockResolvedValue(undefined),
@@ -159,6 +164,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 vi.mock("@/utils/supabaseFunctionErrors", () => ({
   parseFunctionInvokeError: mocks.parseFunctionInvokeError,
+  toUserFacingFunctionError: mocks.toUserFacingFunctionError,
 }));
 
 import { useCompanionAssistant } from "./useCompanionAssistant";
@@ -542,6 +548,55 @@ describe("useCompanionAssistant", () => {
     );
   });
 
+  it("shows user-facing function errors without adding a synthetic assistant turn", async () => {
+    const networkError = Object.assign(
+      new Error("Failed to send a request to the Edge Function"),
+      { name: "FunctionsFetchError" },
+    );
+    mocks.supabaseInvoke.mockRejectedValueOnce(networkError);
+    mocks.parseFunctionInvokeError.mockResolvedValueOnce({
+      name: "FunctionsFetchError",
+      message: "Failed to send a request to the Edge Function",
+      status: undefined,
+      backendMessage: null,
+      isOffline: false,
+      category: "network",
+    });
+    mocks.toUserFacingFunctionError.mockReturnValueOnce(
+      "We couldn't reach the server to send your message. Check your connection and try again.",
+    );
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("persisted-session");
+    });
+
+    let submitted: boolean | undefined;
+    await act(async () => {
+      submitted = await result.current.submitMessage("Plan my day", "text");
+    });
+
+    expect(submitted).toBe(false);
+    expect(mocks.legacySubmitMessage).not.toHaveBeenCalled();
+    expect(mocks.toUserFacingFunctionError).toHaveBeenCalledWith(
+      expect.objectContaining({ category: "network" }),
+      { action: "send your message" },
+    );
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      "We couldn't reach the server to send your message. Check your connection and try again.",
+    );
+    expect(
+      result.current.messages.some((message) =>
+        message.content.includes("lost the thread")
+      ),
+    ).toBe(false);
+  });
+
   it("confirms the active pending action through the deterministic executor path", async () => {
     mocks.loadPendingAction.mockResolvedValue({
       id: "action-1",
@@ -824,6 +879,62 @@ describe("useCompanionAssistant", () => {
     });
   });
 
+  it("defers persisted bootstrap while a launcher template intent is pending", async () => {
+    mocks.supabaseInvoke.mockImplementation(async (_functionName, options) => {
+      const sessionId = options?.body?.sessionId ?? "missing-session";
+
+      return {
+        data: {
+          reply: "I drafted a focused day for you.",
+          mode: "schedule_read",
+          intent: "plan_day",
+          confidence: 0.93,
+          threadState: {
+            threadId: sessionId,
+            sessionId,
+            openaiConversationId: "conv_fresh",
+            lastOpenAIResponseId: "resp_fresh",
+            hasPendingAction: false,
+          },
+        },
+        error: null,
+      };
+    });
+
+    const { wrapper } = createWrapper();
+    renderHook(
+      () =>
+        useCompanionAssistant({
+          surface: "journeys",
+          launchIntent: {
+            id: "launch-skip-bootstrap-1",
+            message: "Plan my day",
+            starterIntent: "plan_day",
+          },
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+        "companion-agent",
+        expect.objectContaining({
+          body: expect.objectContaining({
+            message: "Plan my day",
+            sessionId: "fresh-session",
+            starterIntent: "plan_day",
+          }),
+        }),
+      );
+    });
+
+    expect(mocks.archiveThread).toHaveBeenCalledWith(
+      "persisted-session",
+      true,
+    );
+    expect(mocks.loadThreadMessages).not.toHaveBeenCalled();
+  });
+
   it("keeps launcher template turns on a fresh thread when persisted hydration resolves late", async () => {
     let resolveHydration: (
       messages: Awaited<ReturnType<typeof mocks.loadThreadMessages>>,
@@ -906,6 +1017,54 @@ describe("useCompanionAssistant", () => {
         message.content === "This old thread should not reopen."
       ),
     ).toBe(false);
+  });
+
+  it("consumes launcher intents when starting the fresh thread fails", async () => {
+    const consumed = vi.fn();
+    const archiveError = Object.assign(
+      new Error("Failed to send a request to the Edge Function"),
+      { name: "FunctionsFetchError" },
+    );
+    mocks.archiveThread.mockRejectedValueOnce(archiveError);
+    mocks.parseFunctionInvokeError.mockResolvedValueOnce({
+      name: "FunctionsFetchError",
+      message: "Failed to send a request to the Edge Function",
+      status: undefined,
+      backendMessage: null,
+      isOffline: false,
+      category: "network",
+    });
+    mocks.toUserFacingFunctionError.mockReturnValueOnce(
+      "We couldn't reach the server to start this chat. Check your connection and try again.",
+    );
+
+    const { wrapper } = createWrapper();
+    renderHook(
+      () =>
+        useCompanionAssistant({
+          surface: "journeys",
+          launchIntent: {
+            id: "launch-archive-fails-1",
+            message: "Plan my day",
+            starterIntent: "plan_day",
+          },
+          onLaunchIntentConsumed: consumed,
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(consumed).toHaveBeenCalledWith("launch-archive-fails-1");
+    });
+
+    expect(mocks.supabaseInvoke).not.toHaveBeenCalled();
+    expect(mocks.toUserFacingFunctionError).toHaveBeenCalledWith(
+      expect.objectContaining({ category: "network" }),
+      { action: "start this chat" },
+    );
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      "We couldn't reach the server to start this chat. Check your connection and try again.",
+    );
   });
 
   it("applies launcher planning modes before submitting the starter intent", async () => {

@@ -58,6 +58,29 @@ describe("supabaseFunctionErrors", () => {
     expect(parsed.responsePayload?.code).toBe("INVALID_CREDENTIALS");
   });
 
+  it("preserves diagnostic failureReason payloads", async () => {
+    const response = new Response(
+      JSON.stringify({
+        error: "Account deletion is temporarily unavailable. Please try again later.",
+        code: "ACCOUNT_DELETION_STORAGE_CLEANUP_FAILED",
+        stage: "storage_cleanup",
+        failureReason: "permission",
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+
+    const parsed = await parseFunctionInvokeError({
+      name: "FunctionsHttpError",
+      message: "Edge Function returned a non-2xx status code",
+      context: response,
+    });
+
+    expect(parsed.responsePayload?.failureReason).toBe("permission");
+  });
+
   it("falls back to X-Request-Id when the function body omits requestId", async () => {
     const response = new Response(
       JSON.stringify({ error: "Request could not be processed right now", code: "ABUSE_CHECK_FAILED" }),

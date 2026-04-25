@@ -75,6 +75,21 @@ type ListedStorageObject = {
   path: string;
 };
 
+const withMockedDateNow = async (
+  values: number[],
+  action: () => Promise<void>,
+): Promise<void> => {
+  const originalNow = Date.now;
+  let callCount = 0;
+
+  Date.now = () => values[Math.min(callCount++, values.length - 1)];
+  try {
+    await action();
+  } finally {
+    Date.now = originalNow;
+  }
+};
+
 const createRpcResult = (error: unknown | null = null): RpcResult => ({
   error,
 });
@@ -135,7 +150,10 @@ const listEntriesFromRemainingObjects = (
     }
 
     if (rest.length === 0) {
-      childEntries.set(childName, { name: childName, id: `listed-${childName}` });
+      childEntries.set(childName, {
+        name: childName,
+        id: `listed-${childName}`,
+      });
       continue;
     }
 
@@ -310,7 +328,9 @@ const createHandleDeleteUserHarness = ({
       select: (_columns: string) => builder,
       eq: (column: "user_id", value: string) => {
         if (column !== "user_id") {
-          throw new Error(`Unexpected user_storage_assets eq column: ${column}`);
+          throw new Error(
+            `Unexpected user_storage_assets eq column: ${column}`,
+          );
         }
         userId = value;
         return builder;
@@ -377,9 +397,10 @@ const createHandleDeleteUserHarness = ({
             remainingOwnedStorageObjects = remainingOwnedStorageObjects.filter((
               entry,
             ) => !(entry.bucket === bucket && paths.includes(entry.path)));
-            remainingListedStorageObjects = remainingListedStorageObjects.filter((
-              entry,
-            ) => !(entry.bucket === bucket && paths.includes(entry.path)));
+            remainingListedStorageObjects = remainingListedStorageObjects
+              .filter((
+                entry,
+              ) => !(entry.bucket === bucket && paths.includes(entry.path)));
           }
           return result;
         },
@@ -558,7 +579,10 @@ Deno.test("delete-user removes registered storage assets before relational clean
     "user_storage_assets.select:user-1:0-99",
   );
   const rpcIndex = harness.operations.indexOf("rpc.delete_user_account");
-  assert(registryQueryIndex !== -1, "Expected the storage ledger to be queried");
+  assert(
+    registryQueryIndex !== -1,
+    "Expected the storage ledger to be queried",
+  );
   assert(rpcIndex !== -1, "Expected relational cleanup to run");
   assert(
     registryQueryIndex < rpcIndex,
@@ -674,6 +698,51 @@ Deno.test("delete-user skips unavailable storage ownership columns and continues
   );
 });
 
+Deno.test("delete-user returns permission failureReason when storage ownership query is blocked", async () => {
+  const harness = createHandleDeleteUserHarness({
+    ownershipQueryErrors: {
+      owner: {
+        status: 403,
+        message: "permission denied for table objects",
+      },
+    },
+  });
+
+  const response = await module.handleDeleteUser(
+    createRequest(),
+    harness.dependencies,
+  );
+  const body = await response.json();
+
+  assertEquals(
+    response.status,
+    500,
+    "Expected storage permission errors to remain fatal",
+  );
+  assertEquals(body.success, false, "Expected error response body");
+  assertEquals(
+    body.code,
+    "ACCOUNT_DELETION_STORAGE_CLEANUP_FAILED",
+    "Expected storage cleanup failure code",
+  );
+  assertEquals(body.stage, "storage_cleanup", "Expected storage cleanup stage");
+  assertEquals(
+    body.failureReason,
+    "permission",
+    "Expected permission failureReason",
+  );
+  assertEquals(
+    harness.getRpcCallCount(),
+    0,
+    "Expected relational cleanup not to run after fatal storage failure",
+  );
+  assertArrayEquals(
+    harness.sleepCalls,
+    [],
+    "Expected permission failures not to be retried",
+  );
+});
+
 Deno.test("delete-user still falls back to ownership discovery for unregistered legacy assets", async () => {
   const harness = createHandleDeleteUserHarness({
     registeredStorageAssets: [
@@ -753,6 +822,64 @@ Deno.test("delete-user retries transient storage removal failures and succeeds",
   );
 });
 
+Deno.test("delete-user returns storage_api failureReason when storage cleanup retries are exhausted", async () => {
+  const harness = createHandleDeleteUserHarness({
+    registeredStorageAssets: [
+      {
+        bucket: "quest-attachments",
+        path: "user-1/stuck-upload.png",
+      },
+    ],
+    removeResults: [
+      createStorageRemoveResult({
+        status: 503,
+        message: "Service unavailable",
+      }),
+      createStorageRemoveResult({
+        status: 503,
+        message: "Service unavailable",
+      }),
+      createStorageRemoveResult({
+        status: 503,
+        message: "Service unavailable",
+      }),
+    ],
+  });
+
+  const response = await module.handleDeleteUser(
+    createRequest(),
+    harness.dependencies,
+  );
+  const body = await response.json();
+
+  assertEquals(
+    response.status,
+    500,
+    "Expected exhausted storage retries to remain fatal",
+  );
+  assertEquals(body.success, false, "Expected error response body");
+  assertEquals(
+    body.code,
+    "ACCOUNT_DELETION_STORAGE_CLEANUP_FAILED",
+    "Expected storage cleanup failure code",
+  );
+  assertEquals(
+    body.failureReason,
+    "storage_api",
+    "Expected storage_api failureReason",
+  );
+  assertArrayEquals(
+    harness.sleepCalls,
+    [500, 1500],
+    "Expected storage cleanup retries before failing",
+  );
+  assertEquals(
+    harness.getRpcCallCount(),
+    0,
+    "Expected relational cleanup not to run after fatal storage failure",
+  );
+});
+
 Deno.test("delete-user ignores alternate missing-object errors for stale registered storage ledger paths", async () => {
   const harness = createHandleDeleteUserHarness({
     registeredStorageAssets: [
@@ -822,7 +949,9 @@ Deno.test("delete-user succeeds with warning when owned objects remain after all
     "Expected storage cleanup warnings in response",
   );
   assert(
-    body.warnings.some((w: { code: string }) => w.code === "STORAGE_CLEANUP_INCOMPLETE"),
+    body.warnings.some((w: { code: string }) =>
+      w.code === "STORAGE_CLEANUP_INCOMPLETE"
+    ),
     "Expected STORAGE_CLEANUP_INCOMPLETE warning code",
   );
   assertEquals(
@@ -839,6 +968,52 @@ Deno.test("delete-user succeeds with warning when owned objects remain after all
     harness.getDirectDeleteCallCount() > 0,
     "Expected direct delete fallback to be attempted",
   );
+});
+
+Deno.test("delete-user succeeds with warning when storage cleanup deadline expires", async () => {
+  await withMockedDateNow([0, 14_001], async () => {
+    const harness = createHandleDeleteUserHarness();
+
+    const response = await module.handleDeleteUser(
+      createRequest(),
+      harness.dependencies,
+    );
+    const body = await response.json();
+
+    assertEquals(
+      response.status,
+      200,
+      "Expected deadline overrun to return degraded success",
+    );
+    assertEquals(body.success, true, "Expected success response body");
+    assert(
+      Array.isArray(body.warnings) && body.warnings.length > 0,
+      "Expected a storage cleanup warning",
+    );
+    assert(
+      body.warnings.some((warning: { code: string; message: string }) =>
+        warning.code === "STORAGE_CLEANUP_INCOMPLETE" &&
+        warning.message.includes(
+          "Storage cleanup timed out during registry query",
+        )
+      ),
+      "Expected timeout warning to identify the storage phase",
+    );
+    assertEquals(
+      harness.getRpcCallCount(),
+      1,
+      "Expected relational cleanup to still run after storage timeout",
+    );
+    assertEquals(
+      harness.getAuthDeleteCallCount(),
+      1,
+      "Expected auth deletion to still run after storage timeout",
+    );
+    assert(
+      !harness.operations.some((entry) => entry.startsWith("storage.list:")),
+      "Expected remaining storage sweeps to be skipped after timeout",
+    );
+  });
 });
 
 Deno.test("delete-user uses direct delete fallback when Storage API remove leaves owned objects", async () => {
@@ -887,7 +1062,10 @@ Deno.test("delete-user uses direct delete fallback when Storage API remove leave
   );
   // No storage warnings expected since direct delete cleaned up
   assert(
-    !body.warnings || body.warnings.every((w: { code: string }) => w.code !== "STORAGE_CLEANUP_INCOMPLETE"),
+    !body.warnings ||
+      body.warnings.every((w: { code: string }) =>
+        w.code !== "STORAGE_CLEANUP_INCOMPLETE"
+      ),
     "Expected no storage cleanup warnings when direct delete succeeds",
   );
 });

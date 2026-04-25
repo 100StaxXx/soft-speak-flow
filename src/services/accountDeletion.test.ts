@@ -180,6 +180,7 @@ describe("accountDeletion", () => {
         code: "ACCOUNT_DELETION_STORAGE_CLEANUP_FAILED",
         requestId: "req-delete-1",
         stage: "storage_cleanup",
+        failureReason: "permission",
       },
       requestId: "req-delete-1",
       retryAfterSeconds: undefined,
@@ -200,6 +201,7 @@ describe("accountDeletion", () => {
       status: 500,
       requestId: "req-delete-1",
       stage: "storage_cleanup",
+      failureReason: "permission",
     });
     expect(getAccountDeletionFailureMessage(error)).toBe(
       "We couldn't finish deleting your uploaded files, so your account wasn't removed. Please try again.",
@@ -256,6 +258,7 @@ describe("accountDeletion", () => {
         error: "Account deletion is temporarily unavailable. Please try again later.",
         requestId: "req-delete-2",
         stage: "storage_cleanup",
+        failureReason: "storage_api",
       },
       error: null,
     });
@@ -272,6 +275,7 @@ describe("accountDeletion", () => {
       code: "ACCOUNT_DELETION_STORAGE_CLEANUP_FAILED",
       requestId: "req-delete-2",
       stage: "storage_cleanup",
+      failureReason: "storage_api",
     });
     expect(getAccountDeletionFailureMessage(error)).toBe(
       "We couldn't finish deleting your uploaded files, so your account wasn't removed. Please try again.",

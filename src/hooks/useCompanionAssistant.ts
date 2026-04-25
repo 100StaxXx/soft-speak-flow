@@ -51,7 +51,11 @@ import {
   isCompanionChatSetupError,
 } from "@/utils/companionChatSetup";
 import { formatCurrentDateTimeWithOffset } from "@/utils/currentDateTime";
-import { parseFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
+import {
+  parseFunctionInvokeError,
+  type ParsedFunctionInvokeError,
+  toUserFacingFunctionError,
+} from "@/utils/supabaseFunctionErrors";
 
 export type CompanionAssistantSurface = "companion" | "journeys";
 
@@ -352,8 +356,7 @@ const isSyntheticResolutionMessage = (message: string) => {
   return normalized === "confirm" || normalized === "cancel";
 };
 
-const shouldFallbackToLegacyAgent = async (error: unknown) => {
-  const parsed = await parseFunctionInvokeError(error);
+const shouldFallbackToLegacyAgent = (parsed: ParsedFunctionInvokeError) => {
   const source = [
     parsed.name,
     parsed.message,
@@ -632,6 +635,14 @@ export function useCompanionAssistant({
     if (!unifiedAgentActive) return;
     if (!threadsQuery.isSuccess) return;
     if (bootstrappedScopeRef.current === scopeKey) return;
+    if (
+      launchIntent?.id &&
+      launchIntent.id !== handledLaunchIntentIdRef.current &&
+      launchIntent.starterIntent !== "thread_history" &&
+      launchIntent.target !== "campaign_builder"
+    ) {
+      return;
+    }
 
     const activePersistedThread = threadsQuery.data.threads.find((thread) =>
       thread.archivedAt === null
@@ -680,6 +691,7 @@ export function useCompanionAssistant({
     activeSessionId,
     baseGreeting,
     loadThreadState,
+    launchIntent,
     openFreshThread,
     scopeKey,
     threadsQuery.data,
@@ -891,7 +903,8 @@ export function useCompanionAssistant({
       return true;
     } catch (error) {
       console.error("Failed to submit companion agent message:", error);
-      if (await shouldFallbackToLegacyAgent(error)) {
+      const parsed = await parseFunctionInvokeError(error);
+      if (shouldFallbackToLegacyAgent(parsed)) {
         legacyAssistant.hydrateFromUnifiedState?.({
           sessionId: activeSessionIdRef.current,
           messages: nextUnifiedMessages,
@@ -903,15 +916,9 @@ export function useCompanionAssistant({
         return true;
       }
 
-      toast.error("Cosmiq hit a snag. Try that again.");
-      setMessages((previous) => [
-        ...previous,
-        createMessage(
-          "assistant",
-          "I lost the thread for a second. Ask again and I’ll pick it right back up.",
-          { source: "agent" },
-        ),
-      ]);
+      toast.error(
+        toUserFacingFunctionError(parsed, { action: "send your message" }),
+      );
       return false;
     } finally {
       setIsSubmitting(false);
@@ -1237,24 +1244,35 @@ export function useCompanionAssistant({
     const intentId = launchIntent.id;
 
     void (async () => {
-      if (launchIntent.planningMode) {
-        setPlanningMode(launchIntent.planningMode);
-      }
+      threadMutationVersionRef.current += 1;
 
-      if (useLegacyFallback) {
-        legacyAssistant.startTemplateThread?.();
-      } else {
-        await startNewChat({ greetingText: null });
-      }
+      try {
+        if (launchIntent.planningMode) {
+          setPlanningMode(launchIntent.planningMode);
+        }
 
-      const submitted = await submitMessage(launchMessage, "text", {
-        starterIntent: launchIntent.starterIntent,
-        planningMode: launchIntent.planningMode,
-      });
-      if (submitted && launchIntent.starterIntent === "plan_day") {
-        window.dispatchEvent(new CustomEvent("companion-plan-my-day-started"));
+        if (useLegacyFallback) {
+          legacyAssistant.startTemplateThread?.();
+        } else {
+          await startNewChat({ greetingText: null });
+        }
+
+        const submitted = await submitMessage(launchMessage, "text", {
+          starterIntent: launchIntent.starterIntent,
+          planningMode: launchIntent.planningMode,
+        });
+        if (submitted && launchIntent.starterIntent === "plan_day") {
+          window.dispatchEvent(new CustomEvent("companion-plan-my-day-started"));
+        }
+      } catch (error) {
+        console.error("Failed to handle launch intent:", error);
+        const parsed = await parseFunctionInvokeError(error);
+        toast.error(
+          toUserFacingFunctionError(parsed, { action: "start this chat" }),
+        );
+      } finally {
+        onLaunchIntentConsumed?.(intentId);
       }
-      onLaunchIntentConsumed?.(intentId);
     })();
   }, [
     launchIntent,

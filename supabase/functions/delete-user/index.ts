@@ -11,6 +11,7 @@ interface ErrorWithOptionalFields {
   details?: unknown;
   hint?: unknown;
   cause?: unknown;
+  failureReason?: unknown;
 }
 
 interface StorageListEntry {
@@ -76,30 +77,39 @@ type AccountDeletionStage =
   | "storage_cleanup"
   | "relational_cleanup"
   | "auth_delete";
+type AccountDeletionFailureReason =
+  | "timeout"
+  | "permission"
+  | "storage_api"
+  | "unknown";
 
 interface SanitizedDeleteUserError {
   code: AccountDeletionErrorCode;
   message: string;
   status: number;
   stage?: AccountDeletionStage;
+  failureReason?: AccountDeletionFailureReason;
 }
 
 class AccountDeletionError extends Error {
   status: number;
   code: AccountDeletionErrorCode;
   stage?: AccountDeletionStage;
+  failureReason?: AccountDeletionFailureReason;
 
   constructor(message: string, options: {
     status: number;
     code: AccountDeletionErrorCode;
     cause?: unknown;
     stage?: AccountDeletionStage;
+    failureReason?: AccountDeletionFailureReason;
   }) {
     super(message);
     this.name = "AccountDeletionError";
     this.status = options.status;
     this.code = options.code;
     this.stage = options.stage;
+    this.failureReason = options.failureReason;
     if (options.cause !== undefined) {
       (this as Error & { cause?: unknown }).cause = options.cause;
     }
@@ -154,13 +164,24 @@ const createStageFailureError = (
     | typeof ACCOUNT_DELETION_ERROR_CODES.RELATIONAL_CLEANUP_FAILED
     | typeof ACCOUNT_DELETION_ERROR_CODES.AUTH_DELETE_FAILED,
   cause?: unknown,
-) =>
-  new AccountDeletionError(ACCOUNT_DELETION_TEMPORARILY_UNAVAILABLE_MESSAGE, {
-    status: 500,
-    code,
-    cause,
-    stage,
-  });
+  failureReason?: AccountDeletionFailureReason,
+) => {
+  const resolvedFailureReason = failureReason ??
+    getAccountDeletionFailureReason(cause);
+
+  return new AccountDeletionError(
+    ACCOUNT_DELETION_TEMPORARILY_UNAVAILABLE_MESSAGE,
+    {
+      status: 500,
+      code,
+      cause,
+      stage,
+      ...(resolvedFailureReason
+        ? { failureReason: resolvedFailureReason }
+        : {}),
+    },
+  );
+};
 
 const createAdminClient = (
   supabaseUrl: string,
@@ -186,6 +207,23 @@ const getErrorFieldRecord = (error: unknown): ErrorWithOptionalFields | null =>
   error && typeof error === "object"
     ? (error as ErrorWithOptionalFields)
     : null;
+
+const isAccountDeletionFailureReason = (
+  value: unknown,
+): value is AccountDeletionFailureReason =>
+  value === "timeout" ||
+  value === "permission" ||
+  value === "storage_api" ||
+  value === "unknown";
+
+const getAccountDeletionFailureReason = (
+  error: unknown,
+): AccountDeletionFailureReason | undefined => {
+  const failureReason = getErrorFieldRecord(error)?.failureReason;
+  return isAccountDeletionFailureReason(failureReason)
+    ? failureReason
+    : undefined;
+};
 
 const getErrorMessage = (error: unknown): string | undefined => {
   if (error instanceof Error && error.message.trim().length > 0) {
@@ -267,6 +305,49 @@ const getInnermostError = (error: unknown): unknown => {
   }
 
   return error;
+};
+
+const classifyStorageCleanupFailureReason = (
+  error: unknown,
+): AccountDeletionFailureReason => {
+  const explicitReason = getAccountDeletionFailureReason(error);
+  if (explicitReason) {
+    return explicitReason;
+  }
+
+  const innermostError = getInnermostError(error);
+  const normalizedText = normalizeErrorText(
+    `${getNormalizedErrorText(error)} ${
+      getNormalizedErrorText(innermostError)
+    }`,
+  );
+  const status = getErrorStatus(innermostError) ?? getErrorStatus(error);
+
+  if (
+    normalizedText.includes("storage cleanup timed out") ||
+    normalizedText.includes("timed out during")
+  ) {
+    return "timeout";
+  }
+
+  if (
+    status === 403 ||
+    normalizedText.includes("permission denied") ||
+    normalizedText.includes("rls") ||
+    normalizedText.includes("policy")
+  ) {
+    return "permission";
+  }
+
+  if (
+    typeof status === "number" ||
+    getErrorCode(error) ||
+    getErrorCode(innermostError)
+  ) {
+    return "storage_api";
+  }
+
+  return "unknown";
 };
 
 const describeError = (error: unknown): Record<string, unknown> => {
@@ -358,6 +439,13 @@ const isAlreadyDeletedAuthUserError = (error: unknown): boolean => {
 export const isTransientDeleteUserInfrastructureError = (
   error: unknown,
 ): boolean => {
+  if (
+    error instanceof AccountDeletionError &&
+    error.failureReason === "permission"
+  ) {
+    return false;
+  }
+
   const status = getErrorStatus(error);
   const normalizedText = getNormalizedErrorText(error);
 
@@ -397,6 +485,7 @@ function sanitizeError(error: unknown): SanitizedDeleteUserError {
       status: error.status,
       code: error.code,
       ...(error.stage ? { stage: error.stage } : {}),
+      ...(error.failureReason ? { failureReason: error.failureReason } : {}),
     };
   }
 
@@ -448,6 +537,9 @@ const createErrorResponse = (
       code: details.code,
       status: details.status,
       ...(details.stage ? { stage: details.stage } : {}),
+      ...(details.failureReason
+        ? { failureReason: details.failureReason }
+        : {}),
       requestId,
     }),
     {
@@ -777,6 +869,7 @@ const listOwnedStorageObjectsForColumn = async (
               "storage_cleanup",
               ACCOUNT_DELETION_ERROR_CODES.STORAGE_CLEANUP_FAILED,
               error,
+              "permission",
             );
           }
 
@@ -912,17 +1005,20 @@ const summarizeOwnedStorageObjects = (
     return summary;
   }, {});
 
-const checkStorageDeadline = (startTime: number, phase: string): void => {
+const getStorageDeadlineOverrun = (
+  startTime: number,
+  phase: string,
+): { elapsed: number; message: string; phase: string } | null => {
   const elapsed = Date.now() - startTime;
-  if (elapsed > STORAGE_CLEANUP_DEADLINE_MS) {
-    throw createStageFailureError(
-      "storage_cleanup",
-      ACCOUNT_DELETION_ERROR_CODES.STORAGE_CLEANUP_FAILED,
-      {
-        message: `Storage cleanup timed out during ${phase} after ${elapsed}ms`,
-      },
-    );
+  if (elapsed <= STORAGE_CLEANUP_DEADLINE_MS) {
+    return null;
   }
+
+  return {
+    elapsed,
+    phase,
+    message: `Storage cleanup timed out during ${phase} after ${elapsed}ms`,
+  };
 };
 
 const deleteOwnedStorageObjectsDirectly = async (
@@ -957,12 +1053,33 @@ const deleteUserStorageAssets = async (
 ): Promise<string[]> => {
   const storageWarnings: string[] = [];
   const storageStartTime = Date.now();
+  const stopForStorageDeadline = (phase: string): boolean => {
+    const deadlineOverrun = getStorageDeadlineOverrun(storageStartTime, phase);
+    if (!deadlineOverrun) {
+      return false;
+    }
+
+    console.warn(
+      "[delete-user] storage cleanup deadline reached — continuing with account deletion",
+      {
+        userId,
+        phase: deadlineOverrun.phase,
+        elapsed: deadlineOverrun.elapsed,
+        deadlineMs: STORAGE_CLEANUP_DEADLINE_MS,
+      },
+    );
+    storageWarnings.push(deadlineOverrun.message);
+    return true;
+  };
+
   const registeredStorageAssets = await listRegisteredStorageAssets(
     supabase,
     userId,
     waitForRetry,
   );
-  checkStorageDeadline(storageStartTime, "registry query");
+  if (stopForStorageDeadline("registry query")) {
+    return storageWarnings;
+  }
 
   const registeredStoragePathsByBucket = groupStoragePathsByBucket(
     registeredStorageAssets,
@@ -984,14 +1101,18 @@ const deleteUserStorageAssets = async (
     registeredStoragePathsByBucket,
     waitForRetry,
   );
-  checkStorageDeadline(storageStartTime, "registry removal");
+  if (stopForStorageDeadline("registry removal")) {
+    return storageWarnings;
+  }
 
   const legacyStoragePathsByBucket = await collectLegacyUserStoragePaths(
     supabase,
     userId,
     waitForRetry,
   );
-  checkStorageDeadline(storageStartTime, "legacy collection");
+  if (stopForStorageDeadline("legacy collection")) {
+    return storageWarnings;
+  }
 
   const legacyEntries = Array.from(legacyStoragePathsByBucket.entries())
     .flatMap(([bucket, paths]) => paths.map((path) => ({ bucket, path })));
@@ -1000,11 +1121,14 @@ const deleteUserStorageAssets = async (
   );
 
   if (unregisteredLegacyEntries.length > 0) {
-    console.warn("[delete-user] legacy fallback discovered unregistered storage assets", {
-      userId,
-      count: unregisteredLegacyEntries.length,
-      buckets: summarizeOwnedStorageObjects(unregisteredLegacyEntries),
-    });
+    console.warn(
+      "[delete-user] legacy fallback discovered unregistered storage assets",
+      {
+        userId,
+        count: unregisteredLegacyEntries.length,
+        buckets: summarizeOwnedStorageObjects(unregisteredLegacyEntries),
+      },
+    );
   }
 
   await removeStoragePathsByBucket(
@@ -1012,7 +1136,9 @@ const deleteUserStorageAssets = async (
     legacyStoragePathsByBucket,
     waitForRetry,
   );
-  checkStorageDeadline(storageStartTime, "legacy removal");
+  if (stopForStorageDeadline("legacy removal")) {
+    return storageWarnings;
+  }
 
   // Validate legacy storage was actually removed by re-collecting and checking
   if (legacyStoragePathsByBucket.size > 0) {
@@ -1034,24 +1160,33 @@ const deleteUserStorageAssets = async (
       }
       // Demoted from fatal error to warning — the ownership sweep that follows
       // will catch any stragglers, and orphaned files should not block deletion.
-      console.warn("[delete-user] legacy storage paths remain after cleanup — continuing", {
-        userId,
-        buckets: remainingSummary,
-      });
+      console.warn(
+        "[delete-user] legacy storage paths remain after cleanup — continuing",
+        {
+          userId,
+          buckets: remainingSummary,
+        },
+      );
       storageWarnings.push(
-        `Legacy storage paths remain after cleanup: ${JSON.stringify(remainingSummary)}`,
+        `Legacy storage paths remain after cleanup: ${
+          JSON.stringify(remainingSummary)
+        }`,
       );
     }
   }
 
-  checkStorageDeadline(storageStartTime, "legacy validation");
+  if (stopForStorageDeadline("legacy validation")) {
+    return storageWarnings;
+  }
 
   const ownedStorageObjects = await listOwnedStorageObjects(
     supabase,
     userId,
     waitForRetry,
   );
-  checkStorageDeadline(storageStartTime, "ownership query");
+  if (stopForStorageDeadline("ownership query")) {
+    return storageWarnings;
+  }
 
   const ownedStoragePathsByBucket = groupStoragePathsByBucket(
     ownedStorageObjects,
@@ -1069,12 +1204,15 @@ const deleteUserStorageAssets = async (
   }
 
   if (unregisteredOwnedObjects.length > 0) {
-    console.warn("[delete-user] ownership fallback discovered unregistered storage assets", {
-      userId,
-      count: unregisteredOwnedObjects.length,
-      buckets: summarizeOwnedStorageObjects(unregisteredOwnedObjects),
-      samplePaths: unregisteredOwnedObjects.slice(0, 10),
-    });
+    console.warn(
+      "[delete-user] ownership fallback discovered unregistered storage assets",
+      {
+        userId,
+        count: unregisteredOwnedObjects.length,
+        buckets: summarizeOwnedStorageObjects(unregisteredOwnedObjects),
+        samplePaths: unregisteredOwnedObjects.slice(0, 10),
+      },
+    );
   }
 
   await removeStoragePathsByBucket(
@@ -1082,7 +1220,9 @@ const deleteUserStorageAssets = async (
     ownedStoragePathsByBucket,
     waitForRetry,
   );
-  checkStorageDeadline(storageStartTime, "ownership removal");
+  if (stopForStorageDeadline("ownership removal")) {
+    return storageWarnings;
+  }
 
   let remainingOwnedObjects = await listOwnedStorageObjects(
     supabase,
@@ -1090,15 +1230,20 @@ const deleteUserStorageAssets = async (
     waitForRetry,
   );
   if (remainingOwnedObjects.length > 0) {
-    console.warn("[delete-user] owned storage objects remain after Storage API remove — attempting direct delete", {
-      userId,
-      buckets: summarizeOwnedStorageObjects(remainingOwnedObjects),
-      samplePaths: remainingOwnedObjects.slice(0, 10),
-    });
+    console.warn(
+      "[delete-user] owned storage objects remain after Storage API remove — attempting direct delete",
+      {
+        userId,
+        buckets: summarizeOwnedStorageObjects(remainingOwnedObjects),
+        samplePaths: remainingOwnedObjects.slice(0, 10),
+      },
+    );
 
     try {
       await deleteOwnedStorageObjectsDirectly(supabase, userId, waitForRetry);
-      checkStorageDeadline(storageStartTime, "direct delete");
+      if (stopForStorageDeadline("direct delete")) {
+        return storageWarnings;
+      }
 
       remainingOwnedObjects = await listOwnedStorageObjects(
         supabase,
@@ -1106,21 +1251,31 @@ const deleteUserStorageAssets = async (
         waitForRetry,
       );
     } catch (directDeleteError) {
-      console.warn("[delete-user] direct storage.objects delete failed — continuing", {
-        userId,
-        ...describeError(directDeleteError),
-      });
+      console.warn(
+        "[delete-user] direct storage.objects delete failed — continuing",
+        {
+          userId,
+          ...describeError(directDeleteError),
+        },
+      );
     }
 
     if (remainingOwnedObjects.length > 0) {
-      const remainingSummary = summarizeOwnedStorageObjects(remainingOwnedObjects);
-      console.warn("[delete-user] owned storage objects still remain after fallback — continuing", {
-        userId,
-        buckets: remainingSummary,
-        samplePaths: remainingOwnedObjects.slice(0, 10),
-      });
+      const remainingSummary = summarizeOwnedStorageObjects(
+        remainingOwnedObjects,
+      );
+      console.warn(
+        "[delete-user] owned storage objects still remain after fallback — continuing",
+        {
+          userId,
+          buckets: remainingSummary,
+          samplePaths: remainingOwnedObjects.slice(0, 10),
+        },
+      );
       storageWarnings.push(
-        `Owned storage objects remain after cleanup: ${JSON.stringify(remainingSummary)}`,
+        `Owned storage objects remain after cleanup: ${
+          JSON.stringify(remainingSummary)
+        }`,
       );
     }
   }
@@ -1208,7 +1363,11 @@ export const handleDeleteUser = async (
 
     let storageWarnings: string[] = [];
     try {
-      storageWarnings = await deleteUserStorageAssets(supabase, user.id, waitForRetry);
+      storageWarnings = await deleteUserStorageAssets(
+        supabase,
+        user.id,
+        waitForRetry,
+      );
     } catch (error) {
       console.error("[delete-user] storage cleanup failed", {
         requestId,
@@ -1220,6 +1379,7 @@ export const handleDeleteUser = async (
         "storage_cleanup",
         ACCOUNT_DELETION_ERROR_CODES.STORAGE_CLEANUP_FAILED,
         error,
+        classifyStorageCleanupFailureReason(error),
       );
     }
 

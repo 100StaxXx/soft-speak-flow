@@ -172,7 +172,7 @@ Deno.test("generateCompanionImage falls back to square size and then drops quali
   }
 });
 
-Deno.test("editCompanionImage sends multipart image uploads with input_fidelity for gpt-image-2", async () => {
+Deno.test("editCompanionImage sends multipart image uploads without input_fidelity for gpt-image-2", async () => {
   const originalCompanionImageModel = Deno.env.get("OPENAI_COMPANION_IMAGE_MODEL");
   const originalImageModel = Deno.env.get("OPENAI_IMAGE_MODEL");
 
@@ -208,7 +208,7 @@ Deno.test("editCompanionImage sends multipart image uploads with input_fidelity 
         assert(formData.get("size") === "1536x1024", `Expected size in multipart body, got ${String(formData.get("size"))}`);
         assert(formData.get("quality") === "high", `Expected quality in multipart body, got ${String(formData.get("quality"))}`);
         assert(formData.get("user") === "user-1", `Expected user tag in multipart body, got ${String(formData.get("user"))}`);
-        assert(formData.get("input_fidelity") === "high", `Expected input_fidelity=high, got ${String(formData.get("input_fidelity"))}`);
+        assert(formData.get("input_fidelity") === null, `Did not expect input_fidelity for gpt-image-2, got ${String(formData.get("input_fidelity"))}`);
 
         const images = formData.getAll("image[]");
         assert(images.length === 2, `Expected 2 uploaded reference images, got ${images.length}`);
@@ -245,6 +245,134 @@ Deno.test("editCompanionImage sends multipart image uploads with input_fidelity 
 
     assert(result.revisedPrompt === "evolved prompt", `Expected revised prompt, got ${String(result.revisedPrompt)}`);
     assert(result.imageDataUrl.startsWith("data:image/png;base64,"), "Expected multipart edit result to return a data URL");
+  } finally {
+    restoreEnv("OPENAI_COMPANION_IMAGE_MODEL", originalCompanionImageModel ?? undefined);
+    restoreEnv("OPENAI_IMAGE_MODEL", originalImageModel ?? undefined);
+  }
+});
+
+Deno.test("editCompanionImage retries without input_fidelity when the provider rejects it", async () => {
+  const originalCompanionImageModel = Deno.env.get("OPENAI_COMPANION_IMAGE_MODEL");
+  const originalImageModel = Deno.env.get("OPENAI_IMAGE_MODEL");
+
+  try {
+    Deno.env.set("OPENAI_COMPANION_IMAGE_MODEL", "gpt-image-1.5");
+    Deno.env.delete("OPENAI_IMAGE_MODEL");
+
+    let editCalls = 0;
+    const guardedFetch: typeof fetch = async (input, init) => {
+      const url = resolveInputUrl(input);
+      const requestInit = coerceRequestInit(init);
+
+      if (url === "https://example.com/reference.png") {
+        return createImageResponse("reference-image");
+      }
+
+      if (url === OPENAI_IMAGE_EDITS_URL) {
+        editCalls += 1;
+        const formData = requestInit.body;
+        assert(formData instanceof FormData, "Expected FormData body for input_fidelity retry test");
+
+        if (editCalls === 1) {
+          assert(formData.get("model") === "gpt-image-1.5", `Expected overridden model, got ${String(formData.get("model"))}`);
+          assert(formData.get("input_fidelity") === "high", `Expected first edit attempt input_fidelity high, got ${String(formData.get("input_fidelity"))}`);
+          return new Response(JSON.stringify({ error: "Unsupported parameter: input_fidelity" }), { status: 400 });
+        }
+
+        assert(formData.get("input_fidelity") === null, `Expected retry to omit input_fidelity, got ${String(formData.get("input_fidelity"))}`);
+        return createJsonResponse({
+          data: [
+            {
+              b64_json: btoa("edited-image"),
+            },
+          ],
+        });
+      }
+
+      throw new Error(`Unexpected guardedFetch URL: ${url}`);
+    };
+
+    const result = await editCompanionImage({
+      guardedFetch,
+      openAIApiKey: "test-key",
+      prompt: "retry without fidelity",
+      size: "1024x1024",
+      quality: "high",
+      userId: "user-1",
+      referenceImages: [{ imageUrl: "https://example.com/reference.png" }],
+    });
+
+    assert(editCalls === 2, `Expected 2 edit calls, got ${editCalls}`);
+    assert(result.imageDataUrl.startsWith("data:image/png;base64,"), "Expected retry result to return a data URL");
+  } finally {
+    restoreEnv("OPENAI_COMPANION_IMAGE_MODEL", originalCompanionImageModel ?? undefined);
+    restoreEnv("OPENAI_IMAGE_MODEL", originalImageModel ?? undefined);
+  }
+});
+
+Deno.test("editCompanionImage can fall back size before retrying without input_fidelity", async () => {
+  const originalCompanionImageModel = Deno.env.get("OPENAI_COMPANION_IMAGE_MODEL");
+  const originalImageModel = Deno.env.get("OPENAI_IMAGE_MODEL");
+
+  try {
+    Deno.env.set("OPENAI_COMPANION_IMAGE_MODEL", "gpt-image-1.5");
+    Deno.env.delete("OPENAI_IMAGE_MODEL");
+
+    const seenRequests: Array<{ size: string | null; inputFidelity: string | null }> = [];
+    const guardedFetch: typeof fetch = async (input, init) => {
+      const url = resolveInputUrl(input);
+      const requestInit = coerceRequestInit(init);
+
+      if (url === "https://example.com/reference.png") {
+        return createImageResponse("reference-image");
+      }
+
+      if (url === OPENAI_IMAGE_EDITS_URL) {
+        const formData = requestInit.body;
+        assert(formData instanceof FormData, "Expected FormData body for size and input_fidelity fallback test");
+        seenRequests.push({
+          size: typeof formData.get("size") === "string" ? String(formData.get("size")) : null,
+          inputFidelity: typeof formData.get("input_fidelity") === "string" ? String(formData.get("input_fidelity")) : null,
+        });
+
+        if (seenRequests.length === 1) {
+          return new Response(JSON.stringify({ error: "unsupported size" }), { status: 400 });
+        }
+
+        if (seenRequests.length === 2) {
+          return new Response(JSON.stringify({ error: "Unsupported parameter: input_fidelity" }), { status: 400 });
+        }
+
+        return createJsonResponse({
+          data: [
+            {
+              b64_json: btoa("edited-image"),
+            },
+          ],
+        });
+      }
+
+      throw new Error(`Unexpected guardedFetch URL: ${url}`);
+    };
+
+    const result = await editCompanionImage({
+      guardedFetch,
+      openAIApiKey: "test-key",
+      prompt: "fallback size and fidelity",
+      size: "1536x1024",
+      quality: "high",
+      userId: "user-1",
+      referenceImages: [{ imageUrl: "https://example.com/reference.png" }],
+    });
+
+    assert(seenRequests.length === 3, `Expected 3 edit calls, got ${seenRequests.length}`);
+    assert(seenRequests[0]?.size === "1536x1024", `Expected first attempt requested size, got ${String(seenRequests[0]?.size)}`);
+    assert(seenRequests[0]?.inputFidelity === "high", `Expected first attempt input_fidelity high, got ${String(seenRequests[0]?.inputFidelity)}`);
+    assert(seenRequests[1]?.size === "1024x1024", `Expected second attempt square fallback, got ${String(seenRequests[1]?.size)}`);
+    assert(seenRequests[1]?.inputFidelity === "high", `Expected second attempt input_fidelity high, got ${String(seenRequests[1]?.inputFidelity)}`);
+    assert(seenRequests[2]?.size === "1024x1024", `Expected third attempt square fallback, got ${String(seenRequests[2]?.size)}`);
+    assert(seenRequests[2]?.inputFidelity === null, `Expected third attempt to omit input_fidelity, got ${String(seenRequests[2]?.inputFidelity)}`);
+    assert(result.size === "1024x1024", `Expected returned edit size to reflect fallback, got ${result.size}`);
   } finally {
     restoreEnv("OPENAI_COMPANION_IMAGE_MODEL", originalCompanionImageModel ?? undefined);
     restoreEnv("OPENAI_IMAGE_MODEL", originalImageModel ?? undefined);
@@ -306,12 +434,12 @@ Deno.test("editCompanionImage falls back to square size and then drops quality a
     assert(seenRequests.length === 3, `Expected 3 edit attempts, got ${seenRequests.length}`);
     assert(seenRequests[0]?.size === "1536x1024", `Expected first edit attempt to keep requested size, got ${String(seenRequests[0]?.size)}`);
     assert(seenRequests[0]?.quality === "high", `Expected first edit attempt quality high, got ${String(seenRequests[0]?.quality)}`);
-    assert(seenRequests[0]?.inputFidelity === "high", `Expected first edit attempt input_fidelity high, got ${String(seenRequests[0]?.inputFidelity)}`);
+    assert(seenRequests[0]?.inputFidelity === null, `Did not expect first edit attempt input_fidelity for gpt-image-2, got ${String(seenRequests[0]?.inputFidelity)}`);
     assert(seenRequests[1]?.size === "1024x1024", `Expected second edit attempt to fall back to square size, got ${String(seenRequests[1]?.size)}`);
     assert(seenRequests[1]?.quality === "high", `Expected second edit attempt to keep quality, got ${String(seenRequests[1]?.quality)}`);
     assert(seenRequests[2]?.size === "1024x1024", `Expected third edit attempt to keep square size, got ${String(seenRequests[2]?.size)}`);
     assert(seenRequests[2]?.quality === null, `Expected third edit attempt to drop quality, got ${String(seenRequests[2]?.quality)}`);
-    assert(seenRequests[2]?.inputFidelity === "high", `Expected third edit attempt to preserve input_fidelity, got ${String(seenRequests[2]?.inputFidelity)}`);
+    assert(seenRequests[2]?.inputFidelity === null, `Did not expect third edit attempt input_fidelity for gpt-image-2, got ${String(seenRequests[2]?.inputFidelity)}`);
     assert(result.size === "1024x1024", `Expected returned edit size to reflect fallback, got ${result.size}`);
   } finally {
     restoreEnv("OPENAI_COMPANION_IMAGE_MODEL", originalCompanionImageModel ?? undefined);

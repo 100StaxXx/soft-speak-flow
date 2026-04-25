@@ -310,6 +310,7 @@ const Profile = () => {
           status: errorMetadata.status,
           requestId: errorMetadata.requestId,
           stage: errorMetadata.stage,
+          failureReason: errorMetadata.failureReason,
           message: error instanceof Error ? error.message : String(error),
         });
         toast({
