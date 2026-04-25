@@ -404,11 +404,21 @@ const isMissingCompanionAgentFunctionError = (
 const isCompanionAgentSetupError = (parsed: ParsedFunctionInvokeError) => {
   const code = getParsedFunctionCode(parsed)?.toLowerCase() ?? "";
   const source = getCompanionAgentErrorSource(parsed);
+  const failureReason = [
+    parsed.failureReason,
+    parsed.responsePayload?.failureReason,
+  ]
+    .filter((value): value is string =>
+      typeof value === "string" && value.length > 0
+    )
+    .join(" ")
+    .toLowerCase();
 
   if (
     code === "service_misconfigured" ||
     code === "abuse_check_failed" ||
-    code === "companion_agent_setup_failed"
+    code === "companion_agent_setup_failed" ||
+    failureReason.includes("schema_mismatch")
   ) {
     return true;
   }
@@ -427,6 +437,19 @@ const isCompanionAgentSetupError = (parsed: ParsedFunctionInvokeError) => {
     "abuse_protection_config",
     "cost_guardrail_config",
     "cost_guardrail_state",
+    "user_companion",
+    "daily_tasks",
+    "external_calendar_events",
+    "companion_memories",
+    "user_reflections",
+    "daily_check_ins",
+    "focus_sessions",
+    "habits",
+    "epics",
+    "user_ai_learning",
+    "user_ai_preferences",
+    "daily_planning_preferences",
+    "profiles",
   ].some((token) => source.includes(token));
 };
 

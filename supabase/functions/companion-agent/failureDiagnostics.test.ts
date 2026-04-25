@@ -23,11 +23,10 @@ const subStageError = (
   originalError: unknown,
 ) => ({
   name: "AgentRunSubStageError",
-  message: originalError instanceof Error
-    ? originalError.message
-    : String(originalError),
+  message: `companion agent sub-stage ${subStage} failed`,
   subStage,
   originalError,
+  cause: originalError,
 });
 
 Deno.test("getCompanionAgentFailureReason returns schema_mismatch for missing column on context table", () => {
@@ -210,15 +209,65 @@ Deno.test("buildErrorLog captures stack and PostgrestError fields", () => {
   assertEquals(log.stack, "at fn (file.ts:1)");
 });
 
-Deno.test("buildErrorLog represents Error.cause without recursing", () => {
+Deno.test("buildErrorLog recurses into Error.cause", () => {
   const cause = new Error("inner reason");
   const wrapped = new Error("outer wrap", { cause });
   const log = buildErrorLog(wrapped);
   assertEquals(typeof log.cause, "object");
+  assertEquals(log.cause?.name, "Error");
+  assertEquals(log.cause?.message, "inner reason");
+});
+
+Deno.test("buildErrorLog extracts PostgrestError fields from plain object cause", () => {
+  const cause = postgrestError({
+    message: 'column "scheduled_time" of relation "daily_tasks" does not exist',
+    code: "42703",
+    details: "schema cache lookup failed",
+    hint: "reload PostgREST schema",
+  });
+  const wrapped = new Error("context load failed", { cause });
+  const log = buildErrorLog(wrapped);
+  assertEquals(log.message, "context load failed");
+  assertEquals(log.cause?.name, "PostgrestError");
   assertEquals(
-    (log.cause as { name: string; message: string }).message,
-    "inner reason",
+    log.cause?.message,
+    'column "scheduled_time" of relation "daily_tasks" does not exist',
   );
+  assertEquals(log.cause?.code, "42703");
+  assertEquals(log.cause?.details, "schema cache lookup failed");
+  assertEquals(log.cause?.hint, "reload PostgREST schema");
+});
+
+Deno.test("buildErrorLog exposes PostgrestError cause on AgentRunSubStageError wrappers", () => {
+  const cause = postgrestError({
+    message:
+      'Could not find the "actual_time_spent" column of "focus_sessions" in the schema cache',
+    code: "PGRST204",
+    details: "Searched for the column in public.focus_sessions",
+    hint: "Perhaps you meant focus_duration_minutes",
+  });
+  const wrapped = subStageError("context_load", cause);
+  const log = buildErrorLog(wrapped);
+  assertEquals(log.name, "AgentRunSubStageError");
+  assertEquals(log.message, "companion agent sub-stage context_load failed");
+  assertEquals(log.cause?.name, "PostgrestError");
+  assertEquals(log.cause?.code, "PGRST204");
+  assertEquals(
+    log.cause?.details,
+    "Searched for the column in public.focus_sessions",
+  );
+  assertEquals(log.cause?.hint, "Perhaps you meant focus_duration_minutes");
+});
+
+Deno.test("buildErrorLog guards self-referential cause cycles", () => {
+  const err: { name: string; message: string; cause?: unknown } = {
+    name: "LoopError",
+    message: "outer",
+  };
+  err.cause = err;
+  const log = buildErrorLog(err);
+  assertEquals(log.name, "LoopError");
+  assertEquals(log.cause?.message, "(cause chain cycle)");
 });
 
 Deno.test("buildErrorLog handles null and primitive errors gracefully", () => {

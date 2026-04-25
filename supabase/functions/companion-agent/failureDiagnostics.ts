@@ -27,6 +27,19 @@ const readErrorFields = (error: unknown) => {
   return fields;
 };
 
+interface ErrorLog {
+  name?: string;
+  message?: string;
+  code?: string;
+  details?: string;
+  hint?: string;
+  nestedError?: string;
+  stack?: string;
+  cause?: ErrorLog;
+}
+
+const MAX_ERROR_LOG_DEPTH = 4;
+
 export const normalizeErrorSource = (error: unknown) => {
   if (!error) return "";
   if (typeof error === "string") return error.toLowerCase();
@@ -53,9 +66,21 @@ const unwrapAgentRunSubStage = (error: unknown): unknown => {
   return e.originalError ?? error;
 };
 
-export const buildErrorLog = (error: unknown) => {
+export const buildErrorLog = (
+  error: unknown,
+  depth = 0,
+  seen = new WeakSet<object>(),
+): ErrorLog => {
+  if (depth > MAX_ERROR_LOG_DEPTH) {
+    return { message: "(cause chain truncated)" };
+  }
   if (!error) return { message: "(no error)" };
   if (typeof error !== "object") return { message: String(error) };
+
+  if (seen.has(error)) {
+    return { message: "(cause chain cycle)" };
+  }
+  seen.add(error);
 
   const fields = readErrorFields(error) ?? {};
   const e = error as { stack?: unknown; cause?: unknown };
@@ -70,9 +95,7 @@ export const buildErrorLog = (error: unknown) => {
     stack: stringField(e.stack),
     cause: cause === undefined
       ? undefined
-      : cause instanceof Error
-      ? { name: cause.name, message: cause.message }
-      : String(cause),
+      : buildErrorLog(cause, depth + 1, seen),
   };
 };
 

@@ -104,7 +104,7 @@ serve(async (req) => {
     });
     return createSafeErrorResponse(req, {
       status: 500,
-      code: failureReason === "schema_mismatch"
+      code: failureReason.includes("schema_mismatch")
         ? "COMPANION_AGENT_SETUP_FAILED"
         : "COMPANION_AGENT_FAILED",
       error: "Companion agent hit a snag. Please try again.",

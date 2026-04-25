@@ -694,6 +694,64 @@ describe("useCompanionAssistant", () => {
     consoleError.mockRestore();
   });
 
+  it("shows a setup message for namespaced companion-agent schema mismatch failures", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.supabaseInvoke.mockRejectedValueOnce(
+      Object.assign(new Error("Edge Function returned a non-2xx status code"), {
+        name: "FunctionsHttpError",
+      }),
+    );
+    mocks.parseFunctionInvokeError.mockResolvedValueOnce({
+      name: "FunctionsHttpError",
+      message: "Edge Function returned a non-2xx status code",
+      status: 500,
+      code: "COMPANION_AGENT_FAILED",
+      requestId: "f67d4e8d-5794-42b0-86ed-fc8643136b6a",
+      stage: "agent_run",
+      failureReason: "context_load.schema_mismatch",
+      responsePayload: {
+        code: "COMPANION_AGENT_FAILED",
+        error: "Companion agent hit a snag. Please try again.",
+        requestId: "f67d4e8d-5794-42b0-86ed-fc8643136b6a",
+        stage: "agent_run",
+        failureReason: "context_load.schema_mismatch",
+      },
+      backendMessage: "Companion agent hit a snag. Please try again.",
+      isOffline: false,
+      category: "http",
+    });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("persisted-session");
+    });
+
+    let submitted: boolean | undefined;
+    await act(async () => {
+      submitted = await result.current.submitMessage("Plan my day", "text");
+    });
+
+    expect(submitted).toBe(false);
+    expect(mocks.legacySubmitMessage).not.toHaveBeenCalled();
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      "Companion Agent is still being set up here. Please try again after the latest backend update.",
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      "Failed to submit companion agent message:",
+      expect.objectContaining({
+        code: "COMPANION_AGENT_FAILED",
+        failureReason: "context_load.schema_mismatch",
+        fallbackToLegacy: false,
+      }),
+    );
+    consoleError.mockRestore();
+  });
+
   it("confirms the active pending action through the deterministic executor path", async () => {
     mocks.loadPendingAction.mockResolvedValue({
       id: "action-1",
