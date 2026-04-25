@@ -325,6 +325,29 @@ const isNotFoundStyleError = (error: unknown): boolean => {
     normalizedText.includes("no rows");
 };
 
+const isStorageMissingObjectError = (error: unknown): boolean => {
+  const normalizedText = getNormalizedErrorText(error);
+
+  return isNotFoundStyleError(error) ||
+    normalizedText.includes("no such") ||
+    normalizedText.includes("does not exist");
+};
+
+const isMissingStorageOwnershipColumnError = (
+  error: unknown,
+  ownershipColumn: "owner" | "owner_id",
+): boolean => {
+  const normalizedText = getNormalizedErrorText(error);
+  const normalizedColumn = normalizeErrorText(ownershipColumn);
+
+  return normalizedText.includes(normalizedColumn) &&
+    (
+      normalizedText.includes("does not exist") ||
+      normalizedText.includes("schema cache") ||
+      normalizedText.includes("could not find")
+    );
+};
+
 const isAlreadyDeletedAuthUserError = (error: unknown): boolean => {
   const normalizedText = getNormalizedErrorText(error);
 
@@ -497,7 +520,7 @@ const listStorageDirectoryEntries = async (
         );
 
         if (error) {
-          if (isNotFoundStyleError(error)) {
+          if (isStorageMissingObjectError(error)) {
             pageEntries = [];
             return;
           }
@@ -616,7 +639,7 @@ const removeStoragePaths = async (
       `storage remove ${bucket}`,
       async () => {
         const { error } = await supabase.storage.from(bucket).remove(batch);
-        if (error && !isNotFoundStyleError(error)) {
+        if (error && !isStorageMissingObjectError(error)) {
           throw error;
         }
       },
@@ -724,6 +747,17 @@ const listOwnedStorageObjectsForColumn = async (
           .range(offset, offset + STORAGE_LIST_PAGE_SIZE - 1);
 
         if (error) {
+          if (isMissingStorageOwnershipColumnError(error, ownershipColumn)) {
+            console.warn(
+              `[delete-user] storage ownership query (${ownershipColumn}) skipped because the column is unavailable`,
+              {
+                ...describeError(error),
+              },
+            );
+            pageEntries = [];
+            return;
+          }
+
           // Classify RLS / permission errors as terminal so they aren't
           // uselessly retried — these require a config fix, not a retry.
           const errorText = getNormalizedErrorText(error);

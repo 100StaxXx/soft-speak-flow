@@ -6,7 +6,6 @@ const patterns = [
   "src/hooks/useCompanionPlanner",
   "src/hooks/useLegacyCompanionAssistantAdapter",
   "src/components/companion/CompanionStructuredResponseCards",
-  "src/components/companion/CompanionPlannerPanel",
   "src/components/journeys/JourneysCompanionPlannerModal",
 ];
 

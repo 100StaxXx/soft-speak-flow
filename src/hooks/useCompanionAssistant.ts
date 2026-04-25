@@ -453,6 +453,7 @@ export function useCompanionAssistant({
   const localThreadCreatedAtRef = useRef(new Date().toISOString());
   const scopeKeyRef = useRef<string | null>(null);
   const bootstrappedScopeRef = useRef<string | null>(null);
+  const threadMutationVersionRef = useRef(0);
   const handledLaunchIntentIdRef = useRef<string | null>(null);
   const threadUiStateCacheRef = useRef<
     Map<string, CachedCompanionThreadUiState>
@@ -517,6 +518,7 @@ export function useCompanionAssistant({
     greetingText?: string;
     markBootstrapped?: boolean;
   }) => {
+    threadMutationVersionRef.current += 1;
     const nextSessionId = options?.sessionId ??
       generateCompanionThreadSessionId();
     const greetingText = options?.greetingText?.trim();
@@ -564,11 +566,24 @@ export function useCompanionAssistant({
     structuredResponse,
   ]);
 
-  const loadThreadState = useCallback(async (sessionId: string) => {
+  const loadThreadState = useCallback(async (
+    sessionId: string,
+    options?: {
+      expectedMutationVersion?: number;
+    },
+  ) => {
     const [threadMessages, loadedPendingAction] = await Promise.all([
       loadCompanionChatThreadMessages(sessionId, surface),
       loadCompanionPendingAction(sessionId),
     ]);
+
+    if (
+      options?.expectedMutationVersion !== undefined &&
+      threadMutationVersionRef.current !== options.expectedMutationVersion
+    ) {
+      return false;
+    }
+
     const cachedThreadUiState = threadUiStateCacheRef.current.get(sessionId) ??
       null;
     const mappedThreadMessages = cachedThreadUiState?.messages ??
@@ -597,6 +612,7 @@ export function useCompanionAssistant({
       null;
     lastReplayablePlannerMessageRef.current =
       cachedThreadUiState?.lastReplayablePlannerMessage ?? null;
+    return true;
   }, [applyActiveSessionId, surface]);
 
   useEffect(() => {
@@ -631,14 +647,21 @@ export function useCompanionAssistant({
     }
 
     let cancelled = false;
-    void loadThreadState(activePersistedThread.sessionId)
-      .then(() => {
+    const hydrationVersion = threadMutationVersionRef.current;
+
+    void loadThreadState(activePersistedThread.sessionId, {
+      expectedMutationVersion: hydrationVersion,
+    })
+      .then((hydrated) => {
         if (cancelled) return;
+        if (!hydrated) return;
         bootstrappedScopeRef.current = scopeKey;
       })
       .catch((error) => {
         console.error("Failed to hydrate companion thread:", error);
-        if (cancelled) return;
+        if (cancelled || threadMutationVersionRef.current !== hydrationVersion) {
+          return;
+        }
         toast.error(
           isCompanionChatSetupError(error)
             ? COMPANION_CHAT_THREAD_HISTORY_DISABLED_REASON
@@ -1143,6 +1166,7 @@ export function useCompanionAssistant({
     if (!persistedActiveThread) {
       openFreshThread({
         greetingText: baseGreeting,
+        markBootstrapped: true,
       });
       return;
     }
@@ -1151,14 +1175,19 @@ export function useCompanionAssistant({
     await invalidateThreads();
     openFreshThread({
       greetingText: baseGreeting,
+      markBootstrapped: true,
     });
   }, [baseGreeting, invalidateThreads, openFreshThread, persistedActiveThread]);
 
   const startNewChat = useCallback(
     async (options?: { greetingText?: string | null }) => {
-      if (persistedActiveThread) {
+      const threadToArchive = persistedActiveThread ??
+        threadsQuery.data?.threads.find((thread) => thread.archivedAt === null) ??
+        null;
+
+      if (threadToArchive) {
         await setCompanionChatThreadArchived(
-          persistedActiveThread.sessionId,
+          threadToArchive.sessionId,
           true,
         );
         await invalidateThreads();
@@ -1170,13 +1199,24 @@ export function useCompanionAssistant({
 
       return openFreshThread({
         greetingText,
+        markBootstrapped: true,
       });
     },
-    [baseGreeting, invalidateThreads, openFreshThread, persistedActiveThread],
+    [
+      baseGreeting,
+      invalidateThreads,
+      openFreshThread,
+      persistedActiveThread,
+      threadsQuery.data?.threads,
+    ],
   );
 
   const resumeThread = useCallback(async (sessionId: string) => {
-    await loadThreadState(sessionId);
+    const hydrationVersion = threadMutationVersionRef.current + 1;
+    threadMutationVersionRef.current = hydrationVersion;
+    await loadThreadState(sessionId, {
+      expectedMutationVersion: hydrationVersion,
+    });
   }, [loadThreadState]);
 
   useEffect(() => {

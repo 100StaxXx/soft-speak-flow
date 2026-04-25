@@ -162,6 +162,7 @@ const createHandleDeleteUserHarness = ({
   persistOwnedStorageObjectsAfterRemove = false,
   persistOwnedStorageObjectsAfterDirectDelete = false,
   directDeleteError = null as unknown | null,
+  ownershipQueryErrors = {},
 }: {
   rpcResults?: RpcResult[];
   authDeleteResults?: AuthDeleteResult[];
@@ -176,6 +177,7 @@ const createHandleDeleteUserHarness = ({
   persistOwnedStorageObjectsAfterRemove?: boolean;
   persistOwnedStorageObjectsAfterDirectDelete?: boolean;
   directDeleteError?: unknown | null;
+  ownershipQueryErrors?: Partial<Record<"owner" | "owner_id", unknown>>;
 } = {}) => {
   let rpcCallCount = 0;
   let authDeleteCallCount = 0;
@@ -272,6 +274,10 @@ const createHandleDeleteUserHarness = ({
             ownershipValue ?? "none"
           }:${from}-${to}`,
         );
+
+        if (ownershipColumn && ownershipQueryErrors[ownershipColumn]) {
+          return { data: null, error: ownershipQueryErrors[ownershipColumn] };
+        }
 
         const matchingObjects = remainingOwnedStorageObjects
           .filter((entry) => {
@@ -625,6 +631,49 @@ Deno.test("delete-user removes owned storage objects across multiple buckets eve
   );
 });
 
+Deno.test("delete-user skips unavailable storage ownership columns and continues cleanup", async () => {
+  const harness = createHandleDeleteUserHarness({
+    ownedStorageObjects: [
+      {
+        bucket: "quest-attachments",
+        path: "user-1/owned-upload.png",
+        owner: USER_ID,
+      },
+    ],
+    ownershipQueryErrors: {
+      owner_id: {
+        message:
+          "Could not find the 'owner_id' column of 'objects' in the schema cache",
+      },
+    },
+  });
+
+  const response = await module.handleDeleteUser(
+    createRequest(),
+    harness.dependencies,
+  );
+  const body = await response.json();
+
+  assertEquals(
+    response.status,
+    200,
+    "Expected delete-user to succeed when one storage ownership column is unavailable",
+  );
+  assertEquals(body.success, true, "Expected success response body");
+  assertEquals(
+    harness.getRpcCallCount(),
+    1,
+    "Expected relational cleanup to still run",
+  );
+  assert(
+    harness.removeCalls.some((call) =>
+      call.bucket === "quest-attachments" &&
+      call.paths.includes("user-1/owned-upload.png")
+    ),
+    "Expected available ownership column cleanup to still remove owned objects",
+  );
+});
+
 Deno.test("delete-user still falls back to ownership discovery for unregistered legacy assets", async () => {
   const harness = createHandleDeleteUserHarness({
     registeredStorageAssets: [
@@ -701,6 +750,41 @@ Deno.test("delete-user retries transient storage removal failures and succeeds",
     harness.sleepCalls,
     [500],
     "Expected retry backoff after transient storage failure",
+  );
+});
+
+Deno.test("delete-user ignores alternate missing-object errors for stale registered storage ledger paths", async () => {
+  const harness = createHandleDeleteUserHarness({
+    registeredStorageAssets: [
+      {
+        bucket: "mentors-avatars",
+        path: "user-1/avatar.png",
+      },
+    ],
+    removeResults: [
+      createStorageRemoveResult({
+        status: 400,
+        message: "No such object: user-1/avatar.png",
+      }),
+    ],
+  });
+
+  const response = await module.handleDeleteUser(
+    createRequest(),
+    harness.dependencies,
+  );
+  const body = await response.json();
+
+  assertEquals(
+    response.status,
+    200,
+    "Expected stale registered storage paths to be treated as already removed",
+  );
+  assertEquals(body.success, true, "Expected success response body");
+  assertEquals(
+    harness.getRpcCallCount(),
+    1,
+    "Expected relational cleanup to still run after stale ledger cleanup",
   );
 });
 
@@ -1058,6 +1142,37 @@ Deno.test("delete-user returns degraded success with warning when auth admin del
     harness.getAuthDeleteCallCount(),
     1,
     "Expected auth deletion to be attempted once",
+  );
+});
+
+Deno.test("delete-user does not treat non-user auth delete missing dependency errors as already deleted", async () => {
+  const harness = createHandleDeleteUserHarness({
+    authDeleteResults: [
+      createAuthDeleteResult({
+        status: 400,
+        message: 'relation "public.auth_delete_audit" does not exist',
+      }),
+    ],
+  });
+
+  const response = await module.handleDeleteUser(
+    createRequest(),
+    harness.dependencies,
+  );
+  const body = await response.json();
+
+  assertEquals(
+    response.status,
+    200,
+    "Expected auth dependency failures to return degraded success",
+  );
+  assertEquals(body.success, true, "Expected degraded success response body");
+  assert(
+    Array.isArray(body.warnings) &&
+      body.warnings.some((warning: { code: string }) =>
+        warning.code === "AUTH_DELETE_DEFERRED"
+      ),
+    "Expected auth delete dependency failures to be surfaced as deferred auth cleanup",
   );
 });
 

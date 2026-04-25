@@ -824,6 +824,90 @@ describe("useCompanionAssistant", () => {
     });
   });
 
+  it("keeps launcher template turns on a fresh thread when persisted hydration resolves late", async () => {
+    let resolveHydration: (
+      messages: Awaited<ReturnType<typeof mocks.loadThreadMessages>>,
+    ) => void = () => {};
+
+    mocks.loadThreadMessages.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveHydration = resolve;
+      }),
+    );
+    mocks.supabaseInvoke.mockImplementation(async (_functionName, options) => {
+      const sessionId = options?.body?.sessionId ?? "missing-session";
+
+      return {
+        data: {
+          reply: "I drafted a focused day for you.",
+          mode: "schedule_read",
+          intent: "plan_day",
+          confidence: 0.93,
+          threadState: {
+            threadId: sessionId,
+            sessionId,
+            openaiConversationId: "conv_fresh",
+            lastOpenAIResponseId: "resp_fresh",
+            hasPendingAction: false,
+          },
+        },
+        error: null,
+      };
+    });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () =>
+        useCompanionAssistant({
+          surface: "journeys",
+          launchIntent: {
+            id: "launch-fresh-thread-1",
+            message: "Plan my day",
+            starterIntent: "plan_day",
+          },
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+        "companion-agent",
+        expect.objectContaining({
+          body: expect.objectContaining({
+            message: "Plan my day",
+            sessionId: "fresh-session",
+            starterIntent: "plan_day",
+          }),
+        }),
+      );
+    });
+
+    expect(mocks.archiveThread).toHaveBeenCalledWith(
+      "persisted-session",
+      true,
+    );
+
+    await act(async () => {
+      resolveHydration([
+        {
+          id: "late-m1",
+          sessionId: "persisted-session",
+          role: "assistant",
+          content: "This old thread should not reopen.",
+          createdAt: "2026-04-18T08:00:00.000Z",
+          source: "agent",
+        },
+      ]);
+    });
+
+    expect(result.current.activeThread?.sessionId).toBe("fresh-session");
+    expect(
+      result.current.messages.some((message) =>
+        message.content === "This old thread should not reopen."
+      ),
+    ).toBe(false);
+  });
+
   it("applies launcher planning modes before submitting the starter intent", async () => {
     const { wrapper } = createWrapper();
 

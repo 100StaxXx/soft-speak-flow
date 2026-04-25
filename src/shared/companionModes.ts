@@ -4,7 +4,7 @@ import {
   LOCKED_COMPANION_ENCOURAGEMENT_TEMPLATES,
   LOCKED_COMPANION_PERSONALITY_TRAITS,
   LOCKED_COMPANION_VOICE_STYLE,
-} from "./companionChaosVoice";
+} from "./companionChaosVoice.ts";
 
 export type CompanionModeId =
   | "alpha"
