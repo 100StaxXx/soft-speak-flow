@@ -160,7 +160,7 @@ describe("supabaseFunctionErrors", () => {
       context: response,
     });
 
-    expect(parsed.code).toBeUndefined();
+    expect(parsed.code).toBe("AUDIO_PIPELINE_FAILED");
     expect(parsed.responsePayload?.code).toBe("AUDIO_PIPELINE_FAILED");
     expect(parsed.upstreamStatus).toBe(500);
     expect(parsed.upstreamError).toBe("ElevenLabs API error: 401");
@@ -254,6 +254,25 @@ describe("supabaseFunctionErrors", () => {
       isOffline: false,
       retryAfterSeconds: 30,
     };
+    const pepTalkInProgress: ParsedFunctionInvokeError = {
+      category: "http",
+      isOffline: false,
+      status: 409,
+      code: "PEP_TALK_REQUEST_IN_PROGRESS",
+      backendMessage: "Pep talk generation is already in progress.",
+    };
+    const rateLimitWithPipelineWrapper: ParsedFunctionInvokeError = {
+      category: "rate_limit",
+      isOffline: false,
+      backendMessage: "Failed to prepare pep talk audio",
+      retryAfterSeconds: 45,
+    };
+    const technicalAudioPipelineWrapper: ParsedFunctionInvokeError = {
+      category: "http",
+      isOffline: false,
+      status: 500,
+      backendMessage: "Failed to prepare pep talk audio",
+    };
 
     expect(
       toUserFacingFunctionError(networkParsed, { action: "evolve your companion" }),
@@ -267,6 +286,9 @@ describe("supabaseFunctionErrors", () => {
     expect(toUserFacingFunctionError(audioProviderAuthError)).toContain("provider authentication failed");
     expect(toUserFacingFunctionError(audioProviderCreditsError)).toContain("credits are exhausted");
     expect(toUserFacingFunctionError(rateLimitWithRetryHint)).toContain("30 seconds");
+    expect(toUserFacingFunctionError(pepTalkInProgress)).toContain("still being prepared");
+    expect(toUserFacingFunctionError(rateLimitWithPipelineWrapper)).toContain("45 seconds");
+    expect(toUserFacingFunctionError(technicalAudioPipelineWrapper)).toContain("temporarily unavailable");
     expect(
       toUserFacingFunctionError(unknownParsed, { action: "evolve your companion" }),
     ).toBe("Unable to evolve your companion. Please try again.");

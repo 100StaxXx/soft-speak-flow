@@ -34,6 +34,9 @@ const corsHeaders = {
 const MODEL_NAME = "eleven_multilingual_v2";
 const OPENAI_TTS_MODEL_NAME = "gpt-4o-mini-tts";
 const RATE_LIMIT_KEY = "mentor-audio";
+const ELEVENLABS_FIRST_ATTEMPT_TIMEOUT_MS = 35000;
+const ELEVENLABS_RETRY_TIMEOUT_MS = 18000;
+const ELEVENLABS_RETRY_DELAY_MS = 1500;
 
 interface AudioGenerationResult {
   audioBytes: Uint8Array;
@@ -67,6 +70,31 @@ const defaultDeps: GenerateMentorAudioDeps = {
 async function readErrorSnippet(response: Response): Promise<string> {
   const text = await response.text();
   return text.trim().slice(0, 500);
+}
+
+async function delay(ms: number): Promise<void> {
+  if (ms <= 0) return;
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getElevenLabsRetryDelayMs(): number {
+  return Deno.env.get("SUPABASE_FUNCTIONS_TEST") === "1" ? 0 : ELEVENLABS_RETRY_DELAY_MS;
+}
+
+function isRetriableElevenLabsError(error: Error): boolean {
+  const message = error.message.toLowerCase();
+  if (message.includes("timed out") || message.includes("timeout")) {
+    return true;
+  }
+  if (message.includes("failed to fetch") || message.includes("network")) {
+    return true;
+  }
+
+  const statusMatch = error.message.match(/ElevenLabs API error:\s*(\d{3})/i);
+  if (!statusMatch) return false;
+
+  const status = Number(statusMatch[1]);
+  return status === 408 || status >= 500;
 }
 
 async function fetchAudioWithTimeout({
@@ -107,12 +135,14 @@ async function generateElevenLabsAudio({
   voiceId,
   voiceSettings,
   script,
+  timeoutMs,
 }: {
   fetchImpl: typeof fetch;
   apiKey: string;
   voiceId: string;
   voiceSettings: Record<string, unknown>;
   script: string;
+  timeoutMs: number;
 }): Promise<Uint8Array> {
   const response = await fetchAudioWithTimeout({
     fetchImpl,
@@ -129,7 +159,7 @@ async function generateElevenLabsAudio({
         voice_settings: voiceSettings,
       }),
     },
-    timeoutMs: 55000,
+    timeoutMs,
     timeoutMessage: "Audio generation timed out. Please try again.",
   });
 
@@ -198,6 +228,7 @@ async function generateMentorAudioBytes({
   const elevenLabsApiKey = Deno.env.get("ELEVENLABS_API_KEY");
   const openAiApiKey = Deno.env.get("OPENAI_API_KEY");
   let primaryError: Error | null = null;
+  let allowOpenAiFallback = false;
 
   if (elevenLabsApiKey) {
     try {
@@ -208,14 +239,50 @@ async function generateMentorAudioBytes({
           voiceId: voiceConfig.voiceId,
           voiceSettings,
           script,
+          timeoutMs: ELEVENLABS_FIRST_ATTEMPT_TIMEOUT_MS,
         }),
         provider: "elevenlabs",
         model: MODEL_NAME,
       };
     } catch (error) {
       primaryError = error instanceof Error ? error : new Error(String(error));
+      if (isRetriableElevenLabsError(primaryError)) {
+        console.warn(
+          "ElevenLabs audio generation failed transiently; retrying primary voice",
+          {
+            error: primaryError.message,
+            retryDelayMs: getElevenLabsRetryDelayMs(),
+          },
+        );
+
+        await delay(getElevenLabsRetryDelayMs());
+
+        try {
+          return {
+            audioBytes: await generateElevenLabsAudio({
+              fetchImpl,
+              apiKey: elevenLabsApiKey,
+              voiceId: voiceConfig.voiceId,
+              voiceSettings,
+              script,
+              timeoutMs: ELEVENLABS_RETRY_TIMEOUT_MS,
+            }),
+            provider: "elevenlabs",
+            model: MODEL_NAME,
+          };
+        } catch (retryError) {
+          const retryFailure = retryError instanceof Error ? retryError : new Error(String(retryError));
+          primaryError = new Error(
+            `ElevenLabs primary failed after retry: first (${primaryError.message}); retry (${retryFailure.message})`,
+          );
+          allowOpenAiFallback = isRetriableElevenLabsError(retryFailure);
+        }
+      } else {
+        throw primaryError;
+      }
+
       console.warn(
-        "ElevenLabs audio generation failed; trying OpenAI TTS fallback",
+        "ElevenLabs audio generation failed; trying OpenAI TTS fallback as last resort",
         {
           error: primaryError.message,
         },
@@ -223,25 +290,33 @@ async function generateMentorAudioBytes({
     }
   } else {
     primaryError = new Error("ELEVENLABS_API_KEY is not configured");
-    console.warn(
-      "ELEVENLABS_API_KEY is not configured; trying OpenAI TTS fallback",
-    );
+  }
+
+  if (!allowOpenAiFallback) {
+    throw primaryError ?? new Error("ElevenLabs audio generation failed");
   }
 
   if (!openAiApiKey) {
     throw primaryError ?? new Error("No TTS provider is configured");
   }
 
-  return {
-    audioBytes: await generateOpenAiAudio({
-      fetchImpl,
-      apiKey: openAiApiKey,
-      mentorSlug,
-      script,
-    }),
-    provider: "openai",
-    model: OPENAI_TTS_MODEL_NAME,
-  };
+  try {
+    return {
+      audioBytes: await generateOpenAiAudio({
+        fetchImpl,
+        apiKey: openAiApiKey,
+        mentorSlug,
+        script,
+      }),
+      provider: "openai",
+      model: OPENAI_TTS_MODEL_NAME,
+    };
+  } catch (fallbackError) {
+    const fallbackFailure = fallbackError instanceof Error ? fallbackError : new Error(String(fallbackError));
+    throw new Error(
+      `ElevenLabs primary failed (${primaryError?.message ?? "unknown error"}); OpenAI TTS fallback failed (${fallbackFailure.message})`,
+    );
+  }
 }
 
 export async function handleGenerateMentorAudio(
@@ -392,7 +467,7 @@ export async function handleGenerateMentorAudio(
     );
 
     return new Response(
-      JSON.stringify({ audioUrl, provider: audioResult.provider }),
+      JSON.stringify({ audioUrl, provider: audioResult.provider, storagePath: filePath }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {

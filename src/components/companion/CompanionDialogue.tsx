@@ -103,6 +103,8 @@ interface CompanionDialogueProps {
   canEvolveOverride?: boolean;
 }
 
+type AvatarImageLoadingStatus = "idle" | "loading" | "loaded" | "error";
+
 const normalizeCompanionName = (value: string | null | undefined) => {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
@@ -240,6 +242,12 @@ export const CompanionDialogue = memo(({
     setFallbackToDefaultPortrait(false);
   }, [expressiveCompanionImageUrl, isDormant, health.isNeglected]);
 
+  const handleCompanionImageLoadingStatusChange = useCallback((status: AvatarImageLoadingStatus) => {
+    if (status === "error" && expressiveCompanionImageUrl) {
+      setFallbackToDefaultPortrait(true);
+    }
+  }, [expressiveCompanionImageUrl]);
+
   // Animate text change
   useEffect(() => {
     if (greeting !== displayText && !isAnimating) {
@@ -341,6 +349,7 @@ export const CompanionDialogue = memo(({
                         focalX={companionImageFocalX}
                         focalY={companionImageFocalY}
                         className="rounded-lg"
+                        onLoadingStatusChange={handleCompanionImageLoadingStatusChange}
                         onError={() => {
                           if (!fallbackToDefaultPortrait && expressiveCompanionImageUrl) {
                             setFallbackToDefaultPortrait(true);
@@ -356,6 +365,7 @@ export const CompanionDialogue = memo(({
                       focalX={companionImageFocalX}
                       focalY={companionImageFocalY}
                       className="object-cover"
+                      onLoadingStatusChange={handleCompanionImageLoadingStatusChange}
                       onError={() => {
                         if (!fallbackToDefaultPortrait && expressiveCompanionImageUrl) {
                           setFallbackToDefaultPortrait(true);
@@ -433,6 +443,7 @@ export const CompanionDialogue = memo(({
                         focalX={companionImageFocalX}
                         focalY={companionImageFocalY}
                         className="rounded-lg"
+                        onLoadingStatusChange={handleCompanionImageLoadingStatusChange}
                         onError={() => {
                           if (!fallbackToDefaultPortrait && expressiveCompanionImageUrl) {
                             setFallbackToDefaultPortrait(true);
@@ -448,6 +459,7 @@ export const CompanionDialogue = memo(({
                       focalX={companionImageFocalX}
                       focalY={companionImageFocalY}
                       className="object-cover"
+                      onLoadingStatusChange={handleCompanionImageLoadingStatusChange}
                       onError={() => {
                         if (!fallbackToDefaultPortrait && expressiveCompanionImageUrl) {
                           setFallbackToDefaultPortrait(true);

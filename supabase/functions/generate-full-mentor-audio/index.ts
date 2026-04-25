@@ -162,6 +162,7 @@ serve(async (req) => {
       });
     }
     const audioUrl = typeof audioPayload.audioUrl === "string" ? audioPayload.audioUrl : null;
+    const storagePath = typeof audioPayload.storagePath === "string" ? audioPayload.storagePath : null;
     if (!audioUrl) {
       return buildErrorResponse(502, "Audio generation response missing audioUrl", {
         code: "AUDIO_GENERATION_INCOMPLETE_RESPONSE",
@@ -170,7 +171,7 @@ serve(async (req) => {
     console.log(`Audio generated: ${audioUrl}`);
 
     return new Response(
-      JSON.stringify({ script, audioUrl }),
+      JSON.stringify({ script, audioUrl, audioStoragePath: storagePath }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {

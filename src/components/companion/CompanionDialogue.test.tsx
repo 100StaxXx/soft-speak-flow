@@ -169,6 +169,52 @@ const setReducedMotion = (enabled: boolean) => {
   });
 };
 
+const installMockImageLoader = (shouldError: (src: string) => boolean) => {
+  const originalImage = window.Image;
+
+  class MockImage extends EventTarget {
+    complete = false;
+    naturalWidth = 0;
+    private currentSrc = "";
+
+    set src(value: string) {
+      this.currentSrc = value;
+      this.complete = false;
+      this.naturalWidth = 0;
+
+      window.setTimeout(() => {
+        if (this.currentSrc !== value) return;
+        if (shouldError(value)) {
+          this.dispatchEvent(new Event("error"));
+          return;
+        }
+
+        this.complete = true;
+        this.naturalWidth = 128;
+        this.dispatchEvent(new Event("load"));
+      }, 0);
+    }
+
+    get src() {
+      return this.currentSrc;
+    }
+  }
+
+  Object.defineProperty(window, "Image", {
+    configurable: true,
+    writable: true,
+    value: MockImage as unknown as typeof Image,
+  });
+
+  return () => {
+    Object.defineProperty(window, "Image", {
+      configurable: true,
+      writable: true,
+      value: originalImage,
+    });
+  };
+};
+
 describe("CompanionDialogue", () => {
   beforeEach(() => {
     mocks.dialogue.greeting = "Primary greeting";
@@ -345,6 +391,37 @@ describe("CompanionDialogue", () => {
     expect(container.innerHTML).toContain(
       "griffin/t2_guardian/happy/griffin__t2_guardian__happy__v4__fire.png",
     );
+  });
+
+  it("falls back to the normal portrait when the expressive avatar URL fails to load", async () => {
+    const restoreImage = installMockImageLoader((src) => src.includes("/calm/"));
+    mocks.companion.current_stage = 6;
+    mocks.companion.current_image_url = "/companion-eggs/egg__t0_egg__normal__ice.png";
+    mocks.companion.preset_id = "phoenix";
+    mocks.companion.core_element = "ice";
+    mocks.companion.cached_creature_name = "Phoenix";
+    mocks.companion.spirit_animal = "Phoenix";
+    mocks.expressionState = {
+      mood: "calm",
+      variant: 1,
+      reason: "default-calm",
+      isEventDriven: false,
+    };
+
+    try {
+      const { container } = render(<CompanionDialogue />);
+
+      await waitFor(() => {
+        expect(container.innerHTML).toContain(
+          "phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__ice.png",
+        );
+        expect(container.innerHTML).not.toContain(
+          "phoenix/t2_guardian/calm/phoenix__t2_guardian__calm__v1__ice.png",
+        );
+      });
+    } finally {
+      restoreImage();
+    }
   });
 
   it("keeps dormant overrides ahead of expressive portraits", () => {

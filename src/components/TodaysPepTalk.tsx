@@ -404,6 +404,9 @@ export const TodaysPepTalk = memo(() => {
           backendMessage: parsedError.backendMessage,
           category: parsedError.category,
           code: parsedError.code,
+          upstreamStatus: parsedError.upstreamStatus,
+          upstreamError: parsedError.upstreamError,
+          requestId: parsedError.requestId,
         });
 
         throw new Error(userMessage);

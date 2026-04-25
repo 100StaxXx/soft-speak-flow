@@ -208,6 +208,7 @@ export async function parseFunctionInvokeError(
   }
 
   const requestId = responsePayload?.requestId ?? asString(contextResponse?.headers.get("X-Request-Id"));
+  const resolvedCode = code ?? responsePayload?.code;
   const backendMessage = responsePayload?.message ?? responsePayload?.error;
   const retryAfterSeconds = responsePayload?.retryAfterSeconds;
   const upstreamStatus = responsePayload?.upstreamStatus;
@@ -224,7 +225,7 @@ export async function parseFunctionInvokeError(
     name,
     message,
     status,
-    code,
+    code: resolvedCode,
     requestId,
     responsePayload,
     backendMessage,
@@ -265,7 +266,11 @@ function isLikelyTechnicalMessage(message: string): boolean {
     normalized.includes("edge function") ||
     normalized.includes("functionsfetcherror") ||
     normalized.includes("relay error") ||
-    normalized.includes("failed to send a request")
+    normalized.includes("failed to send a request") ||
+    normalized.includes("failed to prepare pep talk audio") ||
+    normalized.includes("failed to generate audio") ||
+    normalized.includes("failed to generate script") ||
+    normalized.includes("ai gateway error")
   );
 }
 
@@ -321,6 +326,11 @@ export function toUserFacingFunctionError(
   opts?: { action?: string },
 ): string {
   const action = opts?.action ?? "complete this action";
+  const errorCode = parsed.code ?? parsed.responsePayload?.code;
+
+  if (errorCode === "PEP_TALK_REQUEST_IN_PROGRESS") {
+    return "Your pep talk is still being prepared. Give it a moment and try again.";
+  }
 
   if (parsed.isOffline || parsed.category === "network") {
     return `We couldn't reach the server to ${action}. Check your connection and try again.`;
@@ -332,7 +342,9 @@ export function toUserFacingFunctionError(
 
   if (parsed.category === "rate_limit") {
     return (
-      parsed.backendMessage ??
+      (parsed.backendMessage && !isLikelyTechnicalMessage(parsed.backendMessage)
+        ? parsed.backendMessage
+        : undefined) ??
       (typeof parsed.retryAfterSeconds === "number"
         ? `You're making requests too quickly. Please wait about ${parsed.retryAfterSeconds} seconds and try again.`
         : undefined) ??

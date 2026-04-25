@@ -768,3 +768,55 @@ Deno.test("generate-mentor-audio falls back to OpenAI TTS when ElevenLabs fails"
     "Expected OpenAI TTS fallback to be tried",
   );
 });
+
+Deno.test("generate-mentor-audio does not fall back for ElevenLabs configuration errors", async () => {
+  const fetchedUrls: string[] = [];
+  Deno.env.set("ELEVENLABS_API_KEY", "test-elevenlabs-key");
+  Deno.env.set("OPENAI_API_KEY", "test-openai-key");
+
+  const response = await mentorAudioModule.handleGenerateMentorAudio(
+    new Request("https://example.com", {
+      method: "POST",
+      body: JSON.stringify({ mentorSlug: "lyra", script: "Keep going." }),
+    }),
+    {
+      authorize: async () => ({ userId: "user-1", isInternal: false }),
+      createSupabaseClient: () => createMockSupabase({}),
+      fetchImpl: async (input) => {
+        const url = String(input);
+        fetchedUrls.push(url);
+        return new Response(JSON.stringify({ error: "bad voice or auth" }), {
+          status: 401,
+        });
+      },
+      checkRateLimitFn: async () => ({
+        allowed: true,
+        available: true,
+        remaining: 14,
+        limit: 15,
+        resetAt: new Date("2026-03-29T00:00:00.000Z"),
+      }),
+      now: () => 1000,
+    },
+  );
+
+  const body = await response.json();
+  assertEquals(
+    response.status,
+    500,
+    "Expected non-transient ElevenLabs failures to fail loudly",
+  );
+  assert(
+    typeof body.error === "string" &&
+      body.error.includes("ElevenLabs API error: 401"),
+    "Expected the ElevenLabs configuration error to be surfaced",
+  );
+  assert(
+    fetchedUrls.some((url) => url.includes("elevenlabs.io")),
+    "Expected ElevenLabs to be tried",
+  );
+  assert(
+    !fetchedUrls.some((url) => url.includes("api.openai.com/v1/audio/speech")),
+    "Expected OpenAI fallback not to run for configuration/auth failures",
+  );
+});

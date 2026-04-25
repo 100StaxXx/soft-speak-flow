@@ -25,11 +25,27 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const PEP_TALK_REQUEST_IN_PROGRESS_STATUS = 409;
+const REPLAY_AUDIO_HEAD_TIMEOUT_MS = 2500;
+
 interface ErrorResponseDetails {
   code?: string;
   upstreamStatus?: number;
   upstreamError?: string | null;
 }
+
+interface PepTalkGenerationRpcClient {
+  rpc: (
+    functionName: string,
+    args?: Record<string, unknown>,
+  ) => PromiseLike<{ data: unknown; error: { message?: string } | null }>;
+}
+
+type PepTalkGenerationRequestState =
+  | { action: "disabled"; requestKey: null }
+  | { action: "started"; requestKey: string }
+  | { action: "completed"; requestKey: string; responsePayload: Record<string, unknown> }
+  | { action: "in_progress"; requestKey: string };
 
 function normalizeStatus(status: number): number {
   if (!Number.isFinite(status)) return 500;
@@ -115,10 +131,182 @@ function generateSummary(category: string): string {
   return summaries[category] || 'A daily push to help you move forward with purpose and intention.';
 }
 
+function buildPepTalkRequestKey(mentorSlug: string, forDate: string): string {
+  return `daily:${mentorSlug}:${forDate}`;
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { code?: unknown; message?: unknown };
+  const code = typeof candidate.code === "string" ? candidate.code : "";
+  const message = typeof candidate.message === "string" ? candidate.message.toLowerCase() : "";
+  return code === "23505" || message.includes("duplicate key");
+}
+
+function getPepTalkPayloadAudioUrl(responsePayload: Record<string, unknown>): string | null {
+  const pepTalk = responsePayload.pepTalk;
+  if (!pepTalk || typeof pepTalk !== "object" || Array.isArray(pepTalk)) {
+    return null;
+  }
+
+  const audioUrl = (pepTalk as Record<string, unknown>).audio_url;
+  return typeof audioUrl === "string" && audioUrl.trim().length > 0 ? audioUrl.trim() : null;
+}
+
+async function headWithTimeout(url: string, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      method: "HEAD",
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function isReplayPepTalkPayloadUsable(
+  responsePayload: Record<string, unknown>,
+): Promise<boolean> {
+  const audioUrl = getPepTalkPayloadAudioUrl(responsePayload);
+  if (!audioUrl) {
+    console.warn("[PepTalkIdempotency] Completed replay payload has no audio_url");
+    return false;
+  }
+
+  try {
+    const response = await headWithTimeout(audioUrl, REPLAY_AUDIO_HEAD_TIMEOUT_MS);
+
+    if (response.status === 404 || response.status === 410) {
+      console.warn("[PepTalkIdempotency] Completed replay audio is missing", {
+        audioUrl,
+        status: response.status,
+      });
+      return false;
+    }
+
+    if (!response.ok) {
+      console.warn("[PepTalkIdempotency] Completed replay audio HEAD was inconclusive; reusing cached response", {
+        audioUrl,
+        status: response.status,
+      });
+    }
+
+    return true;
+  } catch (error) {
+    console.warn("[PepTalkIdempotency] Completed replay audio HEAD threw; reusing cached response", {
+      audioUrl,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return true;
+  }
+}
+
+async function beginPepTalkGenerationRequest({
+  supabase,
+  requestKey,
+  mentorSlug,
+  forDate,
+  userId,
+}: {
+  supabase: PepTalkGenerationRpcClient;
+  requestKey: string;
+  mentorSlug: string;
+  forDate: string;
+  userId: string;
+}): Promise<PepTalkGenerationRequestState> {
+  try {
+    const { data, error } = await supabase.rpc("begin_pep_talk_generation_request", {
+      p_request_key: requestKey,
+      p_mentor_slug: mentorSlug,
+      p_for_date: forDate,
+      p_started_by_user_id: userId,
+    });
+
+    if (error) {
+      console.warn("[PepTalkIdempotency] Begin request failed; continuing with database uniqueness only", {
+        requestKey,
+        error: error.message ?? "unknown_rpc_error",
+      });
+      return { action: "disabled", requestKey: null };
+    }
+
+    const row = Array.isArray(data)
+      ? (data[0] as Record<string, unknown> | undefined)
+      : (data as Record<string, unknown> | undefined);
+    const action = typeof row?.action === "string" ? row.action : "started";
+
+    if (action === "completed") {
+      const responsePayload =
+        row?.response_payload && typeof row.response_payload === "object" && !Array.isArray(row.response_payload)
+          ? row.response_payload as Record<string, unknown>
+          : {};
+      return { action: "completed", requestKey, responsePayload };
+    }
+
+    if (action === "in_progress") {
+      return { action: "in_progress", requestKey };
+    }
+
+    return { action: "started", requestKey };
+  } catch (error) {
+    console.warn("[PepTalkIdempotency] Begin request threw; continuing with database uniqueness only", {
+      requestKey,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { action: "disabled", requestKey: null };
+  }
+}
+
+async function completePepTalkGenerationRequestBestEffort({
+  supabase,
+  requestKey,
+  status,
+  responsePayload,
+  errorMessage,
+}: {
+  supabase: PepTalkGenerationRpcClient;
+  requestKey: string | null;
+  status: "completed" | "failed";
+  responsePayload?: Record<string, unknown> | null;
+  errorMessage?: string | null;
+}): Promise<void> {
+  if (!requestKey) return;
+
+  try {
+    const { error } = await supabase.rpc("complete_pep_talk_generation_request", {
+      p_request_key: requestKey,
+      p_status: status,
+      p_response_payload: responsePayload ?? null,
+      p_error_message: errorMessage ?? null,
+    });
+
+    if (error) {
+      console.warn("[PepTalkIdempotency] Complete request failed", {
+        requestKey,
+        status,
+        error: error.message ?? "unknown_rpc_error",
+      });
+    }
+  } catch (error) {
+    console.warn("[PepTalkIdempotency] Complete request threw", {
+      requestKey,
+      status,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  let idempotencySupabase: PepTalkGenerationRpcClient | null = null;
+  let idempotencyRequestKey: string | null = null;
+  let idempotencyStarted = false;
 
   try {
     const auth = await requireUserAuth(req, corsHeaders);
@@ -148,6 +336,7 @@ serve(async (req) => {
       return buildErrorResponse(500, "Missing Supabase environment variables", { code: "MISSING_ENV" });
     }
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    idempotencySupabase = supabase as unknown as PepTalkGenerationRpcClient;
     const costGuardrails = createCostGuardrailSession({
       supabase,
       endpointKey: "generate-single-daily-pep-talk",
@@ -210,6 +399,86 @@ serve(async (req) => {
       return buildErrorResponse(404, `Mentor not found: ${resolvedMentorSlug}`, { code: "MENTOR_NOT_FOUND" });
     }
 
+    const markGenerationFailed = async (errorMessage: string) => {
+      if (!idempotencyStarted || !idempotencySupabase) return;
+      await completePepTalkGenerationRequestBestEffort({
+        supabase: idempotencySupabase,
+        requestKey: idempotencyRequestKey,
+        status: "failed",
+        errorMessage,
+      });
+    };
+
+    const failGeneration = async (response: Response, errorMessage: string): Promise<Response> => {
+      await markGenerationFailed(errorMessage);
+      return response;
+    };
+
+    const responseForPayload = (payload: Record<string, unknown>, status = 200) =>
+      new Response(
+        JSON.stringify(payload),
+        { status, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+
+    const requestKey = buildPepTalkRequestKey(resolvedMentorSlug, todayDate);
+    let idempotencyState = await beginPepTalkGenerationRequest({
+      supabase,
+      requestKey,
+      mentorSlug: resolvedMentorSlug,
+      forDate: todayDate,
+      userId: auth.userId,
+    });
+
+    if (idempotencyState.action === "completed") {
+      if (await isReplayPepTalkPayloadUsable(idempotencyState.responsePayload)) {
+        return responseForPayload({
+          ...idempotencyState.responsePayload,
+          idempotencyReplay: true,
+        });
+      }
+
+      await completePepTalkGenerationRequestBestEffort({
+        supabase,
+        requestKey: idempotencyState.requestKey,
+        status: "failed",
+        errorMessage: "Completed replay audio URL was unavailable",
+      });
+      idempotencyState = await beginPepTalkGenerationRequest({
+        supabase,
+        requestKey,
+        mentorSlug: resolvedMentorSlug,
+        forDate: todayDate,
+        userId: auth.userId,
+      });
+    }
+
+    if (idempotencyState.action === "completed") {
+      if (await isReplayPepTalkPayloadUsable(idempotencyState.responsePayload)) {
+        return responseForPayload({
+          ...idempotencyState.responsePayload,
+          idempotencyReplay: true,
+        });
+      }
+
+      console.warn("[PepTalkIdempotency] Completed replay remained unusable after restart attempt; continuing with database uniqueness only", {
+        requestKey: idempotencyState.requestKey,
+      });
+      idempotencyState = { action: "disabled", requestKey: null };
+    }
+
+    if (idempotencyState.action === "in_progress") {
+      return buildErrorResponse(
+        PEP_TALK_REQUEST_IN_PROGRESS_STATUS,
+        "Pep talk generation is already in progress.",
+        { code: "PEP_TALK_REQUEST_IN_PROGRESS" },
+      );
+    }
+
+    if (idempotencyState.action === "started") {
+      idempotencyRequestKey = idempotencyState.requestKey;
+      idempotencyStarted = true;
+    }
+
     // Generate pep talk using existing function via direct fetch (edge-to-edge call)
     console.log(`Calling generate-full-mentor-audio for ${resolvedMentorSlug}...`);
     
@@ -224,14 +493,17 @@ serve(async (req) => {
       const upstreamRaw = await audioResponse.text();
       const upstreamError = parseUpstreamError(upstreamRaw);
       console.error('Error generating audio:', audioResponse.status, upstreamRaw);
-      return buildErrorResponse(
-        audioResponse.status,
-        "Failed to prepare pep talk audio",
-        {
-          code: "AUDIO_PIPELINE_FAILED",
-          upstreamStatus: audioResponse.status,
-          upstreamError,
-        },
+      return await failGeneration(
+        buildErrorResponse(
+          audioResponse.status,
+          "Failed to prepare pep talk audio",
+          {
+            code: "AUDIO_PIPELINE_FAILED",
+            upstreamStatus: audioResponse.status,
+            upstreamError,
+          },
+        ),
+        upstreamError ?? `Audio pipeline failed with status ${audioResponse.status}`,
       );
     }
 
@@ -239,18 +511,29 @@ serve(async (req) => {
     try {
       generatedData = await audioResponse.json() as Record<string, unknown>;
     } catch {
-      return buildErrorResponse(502, "Invalid response from audio generation pipeline", {
-        code: "AUDIO_PIPELINE_INVALID_RESPONSE",
-      });
+      return await failGeneration(
+        buildErrorResponse(502, "Invalid response from audio generation pipeline", {
+          code: "AUDIO_PIPELINE_INVALID_RESPONSE",
+        }),
+        "Invalid response from audio generation pipeline",
+      );
     }
 
     const script = typeof generatedData.script === "string" ? generatedData.script : null;
     const audioUrl = typeof generatedData.audioUrl === "string" ? generatedData.audioUrl : null;
+    const audioStoragePath = typeof generatedData.audioStoragePath === "string"
+      ? generatedData.audioStoragePath
+      : typeof generatedData.storagePath === "string"
+        ? generatedData.storagePath
+        : null;
     
     if (!script || !audioUrl) {
-      return buildErrorResponse(502, "Incomplete generation response", {
-        code: "AUDIO_PIPELINE_INCOMPLETE_RESPONSE",
-      });
+      return await failGeneration(
+        buildErrorResponse(502, "Incomplete generation response", {
+          code: "AUDIO_PIPELINE_INCOMPLETE_RESPONSE",
+        }),
+        "Incomplete generation response",
+      );
     }
 
     // Generate title and summary
@@ -281,8 +564,45 @@ serve(async (req) => {
 
     if (dailyInsertError) {
       console.error('Error inserting daily pep talk:', dailyInsertError);
-      return buildErrorResponse(500, "Failed to save pep talk", { code: "DAILY_PEP_TALK_INSERT_FAILED" });
+
+      if (isUniqueViolation(dailyInsertError)) {
+        const { data: existingAfterConflict, error: conflictFetchError } = await supabase
+          .from('daily_pep_talks')
+          .select('*')
+          .eq('mentor_slug', resolvedMentorSlug)
+          .eq('for_date', todayDate)
+          .maybeSingle();
+
+        if (!conflictFetchError && existingAfterConflict) {
+          const responsePayload = { pepTalk: existingAfterConflict, status: 'existing' };
+          await completePepTalkGenerationRequestBestEffort({
+            supabase,
+            requestKey: idempotencyRequestKey,
+            status: "completed",
+            responsePayload,
+          });
+          return responseForPayload(responsePayload);
+        }
+      }
+
+      return await failGeneration(
+        buildErrorResponse(500, "Failed to save pep talk", { code: "DAILY_PEP_TALK_INSERT_FAILED" }),
+        dailyInsertError.message ?? "Failed to save pep talk",
+      );
     }
+
+    const generationResponsePayload = {
+      pepTalk: dailyPepTalk,
+      status: 'generated',
+      audioStoragePath,
+    };
+
+    await completePepTalkGenerationRequestBestEffort({
+      supabase,
+      requestKey: idempotencyRequestKey,
+      status: "completed",
+      responsePayload: generationResponsePayload,
+    });
 
     // Also insert into main pep_talks library
     const { error: libraryInsertError } = await supabase
@@ -384,16 +704,21 @@ serve(async (req) => {
     console.log(`✓ Successfully generated daily pep talk for ${resolvedMentorSlug}`);
 
     return new Response(
-      JSON.stringify({ 
-        pepTalk: dailyPepTalk, 
-        status: 'generated' 
-      }),
+      JSON.stringify(generationResponsePayload),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
     if (isCostGuardrailBlockedError(error)) {
       return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
+    if (idempotencyStarted && idempotencySupabase) {
+      await completePepTalkGenerationRequestBestEffort({
+        supabase: idempotencySupabase,
+        requestKey: idempotencyRequestKey,
+        status: "failed",
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
     }
     console.error('Error in generate-single-daily-pep-talk:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
