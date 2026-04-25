@@ -6,6 +6,33 @@
 import { resolveMentorSlugAlias } from "@/lib/mentorRoster";
 
 const imageCache = new Map<string, string>();
+const KNOWN_STALE_AVATAR_PATHS: Record<string, readonly string[]> = {
+  lyra: ["/mentors-avatars/lyra-mentor.png"],
+};
+
+const shouldUseBundledImage = (slug: string, avatarUrl?: string | null): boolean => {
+  const resolvedSlug = resolveMentorSlugAlias(slug);
+  if (!resolvedSlug) return !avatarUrl?.trim();
+
+  const trimmedAvatarUrl = avatarUrl?.trim();
+  if (!trimmedAvatarUrl) return true;
+
+  return KNOWN_STALE_AVATAR_PATHS[resolvedSlug]?.some((path) =>
+    trimmedAvatarUrl.includes(path),
+  ) ?? false;
+};
+
+export const getDirectMentorAvatarUrl = (
+  slug: string,
+  avatarUrl?: string | null,
+): string | null => {
+  const trimmedAvatarUrl = avatarUrl?.trim();
+  if (trimmedAvatarUrl && !shouldUseBundledImage(slug, trimmedAvatarUrl)) {
+    return trimmedAvatarUrl;
+  }
+
+  return null;
+};
 
 export const loadMentorImage = async (slug: string): Promise<string> => {
   const resolvedSlug = resolveMentorSlugAlias(slug) ?? "sage";
@@ -19,6 +46,9 @@ export const loadMentorImage = async (slug: string): Promise<string> => {
     switch (resolvedSlug) {
       case "sage":
         module = await import("@/assets/sage-mentor.png");
+        break;
+      case "lyra":
+        module = await import("@/assets/lyra-mentor.png");
         break;
       case "icon":
         module = await import("@/assets/icon-mentor.png");
@@ -50,6 +80,16 @@ export const loadMentorImage = async (slug: string): Promise<string> => {
     console.error(`Failed to load mentor image for ${slug}:`, error);
     return "";
   }
+};
+
+export const resolveMentorImageSource = async (
+  slug: string,
+  avatarUrl?: string | null,
+): Promise<string> => {
+  const directAvatarUrl = getDirectMentorAvatarUrl(slug, avatarUrl);
+  if (directAvatarUrl) return directAvatarUrl;
+
+  return loadMentorImage(slug);
 };
 
 export const preloadMentorImage = (slug: string): void => {

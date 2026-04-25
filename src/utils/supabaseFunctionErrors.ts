@@ -12,6 +12,8 @@ export interface ParsedFunctionInvokeError {
   status?: number;
   code?: string;
   requestId?: string;
+  stage?: string;
+  failureReason?: string;
   responsePayload?: {
     message?: string;
     error?: string;
@@ -209,6 +211,8 @@ export async function parseFunctionInvokeError(
 
   const requestId = responsePayload?.requestId ?? asString(contextResponse?.headers.get("X-Request-Id"));
   const resolvedCode = code ?? responsePayload?.code;
+  const stage = responsePayload?.stage;
+  const failureReason = responsePayload?.failureReason;
   const backendMessage = responsePayload?.message ?? responsePayload?.error;
   const retryAfterSeconds = responsePayload?.retryAfterSeconds;
   const upstreamStatus = responsePayload?.upstreamStatus;
@@ -227,6 +231,8 @@ export async function parseFunctionInvokeError(
     status,
     code: resolvedCode,
     requestId,
+    stage,
+    failureReason,
     responsePayload,
     backendMessage,
     retryAfterSeconds,

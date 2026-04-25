@@ -18,7 +18,7 @@ import { DailyCoachPanel } from "@/components/DailyCoachPanel";
 import { IndexPageSkeleton } from "@/components/skeletons";
 import { ParallaxCard } from "@/components/ui/parallax-card";
 import { Button } from "@/components/ui/button";
-import { loadMentorImage } from "@/utils/mentorImageLoader";
+import { resolveMentorImageSource } from "@/utils/mentorImageLoader";
 import {
   buildEstablishedProfileSelfHealPatch,
   getOnboardingGateState,
@@ -224,7 +224,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
       if (!mentorData) return null;
 
       // Dynamically load mentor image
-      const imageUrl = mentorData.avatar_url || await loadMentorImage(mentorData.slug || "sage");
+      const imageUrl = await resolveMentorImageSource(mentorData.slug || "sage", mentorData.avatar_url);
 
       // Get today's pep talk and quote in parallel
       const { data: dailyPepTalk, error: pepTalkError } = await supabase

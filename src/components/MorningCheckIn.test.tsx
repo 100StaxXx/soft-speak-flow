@@ -105,7 +105,12 @@ vi.mock("@/hooks/useLivingCompanion", () => ({
 }));
 
 vi.mock("@/utils/mentorImageLoader", () => ({
+  getDirectMentorAvatarUrl: (_slug: string, avatarUrl?: string | null) => avatarUrl?.trim() || null,
   loadMentorImage: mocks.loadMentorImage,
+  resolveMentorImageSource: (slug: string, avatarUrl?: string | null) => {
+    const trimmedAvatarUrl = avatarUrl?.trim();
+    return trimmedAvatarUrl ? Promise.resolve(trimmedAvatarUrl) : mocks.loadMentorImage(slug);
+  },
 }));
 
 vi.mock("@/utils/mentorMoodSignal", () => ({

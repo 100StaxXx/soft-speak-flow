@@ -4,14 +4,18 @@ import {
   MENTOR_AVATAR_POSITION_MAP,
   resolveMentorSlugAlias,
 } from "@/lib/mentorRoster";
-import { loadMentorImage } from "@/utils/mentorImageLoader";
+import {
+  getDirectMentorAvatarUrl,
+  loadMentorImage,
+  resolveMentorImageSource,
+} from "@/utils/mentorImageLoader";
 
 interface MentorAvatarProps {
   mentorSlug: string;
   mentorName: string;
   primaryColor: string;
   avatarUrl?: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
   showBorder?: boolean;
   showGlow?: boolean;
@@ -19,6 +23,7 @@ interface MentorAvatarProps {
 }
 
 const SIZE_CLASSES = {
+  xs: 'w-10 h-10',
   sm: 'w-16 h-16',
   md: 'w-24 h-24 md:w-32 md:h-32',
   lg: 'w-32 h-32 md:w-40 md:h-40',
@@ -36,28 +41,56 @@ export const MentorAvatar = memo(({
   showGlow = false,
   style,
 }: MentorAvatarProps) => {
-  const [mentorImage, setMentorImage] = useState<string>(avatarUrl || '');
+  const [mentorImage, setMentorImage] = useState<string>(
+    () => getDirectMentorAvatarUrl(mentorSlug, avatarUrl) ?? '',
+  );
+  const resolvedSlug = resolveMentorSlugAlias(mentorSlug);
   
   // Dynamically load mentor image
   useEffect(() => {
-    if (avatarUrl) {
-      setMentorImage(avatarUrl);
+    const directAvatarUrl = getDirectMentorAvatarUrl(mentorSlug, avatarUrl);
+    if (directAvatarUrl) {
+      setMentorImage(directAvatarUrl);
       return;
     }
-    
-    const resolvedSlug = resolveMentorSlugAlias(mentorSlug);
-    if (resolvedSlug) {
-      loadMentorImage(resolvedSlug).then(setMentorImage).catch(() => {
-        // Keep empty string as fallback
+
+    let cancelled = false;
+
+    resolveMentorImageSource(mentorSlug, avatarUrl)
+      .then((imageUrl) => {
+        if (!cancelled) {
+          setMentorImage(imageUrl || '');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMentorImage('');
+        }
       });
-    }
+
+    return () => {
+      cancelled = true;
+    };
   }, [mentorSlug, avatarUrl]);
 
-  const resolvedSlug = resolveMentorSlugAlias(mentorSlug);
   const imagePosition = resolvedSlug
     ? MENTOR_AVATAR_POSITION_MAP[resolvedSlug]
     : DEFAULT_MENTOR_AVATAR_POSITION;
   const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase();
+  const handleImageError = () => {
+    if (!resolvedSlug || !mentorImage) {
+      setMentorImage('');
+      return;
+    }
+
+    loadMentorImage(resolvedSlug)
+      .then((fallbackImage) => {
+        setMentorImage(fallbackImage && fallbackImage !== mentorImage ? fallbackImage : '');
+      })
+      .catch(() => {
+        setMentorImage('');
+      });
+  };
 
   return (
     <div
@@ -80,6 +113,7 @@ export const MentorAvatar = memo(({
           style={{ objectPosition: imagePosition }}
           loading="lazy"
           decoding="async"
+          onError={handleImageError}
         />
       ) : (
         <div

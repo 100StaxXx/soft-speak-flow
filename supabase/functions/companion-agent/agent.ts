@@ -1455,6 +1455,9 @@ function isOpenAIProviderFallbackError(error: unknown) {
     message.includes("gateway timeout") ||
     message.includes("invalid api key") ||
     message.includes("incorrect api key") ||
+    message.includes("invalid_request_error") ||
+    message.includes("unknown parameter") ||
+    message.includes("unsupported parameter") ||
     message.includes("model_not_found") ||
     message.includes("does not have access to model") ||
     /\b(408|429|500|502|503|504)\b/.test(message);

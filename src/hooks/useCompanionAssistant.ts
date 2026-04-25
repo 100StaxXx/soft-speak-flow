@@ -367,6 +367,10 @@ const getCompanionAgentErrorSource = (parsed: ParsedFunctionInvokeError) =>
     parsed.responsePayload?.error,
     parsed.responsePayload?.message,
     parsed.responsePayload?.code,
+    parsed.stage,
+    parsed.failureReason,
+    parsed.responsePayload?.stage,
+    parsed.responsePayload?.failureReason,
   ]
     .filter((value): value is string =>
       typeof value === "string" && value.length > 0
@@ -403,7 +407,8 @@ const isCompanionAgentSetupError = (parsed: ParsedFunctionInvokeError) => {
 
   if (
     code === "service_misconfigured" ||
-    code === "abuse_check_failed"
+    code === "abuse_check_failed" ||
+    code === "companion_agent_setup_failed"
   ) {
     return true;
   }
@@ -982,6 +987,9 @@ export function useCompanionAssistant({
         status: parsed.status ?? null,
         code: getParsedFunctionCode(parsed) ?? null,
         requestId: parsed.requestId ?? null,
+        stage: parsed.stage ?? parsed.responsePayload?.stage ?? null,
+        failureReason:
+          parsed.failureReason ?? parsed.responsePayload?.failureReason ?? null,
         category: parsed.category ?? "unknown",
         surface,
         sessionId: activeSessionIdRef.current,

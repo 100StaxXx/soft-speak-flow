@@ -15,7 +15,11 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CheckInErrorFallback } from "@/components/ErrorFallback";
 import { logger } from "@/utils/logger";
 import { useLivingCompanionSafe } from "@/hooks/useLivingCompanion";
-import { loadMentorImage } from "@/utils/mentorImageLoader";
+import {
+  getDirectMentorAvatarUrl,
+  loadMentorImage,
+  resolveMentorImageSource,
+} from "@/utils/mentorImageLoader";
 import { setPendingMentorMood } from "@/utils/mentorMoodSignal";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { cn } from "@/lib/utils";
@@ -71,21 +75,21 @@ const MorningCheckInContent = () => {
       return;
     }
 
-    const avatarUrl = personality.avatar_url?.trim();
-    if (avatarUrl) {
-      setMentorPortraitUrl(avatarUrl);
-      return;
-    }
-
     const mentorSlug = (personality.slug || "").trim().toLowerCase();
     if (!mentorSlug) {
       setMentorPortraitUrl("");
       return;
     }
 
+    const directAvatarUrl = getDirectMentorAvatarUrl(mentorSlug, personality.avatar_url);
+    if (directAvatarUrl) {
+      setMentorPortraitUrl(directAvatarUrl);
+      return;
+    }
+
     let cancelled = false;
 
-    loadMentorImage(mentorSlug)
+    resolveMentorImageSource(mentorSlug, personality.avatar_url)
       .then((imageUrl) => {
         if (!cancelled) {
           setMentorPortraitUrl(imageUrl || "");
@@ -101,6 +105,22 @@ const MorningCheckInContent = () => {
       cancelled = true;
     };
   }, [personality?.avatar_url, personality?.slug, personality?.name]);
+
+  const handleMentorPortraitError = () => {
+    const mentorSlug = (personality?.slug || "").trim().toLowerCase();
+    if (!mentorSlug) {
+      setMentorPortraitUrl("");
+      return;
+    }
+
+    loadMentorImage(mentorSlug)
+      .then((imageUrl) => {
+        setMentorPortraitUrl(imageUrl && imageUrl !== mentorPortraitUrl ? imageUrl : "");
+      })
+      .catch(() => {
+        setMentorPortraitUrl("");
+      });
+  };
 
   const { data: existingCheckIn } = useQuery({
     queryKey: ['morning-check-in', today, user?.id],
@@ -385,6 +405,7 @@ const MorningCheckInContent = () => {
                       style={{ objectPosition: "center 25%" }}
                       loading="lazy"
                       decoding="async"
+                      onError={handleMentorPortraitError}
                     />
                   )}
                   {existingCheckIn.mentor_response ? (

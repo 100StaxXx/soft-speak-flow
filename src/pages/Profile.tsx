@@ -33,6 +33,7 @@ import { CalendarIntegrationsSettings } from "@/components/CalendarIntegrationsS
 import { CinematicPageBackground } from "@/components/CinematicPageBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
+import { MentorAvatar } from "@/components/MentorAvatar";
 import { applyMentorChange } from "@/pages/profileMentorChange";
 import { getMentorDisplaySortIndex } from "@/lib/mentorRoster";
 import {
@@ -475,15 +476,14 @@ const Profile = () => {
                 <CardContent className="space-y-3">
                   {selectedMentor && (
                     <div className="flex items-center gap-3 p-2.5 bg-muted/30 rounded-lg">
-                      {selectedMentor.avatar_url && (
-                        <img 
-                          src={selectedMentor.avatar_url} 
-                          alt={selectedMentor.name} 
-                          className="w-10 h-10 rounded-full object-cover" 
-                          loading="lazy" 
-                          decoding="async" 
-                        />
-                      )}
+                      <MentorAvatar
+                        mentorSlug={selectedMentor.slug || selectedMentor.name}
+                        mentorName={selectedMentor.name}
+                        primaryColor={selectedMentor.primary_color || "#7c3aed"}
+                        avatarUrl={selectedMentor.avatar_url || undefined}
+                        size="xs"
+                        showBorder={false}
+                      />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm">{selectedMentor.name}</p>
                         <p className="text-xs text-muted-foreground truncate">{selectedMentor.tone_description}</p>

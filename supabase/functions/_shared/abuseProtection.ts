@@ -38,6 +38,8 @@ interface SafeErrorOptions {
   code: string;
   error: string;
   requestId: string;
+  stage?: string;
+  failureReason?: string;
   retryAfterSeconds?: number | null;
   protection?: AbuseProtectionResult | null;
   extraHeaders?: HeadersInit;
@@ -181,6 +183,10 @@ export function createSafeErrorResponse(req: Request, options: SafeErrorOptions)
       error: options.error,
       code: options.code,
       requestId: options.requestId,
+      ...(options.stage ? { stage: options.stage } : {}),
+      ...(options.failureReason
+        ? { failureReason: options.failureReason }
+        : {}),
       ...(options.retryAfterSeconds && options.retryAfterSeconds > 0
         ? { retryAfterSeconds: options.retryAfterSeconds }
         : {}),
@@ -257,6 +263,8 @@ export async function applyAbuseProtection(
       code: "ABUSE_CHECK_FAILED",
       error: "Request could not be processed right now",
       requestId: options.requestId,
+      stage: "abuse_protection",
+      failureReason: "limiter_error",
     });
   }
 
@@ -281,6 +289,8 @@ export async function applyAbuseProtection(
       code: "ABUSE_CHECK_FAILED",
       error: "Request could not be processed right now",
       requestId: options.requestId,
+      stage: "abuse_protection",
+      failureReason: "missing_limiter_result",
     });
   }
 
@@ -291,6 +301,8 @@ export async function applyAbuseProtection(
       code,
       error: options.blockedMessage ?? "Too many requests. Please try again later.",
       requestId: options.requestId,
+      stage: "abuse_protection",
+      failureReason: protection.code,
       retryAfterSeconds: protection.retry_after_seconds,
       protection,
     });
@@ -320,6 +332,8 @@ export async function requireProtectedRequest(
       code: "SERVICE_MISCONFIGURED",
       error: "Request could not be processed right now",
       requestId,
+      stage: "auth",
+      failureReason: "service_credentials_missing",
     });
   }
 
@@ -335,6 +349,8 @@ export async function requireProtectedRequest(
       code: authError.code,
       error: authError.error,
       requestId,
+      stage: "auth",
+      failureReason: "request_auth_failed",
     });
   }
 
@@ -344,6 +360,8 @@ export async function requireProtectedRequest(
       code: "FORBIDDEN",
       error: "Forbidden",
       requestId,
+      stage: "auth",
+      failureReason: "service_role_disallowed",
     });
   }
 
