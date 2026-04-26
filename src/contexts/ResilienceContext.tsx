@@ -351,7 +351,9 @@ export function ResilienceProvider({ children }: { children: ReactNode }) {
       retryAll: retryAllFailed,
       retryAction,
       discardAction,
-      retryNow: triggerSync,
+      retryNow: async () => {
+        await triggerSync();
+      },
       queueAction,
       queueTaskAction,
       reportIssue,

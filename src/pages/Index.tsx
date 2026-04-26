@@ -702,9 +702,6 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
       >
         {isDesktop ? desktopContent : mobileContent}
       </div>
-      
-      <ErrorBoundary>
-      </ErrorBoundary>
     </PageTransition>
   );
 };

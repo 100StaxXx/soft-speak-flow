@@ -242,8 +242,8 @@ const buildQueuedTogglePayload = (variables: ToggleTaskVariables) => ({
   forceUndo: variables.forceUndo ?? false,
 });
 
-const buildQueuedTaskUpdatePayload = (taskId: string, updates: Record<string, unknown>) => {
-  const queueableUpdates = { ...updates };
+const buildQueuedTaskUpdatePayload = (taskId: string, updates: TaskUpdateInput | Record<string, unknown>) => {
+  const queueableUpdates = { ...(updates as Record<string, unknown>) };
 
   if ("attachments" in queueableUpdates) {
     const attachments = queueableUpdates.attachments as QuestAttachmentInput[] | undefined;
@@ -446,7 +446,7 @@ function buildRecurrenceWriteFields(input: RecurrenceWriteInput): RecurrenceWrit
 
 async function runDailyTaskWriteWithRecurrenceFallback<T>(
   payload: Record<string, unknown>,
-  write: (nextPayload: Record<string, unknown>) => Promise<{ data: T | null; error: SupabaseLikeError | null }>,
+  write: (nextPayload: Record<string, unknown>) => PromiseLike<{ data: T | null; error: SupabaseLikeError | null }>,
 ): Promise<{ data: T | null; error: SupabaseLikeError | null; fallbackUsed: boolean }> {
   const normalizedPayload = normalizeUuidFields(payload) as Record<string, unknown>;
 
@@ -1066,7 +1066,7 @@ export const useTaskMutations = (taskDate: string) => {
               (nextPayload) => {
                 const insertQuery = supabase
                   .from("daily_tasks")
-                  .insert(nextPayload);
+                  .insert(nextPayload as never);
 
                 insertQuery.abortSignal(abortController.signal);
                 return insertQuery.select().single();
@@ -1904,7 +1904,7 @@ export const useTaskMutations = (taskDate: string) => {
           insertPayload,
           (nextPayload) => supabase
             .from('daily_tasks')
-            .insert(nextPayload)
+            .insert(nextPayload as never)
             .select()
             .single(),
         );
@@ -2130,11 +2130,11 @@ export const useTaskMutations = (taskDate: string) => {
       const nextRecurrencePattern = normalizeRecurrencePattern(
         updates.recurrence_pattern !== undefined
           ? updates.recurrence_pattern
-          : existingScheduling?.recurrence_pattern ?? null,
+          : (existingScheduling?.recurrence_pattern as string | null | undefined) ?? null,
       );
-      const nextScheduledTime = typeof updateData.scheduled_time === 'string' || updateData.scheduled_time === null
-        ? updateData.scheduled_time
-        : existingScheduling?.scheduled_time ?? null;
+      const nextScheduledTime: string | null = typeof updateData.scheduled_time === 'string' || updateData.scheduled_time === null
+        ? (updateData.scheduled_time as string | null)
+        : (existingScheduling?.scheduled_time as string | null | undefined) ?? null;
 
       if (recurrenceFieldsUpdated) {
         updateData.is_recurring = hasRecurrencePattern(nextRecurrencePattern);
@@ -2197,7 +2197,7 @@ export const useTaskMutations = (taskDate: string) => {
         updateData,
         (nextPayload) => supabase
           .from('daily_tasks')
-          .update(nextPayload)
+          .update(nextPayload as never)
           .eq('id', remoteTaskId)
           .eq('user_id', user.id),
       );

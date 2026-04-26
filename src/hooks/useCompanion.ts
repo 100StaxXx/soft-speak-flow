@@ -1089,7 +1089,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         ): Promise<CreateCompanionRpcResult> => {
           return await supabase.rpc(
             "create_companion_if_not_exists",
-            args,
+            args as never,
           ) as unknown as CreateCompanionRpcResult;
         };
 

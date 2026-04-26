@@ -1,21 +1,21 @@
-import { COMPANION_PLANNER_SURFACE_ACTIONS } from "@/shared/companionPlannerSurfaceActions";
+import {
+  COMPANION_PLANNER_SURFACE_ACTIONS,
+  type CompanionPlannerSurfaceAction,
+} from "@/shared/companionPlannerSurfaceActions";
 import type { CompanionPlannerLaunchTarget, CompanionPlannerStarterIntent } from "@/types/companionPlanner";
+
+type JourneysCompanionLauncherSurfaceActionId =
+  | "plan-day"
+  | "adjust-day"
+  | "right-now"
+  | "upcoming"
+  | "quest"
+  | "goal";
 
 export interface JourneysCompanionLauncherTemplate {
   id:
     | "free-talk"
-    | "plan-week"
-    | "plan-day"
-    | "prepare-tomorrow"
-    | "advance-campaign"
-    | "adjust-day"
-    | "make-room"
-    | "low-energy"
-    | "what-matters"
-    | "right-now"
-    | "upcoming"
-    | "quest"
-    | "goal";
+    | JourneysCompanionLauncherSurfaceActionId;
   label: string;
   message: string;
   target: CompanionPlannerLaunchTarget;
@@ -60,15 +60,23 @@ const getStableIndex = (seed: string, length: number) => {
   return Math.abs(hash) % length;
 };
 
-const JOURNEYS_LAUNCHER_ACTION_IDS = new Set<JourneysCompanionLauncherTemplate["id"]>([
+const JOURNEYS_LAUNCHER_ACTION_IDS = [
   "plan-day",
   "adjust-day",
-  "low-energy",
   "right-now",
   "upcoming",
   "quest",
   "goal",
-]);
+] as const satisfies readonly JourneysCompanionLauncherSurfaceActionId[];
+
+const JOURNEYS_LAUNCHER_ACTION_ID_SET = new Set<CompanionPlannerSurfaceAction["id"]>(
+  JOURNEYS_LAUNCHER_ACTION_IDS,
+);
+
+const isJourneysCompanionLauncherAction = (
+  action: CompanionPlannerSurfaceAction,
+): action is CompanionPlannerSurfaceAction & { id: JourneysCompanionLauncherSurfaceActionId } =>
+  JOURNEYS_LAUNCHER_ACTION_ID_SET.has(action.id);
 
 export const getJourneysCompanionLauncherGreeting = ({
   date = new Date(),
@@ -98,8 +106,6 @@ export const getJourneysCompanionLauncherTemplates = ({
       target: "conversation",
       starterIntent: "free_talk_start",
     },
-    ...COMPANION_PLANNER_SURFACE_ACTIONS.filter((action) =>
-      JOURNEYS_LAUNCHER_ACTION_IDS.has(action.id)
-    ),
+    ...COMPANION_PLANNER_SURFACE_ACTIONS.filter(isJourneysCompanionLauncherAction),
   ];
 };

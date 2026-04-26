@@ -468,7 +468,7 @@ interface EnqueueActionInput {
   actionKind: QueueActionKind;
   entityType?: QueueEntityType;
   entityId?: string | null;
-  payload: Record<string, unknown>;
+  payload: unknown;
   status?: QueueActionStatus;
 }
 
@@ -479,7 +479,10 @@ export async function enqueueAction(input: EnqueueActionInput): Promise<string> 
   try {
     if (!input.userId) throw new Error("User ID is required for queued actions");
     const timestamp = nowMs();
-    const normalizedPayload = normalizeUuidFields(input.payload);
+    const payload = input.payload && typeof input.payload === "object" && !Array.isArray(input.payload)
+      ? input.payload as Record<string, unknown>
+      : {};
+    const normalizedPayload = normalizeUuidFields(payload);
     const action: QueuedAction = {
       id: createId(),
       user_id: input.userId,

@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildVoiceQuestPrefillFromTranscript } from "./voiceQuestPrefill";
+import {
+  buildQuestPrefillFromNaturalLanguage,
+  buildVoiceQuestPrefillFromTranscript,
+} from "./voiceQuestPrefill";
 
 describe("buildVoiceQuestPrefillFromTranscript", () => {
   beforeEach(() => {
@@ -80,6 +83,20 @@ describe("buildVoiceQuestPrefillFromTranscript", () => {
       taskDate: "2026-04-10",
       scheduledTime: "08:00",
       creationSource: "voice",
+    }));
+  });
+
+  it("can mark typed natural language captures as nlp instead of voice", () => {
+    const prefill = buildQuestPrefillFromNaturalLanguage(
+      "Pilates tomorrow at 8am",
+      "nlp",
+    );
+
+    expect(prefill).toEqual(expect.objectContaining({
+      text: "Pilates",
+      taskDate: "2026-04-10",
+      scheduledTime: "08:00",
+      creationSource: "nlp",
     }));
   });
 

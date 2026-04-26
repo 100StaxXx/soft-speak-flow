@@ -1695,7 +1695,7 @@ export const StoryOnboarding = ({
               />
             ) : (
               <AICompanionCreator
-                onComplete={handleCompanionComplete}
+                onComplete={(data) => handleCompanionComplete({ presetId: null, ...data })}
                 storyTone={selectedStoryTone}
                 isLoading={isCreatingCompanion}
                 title={isResetMode ? "Shape Your New Companion Egg" : "Shape Your Companion Egg"}

@@ -189,17 +189,18 @@ async function fetchRecurringTemplatesRemote(userId: string): Promise<RecurringT
 
   if (isDailyTasksRecurrenceColumnsMissingError(error)) {
     const fallback = await fetchTemplates(RECURRING_TEMPLATE_SELECT_LEGACY_RECURRENCE);
-    templates = (fallback.data || []).map((template) => ({
+    const fallbackTemplates = (fallback.data || []) as unknown as Array<Record<string, unknown>>;
+    templates = fallbackTemplates.map((template) => ({
       ...template,
       recurrence_month_days: null,
       recurrence_custom_period: null,
-    }));
+    })) as unknown as typeof templates;
     error = fallback.error;
   }
 
   if (error) throw error;
 
-  return (templates ?? []) as RecurringTask[];
+  return (templates ?? []) as unknown as RecurringTask[];
 }
 
 function toLocalRecurringTemplateRow(userId: string, template: RecurringTask): DailyTask {

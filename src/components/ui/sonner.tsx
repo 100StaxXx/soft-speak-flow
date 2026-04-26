@@ -1,9 +1,10 @@
 import { Toaster as Sonner, toast as sonnerToast } from "sonner";
-import type { ExternalToast, PromiseData, ToasterProps } from "sonner";
+import type { ExternalToast, ToasterProps } from "sonner";
 
 import { MAX_TOAST_DURATION_MS, clampToastDuration } from "@/constants/toast";
 
 const dismissTimeouts = new Map<string | number, ReturnType<typeof globalThis.setTimeout>>();
+type PromiseData<T> = NonNullable<Parameters<typeof sonnerToast.promise<T>>[1]>;
 
 const capToastOptions = (options?: ExternalToast): ExternalToast => ({
   ...options,

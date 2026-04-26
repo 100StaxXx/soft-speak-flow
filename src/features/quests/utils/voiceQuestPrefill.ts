@@ -1,6 +1,6 @@
 import type { ParsedTask } from "@/features/tasks/hooks";
 import { parseNaturalLanguage } from "@/features/tasks/hooks";
-import type { QuestComposerPrefillDraft } from "@/features/quests/types";
+import type { QuestComposerPrefillDraft, QuestCreationSource } from "@/features/quests/types";
 import { formatGeneratedTaskTitle } from "@/shared/taskTitleNormalization";
 import { format, startOfDay } from "date-fns";
 
@@ -95,7 +95,10 @@ const resolvePrefillTitle = (parsed: ParsedTask, transcript: string) => {
     return sanitizeTitle(value.slice(0, earliestMatch));
   };
 
-  const candidateTitle = parsed.text.trim() || transcript.trim();
+  const parsedTitle = parsed.text.trim();
+  const candidateTitle = /^notes?$/i.test(parsedTitle)
+    ? transcript.trim()
+    : parsedTitle || transcript.trim();
   return formatGeneratedTaskTitle(stripVoiceMetadata(candidateTitle)) ||
     formatGeneratedTaskTitle(sanitizeTitle(transcript));
 };
@@ -197,10 +200,13 @@ const resolveRecurrencePrefill = (
   };
 };
 
-export function buildVoiceQuestPrefillFromTranscript(transcript: string): QuestComposerPrefillDraft {
-  const cleanedTranscript = transcript.trim();
-  const parsed = parseNaturalLanguage(cleanedTranscript);
-  const resolvedScheduledDate = resolveVoiceScheduledDate(parsed, cleanedTranscript);
+export function buildQuestPrefillFromNaturalLanguage(
+  input: string,
+  creationSource: QuestCreationSource = "nlp",
+): QuestComposerPrefillDraft {
+  const cleanedInput = input.trim();
+  const parsed = parseNaturalLanguage(cleanedInput);
+  const resolvedScheduledDate = resolveVoiceScheduledDate(parsed, cleanedInput);
   const parsedWithVoiceSchedule =
     resolvedScheduledDate === parsed.scheduledDate
       ? parsed
@@ -208,7 +214,7 @@ export function buildVoiceQuestPrefillFromTranscript(transcript: string): QuestC
   const recurrencePrefill = resolveRecurrencePrefill(parsedWithVoiceSchedule);
 
   return {
-    text: resolvePrefillTitle(parsedWithVoiceSchedule, cleanedTranscript),
+    text: resolvePrefillTitle(parsedWithVoiceSchedule, cleanedInput),
     taskDate: resolvedScheduledDate,
     difficulty: parsed.difficulty,
     scheduledTime: parsed.scheduledTime,
@@ -221,6 +227,10 @@ export function buildVoiceQuestPrefillFromTranscript(transcript: string): QuestC
     reminderMinutesBefore: parsed.reminderMinutesBefore ?? undefined,
     moreInformation: trimOrNull(parsed.notes),
     location: null,
-    creationSource: "voice",
+    creationSource,
   };
+}
+
+export function buildVoiceQuestPrefillFromTranscript(transcript: string): QuestComposerPrefillDraft {
+  return buildQuestPrefillFromNaturalLanguage(transcript, "voice");
 }

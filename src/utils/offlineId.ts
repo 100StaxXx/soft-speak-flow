@@ -28,13 +28,15 @@ export function normalizeUuidLikeId(value: string): string {
 }
 
 export function createClientUuid(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
+  const cryptoApi = typeof globalThis.crypto !== "undefined" ? globalThis.crypto : null;
+
+  if (cryptoApi && "randomUUID" in cryptoApi) {
+    return cryptoApi.randomUUID();
   }
 
-  if (typeof crypto !== "undefined" && "getRandomValues" in crypto) {
+  if (cryptoApi && "getRandomValues" in cryptoApi) {
     const bytes = new Uint8Array(16);
-    crypto.getRandomValues(bytes);
+    cryptoApi.getRandomValues(bytes);
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
 

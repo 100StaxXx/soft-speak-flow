@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCallback } from "react";
 import { toast } from "@/components/ui/sonner";
+import type { DailyTask } from "@/services/dailyTasksRemote";
 import { normalizeTaskSchedulingState } from "@/utils/taskSchedulingRules";
 import { useResilience } from "@/contexts/ResilienceContext";
 import { isQueueableWriteError } from "@/utils/networkErrors";
@@ -30,7 +31,7 @@ export const fetchInboxTasks = async (userId: string) => {
     .eq("completed", false)
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return data || [];
+  return (data || []) as DailyTask[];
 };
 
 export const fetchInboxCount = async (userId: string) => {
@@ -138,7 +139,11 @@ export const useInboxTasks = (options: InboxTasksOptions = {}) => {
         toast("Quest schedule queued. It will sync when connection is restored.");
         return;
       }
-      if (data?.normalizedToInbox) {
+      if (
+        data
+        && "normalizedToInbox" in data
+        && data.normalizedToInbox
+      ) {
         toast("Regular quests without time stay in Inbox.");
       }
     },

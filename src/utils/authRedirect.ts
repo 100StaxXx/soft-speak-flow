@@ -292,7 +292,7 @@ const resolvePathFromContext = (
       const sanitizedOnboardingData = stripOnboardingMentorId(profile.onboarding_data);
       const { error: cleanupError } = await supabase
         .from("profiles")
-        .update({ onboarding_data: sanitizedOnboardingData })
+        .update({ onboarding_data: sanitizedOnboardingData as never })
         .eq("id", userId);
 
       if (cleanupError) {

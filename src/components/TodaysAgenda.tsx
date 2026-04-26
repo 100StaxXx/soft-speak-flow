@@ -1533,7 +1533,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             sortKey: `1-${minute}-${task.id}`,
           };
         })
-        .filter((row): row is TimelineRow & { minute: number; sortKey: string } => !!row),
+        .filter((row): row is { kind: "task"; task: Task; minute: number; sortKey: string } => row !== null),
     ].sort((a, b) => {
       if (a.minute !== b.minute) return a.minute - b.minute;
       return a.sortKey.localeCompare(b.sortKey);

@@ -47,7 +47,7 @@ interface Campaign {
   start_date: string;
   end_date: string | null;
   status: string;
-  xp_reward: number;
+  xp_reward?: number | null;
   progress_percentage: number;
   is_public?: boolean;
   invite_code?: string;
@@ -332,7 +332,7 @@ export const CampaignCard = memo(function CampaignCard({ campaign, onRename, onC
           ) : (
             <span className="flex items-center gap-1">
               <Zap className="w-3 h-3 text-stardust-gold" />
-              <span className="text-stardust-gold font-medium">{campaign.xp_reward} XP</span>
+              <span className="text-stardust-gold font-medium">{campaign.xp_reward ?? 0} XP</span>
             </span>
           )}
           </div>

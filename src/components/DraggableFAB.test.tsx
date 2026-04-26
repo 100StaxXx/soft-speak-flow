@@ -280,20 +280,15 @@ describe("DraggableFAB", () => {
     }));
   });
 
-  it("routes the low-energy option through the planner", () => {
+  it("omits the low-energy option from the journeys launcher", () => {
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
 
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-low-energy"));
 
-    expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
-      target: "planner",
-      starterIntent: "low_energy_adjust",
-      message: "I'm low energy",
-    }));
+    expect(screen.queryByTestId("journeys-companion-launcher-option-low-energy")).not.toBeInTheDocument();
   });
 
-  it("routes the quest option through the planner as a one-prompt quest capture starter", () => {
+  it("launches the quest option as a local quest-capture starter", () => {
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
 
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
@@ -302,7 +297,7 @@ describe("DraggableFAB", () => {
     expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
       target: "planner",
       starterIntent: "quest_capture",
-      message: "Quest?",
+      message: "",
     }));
   });
 

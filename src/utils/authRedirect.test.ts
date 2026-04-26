@@ -356,7 +356,7 @@ describe("getAuthRedirectPath", () => {
     ).resolves.toBe("/onboarding");
 
     expect(mocks.profilesUpsertMock).toHaveBeenCalledTimes(1);
-    const upsertCalls = mocks.profilesUpsertMock.mock.calls as Array<
+    const upsertCalls = mocks.profilesUpsertMock.mock.calls as unknown as Array<
       [Record<string, unknown>, { onConflict?: string; ignoreDuplicates?: boolean }?]
     >;
     const [payload, options] = upsertCalls[0] ?? [{}];

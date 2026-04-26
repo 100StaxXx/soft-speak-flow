@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
     current_xp: 180,
     current_stage: 8,
     current_image_url: "/companion-presets/phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__fire.png",
+    initial_image_url: null as string | null,
     preset_id: "phoenix",
     spirit_animal: "phoenix",
     core_element: "fire",
@@ -42,7 +43,7 @@ const mocks = vi.hoisted(() => ({
   isPreHatchCompanionStep: false,
   isEvolvingLoading: false,
   expressionState: {
-    mood: "calm" as const,
+    mood: "calm" as "calm" | "happy" | "excited",
     variant: 2,
     reason: "stable",
     isEventDriven: false,
@@ -284,9 +285,6 @@ vi.mock("@/lib/companionAssetResolver", () => ({
       ? `/companion-eggs/egg__t0_egg__normal__${String(companion.core_element ?? "fire").toLowerCase()}.png`
       : (companion.current_image_url ?? "/companion.png")
   )),
-  resolveCompanionExpressiveAssetUrl: vi.fn().mockImplementation((companion: {
-    current_image_url?: string | null;
-  }) => companion.current_image_url ?? "/companion.png"),
 }));
 
 import { CompanionDisplay } from "./CompanionDisplay";
@@ -311,6 +309,7 @@ describe("CompanionDisplay overlay stack", () => {
       current_xp: 180,
       current_stage: 8,
       current_image_url: "/companion-presets/phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__fire.png",
+      initial_image_url: null,
       preset_id: "phoenix",
       spirit_animal: "phoenix",
       core_element: "fire",

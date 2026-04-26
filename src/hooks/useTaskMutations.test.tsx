@@ -168,7 +168,7 @@ vi.mock("@/utils/asyncTimeout", async () => {
 });
 
 vi.mock("@/utils/plannerLocalStore", () => ({
-  createOfflinePlannerId: (...args: unknown[]) => mocks.createOfflinePlannerIdMock(...args),
+  createOfflinePlannerId: (...args: unknown[]) => mocks.createOfflinePlannerIdMock.apply(null, args),
   getLocalHabitCompletionsForDate: (...args: unknown[]) => mocks.getLocalHabitCompletionsForDateMock(...args),
   getLocalSubtasksForTask: (...args: unknown[]) => mocks.getLocalSubtasksForTaskMock(...args),
   getPlannerRecord: (...args: unknown[]) => mocks.getPlannerRecordMock(...args),
@@ -1655,7 +1655,7 @@ describe("useTaskMutations attachment handling", () => {
       recurrence_custom_period: "week",
     });
 
-    expect(restored?.id).toBe("task-restore-1");
+    expect((restored as { id?: string } | null)?.id).toBe("task-restore-1");
     expect(mocks.dailyTasksInsertMock).toHaveBeenCalledTimes(2);
     expect(mocks.dailyTasksInsertMock.mock.calls[0]?.[0]).toEqual(
       expect.objectContaining({

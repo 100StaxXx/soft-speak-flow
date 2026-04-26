@@ -21,8 +21,8 @@ const mocks = vi.hoisted(() => {
     storyOnboardingProps: null as Record<string, unknown> | null,
     queryClient: { invalidateQueries: vi.fn(), refetchQueries: vi.fn() },
     signOut: vi.fn(() => Promise.resolve()),
-    deleteCurrentAccount: vi.fn(() => Promise.resolve({ warnings: [] })),
-    isAccountDeletionAuthError: vi.fn(() => false),
+    deleteCurrentAccount: vi.fn((_options?: unknown) => Promise.resolve({ warnings: [] })),
+    isAccountDeletionAuthError: vi.fn((_error?: unknown) => false),
     status: "authenticated" as "loading" | "recovering" | "authenticated" | "unauthenticated",
     user: { id: "user-1" } as { id: string } | null,
     profile: {

@@ -18,14 +18,14 @@ export const isPilotCompanionPreset = (
   presetId: CompanionPresetId | string | null | undefined,
 ): presetId is CompanionPresetId => (
   typeof presetId === "string"
-  && PILOT_COMPANION_PRESET_IDS.includes(presetId as CompanionPresetId)
+  && (PILOT_COMPANION_PRESET_IDS as readonly string[]).includes(presetId)
 );
 
 export const isPilotCompanionElement = (
   elementId: CompanionElementId | string | null | undefined,
 ): elementId is CompanionElementId => (
   typeof elementId === "string"
-  && PILOT_COMPANION_ELEMENT_IDS.includes(elementId as CompanionElementId)
+  && (PILOT_COMPANION_ELEMENT_IDS as readonly string[]).includes(elementId)
 );
 
 export const getDefaultPilotCompanionPresetId = (): CompanionPresetId =>

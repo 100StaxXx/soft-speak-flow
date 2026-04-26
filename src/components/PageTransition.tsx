@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { ReactNode, memo } from "react";
 import { useMotionProfile } from "@/hooks/useMotionProfile";
 

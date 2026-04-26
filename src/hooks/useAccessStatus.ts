@@ -7,7 +7,7 @@ export type AccessGateReason = 'none' | 'pre_trial_signup' | 'trial_expired';
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const hasGuidedTutorialCompleted = (onboardingData: Record<string, unknown> | null): boolean => {
+const hasGuidedTutorialCompleted = (onboardingData: unknown): boolean => {
   if (!isRecord(onboardingData)) return false;
   const guidedTutorial = onboardingData.guided_tutorial;
   if (!isRecord(guidedTutorial)) return false;

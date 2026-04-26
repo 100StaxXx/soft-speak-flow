@@ -74,6 +74,7 @@ interface JourneysCompanionPlannerModalProps {
   launchIntent?: CompanionPlannerLaunchIntent | null;
   onLaunchIntentConsumed?: (intentId: string) => void;
   onOpenCampaignBuilder?: (message: string) => void;
+  onQuestCaptureSubmit?: (rawQuest: string) => void;
   onQuestProposalEditHandoff?: (
     proposal: CompanionPlannerProposal,
   ) => Promise<{ saved: boolean; savedTitle?: string | null }>;
@@ -87,6 +88,7 @@ type JourneysCompanionDrawerLayout = {
 const MOBILE_DRAWER_HEIGHT_MIN_PX = 320;
 const MOBILE_DRAWER_HEIGHT_MAX_PX = 736;
 const MOBILE_DRAWER_VIEWPORT_OFFSET_PX = 24;
+const QUEST_CAPTURE_PROMPT = "What would you like to do for your quest?";
 
 const formatProposedActionType = (type: string) =>
   type.trim().replace(/[._-]+/g, " ") || "suggestion";
@@ -322,12 +324,14 @@ const JourneysCompanionOverlayBody = memo(({
   launchIntent,
   onLaunchIntentConsumed,
   onOpenCampaignBuilder,
+  onQuestCaptureSubmit,
   drawerLayout,
 }: {
   presentation: JourneysCompanionPlannerModalPresentation;
   launchIntent?: CompanionPlannerLaunchIntent | null;
   onLaunchIntentConsumed?: (intentId: string) => void;
   onOpenCampaignBuilder?: (message: string) => void;
+  onQuestCaptureSubmit?: (rawQuest: string) => void;
   drawerLayout?: JourneysCompanionDrawerLayout;
 }) => {
   const {
@@ -338,10 +342,13 @@ const JourneysCompanionOverlayBody = memo(({
     element,
     usesPortraitShell,
   } = useJourneysCompanionVisual();
+  const assistantLaunchIntent = launchIntent?.starterIntent === "quest_capture"
+    ? null
+    : launchIntent ?? null;
   const assistant = useCompanionAssistant({
     surface: "journeys",
     conversationEnabled: true,
-    launchIntent: launchIntent ?? null,
+    launchIntent: assistantLaunchIntent,
     onLaunchIntentConsumed,
     onOpenCampaignBuilder,
   });
@@ -359,11 +366,32 @@ const JourneysCompanionOverlayBody = memo(({
   const [pendingProposedActionKey, setPendingProposedActionKey] = useState<
     string | null
   >(null);
+  const [questCaptureIntentId, setQuestCaptureIntentId] = useState<
+    string | null
+  >(null);
 
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
   const transcriptScrollAreaRef = useRef<HTMLDivElement | null>(null);
+  const handledQuestCaptureIntentIdRef = useRef<string | null>(null);
   const activeThreadSessionId = assistant.activeThread?.sessionId ?? null;
+  const isQuestCaptureActive = Boolean(questCaptureIntentId);
+  const displayMessages = useMemo(
+    () =>
+      isQuestCaptureActive
+        ? [
+          ...visibleMessages,
+          {
+            id: `quest-capture-${questCaptureIntentId ?? "active"}`,
+            role: "assistant" as const,
+            content: QUEST_CAPTURE_PROMPT,
+            createdAt: new Date(0).toISOString(),
+            source: "agent" as const,
+          },
+        ]
+        : visibleMessages,
+    [isQuestCaptureActive, questCaptureIntentId, visibleMessages],
+  );
 
   useEffect(() => {
     if (!launchIntent?.id || launchIntent.starterIntent !== "thread_history") {
@@ -372,6 +400,20 @@ const JourneysCompanionOverlayBody = memo(({
     setIsThreadPickerOpen(true);
     onLaunchIntentConsumed?.(launchIntent.id);
   }, [launchIntent, onLaunchIntentConsumed]);
+
+  useEffect(() => {
+    if (!launchIntent?.id || launchIntent.starterIntent !== "quest_capture") {
+      return;
+    }
+    if (handledQuestCaptureIntentIdRef.current === launchIntent.id) {
+      return;
+    }
+
+    handledQuestCaptureIntentIdRef.current = launchIntent.id;
+    setQuestCaptureIntentId(launchIntent.id);
+    assistant.setDraftInput("");
+    onLaunchIntentConsumed?.(launchIntent.id);
+  }, [assistant.setDraftInput, launchIntent, onLaunchIntentConsumed]);
 
   const keepBottomContentVisible = useCallback(
     (behavior: ScrollBehavior = prefersReducedMotion ? "auto" : "smooth") => {
@@ -404,8 +446,8 @@ const JourneysCompanionOverlayBody = memo(({
     activeThreadSessionId,
     assistant.activeFollowUp,
     assistant.pendingAction,
+    displayMessages,
     keepBottomContentVisible,
-    visibleMessages,
   ]);
 
   const syncComposerHeight = useCallback(() => {
@@ -426,10 +468,42 @@ const JourneysCompanionOverlayBody = memo(({
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
       if (event.key !== "Enter" || event.shiftKey) return;
       event.preventDefault();
+      const trimmedQuest = assistant.draftInput.trim();
+      if (isQuestCaptureActive) {
+        if (!trimmedQuest || !onQuestCaptureSubmit) return;
+        onQuestCaptureSubmit(trimmedQuest);
+        setQuestCaptureIntentId(null);
+        assistant.setDraftInput("");
+        return;
+      }
       assistant.submitTypedMessage();
     },
-    [assistant],
+    [
+      assistant.draftInput,
+      assistant.setDraftInput,
+      assistant.submitTypedMessage,
+      isQuestCaptureActive,
+      onQuestCaptureSubmit,
+    ],
   );
+
+  const handleComposerSubmit = useCallback(() => {
+    const trimmedQuest = assistant.draftInput.trim();
+    if (isQuestCaptureActive) {
+      if (!trimmedQuest || !onQuestCaptureSubmit) return;
+      onQuestCaptureSubmit(trimmedQuest);
+      setQuestCaptureIntentId(null);
+      assistant.setDraftInput("");
+      return;
+    }
+    assistant.submitTypedMessage();
+  }, [
+    assistant.draftInput,
+    assistant.setDraftInput,
+    assistant.submitTypedMessage,
+    isQuestCaptureActive,
+    onQuestCaptureSubmit,
+  ]);
 
   const handleComposerFocus = useCallback(() => {
     keepBottomContentVisible("auto");
@@ -440,11 +514,13 @@ const JourneysCompanionOverlayBody = memo(({
   }, [assistant]);
 
   const handleResumeThread = useCallback(async (sessionId: string) => {
+    setQuestCaptureIntentId(null);
     await assistant.resumeThread(sessionId);
     setIsThreadPickerOpen(false);
   }, [assistant]);
 
   const handleArchiveAction = useCallback(async () => {
+    setQuestCaptureIntentId(null);
     if (assistant.canArchiveThread) {
       await assistant.archiveCurrentThread();
     }
@@ -453,6 +529,7 @@ const JourneysCompanionOverlayBody = memo(({
 
   const handleNewChatAction = useCallback(async () => {
     if (!assistant.canStartNewChat) return;
+    setQuestCaptureIntentId(null);
     await assistant.startNewChat();
   }, [assistant]);
 
@@ -514,11 +591,13 @@ const JourneysCompanionOverlayBody = memo(({
   const assistantActionDisabled = assistant.isSubmitting ||
     assistant.isResolvingAction ||
     localActionPending;
-  const sendDisabled = assistantActionDisabled || !assistant.draftInput.trim();
+  const sendDisabled = assistantActionDisabled ||
+    !assistant.draftInput.trim() ||
+    (isQuestCaptureActive && !onQuestCaptureSubmit);
   const followUpOptions = assistant.activeFollowUp?.options?.filter((option) =>
     option.trim().length > 0
   ) ?? [];
-  const hasFollowUpPanel = Boolean(
+  const hasFollowUpPanel = !isQuestCaptureActive && Boolean(
     assistant.activeFollowUp && !assistant.pendingAction,
   );
   const visibleProposedActions = hasRichStructuredResponse(
@@ -530,7 +609,8 @@ const JourneysCompanionOverlayBody = memo(({
         getProposedActionTitle(action).trim().length > 0
       )
       .slice(0, 3);
-  const hasProposedActionsPanel = !hasFollowUpPanel &&
+  const hasProposedActionsPanel = !isQuestCaptureActive &&
+    !hasFollowUpPanel &&
     !assistant.pendingAction &&
     visibleProposedActions.length > 0;
   const micButtonLabel = assistant.isRecording
@@ -685,7 +765,7 @@ const JourneysCompanionOverlayBody = memo(({
               className="space-y-3 p-4 sm:p-5"
               data-testid="journeys-companion-planner-transcript"
             >
-              {visibleMessages.map((entry) => (
+              {displayMessages.map((entry) => (
                 <div
                   key={entry.id}
                   className={cn(
@@ -710,15 +790,19 @@ const JourneysCompanionOverlayBody = memo(({
                 </div>
               ))}
 
-              <CompanionStructuredResponseCards
-                structuredResponse={assistant.structuredResponse}
-                variant="journeys"
-                onConfirmSuggestion={assistant.confirmSuggestedQuest}
-                savedProposalIds={assistant.savedSuggestionProposalIds}
-                pendingProposalId={assistant.pendingSuggestionProposalId}
-                actionDisabled={assistantActionDisabled ||
-                  Boolean(assistant.pendingAction)}
-              />
+              {!isQuestCaptureActive
+                ? (
+                  <CompanionStructuredResponseCards
+                    structuredResponse={assistant.structuredResponse}
+                    variant="journeys"
+                    onConfirmSuggestion={assistant.confirmSuggestedQuest}
+                    savedProposalIds={assistant.savedSuggestionProposalIds}
+                    pendingProposalId={assistant.pendingSuggestionProposalId}
+                    actionDisabled={assistantActionDisabled ||
+                      Boolean(assistant.pendingAction)}
+                  />
+                )
+                : null}
 
               {hasFollowUpPanel && assistant.activeFollowUp
                 ? (
@@ -895,7 +979,7 @@ const JourneysCompanionOverlayBody = memo(({
                 )
                 : null}
 
-              {assistant.pendingAction
+              {!isQuestCaptureActive && assistant.pendingAction
                 ? (
                   <div
                     className="flex w-full justify-start"
@@ -1071,7 +1155,9 @@ const JourneysCompanionOverlayBody = memo(({
                 }}
                 onKeyDown={handleComposerKeyDown}
                 onFocus={handleComposerFocus}
-                placeholder={assistant.placeholder}
+                placeholder={isQuestCaptureActive
+                  ? "Describe your quest..."
+                  : assistant.placeholder}
                 className={cn(
                   plannerPathfinderTheme.textField,
                   "min-h-[72px] max-h-[260px] w-full resize-none leading-5",
@@ -1090,8 +1176,9 @@ const JourneysCompanionOverlayBody = memo(({
                       "border-[#7f1616] bg-[linear-gradient(180deg,#ffb8a7_0%,#ff7a59_100%)] text-[#4c0f0f]",
                   )}
                   onClick={handleVoiceToggle}
-                  disabled={!assistant.isVoiceSupported &&
-                    !assistant.isRecording}
+                  disabled={isQuestCaptureActive ||
+                    (!assistant.isVoiceSupported &&
+                      !assistant.isRecording)}
                   aria-label={micButtonLabel}
                   data-testid="journeys-companion-planner-mic-button"
                 >
@@ -1099,7 +1186,7 @@ const JourneysCompanionOverlayBody = memo(({
                 </Button>
                 <Button
                   type="button"
-                  onClick={assistant.submitTypedMessage}
+                  onClick={handleComposerSubmit}
                   disabled={sendDisabled}
                   className={cn(
                     plannerPathfinderTheme.primaryButton,
@@ -1159,6 +1246,7 @@ export const JourneysCompanionPlannerModal = memo(
     launchIntent,
     onLaunchIntentConsumed,
     onOpenCampaignBuilder,
+    onQuestCaptureSubmit,
   }: JourneysCompanionPlannerModalProps) {
     const [drawerLayout, setDrawerLayout] = useState<
       JourneysCompanionDrawerLayout
@@ -1189,6 +1277,7 @@ export const JourneysCompanionPlannerModal = memo(
         launchIntent={launchIntent}
         onLaunchIntentConsumed={onLaunchIntentConsumed}
         onOpenCampaignBuilder={onOpenCampaignBuilder}
+        onQuestCaptureSubmit={onQuestCaptureSubmit}
         drawerLayout={presentation === "drawer" ? drawerLayout : undefined}
       />
     );

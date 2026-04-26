@@ -262,6 +262,109 @@ Deno.test("runCompanionAgent falls back to deterministic planner when OpenAI is 
   );
 });
 
+Deno.test("runCompanionAgent asks a follow-up instead of proposing quests for bare Plan my day", async () => {
+  const supabase = createMockSupabase();
+  const guardedFetch = (async (input: string | URL | Request) => {
+    const url = String(input);
+    if (url.endsWith("/conversations")) {
+      return jsonResponse({ id: "conv_bare_plan_day" });
+    }
+
+    if (url.endsWith("/responses")) {
+      return jsonResponse({
+        id: "resp_bare_plan_day",
+        conversation: { id: "conv_bare_plan_day" },
+        output: [
+          {
+            type: "function_call",
+            call_id: "call_submit",
+            name: "submit_companion_result",
+            arguments: JSON.stringify({
+              reply: "I drafted a focused day with one launch quest.",
+              mode: "schedule_read",
+              intent: "plan_day",
+              confidence: 0.94,
+              understanding_state: "ready_to_draft",
+              proposed_actions: [
+                {
+                  type: "quest.create",
+                  title: "Draft launch email",
+                  reason: "Best fit before the afternoon calendar blocks.",
+                  normalizedPayload: {
+                    title: "Draft launch email",
+                    date: "2026-04-18",
+                    startTime: "10:00",
+                    durationMinutes: 45,
+                  },
+                  confidence: 0.88,
+                },
+              ],
+              structured_response: {
+                intent: {
+                  intentType: "quest",
+                  timeHorizon: "today",
+                  isRecurring: false,
+                  shouldCreateQuest: true,
+                  shouldPromptCampaign: false,
+                },
+                planDay: {
+                  message: "I drafted a focused day.",
+                  dayAssessment: "balanced",
+                  suggestedQuests: [
+                    {
+                      suggestionId: "quest-1",
+                      proposalId: "proposal-1",
+                      title: "Draft launch email",
+                      type: "must",
+                      estimatedDuration: "45 min",
+                      estimatedDurationMinutes: 45,
+                      source: "optimization",
+                      reason: "Best fit before the afternoon calendar blocks.",
+                    },
+                  ],
+                },
+              },
+            }),
+          },
+        ],
+      });
+    }
+
+    throw new Error(`Unexpected fetch: ${url}`);
+  }) as typeof fetch;
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-bare-plan-day",
+      message: "Plan my day",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      starterIntent: "plan_day",
+    },
+  });
+
+  assertEquals(result.mode, "clarify");
+  assertEquals(result.intent, "plan_day");
+  assertEquals(result.understandingState, "needs_followup");
+  assertEquals(result.proposedActions, []);
+  assertEquals(result.structuredResponse, null);
+  assertEquals(result.pendingAction, undefined);
+  assertEquals(result.threadState.hasPendingAction, false);
+  assert(result.followUp?.question.includes("focus"));
+  assert(result.reply.includes("focus, recovery, or catching up"));
+  assert(
+    supabase.inserts.every((entry) =>
+      entry.table !== "companion_pending_actions"
+    ),
+    "bare launcher prompt should not create a pending action",
+  );
+});
+
 Deno.test("runCompanionAgent uses custom companion name before generated cache in model instructions", async () => {
   const supabase = createMockSupabase({
     companion: {

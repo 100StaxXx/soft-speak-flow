@@ -76,14 +76,6 @@ describe("journeys companion launcher greetings", () => {
       starterIntent: "adjust_today",
     });
 
-    expect(templates.find((template) => template.id === "low-energy")).toMatchObject({
-      id: "low-energy",
-      label: "I'm low energy",
-      message: "I'm low energy",
-      target: "planner",
-      starterIntent: "low_energy_adjust",
-    });
-
     expect(templates.find((template) => template.id === "right-now")).toMatchObject({
       id: "right-now",
       label: "What should I do right now?",
@@ -103,7 +95,7 @@ describe("journeys companion launcher greetings", () => {
     expect(templates.find((template) => template.id === "quest")).toMatchObject({
       id: "quest",
       label: "Quest?",
-      message: "Quest?",
+      message: "",
       target: "planner",
       starterIntent: "quest_capture",
     });
@@ -120,7 +112,6 @@ describe("journeys companion launcher greetings", () => {
       "free-talk",
       "plan-day",
       "adjust-day",
-      "low-energy",
       "right-now",
       "upcoming",
       "quest",

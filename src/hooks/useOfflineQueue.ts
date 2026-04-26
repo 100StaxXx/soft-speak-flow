@@ -37,7 +37,7 @@ interface QueueActionInput {
   actionKind: QueueActionKind;
   entityType?: QueueEntityType;
   entityId?: string | null;
-  payload: Record<string, unknown>;
+  payload: unknown;
 }
 
 type SupabaseLikeError = {
@@ -326,7 +326,7 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
       const payload = action.payload as Record<string, unknown>;
       const { error } = await supabase
         .from("habits")
-        .insert(payload);
+        .insert(payload as never);
 
       if (error) throw error;
       return;
@@ -411,7 +411,7 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
       if (payload.habits.length > 0) {
         const { error } = await supabase
           .from("habits")
-          .upsert(payload.habits);
+          .upsert(payload.habits as never);
         if (error) throw error;
       }
 
@@ -423,21 +423,21 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
       if (payload.epicHabits.length > 0) {
         const { error } = await supabase
           .from("epic_habits")
-          .upsert(payload.epicHabits);
+          .upsert(payload.epicHabits as never);
         if (error) throw error;
       }
 
       if (payload.phases.length > 0) {
         const { error } = await supabase
           .from("journey_phases")
-          .upsert(payload.phases);
+          .upsert(payload.phases as never);
         if (error) throw error;
       }
 
       if (payload.milestones.length > 0) {
         const { error } = await supabase
           .from("epic_milestones")
-          .upsert(payload.milestones);
+          .upsert(payload.milestones as never);
         if (error) throw error;
       }
 
@@ -452,12 +452,12 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
 
       const { error: habitError } = await supabase
         .from("habits")
-        .upsert(payload.habit);
+        .upsert(payload.habit as never);
       if (habitError) throw habitError;
 
       const { error: linkError } = await supabase
         .from("epic_habits")
-        .upsert(payload.epicHabit);
+        .upsert(payload.epicHabit as never);
       if (linkError) throw linkError;
 
       return;
@@ -748,8 +748,11 @@ export function useOfflineQueue() {
   const queueTaskAction = useCallback(
     async (
       type: "COMPLETE_TASK" | "CREATE_TASK" | "UPDATE_TASK" | "DELETE_TASK",
-      payload: Record<string, unknown>,
+      payload: unknown,
     ): Promise<string> => {
+      const payloadRecord = payload && typeof payload === "object" && !Array.isArray(payload)
+        ? payload as Record<string, unknown>
+        : {};
       const actionKind: QueueActionKind =
         type === "COMPLETE_TASK"
           ? "TASK_COMPLETE"
@@ -763,12 +766,12 @@ export function useOfflineQueue() {
         actionKind,
         entityType: "task",
         entityId:
-          typeof payload.taskId === "string"
-            ? payload.taskId
-            : typeof payload.id === "string"
-              ? payload.id
+          typeof payloadRecord.taskId === "string"
+            ? payloadRecord.taskId
+            : typeof payloadRecord.id === "string"
+              ? payloadRecord.id
               : null,
-        payload,
+        payload: payloadRecord,
       });
     },
     [queueAction],

@@ -98,7 +98,7 @@ export const COMPANION_PLANNER_SURFACE_ACTIONS: CompanionPlannerSurfaceAction[] 
     {
       id: "quest",
       label: "Quest?",
-      message: "Quest?",
+      message: "",
       target: "planner",
       starterIntent: "quest_capture",
     },

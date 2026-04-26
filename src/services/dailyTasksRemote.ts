@@ -23,8 +23,8 @@ export interface DailyTask {
   estimated_duration: number | null;
   recurrence_pattern: string | null;
   recurrence_days: number[] | null;
-  recurrence_month_days: number[] | null;
-  recurrence_custom_period: "week" | "month" | null;
+  recurrence_month_days?: number[] | null;
+  recurrence_custom_period?: "week" | "month" | null;
   recurrence_end_date?: string | null;
   is_recurring: boolean | null;
   reminder_enabled: boolean | null;
@@ -35,10 +35,10 @@ export interface DailyTask {
   is_bonus: boolean | null;
   created_at: string | null;
   priority: string | null;
-  flexibility: "fixed" | "preferred" | "flexible" | null;
-  energy_type: "deep" | "admin" | "physical" | "errand" | "social" | "creative" | "recovery" | null;
-  must_calendar_block: boolean | null;
-  deadline_at: string | null;
+  flexibility?: "fixed" | "preferred" | "flexible" | null;
+  energy_type?: "deep" | "admin" | "physical" | "errand" | "social" | "creative" | "recovery" | null;
+  must_calendar_block?: boolean | null;
+  deadline_at?: string | null;
   is_top_three: boolean | null;
   actual_time_spent: number | null;
   ai_generated: boolean | null;
@@ -132,7 +132,7 @@ export async function fetchDailyTasksRemote(userId: string, taskDate: string): P
     throw error;
   }
 
-  const rawTasks = data || [];
+  const rawTasks = (data || []) as unknown as Array<DailyTask & Record<string, unknown>>;
   const signedUrlMap = await createQuestAttachmentSignedUrlMap(
     rawTasks.flatMap((task) =>
       (((task.task_attachments as Array<{ file_path: string }> | null) ?? []).map((attachment) => attachment.file_path)),

@@ -131,7 +131,7 @@ vi.mock("@/utils/plannerSync", () => ({
   PLANNER_SYNC_EVENT: "planner-sync-finished",
   dispatchPlannerSyncFinished: (...args: unknown[]) => mocks.dispatchPlannerSyncFinishedMock(...args),
   loadLocalEpics: (...args: unknown[]) => mocks.loadLocalEpicsMock(...args),
-  withPlannerRemoteSyncLock: (...args: unknown[]) => mocks.withPlannerRemoteSyncLockMock(...args),
+  withPlannerRemoteSyncLock: (...args: unknown[]) => mocks.withPlannerRemoteSyncLockMock.apply(null, args),
   warmEpicsQueryFromRemote: (...args: unknown[]) => mocks.warmEpicsQueryFromRemoteMock(...args),
 }));
 

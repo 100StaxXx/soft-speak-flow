@@ -274,16 +274,17 @@ export function useQuestCalendarSync(options: QuestCalendarSyncOptions = {}) {
 
     if (isDailyTasksRecurrenceColumnsMissingError(error)) {
       const fallback = await queryTask(TASK_SELECT_LEGACY_RECURRENCE);
-      data = fallback.data ? {
-        ...(fallback.data as Record<string, unknown>),
+      const fallbackData = fallback.data as unknown as Record<string, unknown> | null;
+      data = fallbackData ? ({
+        ...fallbackData,
         recurrence_month_days: null,
         recurrence_custom_period: null,
-      } : null;
+      } as unknown as typeof data) : null;
       error = fallback.error;
     }
 
     if (error || !data) throw new Error('Task not found');
-    return data as TaskLite;
+    return data as unknown as TaskLite;
   };
 
   const applyTaskTimingOverride = async (taskId: string, options: SendOptions) => {

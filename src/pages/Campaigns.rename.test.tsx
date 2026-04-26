@@ -3,7 +3,7 @@ import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  campaignCardMock: vi.fn(() => <div data-testid="campaign-card" />),
+  campaignCardMock: vi.fn((_props: unknown) => <div data-testid="campaign-card" />),
   renameEpicMock: vi.fn(),
 }));
 

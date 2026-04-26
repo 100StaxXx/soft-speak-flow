@@ -34,6 +34,7 @@ const mockProducts: StoreKitProduct[] = [
     description: "Monthly plan",
     price: 9.99,
     displayPrice: "$9.99",
+    type: "auto_renewable_subscription",
   },
   {
     identifier: "cosmiq_premium_yearly",
@@ -41,6 +42,7 @@ const mockProducts: StoreKitProduct[] = [
     description: "Yearly plan",
     price: 99.99,
     displayPrice: "$99.99",
+    type: "auto_renewable_subscription",
   },
 ];
 
@@ -112,6 +114,7 @@ describe("appleIAP StoreKit 2 utilities", () => {
         description: "",
         price: 0,
         displayPrice: "$0.00",
+        type: "auto_renewable_subscription",
       });
       expect(result).toBeNull();
     });

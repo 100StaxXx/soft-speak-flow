@@ -185,6 +185,7 @@ type LocalHabitRow = {
   current_streak: number | null;
   longest_streak: number | null;
   created_at: string | null;
+  sort_order?: number | null;
 };
 
 type LocalEpicRow = EpicRecord;
@@ -1504,7 +1505,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
       if (status === "completed" && !wasAlreadyCompleted) {
         try {
           await awardCustomXP(
-            epic.xp_reward,
+            epic.xp_reward ?? 0,
             "epic_complete",
             `Epic "${epic.title}" Completed!`,
             { epic_id: variables?.epicId },

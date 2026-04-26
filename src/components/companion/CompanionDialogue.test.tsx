@@ -54,7 +54,7 @@ const mocks = vi.hoisted(() => ({
   },
   isDormant: false,
   expressionState: {
-    mood: "calm" as const,
+    mood: "calm" as "calm" | "happy" | "excited",
     variant: 2,
     reason: "stable",
     isEventDriven: false,

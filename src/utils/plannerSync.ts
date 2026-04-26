@@ -356,7 +356,7 @@ export async function syncLocalEpicsFromRemote(userId: string): Promise<void> {
           longest_streak: null,
           created_at: null,
           is_active: true,
-        });
+        } as HabitRemoteRow);
       }
     });
   }

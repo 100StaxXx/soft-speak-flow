@@ -189,10 +189,10 @@ export const PushNotificationSettings = memo(() => {
 
     queryClient.setQueryData<Profile | null | undefined>(["profile", user.id], (currentProfile) => {
       if (currentProfile == null) {
-        return profile ? { ...profile, ...updates } : currentProfile;
+        return profile ? { ...profile, ...updates } as Profile : currentProfile;
       }
 
-      return { ...currentProfile, ...updates };
+      return { ...currentProfile, ...updates } as Profile;
     });
 
     void queryClient.invalidateQueries({ queryKey: ["profile"] });

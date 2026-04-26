@@ -88,11 +88,13 @@ export interface CompanionStatAnalysisResponse {
 interface ValidationSuccess<T> {
   ok: true;
   data: T;
+  error?: never;
 }
 
 interface ValidationFailure {
   ok: false;
   error: string;
+  data?: never;
 }
 
 type ValidationResult<T> = ValidationSuccess<T> | ValidationFailure;
@@ -170,6 +172,10 @@ function failure(error: string): ValidationFailure {
 
 function success<T>(data: T): ValidationSuccess<T> {
   return { ok: true, data };
+}
+
+function isValidationFailure<T>(result: ValidationResult<T>): result is ValidationFailure {
+  return result.ok === false;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -258,7 +264,7 @@ function validateDriverArray(value: unknown, path: string): ValidationResult<Com
 
   for (const [index, driver] of value.entries()) {
     const validation = validateDriver(driver, `${path}[${index}]`);
-    if (!validation.ok) return validation;
+    if (isValidationFailure(validation)) return validation;
   }
 
   return success(value as CompanionStatDriver[]);
@@ -296,10 +302,10 @@ function validateBreakdown(value: unknown, path: string): ValidationResult<Compa
   }
 
   const reasonsValidation = validateStringArray(value.primaryReasons, `${path}.primaryReasons`);
-  if (!reasonsValidation.ok) return reasonsValidation;
+  if (isValidationFailure(reasonsValidation)) return reasonsValidation;
 
   const driversValidation = validateDriverArray(value.recentDrivers, `${path}.recentDrivers`);
-  if (!driversValidation.ok) return driversValidation;
+  if (isValidationFailure(driversValidation)) return driversValidation;
 
   return success(value as unknown as CompanionStatBreakdown);
 }
@@ -349,7 +355,7 @@ function validateStatNeeds(
     }
 
     const reasonsValidation = validateStringArray(need.reasons, `${path}.${attribute}.reasons`);
-    if (!reasonsValidation.ok) return reasonsValidation;
+    if (isValidationFailure(reasonsValidation)) return reasonsValidation;
   }
 
   return success(value as Record<CompanionStatAttribute, CompanionStatNeed>);
@@ -501,7 +507,7 @@ export function validateCompanionStatAnalysis(value: unknown): ValidationResult<
   }
 
   const activitySnapshotValidation = validateActivitySnapshot(value.activitySnapshot, "activitySnapshot");
-  if (!activitySnapshotValidation.ok) return activitySnapshotValidation;
+  if (isValidationFailure(activitySnapshotValidation)) return activitySnapshotValidation;
 
   if (!Array.isArray(value.statBreakdowns)) {
     return failure(`statBreakdowns must be an array`);
@@ -510,15 +516,15 @@ export function validateCompanionStatAnalysis(value: unknown): ValidationResult<
   const normalizedBreakdowns: CompanionStatBreakdown[] = [];
   for (const [index, breakdown] of value.statBreakdowns.entries()) {
     const validation = validateBreakdown(breakdown, `statBreakdowns[${index}]`);
-    if (!validation.ok) return validation;
+    if (isValidationFailure(validation)) return validation;
     normalizedBreakdowns.push(validation.data);
   }
 
   const statProfileValidation = validateStatProfile(value.statProfile, normalizedBreakdowns, "statProfile");
-  if (!statProfileValidation.ok) return statProfileValidation;
+  if (isValidationFailure(statProfileValidation)) return statProfileValidation;
 
   const statNeedsValidation = validateStatNeeds(value.statNeeds, "statNeeds");
-  if (!statNeedsValidation.ok) return statNeedsValidation;
+  if (isValidationFailure(statNeedsValidation)) return statNeedsValidation;
 
   if (!isString(value.momentumState) || !MOMENTUM_VALUES.has(value.momentumState)) {
     return failure(`momentumState must be a valid companion momentum state`);
@@ -551,7 +557,7 @@ export function validateCompanionStatAnalysis(value: unknown): ValidationResult<
     value.strongestRecentDrivers,
     "strongestRecentDrivers",
   );
-  if (!strongestRecentDriversValidation.ok) return strongestRecentDriversValidation;
+  if (isValidationFailure(strongestRecentDriversValidation)) return strongestRecentDriversValidation;
 
   if (!isNonEmptyString(value.summary)) {
     return failure(`summary must be a non-empty string`);
@@ -581,7 +587,7 @@ export function validateCompanionStatAnalysisResponse(
   }
 
   const analysisValidation = validateCompanionStatAnalysis(value.analysis);
-  if (!analysisValidation.ok) {
+  if (isValidationFailure(analysisValidation)) {
     return failure(`analysis.${analysisValidation.error}`);
   }
 

@@ -66,7 +66,7 @@ export function useMentorConnectionHealth(): {
       const sanitizedOnboardingData = stripOnboardingMentorId(candidateProfile?.onboarding_data);
       const { error: cleanupError } = await supabase
         .from("profiles")
-        .update({ onboarding_data: sanitizedOnboardingData })
+        .update({ onboarding_data: sanitizedOnboardingData as never })
         .eq("id", userId);
 
       if (cleanupError) {

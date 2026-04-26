@@ -119,7 +119,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      return (data || []) as ConnectedCalendar[];
+      return (data || []) as unknown as ConnectedCalendar[];
     },
   });
 
@@ -159,7 +159,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
 
       const { error } = await supabase
         .from('calendar_user_settings')
-        .upsert(payload, { onConflict: 'user_id' });
+        .upsert(payload as never, { onConflict: 'user_id' });
 
       if (error) throw error;
     },
@@ -426,7 +426,8 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
   });
 
   const connectAppleNative = useMutation({
-    mutationFn: async ({ syncMode = 'send_only' as CalendarSyncMode } = {}) => {
+    mutationFn: async (variables?: { syncMode?: CalendarSyncMode }) => {
+      const { syncMode = 'send_only' } = variables ?? {};
       if (!user?.id) throw new Error('User not authenticated');
       if (!isNativeIOS()) throw new Error('Apple Calendar is only available on iOS native');
       if (!canConnectAppleNative) throw new Error(appleNativeUnavailableReason ?? APP_UPDATE_REQUIRED_MESSAGE);

@@ -2,14 +2,12 @@ import type { CSSProperties } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Archive,
-  BatteryLow,
   CalendarCheck,
   Clock3,
   MessageCircle,
   Plus,
   RotateCcw,
   Sparkles,
-  Target,
 } from "lucide-react";
 import type { FABPopupAlignment } from "@/hooks/useDraggableFAB";
 import { cn } from "@/lib/utils";
@@ -55,53 +53,17 @@ const OPTION_META: Record<
     className: "border-[#6b3416] bg-[linear-gradient(180deg,#fffdf7_0%,#fff1cb_100%)] text-[#3c1f10]",
     iconClassName: "bg-[#fff7dc] text-[#b04b12]",
   },
-  "plan-week": {
-    label: "Plan week",
-    Icon: CalendarCheck,
-    className: "border-[#6b3416] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#3c1f10]",
-    iconClassName: "bg-[#fff7dc] text-[#b04b12]",
-  },
   "plan-day": {
     label: "Plan day",
     Icon: CalendarCheck,
     className: "border-[#6b3416] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#3c1f10]",
     iconClassName: "bg-[#fff7dc] text-[#b04b12]",
   },
-  "prepare-tomorrow": {
-    label: "Tomorrow",
-    Icon: Clock3,
-    className: "border-[#5a3f8c] bg-[linear-gradient(180deg,#efe4ff_0%,#c5a7ff_100%)] text-[#2e1d5a]",
-    iconClassName: "bg-white/55 text-[#2e1d5a]",
-  },
-  "advance-campaign": {
-    label: "Campaign",
-    Icon: Target,
-    className: "border-[#224c52] bg-[linear-gradient(180deg,#cffff3_0%,#6fded2_100%)] text-[#08333a]",
-    iconClassName: "bg-white/55 text-[#08333a]",
-  },
   "adjust-day": {
     label: "Adjust day",
     Icon: RotateCcw,
     className: "border-[#7a3b14] bg-[linear-gradient(180deg,#ffd7aa_0%,#ffae52_100%)] text-[#5b2608]",
     iconClassName: "bg-white/55 text-[#5b2608]",
-  },
-  "make-room": {
-    label: "Make room",
-    Icon: Sparkles,
-    className: "border-[#6b3f11] bg-[linear-gradient(180deg,#ffe8c8_0%,#f0b167_100%)] text-[#4d2607]",
-    iconClassName: "bg-white/55 text-[#4d2607]",
-  },
-  "low-energy": {
-    label: "Low energy",
-    Icon: BatteryLow,
-    className: "border-[#35528a] bg-[linear-gradient(180deg,#dfe9ff_0%,#9dc0ff_100%)] text-[#102a57]",
-    iconClassName: "bg-white/55 text-[#102a57]",
-  },
-  "what-matters": {
-    label: "Priorities",
-    Icon: Target,
-    className: "border-[#6b3416] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#3c1f10]",
-    iconClassName: "bg-[#fff7dc] text-[#b04b12]",
   },
   "right-now": {
     label: "Right now",

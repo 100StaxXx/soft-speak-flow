@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => {
   const createOfflinePlannerIdMock = vi.fn(() => "subtask-local");
   const getLocalSubtasksForTaskMock = vi.fn();
   const upsertPlannerRecordMock = vi.fn();
+  const upsertPlannerRecordsMock = vi.fn();
   const removePlannerRecordMock = vi.fn();
 
   return {
@@ -29,6 +30,7 @@ const mocks = vi.hoisted(() => {
     createOfflinePlannerIdMock,
     getLocalSubtasksForTaskMock,
     upsertPlannerRecordMock,
+    upsertPlannerRecordsMock,
     removePlannerRecordMock,
   };
 });
@@ -54,10 +56,11 @@ vi.mock("@/contexts/ResilienceContext", () => ({
 }));
 
 vi.mock("@/utils/plannerLocalStore", () => ({
-  createOfflinePlannerId: (...args: unknown[]) => mocks.createOfflinePlannerIdMock(...args),
+  createOfflinePlannerId: (...args: unknown[]) => mocks.createOfflinePlannerIdMock.apply(null, args),
   getLocalSubtasksForTask: (...args: unknown[]) => mocks.getLocalSubtasksForTaskMock(...args),
   removePlannerRecord: (...args: unknown[]) => mocks.removePlannerRecordMock(...args),
   upsertPlannerRecord: (...args: unknown[]) => mocks.upsertPlannerRecordMock(...args),
+  upsertPlannerRecords: (...args: unknown[]) => mocks.upsertPlannerRecordsMock(...args),
 }));
 
 import { useSubtasks } from "./useSubtasks";

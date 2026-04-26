@@ -173,7 +173,9 @@ const Campaigns = () => {
                         <CampaignCard
                           key={epic.id}
                           campaign={epic}
-                          onRename={(title) => renameEpic({ epicId: epic.id, title })}
+                          onRename={async (title) => {
+                            await renameEpic({ epicId: epic.id, title });
+                          }}
                           onComplete={() => updateEpicStatus({ epicId: epic.id, status: "completed" })}
                           onAbandon={() => updateEpicStatus({ epicId: epic.id, status: "abandoned" })}
                         />

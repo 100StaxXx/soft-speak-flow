@@ -103,7 +103,7 @@ describe("sonner toast wrapper", () => {
   it("disables pause-when-hidden on the shared toaster", () => {
     render(<Toaster />);
 
-    const sonnerProps = sonnerMocks.toaster.mock.calls[0]?.[0];
+    const sonnerProps = (sonnerMocks.toaster.mock.calls as unknown as Array<[unknown]>)[0]?.[0];
 
     expect(sonnerProps).toEqual(expect.objectContaining({
       className: "toaster group",

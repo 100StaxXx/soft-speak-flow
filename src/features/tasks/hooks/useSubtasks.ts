@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/components/ui/sonner";
 import { useResilience } from "@/contexts/ResilienceContext";
 import {
+  createOfflinePlannerId,
   getLocalSubtasksForTask,
   removePlannerRecord,
   upsertPlannerRecord,

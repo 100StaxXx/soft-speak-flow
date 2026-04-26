@@ -23,6 +23,10 @@ import {
   getTimeTriggerLabel,
 } from "./shared";
 
+type DataAttributes = {
+  [key: `data-${string}`]: string | number | boolean | undefined;
+};
+
 export interface TimePickerFieldProps {
   value: string | null;
   onChange: (time: string | null) => void;
@@ -35,10 +39,10 @@ export interface TimePickerFieldProps {
   seedValueOnOpen?: string | (() => string);
   endTimeHint?: string | null;
   suggestionAction?: ReactNode;
-  triggerProps?: ButtonHTMLAttributes<HTMLButtonElement>;
-  panelProps?: HTMLAttributes<HTMLDivElement>;
-  inputProps?: Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange">;
-  getSlotButtonProps?: (slot: string) => ButtonHTMLAttributes<HTMLButtonElement> | undefined;
+  triggerProps?: ButtonHTMLAttributes<HTMLButtonElement> & DataAttributes;
+  panelProps?: HTMLAttributes<HTMLDivElement> & DataAttributes;
+  inputProps?: Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange"> & DataAttributes;
+  getSlotButtonProps?: (slot: string) => (ButtonHTMLAttributes<HTMLButtonElement> & DataAttributes) | undefined;
   className?: string;
 }
 

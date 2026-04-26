@@ -56,7 +56,7 @@ const mapChatHistory = (rows: CompanionChatRow[]): CompanionChatMessage[] =>
     role: row.role,
     content: row.content,
     createdAt: row.created_at,
-    inputMode: row.input_mode ?? undefined,
+    inputMode: (row.input_mode as CompanionChatInputMode | null) ?? undefined,
   }));
 
 const getTodayKey = () => new Date().toISOString().slice(0, 10);

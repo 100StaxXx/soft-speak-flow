@@ -384,6 +384,261 @@ const deriveUnderstandingState = (params: {
   return "enough_to_discuss";
 };
 
+type BareStarterIntent =
+  | "plan_day"
+  | "plan_week"
+  | "advance_campaign_start"
+  | "right_now_start"
+  | "make_room"
+  | "adjust_today"
+  | "low_energy_adjust"
+  | "briefing_followup"
+  | "quest_capture"
+  | "goal_breakdown"
+  | "goal_breakdown_start";
+
+interface BareStarterFollowUpConfig {
+  intent: CompanionAgentIntent;
+  prompts: readonly string[];
+  reply: string;
+  followUp: CompanionAgentFollowUp;
+}
+
+const BARE_STARTER_FOLLOW_UPS: Record<
+  BareStarterIntent,
+  BareStarterFollowUpConfig
+> = {
+  plan_day: {
+    intent: "plan_day",
+    prompts: ["plan my day"],
+    reply:
+      "Absolutely. Before I shape today, should it lean focus, recovery, or catching up?",
+    followUp: {
+      question: "Should today lean focus, recovery, or catching up?",
+      reason:
+        "That choice changes whether I protect deep work, lighten the load, or triage overdue items.",
+      expectedAnswerType: "choice",
+      options: ["Focus", "Recovery", "Catch up"],
+      blocksDrafting: true,
+    },
+  },
+  plan_week: {
+    intent: "plan_week",
+    prompts: ["plan my week"],
+    reply:
+      "I can shape the week. Should I optimize for progress, stability, or recovery first?",
+    followUp: {
+      question:
+        "Should I optimize this week for progress, stability, or recovery first?",
+      reason:
+        "The week changes a lot depending on whether we push, protect, or reset capacity.",
+      expectedAnswerType: "choice",
+      options: ["Progress", "Stability", "Recovery"],
+      blocksDrafting: true,
+    },
+  },
+  advance_campaign_start: {
+    intent: "goal_setting",
+    prompts: ["advance my campaign"],
+    reply:
+      "Yes. Which campaign should I focus on first, and are we looking for a quick next step or a deeper reset?",
+    followUp: {
+      question:
+        "Which campaign should I focus on, and do you want a quick next step or a deeper reset?",
+      reason:
+        "Campaign work depends on the target and how much intervention you want right now.",
+      expectedAnswerType: "free_text",
+      options: ["Quick next step", "Deeper reset"],
+      blocksDrafting: true,
+    },
+  },
+  right_now_start: {
+    intent: "plan_day",
+    prompts: ["what should i do right now"],
+    reply:
+      "I can help choose the next move. Are you trying to make progress, catch up, or keep things light right now?",
+    followUp: {
+      question:
+        "Are you trying to make progress, catch up, or keep things light right now?",
+      reason:
+        "The best next action depends on the energy and pressure of this moment.",
+      expectedAnswerType: "choice",
+      options: ["Make progress", "Catch up", "Keep it light"],
+      blocksDrafting: true,
+    },
+  },
+  make_room: {
+    intent: "update_existing_plan",
+    prompts: ["make room"],
+    reply:
+      "I can make room. What are we making room for: focus work, recovery, or a specific commitment?",
+    followUp: {
+      question:
+        "What are we making room for: focus work, recovery, or a specific commitment?",
+      reason:
+        "I need the thing being protected before I decide what can move, shrink, or drop.",
+      expectedAnswerType: "free_text",
+      options: ["Focus work", "Recovery", "Specific commitment"],
+      blocksDrafting: true,
+    },
+  },
+  adjust_today: {
+    intent: "update_existing_plan",
+    prompts: ["adjust my day"],
+    reply:
+      "I can adjust today. Should I protect your top priority, reduce the load, or make room for something new?",
+    followUp: {
+      question:
+        "Should I protect your top priority, reduce the load, or make room for something new?",
+      reason:
+        "Adjusting the day means choosing which pressure gets priority before anything moves.",
+      expectedAnswerType: "choice",
+      options: ["Protect priority", "Reduce load", "Make room"],
+      blocksDrafting: true,
+    },
+  },
+  low_energy_adjust: {
+    intent: "update_existing_plan",
+    prompts: ["i'm low energy", "im low energy"],
+    reply:
+      "Got it. Should I make today lighter, preserve one important thing, or help you recover?",
+    followUp: {
+      question:
+        "Should I make today lighter, preserve one important thing, or help you recover?",
+      reason:
+        "Low-energy planning should not assume whether you want relief, momentum, or recovery.",
+      expectedAnswerType: "choice",
+      options: ["Make it lighter", "Preserve one thing", "Help me recover"],
+      blocksDrafting: true,
+    },
+  },
+  briefing_followup: {
+    intent: "plan_day",
+    prompts: ["prepare me for tomorrow"],
+    reply:
+      "I can prepare tomorrow. Should I focus on logistics, priorities, or making it feel lighter?",
+    followUp: {
+      question:
+        "Should I focus tomorrow prep on logistics, priorities, or making it feel lighter?",
+      reason:
+        "Tomorrow prep can be a briefing, a priority plan, or a load reduction pass.",
+      expectedAnswerType: "choice",
+      options: ["Logistics", "Priorities", "Lighter"],
+      blocksDrafting: true,
+    },
+  },
+  quest_capture: {
+    intent: "schedule_task",
+    prompts: ["quest"],
+    reply: "Sure. What quest do you want to capture?",
+    followUp: {
+      question: "What quest do you want to capture?",
+      reason:
+        "I need the quest before I can draft something worth putting on your calendar.",
+      expectedAnswerType: "free_text",
+      options: [],
+      blocksDrafting: true,
+    },
+  },
+  goal_breakdown: {
+    intent: "goal_setting",
+    prompts: ["let's lock in a new goal", "lets lock in a new goal"],
+    reply: "Great. What goal are we locking in?",
+    followUp: {
+      question: "What goal are we locking in?",
+      reason:
+        "A goal needs the actual target before I can break it into useful next steps.",
+      expectedAnswerType: "free_text",
+      options: [],
+      blocksDrafting: true,
+    },
+  },
+  goal_breakdown_start: {
+    intent: "goal_setting",
+    prompts: ["let's lock in a new goal", "lets lock in a new goal"],
+    reply: "Great. What goal are we locking in?",
+    followUp: {
+      question: "What goal are we locking in?",
+      reason:
+        "A goal needs the actual target before I can break it into useful next steps.",
+      expectedAnswerType: "free_text",
+      options: [],
+      blocksDrafting: true,
+    },
+  },
+};
+
+const normalizeBareStarterPrompt = (value: string): string =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[‘’]/g, "'")
+    .replace(/[?!.,]+$/g, "")
+    .replace(/\s+/g, " ");
+
+const resolveBareStarterFollowUp = (
+  request: CompanionAgentRequest,
+): BareStarterFollowUpConfig | null => {
+  if (
+    request.activeFollowUp ||
+    request.selectedProposalId ||
+    request.selectedProposedAction ||
+    (request.activeProposedActions?.length ?? 0) > 0
+  ) {
+    return null;
+  }
+
+  const normalizedMessage = normalizeBareStarterPrompt(request.message);
+  for (
+    const starterIntent of Object.keys(BARE_STARTER_FOLLOW_UPS) as Array<
+      BareStarterIntent
+    >
+  ) {
+    const config = BARE_STARTER_FOLLOW_UPS[starterIntent];
+    if (!config.prompts.includes(normalizedMessage)) continue;
+    if (request.starterIntent && request.starterIntent !== starterIntent) {
+      continue;
+    }
+    return config;
+  }
+
+  return null;
+};
+
+const hasProposalOrDraftArtifacts = (result: AgentRunResult["result"]) =>
+  result.mode === "pending_confirmation" ||
+  result.understandingState === "ready_to_draft" ||
+  Boolean(result.preparedActionId) ||
+  result.proposedActions.length > 0 ||
+  result.structuredResponse !== null;
+
+function normalizeBareStarterProposalResult(params: {
+  request: CompanionAgentRequest;
+  result: AgentRunResult["result"];
+}) {
+  const followUpConfig = resolveBareStarterFollowUp(params.request);
+  if (!followUpConfig || !hasProposalOrDraftArtifacts(params.result)) {
+    return;
+  }
+
+  const keepModelClarification = params.result.mode === "clarify" &&
+    params.result.followUp &&
+    params.result.reply.includes("?");
+  const followUp = params.result.followUp ?? followUpConfig.followUp;
+
+  params.result.reply = keepModelClarification
+    ? params.result.reply
+    : followUpConfig.reply;
+  params.result.mode = "clarify";
+  params.result.intent = followUpConfig.intent;
+  params.result.confidence = Math.min(params.result.confidence, 0.8);
+  params.result.understandingState = "needs_followup";
+  params.result.followUp = followUp;
+  params.result.proposedActions = [];
+  params.result.structuredResponse = null;
+  params.result.preparedActionId = null;
+}
+
 const buildAgentDecisionMetadata = (result: AgentRunResult["result"]) => ({
   understandingState: result.understandingState,
   followUp: result.followUp,
@@ -837,6 +1092,9 @@ function buildInstructions(params: {
     "You are the decision layer. The app supplies context, validates actions, and executes only after allowed confirmation.",
     "Interpret intent before acting. Short launcher prompts are complete intent signals, not incomplete forms.",
     "Prompts like 'Plan my day', 'Adjust my day', 'What should I do right now?', 'Make room', 'What matters?', 'Prepare me for tomorrow', 'Plan my week', and 'Advance my campaign' give you permission to reason from app context.",
+    "A bare launcher prompt starts the ChatGPT-style conversation; it is not automatic permission to produce quest cards, structured planner responses, or pending drafts on the first turn.",
+    "For a bare launcher prompt with no follow-up answer, selected proposal, or concrete extra details, do not call consult_planner just to generate default proposals. Ask one targeted follow-up or answer conversationally instead.",
+    "After the user answers the follow-up or explicitly asks you to draft, create, add, save, move, or schedule something specific, you may use consult_planner and prepare tools when helpful.",
     "Your job is to choose whether to answer, ask a follow-up, show a plan, suggest quests, or prepare a confirmable action.",
     "Follow-ups are normal and often appropriate. Ask because one more answer would materially improve the plan or avoid a wrong action, not because the prompt is short.",
     "A good follow-up is specific and grounded in the provided schedule, tasks, campaigns, rituals, or current moment. Avoid generic questions that ask the user to repeat data the app already supplied.",
@@ -2548,6 +2806,11 @@ export async function runCompanionAgent(params: RunAgentParams) {
       }
       throw error;
     }
+  });
+
+  normalizeBareStarterProposalResult({
+    request: params.request,
+    result: agentResult.result,
   });
 
   let persistedPendingAction: PendingActionRow | null =

@@ -24,9 +24,12 @@ export interface EpicRecord {
   description: string | null;
   status: string;
   progress_percentage: number | null;
+  xp_reward?: number | null;
   target_days: number;
   start_date: string;
   end_date: string | null;
+  created_at?: string | null;
+  story_type_slug?: string | null;
   epic_habits?: EpicHabitRecord[] | null;
   latest_journey_path_generated_at?: string | null;
   latest_journey_path_milestone_index?: number | null;

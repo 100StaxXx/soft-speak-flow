@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
     resumeThread: vi.fn().mockResolvedValue(undefined),
   },
   drawerRootProps: [] as Array<Record<string, unknown>>,
+  assistantOptions: [] as Array<Record<string, unknown>>,
   state: {
     messages: [
       {
@@ -129,57 +130,60 @@ vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
 }));
 
 vi.mock("@/hooks/useCompanionAssistant", () => ({
-  useCompanionAssistant: () => ({
-    todayLabel: "Saturday, April 18",
-    placeholder: "Talk to Cosmiq",
-    messages: mocks.state.messages,
-    structuredResponse: mocks.state.structuredResponse,
-    activeFollowUp: mocks.state.activeFollowUp,
-    understandingState: mocks.state.understandingState,
-    proposedActions: mocks.state.proposedActions,
-    pendingAction: mocks.state.pendingAction,
-    savedSuggestionProposalIds: mocks.state.savedSuggestionProposalIds,
-    pendingSuggestionProposalId: mocks.state.pendingSuggestionProposalId,
-    pendingActionCount: 3,
-    readyPendingActionCount: 3,
-    draftInput: mocks.state.draftInput,
-    setDraftInput: mocks.assistant.setDraftInput,
-    interimText: "",
-    isSubmitting: false,
-    isResolvingAction: false,
-    submitMessage: mocks.assistant.submitMessage,
-    submitTypedMessage: mocks.assistant.submitTypedMessage,
-    confirmPendingAction: mocks.assistant.confirmPendingAction,
-    cancelPendingAction: mocks.assistant.cancelPendingAction,
-    confirmSuggestedQuest: mocks.assistant.confirmSuggestedQuest,
-    confirmAllPendingActions: mocks.assistant.confirmAllPendingActions,
-    isRecording: false,
-    isAutoStopping: false,
-    isVoiceSupported: true,
-    permissionStatus: "granted" as const,
-    showPermissionDialog: false,
-    setShowPermissionDialog: mocks.assistant.setShowPermissionDialog,
-    isRequestingPermission: false,
-    toggleRecording: mocks.assistant.toggleRecording,
-    requestMicrophonePermission: mocks.assistant.requestMicrophonePermission,
-    isSpeaking: false,
-    speechProvider: "none" as const,
-    stopSpeaking: mocks.assistant.stopSpeaking,
-    activeThread: mocks.state.activeThread,
-    historyThreads: mocks.state.historyThreads,
-    isLoadingThreads: false,
-    canOpenThreadPicker: true,
-    threadHistoryEmptyStateMessage:
-      "Past chats will show up here after at least one real exchange.",
-    hasPersistedActiveThread: true,
-    canStartNewChat: true,
-    newChatDisabledReason: null,
-    canArchiveThread: true,
-    archiveDisabledReason: null,
-    startNewChat: mocks.assistant.startNewChat,
-    archiveCurrentThread: mocks.assistant.archiveCurrentThread,
-    resumeThread: mocks.assistant.resumeThread,
-  }),
+  useCompanionAssistant: (options: Record<string, unknown>) => {
+    mocks.assistantOptions.push(options);
+    return {
+      todayLabel: "Saturday, April 18",
+      placeholder: "Talk to Cosmiq",
+      messages: mocks.state.messages,
+      structuredResponse: mocks.state.structuredResponse,
+      activeFollowUp: mocks.state.activeFollowUp,
+      understandingState: mocks.state.understandingState,
+      proposedActions: mocks.state.proposedActions,
+      pendingAction: mocks.state.pendingAction,
+      savedSuggestionProposalIds: mocks.state.savedSuggestionProposalIds,
+      pendingSuggestionProposalId: mocks.state.pendingSuggestionProposalId,
+      pendingActionCount: 3,
+      readyPendingActionCount: 3,
+      draftInput: mocks.state.draftInput,
+      setDraftInput: mocks.assistant.setDraftInput,
+      interimText: "",
+      isSubmitting: false,
+      isResolvingAction: false,
+      submitMessage: mocks.assistant.submitMessage,
+      submitTypedMessage: mocks.assistant.submitTypedMessage,
+      confirmPendingAction: mocks.assistant.confirmPendingAction,
+      cancelPendingAction: mocks.assistant.cancelPendingAction,
+      confirmSuggestedQuest: mocks.assistant.confirmSuggestedQuest,
+      confirmAllPendingActions: mocks.assistant.confirmAllPendingActions,
+      isRecording: false,
+      isAutoStopping: false,
+      isVoiceSupported: true,
+      permissionStatus: "granted" as const,
+      showPermissionDialog: false,
+      setShowPermissionDialog: mocks.assistant.setShowPermissionDialog,
+      isRequestingPermission: false,
+      toggleRecording: mocks.assistant.toggleRecording,
+      requestMicrophonePermission: mocks.assistant.requestMicrophonePermission,
+      isSpeaking: false,
+      speechProvider: "none" as const,
+      stopSpeaking: mocks.assistant.stopSpeaking,
+      activeThread: mocks.state.activeThread,
+      historyThreads: mocks.state.historyThreads,
+      isLoadingThreads: false,
+      canOpenThreadPicker: true,
+      threadHistoryEmptyStateMessage:
+        "Past chats will show up here after at least one real exchange.",
+      hasPersistedActiveThread: true,
+      canStartNewChat: true,
+      newChatDisabledReason: null,
+      canArchiveThread: true,
+      archiveDisabledReason: null,
+      startNewChat: mocks.assistant.startNewChat,
+      archiveCurrentThread: mocks.assistant.archiveCurrentThread,
+      resumeThread: mocks.assistant.resumeThread,
+    };
+  },
 }));
 
 vi.mock("@/components/ui/dialog", () => ({
@@ -245,6 +249,8 @@ describe("JourneysCompanionPlannerModal", () => {
     vi.clearAllMocks();
     mocks.assistant.submitMessage.mockResolvedValue(true);
     mocks.drawerRootProps.length = 0;
+    mocks.assistantOptions.length = 0;
+    mocks.state.draftInput = "Plan tomorrow for me";
     mocks.state.activeFollowUp = null;
     mocks.state.understandingState = null;
     mocks.state.proposedActions = [];
@@ -304,6 +310,66 @@ describe("JourneysCompanionPlannerModal", () => {
       .toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Confirm" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+  });
+
+  it("starts quest capture locally without forwarding Quest? to the assistant hook", async () => {
+    const onLaunchIntentConsumed = vi.fn();
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+        launchIntent={{
+          id: "quest-launch-1",
+          message: "Quest?",
+          starterIntent: "quest_capture",
+          target: "planner",
+          briefingContext: null,
+        }}
+        onLaunchIntentConsumed={onLaunchIntentConsumed}
+        onQuestCaptureSubmit={vi.fn()}
+      />,
+    );
+
+    expect(
+      await screen.findByText("What would you like to do for your quest?"),
+    ).toBeInTheDocument();
+    expect(onLaunchIntentConsumed).toHaveBeenCalledWith("quest-launch-1");
+    expect(mocks.assistant.submitMessage).not.toHaveBeenCalled();
+    expect(mocks.assistant.submitTypedMessage).not.toHaveBeenCalled();
+    expect(mocks.assistantOptions.at(-1)?.launchIntent).toBeNull();
+  });
+
+  it("submits the user's quest capture text to the local handoff instead of chat", async () => {
+    const onQuestCaptureSubmit = vi.fn();
+    mocks.state.draftInput = "Pilates tomorrow at 8am";
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+        launchIntent={{
+          id: "quest-launch-2",
+          message: "Quest?",
+          starterIntent: "quest_capture",
+          target: "planner",
+          briefingContext: null,
+        }}
+        onQuestCaptureSubmit={onQuestCaptureSubmit}
+      />,
+    );
+
+    await screen.findByText("What would you like to do for your quest?");
+
+    fireEvent.click(screen.getByTestId("journeys-companion-planner-send-button"));
+
+    expect(onQuestCaptureSubmit).toHaveBeenCalledWith(
+      "Pilates tomorrow at 8am",
+    );
+    expect(mocks.assistant.submitMessage).not.toHaveBeenCalled();
+    expect(mocks.assistant.submitTypedMessage).not.toHaveBeenCalled();
   });
 
   it("opens thread history from the thread-history launch intent and resumes a selected thread", async () => {

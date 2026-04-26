@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion, type MotionProps } from "framer-motion";
 import { LucideIcon, X } from "lucide-react";
 import { useId, useRef } from "react";
 import { cn } from "@/lib/utils";
@@ -92,7 +92,7 @@ export function TutorialModal({
 
   if (!open) return null;
 
-  const cardMotion = prefersReducedMotion
+  const cardMotion: MotionProps = prefersReducedMotion
     ? { initial: false, animate: { opacity: 1 }, transition: { duration: 0 } }
     : {
       initial: { opacity: 0, y: 40, scale: 0.95 },
@@ -103,7 +103,7 @@ export function TutorialModal({
         stiffness: 300,
       },
     };
-  const revealMotion = (delay: number) => prefersReducedMotion
+  const revealMotion = (delay: number): MotionProps => prefersReducedMotion
     ? { initial: false, animate: { opacity: 1 }, transition: { duration: 0 } }
     : {
       initial: { opacity: 0, y: 10 },

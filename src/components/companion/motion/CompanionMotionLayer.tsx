@@ -6,7 +6,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, type TargetAndTransition } from "framer-motion";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import {
   getCompanionMotionSceneConfig,
@@ -156,7 +156,7 @@ const getParticleStyle = (
 const getParticleAnimation = (
   particleStyle: ParticleStyleKind,
   index: number,
-): CSSProperties & Record<string, string[] | number[]> => {
+): TargetAndTransition => {
   switch (particleStyle) {
     case "ember":
       return {

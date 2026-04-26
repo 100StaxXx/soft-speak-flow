@@ -96,7 +96,7 @@ vi.mock("@/utils/plannerSync", () => {
       mocks.localTasks.filter((task) => task.user_id === userId && task.task_date === taskDate),
     ),
     syncLocalDailyTasksFromRemote: vi.fn(async () => []),
-    withPlannerRemoteSyncLock: (...args: unknown[]) => mocks.withPlannerRemoteSyncLockMock(...args),
+    withPlannerRemoteSyncLock: (...args: unknown[]) => mocks.withPlannerRemoteSyncLockMock.apply(null, args),
   };
 });
 
@@ -227,6 +227,7 @@ describe("useRecurringTaskSpawner spawn behavior", () => {
 
     expect(mocks.toastErrorMock).toHaveBeenCalledWith(
       "Set a time on recurring quest templates to resume auto-creation.",
+      { duration: 2000 },
     );
     expect(mocks.toastErrorMock).not.toHaveBeenCalledWith("Failed to create recurring quests");
     expect(mocks.withPlannerRemoteSyncLockMock).toHaveBeenCalledWith(
@@ -337,6 +338,7 @@ describe("useRecurringTaskSpawner spawn behavior", () => {
     }));
     expect(mocks.toastErrorMock).toHaveBeenCalledWith(
       "Some recurring quests were not created. Open and re-save those templates.",
+      { duration: 2000 },
     );
   });
 });

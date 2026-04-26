@@ -70,7 +70,7 @@ type EncounterUnsupportedPlatformError = Error & {
 
 const createUnsupportedPlatformError = (): EncounterUnsupportedPlatformError =>
   Object.assign(new Error('Astral Encounters are only available on iPhone and iPad.'), {
-    code: UNSUPPORTED_PLATFORM_ERROR_CODE as const,
+    code: UNSUPPORTED_PLATFORM_ERROR_CODE as typeof UNSUPPORTED_PLATFORM_ERROR_CODE,
   });
 
 const isUnsupportedPlatformError = (error: unknown): error is EncounterUnsupportedPlatformError => {

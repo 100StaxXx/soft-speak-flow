@@ -3,7 +3,6 @@ import {
   type CompanionDialogueLine,
   type CompanionDialogueTonePack,
   type CompanionShimmerType,
-  COMPANION_DIALOGUE_TONE_PACKS,
   getAllLinesForBucket,
   getLinesForToneAndBucket,
 } from "@/config/companionDialoguePacks";
@@ -576,7 +575,7 @@ export const selectDialogueLineCandidate = ({
   const baseLine =
     pickLineFromCandidates(baseCandidates, rng)
     ?? getLinesForToneAndBucket(tonePack, "base_greetings")[0]
-    ?? COMPANION_DIALOGUE_TONE_PACKS.soft.base_greetings[0];
+    ?? getLinesForToneAndBucket("soft", "base_greetings")[0];
 
   return {
     line: baseLine,

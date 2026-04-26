@@ -20,7 +20,7 @@ describe("companion planner surface actions", () => {
       { id: "what-matters", message: "What matters most?" },
       { id: "right-now", message: "What should I do right now?" },
       { id: "upcoming", message: "What do I have coming up?" },
-      { id: "quest", message: "Quest?" },
+      { id: "quest", message: "" },
       { id: "goal", message: "Let's lock in a new goal" },
     ]);
   });

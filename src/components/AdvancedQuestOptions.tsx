@@ -490,7 +490,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                     onClick={() => {
                       if (option.value === "none") {
                         props.onReminderEnabledChange(false);
-                      } else {
+                      } else if (typeof option.value === "number") {
                         props.onReminderEnabledChange(true);
                         props.onReminderMinutesBeforeChange(option.value);
                       }

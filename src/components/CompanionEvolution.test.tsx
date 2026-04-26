@@ -43,7 +43,7 @@ vi.mock("framer-motion", async () => {
         ...domProps
       } = props;
 
-      return React.createElement(tag, { ...domProps, ref }, children);
+      return React.createElement(tag, { ...domProps, ref }, children as React.ReactNode);
     });
 
     componentCache.set(tag, component);

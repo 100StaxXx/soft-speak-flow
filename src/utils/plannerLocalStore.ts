@@ -22,11 +22,11 @@ type StoreMode = IDBTransactionMode;
 
 interface UserScopedRecord {
   id: string;
-  user_id: string;
+  user_id?: string;
 }
 
 interface TaskScopedRecord extends UserScopedRecord {
-  task_date: string | null;
+  task_date?: string | null;
 }
 
 interface CanonicalTaskScopedRecord extends TaskScopedRecord {
@@ -39,7 +39,7 @@ interface CanonicalTaskScopedRecord extends TaskScopedRecord {
 }
 
 interface SubtaskRecord extends UserScopedRecord {
-  task_id: string;
+  task_id?: string;
 }
 
 interface HabitCompletionRecord extends UserScopedRecord {
@@ -59,9 +59,9 @@ interface EpicScopedRecord extends UserScopedRecord {
 }
 
 interface JourneyPathSnapshotRecord extends EpicScopedRecord {
-  milestone_index: number;
-  image_url: string;
-  generated_at: string;
+  milestone_index?: number;
+  image_url?: string;
+  generated_at?: string;
 }
 
 let db: IDBDatabase | null = null;

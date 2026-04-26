@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("@/utils/plannerLocalStore", () => ({
-  createOfflinePlannerId: (...args: unknown[]) => mocks.createOfflinePlannerIdMock(...args),
+  createOfflinePlannerId: (...args: unknown[]) => mocks.createOfflinePlannerIdMock.apply(null, args),
   getAllLocalTasksForUser: (...args: unknown[]) => mocks.getAllLocalTasksForUserMock(...args),
 }));
 

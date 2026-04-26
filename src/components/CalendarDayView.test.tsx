@@ -134,7 +134,7 @@ describe("CalendarDayView interactions", () => {
     const { onTaskDrop } = setup([baseTask()]);
 
     const label = screen.getByText("8:30 AM");
-    const row = label.closest("div.flex");
+    const row = label.closest("div.flex") as HTMLElement | null;
     expect(row).toBeTruthy();
     mockRowBounds(row!, 100);
 
@@ -152,7 +152,7 @@ describe("CalendarDayView interactions", () => {
     const { onTaskDrop } = setup([baseTask()]);
 
     const label = screen.getByText("8:30 AM");
-    const row = label.closest("div.flex");
+    const row = label.closest("div.flex") as HTMLElement | null;
     expect(row).toBeTruthy();
     mockRowBounds(row!, 100);
 
@@ -175,7 +175,7 @@ describe("CalendarDayView interactions", () => {
     const { onTaskDrop } = setup([baseTask()]);
 
     const label = screen.getByText("8:30 AM");
-    const row = label.closest("div.flex");
+    const row = label.closest("div.flex") as HTMLElement | null;
     expect(row).toBeTruthy();
     mockRowBounds(row!, 100);
 
@@ -199,7 +199,7 @@ describe("CalendarDayView interactions", () => {
     fireEvent.dragStart(card, { dataTransfer });
 
     const label = screen.getByText("8:30 AM");
-    const row = label.closest("div.flex");
+    const row = label.closest("div.flex") as HTMLElement | null;
     expect(row).toBeTruthy();
     mockRowBounds(row!, 100);
     fireEvent(row!, createDropEvent(122, dataTransfer));
@@ -214,7 +214,7 @@ describe("CalendarDayView interactions", () => {
     const { onTimeSlotLongPress } = setup([baseTask()]);
 
     const label = screen.getByText("8:30 AM");
-    const row = label.closest("div.flex");
+    const row = label.closest("div.flex") as HTMLElement | null;
     expect(row).toBeTruthy();
     mockRowBounds(row!, 100);
 

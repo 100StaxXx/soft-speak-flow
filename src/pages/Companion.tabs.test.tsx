@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
     id: "companion-1",
     current_xp: 120,
     current_stage: 3,
+    core_element: null as string | null,
+    initial_image_url: null as string | null,
   },
   isLoading: false,
   error: null as Error | null,
@@ -312,6 +314,8 @@ describe("Companion tabs performance behavior", () => {
       id: "companion-1",
       current_xp: 120,
       current_stage: 3,
+      core_element: null,
+      initial_image_url: null,
     };
     mocks.isLoading = false;
     mocks.error = null;

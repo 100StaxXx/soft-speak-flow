@@ -24,6 +24,18 @@ const MAX_MISSION_QUERY_RETRIES = 2;
 
 type MissionTheme = { name: string; emoji: string };
 
+export interface DailyMission {
+  id: string;
+  mission_text: string;
+  difficulty: string | null;
+  xp_reward: number;
+  completed: boolean | null;
+  is_bonus: boolean | null;
+  auto_complete: boolean | null;
+  progress_current: number | null;
+  progress_target: number | null;
+}
+
 type MissionGenerationMeta = {
   source?: "ai" | "fallback";
   degraded?: boolean;
@@ -116,7 +128,7 @@ export const useDailyMissions = () => {
     const generationPayload = (generated ?? {}) as MissionGenerationResponse;
     maybeToastFallbackInfo(generationPayload.meta);
 
-    const newMissions = generationPayload.missions || [];
+    const newMissions = (generationPayload.missions || []) as DailyMission[];
     if (newMissions.length === 0) {
       const message = 'No missions available right now. Please try again soon.';
       setGenerationErrorMessage(message);
@@ -131,7 +143,7 @@ export const useDailyMissions = () => {
     return newMissions;
   };
 
-  const { data: missions, isLoading, error } = useQuery({
+  const { data: missions, isLoading, error } = useQuery<DailyMission[], MissionQueryError>({
     queryKey: ['daily-missions', today, user?.id],
     queryFn: async () => {
       if (!user) return [];
@@ -180,7 +192,7 @@ export const useDailyMissions = () => {
       }
 
       setGenerationErrorMessage(null);
-      return existing;
+      return existing as DailyMission[];
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000, // 5 minutes - missions are daily, don't change often
@@ -230,7 +242,7 @@ export const useDailyMissions = () => {
       const generationPayload = (generated ?? {}) as MissionGenerationResponse;
       maybeToastFallbackInfo(generationPayload.meta);
 
-      const newMissions = generationPayload.missions || [];
+      const newMissions = (generationPayload.missions || []) as DailyMission[];
       if (newMissions.length === 0) {
         const message = 'No missions were ready. Please try again soon.';
         setGenerationErrorMessage(message);

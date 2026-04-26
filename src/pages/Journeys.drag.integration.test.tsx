@@ -78,12 +78,6 @@ const mocks = vi.hoisted(() => ({
   epicsLoading: false,
   isMacHostedIOSApp: false,
   draggableFabRenderCount: 0,
-  inboxTasks: [] as Array<{
-    id: string;
-    task_text: string;
-    completed: boolean;
-    task_date: string | null;
-  }>,
   lastDatePillSelectedDate: null as Date | null,
   lastAddQuestSheetProps: null as null | {
     autoFillTimeOnFirstTap?: boolean;
@@ -140,6 +134,7 @@ const mocks = vi.hoisted(() => ({
       status: "pending";
       readyToConfirm: boolean;
     }) => Promise<{ saved: boolean; savedTitle?: string | null }>;
+    onQuestCaptureSubmit?: (rawQuest: string) => void;
   },
   lastEditQuestDialogProps: null as null | {
     open?: boolean;
@@ -301,6 +296,7 @@ vi.mock("@/components/journeys/JourneysCompanionPlannerModal", () => ({
     presentation?: string;
     launchIntent?: unknown;
     onLaunchIntentConsumed?: (intentId: string) => void;
+    onQuestCaptureSubmit?: (rawQuest: string) => void;
     onQuestProposalEditHandoff?: (proposal: {
       id: string;
       kind: "create_quest" | "update_quest" | "suggest_reminder";
@@ -949,6 +945,60 @@ describe("Journeys row drag integration", () => {
       message: "Help me plan my afternoon.",
     }));
     expect(screen.getByTestId("journeys-companion-planner-modal")).toBeInTheDocument();
+  });
+
+  it("opens the add quest sheet with NLP-prefilled values from companion quest capture", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-04-09T12:00:00"));
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={[{
+          pathname: "/journeys",
+          state: {
+            companionPlannerLaunchIntent: {
+              id: "quest-capture-route-1",
+              message: "Quest?",
+              starterIntent: "quest_capture",
+              target: "planner",
+              briefingContext: null,
+            },
+          },
+        }]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
+    });
+
+    act(() => {
+      mocks.lastCompanionPlannerModalProps?.onQuestCaptureSubmit?.(
+        "Pilates tomorrow at 8am",
+      );
+    });
+
+    await waitFor(() => {
+      expect(mocks.lastAddQuestSheetProps?.open).toBe(true);
+    });
+    expect(mocks.lastCompanionPlannerModalProps?.open).toBe(false);
+    expect(mocks.lastAddQuestSheetProps?.prefillDraft).toEqual(
+      expect.objectContaining({
+        text: "Pilates",
+        taskDate: "2026-04-10",
+        scheduledTime: "08:00",
+        creationSource: "nlp",
+      }),
+    );
   });
 
   it("keeps the planner open while a planner quest edit handoff is active and resolves back after save", async () => {

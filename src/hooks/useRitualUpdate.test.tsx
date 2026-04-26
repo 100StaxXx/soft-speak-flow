@@ -45,7 +45,7 @@ vi.mock("@/utils/plannerLocalStore", () => ({
 
 vi.mock("@/utils/plannerSync", () => ({
   dispatchPlannerSyncFinished: mocks.dispatchPlannerSyncFinishedMock,
-  withPlannerRemoteSyncLock: (...args: unknown[]) => mocks.withPlannerRemoteSyncLockMock(...args),
+  withPlannerRemoteSyncLock: (...args: unknown[]) => mocks.withPlannerRemoteSyncLockMock.apply(null, args),
 }));
 
 vi.mock("@/hooks/habitTaskReconciliation", () => ({

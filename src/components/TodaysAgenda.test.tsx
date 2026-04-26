@@ -2740,7 +2740,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(edgeHoldDelays()).toContain(75);
     const callsAfterExtremeTier = mocks.nudgeByFineStepMock.mock.calls.length;
     expect(callsAfterExtremeTier - callsBeforeExtremeTier).toBeGreaterThanOrEqual(3);
-    expect(mocks.nudgeByFineStepMock.mock.calls.every(([direction]) => direction === -1)).toBe(true);
+    expect((mocks.nudgeByFineStepMock.mock.calls as unknown as Array<[number]>).every(([direction]) => direction === -1)).toBe(true);
 
     setIntervalSpy.mockRestore();
     vi.useRealTimers();
@@ -2873,7 +2873,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(edgeHoldDelays).toContain(75);
     const callsAfterExtremeTier = mocks.nudgeByFineStepMock.mock.calls.length;
     expect(callsAfterExtremeTier - callsBeforeExtremeTier).toBeGreaterThanOrEqual(3);
-    expect(mocks.nudgeByFineStepMock.mock.calls.every(([direction]) => direction === 1)).toBe(true);
+    expect((mocks.nudgeByFineStepMock.mock.calls as unknown as Array<[number]>).every(([direction]) => direction === 1)).toBe(true);
 
     setIntervalSpy.mockRestore();
     vi.useRealTimers();
@@ -2947,7 +2947,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
 
       expect(edgeHoldDelays).toContain(75);
       expect(mocks.nudgeByFineStepMock.mock.calls.length - callsBeforePin).toBeGreaterThanOrEqual(3);
-      expect(mocks.nudgeByFineStepMock.mock.calls.every(([direction]) => direction === 1)).toBe(true);
+      expect((mocks.nudgeByFineStepMock.mock.calls as unknown as Array<[number]>).every(([direction]) => direction === 1)).toBe(true);
     } finally {
       paneRectSpy?.mockRestore();
       navRectSpy.mockRestore();

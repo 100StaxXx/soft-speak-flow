@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Mail, Star, BookOpen, Sparkles, X } from "lucide-react";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion, type MotionProps } from "framer-motion";
 import { LucideIcon } from "lucide-react";
 import { useId, useRef } from "react";
 import { useFloatingDialogA11y } from "@/hooks/useFloatingDialogA11y";
@@ -53,7 +53,7 @@ export function PostcardsTutorialModal({ open, onClose }: PostcardsTutorialModal
 
   if (!open) return null;
 
-  const cardMotion = prefersReducedMotion
+  const cardMotion: MotionProps = prefersReducedMotion
     ? { initial: false, animate: { opacity: 1 }, transition: { duration: 0 } }
     : {
       initial: { opacity: 0, y: 40, scale: 0.95 },
@@ -64,7 +64,7 @@ export function PostcardsTutorialModal({ open, onClose }: PostcardsTutorialModal
         stiffness: 300,
       },
     };
-  const revealMotion = (delay: number) => prefersReducedMotion
+  const revealMotion = (delay: number): MotionProps => prefersReducedMotion
     ? { initial: false, animate: { opacity: 1 }, transition: { duration: 0 } }
     : {
       initial: { opacity: 0, y: 10 },

@@ -52,7 +52,7 @@ vi.mock("@/contexts/ResilienceContext", () => ({
 }));
 
 vi.mock("@/utils/plannerLocalStore", () => ({
-  createOfflinePlannerId: (...args: unknown[]) => mocks.createOfflinePlannerIdMock(...args),
+  createOfflinePlannerId: (...args: unknown[]) => mocks.createOfflinePlannerIdMock.apply(null, args),
   getLocalHabits: (...args: unknown[]) => mocks.getLocalHabitsMock(...args),
   upsertPlannerRecord: (...args: unknown[]) => mocks.upsertPlannerRecordMock(...args),
 }));
@@ -65,7 +65,7 @@ vi.mock("@/utils/plannerSync", () => ({
   syncLocalHabitsFromRemote: (...args: unknown[]) => mocks.syncLocalHabitsFromRemoteMock(...args),
   syncLocalEpicsFromRemote: (...args: unknown[]) => mocks.syncLocalEpicsFromRemoteMock(...args),
   syncLocalDailyTasksFromRemote: (...args: unknown[]) => mocks.syncLocalDailyTasksFromRemoteMock(...args),
-  withPlannerRemoteSyncLock: (...args: unknown[]) => mocks.withPlannerRemoteSyncLockMock(...args),
+  withPlannerRemoteSyncLock: (...args: unknown[]) => mocks.withPlannerRemoteSyncLockMock.apply(null, args),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({

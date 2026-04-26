@@ -1074,7 +1074,7 @@ describe("AddQuestSheet", () => {
   });
 
   it("preserves custom manual time values on submit", async () => {
-    const onAdd = vi.fn<Parameters<(data: AddQuestData) => Promise<void>>, ReturnType<(data: AddQuestData) => Promise<void>>>()
+    const onAdd = vi.fn<(data: AddQuestData) => Promise<void>>()
       .mockResolvedValue(undefined);
 
     render(
@@ -1107,7 +1107,7 @@ describe("AddQuestSheet", () => {
   });
 
   it("sends inbox payload with null date/time when adding to inbox", async () => {
-    const onAdd = vi.fn<Parameters<(data: AddQuestData) => Promise<void>>, ReturnType<(data: AddQuestData) => Promise<void>>>()
+    const onAdd = vi.fn<(data: AddQuestData) => Promise<void>>()
       .mockResolvedValue(undefined);
     const onOpenChange = vi.fn();
 
@@ -1186,7 +1186,7 @@ describe("AddQuestSheet", () => {
   });
 
   it("submits scheduled quest payload when Add Quest is tapped", async () => {
-    const onAdd = vi.fn<Parameters<(data: AddQuestData) => Promise<void>>, ReturnType<(data: AddQuestData) => Promise<void>>>()
+    const onAdd = vi.fn<(data: AddQuestData) => Promise<void>>()
       .mockResolvedValue(undefined);
     const onOpenChange = vi.fn();
 
@@ -1307,7 +1307,7 @@ describe("AddQuestSheet", () => {
   });
 
   it("submits a voice-prefilled quest with the voice creation source preserved", async () => {
-    const onAdd = vi.fn<Parameters<(data: AddQuestData) => Promise<void>>, ReturnType<(data: AddQuestData) => Promise<void>>>()
+    const onAdd = vi.fn<(data: AddQuestData) => Promise<void>>()
       .mockResolvedValue(undefined);
 
     render(

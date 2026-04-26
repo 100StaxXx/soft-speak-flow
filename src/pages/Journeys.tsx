@@ -70,7 +70,10 @@ import { QUEST_ACTION_TOAST_DURATION_MS } from "@/constants/questToast";
 import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
 import { normalizeUuidLikeId } from "@/utils/offlineId";
 import { parseNaturalLanguage } from "@/features/tasks/hooks/useNaturalLanguageParser";
-import { buildVoiceQuestPrefillFromTranscript } from "@/features/quests/utils/voiceQuestPrefill";
+import {
+  buildQuestPrefillFromNaturalLanguage,
+  buildVoiceQuestPrefillFromTranscript,
+} from "@/features/quests/utils/voiceQuestPrefill";
 import { resolveCampaignBuilderInitialGoal } from "@/shared/bigGoalIntent";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import type {
@@ -466,6 +469,28 @@ const Journeys = () => {
     language: "en-US",
     autoStopOnSilence: true,
   });
+
+  const handleQuestCaptureSubmit = useCallback((rawQuest: string) => {
+    const cleanedQuest = rawQuest.trim();
+    if (!cleanedQuest) return;
+
+    const prefillDraft = buildQuestPrefillFromNaturalLanguage(
+      cleanedQuest,
+      "nlp",
+    );
+    const nextSelectedDate = prefillDraft.taskDate
+      ? new Date(`${prefillDraft.taskDate}T00:00:00`)
+      : selectedDate;
+
+    setPlannerLaunchIntent(null);
+    setIsCompanionPlannerPinned(false);
+    openAddQuestSheet({
+      date: nextSelectedDate,
+      time: prefillDraft.scheduledTime ?? null,
+      prefillDraft,
+      prefillKey: createPlannerLaunchIntentId(),
+    });
+  }, [openAddQuestSheet, selectedDate]);
 
   const openCampaignBuilderFromAssistant = useCallback((message: string) => {
     const parsed = parseNaturalLanguage(message);
@@ -1634,6 +1659,7 @@ const Journeys = () => {
           );
           }}
           onOpenCampaignBuilder={openCampaignBuilderFromAssistant}
+          onQuestCaptureSubmit={handleQuestCaptureSubmit}
           onQuestProposalEditHandoff={handleQuestProposalEditHandoff}
         />
 

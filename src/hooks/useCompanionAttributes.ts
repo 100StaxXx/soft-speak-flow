@@ -24,6 +24,7 @@ interface UpdateAttributeParams {
 }
 
 interface AwardCompanionAttributeParams {
+  companionId?: string;
   attribute: AttributeType;
   sourceEvent: CompanionAttributeSourceEvent;
   sourceKey: string;
@@ -291,9 +292,11 @@ export const useCompanionAttributes = () => {
     onSuccess: (data, variables) => {
       if (data.awardedAmount > 0) {
         queryClient.invalidateQueries({ queryKey: ["companion"] });
-        void syncDerivedAttributeAchievements(variables.companionId).catch((error) => {
-          console.error("Attribute badge sync failed:", error);
-        });
+        if (variables.companionId) {
+          void syncDerivedAttributeAchievements(variables.companionId).catch((error) => {
+            console.error("Attribute badge sync failed:", error);
+          });
+        }
       }
     },
     onError: (error) => {
