@@ -100,6 +100,62 @@ describe("getOnboardingGateState", () => {
     });
   });
 
+  it("does not force journey recovery after partial guided tutorial progress", () => {
+    expect(
+      getOnboardingGateState({
+        profile: {
+          onboarding_completed: false,
+          selected_mentor_id: "mentor-1",
+          onboarding_data: {
+            guided_tutorial: {
+              completed: false,
+              dismissed: false,
+              completedSteps: ["intro"],
+            },
+          },
+        },
+        hasCompanion: true,
+        hasPresetCompanion: false,
+        companionStage: 0,
+        hasCompanionImages: true,
+      }),
+    ).toMatchObject({
+      isEstablished: false,
+      needsOnboarding: true,
+      resumeStep: null,
+      needsCompanionMigration: false,
+    });
+  });
+
+  it("recognizes legacy guided tutorial step maps as partial progress", () => {
+    expect(
+      getOnboardingGateState({
+        profile: {
+          onboarding_completed: false,
+          selected_mentor_id: "mentor-1",
+          onboarding_data: {
+            guided_tutorial: {
+              completed: false,
+              dismissed: false,
+              steps: {
+                intro: { completed: true },
+              },
+            },
+          },
+        },
+        hasCompanion: true,
+        hasPresetCompanion: false,
+        companionStage: 0,
+        hasCompanionImages: true,
+      }),
+    ).toMatchObject({
+      isEstablished: false,
+      needsOnboarding: true,
+      resumeStep: null,
+      needsCompanionMigration: false,
+    });
+  });
+
   it("resumes an explicit in-progress onboarding step", () => {
     expect(
       getOnboardingGateState({

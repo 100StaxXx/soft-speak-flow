@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
     isError: false,
   },
   queryClient: {
+    invalidateQueries: vi.fn().mockResolvedValue(undefined),
     refetchQueries: vi.fn().mockResolvedValue(undefined),
   },
   guidance: {
@@ -165,6 +166,7 @@ describe("Index mentor connection state", () => {
     vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
     mocks.layoutMode = "mobile";
     mocks.refreshConnection.mockClear();
+    mocks.queryClient.invalidateQueries.mockClear();
     mocks.queryClient.refetchQueries.mockClear();
     mocks.user = { id: "user-1" };
     mocks.profile = { onboarding_completed: true };
@@ -243,6 +245,23 @@ describe("Index mentor connection state", () => {
     expect(screen.getByTestId("mentor-desktop-workspace")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ask Atlas" })).toBeInTheDocument();
     expect(screen.queryByText("MentorSwitcher")).not.toBeInTheDocument();
+  });
+
+  it("renders the page while mentor rail data is still loading", () => {
+    mocks.layoutMode = "desktop";
+    mocks.mentorStatus = "ready";
+    mocks.effectiveMentorId = "mentor-1";
+    mocks.mentorQuery = {
+      data: null,
+      isLoading: true,
+      isError: false,
+    };
+
+    renderIndex();
+
+    expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
+    expect(screen.getByTestId("mentor-desktop-layout")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ask your guide" })).toBeInTheDocument();
   });
 
   it("shows mentor connection lost only after recovery fails", () => {

@@ -79,6 +79,47 @@ describe("MentorSpotlightGuard", () => {
     expect(previousFocus).toHaveFocus();
   });
 
+  it("moves focus to a new target without restoring previous focus mid-session", async () => {
+    document.body.innerHTML = `
+      <button data-testid="previous-focus">before</button>
+      <button data-tour="first-action" style="position:fixed;left:20px;top:20px;width:40px;height:40px;">first</button>
+      <button data-tour="second-action" style="position:fixed;left:80px;top:20px;width:40px;height:40px;">second</button>
+      <section data-tutorial="mentor-dialogue-panel"><button>panel</button></section>
+    `;
+    const previousFocus = screen.getByTestId("previous-focus");
+    const firstTarget = document.querySelector('[data-tour="first-action"]') as HTMLElement;
+    const secondTarget = document.querySelector('[data-tour="second-action"]') as HTMLElement;
+    setRect(firstTarget);
+    setRect(secondTarget, rect({ top: 20, left: 80, width: 40, height: 40 }));
+    previousFocus.focus();
+
+    const { rerender, unmount } = render(
+      <MentorSpotlightGuard
+        active
+        targetSelector='[data-tour="first-action"]'
+      />
+    );
+
+    await waitFor(() => {
+      expect(firstTarget).toHaveFocus();
+    });
+
+    rerender(
+      <MentorSpotlightGuard
+        active
+        targetSelector='[data-tour="second-action"]'
+      />
+    );
+
+    await waitFor(() => {
+      expect(secondTarget).toHaveFocus();
+    });
+    expect(previousFocus).not.toHaveFocus();
+
+    unmount();
+    expect(previousFocus).toHaveFocus();
+  });
+
   it("blocks pointer interactions on masks", () => {
     document.body.innerHTML = `
       <button data-tour="add-quest-fab" style="position:fixed;left:20px;top:20px;width:40px;height:40px;">+</button>
@@ -133,12 +174,12 @@ describe("MentorSpotlightGuard", () => {
 
   it("highlights the visible duplicate when an inactive copy appears first", () => {
     document.body.innerHTML = `
-      <button data-tour="campaign-builder-launcher" style="display:none">hidden</button>
-      <button data-tour="campaign-builder-launcher">visible</button>
+      <button data-tour="companion-launcher-option-goal" style="display:none">hidden</button>
+      <button data-tour="companion-launcher-option-goal">visible</button>
       <section data-tutorial="mentor-dialogue-panel"><button>panel</button></section>
     `;
     const [hiddenTarget, visibleTarget] = Array.from(
-      document.querySelectorAll('[data-tour="campaign-builder-launcher"]')
+      document.querySelectorAll('[data-tour="companion-launcher-option-goal"]')
     );
     setRect(hiddenTarget, rect({ top: 300, left: 40, width: 200, height: 64 }));
     setRect(visibleTarget, rect({ top: 20, left: 20, width: 40, height: 40 }));
@@ -146,7 +187,7 @@ describe("MentorSpotlightGuard", () => {
     render(
       <MentorSpotlightGuard
         active
-        targetSelector='[data-tour="campaign-builder-launcher"]'
+        targetSelector='[data-tour="companion-launcher-option-goal"]'
       />
     );
 

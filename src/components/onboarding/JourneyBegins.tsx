@@ -17,9 +17,9 @@ const narrativeLines = [
   "...will shape both your destinies.",
 ];
 
-const LINE_DISPLAY_MS = 3400;
-const FINAL_LINE_HOLD_MS = LINE_DISPLAY_MS;
-const FINAL_BUTTON_DELAY_MS = 3200;
+const LINE_DISPLAY_MS = 1300;
+const FINAL_LINE_HOLD_MS = 1000;
+const FINAL_BUTTON_DELAY_MS = 900;
 
 export const JourneyBegins = ({ userName, companionAnimal, onComplete }: JourneyBeginsProps) => {
   const [currentLine, setCurrentLine] = useState(0);

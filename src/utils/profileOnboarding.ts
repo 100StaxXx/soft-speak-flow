@@ -67,7 +67,22 @@ export const hasResolvedGuidedTutorialProgress = (onboardingData: unknown): bool
   if (!isRecord(onboardingData)) return false;
   const guidedTutorial = onboardingData.guided_tutorial;
   if (!isRecord(guidedTutorial)) return false;
-  return guidedTutorial.completed === true || guidedTutorial.dismissed === true;
+
+  if (guidedTutorial.completed === true || guidedTutorial.dismissed === true) {
+    return true;
+  }
+
+  const hasCompletedListProgress = (value: unknown) =>
+    Array.isArray(value) && value.some((entry) => typeof entry === "string" && entry.trim().length > 0);
+  const hasLegacyStepProgress = (value: unknown) =>
+    isRecord(value) && Object.values(value).some((step) => isRecord(step) && step.completed === true);
+
+  return (
+    hasCompletedListProgress(guidedTutorial.completedSteps)
+    || hasCompletedListProgress(guidedTutorial.milestonesCompleted)
+    || hasCompletedListProgress(guidedTutorial.xpAwardedSteps)
+    || hasLegacyStepProgress(guidedTutorial.steps)
+  );
 };
 
 const normalizeOnboardingData = (onboardingData: unknown): Record<string, unknown> =>

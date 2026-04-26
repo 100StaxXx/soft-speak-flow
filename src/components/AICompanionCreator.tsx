@@ -250,6 +250,7 @@ export const AICompanionCreator = ({
                                 alt=""
                                 aria-hidden="true"
                                 data-testid={`species-silhouette-${preset.id}`}
+                                data-silhouette-variant="compact-black"
                                 className="h-full w-full object-contain opacity-95"
                                 loading="lazy"
                                 style={{ filter: "brightness(0) drop-shadow(0 0 18px rgba(132, 99, 255, 0.34))" }}

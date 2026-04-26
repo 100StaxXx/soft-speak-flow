@@ -22,9 +22,10 @@ describe("AICompanionCreator", () => {
       "src",
       "/onboarding/locked-species-silhouettes/dragon.png",
     );
-    expect(screen.getByTestId("species-silhouette-dragon")).toHaveStyle({
-      filter: "brightness(0) drop-shadow(0 0 18px rgba(132, 99, 255, 0.34))",
-    });
+    expect(screen.getByTestId("species-silhouette-dragon")).toHaveAttribute(
+      "data-silhouette-variant",
+      "compact-black",
+    );
     expect(screen.getByRole("button", { name: "Select Dragon species" })).toHaveAttribute("data-selected", "true");
     expect(screen.getAllByText(/Awaiting/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Awakening/i).length).toBeGreaterThan(0);

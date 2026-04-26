@@ -38,6 +38,38 @@ const toSpotlightRect = (targetElement: HTMLElement, padding: number): Spotlight
   };
 };
 
+const areSpotlightRectsEqual = (a: SpotlightRect | null, b: SpotlightRect | null): boolean => {
+  if (a === b) return true;
+  if (!a || !b) return false;
+
+  return a.top === b.top
+    && a.left === b.left
+    && a.width === b.width
+    && a.height === b.height;
+};
+
+const TUTORIAL_LAYER_MUTATION_SELECTOR = [
+  '[data-tutorial-layer="true"]',
+  '[data-tutorial="mentor-dialogue-panel"]',
+].join(",");
+
+const isTutorialLayerNode = (node: Node): boolean => {
+  if (node instanceof Element) {
+    return Boolean(node.closest(TUTORIAL_LAYER_MUTATION_SELECTOR));
+  }
+
+  return Boolean(node.parentElement?.closest(TUTORIAL_LAYER_MUTATION_SELECTOR));
+};
+
+const isTutorialLayerOnlyMutation = (mutation: MutationRecord): boolean => {
+  if (mutation.type === "attributes") {
+    return isTutorialLayerNode(mutation.target);
+  }
+
+  const changedNodes = [...Array.from(mutation.addedNodes), ...Array.from(mutation.removedNodes)];
+  return changedNodes.length > 0 && changedNodes.every(isTutorialLayerNode);
+};
+
 const FOCUSABLE_SELECTOR = [
   'button:not([disabled])',
   '[href]',
@@ -62,6 +94,21 @@ const getFocusableElements = (root: HTMLElement | null): HTMLElement[] => {
   ].filter((element) => isFocusableElement(element));
 };
 
+const getUniqueFocusableElements = (...roots: Array<HTMLElement | null>): HTMLElement[] => {
+  const seen = new Set<HTMLElement>();
+  const focusables: HTMLElement[] = [];
+
+  roots.forEach((root) => {
+    getFocusableElements(root).forEach((element) => {
+      if (seen.has(element)) return;
+      seen.add(element);
+      focusables.push(element);
+    });
+  });
+
+  return focusables;
+};
+
 export const MentorSpotlightGuard = ({
   active,
   mode = "spotlight",
@@ -73,9 +120,15 @@ export const MentorSpotlightGuard = ({
   const [spotlightRect, setSpotlightRect] = useState<SpotlightRect | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const initialFocusAppliedRef = useRef(false);
+  const focusFrameRef = useRef<number | null>(null);
+  const focusedTargetRef = useRef<HTMLElement | null>(null);
+  const measuredTargetRef = useRef<HTMLElement | null>(null);
+  const measuredSpotlightRectRef = useRef<SpotlightRect | null>(null);
 
   useEffect(() => {
     if (!active || !targetSelector) {
+      measuredTargetRef.current = null;
+      measuredSpotlightRectRef.current = null;
       setTargetElement(null);
       setSpotlightRect(null);
       return;
@@ -87,8 +140,15 @@ export const MentorSpotlightGuard = ({
 
     const update = () => {
       const target = resolveTutorialTarget(targetSelector)?.element ?? null;
-      setTargetElement(target);
-      setSpotlightRect(target ? toSpotlightRect(target, 10) : null);
+      const nextSpotlightRect = target ? toSpotlightRect(target, 10) : null;
+      if (measuredTargetRef.current !== target) {
+        measuredTargetRef.current = target;
+        setTargetElement(target);
+      }
+      if (!areSpotlightRectsEqual(measuredSpotlightRectRef.current, nextSpotlightRect)) {
+        measuredSpotlightRectRef.current = nextSpotlightRect;
+        setSpotlightRect(nextSpotlightRect);
+      }
       if (target && resizeObserver) {
         resizeObserver.disconnect();
         resizeObserver.observe(target);
@@ -109,7 +169,10 @@ export const MentorSpotlightGuard = ({
     }
 
     if ("MutationObserver" in window && document.body) {
-      mutationObserver = new MutationObserver(scheduleUpdate);
+      mutationObserver = new MutationObserver((mutations) => {
+        if (mutations.every(isTutorialLayerOnlyMutation)) return;
+        scheduleUpdate();
+      });
       mutationObserver.observe(document.body, {
         childList: true,
         subtree: true,
@@ -124,6 +187,8 @@ export const MentorSpotlightGuard = ({
 
     return () => {
       window.cancelAnimationFrame(animationFrame);
+      measuredTargetRef.current = null;
+      measuredSpotlightRectRef.current = null;
       resizeObserver?.disconnect();
       mutationObserver?.disconnect();
       window.removeEventListener("scroll", scheduleUpdate, true);
@@ -180,9 +245,15 @@ export const MentorSpotlightGuard = ({
     previousFocusRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     initialFocusAppliedRef.current = false;
+    focusedTargetRef.current = null;
 
     return () => {
+      if (focusFrameRef.current !== null) {
+        window.cancelAnimationFrame(focusFrameRef.current);
+        focusFrameRef.current = null;
+      }
       initialFocusAppliedRef.current = false;
+      focusedTargetRef.current = null;
       const previousFocus = previousFocusRef.current;
       previousFocusRef.current = null;
       if (previousFocus && document.contains(previousFocus)) {
@@ -192,20 +263,40 @@ export const MentorSpotlightGuard = ({
   }, [active, mode]);
 
   useEffect(() => {
-    if (!active || mode !== "spotlight" || !targetElement || initialFocusAppliedRef.current) {
+    if (!active || mode !== "spotlight" || !targetElement) {
+      initialFocusAppliedRef.current = false;
+      focusedTargetRef.current = null;
+      if (focusFrameRef.current !== null) {
+        window.cancelAnimationFrame(focusFrameRef.current);
+        focusFrameRef.current = null;
+      }
       return;
     }
 
-    const focusFrame = window.requestAnimationFrame(() => {
-      const focusables = [
-        ...getFocusableElements(targetElement),
-        ...getFocusableElements(panelElement),
-      ];
+    if (focusedTargetRef.current !== targetElement) {
+      focusedTargetRef.current = targetElement;
+      initialFocusAppliedRef.current = false;
+    }
+
+    if (initialFocusAppliedRef.current) return;
+
+    if (focusFrameRef.current !== null) {
+      window.cancelAnimationFrame(focusFrameRef.current);
+    }
+
+    focusFrameRef.current = window.requestAnimationFrame(() => {
+      focusFrameRef.current = null;
+      const focusables = getUniqueFocusableElements(targetElement, panelElement);
       focusables[0]?.focus();
       initialFocusAppliedRef.current = true;
     });
 
-    return () => window.cancelAnimationFrame(focusFrame);
+    return () => {
+      if (focusFrameRef.current !== null) {
+        window.cancelAnimationFrame(focusFrameRef.current);
+        focusFrameRef.current = null;
+      }
+    };
   }, [active, mode, panelElement, targetElement]);
 
   useEffect(() => {
@@ -214,10 +305,7 @@ export const MentorSpotlightGuard = ({
     const handleTab = (event: KeyboardEvent) => {
       if (event.key !== "Tab") return;
 
-      const focusables = [
-        ...getFocusableElements(targetElement),
-        ...getFocusableElements(panelElement),
-      ];
+      const focusables = getUniqueFocusableElements(targetElement, panelElement);
 
       if (focusables.length === 0) return;
 
@@ -275,6 +363,7 @@ export const MentorSpotlightGuard = ({
         className={`mentor-spotlight-root mentor-spotlight-root--${mode}`}
         aria-hidden="true"
         data-mode={mode}
+        data-tutorial-layer="true"
         data-testid="mentor-spotlight-guard"
       >
         {mode === "spotlight" ? (

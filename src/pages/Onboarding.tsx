@@ -35,10 +35,14 @@ export default function Onboarding() {
   const queryClient = useQueryClient();
   const onboardingSelfHealAttemptedRef = useRef(false);
   const legacyAccountDeletionAttemptedRef = useRef(false);
+  const gateLoadStartedAtRef = useRef<number | null>(null);
+  const gateLoadTimeoutRef = useRef<number | null>(null);
+  const gateLoadSnapshotRef = useRef({ status, profileLoading, companionLoading });
   const [isDeletingLegacyAccount, setIsDeletingLegacyAccount] = useState(false);
   const [isSelfHealingProfile, setIsSelfHealingProfile] = useState(false);
   const [isShowingJourneyCinematic, setIsShowingJourneyCinematic] = useState(false);
   const [hasGateLoadTimedOut, setHasGateLoadTimedOut] = useState(false);
+  const [gateLoadRetryNonce, setGateLoadRetryNonce] = useState(0);
   const onboardingData = (profile?.onboarding_data as Record<string, unknown> | null) ?? null;
   const hasCompanion = Boolean(companion);
   const hasPresetCompanion = Boolean(companion?.preset_id);
@@ -91,6 +95,11 @@ export default function Onboarding() {
   useEffect(() => {
     onboardingSelfHealAttemptedRef.current = false;
     legacyAccountDeletionAttemptedRef.current = false;
+    gateLoadStartedAtRef.current = null;
+    if (gateLoadTimeoutRef.current !== null) {
+      window.clearTimeout(gateLoadTimeoutRef.current);
+      gateLoadTimeoutRef.current = null;
+    }
     setIsDeletingLegacyAccount(false);
     setIsSelfHealingProfile(false);
     setIsShowingJourneyCinematic(false);
@@ -98,28 +107,51 @@ export default function Onboarding() {
   }, [user?.id]);
 
   useEffect(() => {
+    gateLoadSnapshotRef.current = { status, profileLoading, companionLoading };
+  }, [companionLoading, profileLoading, status]);
+
+  useEffect(() => {
+    if (gateLoadTimeoutRef.current !== null) {
+      window.clearTimeout(gateLoadTimeoutRef.current);
+      gateLoadTimeoutRef.current = null;
+    }
+
     if (!user || onboardingGateReady) {
+      gateLoadStartedAtRef.current = null;
       setHasGateLoadTimedOut(false);
       return;
     }
 
-    const timeoutId = window.setTimeout(() => {
+    const startedAt = gateLoadStartedAtRef.current ?? Date.now();
+    gateLoadStartedAtRef.current = startedAt;
+    const remainingMs = Math.max(0, ONBOARDING_GATE_STALL_MS - (Date.now() - startedAt));
+
+    gateLoadTimeoutRef.current = window.setTimeout(() => {
+      gateLoadTimeoutRef.current = null;
+      const snapshot = gateLoadSnapshotRef.current;
       setHasGateLoadTimedOut(true);
       trackOnboardingTutorialEvent("onboarding_gate_load_stalled", {
         userId: user.id,
-        status,
-        profileLoading,
-        companionLoading,
+        status: snapshot.status,
+        profileLoading: snapshot.profileLoading,
+        companionLoading: snapshot.companionLoading,
       });
-    }, ONBOARDING_GATE_STALL_MS);
+    }, remainingMs);
 
-    return () => window.clearTimeout(timeoutId);
-  }, [companionLoading, onboardingGateReady, profileLoading, status, user?.id]);
+    return () => {
+      if (gateLoadTimeoutRef.current !== null) {
+        window.clearTimeout(gateLoadTimeoutRef.current);
+        gateLoadTimeoutRef.current = null;
+      }
+    };
+  }, [gateLoadRetryNonce, onboardingGateReady, user?.id]);
 
   const handleRetryGateLoad = () => {
     if (!user) return;
 
     setHasGateLoadTimedOut(false);
+    gateLoadStartedAtRef.current = Date.now();
+    setGateLoadRetryNonce((nonce) => nonce + 1);
     trackOnboardingTutorialEvent("onboarding_gate_load_retry", {
       userId: user.id,
       profileLoading,
@@ -153,10 +185,12 @@ export default function Onboarding() {
           onboardingSelfHealAttemptedRef.current = false;
           console.warn("Failed to self-heal established profile flags:", error);
           toast.error("We couldn't finish repairing your onboarding state. Please refresh and try again.");
+        } else {
+          void queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
         }
         setIsSelfHealingProfile(false);
       });
-  }, [user, onboardingGateReady, profile, hasCompanion, hasPresetCompanion, companionStage, hasCompanionImages]);
+  }, [user, onboardingGateReady, profile, hasCompanion, hasPresetCompanion, companionStage, hasCompanionImages, queryClient]);
 
   const handleConfirmLegacyAccountReset = () => {
     if (!user || !onboardingGate.needsCompanionMigration) return;

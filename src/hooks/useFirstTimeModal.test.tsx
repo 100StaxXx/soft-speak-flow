@@ -143,4 +143,45 @@ describe("useFirstTimeModal", () => {
       "We couldn't save that tutorial dismissal. Please try again.",
     );
   });
+
+  it("does not reopen when server dismissal arrives before an RPC failure", async () => {
+    let resolveRpc: ((value: { error: Error }) => void) | null = null;
+    mocks.rpc.mockImplementationOnce(
+      () => new Promise((resolve) => {
+        resolveRpc = resolve as (value: { error: Error }) => void;
+      }),
+    );
+
+    const { result, rerender } = renderHook(() => useFirstTimeModal("search"));
+
+    await waitFor(() => {
+      expect(result.current.showModal).toBe(true);
+    });
+
+    act(() => {
+      result.current.dismissModal();
+    });
+
+    expect(result.current.showModal).toBe(false);
+
+    mocks.profile = {
+      onboarding_data: {
+        tab_intros: {
+          search: true,
+        },
+      },
+    };
+    rerender();
+
+    await act(async () => {
+      resolveRpc?.({ error: new Error("network down") });
+      await Promise.resolve();
+    });
+
+    expect(result.current.showModal).toBe(false);
+    expect(storageMocks.safeLocalStorage.removeItem).not.toHaveBeenCalledWith(
+      "tab_intro_search_user-1",
+    );
+    expect(mocks.toastError).not.toHaveBeenCalled();
+  });
 });

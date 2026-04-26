@@ -82,6 +82,7 @@ const mocks = vi.hoisted(() => ({
   lastAddQuestSheetProps: null as null | {
     autoFillTimeOnFirstTap?: boolean;
     open?: boolean;
+    onOpenChange?: (open: boolean) => void;
     presentation?: string;
     prefillKey?: string | null;
     prefillDraft?: {
@@ -150,6 +151,7 @@ const mocks = vi.hoisted(() => ({
   lastPathfinderProps: null as null | {
     open?: boolean;
     initialGoal?: string;
+    onOpenChange?: (open: boolean) => void;
   },
   tutorialGuidance: {
     isActive: false,
@@ -246,6 +248,7 @@ vi.mock("@/components/AddQuestSheet", () => ({
   AddQuestSheet: (props: {
     autoFillTimeOnFirstTap?: boolean;
     open?: boolean;
+    onOpenChange?: (open: boolean) => void;
     presentation?: string;
     prefillKey?: string | null;
     prefillDraft?: {
@@ -374,7 +377,7 @@ vi.mock("@/components/SmartDayPlanner/components/QuickAdjustDrawer", () => ({
 }));
 
 vi.mock("@/components/Pathfinder", () => ({
-  Pathfinder: (props: { open?: boolean; initialGoal?: string }) => {
+  Pathfinder: (props: { open?: boolean; initialGoal?: string; onOpenChange?: (open: boolean) => void }) => {
     mocks.lastPathfinderProps = props;
     return null;
   },
@@ -994,6 +997,67 @@ describe("Journeys row drag integration", () => {
     });
     expect(mocks.lastCompanionPlannerModalProps?.launchIntent).toBeNull();
     expect(screen.queryByTestId("journeys-companion-planner-modal")).not.toBeInTheDocument();
+  });
+
+  it("closes stale blocking overlays when the guided tutorial changes steps", async () => {
+    mocks.tutorialGuidance = {
+      isActive: true,
+      currentStep: "plan_my_day",
+      currentSubstep: null,
+    };
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    const renderTree = () => (
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    const { rerender } = render(renderTree());
+
+    await waitFor(() => {
+      expect(mocks.lastAddQuestSheetProps).not.toBeNull();
+      expect(mocks.lastPathfinderProps).not.toBeNull();
+    });
+
+    act(() => {
+      mocks.lastAddQuestSheetProps?.onOpenChange?.(true);
+      mocks.lastPathfinderProps?.onOpenChange?.(true);
+    });
+
+    await waitFor(() => {
+      expect(mocks.lastAddQuestSheetProps?.open).toBe(true);
+      expect(mocks.lastPathfinderProps?.open).toBe(true);
+    });
+
+    mocks.tutorialGuidance = {
+      isActive: true,
+      currentStep: "create_campaign",
+      currentSubstep: null,
+    };
+    rerender(renderTree());
+
+    await waitFor(() => {
+      expect(mocks.lastAddQuestSheetProps?.open).toBe(false);
+      expect(mocks.lastPathfinderProps?.open).toBe(false);
+    });
+
+    act(() => {
+      mocks.lastPathfinderProps?.onOpenChange?.(true);
+    });
+    await waitFor(() => {
+      expect(mocks.lastPathfinderProps?.open).toBe(true);
+    });
+
+    rerender(renderTree());
+    expect(mocks.lastPathfinderProps?.open).toBe(true);
   });
 
   it("opens the add quest sheet with NLP-prefilled values from companion quest capture", async () => {

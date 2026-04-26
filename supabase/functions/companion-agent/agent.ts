@@ -415,6 +415,9 @@ const BARE_STARTER_FOLLOW_UPS: Record<
       "help me plan my day",
       "help me plan today",
       "plan today",
+      "show me today",
+      "today look like",
+      "what does today look like",
     ],
     reply:
       "Absolutely. Before I shape today, should it lean focus, recovery, or catching up?",
@@ -646,6 +649,33 @@ function normalizeBareStarterResult(params: {
   params.result.proposedActions = [];
   params.result.structuredResponse = null;
   params.result.preparedActionId = null;
+}
+
+function buildBareStarterAgentResult(params: {
+  request: CompanionAgentRequest;
+  context: LoadedCompanionAgentContext;
+}): AgentRunResult | null {
+  const followUpConfig = resolveBareStarterFollowUp(params.request);
+  if (!followUpConfig) return null;
+
+  return {
+    result: {
+      reply: followUpConfig.reply,
+      mode: "clarify",
+      intent: followUpConfig.intent,
+      confidence: 0.8,
+      understandingState: "needs_followup",
+      followUp: followUpConfig.followUp,
+      proposedActions: [],
+      assumptions: [],
+      evidenceIds: [],
+      structuredResponse: null,
+      preparedActionId: null,
+    },
+    openaiConversationId: params.context.thread?.openai_conversation_id ?? null,
+    lastOpenAIResponseId: params.context.thread?.last_openai_response_id ??
+      null,
+  };
 }
 
 const buildAgentDecisionMetadata = (result: AgentRunResult["result"]) => ({
@@ -2761,61 +2791,67 @@ export async function runCompanionAgent(params: RunAgentParams) {
     };
   };
 
-  const agentResult: AgentRunResult = await wrapSubStage("openai", async () => {
-    try {
-      if (context.thread?.openai_conversation_id) {
-        return await runResponseLoopWithTimeout({
-          conversationId: context.thread.openai_conversation_id,
-          manualHistory: false,
-        });
-      }
-      if (context.thread?.last_openai_response_id) {
-        return await runResponseLoopWithTimeout({
-          previousResponseId: context.thread.last_openai_response_id,
-          manualHistory: false,
-        });
-      }
-      const conversationId = await createOpenAIConversation({
-        guardedFetch: params.guardedFetch,
-        userId: params.userId,
-        sessionId: params.request.sessionId,
-        surface: params.request.surface,
-        openAIApiKey: params.openAIApiKey,
-      });
-      return await runResponseLoopWithTimeout({
-        conversationId,
-        manualHistory: false,
-      });
-    } catch (error) {
-      if (isLinkageError(error)) {
-        console.warn("[companion-agent] linkage fallback", {
-          sessionId: params.request.sessionId,
-          message: error instanceof Error ? error.message : String(error),
-        });
+  const bareStarterResult = buildBareStarterAgentResult({
+    request: params.request,
+    context,
+  });
 
-        try {
+  const agentResult: AgentRunResult = bareStarterResult ??
+    await wrapSubStage("openai", async () => {
+      try {
+        if (context.thread?.openai_conversation_id) {
           return await runResponseLoopWithTimeout({
-            manualHistory: true,
+            conversationId: context.thread.openai_conversation_id,
+            manualHistory: false,
           });
-        } catch (manualHistoryError) {
-          if (!isPlannerFallbackError(manualHistoryError)) {
-            throw manualHistoryError;
+        }
+        if (context.thread?.last_openai_response_id) {
+          return await runResponseLoopWithTimeout({
+            previousResponseId: context.thread.last_openai_response_id,
+            manualHistory: false,
+          });
+        }
+        const conversationId = await createOpenAIConversation({
+          guardedFetch: params.guardedFetch,
+          userId: params.userId,
+          sessionId: params.request.sessionId,
+          surface: params.request.surface,
+          openAIApiKey: params.openAIApiKey,
+        });
+        return await runResponseLoopWithTimeout({
+          conversationId,
+          manualHistory: false,
+        });
+      } catch (error) {
+        if (isLinkageError(error)) {
+          console.warn("[companion-agent] linkage fallback", {
+            sessionId: params.request.sessionId,
+            message: error instanceof Error ? error.message : String(error),
+          });
+
+          try {
+            return await runResponseLoopWithTimeout({
+              manualHistory: true,
+            });
+          } catch (manualHistoryError) {
+            if (!isPlannerFallbackError(manualHistoryError)) {
+              throw manualHistoryError;
+            }
+            return buildPlannerFallbackResult(
+              manualHistoryError instanceof Error
+                ? manualHistoryError.message
+                : String(manualHistoryError),
+            );
           }
+        }
+        if (isPlannerFallbackError(error)) {
           return buildPlannerFallbackResult(
-            manualHistoryError instanceof Error
-              ? manualHistoryError.message
-              : String(manualHistoryError),
+            error instanceof Error ? error.message : String(error),
           );
         }
+        throw error;
       }
-      if (isPlannerFallbackError(error)) {
-        return buildPlannerFallbackResult(
-          error instanceof Error ? error.message : String(error),
-        );
-      }
-      throw error;
-    }
-  });
+    });
 
   normalizeBareStarterResult({
     request: params.request,

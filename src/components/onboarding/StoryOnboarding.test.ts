@@ -102,7 +102,7 @@ describe("questionnaire completion stage", () => {
 });
 
 describe("mentor reveal transition timer", () => {
-  it("advances to mentor reveal after exactly 2000ms", () => {
+  it("advances to mentor reveal after exactly 1000ms", () => {
     vi.useFakeTimers();
     let didTransition = false;
 
@@ -110,10 +110,10 @@ describe("mentor reveal transition timer", () => {
       didTransition = true;
     });
 
-    expect(CALCULATING_STAGE_DURATION_MS).toBe(2000);
+    expect(CALCULATING_STAGE_DURATION_MS).toBe(1000);
     expect(didTransition).toBe(false);
 
-    vi.advanceTimersByTime(1999);
+    vi.advanceTimersByTime(999);
     expect(didTransition).toBe(false);
 
     vi.advanceTimersByTime(1);

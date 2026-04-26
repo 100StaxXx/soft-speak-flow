@@ -47,6 +47,11 @@ export function useFirstTimeModal(tabName: string) {
   
   const [showModal, setShowModal] = useState(false);
   const hasCheckedRef = useRef(false);
+  const hasSeenServerModalRef = useRef(hasSeenServerModal);
+
+  useEffect(() => {
+    hasSeenServerModalRef.current = hasSeenServerModal;
+  }, [hasSeenServerModal]);
 
   useEffect(() => {
     // Reset the check flag when userId changes
@@ -96,6 +101,11 @@ export function useFirstTimeModal(tabName: string) {
             tabName,
             error: error instanceof Error ? error.message : String(error),
           });
+          if (hasSeenServerModalRef.current) {
+            safeLocalStorage.setItem(storageKey, "true");
+            return;
+          }
+
           safeLocalStorage.removeItem(storageKey);
           setShowModal(true);
           toast.error("We couldn't save that tutorial dismissal. Please try again.");

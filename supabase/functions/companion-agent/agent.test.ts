@@ -225,7 +225,7 @@ Deno.test("companion agent tools explicitly opt out of strict Responses schemas"
   }
 });
 
-Deno.test("runCompanionAgent falls back to deterministic planner when OpenAI is not configured", async () => {
+Deno.test("runCompanionAgent uses bare starter follow-up when OpenAI is not configured", async () => {
   const supabase = createMockSupabase();
   let guardedFetchCalled = false;
 
@@ -250,87 +250,26 @@ Deno.test("runCompanionAgent falls back to deterministic planner when OpenAI is 
 
   assertEquals(guardedFetchCalled, false);
   assertEquals(result.companionId, "companion-1");
-  assertEquals(result.confidence, 0.55);
+  assertEquals(result.confidence, 0.8);
   assertEquals(result.mode, "clarify");
   assertEquals(result.intent, "plan_day");
   assertEquals(result.threadState.sessionId, "session-1");
   assert(result.reply.length > 0);
-  assert(result.reply.toLowerCase().includes("what kind of day"));
+  assert(result.reply.toLowerCase().includes("focus"));
   assert(
     supabase.inserts.some((entry) => entry.table === "companion_chats"),
-    "expected fallback turn to be persisted",
+    "expected bare starter turn to be persisted",
   );
 });
 
 Deno.test("runCompanionAgent asks a follow-up instead of proposing quests for bare Plan my day", async () => {
   const supabase = createMockSupabase();
+  let guardedFetchCalled = false;
   const guardedFetch = (async (input: string | URL | Request) => {
-    const url = String(input);
-    if (url.endsWith("/conversations")) {
-      return jsonResponse({ id: "conv_bare_plan_day" });
-    }
-
-    if (url.endsWith("/responses")) {
-      return jsonResponse({
-        id: "resp_bare_plan_day",
-        conversation: { id: "conv_bare_plan_day" },
-        output: [
-          {
-            type: "function_call",
-            call_id: "call_submit",
-            name: "submit_companion_result",
-            arguments: JSON.stringify({
-              reply: "I drafted a focused day with one launch quest.",
-              mode: "schedule_read",
-              intent: "plan_day",
-              confidence: 0.94,
-              understanding_state: "ready_to_draft",
-              proposed_actions: [
-                {
-                  type: "quest.create",
-                  title: "Draft launch email",
-                  reason: "Best fit before the afternoon calendar blocks.",
-                  normalizedPayload: {
-                    title: "Draft launch email",
-                    date: "2026-04-18",
-                    startTime: "10:00",
-                    durationMinutes: 45,
-                  },
-                  confidence: 0.88,
-                },
-              ],
-              structured_response: {
-                intent: {
-                  intentType: "quest",
-                  timeHorizon: "today",
-                  isRecurring: false,
-                  shouldCreateQuest: true,
-                  shouldPromptCampaign: false,
-                },
-                planDay: {
-                  message: "I drafted a focused day.",
-                  dayAssessment: "balanced",
-                  suggestedQuests: [
-                    {
-                      suggestionId: "quest-1",
-                      proposalId: "proposal-1",
-                      title: "Draft launch email",
-                      type: "must",
-                      estimatedDuration: "45 min",
-                      estimatedDurationMinutes: 45,
-                      source: "optimization",
-                      reason: "Best fit before the afternoon calendar blocks.",
-                    },
-                  ],
-                },
-              },
-            }),
-          },
-        ],
-      });
-    }
-
-    throw new Error(`Unexpected fetch: ${url}`);
+    guardedFetchCalled = true;
+    throw new Error(
+      `Bare Plan my day should not call OpenAI: ${String(input)}`,
+    );
   }) as typeof fetch;
 
   const result = await runCompanionAgent({
@@ -348,6 +287,7 @@ Deno.test("runCompanionAgent asks a follow-up instead of proposing quests for ba
     },
   });
 
+  assertEquals(guardedFetchCalled, false);
   assertEquals(result.mode, "clarify");
   assertEquals(result.intent, "plan_day");
   assertEquals(result.understandingState, "needs_followup");
@@ -365,11 +305,15 @@ Deno.test("runCompanionAgent asks a follow-up instead of proposing quests for ba
   );
 });
 
-Deno.test("runCompanionAgent asks a follow-up for bare plan-day variants", async () => {
+Deno.test("runCompanionAgent asks a follow-up for bare plan-day variants without OpenAI", async () => {
   const supabase = createMockSupabase();
-  const { guardedFetch } = createInstructionCaptureFetch(
-    "I drafted a default day.",
-  );
+  let guardedFetchCalled = false;
+  const guardedFetch = (async (input: string | URL | Request) => {
+    guardedFetchCalled = true;
+    throw new Error(
+      `Bare plan-day variant should not call OpenAI: ${String(input)}`,
+    );
+  }) as typeof fetch;
 
   const result = await runCompanionAgent({
     guardedFetch,
@@ -379,13 +323,14 @@ Deno.test("runCompanionAgent asks a follow-up for bare plan-day variants", async
     request: {
       surface: "journeys",
       sessionId: "session-plan-day-variant",
-      message: "Help me plan today",
+      message: "Show me today",
       inputMode: "text",
       currentDateTime: "2026-04-18T08:00:00-07:00",
       starterIntent: "plan_day",
     },
   });
 
+  assertEquals(guardedFetchCalled, false);
   assertEquals(result.mode, "clarify");
   assertEquals(result.intent, "plan_day");
   assertEquals(result.understandingState, "needs_followup");

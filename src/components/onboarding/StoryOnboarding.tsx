@@ -96,8 +96,9 @@ export const resolveOnboardingBackdropStage = (
 };
 
 export const resolveQuestionnaireCompletionStage = (): OnboardingStage => "calculating";
-export const CALCULATING_STAGE_DURATION_MS = 2_000;
+export const CALCULATING_STAGE_DURATION_MS = 1_000;
 export const QUESTIONNAIRE_PIPELINE_TIMEOUT_MS = 8_000;
+export const MENTOR_CATALOG_RECOVERY_TIMEOUT_MS = 8_000;
 
 export const scheduleMentorRevealTransition = (
   onComplete: () => void,
@@ -386,6 +387,8 @@ export const StoryOnboarding = ({
   const [pendingCompanionSetup, setPendingCompanionSetup] = useState<CompanionSelectionPreferences | null>(null);
   const [isAwaitingJourneyCompletion, setIsAwaitingJourneyCompletion] = useState(false);
   const [isSubmittingQuestionnaire, setIsSubmittingQuestionnaire] = useState(false);
+  const [isPersistingOnboardingStep, setIsPersistingOnboardingStep] = useState(false);
+  const [mentorCatalogRecoveryTimedOut, setMentorCatalogRecoveryTimedOut] = useState(false);
   const [compatibilityScore, setCompatibilityScore] = useState<number | null>(null);
   const mentorRevealTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const journeyCinematicStartedRef = useRef(false);
@@ -511,6 +514,7 @@ export const StoryOnboarding = ({
     if (persistStepInFlightRef.current) return false;
 
     persistStepInFlightRef.current = true;
+    setIsPersistingOnboardingStep(true);
     try {
       await persistOnboardingProgress(nextStep, dataPatch);
       setStage(nextStage);
@@ -525,6 +529,7 @@ export const StoryOnboarding = ({
       return false;
     } finally {
       persistStepInFlightRef.current = false;
+      setIsPersistingOnboardingStep(false);
     }
   }, [persistOnboardingProgress, user?.id]);
 
@@ -581,6 +586,33 @@ export const StoryOnboarding = ({
   }, [fetchActiveMentors]);
 
   useEffect(() => {
+    if (stage !== "mentor-result") {
+      mentorResultRecoveryNotifiedRef.current = false;
+    }
+  }, [stage]);
+
+  useEffect(() => {
+    const isWaitingForCatalog =
+      stage === "mentor-result"
+      && (!recommendedMentor || !mentorExplanation)
+      && mentorCatalogStatus === "loading";
+
+    if (!isWaitingForCatalog) {
+      setMentorCatalogRecoveryTimedOut(false);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setMentorCatalogRecoveryTimedOut(true);
+      trackOnboardingTutorialEvent("onboarding_mentor_catalog_restore_stalled", {
+        userId: user?.id ?? null,
+      });
+    }, MENTOR_CATALOG_RECOVERY_TIMEOUT_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [mentorCatalogStatus, mentorExplanation, recommendedMentor, stage, user?.id]);
+
+  useEffect(() => {
     if (!resumeData || recommendedMentor) return;
     const mentorId = typeof resumeData.mentorId === "string" ? resumeData.mentorId : null;
     if (!mentorId) return;
@@ -621,41 +653,9 @@ export const StoryOnboarding = ({
     );
   }, [answers, mentorCatalogStatus, mentors, recommendedMentor, resumeData, stage]);
 
-  const handlePrologueComplete = async (name: string) => {
+  const handlePrologueComplete = (name: string) => {
     setUserName(name);
-    
-    // Save name to profile
-    if (user) {
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("onboarding_data")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (profileError) {
-        console.error("Failed to load profile before saving onboarding name:", profileError);
-        toast.error("We couldn't save your name right now. Please try again.");
-        return;
-      }
-
-      const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
-
-      const { error: updateError } = await supabase.from("profiles").update({
-        onboarding_step: "destiny",
-        onboarding_data: {
-          ...existingData,
-          userName: name,
-        },
-      }).eq("id", user.id);
-
-      if (updateError) {
-        console.error("Failed to save onboarding name:", updateError);
-        toast.error("We couldn't save your name right now. Please try again.");
-        return;
-      }
-    }
-    
-    setStage("destiny");
+    void persistStageBeforeAdvance("destiny", { userName: name });
   };
 
   const handleDestinyComplete = () => {
@@ -1008,6 +1008,8 @@ export const StoryOnboarding = ({
         await persistJourneyBeginsStep();
       } catch (error) {
         setCompanionSetupStatus("idle");
+        setPendingCompanionSetup(null);
+        setCompanionAnimal("");
         onboardingLog.warn("Failed to persist journey-begins before companion setup", {
           userId: user.id,
           error: error instanceof Error ? error.message : String(error),
@@ -1063,8 +1065,10 @@ export const StoryOnboarding = ({
 
       safeLocalStorage.removeItem(getGuidedTutorialLocalProgressKey(user.id));
 
-      await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
-      await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ["profile", user.id] }),
+        queryClient.refetchQueries({ queryKey: ["companion", user.id] }),
+      ]);
 
       setCompanionAnimal(fallbackName);
       setCompanionSetupStatus("ready");
@@ -1199,8 +1203,10 @@ export const StoryOnboarding = ({
           throw profileUpdateError;
         }
 
-        await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
-        await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
+        await Promise.all([
+          queryClient.refetchQueries({ queryKey: ["profile", user.id] }),
+          queryClient.refetchQueries({ queryKey: ["companion", user.id] }),
+        ]);
         safeLocalStorage.removeItem(getGuidedTutorialLocalProgressKey(user.id));
         setCompanionSetupStatus("ready");
         trackOnboardingTutorialEvent("onboarding_companion_setup_ready", {
@@ -1416,8 +1422,10 @@ export const StoryOnboarding = ({
         getGuidedTutorialLocalProgressKey(user.id),
         JSON.stringify(initialGuidedTutorialProgress),
       );
-      await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
-      await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ["profile", user.id] }),
+        queryClient.refetchQueries({ queryKey: ["companion", user.id] }),
+      ]);
 
       onJourneyCinematicComplete?.();
       trackOnboardingTutorialEvent("onboarding_completed", {
@@ -1506,6 +1514,18 @@ export const StoryOnboarding = ({
       cancelled = true;
     };
   }, [companionSetupStatus, isAwaitingJourneyCompletion, recoverOrCompleteJourney]);
+
+  const handleMentorResultRecovery = useCallback(() => {
+    mentorResultRecoveryNotifiedRef.current = false;
+    setMentorCatalogRecoveryTimedOut(false);
+    const recoveryStage = mentorCatalogStatus === "ready" && mentors.length > 0 ? "mentor-grid" : "questionnaire";
+    trackOnboardingTutorialEvent("onboarding_mentor_resume_manual_recovery", {
+      userId: user?.id ?? null,
+      mentorCatalogStatus,
+      recoveryStage,
+    });
+    setStage(recoveryStage);
+  }, [mentorCatalogStatus, mentors.length, user?.id]);
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-background">
@@ -1611,20 +1631,24 @@ export const StoryOnboarding = ({
                 Guide Match
               </p>
               <h1 className="mb-3 text-2xl font-bold">
-                {mentorCatalogStatus === "loading" ? "Restoring your guide..." : "Let's reconnect your guide"}
+                {mentorCatalogStatus === "loading" && !mentorCatalogRecoveryTimedOut
+                  ? "Restoring your guide..."
+                  : "Let's reconnect your guide"}
               </h1>
               <p className="text-sm leading-6 text-white/70">
-                {mentorCatalogStatus === "loading"
+                {mentorCatalogStatus === "loading" && !mentorCatalogRecoveryTimedOut
                   ? "We saved your progress. Give us a moment to reload the guide catalog."
-                  : "We couldn't restore that exact guide from your saved progress, so we'll help you pick or rematch safely."}
+                  : mentorCatalogStatus === "loading"
+                    ? "The guide catalog is taking longer than expected. You can retry the match from your saved answers."
+                    : "We couldn't restore that exact guide from your saved progress, so we'll help you pick or rematch safely."}
               </p>
-              {mentorCatalogStatus !== "loading" ? (
+              {mentorCatalogStatus !== "loading" || mentorCatalogRecoveryTimedOut ? (
                 <button
                   type="button"
-                  onClick={() => setStage(mentors.length > 0 ? "mentor-grid" : "questionnaire")}
+                  onClick={handleMentorResultRecovery}
                   className="mt-6 rounded-full bg-white px-5 py-2 text-sm font-semibold text-black transition-transform hover:scale-[1.02]"
                 >
-                  {mentors.length > 0 ? "Choose a Guide" : "Retry Guide Match"}
+                  {mentorCatalogStatus === "ready" && mentors.length > 0 ? "Choose a Guide" : "Retry Guide Match"}
                 </button>
               ) : null}
             </div>
@@ -1750,6 +1774,17 @@ export const StoryOnboarding = ({
           </motion.div>
         )}
       </AnimatePresence>
+      {isPersistingOnboardingStep ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none fixed inset-x-0 bottom-safe z-50 flex justify-center px-6 pb-6"
+        >
+          <div className="rounded-full border border-white/15 bg-black/70 px-4 py-2 text-sm font-medium text-white shadow-2xl backdrop-blur-xl">
+            Saving...
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

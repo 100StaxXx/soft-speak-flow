@@ -330,21 +330,11 @@ const Journeys = () => {
   const scheduledTimeUpdateQueueRef = useRef<Map<string, Promise<void>>>(new Map());
   const inboxSectionRef = useRef<HTMLDivElement | null>(null);
   const hasInitializedInboxVisibilityRef = useRef(false);
+  const tutorialOverlayCleanupSignatureRef = useRef<string | null>(null);
   const { isActive: tutorialActive, currentStep: tutorialStep, currentSubstep: tutorialSubstep } =
     usePostOnboardingMentorGuidance();
   const shouldAutoFillTutorialTime =
     tutorialActive && tutorialStep === "create_quest" && tutorialSubstep === "select_time";
-
-  useEffect(() => {
-    if (!tutorialActive) return;
-
-    const shouldKeepPlannerOpenForPlanMyDay =
-      isTabActive && location.pathname === JOURNEYS_ROUTE && tutorialStep === "plan_my_day";
-    if (shouldKeepPlannerOpenForPlanMyDay) return;
-
-    setPlannerLaunchIntent(null);
-    setIsCompanionPlannerPinned(false);
-  }, [isTabActive, location.pathname, tutorialActive, tutorialStep]);
 
   const isInboxRequested = useMemo(
     () => new URLSearchParams(location.search).get("section") === "inbox",
@@ -606,6 +596,11 @@ const Journeys = () => {
     skipInteraction,
     closeModal: closeInteractionModal,
   } = useTaskCompletionWithInteraction();
+  const closeInteractionModalRef = useRef(closeInteractionModal);
+
+  useEffect(() => {
+    closeInteractionModalRef.current = closeInteractionModal;
+  }, [closeInteractionModal]);
 
   const { 
     tasks: dailyTasks,
@@ -643,6 +638,58 @@ const Journeys = () => {
     || needsStreakDecision
     || isInteractionModalOpen;
   const showCompanionPlanner = isCompanionPlannerPinned && !isCompanionPlannerBlocked;
+
+  useEffect(() => {
+    if (!tutorialActive) {
+      tutorialOverlayCleanupSignatureRef.current = null;
+      return;
+    }
+
+    const shouldKeepPlannerOpenForPlanMyDay =
+      isTabActive && location.pathname === JOURNEYS_ROUTE && tutorialStep === "plan_my_day";
+    if (!shouldKeepPlannerOpenForPlanMyDay) {
+      setPlannerLaunchIntent(null);
+      setIsCompanionPlannerPinned(false);
+    }
+
+    const signature = `${location.pathname}|${tutorialStep ?? "none"}|${isTabActive ? "active" : "inactive"}`;
+    if (tutorialOverlayCleanupSignatureRef.current === signature) return;
+    tutorialOverlayCleanupSignatureRef.current = signature;
+
+    setShowMonthView(false);
+    setShowPageInfo(false);
+    setShowQuickAdjust(false);
+    setEditingTask(null);
+    setEditingRitual(null);
+    closeInteractionModalRef.current();
+
+    if (tutorialStep !== "create_quest") {
+      setShowAddSheet(false);
+      setPrefilledTime(null);
+      setQuestSheetPrefillDraft(null);
+      setQuestSheetPrefillKey(null);
+      if (plannerQuestEditSession?.editor === "create") {
+        finishPlannerQuestEdit({ saved: false });
+      }
+    }
+
+    if (plannerQuestEditSession?.editor === "update") {
+      finishPlannerQuestEdit({ saved: false });
+    }
+
+    setShowPathfinder(false);
+    setPathfinderInitialGoal("");
+    setShowCreatedAnimation(false);
+    setCreatedCampaignData(null);
+  }, [
+    finishPlannerQuestEdit,
+    isTabActive,
+    location.pathname,
+    plannerQuestEditSession?.editor,
+    tutorialActive,
+    tutorialStep,
+  ]);
+
   const desktopInteractionResetKey = useMemo(
     () => [
       format(selectedDate, "yyyy-MM-dd"),

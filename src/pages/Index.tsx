@@ -293,23 +293,8 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
   const isReady = useMemo(() => {
     if (!user) return false;
 
-    // Wait for both profile and companion to finish loading
-    const loadingComplete = !profileLoading && !companionLoading;
-
-    const hasMentor = !!effectiveMentorId;
-
-    // Mentor is ready if: no mentor needed, OR we have cached data, OR initial load complete
-    const mentorDataReady = !hasMentor || !!mentorPageData || !mentorPageDataLoading;
-
-    return loadingComplete && mentorDataReady;
-  }, [
-    user,
-    profileLoading,
-    companionLoading,
-    effectiveMentorId,
-    mentorPageData,
-    mentorPageDataLoading,
-  ]);
+    return !profileLoading && !companionLoading;
+  }, [user, profileLoading, companionLoading]);
 
   useEffect(() => {
     onboardingSelfHealAttemptedRef.current = false;
@@ -337,9 +322,11 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
         if (error) {
           onboardingSelfHealAttemptedRef.current = false;
           console.warn("Failed to self-heal established profile flags:", error);
+        } else {
+          void queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
         }
       });
-  }, [user, onboardingGateReady, profile, companion]);
+  }, [user, onboardingGateReady, profile, companion, queryClient]);
 
   useEffect(() => {
     if (location.pathname !== "/") return;

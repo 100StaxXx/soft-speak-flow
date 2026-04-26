@@ -44,7 +44,6 @@ const PLAN_DAY_AI_SEND_SELECTOR = '[data-tour="companion-plan-day-chat-send"]';
 const PLAN_DAY_SUGGESTION_SAVE_SELECTOR = '[data-tour="companion-plan-day-suggestion-save"]';
 const PLAN_DAY_PENDING_CONFIRM_SELECTOR = '[data-tour="companion-plan-day-pending-confirm"]';
 const PLAN_DAY_PENDING_CONFIRM_ALL_SELECTOR = '[data-tour="companion-plan-day-pending-confirm-all"]';
-const CAMPAIGN_BUILDER_SELECTOR = '[data-tour="campaign-builder-launcher"]';
 const NEW_GOAL_SELECTOR = '[data-tour="companion-launcher-option-goal"]';
 const PATHFINDER_CAMPAIGN_BUILDER_SELECTOR = '[data-tour="pathfinder-campaign-builder"]';
 const EVOLVE_AUTOSCROLL_SELECTOR = '[data-tour="evolve-companion-button"]';
@@ -192,7 +191,7 @@ const getTargetSelectorsForMilestone = (milestoneId: GuidedMilestoneId): string[
     case "complete_campaign_creation":
       return [PATHFINDER_CAMPAIGN_BUILDER_SELECTOR, NEW_GOAL_SELECTOR, COMPANION_QUICK_ACTIONS_SELECTOR];
     case "open_campaign_builder":
-      return [CAMPAIGN_BUILDER_SELECTOR];
+      return [NEW_GOAL_SELECTOR, COMPANION_QUICK_ACTIONS_SELECTOR];
     case "quests_campaigns_intro":
     case "companion_tab_intro":
     case "post_evolution_companion_intro":

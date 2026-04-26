@@ -5,11 +5,9 @@ export interface TutorialTargetResolution {
 }
 
 const TUTORIAL_LAYER_SELECTOR = [
+  '[data-tutorial-layer="true"]',
   '[data-testid="mentor-spotlight-guard"]',
   '[data-tutorial="mentor-dialogue-panel"]',
-  ".mentor-spotlight-root",
-  ".mentor-spotlight-mask",
-  ".mentor-spotlight-ring",
 ].join(",");
 
 const clamp = (value: number, min: number, max: number) =>
@@ -72,26 +70,59 @@ const isBlockingCoverElement = (element: Element, target: HTMLElement): boolean 
   return true;
 };
 
-const isCoveredAtCenter = (element: HTMLElement, rect: DOMRect): boolean => {
-  if (typeof document.elementsFromPoint !== "function") return false;
+interface SamplePoint {
+  x: number;
+  y: number;
+}
 
+const getVisibleSamplePoints = (rect: DOMRect): SamplePoint[] => {
   const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
   const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-  if (viewportWidth <= 0 || viewportHeight <= 0) return false;
+  if (viewportWidth <= 0 || viewportHeight <= 0) return [];
 
-  const visibleLeft = clamp(Math.max(0, rect.left), 0, viewportWidth - 1);
-  const visibleRight = clamp(Math.min(viewportWidth, rect.right), 0, viewportWidth - 1);
-  const visibleTop = clamp(Math.max(0, rect.top), 0, viewportHeight - 1);
-  const visibleBottom = clamp(Math.min(viewportHeight, rect.bottom), 0, viewportHeight - 1);
-  const x = (visibleLeft + visibleRight) / 2;
-  const y = (visibleTop + visibleBottom) / 2;
-  const stack = document.elementsFromPoint(x, y);
+  const left = clamp(Math.max(0, rect.left), 0, viewportWidth);
+  const right = clamp(Math.min(viewportWidth, rect.right), 0, viewportWidth);
+  const top = clamp(Math.max(0, rect.top), 0, viewportHeight);
+  const bottom = clamp(Math.min(viewportHeight, rect.bottom), 0, viewportHeight);
+  if (right <= left || bottom <= top) return [];
+
+  const width = right - left;
+  const height = bottom - top;
+  const centerPoint: SamplePoint = {
+    x: clamp(rect.left + rect.width / 2, 0, viewportWidth - 1),
+    y: clamp(rect.top + rect.height / 2, 0, viewportHeight - 1),
+  };
+  const toPoint = (xRatio: number, yRatio: number): SamplePoint => ({
+    x: clamp(left + width * xRatio, 0, viewportWidth - 1),
+    y: clamp(top + height * yRatio, 0, viewportHeight - 1),
+  });
+
+  return [
+    centerPoint,
+    toPoint(0.25, 0.25),
+    toPoint(0.75, 0.25),
+    toPoint(0.25, 0.75),
+    toPoint(0.75, 0.75),
+  ];
+};
+
+const isCoveredAtPoint = (element: HTMLElement, point: SamplePoint): boolean => {
+  const stack = document.elementsFromPoint(point.x, point.y);
   if (stack.length === 0) return false;
 
   const targetIndex = stack.findIndex((stackElement) => isTargetTreeElement(stackElement, element));
   if (targetIndex === -1) return true;
 
   return stack.slice(0, targetIndex).some((stackElement) => isBlockingCoverElement(stackElement, element));
+};
+
+const isCoveredInVisibleArea = (element: HTMLElement, rect: DOMRect): boolean => {
+  if (typeof document.elementsFromPoint !== "function") return false;
+
+  const points = getVisibleSamplePoints(rect);
+  if (points.length === 0) return false;
+
+  return points.every((point) => isCoveredAtPoint(element, point));
 };
 
 export const resolveTutorialTarget = (selector: string | null): TutorialTargetResolution | null => {
@@ -112,7 +143,7 @@ export const resolveTutorialTarget = (selector: string | null): TutorialTargetRe
     const rect = candidate.getBoundingClientRect();
     if (!isNonZeroRect(rect)) continue;
     if (!intersectsViewport(rect)) continue;
-    if (isCoveredAtCenter(candidate, rect)) continue;
+    if (isCoveredInVisibleArea(candidate, rect)) continue;
 
     return {
       selector,

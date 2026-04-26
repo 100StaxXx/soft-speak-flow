@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CALCULATING_STAGE_DURATION_MS,
+  MENTOR_CATALOG_RECOVERY_TIMEOUT_MS,
   QUESTIONNAIRE_PIPELINE_TIMEOUT_MS,
   StoryOnboarding,
 } from "./StoryOnboarding";
@@ -165,6 +166,7 @@ vi.mock("sonner", () => ({
   toast: {
     error: mocks.toastError,
     success: mocks.toastSuccess,
+    dismiss: vi.fn(),
   },
 }));
 
@@ -1155,6 +1157,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     await waitFor(() => {
       expect(mocks.profilesUpdateEq).toHaveBeenCalled();
     });
+    expect(screen.getByRole("status")).toHaveTextContent("Saving...");
     expect(screen.getByTestId("story-tone-stage")).toBeInTheDocument();
     expect(screen.queryByTestId("egg-prelude-stage")).not.toBeInTheDocument();
 
@@ -1164,6 +1167,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     });
 
     expect(await screen.findByTestId("egg-prelude-stage")).toBeInTheDocument();
+    expect(screen.queryByText("Saving...")).not.toBeInTheDocument();
   });
 
   it.each([
@@ -1300,6 +1304,49 @@ describe("StoryOnboarding questionnaire submission flow", () => {
       "We couldn't reload the guide catalog. Please retry your guide match.",
       expect.objectContaining({ duration: expect.any(Number) }),
     );
+  });
+
+  it("offers a retry when mentor-result resume catalog loading stalls", async () => {
+    mocks.mentorsEq.mockImplementationOnce(() => new Promise(() => {
+      // Keep pending to exercise the restore timeout escape.
+    }));
+
+    vi.useFakeTimers();
+    try {
+      renderOnboarding({
+        resumeState: {
+          stage: "mentor-result",
+          userName: "Nova",
+          faction: "starfall",
+          onboardingData: {
+            mentorId: ACTIVE_MENTOR.id,
+            questionnaireAnswers: QUESTIONNAIRE_ANSWERS,
+            explanation: {
+              title: "Your Guide is: The Sage",
+              subtitle: "Quiet Clarity",
+              paragraph: "A fit for focused builders.",
+              bullets: ["Clear guidance"],
+            },
+          },
+        },
+      });
+
+      expect(screen.getByText("Restoring your guide...")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Retry Guide Match" })).not.toBeInTheDocument();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(MENTOR_CATALOG_RECOVERY_TIMEOUT_MS);
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Retry Guide Match" }));
+
+      expect(screen.getByTestId("questionnaire-stage")).toBeInTheDocument();
+      expect(screen.getByTestId("questionnaire-initial-count")).toHaveTextContent(
+        String(QUESTIONNAIRE_ANSWERS.length),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("starts reset mode at the story-tone stage", async () => {

@@ -2,9 +2,9 @@ import { act, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { JourneyBegins } from "./JourneyBegins";
 
-const LINE_DISPLAY_MS = 3400;
+const LINE_DISPLAY_MS = 1300;
 const NARRATIVE_LINE_COUNT = 5;
-const FINAL_LINE_HOLD_MS = LINE_DISPLAY_MS;
+const FINAL_LINE_HOLD_MS = 1000;
 const FINAL_LINE_TEXT = "...will shape both your destinies.";
 
 vi.mock("framer-motion", async () => {

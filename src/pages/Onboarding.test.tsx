@@ -183,6 +183,11 @@ describe("Onboarding route guard", () => {
       },
     });
     expect(mocks.profilesUpdateEqMock).toHaveBeenCalledWith("id", "user-1");
+    await waitFor(() => {
+      expect(mocks.queryClient.invalidateQueries).toHaveBeenCalledWith({
+        queryKey: ["profile", "user-1"],
+      });
+    });
   });
 
   it("still renders onboarding for incomplete accounts without a companion", () => {
@@ -236,6 +241,35 @@ describe("Onboarding route guard", () => {
       expect(mocks.queryClient.invalidateQueries).toHaveBeenCalledWith({
         queryKey: ["companion", "user-1"],
       });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps the gate stall clock running when query loading flaps", () => {
+    vi.useFakeTimers();
+    mocks.profileLoading = true;
+
+    try {
+      const view = renderOnboarding();
+
+      act(() => {
+        vi.advanceTimersByTime(8_000);
+      });
+
+      mocks.profileLoading = false;
+      mocks.companionLoading = true;
+      view.rerender(
+        <MemoryRouter initialEntries={["/onboarding"]}>
+          <Onboarding />
+        </MemoryRouter>,
+      );
+
+      act(() => {
+        vi.advanceTimersByTime(4_000);
+      });
+
+      expect(screen.getByText("We are still loading your setup")).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
