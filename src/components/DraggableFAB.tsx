@@ -157,6 +157,9 @@ export const DraggableFAB = ({ onOpenCompanionPlanner, onTap }: DraggableFABProp
       return;
     }
     closeMenu();
+    if (template.id === "goal" && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("companion-new-goal-started"));
+    }
     const launchIntent: CompanionPlannerLaunchIntent = {
       id: typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()

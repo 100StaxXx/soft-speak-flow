@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AICompanionCreator } from "./AICompanionCreator";
 
 describe("AICompanionCreator", () => {
-  it("uses a color dropdown and silhouette cards for the onboarding species choices", () => {
+  it("uses a color dropdown and compact silhouette rows for the onboarding species choices", () => {
     const onComplete = vi.fn();
 
     render(
@@ -22,7 +22,13 @@ describe("AICompanionCreator", () => {
       "src",
       "/onboarding/locked-species-silhouettes/dragon.png",
     );
+    expect(screen.getByTestId("species-silhouette-dragon")).toHaveStyle({
+      filter: "brightness(0) drop-shadow(0 0 18px rgba(132, 99, 255, 0.34))",
+    });
     expect(screen.getByRole("button", { name: "Select Dragon species" })).toHaveAttribute("data-selected", "true");
+    expect(screen.getAllByText(/Awaiting/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Awakening/i).length).toBeGreaterThan(0);
+    expect(screen.queryByText("Companion Preset")).not.toBeInTheDocument();
     expect(screen.queryByText("Egg Preview")).not.toBeInTheDocument();
     expect(
       screen.getByText("Optional. If you do not choose a companion name, one will be granted to your companion."),

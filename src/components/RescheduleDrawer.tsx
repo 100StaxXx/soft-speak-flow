@@ -209,7 +209,14 @@ export const RescheduleDrawer = ({
   };
 
   return (
-    <Drawer open={open} onOpenChange={handleOpenChange} handleOnly={true} shouldScaleBackground={false} modal={false}>
+    <Drawer
+      open={open}
+      onOpenChange={handleOpenChange}
+      handleOnly={true}
+      shouldScaleBackground={false}
+      modal={false}
+      repositionInputs={false}
+    >
       <DrawerTrigger asChild>
         {children || (
           <Button variant="outline" size="sm" className="gap-1.5 text-xs">

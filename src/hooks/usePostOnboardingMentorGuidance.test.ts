@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const createFreshTutorial = () => ({
   version: 2,
-  flowVersion: 5,
+  flowVersion: 7,
   eligible: true,
   dismissed: false,
   completed: false,
@@ -28,7 +28,10 @@ const createCloseoutTutorial = () => ({
     "mentor_intro_hello",
     "meet_companion_intro",
     "start_plan_my_day",
-    "open_campaign_builder",
+    "answer_plan_day_ai",
+    "save_plan_day_action",
+    "open_new_goal_from_fab",
+    "complete_campaign_creation",
   ],
 });
 
@@ -38,7 +41,7 @@ const mocks = vi.hoisted(() => ({
     profileLoading: false,
     guidedTutorial: {
       version: 2,
-      flowVersion: 5,
+      flowVersion: 7,
       eligible: true,
       dismissed: false,
       completed: false,
@@ -214,18 +217,21 @@ describe("guided tutorial helpers", () => {
       "Plan day",
     );
     expect(getMentorInstructionLines("create_campaign", null)[0]).toContain(
-      "campaign builder",
+      "New goal",
     );
     expect(
       getMentorInstructionLines("first_plan_closeout", null)[0],
-    ).toContain("campaign builder");
+    ).toContain("New goal");
   });
 
-  it("strict-locks the actionable Plan day and campaign builder targets in the new loop", () => {
+  it("strict-locks the actionable Plan day and New goal targets in the new loop", () => {
     expect(milestoneUsesStrictLock("mentor_intro_hello")).toBe(false);
     expect(milestoneUsesStrictLock("meet_companion_intro")).toBe(false);
     expect(milestoneUsesStrictLock("start_plan_my_day")).toBe(true);
-    expect(milestoneUsesStrictLock("open_campaign_builder")).toBe(true);
+    expect(milestoneUsesStrictLock("answer_plan_day_ai")).toBe(false);
+    expect(milestoneUsesStrictLock("save_plan_day_action")).toBe(true);
+    expect(milestoneUsesStrictLock("open_new_goal_from_fab")).toBe(true);
+    expect(milestoneUsesStrictLock("complete_campaign_creation")).toBe(true);
     expect(milestoneUsesStrictLock("first_plan_closeout_message")).toBe(false);
   });
 
@@ -268,7 +274,7 @@ describe("guided tutorial first-value loop", () => {
 
   afterEach(() => {
     document
-      .querySelectorAll('[data-tour="companion-launcher-option-plan-day"], [data-tour="campaign-builder-launcher"]')
+      .querySelectorAll('[data-tour="companion-launcher-option-plan-day"], [data-tour="companion-plan-day-follow-up-option"], [data-tour="companion-plan-day-suggestion-save"], [data-tour="companion-plan-day-pending-confirm"], [data-tour="companion-plan-day-pending-confirm-all"], [data-tour="companion-launcher-option-goal"], [data-tour="pathfinder-campaign-builder"], [data-tour="campaign-builder-launcher"]')
       .forEach((element) => element.remove());
   });
 
@@ -303,13 +309,22 @@ describe("guided tutorial first-value loop", () => {
     });
   });
 
-  it("advances from companion intro to Plan day, campaign builder, and then closeout", async () => {
+  it("advances from companion intro to Plan day, New goal, campaign creation, and then closeout", async () => {
     const planTarget = document.createElement("button");
     planTarget.setAttribute("data-tour", "companion-launcher-option-plan-day");
     document.body.appendChild(planTarget);
-    const campaignTarget = document.createElement("button");
-    campaignTarget.setAttribute("data-tour", "campaign-builder-launcher");
-    document.body.appendChild(campaignTarget);
+    const answerTarget = document.createElement("button");
+    answerTarget.setAttribute("data-tour", "companion-plan-day-follow-up-option");
+    document.body.appendChild(answerTarget);
+    const saveTarget = document.createElement("button");
+    saveTarget.setAttribute("data-tour", "companion-plan-day-suggestion-save");
+    document.body.appendChild(saveTarget);
+    const goalTarget = document.createElement("button");
+    goalTarget.setAttribute("data-tour", "companion-launcher-option-goal");
+    document.body.appendChild(goalTarget);
+    const pathfinderTarget = document.createElement("div");
+    pathfinderTarget.setAttribute("data-tour", "pathfinder-campaign-builder");
+    document.body.appendChild(pathfinderTarget);
 
     const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
       wrapper: createWrapper(),
@@ -344,12 +359,48 @@ describe("guided tutorial first-value loop", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.currentStep).toBe("create_campaign");
+      expect(result.current.currentStep).toBe("plan_my_day");
+      expect(result.current.dialogueText).toContain("Answer your companion");
       expect(result.current.activeTargetSelectors).toEqual([
-        '[data-tour="campaign-builder-launcher"]',
+        '[data-tour="companion-plan-day-follow-up-option"]',
+        '[data-tour="companion-plan-day-chat-input"]',
+        '[data-tour="companion-plan-day-chat-send"]',
       ]);
       expect(result.current.activeTargetSelector).toBe(
-        '[data-tour="campaign-builder-launcher"]',
+        '[data-tour="companion-plan-day-follow-up-option"]',
+      );
+      expect(mocks.state.awardCustomXP).not.toHaveBeenCalled();
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("companion-plan-my-day-ai-answered"));
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("plan_my_day");
+      expect(result.current.dialogueText).toContain("Save one suggested quest");
+      expect(result.current.activeTargetSelectors).toEqual([
+        '[data-tour="companion-plan-day-pending-confirm"]',
+        '[data-tour="companion-plan-day-pending-confirm-all"]',
+        '[data-tour="companion-plan-day-suggestion-save"]',
+      ]);
+      expect(result.current.activeTargetSelector).toBe(
+        '[data-tour="companion-plan-day-suggestion-save"]',
+      );
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("companion-plan-my-day-action-saved"));
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("create_campaign");
+      expect(result.current.activeTargetSelectors).toEqual([
+        '[data-tour="companion-launcher-option-goal"]',
+        '[data-planner-tour="companion-quick-actions"]',
+      ]);
+      expect(result.current.activeTargetSelector).toBe(
+        '[data-tour="companion-launcher-option-goal"]',
       );
       expect(mocks.state.awardCustomXP).toHaveBeenCalledWith(
         3,
@@ -363,7 +414,23 @@ describe("guided tutorial first-value loop", () => {
     });
 
     await act(async () => {
-      window.dispatchEvent(new CustomEvent("campaign-builder-opened"));
+      window.dispatchEvent(new CustomEvent("companion-new-goal-started"));
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("create_campaign");
+      expect(result.current.activeTargetSelectors).toEqual([
+        '[data-tour="pathfinder-campaign-builder"]',
+        '[data-tour="companion-launcher-option-goal"]',
+        '[data-planner-tour="companion-quick-actions"]',
+      ]);
+      expect(result.current.activeTargetSelector).toBe(
+        '[data-tour="pathfinder-campaign-builder"]',
+      );
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("campaign-created"));
     });
 
     await waitFor(() => {

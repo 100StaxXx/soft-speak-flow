@@ -410,7 +410,12 @@ const BARE_STARTER_FOLLOW_UPS: Record<
 > = {
   plan_day: {
     intent: "plan_day",
-    prompts: ["plan my day"],
+    prompts: [
+      "plan my day",
+      "help me plan my day",
+      "help me plan today",
+      "plan today",
+    ],
     reply:
       "Absolutely. Before I shape today, should it lean focus, recovery, or catching up?",
     followUp: {

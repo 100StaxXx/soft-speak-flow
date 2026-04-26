@@ -120,7 +120,13 @@ export const SmartAdjustPlanDrawer = memo(function SmartAdjustPlanDrawer({
   };
 
   return (
-    <Drawer open={open} onOpenChange={handleClose} handleOnly={true} shouldScaleBackground={false}>
+    <Drawer
+      open={open}
+      onOpenChange={handleClose}
+      handleOnly={true}
+      shouldScaleBackground={false}
+      repositionInputs={false}
+    >
       <DrawerContent className="max-h-[90vh]">
         <DrawerHeader className="pb-2">
           <div className="flex items-center justify-between">

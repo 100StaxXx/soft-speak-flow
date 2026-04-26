@@ -14,14 +14,14 @@ const mocks = vi.hoisted(() => ({
     isIntroDialogueActive: false,
     currentStep: "create_campaign",
     currentSubstep: null,
-    stepRoute: "/campaigns",
-    mentorInstructionLines: ["Tap Launch campaign builder."],
+    stepRoute: "/journeys",
+    mentorInstructionLines: ["Choose New goal."],
     progressText: "Step 3 of 4",
-    activeTargetSelectors: ['[data-tour="campaign-builder-launcher"]'],
-    activeTargetSelector: '[data-tour="campaign-builder-launcher"]',
+    activeTargetSelectors: ['[data-tour="companion-launcher-option-goal"]'],
+    activeTargetSelector: '[data-tour="companion-launcher-option-goal"]',
     isStrictLockActive: true,
     canTemporarilyHide: false,
-    dialogueText: "Tap Launch campaign builder.",
+    dialogueText: "Choose New goal.",
     dialogueSupportText: "I'll highlight it for you.",
     secondaryActionLabel: "Skip tutorial",
     onSecondaryAction: vi.fn(),
@@ -48,7 +48,7 @@ describe("MentorGuidanceCard", () => {
     expect(screen.getByText("Atlas portrait")).toBeInTheDocument();
     expect(screen.getByText("Atlas")).toBeInTheDocument();
     expect(screen.getByText("Step 3 of 4")).toBeInTheDocument();
-    expect(screen.getByText("Tap Launch campaign builder.")).toBeInTheDocument();
+    expect(screen.getByText("Choose New goal.")).toBeInTheDocument();
     expect(screen.getByText("I'll highlight it for you.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Skip tutorial" })).toBeInTheDocument();
   });
@@ -160,7 +160,7 @@ describe("MentorGuidanceCard", () => {
     rerender(<MentorGuidanceCard />);
 
     expect(screen.getByText("Atlas portrait")).toBeInTheDocument();
-    expect(screen.getByText("Tap Launch campaign builder.")).toBeInTheDocument();
+    expect(screen.getByText("Choose New goal.")).toBeInTheDocument();
   });
 });
 

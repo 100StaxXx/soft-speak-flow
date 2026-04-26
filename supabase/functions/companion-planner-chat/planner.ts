@@ -7652,6 +7652,11 @@ const countPlanDayExistingWorkItems = (
     .filter((task) => task.completed !== true && task.taskDate === targetDate)
     .length;
 
+const hasPlanDayScheduledBlocks = (
+  input: PlannerBuildInput,
+  targetDate: string,
+): boolean => buildIntervalsForDate(input, targetDate).length > 0;
+
 const PLAN_DAY_GENERIC_FOCUS_TERMS = new Set([
   "active",
   "admin",
@@ -7827,6 +7832,7 @@ const buildPlanDayClarificationResponse = (
 
 const isGenericPlanDayStarterRequest = (input: PlannerBuildInput): boolean => {
   const parsedTitle = sanitizeProposalTitle(input.parsedInput?.text);
+  if (isPlanDayStarterTitle(input.message)) return true;
   if (parsedTitle && !isPlanDayStarterTitle(parsedTitle)) return false;
 
   return /\b(plan my day|help me plan(?: my day| today)|plan today)\b/i.test(
@@ -7940,7 +7946,7 @@ const getPlanDayRankedScores = (
 const buildPlanDayAcknowledgement = (
   input: PlannerBuildInput,
 ): string | null => {
-  const parsedTitle = sanitizeProposalTitle(input.parsedInput?.text);
+  const parsedTitle = getPlanDayConcreteCandidateTitle(input);
   if (
     parsedTitle &&
     !isPlanDayStarterTitle(parsedTitle) &&
@@ -7957,31 +7963,55 @@ const buildPlanDayAcknowledgement = (
   return "Got it - let's shape the day around that.";
 };
 
-const buildPlanDayConcreteCandidate = (
+const getPlanDayConcreteCandidateTitle = (
   input: PlannerBuildInput,
-  targetDate: string,
-): OptimizerDraftCandidate | null => {
+): string | null => {
+  if (isTimingOnlyReply(input.message, input.parsedInput)) return null;
+
   const parsedTitle = sanitizeProposalTitle(input.parsedInput?.text);
-  if (!parsedTitle || isPlanDayStarterTitle(parsedTitle)) return null;
-  if (isGenericPlanDayFocusTitle(parsedTitle)) return null;
-  if (looksLikeMultiClauseScheduledTitle(parsedTitle)) return null;
+  const messageTitle = sanitizeProposalTitle(input.message);
+  const title = parsedTitle && !isPlanDayStarterTitle(parsedTitle)
+    ? parsedTitle
+    : input.sessionState.pendingStarterIntent === "plan_day"
+    ? messageTitle
+    : parsedTitle ?? messageTitle;
+
+  if (!title || isPlanDayStarterTitle(title)) return null;
+  if (isGenericPlanDayFocusTitle(title)) return null;
+  if (looksLikeMultiClauseScheduledTitle(title)) return null;
   if (
     getPlanDayFocusLabels(input).some((label) =>
-      normalizeText(label) === normalizeText(parsedTitle)
+      normalizeText(label) === normalizeText(title)
     )
   ) {
     return null;
   }
 
+  return title;
+};
+
+const buildPlanDayConcreteCandidate = (
+  input: PlannerBuildInput,
+  targetDate: string,
+): OptimizerDraftCandidate | null => {
+  const parsedTitle = getPlanDayConcreteCandidateTitle(input);
+  if (!parsedTitle) return null;
   const title = formatGeneratedTaskTitle(parsedTitle);
   if (!title) return null;
+  const scheduledDate = input.parsedInput?.scheduledDate ?? targetDate;
+  const suggestedSlot = findSuggestedSlot(
+    input,
+    scheduledDate,
+    input.parsedInput?.scheduledTime ?? null,
+  );
 
   return {
     id: createId(),
     dedupeKey: normalizeText(title),
     title,
-    scheduledDate: input.parsedInput?.scheduledDate ?? targetDate,
-    scheduledTime: input.parsedInput?.scheduledTime ?? null,
+    scheduledDate,
+    scheduledTime: input.parsedInput?.scheduledTime ?? suggestedSlot?.time ??
+      null,
     // Duration precedence: explicit user duration, learned history, then inferred estimates.
     estimatedDuration: getExplicitParsedActivityDuration(input) ??
       getHistoricalActivityDurationMinutes(input, title, "quest", {
@@ -9888,6 +9918,7 @@ const buildPlanDayDraftResponse = (
   const targetDate = getPlanDayTargetDate(input);
   const existingWorkItems = countPlanDayExistingWorkItems(input, targetDate);
   const targetTotal = getPlanDayTargetTotal(input, targetDate);
+  const concreteCandidate = buildPlanDayConcreteCandidate(input, targetDate);
   const strategicAdjustmentProposal = buildPlanDayStrategicAdjustmentProposal(
     input,
   );
@@ -9900,7 +9931,7 @@ const buildPlanDayDraftResponse = (
   const proposalTarget = Math.min(
     Math.max(0, 4 - (strategicAdjustmentProposal ? 1 : 0)),
     Math.max(
-      buildPlanDayConcreteCandidate(input, targetDate) ? 1 : 0,
+      concreteCandidate ? 1 : 0,
       targetTotal - existingWorkItems,
     ),
   );
@@ -9912,7 +9943,7 @@ const buildPlanDayDraftResponse = (
     return true;
   };
 
-  addCandidate(buildPlanDayConcreteCandidate(input, targetDate));
+  addCandidate(concreteCandidate);
 
   if (candidates.length < proposalTarget) {
     for (const score of getPlanDayRankedScores(input)) {
@@ -9970,13 +10001,25 @@ const buildPlanDayDraftResponse = (
       );
     }
 
+    if (
+      existingWorkItems < targetTotal &&
+      !hasPlanDayScheduledBlocks(input, targetDate)
+    ) {
+      return buildPlanDayClarificationResponse(
+        input,
+        sessionState,
+        classificationHint,
+        "I don't see scheduled blocks in the way, but I need one more concrete direction before I draft quests. What kind of day are we making: focused, light, catch-up, or something else?",
+      );
+    }
+
     const noRoomReason = existingWorkItems >= targetTotal
       ? `${
         dateLabel === "today" || dateLabel === "tomorrow"
           ? `${dateLabel[0].toUpperCase()}${dateLabel.slice(1)}`
           : dateLabel
       } is already carrying about as much quest load as I want to give it.`
-      : `I couldn't find clean room on ${dateLabel} without crowding your fixed blocks.`;
+      : `I don't see enough open space on ${dateLabel} around your scheduled blocks to draft that cleanly.`;
 
     return {
       mode: "conversational",

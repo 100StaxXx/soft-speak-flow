@@ -1122,6 +1122,109 @@ describe("useCompanion evolveCompanion", () => {
     );
   });
 
+  it("can defer AI egg image generation so onboarding creates the companion immediately", async () => {
+    const bundledIceEggUrl = "/companion-eggs/egg__t0_egg__normal__ice.png";
+    let resolveGeneratedImage: ((value: { data: unknown; error: unknown }) => void) | null = null;
+    const generatedImagePromise = new Promise<{ data: unknown; error: unknown }>((resolve) => {
+      resolveGeneratedImage = resolve;
+    });
+
+    mocks.invokeMock.mockImplementation((functionName: string) => {
+      if (functionName === "generate-companion-image") {
+        return generatedImagePromise;
+      }
+
+      return Promise.resolve({ data: null, error: null });
+    });
+    mocks.rpcMock.mockImplementation((functionName: string) => {
+      if (functionName === "create_companion_if_not_exists") {
+        return Promise.resolve({
+          data: [
+            {
+              ...companionFixture,
+              preset_id: null,
+              spirit_animal: "Wolf",
+              core_element: "ice",
+              current_image_url: bundledIceEggUrl,
+              initial_image_url: bundledIceEggUrl,
+              visual_identity_profile: null,
+              image_lineage_metadata: null,
+              is_new: true,
+            },
+          ],
+          error: null,
+        });
+      }
+
+      if (functionName === "apply_deferred_companion_onboarding_image") {
+        return Promise.resolve({ data: null, error: null });
+      }
+
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const { result } = await renderUseCompanion();
+
+    let createdCompanion: Awaited<ReturnType<typeof result.current.createCompanion.mutateAsync>>;
+    await act(async () => {
+      createdCompanion = await result.current.createCompanion.mutateAsync({
+        creationMode: "ai",
+        favoriteColor: "#000000",
+        spiritAnimal: "Wolf",
+        coreElement: "ice",
+        storyTone: "epic_adventure",
+        deferInitialImageGeneration: true,
+      });
+    });
+
+    expect(createdCompanion!).toMatchObject({
+      current_image_url: bundledIceEggUrl,
+      initial_image_url: bundledIceEggUrl,
+    });
+    expect(mocks.rpcMock).toHaveBeenCalledWith(
+      "create_companion_if_not_exists",
+      expect.objectContaining({
+        p_preset_id: null,
+        p_current_image_url: bundledIceEggUrl,
+        p_initial_image_url: bundledIceEggUrl,
+        p_visual_identity_profile: null,
+        p_image_lineage_metadata: null,
+      }),
+    );
+    expect(mocks.invokeMock).toHaveBeenCalledWith("generate-companion-image", {
+      body: expect.objectContaining({
+        spiritAnimal: "Wolf",
+        element: "ice",
+        flowType: "ai_onboarding_egg",
+        idempotencyKey: expect.any(String),
+      }),
+    });
+    expect(
+      mocks.rpcMock.mock.calls.some(([functionName]) =>
+        functionName === "apply_deferred_companion_onboarding_image"
+      ),
+    ).toBe(false);
+
+    await act(async () => {
+      resolveGeneratedImage?.({ data: aiEggGenerationFixture, error: null });
+      await generatedImagePromise;
+    });
+
+    await waitFor(() => {
+      expect(mocks.rpcMock).toHaveBeenCalledWith(
+        "apply_deferred_companion_onboarding_image",
+        expect.objectContaining({
+          p_companion_id: "companion-1",
+          p_image_url: aiEggGenerationFixture.imageUrl,
+          p_image_focal_x: aiEggGenerationFixture.imageFocalX,
+          p_image_focal_y: aiEggGenerationFixture.imageFocalY,
+          p_visual_identity_profile: aiEggGenerationFixture.visualIdentityProfile,
+          p_image_lineage_metadata: aiEggGenerationFixture.imageLineageMetadata,
+        }),
+      );
+    });
+  });
+
   it("retries egg-first creation against the preset-aware legacy RPC signature when focal args are unavailable", async () => {
     mocks.invokeMock.mockResolvedValueOnce({
       data: aiEggGenerationFixture,

@@ -819,6 +819,40 @@ Deno.test("generic plan_day starter with no anchors asks what kind of day it is"
   assertEquals(result.structuredResponse, null);
 });
 
+Deno.test("bare plan_day starter asks a follow-up even when parsed text is stale", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Help me plan today",
+    parsedInput: {
+      text: "Call mom",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      starterIntent: "plan_day",
+      tasks: [],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [],
+      calendarEvents: [],
+    },
+  }));
+
+  assertEquals(result.mode, "conversational");
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.followUpQuestions.length, 1);
+  assertStringIncludes(result.reply, "What kind of day");
+  assertEquals(result.sessionState.pendingStarterIntent, "plan_day");
+});
+
 Deno.test("generic plan_day starter with anchors asks a context-aware question", () => {
   const result = buildPlannerResponse(baseInput({
     message: "Plan my day",
@@ -872,6 +906,225 @@ Deno.test("generic plan_day starter with anchors asks a context-aware question",
     "Ship landing page copy",
   ]);
   assertEquals(result.sessionState.pendingStarterIntent, "plan_day");
+});
+
+Deno.test("plan_day follow-up drafts a concrete quest on a blank account", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "clean room",
+    parsedInput: {
+      text: "Plan my day",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+      openQuestionIds: ["details"],
+    },
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [],
+      calendarEvents: [],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [
+          {
+            date: "2026-04-18",
+            totalMinutes: 0,
+            taskCount: 0,
+            status: "open",
+          },
+        ],
+        overloadedDates: [],
+        emptyDates: ["2026-04-18"],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "11:00",
+            endTime: "11:45",
+            score: 88,
+            reason: "Open room after the morning.",
+          },
+        ],
+        moveSuggestions: [],
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(result.proposals.length, 1);
+  assertEquals(result.proposals[0]?.kind, "create_quest");
+  assertEquals(
+    (result.proposals[0]?.payload as {
+      taskText?: string;
+      taskDate?: string | null;
+      scheduledTime?: string | null;
+      estimatedDuration?: number | null;
+    }).taskText,
+    "Clean Room",
+  );
+  assertEquals(
+    (result.proposals[0]?.payload as {
+      taskText?: string;
+      taskDate?: string | null;
+      scheduledTime?: string | null;
+      estimatedDuration?: number | null;
+    }).taskDate,
+    "2026-04-18",
+  );
+  assertEquals(
+    (result.proposals[0]?.payload as {
+      taskText?: string;
+      taskDate?: string | null;
+      scheduledTime?: string | null;
+      estimatedDuration?: number | null;
+    }).scheduledTime,
+    "11:00",
+  );
+  assertEquals(
+    (result.proposals[0]?.payload as {
+      taskText?: string;
+      taskDate?: string | null;
+      scheduledTime?: string | null;
+      estimatedDuration?: number | null;
+    }).estimatedDuration,
+    30,
+  );
+  assertEquals(result.reply.includes("fixed blocks"), false);
+});
+
+Deno.test("plan_day no-candidate reply avoids fixed-block copy when there are no scheduled blocks", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Ship landing page copy",
+    parsedInput: {
+      text: "Ship landing page copy",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+      openQuestionIds: ["details"],
+    },
+    plannerContext: {
+      tasks: [
+        {
+          id: "task-anchor-1",
+          title: "Ship landing page copy",
+          taskDate: "2026-04-18",
+          scheduledTime: null,
+          estimatedDuration: 45,
+          recurrencePattern: null,
+          completed: false,
+          priority: "high",
+        },
+      ],
+      priorityScores: [
+        {
+          id: "task:task-anchor-1",
+          kind: "task",
+          title: "Ship landing page copy",
+          score: 86,
+          reasons: ["Moves the relaunch forward."],
+          taskId: "task-anchor-1",
+          targetDate: "2026-04-18",
+        },
+      ],
+      calendarEvents: [],
+    },
+  }));
+
+  assertEquals(result.mode, "conversational");
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.followUpQuestions.length, 1);
+  assertEquals(result.reply.includes("fixed blocks"), false);
+});
+
+Deno.test("plan_day no-candidate reply may mention scheduled blocks when real blockers exist", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Ship landing page copy",
+    parsedInput: {
+      text: "Ship landing page copy",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+      openQuestionIds: ["details"],
+    },
+    plannerContext: {
+      tasks: [
+        {
+          id: "task-anchor-1",
+          title: "Ship landing page copy",
+          taskDate: "2026-04-18",
+          scheduledTime: null,
+          estimatedDuration: 45,
+          recurrencePattern: null,
+          completed: false,
+          priority: "high",
+        },
+      ],
+      priorityScores: [
+        {
+          id: "task:task-anchor-1",
+          kind: "task",
+          title: "Ship landing page copy",
+          score: 86,
+          reasons: ["Moves the relaunch forward."],
+          taskId: "task-anchor-1",
+          targetDate: "2026-04-18",
+        },
+      ],
+      calendarEvents: [
+        {
+          id: "calendar-1",
+          title: "Therapy",
+          start: "2026-04-18T09:00:00-07:00",
+          end: "2026-04-18T12:00:00-07:00",
+          isAllDay: false,
+          provider: "google",
+          readOnly: true,
+        },
+      ],
+    },
+  }));
+
+  assertEquals(result.mode, "conversational");
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertStringIncludes(result.reply, "scheduled blocks");
+  assertEquals(result.reply.includes("fixed blocks"), false);
 });
 
 Deno.test("plan_day starter with a focus direction returns direct quest drafts with structured output", () => {

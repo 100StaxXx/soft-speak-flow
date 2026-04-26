@@ -1,6 +1,10 @@
 import type { HTMLAttributes, ReactNode } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({
+  drawerRootProps: [] as Array<Record<string, unknown>>,
+}));
 
 vi.mock("framer-motion", () => ({
   motion: {
@@ -16,10 +20,14 @@ vi.mock("@/components/ui/drawer", () => ({
   Drawer: ({
     open,
     children,
+    ...props
   }: {
     open: boolean;
     children: ReactNode;
-  }) => (open ? <div>{children}</div> : null),
+  } & Record<string, unknown>) => {
+    mocks.drawerRootProps.push({ open, ...props });
+    return open ? <div>{children}</div> : null;
+  },
   DrawerContent: ({
     children,
     ...props
@@ -64,6 +72,27 @@ vi.mock("sonner", () => ({
 import { QuickAdjustDrawer } from "./QuickAdjustDrawer";
 
 describe("QuickAdjustDrawer", () => {
+  beforeEach(() => {
+    mocks.drawerRootProps.length = 0;
+  });
+
+  it("disables Vaul input repositioning for the quick adjust drawer", () => {
+    render(
+      <QuickAdjustDrawer
+        open
+        onOpenChange={vi.fn()}
+        tasks={[{ id: "task-1", task_text: "Plan the day", completed: false }]}
+        selectedDate={new Date("2026-03-28T10:00:00Z")}
+        onLaunchPlanner={vi.fn()}
+        onComplete={vi.fn()}
+      />,
+    );
+
+    expect(mocks.drawerRootProps[0]).toMatchObject({
+      repositionInputs: false,
+    });
+  });
+
   it("keeps focus local without calling scrollIntoView", () => {
     const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
     const scrollIntoViewMock = vi.fn();

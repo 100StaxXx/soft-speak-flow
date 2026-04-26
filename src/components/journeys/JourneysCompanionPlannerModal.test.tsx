@@ -312,6 +312,10 @@ describe("JourneysCompanionPlannerModal", () => {
       .toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Confirm" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    expect(screen.getByTestId("journeys-companion-planner-text-input"))
+      .toHaveAttribute("data-tour", "companion-plan-day-chat-input");
+    expect(screen.getByTestId("journeys-companion-planner-send-button"))
+      .toHaveAttribute("data-tour", "companion-plan-day-chat-send");
   });
 
   it("starts quest capture locally without forwarding Quest? to the assistant hook", async () => {
@@ -417,6 +421,44 @@ describe("JourneysCompanionPlannerModal", () => {
     });
   });
 
+  it("disables Vaul input repositioning for the mobile planner drawer", () => {
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="drawer"
+      />,
+    );
+
+    expect(mocks.drawerRootProps.find((props) => props.open === true))
+      .toMatchObject({ repositionInputs: false });
+  });
+
+  it("sizes the mobile planner shell to the visible viewport when the keyboard opens", () => {
+    Object.defineProperty(window, "visualViewport", {
+      configurable: true,
+      value: {
+        height: 500,
+        offsetTop: 0,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+    });
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="drawer"
+      />,
+    );
+
+    expect(screen.getByTestId("journeys-companion-planner-shell"))
+      .toHaveStyle({ height: "476px" });
+    expect(mocks.drawerRootProps.find((props) => props.open === true))
+      .toMatchObject({ repositionInputs: false });
+  });
+
   it("wires inline confirm and cancel actions to the unified assistant hook", () => {
     render(
       <JourneysCompanionPlannerModal
@@ -430,6 +472,10 @@ describe("JourneysCompanionPlannerModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
+    expect(screen.getByRole("button", { name: "Confirm All (3)" }))
+      .toHaveAttribute("data-tour", "companion-plan-day-pending-confirm-all");
+    expect(screen.getByRole("button", { name: "Confirm" }))
+      .toHaveAttribute("data-tour", "companion-plan-day-pending-confirm");
     expect(mocks.assistant.confirmAllPendingActions).toHaveBeenCalledTimes(1);
     expect(mocks.assistant.confirmPendingAction).toHaveBeenCalledTimes(1);
     expect(mocks.assistant.cancelPendingAction).toHaveBeenCalledTimes(1);
@@ -458,6 +504,8 @@ describe("JourneysCompanionPlannerModal", () => {
       .toHaveTextContent("Do you want today to lean progress or recovery?");
     expect(screen.getByText("Your calendar has room for either shape."))
       .toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Progress" }))
+      .toHaveAttribute("data-tour", "companion-plan-day-follow-up-option");
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Progress" }));
@@ -636,6 +684,8 @@ describe("JourneysCompanionPlannerModal", () => {
 
     fireEvent.click(screen.getByTestId("structured-suggestion-confirm-plan-1"));
 
+    expect(screen.getByTestId("structured-suggestion-confirm-plan-1"))
+      .toHaveAttribute("data-tour", "companion-plan-day-suggestion-save");
     expect(mocks.assistant.confirmSuggestedQuest).toHaveBeenCalledWith(
       "proposal-plan-1",
     );

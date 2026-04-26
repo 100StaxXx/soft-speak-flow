@@ -155,6 +155,7 @@ const renderQuestRow = (
                 void options.onConfirmSuggestion?.(quest.proposalId!);
               }}
               disabled={options.actionDisabled || isSaved || isPending}
+              data-tour="companion-plan-day-suggestion-save"
               data-testid={`structured-suggestion-confirm-${quest.suggestionId}`}
             >
               {actionLabel}

@@ -113,7 +113,7 @@ export function QuickAdjustDrawer({
   };
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
+    <Drawer open={open} onOpenChange={onOpenChange} repositionInputs={false}>
       <DrawerContent className="max-h-[70vh]">
         <DrawerHeader className="pb-2 text-center">
           <div className="mb-2 flex justify-center">

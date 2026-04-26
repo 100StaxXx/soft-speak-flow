@@ -601,7 +601,11 @@ export function Pathfinder({
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-3xl border-none bg-transparent p-0 shadow-none" hideCloseButton>
-        <div className={plannerPathfinderTheme.shell} data-testid="pathfinder-shell">
+        <div
+          className={plannerPathfinderTheme.shell}
+          data-tour="pathfinder-campaign-builder"
+          data-testid="pathfinder-shell"
+        >
           <div className={plannerPathfinderTheme.shellGloss} />
           <div className={plannerPathfinderTheme.shellGlow} />
 

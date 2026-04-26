@@ -365,6 +365,35 @@ Deno.test("runCompanionAgent asks a follow-up instead of proposing quests for ba
   );
 });
 
+Deno.test("runCompanionAgent asks a follow-up for bare plan-day variants", async () => {
+  const supabase = createMockSupabase();
+  const { guardedFetch } = createInstructionCaptureFetch(
+    "I drafted a default day.",
+  );
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-plan-day-variant",
+      message: "Help me plan today",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      starterIntent: "plan_day",
+    },
+  });
+
+  assertEquals(result.mode, "clarify");
+  assertEquals(result.intent, "plan_day");
+  assertEquals(result.understandingState, "needs_followup");
+  assert(result.followUp?.question.includes("focus"));
+  assertEquals(result.proposedActions, []);
+  assertEquals(result.structuredResponse, null);
+});
+
 Deno.test("runCompanionAgent asks a follow-up for bare Adjust my day when the model gives a generic reply", async () => {
   const supabase = createMockSupabase();
   const { guardedFetch } = createInstructionCaptureFetch("I'm here.");

@@ -1223,15 +1223,27 @@ export const StoryOnboarding = ({
 
       let companionData: Awaited<ReturnType<typeof createCompanion.mutateAsync>>;
       try {
-        companionData = await createCompanion.mutateAsync({
-          creationMode: preferences.presetId ? "preset" : "ai",
-          presetId: preset?.id ?? null,
-          favoriteColor: preferences.favoriteColor,
-          spiritAnimal: preferences.spiritAnimal,
-          coreElement: preferences.coreElement,
-          storyTone: preferences.storyTone,
-          companionName: preferences.companionName,
-        });
+        companionData = await createCompanion.mutateAsync(
+          preferences.presetId
+            ? {
+              creationMode: "preset",
+              presetId: preset?.id ?? null,
+              favoriteColor: preferences.favoriteColor,
+              spiritAnimal: preferences.spiritAnimal,
+              coreElement: preferences.coreElement,
+              storyTone: preferences.storyTone,
+              companionName: preferences.companionName,
+            }
+            : {
+              creationMode: "ai",
+              favoriteColor: preferences.favoriteColor,
+              spiritAnimal: preferences.spiritAnimal,
+              coreElement: preferences.coreElement,
+              storyTone: preferences.storyTone,
+              companionName: preferences.companionName,
+              deferInitialImageGeneration: true,
+            },
+        );
 
         if (!companionData?.id) {
           throw new Error("Companion record missing ID after creation.");

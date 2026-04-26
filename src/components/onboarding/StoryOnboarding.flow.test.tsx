@@ -595,12 +595,12 @@ describe("StoryOnboarding questionnaire submission flow", () => {
 
       expect(mocks.createCompanionMutateAsync).toHaveBeenCalledWith({
         creationMode: "ai",
-        presetId: null,
         favoriteColor: "#60A5FA",
         spiritAnimal: "Dragon",
         coreElement: "ice",
         storyTone: "dark_intense",
         companionName: null,
+        deferInitialImageGeneration: true,
       });
     } finally {
       vi.useRealTimers();
@@ -686,7 +686,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
       const guidedTutorial = JSON.parse(rawProgress ?? "{}");
       expect(guidedTutorial).toMatchObject({
         version: 2,
-        flowVersion: 5,
+        flowVersion: 7,
         eligible: true,
         completed: false,
         dismissed: false,
@@ -734,12 +734,12 @@ describe("StoryOnboarding questionnaire submission flow", () => {
 
       expect(mocks.createCompanionMutateAsync).toHaveBeenCalledWith({
         creationMode: "ai",
-        presetId: null,
         favoriteColor: "#60A5FA",
         spiritAnimal: "Dragon",
         coreElement: "ice",
         storyTone: "dark_intense",
         companionName: null,
+        deferInitialImageGeneration: true,
       });
     } finally {
       vi.useRealTimers();
@@ -801,12 +801,12 @@ describe("StoryOnboarding questionnaire submission flow", () => {
       expect(screen.getByTestId("journey-begins-summary")).toHaveTextContent("Nova:Lyra");
       expect(mocks.createCompanionMutateAsync).toHaveBeenCalledWith({
         creationMode: "ai",
-        presetId: null,
         favoriteColor: "#60A5FA",
         spiritAnimal: "Dragon",
         coreElement: "ice",
         storyTone: "dark_intense",
         companionName: "Lyra",
+        deferInitialImageGeneration: true,
       });
     } finally {
       vi.useRealTimers();

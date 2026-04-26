@@ -9,7 +9,7 @@ import {
 
 const createFreshTutorial = () => ({
   version: 2,
-  flowVersion: 5,
+  flowVersion: 7,
   eligible: true,
   dismissed: false,
   completed: false,
@@ -32,14 +32,17 @@ const createCloseoutTutorial = () => ({
     "mentor_intro_hello",
     "meet_companion_intro",
     "start_plan_my_day",
-    "open_campaign_builder",
+    "answer_plan_day_ai",
+    "save_plan_day_action",
+    "open_new_goal_from_fab",
+    "complete_campaign_creation",
   ],
 });
 
 const mocks = vi.hoisted(() => ({
   guidedTutorial: {
     version: 2,
-    flowVersion: 5,
+    flowVersion: 7,
     eligible: true,
     dismissed: false,
     completed: false,
@@ -129,7 +132,7 @@ describe("guided tutorial route restoration", () => {
     mocks.guidedTutorial = createFreshTutorial();
     globalThis.localStorage?.removeItem?.("guided_tutorial_progress_user-1");
     document
-      .querySelectorAll('[data-tour="companion-launcher-option-plan-day"], [data-tour="campaign-builder-launcher"]')
+      .querySelectorAll('[data-tour="companion-launcher-option-plan-day"], [data-tour="companion-plan-day-follow-up-option"], [data-tour="companion-plan-day-suggestion-save"], [data-tour="companion-plan-day-pending-confirm"], [data-tour="companion-plan-day-pending-confirm-all"], [data-tour="companion-launcher-option-goal"], [data-tour="pathfinder-campaign-builder"], [data-tour="campaign-builder-launcher"]')
       .forEach((element) => element.remove());
   });
 
@@ -205,14 +208,23 @@ describe("guided tutorial route restoration", () => {
     });
   });
 
-  it("targets Plan My Day, opens campaign builder, and reaches the final closeout", async () => {
+  it("targets Plan My Day, opens New goal, waits for campaign creation, and reaches the final closeout", async () => {
     mocks.guidedTutorial = createPlanStepTutorial();
     const planTarget = document.createElement("button");
     planTarget.setAttribute("data-tour", "companion-launcher-option-plan-day");
     document.body.appendChild(planTarget);
-    const campaignTarget = document.createElement("button");
-    campaignTarget.setAttribute("data-tour", "campaign-builder-launcher");
-    document.body.appendChild(campaignTarget);
+    const answerTarget = document.createElement("button");
+    answerTarget.setAttribute("data-tour", "companion-plan-day-follow-up-option");
+    document.body.appendChild(answerTarget);
+    const saveTarget = document.createElement("button");
+    saveTarget.setAttribute("data-tour", "companion-plan-day-suggestion-save");
+    document.body.appendChild(saveTarget);
+    const goalTarget = document.createElement("button");
+    goalTarget.setAttribute("data-tour", "companion-launcher-option-goal");
+    document.body.appendChild(goalTarget);
+    const pathfinderTarget = document.createElement("div");
+    pathfinderTarget.setAttribute("data-tour", "pathfinder-campaign-builder");
+    document.body.appendChild(pathfinderTarget);
 
     renderWithProviders("/companion");
 
@@ -229,17 +241,55 @@ describe("guided tutorial route restoration", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId("step")).toHaveTextContent(
-        "create_campaign",
-      );
-      expect(screen.getByTestId("path")).toHaveTextContent("/campaigns");
+      expect(screen.getByTestId("step")).toHaveTextContent("plan_my_day");
+      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
       expect(screen.getByTestId("target")).toHaveTextContent(
-        '[data-tour="campaign-builder-launcher"]',
+        '[data-tour="companion-plan-day-follow-up-option"]',
       );
     });
 
     await act(async () => {
-      window.dispatchEvent(new CustomEvent("campaign-builder-opened"));
+      window.dispatchEvent(new CustomEvent("companion-plan-my-day-ai-answered"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("step")).toHaveTextContent("plan_my_day");
+      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
+      expect(screen.getByTestId("target")).toHaveTextContent(
+        '[data-tour="companion-plan-day-suggestion-save"]',
+      );
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("companion-plan-my-day-action-saved"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("step")).toHaveTextContent(
+        "create_campaign",
+      );
+      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
+      expect(screen.getByTestId("target")).toHaveTextContent(
+        '[data-tour="companion-launcher-option-goal"]',
+      );
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("companion-new-goal-started"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("step")).toHaveTextContent(
+        "create_campaign",
+      );
+      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
+      expect(screen.getByTestId("target")).toHaveTextContent(
+        '[data-tour="pathfinder-campaign-builder"]',
+      );
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("campaign-created"));
     });
 
     await waitFor(() => {

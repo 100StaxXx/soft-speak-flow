@@ -75,6 +75,11 @@ type LegacyFallbackHydrationInput = {
   pendingSuggestionProposalId?: string | null;
 };
 
+const emitPlanDayAiAnsweredEvent = () => {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("companion-plan-my-day-ai-answered"));
+};
+
 const normalizeConversationMessages = (
   messages: Array<{
     id: string;
@@ -618,6 +623,10 @@ export function useLegacyCompanionAssistantAdapter({
     const message = rawMessage.trim();
     if (!enabled || !message) return;
     const starterIntent = options?.starterIntent;
+    const shouldEmitPlanDayAiAnswered =
+      !starterIntent &&
+      planner.sessionState.pendingStarterIntent === "plan_day" &&
+      planner.questions.length > 0;
 
     const parsed = parseNaturalLanguage(message);
     const shouldOpenCampaignBuilder = surface === "journeys" &&
@@ -707,6 +716,9 @@ export function useLegacyCompanionAssistantAdapter({
 
     if (routeToPlanner) {
       await planner.submitMessage(message, inputMode);
+      if (shouldEmitPlanDayAiAnswered) {
+        emitPlanDayAiAnsweredEvent();
+      }
       return;
     }
 

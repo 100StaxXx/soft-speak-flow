@@ -195,7 +195,7 @@ export const AICompanionCreator = ({
                 <div
                   role="group"
                   aria-labelledby="species-picker-label"
-                  className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
+                  className="space-y-3"
                 >
                   {COMPANION_PRESETS.map((preset) => {
                     const isSelected = preset.displayName === spiritAnimal;
@@ -209,43 +209,62 @@ export const AICompanionCreator = ({
                         aria-label={`Select ${preset.displayName} species`}
                         aria-pressed={isSelected}
                         className={cn(
-                          "rounded-[24px] border p-3 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60",
+                          "w-full overflow-hidden rounded-[28px] border px-5 py-5 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60",
                           isSelected
-                            ? "border-emerald-300/45 bg-emerald-300/14 text-white shadow-[0_20px_40px_rgba(52,211,153,0.14)]"
-                            : "border-white/10 bg-white/5 text-white/86 hover:border-white/20 hover:bg-white/8",
+                            ? "border-emerald-300/55 bg-[#20313a]/88 text-white shadow-[0_20px_44px_rgba(52,211,153,0.14)]"
+                            : "border-white/10 bg-[#171421]/82 text-white/86 hover:border-white/20 hover:bg-[#1d1929]/88",
                         )}
                         data-selected={isSelected ? "true" : "false"}
                       >
-                        <div className="aspect-square rounded-[20px] border border-white/8 bg-black/25 p-3">
-                          {silhouetteSrc ? (
-                            <img
-                              src={silhouetteSrc}
-                              alt=""
-                              aria-hidden="true"
-                              data-testid={`species-silhouette-${preset.id}`}
-                              className="h-full w-full object-contain"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center text-2xl font-semibold text-white/45">
-                              {preset.displayName.slice(0, 2)}
+                        <div className="grid min-h-[118px] grid-cols-[minmax(0,1fr)_auto_64px] items-center gap-x-3 gap-y-3 sm:grid-cols-[minmax(0,1fr)_auto_80px] sm:gap-x-5">
+                          <div className="min-w-0 self-start">
+                            <div className="text-lg font-semibold leading-tight text-white">
+                              {preset.displayName}
                             </div>
-                          )}
-                        </div>
-                        <div className="mt-3 flex items-start justify-between gap-2">
-                          <div>
-                            <div className="text-sm font-semibold text-white">{preset.displayName}</div>
-                            <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-white/45">
+                            <p className="mt-3 max-w-[12rem] break-words text-[13px] uppercase leading-6 tracking-[0.32em] text-white/48">
                               {preset.role}
                             </p>
                           </div>
-                          {isSelected ? (
-                            <span className="rounded-full border border-white/15 bg-white/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/85">
-                              Selected
-                            </span>
-                          ) : null}
+
+                          <span
+                            className={cn(
+                              "self-start rounded-full border px-3 py-1.5 text-center text-[11px] font-semibold uppercase leading-5 tracking-[0.22em] text-white/78 sm:min-w-[130px]",
+                              isSelected
+                                ? "border-white/18 bg-white/12"
+                                : "border-white/10 bg-black/20",
+                            )}
+                          >
+                            {isSelected ? "Selected" : (
+                              <>
+                                Awaiting
+                                <br />
+                                Awakening
+                              </>
+                            )}
+                          </span>
+
+                          <div className="row-span-2 flex h-16 w-16 items-center justify-center justify-self-end self-center sm:h-20 sm:w-20">
+                            {silhouetteSrc ? (
+                              <img
+                                src={silhouetteSrc}
+                                alt=""
+                                aria-hidden="true"
+                                data-testid={`species-silhouette-${preset.id}`}
+                                className="h-full w-full object-contain opacity-95"
+                                loading="lazy"
+                                style={{ filter: "brightness(0) drop-shadow(0 0 18px rgba(132, 99, 255, 0.34))" }}
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-2xl font-semibold text-black/80">
+                                {preset.displayName.slice(0, 2)}
+                              </div>
+                            )}
+                          </div>
+
+                          <p className="col-span-2 text-sm leading-6 text-white/72 sm:text-base">
+                            {preset.revealCopy}
+                          </p>
                         </div>
-                        <p className="mt-2 text-xs leading-5 text-white/60">{preset.revealCopy}</p>
                       </button>
                     );
                   })}

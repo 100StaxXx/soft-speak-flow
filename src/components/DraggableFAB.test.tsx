@@ -213,7 +213,9 @@ describe("DraggableFAB", () => {
     });
   });
 
-  it("routes the goal option straight to the campaign builder target", () => {
+  it("routes the goal option straight to the campaign builder target and emits the tutorial event", () => {
+    const newGoalStarted = vi.fn();
+    window.addEventListener("companion-new-goal-started", newGoalStarted);
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
 
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
@@ -224,6 +226,8 @@ describe("DraggableFAB", () => {
       starterIntent: "goal_breakdown_start",
       message: "Let's lock in a new goal",
     }));
+    expect(newGoalStarted).toHaveBeenCalledTimes(1);
+    window.removeEventListener("companion-new-goal-started", newGoalStarted);
   });
 
   it("routes planner actions through the planner target", () => {
@@ -242,6 +246,8 @@ describe("DraggableFAB", () => {
   });
 
   it("routes the plan-day option through the planner as the exact daily planning starter", () => {
+    const newGoalStarted = vi.fn();
+    window.addEventListener("companion-new-goal-started", newGoalStarted);
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
 
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
@@ -252,6 +258,8 @@ describe("DraggableFAB", () => {
       starterIntent: "plan_day",
       message: "Plan my day",
     }));
+    expect(newGoalStarted).not.toHaveBeenCalled();
+    window.removeEventListener("companion-new-goal-started", newGoalStarted);
   });
 
   it("routes the right-now option through the planner as an immediate next-action starter", () => {

@@ -453,6 +453,9 @@ describe("useCompanionAssistant", () => {
       }),
     );
 
+    const answeredListener = vi.fn();
+    window.addEventListener("companion-plan-my-day-ai-answered", answeredListener);
+
     await act(async () => {
       await result.current.submitMessage("Progress", "text");
     });
@@ -482,6 +485,8 @@ describe("useCompanionAssistant", () => {
         }),
       }),
     );
+    expect(answeredListener).toHaveBeenCalledTimes(1);
+    window.removeEventListener("companion-plan-my-day-ai-answered", answeredListener);
   });
 
   it("preserves saved and pending suggestion ids in legacy fallback mode", async () => {
@@ -967,6 +972,9 @@ describe("useCompanionAssistant", () => {
       expect(result.current.pendingAction?.id).toBe("action-1");
     });
 
+    const savedListener = vi.fn();
+    window.addEventListener("companion-plan-my-day-action-saved", savedListener);
+
     await act(async () => {
       await result.current.confirmPendingAction();
     });
@@ -998,6 +1006,8 @@ describe("useCompanionAssistant", () => {
         }),
       }),
     );
+    expect(savedListener).toHaveBeenCalledTimes(1);
+    window.removeEventListener("companion-plan-my-day-action-saved", savedListener);
   });
 
   it("tracks cancelled pending actions as rejected companion-agent decisions", async () => {

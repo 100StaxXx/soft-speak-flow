@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   surfaceHabitMock: vi.fn(),
   toggleTaskMock: vi.fn(),
   triggerRitualCompleteMock: vi.fn().mockResolvedValue(undefined),
+  drawerRootProps: [] as Array<Record<string, unknown>>,
 }));
 
 let applyCreatedHabit: ((title: string) => void) | null = null;
@@ -57,7 +58,13 @@ vi.mock("@/components/FrequencyPicker", () => ({
 }));
 
 vi.mock("@/components/ui/drawer", () => ({
-  Drawer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Drawer: ({
+    children,
+    ...props
+  }: { children: React.ReactNode } & Record<string, unknown>) => {
+    mocks.drawerRootProps.push(props);
+    return <div>{children}</div>;
+  },
   DrawerTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   DrawerContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   DrawerHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -67,6 +74,7 @@ vi.mock("@/components/ui/drawer", () => ({
 describe("EpicCheckInDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.drawerRootProps.length = 0;
     applyCreatedHabit = null;
   });
 
@@ -120,6 +128,14 @@ describe("EpicCheckInDrawer", () => {
       </QueryClientProvider>,
     );
   };
+
+  it("disables Vaul input repositioning for the ritual drawer", () => {
+    renderSubject();
+
+    expect(mocks.drawerRootProps[0]).toMatchObject({
+      repositionInputs: false,
+    });
+  });
 
   it("surfaces a newly added ritual as soon as the shared create mutation succeeds", async () => {
     mocks.createCampaignRitualMock.mockImplementation(async ({ title }: { title: string }) => {

@@ -155,6 +155,11 @@ const generateId = () => {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 };
 
+const emitPlanDayActionSavedEvent = () => {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("companion-plan-my-day-action-saved"));
+};
+
 const createInitialSessionState = (
   storedPreferences: StoredPlannerPreferences,
 ): CompanionPlannerSessionState => ({
@@ -2997,6 +3002,7 @@ export function useCompanionPlanner({
           ...optimizerTelemetry,
         },
       });
+      emitPlanDayActionSavedEvent();
     } catch (error) {
       console.error("Failed to confirm planner proposal:", error);
       toast.error("I couldn't save that change yet.");
@@ -3181,6 +3187,7 @@ export function useCompanionPlanner({
         ...optimizerTelemetry,
       },
     });
+    emitPlanDayActionSavedEvent();
   }, [
     enabled,
     persistPlannerThreadRows,

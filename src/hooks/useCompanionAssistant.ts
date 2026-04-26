@@ -149,6 +149,16 @@ const isJsonValue = (value: unknown): value is Json => {
   return false;
 };
 
+const emitPlanDayAiAnsweredEvent = () => {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("companion-plan-my-day-ai-answered"));
+};
+
+const emitPlanDayActionSavedEvent = () => {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("companion-plan-my-day-action-saved"));
+};
+
 const mapLoadedMessage = (
   message: Awaited<ReturnType<typeof loadCompanionChatThreadMessages>>[number],
 ): CompanionAssistantMessage => {
@@ -340,6 +350,16 @@ const inferStarterIntentFromStructuredResponse = (
   if (response?.comingUp) return "upcoming_start";
   return null;
 };
+
+const isPlanDayStarterMessage = (value: string): boolean =>
+  /\b(plan my day|help me plan(?: my day| today)|plan today)\b/i.test(value);
+
+const hasRecentPlanDayStarter = (messages: CompanionAssistantMessage[]) =>
+  messages
+    .slice(-6)
+    .some((message) =>
+      message.role === "user" && isPlanDayStarterMessage(message.content)
+    );
 
 const collectStructuredResponseSectionKeys = (
   response: CompanionAgentResponse["structuredResponse"],
@@ -1086,6 +1106,13 @@ export function useCompanionAssistant({
   ) => {
     const message = rawMessage.trim();
     if (!message || isSubmitting || isResolvingAction) return false;
+    const shouldEmitPlanDayAiAnswered =
+      !options?.starterIntent &&
+      Boolean(activeFollowUp) &&
+      (
+        lastStarterIntentRef.current === "plan_day" ||
+        hasRecentPlanDayStarter(messages)
+      );
 
     if (useLegacyFallback) {
       await legacyAssistant.submitMessage(message, inputMode, options);
@@ -1168,6 +1195,9 @@ export function useCompanionAssistant({
           proposalId: response.pendingAction?.proposalId ?? null,
         },
       });
+      if (shouldEmitPlanDayAiAnswered) {
+        emitPlanDayAiAnsweredEvent();
+      }
       void invalidateThreads();
       return true;
     } catch (error) {
@@ -1214,6 +1244,7 @@ export function useCompanionAssistant({
     isResolvingAction,
     isSubmitting,
     legacyAssistant,
+    messages,
     trackInteraction,
     pendingSuggestionProposalId,
     proposedActions,
@@ -1309,6 +1340,9 @@ export function useCompanionAssistant({
             starterIntent: lastStarterIntentRef.current,
           },
         });
+        if (mode === "confirm" && response.receipt?.status === "executed") {
+          emitPlanDayActionSavedEvent();
+        }
         void speakAssistantReply(
           response.reply,
           response.threadState.sessionId,

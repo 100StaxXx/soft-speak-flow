@@ -37,7 +37,15 @@ const TARGET_MISSING_FALLBACK_MS = 1400;
 const CLOSEOUT_AUTO_COMPLETE_MS = 2600;
 const PLAN_MY_DAY_SELECTOR = '[data-tour="companion-launcher-option-plan-day"]';
 const COMPANION_QUICK_ACTIONS_SELECTOR = '[data-planner-tour="companion-quick-actions"]';
+const PLAN_DAY_AI_FOLLOW_UP_OPTION_SELECTOR = '[data-tour="companion-plan-day-follow-up-option"]';
+const PLAN_DAY_AI_INPUT_SELECTOR = '[data-tour="companion-plan-day-chat-input"]';
+const PLAN_DAY_AI_SEND_SELECTOR = '[data-tour="companion-plan-day-chat-send"]';
+const PLAN_DAY_SUGGESTION_SAVE_SELECTOR = '[data-tour="companion-plan-day-suggestion-save"]';
+const PLAN_DAY_PENDING_CONFIRM_SELECTOR = '[data-tour="companion-plan-day-pending-confirm"]';
+const PLAN_DAY_PENDING_CONFIRM_ALL_SELECTOR = '[data-tour="companion-plan-day-pending-confirm-all"]';
 const CAMPAIGN_BUILDER_SELECTOR = '[data-tour="campaign-builder-launcher"]';
+const NEW_GOAL_SELECTOR = '[data-tour="companion-launcher-option-goal"]';
+const PATHFINDER_CAMPAIGN_BUILDER_SELECTOR = '[data-tour="pathfinder-campaign-builder"]';
 const EVOLVE_AUTOSCROLL_SELECTOR = '[data-tour="evolve-companion-button"]';
 const EVOLVE_AUTOSCROLL_VIEWPORT_MARGIN_PX = 72;
 
@@ -62,11 +70,11 @@ const GUIDED_STEPS: GuidedStep[] = [
   },
   {
     id: "create_campaign",
-    route: "/campaigns",
+    route: "/journeys",
   },
   {
     id: "first_plan_closeout",
-    route: "/campaigns",
+    route: "/journeys",
   },
 ];
 
@@ -116,7 +124,11 @@ const MILESTONE_ID_SET = new Set<GuidedMilestoneId>([
   "mentor_intro_hello",
   "meet_companion_intro",
   "start_plan_my_day",
+  "answer_plan_day_ai",
+  "save_plan_day_action",
   "open_campaign_builder",
+  "open_new_goal_from_fab",
+  "complete_campaign_creation",
   "first_plan_closeout_message",
   "stay_on_quests",
   "quests_campaigns_intro",
@@ -162,6 +174,22 @@ const getTargetSelectorsForMilestone = (milestoneId: GuidedMilestoneId): string[
       return [];
     case "start_plan_my_day":
       return [PLAN_MY_DAY_SELECTOR, COMPANION_QUICK_ACTIONS_SELECTOR];
+    case "answer_plan_day_ai":
+      return [
+        PLAN_DAY_AI_FOLLOW_UP_OPTION_SELECTOR,
+        PLAN_DAY_AI_INPUT_SELECTOR,
+        PLAN_DAY_AI_SEND_SELECTOR,
+      ];
+    case "save_plan_day_action":
+      return [
+        PLAN_DAY_PENDING_CONFIRM_SELECTOR,
+        PLAN_DAY_PENDING_CONFIRM_ALL_SELECTOR,
+        PLAN_DAY_SUGGESTION_SAVE_SELECTOR,
+      ];
+    case "open_new_goal_from_fab":
+      return [NEW_GOAL_SELECTOR, COMPANION_QUICK_ACTIONS_SELECTOR];
+    case "complete_campaign_creation":
+      return [PATHFINDER_CAMPAIGN_BUILDER_SELECTOR, NEW_GOAL_SELECTOR, COMPANION_QUICK_ACTIONS_SELECTOR];
     case "open_campaign_builder":
       return [CAMPAIGN_BUILDER_SELECTOR];
     case "quests_campaigns_intro":
@@ -417,7 +445,8 @@ const migrateGuidedTutorialProgress = ({
     rawMilestoneSet.has("post_evolution_companion_intro");
   const shouldMarkCreateCampaignComplete =
     rawCompletedSet.has("create_campaign") ||
-    rawMilestoneSet.has("open_campaign_builder");
+    rawMilestoneSet.has("open_campaign_builder") ||
+    rawMilestoneSet.has("complete_campaign_creation");
 
   if (isLegacyTutorialComplete) {
     GUIDED_STEPS.forEach((step) => migratedCompletedSet.add(step.id));
@@ -432,22 +461,41 @@ const migrateGuidedTutorialProgress = ({
     "mentor_intro_hello",
     "meet_companion_intro",
     "start_plan_my_day",
-    "open_campaign_builder",
+    "answer_plan_day_ai",
+    "save_plan_day_action",
+    "open_new_goal_from_fab",
+    "complete_campaign_creation",
     "first_plan_closeout_message",
   ]);
   const migratedMilestoneSet = new Set<GuidedMilestoneId>(
     milestonesCompleted.filter((milestoneId) => currentFlowMilestones.has(milestoneId)),
   );
+  if (migratedMilestoneSet.has("answer_plan_day_ai")) {
+    migratedMilestoneSet.add("start_plan_my_day");
+  }
+  if (migratedMilestoneSet.has("save_plan_day_action")) {
+    migratedMilestoneSet.add("start_plan_my_day");
+    migratedMilestoneSet.add("answer_plan_day_ai");
+  }
   if (migratedCompletedSet.has("meet_companion")) {
     migratedMilestoneSet.add("meet_companion_intro");
   }
+  if (migratedCompletedSet.has("plan_my_day")) {
+    migratedMilestoneSet.add("start_plan_my_day");
+    migratedMilestoneSet.add("answer_plan_day_ai");
+    migratedMilestoneSet.add("save_plan_day_action");
+  }
   if (migratedCompletedSet.has("create_campaign")) {
-    migratedMilestoneSet.add("open_campaign_builder");
+    migratedMilestoneSet.add("open_new_goal_from_fab");
+    migratedMilestoneSet.add("complete_campaign_creation");
   }
   if (isLegacyTutorialComplete) {
     migratedMilestoneSet.add("meet_companion_intro");
     migratedMilestoneSet.add("start_plan_my_day");
-    migratedMilestoneSet.add("open_campaign_builder");
+    migratedMilestoneSet.add("answer_plan_day_ai");
+    migratedMilestoneSet.add("save_plan_day_action");
+    migratedMilestoneSet.add("open_new_goal_from_fab");
+    migratedMilestoneSet.add("complete_campaign_creation");
     migratedMilestoneSet.add("first_plan_closeout_message");
   }
 
@@ -608,12 +656,12 @@ export const getMentorInstructionLines = (
   }
 
   if (currentStep === "create_campaign") {
-    return ["Tap Launch campaign builder."];
+    return ["Open the companion quick actions, choose New goal, then create your campaign."];
   }
 
   if (currentStep === "first_plan_closeout") {
     return [
-      "You're ready. Use Plan day for today, and the campaign builder when a goal needs a longer arc.",
+      "You're ready. Use Plan day for today, and New goal when a goal needs a longer arc.",
     ];
   }
 
@@ -674,15 +722,35 @@ const getMilestoneDialogue = (
         text: "Choose Plan day.",
         support: "This gives you the first real value: a focused, realistic plan for today.",
       };
+    case "answer_plan_day_ai":
+      return {
+        text: "Answer your companion so it can shape today.",
+        support: "Give Cosmiq one real signal, like Focus, Recovery, or Catch up.",
+      };
+    case "save_plan_day_action":
+      return {
+        text: "Save one suggested quest to make the plan real.",
+        support: "Pick a suggestion, then confirm it when Cosmiq asks.",
+      };
+    case "open_new_goal_from_fab":
+      return {
+        text: "Choose New goal.",
+        support: "Open your companion quick actions and choose New goal to start a longer arc.",
+      };
+    case "complete_campaign_creation":
+      return {
+        text: "Create Campaign.",
+        support: "Finish the campaign builder so your bigger goal becomes rituals, milestones, and a path you can keep returning to.",
+      };
     case "open_campaign_builder":
       return {
-        text: "Tap Launch campaign builder.",
-        support: "Campaigns turn bigger goals into rituals, milestones, and a path you can keep returning to.",
+        text: "Choose New goal.",
+        support: "Campaigns now start from your companion quick actions.",
       };
     case "first_plan_closeout_message":
       return {
         text: "That's the loop: plan today, shape the bigger goal, then take action.",
-        support: "Use Plan day for daily clarity. Use Campaigns when the work needs rituals and momentum over time.",
+        support: "Use Plan day for daily clarity. Use New goal when the work needs rituals and momentum over time.",
       };
     case "quests_campaigns_intro":
       return getQuestsCampaignsIntroDialogue();
@@ -766,6 +834,7 @@ export const milestoneUsesStrictLock = (milestoneId: GuidedMilestoneId | null): 
   if (!milestoneId) return false;
   if (milestoneId === "mentor_intro_hello") return false;
   if (milestoneId === "meet_companion_intro") return false;
+  if (milestoneId === "answer_plan_day_ai") return false;
   if (milestoneId === "first_plan_closeout_message") return false;
   if (milestoneId === "quests_campaigns_intro") return false;
   if (milestoneId === "confirm_companion_progress") return false;
@@ -1211,6 +1280,10 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     }
 
     if (currentStep.id === "plan_my_day") {
+      if (location.pathname !== "/journeys") return;
+      if (milestoneSet.has("save_plan_day_action")) {
+        markStepComplete("plan_my_day");
+      }
       return;
     }
 
@@ -1219,7 +1292,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     }
 
     if (currentStep.id === "first_plan_closeout") {
-      if (location.pathname !== "/campaigns") return;
+      if (location.pathname !== "/journeys") return;
 
       if (milestoneSet.has("first_plan_closeout_message")) {
         markStepComplete("first_plan_closeout");
@@ -1359,6 +1432,31 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
         handler: () => {
           if (location.pathname !== "/journeys") return;
           markMilestoneComplete("start_plan_my_day");
+        },
+      });
+
+      listeners.push({
+        eventName: "companion-plan-my-day-ai-answered",
+        handler: () => {
+          if (location.pathname !== "/journeys") return;
+          if (!milestoneSet.has("start_plan_my_day")) {
+            markMilestoneComplete("start_plan_my_day");
+          }
+          markMilestoneComplete("answer_plan_day_ai");
+        },
+      });
+
+      listeners.push({
+        eventName: "companion-plan-my-day-action-saved",
+        handler: () => {
+          if (location.pathname !== "/journeys") return;
+          if (!milestoneSet.has("start_plan_my_day")) {
+            markMilestoneComplete("start_plan_my_day");
+          }
+          if (!milestoneSet.has("answer_plan_day_ai")) {
+            markMilestoneComplete("answer_plan_day_ai");
+          }
+          markMilestoneComplete("save_plan_day_action");
           markStepComplete("plan_my_day");
         },
       });
@@ -1366,10 +1464,21 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
 
     if (currentStep.id === "create_campaign") {
       listeners.push({
-        eventName: "campaign-builder-opened",
+        eventName: "companion-new-goal-started",
         handler: () => {
-          if (location.pathname !== "/campaigns") return;
-          markMilestoneComplete("open_campaign_builder");
+          if (location.pathname !== "/journeys") return;
+          markMilestoneComplete("open_new_goal_from_fab");
+        },
+      });
+
+      listeners.push({
+        eventName: "campaign-created",
+        handler: () => {
+          if (location.pathname !== "/journeys") return;
+          if (!milestoneSet.has("open_new_goal_from_fab")) {
+            markMilestoneComplete("open_new_goal_from_fab");
+          }
+          markMilestoneComplete("complete_campaign_creation");
           markStepComplete("create_campaign");
         },
       });
@@ -1497,11 +1606,27 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     }
 
     if (currentStep.id === "plan_my_day") {
-      return "start_plan_my_day";
+      const hasStartedPlanDay =
+        milestoneSet.has("start_plan_my_day") ||
+        milestoneSet.has("answer_plan_day_ai") ||
+        milestoneSet.has("save_plan_day_action");
+      const hasAnsweredPlanDayAI =
+        milestoneSet.has("answer_plan_day_ai") ||
+        milestoneSet.has("save_plan_day_action");
+
+      if (!hasStartedPlanDay) {
+        return "start_plan_my_day";
+      }
+      if (!hasAnsweredPlanDayAI) {
+        return "answer_plan_day_ai";
+      }
+      return "save_plan_day_action";
     }
 
     if (currentStep.id === "create_campaign") {
-      return "open_campaign_builder";
+      return milestoneSet.has("open_new_goal_from_fab")
+        ? "complete_campaign_creation"
+        : "open_new_goal_from_fab";
     }
 
     if (currentStep.id === "first_plan_closeout") {

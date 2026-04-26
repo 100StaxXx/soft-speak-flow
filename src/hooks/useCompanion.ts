@@ -495,6 +495,7 @@ type CreateAiCompanionInput = {
   coreElement: string;
   storyTone: string;
   companionName?: string | null;
+  deferInitialImageGeneration?: boolean;
 };
 
 type CreatePresetCompanionInput = {
@@ -1021,27 +1022,37 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         let currentImageFocal = getBundledCompanionImageFocalPoint(currentImageUrl);
         let visualIdentityProfile: Record<string, unknown> | null = null;
         let imageLineageMetadata: Record<string, unknown> | null = null;
-
-        if (isAiCreation) {
-          const imageRequestFingerprint = JSON.stringify({
+        const shouldDeferInitialImageGeneration =
+          isAiCreation && data.deferInitialImageGeneration === true;
+        const aiImageRequest = isAiCreation
+          ? {
             spiritAnimal: resolvedSpiritAnimal,
             element: normalizedElement,
+            stage: 0,
             favoriteColor: resolvedFavoriteColor,
             storyTone: data.storyTone,
             flowType: "ai_onboarding_egg",
-          });
-          const imageRequestIdempotencyKey = getAiCompanionImageRequestKey(user.id, imageRequestFingerprint);
-          const { data: generatedImageData, error: generatedImageError } =
-            await supabase.functions.invoke("generate-companion-image", {
-              body: {
+            idempotencyKey: getAiCompanionImageRequestKey(
+              user.id,
+              JSON.stringify({
                 spiritAnimal: resolvedSpiritAnimal,
                 element: normalizedElement,
-                stage: 0,
                 favoriteColor: resolvedFavoriteColor,
                 storyTone: data.storyTone,
                 flowType: "ai_onboarding_egg",
-                idempotencyKey: imageRequestIdempotencyKey,
-              },
+              }),
+            ),
+          }
+          : null;
+
+        const generateAiCompanionEggImage = async (): Promise<GeneratedCompanionImageResponse> => {
+          if (!aiImageRequest) {
+            throw new Error("AI companion image request was not prepared.");
+          }
+
+          const { data: generatedImageData, error: generatedImageError } =
+            await supabase.functions.invoke("generate-companion-image", {
+              body: aiImageRequest,
             });
 
           if (generatedImageError) {
@@ -1054,13 +1065,20 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
             throw new Error("AI companion image generation did not return an egg portrait.");
           }
 
-          currentImageUrl = generatedImage.imageUrl;
+          return generatedImage;
+        };
+
+        const applyGeneratedAiImageLocally = (generatedImage: GeneratedCompanionImageResponse) => {
+          currentImageUrl = generatedImage.imageUrl!;
           currentImageFocal = {
             x: typeof generatedImage.imageFocalX === "number" ? generatedImage.imageFocalX : 0.5,
             y: typeof generatedImage.imageFocalY === "number" ? generatedImage.imageFocalY : 0.5,
           };
           visualIdentityProfile = generatedImage.visualIdentityProfile ?? null;
           imageLineageMetadata = generatedImage.imageLineageMetadata ?? null;
+        };
+
+        const logGeneratedAiImageWarnings = (generatedImage: GeneratedCompanionImageResponse) => {
           if (generatedImage.qualityWarning || generatedImage.judgeUnavailable) {
             logger.warn("AI companion image returned with quality warning", {
               userId: user.id,
@@ -1079,6 +1097,20 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
               requestedImageSize: generatedImage.requestedImageSize,
               imageSize: generatedImage.imageSize,
             });
+          }
+        };
+
+        if (isAiCreation) {
+          if (shouldDeferInitialImageGeneration) {
+            logger.info("Deferring AI companion egg image generation until after companion record creation", {
+              userId: user.id,
+              coreElement: normalizedElement,
+              spiritAnimal: resolvedSpiritAnimal,
+            });
+          } else {
+            const generatedImage = await generateAiCompanionEggImage();
+            applyGeneratedAiImageLocally(generatedImage);
+            logGeneratedAiImageWarnings(generatedImage);
           }
         }
 
@@ -1271,6 +1303,59 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
 
         if (Object.prototype.hasOwnProperty.call(data, "companionName")) {
           await persistCompanionCustomName(companionData.id, data.companionName);
+        }
+
+        if (shouldDeferInitialImageGeneration && aiImageRequest && companionData.current_stage === 0) {
+          void (async () => {
+            try {
+              const generatedImage = await generateAiCompanionEggImage();
+              logGeneratedAiImageWarnings(generatedImage);
+
+              const applyDeferredImage = supabase.rpc as unknown as (
+                functionName: "apply_deferred_companion_onboarding_image",
+                args: {
+                  p_companion_id: string;
+                  p_image_url: string;
+                  p_image_focal_x: number | null;
+                  p_image_focal_y: number | null;
+                  p_visual_identity_profile: Record<string, unknown> | null;
+                  p_image_lineage_metadata: Record<string, unknown> | null;
+                },
+              ) => Promise<{ error: SupabaseRpcError | null }>;
+
+              const { error: applyError } = await applyDeferredImage(
+                "apply_deferred_companion_onboarding_image",
+                {
+                  p_companion_id: companionData.id,
+                  p_image_url: generatedImage.imageUrl!,
+                  p_image_focal_x: typeof generatedImage.imageFocalX === "number" ? generatedImage.imageFocalX : 0.5,
+                  p_image_focal_y: typeof generatedImage.imageFocalY === "number" ? generatedImage.imageFocalY : 0.5,
+                  p_visual_identity_profile: generatedImage.visualIdentityProfile ?? null,
+                  p_image_lineage_metadata: generatedImage.imageLineageMetadata ?? null,
+                },
+              );
+
+              if (applyError) {
+                throw new Error(applyError.message?.trim() || "Failed to apply deferred companion image.");
+              }
+
+              clearAiCompanionImageRequestKey(user.id);
+              queryClient.invalidateQueries({ queryKey: ["companion"] });
+              logger.info("Deferred AI companion egg image applied", {
+                userId: user.id,
+                companionId: companionData.id,
+                durationMs: Date.now() - creationStartedAt,
+              });
+            } catch (deferredImageError) {
+              logger.warn("Deferred AI companion egg image generation failed", {
+                userId: user.id,
+                companionId: companionData.id,
+                error: deferredImageError instanceof Error
+                  ? deferredImageError.message
+                  : String(deferredImageError),
+              });
+            }
+          })();
         }
 
         logger.info("Companion creation completed", {

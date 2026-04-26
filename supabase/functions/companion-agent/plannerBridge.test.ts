@@ -203,6 +203,53 @@ Deno.test("consultPlannerForAgent treats a reply after plan-day clarification as
   assertEquals(result.actionHints[0]?.normalizedPayload?.title, "Work On My App");
 });
 
+Deno.test("consultPlannerForAgent drafts clean room after plan-day clarification on a blank account", () => {
+  const result = consultPlannerForAgent({
+    message: "clean room",
+    currentDateTime: "2026-04-18T08:00:00-07:00",
+    surface: "journeys",
+    horizon: "day",
+    context: buildContext({
+      messages: [
+        {
+          id: "msg-1",
+          role: "user",
+          content: "Plan my day",
+          created_at: "2026-04-18T15:00:00.000Z",
+          input_mode: "text",
+          source: "agent",
+          surface: "journeys",
+          session_id: "session-1",
+        },
+        {
+          id: "msg-2",
+          role: "assistant",
+          content:
+            "What kind of day are we making: focused, light, catch-up, or something else?",
+          created_at: "2026-04-18T15:00:01.000Z",
+          input_mode: null,
+          source: "agent",
+          surface: "journeys",
+          session_id: "session-1",
+        },
+      ],
+    }),
+  });
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.questions.length, 0);
+  assertEquals(result.actionHints[0]?.actionType, "task_create");
+  assertEquals(result.actionHints[0]?.normalizedPayload?.title, "Clean Room");
+  assertEquals(
+    result.actionHints[0]?.normalizedPayload?.task_date,
+    "2026-04-18",
+  );
+  assertEquals(
+    result.actionHints[0]?.normalizedPayload?.estimated_duration,
+    30,
+  );
+});
+
 Deno.test("consultPlannerForAgent converts at-risk campaign adjustments into campaign action hints", () => {
   const result = consultPlannerForAgent({
     message: "Advance my campaign",

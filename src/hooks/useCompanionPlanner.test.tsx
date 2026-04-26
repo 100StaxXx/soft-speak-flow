@@ -576,6 +576,9 @@ describe("useCompanionPlanner", () => {
       });
     });
 
+    const savedListener = vi.fn();
+    window.addEventListener("companion-plan-my-day-action-saved", savedListener);
+
     await act(async () => {
       await result.current.confirmProposal("proposal-plan-1");
     });
@@ -588,6 +591,8 @@ describe("useCompanionPlanner", () => {
         estimatedDuration: 45,
       }),
     );
+    expect(savedListener).toHaveBeenCalledTimes(1);
+    window.removeEventListener("companion-plan-my-day-action-saved", savedListener);
   });
 
   it("replays persisted proposal decisions so saved suggestions stay marked after reload", async () => {
@@ -2717,6 +2722,9 @@ describe("useCompanionPlanner", () => {
       await result.current.submitMessage("Make me a workout quest", "text");
     });
 
+    const savedListener = vi.fn();
+    window.addEventListener("companion-plan-my-day-action-saved", savedListener);
+
     await act(async () => {
       await result.current.completeProposalEdit("proposal-1", {
         savedTitle: "Workout moved to tomorrow",
@@ -2746,5 +2754,7 @@ describe("useCompanionPlanner", () => {
         }),
       }),
     );
+    expect(savedListener).toHaveBeenCalledTimes(1);
+    window.removeEventListener("companion-plan-my-day-action-saved", savedListener);
   });
 });
