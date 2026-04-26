@@ -1706,6 +1706,16 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     });
   }, [ritualTasks, activeEpicsById]);
 
+  const campaignRitualEpicIds = useMemo(
+    () => new Set(campaignRitualGroups.map((group) => group.epicId)),
+    [campaignRitualGroups],
+  );
+
+  const activeEpicsWithoutRitualGroup = useMemo(
+    () => activeEpics.filter((epic) => !campaignRitualEpicIds.has(epic.id)),
+    [activeEpics, campaignRitualEpicIds],
+  );
+
   const toggleCampaignExpanded = useCallback((epicId: string) => {
     setExpandedCampaigns(prev => {
       const next = new Set(prev);
@@ -1750,9 +1760,26 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                         end_date: resolvedEndDate,
                         epic_habits: group.epic.epic_habits,
                       }}>
-                        <button className="flex items-center gap-2 min-w-0 flex-1 text-left focus:outline-none">
-                          <Target className="w-4 h-4 text-primary shrink-0" />
-                          <span className="text-sm font-medium truncate">{group.title}</span>
+                        <button
+                          type="button"
+                          aria-label={`Open campaign ${group.title}`}
+                          className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                        >
+                          <span className="flex min-w-0 items-center gap-2">
+                            <Target className="w-4 h-4 text-primary shrink-0" />
+                            <span className="text-sm font-medium truncate">{group.title}</span>
+                          </span>
+                          <span className="flex items-center gap-2 shrink-0">
+                            {group.progress !== null && (
+                              <span className="text-primary font-bold text-xs">{group.progress}%</span>
+                            )}
+                            {group.daysLeft !== null && (
+                              <span className="text-muted-foreground text-xs">{group.daysLeft}d</span>
+                            )}
+                            <Badge variant="secondary" className="text-xs h-5 px-1.5">
+                              {group.completedCount}/{group.rituals.length}
+                            </Badge>
+                          </span>
                         </button>
                       </JourneyPathDrawer>
                     ) : (
@@ -1762,16 +1789,14 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       </div>
                     )}
                     <div className="flex items-center gap-2 shrink-0">
-                      {group.progress !== null && (
-                        <span className="text-primary font-bold text-xs">{group.progress}%</span>
+                      {(!group.epic || !group.isHydrated) && (
+                        <Badge variant="secondary" className="text-xs h-5 px-1.5">
+                          {group.completedCount}/{group.rituals.length}
+                        </Badge>
                       )}
-                      {group.daysLeft !== null && (
-                        <span className="text-muted-foreground text-xs">{group.daysLeft}d</span>
-                      )}
-                      <Badge variant="secondary" className="text-xs h-5 px-1.5">
-                        {group.completedCount}/{group.rituals.length}
-                      </Badge>
                       <button
+                        type="button"
+                        aria-label={`${isCampaignExpanded ? "Collapse" : "Expand"} ${group.title} rituals`}
                         onClick={(e) => {
                           e.stopPropagation();
                           toggleCampaignExpanded(group.epicId);
@@ -1818,6 +1843,45 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         </div>
       )}
 
+      {activeEpicsWithoutRitualGroup.length > 0 && campaignRitualGroups.length > 0 && (
+        <div className={cn(inDesktopRail ? "mt-3 space-y-2" : "mt-3 space-y-2")}>
+          {activeEpicsWithoutRitualGroup.map((epic) => {
+            const progress = Math.round(epic.progress_percentage ?? 0);
+            const daysLeft = getDaysLeft(epic);
+            const resolvedEndDate = resolveEpicEndDate(epic);
+            return (
+              <JourneyPathDrawer key={epic.id} epic={{
+                id: epic.id,
+                title: epic.title,
+                description: epic.description ?? undefined,
+                progress_percentage: epic.progress_percentage ?? 0,
+                target_days: epic.target_days,
+                start_date: epic.start_date,
+                end_date: resolvedEndDate,
+                epic_habits: epic.epic_habits,
+              }}>
+                <button
+                  type="button"
+                  aria-label={`Open campaign ${epic.title}`}
+                  className="flex w-full items-center justify-between gap-2 rounded-xl border border-border/30 bg-card/30 px-3 py-2 text-left hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <Target className="w-4 h-4 text-primary shrink-0" />
+                    <span className="text-sm font-medium truncate max-w-[140px]">{epic.title}</span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span className="text-primary font-bold text-xs">{progress}%</span>
+                    {daysLeft !== null && (
+                      <span className="text-muted-foreground text-xs">{daysLeft}d</span>
+                    )}
+                  </span>
+                </button>
+              </JourneyPathDrawer>
+            );
+          })}
+        </div>
+      )}
+
       {isCampaignsLoading && campaignRitualGroups.length === 0 && (
         <div className={cn(inDesktopRail ? "rounded-[24px] border border-white/8 bg-white/[0.03] p-4" : "mt-4 pt-3 border-t border-border/20")}>
           <p className="text-xs text-muted-foreground">Loading campaigns...</p>
@@ -1842,14 +1906,20 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 end_date: resolvedEndDate,
                 epic_habits: epic.epic_habits,
               }}>
-                <button className="w-full text-left focus:outline-none">
-                  <div className="flex items-center justify-between py-2 px-3 rounded-xl hover:bg-muted/30 border border-border/30 bg-card/30">
-                    <div className="flex items-center gap-2 min-w-0">
+                <button
+                  type="button"
+                  aria-label={`Open campaign ${epic.title}`}
+                  className="w-full rounded-xl border border-border/30 bg-card/30 px-3 py-2 text-left hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
                       <Target className="w-4 h-4 text-primary shrink-0" />
                       <span className="text-sm font-medium truncate max-w-[140px]">{epic.title}</span>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
                       <span className="text-primary font-bold text-xs shrink-0">{progress}%</span>
                       {daysLeft !== null && (
-                        <span className="text-muted-foreground text-xs shrink-0">· {daysLeft}d</span>
+                        <span className="text-muted-foreground text-xs shrink-0">{daysLeft}d</span>
                       )}
                     </div>
                   </div>

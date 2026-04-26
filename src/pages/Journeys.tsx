@@ -577,7 +577,7 @@ const Journeys = () => {
   // Epics for plan my day questions and campaign strip
   const { epics, isLoading: epicsLoading, createEpic, isCreating: isCreatingCampaign } = useEpics({ enabled: isTabActive });
   const activeEpics = useMemo(() =>
-    epics?.filter(e => e.status === 'active').slice(0, 5) || [],
+    epics?.filter(e => e.status === 'active') || [],
     [epics]
   );
   

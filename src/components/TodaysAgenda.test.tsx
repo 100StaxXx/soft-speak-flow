@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { cloneElement, isValidElement, type MouseEvent, type ReactElement, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -112,6 +112,7 @@ const mocks = vi.hoisted(() => {
     dragEdgeMotionValue,
     timelineDragState,
     loadLocalHabitsMock: vi.fn(),
+    journeyPathDrawerOpenMock: vi.fn(),
   };
 });
 
@@ -190,7 +191,26 @@ vi.mock("@/components/calendar/DragTimeZoomRail", () => ({
 }));
 
 vi.mock("@/components/JourneyPathDrawer", () => ({
-  JourneyPathDrawer: ({ children }: { children: ReactNode }) => <>{children}</>,
+  JourneyPathDrawer: ({
+    children,
+    epic,
+  }: {
+    children: ReactNode;
+    epic: { id: string };
+  }) => {
+    if (!isValidElement(children)) return <>{children}</>;
+
+    const child = children as ReactElement<{
+      onClick?: (event: MouseEvent<HTMLElement>) => void;
+    }>;
+
+    return cloneElement(child, {
+      onClick: (event: MouseEvent<HTMLElement>) => {
+        child.props.onClick?.(event);
+        mocks.journeyPathDrawerOpenMock(epic.id);
+      },
+    });
+  },
 }));
 
 vi.mock("@/components/TimelineTaskRow", () => ({
@@ -369,6 +389,7 @@ beforeEach(() => {
   document.documentElement.style.removeProperty("--bottom-nav-safe-offset");
   mocks.loadLocalHabitsMock.mockReset();
   mocks.loadLocalHabitsMock.mockResolvedValue([]);
+  mocks.journeyPathDrawerOpenMock.mockClear();
 });
 
 describe("TodaysAgenda subtasks", () => {
@@ -748,7 +769,124 @@ describe("TodaysAgenda campaign visibility", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(screen.getByRole("button", { name: /Fallback Campaign/i })).toBeInTheDocument();
+    const campaignButton = screen.getByRole("button", {
+      name: "Open campaign Fallback Campaign",
+    });
+
+    fireEvent.click(campaignButton);
+
+    expect(mocks.journeyPathDrawerOpenMock).toHaveBeenCalledWith("epic-1");
+  });
+
+  it("keeps the ritual chevron separate from the campaign drawer trigger", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "ritual-1",
+            task_text: "Morning journal",
+            completed: false,
+            xp_reward: 15,
+            habit_source_id: "habit-1",
+            epic_id: "epic-1",
+            epic_title: "Fallback Campaign",
+          },
+        ]}
+        selectedDate={new Date("2026-02-14T16:34:00")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+        activeEpics={[
+          {
+            id: "epic-1",
+            title: "Fallback Campaign",
+            description: null,
+            progress_percentage: 42,
+            target_days: 30,
+            start_date: "2026-02-01",
+            end_date: "2026-03-02",
+            epic_habits: [],
+          },
+        ]}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    fireEvent.click(screen.getByRole("button", {
+      name: "Expand Fallback Campaign rituals",
+    }));
+
+    expect(await screen.findByText("Morning journal")).toBeInTheDocument();
+    expect(mocks.journeyPathDrawerOpenMock).not.toHaveBeenCalled();
+  });
+
+  it("renders active campaigns without ritual groups when another campaign has rituals", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "ritual-1",
+            task_text: "Mobility",
+            completed: false,
+            xp_reward: 15,
+            habit_source_id: "habit-1",
+            epic_id: "epic-1",
+            epic_title: "Get fit",
+          },
+        ]}
+        selectedDate={new Date("2026-02-14T16:34:00")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+        activeEpics={[
+          {
+            id: "epic-1",
+            title: "Get fit",
+            description: null,
+            progress_percentage: 42,
+            target_days: 30,
+            start_date: "2026-02-01",
+            end_date: "2026-03-02",
+            epic_habits: [],
+          },
+          {
+            id: "epic-2",
+            title: "Drop 10 of my golf score",
+            description: null,
+            progress_percentage: 5,
+            target_days: 60,
+            start_date: "2026-02-01",
+            end_date: "2026-04-01",
+            epic_habits: [],
+          },
+        ]}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const campaignButton = screen.getByRole("button", {
+      name: "Open campaign Drop 10 of my golf score",
+    });
+
+    fireEvent.click(campaignButton);
+
+    expect(mocks.journeyPathDrawerOpenMock).toHaveBeenCalledWith("epic-2");
   });
 
   it("shows linked habit descriptions inside expanded campaign ritual rows", async () => {

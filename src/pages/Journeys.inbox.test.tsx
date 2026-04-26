@@ -71,6 +71,8 @@ const mocks = vi.hoisted(() => ({
   closeInteractionModal: vi.fn(),
   surfaceAllEpicHabits: vi.fn(),
   spawnRecurringTasks: vi.fn(),
+  queueAction: vi.fn().mockResolvedValue(undefined),
+  retryNow: vi.fn().mockResolvedValue(undefined),
   scrollIntoView: vi.fn(),
   activeEpics: [] as Array<{
     id: string;
@@ -307,6 +309,14 @@ vi.mock("@/hooks/useProfile", () => ({
       onboarding_data: {},
     },
     loading: false,
+  }),
+}));
+
+vi.mock("@/contexts/ResilienceContext", () => ({
+  useResilience: () => ({
+    queueAction: mocks.queueAction,
+    shouldQueueWrites: false,
+    retryNow: mocks.retryNow,
   }),
 }));
 
@@ -687,6 +697,29 @@ describe("Journeys inbox integration", () => {
     expect(screen.getByText("Nutrition Tracking (ritual)")).toBeInTheDocument();
     expect(screen.getByText("Summer Gains")).toBeInTheDocument();
     expect(screen.getByText("Get Money")).toBeInTheDocument();
+  });
+
+  it("passes every active campaign through to the agenda", async () => {
+    mocks.activeEpics = Array.from({ length: 6 }, (_, index) => ({
+      id: `epic-${index + 1}`,
+      title: `Campaign ${index + 1}`,
+      status: "active",
+      progress_percentage: 0,
+      target_days: 30,
+      start_date: "2026-03-03",
+      end_date: "2026-04-02",
+      epic_habits: [],
+    }));
+
+    renderJourneys();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("agenda-campaign-list")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Campaign 1")).toBeInTheDocument();
+    expect(screen.getByText("Campaign 5")).toBeInTheDocument();
+    expect(screen.getByText("Campaign 6")).toBeInTheDocument();
   });
 
   it("defaults desktop quests to week mode and preserves the selected date when switching back to day", async () => {
