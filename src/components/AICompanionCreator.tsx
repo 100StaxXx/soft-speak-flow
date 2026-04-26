@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   COMPANION_ELEMENTS,
+  COMPANION_ONBOARDING_SILHOUETTE_SOURCES,
+  COMPANION_PRESETS,
   COMPANION_STORY_TONES,
   type CompanionElementId,
   type CompanionStoryTone,
@@ -24,21 +26,6 @@ const FAVORITE_COLORS = [
   { label: "Moon Silver", value: "#d6dee8", gradient: "from-slate-200 via-zinc-200 to-slate-400" },
   { label: "Crimson Flare", value: "#ef4444", gradient: "from-red-400 via-red-500 to-orange-500" },
   { label: "Ocean Teal", value: "#14b8a6", gradient: "from-teal-300 via-teal-400 to-cyan-500" },
-] as const;
-
-const SPIRIT_ANIMALS = [
-  { name: "Dragon", glyph: "Dr" },
-  { name: "Wolf", glyph: "Wo" },
-  { name: "Fox", glyph: "Fx" },
-  { name: "Owl", glyph: "Ow" },
-  { name: "Lion", glyph: "Li" },
-  { name: "Phoenix", glyph: "Ph" },
-  { name: "Bear", glyph: "Be" },
-  { name: "Deer", glyph: "De" },
-  { name: "Raven", glyph: "Ra" },
-  { name: "Tanuki", glyph: "Ta" },
-  { name: "Pegasus", glyph: "Pe" },
-  { name: "Griffin", glyph: "Gr" },
 ] as const;
 
 const COLOR_ELEMENT_DEFAULTS: Record<string, CompanionElementId> = {
@@ -78,8 +65,15 @@ interface AICompanionCreatorProps {
 const isKnownFavoriteColor = (value: string | null | undefined): value is string =>
   Boolean(value && FAVORITE_COLORS.some((color) => color.value === value));
 
-const isKnownSpiritAnimal = (value: string | null | undefined): value is string =>
-  Boolean(value && SPIRIT_ANIMALS.some((animal) => animal.name === value));
+const getKnownSpiritAnimalDisplayName = (value: string | null | undefined): string | null => {
+  const normalizedValue = value?.trim().toLowerCase();
+  if (!normalizedValue) return null;
+
+  return COMPANION_PRESETS.find((preset) =>
+    preset.displayName.toLowerCase() === normalizedValue
+    || preset.id.toLowerCase() === normalizedValue
+  )?.displayName ?? null;
+};
 
 export const AICompanionCreator = ({
   onComplete,
@@ -100,7 +94,7 @@ export const AICompanionCreator = ({
     isKnownFavoriteColor(initialFavoriteColor) ? initialFavoriteColor : FAVORITE_COLORS[0].value,
   );
   const [spiritAnimal, setSpiritAnimal] = useState<string>(
-    isKnownSpiritAnimal(initialSpiritAnimal) ? initialSpiritAnimal : SPIRIT_ANIMALS[0].name,
+    getKnownSpiritAnimalDisplayName(initialSpiritAnimal) ?? COMPANION_PRESETS[0].displayName,
   );
   const [selectedStoryTone, setSelectedStoryTone] = useState<CompanionStoryTone>(storyTone);
   const [customCompanionName, setCustomCompanionName] = useState(initialCompanionName ?? "");
@@ -191,35 +185,70 @@ export const AICompanionCreator = ({
 
               <section className="space-y-3">
                 <div className="space-y-1">
-                  <Label htmlFor="spirit-animal-select" className="text-lg font-semibold text-white">
+                  <Label id="species-picker-label" className="text-lg font-semibold text-white">
                     Species
                   </Label>
                   <p className="text-sm text-white/60">
                     Choose the creature family your egg will grow toward.
                   </p>
                 </div>
-                <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
-                  <select
-                    id="spirit-animal-select"
-                    value={spiritAnimal}
-                    onChange={(event) => setSpiritAnimal(event.target.value)}
-                    className="h-12 w-full rounded-2xl border border-white/10 bg-black/35 px-4 text-sm font-semibold text-white outline-none transition-colors focus:border-white/35"
-                  >
-                    {SPIRIT_ANIMALS.map((animal) => (
-                      <option key={animal.name} value={animal.name}>
-                        {animal.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
-                    <div className="text-xs uppercase tracking-[0.22em] text-white/45">
-                      Selected Species
-                    </div>
-                    <div className="mt-2 text-lg font-semibold text-white">{spiritAnimal}</div>
-                    <p className="mt-1 text-xs leading-5 text-white/55">
-                      AI lineage locked to {spiritAnimal.toLowerCase()} family anatomy.
-                    </p>
-                  </div>
+                <div
+                  role="group"
+                  aria-labelledby="species-picker-label"
+                  className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
+                >
+                  {COMPANION_PRESETS.map((preset) => {
+                    const isSelected = preset.displayName === spiritAnimal;
+                    const silhouetteSrc = COMPANION_ONBOARDING_SILHOUETTE_SOURCES[preset.id];
+
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => setSpiritAnimal(preset.displayName)}
+                        aria-label={`Select ${preset.displayName} species`}
+                        aria-pressed={isSelected}
+                        className={cn(
+                          "rounded-[24px] border p-3 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60",
+                          isSelected
+                            ? "border-emerald-300/45 bg-emerald-300/14 text-white shadow-[0_20px_40px_rgba(52,211,153,0.14)]"
+                            : "border-white/10 bg-white/5 text-white/86 hover:border-white/20 hover:bg-white/8",
+                        )}
+                        data-selected={isSelected ? "true" : "false"}
+                      >
+                        <div className="aspect-square rounded-[20px] border border-white/8 bg-black/25 p-3">
+                          {silhouetteSrc ? (
+                            <img
+                              src={silhouetteSrc}
+                              alt=""
+                              aria-hidden="true"
+                              data-testid={`species-silhouette-${preset.id}`}
+                              className="h-full w-full object-contain"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-2xl font-semibold text-white/45">
+                              {preset.displayName.slice(0, 2)}
+                            </div>
+                          )}
+                        </div>
+                        <div className="mt-3 flex items-start justify-between gap-2">
+                          <div>
+                            <div className="text-sm font-semibold text-white">{preset.displayName}</div>
+                            <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-white/45">
+                              {preset.role}
+                            </p>
+                          </div>
+                          {isSelected ? (
+                            <span className="rounded-full border border-white/15 bg-white/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/85">
+                              Selected
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-2 text-xs leading-5 text-white/60">{preset.revealCopy}</p>
+                      </button>
+                    );
+                  })}
                 </div>
               </section>
             </div>
@@ -265,7 +294,7 @@ export const AICompanionCreator = ({
                       Companion Name
                     </Label>
                     <p className="text-sm text-white/60">
-                      Optional. This name will appear immediately while the egg is still sealed.
+                      Optional. If you do not choose a companion name, one will be granted to your companion.
                     </p>
                   </div>
                   <Input
@@ -280,40 +309,9 @@ export const AICompanionCreator = ({
                     <span>
                       {normalizedCustomName
                         ? `${normalizedCustomName} will be shown from the beginning.`
-                        : "Leave blank to keep the generated name later."}
+                        : "Leave blank for a granted companion name."}
                     </span>
                     <span>{customCompanionName.length}/{COMPANION_CUSTOM_NAME_MAX_LENGTH}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-[28px] border border-white/10 bg-black/20 p-5">
-                <div className="space-y-3">
-                  <p className="text-xs uppercase tracking-[0.22em] text-white/48">Egg Preview</p>
-                  <div
-                    className={cn(
-                      "rounded-[26px] border border-white/10 p-5",
-                      "bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.10),rgba(255,255,255,0.03)_48%,rgba(0,0,0,0.18)_100%)]",
-                    )}
-                  >
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <div className="text-xl font-semibold text-white">{normalizedCustomName ?? `${selectedElement.label} Egg`}</div>
-                          <div className="mt-1 text-xs uppercase tracking-[0.2em] text-white/48">Stage 0 • AI-generated egg</div>
-                        </div>
-                        <div
-                          className="h-4 w-4 rounded-full shadow-[0_0_18px_currentColor]"
-                          style={{ backgroundColor: favoriteColor, color: favoriteColor }}
-                        />
-                      </div>
-                      <p className="text-sm leading-6 text-white/72">
-                        A {spiritAnimal.toLowerCase()} lineage shaped by {selectedColorMeta.label.toLowerCase()} and {selectedElement.label.toLowerCase()} energy.
-                      </p>
-                      <p className="text-xs leading-5 text-white/52">
-                        The shell will hint at this family now, then reveal the first true creature form when it reaches Level 1.
-                      </p>
-                    </div>
                   </div>
                 </div>
               </div>

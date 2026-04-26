@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AICompanionCreator } from "./AICompanionCreator";
 
 describe("AICompanionCreator", () => {
-  it("uses dropdowns for the onboarding color and species choices", () => {
+  it("uses a color dropdown and silhouette cards for the onboarding species choices", () => {
     const onComplete = vi.fn();
 
     render(
@@ -15,13 +15,22 @@ describe("AICompanionCreator", () => {
     );
 
     const colorSelect = screen.getByLabelText("Favorite Color");
-    const speciesSelect = screen.getByLabelText("Species");
 
     expect(colorSelect.tagName).toBe("SELECT");
-    expect(speciesSelect.tagName).toBe("SELECT");
+    expect(screen.getByRole("group", { name: "Species" })).toBeInTheDocument();
+    expect(screen.getByTestId("species-silhouette-dragon")).toHaveAttribute(
+      "src",
+      "/onboarding/locked-species-silhouettes/dragon.png",
+    );
+    expect(screen.getByRole("button", { name: "Select Dragon species" })).toHaveAttribute("data-selected", "true");
+    expect(screen.queryByText("Egg Preview")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Optional. If you do not choose a companion name, one will be granted to your companion."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Leave blank for a granted companion name.")).toBeInTheDocument();
 
     fireEvent.change(colorSelect, { target: { value: "#9b6bff" } });
-    fireEvent.change(speciesSelect, { target: { value: "Owl" } });
+    fireEvent.click(screen.getByRole("button", { name: "Select Owl species" }));
     fireEvent.click(screen.getByRole("button", { name: "Create AI Egg" }));
 
     expect(onComplete).toHaveBeenCalledWith({
