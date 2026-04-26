@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { format } from "date-fns";
 import { describe, expect, it, vi } from "vitest";
@@ -18,6 +19,12 @@ vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
     element: "fire",
     usesPortraitShell: false,
   }),
+}));
+
+vi.mock("@/components/JourneyPathDrawer", () => ({
+  JourneyPathDrawer: ({ children }: { children: ReactNode }) => (
+    <div data-testid="mock-journey-path-drawer">{children}</div>
+  ),
 }));
 
 const selectedDate = new Date(2026, 2, 31, 12, 0, 0, 0);
@@ -250,6 +257,57 @@ describe("DesktopWeekPlanner", () => {
     expect(screen.queryByText("Anytime")).not.toBeInTheDocument();
     expect(screen.queryByTestId("desktop-week-anytime-2026-03-31")).not.toBeInTheDocument();
     expect(screen.queryByText("Loose planning")).not.toBeInTheDocument();
+  });
+
+  it("renders weekly campaign summaries as accessible drawer trigger buttons", () => {
+    render(
+      <DesktopWeekPlanner
+        selectedDate={selectedDate}
+        tasks={[
+          baseTask({
+            id: "ritual-complete",
+            task_text: "Morning lift",
+            completed: true,
+            habit_source_id: "habit-lift",
+            epic_id: "epic-summer",
+          }),
+          baseTask({
+            id: "ritual-open",
+            task_text: "Protein prep",
+            completed: false,
+            habit_source_id: "habit-protein",
+            epic_id: "epic-summer",
+            scheduled_time: null,
+          }),
+        ]}
+        activeEpics={[
+          {
+            id: "epic-summer",
+            title: "Summer Gains",
+            description: "Build consistent strength.",
+            progress_percentage: 25,
+            target_days: 60,
+            start_date: "2026-03-01",
+            end_date: "2026-04-30",
+            epic_habits: [],
+          },
+        ]}
+        onDateSelect={vi.fn()}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+      />,
+    );
+
+    const campaignButton = screen.getByRole("button", { name: "Open Summer Gains campaign" });
+
+    expect(campaignButton).toBeInTheDocument();
+    expect(campaignButton).toHaveAttribute("type", "button");
+    expect(screen.getByTestId("mock-journey-path-drawer")).toContainElement(campaignButton);
+    expect(within(campaignButton).getByText("Summer Gains")).toBeInTheDocument();
+    expect(within(campaignButton).getByText("1/2 rituals completed this week")).toBeInTheDocument();
+    expect(within(campaignButton).getByText("25%")).toBeInTheDocument();
+
+    fireEvent.click(campaignButton);
   });
 
   it("keeps checkbox, popover details, double-click edit, and day selection wired correctly", async () => {

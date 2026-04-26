@@ -25,6 +25,7 @@ import {
   DesktopQuestDetailsPopover,
   useDesktopQuestCardClickHandlers,
 } from "@/components/DesktopQuestDetailsPopover";
+import { JourneyPathDrawer } from "@/components/JourneyPathDrawer";
 import { getEpicDaysRemaining } from "@/utils/epicDates";
 
 interface ActiveEpic {
@@ -959,27 +960,42 @@ export function DesktopWeekPlanner({
           {epicProgress.length > 0 ? (
             <div className="mt-4 space-y-3">
               {epicProgress.map(({ epic, ritualCounts, daysRemaining }) => (
-                <div
+                <JourneyPathDrawer
                   key={epic.id}
-                  className="rounded-[22px] border border-white/8 bg-white/[0.03] p-3"
+                  epic={{
+                    id: epic.id,
+                    title: epic.title,
+                    description: epic.description ?? undefined,
+                    progress_percentage: epic.progress_percentage ?? 0,
+                    target_days: epic.target_days,
+                    start_date: epic.start_date,
+                    end_date: epic.end_date,
+                    epic_habits: epic.epic_habits,
+                  }}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-foreground">{epic.title}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {ritualCounts.completed}/{ritualCounts.total} rituals completed this week
-                      </p>
+                  <button
+                    type="button"
+                    aria-label={`Open ${epic.title} campaign`}
+                    className="w-full rounded-[22px] border border-white/8 bg-white/[0.03] p-3 text-left transition-colors hover:border-primary/30 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-foreground">{epic.title}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {ritualCounts.completed}/{ritualCounts.total} rituals completed this week
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="h-5 border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px]">
+                        {Math.round(epic.progress_percentage ?? 0)}%
+                      </Badge>
                     </div>
-                    <Badge variant="outline" className="h-5 border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px]">
-                      {Math.round(epic.progress_percentage ?? 0)}%
-                    </Badge>
-                  </div>
-                  {daysRemaining !== null ? (
-                    <p className="mt-2 text-[11px] text-muted-foreground">
-                      {daysRemaining} day{daysRemaining === 1 ? "" : "s"} remaining
-                    </p>
-                  ) : null}
-                </div>
+                    {daysRemaining !== null ? (
+                      <p className="mt-2 text-[11px] text-muted-foreground">
+                        {daysRemaining} day{daysRemaining === 1 ? "" : "s"} remaining
+                      </p>
+                    ) : null}
+                  </button>
+                </JourneyPathDrawer>
               ))}
             </div>
           ) : isCampaignsLoading ? (
