@@ -612,18 +612,22 @@ const hasProposalOrDraftArtifacts = (result: AgentRunResult["result"]) =>
   result.proposedActions.length > 0 ||
   result.structuredResponse !== null;
 
-function normalizeBareStarterProposalResult(params: {
+function normalizeBareStarterResult(params: {
   request: CompanionAgentRequest;
   result: AgentRunResult["result"];
 }) {
   const followUpConfig = resolveBareStarterFollowUp(params.request);
-  if (!followUpConfig || !hasProposalOrDraftArtifacts(params.result)) {
+  if (!followUpConfig) {
     return;
   }
 
   const keepModelClarification = params.result.mode === "clarify" &&
     params.result.followUp &&
     params.result.reply.includes("?");
+  if (keepModelClarification && !hasProposalOrDraftArtifacts(params.result)) {
+    return;
+  }
+
   const followUp = params.result.followUp ?? followUpConfig.followUp;
 
   params.result.reply = keepModelClarification
@@ -2808,7 +2812,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
     }
   });
 
-  normalizeBareStarterProposalResult({
+  normalizeBareStarterResult({
     request: params.request,
     result: agentResult.result,
   });

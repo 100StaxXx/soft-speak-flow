@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   loadThreadMessages: vi.fn(),
   loadPendingAction: vi.fn(),
   archiveThread: vi.fn().mockResolvedValue(undefined),
+  generateThreadSessionId: vi.fn(() => "fresh-session"),
   speakCompanionReply: vi.fn().mockResolvedValue("device"),
   stopCompanionSpeech: vi.fn(),
   toggleRecording: vi.fn(),
@@ -141,7 +142,7 @@ vi.mock("@/services/companionSpeech", () => ({
 vi.mock("@/services/companionChatThreads", () => ({
   buildCompanionThreadPreview: (value: string) => value,
   buildCompanionThreadTitle: (value: string) => value || "New thread",
-  generateCompanionThreadSessionId: () => "fresh-session",
+  generateCompanionThreadSessionId: mocks.generateThreadSessionId,
   getCompanionChatThreadsQueryKey: () => ["companion-chat-threads"],
   listCompanionChatThreads: mocks.listThreads,
   loadCompanionChatThreadMessages: mocks.loadThreadMessages,
@@ -190,6 +191,7 @@ describe("useCompanionAssistant", () => {
     mocks.agentSurfaceEnabled = true;
     mocks.legacySavedSuggestionProposalIds = [];
     mocks.legacyPendingSuggestionProposalId = null;
+    mocks.generateThreadSessionId.mockReturnValue("fresh-session");
     mocks.listThreads.mockResolvedValue([
       {
         sessionId: "persisted-session",
@@ -1282,6 +1284,89 @@ describe("useCompanionAssistant", () => {
       "persisted-session",
       true,
     );
+
+    await act(async () => {
+      resolveHydration([
+        {
+          id: "late-m1",
+          sessionId: "persisted-session",
+          role: "assistant",
+          content: "This old thread should not reopen.",
+          createdAt: "2026-04-18T08:00:00.000Z",
+          source: "agent",
+        },
+      ]);
+    });
+
+    expect(result.current.activeThread?.sessionId).toBe("fresh-session");
+    expect(
+      result.current.messages.some((message) =>
+        message.content === "This old thread should not reopen."
+      ),
+    ).toBe(false);
+  });
+
+  it("starts a unified template thread locally before archival finishes", async () => {
+    const { wrapper, queryClient } = createWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("persisted-session");
+    });
+
+    let nextSessionId: string | undefined;
+    act(() => {
+      nextSessionId = result.current.startTemplateThread({
+        greetingText: null,
+      });
+    });
+
+    expect(nextSessionId).toBe("fresh-session");
+    expect(result.current.activeThread?.sessionId).toBe("fresh-session");
+    expect(result.current.messages).toEqual([]);
+
+    await waitFor(() => {
+      expect(mocks.archiveThread).toHaveBeenCalledWith(
+        "persisted-session",
+        true,
+      );
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ["companion-chat-threads"],
+    });
+  });
+
+  it("keeps direct template threads fresh when persisted hydration resolves late", async () => {
+    let resolveHydration: (
+      messages: Awaited<ReturnType<typeof mocks.loadThreadMessages>>,
+    ) => void = () => {};
+
+    mocks.loadThreadMessages.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveHydration = resolve;
+      }),
+    );
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(mocks.loadThreadMessages).toHaveBeenCalledWith(
+        "persisted-session",
+        "journeys",
+      );
+    });
+
+    act(() => {
+      result.current.startTemplateThread({ greetingText: null });
+    });
 
     await act(async () => {
       resolveHydration([

@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
     stopSpeaking: vi.fn(),
     submitMessage: vi.fn().mockResolvedValue(true),
     startNewChat: vi.fn().mockResolvedValue(undefined),
+    startTemplateThread: vi.fn().mockReturnValue("fresh-template-session"),
     archiveCurrentThread: vi.fn().mockResolvedValue(undefined),
     resumeThread: vi.fn().mockResolvedValue(undefined),
   },
@@ -180,6 +181,7 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
       canArchiveThread: true,
       archiveDisabledReason: null,
       startNewChat: mocks.assistant.startNewChat,
+      startTemplateThread: mocks.assistant.startTemplateThread,
       archiveCurrentThread: mocks.assistant.archiveCurrentThread,
       resumeThread: mocks.assistant.resumeThread,
     };
@@ -336,6 +338,14 @@ describe("JourneysCompanionPlannerModal", () => {
       await screen.findByText("What would you like to do for your quest?"),
     ).toBeInTheDocument();
     expect(onLaunchIntentConsumed).toHaveBeenCalledWith("quest-launch-1");
+    expect(mocks.assistant.startTemplateThread).toHaveBeenCalledWith({
+      greetingText: null,
+    });
+    expect(
+      screen.queryByText(
+        "I can help you shape that into something concrete when you're ready.",
+      ),
+    ).not.toBeInTheDocument();
     expect(mocks.assistant.submitMessage).not.toHaveBeenCalled();
     expect(mocks.assistant.submitTypedMessage).not.toHaveBeenCalled();
     expect(mocks.assistantOptions.at(-1)?.launchIntent).toBeNull();

@@ -290,11 +290,35 @@ type FingerprintPhase = {
 };
 
 const RECENT_EPIC_CREATE_WINDOW_MS = 5 * 60 * 1000;
+const RECENT_EPIC_CREATE_ATTEMPT_WINDOW_MS = 24 * 60 * 60 * 1000;
+const EPIC_CREATE_ATTEMPT_STORAGE_KEY = "cosmiq:recent-epic-create-attempts:v1";
 const inFlightEpicCreateRequests = new Map<string, Promise<CreateEpicMutationResult>>();
+const recentEpicCreateAttempts = new Map<string, { createdAt: number; payload: LocalEpicPayload }>();
 
 const wait = (ms: number) => new Promise<void>((resolve) => {
   window.setTimeout(resolve, ms);
 });
+
+type StoredEpicCreateAttempt = {
+  fingerprint: string;
+  createdAt: number;
+  payload: LocalEpicPayload;
+};
+
+const getCampaignAttemptStorage = (): Storage | null => {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const storage = window.localStorage;
+    return storage
+      && typeof storage.getItem === "function"
+      && typeof storage.setItem === "function"
+      ? storage
+      : null;
+  } catch {
+    return null;
+  }
+};
 
 export interface CreateCampaignRitualInput {
   epicId: string;
@@ -465,6 +489,87 @@ const isRecentEpicCreateTimestamp = (value: string | number | null | undefined, 
   }
 
   return false;
+};
+
+const isRecentEpicCreateAttemptTimestamp = (value: number | null | undefined, nowMs: number): boolean =>
+  typeof value === "number"
+  && Number.isFinite(value)
+  && nowMs - value <= RECENT_EPIC_CREATE_ATTEMPT_WINDOW_MS;
+
+const readStoredEpicCreateAttempts = (): StoredEpicCreateAttempt[] => {
+  const storage = getCampaignAttemptStorage();
+  if (!storage) return [];
+
+  try {
+    const raw = storage.getItem(EPIC_CREATE_ATTEMPT_STORAGE_KEY);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+
+    const nowMs = Date.now();
+    return parsed.filter((entry): entry is StoredEpicCreateAttempt => {
+      if (!entry || typeof entry !== "object") return false;
+      const candidate = entry as Partial<StoredEpicCreateAttempt>;
+      return typeof candidate.fingerprint === "string"
+        && isRecentEpicCreateAttemptTimestamp(candidate.createdAt, nowMs)
+        && Boolean(candidate.payload?.epic)
+        && Array.isArray(candidate.payload?.habits)
+        && Array.isArray(candidate.payload?.epicHabits)
+        && Array.isArray(candidate.payload?.phases)
+        && Array.isArray(candidate.payload?.milestones);
+    });
+  } catch (error) {
+    console.warn("Failed to read recent campaign create attempts:", error);
+    return [];
+  }
+};
+
+const writeStoredEpicCreateAttempts = (attempts: StoredEpicCreateAttempt[]) => {
+  const storage = getCampaignAttemptStorage();
+  if (!storage) return;
+
+  try {
+    const nowMs = Date.now();
+    const recentAttempts = attempts
+      .filter((attempt) => isRecentEpicCreateAttemptTimestamp(attempt.createdAt, nowMs))
+      .slice(-20);
+    storage.setItem(EPIC_CREATE_ATTEMPT_STORAGE_KEY, JSON.stringify(recentAttempts));
+  } catch (error) {
+    console.warn("Failed to store recent campaign create attempts:", error);
+  }
+};
+
+const rememberEpicCreateAttempt = (fingerprint: string, payload: LocalEpicPayload): void => {
+  const createdAt = Date.now();
+  recentEpicCreateAttempts.set(fingerprint, { createdAt, payload });
+
+  const storedAttempts = readStoredEpicCreateAttempts()
+    .filter((attempt) => attempt.fingerprint !== fingerprint);
+  storedAttempts.push({ fingerprint, createdAt, payload });
+  writeStoredEpicCreateAttempts(storedAttempts);
+};
+
+const getRememberedEpicCreatePayload = (fingerprint: string): LocalEpicPayload | null => {
+  const nowMs = Date.now();
+  const memoryAttempt = recentEpicCreateAttempts.get(fingerprint);
+  if (memoryAttempt && isRecentEpicCreateAttemptTimestamp(memoryAttempt.createdAt, nowMs)) {
+    return memoryAttempt.payload;
+  }
+
+  if (memoryAttempt) {
+    recentEpicCreateAttempts.delete(fingerprint);
+  }
+
+  const storedAttempt = readStoredEpicCreateAttempts()
+    .find((attempt) => attempt.fingerprint === fingerprint);
+  if (!storedAttempt) return null;
+
+  recentEpicCreateAttempts.set(fingerprint, {
+    createdAt: storedAttempt.createdAt,
+    payload: storedAttempt.payload,
+  });
+  return storedAttempt.payload;
 };
 
 const isActiveQueuedEpicCreateStatus = (status: QueuedAction["status"]) =>
@@ -1108,90 +1213,100 @@ export const useEpics = (options: EpicsOptions = {}) => {
           throw new Error(ACTIVE_CAMPAIGN_LIMIT_MESSAGE);
         }
 
-        const nowIso = new Date().toISOString();
-        const startDate = nowIso.split("T")[0];
-        const epicId = createOfflinePlannerId("epic");
-        const inviteCode = `EPIC-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-        const habits = epicData.habits.map((habit) => ({
-          id: createOfflinePlannerId("habit"),
-          user_id: user.id,
-          title: habit.title,
-          description: habit.description || null,
-          difficulty: normalizeDifficulty(habit.difficulty),
-          frequency: normalizeFrequency(habit.frequency),
-          custom_days: habit.custom_days?.length ? habit.custom_days : null,
-          custom_month_days: habit.custom_month_days?.length ? habit.custom_month_days : null,
-          preferred_time: habit.preferred_time || null,
-          reminder_enabled: habit.reminder_enabled || false,
-          reminder_minutes_before: habit.reminder_minutes_before || 15,
-          estimated_minutes: habit.estimated_minutes || null,
-          category: habit.category?.trim() || null,
-          is_active: true,
-          current_streak: 0,
-          longest_streak: 0,
-          created_at: nowIso,
-        })) satisfies LocalHabitRow[];
+        const rememberedPayload = getRememberedEpicCreatePayload(fingerprint);
+        const payload: LocalEpicPayload = rememberedPayload ?? (() => {
+          const nowIso = new Date().toISOString();
+          const startDate = nowIso.split("T")[0];
+          const epicId = createOfflinePlannerId("epic");
+          const inviteCode = `EPIC-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+          const habits = epicData.habits.map((habit) => ({
+            id: createOfflinePlannerId("habit"),
+            user_id: user.id,
+            title: habit.title,
+            description: habit.description || null,
+            difficulty: normalizeDifficulty(habit.difficulty),
+            frequency: normalizeFrequency(habit.frequency),
+            custom_days: habit.custom_days?.length ? habit.custom_days : null,
+            custom_month_days: habit.custom_month_days?.length ? habit.custom_month_days : null,
+            preferred_time: habit.preferred_time || null,
+            reminder_enabled: habit.reminder_enabled || false,
+            reminder_minutes_before: habit.reminder_minutes_before || 15,
+            estimated_minutes: habit.estimated_minutes || null,
+            category: habit.category?.trim() || null,
+            is_active: true,
+            current_streak: 0,
+            longest_streak: 0,
+            created_at: nowIso,
+          })) satisfies LocalHabitRow[];
 
-        const epic: LocalEpicRow = {
-          id: epicId,
-          user_id: user.id,
-          title: epicData.title,
-          description: epicData.description || null,
-          status: "active",
-          progress_percentage: 0,
-          target_days: epicData.target_days,
-          start_date: startDate,
-          end_date: resolveEpicEndDate({
-            start_date: startDate,
+          const epic: LocalEpicRow = {
+            id: epicId,
+            user_id: user.id,
+            title: epicData.title,
+            description: epicData.description || null,
+            status: "active",
+            progress_percentage: 0,
             target_days: epicData.target_days,
-          }),
-          epic_habits: [],
-          xp_reward: Math.floor(epicData.target_days * 10),
-          is_public: epicData.is_public ?? false,
-          invite_code: inviteCode,
-          theme_color: normalizeThemeColor(epicData.theme_color),
-          story_type_slug: epicData.story_type_slug || null,
-          created_at: nowIso,
-          completed_at: null,
-        } as LocalEpicRow;
+            start_date: startDate,
+            end_date: resolveEpicEndDate({
+              start_date: startDate,
+              target_days: epicData.target_days,
+            }),
+            epic_habits: [],
+            xp_reward: Math.floor(epicData.target_days * 10),
+            is_public: epicData.is_public ?? false,
+            invite_code: inviteCode,
+            theme_color: normalizeThemeColor(epicData.theme_color),
+            story_type_slug: epicData.story_type_slug || null,
+            created_at: nowIso,
+            completed_at: null,
+          } as LocalEpicRow;
 
-        const epicHabits = habits.map((habit) => ({
-          id: createOfflinePlannerId("epic-habit"),
-          epic_id: epicId,
-          habit_id: habit.id,
-        }));
+          const epicHabits = habits.map((habit) => ({
+            id: createOfflinePlannerId("epic-habit"),
+            epic_id: epicId,
+            habit_id: habit.id,
+          }));
 
-        const phases = (epicData.phases ?? []).map((phase) => ({
-          id: createOfflinePlannerId("journey-phase"),
-          epic_id: epicId,
-          user_id: user.id,
-          name: phase.name,
-          description: phase.description,
-          start_date: phase.start_date,
-          end_date: phase.end_date,
-          phase_order: phase.phase_order,
-        }));
+          const phases = (epicData.phases ?? []).map((phase) => ({
+            id: createOfflinePlannerId("journey-phase"),
+            epic_id: epicId,
+            user_id: user.id,
+            name: phase.name,
+            description: phase.description,
+            start_date: phase.start_date,
+            end_date: phase.end_date,
+            phase_order: phase.phase_order,
+          }));
 
-        const milestones = (epicData.milestones ?? []).map((milestone, index) => ({
-          id: createOfflinePlannerId("epic-milestone"),
-          epic_id: epicId,
-          user_id: user.id,
-          title: milestone.title,
-          description: milestone.description || null,
-          target_date: milestone.target_date,
-          milestone_percent: milestone.milestone_percent,
-          is_postcard_milestone: milestone.is_postcard_milestone ?? false,
-          phase_order: index + 1,
-          phase_name: milestone.phase_name || milestone.phaseName || null,
-        }));
+          const milestones = (epicData.milestones ?? []).map((milestone, index) => ({
+            id: createOfflinePlannerId("epic-milestone"),
+            epic_id: epicId,
+            user_id: user.id,
+            title: milestone.title,
+            description: milestone.description || null,
+            target_date: milestone.target_date,
+            milestone_percent: milestone.milestone_percent,
+            is_postcard_milestone: milestone.is_postcard_milestone ?? false,
+            phase_order: index + 1,
+            phase_name: milestone.phase_name || milestone.phaseName || null,
+          }));
 
-        const payload: LocalEpicPayload = {
-          epic,
-          habits,
-          epicHabits,
-          phases,
-          milestones,
-        };
+          return {
+            epic,
+            habits,
+            epicHabits,
+            phases,
+            milestones,
+          };
+        })();
+
+        if (!rememberedPayload) {
+          rememberEpicCreateAttempt(fingerprint, payload);
+        }
+
+        const { epic, habits, epicHabits, phases, milestones } = payload;
+        const shouldUseIdempotentRemoteWrite = Boolean(rememberedPayload);
 
         const reconcileAfterRemoteRefresh = async (): Promise<EpicCreateMatch | null> => {
           const retryDelaysMs = [0, 350, 1200];
@@ -1228,7 +1343,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
           await queueAction({
             actionKind: "EPIC_CREATE",
             entityType: "epic",
-            entityId: epicId,
+            entityId: epic.id,
             payload,
           });
           trackResilienceEvent("campaign_create_result", {
@@ -1256,26 +1371,34 @@ export const useEpics = (options: EpicsOptions = {}) => {
 
         try {
           const remotePersistStartedAt = Date.now();
-          const { error: habitsError } = await supabase.from("habits").insert(habits);
+          const { error: habitsError } = shouldUseIdempotentRemoteWrite
+            ? await supabase.from("habits").upsert(habits)
+            : await supabase.from("habits").insert(habits);
           if (habitsError) throw habitsError;
 
-          const { error: epicError } = await supabase
-            .from("epics")
-            .insert(toRemoteEpicInsertPayload(epic));
+          const { error: epicError } = shouldUseIdempotentRemoteWrite
+            ? await supabase.from("epics").upsert(toRemoteEpicInsertPayload(epic))
+            : await supabase.from("epics").insert(toRemoteEpicInsertPayload(epic));
           if (epicError) throw epicError;
 
           if (epicHabits.length > 0) {
-            const { error: linkError } = await supabase.from("epic_habits").insert(epicHabits);
+            const { error: linkError } = shouldUseIdempotentRemoteWrite
+              ? await supabase.from("epic_habits").upsert(epicHabits)
+              : await supabase.from("epic_habits").insert(epicHabits);
             if (linkError) throw linkError;
           }
 
           if (phases.length > 0) {
-            const { error: phasesError } = await supabase.from("journey_phases").insert(phases);
+            const { error: phasesError } = shouldUseIdempotentRemoteWrite
+              ? await supabase.from("journey_phases").upsert(phases)
+              : await supabase.from("journey_phases").insert(phases);
             if (phasesError) throw phasesError;
           }
 
           if (milestones.length > 0) {
-            const { error: milestonesError } = await supabase.from("epic_milestones").insert(milestones);
+            const { error: milestonesError } = shouldUseIdempotentRemoteWrite
+              ? await supabase.from("epic_milestones").upsert(milestones)
+              : await supabase.from("epic_milestones").insert(milestones);
             if (milestonesError) throw milestonesError;
           }
 
@@ -1296,7 +1419,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
               await queueAction({
                 actionKind: "EPIC_CREATE",
                 entityType: "epic",
-                entityId: epicId,
+                entityId: epic.id,
                 payload,
               });
             }

@@ -1201,6 +1201,95 @@ describe("useEpics", () => {
     expect(deleteEpicsEqUserMock).toHaveBeenCalledWith("user_id", "user-1");
   });
 
+  it("reuses remembered campaign ids on retry after a failed create confirmation", async () => {
+    const habitsInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const habitsUpsertMock = vi.fn().mockResolvedValue({ error: null });
+    const epicsInsertMock = vi.fn().mockResolvedValueOnce({
+      error: { message: "schema cache stale", status: 400 },
+    });
+    const epicsUpsertMock = vi.fn().mockResolvedValue({ error: null });
+    const linksUpsertMock = vi.fn().mockResolvedValue({ error: null });
+    const deleteEpicHabitsInMock = vi.fn().mockResolvedValue({ error: null });
+    const deleteHabitsEqMock = vi.fn().mockResolvedValue({ error: null });
+    const deleteHabitsInMock = vi.fn().mockReturnValue({ eq: deleteHabitsEqMock });
+    const deleteEpicsEqUserMock = vi.fn().mockResolvedValue({ error: null });
+    const deleteEpicsEqIdMock = vi.fn().mockReturnValue({ eq: deleteEpicsEqUserMock });
+
+    mocks.fromMock.mockImplementation((table: string) => {
+      if (table === "habits") {
+        return {
+          insert: habitsInsertMock,
+          upsert: habitsUpsertMock,
+          delete: vi.fn().mockReturnValue({ in: deleteHabitsInMock }),
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "epics") {
+        return {
+          insert: epicsInsertMock,
+          upsert: epicsUpsertMock,
+          delete: vi.fn().mockReturnValue({ eq: deleteEpicsEqIdMock }),
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "epic_habits") {
+        return {
+          upsert: linksUpsertMock,
+          delete: vi.fn().mockReturnValue({ in: deleteEpicHabitsInMock }),
+          select: mocks.selectMock,
+        };
+      }
+
+      return {
+        select: mocks.selectMock,
+      };
+    });
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    const input = {
+      title: "Retry Idempotent Campaign",
+      target_days: 14,
+      habits: [
+        {
+          title: "Retry focus ritual",
+          difficulty: "easy",
+          frequency: "daily",
+          custom_days: [1, 2, 3, 4, 5],
+        },
+      ],
+    };
+
+    await act(async () => {
+      await expect(result.current.createEpic(input)).rejects.toMatchObject({
+        status: 400,
+      });
+    });
+
+    const firstHabitPayload = habitsInsertMock.mock.calls[0]?.[0];
+    const firstEpicPayload = epicsInsertMock.mock.calls[0]?.[0];
+
+    await act(async () => {
+      await result.current.createEpic(input);
+    });
+
+    expect(habitsInsertMock).toHaveBeenCalledTimes(1);
+    expect(epicsInsertMock).toHaveBeenCalledTimes(1);
+    expect(habitsUpsertMock).toHaveBeenCalledTimes(1);
+    expect(epicsUpsertMock).toHaveBeenCalledTimes(1);
+    expect(linksUpsertMock).toHaveBeenCalledTimes(1);
+    expect(habitsUpsertMock.mock.calls[0]?.[0]?.[0]?.id).toBe(firstHabitPayload?.[0]?.id);
+    expect(epicsUpsertMock.mock.calls[0]?.[0]?.id).toBe(firstEpicPayload?.id);
+  });
+
   it("renames an active campaign locally, syncs the new title remotely, and invalidates dependent queries", async () => {
     let localEpics = [
       {

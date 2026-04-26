@@ -4,8 +4,10 @@ import {
   __resetOfflineDBForTests,
   addPendingAction,
   clearAllPendingActions,
+  enqueueAction,
   getPendingActionCount,
   getPendingActions,
+  getQueuedActions,
   initOfflineDB,
 } from "./offlineStorage";
 
@@ -66,6 +68,9 @@ maybeDescribe("offlineStorage user scoping", () => {
   beforeEach(async () => {
     await deleteDatabase();
   });
+  afterEach(async () => {
+    await deleteDatabase();
+  });
 
   it("partitions pending actions by user_id", async () => {
     await initOfflineDB();
@@ -122,6 +127,31 @@ maybeDescribe("offlineStorage user scoping", () => {
 
     expect(await getPendingActionCount("user-a")).toBe(0);
     expect(await getPendingActionCount("user-b")).toBe(1);
+  });
+
+  it("updates an active queued action instead of duplicating the same entity replay", async () => {
+    await initOfflineDB();
+
+    const firstId = await enqueueAction({
+      userId: "user-a",
+      actionKind: "EPIC_CREATE",
+      entityType: "epic",
+      entityId: "epic-1",
+      payload: { title: "First payload" },
+    });
+    const secondId = await enqueueAction({
+      userId: "user-a",
+      actionKind: "EPIC_CREATE",
+      entityType: "epic",
+      entityId: "epic-1",
+      payload: { title: "Updated payload" },
+    });
+
+    const actions = await getQueuedActions("user-a");
+
+    expect(secondId).toBe(firstId);
+    expect(actions).toHaveLength(1);
+    expect(actions[0].payload).toEqual({ title: "Updated payload" });
   });
 });
 

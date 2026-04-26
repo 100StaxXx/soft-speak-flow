@@ -380,7 +380,6 @@ const JourneysCompanionOverlayBody = memo(({
     () =>
       isQuestCaptureActive
         ? [
-          ...visibleMessages,
           {
             id: `quest-capture-${questCaptureIntentId ?? "active"}`,
             role: "assistant" as const,
@@ -410,10 +409,16 @@ const JourneysCompanionOverlayBody = memo(({
     }
 
     handledQuestCaptureIntentIdRef.current = launchIntent.id;
+    assistant.startTemplateThread({ greetingText: null });
     setQuestCaptureIntentId(launchIntent.id);
     assistant.setDraftInput("");
     onLaunchIntentConsumed?.(launchIntent.id);
-  }, [assistant.setDraftInput, launchIntent, onLaunchIntentConsumed]);
+  }, [
+    assistant.setDraftInput,
+    assistant.startTemplateThread,
+    launchIntent,
+    onLaunchIntentConsumed,
+  ]);
 
   const keepBottomContentVisible = useCallback(
     (behavior: ScrollBehavior = prefersReducedMotion ? "auto" : "smooth") => {

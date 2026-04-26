@@ -497,11 +497,37 @@ export async function enqueueAction(input: EnqueueActionInput): Promise<string> 
       updated_at: timestamp,
     };
 
-    await withStore("pendingActions", "readwrite", async (store) => {
+    const existingId = await withStore("pendingActions", "readwrite", async (store) => {
+      if (action.entity_id && action.action_kind === "EPIC_CREATE") {
+        const rows = await getQueuedActionRowsForUser(store, input.userId);
+        const existing = rows
+          .map((row) => normalizeAnyQueuedAction(row as Partial<QueuedAction> & Record<string, unknown>))
+          .find((candidate): candidate is QueuedAction =>
+            Boolean(candidate)
+            && ACTIVE_QUEUE_STATUSES.includes(candidate.status)
+            && candidate.action_kind === action.action_kind
+            && candidate.entity_type === action.entity_type
+            && candidate.entity_id === action.entity_id
+          );
+
+        if (existing) {
+          await requestToPromise(store.put({
+            ...existing,
+            payload: normalizedPayload,
+            retry_count: 0,
+            last_error: null,
+            status: input.status ?? "queued",
+            updated_at: timestamp,
+          }));
+          return existing.id;
+        }
+      }
+
       await requestToPromise(store.add(action));
+      return action.id;
     });
 
-    return action.id;
+    return existingId;
   } catch (error) {
     console.error("Failed to enqueue action:", error);
     throw error;

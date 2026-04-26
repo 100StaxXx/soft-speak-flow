@@ -1506,6 +1506,60 @@ export function useCompanionAssistant({
     ],
   );
 
+  const startTemplateThread = useCallback(
+    (options?: { greetingText?: string | null }) => {
+      const threadToArchive = persistedActiveThread ??
+        threadsQuery.data?.threads.find((thread) =>
+          thread.archivedAt === null
+        ) ??
+        null;
+      const greetingText = options?.greetingText === null
+        ? undefined
+        : options?.greetingText;
+      const nextSessionId = openFreshThread({
+        greetingText,
+        markBootstrapped: true,
+      });
+
+      void (async () => {
+        try {
+          const resolvedThreadToArchive = threadToArchive ??
+            (
+              companion?.id
+                ? (await listCompanionChatThreads(companion.id, surface)).find(
+                  (thread) => thread.archivedAt === null,
+                ) ?? null
+                : null
+            );
+
+          if (!resolvedThreadToArchive) return;
+          if (resolvedThreadToArchive.sessionId === nextSessionId) return;
+
+          await setCompanionChatThreadArchived(
+            resolvedThreadToArchive.sessionId,
+            true,
+          );
+          await invalidateThreads();
+        } catch (error) {
+          console.warn(
+            "Failed to archive the previous companion template thread:",
+            error,
+          );
+        }
+      })();
+
+      return nextSessionId;
+    },
+    [
+      companion?.id,
+      invalidateThreads,
+      openFreshThread,
+      persistedActiveThread,
+      surface,
+      threadsQuery.data?.threads,
+    ],
+  );
+
   const resumeThread = useCallback(async (sessionId: string) => {
     const hydrationVersion = threadMutationVersionRef.current + 1;
     threadMutationVersionRef.current = hydrationVersion;
@@ -1674,6 +1728,9 @@ export function useCompanionAssistant({
       canArchiveThread: legacyAssistant.canArchiveThread,
       archiveDisabledReason: legacyAssistant.archiveDisabledReason,
       startNewChat: legacyAssistant.startNewChat,
+      startTemplateThread: (
+        _options?: { greetingText?: string | null },
+      ) => legacyAssistant.startTemplateThread?.(),
       canStartNewChat: legacyAssistant.canStartNewChat,
       newChatDisabledReason: legacyAssistant.newChatDisabledReason,
     };
@@ -1730,6 +1787,7 @@ export function useCompanionAssistant({
     canArchiveThread,
     archiveDisabledReason,
     startNewChat,
+    startTemplateThread,
     canStartNewChat,
     newChatDisabledReason,
   };

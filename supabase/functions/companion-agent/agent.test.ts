@@ -365,6 +365,53 @@ Deno.test("runCompanionAgent asks a follow-up instead of proposing quests for ba
   );
 });
 
+Deno.test("runCompanionAgent asks a follow-up for bare Adjust my day when the model gives a generic reply", async () => {
+  const supabase = createMockSupabase();
+  const { guardedFetch } = createInstructionCaptureFetch("I'm here.");
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-bare-adjust-day",
+      message: "Adjust my day",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      starterIntent: "adjust_today",
+    },
+  });
+
+  assertEquals(result.mode, "clarify");
+  assertEquals(result.intent, "update_existing_plan");
+  assertEquals(result.understandingState, "needs_followup");
+  assertEquals(
+    result.reply,
+    "I can adjust today. Should I protect your top priority, reduce the load, or make room for something new?",
+  );
+  assertEquals(
+    result.followUp?.question,
+    "Should I protect your top priority, reduce the load, or make room for something new?",
+  );
+  assertEquals(result.followUp?.options, [
+    "Protect priority",
+    "Reduce load",
+    "Make room",
+  ]);
+  assertEquals(result.proposedActions, []);
+  assertEquals(result.structuredResponse, null);
+  assertEquals(result.pendingAction, undefined);
+  assertEquals(result.threadState.hasPendingAction, false);
+  assert(
+    supabase.inserts.every((entry) =>
+      entry.table !== "companion_pending_actions"
+    ),
+    "bare adjust prompt should not create a pending action",
+  );
+});
+
 Deno.test("runCompanionAgent uses custom companion name before generated cache in model instructions", async () => {
   const supabase = createMockSupabase({
     companion: {
