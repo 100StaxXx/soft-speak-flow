@@ -11,6 +11,7 @@ import {
   resolveCompanionSpiritLockProfile,
 } from "../_shared/companionSpiritLock.ts";
 import { checkRateLimit, createRateLimitResponse, RATE_LIMITS } from "../_shared/rateLimiter.ts";
+import { cacheGeneratedCompanionNameIfUncustomized } from "./nameCache.ts";
 import {
   getCompanionEvolutionCardRarity,
   MAX_COMPANION_STAGE,
@@ -517,6 +518,20 @@ Make it LEGENDARY. This is the birth of a companion.`;
     if (insertError) {
       console.error('Error inserting card:', insertError);
       throw insertError;
+    }
+
+    try {
+      await cacheGeneratedCompanionNameIfUncustomized({
+        supabase: supabaseClient,
+        companionId,
+        creatureName: card?.creature_name ?? cardData.creature_name,
+      });
+    } catch (cacheError) {
+      console.warn("Card generated but companion name cache update failed", {
+        companionId,
+        cardId,
+        error: cacheError instanceof Error ? cacheError.message : String(cacheError),
+      });
     }
 
     console.log('Card generated successfully:', cardId);

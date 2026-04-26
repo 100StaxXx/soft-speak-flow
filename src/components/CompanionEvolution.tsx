@@ -36,6 +36,19 @@ interface ArtReadiness {
   ready: boolean;
 }
 
+interface MappedHatchVideoPolicyInput {
+  isFirstEvolution: boolean;
+  presetId?: string | null;
+  hatchVideoUrl: string | null;
+  disableHatchVideo: boolean;
+}
+
+interface SilhouetteStrobePolicyInput {
+  hasDualArt: boolean;
+  prefersReducedMotion: boolean;
+  useHatchVideo: boolean;
+}
+
 const FULL_SEQUENCE_MS = {
   hold: 800,
   charge: 3200,
@@ -79,6 +92,29 @@ const STROBE_BEAT_OFFSETS_MS = [
 ] as const;
 const STROBE_PULSE_INTERVAL = 4;
 const LAST_STROBE_BEAT_INDEX = STROBE_BEAT_OFFSETS_MS.length - 1;
+
+const shouldUseMappedPresetHatchVideo = ({
+  isFirstEvolution,
+  presetId,
+  hatchVideoUrl,
+  disableHatchVideo,
+}: MappedHatchVideoPolicyInput): boolean => (
+  isFirstEvolution
+  && typeof presetId === "string"
+  && presetId.trim().length > 0
+  && Boolean(hatchVideoUrl)
+  && !disableHatchVideo
+);
+
+const shouldUseSilhouetteStrobe = ({
+  hasDualArt,
+  prefersReducedMotion,
+  useHatchVideo,
+}: SilhouetteStrobePolicyInput): boolean => (
+  hasDualArt
+  && !prefersReducedMotion
+  && !useHatchVideo
+);
 
 const log = logger.scope("CompanionEvolution");
 
@@ -353,7 +389,12 @@ const CompanionEvolutionContent = ({
     () => getCompanionHatchVideoUrl({ presetId, element }),
     [element, presetId],
   );
-  const useHatchVideo = isFirstEvolution && Boolean(hatchVideoUrl) && !disableHatchVideo;
+  const useHatchVideo = shouldUseMappedPresetHatchVideo({
+    isFirstEvolution,
+    presetId,
+    hatchVideoUrl,
+    disableHatchVideo,
+  });
   const theme: EvoTheme = useMemo(
     () => getEvolutionTheme(element, isFirstEvolution),
     [element, isFirstEvolution],
@@ -393,7 +434,11 @@ const CompanionEvolutionContent = ({
       && previousDisplayImageUrl !== revealDisplayImageUrl
       && artReadiness.next === "loaded",
   );
-  const silhouetteStrobeEnabled = hasDualArt && !prefersReducedMotion;
+  const silhouetteStrobeEnabled = shouldUseSilhouetteStrobe({
+    hasDualArt,
+    prefersReducedMotion,
+    useHatchVideo,
+  });
   const strobeDelayMs = silhouetteStrobeEnabled ? sequence.strobe + sequence.apex : 0;
   const revealDelayMs =
     sequence.hold

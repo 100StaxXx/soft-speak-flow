@@ -13,11 +13,19 @@ import type {
 
 const DEFAULT_PENDING_ACTION_TTL_MS = 1000 * 60 * 60 * 12;
 
-const getPendingActionTtlMs = () =>
-  Number(
-    Deno.env.get("COMPANION_PENDING_ACTION_TTL_MS") ??
-      String(DEFAULT_PENDING_ACTION_TTL_MS),
-  );
+const getPendingActionTtlMs = () => {
+  try {
+    return Number(
+      Deno.env.get("COMPANION_PENDING_ACTION_TTL_MS") ??
+        String(DEFAULT_PENDING_ACTION_TTL_MS),
+    );
+  } catch (error) {
+    if (error instanceof Error && error.name === "NotCapable") {
+      return DEFAULT_PENDING_ACTION_TTL_MS;
+    }
+    throw error;
+  }
+};
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -66,18 +74,28 @@ const mapPendingActionRow = (
 const buildAssistantMessageMetadata = (params: {
   assistantMode?: string | null;
   assistantIntent?: string | null;
+  agentDecision?: unknown;
   structuredResponse?: unknown;
   pendingAction?: unknown;
   receipt?: unknown;
 }) => {
   const metadata: Record<string, unknown> = {};
 
-  if (typeof params.assistantMode === "string" && params.assistantMode.length > 0) {
+  if (
+    typeof params.assistantMode === "string" && params.assistantMode.length > 0
+  ) {
     metadata.mode = params.assistantMode;
   }
 
-  if (typeof params.assistantIntent === "string" && params.assistantIntent.length > 0) {
+  if (
+    typeof params.assistantIntent === "string" &&
+    params.assistantIntent.length > 0
+  ) {
     metadata.intent = params.assistantIntent;
+  }
+
+  if ("agentDecision" in params && params.agentDecision) {
+    metadata.agentDecision = params.agentDecision;
   }
 
   if ("structuredResponse" in params) {
@@ -120,7 +138,7 @@ export async function loadRecentMessages(
   const { data, error } = await supabase
     .from("companion_chats")
     .select(
-      "id, role, content, created_at, input_mode, source, surface, session_id",
+      "id, role, content, created_at, input_mode, source, surface, session_id, metadata",
     )
     .eq("session_id", sessionId)
     .eq("user_id", userId)
@@ -246,6 +264,7 @@ export async function persistAgentTurn(params: {
   lastOpenAIResponseId?: string | null;
   assistantMode?: string | null;
   assistantIntent?: string | null;
+  agentDecision?: unknown;
   structuredResponse?: unknown;
   pendingAction?: unknown;
   receipt?: unknown;
@@ -279,6 +298,7 @@ export async function persistAgentTurn(params: {
       metadata: buildAssistantMessageMetadata({
         assistantMode: params.assistantMode ?? null,
         assistantIntent: params.assistantIntent ?? null,
+        agentDecision: params.agentDecision,
         structuredResponse: params.structuredResponse,
         pendingAction: params.pendingAction,
         receipt: params.receipt,
@@ -346,6 +366,13 @@ export async function persistActionReceipt(params: {
         created_at: createdAt,
         metadata: buildAssistantMessageMetadata({
           assistantMode: "receipt",
+          agentDecision: {
+            understandingState: "enough_to_discuss",
+            followUp: null,
+            proposedActions: [],
+            assumptions: [],
+            evidenceIds: [],
+          },
           receipt: params.receipt ?? null,
         }),
       },

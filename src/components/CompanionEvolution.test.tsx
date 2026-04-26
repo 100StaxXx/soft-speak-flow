@@ -351,6 +351,31 @@ describe("CompanionEvolution", () => {
     expect(dialog).toHaveAttribute("data-phase", "reveal");
   });
 
+  it("falls back to a single-image presentation when the previous and next art match", async () => {
+    const props = buildProps();
+
+    render(
+      <CompanionEvolution
+        {...props}
+        newImageUrl={props.previousImageUrl}
+      />,
+    );
+    await prepareEvolution();
+
+    const dialog = screen.getByRole("alertdialog");
+    const artStage = screen.getByTestId("evolution-art-stage");
+
+    expect(artStage).toHaveAttribute("data-art-presentation", "single");
+    expect(artStage).toHaveAttribute("data-strobe-enabled", "false");
+    expect(artStage).toHaveAttribute("data-strobe-beat", "-1");
+    expect(artStage).toHaveAttribute("data-strobe-target", "none");
+    expect(screen.queryByTestId("evolution-previous-art")).not.toBeInTheDocument();
+    expect(screen.getByTestId("evolution-reveal-art")).toBeInTheDocument();
+
+    await flushTimers(FULL_SEQUENCE_MS.hold + FULL_SEQUENCE_MS.charge + FULL_SEQUENCE_MS.conceal);
+    expect(dialog).toHaveAttribute("data-phase", "reveal");
+  });
+
   it("uses the reduced-motion fast path without convergence particles", async () => {
     mocks.profile = "reduced";
     mocks.prefersReducedMotion = true;
@@ -399,6 +424,40 @@ describe("CompanionEvolution", () => {
     expect(HTMLMediaElement.prototype.play).toHaveBeenCalled();
   });
 
+  it("uses the image silhouette strobe for generated first hatches without a mapped preset video", async () => {
+    render(
+      <CompanionEvolution
+        {...buildFirstHatchProps()}
+        presetId={undefined}
+      />,
+    );
+    await prepareEvolution();
+    await flushTimers(HATCH_INTRO_MIN_MS);
+
+    const dialog = screen.getByRole("alertdialog");
+    const artStage = screen.getByTestId("evolution-art-stage");
+
+    expect(screen.queryByTestId("evolution-hatch-video")).not.toBeInTheDocument();
+    expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
+    expect(artStage).toHaveAttribute("data-art-presentation", "swap");
+    expect(artStage).toHaveAttribute("data-strobe-enabled", "true");
+    expect(screen.getByTestId("evolution-previous-art")).toBeInTheDocument();
+    expect(screen.getByTestId("evolution-reveal-art")).toBeInTheDocument();
+    expect(screen.getByTestId("evolution-reveal-art").querySelector("img")).toHaveAttribute(
+      "data-companion-image-fit",
+      "portrait",
+    );
+
+    await flushTimers(FULL_SEQUENCE_MS.hold + FULL_SEQUENCE_MS.charge + FULL_SEQUENCE_MS.conceal);
+    expect(dialog).toHaveAttribute("data-phase", "strobe");
+    expect(artStage).toHaveAttribute("data-strobe-beat", "0");
+    expect(artStage).toHaveAttribute("data-strobe-target", "previous");
+
+    await flushTimers(STROBE_BEAT_OFFSETS_MS[1]);
+    expect(artStage).toHaveAttribute("data-strobe-beat", "1");
+    expect(artStage).toHaveAttribute("data-strobe-target", "next");
+  });
+
   it("plays the mapped first hatch video with embedded audio when global audio is enabled", async () => {
     const props = buildFirstHatchProps();
 
@@ -416,6 +475,7 @@ describe("CompanionEvolution", () => {
     expect(screen.getByTestId("evolution-hatch-video-backdrop")).toBeInTheDocument();
     expect(HTMLMediaElement.prototype.play).toHaveBeenCalled();
     expect(screen.queryByTestId("evolution-hatching-overlay")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("evolution-art-stage")).not.toBeInTheDocument();
 
     fireEvent.ended(video);
     expect(screen.getByText("Tap anywhere to continue")).toBeInTheDocument();

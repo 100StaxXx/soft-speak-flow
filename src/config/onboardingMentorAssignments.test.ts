@@ -61,6 +61,67 @@ describe("ONBOARDING_MENTOR_ASSIGNMENTS", () => {
       }
     }
   });
+
+  it("keeps Operator and Icon popular in a balanced distribution while keeping Charles rare", () => {
+    const counts = Object.values(ONBOARDING_MENTOR_ASSIGNMENTS).reduce(
+      (acc, slug) => {
+        acc[slug] = (acc[slug] ?? 0) + 1;
+        return acc;
+      },
+      {} as Record<(typeof ACTIVE_ONBOARDING_MENTOR_SLUGS)[number], number>,
+    );
+
+    expect(counts).toEqual({
+      lyra: 24,
+      icon: 37,
+      princess: 35,
+      sage: 49,
+      operator: 34,
+      rival: 11,
+      charles: 2,
+    });
+    expect(
+      Object.entries(ONBOARDING_MENTOR_ASSIGNMENTS)
+        .filter(([, slug]) => slug === "charles")
+        .map(([key]) => key),
+    ).toEqual([
+      "masculine_presence|discipline_performance|direct_demanding|pressure_standards",
+      "either_works|discipline_performance|direct_demanding|pressure_standards",
+    ]);
+  });
+
+  it("routes core answer archetypes to the matching mentor personality", () => {
+    expect(
+      ONBOARDING_MENTOR_ASSIGNMENTS[
+        "feminine_presence|emotions_healing|gentle_compassionate|emotional_reassurance"
+      ],
+    ).toBe("princess");
+    expect(
+      ONBOARDING_MENTOR_ASSIGNMENTS[
+        "feminine_presence|confidence_self_belief|encouraging_supportive|belief_support"
+      ],
+    ).toBe("icon");
+    expect(
+      ONBOARDING_MENTOR_ASSIGNMENTS[
+        "masculine_presence|clarity_mindset|calm_grounded|principles_logic"
+      ],
+    ).toBe("sage");
+    expect(
+      ONBOARDING_MENTOR_ASSIGNMENTS[
+        "masculine_presence|confidence_self_belief|encouraging_supportive|belief_support"
+      ],
+    ).toBe("sage");
+    expect(
+      ONBOARDING_MENTOR_ASSIGNMENTS[
+        "masculine_presence|discipline_performance|direct_demanding|belief_support"
+      ],
+    ).toBe("rival");
+    expect(
+      ONBOARDING_MENTOR_ASSIGNMENTS[
+        "either_works|confidence_self_belief|encouraging_supportive|belief_support"
+      ],
+    ).toBe("icon");
+  });
 });
 
 describe("resolvePreassignedMentorSlug", () => {
@@ -90,16 +151,16 @@ describe("resolveAssignedMentorFromActiveMentors", () => {
   it("returns the assigned mentor directly when available", () => {
     const answers = makeAnswers(
       "masculine_presence",
-      "discipline_performance",
+      "clarity_mindset",
       "direct_demanding",
       "pressure_standards",
     );
     const result = resolveAssignedMentorFromActiveMentors(answers, activeMentors);
 
-    expect(result.mentor?.slug).toBe("charles");
+    expect(result.mentor?.slug).toBe("operator");
     expect(result.usedFallback).toBe(false);
-    expect(result.requestedSlug).toBe("charles");
-    expect(result.resolvedSlug).toBe("charles");
+    expect(result.requestedSlug).toBe("operator");
+    expect(result.resolvedSlug).toBe("operator");
   });
 
   it("falls back within same feminine branch when assigned slug is inactive", () => {

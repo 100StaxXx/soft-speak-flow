@@ -289,7 +289,7 @@ describe("DraggableFAB", () => {
     expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
       target: "planner",
       starterIntent: "low_energy_adjust",
-      message: "I'm low energy today",
+      message: "I'm low energy",
     }));
   });
 

@@ -34,6 +34,37 @@ export type CompanionAgentActionStatus =
   | "failed"
   | "executed";
 
+export type CompanionAgentUnderstandingState =
+  | "needs_followup"
+  | "enough_to_discuss"
+  | "ready_to_propose"
+  | "ready_to_draft";
+
+export type CompanionAgentSelectedProposedActionIntent = "draft" | "discuss";
+
+export interface CompanionAgentFollowUp {
+  question: string;
+  reason?: string | null;
+  expectedAnswerType:
+    | "free_text"
+    | "choice"
+    | "time"
+    | "priority"
+    | "confirmation";
+  options?: string[];
+  blocksDrafting: boolean;
+}
+
+export interface CompanionAgentProposedAction {
+  type: string;
+  title?: string | null;
+  summary?: string | null;
+  reason?: string | null;
+  normalizedPayload?: Json;
+  confidence?: number;
+  [key: string]: Json | undefined;
+}
+
 export type CompanionPendingActionType =
   | "task_create"
   | "task_update"
@@ -99,6 +130,10 @@ export interface CompanionAgentRequest {
   visibleDateEnd?: string;
   horizonDays?: number;
   selectedEntityIds?: CompanionAgentSelectedEntityIds;
+  activeFollowUp?: CompanionAgentFollowUp | null;
+  activeProposedActions?: CompanionAgentProposedAction[];
+  selectedProposedAction?: CompanionAgentProposedAction;
+  selectedProposedActionIntent?: CompanionAgentSelectedProposedActionIntent;
 }
 
 export interface CompanionAgentResponse {
@@ -106,6 +141,11 @@ export interface CompanionAgentResponse {
   mode: CompanionAgentMode;
   intent: CompanionAgentIntent;
   confidence: number;
+  understandingState?: CompanionAgentUnderstandingState;
+  followUp?: CompanionAgentFollowUp | null;
+  proposedActions?: CompanionAgentProposedAction[];
+  assumptions?: string[];
+  evidenceIds?: string[];
   structuredResponse?: CompanionStructuredResponse | null;
   pendingAction?: PendingActionView;
   receipt?: ActionReceiptView;
@@ -127,6 +167,11 @@ export interface CompanionAgentMessage {
   inputMode?: CompanionChatInputMode;
   mode?: CompanionAgentMode;
   intent?: CompanionAgentIntent;
+  understandingState?: CompanionAgentUnderstandingState;
+  followUp?: CompanionAgentFollowUp | null;
+  proposedActions?: CompanionAgentProposedAction[];
+  assumptions?: string[];
+  evidenceIds?: string[];
   structuredResponse?: CompanionStructuredResponse | null;
   pendingAction?: PendingActionView;
   receipt?: ActionReceiptView;

@@ -65,6 +65,18 @@ export const COMPANION_PENDING_ACTION_STATUSES = [
   "executed",
 ] as const;
 
+export const COMPANION_AGENT_UNDERSTANDING_STATES = [
+  "needs_followup",
+  "enough_to_discuss",
+  "ready_to_propose",
+  "ready_to_draft",
+] as const;
+
+export const COMPANION_AGENT_SELECTED_PROPOSED_ACTION_INTENTS = [
+  "draft",
+  "discuss",
+] as const;
+
 const CompanionIntentMetadataSchema = z.object({
   intentType: z.enum(["conversation", "quest", "campaign", "clarification"]),
   timeHorizon: z.enum(["today", "short_term", "long_term"]),
@@ -209,9 +221,38 @@ export const PendingActionTypeSchema = z.enum(COMPANION_PENDING_ACTION_TYPES);
 export const PendingActionStatusSchema = z.enum(
   COMPANION_PENDING_ACTION_STATUSES,
 );
+export const UnderstandingStateSchema = z.enum(
+  COMPANION_AGENT_UNDERSTANDING_STATES,
+);
+export const SelectedProposedActionIntentSchema = z.enum(
+  COMPANION_AGENT_SELECTED_PROPOSED_ACTION_INTENTS,
+);
 export const CampaignLifecycleStatusSchema = z.enum(
   COMPANION_CAMPAIGN_LIFECYCLE_STATUSES,
 );
+
+export const CompanionAgentFollowUpSchema = z.object({
+  question: z.string().min(1).max(500),
+  reason: z.string().min(1).max(1000).optional().nullable(),
+  expectedAnswerType: z.enum([
+    "free_text",
+    "choice",
+    "time",
+    "priority",
+    "confirmation",
+  ]).default("free_text"),
+  options: z.array(z.string().min(1).max(120)).max(6).optional(),
+  blocksDrafting: z.boolean().default(true),
+});
+
+export const CompanionAgentProposedActionSchema = z.object({
+  type: z.string().min(1).max(80),
+  title: z.string().min(1).max(200).optional().nullable(),
+  summary: z.string().min(1).max(1000).optional().nullable(),
+  reason: z.string().min(1).max(2000).optional().nullable(),
+  normalizedPayload: z.record(z.unknown()).optional(),
+  confidence: z.number().min(0).max(1).optional(),
+}).passthrough();
 
 export const SelectedEntityIdsSchema = z.object({
   taskIds: z.array(z.string().uuid()).max(12).optional(),
@@ -233,6 +274,11 @@ export const CompanionAgentRequestSchema = z.object({
   visibleDateEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   horizonDays: z.number().int().min(1).max(31).optional(),
   selectedEntityIds: SelectedEntityIdsSchema,
+  activeFollowUp: CompanionAgentFollowUpSchema.nullable().optional(),
+  activeProposedActions: z.array(CompanionAgentProposedActionSchema).max(8)
+    .optional(),
+  selectedProposedAction: CompanionAgentProposedActionSchema.optional(),
+  selectedProposedActionIntent: SelectedProposedActionIntentSchema.optional(),
 });
 
 export const CompanionAgentActionRequestSchema = z.object({
@@ -246,6 +292,12 @@ export const SubmitCompanionResultSchema = z.object({
   mode: ModeSchema,
   intent: IntentSchema,
   confidence: z.number().min(0).max(1),
+  understanding_state: UnderstandingStateSchema.optional(),
+  follow_up: CompanionAgentFollowUpSchema.nullable().optional(),
+  proposed_actions: z.array(CompanionAgentProposedActionSchema).max(8)
+    .optional(),
+  assumptions: z.array(z.string().min(1).max(500)).max(8).optional(),
+  evidence_ids: z.array(z.string().min(1).max(200)).max(24).optional(),
   structured_response: CompanionStructuredResponseSchema.nullable().optional(),
   prepared_action_id: z.string().uuid().nullable().optional(),
 });
@@ -261,6 +313,18 @@ export type CompanionPendingActionType = z.infer<
 >;
 export type CompanionPendingActionStatus = z.infer<
   typeof PendingActionStatusSchema
+>;
+export type CompanionAgentUnderstandingState = z.infer<
+  typeof UnderstandingStateSchema
+>;
+export type CompanionAgentSelectedProposedActionIntent = z.infer<
+  typeof SelectedProposedActionIntentSchema
+>;
+export type CompanionAgentFollowUp = z.infer<
+  typeof CompanionAgentFollowUpSchema
+>;
+export type CompanionAgentProposedAction = z.infer<
+  typeof CompanionAgentProposedActionSchema
 >;
 export type CompanionCampaignLifecycleStatus = z.infer<
   typeof CampaignLifecycleStatusSchema
@@ -332,6 +396,7 @@ export interface ChatRow {
   source: string;
   surface: string;
   session_id: string;
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface LoadedCompanionAgentContext {

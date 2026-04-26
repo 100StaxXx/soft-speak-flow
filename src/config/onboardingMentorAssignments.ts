@@ -65,11 +65,11 @@ const ENERGY_CANDIDATES: Record<EnergyOptionId, readonly OnboardingMentorSlug[]>
 };
 
 const MENTOR_PRIORITY: readonly OnboardingMentorSlug[] = [
+  "operator",
+  "icon",
   "sage",
   "lyra",
   "princess",
-  "operator",
-  "icon",
   "rival",
   "charles",
 ];
@@ -109,7 +109,7 @@ const SCORE_CARDS: Record<OnboardingMentorSlug, MentorScoreCard> = {
       direct_demanding: 0,
     },
     progress: {
-      principles_logic: 3,
+      principles_logic: 4,
       emotional_reassurance: 4,
       belief_support: 4,
       pressure_standards: 0,
@@ -120,39 +120,39 @@ const SCORE_CARDS: Record<OnboardingMentorSlug, MentorScoreCard> = {
       clarity_mindset: 2,
       emotions_healing: 1,
       discipline_performance: 2,
-      confidence_self_belief: 5,
+      confidence_self_belief: 6,
     },
     tone: {
       gentle_compassionate: 1,
-      encouraging_supportive: 2,
-      calm_grounded: 2,
+      encouraging_supportive: 4,
+      calm_grounded: 3,
       direct_demanding: 4,
     },
     progress: {
-      principles_logic: 2,
+      principles_logic: 3,
       emotional_reassurance: 1,
-      belief_support: 4,
+      belief_support: 6,
       pressure_standards: 5,
     },
   },
   charles: {
     focus: {
-      clarity_mindset: 3,
+      clarity_mindset: 1,
       emotions_healing: 0,
-      discipline_performance: 5,
-      confidence_self_belief: 2,
+      discipline_performance: 3,
+      confidence_self_belief: 1,
     },
     tone: {
       gentle_compassionate: 0,
       encouraging_supportive: 0,
       calm_grounded: 0,
-      direct_demanding: 6,
+      direct_demanding: 3,
     },
     progress: {
-      principles_logic: 2,
+      principles_logic: 1,
       emotional_reassurance: 0,
       belief_support: 0,
-      pressure_standards: 6,
+      pressure_standards: 3,
     },
   },
   princess: {
@@ -172,7 +172,7 @@ const SCORE_CARDS: Record<OnboardingMentorSlug, MentorScoreCard> = {
       principles_logic: 1,
       emotional_reassurance: 5,
       belief_support: 5,
-      pressure_standards: 1,
+      pressure_standards: 2,
     },
   },
   operator: {
@@ -180,18 +180,18 @@ const SCORE_CARDS: Record<OnboardingMentorSlug, MentorScoreCard> = {
       clarity_mindset: 5,
       emotions_healing: 0,
       discipline_performance: 5,
-      confidence_self_belief: 1,
+      confidence_self_belief: 2,
     },
     tone: {
       gentle_compassionate: 0,
-      encouraging_supportive: 0,
-      calm_grounded: 3,
+      encouraging_supportive: 1,
+      calm_grounded: 4,
       direct_demanding: 5,
     },
     progress: {
       principles_logic: 5,
       emotional_reassurance: 0,
-      belief_support: 1,
+      belief_support: 2,
       pressure_standards: 5,
     },
   },
@@ -204,15 +204,15 @@ const SCORE_CARDS: Record<OnboardingMentorSlug, MentorScoreCard> = {
     },
     tone: {
       gentle_compassionate: 0,
-      encouraging_supportive: 2,
+      encouraging_supportive: 3,
       calm_grounded: 0,
       direct_demanding: 5,
     },
     progress: {
       principles_logic: 2,
       emotional_reassurance: 0,
-      belief_support: 2,
-      pressure_standards: 5,
+      belief_support: 3,
+      pressure_standards: 6,
     },
   },
 };
@@ -273,6 +273,15 @@ const getMentorScore = (
   }
 
   if (
+    mentorSlug === "sage"
+    && focusOptionId === "clarity_mindset"
+    && toneOptionId === "calm_grounded"
+    && progressOptionId === "principles_logic"
+  ) {
+    score += 2;
+  }
+
+  if (
     mentorSlug === "princess"
     && (focusOptionId === "emotions_healing" || focusOptionId === "confidence_self_belief")
     && (toneOptionId === "gentle_compassionate" || toneOptionId === "encouraging_supportive")
@@ -281,11 +290,40 @@ const getMentorScore = (
   }
 
   if (
+    mentorSlug === "princess"
+    && focusOptionId === "confidence_self_belief"
+    && toneOptionId === "gentle_compassionate"
+    && progressOptionId === "belief_support"
+  ) {
+    score += 2;
+  }
+
+  if (
     mentorSlug === "operator"
     && focusOptionId === "clarity_mindset"
     && progressOptionId === "principles_logic"
   ) {
-    score += 1;
+    score += 2;
+  }
+
+  if (
+    mentorSlug === "operator"
+    && focusOptionId === "discipline_performance"
+    && progressOptionId === "pressure_standards"
+  ) {
+    score += 2;
+  }
+
+  if (mentorSlug === "operator" && toneOptionId === "gentle_compassionate") {
+    score -= 1;
+  }
+
+  if (mentorSlug === "operator" && progressOptionId === "emotional_reassurance") {
+    score -= 1;
+  }
+
+  if (mentorSlug === "operator" && focusOptionId === "emotions_healing") {
+    score -= 2;
   }
 
   if (
@@ -296,20 +334,54 @@ const getMentorScore = (
     score += 1;
   }
 
+  if (mentorSlug === "rival" && toneOptionId === "gentle_compassionate") {
+    score -= 4;
+  }
+
+  if (mentorSlug === "rival" && progressOptionId === "emotional_reassurance") {
+    score -= 3;
+  }
+
+  if (
+    mentorSlug === "rival"
+    && focusOptionId === "confidence_self_belief"
+    && toneOptionId === "encouraging_supportive"
+    && progressOptionId === "belief_support"
+  ) {
+    score -= 3;
+  }
+
   if (
     mentorSlug === "icon"
     && focusOptionId === "confidence_self_belief"
     && progressOptionId === "pressure_standards"
   ) {
-    score += 1;
+    score += 2;
+  }
+
+  if (
+    mentorSlug === "icon"
+    && focusOptionId === "confidence_self_belief"
+    && progressOptionId === "belief_support"
+  ) {
+    score += 2;
+  }
+
+  if (mentorSlug === "icon" && focusOptionId === "emotions_healing") {
+    score -= 2;
+  }
+
+  if (mentorSlug === "icon" && progressOptionId === "emotional_reassurance") {
+    score -= 1;
   }
 
   if (
     mentorSlug === "charles"
+    && focusOptionId === "discipline_performance"
     && toneOptionId === "direct_demanding"
     && progressOptionId === "pressure_standards"
   ) {
-    score += 2;
+    score += 12;
   }
 
   return score;

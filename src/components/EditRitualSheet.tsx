@@ -229,8 +229,8 @@ export const EditRitualSheet = memo(function EditRitualSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[85vh] rounded-t-xl">
-        <SheetHeader className="pb-2">
+      <SheetContent side="bottom" className="flex h-[85dvh] max-h-[85dvh] flex-col overflow-hidden rounded-t-xl">
+        <SheetHeader className="shrink-0 pb-2">
           <SheetTitle className="flex items-center gap-2">
             <Repeat className="h-5 w-5 text-accent" />
             Edit Ritual
@@ -240,7 +240,7 @@ export const EditRitualSheet = memo(function EditRitualSheet({
           </p>
         </SheetHeader>
         
-        <ScrollArea className="h-[calc(85vh-140px)] pr-4">
+        <ScrollArea className="min-h-0 flex-1 pr-4">
           <div className="space-y-6 py-4" data-vaul-no-drag>
             {/* Natural Language Quick Edit */}
             <NaturalLanguageEditor onApply={handleNaturalLanguageApply} />
@@ -434,7 +434,7 @@ export const EditRitualSheet = memo(function EditRitualSheet({
           </div>
         </ScrollArea>
 
-        <SheetFooter className="pt-4 flex gap-2">
+        <SheetFooter className="flex shrink-0 gap-2 pb-safe pt-4">
           <Button variant="outline" className="flex-1" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>

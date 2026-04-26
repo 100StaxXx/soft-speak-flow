@@ -373,7 +373,7 @@ describe("companionChatThreads service", () => {
       rows: [
         {
           role: "user",
-          content: "What matters most today?",
+          content: "What matters most?",
           createdAt: "2026-04-24T10:00:00.000Z",
           inputMode: "text",
         },
@@ -423,7 +423,7 @@ describe("companionChatThreads service", () => {
         user_id: "user-1",
         companion_id: "companion-1",
         role: "user",
-        content: "What matters most today?",
+        content: "What matters most?",
         input_mode: "text",
         metadata: {},
         session_id: "session-1",

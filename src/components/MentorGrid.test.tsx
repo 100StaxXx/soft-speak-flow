@@ -65,5 +65,26 @@ describe("MentorGrid", () => {
     fireEvent.click(screen.getByText("The Sage"));
     expect(screen.getByText("Guide Preview")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /choose the sage/i })).toBeInTheDocument();
+    expect(screen.getByTestId("mentor-preview-content")).toHaveAttribute(
+      "data-bottom-padding",
+      "calc(env(safe-area-inset-bottom, 0px) + 2rem)",
+    );
+  });
+
+  it("reserves bottom navigation space in the default mentor preview", () => {
+    render(
+      <MentorGrid
+        mentors={mentors}
+        onSelectMentor={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("The Sage"));
+
+    expect(screen.getByRole("button", { name: /choose the sage/i })).toBeInTheDocument();
+    expect(screen.getByTestId("mentor-preview-content")).toHaveAttribute(
+      "data-bottom-padding",
+      "calc(var(--bottom-nav-runtime-offset, var(--bottom-nav-safe-offset)) + 2rem)",
+    );
   });
 });

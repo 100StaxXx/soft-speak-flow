@@ -57,7 +57,10 @@ const DrawerContent = React.forwardRef<
       }}
       {...props}
     >
-      <DrawerPrimitive.Handle className="mx-auto mt-4 h-1.5 w-[88px] rounded-full bg-muted-foreground/45" />
+      <DrawerPrimitive.Handle
+        aria-label="Drag drawer"
+        className="mx-auto mt-4 h-1.5 w-[88px] rounded-full bg-muted-foreground/45"
+      />
       {children}
     </DrawerPrimitive.Content>
   </DrawerPortal>

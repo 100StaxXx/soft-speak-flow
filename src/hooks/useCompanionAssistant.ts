@@ -31,7 +31,11 @@ import {
 import { getCompanionPlannerOpener } from "@/shared/companionPlannerCopy";
 import type {
   ActionReceiptView,
+  CompanionAgentFollowUp,
+  CompanionAgentProposedAction,
   CompanionAgentResponse,
+  CompanionAgentSelectedProposedActionIntent,
+  CompanionAgentUnderstandingState,
   PendingActionView,
 } from "@/types/companionAgent";
 import type {
@@ -48,8 +52,8 @@ import {
 } from "@/utils/companionChatSetup";
 import { formatCurrentDateTimeWithOffset } from "@/utils/currentDateTime";
 import {
-  parseFunctionInvokeError,
   type ParsedFunctionInvokeError,
+  parseFunctionInvokeError,
   toUserFacingFunctionError,
 } from "@/utils/supabaseFunctionErrors";
 
@@ -63,6 +67,11 @@ export interface CompanionAssistantMessage {
   inputMode?: CompanionChatInputMode;
   source: CompanionChatSource;
   isSeed?: boolean;
+  understandingState?: CompanionAgentUnderstandingState;
+  followUp?: CompanionAgentFollowUp | null;
+  proposedActions?: CompanionAgentProposedAction[];
+  assumptions?: string[];
+  evidenceIds?: string[];
   structuredResponse?: CompanionAgentResponse["structuredResponse"];
   pendingAction?: PendingActionView;
   receipt?: ActionReceiptView;
@@ -79,6 +88,9 @@ interface UseCompanionAssistantOptions {
 interface CachedCompanionThreadUiState {
   messages: CompanionAssistantMessage[];
   structuredResponse: CompanionAgentResponse["structuredResponse"];
+  activeFollowUp: CompanionAgentFollowUp | null;
+  understandingState: CompanionAgentUnderstandingState | null;
+  proposedActions: CompanionAgentProposedAction[];
   savedSuggestionProposalIds: string[];
   lastStarterIntent: CompanionPlannerLaunchIntent["starterIntent"] | null;
   lastReplayablePlannerMessage: string | null;
@@ -88,6 +100,8 @@ type ThreadsQueryResult = {
   threads: CompanionChatThreadSummary[];
   setupUnavailable: boolean;
 };
+
+const MAX_ACTIVE_PROPOSED_ACTIONS = 8;
 
 const generateMessageId = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -143,8 +157,12 @@ const mapLoadedMessage = (
     ? message.metadata as Record<string, unknown>
     : null;
 
-  const parsePendingAction = (value: unknown): PendingActionView | undefined => {
-    if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const parsePendingAction = (
+    value: unknown,
+  ): PendingActionView | undefined => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return undefined;
+    }
     const pendingAction = value as Record<string, unknown>;
     if (
       typeof pendingAction.id !== "string" ||
@@ -182,7 +200,9 @@ const mapLoadedMessage = (
   };
 
   const parseReceipt = (value: unknown): ActionReceiptView | undefined => {
-    if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return undefined;
+    }
     const receipt = value as Record<string, unknown>;
     if (
       typeof receipt.actionId !== "string" ||
@@ -211,8 +231,69 @@ const mapLoadedMessage = (
     };
   };
 
+  const parseUnderstandingState = (value: unknown) =>
+    value === "needs_followup" ||
+      value === "enough_to_discuss" ||
+      value === "ready_to_propose" ||
+      value === "ready_to_draft"
+      ? value as CompanionAgentUnderstandingState
+      : undefined;
+
+  const parseFollowUp = (value: unknown): CompanionAgentFollowUp | null => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return null;
+    }
+    const followUp = value as Record<string, unknown>;
+    if (typeof followUp.question !== "string") return null;
+
+    const expectedAnswerType = followUp.expectedAnswerType === "choice" ||
+        followUp.expectedAnswerType === "time" ||
+        followUp.expectedAnswerType === "priority" ||
+        followUp.expectedAnswerType === "confirmation" ||
+        followUp.expectedAnswerType === "free_text"
+      ? followUp.expectedAnswerType
+      : "free_text";
+
+    return {
+      question: followUp.question,
+      reason: typeof followUp.reason === "string" ? followUp.reason : null,
+      expectedAnswerType,
+      options: Array.isArray(followUp.options)
+        ? followUp.options.filter((option): option is string =>
+          typeof option === "string"
+        )
+        : undefined,
+      blocksDrafting: typeof followUp.blocksDrafting === "boolean"
+        ? followUp.blocksDrafting
+        : true,
+    };
+  };
+
+  const parseProposedActions = (
+    value: unknown,
+  ): CompanionAgentProposedAction[] =>
+    Array.isArray(value)
+      ? value.filter((entry): entry is CompanionAgentProposedAction =>
+        Boolean(entry) && typeof entry === "object" && !Array.isArray(entry) &&
+        typeof (entry as Record<string, unknown>).type === "string"
+      )
+      : [];
+
+  const parseStringArray = (value: unknown): string[] =>
+    Array.isArray(value)
+      ? value.filter((entry): entry is string => typeof entry === "string")
+      : [];
+
+  const agentDecision =
+    metadata && typeof metadata.agentDecision === "object" &&
+      metadata.agentDecision !== null && !Array.isArray(metadata.agentDecision)
+      ? metadata.agentDecision as Record<string, unknown>
+      : null;
+
   const structuredResponse = metadata && "structuredResponse" in metadata
-    ? (metadata.structuredResponse as CompanionAgentResponse["structuredResponse"] ?? null)
+    ? (metadata
+      .structuredResponse as CompanionAgentResponse["structuredResponse"] ??
+      null)
     : undefined;
 
   return {
@@ -222,6 +303,13 @@ const mapLoadedMessage = (
     createdAt: message.createdAt,
     inputMode: message.inputMode,
     source: message.source,
+    understandingState: parseUnderstandingState(
+      agentDecision?.understandingState,
+    ),
+    followUp: parseFollowUp(agentDecision?.followUp),
+    proposedActions: parseProposedActions(agentDecision?.proposedActions),
+    assumptions: parseStringArray(agentDecision?.assumptions),
+    evidenceIds: parseStringArray(agentDecision?.evidenceIds),
     structuredResponse,
     pendingAction: parsePendingAction(metadata?.pendingAction),
     receipt: parseReceipt(metadata?.receipt),
@@ -318,10 +406,13 @@ const pruneProposalIdsToStructuredResponse = (
 const deriveStructuredResponseFromMessages = (
   messages: CompanionAssistantMessage[],
 ) => {
-  let currentStructuredResponse: CompanionAgentResponse["structuredResponse"] = null;
+  let currentStructuredResponse: CompanionAgentResponse["structuredResponse"] =
+    null;
 
   for (const message of messages) {
-    if (message.role !== "assistant" || message.structuredResponse === undefined) {
+    if (
+      message.role !== "assistant" || message.structuredResponse === undefined
+    ) {
       continue;
     }
 
@@ -329,6 +420,36 @@ const deriveStructuredResponseFromMessages = (
   }
 
   return currentStructuredResponse;
+};
+
+const deriveLatestAgentDecisionFromMessages = (
+  messages: CompanionAssistantMessage[],
+) => {
+  let current: {
+    activeFollowUp: CompanionAgentFollowUp | null;
+    understandingState: CompanionAgentUnderstandingState | null;
+    proposedActions: CompanionAgentProposedAction[];
+  } = {
+    activeFollowUp: null,
+    understandingState: null,
+    proposedActions: [],
+  };
+
+  for (const message of messages) {
+    if (message.role !== "assistant") continue;
+    const hasDecision = message.understandingState !== undefined ||
+      message.followUp !== undefined ||
+      message.proposedActions !== undefined;
+    if (!hasDecision) continue;
+
+    current = {
+      activeFollowUp: message.followUp ?? null,
+      understandingState: message.understandingState ?? null,
+      proposedActions: message.proposedActions ?? [],
+    };
+  }
+
+  return current;
 };
 
 const collectSavedProposalIdsFromMessages = (
@@ -529,6 +650,15 @@ export function useCompanionAssistant({
   const [structuredResponse, setStructuredResponse] = useState<
     CompanionAgentResponse["structuredResponse"]
   >(null);
+  const [activeFollowUp, setActiveFollowUp] = useState<
+    CompanionAgentFollowUp | null
+  >(null);
+  const [understandingState, setUnderstandingState] = useState<
+    CompanionAgentUnderstandingState | null
+  >(null);
+  const [proposedActions, setProposedActions] = useState<
+    CompanionAgentProposedAction[]
+  >([]);
   const [pendingAction, setPendingAction] = useState<PendingActionView | null>(
     null,
   );
@@ -570,6 +700,8 @@ export function useCompanionAssistant({
   const todayLabel = getTodayLabel();
   const placeholder = pendingAction
     ? "Reply here or confirm the pending action."
+    : activeFollowUp
+    ? "Answer Cosmiq's follow-up."
     : surface === "journeys"
     ? "Talk to Cosmiq"
     : "Talk to Cosmiq naturally.";
@@ -618,6 +750,9 @@ export function useCompanionAssistant({
     setDraftInput("");
     setInterimText("");
     setStructuredResponse(null);
+    setActiveFollowUp(null);
+    setUnderstandingState(null);
+    setProposedActions([]);
     setPendingAction(null);
     setSavedSuggestionProposalIds([]);
     setPendingSuggestionProposalId(null);
@@ -647,14 +782,20 @@ export function useCompanionAssistant({
     threadUiStateCacheRef.current.set(activeSessionIdRef.current, {
       messages,
       structuredResponse,
+      activeFollowUp,
+      understandingState,
+      proposedActions,
       savedSuggestionProposalIds,
       lastStarterIntent: lastStarterIntentRef.current,
       lastReplayablePlannerMessage: lastReplayablePlannerMessageRef.current,
     });
   }, [
     messages,
+    activeFollowUp,
+    proposedActions,
     savedSuggestionProposalIds,
     structuredResponse,
+    understandingState,
   ]);
 
   const loadThreadState = useCallback(async (
@@ -679,16 +820,28 @@ export function useCompanionAssistant({
       null;
     const mappedThreadMessages = cachedThreadUiState?.messages ??
       threadMessages.map(mapLoadedMessage);
-    const restoredStructuredResponse = cachedThreadUiState?.structuredResponse ??
-      deriveStructuredResponseFromMessages(mappedThreadMessages);
-    const restoredSavedProposalIds = cachedThreadUiState?.savedSuggestionProposalIds ??
-      collectSavedProposalIdsFromMessages(mappedThreadMessages);
+    const restoredStructuredResponse =
+      cachedThreadUiState?.structuredResponse ??
+        deriveStructuredResponseFromMessages(mappedThreadMessages);
+    const restoredDecision = cachedThreadUiState
+      ? {
+        activeFollowUp: cachedThreadUiState.activeFollowUp,
+        understandingState: cachedThreadUiState.understandingState,
+        proposedActions: cachedThreadUiState.proposedActions,
+      }
+      : deriveLatestAgentDecisionFromMessages(mappedThreadMessages);
+    const restoredSavedProposalIds =
+      cachedThreadUiState?.savedSuggestionProposalIds ??
+        collectSavedProposalIdsFromMessages(mappedThreadMessages);
 
     localThreadCreatedAtRef.current = threadMessages[0]?.createdAt ??
       new Date().toISOString();
     applyActiveSessionId(sessionId);
     setMessages(mappedThreadMessages);
     setStructuredResponse(restoredStructuredResponse);
+    setActiveFollowUp(restoredDecision.activeFollowUp);
+    setUnderstandingState(restoredDecision.understandingState);
+    setProposedActions(restoredDecision.proposedActions);
     setPendingAction(loadedPendingAction);
     setSavedSuggestionProposalIds(
       pruneProposalIdsToStructuredResponse(
@@ -758,7 +911,9 @@ export function useCompanionAssistant({
       })
       .catch((error) => {
         console.error("Failed to hydrate companion thread:", error);
-        if (cancelled || threadMutationVersionRef.current !== hydrationVersion) {
+        if (
+          cancelled || threadMutationVersionRef.current !== hydrationVersion
+        ) {
           return;
         }
         toast.error(
@@ -893,19 +1048,28 @@ export function useCompanionAssistant({
       ...previous,
       createMessage("assistant", stripMarkdown(response.reply), {
         source: "agent",
+        understandingState: response.understandingState,
+        followUp: response.followUp ?? null,
+        proposedActions: response.proposedActions ?? [],
+        assumptions: response.assumptions ?? [],
+        evidenceIds: response.evidenceIds ?? [],
         structuredResponse: nextStructuredResponse,
         pendingAction: response.pendingAction,
         receipt: response.receipt,
       }),
     ]);
     setStructuredResponse(nextStructuredResponse);
+    setActiveFollowUp(response.followUp ?? null);
+    setUnderstandingState(response.understandingState ?? null);
+    setProposedActions(response.proposedActions ?? []);
     setPendingAction(response.pendingAction ?? null);
     setSavedSuggestionProposalIds((previous) =>
       pruneProposalIdsToStructuredResponse(previous, nextStructuredResponse)
     );
     setPendingSuggestionProposalId(
       response.pendingAction
-        ? response.pendingAction.proposalId ?? options?.pendingProposalId ?? null
+        ? response.pendingAction.proposalId ?? options?.pendingProposalId ??
+          null
         : null,
     );
     void speakAssistantReply(response.reply, response.threadState.sessionId);
@@ -916,6 +1080,8 @@ export function useCompanionAssistant({
     inputMode: CompanionChatInputMode = "text",
     options?: {
       starterIntent?: CompanionPlannerLaunchIntent["starterIntent"];
+      selectedProposedAction?: CompanionAgentProposedAction | null;
+      selectedProposedActionIntent?: CompanionAgentSelectedProposedActionIntent;
     },
   ) => {
     const message = rawMessage.trim();
@@ -955,6 +1121,16 @@ export function useCompanionAssistant({
             inputMode,
             currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
             starterIntent: options?.starterIntent,
+            activeFollowUp,
+            activeProposedActions: proposedActions.slice(
+              0,
+              MAX_ACTIVE_PROPOSED_ACTIONS,
+            ),
+            selectedProposedAction: options?.selectedProposedAction ??
+              undefined,
+            selectedProposedActionIntent: options?.selectedProposedAction
+              ? options.selectedProposedActionIntent ?? "draft"
+              : undefined,
           },
         },
       );
@@ -976,11 +1152,19 @@ export function useCompanionAssistant({
           hasPendingAction: Boolean(response.pendingAction),
           pendingActionType: response.pendingAction?.actionType ?? null,
           hasReceipt: Boolean(response.receipt),
+          understandingState: response.understandingState ?? null,
+          hasFollowUp: Boolean(response.followUp),
+          proposedActionCount: response.proposedActions?.length ?? 0,
         },
         userAction: "accepted",
         modifications: {
           surface,
           starterIntent: options?.starterIntent ?? null,
+          selectedProposedActionType: options?.selectedProposedAction?.type ??
+            null,
+          selectedProposedActionIntent: options?.selectedProposedAction
+            ? options.selectedProposedActionIntent ?? "draft"
+            : null,
           proposalId: response.pendingAction?.proposalId ?? null,
         },
       });
@@ -994,8 +1178,8 @@ export function useCompanionAssistant({
         code: getParsedFunctionCode(parsed) ?? null,
         requestId: parsed.requestId ?? null,
         stage: parsed.stage ?? parsed.responsePayload?.stage ?? null,
-        failureReason:
-          parsed.failureReason ?? parsed.responsePayload?.failureReason ?? null,
+        failureReason: parsed.failureReason ??
+          parsed.responsePayload?.failureReason ?? null,
         category: parsed.category ?? "unknown",
         surface,
         sessionId: activeSessionIdRef.current,
@@ -1024,6 +1208,7 @@ export function useCompanionAssistant({
   }, [
     applyActiveSessionId,
     appendAssistantResponse,
+    activeFollowUp,
     companion?.id,
     invalidateThreads,
     isResolvingAction,
@@ -1031,6 +1216,7 @@ export function useCompanionAssistant({
     legacyAssistant,
     trackInteraction,
     pendingSuggestionProposalId,
+    proposedActions,
     savedSuggestionProposalIds,
     surface,
     useLegacyFallback,
@@ -1079,11 +1265,19 @@ export function useCompanionAssistant({
           }),
           createMessage("assistant", stripMarkdown(response.reply), {
             source: "agent",
+            understandingState: response.understandingState,
+            followUp: response.followUp ?? null,
+            proposedActions: response.proposedActions ?? [],
+            assumptions: response.assumptions ?? [],
+            evidenceIds: response.evidenceIds ?? [],
             structuredResponse: nextStructuredResponse,
             receipt: response.receipt,
           }),
         ]);
         setStructuredResponse(nextStructuredResponse);
+        setActiveFollowUp(response.followUp ?? null);
+        setUnderstandingState(response.understandingState ?? null);
+        setProposedActions(response.proposedActions ?? []);
         setSavedSuggestionProposalIds((previous) => {
           const nextProposalIds = mode === "confirm" &&
               response.receipt?.status === "executed" &&
@@ -1174,8 +1368,8 @@ export function useCompanionAssistant({
         ? structuredResponse.priorityOverview.title.toLowerCase().includes(
             "make room",
           )
-          ? "Help me make room for what matters."
-          : "What matters most today?"
+          ? "Make room"
+          : "What matters most?"
         : structuredResponse?.reflectionBridge
         ? "Prepare me for tomorrow"
         : structuredResponse?.campaignMomentum
@@ -1281,7 +1475,9 @@ export function useCompanionAssistant({
   const startNewChat = useCallback(
     async (options?: { greetingText?: string | null }) => {
       const threadToArchive = persistedActiveThread ??
-        threadsQuery.data?.threads.find((thread) => thread.archivedAt === null) ??
+        threadsQuery.data?.threads.find((thread) =>
+          thread.archivedAt === null
+        ) ??
         null;
 
       if (threadToArchive) {
@@ -1349,7 +1545,9 @@ export function useCompanionAssistant({
           starterIntent: launchIntent.starterIntent,
         });
         if (submitted && launchIntent.starterIntent === "plan_day") {
-          window.dispatchEvent(new CustomEvent("companion-plan-my-day-started"));
+          window.dispatchEvent(
+            new CustomEvent("companion-plan-my-day-started"),
+          );
         }
       } catch (error) {
         console.error("Failed to handle launch intent:", error);
@@ -1429,9 +1627,12 @@ export function useCompanionAssistant({
       placeholder: legacyAssistant.placeholder,
       messages: legacyAssistant.messages,
       structuredResponse: legacyAssistant.structuredResponse,
+      activeFollowUp: null,
+      understandingState: null,
+      proposedActions: [],
       pendingAction: legacyAssistant.pendingAction,
-      savedSuggestionProposalIds:
-        legacyAssistant.savedSuggestionProposalIds ?? [],
+      savedSuggestionProposalIds: legacyAssistant.savedSuggestionProposalIds ??
+        [],
       pendingSuggestionProposalId:
         legacyAssistant.pendingSuggestionProposalId ??
           legacyAssistant.pendingAction?.proposalId ??
@@ -1483,6 +1684,9 @@ export function useCompanionAssistant({
     placeholder,
     messages,
     structuredResponse,
+    activeFollowUp,
+    understandingState,
+    proposedActions,
     pendingAction,
     savedSuggestionProposalIds,
     pendingSuggestionProposalId,

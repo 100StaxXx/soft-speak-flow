@@ -14,6 +14,7 @@ import {
   Check,
   ChevronRight,
   Loader2,
+  MessageSquare,
   Mic,
   Plus,
   Send,
@@ -56,7 +57,9 @@ import {
 import { useCompanionAssistant } from "@/hooks/useCompanionAssistant";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
 import { cn, stripMarkdown } from "@/lib/utils";
+import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
 import type { CompanionChatThreadSummary } from "@/types/companionConversation";
+import type { CompanionAgentProposedAction } from "@/types/companionAgent";
 import type {
   CompanionPlannerLaunchIntent,
   CompanionPlannerProposal,
@@ -84,6 +87,63 @@ type JourneysCompanionDrawerLayout = {
 const MOBILE_DRAWER_HEIGHT_MIN_PX = 320;
 const MOBILE_DRAWER_HEIGHT_MAX_PX = 736;
 const MOBILE_DRAWER_VIEWPORT_OFFSET_PX = 24;
+
+const formatProposedActionType = (type: string) =>
+  type.trim().replace(/[._-]+/g, " ") || "suggestion";
+
+const normalizeProposedActionType = (type: string) =>
+  type.trim().toLowerCase().replace(/[.\s-]+/g, "_");
+
+const isDraftableProposedAction = (action: CompanionAgentProposedAction) =>
+  [
+    "quest_create",
+    "task_create",
+    "quest_update",
+    "task_update",
+    "quest_move",
+    "task_move",
+    "ritual_create",
+    "habit_create",
+    "reminder_create",
+    "campaign_update",
+    "goal_update",
+    "campaign_adjust",
+    "goal_adjust",
+    "journal_entry",
+    "reflection_create",
+  ].includes(normalizeProposedActionType(action.type));
+
+const getProposedActionTitle = (action: CompanionAgentProposedAction) =>
+  action.title?.trim() || action.summary?.trim() ||
+  formatProposedActionType(action.type);
+
+const getProposedActionSummary = (action: CompanionAgentProposedAction) => {
+  const title = getProposedActionTitle(action);
+  const summary = action.summary?.trim();
+  return summary && summary !== title ? summary : null;
+};
+
+const getProposedActionKey = (action: CompanionAgentProposedAction) =>
+  [
+    normalizeProposedActionType(action.type),
+    getProposedActionTitle(action),
+    getProposedActionSummary(action) ?? "",
+    action.reason?.trim() ?? "",
+  ].join("::");
+
+const hasRichStructuredResponse = (
+  structuredResponse: CompanionStructuredResponse | null | undefined,
+) =>
+  Boolean(
+    structuredResponse?.planDay ||
+      structuredResponse?.weeklyPlan ||
+      structuredResponse?.priorityOverview ||
+      structuredResponse?.reflectionBridge ||
+      structuredResponse?.comingUp ||
+      structuredResponse?.rightNow ||
+      structuredResponse?.dayAdjust ||
+      structuredResponse?.campaignMomentum,
+  );
 
 const getReducedMotionPreference = () =>
   typeof window !== "undefined" &&
@@ -285,10 +345,20 @@ const JourneysCompanionOverlayBody = memo(({
     onLaunchIntentConsumed,
     onOpenCampaignBuilder,
   });
+  const visibleMessages = useMemo(
+    () => assistant.messages.filter((entry) => !entry.isSeed),
+    [assistant.messages],
+  );
   const prefersReducedMotion = getReducedMotionPreference();
   const isDrawerPresentation = presentation === "drawer";
 
   const [isThreadPickerOpen, setIsThreadPickerOpen] = useState(false);
+  const [pendingFollowUpOption, setPendingFollowUpOption] = useState<
+    string | null
+  >(null);
+  const [pendingProposedActionKey, setPendingProposedActionKey] = useState<
+    string | null
+  >(null);
 
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
@@ -332,9 +402,10 @@ const JourneysCompanionOverlayBody = memo(({
     keepBottomContentVisible("auto");
   }, [
     activeThreadSessionId,
-    assistant.messages,
+    assistant.activeFollowUp,
     assistant.pendingAction,
     keepBottomContentVisible,
+    visibleMessages,
   ]);
 
   const syncComposerHeight = useCallback(() => {
@@ -385,8 +456,83 @@ const JourneysCompanionOverlayBody = memo(({
     await assistant.startNewChat();
   }, [assistant]);
 
-  const sendDisabled = assistant.isSubmitting || assistant.isResolvingAction ||
-    !assistant.draftInput.trim();
+  const localActionPending = Boolean(
+    pendingFollowUpOption || pendingProposedActionKey,
+  );
+
+  const handleFollowUpOption = useCallback(async (option: string) => {
+    if (localActionPending) return;
+
+    setPendingFollowUpOption(option);
+    try {
+      await assistant.submitMessage(option, "text");
+    } finally {
+      setPendingFollowUpOption(null);
+    }
+  }, [assistant, localActionPending]);
+
+  const handleProposedActionDraft = useCallback((
+    action: CompanionAgentProposedAction,
+  ) => {
+    if (localActionPending) return;
+
+    setPendingProposedActionKey(getProposedActionKey(action));
+    void assistant
+      .submitMessage(
+        `Draft this: ${getProposedActionTitle(action)}`,
+        "text",
+        {
+          selectedProposedAction: action,
+          selectedProposedActionIntent: "draft",
+        },
+      )
+      .finally(() => {
+        setPendingProposedActionKey(null);
+      });
+  }, [assistant, localActionPending]);
+
+  const handleProposedActionDiscuss = useCallback((
+    action: CompanionAgentProposedAction,
+  ) => {
+    if (localActionPending) return;
+
+    setPendingProposedActionKey(getProposedActionKey(action));
+    void assistant
+      .submitMessage(
+        `Tell me more about: ${getProposedActionTitle(action)}`,
+        "text",
+        {
+          selectedProposedAction: action,
+          selectedProposedActionIntent: "discuss",
+        },
+      )
+      .finally(() => {
+        setPendingProposedActionKey(null);
+      });
+  }, [assistant, localActionPending]);
+
+  const assistantActionDisabled = assistant.isSubmitting ||
+    assistant.isResolvingAction ||
+    localActionPending;
+  const sendDisabled = assistantActionDisabled || !assistant.draftInput.trim();
+  const followUpOptions = assistant.activeFollowUp?.options?.filter((option) =>
+    option.trim().length > 0
+  ) ?? [];
+  const hasFollowUpPanel = Boolean(
+    assistant.activeFollowUp && !assistant.pendingAction,
+  );
+  const visibleProposedActions = hasRichStructuredResponse(
+      assistant.structuredResponse,
+    )
+    ? []
+    : assistant.proposedActions
+      .filter((action) =>
+        getProposedActionTitle(action).trim().length > 0
+      )
+      .slice(0, 3);
+  const hasProposedActionsPanel = !hasFollowUpPanel &&
+    !assistant.pendingAction &&
+    visibleProposedActions.length > 0;
   const micButtonLabel = assistant.isRecording
     ? "Stop voice reply"
     : "Start voice reply";
@@ -539,7 +685,7 @@ const JourneysCompanionOverlayBody = memo(({
               className="space-y-3 p-4 sm:p-5"
               data-testid="journeys-companion-planner-transcript"
             >
-              {assistant.messages.map((entry) => (
+              {visibleMessages.map((entry) => (
                 <div
                   key={entry.id}
                   className={cn(
@@ -570,10 +716,184 @@ const JourneysCompanionOverlayBody = memo(({
                 onConfirmSuggestion={assistant.confirmSuggestedQuest}
                 savedProposalIds={assistant.savedSuggestionProposalIds}
                 pendingProposalId={assistant.pendingSuggestionProposalId}
-                actionDisabled={assistant.isSubmitting ||
-                  assistant.isResolvingAction ||
+                actionDisabled={assistantActionDisabled ||
                   Boolean(assistant.pendingAction)}
               />
+
+              {hasFollowUpPanel && assistant.activeFollowUp
+                ? (
+                  <div
+                    className="flex w-full justify-start"
+                    data-testid="journeys-companion-follow-up"
+                  >
+                    <div
+                      className={cn(
+                        plannerPathfinderTheme.raisedPanel,
+                        "max-w-[88%] p-4",
+                      )}
+                    >
+                      <Badge
+                        variant="outline"
+                        className={plannerPathfinderTheme.chip}
+                      >
+                        Follow-up
+                      </Badge>
+                      <p className="mt-3 text-sm font-semibold text-[#4f240c]">
+                        {assistant.activeFollowUp.question}
+                      </p>
+                      {assistant.activeFollowUp.reason
+                        ? (
+                          <p className="mt-1 text-sm text-[#6b3416]/80">
+                            {assistant.activeFollowUp.reason}
+                          </p>
+                        )
+                        : null}
+                      {followUpOptions.length > 0
+                        ? (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {followUpOptions.map((option) => (
+                              <Button
+                                key={option}
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className={cn(
+                                  plannerPathfinderTheme.outlineButton,
+                                  "h-auto min-h-9 max-w-full whitespace-normal text-left leading-tight",
+                                )}
+                                onClick={() => handleFollowUpOption(option)}
+                                disabled={assistantActionDisabled}
+                              >
+                                {pendingFollowUpOption === option
+                                  ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  )
+                                  : null}
+                                {option}
+                              </Button>
+                            ))}
+                          </div>
+                        )
+                        : null}
+                    </div>
+                  </div>
+                )
+                : null}
+
+              {hasProposedActionsPanel
+                ? (
+                  <div
+                    className="flex w-full justify-start"
+                    data-testid="journeys-companion-proposed-actions"
+                  >
+                    <div
+                      className={cn(
+                        plannerPathfinderTheme.raisedPanel,
+                        "max-w-[88%] p-4",
+                      )}
+                    >
+                      <Badge
+                        variant="outline"
+                        className={plannerPathfinderTheme.chip}
+                      >
+                        Suggestions
+                      </Badge>
+                      <div className="mt-3 space-y-3">
+                        {visibleProposedActions.map((action, index) => {
+                          const title = getProposedActionTitle(action);
+                          const summary = getProposedActionSummary(action);
+                          const isDraftable = isDraftableProposedAction(action);
+                          const actionKey = getProposedActionKey(action);
+                          const isActionPending =
+                            pendingProposedActionKey === actionKey;
+                          return (
+                            <div
+                              key={`${actionKey}-${index}`}
+                              className="border-t border-[#6b3416]/24 pt-3 first:border-t-0 first:pt-0"
+                            >
+                              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div className="min-w-0">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <p className="text-sm font-semibold text-[#4f240c]">
+                                      {title}
+                                    </p>
+                                    <Badge
+                                      variant="outline"
+                                      className={plannerPathfinderTheme.chip}
+                                    >
+                                      {formatProposedActionType(action.type)}
+                                    </Badge>
+                                  </div>
+                                  {summary
+                                    ? (
+                                      <p className="mt-1 text-sm text-[#6b3416]/80">
+                                        {summary}
+                                      </p>
+                                    )
+                                    : null}
+                                  {action.reason
+                                    ? (
+                                      <p className="mt-1 text-xs leading-5 text-[#6b3416]/70">
+                                        {action.reason}
+                                      </p>
+                                    )
+                                    : null}
+                                </div>
+                                {isDraftable
+                                  ? (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      className={cn(
+                                        plannerPathfinderTheme.primaryButton,
+                                        "h-auto min-h-9 shrink-0 whitespace-normal leading-tight",
+                                      )}
+                                      onClick={() =>
+                                        handleProposedActionDraft(action)}
+                                      disabled={assistantActionDisabled}
+                                    >
+                                      {isActionPending
+                                        ? (
+                                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        )
+                                        : <Plus className="mr-2 h-4 w-4" />}
+                                      {isActionPending ? "Drafting" : "Draft"}
+                                    </Button>
+                                  )
+                                  : (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      className={cn(
+                                        plannerPathfinderTheme.outlineButton,
+                                        "h-auto min-h-9 shrink-0 whitespace-normal leading-tight",
+                                      )}
+                                      onClick={() =>
+                                        handleProposedActionDiscuss(action)}
+                                      disabled={assistantActionDisabled}
+                                    >
+                                      {isActionPending
+                                        ? (
+                                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        )
+                                        : (
+                                          <MessageSquare className="mr-2 h-4 w-4" />
+                                        )}
+                                      {isActionPending
+                                        ? "Discussing"
+                                        : "Discuss"}
+                                    </Button>
+                                  )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )
+                : null}
 
               {assistant.pendingAction
                 ? (
@@ -608,7 +928,10 @@ const JourneysCompanionOverlayBody = memo(({
                           variant="outline"
                           className={plannerPathfinderTheme.chip}
                         >
-                          {assistant.pendingAction.actionType.replace(/_/g, " ")}
+                          {assistant.pendingAction.actionType.replace(
+                            /_/g,
+                            " ",
+                          )}
                         </Badge>
                       </div>
                       <p className="mt-3 text-sm font-semibold text-white">
@@ -639,8 +962,7 @@ const JourneysCompanionOverlayBody = memo(({
                               variant="outline"
                               className={plannerPathfinderTheme.outlineButton}
                               onClick={assistant.confirmAllPendingActions}
-                              disabled={assistant.isSubmitting ||
-                                assistant.isResolvingAction}
+                              disabled={assistantActionDisabled}
                             >
                               Confirm All ({assistant.readyPendingActionCount})
                             </Button>
@@ -651,8 +973,7 @@ const JourneysCompanionOverlayBody = memo(({
                           size="sm"
                           className={plannerPathfinderTheme.primaryButton}
                           onClick={assistant.confirmPendingAction}
-                          disabled={assistant.isSubmitting ||
-                            assistant.isResolvingAction}
+                          disabled={assistantActionDisabled}
                         >
                           <Check className="mr-2 h-4 w-4" />
                           Confirm
@@ -663,8 +984,7 @@ const JourneysCompanionOverlayBody = memo(({
                           variant="outline"
                           className={plannerPathfinderTheme.outlineButton}
                           onClick={assistant.cancelPendingAction}
-                          disabled={assistant.isSubmitting ||
-                            assistant.isResolvingAction}
+                          disabled={assistantActionDisabled}
                         >
                           <X className="mr-2 h-4 w-4" />
                           Cancel

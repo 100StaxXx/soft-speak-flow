@@ -127,7 +127,7 @@ describe("QuickAdjustDrawer", () => {
     fireEvent.click(screen.getByRole("button", { name: /push all by 1 hour/i }));
 
     expect(onLaunchPlanner).toHaveBeenCalledWith(
-      "Push all remaining tasks back by 1 hour.",
+      "Push all by 1 hour",
       "adjust_today",
     );
     expect(onComplete).toHaveBeenCalledTimes(1);

@@ -75,14 +75,14 @@ describe("useJourneysCompanionConversation", () => {
     vi.clearAllMocks();
   });
 
-  it("starts with a blank transcript while still exposing the journeys greeting", () => {
+  it("starts with a blank transcript without a hardcoded opener", () => {
     const { result } = renderHook(() => useJourneysCompanionConversation());
-    const expectedOpener = getCompanionPlannerOpener({ userId: "user-1" });
 
     expect(result.current.messages).toEqual([]);
-    expect(result.current.greeting).toBe(expectedOpener);
-    expect(COMPANION_PLANNER_OPENER_TEMPLATES).toContain(expectedOpener);
-    expect(JOURNEYS_COMPANION_OPENERS).toContain(expectedOpener);
+    expect(result.current.greeting).toBe("");
+    expect(getCompanionPlannerOpener({ userId: "user-1" })).toBe("");
+    expect(COMPANION_PLANNER_OPENER_TEMPLATES).toEqual([]);
+    expect(JOURNEYS_COMPANION_OPENERS).toEqual([]);
   });
 
   it("stays dormant when disabled until the fallback path needs it", async () => {

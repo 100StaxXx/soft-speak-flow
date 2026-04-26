@@ -2,8 +2,14 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 import { getCorsHeaders } from "../_shared/cors.ts";
-import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
-import { cancelPendingAction, confirmPendingAction } from "../companion-agent/executor.ts";
+import {
+  createSafeErrorResponse,
+  requireProtectedRequest,
+} from "../_shared/abuseProtection.ts";
+import {
+  cancelPendingAction,
+  confirmPendingAction,
+} from "../companion-agent/executor.ts";
 import { CompanionAgentActionRequestSchema } from "../companion-agent/types.ts";
 
 serve(async (req) => {
@@ -20,18 +26,22 @@ serve(async (req) => {
       profileKey: "companion_agent_action",
       endpointName: "companion-agent-action",
       allowServiceRole: false,
-      blockedMessage: "Too many companion action requests right now. Try again in a moment.",
+      blockedMessage:
+        "Too many companion action requests right now. Try again in a moment.",
     });
 
     if (protectedRequest instanceof Response) return protectedRequest;
     requestId = protectedRequest.requestId;
 
-    const parsed = CompanionAgentActionRequestSchema.safeParse(await req.json());
+    const parsed = CompanionAgentActionRequestSchema.safeParse(
+      await req.json(),
+    );
     if (!parsed.success) {
       return createSafeErrorResponse(req, {
         status: 400,
         code: "INVALID_REQUEST",
-        error: parsed.error.flatten().formErrors[0] ?? "Invalid companion action request",
+        error: parsed.error.flatten().formErrors[0] ??
+          "Invalid companion action request",
         requestId,
       });
     }
@@ -56,6 +66,11 @@ serve(async (req) => {
         mode: "receipt",
         intent: result.action?.intent ?? "unknown",
         confidence: 1,
+        understandingState: "enough_to_discuss",
+        followUp: null,
+        proposedActions: [],
+        assumptions: [],
+        evidenceIds: [],
         receipt: result.receipt,
         threadState: {
           threadId: result.thread.session_id,

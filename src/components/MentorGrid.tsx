@@ -40,6 +40,9 @@ export const MentorGrid = ({
   const [selectedMentor, setSelectedMentor] = useState<string | null>(null);
   const topControlOffset = 'calc(env(safe-area-inset-top, 0px) + 1rem)';
   const isOnboardingAppearance = appearance === "onboarding";
+  const mentorPreviewBottomPadding = isOnboardingAppearance
+    ? 'calc(env(safe-area-inset-bottom, 0px) + 2rem)'
+    : 'calc(var(--bottom-nav-runtime-offset, var(--bottom-nav-safe-offset)) + 2rem)';
 
   // Order mentors: first by MENTOR_ORDER, then any unlisted mentors alphabetically
   const orderedMentors = (() => {
@@ -84,6 +87,7 @@ export const MentorGrid = ({
               ? "bg-[linear-gradient(180deg,rgba(7,7,16,0.9),rgba(7,7,16,0.98))]"
               : "bg-obsidian animate-fade-in",
           )}
+          style={{ scrollPaddingBottom: mentorPreviewBottomPadding }}
         >
           {/* Full Size Mentor Image */}
           <div className="absolute inset-0">
@@ -146,13 +150,15 @@ export const MentorGrid = ({
 
           {/* Overlayed Content */}
           <div
+            data-testid="mentor-preview-content"
+            data-bottom-padding={mentorPreviewBottomPadding}
             className={cn(
               "relative z-10 min-h-[100svh] w-full flex flex-col justify-end px-6 py-8 md:px-16 md:py-12 max-w-5xl mx-auto",
               isOnboardingAppearance ? "max-w-6xl" : "",
             )}
             style={{
               paddingTop: 'calc(env(safe-area-inset-top, 0px) + 4rem)',
-              paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 2rem)',
+              paddingBottom: mentorPreviewBottomPadding,
             }}
           >
             <div

@@ -1,5 +1,5 @@
 import type { HTMLAttributes, ReactNode } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
 
@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
     confirmSuggestedQuest: vi.fn(),
     confirmAllPendingActions: vi.fn(),
     stopSpeaking: vi.fn(),
+    submitMessage: vi.fn().mockResolvedValue(true),
     startNewChat: vi.fn().mockResolvedValue(undefined),
     archiveCurrentThread: vi.fn().mockResolvedValue(undefined),
     resumeThread: vi.fn().mockResolvedValue(undefined),
@@ -96,7 +97,21 @@ const mocks = vi.hoisted(() => ({
           },
         ],
       },
-    } as CompanionStructuredResponse,
+    } as CompanionStructuredResponse | null,
+    activeFollowUp: null as null | {
+      question: string;
+      reason?: string | null;
+      expectedAnswerType:
+        | "free_text"
+        | "choice"
+        | "time"
+        | "priority"
+        | "confirmation";
+      options?: string[];
+      blocksDrafting: boolean;
+    },
+    understandingState: null as null | string,
+    proposedActions: [] as Array<{ type: string }>,
     savedSuggestionProposalIds: ["proposal-plan-1"],
     pendingSuggestionProposalId: null as string | null,
   },
@@ -119,6 +134,9 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
     placeholder: "Talk to Cosmiq",
     messages: mocks.state.messages,
     structuredResponse: mocks.state.structuredResponse,
+    activeFollowUp: mocks.state.activeFollowUp,
+    understandingState: mocks.state.understandingState,
+    proposedActions: mocks.state.proposedActions,
     pendingAction: mocks.state.pendingAction,
     savedSuggestionProposalIds: mocks.state.savedSuggestionProposalIds,
     pendingSuggestionProposalId: mocks.state.pendingSuggestionProposalId,
@@ -129,6 +147,7 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
     interimText: "",
     isSubmitting: false,
     isResolvingAction: false,
+    submitMessage: mocks.assistant.submitMessage,
     submitTypedMessage: mocks.assistant.submitTypedMessage,
     confirmPendingAction: mocks.assistant.confirmPendingAction,
     cancelPendingAction: mocks.assistant.cancelPendingAction,
@@ -224,7 +243,11 @@ describe("JourneysCompanionPlannerModal", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.assistant.submitMessage.mockResolvedValue(true);
     mocks.drawerRootProps.length = 0;
+    mocks.state.activeFollowUp = null;
+    mocks.state.understandingState = null;
+    mocks.state.proposedActions = [];
 
     Object.defineProperty(window, "matchMedia", {
       writable: true,
@@ -336,6 +359,190 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(mocks.assistant.cancelPendingAction).toHaveBeenCalledTimes(1);
   });
 
+  it("renders model follow-up options as direct replies", async () => {
+    const previousPendingAction = mocks.state.pendingAction;
+    mocks.state.pendingAction = null;
+    mocks.state.activeFollowUp = {
+      question: "Do you want today to lean progress or recovery?",
+      reason: "Your calendar has room for either shape.",
+      expectedAnswerType: "choice",
+      options: ["Progress", "Recovery"],
+      blocksDrafting: true,
+    };
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    expect(screen.getByTestId("journeys-companion-follow-up"))
+      .toHaveTextContent("Do you want today to lean progress or recovery?");
+    expect(screen.getByText("Your calendar has room for either shape."))
+      .toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Progress" }));
+    });
+
+    expect(mocks.assistant.submitMessage).toHaveBeenCalledWith(
+      "Progress",
+      "text",
+    );
+
+    mocks.state.pendingAction = previousPendingAction;
+    mocks.state.activeFollowUp = null;
+  });
+
+  it("renders model proposed actions and sends the selected draft context", async () => {
+    const previousPendingAction = mocks.state.pendingAction;
+    const previousStructuredResponse = mocks.state.structuredResponse;
+    const previousProposedActions = mocks.state.proposedActions;
+    const proposedAction = {
+      type: "quest.create",
+      title: "Draft launch email",
+      summary: "Protect one launch block before the afternoon fills.",
+      reason: "It fits the cleanest open window.",
+      normalizedPayload: {
+        title: "Draft launch email",
+        date: "2026-04-18",
+        startTime: "10:00",
+      },
+    };
+    mocks.state.pendingAction = null;
+    mocks.state.structuredResponse = null;
+    mocks.state.proposedActions = [proposedAction];
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    expect(screen.getByTestId("journeys-companion-proposed-actions"))
+      .toHaveTextContent("Draft launch email");
+    expect(screen.getByText("It fits the cleanest open window."))
+      .toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Draft/i }));
+    });
+
+    expect(mocks.assistant.submitMessage).toHaveBeenCalledWith(
+      "Draft this: Draft launch email",
+      "text",
+      {
+        selectedProposedAction: proposedAction,
+        selectedProposedActionIntent: "draft",
+      },
+    );
+
+    mocks.state.pendingAction = previousPendingAction;
+    mocks.state.structuredResponse = previousStructuredResponse;
+    mocks.state.proposedActions = previousProposedActions;
+  });
+
+  it("prevents duplicate proposed action submits while a selection is in flight", async () => {
+    const previousPendingAction = mocks.state.pendingAction;
+    const previousStructuredResponse = mocks.state.structuredResponse;
+    const previousProposedActions = mocks.state.proposedActions;
+    const firstProposedAction = {
+      type: "quest.create",
+      title: "Draft launch email",
+      summary: "Protect one launch block before the afternoon fills.",
+    };
+    const secondProposedAction = {
+      type: "quest.create",
+      title: "Outline sales page",
+      summary: "Use the next clean focus block.",
+    };
+    mocks.assistant.submitMessage.mockReturnValueOnce(
+      new Promise<boolean>(() => undefined),
+    );
+    mocks.state.pendingAction = null;
+    mocks.state.structuredResponse = null;
+    mocks.state.proposedActions = [firstProposedAction, secondProposedAction];
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    const draftButtons = screen.getAllByRole("button", { name: /Draft/i });
+    expect(draftButtons).toHaveLength(2);
+    fireEvent.click(draftButtons[0]!);
+    fireEvent.click(draftButtons[1]!);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Drafting/i }))
+        .toBeDisabled();
+    });
+    expect(mocks.assistant.submitMessage).toHaveBeenCalledTimes(1);
+    expect(mocks.assistant.submitMessage).toHaveBeenCalledWith(
+      "Draft this: Draft launch email",
+      "text",
+      {
+        selectedProposedAction: firstProposedAction,
+        selectedProposedActionIntent: "draft",
+      },
+    );
+
+    mocks.state.pendingAction = previousPendingAction;
+    mocks.state.structuredResponse = previousStructuredResponse;
+    mocks.state.proposedActions = previousProposedActions;
+  });
+
+  it("keeps unsupported proposed actions conversational instead of draftable", async () => {
+    const previousPendingAction = mocks.state.pendingAction;
+    const previousStructuredResponse = mocks.state.structuredResponse;
+    const previousProposedActions = mocks.state.proposedActions;
+    const proposedAction = {
+      type: "calendar.event.update",
+      title: "Move dentist appointment",
+      summary: "External calendar events are read-only here.",
+      reason: "Cosmiq can talk through options, but cannot edit that event.",
+    };
+    mocks.state.pendingAction = null;
+    mocks.state.structuredResponse = null;
+    mocks.state.proposedActions = [proposedAction];
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    expect(screen.getByTestId("journeys-companion-proposed-actions"))
+      .toHaveTextContent("Move dentist appointment");
+    expect(screen.queryByRole("button", { name: /Draft/i })).toBeNull();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Discuss/i }));
+    });
+
+    expect(mocks.assistant.submitMessage).toHaveBeenCalledWith(
+      "Tell me more about: Move dentist appointment",
+      "text",
+      {
+        selectedProposedAction: proposedAction,
+        selectedProposedActionIntent: "discuss",
+      },
+    );
+
+    mocks.state.pendingAction = previousPendingAction;
+    mocks.state.structuredResponse = previousStructuredResponse;
+    mocks.state.proposedActions = previousProposedActions;
+  });
+
   it("lets the user confirm a specific structured quest suggestion", () => {
     const previousPendingAction = mocks.state.pendingAction;
     const previousSavedSuggestionProposalIds =
@@ -404,7 +611,8 @@ describe("JourneysCompanionPlannerModal", () => {
             estimatedDuration: "20 min",
             estimatedDurationMinutes: 20,
             source: "campaign" as const,
-            reason: "This campaign has slipped repeatedly and needs a reset plan this week.",
+            reason:
+              "This campaign has slipped repeatedly and needs a reset plan this week.",
           },
         ],
         busyDays: [],
@@ -424,12 +632,14 @@ describe("JourneysCompanionPlannerModal", () => {
             estimatedDuration: "20 min",
             estimatedDurationMinutes: 20,
             source: "campaign" as const,
-            reason: "This campaign has slipped repeatedly and needs a reset plan right now.",
+            reason:
+              "This campaign has slipped repeatedly and needs a reset plan right now.",
           },
         ],
       },
       reflectionBridge: {
-        message: "Tomorrow should start with a reset move before you add more pressure.",
+        message:
+          "Tomorrow should start with a reset move before you add more pressure.",
         carryForward: null,
         tomorrowSummary: "light" as const,
         firstAction: {
@@ -440,7 +650,8 @@ describe("JourneysCompanionPlannerModal", () => {
           estimatedDuration: "20 min",
           estimatedDurationMinutes: 20,
           source: "campaign" as const,
-          reason: "This campaign has slipped repeatedly without a protected recovery move. The honest first move tomorrow is resetting Launch prep before you pile on more work.",
+          reason:
+            "This campaign has slipped repeatedly without a protected recovery move. The honest first move tomorrow is resetting Launch prep before you pile on more work.",
         },
         tomorrowSchedule: [],
       },

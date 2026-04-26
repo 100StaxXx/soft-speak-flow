@@ -226,7 +226,7 @@ export function EditCampaignSheet({
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="bottom" className="h-[88vh] rounded-t-3xl px-0 pb-0">
+        <SheetContent side="bottom" className="flex h-[88dvh] max-h-[88dvh] flex-col overflow-hidden rounded-t-3xl px-0 pb-0">
           <SheetHeader className="px-6 pb-0">
             <SheetTitle className="flex items-center gap-2">
               <Pencil className="h-5 w-5 text-primary" />
@@ -237,7 +237,7 @@ export function EditCampaignSheet({
             </SheetDescription>
           </SheetHeader>
 
-          <ScrollArea className="mt-4 h-[calc(88vh-152px)] px-6 pb-6">
+          <ScrollArea className="mt-4 min-h-0 flex-1 px-6">
             <div className="space-y-8 pb-6" data-vaul-no-drag>
               <section className="space-y-4">
                 <div className="space-y-2">
@@ -411,7 +411,7 @@ export function EditCampaignSheet({
             </div>
           </ScrollArea>
 
-          <SheetFooter className="border-t border-border/40 px-6 py-4">
+          <SheetFooter className="shrink-0 border-t border-border/40 px-6 pb-safe pt-4">
             <Button
               type="button"
               variant="outline"

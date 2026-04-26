@@ -1,8 +1,6 @@
-export const COMPANION_PLANNER_OPENER_TEMPLATES = [
-  "The road's open. What are we setting in motion?",
-] as const;
+export const COMPANION_PLANNER_OPENER_TEMPLATES: readonly string[] = [];
 
-const DEFAULT_COMPANION_PLANNER_OPENER = COMPANION_PLANNER_OPENER_TEMPLATES[0];
+const DEFAULT_COMPANION_PLANNER_OPENER = "";
 
 const getPlannerDayKey = (date: Date) => {
   const year = date.getFullYear();
@@ -29,6 +27,10 @@ export const getCompanionPlannerOpener = ({
   date?: Date;
   userId?: string | null;
 } = {}) => {
+  if (COMPANION_PLANNER_OPENER_TEMPLATES.length === 0) {
+    return DEFAULT_COMPANION_PLANNER_OPENER;
+  }
+
   const seed = `${getPlannerDayKey(date)}:${userId ?? "anonymous"}:planner`;
   return COMPANION_PLANNER_OPENER_TEMPLATES[
     getStableIndex(seed, COMPANION_PLANNER_OPENER_TEMPLATES.length)

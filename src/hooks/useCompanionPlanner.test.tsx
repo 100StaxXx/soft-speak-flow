@@ -269,18 +269,11 @@ describe("useCompanionPlanner", () => {
     expect(mocks.externalCalendarHorizons).toEqual(["day", "week"]);
   });
 
-  it("bootstraps with planner-specific opener copy", async () => {
+  it("does not bootstrap a hardcoded planner opener", async () => {
     const { result } = renderHook(() => useCompanionPlanner());
 
-    await waitFor(() => {
-      expect(result.current.messages[0]?.content).toBe(
-        getCompanionPlannerOpener({ userId: null }),
-      );
-    });
-
-    expect(result.current.messages[0]?.content).not.toBe(
-      "Let's line things up.",
-    );
+    expect(getCompanionPlannerOpener({ userId: null })).toBe("");
+    expect(result.current.messages).toEqual([]);
   });
 
   it("stays dormant when disabled until fallback actually needs it", async () => {
@@ -2324,7 +2317,7 @@ describe("useCompanionPlanner", () => {
 
     await act(async () => {
       await result.current.submitMessage(
-        "Help me make room for what matters.",
+        "Make room",
         "text",
       );
     });

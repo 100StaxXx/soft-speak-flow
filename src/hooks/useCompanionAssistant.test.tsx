@@ -146,8 +146,9 @@ vi.mock("@/services/companionChatThreads", () => ({
   listCompanionChatThreads: mocks.listThreads,
   loadCompanionChatThreadMessages: mocks.loadThreadMessages,
   loadCompanionPendingAction: mocks.loadPendingAction,
-  readCompanionThreadReceiptProposalId: (receipt: { proposalId?: string | null } | null | undefined) =>
-    receipt?.proposalId ?? null,
+  readCompanionThreadReceiptProposalId: (
+    receipt: { proposalId?: string | null } | null | undefined,
+  ) => receipt?.proposalId ?? null,
   setCompanionChatThreadArchived: mocks.archiveThread,
 }));
 
@@ -339,7 +340,8 @@ describe("useCompanionAssistant", () => {
             actionId: "action-prepare-1",
             status: "executed",
             proposalId: "proposal-plan-1",
-            message: 'Got it — "Outline launch checklist" added for 2026-04-18.',
+            message:
+              'Got it — "Outline launch checklist" added for 2026-04-18.',
             summary: 'Create a quest for "Outline launch checklist".',
             createdAt: "2026-04-18T08:02:01.000Z",
           },
@@ -357,7 +359,8 @@ describe("useCompanionAssistant", () => {
       expect(result.current.activeThread?.sessionId).toBe("persisted-session");
     });
 
-    expect(result.current.structuredResponse?.planDay?.suggestedQuests).toHaveLength(2);
+    expect(result.current.structuredResponse?.planDay?.suggestedQuests)
+      .toHaveLength(2);
     expect(result.current.savedSuggestionProposalIds).toEqual([
       "proposal-plan-1",
     ]);
@@ -367,6 +370,116 @@ describe("useCompanionAssistant", () => {
         Boolean(message.structuredResponse?.planDay)
       ),
     ).toBe(true);
+  });
+
+  it("restores the latest persisted agent follow-up decision", async () => {
+    mocks.loadThreadMessages.mockResolvedValue([
+      {
+        id: "m1",
+        sessionId: "persisted-session",
+        role: "user",
+        content: "Plan my day",
+        createdAt: "2026-04-18T08:00:00.000Z",
+        source: "agent",
+      },
+      {
+        id: "m2",
+        sessionId: "persisted-session",
+        role: "assistant",
+        content: "Do you want today to lean progress or recovery?",
+        createdAt: "2026-04-18T08:00:01.000Z",
+        source: "agent",
+        metadata: {
+          mode: "clarify",
+          intent: "plan_day",
+          agentDecision: {
+            understandingState: "needs_followup",
+            followUp: {
+              question: "Do you want today to lean progress or recovery?",
+              reason: "Your calendar has room for either shape.",
+              expectedAnswerType: "choice",
+              options: ["Progress", "Recovery"],
+              blocksDrafting: true,
+            },
+            proposedActions: Array.from({ length: 9 }, (_, index) => ({
+              type: "quest.create",
+              title: index === 0
+                ? "Draft launch email"
+                : `Suggestion ${index + 1}`,
+              confidence: 0.72,
+            })),
+            assumptions: ["Calendar blocks are fixed."],
+            evidenceIds: ["task-1"],
+          },
+        },
+      },
+    ]);
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("persisted-session");
+    });
+
+    expect(result.current.understandingState).toBe("needs_followup");
+    expect(result.current.activeFollowUp?.question).toBe(
+      "Do you want today to lean progress or recovery?",
+    );
+    expect(result.current.activeFollowUp?.options).toEqual([
+      "Progress",
+      "Recovery",
+    ]);
+    expect(result.current.proposedActions).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: "quest.create",
+        title: "Draft launch email",
+      }),
+    ]));
+    expect(result.current.placeholder).toBe("Answer Cosmiq's follow-up.");
+    expect(result.current.messages.at(-1)).toEqual(
+      expect.objectContaining({
+        understandingState: "needs_followup",
+        followUp: expect.objectContaining({
+          expectedAnswerType: "choice",
+        }),
+        assumptions: ["Calendar blocks are fixed."],
+        evidenceIds: ["task-1"],
+      }),
+    );
+
+    await act(async () => {
+      await result.current.submitMessage("Progress", "text");
+    });
+
+    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+      "companion-agent",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          message: "Progress",
+          activeFollowUp: expect.objectContaining({
+            question: "Do you want today to lean progress or recovery?",
+            expectedAnswerType: "choice",
+          }),
+          activeProposedActions: [
+            expect.objectContaining({
+              type: "quest.create",
+              title: "Draft launch email",
+            }),
+            expect.objectContaining({ title: "Suggestion 2" }),
+            expect.objectContaining({ title: "Suggestion 3" }),
+            expect.objectContaining({ title: "Suggestion 4" }),
+            expect.objectContaining({ title: "Suggestion 5" }),
+            expect.objectContaining({ title: "Suggestion 6" }),
+            expect.objectContaining({ title: "Suggestion 7" }),
+            expect.objectContaining({ title: "Suggestion 8" }),
+          ],
+        }),
+      }),
+    );
   });
 
   it("preserves saved and pending suggestion ids in legacy fallback mode", async () => {
@@ -544,6 +657,57 @@ describe("useCompanionAssistant", () => {
     );
   });
 
+  it("sends selected proposed action context with draft requests", async () => {
+    const selectedProposedAction = {
+      type: "quest.create",
+      title: "Draft launch email",
+      normalizedPayload: {
+        title: "Draft launch email",
+        date: "2026-04-18",
+      },
+    };
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("persisted-session");
+    });
+
+    await act(async () => {
+      await result.current.submitMessage(
+        "Draft this: Draft launch email",
+        "text",
+        {
+          selectedProposedAction,
+          selectedProposedActionIntent: "draft",
+        },
+      );
+    });
+
+    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+      "companion-agent",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          message: "Draft this: Draft launch email",
+          selectedProposedAction,
+          selectedProposedActionIntent: "draft",
+        }),
+      }),
+    );
+    expect(mocks.trackInteraction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modifications: expect.objectContaining({
+          selectedProposedActionType: "quest.create",
+          selectedProposedActionIntent: "draft",
+        }),
+      }),
+    );
+  });
+
   it("shows user-facing function errors without adding a synthetic assistant turn", async () => {
     const networkError = Object.assign(
       new Error("Failed to send a request to the Edge Function"),
@@ -594,7 +758,9 @@ describe("useCompanionAssistant", () => {
   });
 
   it("logs parsed companion-agent HTTP failures with safe diagnostic metadata", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi.spyOn(console, "error").mockImplementation(
+      () => {},
+    );
     const httpError = Object.assign(
       new Error("Edge Function returned a non-2xx status code"),
       { name: "FunctionsHttpError" },
@@ -647,7 +813,9 @@ describe("useCompanionAssistant", () => {
   });
 
   it("shows a companion-agent setup message for backend setup failures", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi.spyOn(console, "error").mockImplementation(
+      () => {},
+    );
     mocks.supabaseInvoke.mockRejectedValueOnce(
       Object.assign(new Error("Edge Function returned a non-2xx status code"), {
         name: "FunctionsHttpError",
@@ -691,7 +859,9 @@ describe("useCompanionAssistant", () => {
   });
 
   it("shows a setup message for namespaced companion-agent schema mismatch failures", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi.spyOn(console, "error").mockImplementation(
+      () => {},
+    );
     mocks.supabaseInvoke.mockRejectedValueOnce(
       Object.assign(new Error("Edge Function returned a non-2xx status code"), {
         name: "FunctionsHttpError",
@@ -1191,7 +1361,7 @@ describe("useCompanionAssistant", () => {
           surface: "journeys",
           launchIntent: {
             id: "launch-recovery-1",
-            message: "I'm low energy today",
+            message: "I'm low energy",
             starterIntent: "low_energy_adjust",
           },
         }),
@@ -1203,7 +1373,7 @@ describe("useCompanionAssistant", () => {
         "companion-agent",
         expect.objectContaining({
           body: expect.objectContaining({
-            message: "I'm low energy today",
+            message: "I'm low energy",
             starterIntent: "low_energy_adjust",
           }),
         }),
@@ -1490,7 +1660,8 @@ describe("useCompanionAssistant", () => {
     expect(result.current.savedSuggestionProposalIds).toEqual([
       "proposal-plan-1",
     ]);
-    expect(result.current.structuredResponse?.planDay?.suggestedQuests).toHaveLength(2);
+    expect(result.current.structuredResponse?.planDay?.suggestedQuests)
+      .toHaveLength(2);
 
     await act(async () => {
       await result.current.confirmSuggestedQuest("proposal-plan-2");
@@ -1594,7 +1765,10 @@ describe("useCompanionAssistant", () => {
     );
 
     await waitFor(() => {
-      expect(result.current.structuredResponse?.planDay?.suggestedQuests[0]?.proposalId)
+      expect(
+        result.current.structuredResponse?.planDay?.suggestedQuests[0]
+          ?.proposalId,
+      )
         .toBe("proposal-plan-1");
     });
 
@@ -1689,7 +1863,10 @@ describe("useCompanionAssistant", () => {
     );
 
     await waitFor(() => {
-      expect(result.current.structuredResponse?.reflectionBridge?.firstAction?.proposalId)
+      expect(
+        result.current.structuredResponse?.reflectionBridge?.firstAction
+          ?.proposalId,
+      )
         .toBe("proposal-tomorrow-1");
     });
 
@@ -1818,7 +1995,10 @@ describe("useCompanionAssistant", () => {
     );
 
     await waitFor(() => {
-      expect(result.current.structuredResponse?.priorityOverview?.topPriorities[0]?.proposalId)
+      expect(
+        result.current.structuredResponse?.priorityOverview?.topPriorities[0]
+          ?.proposalId,
+      )
         .toBe("proposal-priority-1");
     });
 
@@ -1830,7 +2010,7 @@ describe("useCompanionAssistant", () => {
       "companion-agent",
       expect.objectContaining({
         body: expect.objectContaining({
-          message: "What matters most today?",
+          message: "What matters most?",
           starterIntent: "what_matters",
           selectedProposalId: "proposal-priority-1",
         }),
@@ -1942,7 +2122,7 @@ describe("useCompanionAssistant", () => {
       "companion-agent",
       expect.objectContaining({
         body: expect.objectContaining({
-          message: "Help me make room for what matters.",
+          message: "Make room",
           starterIntent: "make_room",
           selectedProposalId: "proposal-make-room-1",
         }),
@@ -2071,7 +2251,10 @@ describe("useCompanionAssistant", () => {
     );
 
     await waitFor(() => {
-      expect(result.current.structuredResponse?.campaignMomentum?.nextStep?.proposalId)
+      expect(
+        result.current.structuredResponse?.campaignMomentum?.nextStep
+          ?.proposalId,
+      )
         .toBe("proposal-campaign-1");
     });
 
@@ -2180,7 +2363,10 @@ describe("useCompanionAssistant", () => {
     );
 
     await waitFor(() => {
-      expect(result.current.structuredResponse?.rightNow?.recommendedAction?.proposalId)
+      expect(
+        result.current.structuredResponse?.rightNow?.recommendedAction
+          ?.proposalId,
+      )
         .toBe("proposal-right-now-1");
     });
 
@@ -2322,7 +2508,10 @@ describe("useCompanionAssistant", () => {
     );
 
     await waitFor(() => {
-      expect(result.current.structuredResponse?.weeklyPlan?.topPriorities[0]?.proposalId)
+      expect(
+        result.current.structuredResponse?.weeklyPlan?.topPriorities[0]
+          ?.proposalId,
+      )
         .toBe("proposal-weekly-1");
     });
 
@@ -2442,7 +2631,9 @@ describe("useCompanionAssistant", () => {
     );
 
     await waitFor(() => {
-      expect(result.current.structuredResponse?.comingUp?.nextBestAction?.proposalId)
+      expect(
+        result.current.structuredResponse?.comingUp?.nextBestAction?.proposalId,
+      )
         .toBe("proposal-coming-up-1");
     });
 
@@ -2484,7 +2675,8 @@ describe("useCompanionAssistant", () => {
               shouldPromptCampaign: false,
             },
             dayAdjust: {
-              message: "Keep the launch reset, move the rest, and trim one thing.",
+              message:
+                "Keep the launch reset, move the rest, and trim one thing.",
               keep: [
                 {
                   suggestionId: "adjust-1",
@@ -2694,7 +2886,8 @@ describe("useCompanionAssistant", () => {
       });
     });
 
-    expect(result.current.structuredResponse?.planDay?.suggestedQuests).toHaveLength(2);
+    expect(result.current.structuredResponse?.planDay?.suggestedQuests)
+      .toHaveLength(2);
     expect(result.current.messages.at(-1)?.content).toBe(
       "I drafted a focused day for you.",
     );
@@ -2714,7 +2907,8 @@ describe("useCompanionAssistant", () => {
     });
 
     expect(result.current.activeThread?.sessionId).toBe("persisted-session");
-    expect(result.current.structuredResponse?.planDay?.suggestedQuests).toHaveLength(2);
+    expect(result.current.structuredResponse?.planDay?.suggestedQuests)
+      .toHaveLength(2);
     expect(
       result.current.messages.some((message) =>
         message.content === "I drafted a focused day for you." &&

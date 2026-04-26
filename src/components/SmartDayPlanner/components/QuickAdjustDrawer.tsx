@@ -67,7 +67,7 @@ export function QuickAdjustDrawer({
       actions.push({
         icon: <Target className="h-4 w-4" />,
         label: "Focus on top 3",
-        prompt: "Keep only the 3 most important remaining tasks for today and move the rest to tomorrow.",
+        prompt: "Focus on top 3",
         starterIntent: "what_matters",
       });
     }
@@ -76,7 +76,7 @@ export function QuickAdjustDrawer({
       actions.push({
         icon: <Clock className="h-4 w-4" />,
         label: "Push all by 1 hour",
-        prompt: "Push all remaining tasks back by 1 hour.",
+        prompt: "Push all by 1 hour",
         starterIntent: "adjust_today",
       });
     }
@@ -85,7 +85,7 @@ export function QuickAdjustDrawer({
       actions.push({
         icon: <Calendar className="h-4 w-4" />,
         label: "Move rest to tomorrow",
-        prompt: "Move all remaining incomplete tasks to tomorrow.",
+        prompt: "Move rest to tomorrow",
         starterIntent: "adjust_today",
       });
     }
@@ -93,7 +93,7 @@ export function QuickAdjustDrawer({
     actions.push({
       icon: <Sparkles className="h-4 w-4" />,
       label: "Reschedule smarter",
-      prompt: "I am tired today. Reorganize the remaining tasks based on current time and energy optimization.",
+      prompt: "Reschedule smarter",
       starterIntent: "low_energy_adjust",
     });
 

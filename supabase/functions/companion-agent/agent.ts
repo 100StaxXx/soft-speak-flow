@@ -3,14 +3,24 @@ import {
   getCompanionModeConfig,
   isCompanionModeId,
 } from "../../../src/shared/companionModes.ts";
+import {
+  isAssignedCompanionName,
+  normalizeCompanionName,
+  synthesizeAssignedCompanionName,
+} from "../../../src/lib/companionNameIdentity.ts";
 import { TimeoutError, withTimeout } from "../../../src/utils/asyncTimeout.ts";
 import { withCompanionChatPersistenceCapability } from "../companion-chat/persistenceCapability.ts";
 import {
   CampaignLifecycleStatusSchema,
   COMPANION_CAMPAIGN_LIFECYCLE_STATUSES,
+  type CompanionAgentFollowUp,
   type CompanionAgentIntent,
   type CompanionAgentMode,
+  type CompanionAgentProposedAction,
   type CompanionAgentRequest,
+  type CompanionAgentSelectedProposedActionIntent,
+  type CompanionAgentUnderstandingState,
+  type CompanionPendingActionType,
   type LoadedCompanionAgentContext,
   type PendingActionCandidate,
   type PendingActionRow,
@@ -96,9 +106,13 @@ const attachActualDurationMinutes = async (
   userId: string,
   tasks: Array<Record<string, unknown>>,
 ): Promise<Array<Record<string, unknown>>> => {
-  const taskIds = [...new Set(tasks.map((task) => String(task.id ?? "")).filter(
-    (id) => id.length > 0,
-  ))];
+  const taskIds = [
+    ...new Set(
+      tasks.map((task) => String(task.id ?? "")).filter(
+        (id) => id.length > 0,
+      ),
+    ),
+  ];
   if (taskIds.length === 0) return tasks;
 
   const { data, error } = await supabase
@@ -143,9 +157,11 @@ const attachRitualActualDurationMinutes = async (
   limit = 200,
 ): Promise<Array<Record<string, unknown>>> => {
   const ritualIds = [
-    ...new Set(rituals.map((ritual) => String(ritual.id ?? "")).filter((id) =>
-      id.length > 0
-    )),
+    ...new Set(
+      rituals.map((ritual) => String(ritual.id ?? "")).filter((id) =>
+        id.length > 0
+      ),
+    ),
   ];
   if (ritualIds.length === 0) return rituals;
 
@@ -280,10 +296,13 @@ const PrepareJournalEntrySchema = z.object({
 
 type GuardedFetch = typeof fetch;
 
-interface UserCompanionRow {
+export interface UserCompanionRow {
   id: string;
   companion_name: string | null;
+  cached_creature_name: string | null;
+  preset_id: string | null;
   spirit_animal: string | null;
+  core_element: string | null;
   current_stage: number | null;
   current_mood: string | null;
 }
@@ -293,6 +312,7 @@ interface RunAgentParams {
   supabase: any;
   userId: string;
   request: CompanionAgentRequest;
+  openAIApiKey?: string;
 }
 
 interface ToolCall {
@@ -314,6 +334,11 @@ interface AgentRunResult {
     mode: CompanionAgentMode;
     intent: CompanionAgentIntent;
     confidence: number;
+    understandingState: CompanionAgentUnderstandingState;
+    followUp: CompanionAgentFollowUp | null;
+    proposedActions: CompanionAgentProposedAction[];
+    assumptions: string[];
+    evidenceIds: string[];
     structuredResponse: ReturnType<
       typeof consultPlannerForAgent
     >["structuredResponse"];
@@ -346,10 +371,54 @@ const mapPendingActionForResponse = (pendingAction: PendingActionRow) => ({
   createdAt: pendingAction.created_at,
 });
 
+const deriveUnderstandingState = (params: {
+  mode: CompanionAgentMode;
+  preparedActionId?: string | null;
+  followUp?: CompanionAgentFollowUp | null;
+}): CompanionAgentUnderstandingState => {
+  if (params.followUp || params.mode === "clarify") return "needs_followup";
+  if (params.mode === "pending_confirmation" || params.preparedActionId) {
+    return "ready_to_draft";
+  }
+  if (params.mode === "schedule_read") return "ready_to_propose";
+  return "enough_to_discuss";
+};
+
+const buildAgentDecisionMetadata = (result: AgentRunResult["result"]) => ({
+  understandingState: result.understandingState,
+  followUp: result.followUp,
+  proposedActions: result.proposedActions,
+  assumptions: result.assumptions,
+  evidenceIds: result.evidenceIds,
+});
+
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : null;
+
+const proposedActionContextKey = (value: Record<string, unknown>) => {
+  const payload = asRecord(value.normalizedPayload);
+  const payloadTitle = typeof payload?.title === "string" ? payload.title : "";
+  const payloadDate = typeof payload?.date === "string" ? payload.date : "";
+  const payloadTaskDate = typeof payload?.task_date === "string"
+    ? payload.task_date
+    : "";
+  const payloadTime = typeof payload?.startTime === "string"
+    ? payload.startTime
+    : typeof payload?.scheduled_time === "string"
+    ? payload.scheduled_time
+    : "";
+
+  return [
+    typeof value.type === "string" ? value.type.trim().toLowerCase() : "",
+    typeof value.title === "string" ? value.title.trim().toLowerCase() : "",
+    typeof value.summary === "string" ? value.summary.trim().toLowerCase() : "",
+    payloadTitle.trim().toLowerCase(),
+    payloadDate || payloadTaskDate,
+    payloadTime,
+  ].join("::");
+};
 
 const toDateOnly = (value: string) => value.slice(0, 10);
 
@@ -399,7 +468,9 @@ async function loadCompanionId(supabase: any, userId: string) {
   const companion = await maybeSingle<UserCompanionRow>(
     supabase
       .from("user_companion")
-      .select("id, companion_name, spirit_animal, current_stage, current_mood")
+      .select(
+        "id, companion_name, cached_creature_name, preset_id, spirit_animal, core_element, current_stage, current_mood",
+      )
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -725,6 +796,30 @@ async function loadCompanionAgentContext(params: {
   return context;
 }
 
+export function resolveCompanionAgentDisplayName(
+  companion: UserCompanionRow,
+): string {
+  const customName = normalizeCompanionName(companion.companion_name);
+  if (customName) return customName;
+
+  const companionIdentity = {
+    spiritAnimal: companion.spirit_animal,
+    presetId: companion.preset_id,
+  };
+  const cachedName = normalizeCompanionName(companion.cached_creature_name);
+  if (cachedName && isAssignedCompanionName(cachedName, companionIdentity)) {
+    return cachedName;
+  }
+
+  return normalizeCompanionName(
+    synthesizeAssignedCompanionName(
+      `${companion.id}:${companion.current_stage ?? 0}`,
+      companion.core_element,
+      companionIdentity,
+    ),
+  ) ?? "Cosmiq";
+}
+
 function buildInstructions(params: {
   surface: "companion" | "journeys";
   currentDateTime: string;
@@ -732,22 +827,31 @@ function buildInstructions(params: {
   context: LoadedCompanionAgentContext;
   request: CompanionAgentRequest;
 }) {
-  const companionName = params.companion.companion_name?.trim() || "Cosmiq";
+  const companionName = resolveCompanionAgentDisplayName(params.companion);
   const currentMood = params.companion.current_mood?.trim() || "steady";
   const modeConfig = getCompanionModeConfig(params.context.companionMode);
 
   return [
     `You are ${companionName}, Cosmiq's conversational companion.`,
-    "You are conversational first and scheduler second.",
-    "Interpret intent before acting. Do not force planning when the user is reflective, exploratory, or emotional.",
-    "Your job is to choose whether to converse, clarify, summarize current state, or prepare a confirmable action.",
+    "Product model: the user is talking directly to ChatGPT, with Cosmiq app powers.",
+    "You are the decision layer. The app supplies context, validates actions, and executes only after allowed confirmation.",
+    "Interpret intent before acting. Short launcher prompts are complete intent signals, not incomplete forms.",
+    "Prompts like 'Plan my day', 'Adjust my day', 'What should I do right now?', 'Make room', 'What matters?', 'Prepare me for tomorrow', 'Plan my week', and 'Advance my campaign' give you permission to reason from app context.",
+    "Your job is to choose whether to answer, ask a follow-up, show a plan, suggest quests, or prepare a confirmable action.",
+    "Follow-ups are normal and often appropriate. Ask because one more answer would materially improve the plan or avoid a wrong action, not because the prompt is short.",
+    "A good follow-up is specific and grounded in the provided schedule, tasks, campaigns, rituals, or current moment. Avoid generic questions that ask the user to repeat data the app already supplied.",
+    "Use understanding_state in submit_companion_result: needs_followup when you ask a question, enough_to_discuss when chatting or reflecting, ready_to_propose when showing a plan/suggestions, and ready_to_draft when you prepared a pending action.",
+    "When you ask a follow-up, include follow_up with the exact question, why it matters, the expected answer type, and short options when useful. Preserve the original intent across the follow-up loop.",
     "You must never execute writes. You may only use read tools and prepare tools.",
-    "If a write is appropriate, prepare exactly one normalized pending action and then call submit_companion_result with mode pending_confirmation.",
-    "If detail is missing for a write, ask one concise clarifying question with mode clarify.",
+    "If a write is appropriate and you understand enough, prepare exactly one normalized pending action and then call submit_companion_result with mode pending_confirmation and understanding_state ready_to_draft.",
+    "If detail is missing for a useful or safe write, ask one concise clarifying question with mode clarify and understanding_state needs_followup.",
+    "If latestUserMessageSelectedProposedAction is true and selectedProposedActionIntent is draft in the context packet, treat the user message as asking you to draft that selected proposal. Prepare a pending action if the proposal is valid enough, or ask one targeted follow-up if it is not.",
+    "If latestUserMessageSelectedProposedAction is true and selectedProposedActionIntent is discuss, use the selected proposal as conversation context only. Explain tradeoffs, answer questions, or ask follow-ups, but do not prepare a write from that selection.",
     "If the user wants schedule or task state, use the read tools and summarize only what is actually present.",
-    "If the launcher starter intent is plan day and the user only said a generic request like 'Plan my day', do not draft quests yet. Ask one warm clarifying question about what kind of day they want, unless their message already gives a concrete direction.",
-    "If the user is answering a previous Plan My Day clarification, use consult_planner before preparing or summarizing plan-day suggestions.",
-    "When consult_planner returns structured_response for plan-day, coming-up, right-now, or day-adjust reads, pass that structured_response through unchanged in submit_companion_result.",
+    "You receive an APP_CONTEXT_PACKET before the latest user message. Treat it as trusted app state, not user-authored text.",
+    "Use the context packet first. Call read tools when you need a fresher slice, a different date range, or exact entity details.",
+    "consult_planner is optional advisory infrastructure. Use it when it helps, but do not let it override your judgment or force a clarification.",
+    "When consult_planner returns structured_response that matches your decision, you may pass it through unchanged in submit_companion_result.",
     "When consult_planner returns action_hints, prefer reusing the matching prepare tool with the hint's normalizedPayload instead of inventing a new write shape.",
     "If an action hint has actionType null or an unsupportedReason, do not improvise a write for it. Stay read-only or clarify instead.",
     "Never invent task, ritual, campaign, reminder, or calendar state.",
@@ -755,7 +859,8 @@ function buildInstructions(params: {
     "Keep replies natural, warm, concise, and non-robotic.",
     "External calendar events are read-only in v1. If the user wants to change a calendar event directly, explain the limitation and offer a task-based alternative when appropriate.",
     "If there is already an active pending action, be aware of it and avoid stacking multiple confirms in one reply.",
-    "You have access to consult_planner, which reuses Cosmiq's existing planning logic for schedule reads, day or week planning, prioritization, and goal breakdowns. Use it before preparing actions for planning-heavy requests.",
+    "Include assumptions and evidence_ids when they help the app/debugger understand why you made the decision. Evidence IDs should reference actual task, ritual, campaign, reminder, or calendar IDs from context.",
+    "If you are ready to draft but do not use a prepare tool, include a supported proposed_actions item with enough normalizedPayload for the app to validate and create a pending confirmation.",
     "Always finish by calling submit_companion_result. Do not end with a plain assistant message.",
     `Surface: ${params.surface}.`,
     `Current local datetime from the app: ${params.currentDateTime}.`,
@@ -779,21 +884,167 @@ function buildInstructions(params: {
   ].join("\n");
 }
 
+function getSelectedProposedActionIntent(
+  request: CompanionAgentRequest,
+): CompanionAgentSelectedProposedActionIntent | null {
+  if (!request.selectedProposedAction) return null;
+  return request.selectedProposedActionIntent ?? "draft";
+}
+
+function getDiscussionModeForIntent(
+  intent: CompanionAgentIntent,
+): CompanionAgentMode {
+  switch (intent) {
+    case "plan_day":
+    case "plan_week":
+    case "check_calendar":
+    case "update_existing_plan":
+    case "schedule_task":
+      return "schedule_read";
+    default:
+      return "conversation";
+  }
+}
+
+function normalizeUnpersistedDraftResult(result: AgentRunResult["result"]) {
+  const mode = result.mode === "pending_confirmation"
+    ? getDiscussionModeForIntent(result.intent)
+    : result.mode;
+
+  result.mode = mode;
+  result.understandingState = deriveUnderstandingState({
+    mode,
+    followUp: result.followUp,
+  });
+  result.preparedActionId = null;
+}
+
+function buildAgentContextPacket(params: {
+  context: LoadedCompanionAgentContext;
+  request: CompanionAgentRequest;
+}) {
+  const latestAssistantDecision = [...params.context.messages]
+    .reverse()
+    .map((message) => asRecord(message.metadata)?.agentDecision)
+    .map((decision) => asRecord(decision))
+    .find((decision) => decision !== null) ?? null;
+  const requestActiveFollowUp = asRecord(params.request.activeFollowUp);
+  const persistedActiveFollowUp = asRecord(latestAssistantDecision?.followUp);
+  const activeFollowUp = requestActiveFollowUp ?? persistedActiveFollowUp;
+  const requestSelectedProposedAction = asRecord(
+    params.request.selectedProposedAction,
+  );
+  const selectedProposedActionIntent = getSelectedProposedActionIntent(
+    params.request,
+  );
+  const requestActiveProposedActions =
+    Array.isArray(params.request.activeProposedActions)
+      ? params.request.activeProposedActions
+        .map((action) => asRecord(action))
+        .filter((action): action is Record<string, unknown> => action !== null)
+      : [];
+  const persistedProposedActions =
+    Array.isArray(latestAssistantDecision?.proposedActions)
+      ? latestAssistantDecision.proposedActions
+        .map((action) => asRecord(action))
+        .filter((action): action is Record<string, unknown> => action !== null)
+      : [];
+  const baseProposedActions = requestActiveProposedActions.length > 0
+    ? requestActiveProposedActions
+    : persistedProposedActions;
+  const activeProposedActions = requestSelectedProposedAction
+    ? [
+      requestSelectedProposedAction,
+      ...baseProposedActions.filter((action) =>
+        proposedActionContextKey(action) !==
+          proposedActionContextKey(requestSelectedProposedAction)
+      ),
+    ].slice(0, 8)
+    : baseProposedActions.slice(0, 8);
+
+  return {
+    packetType: "cosmiq_companion_context_v1",
+    currentDateTime: params.context.currentDateTime,
+    timezone: params.context.timezone,
+    surface: params.request.surface,
+    latestUserMessage: params.request.message,
+    launcherStarterIntent: params.request.starterIntent ?? null,
+    selectedEntityIds: params.request.selectedEntityIds ?? null,
+    visibleDateRange: {
+      start: params.context.visibleDateStart,
+      end: params.context.visibleDateEnd,
+    },
+    activeFollowUp,
+    latestUserMessageAnswersFollowUp: Boolean(activeFollowUp),
+    activeProposedActions,
+    selectedProposedAction: requestSelectedProposedAction,
+    selectedProposedActionIntent,
+    latestUserMessageSelectedProposedAction: Boolean(
+      requestSelectedProposedAction,
+    ),
+    latestUserMessageSelectedProposedActionForDraft:
+      selectedProposedActionIntent === "draft",
+    latestUserMessageSelectedProposedActionForDiscussion:
+      selectedProposedActionIntent === "discuss",
+    activePendingAction: params.context.activePendingAction,
+    goals: params.context.goals,
+    tasks: params.context.tasks,
+    recentCompletedTasks: params.context.recentCompletedTasks,
+    rituals: params.context.rituals,
+    campaigns: params.context.campaigns,
+    calendarEvents: params.context.calendarEvents,
+    reminders: params.context.reminders,
+    reflections: params.context.reflections,
+    memory: params.context.recentMemory,
+    availableCapabilities: [
+      "read_current_datetime",
+      "read_profile",
+      "read_goals",
+      "read_calendar_range",
+      "read_tasks",
+      "read_rituals",
+      "read_campaigns",
+      "read_reminders",
+      "prepare_task_create",
+      "prepare_task_update",
+      "prepare_ritual_create",
+      "prepare_reminder_create",
+      "prepare_campaign_update",
+      "prepare_journal_entry",
+    ],
+    safety: {
+      writesRequirePreparedAction: true,
+      userConfirmationRequiredBeforeExecution: true,
+      externalCalendarEventsReadOnly: true,
+    },
+  };
+}
+
 function buildInitialInput(params: {
   context: LoadedCompanionAgentContext;
   request: CompanionAgentRequest;
   manualHistory: boolean;
 }) {
+  const contextPacket = {
+    role: "user",
+    content: `APP_CONTEXT_PACKET\n${
+      JSON.stringify(buildAgentContextPacket(params))
+    }`,
+  };
   const latestHistory = params.context.messages.map((message) => ({
     role: message.role,
     content: message.content,
   }));
 
   if (!params.manualHistory) {
-    return [{ role: "user", content: params.request.message }];
+    return [
+      contextPacket,
+      { role: "user", content: params.request.message },
+    ];
   }
 
   return [
+    contextPacket,
     ...latestHistory,
     { role: "user", content: params.request.message },
   ];
@@ -804,8 +1055,9 @@ async function createOpenAIConversation(params: {
   userId: string;
   sessionId: string;
   surface: "companion" | "journeys";
+  openAIApiKey?: string;
 }) {
-  const openAIApiKey = getOptionalEnv("OPENAI_API_KEY");
+  const openAIApiKey = params.openAIApiKey ?? getOptionalEnv("OPENAI_API_KEY");
   if (!openAIApiKey) throw new Error("OPENAI_API_KEY not configured");
 
   let response: Response;
@@ -849,8 +1101,9 @@ async function createOpenAIResponse(params: {
   conversationId?: string | null;
   previousResponseId?: string | null;
   tools: Array<Record<string, unknown>>;
+  openAIApiKey?: string;
 }) {
-  const openAIApiKey = getOptionalEnv("OPENAI_API_KEY");
+  const openAIApiKey = params.openAIApiKey ?? getOptionalEnv("OPENAI_API_KEY");
   if (!openAIApiKey) throw new Error("OPENAI_API_KEY not configured");
 
   const body: Record<string, unknown> = {
@@ -1180,6 +1433,64 @@ export function buildToolDefinitions() {
             ],
           },
           confidence: { type: "number" },
+          understanding_state: {
+            type: "string",
+            enum: [
+              "needs_followup",
+              "enough_to_discuss",
+              "ready_to_propose",
+              "ready_to_draft",
+            ],
+          },
+          follow_up: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              question: { type: "string" },
+              reason: { type: "string" },
+              expectedAnswerType: {
+                type: "string",
+                enum: [
+                  "free_text",
+                  "choice",
+                  "time",
+                  "priority",
+                  "confirmation",
+                ],
+              },
+              options: {
+                type: "array",
+                items: { type: "string" },
+              },
+              blocksDrafting: { type: "boolean" },
+            },
+          },
+          proposed_actions: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: true,
+              properties: {
+                type: { type: "string" },
+                title: { type: "string" },
+                summary: { type: "string" },
+                reason: { type: "string" },
+                normalizedPayload: {
+                  type: "object",
+                  additionalProperties: true,
+                },
+                confidence: { type: "number" },
+              },
+            },
+          },
+          assumptions: {
+            type: "array",
+            items: { type: "string" },
+          },
+          evidence_ids: {
+            type: "array",
+            items: { type: "string" },
+          },
           structured_response: {
             type: "object",
             additionalProperties: true,
@@ -1460,14 +1771,12 @@ function getErrorMessage(error: unknown) {
 
 function isOpenAIProviderFallbackError(error: unknown) {
   const message = getErrorMessage(error).toLowerCase();
-  const isOpenAIError =
-    message.includes("openai_api_key not configured") ||
+  const isOpenAIError = message.includes("openai_api_key not configured") ||
     message.includes("openai conversation create failed") ||
     message.includes("openai responses call failed") ||
     message.includes("openai conversation id missing");
 
-  const hasProviderFailureSignal =
-    message.includes("failed to fetch") ||
+  const hasProviderFailureSignal = message.includes("failed to fetch") ||
     message.includes("network") ||
     message.includes("timeout") ||
     message.includes("timed out") ||
@@ -1560,19 +1869,316 @@ function buildPreparedCandidateFromPlannerHint(
   });
 }
 
+const normalizeProposedActionType = (
+  value: unknown,
+): CompanionPendingActionType | null => {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase().replace(/[.\s-]+/g, "_");
+  switch (normalized) {
+    case "quest_create":
+    case "task_create":
+      return "task_create";
+    case "quest_update":
+    case "task_update":
+    case "quest_move":
+    case "task_move":
+      return "task_update";
+    case "ritual_create":
+    case "habit_create":
+      return "ritual_create";
+    case "reminder_create":
+      return "reminder_create";
+    case "campaign_update":
+    case "goal_update":
+      return "campaign_update";
+    case "campaign_adjust":
+    case "goal_adjust":
+      return "campaign_adjust";
+    case "journal_entry":
+    case "reflection_create":
+      return "journal_entry";
+    default:
+      return null;
+  }
+};
+
+const readProposedActionPayload = (
+  proposedAction: CompanionAgentProposedAction,
+) => asRecord(proposedAction.normalizedPayload) ?? proposedAction;
+
+const readFirstString = (
+  source: Record<string, unknown>,
+  keys: string[],
+): string | undefined => {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return undefined;
+};
+
+const readFirstNumber = (
+  source: Record<string, unknown>,
+  keys: string[],
+): number | undefined => {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+  }
+  return undefined;
+};
+
+const readFirstBoolean = (
+  source: Record<string, unknown>,
+  keys: string[],
+): boolean | undefined => {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "boolean") return value;
+  }
+  return undefined;
+};
+
+const buildAffectedEntities = (
+  actionType: CompanionPendingActionType,
+  normalizedPayload: Record<string, unknown>,
+) =>
+  actionType === "task_update" &&
+    typeof normalizedPayload.task_id === "string"
+    ? { task_id: normalizedPayload.task_id }
+    : (actionType === "campaign_update" || actionType === "campaign_adjust") &&
+        typeof normalizedPayload.campaign_id === "string"
+    ? { campaign_id: normalizedPayload.campaign_id }
+    : actionType === "reminder_create" &&
+        typeof normalizedPayload.target_id === "string" &&
+        typeof normalizedPayload.target_type === "string"
+    ? {
+      target_id: normalizedPayload.target_id,
+      target_type: normalizedPayload.target_type,
+    }
+    : actionType === "task_create" &&
+        typeof normalizedPayload.epic_id === "string"
+    ? { epic_id: normalizedPayload.epic_id }
+    : null;
+
+const normalizeProposedActionPayload = (
+  actionType: CompanionPendingActionType,
+  proposedAction: CompanionAgentProposedAction,
+) => {
+  const source = readProposedActionPayload(proposedAction);
+  switch (actionType) {
+    case "task_create":
+      return PrepareTaskCreateSchema.parse({
+        title: readFirstString(source, ["title", "task_text", "name"]) ??
+          proposedAction.title,
+        task_date: readFirstString(source, ["task_date", "date"]),
+        scheduled_time: readFirstString(source, [
+          "scheduled_time",
+          "startTime",
+          "time",
+        ]),
+        estimated_duration: readFirstNumber(source, [
+          "estimated_duration",
+          "durationMinutes",
+          "duration_minutes",
+        ]),
+        notes: readFirstString(source, ["notes", "note", "description"]),
+        location: readFirstString(source, ["location"]),
+        epic_id: readFirstString(source, ["epic_id", "epicId", "campaignId"]),
+        priority: readFirstString(source, ["priority"]),
+        reminder_enabled: readFirstBoolean(source, ["reminder_enabled"]),
+        reminder_minutes_before: readFirstNumber(source, [
+          "reminder_minutes_before",
+          "reminderMinutesBefore",
+        ]),
+      });
+    case "task_update":
+      return PrepareTaskUpdateSchema.parse({
+        task_id: readFirstString(source, ["task_id", "taskId", "id"]),
+        title: readFirstString(source, ["title", "task_text", "name"]),
+        task_date: readFirstString(source, ["task_date", "date"]),
+        scheduled_time: readFirstString(source, [
+          "scheduled_time",
+          "startTime",
+          "time",
+        ]),
+        estimated_duration: readFirstNumber(source, [
+          "estimated_duration",
+          "durationMinutes",
+          "duration_minutes",
+        ]),
+        notes: readFirstString(source, ["notes", "note", "description"]),
+        location: readFirstString(source, ["location"]),
+        priority: readFirstString(source, ["priority"]),
+        completed: readFirstBoolean(source, ["completed"]),
+        reminder_enabled: readFirstBoolean(source, ["reminder_enabled"]),
+        reminder_minutes_before: readFirstNumber(source, [
+          "reminder_minutes_before",
+          "reminderMinutesBefore",
+        ]),
+      });
+    case "ritual_create":
+      return PrepareRitualCreateSchema.parse({
+        title: readFirstString(source, ["title", "name"]) ??
+          proposedAction.title,
+        frequency: readFirstString(source, ["frequency"]) ?? "daily",
+        preferred_time: readFirstString(source, [
+          "preferred_time",
+          "preferredTime",
+          "time",
+        ]),
+        estimated_minutes: readFirstNumber(source, [
+          "estimated_minutes",
+          "estimatedMinutes",
+          "durationMinutes",
+        ]),
+        description: readFirstString(source, ["description", "notes", "note"]),
+        category: readFirstString(source, ["category"]),
+        reminder_enabled: readFirstBoolean(source, ["reminder_enabled"]),
+        reminder_minutes_before: readFirstNumber(source, [
+          "reminder_minutes_before",
+          "reminderMinutesBefore",
+        ]),
+      });
+    case "reminder_create":
+      return PrepareReminderCreateSchema.parse({
+        target_type: readFirstString(source, ["target_type", "targetType"]),
+        target_id: readFirstString(source, ["target_id", "targetId", "id"]),
+        reminder_enabled: readFirstBoolean(source, ["reminder_enabled"]),
+        reminder_minutes_before: readFirstNumber(source, [
+          "reminder_minutes_before",
+          "reminderMinutesBefore",
+        ]),
+      });
+    case "campaign_update":
+      return PrepareCampaignUpdateSchema.parse({
+        campaign_id: readFirstString(source, [
+          "campaign_id",
+          "campaignId",
+          "epic_id",
+          "epicId",
+          "id",
+        ]),
+        title: readFirstString(source, ["title", "name"]),
+        description: readFirstString(source, ["description", "notes", "note"]),
+        end_date: readFirstString(source, ["end_date", "endDate"]),
+        status: readFirstString(source, ["status"]),
+        target_days: readFirstNumber(source, ["target_days", "targetDays"]),
+      });
+    case "campaign_adjust":
+      return {
+        campaign_id: readFirstString(source, [
+          "campaign_id",
+          "campaignId",
+          "epic_id",
+          "epicId",
+          "id",
+        ]),
+        adjustment_type: readFirstString(source, [
+          "adjustment_type",
+          "adjustmentType",
+        ]) ?? "custom",
+        description: readFirstString(source, [
+          "description",
+          "reason",
+          "summary",
+        ]) ?? proposedAction.reason ?? proposedAction.summary ?? null,
+        requested_summary: proposedAction.summary ?? null,
+      };
+    case "journal_entry":
+      return PrepareJournalEntrySchema.parse({
+        note: readFirstString(source, ["note", "content", "text"]) ??
+          proposedAction.summary,
+        mood: readFirstString(source, ["mood"]),
+        reflection_date: readFirstString(source, [
+          "reflection_date",
+          "reflectionDate",
+          "date",
+        ]),
+      });
+  }
+};
+
+const buildPreparedCandidateFromProposedAction = (
+  proposedAction: CompanionAgentProposedAction | null | undefined,
+  intent: CompanionAgentIntent,
+) => {
+  const actionType = normalizeProposedActionType(proposedAction?.type);
+  if (!proposedAction || !actionType) return null;
+
+  try {
+    const normalizedPayload = normalizeProposedActionPayload(
+      actionType,
+      proposedAction,
+    );
+    const normalizedPayloadRecord = normalizedPayload as Record<
+      string,
+      unknown
+    >;
+    const summary = proposedAction.summary?.trim() ||
+      (actionType === "task_create"
+        ? `Add "${String(normalizedPayloadRecord.title)}" for ${
+          formatDateTimeLabel(
+            typeof normalizedPayloadRecord.task_date === "string"
+              ? normalizedPayloadRecord.task_date
+              : null,
+            typeof normalizedPayloadRecord.scheduled_time === "string"
+              ? normalizedPayloadRecord.scheduled_time
+              : null,
+          )
+        }.`
+        : proposedAction.title
+        ? `Prepare "${proposedAction.title}".`
+        : "Prepare this action.");
+
+    return createPreparedAction({
+      actionType,
+      intent: actionType === "task_create"
+        ? "schedule_task"
+        : actionType === "task_update" || actionType === "reminder_create"
+        ? "update_existing_plan"
+        : actionType === "journal_entry"
+        ? "journal"
+        : actionType === "ritual_create" ||
+            actionType === "campaign_update" ||
+            actionType === "campaign_adjust"
+        ? "goal_setting"
+        : intent,
+      summary,
+      confirmationMessage: "Want me to lock that in?",
+      normalizedPayload: normalizedPayloadRecord,
+      affectedEntities: buildAffectedEntities(
+        actionType,
+        normalizedPayloadRecord,
+      ),
+    });
+  } catch (error) {
+    console.warn("[companion-agent] rejected proposed action draft", {
+      actionType,
+      reason: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+};
+
 export async function runCompanionAgent(params: RunAgentParams) {
   const companion = await wrapSubStage(
     "context_load",
     () => loadCompanionId(params.supabase, params.userId),
   );
-  const context = await wrapSubStage("context_load", () =>
-    loadCompanionAgentContext({
-      supabase: params.supabase,
-      userId: params.userId,
-      companionId: companion.id,
-      sessionId: params.request.sessionId,
-      request: params.request,
-    }));
+  const context = await wrapSubStage(
+    "context_load",
+    () =>
+      loadCompanionAgentContext({
+        supabase: params.supabase,
+        userId: params.userId,
+        companionId: companion.id,
+        sessionId: params.request.sessionId,
+        request: params.request,
+      }),
+  );
 
   const preparedActions = new Map<string, PendingActionCandidate>();
 
@@ -1591,47 +2197,69 @@ export async function runCompanionAgent(params: RunAgentParams) {
     const candidate = buildPreparedCandidateFromPlannerHint(matchingHint);
 
     if (candidate) {
-      const persistedPendingAction = await wrapSubStage("persistence", () =>
-        replacePendingAction({
-          supabase: params.supabase,
-          userId: params.userId,
-          companionId: companion.id,
-          sessionId: params.request.sessionId,
-          intent: candidate.intent,
-          candidate,
-          metadata: {
-            source: "companion-agent",
-            selectedProposalId: params.request.selectedProposalId,
-            visibleDateStart: context.visibleDateStart,
-            visibleDateEnd: context.visibleDateEnd,
-          },
-        }));
-
-      const persistenceReady = await wrapSubStage("persistence", () =>
-        withCompanionChatPersistenceCapability(async () => {
-          const responsePendingAction = mapPendingActionForResponse(
-            persistedPendingAction,
-          );
-          await persistAgentTurn({
+      const persistedPendingAction = await wrapSubStage(
+        "persistence",
+        () =>
+          replacePendingAction({
             supabase: params.supabase,
             userId: params.userId,
             companionId: companion.id,
             sessionId: params.request.sessionId,
-            surface: params.request.surface,
-            userMessage: null,
-            assistantReply:
-              "I pulled that suggestion into a confirmable action. Review it and confirm if it fits.",
-            inputMode: params.request.inputMode,
-            openaiConversationId: context.thread?.openai_conversation_id ??
-              null,
-            lastOpenAIResponseId: context.thread?.last_openai_response_id ??
-              null,
-            assistantMode: "pending_confirmation",
-            assistantIntent: candidate.intent,
-            structuredResponse: plannerResult.structuredResponse ?? null,
-            pendingAction: responsePendingAction,
-          });
-        }));
+            intent: candidate.intent,
+            candidate,
+            metadata: {
+              source: "companion-agent",
+              selectedProposalId: params.request.selectedProposalId,
+              visibleDateStart: context.visibleDateStart,
+              visibleDateEnd: context.visibleDateEnd,
+            },
+          }),
+      );
+      const selectedProposalDecision = {
+        understandingState:
+          "ready_to_draft" as CompanionAgentUnderstandingState,
+        followUp: null,
+        proposedActions: [{
+          type: candidate.actionType,
+          summary: candidate.summary,
+          reason:
+            "User selected a structured suggestion to turn into a confirmable action.",
+          normalizedPayload: candidate.normalizedPayload,
+          confidence: 0.82,
+        }],
+        assumptions: [],
+        evidenceIds: [],
+      };
+
+      const persistenceReady = await wrapSubStage(
+        "persistence",
+        () =>
+          withCompanionChatPersistenceCapability(async () => {
+            const responsePendingAction = mapPendingActionForResponse(
+              persistedPendingAction,
+            );
+            await persistAgentTurn({
+              supabase: params.supabase,
+              userId: params.userId,
+              companionId: companion.id,
+              sessionId: params.request.sessionId,
+              surface: params.request.surface,
+              userMessage: null,
+              assistantReply:
+                "I pulled that suggestion into a confirmable action. Review it and confirm if it fits.",
+              inputMode: params.request.inputMode,
+              openaiConversationId: context.thread?.openai_conversation_id ??
+                null,
+              lastOpenAIResponseId: context.thread?.last_openai_response_id ??
+                null,
+              assistantMode: "pending_confirmation",
+              assistantIntent: candidate.intent,
+              agentDecision: selectedProposalDecision,
+              structuredResponse: plannerResult.structuredResponse ?? null,
+              pendingAction: responsePendingAction,
+            });
+          }),
+      );
 
       console.log("[companion-agent] prepared planner suggestion", {
         sessionId: params.request.sessionId,
@@ -1648,6 +2276,12 @@ export async function runCompanionAgent(params: RunAgentParams) {
         mode: "pending_confirmation" as CompanionAgentMode,
         intent: candidate.intent,
         confidence: 0.82,
+        understandingState:
+          "ready_to_draft" as CompanionAgentUnderstandingState,
+        followUp: null,
+        proposedActions: selectedProposalDecision.proposedActions,
+        assumptions: [],
+        evidenceIds: [],
         structuredResponse: plannerResult.structuredResponse ?? null,
         pendingAction: mapPendingActionForResponse(persistedPendingAction),
         threadState: {
@@ -1692,6 +2326,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
       conversationId: transport.conversationId,
       previousResponseId: transport.previousResponseId,
       tools,
+      openAIApiKey: params.openAIApiKey,
     });
 
     let currentConversationId = response.conversation?.id ??
@@ -1707,6 +2342,12 @@ export async function runCompanionAgent(params: RunAgentParams) {
             mode: "conversation" as CompanionAgentMode,
             intent: "unknown" as CompanionAgentIntent,
             confidence: 0.25,
+            understandingState:
+              "enough_to_discuss" as CompanionAgentUnderstandingState,
+            followUp: null,
+            proposedActions: [],
+            assumptions: [],
+            evidenceIds: [],
             structuredResponse: null,
             preparedActionId: null,
           },
@@ -1722,14 +2363,27 @@ export async function runCompanionAgent(params: RunAgentParams) {
         const payload = SubmitCompanionResultSchema.parse(
           JSON.parse(finalCall.arguments || "{}"),
         );
+        const followUp = payload.follow_up ?? null;
+        const preparedActionId = payload.prepared_action_id ?? null;
+        const understandingState = payload.understanding_state ??
+          deriveUnderstandingState({
+            mode: payload.mode,
+            preparedActionId,
+            followUp,
+          });
         return {
           result: {
             reply: payload.reply.trim(),
             mode: payload.mode,
             intent: payload.intent,
             confidence: payload.confidence,
+            understandingState,
+            followUp,
+            proposedActions: payload.proposed_actions ?? [],
+            assumptions: payload.assumptions ?? [],
+            evidenceIds: payload.evidence_ids ?? [],
             structuredResponse: payload.structured_response ?? null,
-            preparedActionId: payload.prepared_action_id ?? null,
+            preparedActionId,
           },
           openaiConversationId: currentConversationId,
           lastOpenAIResponseId: currentPreviousResponseId,
@@ -1751,6 +2405,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
           ? null
           : currentPreviousResponseId,
         tools,
+        openAIApiKey: params.openAIApiKey,
       });
 
       currentConversationId = response.conversation?.id ??
@@ -1790,21 +2445,47 @@ export async function runCompanionAgent(params: RunAgentParams) {
       context,
     });
 
+    const mode = plannerResult.questions.length > 0
+      ? "clarify" as CompanionAgentMode
+      : plannerResult.mode === "proposal"
+      ? "schedule_read" as CompanionAgentMode
+      : plannerResult.mode === "schedule_read"
+      ? "schedule_read" as CompanionAgentMode
+      : "conversation" as CompanionAgentMode;
+    const followUp = plannerResult.questions[0]
+      ? {
+        question: plannerResult.questions[0].prompt,
+        reason: plannerResult.questions[0].reason ?? null,
+        expectedAnswerType: plannerResult.questions[0].options?.length
+          ? "choice" as const
+          : "free_text" as const,
+        options: plannerResult.questions[0].options ?? [],
+        blocksDrafting: true,
+      }
+      : null;
+
     return {
       result: {
         reply: plannerResult.reply,
-        mode: plannerResult.questions.length > 0
-          ? "clarify" as CompanionAgentMode
-          : plannerResult.mode === "proposal"
-          ? "schedule_read" as CompanionAgentMode
-          : plannerResult.mode === "schedule_read"
-          ? "schedule_read" as CompanionAgentMode
-          : "conversation" as CompanionAgentMode,
+        mode,
         intent: params.request.starterIntent === "plan_day" &&
             plannerResult.questions.length > 0
           ? "plan_day"
           : mapPlannerFallbackIntent(plannerResult),
         confidence: 0.55,
+        understandingState: deriveUnderstandingState({ mode, followUp }),
+        followUp,
+        proposedActions: plannerResult.actionHints
+          .filter((hint) => hint.actionType && hint.normalizedPayload)
+          .map((hint) => ({
+            type: hint.actionType ?? "unknown",
+            summary: hint.summary,
+            reason: hint.unsupportedReason ?? null,
+            normalizedPayload: hint.normalizedPayload ?? {},
+            confidence: 0.55,
+          })),
+        assumptions: [],
+        evidenceIds: [],
         structuredResponse: plannerResult.structuredResponse ?? null,
         preparedActionId: null,
       },
@@ -1832,6 +2513,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
         userId: params.userId,
         sessionId: params.request.sessionId,
         surface: params.request.surface,
+        openAIApiKey: params.openAIApiKey,
       });
       return await runResponseLoopWithTimeout({
         conversationId,
@@ -1870,51 +2552,145 @@ export async function runCompanionAgent(params: RunAgentParams) {
 
   let persistedPendingAction: PendingActionRow | null =
     context.activePendingAction;
+  let candidateToPersist: PendingActionCandidate | null = null;
+  let candidateSource:
+    | "tool"
+    | "proposed_action"
+    | "selected_proposed_action"
+    | null = null;
+  const selectedProposedActionIntent = getSelectedProposedActionIntent(
+    params.request,
+  );
+  const selectedProposedActionIsDiscussion =
+    selectedProposedActionIntent === "discuss";
+
   if (
     agentResult.result.mode === "pending_confirmation" &&
     agentResult.result.preparedActionId
   ) {
-    const candidate = preparedActions.get(agentResult.result.preparedActionId);
-    if (candidate) {
-      persistedPendingAction = await wrapSubStage("persistence", () =>
+    candidateToPersist =
+      preparedActions.get(agentResult.result.preparedActionId) ?? null;
+    candidateSource = candidateToPersist ? "tool" : null;
+  }
+
+  if (selectedProposedActionIsDiscussion && candidateToPersist) {
+    console.warn("[companion-agent] ignored discussion proposal draft", {
+      userId: params.userId,
+      sessionId: params.request.sessionId,
+      candidateSource,
+      actionType: candidateToPersist.actionType,
+    });
+    candidateToPersist = null;
+    candidateSource = null;
+    agentResult.result.preparedActionId = null;
+  }
+
+  if (
+    !persistedPendingAction &&
+    !candidateToPersist &&
+    !selectedProposedActionIsDiscussion &&
+    agentResult.result.understandingState === "ready_to_draft" &&
+    !agentResult.result.followUp
+  ) {
+    candidateToPersist = agentResult.result.proposedActions
+      .map((proposedAction) =>
+        buildPreparedCandidateFromProposedAction(
+          proposedAction,
+          agentResult.result.intent,
+        )
+      )
+      .find((candidate): candidate is PendingActionCandidate =>
+        candidate !== null
+      ) ?? null;
+    candidateSource = candidateToPersist ? "proposed_action" : null;
+
+    if (!candidateToPersist && params.request.selectedProposedAction) {
+      candidateToPersist = buildPreparedCandidateFromProposedAction(
+        params.request.selectedProposedAction,
+        agentResult.result.intent,
+      );
+      candidateSource = candidateToPersist ? "selected_proposed_action" : null;
+    }
+  }
+
+  if (
+    selectedProposedActionIsDiscussion &&
+    agentResult.result.mode === "pending_confirmation"
+  ) {
+    normalizeUnpersistedDraftResult(agentResult.result);
+  }
+  if (
+    selectedProposedActionIsDiscussion &&
+    agentResult.result.understandingState === "ready_to_draft"
+  ) {
+    normalizeUnpersistedDraftResult(agentResult.result);
+  }
+  if (
+    !persistedPendingAction &&
+    !candidateToPersist &&
+    (
+      agentResult.result.mode === "pending_confirmation" ||
+      agentResult.result.understandingState === "ready_to_draft" ||
+      agentResult.result.preparedActionId
+    )
+  ) {
+    normalizeUnpersistedDraftResult(agentResult.result);
+  }
+
+  if (candidateToPersist) {
+    agentResult.result.mode = "pending_confirmation";
+    agentResult.result.intent = candidateToPersist.intent;
+    agentResult.result.understandingState = "ready_to_draft";
+    agentResult.result.preparedActionId = candidateToPersist.id;
+    persistedPendingAction = await wrapSubStage(
+      "persistence",
+      () =>
         replacePendingAction({
           supabase: params.supabase,
           userId: params.userId,
           companionId: companion.id,
           sessionId: params.request.sessionId,
-          intent: agentResult.result.intent,
-          candidate,
+          intent: candidateToPersist.intent,
+          candidate: candidateToPersist,
           metadata: {
-            source: "companion-agent",
+            source: candidateSource === "selected_proposed_action"
+              ? "companion-agent-selected-proposed-action"
+              : candidateSource === "proposed_action"
+              ? "companion-agent-proposed-action"
+              : "companion-agent",
             visibleDateStart: context.visibleDateStart,
             visibleDateEnd: context.visibleDateEnd,
           },
-        }));
-    }
+        }),
+    );
   }
 
-  const persistenceReady = await wrapSubStage("persistence", () =>
-    withCompanionChatPersistenceCapability(async () => {
-      const responsePendingAction = persistedPendingAction
-        ? mapPendingActionForResponse(persistedPendingAction)
-        : null;
-      await persistAgentTurn({
-        supabase: params.supabase,
-        userId: params.userId,
-        companionId: companion.id,
-        sessionId: params.request.sessionId,
-        surface: params.request.surface,
-        userMessage: params.request.message,
-        assistantReply: agentResult.result.reply,
-        inputMode: params.request.inputMode,
-        openaiConversationId: agentResult.openaiConversationId,
-        lastOpenAIResponseId: agentResult.lastOpenAIResponseId,
-        assistantMode: agentResult.result.mode,
-        assistantIntent: agentResult.result.intent,
-        structuredResponse: agentResult.result.structuredResponse ?? null,
-        pendingAction: responsePendingAction,
-      });
-    }));
+  const persistenceReady = await wrapSubStage(
+    "persistence",
+    () =>
+      withCompanionChatPersistenceCapability(async () => {
+        const responsePendingAction = persistedPendingAction
+          ? mapPendingActionForResponse(persistedPendingAction)
+          : null;
+        await persistAgentTurn({
+          supabase: params.supabase,
+          userId: params.userId,
+          companionId: companion.id,
+          sessionId: params.request.sessionId,
+          surface: params.request.surface,
+          userMessage: params.request.message,
+          assistantReply: agentResult.result.reply,
+          inputMode: params.request.inputMode,
+          openaiConversationId: agentResult.openaiConversationId,
+          lastOpenAIResponseId: agentResult.lastOpenAIResponseId,
+          assistantMode: agentResult.result.mode,
+          assistantIntent: agentResult.result.intent,
+          agentDecision: buildAgentDecisionMetadata(agentResult.result),
+          structuredResponse: agentResult.result.structuredResponse ?? null,
+          pendingAction: responsePendingAction,
+        });
+      }),
+  );
 
   console.log("[companion-agent] turn", {
     sessionId: params.request.sessionId,
@@ -1922,6 +2698,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
     intent: agentResult.result.intent,
     confidence: agentResult.result.confidence,
     mode: agentResult.result.mode,
+    understandingState: agentResult.result.understandingState,
     toolsPrepared: preparedActions.size,
     pendingActionId: persistedPendingAction?.id ?? null,
     persistenceReady,
@@ -1935,6 +2712,11 @@ export async function runCompanionAgent(params: RunAgentParams) {
     mode: agentResult.result.mode,
     intent: agentResult.result.intent,
     confidence: agentResult.result.confidence,
+    understandingState: agentResult.result.understandingState,
+    followUp: agentResult.result.followUp,
+    proposedActions: agentResult.result.proposedActions,
+    assumptions: agentResult.result.assumptions,
+    evidenceIds: agentResult.result.evidenceIds,
     structuredResponse: agentResult.result.structuredResponse ?? null,
     pendingAction: persistedPendingAction
       ? mapPendingActionForResponse(persistedPendingAction)
