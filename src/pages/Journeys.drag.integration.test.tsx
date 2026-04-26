@@ -947,6 +947,55 @@ describe("Journeys row drag integration", () => {
     expect(screen.getByTestId("journeys-companion-planner-modal")).toBeInTheDocument();
   });
 
+  it("closes the planner when the guided tutorial leaves Plan My Day", async () => {
+    mocks.tutorialGuidance = {
+      isActive: true,
+      currentStep: "plan_my_day",
+      currentSubstep: null,
+    };
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    const renderTree = () => (
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    const { rerender } = render(renderTree());
+
+    await waitFor(() => {
+      expect(mocks.lastCompanionPlannerModalProps).not.toBeNull();
+    });
+
+    act(() => {
+      mocks.lastCompanionPlannerModalProps?.onOpenChange?.(true);
+    });
+
+    await waitFor(() => {
+      expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
+    });
+
+    mocks.tutorialGuidance = {
+      isActive: true,
+      currentStep: "create_campaign",
+      currentSubstep: null,
+    };
+    rerender(renderTree());
+
+    await waitFor(() => {
+      expect(mocks.lastCompanionPlannerModalProps?.open).toBe(false);
+    });
+    expect(mocks.lastCompanionPlannerModalProps?.launchIntent).toBeNull();
+    expect(screen.queryByTestId("journeys-companion-planner-modal")).not.toBeInTheDocument();
+  });
+
   it("opens the add quest sheet with NLP-prefilled values from companion quest capture", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date("2026-04-09T12:00:00"));

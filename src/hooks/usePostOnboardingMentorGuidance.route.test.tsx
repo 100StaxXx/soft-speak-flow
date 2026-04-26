@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   PostOnboardingMentorGuidanceProvider,
   usePostOnboardingMentorGuidance,
@@ -51,6 +51,29 @@ const mocks = vi.hoisted(() => ({
     milestonesCompleted: [],
   } as Record<string, unknown>,
 }));
+
+const createRect = ({
+  top = 80,
+  left = 24,
+  width = 180,
+  height = 48,
+}: {
+  top?: number;
+  left?: number;
+  width?: number;
+  height?: number;
+} = {}) =>
+  ({
+    top,
+    left,
+    width,
+    height,
+    right: left + width,
+    bottom: top + height,
+    x: left,
+    y: top,
+    toJSON: () => ({}),
+  }) as DOMRect;
 
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
@@ -131,9 +154,19 @@ describe("guided tutorial route restoration", () => {
   beforeEach(() => {
     mocks.guidedTutorial = createFreshTutorial();
     globalThis.localStorage?.removeItem?.("guided_tutorial_progress_user-1");
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
+      const element = this as HTMLElement;
+      return element.matches("[data-tour], [data-planner-tour]")
+        ? createRect()
+        : createRect({ width: 0, height: 0 });
+    });
     document
       .querySelectorAll('[data-tour="companion-launcher-option-plan-day"], [data-tour="companion-plan-day-follow-up-option"], [data-tour="companion-plan-day-suggestion-save"], [data-tour="companion-plan-day-pending-confirm"], [data-tour="companion-plan-day-pending-confirm-all"], [data-tour="companion-launcher-option-goal"], [data-tour="pathfinder-campaign-builder"], [data-tour="campaign-builder-launcher"]')
       .forEach((element) => element.remove());
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   const renderWithProviders = (initialPath = "/journeys") => {

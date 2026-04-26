@@ -334,6 +334,18 @@ const Journeys = () => {
     usePostOnboardingMentorGuidance();
   const shouldAutoFillTutorialTime =
     tutorialActive && tutorialStep === "create_quest" && tutorialSubstep === "select_time";
+
+  useEffect(() => {
+    if (!tutorialActive) return;
+
+    const shouldKeepPlannerOpenForPlanMyDay =
+      isTabActive && location.pathname === JOURNEYS_ROUTE && tutorialStep === "plan_my_day";
+    if (shouldKeepPlannerOpenForPlanMyDay) return;
+
+    setPlannerLaunchIntent(null);
+    setIsCompanionPlannerPinned(false);
+  }, [isTabActive, location.pathname, tutorialActive, tutorialStep]);
+
   const isInboxRequested = useMemo(
     () => new URLSearchParams(location.search).get("section") === "inbox",
     [location.search],

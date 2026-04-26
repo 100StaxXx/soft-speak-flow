@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { resolveTutorialTarget } from "@/utils/tutorialTargets";
 
 interface SpotlightRect {
   top: number;
@@ -85,7 +86,7 @@ export const MentorSpotlightGuard = ({
     let mutationObserver: MutationObserver | null = null;
 
     const update = () => {
-      const target = document.querySelector(targetSelector) as HTMLElement | null;
+      const target = resolveTutorialTarget(targetSelector)?.element ?? null;
       setTargetElement(target);
       setSpotlightRect(target ? toSpotlightRect(target, 10) : null);
       if (target && resizeObserver) {
@@ -103,7 +104,7 @@ export const MentorSpotlightGuard = ({
 
     if ("ResizeObserver" in window) {
       resizeObserver = new ResizeObserver(scheduleUpdate);
-      const target = document.querySelector(targetSelector) as HTMLElement | null;
+      const target = resolveTutorialTarget(targetSelector)?.element ?? null;
       if (target) resizeObserver.observe(target);
     }
 

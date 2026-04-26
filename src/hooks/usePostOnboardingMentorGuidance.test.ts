@@ -93,6 +93,29 @@ const storageMocks = vi.hoisted(() => {
   };
 });
 
+const createRect = ({
+  top = 80,
+  left = 24,
+  width = 180,
+  height = 48,
+}: {
+  top?: number;
+  left?: number;
+  width?: number;
+  height?: number;
+} = {}) =>
+  ({
+    top,
+    left,
+    width,
+    height,
+    right: left + width,
+    bottom: top + height,
+    x: left,
+    y: top,
+    toJSON: () => ({}),
+  }) as DOMRect;
+
 vi.mock("@tanstack/react-query", async () => {
   const actual =
     await vi.importActual<typeof import("@tanstack/react-query")>("@tanstack/react-query");
@@ -267,12 +290,22 @@ describe("guided tutorial first-value loop", () => {
     mocks.state.guidedTutorial = createFreshTutorial();
     mocks.state.profileUpdatePayloads = [];
     mocks.state.queryClient.invalidateQueries.mockClear();
+    mocks.state.queryClient.invalidateQueries.mockResolvedValue(undefined);
+    mocks.state.queryClient.getQueryData.mockReturnValue(null);
     mocks.state.awardCustomXP.mockClear();
+    mocks.state.awardCustomXP.mockResolvedValue(undefined);
     mocks.state.personality = null;
     storageMocks.reset();
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
+      const element = this as HTMLElement;
+      return element.matches("[data-tour], [data-planner-tour]")
+        ? createRect()
+        : createRect({ width: 0, height: 0 });
+    });
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     document
       .querySelectorAll('[data-tour="companion-launcher-option-plan-day"], [data-tour="companion-plan-day-follow-up-option"], [data-tour="companion-plan-day-suggestion-save"], [data-tour="companion-plan-day-pending-confirm"], [data-tour="companion-plan-day-pending-confirm-all"], [data-tour="companion-launcher-option-goal"], [data-tour="pathfinder-campaign-builder"], [data-tour="campaign-builder-launcher"]')
       .forEach((element) => element.remove());

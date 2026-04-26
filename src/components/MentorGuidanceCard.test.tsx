@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
   MentorGuidanceCard,
@@ -41,6 +41,29 @@ vi.mock("@/hooks/usePostOnboardingMentorGuidance", () => ({
   usePostOnboardingMentorGuidance: () => mocks.guidance,
 }));
 
+const rect = ({
+  top,
+  left,
+  width,
+  height,
+}: {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+}) =>
+  ({
+    top,
+    left,
+    width,
+    height,
+    right: left + width,
+    bottom: top + height,
+    x: left,
+    y: top,
+    toJSON: () => ({}),
+  }) as DOMRect;
+
 describe("MentorGuidanceCard", () => {
   it("renders VN-style dialogue with a skip control once the tutorial is in progress", () => {
     render(<MentorGuidanceCard />);
@@ -58,6 +81,39 @@ describe("MentorGuidanceCard", () => {
 
     const panel = container.querySelector('[data-tutorial="mentor-dialogue-panel"] > div');
     expect(panel).toHaveClass("mx-auto", "w-full", "max-w-[22rem]", "sm:max-w-4xl");
+  });
+
+  it("places the panel against the visible duplicate target", async () => {
+    document.body.innerHTML = `
+      <button data-tour="companion-launcher-option-goal" data-kind="hidden" style="display:none">hidden</button>
+      <button data-tour="companion-launcher-option-goal" data-kind="visible">visible</button>
+    `;
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      value: 844,
+    });
+    const rectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
+      const element = this as HTMLElement;
+      if (element.dataset.tutorial === "mentor-dialogue-panel") {
+        return rect({ top: 620, left: 0, width: 390, height: 224 });
+      }
+      if (element.dataset.kind === "hidden") {
+        return rect({ top: 300, left: 30, width: 330, height: 58 });
+      }
+      if (element.dataset.kind === "visible") {
+        return rect({ top: 690, left: 30, width: 330, height: 58 });
+      }
+      return rect({ top: 0, left: 0, width: 0, height: 0 });
+    });
+
+    const { container } = render(<MentorGuidanceCard />);
+
+    const wrapper = container.querySelector('[data-tutorial="mentor-dialogue-panel"]');
+    await waitFor(() => {
+      expect(wrapper).toHaveStyle({ bottom: "166px" });
+    });
+
+    rectSpy.mockRestore();
   });
 
   it("does not render when guidance is inactive", () => {

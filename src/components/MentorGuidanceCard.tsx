@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { MentorAvatar } from "@/components/MentorAvatar";
 import { Button } from "@/components/ui/button";
+import { resolveTutorialTarget } from "@/utils/tutorialTargets";
 
 const PANEL_GAP_PX = 12;
 const PANEL_TOP_MARGIN_PX = 12;
@@ -190,7 +191,7 @@ export const MentorGuidanceCard = () => {
     if (panelRect.height <= 0) return;
 
     const targetElement = activeTargetSelector
-      ? (document.querySelector(activeTargetSelector) as HTMLElement | null)
+      ? resolveTutorialTarget(activeTargetSelector)?.element ?? null
       : null;
     const targetRect = targetElement?.getBoundingClientRect() ?? null;
     const safeAreaInsetTopPx = readSafeAreaInsetTopPx();

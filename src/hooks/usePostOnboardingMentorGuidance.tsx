@@ -23,6 +23,7 @@ import {
   getGuidedTutorialLocalProgressKey,
 } from "@/utils/guidedTutorial";
 import { safeLocalStorage } from "@/utils/storage";
+import { resolveTutorialTargetFromSelectors } from "@/utils/tutorialTargets";
 import { trackOnboardingTutorialEvent } from "@/utils/onboardingTutorialTelemetry";
 import type {
   CreateQuestSubstepId,
@@ -294,10 +295,7 @@ const getMeetCompanionIntroDialogue = (): MentorDialogueLine => ({
 });
 
 const resolveSelectorFromCandidates = (selectors: string[]): string | null => {
-  for (const selector of selectors) {
-    if (document.querySelector(selector)) return selector;
-  }
-  return null;
+  return resolveTutorialTargetFromSelectors(selectors)?.selector ?? null;
 };
 
 const isElementComfortablyInView = (element: HTMLElement, viewportHeight: number): boolean => {
