@@ -148,6 +148,61 @@ Deno.test("consultPlannerForAgent applies onboarding schedule defaults to primar
   );
 });
 
+Deno.test("consultPlannerForAgent asks a clarifying plan-day question with no anchors", () => {
+  const result = consultPlannerForAgent({
+    message: "Plan my day",
+    currentDateTime: "2026-04-18T08:00:00-07:00",
+    surface: "journeys",
+    horizon: "day",
+    starterIntent: "plan_day",
+    context: buildContext(),
+  });
+
+  assertEquals(result.mode, "conversational");
+  assertEquals(result.actionHints.length, 0);
+  assertEquals(result.questions.length, 1);
+  assertMatch(result.reply, /what kind of day/i);
+});
+
+Deno.test("consultPlannerForAgent treats a reply after plan-day clarification as the follow-up", () => {
+  const result = consultPlannerForAgent({
+    message: "Work on my app",
+    currentDateTime: "2026-04-18T08:00:00-07:00",
+    surface: "journeys",
+    horizon: "day",
+    context: buildContext({
+      messages: [
+        {
+          id: "msg-1",
+          role: "user",
+          content: "Plan my day",
+          created_at: "2026-04-18T15:00:00.000Z",
+          input_mode: "text",
+          source: "agent",
+          surface: "journeys",
+          session_id: "session-1",
+        },
+        {
+          id: "msg-2",
+          role: "assistant",
+          content:
+            "What kind of day are we making: focused, light, catch-up, or something else?",
+          created_at: "2026-04-18T15:00:01.000Z",
+          input_mode: null,
+          source: "agent",
+          surface: "journeys",
+          session_id: "session-1",
+        },
+      ],
+    }),
+  });
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.questions.length, 0);
+  assertEquals(result.actionHints[0]?.actionType, "task_create");
+  assertEquals(result.actionHints[0]?.normalizedPayload?.title, "Work On My App");
+});
+
 Deno.test("consultPlannerForAgent converts at-risk campaign adjustments into campaign action hints", () => {
   const result = consultPlannerForAgent({
     message: "Advance my campaign",

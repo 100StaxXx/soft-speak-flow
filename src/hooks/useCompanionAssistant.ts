@@ -29,10 +29,6 @@ import {
   stopCompanionSpeech,
 } from "@/services/companionSpeech";
 import { getCompanionPlannerOpener } from "@/shared/companionPlannerCopy";
-import {
-  type CompanionPlanningMode,
-  DEFAULT_COMPANION_PLANNING_MODE,
-} from "@/shared/companionPlanningMode";
 import type {
   ActionReceiptView,
   CompanionAgentResponse,
@@ -533,9 +529,6 @@ export function useCompanionAssistant({
   const [structuredResponse, setStructuredResponse] = useState<
     CompanionAgentResponse["structuredResponse"]
   >(null);
-  const [planningModeOverride, setPlanningModeOverride] = useState<
-    CompanionPlanningMode | null
-  >(null);
   const [pendingAction, setPendingAction] = useState<PendingActionView | null>(
     null,
   );
@@ -580,13 +573,6 @@ export function useCompanionAssistant({
     : surface === "journeys"
     ? "Talk to Cosmiq"
     : "Talk to Cosmiq naturally.";
-  const planningMode = planningModeOverride ??
-    legacyAssistant.planningMode ??
-    DEFAULT_COMPANION_PLANNING_MODE;
-  const setPlanningMode = useCallback((nextMode: CompanionPlanningMode) => {
-    setPlanningModeOverride(nextMode);
-    legacyAssistant.setPlanningMode?.(nextMode);
-  }, [legacyAssistant]);
 
   const threadsQuery = useQuery({
     queryKey: getCompanionChatThreadsQueryKey(user?.id, companion?.id, surface),
@@ -930,7 +916,6 @@ export function useCompanionAssistant({
     inputMode: CompanionChatInputMode = "text",
     options?: {
       starterIntent?: CompanionPlannerLaunchIntent["starterIntent"];
-      planningMode?: CompanionPlanningMode | null;
     },
   ) => {
     const message = rawMessage.trim();
@@ -970,7 +955,6 @@ export function useCompanionAssistant({
             inputMode,
             currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
             starterIntent: options?.starterIntent,
-            planningMode: options?.planningMode ?? planningMode,
           },
         },
       );
@@ -997,7 +981,6 @@ export function useCompanionAssistant({
         modifications: {
           surface,
           starterIntent: options?.starterIntent ?? null,
-          planningMode: options?.planningMode ?? planningMode,
           proposalId: response.pendingAction?.proposalId ?? null,
         },
       });
@@ -1046,7 +1029,6 @@ export function useCompanionAssistant({
     isResolvingAction,
     isSubmitting,
     legacyAssistant,
-    planningMode,
     trackInteraction,
     pendingSuggestionProposalId,
     savedSuggestionProposalIds,
@@ -1130,7 +1112,6 @@ export function useCompanionAssistant({
             proposalId: resolvedProposalId ?? null,
             confirmationMode: mode,
             surface,
-            planningMode,
             starterIntent: lastStarterIntentRef.current,
           },
         });
@@ -1157,7 +1138,6 @@ export function useCompanionAssistant({
       legacyAssistant,
       pendingAction,
       pendingSuggestionProposalId,
-      planningMode,
       speakAssistantReply,
       structuredResponse,
       surface,
@@ -1231,7 +1211,6 @@ export function useCompanionAssistant({
             inputMode: "text",
             currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
             starterIntent,
-            planningMode,
             selectedProposalId: proposalId,
           },
         },
@@ -1257,7 +1236,6 @@ export function useCompanionAssistant({
         modifications: {
           proposalId,
           starterIntent: starterIntent ?? null,
-          planningMode,
           surface,
         },
       });
@@ -1277,7 +1255,6 @@ export function useCompanionAssistant({
     legacyAssistant,
     messages,
     pendingAction,
-    planningMode,
     structuredResponse,
     surface,
     trackInteraction,
@@ -1362,10 +1339,6 @@ export function useCompanionAssistant({
       threadMutationVersionRef.current += 1;
 
       try {
-        if (launchIntent.planningMode) {
-          setPlanningMode(launchIntent.planningMode);
-        }
-
         if (useLegacyFallback) {
           legacyAssistant.startTemplateThread?.();
         } else {
@@ -1374,7 +1347,6 @@ export function useCompanionAssistant({
 
         const submitted = await submitMessage(launchMessage, "text", {
           starterIntent: launchIntent.starterIntent,
-          planningMode: launchIntent.planningMode,
         });
         if (submitted && launchIntent.starterIntent === "plan_day") {
           window.dispatchEvent(new CustomEvent("companion-plan-my-day-started"));
@@ -1457,8 +1429,6 @@ export function useCompanionAssistant({
       placeholder: legacyAssistant.placeholder,
       messages: legacyAssistant.messages,
       structuredResponse: legacyAssistant.structuredResponse,
-      planningMode: legacyAssistant.planningMode,
-      setPlanningMode: legacyAssistant.setPlanningMode,
       pendingAction: legacyAssistant.pendingAction,
       savedSuggestionProposalIds:
         legacyAssistant.savedSuggestionProposalIds ?? [],
@@ -1513,8 +1483,6 @@ export function useCompanionAssistant({
     placeholder,
     messages,
     structuredResponse,
-    planningMode,
-    setPlanningMode,
     pendingAction,
     savedSuggestionProposalIds,
     pendingSuggestionProposalId,

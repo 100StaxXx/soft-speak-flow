@@ -280,7 +280,7 @@ describe("DraggableFAB", () => {
     }));
   });
 
-  it("routes the low-energy option through the planner with recovery mode preselected", () => {
+  it("routes the low-energy option through the planner", () => {
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
 
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
@@ -290,7 +290,6 @@ describe("DraggableFAB", () => {
       target: "planner",
       starterIntent: "low_energy_adjust",
       message: "I'm low energy today",
-      planningMode: "recovery",
     }));
   });
 

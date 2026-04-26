@@ -3,6 +3,7 @@ import type {
   PlannerBuildInput,
   PlannerBuildResult,
   PlannerProposal,
+  PlannerQuestion,
   PlannerResponseMode,
   PlannerTonePack,
 } from "./planner.ts";
@@ -408,8 +409,10 @@ type PlanDayQuestSuggestion = {
 };
 
 type PlanDayAIOutput = {
+  mode: "clarify" | "suggest";
   message: string;
   day_assessment: string;
+  follow_up_question?: string | null;
   suggested_quests: PlanDayQuestSuggestion[];
 };
 
@@ -422,15 +425,18 @@ const buildPlanDaySystemPrompt = (tonePack: PlannerTonePack): string => {
 
   return [
     "You are Cosmiq, a context-aware AI companion inside an app called Cosmiq.",
-    "Your job: analyze the user's full day context and suggest 2–4 smart, realistic quests for the remaining part of their day.",
+    "Your job: analyze the user's full day context and either ask one useful clarifying question or suggest smart, realistic quests for the remaining part of their day.",
     toneInstruction,
     "Rules:",
-    "- Each quest must be small, actionable, and fit within remaining time",
+    "- If the user's direction or saved context is too thin, ask exactly one natural question instead of inventing quests",
+    "- If you suggest quests, suggest 1–4; each quest must be small, actionable, and fit within remaining time",
     "- Ground every suggestion in real context: missed tasks → recovery, habits → consistency, campaigns → alignment",
     "- Do NOT suggest hour-by-hour schedules or vague goals like 'be productive'",
     "- Do NOT invent quests unrelated to the user's actual context",
-    "- message must be under 80 words, plain text, no markdown, must NOT end with a question mark",
-    "Return minified JSON only with keys: message, day_assessment, suggested_quests",
+    "- message must be under 80 words, plain text, no markdown",
+    "Return minified JSON only with keys: mode, message, day_assessment, follow_up_question, suggested_quests",
+    "mode must be clarify or suggest",
+    "follow_up_question is required when mode is clarify and null otherwise",
     "day_assessment must be one of: behind | open | productive | low_energy | busy",
     "Each quest: { title, type (must|should|nice), estimated_duration (e.g. '45 min'), source (campaign|habit|recovery|optimization), reason }",
   ].join("\n");
@@ -570,18 +576,55 @@ const normalizePlanDayOutput = (value: unknown): PlanDayAIOutput | null => {
     .filter((q) => q.title.length > 0);
 
   return {
+    mode: obj.mode === "clarify" ? "clarify" : "suggest",
     message,
     day_assessment: typeof obj.day_assessment === "string"
       ? obj.day_assessment
       : "open",
+    follow_up_question: typeof obj.follow_up_question === "string"
+      ? obj.follow_up_question.trim()
+      : null,
     suggested_quests,
   };
 };
 
 const mapPlanDayOutputToResult = (
+  input: PlannerBuildInput,
   aiOutput: PlanDayAIOutput,
   baseResult: PlannerBuildResult,
 ): PlannerBuildResult => {
+  if (
+    aiOutput.mode === "clarify" ||
+    (aiOutput.suggested_quests.length === 0 && /\?\s*$/.test(aiOutput.message))
+  ) {
+    const prompt = aiOutput.follow_up_question?.trim() || aiOutput.message;
+    const followUpQuestion: PlannerQuestion = {
+      id: "details",
+      field: "details",
+      prompt,
+      reason:
+        "A little more direction will keep the plan grounded in the user's actual day.",
+      required: true,
+      options: [],
+    };
+
+    return {
+      ...baseResult,
+      mode: "conversational",
+      reply: aiOutput.message,
+      proposals: [],
+      suggestedReminders: [],
+      followUpQuestions: [followUpQuestion],
+      structuredResponse: null,
+      sessionState: {
+        ...baseResult.sessionState,
+        draft: {},
+        openQuestionIds: [followUpQuestion.id],
+        pendingStarterIntent: "plan_day",
+      },
+    };
+  }
+
   const proposals: PlannerProposal[] = aiOutput.suggested_quests.map(
     (quest) => ({
       id: crypto.randomUUID(),
@@ -600,7 +643,7 @@ const mapPlanDayOutputToResult = (
         ),
         suggestedType: quest.type,
         aiSource: quest.source,
-        taskDate: null,
+        taskDate: input.currentDate,
         scheduledTime: null,
       },
       status: "pending" as const,
@@ -677,7 +720,7 @@ export async function buildPlanDayAIResponse(params: {
     const aiOutput = normalizePlanDayOutput(JSON.parse(rawContent));
     if (!aiOutput) return null;
 
-    return mapPlanDayOutputToResult(aiOutput, params.baseResult);
+    return mapPlanDayOutputToResult(params.input, aiOutput, params.baseResult);
   } catch (error) {
     console.warn("[companion-planner-chat] plan_day AI failed", error);
     return null;

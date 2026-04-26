@@ -70,11 +70,6 @@ import {
   getReadyQuestPlannerProposals,
   isQuestionLikePlannerReply,
 } from "@/shared/companionPlannerReadyProposal";
-import {
-  mapPlanningModeToWorkloadTolerance,
-  mapWorkloadToleranceToPlanningMode,
-  type CompanionPlanningMode,
-} from "@/shared/companionPlanningMode";
 import { getOnboardingScheduleArchetypeProfile } from "@/shared/onboardingScheduleArchetype";
 import { computePlannerPriorityScores } from "@/shared/companionPlannerPriority";
 import { buildCompanionStatInterpretation } from "@/shared/companionStatSignals";
@@ -1246,9 +1241,6 @@ export function useCompanionPlanner({
   const [structuredResponse, setStructuredResponse] = useState<
     CompanionPlannerResponse["structuredResponse"]
   >(null);
-  const [planningModeOverride, setPlanningModeOverride] = useState<
-    CompanionPlanningMode | null
-  >(null);
   const [proposals, setProposals] = useState<CompanionPlannerProposal[]>([]);
   const [questions, setQuestions] = useState<CompanionPlannerQuestion[]>([]);
   const [sessionState, setSessionState] = useState<
@@ -1804,31 +1796,13 @@ export function useCompanionPlanner({
     [enrichedContext],
   );
 
-  const planningMode = useMemo<CompanionPlanningMode>(() => (
-    planningModeOverride ??
-      mapWorkloadToleranceToPlanningMode(
-        plannerMemory.workloadTolerance ??
-          plannerAISignals?.suggestedWorkload ??
-          null,
-      )
-  ), [
-    plannerAISignals?.suggestedWorkload,
-    plannerMemory.workloadTolerance,
-    planningModeOverride,
-  ]);
-
   const effectiveWorkloadTolerance = useMemo(
-    () => (
-      planningModeOverride
-        ? mapPlanningModeToWorkloadTolerance(planningModeOverride)
-        : plannerMemory.workloadTolerance ??
-          plannerAISignals?.suggestedWorkload ??
-          null
-    ),
+    () => plannerMemory.workloadTolerance ??
+      plannerAISignals?.suggestedWorkload ??
+      null,
     [
       plannerAISignals?.suggestedWorkload,
       plannerMemory.workloadTolerance,
-      planningModeOverride,
     ],
   );
 
@@ -2354,7 +2328,6 @@ export function useCompanionPlanner({
       skipUserEcho?: boolean;
       starterIntent?: CompanionPlannerStarterIntent;
       briefingContext?: PlannerBriefingContext | null;
-      planningMode?: CompanionPlanningMode | null;
     },
   ) => {
     if (!enabled) return;
@@ -2404,13 +2377,9 @@ export function useCompanionPlanner({
 
     try {
       const resolvedBriefingContext = options?.briefingContext ?? null;
-      const resolvedPlanningMode = options?.planningMode ?? null;
-      const resolvedWorkloadTolerance = resolvedPlanningMode
-        ? mapPlanningModeToWorkloadTolerance(resolvedPlanningMode)
-        : effectiveWorkloadTolerance;
       const resolvedPlannerMemory: PlannerMemoryProfile = {
         ...plannerMemory,
-        workloadTolerance: resolvedWorkloadTolerance,
+        workloadTolerance: effectiveWorkloadTolerance,
       };
       const outlookSyncPromise = withTimeout(
         () => syncOutlookPlanningContext(),
@@ -3384,8 +3353,6 @@ export function useCompanionPlanner({
     setHorizon,
     messages,
     structuredResponse,
-    planningMode,
-    setPlanningMode: setPlanningModeOverride,
     hasRealMessages: messages.length > 0,
     questions,
     proposals,

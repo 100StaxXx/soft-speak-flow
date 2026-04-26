@@ -31,8 +31,6 @@ const mocks = vi.hoisted(() => ({
     todayLabel: "Friday, April 24",
     messages: [],
     structuredResponse: null,
-    planningMode: "balanced" as const,
-    setPlanningMode: vi.fn(),
     questions: [],
     proposals: [],
     pendingProposals: [],

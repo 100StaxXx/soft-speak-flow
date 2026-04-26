@@ -1,5 +1,4 @@
 import type { IntentClassification } from "@/hooks/useIntentClassifier";
-import type { CompanionPlanningMode } from "@/shared/companionPlanningMode";
 import type { OnboardingScheduleArchetype } from "@/shared/onboardingScheduleArchetype";
 import type {
   CompanionMissInterpretation,
@@ -239,7 +238,6 @@ export interface CompanionPlannerLaunchIntent {
   starterIntent: CompanionPlannerStarterIntent;
   target?: CompanionPlannerLaunchTarget;
   briefingContext?: PlannerBriefingContext | null;
-  planningMode?: CompanionPlanningMode | null;
 }
 
 export interface PlannerContextCalendarEvent {

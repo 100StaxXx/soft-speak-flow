@@ -784,11 +784,101 @@ Deno.test("normalizes parsed input server-side for question-form scheduling requ
   );
 });
 
-Deno.test("plan_day starter returns direct quest drafts with structured output", () => {
+Deno.test("generic plan_day starter with no anchors asks what kind of day it is", () => {
   const result = buildPlannerResponse(baseInput({
     message: "Plan my day",
     parsedInput: {
       text: "Plan my day",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      starterIntent: "plan_day",
+      tasks: [],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [],
+      calendarEvents: [],
+    },
+  }));
+
+  assertEquals(result.mode, "conversational");
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.followUpQuestions.length, 1);
+  assertStringIncludes(result.reply, "What kind of day");
+  assertEquals(result.sessionState.pendingStarterIntent, "plan_day");
+  assertEquals(result.structuredResponse, null);
+});
+
+Deno.test("generic plan_day starter with anchors asks a context-aware question", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Plan my day",
+    parsedInput: {
+      text: "Plan my day",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      starterIntent: "plan_day",
+      tasks: [
+        {
+          id: "task-anchor-1",
+          title: "Ship landing page copy",
+          taskDate: "2026-04-18",
+          scheduledTime: null,
+          estimatedDuration: 45,
+          recurrencePattern: null,
+          completed: false,
+          priority: "high",
+        },
+      ],
+      priorityScores: [
+        {
+          id: "task:task-anchor-1",
+          kind: "task",
+          title: "Ship landing page copy",
+          score: 86,
+          reasons: ["Moves the relaunch forward."],
+          taskId: "task-anchor-1",
+          targetDate: "2026-04-18",
+        },
+      ],
+    },
+  }));
+
+  assertEquals(result.mode, "conversational");
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.followUpQuestions.length, 1);
+  assertStringIncludes(result.reply, "focusing");
+  assertEquals(result.followUpQuestions[0]?.options, [
+    "Ship landing page copy",
+  ]);
+  assertEquals(result.sessionState.pendingStarterIntent, "plan_day");
+});
+
+Deno.test("plan_day starter with a focus direction returns direct quest drafts with structured output", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Work",
+    parsedInput: {
+      text: "Work",
       scheduledTime: null,
       scheduledDate: null,
       estimatedDuration: null,
@@ -943,11 +1033,11 @@ Deno.test("plan_day starter returns direct quest drafts with structured output",
   assertStringIncludes(result.reply, "I drafted");
 });
 
-Deno.test("plan_day trims draft count in recovery mode when the day has room", () => {
+Deno.test("plan_day trims draft count when inferred workload tolerance is light", () => {
   const result = buildPlannerResponse(baseInput({
-    message: "Plan my day",
+    message: "Work",
     parsedInput: {
-      text: "Plan my day",
+      text: "Work",
       scheduledTime: null,
       scheduledDate: null,
       estimatedDuration: null,
@@ -1088,9 +1178,9 @@ Deno.test("plan_day trims draft count in recovery mode when the day has room", (
 
 Deno.test("plan_day relationship touch drafts shrink to fit a short suggested slot", () => {
   const result = buildPlannerResponse(baseInput({
-    message: "Plan my day",
+    message: "Work",
     parsedInput: {
-      text: "Plan my day",
+      text: "Work",
       scheduledTime: null,
       scheduledDate: null,
       estimatedDuration: null,
@@ -1173,9 +1263,9 @@ Deno.test("plan_day relationship touch drafts shrink to fit a short suggested sl
 
 Deno.test("plan_day ritual keep drafts shrink to fit a short suggested slot", () => {
   const result = buildPlannerResponse(baseInput({
-    message: "Plan my day",
+    message: "Work",
     parsedInput: {
-      text: "Plan my day",
+      text: "Work",
       scheduledTime: null,
       scheduledDate: null,
       estimatedDuration: null,
@@ -1269,9 +1359,9 @@ Deno.test("plan_day ritual keep drafts shrink to fit a short suggested slot", ()
 
 Deno.test("plan_day ritual keep drafts use the ritual's estimated duration when the slot fits", () => {
   const result = buildPlannerResponse(baseInput({
-    message: "Plan my day",
+    message: "Work",
     parsedInput: {
-      text: "Plan my day",
+      text: "Work",
       scheduledTime: null,
       scheduledDate: null,
       estimatedDuration: null,
@@ -1366,9 +1456,9 @@ Deno.test("plan_day ritual keep drafts use the ritual's estimated duration when 
 
 Deno.test("plan_day campaign fallback drafts shrink to fit a short suggested slot", () => {
   const result = buildPlannerResponse(baseInput({
-    message: "Plan my day",
+    message: "Work",
     parsedInput: {
-      text: "Plan my day",
+      text: "Work",
       scheduledTime: null,
       scheduledDate: null,
       estimatedDuration: null,
@@ -1451,9 +1541,9 @@ Deno.test("plan_day campaign fallback drafts shrink to fit a short suggested slo
 
 Deno.test("plan_day turns campaign pressure into a linked concrete quest draft", () => {
   const result = buildPlannerResponse(baseInput({
-    message: "Plan my day",
+    message: "Work",
     parsedInput: {
-      text: "Plan my day",
+      text: "Work",
       scheduledTime: null,
       scheduledDate: null,
       estimatedDuration: null,
@@ -1550,9 +1640,9 @@ Deno.test("plan_day turns campaign pressure into a linked concrete quest draft",
 
 Deno.test("plan_day keeps task-scored campaign work urgent when the campaign is slipping", () => {
   const result = buildPlannerResponse(baseInput({
-    message: "Plan my day",
+    message: "Work",
     parsedInput: {
-      text: "Plan my day",
+      text: "Work",
       scheduledTime: null,
       scheduledDate: null,
       estimatedDuration: null,
@@ -1644,9 +1734,9 @@ Deno.test("plan_day keeps task-scored campaign work urgent when the campaign is 
 
 Deno.test("plan_day defines the next step when a campaign has a recent win but no linked follow-up quest", () => {
   const result = buildPlannerResponse(baseInput({
-    message: "Plan my day",
+    message: "Work",
     parsedInput: {
-      text: "Plan my day",
+      text: "Work",
       scheduledTime: null,
       scheduledDate: null,
       estimatedDuration: null,
@@ -1744,9 +1834,9 @@ Deno.test("plan_day defines the next step when a campaign has a recent win but n
 
 Deno.test("plan_day can lead with a strategic campaign adjustment when repeated slip makes more tasks dishonest", () => {
   const result = buildPlannerResponse(baseInput({
-    message: "Plan my day",
+    message: "Work",
     parsedInput: {
-      text: "Plan my day",
+      text: "Work",
       scheduledTime: null,
       scheduledDate: null,
       estimatedDuration: null,
@@ -1829,11 +1919,11 @@ Deno.test("plan_day can lead with a strategic campaign adjustment when repeated 
   );
 });
 
-Deno.test("plan_day expands draft count in lock-in mode when there is room to add more", () => {
+Deno.test("plan_day expands draft count when inferred workload tolerance is heavy", () => {
   const result = buildPlannerResponse(baseInput({
-    message: "Plan my day",
+    message: "Work",
     parsedInput: {
-      text: "Plan my day",
+      text: "Work",
       scheduledTime: null,
       scheduledDate: null,
       estimatedDuration: null,
@@ -2144,6 +2234,45 @@ Deno.test("turns a clear plan-day focus reply into confirmable quest drafts", ()
     }).taskText,
     "Work On My App",
   );
+});
+
+Deno.test("asks again instead of turning empty-day plan-day options into filler quests", () => {
+  for (const answer of ["Focused", "Catch-up"]) {
+    const result = buildPlannerResponse(baseInput({
+      message: answer,
+      parsedInput: {
+        text: answer,
+        scheduledTime: null,
+        scheduledDate: null,
+        estimatedDuration: null,
+        recurrencePattern: null,
+        recurrenceDays: [],
+        recurrenceMonthDays: [],
+        recurrenceCustomPeriod: null,
+        recurrenceEndDate: null,
+        notes: null,
+        category: null,
+        newTitle: null,
+      },
+      sessionState: {
+        pendingStarterIntent: "plan_day",
+        openQuestionIds: ["details"],
+      },
+      plannerContext: {
+        tasks: [],
+        inboxTasks: [],
+        activeEpics: [],
+        rituals: [],
+        calendarEvents: [],
+      },
+    }));
+
+    assertEquals(result.mode, "conversational");
+    assertEquals(result.proposals.length, 0);
+    assertEquals(result.followUpQuestions.length, 1);
+    assertStringIncludes(result.reply, "need one real direction");
+    assertEquals(result.sessionState.pendingStarterIntent, "plan_day");
+  }
 });
 
 Deno.test("drafts from a vague directional plan-day reply without asking a second question", () => {
@@ -3484,7 +3613,7 @@ Deno.test("right_now_start returns one structured next action for the current wi
   );
 });
 
-Deno.test("right_now_start shifts between lighter and deeper work based on day mode", () => {
+Deno.test("right_now_start shifts between lighter and deeper work based on inferred workload tolerance", () => {
   const recoveryResult = buildPlannerResponse(baseInput({
     message: "What should I do right now?",
     currentDate: "2026-04-18",

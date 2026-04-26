@@ -26,7 +26,6 @@ import {
   CompanionImage,
   CompanionPortraitShell,
 } from "@/components/CompanionImage";
-import { CompanionPlanningModeSelector } from "@/components/companion/CompanionPlanningModeSelector";
 import { CompanionStructuredResponseCards } from "@/components/companion/CompanionStructuredResponseCards";
 import { PermissionRequestDialog } from "@/components/PermissionRequestDialog";
 import { plannerPathfinderTheme } from "@/components/companion/plannerPathfinderTheme";
@@ -535,14 +534,6 @@ const JourneysCompanionOverlayBody = memo(({
           data-testid="journeys-companion-planner-dialogue-screen"
           data-vaul-no-drag
         >
-          <div className="px-4 pt-4 sm:px-5 sm:pt-5">
-            <CompanionPlanningModeSelector
-              mode={assistant.planningMode}
-              onChange={assistant.setPlanningMode}
-              variant="journeys"
-            />
-          </div>
-
           <ScrollArea ref={transcriptScrollAreaRef} className="flex-1">
             <div
               className="space-y-3 p-4 sm:p-5"

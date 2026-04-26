@@ -19,9 +19,6 @@ const mocks = vi.hoisted(() => ({
     archiveCurrentThread: vi.fn().mockResolvedValue(undefined),
     resumeThread: vi.fn().mockResolvedValue(undefined),
   },
-  planningMode: {
-    setPlanningMode: vi.fn(),
-  },
   drawerRootProps: [] as Array<Record<string, unknown>>,
   state: {
     messages: [
@@ -122,8 +119,6 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
     placeholder: "Talk to Cosmiq",
     messages: mocks.state.messages,
     structuredResponse: mocks.state.structuredResponse,
-    planningMode: "balanced" as const,
-    setPlanningMode: mocks.planningMode.setPlanningMode,
     pendingAction: mocks.state.pendingAction,
     savedSuggestionProposalIds: mocks.state.savedSuggestionProposalIds,
     pendingSuggestionProposalId: mocks.state.pendingSuggestionProposalId,
@@ -364,20 +359,6 @@ describe("JourneysCompanionPlannerModal", () => {
 
     mocks.state.pendingAction = previousPendingAction;
     mocks.state.savedSuggestionProposalIds = previousSavedSuggestionProposalIds;
-  });
-
-  it("lets the user switch the day mode inside the journeys planner shell", () => {
-    render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        presentation="dialog"
-      />,
-    );
-
-    fireEvent.click(screen.getByTestId("companion-planning-mode-lock_in"));
-
-    expect(mocks.planningMode.setPlanningMode).toHaveBeenCalledWith("lock_in");
   });
 
   it("keeps proposal-backed weekly, tomorrow, and priority cards actionable in the journeys shell", () => {

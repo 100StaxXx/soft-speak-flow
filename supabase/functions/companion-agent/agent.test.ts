@@ -133,15 +133,17 @@ Deno.test("runCompanionAgent falls back to deterministic planner when OpenAI is 
       inputMode: "text",
       currentDateTime: "2026-04-18T08:00:00-07:00",
       starterIntent: "plan_day",
-      planningMode: "balanced",
     },
   });
 
   assertEquals(guardedFetchCalled, false);
   assertEquals(result.companionId, "companion-1");
   assertEquals(result.confidence, 0.55);
+  assertEquals(result.mode, "clarify");
+  assertEquals(result.intent, "plan_day");
   assertEquals(result.threadState.sessionId, "session-1");
   assert(result.reply.length > 0);
+  assert(result.reply.toLowerCase().includes("what kind of day"));
   assert(
     supabase.inserts.some((entry) => entry.table === "companion_chats"),
     "expected fallback turn to be persisted",

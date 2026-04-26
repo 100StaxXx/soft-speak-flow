@@ -2,7 +2,6 @@ import type {
   CompanionPlannerLaunchTarget,
   CompanionPlannerStarterIntent,
 } from "@/types/companionPlanner";
-import type { CompanionPlanningMode } from "@/shared/companionPlanningMode";
 
 export interface CompanionPlannerSurfaceAction {
   id:
@@ -22,7 +21,6 @@ export interface CompanionPlannerSurfaceAction {
   message: string;
   target: CompanionPlannerLaunchTarget;
   starterIntent: CompanionPlannerStarterIntent;
-  planningMode?: CompanionPlanningMode | null;
 }
 
 export const COMPANION_PLANNER_SURFACE_ACTIONS: CompanionPlannerSurfaceAction[] =
@@ -75,7 +73,6 @@ export const COMPANION_PLANNER_SURFACE_ACTIONS: CompanionPlannerSurfaceAction[] 
       message: "I'm low energy today",
       target: "planner",
       starterIntent: "low_energy_adjust",
-      planningMode: "recovery",
     },
     {
       id: "what-matters",

@@ -181,7 +181,7 @@ serve(async (req) => {
 
     const starterIntent = plannerInput.plannerContext.starterIntent;
 
-    if (starterIntent === "plan_day") {
+    if (starterIntent === "plan_day" && result.followUpQuestions.length === 0) {
       const aiResult = await runPlannerStageWithTimeout({
         work: () =>
           buildPlanDayAIResponse({

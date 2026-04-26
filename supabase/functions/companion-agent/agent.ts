@@ -745,6 +745,8 @@ function buildInstructions(params: {
     "If a write is appropriate, prepare exactly one normalized pending action and then call submit_companion_result with mode pending_confirmation.",
     "If detail is missing for a write, ask one concise clarifying question with mode clarify.",
     "If the user wants schedule or task state, use the read tools and summarize only what is actually present.",
+    "If the launcher starter intent is plan day and the user only said a generic request like 'Plan my day', do not draft quests yet. Ask one warm clarifying question about what kind of day they want, unless their message already gives a concrete direction.",
+    "If the user is answering a previous Plan My Day clarification, use consult_planner before preparing or summarizing plan-day suggestions.",
     "When consult_planner returns structured_response for plan-day, coming-up, right-now, or day-adjust reads, pass that structured_response through unchanged in submit_companion_result.",
     "When consult_planner returns action_hints, prefer reusing the matching prepare tool with the hint's normalizedPayload instead of inventing a new write shape.",
     "If an action hint has actionType null or an unsupportedReason, do not improvise a write for it. Stay read-only or clarify instead.",
@@ -761,11 +763,6 @@ function buildInstructions(params: {
     params.request.starterIntent
       ? `Launcher starter intent: ${
         params.request.starterIntent.replaceAll("_", " ")
-      }.`
-      : null,
-    params.request.planningMode
-      ? `User-selected day mode: ${
-        params.request.planningMode.replaceAll("_", " ")
       }.`
       : null,
     `Companion state: mood ${currentMood}, stage ${
@@ -1183,6 +1180,10 @@ export function buildToolDefinitions() {
             ],
           },
           confidence: { type: "number" },
+          structured_response: {
+            type: "object",
+            additionalProperties: true,
+          },
           prepared_action_id: { type: "string" },
         },
       },
@@ -1296,7 +1297,6 @@ function buildToolExecutor(params: {
           surface: params.surface,
           horizon: parsed.horizon === "week" ? "week" : "day",
           starterIntent: params.request.starterIntent ?? null,
-          planningMode: params.request.planningMode ?? null,
           context: params.context,
         });
 
@@ -1583,7 +1583,6 @@ export async function runCompanionAgent(params: RunAgentParams) {
       surface: params.request.surface,
       horizon: "day",
       starterIntent: params.request.starterIntent ?? null,
-      planningMode: params.request.planningMode ?? null,
       context,
     });
     const matchingHint = plannerResult.actionHints.find((hint) =>
@@ -1788,19 +1787,23 @@ export async function runCompanionAgent(params: RunAgentParams) {
       surface: params.request.surface,
       horizon: "day",
       starterIntent: params.request.starterIntent ?? null,
-      planningMode: params.request.planningMode ?? null,
       context,
     });
 
     return {
       result: {
         reply: plannerResult.reply,
-        mode: plannerResult.mode === "proposal"
+        mode: plannerResult.questions.length > 0
+          ? "clarify" as CompanionAgentMode
+          : plannerResult.mode === "proposal"
           ? "schedule_read" as CompanionAgentMode
           : plannerResult.mode === "schedule_read"
           ? "schedule_read" as CompanionAgentMode
           : "conversation" as CompanionAgentMode,
-        intent: mapPlannerFallbackIntent(plannerResult),
+        intent: params.request.starterIntent === "plan_day" &&
+            plannerResult.questions.length > 0
+          ? "plan_day"
+          : mapPlannerFallbackIntent(plannerResult),
         confidence: 0.55,
         structuredResponse: plannerResult.structuredResponse ?? null,
         preparedActionId: null,

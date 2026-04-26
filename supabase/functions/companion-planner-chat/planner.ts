@@ -7655,8 +7655,16 @@ const countPlanDayExistingWorkItems = (
 const PLAN_DAY_GENERIC_FOCUS_TERMS = new Set([
   "active",
   "admin",
+  "catch up",
+  "catch up day",
+  "catching up",
+  "catchup",
   "chores",
   "fitness",
+  "focus",
+  "focus day",
+  "focused",
+  "focused day",
   "light",
   "life admin",
   "movement",
@@ -7676,14 +7684,21 @@ const isGenericPlanDayFocusTitle = (value: string): boolean => {
   if (PLAN_DAY_GENERIC_FOCUS_TERMS.has(normalized)) return true;
 
   const wordCount = normalized.split(/\s+/).filter(Boolean).length;
-  return wordCount <= 2 &&
-    /\b(work|active|light|admin|social|recovery|personal)\b/.test(
-      normalized,
-    );
+  const hasGenericFocusWord =
+    /\b(work|active|light|admin|social|recovery|personal|focus(?:ed)?|catch(?:ing)?(?: up)?)\b/
+      .test(normalized);
+  return wordCount <= 2 && hasGenericFocusWord;
 };
 
 const isPlanDayStarterTitle = (value: string): boolean =>
-  normalizeText(value) === "plan my day";
+  /^(?:help me )?plan(?: my day| today)$/.test(normalizeText(value));
+
+const hasPlanDayContextAnchors = (input: PlannerBuildInput): boolean =>
+  input.plannerContext.tasks.some((task) => task.completed !== true) ||
+  input.plannerContext.inboxTasks.some((task) => task.completed !== true) ||
+  input.plannerContext.activeEpics.length > 0 ||
+  input.plannerContext.rituals.length > 0 ||
+  Boolean(input.plannerContext.contactsNeedingAttention?.length);
 
 const getPlanDayFocusLabels = (input: PlannerBuildInput): string[] => {
   const labels: string[] = [];
@@ -7738,21 +7753,26 @@ const getPlanDayFocusLabels = (input: PlannerBuildInput): string[] => {
     }
   }
 
-  if (labels.length === 0) {
-    const currentMinutes = getLocalMinutesFromDateTime(input.currentDateTime);
-    if (currentMinutes !== null && currentMinutes >= 17 * 60) {
-      return ["Work", "Something active", "Something light"];
-    }
-
-    return ["Work", "Something active", "People"];
-  }
-
   return labels.slice(0, 3);
 };
 
 const buildPlanDayClarificationQuestion = (
   input: PlannerBuildInput,
 ): PlannerQuestion => {
+  const focusOptions = getPlanDayFocusLabels(input);
+  if (focusOptions.length === 0) {
+    return question({
+      id: "details",
+      field: "details",
+      prompt:
+        "What kind of day are we making: focused, light, catch-up, or something else?",
+      reason:
+        "I don't want to invent quests when your day is still a blank page.",
+      required: true,
+      options: ["Focused", "Light", "Catch-up"],
+    });
+  }
+
   const currentMinutes = getLocalMinutesFromDateTime(input.currentDateTime);
   const prompt = currentMinutes !== null && currentMinutes < 12 * 60
     ? "What are you feeling like focusing on this morning?"
@@ -7767,8 +7787,60 @@ const buildPlanDayClarificationQuestion = (
     reason:
       "Once I know the direction, I can shape the rest of the day around it.",
     required: true,
-    options: getPlanDayFocusLabels(input),
+    options: focusOptions,
   });
+};
+
+const buildPlanDayClarificationResponse = (
+  input: PlannerBuildInput,
+  sessionState: PlannerSessionState,
+  classificationHint: ClassificationHint,
+  reply?: string,
+): PlannerBuildResult => {
+  const clarification = buildPlanDayClarificationQuestion(input);
+  return {
+    mode: "conversational",
+    reply: reply ?? clarification.prompt,
+    followUpQuestions: [clarification],
+    proposals: [],
+    suggestedReminders: [],
+    structuredResponse: null,
+    memoryUpdates: {
+      preferredTimeOfDay: sessionState.preferredTimeOfDay ??
+        input.plannerContext.plannerMemory?.preferredTimeOfDay ?? null,
+      preferredTimeReason: sessionState.preferredTimeReason ??
+        input.plannerContext.plannerMemory?.preferredTimeReason ?? null,
+      reminderPreference: sessionState.reminderPreference ??
+        (input.plannerContext.plannerMemory?.reminderMinutesBefore
+          ? `${input.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
+          : null),
+    },
+    sessionState: {
+      ...sessionState,
+      draft: {},
+      openQuestionIds: [clarification.id],
+      pendingStarterIntent: "plan_day",
+      lastClassification: classificationHint.type,
+    },
+  };
+};
+
+const isGenericPlanDayStarterRequest = (input: PlannerBuildInput): boolean => {
+  const parsedTitle = sanitizeProposalTitle(input.parsedInput?.text);
+  if (parsedTitle && !isPlanDayStarterTitle(parsedTitle)) return false;
+
+  return /\b(plan my day|help me plan(?: my day| today)|plan today)\b/i.test(
+    input.message,
+  );
+};
+
+const isVaguePlanDayDirection = (input: PlannerBuildInput): boolean => {
+  const parsedTitle = sanitizeProposalTitle(input.parsedInput?.text);
+  const normalized = normalizeText(parsedTitle || input.message);
+  if (!normalized) return true;
+  if (isGenericPlanDayFocusTitle(normalized)) return true;
+  return /\b(idk|i don't know|not sure|whatever|anything|something|you pick|surprise me)\b/
+    .test(normalized);
 };
 
 const scoreMatchesPlanDayFocus = (
@@ -9884,6 +9956,20 @@ const buildPlanDayDraftResponse = (
     : null;
 
   if (proposals.length === 0) {
+    if (
+      input.sessionState.pendingStarterIntent === "plan_day" &&
+      existingWorkItems === 0 &&
+      !hasPlanDayContextAnchors(input) &&
+      isVaguePlanDayDirection(input)
+    ) {
+      return buildPlanDayClarificationResponse(
+        input,
+        sessionState,
+        classificationHint,
+        "I can shape that, but I need one real direction first. What kind of day are we making: focused, light, catch-up, or something else?",
+      );
+    }
+
     const noRoomReason = existingWorkItems >= targetTotal
       ? `${
         dateLabel === "today" || dateLabel === "tomorrow"
@@ -10041,8 +10127,16 @@ const buildPlanDayStarterResponse = (
   input: PlannerBuildInput,
   sessionState: PlannerSessionState,
   classificationHint: ClassificationHint,
-): PlannerBuildResult =>
-  buildPlanDayDraftResponse(
+): PlannerBuildResult => {
+  if (isGenericPlanDayStarterRequest(input)) {
+    return buildPlanDayClarificationResponse(
+      input,
+      sessionState,
+      classificationHint,
+    );
+  }
+
+  return buildPlanDayDraftResponse(
     input,
     {
       ...sessionState,
@@ -10050,6 +10144,7 @@ const buildPlanDayStarterResponse = (
     },
     classificationHint,
   );
+};
 
 const buildUpcomingStarterResponse = (
   input: PlannerBuildInput,

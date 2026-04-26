@@ -31,7 +31,6 @@ const mocks = vi.hoisted(() => ({
   legacyCancelPendingAction: vi.fn().mockResolvedValue(undefined),
   legacyConfirmSuggestedQuest: vi.fn().mockResolvedValue(undefined),
   legacyConfirmAllPendingActions: vi.fn().mockResolvedValue(undefined),
-  legacySetPlanningMode: vi.fn(),
   legacyStartTemplateThread: vi.fn(),
   legacyHydrateFromUnifiedState: vi.fn(),
   legacySavedSuggestionProposalIds: [] as string[],
@@ -89,8 +88,6 @@ vi.mock("@/hooks/useLegacyCompanionAssistantAdapter", () => ({
     placeholder: "Talk to Cosmiq",
     messages: [],
     structuredResponse: null,
-    planningMode: "balanced" as const,
-    setPlanningMode: mocks.legacySetPlanningMode,
     pendingAction: null,
     savedSuggestionProposalIds: mocks.legacySavedSuggestionProposalIds,
     pendingSuggestionProposalId: mocks.legacyPendingSuggestionProposalId,
@@ -542,7 +539,6 @@ describe("useCompanionAssistant", () => {
         modifications: expect.objectContaining({
           surface: "journeys",
           starterIntent: null,
-          planningMode: "balanced",
         }),
       }),
     );
@@ -827,7 +823,6 @@ describe("useCompanionAssistant", () => {
           actionId: "action-1",
           confirmationMode: "confirm",
           surface: "journeys",
-          planningMode: "balanced",
         }),
       }),
     );
@@ -894,7 +889,6 @@ describe("useCompanionAssistant", () => {
           actionId: "action-2",
           confirmationMode: "cancel",
           surface: "journeys",
-          planningMode: "balanced",
         }),
       }),
     );
@@ -968,40 +962,6 @@ describe("useCompanionAssistant", () => {
       "Plan my day",
       "text",
       { starterIntent: "plan_day" },
-    );
-  });
-
-  it("passes the selected day mode through to companion-agent requests", async () => {
-    const { wrapper } = createWrapper();
-    const { result } = renderHook(
-      () => useCompanionAssistant({ surface: "journeys" }),
-      { wrapper },
-    );
-
-    await waitFor(() => {
-      expect(result.current.activeThread?.sessionId).toBe("persisted-session");
-    });
-
-    act(() => {
-      result.current.setPlanningMode("recovery");
-    });
-
-    await waitFor(() => {
-      expect(result.current.planningMode).toBe("recovery");
-    });
-
-    await act(async () => {
-      await result.current.submitMessage("Adjust my day", "text");
-    });
-
-    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
-      "companion-agent",
-      expect.objectContaining({
-        body: expect.objectContaining({
-          message: "Adjust my day",
-          planningMode: "recovery",
-        }),
-      }),
     );
   });
 
@@ -1222,7 +1182,7 @@ describe("useCompanionAssistant", () => {
     );
   });
 
-  it("applies launcher planning modes before submitting the starter intent", async () => {
+  it("submits low-energy launcher intents without explicit intensity overrides", async () => {
     const { wrapper } = createWrapper();
 
     renderHook(
@@ -1233,7 +1193,6 @@ describe("useCompanionAssistant", () => {
             id: "launch-recovery-1",
             message: "I'm low energy today",
             starterIntent: "low_energy_adjust",
-            planningMode: "recovery",
           },
         }),
       { wrapper },
@@ -1246,7 +1205,6 @@ describe("useCompanionAssistant", () => {
           body: expect.objectContaining({
             message: "I'm low energy today",
             starterIntent: "low_energy_adjust",
-            planningMode: "recovery",
           }),
         }),
       );
@@ -1505,7 +1463,6 @@ describe("useCompanionAssistant", () => {
           sessionId: "persisted-session",
           message: "Plan my day",
           starterIntent: "plan_day",
-          planningMode: "balanced",
           selectedProposalId: "proposal-plan-1",
         }),
       }),
@@ -1519,7 +1476,6 @@ describe("useCompanionAssistant", () => {
         modifications: expect.objectContaining({
           proposalId: "proposal-plan-1",
           starterIntent: "plan_day",
-          planningMode: "balanced",
           surface: "journeys",
         }),
       }),
@@ -1552,7 +1508,6 @@ describe("useCompanionAssistant", () => {
           sessionId: "persisted-session",
           message: "Plan my day",
           starterIntent: "plan_day",
-          planningMode: "balanced",
           selectedProposalId: "proposal-plan-2",
         }),
       }),

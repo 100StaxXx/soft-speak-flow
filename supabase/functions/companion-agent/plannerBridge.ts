@@ -3,10 +3,6 @@ import { addDays, format, parseISO } from "https://esm.sh/date-fns@3.6.0";
 import { computePlannerPriorityScores } from "../../../src/shared/companionPlannerPriority.ts";
 import { getCompanionModeConfig } from "../../../src/shared/companionModes.ts";
 import {
-  type CompanionPlanningMode,
-  mapPlanningModeToWorkloadTolerance,
-} from "../../../src/shared/companionPlanningMode.ts";
-import {
   buildPlannerResponse,
   type PlannerBuildInput,
   type PlannerContextCalendarEvent,
@@ -972,13 +968,48 @@ const normalizePlannerStarterIntent = (
   }
 };
 
+const isPlanDayStarterText = (value: string): boolean =>
+  /\b(plan my day|help me plan(?: my day| today)|plan today)\b/i.test(value);
+
+const isLikelyPlanDayClarificationReply = (value: string): boolean => {
+  const normalized = value.toLowerCase();
+  return normalized.includes("?") &&
+    (
+      normalized.includes("what kind of day") ||
+      normalized.includes("what type of day") ||
+      normalized.includes("feeling like focusing") ||
+      normalized.includes("what are we making") ||
+      normalized.includes("focus")
+    );
+};
+
+const hasPendingPlanDayClarification = (
+  context: LoadedCompanionAgentContext,
+): boolean => {
+  const lastAssistantIndex = [...context.messages]
+    .map((message, index) => ({ message, index }))
+    .reverse()
+    .find(({ message }) => message.role === "assistant")?.index;
+  if (lastAssistantIndex === undefined) return false;
+
+  const assistantMessage = context.messages[lastAssistantIndex];
+  if (!isLikelyPlanDayClarificationReply(assistantMessage.content)) {
+    return false;
+  }
+
+  return context.messages
+    .slice(Math.max(0, lastAssistantIndex - 4), lastAssistantIndex)
+    .some((message) =>
+      message.role === "user" && isPlanDayStarterText(message.content)
+    );
+};
+
 export function consultPlannerForAgent(params: {
   message: string;
   currentDateTime: string;
   surface: "companion" | "journeys";
   horizon?: PlannerHorizon;
   starterIntent?: string | null;
-  planningMode?: CompanionPlanningMode | null;
   context: LoadedCompanionAgentContext;
 }): PlannerAssistResult {
   const normalizedMessage = normalizeScheduleReadMessage(params.message);
@@ -989,9 +1020,7 @@ export function consultPlannerForAgent(params: {
   );
   const plannerMemoryForPlanning: Record<string, unknown> = {
     ...(plannerMemory ?? {}),
-    workloadTolerance: params.planningMode
-      ? mapPlanningModeToWorkloadTolerance(params.planningMode)
-      : asString(plannerMemory?.workloadTolerance),
+    workloadTolerance: asString(plannerMemory?.workloadTolerance),
   };
   const tasks = params.context.tasks.map(mapTask);
   const recentCompletedTasks = params.context.recentCompletedTasks.map(mapTask);
@@ -1056,15 +1085,17 @@ export function consultPlannerForAgent(params: {
   });
 
   const modeConfig = getCompanionModeConfig(params.context.companionMode);
+  const pendingPlanDayClarification = !plannerStarterIntent &&
+    hasPendingPlanDayClarification(params.context);
   const sessionState: PlannerSessionState = {
     draft: {},
-    openQuestionIds: [],
+    openQuestionIds: pendingPlanDayClarification ? ["details"] : [],
     preferredTimeOfDay: asString(plannerMemory?.preferredTimeOfDay),
     preferredTimeReason: asString(plannerMemory?.preferredTimeReason),
     reminderPreference: asNumber(plannerMemory?.reminderMinutesBefore)
       ? `${plannerMemory?.reminderMinutesBefore} minutes`
       : null,
-    pendingStarterIntent: null,
+    pendingStarterIntent: pendingPlanDayClarification ? "plan_day" : null,
     lastClassification: null,
   };
 

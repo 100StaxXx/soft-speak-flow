@@ -40,12 +40,6 @@ export const COMPANION_AGENT_STARTER_INTENTS = [
   "goal_breakdown_start",
 ] as const;
 
-export const COMPANION_PLANNING_MODES = [
-  "lock_in",
-  "balanced",
-  "recovery",
-] as const;
-
 export const COMPANION_CAMPAIGN_LIFECYCLE_STATUSES = [
   "active",
   "completed",
@@ -211,7 +205,6 @@ export const InputModeSchema = z.enum(["text", "voice"]);
 export const ModeSchema = z.enum(COMPANION_AGENT_MODES);
 export const IntentSchema = z.enum(COMPANION_AGENT_INTENTS);
 export const StarterIntentSchema = z.enum(COMPANION_AGENT_STARTER_INTENTS);
-export const PlanningModeSchema = z.enum(COMPANION_PLANNING_MODES);
 export const PendingActionTypeSchema = z.enum(COMPANION_PENDING_ACTION_TYPES);
 export const PendingActionStatusSchema = z.enum(
   COMPANION_PENDING_ACTION_STATUSES,
@@ -235,7 +228,6 @@ export const CompanionAgentRequestSchema = z.object({
   inputMode: InputModeSchema.default("text"),
   currentDateTime: z.string().datetime({ offset: true }),
   starterIntent: StarterIntentSchema.optional(),
-  planningMode: PlanningModeSchema.optional(),
   selectedProposalId: z.string().min(1).max(200).optional(),
   visibleDateStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   visibleDateEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),

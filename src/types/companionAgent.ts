@@ -1,5 +1,4 @@
 import type { Json } from "@/integrations/supabase/types";
-import type { CompanionPlanningMode } from "@/shared/companionPlanningMode";
 import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
 import type {
   CompanionChatInputMode,
@@ -95,7 +94,6 @@ export interface CompanionAgentRequest {
   inputMode: CompanionChatInputMode;
   currentDateTime: string;
   starterIntent?: CompanionPlannerStarterIntent;
-  planningMode?: CompanionPlanningMode;
   selectedProposalId?: string;
   visibleDateStart?: string;
   visibleDateEnd?: string;

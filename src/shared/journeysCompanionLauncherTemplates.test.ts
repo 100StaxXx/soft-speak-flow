@@ -82,7 +82,6 @@ describe("journeys companion launcher greetings", () => {
       message: "I'm low energy today",
       target: "planner",
       starterIntent: "low_energy_adjust",
-      planningMode: "recovery",
     });
 
     expect(templates.find((template) => template.id === "right-now")).toMatchObject({
