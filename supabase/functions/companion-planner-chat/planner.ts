@@ -493,6 +493,21 @@ export const normalizePlannerBuildResultText = (
         ? {
           ...result.structuredResponse.planDay,
           message: normalizePlannerDisplayText(result.reply),
+          campaignFocus: result.structuredResponse.planDay.campaignFocus
+            ? {
+              ...result.structuredResponse.planDay.campaignFocus,
+              campaignTitle: normalizePlannerDisplayText(
+                result.structuredResponse.planDay.campaignFocus
+                  .campaignTitle,
+              ),
+              campaignReason: normalizePlannerDisplayText(
+                result.structuredResponse.planDay.campaignFocus
+                  .campaignReason,
+              ),
+              focusItems: result.structuredResponse.planDay.campaignFocus
+                .focusItems.map((item) => normalizePlannerDisplayText(item)),
+            }
+            : result.structuredResponse.planDay.campaignFocus,
           suggestedQuests: result.structuredResponse.planDay.suggestedQuests
             .map((quest) => ({
               ...quest,
@@ -7608,6 +7623,72 @@ const getPlanDayLoadStatus = (
       ? "overloaded"
       : null);
 
+type PlanDayLoadBreakdown = {
+  visibleStandaloneQuests: PlannerContextTask[];
+  campaignLinkedQuests: PlannerContextTask[];
+  surfacedCampaignRituals: PlannerContextTask[];
+  datedInboxItems: PlannerContextTask[];
+  undatedInboxItems: PlannerContextTask[];
+  calendarBlocks: PlannerContextCalendarEvent[];
+  workItemsForProposalLimit: number;
+};
+
+type PlanDayCampaignFocus = NonNullable<
+  NonNullable<CompanionStructuredResponse["planDay"]>["campaignFocus"]
+>;
+
+const calendarEventOverlapsDate = (
+  event: PlannerContextCalendarEvent,
+  date: string,
+): boolean => {
+  const dayStart = new Date(`${date}T00:00:00`);
+  const dayEnd = new Date(`${addDaysToDateKey(date, 1)}T00:00:00`);
+  const start = new Date(event.start);
+  const end = new Date(event.end);
+  return end > dayStart && start < dayEnd;
+};
+
+const isCampaignRitualTask = (task: PlannerContextTask): boolean =>
+  Boolean(task.epicId && task.habitSourceId);
+
+const getPlanDayLoadBreakdown = (
+  input: PlannerBuildInput,
+  targetDate: string,
+): PlanDayLoadBreakdown => {
+  const datedTasks = input.plannerContext.tasks.filter((task) =>
+    task.completed !== true && task.taskDate === targetDate
+  );
+  const datedInboxItems = input.plannerContext.inboxTasks.filter((task) =>
+    task.completed !== true && task.taskDate === targetDate
+  );
+  const undatedInboxItems = input.plannerContext.inboxTasks.filter((task) =>
+    task.completed !== true && !task.taskDate
+  );
+  const surfacedCampaignRituals = datedTasks.filter(isCampaignRitualTask);
+  const campaignLinkedQuests = datedTasks.filter((task) =>
+    Boolean(task.epicId) && !isCampaignRitualTask(task)
+  );
+  const visibleStandaloneQuests = datedTasks.filter((task) =>
+    !task.epicId && !task.habitSourceId
+  );
+  const calendarBlocks = input.plannerContext.calendarEvents.filter((event) =>
+    calendarEventOverlapsDate(event, targetDate)
+  );
+
+  return {
+    visibleStandaloneQuests,
+    campaignLinkedQuests,
+    surfacedCampaignRituals,
+    datedInboxItems,
+    undatedInboxItems,
+    calendarBlocks,
+    workItemsForProposalLimit: visibleStandaloneQuests.length +
+      campaignLinkedQuests.length +
+      surfacedCampaignRituals.length +
+      datedInboxItems.length,
+  };
+};
+
 const getPlanDayTargetTotal = (
   input: PlannerBuildInput,
   targetDate: string,
@@ -7643,14 +7724,6 @@ const getPlanDayTargetTotal = (
       return 4;
   }
 };
-
-const countPlanDayExistingWorkItems = (
-  input: PlannerBuildInput,
-  targetDate: string,
-): number =>
-  [...input.plannerContext.tasks, ...input.plannerContext.inboxTasks]
-    .filter((task) => task.completed !== true && task.taskDate === targetDate)
-    .length;
 
 const hasPlanDayScheduledBlocks = (
   input: PlannerBuildInput,
@@ -8386,9 +8459,138 @@ const buildOptimizerReply = (
   return body.filter(Boolean).join(" ");
 };
 
+const formatPlanDayInlineList = (items: string[]): string => {
+  const cleanItems = items
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+  if (cleanItems.length <= 2) return cleanItems.join(" and ");
+  return `${cleanItems.slice(0, -1).join(", ")}, and ${
+    cleanItems[cleanItems.length - 1]
+  }`;
+};
+
+const capitalizeScheduleReference = (value: string): string =>
+  value === "today" || value === "tomorrow"
+    ? `${value[0]?.toUpperCase() ?? ""}${value.slice(1)}`
+    : value;
+
+const getPlanDayHiddenCampaignTasks = (
+  loadBreakdown: PlanDayLoadBreakdown,
+): PlannerContextTask[] => [
+  ...loadBreakdown.surfacedCampaignRituals,
+  ...loadBreakdown.campaignLinkedQuests,
+];
+
+const buildPlanDayCampaignFocus = (
+  input: PlannerBuildInput,
+  loadBreakdown: PlanDayLoadBreakdown,
+): PlanDayCampaignFocus | null => {
+  const campaignTasks = getPlanDayHiddenCampaignTasks(loadBreakdown);
+  if (campaignTasks.length === 0) return null;
+
+  const groups = new Map<
+    string,
+    {
+      epic: PlannerContextEpic | null;
+      title: string;
+      tasks: PlannerContextTask[];
+      ritualCount: number;
+    }
+  >();
+
+  for (const task of campaignTasks) {
+    const epic = task.epicId
+      ? input.plannerContext.activeEpics.find((candidate) =>
+        candidate.id === task.epicId
+      ) ?? null
+      : null;
+    const title = epic?.title ?? task.epicTitle ?? "Campaign";
+    const key = task.epicId ?? `title:${normalizeText(title)}`;
+    const existing = groups.get(key) ?? {
+      epic,
+      title,
+      tasks: [],
+      ritualCount: 0,
+    };
+    existing.tasks.push(task);
+    if (isCampaignRitualTask(task)) existing.ritualCount += 1;
+    groups.set(key, existing);
+  }
+
+  const selected =
+    [...groups.values()].sort((left, right) =>
+      right.tasks.length - left.tasks.length ||
+      right.ritualCount - left.ritualCount ||
+      left.title.localeCompare(right.title)
+    )[0];
+  if (!selected) return null;
+
+  const campaignMomentum = selected.epic
+    ? buildCampaignMomentumCandidate(input, selected.epic)
+    : null;
+  const focusItems = selected.tasks
+    .map((task) => task.title)
+    .filter((title, index, titles) =>
+      titles.findIndex((candidate) =>
+        normalizeText(candidate) === normalizeText(title)
+      ) === index
+    )
+    .slice(0, 4);
+  const focusItemList = formatPlanDayInlineList(focusItems);
+
+  return {
+    campaignTitle: selected.title,
+    campaignStatus: campaignMomentum?.status ?? null,
+    campaignInterventionLevel: campaignMomentum?.interventionLevel ?? null,
+    campaignReason: selected.ritualCount > 0 && focusItemList
+      ? `${focusItemList} ${
+        focusItems.length === 1 ? "is" : "are"
+      } already tucked into this campaign today.`
+      : campaignMomentum?.statusReason ?? null,
+    campaignHealth: campaignMomentum
+      ? buildCampaignHealthSnapshot(input, campaignMomentum)
+      : null,
+    focusItems,
+  };
+};
+
+const countPlanDayCampaignGroups = (
+  loadBreakdown: PlanDayLoadBreakdown,
+): number =>
+  new Set(
+    getPlanDayHiddenCampaignTasks(loadBreakdown).map((task) =>
+      task.epicId ?? task.epicTitle ?? task.title
+    ),
+  ).size;
+
+const buildPlanDayCampaignLoadMessage = (
+  input: PlannerBuildInput,
+  dateLabel: string,
+  loadBreakdown: PlanDayLoadBreakdown,
+): string | null => {
+  const campaignFocus = buildPlanDayCampaignFocus(input, loadBreakdown);
+  if (!campaignFocus || campaignFocus.focusItems.length === 0) return null;
+
+  const dateLead = capitalizeScheduleReference(dateLabel);
+  const focusItemList = formatPlanDayInlineList(campaignFocus.focusItems);
+  const campaignGroupCount = countPlanDayCampaignGroups(loadBreakdown);
+  const drawerLabel = campaignGroupCount > 1
+    ? "those campaign drawers"
+    : "that campaign drawer";
+  const opener = loadBreakdown.visibleStandaloneQuests.length === 0
+    ? `${dateLead} looks open in standalone quests, but your campaign work is already carrying the focus`
+    : `${dateLead} already has campaign work carrying much of the focus`;
+
+  return `${opener}: ${focusItemList} for ${campaignFocus.campaignTitle}. I'd work from ${drawerLabel} before adding more.`;
+};
+
 const derivePlanDayAssessment = (
   input: PlannerBuildInput,
   targetDate: string,
+  loadBreakdown: PlanDayLoadBreakdown = getPlanDayLoadBreakdown(
+    input,
+    targetDate,
+  ),
 ): CompanionDayAssessment => {
   const currentDayLoad = input.plannerContext.scheduleInsights?.dayLoads.find((
     day,
@@ -8402,12 +8604,22 @@ const derivePlanDayAssessment = (
   if (missedCount >= 2) return "behind";
   if (momentumState === "locked_in") return "productive";
   if (
+    loadBreakdown.workItemsForProposalLimit >=
+      getPlanDayTargetTotal(input, targetDate)
+  ) {
+    return "busy";
+  }
+  if (
     currentDayLoad?.status === "overloaded" ||
     currentDayLoad?.status === "busy"
   ) {
     return "busy";
   }
-  if (currentDayLoad?.status === "balanced") return "balanced";
+  if (
+    currentDayLoad?.status === "balanced" ||
+    loadBreakdown.workItemsForProposalLimit > 0 ||
+    loadBreakdown.calendarBlocks.length > 0
+  ) return "balanced";
   return "open";
 };
 
@@ -8416,6 +8628,7 @@ const buildPlanDayStructuredOutput = (
   reply: string,
   classificationHint: ClassificationHint,
   proposals: PlannerProposal[],
+  loadBreakdown = getPlanDayLoadBreakdown(input, getPlanDayTargetDate(input)),
 ): CompanionStructuredResponse => ({
   intent: mapPlannerIntentMetadata(input, classificationHint, {
     forceIntentType: getProposalDrivenIntentType("quest", proposals),
@@ -8424,10 +8637,15 @@ const buildPlanDayStructuredOutput = (
   }),
   planDay: {
     message: reply,
-    dayAssessment: derivePlanDayAssessment(input, getPlanDayTargetDate(input)),
+    dayAssessment: derivePlanDayAssessment(
+      input,
+      getPlanDayTargetDate(input),
+      loadBreakdown,
+    ),
     suggestedQuests: proposals.slice(0, 5).map((proposal) =>
       buildSuggestedQuestFromProposal(input, proposal)
     ),
+    campaignFocus: buildPlanDayCampaignFocus(input, loadBreakdown),
   },
   weeklyPlan: null,
   comingUp: null,
@@ -9916,7 +10134,8 @@ const buildPlanDayDraftResponse = (
   classificationHint: ClassificationHint,
 ): PlannerBuildResult => {
   const targetDate = getPlanDayTargetDate(input);
-  const existingWorkItems = countPlanDayExistingWorkItems(input, targetDate);
+  const loadBreakdown = getPlanDayLoadBreakdown(input, targetDate);
+  const existingWorkItems = loadBreakdown.workItemsForProposalLimit;
   const targetTotal = getPlanDayTargetTotal(input, targetDate);
   const concreteCandidate = buildPlanDayConcreteCandidate(input, targetDate);
   const strategicAdjustmentProposal = buildPlanDayStrategicAdjustmentProposal(
@@ -9937,8 +10156,13 @@ const buildPlanDayDraftResponse = (
   );
   const addCandidate = (candidate: OptimizerDraftCandidate | null) => {
     if (!candidate) return false;
-    if (existingTitleKeys.has(candidate.dedupeKey)) return false;
-    existingTitleKeys.add(candidate.dedupeKey);
+    const candidateKeys = [
+      candidate.dedupeKey,
+      normalizeText(candidate.title),
+      normalizeText(candidate.derivedFromMessage),
+    ].filter((key) => key.length > 0);
+    if (candidateKeys.some((key) => existingTitleKeys.has(key))) return false;
+    candidateKeys.forEach((key) => existingTitleKeys.add(key));
     candidates.push(candidate);
     return true;
   };
@@ -10013,12 +10237,14 @@ const buildPlanDayDraftResponse = (
       );
     }
 
+    const campaignLoadMessage = existingWorkItems >= targetTotal
+      ? buildPlanDayCampaignLoadMessage(input, dateLabel, loadBreakdown)
+      : null;
     const noRoomReason = existingWorkItems >= targetTotal
-      ? `${
-        dateLabel === "today" || dateLabel === "tomorrow"
-          ? `${dateLabel[0].toUpperCase()}${dateLabel.slice(1)}`
-          : dateLabel
-      } is already carrying about as much quest load as I want to give it.`
+      ? campaignLoadMessage ??
+        `${
+          capitalizeScheduleReference(dateLabel)
+        } is already carrying about as much quest load as I want to give it.`
       : `I don't see enough open space on ${dateLabel} around your scheduled blocks to draft that cleanly.`;
 
     return {
@@ -10034,6 +10260,7 @@ const buildPlanDayDraftResponse = (
         [acknowledgement, noRoomReason].filter(Boolean).join(" "),
         classificationHint,
         [],
+        loadBreakdown,
       ),
       memoryUpdates: {
         preferredTimeOfDay: sessionState.preferredTimeOfDay ??
@@ -10075,6 +10302,7 @@ const buildPlanDayDraftResponse = (
       reply,
       classificationHint,
       proposals,
+      loadBreakdown,
     ),
     memoryUpdates: {
       preferredTimeOfDay: sessionState.preferredTimeOfDay ??

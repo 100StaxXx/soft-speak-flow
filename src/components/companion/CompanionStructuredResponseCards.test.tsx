@@ -68,6 +68,48 @@ describe("CompanionStructuredResponseCards", () => {
     expect(onConfirmSuggestion).toHaveBeenCalledWith("proposal-plan-day-1");
   });
 
+  it("renders plan-day campaign focus without needing a new card path", () => {
+    const structuredResponse: CompanionStructuredResponse = {
+      intent: baseIntent,
+      planDay: {
+        message:
+          "Today looks open in standalone quests, but your campaign work is already carrying the focus.",
+        dayAssessment: "busy",
+        suggestedQuests: [],
+        campaignFocus: {
+          campaignTitle: "Gain 10 pounds of muscle",
+          campaignStatus: "stalled",
+          campaignInterventionLevel: "protect",
+          campaignReason:
+            "Weekly Meal Prep and Progress Tracking are already tucked into this campaign today.",
+          campaignHealth: {
+            overdueQuestCount: 0,
+            protectedTodayCount: 2,
+            recentCompletedQuestCount: 0,
+            daysWithoutMomentum: null,
+            activeCampaignCount: 1,
+          },
+          focusItems: ["Weekly Meal Prep", "Progress Tracking"],
+        },
+      },
+    };
+
+    render(
+      <CompanionStructuredResponseCards
+        structuredResponse={structuredResponse}
+        variant="journeys"
+      />,
+    );
+
+    expect(screen.getByTestId("structured-plan-day-campaign-focus"))
+      .toHaveTextContent("Gain 10 pounds of muscle");
+    expect(screen.getByTestId("structured-plan-day-campaign-focus"))
+      .toHaveTextContent("Weekly Meal Prep");
+    expect(screen.getByTestId("structured-plan-day-campaign-health"))
+      .toHaveTextContent("2 protected today");
+    expect(screen.getByText(/Day status:/)).toHaveTextContent("busy");
+  });
+
   it("shows saved right-now proposals as disabled", () => {
     const onConfirmSuggestion = vi.fn();
     const structuredResponse: CompanionStructuredResponse = {

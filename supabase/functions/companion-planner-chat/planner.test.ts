@@ -91,6 +91,26 @@ const baseInput = (
   };
 };
 
+const plannerTask = (
+  overrides: Partial<PlannerBuildInput["plannerContext"]["tasks"][number]> & {
+    id: string;
+    title: string;
+  },
+): PlannerBuildInput["plannerContext"]["tasks"][number] => ({
+  id: overrides.id,
+  title: overrides.title,
+  taskDate: overrides.taskDate ?? null,
+  category: overrides.category ?? null,
+  scheduledTime: overrides.scheduledTime ?? null,
+  estimatedDuration: overrides.estimatedDuration ?? null,
+  recurrencePattern: overrides.recurrencePattern ?? null,
+  completed: overrides.completed ?? false,
+  source: overrides.source ?? null,
+  habitSourceId: overrides.habitSourceId ?? null,
+  epicId: overrides.epicId ?? null,
+  epicTitle: overrides.epicTitle ?? null,
+});
+
 Deno.test("turns a one-off request into a quest without forcing schedule details", () => {
   const result = buildPlannerResponse(baseInput());
 
@@ -906,6 +926,244 @@ Deno.test("generic plan_day starter with anchors asks a context-aware question",
     "Ship landing page copy",
   ]);
   assertEquals(result.sessionState.pendingStarterIntent, "plan_day");
+});
+
+Deno.test("bare plan_day with campaign rituals still asks before drafting", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Plan my day",
+    parsedInput: {
+      text: "Plan my day",
+    },
+    plannerContext: {
+      starterIntent: "plan_day",
+      activeEpics: [{
+        id: "epic-muscle",
+        title: "Gain 10 pounds of muscle",
+        endDate: null,
+        progressPercentage: 25,
+        habitCount: 2,
+      }],
+      tasks: [
+        plannerTask({
+          id: "ritual-task-1",
+          title: "Weekly Meal Prep",
+          taskDate: "2026-04-18",
+          habitSourceId: "habit-meal-prep",
+          epicId: "epic-muscle",
+          epicTitle: "Gain 10 pounds of muscle",
+          estimatedDuration: 120,
+        }),
+        plannerTask({
+          id: "ritual-task-2",
+          title: "Progress Tracking",
+          taskDate: "2026-04-18",
+          habitSourceId: "habit-progress",
+          epicId: "epic-muscle",
+          epicTitle: "Gain 10 pounds of muscle",
+          estimatedDuration: 30,
+        }),
+      ],
+    },
+  }));
+
+  assertEquals(result.mode, "conversational");
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.followUpQuestions.length, 1);
+  assertEquals(result.structuredResponse, null);
+  assertEquals(result.sessionState.pendingStarterIntent, "plan_day");
+});
+
+Deno.test("plan_day no-room copy explains hidden campaign ritual load", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Focus",
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T16:38:00-07:00",
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+      openQuestionIds: ["details"],
+    },
+    parsedInput: {
+      text: "Focus",
+    },
+    plannerContext: {
+      starterIntent: undefined,
+      activeEpics: [{
+        id: "epic-muscle",
+        title: "Gain 10 pounds of muscle",
+        endDate: null,
+        progressPercentage: 25,
+        habitCount: 4,
+      }],
+      tasks: [
+        plannerTask({
+          id: "ritual-task-1",
+          title: "Weekly Meal Prep",
+          taskDate: "2026-04-18",
+          habitSourceId: "habit-meal-prep",
+          epicId: "epic-muscle",
+          epicTitle: "Gain 10 pounds of muscle",
+          estimatedDuration: 120,
+        }),
+        plannerTask({
+          id: "ritual-task-2",
+          title: "Progress Tracking",
+          taskDate: "2026-04-18",
+          habitSourceId: "habit-progress",
+          epicId: "epic-muscle",
+          epicTitle: "Gain 10 pounds of muscle",
+          estimatedDuration: 30,
+        }),
+        plannerTask({
+          id: "ritual-task-3",
+          title: "Strength Session",
+          taskDate: "2026-04-18",
+          habitSourceId: "habit-strength",
+          epicId: "epic-muscle",
+          epicTitle: "Gain 10 pounds of muscle",
+          estimatedDuration: 60,
+        }),
+        plannerTask({
+          id: "ritual-task-4",
+          title: "Protein Check",
+          taskDate: "2026-04-18",
+          habitSourceId: "habit-protein",
+          epicId: "epic-muscle",
+          epicTitle: "Gain 10 pounds of muscle",
+          estimatedDuration: 15,
+        }),
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [{
+          date: "2026-04-18",
+          totalMinutes: 0,
+          taskCount: 0,
+          status: "open",
+        }],
+        overloadedDates: [],
+        emptyDates: ["2026-04-18"],
+        conflicts: [],
+        suggestedSlots: [],
+        moveSuggestions: [],
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "conversational");
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertStringIncludes(result.reply, "campaign work");
+  assertStringIncludes(result.reply, "Weekly Meal Prep");
+  assertStringIncludes(result.reply, "campaign drawer");
+  assertEquals(
+    result.structuredResponse?.planDay?.dayAssessment === "open",
+    false,
+  );
+  assertEquals(
+    result.structuredResponse?.planDay?.campaignFocus?.campaignTitle,
+    "Gain 10 pounds of muscle",
+  );
+  assertEquals(
+    result.structuredResponse?.planDay?.campaignFocus?.focusItems.includes(
+      "Progress Tracking",
+    ),
+    true,
+  );
+});
+
+Deno.test("plan_day does not draft duplicate focus blocks for campaign rituals already on the day", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Focus",
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T16:42:00-07:00",
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+      openQuestionIds: ["details"],
+    },
+    parsedInput: {
+      text: "Focus",
+    },
+    plannerContext: {
+      activeEpics: [{
+        id: "epic-muscle",
+        title: "Gain 10 pounds of muscle",
+        endDate: null,
+        progressPercentage: 25,
+        habitCount: 2,
+      }],
+      tasks: [
+        plannerTask({
+          id: "ritual-task-1",
+          title: "Weekly Meal Prep",
+          taskDate: "2026-04-18",
+          habitSourceId: "habit-meal-prep",
+          epicId: "epic-muscle",
+          epicTitle: "Gain 10 pounds of muscle",
+          estimatedDuration: 120,
+        }),
+        plannerTask({
+          id: "ritual-task-2",
+          title: "Progress Tracking",
+          taskDate: "2026-04-18",
+          habitSourceId: "habit-progress",
+          epicId: "epic-muscle",
+          epicTitle: "Gain 10 pounds of muscle",
+          estimatedDuration: 30,
+        }),
+      ],
+      priorityScores: [
+        {
+          id: "task:ritual-task-1",
+          kind: "task",
+          title: "Weekly Meal Prep",
+          score: 86,
+          reasons: ["Protect the meal-prep ritual."],
+          taskId: "ritual-task-1",
+          epicId: "epic-muscle",
+          targetDate: "2026-04-18",
+        },
+        {
+          id: "task:ritual-task-2",
+          kind: "task",
+          title: "Progress Tracking",
+          score: 84,
+          reasons: ["Keep the tracking ritual visible."],
+          taskId: "ritual-task-2",
+          epicId: "epic-muscle",
+          targetDate: "2026-04-18",
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [{
+          date: "2026-04-18",
+          totalMinutes: 0,
+          taskCount: 0,
+          status: "open",
+        }],
+        overloadedDates: [],
+        emptyDates: ["2026-04-18"],
+        conflicts: [],
+        suggestedSlots: [],
+        moveSuggestions: [],
+      },
+    },
+  }));
+
+  assertEquals(
+    result.proposals.some((proposal) => {
+      const payload = proposal.payload as { taskText?: string };
+      return /Weekly Meal Prep|Progress Tracking/i.test(
+        payload.taskText ?? proposal.title,
+      );
+    }),
+    false,
+  );
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.followUpQuestions.length, 1);
+  assertEquals(result.structuredResponse, null);
 });
 
 Deno.test("plan_day follow-up drafts a concrete quest on a blank account", () => {

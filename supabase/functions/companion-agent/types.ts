@@ -134,6 +134,20 @@ const CompanionStructuredResponseSchema = z.object({
       "low_energy",
     ]),
     suggestedQuests: z.array(CompanionSuggestedQuestSchema).max(5),
+    campaignFocus: z.object({
+      campaignTitle: z.string().min(1).max(200),
+      campaignStatus: z.enum(["moving", "drifting", "stalled", "at_risk"])
+        .nullable(),
+      campaignInterventionLevel: z.enum([
+        "steady",
+        "nudge",
+        "protect",
+        "reset",
+      ]).nullable(),
+      campaignReason: z.string().min(1).max(2000).nullable(),
+      campaignHealth: CompanionCampaignHealthSnapshotSchema.nullable(),
+      focusItems: z.array(z.string().min(1).max(200)).max(6),
+    }).nullable().optional(),
   }).nullable().optional(),
   weeklyPlan: z.object({
     message: z.string().min(1).max(4000),

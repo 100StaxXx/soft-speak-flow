@@ -180,6 +180,8 @@ export const CompanionStructuredResponseCards = memo(
     if (!structuredResponse) return null;
 
     const styles = variantStyles[variant];
+    const planDayCampaignFocus =
+      structuredResponse.planDay?.campaignFocus ?? null;
 
     return (
       <div className={cn("space-y-3", className)}>
@@ -197,6 +199,65 @@ export const CompanionStructuredResponseCards = memo(
                 Day status:{" "}
                 {structuredResponse.planDay.dayAssessment.replace(/_/g, " ")}
               </p>
+              {planDayCampaignFocus
+                ? (
+                  <div
+                    className={cn("mt-4", styles.item)}
+                    data-testid="structured-plan-day-campaign-focus"
+                  >
+                    <p className={styles.title}>Campaign Focus</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <span className={styles.accent}>
+                        {planDayCampaignFocus.campaignTitle}
+                      </span>
+                      {planDayCampaignFocus.campaignStatus
+                        ? (
+                          <span className={styles.accent}>
+                            {planDayCampaignFocus.campaignStatus.replace(
+                              /_/g,
+                              " ",
+                            )}
+                          </span>
+                        )
+                        : null}
+                      {planDayCampaignFocus.campaignInterventionLevel
+                        ? (
+                          <span className={styles.accent}>
+                            {formatCampaignInterventionLabel(
+                              planDayCampaignFocus.campaignInterventionLevel,
+                            )}
+                          </span>
+                        )
+                        : null}
+                    </div>
+                    {planDayCampaignFocus.campaignReason
+                      ? (
+                        <p className={cn("mt-3", styles.subtext)}>
+                          {planDayCampaignFocus.campaignReason}
+                        </p>
+                      )
+                      : null}
+                    {planDayCampaignFocus.focusItems.length > 0
+                      ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {planDayCampaignFocus.focusItems.map((item) => (
+                            <span key={item} className={styles.accent}>
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      )
+                      : null}
+                    {planDayCampaignFocus.campaignHealth
+                      ? renderCampaignHealthSnapshot(
+                        planDayCampaignFocus.campaignHealth,
+                        styles,
+                        "structured-plan-day-campaign-health",
+                      )
+                      : null}
+                  </div>
+                )
+                : null}
               <div className="mt-4 space-y-3">
                 {structuredResponse.planDay.suggestedQuests.length > 0
                   ? structuredResponse.planDay.suggestedQuests.map((quest) =>

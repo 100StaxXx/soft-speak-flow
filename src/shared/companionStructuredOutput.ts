@@ -90,6 +90,14 @@ export interface CompanionPlanDayStructuredOutput {
   message: string;
   dayAssessment: CompanionDayAssessment;
   suggestedQuests: CompanionSuggestedQuest[];
+  campaignFocus?: {
+    campaignTitle: string;
+    campaignStatus: CompanionCampaignStatus | null;
+    campaignInterventionLevel: CompanionCampaignInterventionLevel | null;
+    campaignReason: string | null;
+    campaignHealth: CompanionCampaignHealthSnapshot | null;
+    focusItems: string[];
+  } | null;
 }
 
 export interface CompanionRightNowStructuredOutput {
