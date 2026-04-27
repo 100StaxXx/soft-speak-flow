@@ -89,6 +89,180 @@ describe("DatePillsScroller", () => {
     });
   });
 
+  it("keeps user wheel scrolling stable when extending near the right edge", async () => {
+    const onDateSelect = vi.fn();
+    const scrollToSpy = vi.fn();
+    const originalScrollTo = HTMLElement.prototype.scrollTo;
+    const originalRequestAnimationFrame = window.requestAnimationFrame;
+    const originalCancelAnimationFrame = window.cancelAnimationFrame;
+    const originalOffsetWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetWidth");
+    const rafCallbacks = new Map<number, FrameRequestCallback>();
+    let nextRafId = 0;
+
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true,
+      value: scrollToSpy,
+    });
+    Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
+      configurable: true,
+      get() {
+        return (this as HTMLElement).dataset?.datePill === "true" ? 60 : 320;
+      },
+    });
+
+    try {
+      const { container } = render(
+        <DatePillsScroller
+          selectedDate={new Date("2026-02-13T12:00:00.000Z")}
+          onDateSelect={onDateSelect}
+        />,
+      );
+
+      scrollToSpy.mockClear();
+      window.requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
+        nextRafId += 1;
+        rafCallbacks.set(nextRafId, callback);
+        return nextRafId;
+      });
+      window.cancelAnimationFrame = vi.fn((id: number) => {
+        rafCallbacks.delete(id);
+      });
+
+      const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
+      const selectedButton = scroller.querySelector("button.bg-gradient-to-br") as HTMLButtonElement;
+      const initialCount = scroller.querySelectorAll("button").length;
+      setCenteringMetrics(scroller, selectedButton, {
+        scrollLeft: 0,
+        scrollWidth: 1000,
+        containerWidth: 320,
+        selectedLeft: 320,
+        selectedWidth: 60,
+      });
+      setScrollMetrics(scroller, { scrollLeft: 700, clientWidth: 320, scrollWidth: 1000 });
+
+      fireEvent.scroll(scroller);
+
+      await waitFor(() => {
+        expect(scroller.querySelectorAll("button").length).toBeGreaterThan(initialCount);
+      });
+
+      await act(async () => {
+        const callbacks = Array.from(rafCallbacks.values());
+        rafCallbacks.clear();
+        callbacks.forEach((callback) => callback(16));
+      });
+
+      expect(scrollToSpy).not.toHaveBeenCalled();
+    } finally {
+      window.requestAnimationFrame = originalRequestAnimationFrame;
+      window.cancelAnimationFrame = originalCancelAnimationFrame;
+      Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+        configurable: true,
+        value: originalScrollTo,
+      });
+      if (originalOffsetWidth) {
+        Object.defineProperty(HTMLElement.prototype, "offsetWidth", originalOffsetWidth);
+      } else {
+        delete (HTMLElement.prototype as unknown as { offsetWidth?: number }).offsetWidth;
+      }
+    }
+  });
+
+  it("does not snap back on user scroll near edge after a programmatic centering", async () => {
+    const onDateSelect = vi.fn();
+    const scrollToSpy = vi.fn();
+    const originalScrollTo = HTMLElement.prototype.scrollTo;
+    const originalRequestAnimationFrame = window.requestAnimationFrame;
+    const originalCancelAnimationFrame = window.cancelAnimationFrame;
+    const originalOffsetWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetWidth");
+    const rafCallbacks = new Map<number, FrameRequestCallback>();
+    let nextRafId = 0;
+
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true,
+      value: scrollToSpy,
+    });
+    Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
+      configurable: true,
+      get() {
+        return (this as HTMLElement).dataset?.datePill === "true" ? 60 : 320;
+      },
+    });
+
+    try {
+      const { rerender, container } = render(
+        <DatePillsScroller
+          selectedDate={new Date("2026-02-13T12:00:00.000Z")}
+          onDateSelect={onDateSelect}
+        />,
+      );
+
+      const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
+      const selectedButton = scroller.querySelector("button.bg-gradient-to-br") as HTMLButtonElement;
+      setCenteringMetrics(scroller, selectedButton, {
+        scrollLeft: 0,
+        scrollWidth: 1000,
+        containerWidth: 320,
+        selectedLeft: 320,
+        selectedWidth: 60,
+      });
+
+      // Force a programmatic centering scroll by changing selectedDate.
+      rerender(
+        <DatePillsScroller
+          selectedDate={new Date("2026-02-14T12:00:00.000Z")}
+          onDateSelect={onDateSelect}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(scrollToSpy).toHaveBeenCalled();
+      });
+      const baselineCalls = scrollToSpy.mock.calls.length;
+
+      // Mock RAF after the centering scroll has fired so we can drain
+      // post-expansion frames deterministically.
+      window.requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
+        nextRafId += 1;
+        rafCallbacks.set(nextRafId, callback);
+        return nextRafId;
+      });
+      window.cancelAnimationFrame = vi.fn((id: number) => {
+        rafCallbacks.delete(id);
+      });
+
+      // Simulate a user wheel/touch scroll near the right edge while the prior
+      // centering is "fresh" — the dirty path that previously snapped back.
+      const initialCount = scroller.querySelectorAll("button").length;
+      setScrollMetrics(scroller, { scrollLeft: 700, clientWidth: 320, scrollWidth: 1000 });
+      fireEvent.scroll(scroller);
+
+      await waitFor(() => {
+        expect(scroller.querySelectorAll("button").length).toBeGreaterThan(initialCount);
+      });
+
+      await act(async () => {
+        const callbacks = Array.from(rafCallbacks.values());
+        rafCallbacks.clear();
+        callbacks.forEach((callback) => callback(16));
+      });
+
+      expect(scrollToSpy.mock.calls.length).toBe(baselineCalls);
+    } finally {
+      window.requestAnimationFrame = originalRequestAnimationFrame;
+      window.cancelAnimationFrame = originalCancelAnimationFrame;
+      Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+        configurable: true,
+        value: originalScrollTo,
+      });
+      if (originalOffsetWidth) {
+        Object.defineProperty(HTMLElement.prototype, "offsetWidth", originalOffsetWidth);
+      } else {
+        delete (HTMLElement.prototype as unknown as { offsetWidth?: number }).offsetWidth;
+      }
+    }
+  });
+
   it("extends the range when scrolled near the left edge", async () => {
     const onDateSelect = vi.fn();
 

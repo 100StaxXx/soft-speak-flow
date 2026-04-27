@@ -23,7 +23,6 @@ interface DatePillsScrollerProps {
 const EDGE_THRESHOLD_PX = 80;
 const DEFAULT_EXTENSION_CHUNK = 14;
 const CENTER_RETRY_ATTEMPTS = 8;
-const PROGRAMMATIC_SCROLL_GUARD_MS = 500;
 
 const triggerHaptic = async (style: ImpactStyle) => {
   try {
@@ -56,14 +55,11 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     previousScrollLeft: number;
   } | null>(null);
   const isExpandingRef = useRef(false);
-  const pendingCenterAfterExpansionRef = useRef(false);
-  const isProgrammaticScrollRef = useRef(false);
-  const programmaticScrollResetTimeoutRef = useRef<number | null>(null);
 
   const [rangeStart, setRangeStart] = useState<Date>(() => getInitialRange(selectedDate, daysToShow).start);
   const [rangeEnd, setRangeEnd] = useState<Date>(() => getInitialRange(selectedDate, daysToShow).end);
   const [edgeSpacerWidth, setEdgeSpacerWidth] = useState(0);
-  const [centerRequestVersion, setCenterRequestVersion] = useState(0);
+  const [centerRequestVersion] = useState(0);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
   const extensionChunk = Math.max(DEFAULT_EXTENSION_CHUNK, daysToShow);
@@ -156,42 +152,15 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     setEdgeSpacerWidth((currentWidth) => (Math.abs(currentWidth - nextWidth) < 0.5 ? currentWidth : nextWidth));
   }, [calculateEdgeSpacerWidth]);
 
-  const clearProgrammaticScrollResetTimeout = useCallback(() => {
-    if (programmaticScrollResetTimeoutRef.current === null) return;
-    window.clearTimeout(programmaticScrollResetTimeoutRef.current);
-    programmaticScrollResetTimeoutRef.current = null;
-  }, []);
-
-  const requestCenterSelectedDate = useCallback(() => {
-    setCenterRequestVersion((currentVersion) => currentVersion + 1);
-  }, []);
-
-  const markProgrammaticScroll = useCallback(() => {
-    if (typeof window === "undefined") return;
-
-    isProgrammaticScrollRef.current = true;
-    clearProgrammaticScrollResetTimeout();
-    programmaticScrollResetTimeoutRef.current = window.setTimeout(() => {
-      isProgrammaticScrollRef.current = false;
-      programmaticScrollResetTimeoutRef.current = null;
-    }, PROGRAMMATIC_SCROLL_GUARD_MS);
-  }, [clearProgrammaticScrollResetTimeout]);
-
   const handleScroll = useCallback(() => {
     const container = scrollRef.current;
     if (!container) return;
-    if (isExpandingRef.current) {
-      if (!isProgrammaticScrollRef.current) {
-        pendingCenterAfterExpansionRef.current = true;
-      }
-      return;
-    }
+    if (isExpandingRef.current) return;
 
     const { scrollLeft, clientWidth, scrollWidth } = container;
 
     if (scrollLeft <= EDGE_THRESHOLD_PX) {
       isExpandingRef.current = true;
-      pendingCenterAfterExpansionRef.current = true;
       pendingLeftCompensationRef.current = {
         previousScrollWidth: scrollWidth,
         previousScrollLeft: scrollLeft,
@@ -202,7 +171,6 @@ export const DatePillsScroller = memo(function DatePillsScroller({
 
     if (scrollLeft + clientWidth >= scrollWidth - EDGE_THRESHOLD_PX) {
       isExpandingRef.current = true;
-      pendingCenterAfterExpansionRef.current = true;
       setRangeEnd((currentEnd) => addDays(currentEnd, extensionChunk));
     }
   }, [extensionChunk]);
@@ -225,10 +193,6 @@ export const DatePillsScroller = memo(function DatePillsScroller({
       typeof window !== "undefined"
         ? window.requestAnimationFrame(() => {
             isExpandingRef.current = false;
-            if (pendingCenterAfterExpansionRef.current) {
-              pendingCenterAfterExpansionRef.current = false;
-              requestCenterSelectedDate();
-            }
           })
         : null;
 
@@ -237,7 +201,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
         window.cancelAnimationFrame(frame);
       }
     };
-  }, [rangeEnd, rangeStart, requestCenterSelectedDate]);
+  }, [rangeEnd, rangeStart]);
 
   useLayoutEffect(() => {
     recalculateEdgeSpacers();
@@ -258,14 +222,9 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     };
   }, [recalculateEdgeSpacers]);
 
-  useEffect(() => {
-    return () => {
-      clearProgrammaticScrollResetTimeout();
-      isProgrammaticScrollRef.current = false;
-    };
-  }, [clearProgrammaticScrollResetTimeout]);
-
-  // Keep selected date centered after selected-date and activation changes.
+  // Center the selected pill on selected-date and activation changes only.
+  // Range extensions from edge scrolls intentionally don't re-center, so the
+  // user's scroll momentum is preserved.
   useLayoutEffect(() => {
     if (!isActive) return;
 
@@ -317,11 +276,6 @@ export const DatePillsScroller = memo(function DatePillsScroller({
       const targetLeft = selectedLeft - containerWidth / 2 + selectedWidth / 2;
       const maxScrollLeft = Math.max(0, container.scrollWidth - containerWidth);
       const clampedLeft = Math.min(Math.max(targetLeft, 0), maxScrollLeft);
-      const hasMeaningfulDelta = Math.abs(container.scrollLeft - clampedLeft) > 0.5;
-
-      if (hasMeaningfulDelta) {
-        markProgrammaticScroll();
-      }
 
       try {
         container.scrollTo({
@@ -342,13 +296,13 @@ export const DatePillsScroller = memo(function DatePillsScroller({
         window.cancelAnimationFrame(frameId);
       }
     };
-  }, [calculateEdgeSpacerWidth, centerRequestVersion, dates, edgeSpacerWidth, getSelectedPillElement, isActive, markProgrammaticScroll, prefersReducedMotion, selectedDateKey]);
+  }, [calculateEdgeSpacerWidth, centerRequestVersion, edgeSpacerWidth, getSelectedPillElement, isActive, prefersReducedMotion, selectedDateKey]);
 
   return (
     <div
       ref={scrollRef}
       onScroll={handleScroll}
-      className={cn("flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-1 px-1 transition-all duration-200")}
+      className={cn("flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-1 px-1")}
       style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
     >
       <div
