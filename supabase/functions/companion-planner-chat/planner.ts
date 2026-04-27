@@ -8602,13 +8602,13 @@ const derivePlanDayAssessment = (
 
   if (latestEnergy === "low") return "low_energy";
   if (missedCount >= 2) return "behind";
-  if (momentumState === "locked_in") return "productive";
   if (
     loadBreakdown.workItemsForProposalLimit >=
       getPlanDayTargetTotal(input, targetDate)
   ) {
     return "busy";
   }
+  if (momentumState === "locked_in") return "productive";
   if (
     currentDayLoad?.status === "overloaded" ||
     currentDayLoad?.status === "busy"

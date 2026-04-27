@@ -1,6 +1,5 @@
 import { TimeoutError, withTimeout } from "../../../src/utils/asyncTimeout.ts";
 
-export const PLAN_DAY_AI_TIMEOUT_MS = 5_000;
 export const UPCOMING_AI_TIMEOUT_MS = 3_000;
 export const QUEST_ENRICHMENT_TIMEOUT_MS = 3_000;
 export const PLANNER_ORCHESTRATION_TIMEOUT_MS = 3_000;

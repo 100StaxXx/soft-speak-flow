@@ -20,7 +20,6 @@ import {
 } from "./planner.ts";
 import {
   buildOrchestratedPlannerResponse,
-  buildPlanDayAIResponse,
   buildUpcomingAIResponse,
   sanitizeReadyQuestProposalResponse,
 } from "./orchestrator.ts";
@@ -31,7 +30,6 @@ import {
   PlannerRequestSchema,
 } from "./request.ts";
 import {
-  PLAN_DAY_AI_TIMEOUT_MS,
   PLANNER_ORCHESTRATION_TIMEOUT_MS,
   QUEST_ENRICHMENT_TIMEOUT_MS,
   runPlannerStageWithTimeout,
@@ -180,43 +178,6 @@ serve(async (req) => {
     });
 
     const starterIntent = plannerInput.plannerContext.starterIntent;
-
-    if (starterIntent === "plan_day" && result.followUpQuestions.length === 0) {
-      const aiResult = await runPlannerStageWithTimeout({
-        work: () =>
-          buildPlanDayAIResponse({
-            guardedFetch,
-            input: plannerInput,
-            baseResult: result,
-          }),
-        timeoutMs: PLAN_DAY_AI_TIMEOUT_MS,
-        operation: "companion planner plan_day ai response",
-        timeoutCode: "PLANNER_PLAN_DAY_TIMEOUT",
-        fallbackValue: null,
-        onTimeout: () => {
-          console.warn(
-            "[companion-planner-chat] plan_day AI timed out, falling back to deterministic",
-            { requestId, timeoutMs: PLAN_DAY_AI_TIMEOUT_MS },
-          );
-        },
-      });
-      if (aiResult) {
-        const responseResult = sanitizeReadyQuestProposalResponse(
-          normalizePlannerBuildResultText(aiResult),
-        );
-        return new Response(JSON.stringify(responseResult), {
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-            "X-Request-Id": requestId,
-          },
-        });
-      }
-      console.warn(
-        "[companion-planner-chat] plan_day AI failed, falling back to deterministic",
-        { requestId },
-      );
-    }
 
     if (starterIntent === "upcoming_start") {
       const aiResult = await runPlannerStageWithTimeout({

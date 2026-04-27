@@ -111,6 +111,37 @@ const plannerTask = (
   epicTitle: overrides.epicTitle ?? null,
 });
 
+const plannerStatInterpretation = (
+  momentumState: NonNullable<
+    PlannerBuildInput["plannerContext"]["statInterpretation"]
+  >["momentumState"],
+): NonNullable<PlannerBuildInput["plannerContext"]["statInterpretation"]> => ({
+  statProfile: {
+    scores: {
+      vitality: 450,
+      wisdom: 480,
+      discipline: 520,
+      resolve: 470,
+      creativity: 410,
+      alignment: 465,
+    },
+    dominantStat: "discipline",
+    secondaryStat: "wisdom",
+  },
+  statNeeds: {
+    vitality: { level: "low", reasons: [] },
+    wisdom: { level: "low", reasons: [] },
+    discipline: { level: "low", reasons: [] },
+    resolve: { level: "low", reasons: [] },
+    creativity: { level: "low", reasons: [] },
+    alignment: { level: "low", reasons: [] },
+  },
+  momentumState,
+  recentMissInterpretation: "normal_variance",
+  narrativeBrief: "You're in a solid rhythm.",
+  dailyNarrative: "Locked-in day",
+});
+
 Deno.test("turns a one-off request into a quest without forcing schedule details", () => {
   const result = buildPlannerResponse(baseInput());
 
@@ -1031,6 +1062,24 @@ Deno.test("plan_day no-room copy explains hidden campaign ritual load", () => {
           epicTitle: "Gain 10 pounds of muscle",
           estimatedDuration: 15,
         }),
+        plannerTask({
+          id: "ritual-task-5",
+          title: "Hydration Check",
+          taskDate: "2026-04-18",
+          habitSourceId: "habit-hydration",
+          epicId: "epic-muscle",
+          epicTitle: "Gain 10 pounds of muscle",
+          estimatedDuration: 15,
+        }),
+        plannerTask({
+          id: "ritual-task-6",
+          title: "Recovery Stretch",
+          taskDate: "2026-04-18",
+          habitSourceId: "habit-recovery",
+          epicId: "epic-muscle",
+          epicTitle: "Gain 10 pounds of muscle",
+          estimatedDuration: 15,
+        }),
       ],
       scheduleInsights: {
         horizon: "day",
@@ -1047,6 +1096,7 @@ Deno.test("plan_day no-room copy explains hidden campaign ritual load", () => {
         suggestedSlots: [],
         moveSuggestions: [],
       },
+      statInterpretation: plannerStatInterpretation("locked_in"),
     },
   }));
 
@@ -1056,10 +1106,7 @@ Deno.test("plan_day no-room copy explains hidden campaign ritual load", () => {
   assertStringIncludes(result.reply, "campaign work");
   assertStringIncludes(result.reply, "Weekly Meal Prep");
   assertStringIncludes(result.reply, "campaign drawer");
-  assertEquals(
-    result.structuredResponse?.planDay?.dayAssessment === "open",
-    false,
-  );
+  assertEquals(result.structuredResponse?.planDay?.dayAssessment, "busy");
   assertEquals(
     result.structuredResponse?.planDay?.campaignFocus?.campaignTitle,
     "Gain 10 pounds of muscle",
