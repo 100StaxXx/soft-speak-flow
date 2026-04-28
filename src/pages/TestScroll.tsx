@@ -1,10 +1,10 @@
 import { useState, type ComponentProps } from "react";
 
 import { AddQuestSheet, type AddQuestData } from "@/components/AddQuestSheet";
-import { EditCampaignSheetPreview } from "@/components/EditCampaignSheet";
 import { Pathfinder } from "@/components/Pathfinder/Pathfinder";
 import { Button } from "@/components/ui/button";
 import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
+import { EditCampaignSheetPreview } from "@/pages/test-scroll/EditCampaignSheetPreview";
 
 type VisualOverlay =
   | "pathfinder"

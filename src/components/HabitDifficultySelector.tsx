@@ -2,17 +2,14 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Flame, Zap, Mountain } from "lucide-react";
 import { HABIT_XP_REWARDS } from "@/config/xpRewards";
-import { DIFFICULTY_COLORS, type QuestFormDifficulty } from "@/components/quest-shared";
-import { cn } from "@/lib/utils";
 
 interface HabitDifficultySelectorProps {
   value: "easy" | "medium" | "hard";
   onChange: (value: "easy" | "medium" | "hard") => void;
-  variant?: "default" | "planner";
 }
 
 const difficultyOptions: Array<{
-  value: QuestFormDifficulty;
+  value: "easy" | "medium" | "hard";
   label: string;
   xp: number;
   icon: typeof Zap;
@@ -44,53 +41,24 @@ const difficultyOptions: Array<{
 export const HabitDifficultySelector = ({
   value,
   onChange,
-  variant = "default",
 }: HabitDifficultySelectorProps) => {
-  const isPlannerVariant = variant === "planner";
-
   return (
     <div className="space-y-3">
-      <Label className={cn("text-sm font-bold", isPlannerVariant && "text-[#5d2a0f]")}>
-        Difficulty (affects XP reward)
-      </Label>
+      <Label className="text-sm font-bold">Difficulty (affects XP reward)</Label>
       <RadioGroup value={value} onValueChange={onChange} className="grid grid-cols-3 gap-3">
         {difficultyOptions.map((option) => {
           const Icon = option.icon;
-          const isSelected = value === option.value;
 
           return (
             <div key={option.value} className="relative">
               <RadioGroupItem value={option.value} id={option.value} className="peer sr-only" />
               <Label
                 htmlFor={option.value}
-                className={cn(
-                  "flex cursor-pointer flex-col items-center gap-2 transition-all",
-                  isPlannerVariant
-                    ? cn(
-                      "min-h-[5.75rem] justify-center rounded-[16px] border-[3px] px-2.5 py-3 text-center duration-200 ease-out active:scale-[0.98] motion-safe:hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0",
-                      isSelected
-                        ? DIFFICULTY_COLORS[option.value].difficultyActive
-                        : "border-[#6b3416] bg-white/60 text-[#6b3416]/82 shadow-[0_4px_0_rgba(77,40,17,0.16)] hover:bg-white/75 hover:text-[#4f240c]",
-                    )
-                    : "rounded-lg border-2 border-muted bg-background p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary",
-                )}
+                className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-muted bg-background p-4 transition-all hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary"
               >
-                {isPlannerVariant ? (
-                  <span
-                    className={cn(
-                      "flex h-7 w-7 items-center justify-center rounded-full border-2",
-                      isSelected
-                        ? DIFFICULTY_COLORS[option.value].iconBubble
-                        : "border-[#6b3416]/35 bg-white/55 text-[#7f4a1d]/80",
-                    )}
-                  >
-                    <Icon className="h-[1.125rem] w-[1.125rem]" />
-                  </span>
-                ) : (
-                  <Icon className={option.defaultIconClassName} />
-                )}
+                <Icon className={option.defaultIconClassName} />
                 <span className="font-semibold">{option.label}</span>
-                <span className={cn("text-xs", isPlannerVariant ? "text-[#7f4a1d]/80" : "text-muted-foreground")}>
+                <span className="text-xs text-muted-foreground">
                   +{option.xp} XP
                 </span>
               </Label>
