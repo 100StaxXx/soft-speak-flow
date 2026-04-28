@@ -7,7 +7,8 @@ export type NotificationType =
   | "contact_reminder"
   | "mentor_nudge"
   | "checkin_morning_reminder"
-  | "checkin_evening_reminder";
+  | "checkin_evening_reminder"
+  | "plan_day_overdue";
 
 export type QueueStatus =
   | "queued"
@@ -64,6 +65,7 @@ const CRITICAL_TYPES: ReadonlySet<NotificationType> = new Set([
   "task_reminder",
   "habit_reminder",
   "contact_reminder",
+  "plan_day_overdue",
 ]);
 
 const ENGAGEMENT_BUDGET_EXEMPT_TYPES: ReadonlySet<NotificationType> = new Set([
@@ -71,12 +73,14 @@ const ENGAGEMENT_BUDGET_EXEMPT_TYPES: ReadonlySet<NotificationType> = new Set([
   "task_reminder",
   "habit_reminder",
   "contact_reminder",
+  "plan_day_overdue",
 ]);
 
 const NOTIFICATION_PRIORITY: Record<NotificationType, number> = {
   task_start: 100,
   task_reminder: 95,
   habit_reminder: 90,
+  plan_day_overdue: 88,
   contact_reminder: 85,
   daily_pep: 70,
   daily_quote: 68,

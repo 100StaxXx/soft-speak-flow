@@ -160,6 +160,7 @@ serve(async (req) => {
         null,
       classificationHint,
       plannerContext: parsed.data.plannerContext,
+      activeDayPlan: parsed.data.activeDayPlan ?? null,
     } satisfies PlannerBuildInput;
 
     const result = buildPlannerResponse(plannerInput);

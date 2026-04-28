@@ -103,6 +103,7 @@ export interface CompanionPlannerMessage {
   questions?: CompanionPlannerQuestion[];
   proposalIds?: string[];
   structuredResponse?: CompanionStructuredResponse | null;
+  dayPlan?: CompanionDayPlan | null;
 }
 
 export interface CompanionPlannerDraftState {
@@ -402,6 +403,46 @@ export interface CompanionPlannerRequest {
     epicId?: string | null;
     ritualId?: string | null;
   };
+  activeDayPlan?: CompanionDayPlan | null;
+}
+
+export type CompanionDayPlanStatus = "draft" | "committed";
+
+export type CompanionDayPlanBlockSource =
+  | "campaign"
+  | "habit"
+  | "recovery"
+  | "optimization";
+
+export type CompanionDayPlanBlockEnergyType =
+  | "deep"
+  | "admin"
+  | "physical"
+  | "errand"
+  | "social"
+  | "creative"
+  | "recovery";
+
+export interface CompanionDayPlanBlock {
+  id: string;
+  proposalId: string | null;
+  questId: string | null;
+  title: string;
+  startTime: string | null;
+  durationMinutes: number;
+  energyType: CompanionDayPlanBlockEnergyType | null;
+  source: CompanionDayPlanBlockSource;
+  reasoning: string;
+  epicId?: string | null;
+  habitSourceId?: string | null;
+}
+
+export interface CompanionDayPlan {
+  id: string | null;
+  date: string;
+  status: CompanionDayPlanStatus;
+  blocks: CompanionDayPlanBlock[];
+  updatedAt: string;
 }
 
 export interface CompanionPlannerResponse {
@@ -412,6 +453,7 @@ export interface CompanionPlannerResponse {
   proposals: CompanionPlannerProposal[];
   suggestedReminders: CompanionPlannerProposal[];
   structuredResponse?: CompanionStructuredResponse | null;
+  dayPlan?: CompanionDayPlan | null;
   memoryUpdates: {
     preferredTimeOfDay?: string | null;
     preferredTimeReason?: string | null;

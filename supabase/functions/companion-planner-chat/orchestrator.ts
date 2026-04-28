@@ -1,4 +1,22 @@
-import { normalizePlannerBuildResultText } from "./planner.ts";
+import {
+  buildPlanDayCampaignGoalsAtRiskLine,
+  buildPlanDayLoadReason,
+  buildProposalFromDayPlanBlock,
+  formatScheduleReference,
+  getPlanDayAtRiskCampaignFacts,
+  getPlanDayLoadBreakdown,
+  getPlanDayLoadFacts,
+  getPlanDayTargetDate,
+  normalizePlannerBuildResultText,
+  synthesizeDayPlanFromProposals,
+} from "./planner.ts";
+import {
+  buildPlanDayToolSystemPrompt,
+  buildPlanDayToolUserPrompt,
+  executePlanDayToolCall,
+  initializePlanDayToolState,
+  PLAN_DAY_TOOL_DEFINITIONS,
+} from "./planDayTools.ts";
 import type {
   PlannerBuildInput,
   PlannerBuildResult,
@@ -186,9 +204,38 @@ const buildSystemPrompt = (
     "Schedule facts come before interpretation. Acknowledge open, light, or crowded days plainly before giving opinions or coaching.",
     "If deterministicContext.availabilityFacts says the day is open, balanced, or has zero/one scheduled items, say that clearly and do not describe the day as packed, slammed, crowded, or overbooked.",
     "Preserve the deterministic meaning of fallbackReply. Rewrite for voice, but do not contradict schedule truth, proposal state, or missing details.",
+    "If deterministicContext.planDayContext is present, it is the source of truth for what is on the user's day. Use loadFacts (totalQuestCount, campaignBreakdown, ritualCount, calendarBlockCount) to name what is loading the day rather than vague phrasing. If atRiskCampaigns has entries, briefly surface the top one or two by title with a one-fragment hint about the deadline or progress. Never invent quest counts, campaign names, or events that are not in planDayContext.",
+    "When planDayContext.suggestedQuests is non-empty, treat those as the proposals being shown — frame the reply as a brief offer of those quests; do not list every title verbatim if the cards already render them.",
     modeInstructions[mode],
     "Return minified JSON with keys reply and mode only.",
   ].join("\n");
+};
+
+const buildPlanDayContextForPrompt = (
+  input: PlannerBuildInput,
+  baseResult: PlannerBuildResult,
+) => {
+  const isPlanDay =
+    input.plannerContext.starterIntent === "plan_day" ||
+    input.sessionState.pendingStarterIntent === "plan_day";
+  if (!isPlanDay) return null;
+  const targetDate = getPlanDayTargetDate(input);
+  const loadBreakdown = getPlanDayLoadBreakdown(input, targetDate);
+  const dateLabel = formatScheduleReference(input.currentDate, targetDate);
+  return {
+    targetDate,
+    dateLabel,
+    loadFacts: getPlanDayLoadFacts(input, loadBreakdown),
+    atRiskCampaigns: getPlanDayAtRiskCampaignFacts(input),
+    loadReason: buildPlanDayLoadReason(input, dateLabel, loadBreakdown),
+    atRiskLine: buildPlanDayCampaignGoalsAtRiskLine(input, baseResult.proposals),
+    plannedEnergy: input.sessionState.planDayEnergy ?? null,
+    suggestedQuests: baseResult.proposals.map((proposal) => ({
+      title: proposal.title,
+      summary: proposal.summary,
+      reasoning: proposal.reasoning ?? null,
+    })),
+  };
 };
 
 const buildUserPrompt = (
@@ -205,6 +252,7 @@ const buildUserPrompt = (
     deterministicContext: {
       fallbackReply: baseResult.reply,
       availabilityFacts: buildAvailabilityFacts(input, baseResult.mode),
+      planDayContext: buildPlanDayContextForPrompt(input, baseResult),
       followUpQuestions: baseResult.followUpQuestions.map((question) => ({
         prompt: question.prompt,
         reason: question.reason ?? null,
@@ -314,22 +362,6 @@ const isPlanDayClarificationResponse = (
   baseResult.followUpQuestions.length > 0 &&
   baseResult.proposals.length === 0 &&
   baseResult.suggestedReminders.length === 0;
-
-const isPlanDayDeterministicResponse = (
-  input: PlannerBuildInput,
-  baseResult: PlannerBuildResult,
-) =>
-  (input.plannerContext.starterIntent === "plan_day" ||
-    input.sessionState.pendingStarterIntent === "plan_day") &&
-  baseResult.followUpQuestions.length === 0 &&
-  (
-    baseResult.mode === "proposal" ||
-    (
-      baseResult.mode === "conversational" &&
-      baseResult.proposals.length === 0 &&
-      baseResult.suggestedReminders.length === 0
-    )
-  );
 
 const isPhaseADeterministicStarterResponse = (
   input: PlannerBuildInput,
@@ -678,7 +710,7 @@ export async function buildPlanDayAIResponse(params: {
 
   const model = params.model ??
     Deno.env.get("OPENAI_COMPANION_PLANNER_MODEL") ??
-    "gpt-4.1";
+    "gpt-5";
 
   try {
     const response = await params.guardedFetch(OPENAI_API_URL, {
@@ -802,7 +834,7 @@ export async function buildUpcomingAIResponse(params: {
 
   const model = params.model ??
     Deno.env.get("OPENAI_COMPANION_PLANNER_MODEL") ??
-    "gpt-4.1";
+    "gpt-5";
 
   try {
     const response = await params.guardedFetch(OPENAI_API_URL, {
@@ -891,6 +923,287 @@ export const sanitizeReadyQuestProposalResponse = (
   });
 };
 
+const MAX_PLAN_DAY_TOOL_ITERATIONS = 4;
+
+type PlanDayToolFallbackReason =
+  | "openai_error"
+  | "openai_empty_choice"
+  | "max_iterations"
+  | "empty_state"
+  | "exception";
+
+interface PlanDayToolTelemetryContext {
+  reason: PlanDayToolFallbackReason;
+  model: string;
+  refining: boolean;
+  iteration: number;
+  proposalCount: number;
+  hasClarification: boolean;
+  detail?: string;
+}
+
+const recordPlanDayToolFallback = (
+  context: PlanDayToolTelemetryContext,
+): void => {
+  console.warn(
+    "[companion-planner-chat] plan_day_tool_fallback",
+    {
+      reason: context.reason,
+      model: context.model,
+      refining: context.refining,
+      iteration: context.iteration,
+      proposalCount: context.proposalCount,
+      hasClarification: context.hasClarification,
+      ...(context.detail ? { detail: context.detail } : {}),
+    },
+  );
+};
+
+const hasRefinableDayPlan = (input: PlannerBuildInput): boolean =>
+  Boolean(
+    input.activeDayPlan &&
+      input.activeDayPlan.status === "draft" &&
+      input.activeDayPlan.blocks.length > 0,
+  );
+
+const isPlanDayRefinementTurn = (
+  input: PlannerBuildInput,
+  baseResult: PlannerBuildResult,
+): boolean => {
+  if (!hasRefinableDayPlan(input)) return false;
+  if (baseResult.followUpQuestions.length > 0) return false;
+  if (input.plannerContext.starterIntent === "plan_day") return false;
+  return true;
+};
+
+const isPlanDayDraftTurn = (
+  input: PlannerBuildInput,
+  baseResult: PlannerBuildResult,
+): boolean => {
+  const isPlanDay = input.plannerContext.starterIntent === "plan_day" ||
+    input.sessionState.pendingStarterIntent === "plan_day";
+  if (!isPlanDay) return false;
+  if (baseResult.followUpQuestions.length > 0) return false;
+  return baseResult.mode === "conversational" || baseResult.mode === "proposal";
+};
+
+const shouldUsePlanDayToolLoop = (
+  input: PlannerBuildInput,
+  baseResult: PlannerBuildResult,
+): boolean =>
+  isPlanDayDraftTurn(input, baseResult) ||
+  isPlanDayRefinementTurn(input, baseResult);
+
+type PlanDayToolMessage = {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | null;
+  tool_calls?: Array<{
+    id: string;
+    type: "function";
+    function: { name: string; arguments: string };
+  }>;
+  tool_call_id?: string;
+};
+
+async function runPlanDayToolLoop(params: {
+  guardedFetch: typeof fetch;
+  input: PlannerBuildInput;
+  baseResult: PlannerBuildResult;
+  openAIApiKey: string;
+  model: string;
+}): Promise<PlannerBuildResult | null> {
+  const { input, baseResult } = params;
+  const isRefining = isPlanDayRefinementTurn(input, baseResult);
+  const seedProposals = isRefining && input.activeDayPlan
+    ? input.activeDayPlan.blocks.map((block) =>
+      buildProposalFromDayPlanBlock(input, block)
+    )
+    : baseResult.proposals;
+  const state = initializePlanDayToolState(seedProposals);
+  const messages: PlanDayToolMessage[] = [
+    {
+      role: "system",
+      content: buildPlanDayToolSystemPrompt(input.tonePack, { isRefining }),
+    },
+    {
+      role: "user",
+      content: buildPlanDayToolUserPrompt(input, seedProposals, { isRefining }),
+    },
+  ];
+
+  let finalReply: string | null = null;
+  let lastIteration = 0;
+  let exitedByModelMessage = false;
+  for (let iter = 0; iter < MAX_PLAN_DAY_TOOL_ITERATIONS; iter += 1) {
+    lastIteration = iter;
+    const response = await params.guardedFetch(OPENAI_API_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${params.openAIApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: params.model,
+        temperature: 0.5,
+        max_tokens: 600,
+        parallel_tool_calls: true,
+        tools: PLAN_DAY_TOOL_DEFINITIONS,
+        tool_choice: state.clarification ? "none" : "auto",
+        messages,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      recordPlanDayToolFallback({
+        reason: "openai_error",
+        model: params.model,
+        refining: isRefining,
+        iteration: iter,
+        proposalCount: state.proposals.length,
+        hasClarification: Boolean(state.clarification),
+        detail: `status=${response.status} ${errorText.slice(0, 240)}`,
+      });
+      return null;
+    }
+
+    const data = await response.json();
+    const choice = data?.choices?.[0];
+    const message = choice?.message;
+    if (!message) {
+      recordPlanDayToolFallback({
+        reason: "openai_empty_choice",
+        model: params.model,
+        refining: isRefining,
+        iteration: iter,
+        proposalCount: state.proposals.length,
+        hasClarification: Boolean(state.clarification),
+      });
+      return null;
+    }
+
+    const toolCalls = Array.isArray(message.tool_calls)
+      ? message.tool_calls
+      : [];
+
+    if (toolCalls.length === 0) {
+      finalReply = typeof message.content === "string"
+        ? message.content.trim()
+        : null;
+      exitedByModelMessage = true;
+      break;
+    }
+
+    messages.push({
+      role: "assistant",
+      content: typeof message.content === "string" ? message.content : null,
+      tool_calls: toolCalls.map((
+        call: {
+          id: string;
+          type: string;
+          function: { name: string; arguments: string };
+        },
+      ) => ({
+        id: call.id,
+        type: "function",
+        function: {
+          name: call.function.name,
+          arguments: call.function.arguments ?? "{}",
+        },
+      })),
+    });
+
+    for (
+      const call of toolCalls as Array<{
+        id: string;
+        function: { name: string; arguments: string };
+      }>
+    ) {
+      const result = executePlanDayToolCall(input, state, {
+        id: call.id,
+        name: call.function.name,
+        argumentsJson: call.function.arguments ?? "{}",
+      });
+      messages.push({
+        role: "tool",
+        tool_call_id: call.id,
+        content: result,
+      });
+    }
+  }
+
+  if (state.clarification) {
+    const reply = finalReply && finalReply.length > 0
+      ? finalReply
+      : state.clarification.prompt;
+    const followUpQuestion: PlannerQuestion = {
+      id: "details",
+      field: "details",
+      prompt: state.clarification.prompt,
+      reason: state.clarification.reason ?? null,
+      required: true,
+      options: state.clarification.options,
+    };
+    return {
+      ...baseResult,
+      mode: "conversational",
+      reply,
+      proposals: [],
+      suggestedReminders: [],
+      followUpQuestions: [followUpQuestion],
+      sessionState: {
+        ...baseResult.sessionState,
+        draft: {},
+        openQuestionIds: [followUpQuestion.id],
+        pendingStarterIntent: "plan_day",
+      },
+    };
+  }
+
+  if (!exitedByModelMessage) {
+    recordPlanDayToolFallback({
+      reason: "max_iterations",
+      model: params.model,
+      refining: isRefining,
+      iteration: lastIteration,
+      proposalCount: state.proposals.length,
+      hasClarification: Boolean(state.clarification),
+    });
+  }
+
+  if (!finalReply || finalReply.length === 0) {
+    if (state.proposals.length === 0) {
+      recordPlanDayToolFallback({
+        reason: "empty_state",
+        model: params.model,
+        refining: isRefining,
+        iteration: lastIteration,
+        proposalCount: 0,
+        hasClarification: Boolean(state.clarification),
+      });
+      return null;
+    }
+    finalReply = baseResult.reply;
+  }
+
+  const proposals = state.proposals.slice(0, 5);
+  const targetDate = getPlanDayTargetDate(input);
+  const dayPlan = synthesizeDayPlanFromProposals(targetDate, proposals);
+  return sanitizeReadyQuestProposalResponse({
+    ...baseResult,
+    mode: proposals.length > 0 ? "proposal" : "conversational",
+    reply: finalReply,
+    proposals,
+    followUpQuestions: [],
+    suggestedReminders: [],
+    dayPlan,
+    sessionState: {
+      ...baseResult.sessionState,
+      openQuestionIds: [],
+    },
+  });
+}
+
 export async function buildOrchestratedPlannerResponse(params: {
   guardedFetch: typeof fetch;
   input: PlannerBuildInput;
@@ -913,10 +1226,6 @@ export async function buildOrchestratedPlannerResponse(params: {
     return normalizedBaseResult;
   }
 
-  if (isPlanDayDeterministicResponse(params.input, params.baseResult)) {
-    return normalizedBaseResult;
-  }
-
   if (
     isPhaseADeterministicStarterResponse(params.input, normalizedBaseResult)
   ) {
@@ -933,7 +1242,30 @@ export async function buildOrchestratedPlannerResponse(params: {
   }
 
   const model = params.model ??
-    Deno.env.get("OPENAI_COMPANION_PLANNER_MODEL") ?? "gpt-4.1";
+    Deno.env.get("OPENAI_COMPANION_PLANNER_MODEL") ?? "gpt-5";
+
+  if (shouldUsePlanDayToolLoop(params.input, normalizedBaseResult)) {
+    try {
+      const toolResult = await runPlanDayToolLoop({
+        guardedFetch: params.guardedFetch,
+        input: params.input,
+        baseResult: normalizedBaseResult,
+        openAIApiKey,
+        model,
+      });
+      if (toolResult) return toolResult;
+    } catch (error) {
+      recordPlanDayToolFallback({
+        reason: "exception",
+        model,
+        refining: isPlanDayRefinementTurn(params.input, normalizedBaseResult),
+        iteration: -1,
+        proposalCount: normalizedBaseResult.proposals.length,
+        hasClarification: false,
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 
   try {
     const isPlanDayClarification = isPlanDayClarificationResponse(

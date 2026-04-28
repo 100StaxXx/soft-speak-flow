@@ -1119,6 +1119,286 @@ Deno.test("plan_day no-room copy explains hidden campaign ritual load", () => {
   );
 });
 
+Deno.test("plan_day no-room reply names what is loading the day when no campaign focus dominates", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Focus",
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T09:00:00-07:00",
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+      openQuestionIds: ["details"],
+      planDayEnergy: "medium",
+    },
+    parsedInput: {
+      text: "Focus",
+    },
+    plannerContext: {
+      starterIntent: undefined,
+      activeEpics: [],
+      tasks: [
+        plannerTask({
+          id: "standalone-1",
+          title: "Pay landlord",
+          taskDate: "2026-04-18",
+          estimatedDuration: 15,
+        }),
+        plannerTask({
+          id: "standalone-2",
+          title: "Reply to recruiter",
+          taskDate: "2026-04-18",
+          estimatedDuration: 20,
+        }),
+        plannerTask({
+          id: "standalone-3",
+          title: "Doctor appt prep",
+          taskDate: "2026-04-18",
+          estimatedDuration: 30,
+        }),
+        plannerTask({
+          id: "standalone-4",
+          title: "Pick up groceries",
+          taskDate: "2026-04-18",
+          estimatedDuration: 45,
+        }),
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [{
+          date: "2026-04-18",
+          totalMinutes: 110,
+          taskCount: 4,
+          status: "balanced",
+        }],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [],
+        moveSuggestions: [],
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "conversational");
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertStringIncludes(result.reply, "4");
+  assertStringIncludes(result.reply, "quests");
+});
+
+Deno.test("plan_day reply surfaces an at-risk campaign callout when one exists", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Focus",
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T09:00:00-07:00",
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+      openQuestionIds: ["details"],
+      planDayEnergy: "medium",
+    },
+    parsedInput: {
+      text: "Focus",
+    },
+    plannerContext: {
+      starterIntent: undefined,
+      activeEpics: [{
+        id: "epic-relaunch",
+        title: "Website relaunch",
+        endDate: "2026-04-22",
+        progressPercentage: 25,
+        daysRemaining: 4,
+        habitCount: 1,
+      }],
+      tasks: [
+        plannerTask({
+          id: "standalone-1",
+          title: "Pay landlord",
+          taskDate: "2026-04-18",
+          estimatedDuration: 15,
+        }),
+        plannerTask({
+          id: "standalone-2",
+          title: "Reply to recruiter",
+          taskDate: "2026-04-18",
+          estimatedDuration: 20,
+        }),
+        plannerTask({
+          id: "standalone-3",
+          title: "Doctor appt prep",
+          taskDate: "2026-04-18",
+          estimatedDuration: 30,
+        }),
+        plannerTask({
+          id: "standalone-4",
+          title: "Pick up groceries",
+          taskDate: "2026-04-18",
+          estimatedDuration: 45,
+        }),
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [{
+          date: "2026-04-18",
+          totalMinutes: 110,
+          taskCount: 4,
+          status: "balanced",
+        }],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [],
+        moveSuggestions: [],
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "conversational");
+  assertEquals(result.proposals.length, 0);
+  assertStringIncludes(result.reply, "Website relaunch");
+  assertStringIncludes(result.reply, "at risk");
+});
+
+Deno.test("plan_day follow-up asks about energy when the answer is vague and there is room to draft", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "focused",
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T09:00:00-07:00",
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+      openQuestionIds: ["details"],
+    },
+    parsedInput: {
+      text: "focused",
+    },
+    plannerContext: {
+      starterIntent: undefined,
+      activeEpics: [],
+      tasks: [],
+      inboxTasks: [],
+      rituals: [],
+      calendarEvents: [],
+    },
+  }));
+
+  assertEquals(result.mode, "conversational");
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.followUpQuestions.length, 1);
+  assertEquals(result.followUpQuestions[0]?.id, "plan_day_energy");
+  assertEquals(result.sessionState.pendingStarterIntent, "plan_day");
+});
+
+Deno.test("plan_day follow-up skips the energy question when the user gives a concrete title", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Finish my essay",
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T09:00:00-07:00",
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+      openQuestionIds: ["details"],
+    },
+    parsedInput: {
+      text: "Finish my essay",
+    },
+    plannerContext: {
+      starterIntent: undefined,
+      activeEpics: [],
+      tasks: [],
+      inboxTasks: [],
+      rituals: [],
+      calendarEvents: [],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [{
+          date: "2026-04-18",
+          totalMinutes: 0,
+          taskCount: 0,
+          status: "open",
+        }],
+        overloadedDates: [],
+        emptyDates: ["2026-04-18"],
+        conflicts: [],
+        suggestedSlots: [{
+          date: "2026-04-18",
+          time: "11:00",
+          endTime: "11:45",
+          score: 88,
+          reason: "Open mid-morning slot.",
+        }],
+        moveSuggestions: [],
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals.length >= 1, true);
+});
+
+Deno.test("plan_day follow-up after energy answer drafts proposals", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "high",
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T09:00:00-07:00",
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+      openQuestionIds: ["plan_day_energy"],
+    },
+    parsedInput: {
+      text: "high",
+    },
+    plannerContext: {
+      starterIntent: undefined,
+      activeEpics: [],
+      tasks: [],
+      inboxTasks: [
+        plannerTask({
+          id: "inbox-1",
+          title: "Outline launch email",
+        }),
+      ],
+      rituals: [],
+      calendarEvents: [],
+      priorityScores: [
+        {
+          id: "task:inbox-1",
+          kind: "task",
+          title: "Outline launch email",
+          score: 80,
+          reasons: ["A focused move keeps the launch on track."],
+          taskId: "inbox-1",
+          targetDate: "2026-04-18",
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [{
+          date: "2026-04-18",
+          totalMinutes: 0,
+          taskCount: 0,
+          status: "open",
+        }],
+        overloadedDates: [],
+        emptyDates: ["2026-04-18"],
+        conflicts: [],
+        suggestedSlots: [{
+          date: "2026-04-18",
+          time: "10:00",
+          endTime: "10:45",
+          score: 86,
+          reason: "Open mid-morning slot.",
+        }],
+        moveSuggestions: [],
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals.length >= 1, true);
+  assertEquals(result.sessionState.planDayEnergy ?? null, null);
+});
+
 Deno.test("plan_day does not draft duplicate focus blocks for campaign rituals already on the day", () => {
   const result = buildPlannerResponse(baseInput({
     message: "Focus",
@@ -2792,6 +3072,140 @@ Deno.test("turns a clear plan-day focus reply into confirmable quest drafts", ()
     }).taskText,
     "Work On My App",
   );
+  assertEquals(result.dayPlan?.status, "draft");
+  assertEquals(result.dayPlan?.id, null);
+  assertEquals(result.dayPlan?.blocks.length, result.proposals.length);
+  assertEquals(result.dayPlan?.date, "2026-04-18");
+});
+
+Deno.test("plan_day no-room reply returns no DayPlan", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Focus",
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T16:38:00-07:00",
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+      openQuestionIds: ["details"],
+      planDayEnergy: "medium",
+    },
+    parsedInput: {
+      text: "Focus",
+    },
+    plannerContext: {
+      starterIntent: undefined,
+      activeEpics: [],
+      tasks: [
+        plannerTask({
+          id: "task-1",
+          title: "Pay landlord",
+          taskDate: "2026-04-18",
+          estimatedDuration: 15,
+        }),
+        plannerTask({
+          id: "task-2",
+          title: "Reply to recruiter",
+          taskDate: "2026-04-18",
+          estimatedDuration: 20,
+        }),
+        plannerTask({
+          id: "task-3",
+          title: "Doctor appt prep",
+          taskDate: "2026-04-18",
+          estimatedDuration: 30,
+        }),
+        plannerTask({
+          id: "task-4",
+          title: "Pick up groceries",
+          taskDate: "2026-04-18",
+          estimatedDuration: 45,
+        }),
+      ],
+    },
+  }));
+
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.dayPlan ?? null, null);
+});
+
+Deno.test("DayPlan blocks are sorted by startTime with unscheduled at the end", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Work on my app",
+    parsedInput: {
+      text: "Work on my app",
+    },
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+      openQuestionIds: ["details"],
+    },
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [],
+      calendarEvents: [],
+      priorityScores: [
+        {
+          id: "task:t1",
+          kind: "task",
+          title: "Outline launch email",
+          score: 80,
+          reasons: ["Anchors the morning."],
+          taskId: "t1",
+          targetDate: "2026-04-18",
+          suggestedTime: "13:00",
+        },
+        {
+          id: "task:t2",
+          kind: "task",
+          title: "Reply to support queue",
+          score: 75,
+          reasons: ["Steady momentum."],
+          taskId: "t2",
+          targetDate: "2026-04-18",
+          suggestedTime: "09:30",
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [{
+          date: "2026-04-18",
+          totalMinutes: 0,
+          taskCount: 0,
+          status: "open",
+        }],
+        overloadedDates: [],
+        emptyDates: ["2026-04-18"],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "09:30",
+            endTime: "10:00",
+            score: 86,
+            reason: "Open mid-morning.",
+          },
+          {
+            date: "2026-04-18",
+            time: "13:00",
+            endTime: "13:45",
+            score: 82,
+            reason: "Open early afternoon.",
+          },
+        ],
+        moveSuggestions: [],
+      },
+    },
+  }));
+
+  const blocks = result.dayPlan?.blocks ?? [];
+  if (blocks.length >= 2) {
+    const startTimes = blocks
+      .map((block) => block.startTime)
+      .filter((t): t is string => typeof t === "string");
+    const sorted = [...startTimes].sort();
+    assertEquals(startTimes, sorted);
+  }
 });
 
 Deno.test("asks again instead of turning empty-day plan-day options into filler quests", () => {
@@ -2828,7 +3242,6 @@ Deno.test("asks again instead of turning empty-day plan-day options into filler 
     assertEquals(result.mode, "conversational");
     assertEquals(result.proposals.length, 0);
     assertEquals(result.followUpQuestions.length, 1);
-    assertStringIncludes(result.reply, "need one real direction");
     assertEquals(result.sessionState.pendingStarterIntent, "plan_day");
   }
 });

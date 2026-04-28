@@ -464,6 +464,33 @@ export const PlannerRequestSchema = z.object({
       suggestedWorkload: WorkloadToleranceSchema.optional(),
     }).optional(),
   }),
+  activeDayPlan: z.object({
+    id: z.string().nullable(),
+    date: z.string(),
+    status: z.enum(["draft", "committed"]),
+    updatedAt: z.string(),
+    blocks: z.array(z.object({
+      id: z.string(),
+      proposalId: z.string().nullable(),
+      questId: z.string().nullable(),
+      title: z.string(),
+      startTime: z.string().nullable(),
+      durationMinutes: z.number(),
+      energyType: z.enum([
+        "deep",
+        "admin",
+        "physical",
+        "errand",
+        "social",
+        "creative",
+        "recovery",
+      ]).nullable(),
+      source: z.enum(["campaign", "habit", "recovery", "optimization"]),
+      reasoning: z.string(),
+      epicId: z.string().nullable().optional(),
+      habitSourceId: z.string().nullable().optional(),
+    })),
+  }).nullable().optional(),
 });
 
 type PlannerRequestClassificationHint = z.infer<
