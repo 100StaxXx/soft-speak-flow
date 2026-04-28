@@ -12,23 +12,23 @@ const mocks = vi.hoisted(() => ({
   guidance: {
     isActive: true,
     isIntroDialogueActive: false,
-    currentStep: "create_campaign",
+    currentStep: "plan_my_day",
     currentSubstep: null,
     stepRoute: "/journeys",
-    mentorInstructionLines: ["Choose New goal."],
-    progressText: "Step 3 of 4",
-    activeTargetSelectors: ['[data-tour="companion-launcher-option-goal"]'],
-    activeTargetSelector: '[data-tour="companion-launcher-option-goal"]',
+    mentorInstructionLines: ["Tap 'Plan day.'"],
+    progressText: "Step 2 of 3",
+    activeTargetSelectors: ['[data-tour="companion-launcher-option-plan-day"]'],
+    activeTargetSelector: '[data-tour="companion-launcher-option-plan-day"]',
     isStrictLockActive: true,
     canTemporarilyHide: false,
-    dialogueText: "Choose New goal.",
-    dialogueSupportText: "I'll highlight it for you.",
+    dialogueText: "Tap 'Plan day.'",
+    dialogueSupportText: "It'll give you something simple to follow.",
     secondaryActionLabel: "Skip tutorial",
     onSecondaryAction: vi.fn(),
     dialogueActionLabel: undefined,
     onDialogueAction: undefined,
-    speakerName: "Atlas",
-    speakerSlug: "atlas",
+    speakerName: "Sage",
+    speakerSlug: "sage",
     speakerAvatarUrl: "",
   },
 }));
@@ -68,11 +68,11 @@ describe("MentorGuidanceCard", () => {
   it("renders VN-style dialogue with a skip control once the tutorial is in progress", () => {
     render(<MentorGuidanceCard />);
 
-    expect(screen.getByText("Atlas portrait")).toBeInTheDocument();
-    expect(screen.getByText("Atlas")).toBeInTheDocument();
-    expect(screen.getByText("Step 3 of 4")).toBeInTheDocument();
-    expect(screen.getByText("Choose New goal.")).toBeInTheDocument();
-    expect(screen.getByText("I'll highlight it for you.")).toBeInTheDocument();
+    expect(screen.getByText("Sage portrait")).toBeInTheDocument();
+    expect(screen.getByText("Sage")).toBeInTheDocument();
+    expect(screen.getByText("Step 2 of 3")).toBeInTheDocument();
+    expect(screen.getByText("Tap 'Plan day.'")).toBeInTheDocument();
+    expect(screen.getByText("It'll give you something simple to follow.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Skip tutorial" })).toBeInTheDocument();
   });
 
@@ -85,8 +85,8 @@ describe("MentorGuidanceCard", () => {
 
   it("places the panel against the visible duplicate target", async () => {
     document.body.innerHTML = `
-      <button data-tour="companion-launcher-option-goal" data-kind="hidden" style="display:none">hidden</button>
-      <button data-tour="companion-launcher-option-goal" data-kind="visible">visible</button>
+      <button data-tour="companion-launcher-option-plan-day" data-kind="hidden" style="display:none">hidden</button>
+      <button data-tour="companion-launcher-option-plan-day" data-kind="visible">visible</button>
     `;
     Object.defineProperty(window, "innerHeight", {
       configurable: true,
@@ -119,7 +119,7 @@ describe("MentorGuidanceCard", () => {
   it("does not render when guidance is inactive", () => {
     mocks.guidance.isActive = false;
     render(<MentorGuidanceCard />);
-    expect(screen.queryByText("Atlas")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sage")).not.toBeInTheDocument();
     mocks.guidance.isActive = true;
   });
 
@@ -200,7 +200,7 @@ describe("MentorGuidanceCard", () => {
     render(<MentorGuidanceCard />);
     fireEvent.click(screen.getByRole("button", { name: "Hide tutorial" }));
 
-    expect(screen.queryByText("Atlas portrait")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sage portrait")).not.toBeInTheDocument();
 
     mocks.guidance.canTemporarilyHide = false;
   });
@@ -210,13 +210,13 @@ describe("MentorGuidanceCard", () => {
     const { rerender } = render(<MentorGuidanceCard />);
 
     fireEvent.click(screen.getByRole("button", { name: "Hide tutorial" }));
-    expect(screen.queryByText("Atlas portrait")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sage portrait")).not.toBeInTheDocument();
 
     mocks.guidance.canTemporarilyHide = false;
     rerender(<MentorGuidanceCard />);
 
-    expect(screen.getByText("Atlas portrait")).toBeInTheDocument();
-    expect(screen.getByText("Choose New goal.")).toBeInTheDocument();
+    expect(screen.getByText("Sage portrait")).toBeInTheDocument();
+    expect(screen.getByText("Tap 'Plan day.'")).toBeInTheDocument();
   });
 });
 

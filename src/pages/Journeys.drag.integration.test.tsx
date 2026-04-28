@@ -987,7 +987,7 @@ describe("Journeys row drag integration", () => {
 
     mocks.tutorialGuidance = {
       isActive: true,
-      currentStep: "create_campaign",
+      currentStep: "first_plan_closeout",
       currentSubstep: null,
     };
     rerender(renderTree());
@@ -1039,7 +1039,7 @@ describe("Journeys row drag integration", () => {
 
     mocks.tutorialGuidance = {
       isActive: true,
-      currentStep: "create_campaign",
+      currentStep: "first_plan_closeout",
       currentSubstep: null,
     };
     rerender(renderTree());
