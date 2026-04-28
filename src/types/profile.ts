@@ -7,7 +7,6 @@ import type { OnboardingScheduleArchetype } from "@/shared/onboardingScheduleArc
 export type GuidedTutorialStepId =
   | "quests_campaigns_intro"
   | "create_quest"
-  | "create_campaign"
   | "meet_companion"
   | "plan_my_day"
   | "first_plan_closeout"
@@ -32,9 +31,6 @@ export type GuidedMilestoneId =
   | "start_plan_my_day"
   | "answer_plan_day_ai"
   | "save_plan_day_action"
-  | "open_campaign_builder"
-  | "open_new_goal_from_fab"
-  | "complete_campaign_creation"
   | "first_plan_closeout_message"
   | "open_add_quest"
   | "enter_title"

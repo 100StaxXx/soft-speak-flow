@@ -9,7 +9,7 @@ import {
 
 const createFreshTutorial = () => ({
   version: 2,
-  flowVersion: 7,
+  flowVersion: 8,
   eligible: true,
   dismissed: false,
   completed: false,
@@ -26,7 +26,7 @@ const createPlanStepTutorial = () => ({
 
 const createCloseoutTutorial = () => ({
   ...createFreshTutorial(),
-  completedSteps: ["meet_companion", "plan_my_day", "create_campaign"],
+  completedSteps: ["meet_companion", "plan_my_day"],
   xpAwardedSteps: ["plan_my_day"],
   milestonesCompleted: [
     "mentor_intro_hello",
@@ -34,15 +34,13 @@ const createCloseoutTutorial = () => ({
     "start_plan_my_day",
     "answer_plan_day_ai",
     "save_plan_day_action",
-    "open_new_goal_from_fab",
-    "complete_campaign_creation",
   ],
 });
 
 const mocks = vi.hoisted(() => ({
   guidedTutorial: {
     version: 2,
-    flowVersion: 7,
+    flowVersion: 8,
     eligible: true,
     dismissed: false,
     completed: false,
@@ -241,7 +239,7 @@ describe("guided tutorial route restoration", () => {
     });
   });
 
-  it("targets Plan My Day, opens New goal, waits for campaign creation, and reaches the final closeout", async () => {
+  it("targets Plan My Day through Save quest, then reaches the final closeout", async () => {
     mocks.guidedTutorial = createPlanStepTutorial();
     const planTarget = document.createElement("button");
     planTarget.setAttribute("data-tour", "companion-launcher-option-plan-day");
@@ -252,12 +250,6 @@ describe("guided tutorial route restoration", () => {
     const saveTarget = document.createElement("button");
     saveTarget.setAttribute("data-tour", "companion-plan-day-suggestion-save");
     document.body.appendChild(saveTarget);
-    const goalTarget = document.createElement("button");
-    goalTarget.setAttribute("data-tour", "companion-launcher-option-goal");
-    document.body.appendChild(goalTarget);
-    const pathfinderTarget = document.createElement("div");
-    pathfinderTarget.setAttribute("data-tour", "pathfinder-campaign-builder");
-    document.body.appendChild(pathfinderTarget);
 
     renderWithProviders("/companion");
 
@@ -295,34 +287,6 @@ describe("guided tutorial route restoration", () => {
 
     await act(async () => {
       window.dispatchEvent(new CustomEvent("companion-plan-my-day-action-saved"));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("step")).toHaveTextContent(
-        "create_campaign",
-      );
-      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
-      expect(screen.getByTestId("target")).toHaveTextContent(
-        '[data-tour="companion-launcher-option-goal"]',
-      );
-    });
-
-    await act(async () => {
-      window.dispatchEvent(new CustomEvent("companion-new-goal-started"));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("step")).toHaveTextContent(
-        "create_campaign",
-      );
-      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
-      expect(screen.getByTestId("target")).toHaveTextContent(
-        '[data-tour="pathfinder-campaign-builder"]',
-      );
-    });
-
-    await act(async () => {
-      window.dispatchEvent(new CustomEvent("campaign-created"));
     });
 
     await waitFor(() => {

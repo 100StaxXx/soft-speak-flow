@@ -688,7 +688,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
       const guidedTutorial = JSON.parse(rawProgress ?? "{}");
       expect(guidedTutorial).toMatchObject({
         version: 2,
-        flowVersion: 7,
+        flowVersion: 8,
         eligible: true,
         completed: false,
         dismissed: false,

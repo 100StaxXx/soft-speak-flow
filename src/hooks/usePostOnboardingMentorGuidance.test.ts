@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const createFreshTutorial = () => ({
   version: 2,
-  flowVersion: 7,
+  flowVersion: 8,
   eligible: true,
   dismissed: false,
   completed: false,
@@ -14,34 +14,13 @@ const createFreshTutorial = () => ({
   milestonesCompleted: [] as string[],
 });
 
-const createPlanStepTutorial = () => ({
-  ...createFreshTutorial(),
-  completedSteps: ["meet_companion"],
-  milestonesCompleted: ["mentor_intro_hello", "meet_companion_intro"],
-});
-
-const createCloseoutTutorial = () => ({
-  ...createFreshTutorial(),
-  completedSteps: ["meet_companion", "plan_my_day", "create_campaign"],
-  xpAwardedSteps: ["plan_my_day"],
-  milestonesCompleted: [
-    "mentor_intro_hello",
-    "meet_companion_intro",
-    "start_plan_my_day",
-    "answer_plan_day_ai",
-    "save_plan_day_action",
-    "open_new_goal_from_fab",
-    "complete_campaign_creation",
-  ],
-});
-
 const mocks = vi.hoisted(() => ({
   state: {
     user: { id: "user-1" } as { id: string } | null,
     profileLoading: false,
     guidedTutorial: {
       version: 2,
-      flowVersion: 7,
+      flowVersion: 8,
       eligible: true,
       dismissed: false,
       completed: false,
@@ -190,7 +169,6 @@ describe("guided tutorial helpers", () => {
     const result = safeCompletedSteps([
       "meet_companion",
       "plan_my_day",
-      "create_campaign",
       "first_plan_closeout",
       "create_quest",
       "invalid-step",
@@ -200,7 +178,6 @@ describe("guided tutorial helpers", () => {
     expect(result).toEqual([
       "meet_companion",
       "plan_my_day",
-      "create_campaign",
       "first_plan_closeout",
       "create_quest",
     ]);
@@ -232,29 +209,36 @@ describe("guided tutorial helpers", () => {
     });
   });
 
-  it("describes the new companion plus Plan My Day and campaign tutorial", () => {
-    expect(getMentorInstructionLines("meet_companion", null)[0]).toContain(
-      "companion is already created",
+  it("returns the per-mentor step text for the active flow", () => {
+    expect(getMentorInstructionLines("meet_companion", null, "sage")[0]).toBe(
+      "This is your Companion.",
     );
-    expect(getMentorInstructionLines("plan_my_day", null)[0]).toContain(
-      "Plan day",
-    );
-    expect(getMentorInstructionLines("create_campaign", null)[0]).toContain(
-      "New goal",
+    expect(getMentorInstructionLines("plan_my_day", null, "sage")[0]).toBe(
+      "Tap 'Plan day.'",
     );
     expect(
-      getMentorInstructionLines("first_plan_closeout", null)[0],
-    ).toContain("New goal");
+      getMentorInstructionLines("first_plan_closeout", null, "sage")[0],
+    ).toBe("That's it.");
+
+    expect(getMentorInstructionLines("meet_companion", null, "rival")[0]).toBe(
+      "This is your Companion.",
+    );
+    expect(
+      getMentorInstructionLines("first_plan_closeout", null, "rival")[0],
+    ).toBe("That's all you need.");
+
+    // Unknown mentor falls back to sage
+    expect(getMentorInstructionLines("plan_my_day", null, undefined)[0]).toBe(
+      "Tap 'Plan day.'",
+    );
   });
 
-  it("strict-locks the actionable Plan day and New goal targets in the new loop", () => {
+  it("strict-locks the actionable Plan day target in the new loop", () => {
     expect(milestoneUsesStrictLock("mentor_intro_hello")).toBe(false);
     expect(milestoneUsesStrictLock("meet_companion_intro")).toBe(false);
     expect(milestoneUsesStrictLock("start_plan_my_day")).toBe(true);
     expect(milestoneUsesStrictLock("answer_plan_day_ai")).toBe(false);
     expect(milestoneUsesStrictLock("save_plan_day_action")).toBe(true);
-    expect(milestoneUsesStrictLock("open_new_goal_from_fab")).toBe(true);
-    expect(milestoneUsesStrictLock("complete_campaign_creation")).toBe(true);
     expect(milestoneUsesStrictLock("first_plan_closeout_message")).toBe(false);
   });
 
@@ -307,7 +291,7 @@ describe("guided tutorial first-value loop", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     document
-      .querySelectorAll('[data-tour="companion-launcher-option-plan-day"], [data-tour="companion-plan-day-follow-up-option"], [data-tour="companion-plan-day-suggestion-save"], [data-tour="companion-plan-day-pending-confirm"], [data-tour="companion-plan-day-pending-confirm-all"], [data-tour="companion-launcher-option-goal"], [data-tour="pathfinder-campaign-builder"]')
+      .querySelectorAll('[data-tour="companion-launcher-option-plan-day"], [data-tour="companion-plan-day-follow-up-option"], [data-tour="companion-plan-day-suggestion-save"], [data-tour="companion-plan-day-pending-confirm"], [data-tour="companion-plan-day-pending-confirm-all"]')
       .forEach((element) => element.remove());
   });
 
@@ -338,11 +322,11 @@ describe("guided tutorial first-value loop", () => {
       expect(result.current.isIntroDialogueActive).toBe(false);
       expect(result.current.currentStep).toBe("meet_companion");
       expect(result.current.dialogueActionLabel).toBe("Continue");
-      expect(result.current.dialogueText).toContain("This is your Companion");
+      expect(result.current.dialogueText).toBe("This is your Companion.");
     });
   });
 
-  it("advances from companion intro to Plan day, New goal, campaign creation, and then closeout", async () => {
+  it("advances from companion intro through Plan day to closeout", async () => {
     const planTarget = document.createElement("button");
     planTarget.setAttribute("data-tour", "companion-launcher-option-plan-day");
     document.body.appendChild(planTarget);
@@ -352,12 +336,6 @@ describe("guided tutorial first-value loop", () => {
     const saveTarget = document.createElement("button");
     saveTarget.setAttribute("data-tour", "companion-plan-day-suggestion-save");
     document.body.appendChild(saveTarget);
-    const goalTarget = document.createElement("button");
-    goalTarget.setAttribute("data-tour", "companion-launcher-option-goal");
-    document.body.appendChild(goalTarget);
-    const pathfinderTarget = document.createElement("div");
-    pathfinderTarget.setAttribute("data-tour", "pathfinder-campaign-builder");
-    document.body.appendChild(pathfinderTarget);
 
     const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
       wrapper: createWrapper(),
@@ -393,7 +371,7 @@ describe("guided tutorial first-value loop", () => {
 
     await waitFor(() => {
       expect(result.current.currentStep).toBe("plan_my_day");
-      expect(result.current.dialogueText).toContain("Answer your companion");
+      expect(result.current.dialogueText).toBe("Tell it what you need.");
       expect(result.current.activeTargetSelectors).toEqual([
         '[data-tour="companion-plan-day-follow-up-option"]',
         '[data-tour="companion-plan-day-chat-input"]',
@@ -411,7 +389,7 @@ describe("guided tutorial first-value loop", () => {
 
     await waitFor(() => {
       expect(result.current.currentStep).toBe("plan_my_day");
-      expect(result.current.dialogueText).toContain("Save one suggested quest");
+      expect(result.current.dialogueText).toBe("Save one quest.");
       expect(result.current.activeTargetSelectors).toEqual([
         '[data-tour="companion-plan-day-pending-confirm"]',
         '[data-tour="companion-plan-day-pending-confirm-all"]',
@@ -427,14 +405,9 @@ describe("guided tutorial first-value loop", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.currentStep).toBe("create_campaign");
-      expect(result.current.activeTargetSelectors).toEqual([
-        '[data-tour="companion-launcher-option-goal"]',
-        '[data-planner-tour="companion-quick-actions"]',
-      ]);
-      expect(result.current.activeTargetSelector).toBe(
-        '[data-tour="companion-launcher-option-goal"]',
-      );
+      expect(result.current.currentStep).toBe("first_plan_closeout");
+      expect(result.current.dialogueText).toBe("That's it.");
+      expect(result.current.dialogueActionLabel).toBe("Finish");
       expect(mocks.state.awardCustomXP).toHaveBeenCalledWith(
         3,
         "guided_tutorial_step_complete",
@@ -444,31 +417,6 @@ describe("guided tutorial first-value loop", () => {
           source: "guided_tutorial",
         }),
       );
-    });
-
-    await act(async () => {
-      window.dispatchEvent(new CustomEvent("companion-new-goal-started"));
-    });
-
-    await waitFor(() => {
-      expect(result.current.currentStep).toBe("create_campaign");
-      expect(result.current.activeTargetSelectors).toEqual([
-        '[data-tour="pathfinder-campaign-builder"]',
-        '[data-tour="companion-launcher-option-goal"]',
-        '[data-planner-tour="companion-quick-actions"]',
-      ]);
-      expect(result.current.activeTargetSelector).toBe(
-        '[data-tour="pathfinder-campaign-builder"]',
-      );
-    });
-
-    await act(async () => {
-      window.dispatchEvent(new CustomEvent("campaign-created"));
-    });
-
-    await waitFor(() => {
-      expect(result.current.currentStep).toBe("first_plan_closeout");
-      expect(result.current.dialogueActionLabel).toBe("Finish");
     });
 
     await act(async () => {
