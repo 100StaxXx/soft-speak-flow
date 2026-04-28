@@ -6,6 +6,7 @@ interface SpotlightRect {
   left: number;
   width: number;
   height: number;
+  borderRadius: number;
 }
 
 type MentorSpotlightMode = "spotlight" | "outline";
@@ -20,6 +21,18 @@ interface MentorSpotlightGuardProps {
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
 
+const parseLengthPx = (value: string, fallback: number): number => {
+  if (!value) return fallback;
+  if (value.includes("%")) return fallback;
+  const n = Number.parseFloat(value);
+  return Number.isFinite(n) ? n : fallback;
+};
+
+const readTargetBorderRadius = (element: HTMLElement): number => {
+  const computed = window.getComputedStyle(element);
+  return Math.max(0, parseLengthPx(computed.borderTopLeftRadius, 0));
+};
+
 const toSpotlightRect = (targetElement: HTMLElement, padding: number): SpotlightRect => {
   const rect = targetElement.getBoundingClientRect();
   const viewportWidth = window.innerWidth;
@@ -30,11 +43,18 @@ const toSpotlightRect = (targetElement: HTMLElement, padding: number): Spotlight
   const right = clamp(rect.right + padding, 0, viewportWidth);
   const bottom = clamp(rect.bottom + padding, 0, viewportHeight);
 
+  const width = Math.max(0, right - left);
+  const height = Math.max(0, bottom - top);
+  const innerRadius = readTargetBorderRadius(targetElement);
+  const maxRadius = Math.max(0, Math.min(width, height) / 2);
+  const borderRadius = Math.min(innerRadius + padding, maxRadius);
+
   return {
     top,
     left,
-    width: Math.max(0, right - left),
-    height: Math.max(0, bottom - top),
+    width,
+    height,
+    borderRadius,
   };
 };
 
@@ -45,7 +65,8 @@ const areSpotlightRectsEqual = (a: SpotlightRect | null, b: SpotlightRect | null
   return a.top === b.top
     && a.left === b.left
     && a.width === b.width
-    && a.height === b.height;
+    && a.height === b.height
+    && a.borderRadius === b.borderRadius;
 };
 
 const TUTORIAL_LAYER_MUTATION_SELECTOR = [
@@ -369,12 +390,12 @@ export const MentorSpotlightGuard = ({
         {mode === "spotlight" ? (
           <>
             <div
-              className="mentor-spotlight-mask"
+              className="mentor-spotlight-blocker"
               style={{ top: 0, left: 0, width: "100%", height: `${spotlightRect.top}px` }}
               {...blockedClickProps}
             />
             <div
-              className="mentor-spotlight-mask"
+              className="mentor-spotlight-blocker"
               style={{
                 top: `${spotlightRect.top}px`,
                 left: 0,
@@ -384,7 +405,7 @@ export const MentorSpotlightGuard = ({
               {...blockedClickProps}
             />
             <div
-              className="mentor-spotlight-mask"
+              className="mentor-spotlight-blocker"
               style={{
                 top: `${spotlightRect.top}px`,
                 left: `${spotlightRect.left + spotlightRect.width}px`,
@@ -394,7 +415,7 @@ export const MentorSpotlightGuard = ({
               {...blockedClickProps}
             />
             <div
-              className="mentor-spotlight-mask"
+              className="mentor-spotlight-blocker"
               style={{
                 top: `${spotlightRect.top + spotlightRect.height}px`,
                 left: 0,
@@ -402,6 +423,16 @@ export const MentorSpotlightGuard = ({
                 height: `${Math.max(0, viewportHeight - (spotlightRect.top + spotlightRect.height))}px`,
               }}
               {...blockedClickProps}
+            />
+            <div
+              className="mentor-spotlight-mask"
+              style={{
+                top: `${spotlightRect.top}px`,
+                left: `${spotlightRect.left}px`,
+                width: `${spotlightRect.width}px`,
+                height: `${spotlightRect.height}px`,
+                borderRadius: `${spotlightRect.borderRadius}px`,
+              }}
             />
           </>
         ) : null}
@@ -413,6 +444,7 @@ export const MentorSpotlightGuard = ({
             left: `${spotlightRect.left}px`,
             width: `${spotlightRect.width}px`,
             height: `${spotlightRect.height}px`,
+            borderRadius: `${spotlightRect.borderRadius}px`,
           }}
         />
       </div>
