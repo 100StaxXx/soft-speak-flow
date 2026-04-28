@@ -1,3 +1,5 @@
+// Internal presentation frame shared by the production edit campaign sheet and
+// the /test-scroll visual QA preview; keep production imports on EditCampaignSheet.
 import { useEffect, useMemo, useState } from "react";
 import { Calendar, Flame, Loader2, Mountain, Pencil, Plus, Repeat, Target, Trash2, Wand2, Zap } from "lucide-react";
 
@@ -76,6 +78,16 @@ export interface EditCampaignSheetFrameProps {
 }
 
 const DEFAULT_RITUAL_DAYS = [0, 1, 2, 3, 4, 5, 6];
+
+const formatRitualDeleteError = (error: unknown): string | undefined => {
+  if (typeof error !== "object" || error === null) return undefined;
+  const err = error as { code?: string; message?: string; hint?: string };
+  const parts: string[] = [];
+  if (err.code) parts.push(err.code);
+  if (err.message) parts.push(err.message);
+  if (err.hint) parts.push(`hint: ${err.hint}`);
+  return parts.length > 0 ? parts.join(" — ") : undefined;
+};
 
 const ritualDifficultyOptions: Array<{
   value: QuestFormDifficulty;
@@ -266,7 +278,8 @@ export function EditCampaignSheetFrame({
       }
     } catch (error) {
       console.error("Error deleting ritual:", error);
-      toast.error("Failed to delete ritual");
+      const description = formatRitualDeleteError(error);
+      toast.error("Failed to delete ritual", description ? { description } : undefined);
     } finally {
       setIsDeletingRitual(false);
       setEditingRitual(null);

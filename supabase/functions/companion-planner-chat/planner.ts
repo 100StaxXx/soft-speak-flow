@@ -126,6 +126,8 @@ export interface PlannerDraftState {
   questSubtaskPlanMode?: "append" | "replace" | null;
 }
 
+export type PlanDayEnergyLevel = "low" | "medium" | "high";
+
 export interface PlannerSessionState {
   draft: PlannerDraftState;
   openQuestionIds: string[];
@@ -134,6 +136,7 @@ export interface PlannerSessionState {
   reminderPreference?: string | null;
   pendingStarterIntent?: PlannerStarterIntent | null;
   lastClassification?: IntentType | null;
+  planDayEnergy?: PlanDayEnergyLevel | null;
 }
 
 export interface PlannerContextTask {
@@ -7903,6 +7906,93 @@ const buildPlanDayClarificationResponse = (
   };
 };
 
+const PLAN_DAY_ENERGY_OPTIONS = [
+  "Low — keep it light",
+  "Medium — balanced",
+  "High — bring it on",
+];
+
+const buildPlanDayEnergyQuestion = (): PlannerQuestion =>
+  question({
+    id: "plan_day_energy",
+    field: "details",
+    prompt: "Quick check — what kind of energy are we working with?",
+    reason: "Energy shapes how heavy I make the plan.",
+    required: true,
+    options: PLAN_DAY_ENERGY_OPTIONS,
+  });
+
+const detectPlanDayEnergyFromMessage = (
+  message: string,
+): PlanDayEnergyLevel | null => {
+  const normalized = normalizeText(message);
+  if (!normalized) return null;
+  if (
+    /\b(low|tired|drained|fried|exhausted|wiped|sluggish|sleepy|keep it light)\b/
+      .test(normalized)
+  ) {
+    return "low";
+  }
+  if (
+    /\b(high|wired|amped|energized|fired up|locked in|bring it on|let'?s go)\b/
+      .test(normalized)
+  ) {
+    return "high";
+  }
+  if (/\b(medium|balanced|moderate|normal|okay|fine|alright)\b/.test(normalized)) {
+    return "medium";
+  }
+  return null;
+};
+
+type PlanDayClarificationPhase = "energy" | "ready";
+
+const getPlanDayClarificationPhase = (
+  input: PlannerBuildInput,
+  sessionState: PlannerSessionState,
+): PlanDayClarificationPhase => {
+  if (sessionState.planDayEnergy) return "ready";
+  if (getPlanDayConcreteCandidateTitle(input)) return "ready";
+  return "energy";
+};
+
+const buildPlanDayEnergyClarificationResponse = (
+  input: PlannerBuildInput,
+  sessionState: PlannerSessionState,
+  classificationHint: ClassificationHint,
+): PlannerBuildResult => {
+  const energyQuestion = buildPlanDayEnergyQuestion();
+  const acknowledgement = buildPlanDayAcknowledgement(input);
+  const reply = [acknowledgement, energyQuestion.prompt]
+    .filter(Boolean)
+    .join(" ");
+  return {
+    mode: "conversational",
+    reply,
+    followUpQuestions: [energyQuestion],
+    proposals: [],
+    suggestedReminders: [],
+    structuredResponse: null,
+    memoryUpdates: {
+      preferredTimeOfDay: sessionState.preferredTimeOfDay ??
+        input.plannerContext.plannerMemory?.preferredTimeOfDay ?? null,
+      preferredTimeReason: sessionState.preferredTimeReason ??
+        input.plannerContext.plannerMemory?.preferredTimeReason ?? null,
+      reminderPreference: sessionState.reminderPreference ??
+        (input.plannerContext.plannerMemory?.reminderMinutesBefore
+          ? `${input.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
+          : null),
+    },
+    sessionState: {
+      ...sessionState,
+      draft: {},
+      openQuestionIds: [energyQuestion.id],
+      pendingStarterIntent: "plan_day",
+      lastClassification: classificationHint.type,
+    },
+  };
+};
+
 const isGenericPlanDayStarterRequest = (input: PlannerBuildInput): boolean => {
   const parsedTitle = sanitizeProposalTitle(input.parsedInput?.text);
   if (isPlanDayStarterTitle(input.message)) return true;
@@ -8582,6 +8672,112 @@ const buildPlanDayCampaignLoadMessage = (
     : `${dateLead} already has campaign work carrying much of the focus`;
 
   return `${opener}: ${focusItemList} for ${campaignFocus.campaignTitle}. I'd work from ${drawerLabel} before adding more.`;
+};
+
+const buildPlanDayLoadReason = (
+  input: PlannerBuildInput,
+  dateLabel: string,
+  loadBreakdown: PlanDayLoadBreakdown,
+): string => {
+  const dateLead = capitalizeScheduleReference(dateLabel);
+  const standaloneCount = loadBreakdown.visibleStandaloneQuests.length;
+  const campaignTasks = loadBreakdown.campaignLinkedQuests;
+  const ritualCount = loadBreakdown.surfacedCampaignRituals.length;
+  const calendarCount = loadBreakdown.calendarBlocks.length;
+
+  const campaignTitleCounts = new Map<string, number>();
+  for (const task of campaignTasks) {
+    const epic = task.epicId
+      ? input.plannerContext.activeEpics.find((candidate) =>
+        candidate.id === task.epicId
+      ) ?? null
+      : null;
+    const title = epic?.title ?? task.epicTitle ?? null;
+    if (!title) continue;
+    campaignTitleCounts.set(title, (campaignTitleCounts.get(title) ?? 0) + 1);
+  }
+  const campaignSummaries = [...campaignTitleCounts.entries()]
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 2)
+    .map(([title, count]) =>
+      count > 1 ? `${title} carrying ${count} of them` : `${title}`
+    );
+
+  const totalQuestCount = standaloneCount + campaignTasks.length;
+  const segments: string[] = [];
+
+  if (totalQuestCount > 0) {
+    const noun = totalQuestCount === 1 ? "quest" : "quests";
+    segments.push(`${totalQuestCount} ${noun} lined up`);
+  }
+  if (campaignSummaries.length > 0) {
+    segments.push(formatPlanDayInlineList(campaignSummaries));
+  }
+  if (ritualCount > 0) {
+    const ritualNoun = ritualCount === 1 ? "habit" : "habits";
+    segments.push(`${ritualCount} campaign ${ritualNoun}`);
+  }
+  if (calendarCount > 0) {
+    const eventNoun = calendarCount === 1 ? "calendar block" : "calendar blocks";
+    segments.push(`${calendarCount} ${eventNoun}`);
+  }
+
+  if (segments.length === 0) {
+    return `${dateLead} is already shaping up — let's not pile more on without a clear reason.`;
+  }
+
+  const detail = segments.length === 1
+    ? segments[0]
+    : `${segments[0]} (${segments.slice(1).join(", ")})`;
+  const closer = isWittySassyTone(input.tonePack)
+    ? "Let's actually work through that before stacking more on."
+    : "Let's lean into what's there before stacking more on.";
+
+  return `${dateLead} already has ${detail}. ${closer}`;
+};
+
+const buildPlanDayCampaignGoalsAtRiskLine = (
+  input: PlannerBuildInput,
+): string | null => {
+  const candidates = input.plannerContext.activeEpics
+    .slice(0, 5)
+    .map((epic) => buildCampaignMomentumCandidate(input, epic))
+    .filter((candidate) =>
+      (candidate.status === "at_risk" || candidate.status === "stalled") &&
+      (candidate.interventionLevel === "protect" ||
+        candidate.interventionLevel === "reset")
+    )
+    .sort((left, right) => right.selectionScore - left.selectionScore)
+    .slice(0, 2);
+  if (candidates.length === 0) return null;
+
+  const describe = (candidate: CampaignMomentumCandidate): string => {
+    const verb = candidate.status === "stalled" ? "is stalled" : "is at risk";
+    const fragments: string[] = [];
+    if (typeof candidate.daysRemaining === "number") {
+      if (candidate.daysRemaining <= 0) {
+        fragments.push("deadline today");
+      } else if (candidate.daysRemaining === 1) {
+        fragments.push("deadline tomorrow");
+      } else {
+        fragments.push(`deadline in ${candidate.daysRemaining} days`);
+      }
+    }
+    if (candidate.progressPercentage > 0) {
+      fragments.push(`${Math.round(candidate.progressPercentage)}% done`);
+    }
+    const detail = fragments.length > 0 ? ` (${fragments.join(", ")})` : "";
+    return `${candidate.epic.title} ${verb}${detail}`;
+  };
+
+  const list = formatPlanDayInlineList(candidates.map(describe));
+  const lead = isWittySassyTone(input.tonePack)
+    ? "Heads up though —"
+    : "Heads up —";
+  const closer = candidates.length === 1
+    ? "and could use a touch."
+    : "and could use a touch.";
+  return `${lead} ${list} ${closer}`;
 };
 
 const derivePlanDayAssessment = (
@@ -10240,24 +10436,28 @@ const buildPlanDayDraftResponse = (
     const campaignLoadMessage = existingWorkItems >= targetTotal
       ? buildPlanDayCampaignLoadMessage(input, dateLabel, loadBreakdown)
       : null;
+    const atRiskLine = buildPlanDayCampaignGoalsAtRiskLine(input);
     const noRoomReason = existingWorkItems >= targetTotal
-      ? campaignLoadMessage ??
-        `${
-          capitalizeScheduleReference(dateLabel)
-        } is already carrying about as much quest load as I want to give it.`
+      ? [
+        campaignLoadMessage ??
+          buildPlanDayLoadReason(input, dateLabel, loadBreakdown),
+        atRiskLine,
+      ].filter(Boolean).join(" ")
       : `I don't see enough open space on ${dateLabel} around your scheduled blocks to draft that cleanly.`;
+
+    const noRoomReply = [acknowledgement, noRoomReason]
+      .filter(Boolean)
+      .join(" ");
 
     return {
       mode: "conversational",
-      reply: [acknowledgement, noRoomReason]
-        .filter(Boolean)
-        .join(" "),
+      reply: noRoomReply,
       followUpQuestions: [],
       proposals: [],
       suggestedReminders: [],
       structuredResponse: buildPlanDayStructuredOutput(
         input,
-        [acknowledgement, noRoomReason].filter(Boolean).join(" "),
+        noRoomReply,
         classificationHint,
         [],
         loadBreakdown,
@@ -10288,6 +10488,7 @@ const buildPlanDayDraftResponse = (
     proposals.length < proposalTarget
       ? "That's all the strong next moves I found without crowding the day."
       : null,
+    buildPlanDayCampaignGoalsAtRiskLine(input),
     ...conflictNotes,
   ].filter(Boolean).join(" ");
 
@@ -10507,8 +10708,25 @@ const buildPlanDayFollowUpResponse = (
   input: PlannerBuildInput,
   sessionState: PlannerSessionState,
   classificationHint: ClassificationHint,
-): PlannerBuildResult =>
-  buildPlanDayDraftResponse(input, sessionState, classificationHint);
+): PlannerBuildResult => {
+  const detectedEnergy = detectPlanDayEnergyFromMessage(input.message);
+  const sessionStateWithEnergy: PlannerSessionState = detectedEnergy
+    ? { ...sessionState, planDayEnergy: detectedEnergy }
+    : sessionState;
+  const phase = getPlanDayClarificationPhase(input, sessionStateWithEnergy);
+  if (phase === "energy") {
+    return buildPlanDayEnergyClarificationResponse(
+      input,
+      sessionStateWithEnergy,
+      classificationHint,
+    );
+  }
+  return buildPlanDayDraftResponse(
+    input,
+    sessionStateWithEnergy,
+    classificationHint,
+  );
+};
 
 const inferClassification = (
   message: string,

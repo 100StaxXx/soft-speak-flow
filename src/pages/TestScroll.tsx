@@ -39,7 +39,7 @@ const editQuestFixture: NonNullable<ComponentProps<typeof EditQuestDialog>["task
 };
 
 const TestScroll = () => {
-  const [activeOverlay, setActiveOverlay] = useState<VisualOverlay>("pathfinder");
+  const [activeOverlay, setActiveOverlay] = useState<VisualOverlay>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isAddingQuest, setIsAddingQuest] = useState(false);
   const [isSavingQuest, setIsSavingQuest] = useState(false);

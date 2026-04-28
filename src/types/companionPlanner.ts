@@ -125,6 +125,8 @@ export interface CompanionPlannerDraftState {
   questSubtaskPlanMode?: "append" | "replace" | null;
 }
 
+export type CompanionPlanDayEnergyLevel = "low" | "medium" | "high";
+
 export interface CompanionPlannerSessionState {
   draft: CompanionPlannerDraftState;
   openQuestionIds: string[];
@@ -133,6 +135,7 @@ export interface CompanionPlannerSessionState {
   reminderPreference?: string | null;
   pendingStarterIntent?: CompanionPlannerStarterIntent | null;
   lastClassification?: IntentClassification["type"] | null;
+  planDayEnergy?: CompanionPlanDayEnergyLevel | null;
 }
 
 export interface PlannerContextTask {

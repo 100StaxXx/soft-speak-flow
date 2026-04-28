@@ -33,13 +33,20 @@ export function EditCampaignSheet({
   const deleteRitual = async (habitId: string) => {
     if (!user?.id) return false;
 
-    const { error: habitError } = await supabase
+    const { data: deletedHabits, error: habitError } = await supabase
       .from("habits")
       .delete()
       .eq("id", habitId)
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .select("id");
 
     if (habitError) throw habitError;
+
+    if (!deletedHabits || deletedHabits.length === 0) {
+      throw new Error(
+        `No matching ritual deleted (habit_id=${habitId}, user_id=${user.id}) — RLS denied or row already gone.`,
+      );
+    }
 
     const { error: tasksError } = await supabase
       .from("daily_tasks")

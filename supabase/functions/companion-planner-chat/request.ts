@@ -181,6 +181,7 @@ export const PlannerRequestSchema = z.object({
     reminderPreference: z.string().nullable().optional(),
     pendingStarterIntent: PlannerNullableStarterIntentSchema,
     lastClassification: PlannerIntentTypeSchema.nullable().optional(),
+    planDayEnergy: z.enum(["low", "medium", "high"]).nullable().optional(),
   }),
   parsedInput: z.object({
     text: z.string(),
