@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { format, addDays } from "date-fns";
+import { format, addDays, isSameDay } from "date-fns";
 import { motion, useReducedMotion } from "framer-motion";
 import { Compass } from "lucide-react";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
@@ -59,7 +59,7 @@ import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
 import { HourlyViewModal } from "@/components/HourlyViewModal";
 import { JourneysCompanionPlannerModal } from "@/components/journeys/JourneysCompanionPlannerModal";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
-import { getTodayIfDateStale, JOURNEYS_ROUTE } from "@/pages/journeysDateSync";
+import { JOURNEYS_ROUTE } from "@/pages/journeysDateSync";
 import { isOnboardingCleanupEligible } from "@/pages/journeysCleanupEligibility";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 import { SEND_TO_CALENDAR_ENABLED } from "@/utils/calendarFeatureFlags";
@@ -510,17 +510,20 @@ const Journeys = () => {
     }
   }, []);
 
-  const syncSelectedDateToTodayIfStale = useCallback(() => {
+  const resetSelectedDateToToday = useCallback(() => {
     if (showAddSheet) return;
-    setSelectedDate((currentDate) => getTodayIfDateStale(currentDate));
+    setSelectedDate((current) => {
+      const today = new Date();
+      return isSameDay(current, today) ? current : today;
+    });
   }, [showAddSheet]);
 
   useEffect(() => {
     if (isTabActive && !previousIsTabActiveRef.current) {
-      syncSelectedDateToTodayIfStale();
+      resetSelectedDateToToday();
     }
     previousIsTabActiveRef.current = isTabActive;
-  }, [isTabActive, syncSelectedDateToTodayIfStale]);
+  }, [isTabActive, resetSelectedDateToToday]);
 
   useEffect(() => {
     if (!isTabActive) return;
@@ -528,14 +531,14 @@ const Journeys = () => {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState !== "visible") return;
-      syncSelectedDateToTodayIfStale();
+      resetSelectedDateToToday();
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [isTabActive, syncSelectedDateToTodayIfStale]);
+  }, [isTabActive, resetSelectedDateToToday]);
 
   useEffect(() => {
     if (!isTabActive) return;
@@ -547,7 +550,7 @@ const Journeys = () => {
     const setupListener = async () => {
       const handle = await CapacitorApp.addListener("appStateChange", ({ isActive }) => {
         if (!isActive) return;
-        syncSelectedDateToTodayIfStale();
+        resetSelectedDateToToday();
       });
 
       if (isDisposed) {
@@ -566,7 +569,7 @@ const Journeys = () => {
         void listenerHandle.remove();
       }
     };
-  }, [isTabActive, syncSelectedDateToTodayIfStale]);
+  }, [isTabActive, resetSelectedDateToToday]);
 
   // Combo tracking
   
