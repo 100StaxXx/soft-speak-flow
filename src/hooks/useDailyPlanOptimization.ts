@@ -51,6 +51,8 @@ interface GeneratedPlanResponse {
   summaryMessage: string;
 }
 
+export const DAILY_PLAN_OPTIMIZATION_QUERY_KEY = ['daily-plan-optimization'] as const;
+
 export function useDailyPlanOptimization() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -61,7 +63,7 @@ export function useDailyPlanOptimization() {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['daily-plan-optimization', user?.id],
+    queryKey: [...DAILY_PLAN_OPTIMIZATION_QUERY_KEY, user?.id],
     queryFn: async (): Promise<DailyPlanOptimization | null> => {
       if (!user) return null;
 
