@@ -176,7 +176,7 @@ export function Pathfinder({
   
   const targetDays = useMemo(() => {
     if (deadline) {
-      return Math.max(7, differenceInDays(deadline, new Date()));
+      return Math.max(1, differenceInDays(deadline, new Date()));
     }
     if (initialTargetDays) return initialTargetDays;
     return preferences.epicDuration || 30;
