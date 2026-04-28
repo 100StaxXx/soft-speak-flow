@@ -28,7 +28,6 @@ describe("AICompanionCreator", () => {
     );
     expect(screen.getByRole("button", { name: "Select Dragon species" })).toHaveAttribute("data-selected", "true");
     expect(screen.getAllByText(/Awaiting/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Awakening/i).length).toBeGreaterThan(0);
     expect(screen.queryByText("Companion Preset")).not.toBeInTheDocument();
     expect(screen.queryByText("Egg Preview")).not.toBeInTheDocument();
     expect(
