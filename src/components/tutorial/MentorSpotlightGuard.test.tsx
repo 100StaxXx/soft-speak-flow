@@ -120,7 +120,7 @@ describe("MentorSpotlightGuard", () => {
     expect(previousFocus).toHaveFocus();
   });
 
-  it("blocks pointer interactions on masks", () => {
+  it("blocks pointer interactions on blockers around the spotlight", () => {
     document.body.innerHTML = `
       <button data-tour="add-quest-fab" style="position:fixed;left:20px;top:20px;width:40px;height:40px;">+</button>
       <section data-tutorial="mentor-dialogue-panel"><button>panel</button></section>
@@ -135,12 +135,43 @@ describe("MentorSpotlightGuard", () => {
     );
 
     const guard = screen.getByTestId("mentor-spotlight-guard");
-    const mask = guard.querySelector(".mentor-spotlight-mask") as HTMLElement;
+    const blocker = guard.querySelector(".mentor-spotlight-blocker") as HTMLElement;
+    expect(blocker).toBeInTheDocument();
     const clickSpy = vi.fn();
     document.body.addEventListener("click", clickSpy);
-    fireEvent.click(mask);
+    fireEvent.click(blocker);
     expect(clickSpy).not.toHaveBeenCalled();
     document.body.removeEventListener("click", clickSpy);
+  });
+
+  it("derives the spotlight border-radius from the target's computed style", () => {
+    // jsdom does not expand the `border-radius` shorthand to per-corner longhands,
+    // so set the longhand the parser actually reads.
+    document.body.innerHTML = `
+      <button
+        data-tour="rounded-target"
+        style="position:fixed;left:20px;top:20px;width:120px;height:64px;border-top-left-radius:16px;"
+      >rounded</button>
+      <section data-tutorial="mentor-dialogue-panel"><button>panel</button></section>
+    `;
+    setRect(
+      document.querySelector('[data-tour="rounded-target"]')!,
+      rect({ top: 20, left: 20, width: 120, height: 64 })
+    );
+
+    render(
+      <MentorSpotlightGuard
+        active
+        targetSelector='[data-tour="rounded-target"]'
+      />
+    );
+
+    const guard = screen.getByTestId("mentor-spotlight-guard");
+    const mask = guard.querySelector(".mentor-spotlight-mask") as HTMLElement;
+    const ring = guard.querySelector(".mentor-spotlight-ring") as HTMLElement;
+    // 16px target radius + 10px padding = 26px outer radius.
+    expect(mask).toHaveStyle({ borderRadius: "26px" });
+    expect(ring).toHaveStyle({ borderRadius: "26px" });
   });
 
   it("renders a non-blocking outline without masks", () => {
@@ -197,6 +228,7 @@ describe("MentorSpotlightGuard", () => {
       left: "10px",
       width: "60px",
       height: "60px",
+      borderRadius: "10px",
     });
   });
 });

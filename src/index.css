@@ -2239,16 +2239,25 @@ All colors MUST be HSL.
     pointer-events: none;
   }
 
-  .mentor-spotlight-mask {
+  .mentor-spotlight-blocker {
     position: fixed;
     pointer-events: auto;
-    background: hsl(0 0% 0% / 0.65);
+    background: transparent;
+  }
+
+  .mentor-spotlight-mask {
+    position: fixed;
+    pointer-events: none;
+    background: transparent;
+    /* Spotlight via box-shadow: the element body is transparent, the
+       enormous spread paints everything outside the rounded rect dark.
+       Do not "clean up" the 9999px spread — it carves the cutout. */
+    box-shadow: 0 0 0 9999px hsl(0 0% 0% / 0.65);
   }
 
   .mentor-spotlight-ring {
     position: fixed;
     pointer-events: none;
-    border-radius: 12px;
     z-index: 101;
   }
 
@@ -2261,7 +2270,6 @@ All colors MUST be HSL.
 
   .mentor-spotlight-ring--outline {
     border: 3px solid hsl(var(--primary) / 0.95);
-    border-radius: 20px;
     box-shadow:
       0 0 0 2px hsl(var(--primary) / 0.32),
       0 0 0 8px hsl(var(--primary) / 0.16),
