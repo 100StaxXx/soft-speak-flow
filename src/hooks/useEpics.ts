@@ -9,6 +9,7 @@ import { useAchievements } from "@/hooks/useAchievements";
 import { format } from "date-fns";
 import type { StoryTypeSlug } from "@/types/narrativeTypes";
 import { getEpicsQueryKey, type EpicRecord } from "@/hooks/epicsQuery";
+import { DAILY_PLAN_OPTIMIZATION_QUERY_KEY } from "@/hooks/useDailyPlanOptimization";
 import { requestJourneyPathGeneration } from "@/utils/journeyPathCache";
 import { useResilience } from "@/contexts/ResilienceContext";
 import {
@@ -1490,6 +1491,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
       queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
       queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
+      queryClient.invalidateQueries({ queryKey: DAILY_PLAN_OPTIMIZATION_QUERY_KEY });
 
       if (!queued && isNewCreate && user?.id) {
         const { count } = await supabase
@@ -1611,6 +1613,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
       queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
       queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
+      queryClient.resetQueries({ queryKey: DAILY_PLAN_OPTIMIZATION_QUERY_KEY });
 
       if (status === "completed" || status === "abandoned") {
         trackEpicOutcome(variables.epicId, status).catch((err) => {
@@ -1755,6 +1758,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
       queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
       queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
+      queryClient.invalidateQueries({ queryKey: DAILY_PLAN_OPTIMIZATION_QUERY_KEY });
 
       const changedKeys = Object.keys(updates);
       const titleOnly = changedKeys.length === 1 && changedKeys[0] === "title";
@@ -1834,6 +1838,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
       queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
       queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
       queryClient.invalidateQueries({ queryKey: ["milestones", epic.id] });
+      queryClient.resetQueries({ queryKey: DAILY_PLAN_OPTIMIZATION_QUERY_KEY });
 
       toast.success(queued ? "Campaign deletion saved offline" : "Campaign deleted", {
         description: queued
