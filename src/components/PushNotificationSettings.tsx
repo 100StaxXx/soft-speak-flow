@@ -63,7 +63,11 @@ type NotificationProfileUpdates = Partial<Pick<
 type NotificationTimeField = "daily_push_time" | "daily_quote_push_time";
 
 const RECENT_QUEUE_LIMIT = 12;
-const QUEST_NOTIFICATION_TYPES = new Set(["task_start", "task_reminder"]);
+const QUEST_NOTIFICATION_TYPES = new Set([
+  "task_start",
+  "task_reminder",
+  "plan_day_overdue",
+]);
 
 const toQueuePayload = (value: QueueDebugRow["payload"]): Record<string, unknown> => {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -499,7 +503,8 @@ export const PushNotificationSettings = memo(() => {
             <div>
               <Label className="text-foreground font-medium">Quest Reminders</Label>
               <p className="text-xs text-muted-foreground mt-1">
-                Get notified before scheduled quests and again when they start
+                Get notified before scheduled quests, when they start, and if a
+                planned block goes past its time
               </p>
             </div>
             <Switch

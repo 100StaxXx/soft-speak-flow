@@ -450,7 +450,197 @@ export interface PlannerBuildInput {
   currentDate: string;
   currentDateTime: string;
   timezone?: string;
+  activeDayPlan?: DayPlan | null;
 }
+
+export type DayPlanStatus = "draft" | "committed";
+
+export type DayPlanBlockSource =
+  | "campaign"
+  | "habit"
+  | "recovery"
+  | "optimization";
+
+export type DayPlanBlockEnergyType =
+  | "deep"
+  | "admin"
+  | "physical"
+  | "errand"
+  | "social"
+  | "creative"
+  | "recovery";
+
+export interface DayPlanBlock {
+  id: string;
+  proposalId: string | null;
+  questId: string | null;
+  title: string;
+  startTime: string | null;
+  durationMinutes: number;
+  energyType: DayPlanBlockEnergyType | null;
+  source: DayPlanBlockSource;
+  reasoning: string;
+  epicId?: string | null;
+  habitSourceId?: string | null;
+}
+
+export interface DayPlan {
+  id: string | null;
+  date: string;
+  status: DayPlanStatus;
+  blocks: DayPlanBlock[];
+  updatedAt: string;
+}
+
+const isDayPlanBlockEnergyType = (
+  value: unknown,
+): value is DayPlanBlockEnergyType =>
+  typeof value === "string" &&
+  (value === "deep" ||
+    value === "admin" ||
+    value === "physical" ||
+    value === "errand" ||
+    value === "social" ||
+    value === "creative" ||
+    value === "recovery");
+
+const inferDayPlanBlockSourceFromProposal = (
+  proposal: PlannerProposal,
+): DayPlanBlockSource => {
+  const payload = (proposal.payload ?? {}) as Record<string, unknown>;
+  const aiSource = typeof payload.aiSource === "string" ? payload.aiSource : null;
+  if (
+    aiSource === "campaign" || aiSource === "habit" ||
+    aiSource === "recovery" || aiSource === "optimization"
+  ) {
+    return aiSource;
+  }
+  if (typeof payload.epicId === "string" && payload.epicId.length > 0) {
+    return "campaign";
+  }
+  if (
+    typeof payload.habitSourceId === "string" &&
+    payload.habitSourceId.length > 0
+  ) {
+    return "habit";
+  }
+  return "optimization";
+};
+
+const compareDayPlanBlocks = (a: DayPlanBlock, b: DayPlanBlock): number => {
+  if (a.startTime === b.startTime) return 0;
+  if (a.startTime === null) return 1;
+  if (b.startTime === null) return -1;
+  return a.startTime.localeCompare(b.startTime);
+};
+
+const narrowDayPlanBlockEnergyType = (
+  value: DayPlanBlockEnergyType | null,
+): PlannerOptimizerTaskToSchedule["energy_type"] | null => {
+  if (value === "deep" || value === "admin" || value === "physical" ||
+    value === "errand" || value === "social"
+  ) {
+    return value;
+  }
+  if (value === "creative") return "deep";
+  if (value === "recovery") return "physical";
+  return null;
+};
+
+export const buildProposalFromDayPlanBlock = (
+  input: PlannerBuildInput,
+  block: DayPlanBlock,
+): PlannerProposal => {
+  const narrowedEnergy = narrowDayPlanBlockEnergyType(block.energyType);
+  const candidate: OptimizerDraftCandidate = {
+    id: block.id,
+    dedupeKey: block.title.toLowerCase(),
+    title: block.title,
+    scheduledDate: input.currentDate,
+    scheduledTime: block.startTime,
+    estimatedDuration: block.durationMinutes,
+    reasoning: block.reasoning,
+    energyType: narrowedEnergy ?? inferEnergyTypeFromTitle(block.title),
+    confidence: 0.85,
+    derivedFromMessage: input.message,
+    priority: block.source === "campaign"
+      ? 5
+      : block.source === "habit"
+      ? 4
+      : block.source === "recovery"
+      ? 3
+      : 2,
+    epicId: block.epicId ?? null,
+    habitSourceId: block.habitSourceId ?? null,
+  };
+  const proposal = buildOptimizerQuestProposal(input, candidate);
+  return {
+    ...proposal,
+    id: block.id,
+    payload: {
+      ...(proposal.payload ?? {}),
+      energyType: block.energyType ?? null,
+      epicId: block.epicId ?? null,
+      habitSourceId: block.habitSourceId ?? null,
+    },
+  };
+};
+
+export const synthesizeDayPlanFromProposals = (
+  date: string,
+  proposals: ReadonlyArray<PlannerProposal>,
+): DayPlan | null => {
+  const blocks = proposals
+    .filter((proposal) => proposal.kind === "create_quest")
+    .map((proposal): DayPlanBlock => {
+      const payload = (proposal.payload ?? {}) as Record<string, unknown>;
+      const title = typeof payload.taskText === "string"
+        ? payload.taskText
+        : proposal.title;
+      const startTime = typeof payload.scheduledTime === "string"
+        ? payload.scheduledTime
+        : null;
+      const durationRaw = payload.estimatedDuration;
+      const duration =
+        typeof durationRaw === "number" && Number.isFinite(durationRaw)
+          ? Math.max(5, Math.round(durationRaw))
+          : 30;
+      const energyType = isDayPlanBlockEnergyType(payload.energyType)
+        ? payload.energyType
+        : null;
+      const epicId = typeof payload.epicId === "string" && payload.epicId.length > 0
+        ? payload.epicId
+        : null;
+      const habitSourceId = typeof payload.habitSourceId === "string" &&
+          payload.habitSourceId.length > 0
+        ? payload.habitSourceId
+        : null;
+      return {
+        id: proposal.id,
+        proposalId: proposal.id,
+        questId: null,
+        title,
+        startTime,
+        durationMinutes: duration,
+        energyType,
+        source: inferDayPlanBlockSourceFromProposal(proposal),
+        reasoning: typeof proposal.reasoning === "string"
+          ? proposal.reasoning
+          : "",
+        epicId,
+        habitSourceId,
+      };
+    });
+  if (blocks.length === 0) return null;
+  blocks.sort(compareDayPlanBlocks);
+  return {
+    id: null,
+    date,
+    status: "draft",
+    blocks,
+    updatedAt: new Date().toISOString(),
+  };
+};
 
 export interface PlannerBuildResult {
   mode: PlannerResponseMode;
@@ -460,6 +650,7 @@ export interface PlannerBuildResult {
   proposals: PlannerProposal[];
   suggestedReminders: PlannerProposal[];
   structuredResponse?: CompanionStructuredResponse | null;
+  dayPlan?: DayPlan | null;
   memoryUpdates: {
     preferredTimeOfDay?: string | null;
     preferredTimeReason?: string | null;
@@ -1178,7 +1369,7 @@ const findWeekdayReference = (
   };
 };
 
-const formatScheduleReference = (
+export const formatScheduleReference = (
   currentDate: string,
   targetDate: string,
   capitalizeRelative = false,
@@ -7549,7 +7740,7 @@ const buildGoalBreakdownStarterResponse = (
   },
 });
 
-type OptimizerDraftCandidate = {
+export type OptimizerDraftCandidate = {
   id: string;
   dedupeKey: string;
   title: string;
@@ -7558,6 +7749,7 @@ type OptimizerDraftCandidate = {
   estimatedDuration: number;
   reasoning: string;
   epicId?: string | null;
+  habitSourceId?: string | null;
   category?: string | null;
   notes?: string | null;
   timingPreferenceLabel?: PlannerTaskTimingLabel;
@@ -7589,7 +7781,7 @@ const inferTimingLabelFromClock = (
   return "tonight";
 };
 
-const inferEnergyTypeFromTitle = (
+export const inferEnergyTypeFromTitle = (
   title: string,
 ): PlannerOptimizerTaskToSchedule["energy_type"] => {
   const normalized = title.toLowerCase();
@@ -7605,15 +7797,19 @@ const inferEnergyTypeFromTitle = (
   return "deep";
 };
 
-const getPlanDayTargetDate = (input: PlannerBuildInput): string =>
+export const getPlanDayTargetDate = (input: PlannerBuildInput): string =>
   input.plannerContext.scheduleInsights?.selectedDate ?? input.currentDate;
 
 const getPlanDayWorkloadProfile = (
   input: PlannerBuildInput,
-): "light" | "normal" | "heavy" =>
-  input.plannerContext.plannerMemory?.workloadTolerance ??
+): "light" | "normal" | "heavy" => {
+  const sessionEnergy = input.sessionState.planDayEnergy;
+  if (sessionEnergy === "low") return "light";
+  if (sessionEnergy === "high") return "heavy";
+  return input.plannerContext.plannerMemory?.workloadTolerance ??
     input.plannerContext.aiSignals?.suggestedWorkload ??
     "normal";
+};
 
 const getPlanDayLoadStatus = (
   input: PlannerBuildInput,
@@ -7654,7 +7850,7 @@ const calendarEventOverlapsDate = (
 const isCampaignRitualTask = (task: PlannerContextTask): boolean =>
   Boolean(task.epicId && task.habitSourceId);
 
-const getPlanDayLoadBreakdown = (
+export const getPlanDayLoadBreakdown = (
   input: PlannerBuildInput,
   targetDate: string,
 ): PlanDayLoadBreakdown => {
@@ -7947,12 +8143,20 @@ const detectPlanDayEnergyFromMessage = (
 
 type PlanDayClarificationPhase = "energy" | "ready";
 
+const hasPlanDayPriorityFocusMatch = (input: PlannerBuildInput): boolean => {
+  const focusText = input.message;
+  return getResolvedPriorityScores(input).some((score) =>
+    scoreMatchesPlanDayFocus(score, focusText, input)
+  );
+};
+
 const getPlanDayClarificationPhase = (
   input: PlannerBuildInput,
   sessionState: PlannerSessionState,
 ): PlanDayClarificationPhase => {
   if (sessionState.planDayEnergy) return "ready";
   if (getPlanDayConcreteCandidateTitle(input)) return "ready";
+  if (hasPlanDayPriorityFocusMatch(input)) return "ready";
   return "energy";
 };
 
@@ -8126,10 +8330,20 @@ const buildPlanDayAcknowledgement = (
   return "Got it - let's shape the day around that.";
 };
 
+const isPlanDayEnergyOnlyReply = (
+  input: PlannerBuildInput,
+): boolean => {
+  if (detectPlanDayEnergyFromMessage(input.message) === null) return false;
+  const text = normalizeText(input.parsedInput?.text ?? input.message);
+  if (!text) return false;
+  return text.split(/\s+/).filter(Boolean).length <= 4;
+};
+
 const getPlanDayConcreteCandidateTitle = (
   input: PlannerBuildInput,
 ): string | null => {
   if (isTimingOnlyReply(input.message, input.parsedInput)) return null;
+  if (isPlanDayEnergyOnlyReply(input)) return null;
 
   const parsedTitle = sanitizeProposalTitle(input.parsedInput?.text);
   const messageTitle = sanitizeProposalTitle(input.message);
@@ -8488,7 +8702,7 @@ const buildPlanDayPriorityCandidate = (
   return null;
 };
 
-const buildOptimizerQuestProposal = (
+export const buildOptimizerQuestProposal = (
   input: PlannerBuildInput,
   candidate: OptimizerDraftCandidate,
 ): PlannerProposal => {
@@ -8512,9 +8726,11 @@ const buildOptimizerQuestProposal = (
       taskDate: candidate.scheduledDate,
       scheduledTime: candidate.scheduledTime,
       estimatedDuration: candidate.estimatedDuration,
+      energyType: candidate.energyType ?? null,
       reminderEnabled: reminderMinutesBefore !== null,
       reminderMinutesBefore: reminderMinutesBefore ?? 15,
       epicId: candidate.epicId ?? undefined,
+      habitSourceId: candidate.habitSourceId ?? undefined,
       category: candidate.category ?? undefined,
       notes: candidate.notes ?? undefined,
       source: "optimizer",
@@ -8674,7 +8890,46 @@ const buildPlanDayCampaignLoadMessage = (
   return `${opener}: ${focusItemList} for ${campaignFocus.campaignTitle}. I'd work from ${drawerLabel} before adding more.`;
 };
 
-const buildPlanDayLoadReason = (
+export type PlanDayLoadFacts = {
+  standaloneQuestCount: number;
+  campaignQuestCount: number;
+  campaignBreakdown: { title: string; count: number }[];
+  ritualCount: number;
+  calendarBlockCount: number;
+  totalQuestCount: number;
+};
+
+export const getPlanDayLoadFacts = (
+  input: PlannerBuildInput,
+  loadBreakdown: PlanDayLoadBreakdown,
+): PlanDayLoadFacts => {
+  const standaloneCount = loadBreakdown.visibleStandaloneQuests.length;
+  const campaignTasks = loadBreakdown.campaignLinkedQuests;
+  const titleCounts = new Map<string, number>();
+  for (const task of campaignTasks) {
+    const epic = task.epicId
+      ? input.plannerContext.activeEpics.find((candidate) =>
+        candidate.id === task.epicId
+      ) ?? null
+      : null;
+    const title = epic?.title ?? task.epicTitle ?? null;
+    if (!title) continue;
+    titleCounts.set(title, (titleCounts.get(title) ?? 0) + 1);
+  }
+  const campaignBreakdown = [...titleCounts.entries()]
+    .sort((left, right) => right[1] - left[1])
+    .map(([title, count]) => ({ title, count }));
+  return {
+    standaloneQuestCount: standaloneCount,
+    campaignQuestCount: campaignTasks.length,
+    campaignBreakdown,
+    ritualCount: loadBreakdown.surfacedCampaignRituals.length,
+    calendarBlockCount: loadBreakdown.calendarBlocks.length,
+    totalQuestCount: standaloneCount + campaignTasks.length,
+  };
+};
+
+export const buildPlanDayLoadReason = (
   input: PlannerBuildInput,
   dateLabel: string,
   loadBreakdown: PlanDayLoadBreakdown,
@@ -8684,6 +8939,7 @@ const buildPlanDayLoadReason = (
   const campaignTasks = loadBreakdown.campaignLinkedQuests;
   const ritualCount = loadBreakdown.surfacedCampaignRituals.length;
   const calendarCount = loadBreakdown.calendarBlocks.length;
+  const inboxCount = loadBreakdown.datedInboxItems.length;
 
   const campaignTitleCounts = new Map<string, number>();
   for (const task of campaignTasks) {
@@ -8703,7 +8959,7 @@ const buildPlanDayLoadReason = (
       count > 1 ? `${title} carrying ${count} of them` : `${title}`
     );
 
-  const totalQuestCount = standaloneCount + campaignTasks.length;
+  const totalQuestCount = standaloneCount + campaignTasks.length + inboxCount;
   const segments: string[] = [];
 
   if (totalQuestCount > 0) {
@@ -8712,6 +8968,10 @@ const buildPlanDayLoadReason = (
   }
   if (campaignSummaries.length > 0) {
     segments.push(formatPlanDayInlineList(campaignSummaries));
+  }
+  if (inboxCount > 0) {
+    const inboxNoun = inboxCount === 1 ? "inbox item" : "inbox items";
+    segments.push(`${inboxCount} dated ${inboxNoun}`);
   }
   if (ritualCount > 0) {
     const ritualNoun = ritualCount === 1 ? "habit" : "habits";
@@ -8736,11 +8996,56 @@ const buildPlanDayLoadReason = (
   return `${dateLead} already has ${detail}. ${closer}`;
 };
 
-const buildPlanDayCampaignGoalsAtRiskLine = (
+export type PlanDayAtRiskCampaignFact = {
+  title: string;
+  status: "at_risk" | "stalled";
+  daysRemaining: number | null;
+  progressPercentage: number;
+};
+
+export const getPlanDayAtRiskCampaignFacts = (
   input: PlannerBuildInput,
-): string | null => {
+): PlanDayAtRiskCampaignFact[] => {
   const candidates = input.plannerContext.activeEpics
     .slice(0, 5)
+    .map((epic) => buildCampaignMomentumCandidate(input, epic))
+    .filter((candidate) =>
+      (candidate.status === "at_risk" || candidate.status === "stalled") &&
+      (candidate.interventionLevel === "protect" ||
+        candidate.interventionLevel === "reset")
+    )
+    .sort((left, right) => right.selectionScore - left.selectionScore)
+    .slice(0, 2);
+  return candidates.map((candidate) => ({
+    title: candidate.epic.title,
+    status: candidate.status === "stalled" ? "stalled" : "at_risk",
+    daysRemaining: typeof candidate.daysRemaining === "number"
+      ? candidate.daysRemaining
+      : null,
+    progressPercentage: Math.round(candidate.progressPercentage),
+  }));
+};
+
+const collectProposalEpicIds = (
+  proposals: ReadonlyArray<PlannerProposal>,
+): Set<string> => {
+  const ids = new Set<string>();
+  for (const proposal of proposals) {
+    const payload = (proposal.payload ?? {}) as Record<string, unknown>;
+    const epicId = typeof payload.epicId === "string" ? payload.epicId : null;
+    if (epicId) ids.add(epicId);
+  }
+  return ids;
+};
+
+export const buildPlanDayCampaignGoalsAtRiskLine = (
+  input: PlannerBuildInput,
+  proposals: ReadonlyArray<PlannerProposal> = [],
+): string | null => {
+  const coveredEpicIds = collectProposalEpicIds(proposals);
+  const candidates = input.plannerContext.activeEpics
+    .slice(0, 5)
+    .filter((epic) => !coveredEpicIds.has(epic.id))
     .map((epic) => buildCampaignMomentumCandidate(input, epic))
     .filter((candidate) =>
       (candidate.status === "at_risk" || candidate.status === "stalled") &&
@@ -10477,6 +10782,7 @@ const buildPlanDayDraftResponse = (
         draft: {},
         openQuestionIds: [],
         pendingStarterIntent: null,
+        planDayEnergy: null,
         lastClassification: classificationHint.type,
       },
     };
@@ -10488,7 +10794,7 @@ const buildPlanDayDraftResponse = (
     proposals.length < proposalTarget
       ? "That's all the strong next moves I found without crowding the day."
       : null,
-    buildPlanDayCampaignGoalsAtRiskLine(input),
+    buildPlanDayCampaignGoalsAtRiskLine(input, proposals),
     ...conflictNotes,
   ].filter(Boolean).join(" ");
 
@@ -10505,6 +10811,7 @@ const buildPlanDayDraftResponse = (
       proposals,
       loadBreakdown,
     ),
+    dayPlan: synthesizeDayPlanFromProposals(targetDate, proposals),
     memoryUpdates: {
       preferredTimeOfDay: sessionState.preferredTimeOfDay ??
         input.plannerContext.plannerMemory?.preferredTimeOfDay ?? null,
@@ -10520,6 +10827,7 @@ const buildPlanDayDraftResponse = (
       draft: {},
       openQuestionIds: [],
       pendingStarterIntent: null,
+      planDayEnergy: null,
       lastClassification: classificationHint.type,
     },
   };
@@ -10600,10 +10908,14 @@ const buildPlanDayStarterResponse = (
   sessionState: PlannerSessionState,
   classificationHint: ClassificationHint,
 ): PlannerBuildResult => {
+  const freshSessionState: PlannerSessionState = {
+    ...sessionState,
+    planDayEnergy: null,
+  };
   if (isGenericPlanDayStarterRequest(input)) {
     return buildPlanDayClarificationResponse(
       input,
-      sessionState,
+      freshSessionState,
       classificationHint,
     );
   }
@@ -10611,7 +10923,7 @@ const buildPlanDayStarterResponse = (
   return buildPlanDayDraftResponse(
     input,
     {
-      ...sessionState,
+      ...freshSessionState,
       pendingStarterIntent: "plan_day",
     },
     classificationHint,
@@ -10713,8 +11025,16 @@ const buildPlanDayFollowUpResponse = (
   const sessionStateWithEnergy: PlannerSessionState = detectedEnergy
     ? { ...sessionState, planDayEnergy: detectedEnergy }
     : sessionState;
+  const targetDate = getPlanDayTargetDate(input);
+  const loadBreakdown = getPlanDayLoadBreakdown(input, targetDate);
+  const existingWorkItems = loadBreakdown.workItemsForProposalLimit;
+  const targetTotal = getPlanDayTargetTotal(input, targetDate);
   const phase = getPlanDayClarificationPhase(input, sessionStateWithEnergy);
-  if (phase === "energy") {
+  if (
+    phase === "energy" &&
+    existingWorkItems < targetTotal &&
+    !isGenericPlanDayStarterRequest(input)
+  ) {
     return buildPlanDayEnergyClarificationResponse(
       input,
       sessionStateWithEnergy,

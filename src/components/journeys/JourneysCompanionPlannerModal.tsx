@@ -28,6 +28,7 @@ import {
   CompanionPortraitShell,
 } from "@/components/CompanionImage";
 import { CompanionStructuredResponseCards } from "@/components/companion/CompanionStructuredResponseCards";
+import { DayPlanCard } from "@/components/companion/DayPlanCard";
 import { PermissionRequestDialog } from "@/components/PermissionRequestDialog";
 import { plannerPathfinderTheme } from "@/components/companion/plannerPathfinderTheme";
 import { Badge } from "@/components/ui/badge";
@@ -815,7 +816,20 @@ const JourneysCompanionOverlayBody = memo(({
                 </div>
               ))}
 
-              {!isQuestCaptureActive
+              {!isQuestCaptureActive && assistant.dayPlan
+                ? (
+                  <DayPlanCard
+                    dayPlan={assistant.dayPlan}
+                    committed={Boolean(assistant.committedDayPlanId)}
+                    committing={assistant.committingDayPlan}
+                    onCommit={() => {
+                      void assistant.commitDayPlan();
+                    }}
+                  />
+                )
+                : null}
+
+              {!isQuestCaptureActive && !assistant.dayPlan
                 ? (
                   <CompanionStructuredResponseCards
                     structuredResponse={assistant.structuredResponse}

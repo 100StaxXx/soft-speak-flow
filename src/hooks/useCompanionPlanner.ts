@@ -486,6 +486,24 @@ const readPersistedPlannerSessionState = (
   return sanitizePlannerSessionState(value as CompanionPlannerSessionState);
 };
 
+const readPersistedDayPlan = (
+  metadata: unknown,
+): NonNullable<CompanionPlannerResponse["dayPlan"]> | null => {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return null;
+  }
+  const candidate = (metadata as Record<string, unknown>).dayPlan;
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+    return null;
+  }
+  const record = candidate as Record<string, unknown>;
+  if (!Array.isArray(record.blocks) || typeof record.date !== "string") {
+    return null;
+  }
+  if (record.status !== "draft" && record.status !== "committed") return null;
+  return candidate as NonNullable<CompanionPlannerResponse["dayPlan"]>;
+};
+
 type PersistedPlannerProposalDecision = {
   proposalId: string;
   status: "confirmed" | "modified" | "rejected";
@@ -1246,6 +1264,13 @@ export function useCompanionPlanner({
   const [structuredResponse, setStructuredResponse] = useState<
     CompanionPlannerResponse["structuredResponse"]
   >(null);
+  const [dayPlan, setDayPlan] = useState<
+    NonNullable<CompanionPlannerResponse["dayPlan"]> | null
+  >(null);
+  const [committingDayPlan, setCommittingDayPlan] = useState(false);
+  const [committedDayPlanId, setCommittedDayPlanId] = useState<string | null>(
+    null,
+  );
   const [proposals, setProposals] = useState<CompanionPlannerProposal[]>([]);
   const [questions, setQuestions] = useState<CompanionPlannerQuestion[]>([]);
   const [sessionState, setSessionState] = useState<
@@ -2094,11 +2119,14 @@ export function useCompanionPlanner({
           proposalIds: [...response.proposals, ...response.suggestedReminders]
             .map((proposal) => proposal.id),
           structuredResponse: response.structuredResponse ?? null,
+          dayPlan: response.dayPlan ?? null,
         },
       );
 
       setQuestions(response.followUpQuestions);
       setStructuredResponse(response.structuredResponse ?? null);
+      setDayPlan(response.dayPlan ?? null);
+      setCommittedDayPlanId(null);
       setProposals((previous) => {
         const settled = previous.filter((proposal) =>
           proposal.status !== "pending"
@@ -2143,6 +2171,8 @@ export function useCompanionPlanner({
       questCaptureMessage,
     ]);
     setStructuredResponse(null);
+    setDayPlan(null);
+    setCommittedDayPlanId(null);
     setProposals([]);
     setQuestions([]);
     setSessionState(nextSessionState);
@@ -2468,6 +2498,9 @@ export function useCompanionPlanner({
         parsedInput: sanitizedParsedInput,
         classificationHint,
         plannerContext: requestPlannerContext,
+        activeDayPlan: dayPlan && dayPlan.status === "draft"
+          ? dayPlan
+          : null,
       };
       const localValidation = validateCompanionPlannerRequest(requestBody);
       if (!localValidation.success) {
@@ -2517,6 +2550,7 @@ export function useCompanionPlanner({
             proposals: response.proposals,
             suggestedReminders: response.suggestedReminders,
             sessionState: response.sessionState,
+            dayPlan: response.dayPlan ?? null,
           } as unknown as Json,
         },
       ];
@@ -2647,6 +2681,7 @@ export function useCompanionPlanner({
     contextEventsQuery.events,
     contextTasks,
     conversationHistory,
+    dayPlan,
     enabled,
     effectivePlannerMemory,
     horizon,
@@ -3209,6 +3244,98 @@ export function useCompanionPlanner({
     setQuestions([]);
   }, [enabled, handleConfirmProposal, proposals]);
 
+  const handleCommitDayPlan = useCallback(async () => {
+    if (!enabled) return;
+    if (!dayPlan || dayPlan.blocks.length === 0) return;
+    if (committingDayPlan) return;
+
+    // Capture the exact plan we're committing. If a refinement turn replaces
+    // dayPlan mid-flight, we won't apply our optimistic "committed" update to
+    // the new plan (which would mismatch the daily_tasks rows we just wrote).
+    const startingPlan = dayPlan;
+    const startingProposalIds = new Set(
+      startingPlan.blocks
+        .map((block) => block.proposalId ?? null)
+        .filter((id): id is string => typeof id === "string"),
+    );
+
+    setCommittingDayPlan(true);
+    try {
+      const draftRpc = supabase.rpc as unknown as (
+        fn: string,
+        args: Record<string, unknown>,
+      ) => Promise<{ data: string | null; error: { message?: string } | null }>;
+      const upsertResult = await draftRpc("upsert_day_plan_draft", {
+        p_plan_date: startingPlan.date,
+        p_blocks: startingPlan.blocks,
+      });
+      if (upsertResult.error) {
+        throw new Error(
+          upsertResult.error.message ?? "Could not save the plan.",
+        );
+      }
+      const planId = upsertResult.data;
+      if (!planId) {
+        throw new Error("Plan id missing after save.");
+      }
+
+      const commitRpc = supabase.rpc as unknown as (
+        fn: string,
+        args: Record<string, unknown>,
+      ) => Promise<
+        {
+          data: { committedTaskIds?: string[]; planId?: string } | null;
+          error: { message?: string } | null;
+        }
+      >;
+      const commitResult = await commitRpc("apply_day_plan", {
+        p_plan_id: planId,
+      });
+      if (commitResult.error) {
+        throw new Error(
+          commitResult.error.message ?? "Could not lock in the plan.",
+        );
+      }
+
+      setCommittedDayPlanId(planId);
+      setDayPlan((current) => {
+        if (!current) return current;
+        // Only overwrite the visible plan if it still matches the one we
+        // committed. A refinement turn that replaced it should keep its
+        // own (uncommitted) state.
+        if (current === startingPlan) {
+          return { ...current, id: planId, status: "committed" };
+        }
+        if (current.date !== startingPlan.date) return current;
+        if (current.blocks.length !== startingPlan.blocks.length) return current;
+        return { ...current, id: planId, status: "committed" };
+      });
+      setProposals((previous) =>
+        previous.map((proposal) =>
+          proposal.kind === "create_quest" &&
+            startingProposalIds.has(proposal.id)
+            ? { ...proposal, status: "confirmed" }
+            : proposal
+        )
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["daily-tasks"] }),
+        queryClient.invalidateQueries({ queryKey: ["calendar-tasks"] }),
+        queryClient.invalidateQueries({ queryKey: ["inbox-tasks"] }),
+      ]);
+      toast(`Plan locked in for ${format(today, "EEE, MMM d")}.`);
+    } catch (error) {
+      console.error("[companion-planner] commit day plan failed", error);
+      toast(
+        error instanceof Error
+          ? error.message
+          : "Could not lock in the plan. Try again.",
+      );
+    } finally {
+      setCommittingDayPlan(false);
+    }
+  }, [committingDayPlan, dayPlan, enabled, queryClient, today]);
+
   const {
     isRecording,
     isAutoStopping,
@@ -3270,6 +3397,8 @@ export function useCompanionPlanner({
         : [],
     );
     setStructuredResponse(null);
+    setDayPlan(null);
+    setCommittedDayPlanId(null);
     setProposals([]);
     setQuestions([]);
     setSessionState(createInitialSessionState(storedPreferences));
@@ -3307,6 +3436,9 @@ export function useCompanionPlanner({
     const latestPlannerSnapshot = findLatestPlannerSnapshotMetadata(
       options.messages,
     );
+    const latestDayPlan = readPersistedDayPlan(
+      latestPlannerSnapshot?.metadata,
+    );
     const nextQuestions = readPersistedPlannerQuestions(
       latestPlannerSnapshot?.metadata.followUpQuestions,
     );
@@ -3339,6 +3471,12 @@ export function useCompanionPlanner({
       }, nextProposals);
 
     setStructuredResponse(nextStructuredResponse);
+    setDayPlan(latestDayPlan);
+    setCommittedDayPlanId(
+      latestDayPlan && latestDayPlan.status === "committed" && latestDayPlan.id
+        ? latestDayPlan.id
+        : null,
+    );
     setProposals(hydratedProposals);
     setQuestions(nextQuestions);
     setSessionState(nextSessionState);
@@ -3388,6 +3526,10 @@ export function useCompanionPlanner({
     rejectProposal: handleRejectProposal,
     completeProposalEdit: handleCompleteProposalEdit,
     confirmAll: handleConfirmAll,
+    dayPlan,
+    committingDayPlan,
+    committedDayPlanId,
+    commitDayPlan: handleCommitDayPlan,
     sessionState,
     plannerContext,
     plannerMemory: effectivePlannerMemory,

@@ -567,6 +567,18 @@ export function useLegacyCompanionAssistantAdapter({
   const structuredResponse = plannerSuggestionsReadOnly
     ? buildReadOnlyStructuredResponse(planner.structuredResponse)
     : planner.structuredResponse;
+  const dayPlan = plannerSuggestionsReadOnly ? null : planner.dayPlan ?? null;
+  const committingDayPlan = plannerSuggestionsReadOnly
+    ? false
+    : Boolean(planner.committingDayPlan);
+  const committedDayPlanId = plannerSuggestionsReadOnly
+    ? null
+    : planner.committedDayPlanId ?? null;
+  const commitDayPlan = plannerSuggestionsReadOnly
+    ? async () => {
+      toastPlannerFallbackReadOnly();
+    }
+    : planner.commitDayPlan;
 
   const toastPlannerFallbackReadOnly = useCallback(() => {
     toast.error(
@@ -754,6 +766,10 @@ export function useLegacyCompanionAssistantAdapter({
       : companionChat.greeting ?? greeting,
     messages,
     structuredResponse,
+    dayPlan,
+    committingDayPlan,
+    committedDayPlanId,
+    commitDayPlan,
     pendingAction: plannerSuggestionsReadOnly ? null : pendingAction,
     savedSuggestionProposalIds,
     pendingSuggestionProposalId,
