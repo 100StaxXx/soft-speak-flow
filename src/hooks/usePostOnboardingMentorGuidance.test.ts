@@ -155,6 +155,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 import {
   CREATE_QUEST_SUBSTEP_ORDER,
+  MILESTONES_ALLOWING_TEMPORARY_HIDE,
   PostOnboardingMentorGuidanceProvider,
   getMentorInstructionLines,
   milestoneUsesStrictLock,
@@ -240,6 +241,21 @@ describe("guided tutorial helpers", () => {
     expect(milestoneUsesStrictLock("answer_plan_day_ai")).toBe(false);
     expect(milestoneUsesStrictLock("save_plan_day_action")).toBe(true);
     expect(milestoneUsesStrictLock("first_plan_closeout_message")).toBe(false);
+  });
+
+  it("allows temporarily hiding the panel on planner milestones that occlude transcript content", () => {
+    expect(
+      MILESTONES_ALLOWING_TEMPORARY_HIDE.has("complete_companion_evolution"),
+    ).toBe(true);
+    expect(MILESTONES_ALLOWING_TEMPORARY_HIDE.has("start_plan_my_day")).toBe(true);
+    expect(MILESTONES_ALLOWING_TEMPORARY_HIDE.has("answer_plan_day_ai")).toBe(true);
+    expect(MILESTONES_ALLOWING_TEMPORARY_HIDE.has("save_plan_day_action")).toBe(true);
+    expect(
+      MILESTONES_ALLOWING_TEMPORARY_HIDE.has("first_plan_closeout_message"),
+    ).toBe(true);
+    expect(MILESTONES_ALLOWING_TEMPORARY_HIDE.has("mentor_intro_hello")).toBe(false);
+    expect(MILESTONES_ALLOWING_TEMPORARY_HIDE.has("meet_companion_intro")).toBe(false);
+    expect(MILESTONES_ALLOWING_TEMPORARY_HIDE.has("open_new_goal_from_fab")).toBe(false);
   });
 
   it("restores current tutorial work to the active feature route", () => {

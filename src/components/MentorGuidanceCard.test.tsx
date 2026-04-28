@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   MentorGuidanceCard,
+  resolveMentorGuidanceBottomInsetPx,
   resolveMentorGuidanceMinTopPx,
   resolveMentorGuidancePlacement,
 } from "./MentorGuidanceCard";
@@ -346,6 +347,141 @@ describe("resolveMentorGuidancePlacement", () => {
     if (placement.anchor === "top") {
       expect(placement.topPx).toBe(minTopPx);
     }
+  });
+});
+
+describe("resolveMentorGuidanceBottomInsetPx", () => {
+  it("returns the panel height when bottom-anchored within the cap", () => {
+    expect(
+      resolveMentorGuidanceBottomInsetPx({
+        panelHeight: 224,
+        viewportHeight: 844,
+        anchor: "bottom",
+      })
+    ).toBe(224);
+  });
+
+  it("caps the inset at 40% of the viewport height for tall panels", () => {
+    expect(
+      resolveMentorGuidanceBottomInsetPx({
+        panelHeight: 600,
+        viewportHeight: 844,
+        anchor: "bottom",
+      })
+    ).toBeCloseTo(844 * 0.4);
+  });
+
+  it("returns 0 when top-anchored", () => {
+    expect(
+      resolveMentorGuidanceBottomInsetPx({
+        panelHeight: 224,
+        viewportHeight: 844,
+        anchor: "top",
+      })
+    ).toBe(0);
+  });
+
+  it("returns 0 for non-positive heights", () => {
+    expect(
+      resolveMentorGuidanceBottomInsetPx({
+        panelHeight: 0,
+        viewportHeight: 844,
+        anchor: "bottom",
+      })
+    ).toBe(0);
+  });
+});
+
+describe("MentorGuidanceCard CSS var", () => {
+  afterEach(() => {
+    document.documentElement.style.removeProperty("--mentor-guidance-bottom-inset");
+    mocks.guidance.canTemporarilyHide = false;
+    mocks.guidance.isActive = true;
+  });
+
+  it("writes the bottom inset variable while bottom-anchored", async () => {
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      value: 844,
+    });
+    const rectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
+      const element = this as HTMLElement;
+      if (element.dataset.tutorial === "mentor-dialogue-panel") {
+        return rect({ top: 620, left: 0, width: 390, height: 224 });
+      }
+      return rect({ top: 0, left: 0, width: 0, height: 0 });
+    });
+
+    render(<MentorGuidanceCard />);
+
+    await waitFor(() => {
+      expect(
+        document.documentElement.style.getPropertyValue("--mentor-guidance-bottom-inset")
+      ).toBe("224px");
+    });
+
+    rectSpy.mockRestore();
+  });
+
+  it("resets the bottom inset variable when the panel unmounts", async () => {
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      value: 844,
+    });
+    const rectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
+      const element = this as HTMLElement;
+      if (element.dataset.tutorial === "mentor-dialogue-panel") {
+        return rect({ top: 620, left: 0, width: 390, height: 224 });
+      }
+      return rect({ top: 0, left: 0, width: 0, height: 0 });
+    });
+
+    const { unmount } = render(<MentorGuidanceCard />);
+    await waitFor(() => {
+      expect(
+        document.documentElement.style.getPropertyValue("--mentor-guidance-bottom-inset")
+      ).toBe("224px");
+    });
+
+    unmount();
+
+    expect(
+      document.documentElement.style.getPropertyValue("--mentor-guidance-bottom-inset")
+    ).toBe("0px");
+
+    rectSpy.mockRestore();
+  });
+
+  it("resets the bottom inset variable when the panel is temporarily hidden", async () => {
+    mocks.guidance.canTemporarilyHide = true;
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      value: 844,
+    });
+    const rectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
+      const element = this as HTMLElement;
+      if (element.dataset.tutorial === "mentor-dialogue-panel") {
+        return rect({ top: 620, left: 0, width: 390, height: 224 });
+      }
+      return rect({ top: 0, left: 0, width: 0, height: 0 });
+    });
+
+    render(<MentorGuidanceCard />);
+    await waitFor(() => {
+      expect(
+        document.documentElement.style.getPropertyValue("--mentor-guidance-bottom-inset")
+      ).toBe("224px");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide tutorial" }));
+
+    await waitFor(() => {
+      expect(
+        document.documentElement.style.getPropertyValue("--mentor-guidance-bottom-inset")
+      ).toBe("0px");
+    });
+
+    rectSpy.mockRestore();
   });
 });
 
