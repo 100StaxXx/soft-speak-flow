@@ -5,6 +5,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ACTIVE_CAMPAIGN_LIMIT_WARNING } from "@/features/epics/constants";
 import { Pathfinder } from "./Pathfinder";
 
+const expectElementToIncludeClasses = (element: HTMLElement, classes: string) => {
+  for (const token of classes.split(" ").filter(Boolean)) {
+    expect(element.className).toContain(token);
+  }
+};
+
 const mocks = vi.hoisted(() => ({
   onCreateEpic: vi.fn(),
   trackInteraction: vi.fn(),
@@ -200,6 +206,10 @@ describe("Pathfinder", () => {
     );
 
     expect(screen.getByTestId("pathfinder-shell")).toBeInTheDocument();
+    expectElementToIncludeClasses(
+      screen.getByTestId("pathfinder-shell"),
+      "border-[#4d2811] text-white",
+    );
     expect(screen.getByTestId("pathfinder-header")).toBeInTheDocument();
     expect(screen.getByTestId("pathfinder-progress")).toBeInTheDocument();
     expect(screen.getByTestId("pathfinder-footer")).toBeInTheDocument();

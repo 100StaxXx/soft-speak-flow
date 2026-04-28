@@ -40,7 +40,7 @@ export const FrequencyPicker = ({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h4 className={cn("text-sm font-medium", isQuestSoft ? "text-white" : "text-foreground")}>
+        <h4 className={cn("text-sm font-medium", isQuestSoft ? "text-[#4f240c]" : "text-foreground")}>
           Select days ({selectedDays.length}/7)
         </h4>
         {selectionMode === "multiple" && (
@@ -48,7 +48,7 @@ export const FrequencyPicker = ({
             onClick={selectAll}
             className={cn(
               "text-xs font-medium",
-              isQuestSoft ? "text-white/70 hover:text-white" : "text-primary hover:text-primary/80",
+              isQuestSoft ? "text-[#6b3416] hover:text-[#4f240c]" : "text-primary hover:text-primary/80",
             )}
           >
             Select all
@@ -67,12 +67,12 @@ export const FrequencyPicker = ({
               selectedDays.includes(index)
                 ? cn(
                   isQuestSoft
-                    ? "border-transparent text-white shadow-[0_10px_18px_rgba(0,0,0,0.14)]"
+                    ? "border-transparent shadow-[0_4px_0_rgba(77,40,17,0.2)]"
                     : "bg-primary border-primary text-primary-foreground shadow-glow",
                   isQuestSoft && activeTone ? activeTone : "",
                 )
                 : isQuestSoft
-                  ? "border-white/7 bg-white/[0.05] text-white/68 hover:bg-white/[0.08] hover:text-white/84"
+                  ? "border-[#6b3416]/35 bg-white/55 text-[#6b3416] hover:bg-white/75 hover:text-[#4f240c]"
                   : "border-border bg-card text-muted-foreground hover:border-primary/50"
             )}
           >

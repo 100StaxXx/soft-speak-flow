@@ -176,6 +176,10 @@ describe("AddQuestSheet", () => {
     expect(screen.getByRole("button", { name: "Time" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add Quest" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add to Inbox instead" })).toBeInTheDocument();
+    expectElementToIncludeClasses(
+      screen.getByTestId("add-quest-mobile-sheet"),
+      "border-[#4d2811] text-[#4f240c]",
+    );
     expect(screen.getByTestId("add-quest-editor-header").firstElementChild).toContainElement(
       screen.getByPlaceholderText("Quest Title"),
     );
@@ -195,6 +199,10 @@ describe("AddQuestSheet", () => {
     );
 
     expect(screen.getByTestId("add-quest-desktop-panel")).toBeInTheDocument();
+    expectElementToIncludeClasses(
+      screen.getByTestId("add-quest-desktop-panel"),
+      "border-[#4d2811] text-[#4f240c]",
+    );
     expect(screen.queryByTestId("add-quest-mobile-sheet")).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText("Quest Title")).toBeInTheDocument();
   });
@@ -328,7 +336,7 @@ describe("AddQuestSheet", () => {
     expect(createButton).toBeEnabled();
   });
 
-  it("colors the Add Quest CTA green when easy is selected", () => {
+  it("uses the companion primary CTA style when easy is selected", () => {
     render(
       <AddQuestSheet
         open
@@ -349,7 +357,7 @@ describe("AddQuestSheet", () => {
     expectElementToIncludeClasses(createButton, DIFFICULTY_COLORS.easy.primaryButton);
   });
 
-  it("colors the Add Quest CTA orange when medium is selected", () => {
+  it("uses the companion primary CTA style when medium is selected", () => {
     render(
       <AddQuestSheet
         open

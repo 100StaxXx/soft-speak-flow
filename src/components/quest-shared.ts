@@ -4,37 +4,37 @@ import { cn } from "@/lib/utils";
 // --- Difficulty color helpers ---
 export const DIFFICULTY_COLORS = {
   easy: {
-    bg: "bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_52%),linear-gradient(180deg,rgba(35,48,45,0.98),rgba(24,34,31,0.98))] shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_20px_40px_rgba(0,0,0,0.26)]",
-    text: "text-emerald-50",
-    pill: "bg-[linear-gradient(180deg,rgba(90,192,145,0.9),rgba(47,146,105,0.95))]",
-    border: "border-emerald-300/28",
-    difficultyActive: "border-emerald-300/40 bg-emerald-400/[0.14] text-emerald-50 shadow-[0_12px_22px_rgba(7,44,31,0.22),inset_0_1px_0_rgba(255,255,255,0.08)]",
-    iconBubble: "border-emerald-300/20 bg-emerald-400/[0.12] text-emerald-50",
-    primaryButton: "bg-[linear-gradient(180deg,#65d8a5_0%,#38bf86_55%,#239a67_100%)] text-[#0e261d] shadow-[0_16px_28px_rgba(17,85,58,0.26)]",
-    primaryButtonDisabled: "bg-[linear-gradient(180deg,rgba(101,216,165,0.18),rgba(35,154,103,0.18))] text-[#dff8ed]/45 shadow-none",
-    highlightBadge: "border-emerald-300/20 bg-emerald-400/[0.10]",
+    bg: "bg-[linear-gradient(180deg,#fff8e8_0%,#ffcf6e_100%)] shadow-[0_8px_0_rgba(77,40,17,0.8),0_18px_34px_-28px_rgba(36,12,4,0.5)]",
+    text: "text-[#183304]",
+    pill: "border-[#315114] bg-[linear-gradient(180deg,#d7ff86_0%,#9fda3f_100%)] text-[#183304]",
+    border: "border-[#315114]",
+    difficultyActive: "border-[#315114] bg-[linear-gradient(180deg,#d7ff86_0%,#9fda3f_100%)] text-[#183304] shadow-[0_5px_0_rgba(49,81,20,0.45)]",
+    iconBubble: "border-[#315114]/40 bg-white/55 text-[#183304]",
+    primaryButton: "border-[3px] border-[#315114] bg-[linear-gradient(180deg,#d7ff86_0%,#9fda3f_100%)] text-[#183304] shadow-[0_6px_0_rgba(49,81,20,0.45)] hover:bg-[linear-gradient(180deg,#e3ff9e_0%,#a6e145_100%)]",
+    primaryButtonDisabled: "border-[3px] border-[#315114]/30 bg-white/45 text-[#315114]/45 shadow-none",
+    highlightBadge: "border-[#315114]/35 bg-[#d7ff86]/45",
   },
   medium: {
-    bg: "bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_52%),linear-gradient(180deg,rgba(47,39,33,0.98),rgba(34,28,24,0.98))] shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_20px_40px_rgba(0,0,0,0.26)]",
-    text: "text-amber-50",
-    pill: "bg-[linear-gradient(180deg,rgba(237,166,103,0.92),rgba(185,108,57,0.96))]",
-    border: "border-amber-300/28",
-    difficultyActive: "border-amber-300/40 bg-amber-400/[0.14] text-amber-50 shadow-[0_12px_22px_rgba(64,35,13,0.24),inset_0_1px_0_rgba(255,255,255,0.08)]",
-    iconBubble: "border-amber-300/20 bg-amber-400/[0.12] text-amber-50",
-    primaryButton: "bg-[linear-gradient(180deg,#f2c39d_0%,#df965f_52%,#bf6d38_100%)] text-[#2f180a] shadow-[0_16px_28px_rgba(98,54,25,0.28)]",
-    primaryButtonDisabled: "bg-[linear-gradient(180deg,rgba(242,195,157,0.18),rgba(191,109,56,0.18))] text-[#fff1e5]/45 shadow-none",
-    highlightBadge: "border-amber-300/20 bg-amber-400/[0.10]",
+    bg: "bg-[linear-gradient(180deg,#fff8e8_0%,#ffcf6e_100%)] shadow-[0_8px_0_rgba(77,40,17,0.8),0_18px_34px_-28px_rgba(36,12,4,0.5)]",
+    text: "text-[#4f240c]",
+    pill: "border-[#6b3416] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#3c1f10]",
+    border: "border-[#6b3416]",
+    difficultyActive: "border-[#6b3416] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#3c1f10] shadow-[0_5px_0_rgba(95,50,18,0.72)]",
+    iconBubble: "border-[#6b3416]/35 bg-[#fff7dc] text-[#b04b12]",
+    primaryButton: "border-[3px] border-[#315114] bg-[linear-gradient(180deg,#d7ff86_0%,#9fda3f_100%)] text-[#183304] shadow-[0_6px_0_rgba(49,81,20,0.45)] hover:bg-[linear-gradient(180deg,#e3ff9e_0%,#a6e145_100%)]",
+    primaryButtonDisabled: "border-[3px] border-[#315114]/30 bg-white/45 text-[#315114]/45 shadow-none",
+    highlightBadge: "border-[#6b3416]/24 bg-[#ffd77d]/45",
   },
   hard: {
-    bg: "bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_52%),linear-gradient(180deg,rgba(43,33,50,0.98),rgba(31,24,37,0.98))] shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_20px_40px_rgba(0,0,0,0.26)]",
-    text: "text-fuchsia-50",
-    pill: "bg-[linear-gradient(180deg,rgba(191,133,236,0.92),rgba(128,78,185,0.96))]",
-    border: "border-fuchsia-300/28",
-    difficultyActive: "border-fuchsia-300/38 bg-fuchsia-400/[0.14] text-fuchsia-50 shadow-[0_12px_22px_rgba(44,20,67,0.26),inset_0_1px_0_rgba(255,255,255,0.08)]",
-    iconBubble: "border-fuchsia-300/20 bg-fuchsia-400/[0.12] text-fuchsia-50",
-    primaryButton: "bg-[linear-gradient(180deg,#d9b5f0_0%,#b77fe1_52%,#8e5bbb_100%)] text-[#261332] shadow-[0_16px_28px_rgba(73,38,105,0.28)]",
-    primaryButtonDisabled: "bg-[linear-gradient(180deg,rgba(217,181,240,0.18),rgba(142,91,187,0.18))] text-[#f4eafe]/45 shadow-none",
-    highlightBadge: "border-fuchsia-300/20 bg-fuchsia-400/[0.10]",
+    bg: "bg-[linear-gradient(180deg,#fff8e8_0%,#ffcf6e_100%)] shadow-[0_8px_0_rgba(77,40,17,0.8),0_18px_34px_-28px_rgba(36,12,4,0.5)]",
+    text: "text-[#5b2608]",
+    pill: "border-[#7a3b14] bg-[linear-gradient(180deg,#ffd7aa_0%,#ffae52_100%)] text-[#5b2608]",
+    border: "border-[#7a3b14]",
+    difficultyActive: "border-[#7a3b14] bg-[linear-gradient(180deg,#ffd7aa_0%,#ffae52_100%)] text-[#5b2608] shadow-[0_5px_0_rgba(95,50,18,0.72)]",
+    iconBubble: "border-[#7a3b14]/35 bg-white/55 text-[#5b2608]",
+    primaryButton: "border-[3px] border-[#315114] bg-[linear-gradient(180deg,#d7ff86_0%,#9fda3f_100%)] text-[#183304] shadow-[0_6px_0_rgba(49,81,20,0.45)] hover:bg-[linear-gradient(180deg,#e3ff9e_0%,#a6e145_100%)]",
+    primaryButtonDisabled: "border-[3px] border-[#315114]/30 bg-white/45 text-[#315114]/45 shadow-none",
+    highlightBadge: "border-[#7a3b14]/24 bg-[#ffae52]/38",
   },
 } as const;
 
@@ -49,112 +49,112 @@ export const DifficultyIconMap = {
 
 export const QUEST_FORM_STYLES = {
   sheet:
-    "border border-white/8 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.04),transparent_26%),linear-gradient(180deg,rgba(26,23,36,0.985),rgba(19,17,27,0.99))] shadow-[0_-18px_54px_rgba(0,0,0,0.34)]",
+    "border-[4px] border-[#4d2811] bg-[radial-gradient(circle_at_top_left,rgba(255,247,199,0.24),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(254,151,54,0.18),transparent_28%),linear-gradient(180deg,#a23518_0%,#701d0d_62%,#4a1209_100%)] text-[#4f240c] shadow-[0_-14px_0_#4d2811,0_-28px_70px_-36px_rgba(38,12,5,0.62)]",
   body:
-    "bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.025),transparent_24%),linear-gradient(180deg,rgba(26,23,36,0.985),rgba(19,17,27,0.99))]",
+    "bg-[linear-gradient(180deg,rgba(255,248,225,0.95),rgba(255,216,128,0.88))] text-[#4f240c]",
   sectionCard:
-    "rounded-[24px] border border-white/7 bg-[linear-gradient(180deg,rgba(36,31,49,0.94),rgba(27,24,38,0.96))] shadow-[0_14px_28px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.045)] backdrop-blur-xl",
+    "rounded-[1.6rem] border-[3px] border-[#6b3416] bg-[linear-gradient(180deg,#fff8e8_0%,#ffcf6e_100%)] text-[#4f240c] shadow-[0_8px_0_rgba(77,40,17,0.8),0_18px_34px_-28px_rgba(36,12,4,0.5)]",
   sectionCardSoft:
-    "rounded-[20px] border border-white/7 bg-[linear-gradient(180deg,rgba(39,34,53,0.9),rgba(29,25,41,0.92))] shadow-[0_10px_22px_rgba(0,0,0,0.16),inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-lg",
+    "rounded-[1.35rem] border-[3px] border-[#6b3416] bg-white/60 text-[#5d2a0f] shadow-[0_8px_0_rgba(77,40,17,0.16)]",
   insetPanel:
-    "rounded-[18px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.025))] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
+    "rounded-[1.15rem] border-2 border-[#6b3416]/45 bg-white/60 shadow-[inset_0_3px_0_rgba(255,255,255,0.55)]",
   heroIcon:
-    "inline-flex h-11 w-11 items-center justify-center rounded-[14px] border border-white/12 bg-white/[0.07] text-white/84 shadow-[0_10px_18px_rgba(0,0,0,0.16)] backdrop-blur-md",
+    "inline-flex h-11 w-11 items-center justify-center rounded-[14px] border-[3px] border-[#6b3416] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#b04b12] shadow-[0_5px_0_rgba(95,50,18,0.72)]",
   heroAction:
-    "inline-flex items-center gap-1.5 rounded-[15px] border border-white/10 bg-white/[0.05] px-3 py-1.5 text-[12px] font-semibold text-white/76 shadow-[0_8px_14px_rgba(0,0,0,0.12)] backdrop-blur-md transition-all duration-200 ease-out hover:bg-white/[0.09] hover:text-white active:scale-[0.98] motion-reduce:transition-none",
+    "inline-flex items-center gap-1.5 rounded-[15px] border-[3px] border-[#6b3416] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] px-3 py-1.5 text-[12px] font-semibold text-[#3c1f10] shadow-[0_4px_0_rgba(95,50,18,0.72)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-[linear-gradient(180deg,#fffdf7_0%,#ffe19b_100%)] active:translate-y-0 active:shadow-[0_2px_0_rgba(95,50,18,0.72)] motion-reduce:transition-none",
   titleFieldShell:
-    "w-full rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-[1px] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-md",
+    "w-full rounded-[20px] border-[3px] border-[#6b3416] bg-white/60 p-[2px] shadow-[inset_0_3px_0_rgba(255,255,255,0.55)]",
   titleFieldInner:
-    "rounded-[19px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] px-2.5 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
+    "rounded-[17px] border border-[#6b3416]/20 bg-white/80 px-2.5 py-1",
   titleInput:
-    "h-9 border-0 bg-transparent px-3 text-[15px] font-semibold text-white placeholder:text-white/50 focus-visible:ring-0 focus-visible:ring-offset-0",
+    "h-9 border-0 bg-transparent px-3 text-[15px] font-semibold text-[#4d2811] placeholder:text-[#9a6d47] focus-visible:ring-0 focus-visible:ring-offset-0",
   selectorChip:
-    "rounded-[18px] border border-white/7 bg-[linear-gradient(180deg,rgba(38,33,52,0.98),rgba(29,25,41,0.98))] px-4 py-3 shadow-[0_10px_20px_rgba(0,0,0,0.16),inset_0_1px_0_rgba(255,255,255,0.04)] transition-all duration-200 ease-out hover:border-white/12 hover:bg-[linear-gradient(180deg,rgba(42,36,57,0.98),rgba(31,27,44,0.98))] motion-reduce:transition-none",
+    "rounded-[18px] border-[3px] border-[#6b3416] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,238,188,0.9))] px-4 py-3 text-[#4f240c] shadow-[0_5px_0_rgba(95,50,18,0.42),inset_0_3px_0_rgba(255,255,255,0.55)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-[linear-gradient(180deg,#fffdf7_0%,#ffe19b_100%)] motion-reduce:transition-none",
   selectorChipMuted:
-    "border-dashed text-white/48",
+    "border-dashed text-[#7f4a1d]/62",
   timeWheel:
-    "relative h-[180px] overflow-y-auto rounded-[20px] border border-white/7 bg-[linear-gradient(180deg,rgba(38,33,52,0.98),rgba(28,24,40,0.98))] shadow-[0_12px_24px_rgba(0,0,0,0.18)] snap-y snap-mandatory scrollbar-none",
+    "relative h-[180px] overflow-y-auto rounded-[20px] border-[3px] border-[#6b3416] bg-white/70 shadow-[0_8px_0_rgba(77,40,17,0.16)] snap-y snap-mandatory scrollbar-none",
   timeWheelFadeTop:
-    "sticky top-0 h-12 bg-gradient-to-b from-[rgba(31,27,43,0.98)] via-[rgba(31,27,43,0.82)] to-transparent z-10 pointer-events-none",
+    "sticky top-0 h-12 bg-gradient-to-b from-[rgba(255,248,232,0.98)] via-[rgba(255,248,232,0.82)] to-transparent z-10 pointer-events-none",
   timeWheelFadeBottom:
-    "sticky bottom-0 h-12 bg-gradient-to-t from-[rgba(31,27,43,0.98)] via-[rgba(31,27,43,0.82)] to-transparent z-10 pointer-events-none",
+    "sticky bottom-0 h-12 bg-gradient-to-t from-[rgba(255,248,232,0.98)] via-[rgba(255,248,232,0.82)] to-transparent z-10 pointer-events-none",
   optionPill:
-    "rounded-[14px] border border-white/7 bg-white/[0.05] px-4 py-2 text-sm font-semibold text-white/70 shadow-[0_8px_14px_rgba(0,0,0,0.1)] transition-all duration-200 ease-out hover:bg-white/[0.08] motion-reduce:transition-none",
+    "rounded-[14px] border-[3px] border-[#6b3416] bg-white/60 px-4 py-2 text-sm font-semibold text-[#5d2a0f] shadow-[0_4px_0_rgba(77,40,17,0.16)] transition-all duration-200 ease-out hover:bg-white/75 motion-reduce:transition-none",
   optionPillCompact:
-    "rounded-[13px] border border-white/7 bg-white/[0.05] px-3 py-2 text-sm font-semibold text-white/70 shadow-[0_8px_14px_rgba(0,0,0,0.1)] transition-all duration-200 ease-out hover:bg-white/[0.08] motion-reduce:transition-none",
+    "rounded-[13px] border-[3px] border-[#6b3416] bg-white/60 px-3 py-2 text-sm font-semibold text-[#5d2a0f] shadow-[0_4px_0_rgba(77,40,17,0.16)] transition-all duration-200 ease-out hover:bg-white/75 motion-reduce:transition-none",
   difficultyButton:
-    "relative flex min-w-[72px] flex-col items-center justify-center gap-0.5 rounded-[16px] border px-2.5 py-2 text-center transition-all duration-200 ease-out active:scale-[0.98] motion-safe:hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0",
+    "relative flex min-w-[72px] flex-col items-center justify-center gap-0.5 rounded-[16px] border-[3px] px-2.5 py-2 text-center transition-all duration-200 ease-out active:scale-[0.98] motion-safe:hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0",
   difficultyButtonInactive:
-    "border-white/8 bg-white/[0.05] text-white/68 shadow-[0_8px_14px_rgba(0,0,0,0.08)] hover:bg-white/[0.08] hover:text-white/84",
+    "border-[#6b3416] bg-white/60 text-[#6b3416]/82 shadow-[0_4px_0_rgba(77,40,17,0.16)] hover:bg-white/75 hover:text-[#4f240c]",
   difficultyIconBubble:
-    "flex h-6.5 w-6.5 items-center justify-center rounded-[999px] border border-white/10 bg-white/[0.05]",
+    "flex h-6.5 w-6.5 items-center justify-center rounded-[999px] border-2 border-[#6b3416]/35 bg-white/55",
   footerReview:
-    "rounded-[18px] border border-white/7 bg-[linear-gradient(180deg,rgba(36,31,49,0.94),rgba(28,24,39,0.96))] px-4 py-3 text-white/66 shadow-[0_10px_20px_rgba(0,0,0,0.16)]",
+    "rounded-[18px] border-[3px] border-[#6b3416] bg-white/60 px-4 py-3 text-[#5d2a0f] shadow-[0_5px_0_rgba(77,40,17,0.16)]",
   secondaryButton:
-    "rounded-[18px] border border-white/9 bg-[linear-gradient(180deg,rgba(39,34,53,0.98),rgba(29,25,42,0.98))] text-white/84 shadow-[0_10px_20px_rgba(0,0,0,0.14)] transition-all duration-200 ease-out hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(43,37,58,0.98),rgba(32,28,45,0.98))] motion-reduce:transition-none",
+    "rounded-[18px] border-[3px] border-[#6b3416] bg-white/60 text-[#6b3416] shadow-[0_5px_0_rgba(77,40,17,0.16)] transition-all duration-200 ease-out hover:bg-white/75 hover:text-[#4f240c] motion-reduce:transition-none",
   iconSecondaryButton:
-    "rounded-[18px] border border-white/9 bg-[linear-gradient(180deg,rgba(39,34,53,0.98),rgba(29,25,42,0.98))] text-white/84 shadow-[0_10px_20px_rgba(0,0,0,0.14)] transition-all duration-200 ease-out hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(43,37,58,0.98),rgba(32,28,45,0.98))] motion-reduce:transition-none",
+    "rounded-[18px] border-[3px] border-[#6b3416] bg-white/60 text-[#6b3416] shadow-[0_5px_0_rgba(77,40,17,0.16)] transition-all duration-200 ease-out hover:bg-white/75 hover:text-[#4f240c] motion-reduce:transition-none",
   advancedTrigger:
-    "w-full justify-between rounded-[18px] border border-white/7 bg-[linear-gradient(180deg,rgba(38,33,52,0.96),rgba(29,25,41,0.96))] px-4 py-3 text-white/72 shadow-[0_10px_20px_rgba(0,0,0,0.14)] hover:bg-[linear-gradient(180deg,rgba(42,36,57,0.98),rgba(31,27,44,0.98))]",
-  helperText: "text-[12px] leading-5 text-white/58",
-  label: "text-[13px] font-semibold tracking-[0.01em] text-white/84",
-  divider: "border-white/6",
+    "w-full justify-between rounded-[18px] border-[3px] border-[#6b3416] bg-white/60 px-4 py-3 text-[#6b3416] shadow-[0_5px_0_rgba(77,40,17,0.16)] hover:bg-white/75",
+  helperText: "text-[12px] leading-5 text-[#7f4a1d]/80",
+  label: "text-[13px] font-semibold tracking-[0.01em] text-[#5d2a0f]",
+  divider: "border-[#6b3416]/20",
   subtleBadge:
-    "inline-flex items-center rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1 text-[11px] font-medium text-white/66",
+    "inline-flex items-center rounded-full border border-[#6b3416]/25 bg-white/55 px-2.5 py-1 text-[11px] font-medium text-[#7f4a1d]",
   popover:
-    "rounded-[20px] border border-white/8 bg-[linear-gradient(180deg,rgba(37,32,51,0.98),rgba(28,24,40,0.98))] p-2 text-white shadow-[0_18px_32px_rgba(0,0,0,0.26)] backdrop-blur-2xl",
+    "rounded-[20px] border-[3px] border-[#6b3416] bg-[linear-gradient(180deg,#fff8e8_0%,#ffcf6e_100%)] p-2 text-[#4f240c] shadow-[0_10px_0_rgba(77,40,17,0.8),0_22px_34px_-28px_rgba(36,12,4,0.5)]",
   footerLink:
-    "text-sm text-white/68 transition-colors hover:text-white/90",
+    "text-sm text-[#6b3416] transition-colors hover:text-[#4f240c]",
   mobileHeader:
-    "relative isolate overflow-hidden border-b border-white/8 bg-[linear-gradient(180deg,rgba(34,30,47,0.98),rgba(24,21,34,0.98))]",
+    "relative isolate overflow-hidden border-b-[3px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,251,239,0.22),rgba(255,206,105,0.16))]",
   mobileHeaderGlow:
-    "pointer-events-none absolute inset-x-0 top-0 h-16 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_70%)]",
+    "pointer-events-none absolute inset-x-0 top-0 h-16 bg-[radial-gradient(circle_at_top,rgba(255,248,212,0.36),transparent_70%)]",
   mobileHeaderUtilityButton:
-    "rounded-[14px] border border-white/10 bg-white/[0.05] p-2 text-white/72 shadow-[0_8px_14px_rgba(0,0,0,0.14)] backdrop-blur-md transition-all duration-200 ease-out hover:bg-white/[0.08] hover:text-white active:scale-[0.97] motion-reduce:transition-none",
+    "rounded-[14px] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,246,221,0.22),rgba(255,191,89,0.18))] p-2 text-[#fff8e8] shadow-[0_4px_0_rgba(77,40,17,0.85)] transition-all duration-200 ease-out hover:bg-[linear-gradient(180deg,rgba(255,250,236,0.28),rgba(255,191,89,0.24))] active:translate-y-0.5 motion-reduce:transition-none",
   mobileHeaderKicker:
-    "text-[11px] font-semibold uppercase tracking-[0.22em] text-white/36",
+    "text-[11px] font-semibold uppercase tracking-[0.22em] text-[#ffd77d]/78",
   mobileHeaderSummary:
-    "mt-1 text-sm text-white/56",
+    "mt-1 text-sm text-[#ffe9ba]/78",
   mobileHeaderToolbar:
     "mt-3 flex items-center justify-between gap-2",
   mobileDifficultyGroup:
-    "mt-4 inline-flex w-full items-stretch gap-2 rounded-[20px] border border-white/7 bg-black/10 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
+    "mt-4 inline-flex w-full items-stretch gap-2 rounded-[20px] border-[3px] border-[#4d2811] bg-white/35 p-2 shadow-[inset_0_3px_0_rgba(255,255,255,0.22)]",
   desktopPanelShell:
-    "border border-white/8 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.04),transparent_22%),linear-gradient(180deg,rgba(28,25,39,0.985),rgba(20,18,28,0.99))] shadow-[0_28px_60px_rgba(0,0,0,0.38)]",
+    "border-[4px] border-[#4d2811] bg-[radial-gradient(circle_at_top_left,rgba(255,247,199,0.24),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(254,151,54,0.18),transparent_28%),linear-gradient(180deg,#a23518_0%,#701d0d_62%,#4a1209_100%)] text-[#4f240c] shadow-[0_18px_0_#4d2811,0_34px_90px_-36px_rgba(38,12,5,0.62)]",
   desktopPanelHeader:
-    "border-b border-white/8 bg-[linear-gradient(180deg,rgba(35,31,48,0.96),rgba(26,23,37,0.98))]",
+    "border-b-[3px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,251,239,0.22),rgba(255,206,105,0.16))]",
   desktopPanelHeaderCard:
-    "rounded-[22px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-4 shadow-[0_12px_24px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.04)]",
+    "rounded-[22px] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,251,239,0.2),rgba(255,206,105,0.14))] p-4 shadow-[0_8px_0_rgba(77,40,17,0.85)]",
   desktopPanelFooter:
-    "border-t border-white/8 bg-[linear-gradient(180deg,rgba(28,25,39,0.92),rgba(20,18,28,0.98))] backdrop-blur-xl",
+    "border-t-[3px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,248,225,0.18),rgba(255,193,90,0.14))]",
   desktopPanelCloseButton:
-    "rounded-[14px] border border-white/10 bg-white/[0.05] p-2 text-white/72 shadow-[0_8px_14px_rgba(0,0,0,0.14)] transition-all duration-200 ease-out hover:bg-white/[0.08] hover:text-white active:scale-[0.97] motion-reduce:transition-none",
+    "rounded-[14px] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,246,221,0.22),rgba(255,191,89,0.18))] p-2 text-[#fff8e8] shadow-[0_4px_0_rgba(77,40,17,0.85)] transition-all duration-200 ease-out hover:bg-[linear-gradient(180deg,rgba(255,250,236,0.28),rgba(255,191,89,0.24))] active:translate-y-0.5 motion-reduce:transition-none",
   desktopPanelToolbarButton:
-    "inline-flex items-center gap-2 rounded-[14px] border border-white/10 bg-white/[0.05] px-3 py-2 text-sm font-semibold text-white/74 shadow-[0_8px_14px_rgba(0,0,0,0.12)] transition-all duration-200 ease-out hover:bg-white/[0.08] hover:text-white motion-reduce:transition-none",
+    "inline-flex items-center gap-2 rounded-[14px] border-[3px] border-[#6b3416] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] px-3 py-2 text-sm font-semibold text-[#3c1f10] shadow-[0_4px_0_rgba(95,50,18,0.72)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-[linear-gradient(180deg,#fffdf7_0%,#ffe19b_100%)] motion-reduce:transition-none",
   desktopPanelInput:
-    "h-11 rounded-[16px] border-white/9 bg-white/[0.05] px-4 text-[15px] font-semibold text-white placeholder:text-white/40 focus-visible:ring-1 focus-visible:ring-white/15 focus-visible:ring-offset-0",
+    "h-11 rounded-[16px] border-[3px] border-[#6b3416] bg-white/80 px-4 text-[15px] font-semibold text-[#4d2811] placeholder:text-[#9a6d47] focus-visible:border-[#d48635] focus-visible:ring-2 focus-visible:ring-[#f3be54] focus-visible:ring-offset-0",
 } as const;
 
 export const QUEST_TEMPLATE_BROWSER_STYLES = {
   header:
-    "border-b border-white/8 bg-[linear-gradient(180deg,rgba(35,31,48,0.98),rgba(27,24,38,0.98))] shadow-[0_10px_20px_rgba(0,0,0,0.16)]",
+    "border-b-[3px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,251,239,0.22),rgba(255,206,105,0.16))] shadow-[0_8px_0_rgba(77,40,17,0.85)]",
   tabList:
-    "grid w-full grid-cols-2 rounded-[22px] border border-white/8 bg-white/[0.05] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
+    "grid w-full grid-cols-2 rounded-[22px] border-[3px] border-[#6b3416] bg-white/45 p-1 shadow-[inset_0_3px_0_rgba(255,255,255,0.28)]",
   tabTrigger:
-    "rounded-[18px] text-sm font-semibold text-white/66 transition-all duration-200 data-[state=active]:border data-[state=active]:border-white/12 data-[state=active]:bg-white/[0.12] data-[state=active]:text-white data-[state=active]:shadow-[0_8px_14px_rgba(0,0,0,0.12)]",
-  searchInput: "border-white/10 bg-white/[0.06] text-white placeholder:text-white/45",
+    "rounded-[18px] text-sm font-semibold text-[#6b3416] transition-all duration-200 data-[state=active]:border-[3px] data-[state=active]:border-[#6b3416] data-[state=active]:bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] data-[state=active]:text-[#3c1f10] data-[state=active]:shadow-[0_4px_0_rgba(95,50,18,0.42)]",
+  searchInput: "border-[3px] border-[#6b3416] bg-white/80 text-[#4d2811] placeholder:text-[#9a6d47]",
   filterChip:
-    "shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-200 motion-reduce:transition-none",
-  filterChipActive: "border-white/20 bg-white/[0.14] text-white shadow-[0_8px_14px_rgba(0,0,0,0.12)]",
-  filterChipInactive: "border-white/10 bg-white/[0.05] text-white/66 hover:text-white hover:bg-white/[0.1]",
+    "shrink-0 rounded-full border-[3px] px-3 py-1.5 text-xs font-semibold transition-all duration-200 motion-reduce:transition-none",
+  filterChipActive: "border-[#6b3416] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#3c1f10] shadow-[0_4px_0_rgba(95,50,18,0.42)]",
+  filterChipInactive: "border-[#6b3416] bg-white/55 text-[#6b3416] hover:bg-white/75 hover:text-[#4f240c]",
   row:
-    "w-full rounded-[22px] border px-4 py-4 text-left transition-all duration-200 ease-out motion-safe:hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0",
+    "w-full rounded-[22px] border-[3px] px-4 py-4 text-left transition-all duration-200 ease-out motion-safe:hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0",
   rowHighlighted:
-    "border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03))] shadow-[0_14px_24px_rgba(0,0,0,0.18)]",
+    "border-[#6b3416] bg-[linear-gradient(180deg,#fff8e8_0%,#ffcf6e_100%)] text-[#4f240c] shadow-[0_8px_0_rgba(77,40,17,0.8),0_18px_34px_-28px_rgba(36,12,4,0.5)]",
   rowDefault:
-    "border-white/8 bg-[linear-gradient(180deg,rgba(38,33,52,0.96),rgba(28,24,40,0.96))] shadow-[0_12px_22px_rgba(0,0,0,0.16)]",
+    "border-[#6b3416] bg-white/60 text-[#5d2a0f] shadow-[0_8px_0_rgba(77,40,17,0.16)]",
   emptyState:
-    "rounded-[22px] border border-dashed border-white/10 bg-white/[0.04] px-5 py-10 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
+    "rounded-[22px] border-[3px] border-dashed border-[#6b3416] bg-white/45 px-5 py-10 text-center shadow-[inset_0_3px_0_rgba(255,255,255,0.28)]",
 } as const;
 
 export function getQuestDifficultyOptionClasses(
@@ -173,7 +173,7 @@ export function getQuestDifficultyIconClasses(
 ): string {
   return cn(
     QUEST_FORM_STYLES.difficultyIconBubble,
-    active ? DIFFICULTY_COLORS[difficulty].iconBubble : "border-white/12 bg-white/[0.08] text-white/72",
+    active ? DIFFICULTY_COLORS[difficulty].iconBubble : "border-[#6b3416]/35 bg-white/55 text-[#7f4a1d]/80",
   );
 }
 
@@ -185,7 +185,7 @@ export function getQuestOptionPillClasses(
   return cn(
     compact ? QUEST_FORM_STYLES.optionPillCompact : QUEST_FORM_STYLES.optionPill,
     active
-      ? cn(activeTone, "border-transparent text-white shadow-[0_12px_20px_rgba(0,0,0,0.16)]")
+      ? cn(activeTone ?? DIFFICULTY_COLORS.medium.pill, "shadow-[0_4px_0_rgba(77,40,17,0.2)]")
       : "",
   );
 }

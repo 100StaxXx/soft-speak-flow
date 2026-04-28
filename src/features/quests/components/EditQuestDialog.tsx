@@ -348,10 +348,10 @@ export function EditQuestDialog({
           <div className={cn("flex-shrink-0 px-5 py-5", QUEST_FORM_STYLES.desktopPanelHeader)}>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/42">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#ffd77d]/78">
                   Edit Quest
                 </p>
-                <p className="mt-1 text-sm text-white/62">{summaryLine}</p>
+                <p className="mt-1 text-sm text-[#ffe9ba]/78">{summaryLine}</p>
               </div>
               <button
                 onClick={() => onOpenChange(false)}
@@ -445,7 +445,7 @@ export function EditQuestDialog({
               <Popover>
                 <PopoverTrigger asChild>
                   <button className={cn(
-                    "flex items-center justify-center gap-2 text-sm font-semibold text-white",
+                    "flex items-center justify-center gap-2 text-sm font-semibold",
                     QUEST_FORM_STYLES.selectorChip,
                     taskDate
                       ? ""
@@ -528,9 +528,9 @@ export function EditQuestDialog({
                       if (hasPlannerSubtaskDraft) return;
                       toggleSubtask({ subtaskId: st.id, completed: !!checked });
                     }}
-                    className="h-4 w-4 border-white/18"
+                    className="h-4 w-4 border-[#6b3416]/45"
                   />
-                  <span className={cn("flex-1 text-sm text-white", st.completed && "line-through text-white/42")}>{st.title}</span>
+                  <span className={cn("flex-1 text-sm text-[#4f240c]", st.completed && "line-through text-[#7f4a1d]/55")}>{st.title}</span>
                   <button
                     onClick={() => {
                       if (hasPlannerSubtaskDraft) {
@@ -539,7 +539,7 @@ export function EditQuestDialog({
                       }
                       deleteSubtask(st.id);
                     }}
-                    className="rounded-full p-1 opacity-0 transition-all hover:bg-white/[0.08] text-white/44 hover:text-white group-hover:opacity-100"
+                    className="rounded-full p-1 text-[#7f4a1d]/60 opacity-0 transition-all hover:bg-white/55 hover:text-[#4f240c] group-hover:opacity-100"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -548,7 +548,7 @@ export function EditQuestDialog({
 
               {/* Add subtask row */}
               <div className={cn("flex items-center gap-2 px-4 py-3", `border-b ${QUEST_FORM_STYLES.divider}`)}>
-                <Checkbox disabled className="h-4 w-4 border-white/14 opacity-40" />
+                <Checkbox disabled className="h-4 w-4 border-[#6b3416]/35 opacity-40" />
                 <input
                   value={newSubtaskText}
                   onChange={(e) => setNewSubtaskText(e.target.value)}
@@ -559,7 +559,7 @@ export function EditQuestDialog({
                     }
                   }}
                   placeholder="Add Subtask"
-                  className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/42"
+                  className="flex-1 bg-transparent text-sm text-[#4f240c] outline-none placeholder:text-[#9a6d47]"
                 />
               </div>
 
@@ -567,7 +567,7 @@ export function EditQuestDialog({
                 value={moreInformation || ""}
                 onChange={(e) => setMoreInformation(e.target.value || null)}
                 placeholder="Add notes, meeting links or phone numbers..."
-                className="min-h-[88px] border-0 rounded-none bg-transparent resize-none px-4 py-4 text-sm text-white placeholder:text-white/42 focus-visible:ring-0 focus-visible:ring-offset-0"
+                className="min-h-[88px] border-0 rounded-none bg-transparent resize-none px-4 py-4 text-sm text-[#4f240c] placeholder:text-[#9a6d47] focus-visible:ring-0 focus-visible:ring-offset-0"
                 style={{ touchAction: 'pan-y', WebkitTapHighlightColor: 'transparent' }}
                 data-vaul-no-drag
               />
@@ -577,8 +577,8 @@ export function EditQuestDialog({
               <QuestLocationLink
                 location={location}
                 label="Address"
-                className={cn(QUEST_FORM_STYLES.sectionCard, "text-white")}
-                textClassName="text-white"
+                className={cn(QUEST_FORM_STYLES.sectionCard, "text-[#4f240c]")}
+                textClassName="text-[#4f240c]"
               />
             ) : null}
 
@@ -653,7 +653,7 @@ export function EditQuestDialog({
         <div
           className={cn(
             "flex-shrink-0 flex flex-col gap-3 px-5 pt-4",
-            isDesktopPanel ? `${QUEST_FORM_STYLES.desktopPanelFooter} pb-5` : "border-t border-white/8 pb-6",
+            isDesktopPanel ? `${QUEST_FORM_STYLES.desktopPanelFooter} pb-5` : "border-t-[3px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,248,225,0.18),rgba(255,193,90,0.14))] pb-6",
           )}
         >
           <Button
@@ -686,7 +686,7 @@ export function EditQuestDialog({
               variant="ghost"
               onClick={() => setShowDeleteConfirm(true)}
               disabled={isDeleting}
-              className="w-full rounded-[24px] text-white/72 hover:bg-white/[0.06] hover:text-white"
+              className="w-full rounded-[24px] text-[#6b3416] hover:bg-white/55 hover:text-[#4f240c]"
             >
               <Trash2 className="w-4 h-4 mr-2" />
               Delete

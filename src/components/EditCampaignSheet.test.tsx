@@ -57,6 +57,13 @@ vi.mock("@/components/ui/sonner", () => ({
 }));
 
 import { EditCampaignSheet } from "./EditCampaignSheet";
+import { DIFFICULTY_COLORS } from "./quest-shared";
+
+const expectElementToIncludeClasses = (element: HTMLElement, classes: string) => {
+  for (const token of classes.split(" ").filter(Boolean)) {
+    expect(element.className).toContain(token);
+  }
+};
 
 const baseEpic = {
   id: "epic-1",
@@ -125,6 +132,10 @@ describe("EditCampaignSheet", () => {
 
     expect(screen.getByLabelText("Campaign name")).toHaveValue("Campaign Aurora");
     expect(screen.getByLabelText("Description")).toHaveValue("A focused campaign");
+    expectElementToIncludeClasses(
+      screen.getByTestId("edit-campaign-sheet-shell"),
+      "fixed border-[#4d2811] text-white",
+    );
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
   });
 
@@ -172,6 +183,10 @@ describe("EditCampaignSheet", () => {
     renderSheet();
 
     fireEvent.click(screen.getByRole("button", { name: "Add ritual" }));
+    expectElementToIncludeClasses(
+      screen.getByText("Medium").closest("label") as HTMLElement,
+      DIFFICULTY_COLORS.medium.difficultyActive,
+    );
     fireEvent.change(screen.getByLabelText("Ritual name"), {
       target: { value: "Evening review" },
     });

@@ -130,17 +130,17 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
   const labelClassName = isQuestSoft ? QUEST_FORM_STYLES.label : "text-sm font-medium";
   const helperClassName = isQuestSoft ? QUEST_FORM_STYLES.helperText : "text-xs text-muted-foreground";
   const triggerClassName = isQuestSoft
-    ? cn("w-full px-4 py-3 text-sm text-left font-semibold text-white flex items-center justify-between", QUEST_FORM_STYLES.selectorChip)
+    ? cn("w-full px-4 py-3 text-sm text-left font-semibold flex items-center justify-between", QUEST_FORM_STYLES.selectorChip)
     : "w-full px-3 py-2 text-sm text-left border rounded-lg bg-background hover:bg-accent transition-colors flex items-center justify-between";
   const disabledTriggerClassName = isQuestSoft
     ? cn(
-      "w-full cursor-not-allowed px-4 py-3 text-sm text-left font-semibold text-white/50 flex items-center justify-between opacity-70",
+      "w-full cursor-not-allowed px-4 py-3 text-sm text-left font-semibold text-[#7f4a1d]/50 flex items-center justify-between opacity-70",
       QUEST_FORM_STYLES.selectorChip,
       "border-dashed",
     )
     : "w-full px-3 py-2 text-sm text-left border rounded-lg transition-colors flex items-center justify-between bg-muted text-muted-foreground cursor-not-allowed opacity-70";
   const inputClassName = isQuestSoft
-    ? "border-white/10 bg-white/[0.08] text-white placeholder:text-white/42"
+    ? "border-[3px] border-[#6b3416] bg-white/80 text-[#4d2811] placeholder:text-[#9a6d47]"
     : "";
   const popoverClassName = isQuestSoft
     ? cn("w-[min(24rem,var(--radix-popover-trigger-width))] p-2", QUEST_FORM_STYLES.popover)
@@ -151,8 +151,8 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
       : "w-full px-3 py-2 text-sm text-left hover:bg-accent transition-colors",
     isQuestSoft
       ? selected
-        ? cn(toneColors.pill, "text-white shadow-[0_10px_18px_rgba(0,0,0,0.14)]")
-        : "text-white/76 hover:bg-white/[0.08]"
+        ? cn(toneColors.pill, "shadow-[0_4px_0_rgba(77,40,17,0.2)]")
+        : "text-[#6b3416] hover:bg-white/55"
       : selected
         ? "bg-accent"
         : "",
@@ -361,7 +361,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
       {!props.hideScheduledTime && (
       <div className={sectionClassName}>
         <div className="flex items-center gap-2">
-          <Clock className={cn("w-4 h-4", isQuestSoft ? "text-white/58" : "text-muted-foreground")} />
+          <Clock className={cn("w-4 h-4", isQuestSoft ? "text-[#7f4a1d]/80" : "text-muted-foreground")} />
           <Label className={labelClassName}>Scheduled Time</Label>
         </div>
         <TimePickerField
@@ -388,17 +388,17 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                   {isSuggestLoading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Sparkles className={cn("h-4 w-4", isQuestSoft ? "text-white" : "text-primary")} />
+                    <Sparkles className={cn("h-4 w-4", isQuestSoft ? "text-[#b04b12]" : "text-primary")} />
                   )}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className={cn(isQuestSoft ? popoverClassName : "w-64 p-2", !isQuestSoft && "")} align="end">
                 <div className="space-y-1">
-                  <p className={cn("px-2 py-1 text-xs font-medium", isQuestSoft ? "text-white/58" : "text-muted-foreground")}>
+                  <p className={cn("px-2 py-1 text-xs font-medium", isQuestSoft ? "text-[#7f4a1d]/80" : "text-muted-foreground")}>
                     Suggested Times
                   </p>
                   {suggestions.length === 0 ? (
-                    <p className={cn("px-2 py-2 text-sm", isQuestSoft ? "text-white/58" : "text-muted-foreground")}>
+                    <p className={cn("px-2 py-2 text-sm", isQuestSoft ? "text-[#7f4a1d]/80" : "text-muted-foreground")}>
                       No suggestions available
                     </p>
                   ) : (
@@ -409,7 +409,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                         onClick={() => handleSelectSuggestion(slot.time)}
                         className={cn(
                           "w-full flex items-start gap-2 px-2 py-2 text-left transition-colors",
-                          isQuestSoft ? "rounded-[18px] hover:bg-white/[0.08]" : "rounded-md hover:bg-accent",
+                          isQuestSoft ? "rounded-[18px] hover:bg-white/55" : "rounded-md hover:bg-accent",
                         )}
                       >
                         <div className="flex-1">
@@ -417,11 +417,11 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                             {index === 0 && (
                               <Star className="h-3 w-3 text-amber-500 fill-amber-500" />
                             )}
-                            <span className={cn("text-sm font-medium", isQuestSoft && "text-white")}>
+                            <span className={cn("text-sm font-medium", isQuestSoft && "text-[#4f240c]")}>
                               {formatTime(slot.time)}
                             </span>
                           </div>
-                          <p className={cn("mt-0.5 text-xs", isQuestSoft ? "text-white/56" : "text-muted-foreground")}>
+                          <p className={cn("mt-0.5 text-xs", isQuestSoft ? "text-[#7f4a1d]/80" : "text-muted-foreground")}>
                             {slot.reason}
                           </p>
                         </div>
@@ -440,7 +440,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
       {!props.hideDuration && (
       <div className={sectionClassName}>
         <div className="flex items-center gap-2">
-          <Calendar className={cn("w-4 h-4", isQuestSoft ? "text-white/58" : "text-muted-foreground")} />
+          <Calendar className={cn("w-4 h-4", isQuestSoft ? "text-[#7f4a1d]/80" : "text-muted-foreground")} />
           <Label className={labelClassName}>Estimated Duration</Label>
         </div>
         <DurationPickerField
@@ -458,7 +458,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
       {!props.hideReminder && props.scheduledTime && (
         <div className={blockClassName}>
           <div className="flex items-center gap-2">
-            <Bell className={cn("w-4 h-4", isQuestSoft ? "text-white/58" : "text-muted-foreground")} />
+            <Bell className={cn("w-4 h-4", isQuestSoft ? "text-[#7f4a1d]/80" : "text-muted-foreground")} />
             <Label className={labelClassName}>Early Reminder</Label>
           </div>
           <p className={helperClassName}>
@@ -472,7 +472,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                 className={triggerClassName}
               >
                 <span>{reminderTriggerLabel}</span>
-                <ChevronDown className={cn("w-4 h-4", isQuestSoft ? "text-white/52" : "text-muted-foreground")} />
+                <ChevronDown className={cn("w-4 h-4", isQuestSoft ? "text-[#7f4a1d]/72" : "text-muted-foreground")} />
               </button>
             </PopoverTrigger>
 
@@ -522,8 +522,8 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
               </div>
 
               {isEditingCustomReminder && (
-                <div className={cn("mt-1 space-y-2 border-t pt-3 px-2 pb-2", isQuestSoft ? "border-white/10" : "border-border/60")}>
-                  <Label htmlFor="custom-reminder-minutes" className={cn("text-xs font-medium", isQuestSoft ? "text-white/58" : "text-muted-foreground")}>
+                <div className={cn("mt-1 space-y-2 border-t pt-3 px-2 pb-2", isQuestSoft ? "border-[#6b3416]/20" : "border-border/60")}>
+                  <Label htmlFor="custom-reminder-minutes" className={cn("text-xs font-medium", isQuestSoft ? "text-[#7f4a1d]/80" : "text-muted-foreground")}>
                     Minutes before
                   </Label>
                   <div className="flex items-center gap-2">
@@ -559,7 +559,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
       {!props.hideRecurrence && (
         <div className={blockClassName}>
           <div className="flex items-center gap-2">
-            <Repeat className={cn("w-4 h-4", isQuestSoft ? "text-white/58" : "text-muted-foreground")} />
+            <Repeat className={cn("w-4 h-4", isQuestSoft ? "text-[#7f4a1d]/80" : "text-muted-foreground")} />
             <Label className={labelClassName}>Recurrence</Label>
           </div>
 
@@ -573,7 +573,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                 <span>
                   {recurrenceOptions.find(opt => opt.value === (recurrencePatternForEditor || 'none'))?.label || "None"}
                 </span>
-                <ChevronDown className={cn("w-4 h-4", isQuestSoft ? "text-white/52" : "text-muted-foreground")} />
+                <ChevronDown className={cn("w-4 h-4", isQuestSoft ? "text-[#7f4a1d]/72" : "text-muted-foreground")} />
               </button>
             </PopoverTrigger>
             <PopoverContent
@@ -650,8 +650,8 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                       "h-8 rounded-md text-xs font-medium border transition-colors",
                       isQuestSoft
                         ? props.recurrenceMonthDays.includes(dayOfMonth)
-                          ? cn(toneColors.pill, "border-transparent text-white shadow-[0_10px_18px_rgba(0,0,0,0.14)]")
-                          : "border-white/8 bg-white/[0.06] text-white/74 hover:bg-white/[0.10]"
+                          ? cn(toneColors.pill, "shadow-[0_4px_0_rgba(77,40,17,0.2)]")
+                          : "border-[#6b3416]/35 bg-white/55 text-[#6b3416] hover:bg-white/75"
                         : props.recurrenceMonthDays.includes(dayOfMonth)
                           ? "bg-primary border-primary text-primary-foreground"
                           : "bg-background border-border hover:bg-accent",
@@ -673,7 +673,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
       {!props.hideLocation && (
         <div className={sectionClassName}>
           <div className="flex items-center gap-2">
-            <MapPin className={cn("w-4 h-4", isQuestSoft ? "text-white/58" : "text-muted-foreground")} />
+            <MapPin className={cn("w-4 h-4", isQuestSoft ? "text-[#7f4a1d]/80" : "text-muted-foreground")} />
             <Label className={labelClassName}>Location</Label>
           </div>
           <Input
@@ -689,7 +689,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
       {!props.hideMoreInformation && (
       <div className={blockClassName}>
         <div className="flex items-center gap-2">
-          <Info className={cn("w-4 h-4", isQuestSoft ? "text-white/58" : "text-muted-foreground")} />
+          <Info className={cn("w-4 h-4", isQuestSoft ? "text-[#7f4a1d]/80" : "text-muted-foreground")} />
           <Label className={labelClassName}>More Information</Label>
         </div>
         <Textarea
@@ -699,7 +699,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
           className={cn(
             "min-h-[100px] resize-none",
             isQuestSoft
-              ? "border-white/10 bg-white/[0.08] text-white placeholder:text-white/42"
+              ? "border-[3px] border-[#6b3416] bg-white/80 text-[#4d2811] placeholder:text-[#9a6d47]"
               : "bg-muted/30 border-border/50",
           )}
           style={{ touchAction: 'pan-y', WebkitTapHighlightColor: 'transparent' }}

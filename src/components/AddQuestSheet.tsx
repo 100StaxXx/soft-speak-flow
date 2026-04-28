@@ -725,10 +725,10 @@ export const AddQuestSheet = memo(function AddQuestSheet({
             <div className={cn("flex-shrink-0 px-5 py-5", QUEST_FORM_STYLES.desktopPanelHeader)}>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/42">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#ffd77d]/78">
                     New Quest
                   </p>
-                  <p className="mt-1 text-sm text-white/62">{summaryLine}</p>
+                  <p className="mt-1 text-sm text-[#ffe9ba]/78">{summaryLine}</p>
                 </div>
                 <button
                   onClick={() => requestOpenChange(false)}
@@ -789,7 +789,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 <X className="h-4 w-4" />
               </button>
 
-              <div data-testid="add-quest-editor-header" className="pt-1 text-white">
+              <div data-testid="add-quest-editor-header" className="pt-1 text-[#fff8e8]">
                 <div className="pr-12">
                   <div className={QUEST_FORM_STYLES.titleFieldShell}>
                     <div className={QUEST_FORM_STYLES.titleFieldInner}>
@@ -840,10 +840,10 @@ export const AddQuestSheet = memo(function AddQuestSheet({
           <div className={cn("flex-shrink-0 px-5 py-4", QUEST_FORM_STYLES.desktopPanelHeader)}>
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/42">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#ffd77d]/78">
                   Quest Shortcuts
                 </p>
-                <p className="mt-1 text-sm text-white/62">
+                <p className="mt-1 text-sm text-[#ffe9ba]/78">
                   Pick a common quest or one you already use a lot.
                 </p>
               </div>
@@ -859,12 +859,12 @@ export const AddQuestSheet = memo(function AddQuestSheet({
         ) : (
           <div className={cn("relative px-4 pt-4 pb-4 flex-shrink-0", QUEST_FORM_STYLES.mobileHeader)}>
             <div className={QUEST_FORM_STYLES.mobileHeaderGlow} />
-            <div className="flex min-h-[128px] flex-col items-center justify-center pt-2 text-center text-white">
+            <div className="flex min-h-[128px] flex-col items-center justify-center pt-2 text-center text-[#fff8e8]">
               <div className={QUEST_FORM_STYLES.heroIcon}>
                 <History className="h-5 w-5" />
               </div>
               <p className="mt-3 font-fredoka text-[1.15rem]">Quest shortcuts</p>
-              <p className="mt-1 max-w-[16rem] text-sm text-white/74">
+              <p className="mt-1 max-w-[16rem] text-sm text-[#ffe9ba]/78">
                 Pick a common quest or one you already use a lot.
               </p>
             </div>
@@ -879,13 +879,13 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 <div className={cn(QUEST_FORM_STYLES.sectionCard, "px-4 py-4")}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="font-fredoka text-[1.05rem] text-white">Your templates</p>
-                      <p className="text-xs text-white/60">Saved templates and repeat quests you can reuse fast</p>
+                      <p className="font-fredoka text-[1.05rem] text-[#4f240c]">Your templates</p>
+                      <p className="text-xs text-[#7f4a1d]/80">Saved templates and repeat quests you can reuse fast</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => openTemplateBrowser("yours")}
-                      className="text-xs font-semibold text-white/72 transition-colors hover:text-white"
+                      className="text-xs font-semibold text-[#6b3416] transition-colors hover:text-[#4f240c]"
                     >
                       See all
                     </button>
@@ -901,7 +901,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                           QUEST_FORM_STYLES.sectionCardSoft,
                         )}
                       >
-                        <span className="line-clamp-2 text-sm font-semibold text-white">{template.title}</span>
+                        <span className="line-clamp-2 text-sm font-semibold text-[#4f240c]">{template.title}</span>
                         <span className={cn("mt-2", QUEST_FORM_STYLES.subtleBadge)}>
                           {template.templateOrigin === "personal_explicit" ? "Saved" : `${template.frequency}x`}
                         </span>
@@ -914,7 +914,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
                   <PopoverTrigger asChild>
                     <button className={cn(
-                      "flex items-center justify-center gap-2 text-sm font-semibold text-white",
+                      "flex items-center justify-center gap-2 text-sm font-semibold",
                       QUEST_FORM_STYLES.selectorChip,
                       taskDate
                         ? ""
@@ -1012,18 +1012,18 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               <div className={cn(QUEST_FORM_STYLES.sectionCard, "overflow-hidden")}>
                 {subtasks.map((st, idx) => (
                   <div key={idx} className={cn("group flex items-center gap-2 px-4 py-3", `border-b ${QUEST_FORM_STYLES.divider}`)}>
-                    <Checkbox disabled className="h-4 w-4 border-white/18 opacity-60" />
+                    <Checkbox disabled className="h-4 w-4 border-[#6b3416]/45 opacity-60" />
                     <input
                       ref={(el) => { subtaskInputRefs.current[idx] = el; }}
                       value={st}
                       onChange={(e) => handleSubtaskChange(idx, e.target.value)}
                       onKeyDown={(e) => handleSubtaskKeyDown(idx, e)}
                       placeholder="Subtask"
-                      className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/42"
+                      className="flex-1 bg-transparent text-sm text-[#4f240c] outline-none placeholder:text-[#9a6d47]"
                     />
                     <button
                       onClick={() => handleDeleteSubtask(idx)}
-                      className="rounded-full p-1 opacity-0 transition-all hover:bg-white/[0.08] text-white/44 hover:text-white group-hover:opacity-100"
+                      className="rounded-full p-1 text-[#7f4a1d]/60 opacity-0 transition-all hover:bg-white/55 hover:text-[#4f240c] group-hover:opacity-100"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -1040,17 +1040,17 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                       handleAddSubtaskRow();
                     }
                   }}
-                  className={cn("flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-white/[0.05]", `border-b ${QUEST_FORM_STYLES.divider}`)}
+                  className={cn("flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-white/55", `border-b ${QUEST_FORM_STYLES.divider}`)}
                 >
-                  <Checkbox disabled className="h-4 w-4 border-white/14 opacity-40" />
-                  <span className="text-sm text-white/48">Add Subtask</span>
+                  <Checkbox disabled className="h-4 w-4 border-[#6b3416]/35 opacity-40" />
+                  <span className="text-sm text-[#7f4a1d]/70">Add Subtask</span>
                 </div>
 
                 <Textarea
                   value={moreInformation || ""}
                   onChange={(e) => setMoreInformation(e.target.value || null)}
                   placeholder="Add notes, meeting links or phone numbers..."
-                  className="min-h-[88px] border-0 rounded-none bg-transparent resize-none px-4 py-4 text-sm text-white placeholder:text-white/42 focus-visible:ring-0 focus-visible:ring-offset-0"
+                  className="min-h-[88px] border-0 rounded-none bg-transparent resize-none px-4 py-4 text-sm text-[#4f240c] placeholder:text-[#9a6d47] focus-visible:ring-0 focus-visible:ring-offset-0"
                   style={{ touchAction: "pan-y", WebkitTapHighlightColor: "transparent" }}
                   data-vaul-no-drag
                 />
@@ -1165,17 +1165,17 @@ export const AddQuestSheet = memo(function AddQuestSheet({
           <div
             className={cn(
               "flex-shrink-0 flex flex-col gap-3 px-5 pt-4",
-              isDesktopPanel ? `${QUEST_FORM_STYLES.desktopPanelFooter} pb-5` : "border-t border-white/8 pb-6",
+              isDesktopPanel ? `${QUEST_FORM_STYLES.desktopPanelFooter} pb-5` : "border-t-[3px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,248,225,0.18),rgba(255,193,90,0.14))] pb-6",
             )}
           >
             <div className={QUEST_FORM_STYLES.footerReview}>
-              <p className="text-xs text-white/74">
+              <p className="text-xs text-[#5d2a0f]">
                 {reviewTitle} · {reviewTimeLabel} · {reviewDateLabel}
               </p>
             </div>
             {canShowCalendarSendOption && (
               <div className={cn(QUEST_FORM_STYLES.sectionCardSoft, "flex items-center justify-between px-4 py-3")}>
-                <div className="text-xs text-white/62">
+                <div className="text-xs text-[#7f4a1d]/80">
                   Send to {effectiveProvider === "apple" ? "Apple" : effectiveProvider === "google" ? "Google" : "Outlook"} Calendar after create
                 </div>
                 <Switch checked={sendToCalendar} onCheckedChange={setSendToCalendar} />

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { TIME_SLOTS, generateTimeSlots, getNextHalfHourTime } from "./quest-shared";
+import {
+  DIFFICULTY_COLORS,
+  TIME_SLOTS,
+  generateTimeSlots,
+  getNextHalfHourTime,
+  getQuestDifficultyIconClasses,
+  getQuestOptionPillClasses,
+} from "./quest-shared";
 
 const toMinutes = (time: string) => {
   const [hours, minutes] = time.split(":").map(Number);
@@ -27,5 +34,23 @@ describe("quest-shared time slots", () => {
 
   it("rolls over to 00:00 when rounding late-night times", () => {
     expect(getNextHalfHourTime(new Date("2026-02-16T23:46:00"))).toBe("00:00");
+  });
+});
+
+describe("quest-shared warm editor classes", () => {
+  it("lets active option pill tones own their text color", () => {
+    const classes = getQuestOptionPillClasses(true, DIFFICULTY_COLORS.medium.pill);
+
+    expect(classes).toContain("text-[#3c1f10]");
+    expect(classes).not.toContain("text-white");
+  });
+
+  it("uses warm inactive icon contrast for difficulty bubbles", () => {
+    const classes = getQuestDifficultyIconClasses("medium", false);
+
+    expect(classes).toContain("border-[#6b3416]/35");
+    expect(classes).toContain("bg-white/55");
+    expect(classes).toContain("text-[#7f4a1d]/80");
+    expect(classes).not.toContain("text-white");
   });
 });

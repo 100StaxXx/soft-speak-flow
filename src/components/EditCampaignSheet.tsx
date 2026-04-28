@@ -13,11 +13,14 @@ import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { EditRitualSheet, type RitualData } from "@/components/EditRitualSheet";
 import { RescheduleDrawer } from "@/components/RescheduleDrawer";
+import { plannerPathfinderTheme } from "@/components/companion/plannerPathfinderTheme";
+import { DIFFICULTY_COLORS } from "@/components/quest-shared";
 import { useAuth } from "@/hooks/useAuth";
 import { useEpics } from "@/hooks/useEpics";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveEpicEndDate } from "@/utils/epicDates";
 import { toast } from "@/components/ui/sonner";
+import { cn } from "@/lib/utils";
 
 type CampaignHabit = {
   habit_id: string;
@@ -53,7 +56,74 @@ interface EditCampaignSheetProps {
   onDeleted?: () => void;
 }
 
+type EditCampaignSheetDependencies = {
+  activeEpics: EditCampaignSheetEpic[];
+  updateEpic: (params: {
+    epicId: string;
+    updates: {
+      title: string;
+      description: string | null;
+    };
+  }) => Promise<void>;
+  deleteEpic: (params: { epicId: string }) => Promise<void>;
+  createCampaignRitual: (params: {
+    epicId: string;
+    title: string;
+    difficulty: "easy" | "medium" | "hard";
+    frequency: string;
+    customDays: number[];
+  }) => Promise<void>;
+  deleteRitual: (habitId: string) => Promise<boolean>;
+};
+
+interface EditCampaignSheetFrameProps extends EditCampaignSheetProps {
+  dependencies: EditCampaignSheetDependencies;
+  visualPreview?: boolean;
+}
+
 const DEFAULT_RITUAL_DAYS = [0, 1, 2, 3, 4, 5, 6];
+
+const createPreviewCampaignEpic = (): EditCampaignSheetEpic => ({
+  id: "test-scroll-campaign-preview",
+  title: "Companion Planner Sprint",
+  description: "A local-only visual fixture for checking the warm campaign editor shell.",
+  target_days: 30,
+  start_date: "2026-04-01",
+  end_date: "2026-04-30",
+  status: "active",
+  epic_habits: [
+    {
+      habit_id: "test-scroll-ritual-focus",
+      habits: {
+        id: "test-scroll-ritual-focus",
+        title: "Morning focus ritual",
+        description: "Open the day with one intentional planning block.",
+        difficulty: "medium",
+        frequency: "daily",
+        custom_days: [],
+        custom_month_days: null,
+        preferred_time: "08:30",
+        estimated_minutes: 25,
+        category: "mind",
+      },
+    },
+    {
+      habit_id: "test-scroll-ritual-review",
+      habits: {
+        id: "test-scroll-ritual-review",
+        title: "Evening review",
+        description: "Close the loop and choose tomorrow's first move.",
+        difficulty: "easy",
+        frequency: "custom",
+        custom_days: [1, 3, 5],
+        custom_month_days: null,
+        preferred_time: "18:00",
+        estimated_minutes: 15,
+        category: "soul",
+      },
+    },
+  ],
+});
 
 export function EditCampaignSheet({
   epic,
@@ -70,9 +140,141 @@ export function EditCampaignSheet({
     createCampaignRitual,
   } = useEpics();
 
+  const deleteRitual = async (habitId: string) => {
+    if (!user?.id) return false;
+
+    const { error: habitError } = await supabase
+      .from("habits")
+      .delete()
+      .eq("id", habitId)
+      .eq("user_id", user.id);
+
+    if (habitError) throw habitError;
+
+    const { error: tasksError } = await supabase
+      .from("daily_tasks")
+      .delete()
+      .eq("habit_source_id", habitId)
+      .eq("user_id", user.id)
+      .eq("completed", false);
+
+    if (tasksError) {
+      console.error("Error deleting linked tasks:", tasksError);
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["habits"] });
+    queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+    queryClient.invalidateQueries({ queryKey: ["epics"] });
+
+    return true;
+  };
+
+  return (
+    <EditCampaignSheetFrame
+      epic={epic}
+      open={open}
+      onOpenChange={onOpenChange}
+      onDeleted={onDeleted}
+      dependencies={{
+        activeEpics,
+        updateEpic,
+        deleteEpic,
+        createCampaignRitual,
+        deleteRitual,
+      }}
+    />
+  );
+}
+
+export function EditCampaignSheetPreview({
+  open,
+  onOpenChange,
+}: Pick<EditCampaignSheetProps, "open" | "onOpenChange">) {
+  const [previewEpic, setPreviewEpic] = useState<EditCampaignSheetEpic>(() => createPreviewCampaignEpic());
+
+  useEffect(() => {
+    if (open && !previewEpic) {
+      setPreviewEpic(createPreviewCampaignEpic());
+    }
+  }, [open, previewEpic]);
+
+  const previewDependencies = useMemo<EditCampaignSheetDependencies>(() => ({
+    activeEpics: previewEpic ? [previewEpic] : [],
+    updateEpic: async ({ updates }) => {
+      setPreviewEpic((current) => current
+        ? {
+          ...current,
+          title: updates.title,
+          description: updates.description,
+        }
+        : current);
+    },
+    deleteEpic: async () => {
+      setPreviewEpic(null);
+    },
+    createCampaignRitual: async ({ title, difficulty, frequency, customDays }) => {
+      setPreviewEpic((current) => {
+        if (!current) return current;
+
+        const ritualId = `test-scroll-ritual-${Date.now()}`;
+        return {
+          ...current,
+          epic_habits: [
+            ...(current.epic_habits ?? []),
+            {
+              habit_id: ritualId,
+              habits: {
+                id: ritualId,
+                title,
+                description: "Local-only preview ritual.",
+                difficulty,
+                frequency,
+                custom_days: customDays,
+                custom_month_days: null,
+                preferred_time: null,
+                estimated_minutes: 20,
+                category: "mind",
+              },
+            },
+          ],
+        };
+      });
+    },
+    deleteRitual: async (habitId) => {
+      setPreviewEpic((current) => current
+        ? {
+          ...current,
+          epic_habits: (current.epic_habits ?? []).filter((link) => link.habit_id !== habitId),
+        }
+        : current);
+
+      return true;
+    },
+  }), [previewEpic]);
+
+  return (
+    <EditCampaignSheetFrame
+      epic={previewEpic}
+      open={open}
+      onOpenChange={onOpenChange}
+      onDeleted={() => setPreviewEpic(createPreviewCampaignEpic())}
+      dependencies={previewDependencies}
+      visualPreview
+    />
+  );
+}
+
+function EditCampaignSheetFrame({
+  epic,
+  open,
+  onOpenChange,
+  onDeleted,
+  dependencies,
+  visualPreview = false,
+}: EditCampaignSheetFrameProps) {
   const currentEpic = useMemo(
-    () => activeEpics.find((candidate) => candidate.id === epic?.id) ?? epic,
-    [activeEpics, epic],
+    () => dependencies.activeEpics.find((candidate) => candidate.id === epic?.id) ?? epic,
+    [dependencies.activeEpics, epic],
   );
 
   const [title, setTitle] = useState("");
@@ -138,7 +340,7 @@ export function EditCampaignSheet({
 
     setIsSaving(true);
     try {
-      await updateEpic({
+      await dependencies.updateEpic({
         epicId: currentEpic.id,
         updates: {
           title: trimmedTitle,
@@ -155,7 +357,7 @@ export function EditCampaignSheet({
 
     setIsDeletingCampaign(true);
     try {
-      await deleteEpic({ epicId: currentEpic.id });
+      await dependencies.deleteEpic({ epicId: currentEpic.id });
       setShowDeleteConfirm(false);
       onOpenChange(false);
       onDeleted?.();
@@ -165,34 +367,12 @@ export function EditCampaignSheet({
   };
 
   const handleDeleteRitual = async (habitId: string) => {
-    if (!user?.id) return;
-
     setIsDeletingRitual(true);
     try {
-      const { error: habitError } = await supabase
-        .from("habits")
-        .delete()
-        .eq("id", habitId)
-        .eq("user_id", user.id);
-
-      if (habitError) throw habitError;
-
-      const { error: tasksError } = await supabase
-        .from("daily_tasks")
-        .delete()
-        .eq("habit_source_id", habitId)
-        .eq("user_id", user.id)
-        .eq("completed", false);
-
-      if (tasksError) {
-        console.error("Error deleting linked tasks:", tasksError);
+      const didDelete = await dependencies.deleteRitual(habitId);
+      if (didDelete) {
+        toast.success("Ritual deleted");
       }
-
-      queryClient.invalidateQueries({ queryKey: ["habits"] });
-      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["epics"] });
-
-      toast.success("Ritual deleted");
     } catch (error) {
       console.error("Error deleting ritual:", error);
       toast.error("Failed to delete ritual");
@@ -207,7 +387,7 @@ export function EditCampaignSheet({
 
     setIsAddingRitual(true);
     try {
-      await createCampaignRitual({
+      await dependencies.createCampaignRitual({
         epicId: currentEpic.id,
         title: newRitualTitle.trim(),
         difficulty: newRitualDifficulty,
@@ -226,77 +406,102 @@ export function EditCampaignSheet({
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="bottom" className="flex h-[88dvh] max-h-[88dvh] flex-col overflow-hidden rounded-t-3xl px-0 pb-0">
-          <SheetHeader className="px-6 pb-0">
-            <SheetTitle className="flex items-center gap-2">
-              <Pencil className="h-5 w-5 text-primary" />
-              Edit Campaign
-            </SheetTitle>
-            <SheetDescription>
-              Update campaign details, manage linked rituals, or permanently delete this campaign.
-            </SheetDescription>
+        <SheetContent
+          side="bottom"
+          className={cn(
+            plannerPathfinderTheme.shell,
+            "fixed flex h-[88dvh] max-h-[88dvh] flex-col overflow-hidden rounded-t-[2.25rem] px-0 pb-0",
+          )}
+          data-testid="edit-campaign-sheet-shell"
+        >
+          <div className={plannerPathfinderTheme.shellGloss} />
+          <div className={plannerPathfinderTheme.shellGlow} />
+
+          <SheetHeader className="relative z-10 px-4 pt-4 sm:px-5 sm:pt-5">
+            <div className={plannerPathfinderTheme.headerBar}>
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#b04b12] shadow-[0_5px_0_rgba(77,40,17,0.45)]">
+                <Pencil className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 text-left">
+                <SheetTitle className="text-xl text-white">
+                  Edit Campaign
+                </SheetTitle>
+                <SheetDescription className="text-sm text-white/[0.68]">
+                  Update campaign details, manage linked rituals, or permanently delete this campaign.
+                </SheetDescription>
+              </div>
+            </div>
           </SheetHeader>
 
-          <ScrollArea className="mt-4 min-h-0 flex-1 px-6">
-            <div className="space-y-8 pb-6" data-vaul-no-drag>
-              <section className="space-y-4">
+          <ScrollArea className={cn("relative z-10 mx-4 mt-3 min-h-0 flex-1 rounded-[2rem] border-[4px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,248,225,0.9),rgba(255,216,128,0.82))] shadow-[0_12px_0_rgba(77,40,17,0.84)] sm:mx-5")}>
+            <div className="space-y-5 px-4 py-4 text-[#4f240c] sm:px-5" data-vaul-no-drag>
+              <section className={cn(plannerPathfinderTheme.raisedPanel, "space-y-4 p-4")}>
                 <div className="space-y-2">
-                  <Label htmlFor="campaign-title">Campaign name</Label>
+                  <Label htmlFor="campaign-title" className="text-[#5d2a0f]">Campaign name</Label>
                   <Input
                     id="campaign-title"
                     value={title}
                     onChange={(event) => setTitle(event.target.value)}
                     placeholder="Name your campaign"
+                    className={plannerPathfinderTheme.textField}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="campaign-description">Description</Label>
+                  <Label htmlFor="campaign-description" className="text-[#5d2a0f]">Description</Label>
                   <Textarea
                     id="campaign-description"
                     value={description}
                     onChange={(event) => setDescription(event.target.value)}
                     placeholder="What is this campaign about?"
                     rows={4}
+                    className={plannerPathfinderTheme.textField}
                   />
                 </div>
               </section>
 
-              <section className="space-y-3 rounded-2xl border border-border/40 bg-card/40 p-4">
+              <section className={cn(plannerPathfinderTheme.mutedPanel, "space-y-3 p-4")}>
                 <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-primary" />
+                  <Calendar className="h-4 w-4 text-[#8d481c]" />
                   <h3 className="text-sm font-semibold">Timeline</h3>
                 </div>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-[#7f4a1d]/80">
                   {resolvedEndDate
                     ? `Deadline: ${new Date(resolvedEndDate).toLocaleDateString()}`
                     : "No deadline is set for this campaign yet."}
                 </p>
                 {currentEpic && resolvedEndDate ? (
-                  <RescheduleDrawer
-                    epicId={currentEpic.id}
-                    epicTitle={currentEpic.title}
-                    epicGoal={currentEpic.description ?? undefined}
-                    currentDeadline={resolvedEndDate}
-                  >
-                    <Button type="button" variant="outline" className="gap-2">
+                  visualPreview ? (
+                    <Button type="button" variant="outline" className={cn(plannerPathfinderTheme.outlineButton, "gap-2")}>
                       <Wand2 className="h-4 w-4" />
                       Adjust timeline
                     </Button>
-                  </RescheduleDrawer>
+                  ) : (
+                    <RescheduleDrawer
+                      epicId={currentEpic.id}
+                      epicTitle={currentEpic.title}
+                      epicGoal={currentEpic.description ?? undefined}
+                      currentDeadline={resolvedEndDate}
+                    >
+                      <Button type="button" variant="outline" className={cn(plannerPathfinderTheme.outlineButton, "gap-2")}>
+                        <Wand2 className="h-4 w-4" />
+                        Adjust timeline
+                      </Button>
+                    </RescheduleDrawer>
+                  )
                 ) : null}
               </section>
 
-              <section className="space-y-4 rounded-2xl border border-border/40 bg-card/40 p-4">
+              <section className={cn(plannerPathfinderTheme.raisedPanel, "space-y-4 p-4")}>
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <Repeat className="h-4 w-4 text-primary" />
+                    <Repeat className="h-4 w-4 text-[#8d481c]" />
                     <h3 className="text-sm font-semibold">Rituals</h3>
                   </div>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="gap-2"
+                    className={cn(plannerPathfinderTheme.outlineButton, "gap-2")}
                     onClick={() => setShowAddRitual((current) => !current)}
                   >
                     <Plus className="h-4 w-4" />
@@ -305,28 +510,32 @@ export function EditCampaignSheet({
                 </div>
 
                 {showAddRitual ? (
-                  <div className="space-y-4 rounded-2xl border border-dashed border-border/50 bg-background/40 p-4">
+                  <div className={cn(plannerPathfinderTheme.mutedPanel, "space-y-4 border-dashed p-4")}>
                     <div className="space-y-2">
-                      <Label htmlFor="new-ritual-title">Ritual name</Label>
+                      <Label htmlFor="new-ritual-title" className="text-[#5d2a0f]">Ritual name</Label>
                       <Input
                         id="new-ritual-title"
                         value={newRitualTitle}
                         onChange={(event) => setNewRitualTitle(event.target.value)}
                         placeholder="Add a campaign ritual"
+                        className={plannerPathfinderTheme.textField}
                       />
                     </div>
                     <HabitDifficultySelector
                       value={newRitualDifficulty}
                       onChange={setNewRitualDifficulty}
+                      variant="planner"
                     />
                     <FrequencyPicker
                       selectedDays={newRitualDays}
                       onDaysChange={setNewRitualDays}
+                      variant="quest-soft"
+                      activeTone={DIFFICULTY_COLORS.medium.pill}
                     />
                     <div className="flex gap-3">
                       <Button
                         type="button"
-                        className="gap-2"
+                        className={cn(plannerPathfinderTheme.primaryButton, "gap-2")}
                         disabled={isAddingRitual || newRitualTitle.trim().length === 0 || newRitualDays.length === 0}
                         onClick={handleAddRitual}
                       >
@@ -337,6 +546,7 @@ export function EditCampaignSheet({
                         type="button"
                         variant="ghost"
                         disabled={isAddingRitual}
+                        className="text-[#6b3416] hover:bg-white/55 hover:text-[#4f240c]"
                         onClick={() => {
                           setShowAddRitual(false);
                           setNewRitualTitle("");
@@ -356,8 +566,13 @@ export function EditCampaignSheet({
                       <button
                         key={ritual.id}
                         type="button"
-                        className="flex w-full items-center justify-between rounded-2xl border border-border/40 bg-background/40 px-4 py-3 text-left transition-colors hover:border-primary/40 hover:bg-background/70"
+                        className={cn(
+                          plannerPathfinderTheme.mutedPanel,
+                          "flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-transform hover:-translate-y-0.5 hover:bg-white/75",
+                        )}
                         onClick={() => {
+                          if (visualPreview) return;
+
                           setEditingRitual({
                             habitId: ritual.id,
                             title: ritual.title,
@@ -374,27 +589,27 @@ export function EditCampaignSheet({
                       >
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium">{ritual.title}</p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-[#7f4a1d]/80">
                             {ritual.frequency ?? "daily"}
                           </p>
                         </div>
-                        <Pencil className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <Pencil className="h-4 w-4 shrink-0 text-[#8d481c]" />
                       </button>
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-border/50 bg-background/30 px-4 py-6 text-center text-sm text-muted-foreground">
+                  <div className="rounded-[1.5rem] border-[3px] border-dashed border-[#6b3416] bg-white/45 px-4 py-6 text-center text-sm text-[#7f4a1d]/80">
                     No rituals are linked to this campaign yet.
                   </div>
                 )}
               </section>
 
-              <section className="space-y-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
+              <section className="space-y-3 rounded-[1.5rem] border-[3px] border-[#8a2716] bg-[#ffd9bf] p-4 text-[#8a2716] shadow-[0_8px_0_rgba(154,71,24,0.18)]">
                 <div className="flex items-center gap-2">
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                  <h3 className="text-sm font-semibold text-destructive">Danger zone</h3>
+                  <Trash2 className="h-4 w-4" />
+                  <h3 className="text-sm font-semibold">Danger zone</h3>
                 </div>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-[#8a2716]/80">
                   Permanently delete this campaign, its linked rituals, and any incomplete ritual tasks.
                 </p>
                 <Button
@@ -411,18 +626,19 @@ export function EditCampaignSheet({
             </div>
           </ScrollArea>
 
-          <SheetFooter className="shrink-0 border-t border-border/40 px-6 pb-safe pt-4">
+          <SheetFooter className={cn(plannerPathfinderTheme.footerBar, "relative z-10 shrink-0 px-4 pb-safe pt-4 sm:px-5")}>
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={isSaving || isDeletingCampaign}
+              className={plannerPathfinderTheme.outlineButton}
             >
               Close
             </Button>
             <Button
               type="button"
-              className="gap-2"
+              className={cn(plannerPathfinderTheme.primaryButton, "gap-2")}
               disabled={!currentEpic || !trimmedTitle || !hasChanges || isSaving || isDeletingCampaign}
               onClick={handleSave}
             >
@@ -433,17 +649,19 @@ export function EditCampaignSheet({
         </SheetContent>
       </Sheet>
 
-      <EditRitualSheet
-        ritual={editingRitual}
-        open={!!editingRitual}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) {
-            setEditingRitual(null);
-          }
-        }}
-        onDelete={handleDeleteRitual}
-        isDeleting={isDeletingRitual}
-      />
+      {!visualPreview ? (
+        <EditRitualSheet
+          ritual={editingRitual}
+          open={!!editingRitual}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              setEditingRitual(null);
+            }
+          }}
+          onDelete={handleDeleteRitual}
+          isDeleting={isDeletingRitual}
+        />
+      ) : null}
 
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>

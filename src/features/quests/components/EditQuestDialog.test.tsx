@@ -131,7 +131,7 @@ describe("EditQuestDialog", () => {
     expect(screen.getByRole("button", { name: "Save Changes" })).toBeEnabled();
   });
 
-  it("colors the Save Changes CTA green when easy is selected", () => {
+  it("uses the companion primary CTA style when easy is selected", () => {
     render(
       <EditQuestDialog
         task={legacyTask}
@@ -149,7 +149,7 @@ describe("EditQuestDialog", () => {
     expectElementToIncludeClasses(saveButton, DIFFICULTY_COLORS.easy.primaryButton);
   });
 
-  it("colors the Save Changes CTA orange when medium is selected", () => {
+  it("uses the companion primary CTA style when medium is selected", () => {
     render(
       <EditQuestDialog
         task={legacyTask}
@@ -180,6 +180,10 @@ describe("EditQuestDialog", () => {
     );
 
     expect(screen.getByTestId("edit-quest-desktop-panel")).toBeInTheDocument();
+    expectElementToIncludeClasses(
+      screen.getByTestId("edit-quest-desktop-panel"),
+      "border-[#4d2811] text-[#4f240c]",
+    );
     expect(screen.queryByTestId("edit-quest-mobile-sheet")).not.toBeInTheDocument();
     expect(screen.getByDisplayValue("Legacy quest")).toBeInTheDocument();
   });

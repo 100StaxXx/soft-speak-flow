@@ -57,20 +57,20 @@ export function QuestAttachmentPicker({
           className={cn(
             "gap-2",
             isQuestSoft
-              ? "rounded-[16px] border-white/8 bg-white/[0.05] text-white/82 shadow-[0_8px_14px_rgba(0,0,0,0.12)] hover:bg-white/[0.08] hover:text-white"
+              ? "rounded-[16px] border-[3px] border-[#6b3416] bg-white/60 text-[#6b3416] shadow-[0_4px_0_rgba(77,40,17,0.16)] hover:bg-white/75 hover:text-[#4f240c]"
               : "",
           )}
         >
           {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
           {isUploading ? "Uploading..." : "Add Photo/File"}
         </Button>
-        <span className={cn("text-xs", isQuestSoft ? "text-white/54" : "text-muted-foreground")}>
+        <span className={cn("text-xs", isQuestSoft ? "text-[#7f4a1d]/80" : "text-muted-foreground")}>
           {attachments.length}/{MAX_ATTACHMENTS_PER_TASK}
         </span>
       </div>
 
       {helperText && (
-        <p className={cn("text-xs", isQuestSoft ? "text-white/54" : "text-muted-foreground")}>Up to 10 files, 10MB each.</p>
+        <p className={cn("text-xs", isQuestSoft ? "text-[#7f4a1d]/80" : "text-muted-foreground")}>Up to 10 files, 10MB each.</p>
       )}
 
       {attachments.length > 0 && (
@@ -81,7 +81,7 @@ export function QuestAttachmentPicker({
               className={cn(
                 "relative p-2",
                 isQuestSoft
-                  ? "rounded-[16px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.025))] shadow-[0_8px_16px_rgba(0,0,0,0.12)]"
+                  ? "rounded-[16px] border-[3px] border-[#6b3416]/60 bg-white/55 shadow-[0_4px_0_rgba(77,40,17,0.16)]"
                   : "rounded-lg border border-border/60 bg-card",
               )}
             >
@@ -91,7 +91,7 @@ export function QuestAttachmentPicker({
                 className={cn(
                   "absolute right-1 top-1 rounded-full p-1",
                   isQuestSoft
-                    ? "bg-black/18 text-white/60 hover:bg-black/28 hover:text-white"
+                    ? "bg-white/75 text-[#7f4a1d] hover:bg-white hover:text-[#4f240c]"
                     : "bg-background/80 text-muted-foreground hover:text-destructive",
                 )}
                 aria-label={`Remove ${attachment.fileName}`}
@@ -114,20 +114,20 @@ export function QuestAttachmentPicker({
                   rel="noreferrer"
                   className={cn(
                     "flex h-16 items-center justify-center rounded",
-                    isQuestSoft ? "bg-white/[0.08]" : "bg-muted/30",
+                    isQuestSoft ? "bg-white/55" : "bg-muted/30",
                   )}
                 >
-                  <FileText className={cn("h-5 w-5", isQuestSoft ? "text-white/58" : "text-muted-foreground")} />
+                  <FileText className={cn("h-5 w-5", isQuestSoft ? "text-[#7f4a1d]/80" : "text-muted-foreground")} />
                 </a>
               )}
 
               <div className="mt-2 flex items-center gap-1">
                 {attachment.isImage ? (
-                  <FileImage className={cn("h-3.5 w-3.5", isQuestSoft ? "text-white/58" : "text-muted-foreground")} />
+                  <FileImage className={cn("h-3.5 w-3.5", isQuestSoft ? "text-[#7f4a1d]/80" : "text-muted-foreground")} />
                 ) : (
-                  <FileText className={cn("h-3.5 w-3.5", isQuestSoft ? "text-white/58" : "text-muted-foreground")} />
+                  <FileText className={cn("h-3.5 w-3.5", isQuestSoft ? "text-[#7f4a1d]/80" : "text-muted-foreground")} />
                 )}
-                <span className={cn("truncate text-xs", isQuestSoft ? "text-white/66" : "text-muted-foreground")}>{attachment.fileName}</span>
+                <span className={cn("truncate text-xs", isQuestSoft ? "text-[#6b3416]" : "text-muted-foreground")}>{attachment.fileName}</span>
               </div>
             </div>
           ))}

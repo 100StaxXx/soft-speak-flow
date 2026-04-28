@@ -106,34 +106,34 @@ export function getSchedulingFieldStyles(variant: SchedulingFieldVariant) {
       label: QUEST_FORM_STYLES.label,
       trigger:
         cn(
-          "w-full flex items-center justify-center gap-2 text-sm font-semibold text-white",
+          "w-full flex items-center justify-center gap-2 text-sm font-semibold",
           QUEST_FORM_STYLES.selectorChip,
         ),
-      triggerOpen: "border-white/18",
+      triggerOpen: "border-[#4d2811]",
       triggerMuted: QUEST_FORM_STYLES.selectorChipMuted,
       triggerRow: "flex gap-2",
       triggerIcon: "h-4 w-4",
       panel: "space-y-2",
-      input: "h-11 rounded-[20px] border-white/10 bg-white/[0.08] text-base text-white placeholder:text-white/42",
+      input: "h-11 rounded-[20px] border-[3px] border-[#6b3416] bg-white/80 text-base text-[#4d2811] placeholder:text-[#9a6d47]",
       wheel: QUEST_FORM_STYLES.timeWheel,
       wheelFadeTop: QUEST_FORM_STYLES.timeWheelFadeTop,
       wheelFadeBottom: QUEST_FORM_STYLES.timeWheelFadeBottom,
       wheelInner: "flex flex-col items-center py-1",
       wheelSlot:
         "my-0.5 w-[85%] rounded-[20px] py-2.5 text-center text-sm font-semibold snap-center transition-all duration-150 motion-reduce:transition-none",
-      wheelSlotInactive: "text-white/74 hover:bg-white/[0.08]",
+      wheelSlotInactive: "text-[#7f4a1d]/82 hover:bg-white/55",
       durationTrigger:
         cn(
-          "w-full flex items-center justify-between text-white",
+          "w-full flex items-center justify-between",
           QUEST_FORM_STYLES.selectorChip,
         ),
       durationTriggerContent: "flex items-center gap-2.5 text-sm font-semibold",
-      chevron: "h-4 w-4 text-white/52 transition-transform",
+      chevron: "h-4 w-4 text-[#7f4a1d]/72 transition-transform",
       chipsWrapper: "space-y-2 px-1",
       chipsRow: "flex gap-2 flex-wrap",
       customPanel: cn("flex items-center gap-2 rounded-[20px] px-3 py-2", QUEST_FORM_STYLES.insetPanel),
-      customInput: "h-10 w-28 border-white/10 bg-white/[0.08] text-sm text-white",
-      customSuffix: "text-xs text-white/58",
+      customInput: "h-10 w-28 border-[3px] border-[#6b3416] bg-white/80 text-sm text-[#4d2811]",
+      customSuffix: "text-xs text-[#7f4a1d]/80",
     } as const;
   }
 

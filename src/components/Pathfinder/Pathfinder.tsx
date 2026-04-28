@@ -600,9 +600,9 @@ export function Pathfinder({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl border-none bg-transparent p-0 shadow-none" hideCloseButton>
+      <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] border-none bg-transparent p-0 shadow-none sm:max-w-3xl" hideCloseButton>
         <div
-          className={plannerPathfinderTheme.shell}
+          className={cn(plannerPathfinderTheme.shell, "mx-auto w-full")}
           data-tour="pathfinder-campaign-builder"
           data-testid="pathfinder-shell"
         >
