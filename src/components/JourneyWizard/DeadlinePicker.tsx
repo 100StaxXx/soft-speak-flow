@@ -24,7 +24,7 @@ const quickOptions = [
 export function DeadlinePicker({ value, onChange, minDate }: DeadlinePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   
-  const effectiveMinDate = minDate || addDays(new Date(), 7);
+  const effectiveMinDate = minDate || addDays(new Date(), 1);
   
   const daysUntilDeadline = value 
     ? differenceInDays(value, new Date())
