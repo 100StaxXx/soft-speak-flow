@@ -38,7 +38,7 @@ describe("companionImageFocal", () => {
     ).toMatchObject({
       focalSource: "manifest",
       style: {
-        transform: "translate(1.906%, 9.668%) scale(1.08)",
+        transform: "translate(1.906%, 9.668%)",
       },
     });
   });
@@ -64,7 +64,7 @@ describe("companionImageFocal", () => {
       focalSource: "manifest",
       assetKey: "companion-presets/buttercat/t1_youth/normal/buttercat__t1_youth__normal__fire.png",
       style: {
-        transform: "translate(0.000%, 2.930%) scale(1.08)",
+        transform: "translate(0.000%, 2.930%)",
       },
     });
   });
@@ -88,7 +88,7 @@ describe("companionImageFocal", () => {
       focalSource: "manifest",
       assetKey: "companion-presets/phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__nature.png",
       style: {
-        transform: "translate(-0.098%, 2.930%) scale(1.08)",
+        transform: "translate(-0.098%, 2.930%)",
       },
     });
   });
