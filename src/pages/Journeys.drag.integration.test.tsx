@@ -1895,7 +1895,7 @@ describe("Journeys row drag integration", () => {
     });
   });
 
-  it("keeps future selected date on app foreground visibility sync", async () => {
+  it("resets future selected date on app foreground visibility sync", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1917,9 +1917,8 @@ describe("Journeys row drag integration", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "set-future-day" }));
 
-    let futureDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
-      futureDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      const futureDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       const futureDate = new Date(futureDateIso);
       expect(futureDate.getTime()).toBeGreaterThan(Date.now());
       expect(isSameDay(futureDate, new Date())).toBe(false);
@@ -1930,8 +1929,8 @@ describe("Journeys row drag integration", () => {
     });
 
     await waitFor(() => {
-      const refreshedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(refreshedDateIso).toBe(futureDateIso);
+      const refreshedDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
+      expect(isSameDay(refreshedDate, new Date())).toBe(true);
     });
   });
 });
