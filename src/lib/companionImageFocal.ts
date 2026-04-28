@@ -142,9 +142,7 @@ const resolveCoverObjectPosition = ({
 const resolveContainTransform = (focalPoint: CompanionImageFocalPoint): string => {
   const translateX = (0.5 - focalPoint.x) * 100;
   const translateY = (0.5 - focalPoint.y) * 100;
-  const maxMagnitude = Math.max(Math.abs(translateX), Math.abs(translateY));
-  const scale = maxMagnitude > 0.5 ? 1.08 : 1;
-  return `translate(${translateX.toFixed(3)}%, ${translateY.toFixed(3)}%) scale(${scale})`;
+  return `translate(${translateX.toFixed(3)}%, ${translateY.toFixed(3)}%)`;
 };
 
 export const resolveCompanionImagePresentation = ({
