@@ -150,6 +150,14 @@ const MILESTONE_ID_SET = new Set<GuidedMilestoneId>([
 const isGuidedMilestoneId = (value: unknown): value is GuidedMilestoneId =>
   typeof value === "string" && MILESTONE_ID_SET.has(value as GuidedMilestoneId);
 
+export const MILESTONES_ALLOWING_TEMPORARY_HIDE = new Set<GuidedMilestoneId>([
+  "complete_companion_evolution",
+  "start_plan_my_day",
+  "answer_plan_day_ai",
+  "save_plan_day_action",
+  "first_plan_closeout_message",
+]);
+
 const getSafeMilestoneArray = (value: unknown): GuidedMilestoneId[] => {
   if (!Array.isArray(value)) return [];
   return value.filter(isGuidedMilestoneId);
@@ -2006,7 +2014,8 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     activeTargetSelectors: tutorialSuppressed ? [] : activeTargetSelectors,
     activeTargetSelector: tutorialSuppressed ? null : activeTargetSelector,
     isStrictLockActive: Boolean(isActive && activeTargetSelector && strictLockEnabled),
-    canTemporarilyHide: !tutorialSuppressed && currentMilestone === "complete_companion_evolution",
+    canTemporarilyHide: !tutorialSuppressed &&
+      MILESTONES_ALLOWING_TEMPORARY_HIDE.has(currentMilestone as GuidedMilestoneId),
     dialogueText: tutorialSuppressed ? "" : dialogue.text,
     dialogueSupportText: tutorialSuppressed ? undefined : dialogueSupportText,
     speakerName: personality?.name ?? "Your guide",

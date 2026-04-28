@@ -364,6 +364,7 @@ const JourneysCompanionOverlayBody = memo(({
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
   const transcriptScrollAreaRef = useRef<HTMLDivElement | null>(null);
+  const transcriptInnerRef = useRef<HTMLDivElement | null>(null);
   const handledQuestCaptureIntentIdRef = useRef<string | null>(null);
   const activeThreadSessionId = assistant.activeThread?.sessionId ?? null;
   const isQuestCaptureActive = Boolean(questCaptureIntentId);
@@ -445,6 +446,29 @@ const JourneysCompanionOverlayBody = memo(({
     displayMessages,
     keepBottomContentVisible,
   ]);
+
+  useEffect(() => {
+    if (typeof ResizeObserver === "undefined") return;
+    const inner = transcriptInnerRef.current;
+    const transcriptViewport = transcriptScrollAreaRef.current?.querySelector<
+      HTMLElement
+    >("[data-radix-scroll-area-viewport]");
+    if (!inner || !transcriptViewport) return;
+
+    const reanchorIfNearBottom = () => {
+      const distanceFromBottom = transcriptViewport.scrollHeight -
+        (transcriptViewport.scrollTop + transcriptViewport.clientHeight);
+      if (distanceFromBottom < 96) {
+        keepBottomContentVisible(prefersReducedMotion ? "auto" : "smooth");
+      }
+    };
+
+    const observer = new ResizeObserver(() => {
+      reanchorIfNearBottom();
+    });
+    observer.observe(inner);
+    return () => observer.disconnect();
+  }, [keepBottomContentVisible, prefersReducedMotion]);
 
   const syncComposerHeight = useCallback(() => {
     const composer = composerRef.current;
@@ -758,7 +782,12 @@ const JourneysCompanionOverlayBody = memo(({
         >
           <ScrollArea ref={transcriptScrollAreaRef} className="flex-1">
             <div
+              ref={transcriptInnerRef}
               className="space-y-3 p-4 sm:p-5"
+              style={{
+                paddingBottom:
+                  "calc(1rem + var(--mentor-guidance-bottom-inset, 0px))",
+              }}
               data-testid="journeys-companion-planner-transcript"
             >
               {displayMessages.map((entry) => (

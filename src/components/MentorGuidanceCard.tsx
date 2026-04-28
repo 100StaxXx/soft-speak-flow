@@ -8,6 +8,9 @@ const PANEL_GAP_PX = 12;
 const PANEL_TOP_MARGIN_PX = 12;
 const PANEL_TOP_SAFE_BUFFER_PX = 8;
 const PANEL_BASE_BOTTOM_PX = 0;
+const BOTTOM_INSET_CSS_VAR = "--mentor-guidance-bottom-inset";
+const BOTTOM_INSET_MAX_VIEWPORT_RATIO = 0.4;
+const BOTTOM_INSET_UPDATE_THRESHOLD_PX = 1;
 
 type PanelPlacement =
   | { anchor: "bottom"; bottomPx: number }
@@ -65,6 +68,43 @@ const parsePxValue = (value: string | null | undefined): number | null => {
   const parsed = Number.parseFloat(value);
   if (!Number.isFinite(parsed)) return null;
   return Math.max(0, parsed);
+};
+
+const readBottomInsetVarPx = (): number => {
+  if (typeof document === "undefined" || !document.documentElement) return 0;
+  return parsePxValue(document.documentElement.style.getPropertyValue(BOTTOM_INSET_CSS_VAR)) ?? 0;
+};
+
+const writeBottomInsetVar = (value: number): void => {
+  if (typeof document === "undefined" || !document.documentElement) return;
+  const next = Math.max(0, Math.round(value));
+  const current = readBottomInsetVarPx();
+  if (Math.abs(next - current) <= BOTTOM_INSET_UPDATE_THRESHOLD_PX) return;
+  document.documentElement.style.setProperty(BOTTOM_INSET_CSS_VAR, `${next}px`);
+};
+
+const clearBottomInsetVar = (): void => {
+  if (typeof document === "undefined" || !document.documentElement) return;
+  if (readBottomInsetVarPx() === 0) return;
+  document.documentElement.style.setProperty(BOTTOM_INSET_CSS_VAR, "0px");
+};
+
+export const resolveMentorGuidanceBottomInsetPx = ({
+  panelHeight,
+  viewportHeight,
+  anchor,
+  maxViewportRatio = BOTTOM_INSET_MAX_VIEWPORT_RATIO,
+}: {
+  panelHeight: number;
+  viewportHeight: number;
+  anchor: PanelPlacement["anchor"];
+  maxViewportRatio?: number;
+}): number => {
+  if (anchor !== "bottom") return 0;
+  if (!Number.isFinite(panelHeight) || panelHeight <= 0) return 0;
+  if (!Number.isFinite(viewportHeight) || viewportHeight <= 0) return 0;
+  const cap = Math.max(0, viewportHeight * maxViewportRatio);
+  return Math.max(0, Math.min(panelHeight, cap));
 };
 
 const readSafeAreaInsetTopPx = (): number => {
@@ -204,6 +244,14 @@ export const MentorGuidanceCard = () => {
       minTopPx,
     });
 
+    writeBottomInsetVar(
+      resolveMentorGuidanceBottomInsetPx({
+        panelHeight: panelRect.height,
+        viewportHeight: window.innerHeight,
+        anchor: next.anchor,
+      })
+    );
+
     setPlacement((prev) => (arePlacementsEqual(prev, next) ? prev : next));
   }, [activeTargetSelector, isActive]);
 
@@ -241,6 +289,18 @@ export const MentorGuidanceCard = () => {
     if (canTemporarilyHide) return;
     setIsTemporarilyHidden(false);
   }, [canTemporarilyHide]);
+
+  const isPanelVisible = Boolean(
+    isActive && dialogueText && !(canTemporarilyHide && isTemporarilyHidden)
+  );
+
+  useEffect(() => {
+    if (!isPanelVisible) {
+      clearBottomInsetVar();
+    }
+  }, [isPanelVisible]);
+
+  useEffect(() => () => clearBottomInsetVar(), []);
 
   const placementStyle = useMemo(
     () =>
