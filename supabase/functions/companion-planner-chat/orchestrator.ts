@@ -23,7 +23,6 @@ import type {
   PlannerProposal,
   PlannerQuestion,
   PlannerResponseMode,
-  PlannerTonePack,
 } from "./planner.ts";
 import {
   buildConfirmReadyPlannerReply,
@@ -215,8 +214,7 @@ const buildPlanDayContextForPrompt = (
   input: PlannerBuildInput,
   baseResult: PlannerBuildResult,
 ) => {
-  const isPlanDay =
-    input.plannerContext.starterIntent === "plan_day" ||
+  const isPlanDay = input.plannerContext.starterIntent === "plan_day" ||
     input.sessionState.pendingStarterIntent === "plan_day";
   if (!isPlanDay) return null;
   const targetDate = getPlanDayTargetDate(input);
@@ -228,7 +226,10 @@ const buildPlanDayContextForPrompt = (
     loadFacts: getPlanDayLoadFacts(input, loadBreakdown),
     atRiskCampaigns: getPlanDayAtRiskCampaignFacts(input),
     loadReason: buildPlanDayLoadReason(input, dateLabel, loadBreakdown),
-    atRiskLine: buildPlanDayCampaignGoalsAtRiskLine(input, baseResult.proposals),
+    atRiskLine: buildPlanDayCampaignGoalsAtRiskLine(
+      input,
+      baseResult.proposals,
+    ),
     plannedEnergy: input.sessionState.planDayEnergy ?? null,
     suggestedQuests: baseResult.proposals.map((proposal) => ({
       title: proposal.title,
@@ -401,6 +402,10 @@ const isPhaseADeterministicStarterResponse = (
       );
   }
 
+  if (starterIntent === "plan_day") {
+    return true;
+  }
+
   return false;
 };
 
@@ -429,335 +434,6 @@ const extractPreservedProposalReplyNotes = (
       /saved calendar event/i.test(segment) ||
       /external calendar events are read-only/i.test(segment)
     );
-
-// ─── AI-first handlers ────────────────────────────────────────────────────────
-
-type PlanDayQuestSuggestion = {
-  title: string;
-  type: "must" | "should" | "nice";
-  estimated_duration: string;
-  source: "campaign" | "habit" | "recovery" | "optimization";
-  reason: string;
-};
-
-type PlanDayAIOutput = {
-  mode: "clarify" | "suggest";
-  message: string;
-  day_assessment: string;
-  follow_up_question?: string | null;
-  suggested_quests: PlanDayQuestSuggestion[];
-};
-
-const buildPlanDaySystemPrompt = (tonePack: PlannerTonePack): string => {
-  const toneInstruction = tonePack === "witty_sassy"
-    ? "Voice: bold and a bit cheeky, but always supportive underneath."
-    : tonePack === "playful"
-    ? "Voice: lightly playful and friendly."
-    : "Voice: warm, grounded, and supportive.";
-
-  return [
-    "You are Cosmiq, a context-aware AI companion inside an app called Cosmiq.",
-    "Your job: analyze the user's full day context and either ask one useful clarifying question or suggest smart, realistic quests for the remaining part of their day.",
-    toneInstruction,
-    "Rules:",
-    "- If the user's direction or saved context is too thin, ask exactly one natural question instead of inventing quests",
-    "- If you suggest quests, suggest 1–4; each quest must be small, actionable, and fit within remaining time",
-    "- Ground every suggestion in real context: missed tasks → recovery, habits → consistency, campaigns → alignment",
-    "- Do NOT suggest hour-by-hour schedules or vague goals like 'be productive'",
-    "- Do NOT invent quests unrelated to the user's actual context",
-    "- message must be under 80 words, plain text, no markdown",
-    "Return minified JSON only with keys: mode, message, day_assessment, follow_up_question, suggested_quests",
-    "mode must be clarify or suggest",
-    "follow_up_question is required when mode is clarify and null otherwise",
-    "day_assessment must be one of: behind | open | productive | low_energy | busy",
-    "Each quest: { title, type (must|should|nice), estimated_duration (e.g. '45 min'), source (campaign|habit|recovery|optimization), reason }",
-  ].join("\n");
-};
-
-const buildPlanDayUserPrompt = (input: PlannerBuildInput): string => {
-  const ctx = input.plannerContext;
-  const now = new Date(input.currentDateTime);
-
-  const completedToday = ctx.tasks
-    .filter((t) => t.completed === true)
-    .slice(0, 8)
-    .map((t) => ({ title: t.title }));
-
-  const pendingToday = ctx.tasks
-    .filter((t) => t.completed !== true && t.taskDate === input.currentDate)
-    .slice(0, 10)
-    .map((t) => ({
-      title: t.title,
-      scheduledTime: t.scheduledTime,
-      estimatedDuration: t.estimatedDuration,
-      epicTitle: t.epicTitle ?? null,
-    }));
-
-  const missedTasks = ctx.tasks
-    .filter(
-      (t) =>
-        t.completed !== true &&
-        t.taskDate !== null &&
-        t.taskDate < input.currentDate,
-    )
-    .slice(0, 6)
-    .map((t) => ({ title: t.title, taskDate: t.taskDate }));
-
-  const remainingEvents = ctx.calendarEvents
-    .filter((e) => new Date(e.start) > now)
-    .slice(0, 5)
-    .map((e) => ({ title: e.title, start: e.start, end: e.end }));
-
-  return JSON.stringify({
-    currentTime: input.currentDateTime,
-    userMessage: input.message,
-    conversationHistory: input.conversationHistory.slice(-6),
-    completedToday,
-    pendingToday,
-    missedTasks,
-    remainingEventsToday: remainingEvents,
-    inboxQuests: ctx.inboxTasks.slice(0, 8).map((t) => ({
-      title: t.title,
-      epicTitle: t.epicTitle ?? null,
-    })),
-    activeCampaigns: ctx.activeEpics.slice(0, 5).map((e) => ({
-      title: e.title,
-      endDate: e.endDate,
-      progressPercentage: e.progressPercentage ?? null,
-    })),
-    habits: ctx.rituals.slice(0, 6).map((r) => ({
-      title: r.title,
-      epicTitle: r.epicTitle,
-      frequency: r.frequency,
-      currentStreak: r.currentStreak ?? null,
-    })),
-    recentReflections: (ctx.reflectionSignals ?? []).slice(-2).map((s) => ({
-      mood: s.mood,
-      energy: s.energy ?? null,
-      wins: s.wins ?? null,
-    })),
-    briefingContext: ctx.briefingContext
-      ? {
-        focus: ctx.briefingContext.focus ?? null,
-        inferredGoals: (ctx.briefingContext.inferredGoals ?? []).slice(0, 5),
-      }
-      : null,
-    behaviorSignals: ctx.statInterpretation
-      ? {
-        momentumState: ctx.statInterpretation.momentumState,
-        recentMissInterpretation:
-          ctx.statInterpretation.recentMissInterpretation,
-        narrativeBrief: ctx.statInterpretation.narrativeBrief,
-      }
-      : null,
-    scheduleLoad: ctx.scheduleInsights?.dayLoads.find(
-      (d) => d.date === input.currentDate,
-    ) ?? null,
-  });
-};
-
-const parseEstimatedDurationMinutes = (value: string): number => {
-  const match = value.match(/(\d+)/);
-  if (!match) return 30;
-  const num = Number.parseInt(match[1] ?? "30", 10);
-  return /hour/i.test(value) ? num * 60 : num;
-};
-
-const normalizePlanDayOutput = (value: unknown): PlanDayAIOutput | null => {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const obj = value as Record<string, unknown>;
-
-  const message =
-    typeof obj.message === "string" && obj.message.trim().length > 0
-      ? obj.message.trim()
-      : null;
-  if (!message) return null;
-
-  const rawQuests = Array.isArray(obj.suggested_quests)
-    ? obj.suggested_quests
-    : [];
-
-  const suggested_quests: PlanDayQuestSuggestion[] = rawQuests
-    .filter(
-      (q): q is Record<string, unknown> =>
-        typeof q === "object" && q !== null && !Array.isArray(q),
-    )
-    .map((q): PlanDayQuestSuggestion => {
-      const type: PlanDayQuestSuggestion["type"] =
-        q.type === "must" || q.type === "should" || q.type === "nice"
-          ? q.type
-          : "should";
-      const source: PlanDayQuestSuggestion["source"] =
-        q.source === "campaign" ||
-          q.source === "habit" ||
-          q.source === "recovery" ||
-          q.source === "optimization"
-          ? q.source
-          : "optimization";
-
-      return {
-        title: typeof q.title === "string" ? q.title.trim() : "",
-        type,
-        estimated_duration: typeof q.estimated_duration === "string"
-          ? q.estimated_duration
-          : "30 min",
-        source,
-        reason: typeof q.reason === "string" ? q.reason.trim() : "",
-      };
-    })
-    .filter((q) => q.title.length > 0);
-
-  return {
-    mode: obj.mode === "clarify" ? "clarify" : "suggest",
-    message,
-    day_assessment: typeof obj.day_assessment === "string"
-      ? obj.day_assessment
-      : "open",
-    follow_up_question: typeof obj.follow_up_question === "string"
-      ? obj.follow_up_question.trim()
-      : null,
-    suggested_quests,
-  };
-};
-
-const mapPlanDayOutputToResult = (
-  input: PlannerBuildInput,
-  aiOutput: PlanDayAIOutput,
-  baseResult: PlannerBuildResult,
-): PlannerBuildResult => {
-  if (
-    aiOutput.mode === "clarify" ||
-    (aiOutput.suggested_quests.length === 0 && /\?\s*$/.test(aiOutput.message))
-  ) {
-    const prompt = aiOutput.follow_up_question?.trim() || aiOutput.message;
-    const followUpQuestion: PlannerQuestion = {
-      id: "details",
-      field: "details",
-      prompt,
-      reason:
-        "A little more direction will keep the plan grounded in the user's actual day.",
-      required: true,
-      options: [],
-    };
-
-    return {
-      ...baseResult,
-      mode: "conversational",
-      reply: aiOutput.message,
-      proposals: [],
-      suggestedReminders: [],
-      followUpQuestions: [followUpQuestion],
-      structuredResponse: null,
-      sessionState: {
-        ...baseResult.sessionState,
-        draft: {},
-        openQuestionIds: [followUpQuestion.id],
-        pendingStarterIntent: "plan_day",
-      },
-    };
-  }
-
-  const proposals: PlannerProposal[] = aiOutput.suggested_quests.map(
-    (quest) => ({
-      id: crypto.randomUUID(),
-      kind: "create_quest" as const,
-      title: quest.title,
-      summary: quest.reason
-        ? `Create a quest for "${quest.title}" — ${quest.reason}.`
-        : `Create a quest for "${quest.title}".`,
-      reasoning: quest.reason || null,
-      payload: {
-        taskText: quest.title,
-        questSource: "inbox",
-        source: "optimizer",
-        estimatedDuration: parseEstimatedDurationMinutes(
-          quest.estimated_duration,
-        ),
-        suggestedType: quest.type,
-        aiSource: quest.source,
-        taskDate: input.currentDate,
-        scheduledTime: null,
-      },
-      status: "pending" as const,
-      readyToConfirm: true,
-      missingFields: [],
-    }),
-  );
-
-  return {
-    ...baseResult,
-    mode: proposals.length > 0 ? "proposal" : "conversational",
-    reply: aiOutput.message,
-    proposals,
-    suggestedReminders: [],
-    followUpQuestions: [],
-    sessionState: {
-      ...baseResult.sessionState,
-      openQuestionIds: [],
-    },
-  };
-};
-
-export async function buildPlanDayAIResponse(params: {
-  guardedFetch: typeof fetch;
-  input: PlannerBuildInput;
-  baseResult: PlannerBuildResult;
-  openAIApiKey?: string;
-  model?: string;
-}): Promise<PlannerBuildResult | null> {
-  const openAIApiKey = params.openAIApiKey ?? Deno.env.get("OPENAI_API_KEY");
-  if (!openAIApiKey) return null;
-
-  const model = params.model ??
-    Deno.env.get("OPENAI_COMPANION_PLANNER_MODEL") ??
-    "gpt-5";
-
-  try {
-    const response = await params.guardedFetch(OPENAI_API_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${openAIApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0.7,
-        max_tokens: 600,
-        response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "system",
-            content: buildPlanDaySystemPrompt(params.input.tonePack),
-          },
-          {
-            role: "user",
-            content: buildPlanDayUserPrompt(params.input),
-          },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      console.warn(
-        "[companion-planner-chat] plan_day AI error",
-        response.status,
-      );
-      return null;
-    }
-
-    const data = await response.json();
-    const rawContent = data?.choices?.[0]?.message?.content?.trim() ?? "";
-    if (!rawContent) return null;
-
-    const aiOutput = normalizePlanDayOutput(JSON.parse(rawContent));
-    if (!aiOutput) return null;
-
-    return mapPlanDayOutputToResult(params.input, aiOutput, params.baseResult);
-  } catch (error) {
-    console.warn("[companion-planner-chat] plan_day AI failed", error);
-    return null;
-  }
-}
 
 const buildUpcomingSystemPrompt = (): string =>
   [
@@ -976,23 +652,10 @@ const isPlanDayRefinementTurn = (
   return true;
 };
 
-const isPlanDayDraftTurn = (
-  input: PlannerBuildInput,
-  baseResult: PlannerBuildResult,
-): boolean => {
-  const isPlanDay = input.plannerContext.starterIntent === "plan_day" ||
-    input.sessionState.pendingStarterIntent === "plan_day";
-  if (!isPlanDay) return false;
-  if (baseResult.followUpQuestions.length > 0) return false;
-  return baseResult.mode === "conversational" || baseResult.mode === "proposal";
-};
-
 const shouldUsePlanDayToolLoop = (
   input: PlannerBuildInput,
   baseResult: PlannerBuildResult,
-): boolean =>
-  isPlanDayDraftTurn(input, baseResult) ||
-  isPlanDayRefinementTurn(input, baseResult);
+): boolean => isPlanDayRefinementTurn(input, baseResult);
 
 type PlanDayToolMessage = {
   role: "system" | "user" | "assistant" | "tool";

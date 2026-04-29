@@ -78,12 +78,16 @@ const getClassificationHint = async (
 };
 
 const shouldReturnDeterministicStarterImmediately = (
-  starterIntent: PlannerBuildInput["plannerContext"]["starterIntent"] | null | undefined,
+  starterIntent:
+    | PlannerBuildInput["plannerContext"]["starterIntent"]
+    | null
+    | undefined,
 ) =>
   starterIntent === "right_now_start" ||
   starterIntent === "adjust_today" ||
   starterIntent === "low_energy_adjust" ||
-  starterIntent === "advance_campaign_start";
+  starterIntent === "advance_campaign_start" ||
+  starterIntent === "plan_day";
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);

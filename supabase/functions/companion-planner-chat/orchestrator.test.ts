@@ -279,7 +279,10 @@ Deno.test("skips orchestration for reflection bridge starter schedule reads", as
   });
 
   assertEquals(fetchCalled, false);
-  assertStringIncludes(response.reply, "Take a short walk before jumping back into messages.");
+  assertStringIncludes(
+    response.reply,
+    "Take a short walk before jumping back into messages.",
+  );
 });
 
 Deno.test("skips orchestration when a ready quest proposal is present in a mixed proposal turn", async () => {
@@ -474,7 +477,8 @@ Deno.test("skips orchestration for advance-campaign starter responses", async ()
           campaignTitle: "Launch prep",
           status: "stalled",
           interventionLevel: "protect",
-          statusReason: "There is no concrete next step tied to this campaign right now.",
+          statusReason:
+            "There is no concrete next step tied to this campaign right now.",
           healthSnapshot: null,
           pressureSignals: [
             "No concrete next quest is linked yet.",
@@ -843,23 +847,13 @@ Deno.test("does not rewrite deterministic plan-day starter proposals", async () 
   assertEquals(captured.called, false);
 });
 
-Deno.test("rewrites the initial plan-day clarification turn with the focus prompt", async () => {
-  let capturedSystemPrompt = "";
+Deno.test("does not rewrite the initial deterministic plan-day clarification turn", async () => {
+  let called = false;
 
   const response = await buildOrchestratedPlannerResponse({
-    guardedFetch: async (_input: RequestInfo | URL, init?: RequestInit) => {
-      const body = JSON.parse(String(init?.body ?? "{}"));
-      capturedSystemPrompt = body.messages?.[0]?.content ?? "";
-      return new Response(JSON.stringify({
-        choices: [{
-          message: {
-            content: JSON.stringify({
-              reply: "What are you feeling like focusing on right now?",
-              mode: "conversational",
-            }),
-          },
-        }],
-      }));
+    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) => {
+      called = true;
+      return new Response("unexpected");
     },
     input: {
       ...baseInput(),
@@ -894,36 +888,20 @@ Deno.test("rewrites the initial plan-day clarification turn with the focus promp
     response.reply,
     "What are you feeling like focusing on right now?",
   );
-  assertStringIncludes(
-    capturedSystemPrompt,
-    "You are an intelligent companion whose only job in this step is to understand what the user wants to focus on.",
-  );
+  assertEquals(called, false);
 });
 
-Deno.test("rewrites no-room plan-day replies through the LLM with planDayContext", async () => {
+Deno.test("does not rewrite deterministic no-room plan-day replies", async () => {
   const captured = {
     called: false,
-    userPrompt: "",
   };
+  const reply =
+    "Today already has 3 quests lined up. Let's lean into what's there before stacking more on.";
 
   const response = await buildOrchestratedPlannerResponse({
-    guardedFetch: async (_input: RequestInfo | URL, init?: RequestInit) => {
+    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) => {
       captured.called = true;
-      const body = init?.body ? JSON.parse(String(init.body)) : null;
-      const userMessage = body?.messages?.find(
-        (m: { role: string }) => m.role === "user",
-      );
-      captured.userPrompt = userMessage?.content ?? "";
-      return new Response(JSON.stringify({
-        choices: [{
-          message: {
-            role: "assistant",
-            content:
-              "Today already has a few quests lined up — let's lean into those before stacking more on.",
-          },
-          finish_reason: "stop",
-        }],
-      }));
+      return new Response("unexpected");
     },
     input: {
       ...baseInput(),
@@ -935,8 +913,25 @@ Deno.test("rewrites no-room plan-day replies through the LLM with planDayContext
     },
     baseResult: {
       ...baseResult("conversational"),
-      reply:
-        "Today already has 3 quests lined up. Let's lean into what's there before stacking more on.",
+      reply,
+      structuredResponse: {
+        intent: {
+          intentType: "conversation",
+          timeHorizon: "today",
+          isRecurring: false,
+          shouldCreateQuest: false,
+          shouldPromptCampaign: false,
+        },
+        planDay: {
+          message: reply,
+          dayAssessment: "busy",
+          suggestedQuests: [],
+          campaignFocus: null,
+        },
+        comingUp: null,
+        rightNow: null,
+        dayAdjust: null,
+      },
       sessionState: {
         ...baseResult("conversational").sessionState,
       },
@@ -946,65 +941,18 @@ Deno.test("rewrites no-room plan-day replies through the LLM with planDayContext
   });
 
   assertEquals(response.mode, "conversational");
-  assertEquals(
-    response.reply,
-    "Today already has a few quests lined up — let's lean into those before stacking more on.",
-  );
+  assertEquals(response.reply, reply);
   assertEquals(response.proposals.length, 0);
-  assertEquals(captured.called, true);
-  assertStringIncludes(captured.userPrompt, "planDayContext");
+  assertEquals(captured.called, false);
 });
 
-Deno.test("plan-day tool loop drafts a quest from a propose_quest tool call", async () => {
-  const captured: { calls: number; toolsSent: boolean } = {
-    calls: 0,
-    toolsSent: false,
-  };
+Deno.test("ordinary plan-day turns do not enter the tool loop", async () => {
+  let called = false;
 
   const response = await buildOrchestratedPlannerResponse({
-    guardedFetch: async (_input: RequestInfo | URL, init?: RequestInit) => {
-      captured.calls += 1;
-      const body = init?.body ? JSON.parse(String(init.body)) : null;
-      if (Array.isArray(body?.tools) && body.tools.length > 0) {
-        captured.toolsSent = true;
-      }
-      if (captured.calls === 1) {
-        return new Response(JSON.stringify({
-          choices: [{
-            message: {
-              role: "assistant",
-              content: null,
-              tool_calls: [{
-                id: "call_1",
-                type: "function",
-                function: {
-                  name: "propose_quest",
-                  arguments: JSON.stringify({
-                    title: "Outline launch email",
-                    startTime: "10:00",
-                    durationMinutes: 45,
-                    energyType: "deep",
-                    source: "optimization",
-                    reasoning:
-                      "Open mid-morning slot fits a focused writing block.",
-                  }),
-                },
-              }],
-            },
-            finish_reason: "tool_calls",
-          }],
-        }));
-      }
-      return new Response(JSON.stringify({
-        choices: [{
-          message: {
-            role: "assistant",
-            content:
-              "Drafted Outline launch email at 10am — focused work fits the open slot.",
-          },
-          finish_reason: "stop",
-        }],
-      }));
+    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) => {
+      called = true;
+      return new Response("unexpected");
     },
     input: {
       ...baseInput(),
@@ -1022,85 +970,13 @@ Deno.test("plan-day tool loop drafts a quest from a propose_quest tool call", as
     model: "test-model",
   });
 
-  assertEquals(captured.toolsSent, true);
-  assertEquals(captured.calls >= 2, true);
-  assertEquals(response.mode, "proposal");
-  assertEquals(response.proposals.length, 1);
-  assertEquals(
-    (response.proposals[0]?.payload as { taskText?: string }).taskText,
-    "Outline launch email",
-  );
-  assertEquals(
-    (response.proposals[0]?.payload as { scheduledTime?: string | null })
-      .scheduledTime,
-    "10:00",
-  );
-  assertStringIncludes(response.reply, "Outline launch email");
-  assertEquals(response.dayPlan?.status, "draft");
-  assertEquals(response.dayPlan?.blocks.length, 1);
-  assertEquals(response.dayPlan?.blocks[0]?.title, "Outline launch email");
-  assertEquals(response.dayPlan?.blocks[0]?.startTime, "10:00");
-  assertEquals(response.dayPlan?.blocks[0]?.durationMinutes, 45);
-  assertEquals(response.dayPlan?.blocks[0]?.energyType, "deep");
-  assertEquals(response.dayPlan?.id, null);
-});
-
-Deno.test("plan-day tool loop returns a clarification follow-up when ask_clarification is called", async () => {
-  const response = await buildOrchestratedPlannerResponse({
-    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) =>
-      new Response(JSON.stringify({
-        choices: [{
-          message: {
-            role: "assistant",
-            content: null,
-            tool_calls: [{
-              id: "call_clarify",
-              type: "function",
-              function: {
-                name: "ask_clarification",
-                arguments: JSON.stringify({
-                  prompt:
-                    "Quick check — what kind of energy are we working with?",
-                  reason: "Energy shapes how heavy I make the plan.",
-                  options: [
-                    "Low — keep it light",
-                    "Medium — balanced",
-                    "High — bring it on",
-                  ],
-                }),
-              },
-            }],
-          },
-          finish_reason: "tool_calls",
-        }],
-      })),
-    input: {
-      ...baseInput(),
-      message: "focused",
-      sessionState: {
-        ...baseInput().sessionState,
-        pendingStarterIntent: "plan_day",
-      },
-    },
-    baseResult: {
-      ...baseResult("conversational"),
-      reply: "Got it.",
-    },
-    openAIApiKey: "test-openai-key",
-    model: "test-model",
-  });
-
   assertEquals(response.mode, "conversational");
+  assertEquals(response.reply, "Today is open — let's draft a few quests.");
   assertEquals(response.proposals.length, 0);
-  assertEquals(response.followUpQuestions.length, 1);
-  assertEquals(
-    response.followUpQuestions[0]?.prompt,
-    "Quick check — what kind of energy are we working with?",
-  );
-  assertEquals(response.sessionState.pendingStarterIntent, "plan_day");
+  assertEquals(called, false);
 });
 
-Deno.test("plan-day tool loop is skipped on clarification turns and uses polish path", async () => {
+Deno.test("plan-day clarification turns bypass tool loop and polish", async () => {
   let toolsSent = false;
   let polishCalled = false;
 
@@ -1148,32 +1024,12 @@ Deno.test("plan-day tool loop is skipped on clarification turns and uses polish 
   });
 
   assertEquals(toolsSent, false);
-  assertEquals(polishCalled, true);
+  assertEquals(polishCalled, false);
   assertEquals(response.followUpQuestions.length, 1);
-});
-
-Deno.test("plan-day tool loop falls back to baseResult when OpenAI errors", async () => {
-  const response = await buildOrchestratedPlannerResponse({
-    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) =>
-      new Response("server error", { status: 500 }),
-    input: {
-      ...baseInput(),
-      message: "Plan my day",
-      sessionState: {
-        ...baseInput().sessionState,
-        pendingStarterIntent: "plan_day",
-      },
-    },
-    baseResult: {
-      ...baseResult("conversational"),
-      reply: "Today already has 3 quests lined up.",
-    },
-    openAIApiKey: "test-openai-key",
-    model: "test-model",
-  });
-
-  assertEquals(response.reply, "Today already has 3 quests lined up.");
-  assertEquals(response.proposals.length, 0);
+  assertEquals(
+    response.reply,
+    "What are you feeling like focusing on this morning?",
+  );
 });
 
 Deno.test("refinement turn seeds tool loop from activeDayPlan and applies move_quest", async () => {
@@ -1383,10 +1239,25 @@ Deno.test("logs plan_day_tool_fallback with reason=openai_error when OpenAI retu
       guardedFetch: async () => new Response("server error", { status: 500 }),
       input: {
         ...baseInput(),
-        message: "Plan my day",
-        sessionState: {
-          ...baseInput().sessionState,
-          pendingStarterIntent: "plan_day",
+        message: "push the workout later",
+        activeDayPlan: {
+          id: "plan-1",
+          date: "2026-04-18",
+          status: "draft",
+          updatedAt: "2026-04-18T09:00:00.000Z",
+          blocks: [
+            {
+              id: "block-existing-1",
+              proposalId: "block-existing-1",
+              questId: null,
+              title: "Workout",
+              startTime: "17:00",
+              durationMinutes: 45,
+              energyType: "physical",
+              source: "optimization",
+              reasoning: "Recovery block.",
+            },
+          ],
         },
       },
       baseResult: {
@@ -1431,10 +1302,25 @@ Deno.test("logs plan_day_tool_fallback with reason=exception when tool execution
       },
       input: {
         ...baseInput(),
-        message: "Plan my day",
-        sessionState: {
-          ...baseInput().sessionState,
-          pendingStarterIntent: "plan_day",
+        message: "push the workout later",
+        activeDayPlan: {
+          id: "plan-1",
+          date: "2026-04-18",
+          status: "draft",
+          updatedAt: "2026-04-18T09:00:00.000Z",
+          blocks: [
+            {
+              id: "block-existing-1",
+              proposalId: "block-existing-1",
+              questId: null,
+              title: "Workout",
+              startTime: "17:00",
+              durationMinutes: 45,
+              energyType: "physical",
+              source: "optimization",
+              reasoning: "Recovery block.",
+            },
+          ],
         },
       },
       baseResult: {
