@@ -54,6 +54,10 @@ import type { StoryTypeSlug } from '@/types/narrativeTypes';
 import type { ClarifyingQuestion } from '@/hooks/useIntentClassifier';
 import { getDefaultMonthDaysForFrequency, getDefaultWeekdaysForFrequency } from '@/utils/habitSchedule';
 import { CompanionImage, CompanionPortraitShell } from '@/components/CompanionImage';
+import {
+  isValidCampaignMilestonePercent,
+  normalizeCampaignMilestonePercentArray,
+} from '@/utils/campaignMilestones';
 
 // Default clarification questions when AI doesn't provide any
 const DEFAULT_CLARIFICATION_QUESTIONS: ClarifyingQuestion[] = [
@@ -452,8 +456,6 @@ export function Pathfinder({
       return;
     }
 
-    setIsSubmittingCreate(true);
-
     const habits = selectedHabits.map((h) => ({
       title: h.title,
       description: h.description,
@@ -470,14 +472,25 @@ export function Pathfinder({
       console.warn('[Pathfinder] Habit count mismatch! Schedule has', schedule.rituals.length, 'but habits array has', habits.length);
     }
 
+    const normalizedMilestonePercents = schedule?.milestones
+      ? normalizeCampaignMilestonePercentArray(schedule.milestones.map((m) => m.milestonePercent))
+      : [];
+
     // Include milestones with dates from schedule
-    const milestones = schedule?.milestones.map(m => ({
+    const milestones = schedule?.milestones.map((m, index) => ({
       title: m.title,
       description: m.description,
       target_date: m.targetDate,
-      milestone_percent: m.milestonePercent,
+      milestone_percent: normalizedMilestonePercents[index],
       is_postcard_milestone: m.isPostcardMilestone,
     }));
+
+    if (milestones?.some((milestone) => !isValidCampaignMilestonePercent(milestone.milestone_percent))) {
+      toast.error('Campaign plan needs an update', {
+        description: 'One of the generated milestones had an invalid percentage. Rebuild the plan and try again.',
+      });
+      return;
+    }
     
     console.log('[Pathfinder] Creating epic with milestones:', milestones?.length || 0, milestones);
 
@@ -489,6 +502,15 @@ export function Pathfinder({
       end_date: p.endDate,
       phase_order: p.phaseOrder,
     }));
+
+    if (phases?.some((phase) => !phase.start_date || !phase.end_date || !Number.isFinite(Number(phase.phase_order)))) {
+      toast.error('Campaign plan needs dates', {
+        description: 'One of the generated phases is missing dates. Rebuild the plan and try again.',
+      });
+      return;
+    }
+
+    setIsSubmittingCreate(true);
 
     trackInteraction({
       interactionType: 'epic-creation',

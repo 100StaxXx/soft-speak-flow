@@ -3,6 +3,7 @@ import {
   enforceExecutionModelSemantics,
   getExecutionModelInstructions,
   inferExecutionModel,
+  normalizeJourneyMilestonePercents,
 } from "./planner.ts";
 
 function assert(condition: boolean, message: string): void {
@@ -76,6 +77,47 @@ Deno.test("creates sequential fallback phases for linear goals", () => {
 
   assert(fallback.phases[0].name === "Foundation", "Expected sequential foundation phase");
   assert(fallback.milestones[0].milestonePercent === 20, "Expected evenly spaced sequential milestone");
+});
+
+Deno.test("normalizes fractional milestone percents to unique integers", () => {
+  const milestones = normalizeJourneyMilestonePercents([
+    {
+      id: "m-1",
+      title: "Checkpoint 1",
+      description: "First",
+      targetDate: "2026-03-01",
+      phaseOrder: 1,
+      phaseName: "Phase 1",
+      isPostcardMilestone: true,
+      milestonePercent: 33.33,
+    },
+    {
+      id: "m-2",
+      title: "Checkpoint 2",
+      description: "Second",
+      targetDate: "2026-03-15",
+      phaseOrder: 2,
+      phaseName: "Phase 2",
+      isPostcardMilestone: true,
+      milestonePercent: 66.67,
+    },
+    {
+      id: "m-3",
+      title: "Finish",
+      description: "Final",
+      targetDate: "2026-03-30",
+      phaseOrder: 3,
+      phaseName: "Phase 3",
+      isPostcardMilestone: true,
+      milestonePercent: 100,
+    },
+  ]);
+
+  const percents = milestones.map((milestone) => milestone.milestonePercent);
+
+  assert(percents.join(",") === "33,67,100", `Expected 33,67,100, got ${percents.join(",")}`);
+  assert(new Set(percents).size === percents.length, "Expected unique milestone percents");
+  assert(percents.every((percent) => Number.isInteger(percent)), "Expected integer milestone percents");
 });
 
 Deno.test("enforces overlap semantics by pulling first milestone earlier", () => {

@@ -435,6 +435,11 @@ export interface CompanionDayPlanBlock {
   reasoning: string;
   epicId?: string | null;
   habitSourceId?: string | null;
+  difficulty?: "easy" | "medium" | "hard" | null;
+  reminderEnabled?: boolean | null;
+  reminderMinutesBefore?: number | null;
+  category?: string | null;
+  notes?: string | null;
 }
 
 export interface CompanionDayPlan {

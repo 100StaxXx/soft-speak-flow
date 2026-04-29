@@ -185,6 +185,20 @@ const createWrapper = () => {
   );
 };
 
+const createDailyTasksRollbackDeleteMock = () => {
+  const eqCompletedMock = vi.fn().mockResolvedValue({ error: null });
+  const eqUserMock = vi.fn().mockReturnValue({ eq: eqCompletedMock });
+  const inHabitSourceMock = vi.fn().mockReturnValue({ eq: eqUserMock });
+  const deleteMock = vi.fn().mockReturnValue({ in: inHabitSourceMock });
+
+  return {
+    deleteMock,
+    inHabitSourceMock,
+    eqUserMock,
+    eqCompletedMock,
+  };
+};
+
 describe("useEpics", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -554,6 +568,7 @@ describe("useEpics", () => {
     const deleteHabitsInMock = vi.fn().mockReturnValue({ eq: deleteHabitsEqMock });
     const deleteEpicsEqUserMock = vi.fn().mockResolvedValue({ error: null });
     const deleteEpicsEqIdMock = vi.fn().mockReturnValue({ eq: deleteEpicsEqUserMock });
+    const dailyTasksRollbackDeleteMock = createDailyTasksRollbackDeleteMock();
 
     mocks.loadLocalEpicsMock.mockImplementation(async () => localEpics);
     mocks.getLocalHabitsMock.mockImplementation(async () => localHabits);
@@ -615,6 +630,13 @@ describe("useEpics", () => {
       if (table === "epic_habits") {
         return {
           delete: vi.fn().mockReturnValue({ in: deleteEpicHabitsInMock }),
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "daily_tasks") {
+        return {
+          delete: dailyTasksRollbackDeleteMock.deleteMock,
           select: mocks.selectMock,
         };
       }
@@ -1125,6 +1147,7 @@ describe("useEpics", () => {
     const deleteHabitsInMock = vi.fn().mockReturnValue({ eq: deleteHabitsEqMock });
     const deleteEpicsEqUserMock = vi.fn().mockResolvedValue({ error: null });
     const deleteEpicsEqIdMock = vi.fn().mockReturnValue({ eq: deleteEpicsEqUserMock });
+    const dailyTasksRollbackDeleteMock = createDailyTasksRollbackDeleteMock();
 
     mocks.fromMock.mockImplementation((table: string) => {
       if (table === "habits") {
@@ -1146,6 +1169,13 @@ describe("useEpics", () => {
       if (table === "epic_habits") {
         return {
           delete: vi.fn().mockReturnValue({ in: deleteEpicHabitsInMock }),
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "daily_tasks") {
+        return {
+          delete: dailyTasksRollbackDeleteMock.deleteMock,
           select: mocks.selectMock,
         };
       }
@@ -1196,9 +1226,152 @@ describe("useEpics", () => {
     expect(mocks.removePlannerRecordMock).toHaveBeenCalledWith("epics", expect.any(String));
     expect(mocks.removePlannerRecordsMock).toHaveBeenCalledWith("habits", expect.any(Array));
     expect(deleteEpicHabitsInMock).toHaveBeenCalled();
+    expect(dailyTasksRollbackDeleteMock.inHabitSourceMock).toHaveBeenCalledWith("habit_source_id", expect.any(Array));
+    expect(dailyTasksRollbackDeleteMock.eqUserMock).toHaveBeenCalledWith("user_id", "user-1");
+    expect(dailyTasksRollbackDeleteMock.eqCompletedMock).toHaveBeenCalledWith("completed", false);
     expect(deleteHabitsInMock).toHaveBeenCalled();
+    expect(dailyTasksRollbackDeleteMock.eqCompletedMock.mock.invocationCallOrder[0])
+      .toBeLessThan(deleteHabitsInMock.mock.invocationCallOrder[0]);
     expect(deleteEpicsEqIdMock).toHaveBeenCalledWith("id", expect.any(String));
     expect(deleteEpicsEqUserMock).toHaveBeenCalledWith("user_id", "user-1");
+  });
+
+  it("normalizes milestone percents and deletes linked incomplete tasks before habit rollback when milestone insert fails", async () => {
+    const habitsInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const epicsInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const linksInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const phasesInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const milestonesInsertMock = vi.fn().mockResolvedValue({
+      error: {
+        code: "22P02",
+        message: 'invalid input syntax for type integer: "33.33"',
+        status: 400,
+      },
+    });
+    const deleteEpicHabitsInMock = vi.fn().mockResolvedValue({ error: null });
+    const deleteChildEqMock = vi.fn().mockResolvedValue({ error: null });
+    const deleteChildInMock = vi.fn().mockReturnValue({ eq: deleteChildEqMock });
+    const deleteHabitsEqMock = vi.fn().mockResolvedValue({ error: null });
+    const deleteHabitsInMock = vi.fn().mockReturnValue({ eq: deleteHabitsEqMock });
+    const deleteEpicsEqUserMock = vi.fn().mockResolvedValue({ error: null });
+    const deleteEpicsEqIdMock = vi.fn().mockReturnValue({ eq: deleteEpicsEqUserMock });
+    const dailyTasksRollbackDeleteMock = createDailyTasksRollbackDeleteMock();
+
+    mocks.fromMock.mockImplementation((table: string) => {
+      if (table === "habits") {
+        return {
+          insert: habitsInsertMock,
+          delete: vi.fn().mockReturnValue({ in: deleteHabitsInMock }),
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "epics") {
+        return {
+          insert: epicsInsertMock,
+          delete: vi.fn().mockReturnValue({ eq: deleteEpicsEqIdMock }),
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "epic_habits") {
+        return {
+          insert: linksInsertMock,
+          delete: vi.fn().mockReturnValue({ in: deleteEpicHabitsInMock }),
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "journey_phases") {
+        return {
+          insert: phasesInsertMock,
+          delete: vi.fn().mockReturnValue({ in: deleteChildInMock }),
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "epic_milestones") {
+        return {
+          insert: milestonesInsertMock,
+          delete: vi.fn().mockReturnValue({ in: deleteChildInMock }),
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "daily_tasks") {
+        return {
+          delete: dailyTasksRollbackDeleteMock.deleteMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      return {
+        select: mocks.selectMock,
+      };
+    });
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await expect(result.current.createEpic({
+        title: "Broken Milestones Campaign",
+        target_days: 90,
+        habits: [
+          {
+            title: "Daily running journal",
+            difficulty: "medium",
+            frequency: "daily",
+            custom_days: [0, 1, 2, 3, 4, 5, 6],
+          },
+        ],
+        phases: [
+          {
+            name: "Base",
+            description: "Build base miles.",
+            start_date: "2026-04-28",
+            end_date: "2026-05-28",
+            phase_order: 1,
+          },
+        ],
+        milestones: [
+          {
+            title: "First third",
+            target_date: "2026-05-28",
+            milestone_percent: 33.33,
+            is_postcard_milestone: true,
+          },
+          {
+            title: "Second third",
+            target_date: "2026-06-27",
+            milestone_percent: 66.67,
+            is_postcard_milestone: true,
+          },
+          {
+            title: "Finish",
+            target_date: "2026-07-27",
+            milestone_percent: 100,
+            is_postcard_milestone: true,
+          },
+        ],
+      })).rejects.toMatchObject({
+        code: "22P02",
+      });
+    });
+
+    const milestonePayload = milestonesInsertMock.mock.calls[0]?.[0] as Array<{ milestone_percent: number }>;
+
+    expect(milestonePayload.map((milestone) => milestone.milestone_percent)).toEqual([33, 67, 100]);
+    expect(dailyTasksRollbackDeleteMock.inHabitSourceMock).toHaveBeenCalledWith("habit_source_id", expect.any(Array));
+    expect(dailyTasksRollbackDeleteMock.eqUserMock).toHaveBeenCalledWith("user_id", "user-1");
+    expect(dailyTasksRollbackDeleteMock.eqCompletedMock).toHaveBeenCalledWith("completed", false);
+    expect(dailyTasksRollbackDeleteMock.eqCompletedMock.mock.invocationCallOrder[0])
+      .toBeLessThan(deleteHabitsInMock.mock.invocationCallOrder[0]);
   });
 
   it("reuses remembered campaign ids on retry after a failed create confirmation", async () => {
@@ -1214,6 +1387,7 @@ describe("useEpics", () => {
     const deleteHabitsInMock = vi.fn().mockReturnValue({ eq: deleteHabitsEqMock });
     const deleteEpicsEqUserMock = vi.fn().mockResolvedValue({ error: null });
     const deleteEpicsEqIdMock = vi.fn().mockReturnValue({ eq: deleteEpicsEqUserMock });
+    const dailyTasksRollbackDeleteMock = createDailyTasksRollbackDeleteMock();
 
     mocks.fromMock.mockImplementation((table: string) => {
       if (table === "habits") {
@@ -1238,6 +1412,13 @@ describe("useEpics", () => {
         return {
           upsert: linksUpsertMock,
           delete: vi.fn().mockReturnValue({ in: deleteEpicHabitsInMock }),
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "daily_tasks") {
+        return {
+          delete: dailyTasksRollbackDeleteMock.deleteMock,
           select: mocks.selectMock,
         };
       }
@@ -2104,5 +2285,14 @@ describe("normalizeCreateCampaignError", () => {
     );
 
     expect(result.title).toBe("Campaign setup update needed");
+  });
+
+  it("returns a dedicated message for invalid milestone percent errors", () => {
+    const result = normalizeCreateCampaignError({
+      code: "22P02",
+      message: 'invalid input syntax for type integer: "33.33"',
+    });
+
+    expect(result.title).toBe("Campaign plan needs an update");
   });
 });

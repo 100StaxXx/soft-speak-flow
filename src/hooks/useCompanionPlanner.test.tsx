@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   externalCalendarHorizons: [] as string[],
   classify: vi.fn(),
   invoke: vi.fn(),
+  rpc: vi.fn(),
   persistCompanionThreadMessages: vi.fn().mockResolvedValue(undefined),
   upsertPlannerPreferences: vi.fn(),
   insertPlannerEvent: vi.fn(),
@@ -47,6 +48,7 @@ vi.mock("@/integrations/supabase/client", () => ({
     functions: {
       invoke: (...args: unknown[]) => mocks.invoke(...args),
     },
+    rpc: (...args: unknown[]) => mocks.rpc(...args),
     from: (table: string) =>
       table === "planner_events"
         ? {
@@ -234,6 +236,18 @@ describe("useCompanionPlanner", () => {
     mocks.user = { id: "user-1" };
     mocks.companion = { id: "companion-1" };
     mocks.upsertPlannerPreferences.mockResolvedValue({ error: null });
+    mocks.rpc.mockImplementation((fn: string) => {
+      if (fn === "upsert_day_plan_draft") {
+        return Promise.resolve({ data: "plan-1", error: null });
+      }
+      if (fn === "apply_day_plan") {
+        return Promise.resolve({
+          data: { planId: "plan-1", committedTaskIds: ["task-1"] },
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
     mocks.insertPlannerEvent.mockResolvedValue({ error: null });
     mocks.addTask.mockResolvedValue(undefined);
     mocks.updateTask.mockResolvedValue(undefined);
@@ -701,6 +715,244 @@ describe("useCompanionPlanner", () => {
         status: "confirmed",
       }),
     ]);
+  });
+
+  it("hydrates committed DayPlan snapshots so reloads do not show the draft lock-in CTA again", async () => {
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
+
+    act(() => {
+      result.current.hydrateThread({
+        sessionId: "persisted-planner-session",
+        messages: [
+          {
+            id: "planner-assistant-1",
+            sessionId: "persisted-planner-session",
+            role: "assistant",
+            content: "I drafted a focused day for you.",
+            createdAt: "2026-04-18T08:00:01.000Z",
+            source: "plan",
+            metadata: {
+              dayPlan: {
+                id: null,
+                date: "2026-04-18",
+                status: "draft",
+                updatedAt: "2026-04-18T08:00:01.000Z",
+                blocks: [
+                  {
+                    id: "proposal-plan-1",
+                    proposalId: "proposal-plan-1",
+                    questId: null,
+                    title: "Outline launch checklist",
+                    startTime: "09:00",
+                    durationMinutes: 45,
+                    energyType: "deep",
+                    source: "campaign",
+                    reasoning: "It keeps launch moving.",
+                  },
+                ],
+              },
+              followUpQuestions: [],
+              proposals: [],
+              suggestedReminders: [],
+              sessionState: {
+                draft: {},
+                openQuestionIds: [],
+                pendingStarterIntent: null,
+                lastClassification: "quest",
+              },
+            },
+          },
+          {
+            id: "planner-assistant-2",
+            sessionId: "persisted-planner-session",
+            role: "assistant",
+            content: "Plan locked in for Sat, Apr 18.",
+            createdAt: "2026-04-18T08:05:00.000Z",
+            source: "plan",
+            metadata: {
+              dayPlan: {
+                id: "plan-1",
+                date: "2026-04-18",
+                status: "committed",
+                updatedAt: "2026-04-18T08:00:01.000Z",
+                blocks: [
+                  {
+                    id: "proposal-plan-1",
+                    proposalId: "proposal-plan-1",
+                    questId: "task-1",
+                    title: "Outline launch checklist",
+                    startTime: "09:00",
+                    durationMinutes: 45,
+                    energyType: "deep",
+                    source: "campaign",
+                    reasoning: "It keeps launch moving.",
+                  },
+                ],
+              },
+              followUpQuestions: [],
+              proposals: [],
+              suggestedReminders: [],
+              sessionState: {
+                draft: {},
+                openQuestionIds: [],
+                pendingStarterIntent: null,
+                lastClassification: "quest",
+              },
+            },
+          },
+        ],
+      });
+    });
+
+    expect(result.current.dayPlan?.status).toBe("committed");
+    expect(result.current.dayPlan?.id).toBe("plan-1");
+    expect(result.current.dayPlan?.blocks[0]?.questId).toBe("task-1");
+    expect(result.current.committedDayPlanId).toBe("plan-1");
+  });
+
+  it("persists a committed DayPlan snapshot after locking in a draft", async () => {
+    const { result } = renderHook(() =>
+      useCompanionPlanner({
+        bootstrapGreeting: false,
+        threadPersistence: {
+          enabled: true,
+          surface: "journeys",
+        },
+      })
+    );
+
+    act(() => {
+      result.current.hydrateThread({
+        sessionId: "persisted-planner-session",
+        messages: [
+          {
+            id: "planner-assistant-1",
+            sessionId: "persisted-planner-session",
+            role: "assistant",
+            content: "I drafted a focused day for you.",
+            createdAt: "2026-04-18T08:00:01.000Z",
+            source: "plan",
+            metadata: {
+              dayPlan: {
+                id: null,
+                date: "2026-04-18",
+                status: "draft",
+                updatedAt: "2026-04-18T08:00:01.000Z",
+                blocks: [
+                  {
+                    id: "proposal-plan-1",
+                    proposalId: "proposal-plan-1",
+                    questId: null,
+                    title: "Outline launch checklist",
+                    startTime: "09:00",
+                    durationMinutes: 45,
+                    energyType: "deep",
+                    source: "campaign",
+                    reasoning: "It keeps launch moving.",
+                    difficulty: "hard",
+                    reminderEnabled: true,
+                    reminderMinutesBefore: 20,
+                    category: "mind",
+                    notes: "Draft the launch checklist before standup.",
+                  },
+                ],
+              },
+              followUpQuestions: [],
+              proposals: [
+                {
+                  id: "proposal-plan-1",
+                  kind: "create_quest",
+                  title: "Outline launch checklist",
+                  summary: "Create a focused quest.",
+                  reasoning: "It fits your first open work block.",
+                  payload: {
+                    taskText: "Outline launch checklist",
+                    taskDate: "2026-04-18",
+                    scheduledTime: "09:00",
+                    estimatedDuration: 45,
+                    difficulty: "hard",
+                    reminderEnabled: true,
+                    reminderMinutesBefore: 20,
+                    category: "mind",
+                    notes: "Draft the launch checklist before standup.",
+                  },
+                  status: "pending",
+                  readyToConfirm: true,
+                  missingFields: [],
+                },
+              ],
+              suggestedReminders: [],
+              sessionState: {
+                draft: {},
+                openQuestionIds: [],
+                pendingStarterIntent: null,
+                lastClassification: "quest",
+              },
+            },
+          },
+        ],
+      });
+    });
+
+    await act(async () => {
+      await result.current.commitDayPlan();
+    });
+
+    expect(mocks.rpc).toHaveBeenCalledWith("upsert_day_plan_draft", {
+      p_plan_date: "2026-04-18",
+      p_blocks: [
+        expect.objectContaining({
+          title: "Outline launch checklist",
+          difficulty: "hard",
+          reminderEnabled: true,
+          reminderMinutesBefore: 20,
+          category: "mind",
+          notes: "Draft the launch checklist before standup.",
+        }),
+      ],
+    });
+    expect(mocks.rpc).toHaveBeenCalledWith("apply_day_plan", {
+      p_plan_id: "plan-1",
+    });
+    expect(result.current.dayPlan?.status).toBe("committed");
+    expect(result.current.dayPlan?.blocks[0]?.questId).toBe("task-1");
+    expect(result.current.proposals[0]?.status).toBe("confirmed");
+    expect(mocks.persistCompanionThreadMessages).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: "journeys",
+        source: "plan",
+        rows: expect.arrayContaining([
+          expect.objectContaining({
+            role: "assistant",
+            content: "Plan locked in for Sat, Apr 18.",
+            metadata: expect.objectContaining({
+              dayPlan: expect.objectContaining({
+                id: "plan-1",
+                status: "committed",
+                blocks: [
+                  expect.objectContaining({
+                    questId: "task-1",
+                    difficulty: "hard",
+                    reminderEnabled: true,
+                    reminderMinutesBefore: 20,
+                    category: "mind",
+                    notes: "Draft the launch checklist before standup.",
+                  }),
+                ],
+              }),
+              proposals: [
+                expect.objectContaining({
+                  id: "proposal-plan-1",
+                  status: "confirmed",
+                }),
+              ],
+            }),
+          }),
+        ]),
+      }),
+    );
   });
 
   it("persists planner structured output metadata for journeys thread history", async () => {

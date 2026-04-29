@@ -489,6 +489,11 @@ export const PlannerRequestSchema = z.object({
       reasoning: z.string(),
       epicId: z.string().nullable().optional(),
       habitSourceId: z.string().nullable().optional(),
+      difficulty: z.enum(["easy", "medium", "hard"]).nullable().optional(),
+      reminderEnabled: z.boolean().nullable().optional(),
+      reminderMinutesBefore: z.number().nullable().optional(),
+      category: z.string().nullable().optional(),
+      notes: z.string().nullable().optional(),
     })),
   }).nullable().optional(),
 });

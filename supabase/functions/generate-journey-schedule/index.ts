@@ -8,6 +8,7 @@ import {
   enforceExecutionModelSemantics,
   getExecutionModelInstructions,
   inferExecutionModel,
+  normalizeJourneyMilestonePercents,
   type ExecutionModel,
 } from "./planner.ts";
 import {
@@ -375,12 +376,14 @@ ${timelineContext ? '11. Adjust the schedule based on the user\'s context (exist
         phaseOrder: p.phaseOrder || i + 1,
       }));
       
-      schedule.milestones = schedule.milestones.map((m, i) => ({
-        ...m,
-        id: m.id || `milestone-${Date.now()}-${i}`,
-        isPostcardMilestone: m.isPostcardMilestone ?? false,
-        milestonePercent: m.milestonePercent || Math.round((i + 1) / schedule.milestones.length * 100),
-      }));
+      schedule.milestones = normalizeJourneyMilestonePercents(
+        schedule.milestones.map((m, i) => ({
+          ...m,
+          id: m.id || `milestone-${Date.now()}-${i}`,
+          isPostcardMilestone: m.isPostcardMilestone ?? false,
+          milestonePercent: m.milestonePercent ?? Math.round((i + 1) / schedule.milestones.length * 100),
+        })),
+      );
       
       schedule.rituals = schedule.rituals.map((ritual, index) =>
         normalizeJourneyRitual(
@@ -403,7 +406,7 @@ ${timelineContext ? '11. Adjust the schedule based on the user\'s context (exist
         daysAvailable,
       });
       schedule.phases = semanticallyEnforced.phases;
-      schedule.milestones = semanticallyEnforced.milestones;
+      schedule.milestones = normalizeJourneyMilestonePercents(semanticallyEnforced.milestones);
       
       // Ensure suggestedChapterCount matches actual postcard milestone count
       const postcardCount = schedule.milestones.filter(m => m.isPostcardMilestone).length;

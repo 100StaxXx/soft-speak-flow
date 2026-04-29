@@ -44,6 +44,10 @@ import {
 } from "@/utils/plannerLocalStore";
 import { toRemoteEpicInsertPayload } from "@/utils/epicRemotePayload";
 import { getQueuedActions, type QueuedAction } from "@/utils/offlineStorage";
+import {
+  isValidCampaignMilestonePercent,
+  normalizeCampaignMilestonePercentArray,
+} from "@/utils/campaignMilestones";
 
 const normalizeDifficulty = (value: string): "easy" | "medium" | "hard" => {
   const lower = value?.toLowerCase()?.trim() || "medium";
@@ -155,6 +159,24 @@ export const normalizeCreateCampaignError = (error: unknown): { title: string; d
     };
   }
 
+  if (
+    haystack.includes("invalid input syntax for type integer")
+    || haystack.includes("22p02")
+    || haystack.includes("milestone_percent")
+  ) {
+    return {
+      title: "Campaign plan needs an update",
+      description: "One of the generated milestones had an invalid percentage. Rebuild the plan and try again.",
+    };
+  }
+
+  if (haystack.includes("daily_tasks_regular_requires_time_or_inbox")) {
+    return {
+      title: "Campaign cleanup needs attention",
+      description: "We couldn't finish cleaning up a failed campaign save. Refresh your planner and try again.",
+    };
+  }
+
   if (haystack.includes("failed to create habits") || haystack.includes("no habits were created")) {
     return {
       title: "Campaign needs attention",
@@ -163,8 +185,8 @@ export const normalizeCreateCampaignError = (error: unknown): { title: string; d
   }
 
   return {
-    title: "Confirming your campaign",
-    description: "We couldn't confirm it yet. Keep the planner open and check your campaigns again in a moment.",
+    title: "Campaign couldn't be saved",
+    description: "We couldn't finish saving every part of this campaign. Please review it and try again.",
   };
 };
 
@@ -424,17 +446,19 @@ const normalizeFingerprintMilestone = (
     LocalEpicPayload["milestones"][number],
     "title" | "description" | "target_date" | "milestone_percent" | "is_postcard_milestone" | "phase_name"
   >,
+  normalizedPercent = milestone.milestone_percent,
 ): FingerprintMilestone => ({
   title: normalizeFingerprintText(milestone.title) ?? "",
   description: normalizeFingerprintText(milestone.description),
   target_date: milestone.target_date,
-  milestone_percent: milestone.milestone_percent,
+  milestone_percent: normalizedPercent,
   is_postcard_milestone: Boolean(milestone.is_postcard_milestone),
   phase_name: normalizeFingerprintText(milestone.phase_name),
 });
 
 const normalizeFingerprintInputMilestone = (
   milestone: NonNullable<CreateEpicInput["milestones"]>[number],
+  normalizedPercent = milestone.milestone_percent,
 ): FingerprintMilestone =>
   normalizeFingerprintMilestone({
     title: milestone.title,
@@ -455,27 +479,48 @@ const normalizeFingerprintPhase = (
   phase_order: phase.phase_order,
 });
 
-const buildCampaignCreateFingerprint = (userId: string, epicData: CreateEpicInput): string =>
-  JSON.stringify({
+const buildCampaignCreateFingerprint = (userId: string, epicData: CreateEpicInput): string => {
+  const milestones = epicData.milestones ?? [];
+  const normalizedMilestonePercents = normalizeCampaignMilestonePercentArray(
+    milestones.map((milestone) => milestone.milestone_percent),
+  );
+
+  return JSON.stringify({
     user_id: userId,
     title: normalizeFingerprintText(epicData.title) ?? "",
     target_days: epicData.target_days,
     story_type_slug: normalizeFingerprintText(epicData.story_type_slug ?? null),
     habits: sortByStableJson(epicData.habits.map(normalizeFingerprintInputHabit)),
-    milestones: sortByStableJson((epicData.milestones ?? []).map(normalizeFingerprintInputMilestone)),
+    milestones: sortByStableJson(
+      milestones.map((milestone, index) => normalizeFingerprintInputMilestone(
+        milestone,
+        normalizedMilestonePercents[index],
+      )),
+    ),
     phases: sortByStableJson((epicData.phases ?? []).map(normalizeFingerprintPhase)),
   });
+};
 
-const buildCampaignCreateFingerprintFromPayload = (userId: string, payload: LocalEpicPayload): string =>
-  JSON.stringify({
+const buildCampaignCreateFingerprintFromPayload = (userId: string, payload: LocalEpicPayload): string => {
+  const normalizedMilestonePercents = normalizeCampaignMilestonePercentArray(
+    payload.milestones.map((milestone) => milestone.milestone_percent),
+  );
+
+  return JSON.stringify({
     user_id: userId,
     title: normalizeFingerprintText(payload.epic.title) ?? "",
     target_days: payload.epic.target_days,
     story_type_slug: normalizeFingerprintText(payload.epic.story_type_slug ?? null),
     habits: sortByStableJson(payload.habits.map(normalizeFingerprintHabit)),
-    milestones: sortByStableJson(payload.milestones.map(normalizeFingerprintMilestone)),
+    milestones: sortByStableJson(
+      payload.milestones.map((milestone, index) => normalizeFingerprintMilestone(
+        milestone,
+        normalizedMilestonePercents[index],
+      )),
+    ),
     phases: sortByStableJson(payload.phases.map(normalizeFingerprintPhase)),
   });
+};
 
 const isRecentEpicCreateTimestamp = (value: string | number | null | undefined, nowMs: number): boolean => {
   if (typeof value === "number") {
@@ -684,6 +729,20 @@ async function applyLocalEpicPayload(payload: LocalEpicPayload) {
   await upsertPlannerRecords("epic_milestones", payload.milestones);
 }
 
+function withNormalizedCampaignMilestonePercents(payload: LocalEpicPayload): LocalEpicPayload {
+  const normalizedMilestonePercents = normalizeCampaignMilestonePercentArray(
+    payload.milestones.map((milestone) => milestone.milestone_percent),
+  );
+
+  return {
+    ...payload,
+    milestones: payload.milestones.map((milestone, index) => ({
+      ...milestone,
+      milestone_percent: normalizedMilestonePercents[index] ?? milestone.milestone_percent,
+    })),
+  };
+}
+
 async function rollbackLocalEpicPayload(payload: LocalEpicPayload) {
   if (payload.epicHabits.length > 0) {
     await removePlannerRecords("epic_habits", payload.epicHabits.map((link) => link.id));
@@ -739,10 +798,19 @@ async function rollbackRemoteEpicPayload(userId: string, payload: LocalEpicPaylo
   if (epicError) throw epicError;
 
   if (payload.habits.length > 0) {
+    const habitIds = payload.habits.map((habit) => habit.id);
+    const { error: tasksError } = await supabase
+      .from("daily_tasks")
+      .delete()
+      .in("habit_source_id", habitIds)
+      .eq("user_id", userId)
+      .eq("completed", false);
+    if (tasksError) throw tasksError;
+
     const { error } = await supabase
       .from("habits")
       .delete()
-      .in("id", payload.habits.map((habit) => habit.id))
+      .in("id", habitIds)
       .eq("user_id", userId);
     if (error) throw error;
   }
@@ -1194,6 +1262,20 @@ export const useEpics = (options: EpicsOptions = {}) => {
           throw new Error("Campaign must have at least one ritual");
         }
 
+        const invalidPhase = (epicData.phases ?? []).find(
+          (phase) => !phase.start_date || !phase.end_date || !Number.isFinite(Number(phase.phase_order)),
+        );
+        if (invalidPhase) {
+          throw new Error("Campaign phase dates are missing. Please rebuild the plan and try again.");
+        }
+
+        const normalizedInputMilestonePercents = normalizeCampaignMilestonePercentArray(
+          (epicData.milestones ?? []).map((milestone) => milestone.milestone_percent),
+        );
+        if (normalizedInputMilestonePercents.some((percent) => !isValidCampaignMilestonePercent(percent))) {
+          throw new Error("Campaign milestone percentages must be whole numbers from 1 to 100.");
+        }
+
         const fingerprint = buildCampaignCreateFingerprint(user.id, epicData);
         const recentMatch = await reconcileRecentEpicCreate(user.id, fingerprint);
         if (recentMatch) {
@@ -1215,92 +1297,94 @@ export const useEpics = (options: EpicsOptions = {}) => {
         }
 
         const rememberedPayload = getRememberedEpicCreatePayload(fingerprint);
-        const payload: LocalEpicPayload = rememberedPayload ?? (() => {
-          const nowIso = new Date().toISOString();
-          const startDate = nowIso.split("T")[0];
-          const epicId = createOfflinePlannerId("epic");
-          const inviteCode = `EPIC-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-          const habits = epicData.habits.map((habit) => ({
-            id: createOfflinePlannerId("habit"),
-            user_id: user.id,
-            title: habit.title,
-            description: habit.description || null,
-            difficulty: normalizeDifficulty(habit.difficulty),
-            frequency: normalizeFrequency(habit.frequency),
-            custom_days: habit.custom_days?.length ? habit.custom_days : null,
-            custom_month_days: habit.custom_month_days?.length ? habit.custom_month_days : null,
-            preferred_time: habit.preferred_time || null,
-            reminder_enabled: habit.reminder_enabled || false,
-            reminder_minutes_before: habit.reminder_minutes_before || 15,
-            estimated_minutes: habit.estimated_minutes || null,
-            category: habit.category?.trim() || null,
-            is_active: true,
-            current_streak: 0,
-            longest_streak: 0,
-            created_at: nowIso,
-          })) satisfies LocalHabitRow[];
+        const payload: LocalEpicPayload = rememberedPayload
+          ? withNormalizedCampaignMilestonePercents(rememberedPayload)
+          : (() => {
+            const nowIso = new Date().toISOString();
+            const startDate = nowIso.split("T")[0];
+            const epicId = createOfflinePlannerId("epic");
+            const inviteCode = `EPIC-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+            const habits = epicData.habits.map((habit) => ({
+              id: createOfflinePlannerId("habit"),
+              user_id: user.id,
+              title: habit.title,
+              description: habit.description || null,
+              difficulty: normalizeDifficulty(habit.difficulty),
+              frequency: normalizeFrequency(habit.frequency),
+              custom_days: habit.custom_days?.length ? habit.custom_days : null,
+              custom_month_days: habit.custom_month_days?.length ? habit.custom_month_days : null,
+              preferred_time: habit.preferred_time || null,
+              reminder_enabled: habit.reminder_enabled || false,
+              reminder_minutes_before: habit.reminder_minutes_before || 15,
+              estimated_minutes: habit.estimated_minutes || null,
+              category: habit.category?.trim() || null,
+              is_active: true,
+              current_streak: 0,
+              longest_streak: 0,
+              created_at: nowIso,
+            })) satisfies LocalHabitRow[];
 
-          const epic: LocalEpicRow = {
-            id: epicId,
-            user_id: user.id,
-            title: epicData.title,
-            description: epicData.description || null,
-            status: "active",
-            progress_percentage: 0,
-            target_days: epicData.target_days,
-            start_date: startDate,
-            end_date: resolveEpicEndDate({
-              start_date: startDate,
+            const epic: LocalEpicRow = {
+              id: epicId,
+              user_id: user.id,
+              title: epicData.title,
+              description: epicData.description || null,
+              status: "active",
+              progress_percentage: 0,
               target_days: epicData.target_days,
-            }),
-            epic_habits: [],
-            xp_reward: Math.floor(epicData.target_days * 10),
-            is_public: epicData.is_public ?? false,
-            invite_code: inviteCode,
-            theme_color: normalizeThemeColor(epicData.theme_color),
-            story_type_slug: epicData.story_type_slug || null,
-            created_at: nowIso,
-            completed_at: null,
-          } as LocalEpicRow;
+              start_date: startDate,
+              end_date: resolveEpicEndDate({
+                start_date: startDate,
+                target_days: epicData.target_days,
+              }),
+              epic_habits: [],
+              xp_reward: Math.floor(epicData.target_days * 10),
+              is_public: epicData.is_public ?? false,
+              invite_code: inviteCode,
+              theme_color: normalizeThemeColor(epicData.theme_color),
+              story_type_slug: epicData.story_type_slug || null,
+              created_at: nowIso,
+              completed_at: null,
+            } as LocalEpicRow;
 
-          const epicHabits = habits.map((habit) => ({
-            id: createOfflinePlannerId("epic-habit"),
-            epic_id: epicId,
-            habit_id: habit.id,
-          }));
+            const epicHabits = habits.map((habit) => ({
+              id: createOfflinePlannerId("epic-habit"),
+              epic_id: epicId,
+              habit_id: habit.id,
+            }));
 
-          const phases = (epicData.phases ?? []).map((phase) => ({
-            id: createOfflinePlannerId("journey-phase"),
-            epic_id: epicId,
-            user_id: user.id,
-            name: phase.name,
-            description: phase.description,
-            start_date: phase.start_date,
-            end_date: phase.end_date,
-            phase_order: phase.phase_order,
-          }));
+            const phases = (epicData.phases ?? []).map((phase) => ({
+              id: createOfflinePlannerId("journey-phase"),
+              epic_id: epicId,
+              user_id: user.id,
+              name: phase.name,
+              description: phase.description,
+              start_date: phase.start_date,
+              end_date: phase.end_date,
+              phase_order: phase.phase_order,
+            }));
 
-          const milestones = (epicData.milestones ?? []).map((milestone, index) => ({
-            id: createOfflinePlannerId("epic-milestone"),
-            epic_id: epicId,
-            user_id: user.id,
-            title: milestone.title,
-            description: milestone.description || null,
-            target_date: milestone.target_date,
-            milestone_percent: milestone.milestone_percent,
-            is_postcard_milestone: milestone.is_postcard_milestone ?? false,
-            phase_order: index + 1,
-            phase_name: milestone.phase_name || milestone.phaseName || null,
-          }));
+            const milestones = (epicData.milestones ?? []).map((milestone, index) => ({
+              id: createOfflinePlannerId("epic-milestone"),
+              epic_id: epicId,
+              user_id: user.id,
+              title: milestone.title,
+              description: milestone.description || null,
+              target_date: milestone.target_date,
+              milestone_percent: normalizedInputMilestonePercents[index] ?? milestone.milestone_percent,
+              is_postcard_milestone: milestone.is_postcard_milestone ?? false,
+              phase_order: index + 1,
+              phase_name: milestone.phase_name || milestone.phaseName || null,
+            }));
 
-          return {
-            epic,
-            habits,
-            epicHabits,
-            phases,
-            milestones,
-          };
-        })();
+            return {
+              epic,
+              habits,
+              epicHabits,
+              phases,
+              milestones,
+            };
+          })();
 
         if (!rememberedPayload) {
           rememberEpicCreateAttempt(fingerprint, payload);

@@ -3297,6 +3297,37 @@ export function useCompanionPlanner({
         );
       }
 
+      const committedTaskIds = Array.isArray(commitResult.data?.committedTaskIds)
+        ? commitResult.data.committedTaskIds.filter((taskId): taskId is string =>
+          typeof taskId === "string" && taskId.trim().length > 0
+        )
+        : [];
+      const committedPlan: NonNullable<CompanionPlannerResponse["dayPlan"]> = {
+        ...startingPlan,
+        id: planId,
+        status: "committed",
+        blocks: startingPlan.blocks.map((block, index) => ({
+          ...block,
+          questId: committedTaskIds[index] ?? block.questId ?? null,
+        })),
+      };
+      const committedProposals = proposals.map((proposal) =>
+        proposal.kind === "create_quest" && startingProposalIds.has(proposal.id)
+          ? { ...proposal, status: "confirmed" as const }
+          : proposal
+      );
+      const planDate = new Date(`${startingPlan.date}T12:00:00`);
+      const planDateLabel = Number.isNaN(planDate.getTime())
+        ? startingPlan.date
+        : format(planDate, "EEE, MMM d");
+      const confirmationMessage = createMessage(
+        "companion",
+        `Plan locked in for ${planDateLabel}.`,
+        {
+          dayPlan: committedPlan,
+        },
+      );
+
       setCommittedDayPlanId(planId);
       setDayPlan((current) => {
         if (!current) return current;
@@ -3304,26 +3335,35 @@ export function useCompanionPlanner({
         // committed. A refinement turn that replaced it should keep its
         // own (uncommitted) state.
         if (current === startingPlan) {
-          return { ...current, id: planId, status: "committed" };
+          return committedPlan;
         }
         if (current.date !== startingPlan.date) return current;
         if (current.blocks.length !== startingPlan.blocks.length) return current;
-        return { ...current, id: planId, status: "committed" };
+        return committedPlan;
       });
-      setProposals((previous) =>
-        previous.map((proposal) =>
-          proposal.kind === "create_quest" &&
-            startingProposalIds.has(proposal.id)
-            ? { ...proposal, status: "confirmed" }
-            : proposal
-        )
-      );
+      setProposals(committedProposals);
+      setMessages((previous) => [...previous, confirmationMessage]);
+      await persistPlannerThreadRows([
+        {
+          role: "assistant",
+          content: confirmationMessage.content,
+          createdAt: confirmationMessage.createdAt,
+          metadata: {
+            structuredResponse: confirmationMessage.structuredResponse ?? null,
+            followUpQuestions: [],
+            proposals: committedProposals,
+            suggestedReminders: [],
+            sessionState,
+            dayPlan: committedPlan,
+          } as unknown as Json,
+        },
+      ]);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["daily-tasks"] }),
         queryClient.invalidateQueries({ queryKey: ["calendar-tasks"] }),
         queryClient.invalidateQueries({ queryKey: ["inbox-tasks"] }),
       ]);
-      toast(`Plan locked in for ${format(today, "EEE, MMM d")}.`);
+      toast(confirmationMessage.content);
     } catch (error) {
       console.error("[companion-planner] commit day plan failed", error);
       toast(
@@ -3334,7 +3374,15 @@ export function useCompanionPlanner({
     } finally {
       setCommittingDayPlan(false);
     }
-  }, [committingDayPlan, dayPlan, enabled, queryClient, today]);
+  }, [
+    committingDayPlan,
+    dayPlan,
+    enabled,
+    persistPlannerThreadRows,
+    proposals,
+    queryClient,
+    sessionState,
+  ]);
 
   const {
     isRecording,

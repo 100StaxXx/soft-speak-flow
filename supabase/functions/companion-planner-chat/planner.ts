@@ -470,6 +470,8 @@ export type DayPlanBlockEnergyType =
   | "creative"
   | "recovery";
 
+export type DayPlanBlockDifficulty = "easy" | "medium" | "hard";
+
 export interface DayPlanBlock {
   id: string;
   proposalId: string | null;
@@ -482,6 +484,11 @@ export interface DayPlanBlock {
   reasoning: string;
   epicId?: string | null;
   habitSourceId?: string | null;
+  difficulty?: DayPlanBlockDifficulty | null;
+  reminderEnabled?: boolean | null;
+  reminderMinutesBefore?: number | null;
+  category?: string | null;
+  notes?: string | null;
 }
 
 export interface DayPlan {
@@ -503,6 +510,14 @@ const isDayPlanBlockEnergyType = (
     value === "social" ||
     value === "creative" ||
     value === "recovery");
+
+const isDayPlanBlockDifficulty = (
+  value: unknown,
+): value is DayPlanBlockDifficulty =>
+  value === "easy" || value === "medium" || value === "hard";
+
+const asOptionalDayPlanString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 
 const inferDayPlanBlockSourceFromProposal = (
   proposal: PlannerProposal,
@@ -572,16 +587,36 @@ export const buildProposalFromDayPlanBlock = (
       : 2,
     epicId: block.epicId ?? null,
     habitSourceId: block.habitSourceId ?? null,
+    category: block.category ?? null,
+    notes: block.notes ?? null,
   };
   const proposal = buildOptimizerQuestProposal(input, candidate);
+  const preservedPayload: Record<string, unknown> = {
+    energyType: block.energyType ?? null,
+    epicId: block.epicId ?? null,
+    habitSourceId: block.habitSourceId ?? null,
+  };
+  if (block.difficulty) {
+    preservedPayload.difficulty = block.difficulty;
+  }
+  if (typeof block.reminderEnabled === "boolean") {
+    preservedPayload.reminderEnabled = block.reminderEnabled;
+  }
+  if (typeof block.reminderMinutesBefore === "number") {
+    preservedPayload.reminderMinutesBefore = block.reminderMinutesBefore;
+  }
+  if (block.category) {
+    preservedPayload.category = block.category;
+  }
+  if (block.notes) {
+    preservedPayload.notes = block.notes;
+  }
   return {
     ...proposal,
     id: block.id,
     payload: {
       ...(proposal.payload ?? {}),
-      energyType: block.energyType ?? null,
-      epicId: block.epicId ?? null,
-      habitSourceId: block.habitSourceId ?? null,
+      ...preservedPayload,
     },
   };
 };
@@ -608,6 +643,17 @@ export const synthesizeDayPlanFromProposals = (
       const energyType = isDayPlanBlockEnergyType(payload.energyType)
         ? payload.energyType
         : null;
+      const difficulty = isDayPlanBlockDifficulty(payload.difficulty)
+        ? payload.difficulty
+        : null;
+      const reminderEnabled = typeof payload.reminderEnabled === "boolean"
+        ? payload.reminderEnabled
+        : null;
+      const reminderMinutesBefore =
+        typeof payload.reminderMinutesBefore === "number" &&
+          Number.isFinite(payload.reminderMinutesBefore)
+          ? Math.max(0, Math.round(payload.reminderMinutesBefore))
+          : null;
       const epicId = typeof payload.epicId === "string" && payload.epicId.length > 0
         ? payload.epicId
         : null;
@@ -615,6 +661,8 @@ export const synthesizeDayPlanFromProposals = (
           payload.habitSourceId.length > 0
         ? payload.habitSourceId
         : null;
+      const category = asOptionalDayPlanString(payload.category);
+      const notes = asOptionalDayPlanString(payload.notes);
       return {
         id: proposal.id,
         proposalId: proposal.id,
@@ -629,6 +677,11 @@ export const synthesizeDayPlanFromProposals = (
           : "",
         epicId,
         habitSourceId,
+        difficulty,
+        reminderEnabled,
+        reminderMinutesBefore,
+        category,
+        notes,
       };
     });
   if (blocks.length === 0) return null;

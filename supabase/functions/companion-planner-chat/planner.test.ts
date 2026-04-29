@@ -2,7 +2,11 @@ import {
   assertEquals,
   assertStringIncludes,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { buildPlannerResponse, type PlannerBuildInput } from "./planner.ts";
+import {
+  buildPlannerResponse,
+  synthesizeDayPlanFromProposals,
+  type PlannerBuildInput,
+} from "./planner.ts";
 
 type PlannerBuildInputOverrides =
   & Partial<
@@ -3206,6 +3210,42 @@ Deno.test("DayPlan blocks are sorted by startTime with unscheduled at the end", 
     const sorted = [...startTimes].sort();
     assertEquals(startTimes, sorted);
   }
+});
+
+Deno.test("DayPlan blocks preserve quest payload fields needed by the commit RPC", () => {
+  const dayPlan = synthesizeDayPlanFromProposals("2026-04-18", [
+    {
+      id: "proposal-plan-1",
+      kind: "create_quest",
+      title: "Create Outline launch checklist",
+      summary: "Create a focused quest.",
+      reasoning: "It fits your first open work block.",
+      payload: {
+        taskText: "Outline launch checklist",
+        taskDate: "2026-04-18",
+        scheduledTime: "09:00",
+        estimatedDuration: 45,
+        energyType: "deep",
+        difficulty: "hard",
+        reminderEnabled: true,
+        reminderMinutesBefore: 20,
+        category: "mind",
+        notes: "Draft the launch checklist before standup.",
+        epicId: "00000000-0000-4000-8000-000000000101",
+      },
+      status: "pending",
+      readyToConfirm: true,
+      missingFields: [],
+    },
+  ]);
+
+  const block = dayPlan?.blocks[0];
+  assertEquals(block?.difficulty, "hard");
+  assertEquals(block?.reminderEnabled, true);
+  assertEquals(block?.reminderMinutesBefore, 20);
+  assertEquals(block?.category, "mind");
+  assertEquals(block?.notes, "Draft the launch checklist before standup.");
+  assertEquals(block?.epicId, "00000000-0000-4000-8000-000000000101");
 });
 
 Deno.test("asks again instead of turning empty-day plan-day options into filler quests", () => {

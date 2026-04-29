@@ -21,6 +21,7 @@ import { extractErrorMessage } from "@/utils/networkErrors";
 import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
 import { dispatchPlannerSyncFinished } from "@/utils/plannerSync";
 import { toRemoteEpicInsertPayload } from "@/utils/epicRemotePayload";
+import { normalizeCampaignMilestonePercentArray } from "@/utils/campaignMilestones";
 
 export type SyncStatus = "idle" | "syncing" | "success" | "error";
 
@@ -435,9 +436,17 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
       }
 
       if (payload.milestones.length > 0) {
+        const normalizedMilestonePercents = normalizeCampaignMilestonePercentArray(
+          payload.milestones.map((milestone) => milestone.milestone_percent),
+        );
+        const normalizedMilestones = payload.milestones.map((milestone, index) => ({
+          ...milestone,
+          milestone_percent: normalizedMilestonePercents[index] ?? milestone.milestone_percent,
+        }));
+
         const { error } = await supabase
           .from("epic_milestones")
-          .upsert(payload.milestones as never);
+          .upsert(normalizedMilestones as never);
         if (error) throw error;
       }
 
