@@ -11,11 +11,11 @@ import {
   type PlannerContextTask,
   type PlannerDayLoad,
   type PlannerHorizon,
+  type PlannerMemoryProfile,
   type PlannerMoveSuggestion,
   type PlannerOpenSlot,
   type PlannerProposal,
   type PlannerQuestion,
-  type PlannerMemoryProfile,
   type PlannerScheduleConflict,
   type PlannerScheduleInsights,
   type PlannerSessionState,
@@ -755,9 +755,9 @@ const buildPlannerMemory = (
   const scheduleArchetype = scheduleDefaults?.id ?? null;
   const scheduleArchetypePlanningHint =
     asString(profile.scheduleArchetypePlanningHint) ??
-    asString(profileOnboarding?.scheduleArchetypePlanningHint) ??
-    scheduleDefaults?.plannerHint ??
-    null;
+      asString(profileOnboarding?.scheduleArchetypePlanningHint) ??
+      scheduleDefaults?.plannerHint ??
+      null;
   const preferredTimeOfDay = asString(profile.preferredTimeOfDay) ??
     scheduleDefaults?.defaultPreferredTimeOfDay ??
     null;
@@ -978,6 +978,9 @@ const isLikelyPlanDayClarificationReply = (value: string): boolean => {
       normalized.includes("what kind of day") ||
       normalized.includes("what type of day") ||
       normalized.includes("feeling like focusing") ||
+      normalized.includes("focus, recovery, or catching up") ||
+      normalized.includes("should today lean focus") ||
+      normalized.includes("energy") ||
       normalized.includes("what are we making") ||
       normalized.includes("focus")
     );
@@ -1010,6 +1013,7 @@ export function consultPlannerForAgent(params: {
   surface: "companion" | "journeys";
   horizon?: PlannerHorizon;
   starterIntent?: string | null;
+  forcePlanDayFollowUp?: boolean;
   context: LoadedCompanionAgentContext;
 }): PlannerAssistResult {
   const normalizedMessage = normalizeScheduleReadMessage(params.message);
@@ -1085,8 +1089,8 @@ export function consultPlannerForAgent(params: {
   });
 
   const modeConfig = getCompanionModeConfig(params.context.companionMode);
-  const pendingPlanDayClarification = !plannerStarterIntent &&
-    hasPendingPlanDayClarification(params.context);
+  const pendingPlanDayClarification = params.forcePlanDayFollowUp === true ||
+    (!plannerStarterIntent && hasPendingPlanDayClarification(params.context));
   const sessionState: PlannerSessionState = {
     draft: {},
     openQuestionIds: pendingPlanDayClarification ? ["details"] : [],

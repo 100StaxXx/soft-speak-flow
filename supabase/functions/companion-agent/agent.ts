@@ -584,6 +584,14 @@ const normalizeBareStarterPrompt = (value: string): string =>
     .replace(/[?!.,]+$/g, "")
     .replace(/\s+/g, " ");
 
+const isThinGenericAgentReply = (value: string): boolean => {
+  const normalized = normalizeBareStarterPrompt(value);
+  return normalized === "i'm here" ||
+    normalized === "im here" ||
+    normalized === "i am here" ||
+    normalized === "here";
+};
+
 const resolveBareStarterFollowUp = (
   request: CompanionAgentRequest,
 ): BareStarterFollowUpConfig | null => {
@@ -611,6 +619,130 @@ const resolveBareStarterFollowUp = (
   }
 
   return null;
+};
+
+const isPlanDayFollowUpQuestion = (
+  followUp: CompanionAgentFollowUp | null | undefined,
+): boolean => {
+  if (!followUp) return false;
+  const normalizedQuestion = normalizeBareStarterPrompt(followUp.question);
+  const normalizedOptions = (followUp.options ?? []).map((option) =>
+    normalizeBareStarterPrompt(option)
+  );
+  const optionSet = new Set(normalizedOptions);
+  const hasFocusRecoveryOptions = optionSet.has("focus") &&
+    optionSet.has("recovery") &&
+    (optionSet.has("catch up") || optionSet.has("catch-up"));
+  const hasBlankDayOptions = optionSet.has("focused") &&
+    optionSet.has("light") &&
+    (optionSet.has("catch up") || optionSet.has("catch-up"));
+  const hasEnergyOptions =
+    normalizedOptions.some((option) => option.startsWith("low")) &&
+    normalizedOptions.some((option) => option.startsWith("medium")) &&
+    normalizedOptions.some((option) => option.startsWith("high"));
+
+  return hasFocusRecoveryOptions ||
+    hasBlankDayOptions ||
+    hasEnergyOptions ||
+    normalizedQuestion.includes("what kind of day") ||
+    normalizedQuestion.includes("what type of day") ||
+    normalizedQuestion.includes("feeling like focusing") ||
+    (normalizedQuestion.includes("today") &&
+      normalizedQuestion.includes("focus") &&
+      (
+        normalizedQuestion.includes("recovery") ||
+        normalizedQuestion.includes("catch")
+      )) ||
+    (normalizedQuestion.includes("energy") &&
+      normalizedQuestion.includes("working"));
+};
+
+const parsePersistedFollowUp = (
+  value: unknown,
+): CompanionAgentFollowUp | null => {
+  const record = asRecord(value);
+  if (!record || typeof record.question !== "string") return null;
+  const expectedAnswerType = record.expectedAnswerType === "choice" ||
+      record.expectedAnswerType === "time" ||
+      record.expectedAnswerType === "priority" ||
+      record.expectedAnswerType === "confirmation" ||
+      record.expectedAnswerType === "free_text"
+    ? record.expectedAnswerType
+    : "free_text";
+
+  return {
+    question: record.question,
+    reason: typeof record.reason === "string" ? record.reason : null,
+    expectedAnswerType,
+    options: Array.isArray(record.options)
+      ? record.options.filter((option): option is string =>
+        typeof option === "string"
+      )
+      : [],
+    blocksDrafting: typeof record.blocksDrafting === "boolean"
+      ? record.blocksDrafting
+      : true,
+  };
+};
+
+const getPersistedActiveFollowUp = (
+  context: LoadedCompanionAgentContext,
+): CompanionAgentFollowUp | null => {
+  for (const message of [...context.messages].reverse()) {
+    if (message.role !== "assistant") continue;
+    const metadata = asRecord(message.metadata);
+    const decision = asRecord(metadata?.agentDecision);
+    const followUp = parsePersistedFollowUp(decision?.followUp);
+    if (followUp) return followUp;
+  }
+
+  return null;
+};
+
+const isPlanDayClarificationText = (value: string): boolean => {
+  const normalized = normalizeBareStarterPrompt(value);
+  return normalized.includes("what kind of day") ||
+    normalized.includes("what type of day") ||
+    normalized.includes("feeling like focusing") ||
+    normalized.includes("focus, recovery, or catching up") ||
+    normalized.includes("should today lean focus") ||
+    (normalized.includes("energy") && normalized.includes("working"));
+};
+
+const hasRecentPlanDayStarterBeforeLastAssistant = (
+  context: LoadedCompanionAgentContext,
+): boolean => {
+  const lastAssistantIndex = [...context.messages]
+    .map((message, index) => ({ message, index }))
+    .reverse()
+    .find(({ message }) => message.role === "assistant")?.index;
+  if (lastAssistantIndex === undefined) return false;
+
+  const assistantMessage = context.messages[lastAssistantIndex];
+  if (!isPlanDayClarificationText(assistantMessage.content)) return false;
+
+  return context.messages
+    .slice(Math.max(0, lastAssistantIndex - 6), lastAssistantIndex)
+    .some((message) =>
+      message.role === "user" &&
+      normalizeBareStarterPrompt(message.content).includes("plan my day")
+    );
+};
+
+const isPlanDayFollowUpAnswer = (
+  request: CompanionAgentRequest,
+  context: LoadedCompanionAgentContext,
+): boolean => {
+  if (
+    request.selectedProposalId ||
+    request.selectedProposedAction
+  ) {
+    return false;
+  }
+
+  return isPlanDayFollowUpQuestion(request.activeFollowUp) ||
+    isPlanDayFollowUpQuestion(getPersistedActiveFollowUp(context)) ||
+    hasRecentPlanDayStarterBeforeLastAssistant(context);
 };
 
 const hasProposalOrDraftArtifacts = (result: AgentRunResult["result"]) =>
@@ -675,6 +807,41 @@ function buildBareStarterAgentResult(params: {
     openaiConversationId: params.context.thread?.openai_conversation_id ?? null,
     lastOpenAIResponseId: params.context.thread?.last_openai_response_id ??
       null,
+  };
+}
+
+function buildActiveFollowUpClarifyAgentResult(params: {
+  followUp: CompanionAgentFollowUp;
+  reply?: string | null;
+  intent: CompanionAgentIntent;
+  confidence: number;
+  context: LoadedCompanionAgentContext;
+  openaiConversationId?: string | null;
+  lastOpenAIResponseId?: string | null;
+}): AgentRunResult {
+  const usableReply = params.reply?.trim();
+  const reply = usableReply && !isThinGenericAgentReply(usableReply)
+    ? usableReply
+    : `I need your answer to the follow-up before I can act: ${params.followUp.question}`;
+
+  return {
+    result: {
+      reply,
+      mode: "clarify",
+      intent: params.intent,
+      confidence: Math.min(params.confidence, 0.6),
+      understandingState: "needs_followup",
+      followUp: params.followUp,
+      proposedActions: [],
+      assumptions: [],
+      evidenceIds: [],
+      structuredResponse: null,
+      preparedActionId: null,
+    },
+    openaiConversationId: params.openaiConversationId ??
+      params.context.thread?.openai_conversation_id ?? null,
+    lastOpenAIResponseId: params.lastOpenAIResponseId ??
+      params.context.thread?.last_openai_response_id ?? null,
   };
 }
 
@@ -2633,9 +2800,30 @@ export async function runCompanionAgent(params: RunAgentParams) {
     for (let loop = 0; loop < MAX_TOOL_LOOPS; loop += 1) {
       const functionCalls = getFunctionCalls(response);
       if (functionCalls.length === 0) {
+        const outputReply = response.output_text?.trim() ?? "";
+        const activeFollowUp = params.request.activeFollowUp ??
+          getPersistedActiveFollowUp(context);
+        if (
+          activeFollowUp &&
+          (!outputReply || isThinGenericAgentReply(outputReply))
+        ) {
+          return buildActiveFollowUpClarifyAgentResult({
+            followUp: activeFollowUp,
+            intent: isPlanDayFollowUpQuestion(activeFollowUp)
+              ? "plan_day"
+              : "unknown",
+            confidence: 0.25,
+            context,
+            openaiConversationId: currentConversationId,
+            lastOpenAIResponseId: currentPreviousResponseId,
+          });
+        }
+
         return {
           result: {
-            reply: response.output_text?.trim() || "I’m here.",
+            reply: outputReply && !isThinGenericAgentReply(outputReply)
+              ? outputReply
+              : "I need a little more to help. Tell me what you want to do next.",
             mode: "conversation" as CompanionAgentMode,
             intent: "unknown" as CompanionAgentIntent,
             confidence: 0.25,
@@ -2660,8 +2848,26 @@ export async function runCompanionAgent(params: RunAgentParams) {
         const payload = SubmitCompanionResultSchema.parse(
           JSON.parse(finalCall.arguments || "{}"),
         );
+        const payloadReply = payload.reply.trim();
         const followUp = payload.follow_up ?? null;
         const preparedActionId = payload.prepared_action_id ?? null;
+        const activeFollowUp = params.request.activeFollowUp ??
+          getPersistedActiveFollowUp(context);
+        const followUpToPreserve = activeFollowUp ?? followUp;
+        if (followUpToPreserve && isThinGenericAgentReply(payloadReply)) {
+          return buildActiveFollowUpClarifyAgentResult({
+            followUp: followUpToPreserve,
+            intent: payload.intent === "unknown" &&
+                isPlanDayFollowUpQuestion(followUpToPreserve)
+              ? "plan_day"
+              : payload.intent,
+            confidence: payload.confidence,
+            context,
+            openaiConversationId: currentConversationId,
+            lastOpenAIResponseId: currentPreviousResponseId,
+          });
+        }
+
         const understandingState = payload.understanding_state ??
           deriveUnderstandingState({
             mode: payload.mode,
@@ -2670,7 +2876,9 @@ export async function runCompanionAgent(params: RunAgentParams) {
           });
         return {
           result: {
-            reply: payload.reply.trim(),
+            reply: payloadReply && !isThinGenericAgentReply(payloadReply)
+              ? payloadReply
+              : "I need a little more to help. Tell me what you want to do next.",
             mode: payload.mode,
             intent: payload.intent,
             confidence: payload.confidence,
@@ -2727,18 +2935,29 @@ export async function runCompanionAgent(params: RunAgentParams) {
       },
     );
 
-  const buildPlannerFallbackResult = (reason: string): AgentRunResult => {
+  const buildPlannerFallbackResult = (
+    reason: string,
+    options: {
+      starterIntent?: string | null;
+      forcePlanDayFollowUp?: boolean;
+      confidence?: number;
+    } = {},
+  ): AgentRunResult => {
     console.warn("[companion-agent] planner fallback", {
       sessionId: params.request.sessionId,
       reason,
     });
 
+    const plannerStarterIntent = options.starterIntent ??
+      params.request.starterIntent ??
+      null;
     const plannerResult = consultPlannerForAgent({
       message: params.request.message,
       currentDateTime: context.currentDateTime,
       surface: params.request.surface,
       horizon: "day",
-      starterIntent: params.request.starterIntent ?? null,
+      starterIntent: plannerStarterIntent,
+      forcePlanDayFollowUp: options.forcePlanDayFollowUp,
       context,
     });
 
@@ -2765,11 +2984,13 @@ export async function runCompanionAgent(params: RunAgentParams) {
       result: {
         reply: plannerResult.reply,
         mode,
-        intent: params.request.starterIntent === "plan_day" &&
-            plannerResult.questions.length > 0
+        intent: (
+            plannerStarterIntent === "plan_day" ||
+            options.forcePlanDayFollowUp === true
+          ) && plannerResult.questions.length > 0
           ? "plan_day"
           : mapPlannerFallbackIntent(plannerResult),
-        confidence: 0.55,
+        confidence: options.confidence ?? 0.55,
         understandingState: deriveUnderstandingState({ mode, followUp }),
         followUp,
         proposedActions: plannerResult.actionHints
@@ -2795,8 +3016,18 @@ export async function runCompanionAgent(params: RunAgentParams) {
     request: params.request,
     context,
   });
+  const deterministicPlanDayFollowUpResult = bareStarterResult
+    ? null
+    : isPlanDayFollowUpAnswer(params.request, context)
+    ? buildPlannerFallbackResult("plan_day_follow_up_answer", {
+      starterIntent: null,
+      forcePlanDayFollowUp: true,
+      confidence: 0.78,
+    })
+    : null;
 
   const agentResult: AgentRunResult = bareStarterResult ??
+    deterministicPlanDayFollowUpResult ??
     await wrapSubStage("openai", async () => {
       try {
         if (context.thread?.openai_conversation_id) {

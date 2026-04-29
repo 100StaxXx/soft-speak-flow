@@ -24,6 +24,7 @@ type MockCompanionRow = {
 
 type MockSupabaseOptions = {
   companion?: Partial<MockCompanionRow>;
+  messages?: unknown[];
 };
 
 const defaultCompanionRow: MockCompanionRow = {
@@ -82,7 +83,7 @@ function createQueryResult(
   }
 
   if (table === "companion_chats" && operation === "select") {
-    return { data: [], error: null, count: 0 };
+    return { data: options.messages ?? [], error: null, count: 0 };
   }
 
   if (
@@ -215,6 +216,37 @@ function createInstructionCaptureFetch(reply = "I’m here.") {
   return { guardedFetch, responseBodies };
 }
 
+function createOutputTextCaptureFetch(outputText = "I’m here.") {
+  const responseBodies: Array<Record<string, unknown>> = [];
+  const guardedFetch = (async (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ) => {
+    const url = String(input);
+    if (url.endsWith("/conversations")) {
+      return jsonResponse({ id: `conv_${responseBodies.length + 1}` });
+    }
+
+    if (url.endsWith("/responses")) {
+      const body = JSON.parse(String(init?.body ?? "{}")) as Record<
+        string,
+        unknown
+      >;
+      responseBodies.push(body);
+      return jsonResponse({
+        id: `resp_${responseBodies.length}`,
+        conversation: { id: `conv_${responseBodies.length}` },
+        output_text: outputText,
+        output: [],
+      });
+    }
+
+    throw new Error(`Unexpected fetch: ${url}`);
+  }) as typeof fetch;
+
+  return { guardedFetch, responseBodies };
+}
+
 Deno.test("companion agent tools explicitly opt out of strict Responses schemas", () => {
   const tools = buildToolDefinitions();
 
@@ -305,6 +337,168 @@ Deno.test("runCompanionAgent asks a follow-up instead of proposing quests for ba
   );
 });
 
+Deno.test("runCompanionAgent routes plan-day follow-up answers through the planner", async () => {
+  const supabase = createMockSupabase();
+  let guardedFetchCalled = false;
+  const guardedFetch = (async (input: string | URL | Request) => {
+    guardedFetchCalled = true;
+    throw new Error(
+      `Plan-day follow-up should not call OpenAI: ${String(input)}`,
+    );
+  }) as typeof fetch;
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-plan-day-follow-up",
+      message: "Recovery",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      activeFollowUp: {
+        question: "Should today lean focus, recovery, or catching up?",
+        reason:
+          "That choice changes whether I protect deep work, lighten the load, or triage overdue items.",
+        expectedAnswerType: "choice",
+        options: ["Focus", "Recovery", "Catch up"],
+        blocksDrafting: true,
+      },
+      activeProposedActions: [
+        {
+          type: "quest.create",
+          title: "Stale previous suggestion",
+          normalizedPayload: { title: "Stale previous suggestion" },
+        },
+      ],
+    },
+  });
+
+  assertEquals(guardedFetchCalled, false);
+  assertEquals(result.mode, "clarify");
+  assertEquals(result.intent, "plan_day");
+  assertEquals(result.understandingState, "needs_followup");
+  assertEquals(result.proposedActions, []);
+  assertEquals(result.structuredResponse, null);
+  assertEquals(result.pendingAction, undefined);
+  assert(result.reply !== "I'm here.");
+  assert(result.reply.toLowerCase().includes("energy"));
+  assertEquals(
+    result.followUp?.question,
+    "Quick check — what kind of energy are we working with?",
+  );
+});
+
+Deno.test("runCompanionAgent keeps plan-day energy answers out of the generic agent path", async () => {
+  const supabase = createMockSupabase();
+  let guardedFetchCalled = false;
+  const guardedFetch = (async (input: string | URL | Request) => {
+    guardedFetchCalled = true;
+    throw new Error(
+      `Plan-day energy answer should not call OpenAI: ${String(input)}`,
+    );
+  }) as typeof fetch;
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-plan-day-energy",
+      message: "Low — keep it light",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      activeFollowUp: {
+        question: "Quick check — what kind of energy are we working with?",
+        reason: "Energy shapes how heavy I make the plan.",
+        expectedAnswerType: "choice",
+        options: [
+          "Low — keep it light",
+          "Medium — balanced",
+          "High — bring it on",
+        ],
+        blocksDrafting: true,
+      },
+    },
+  });
+
+  assertEquals(guardedFetchCalled, false);
+  assertEquals(result.intent, "plan_day");
+  assert(result.reply !== "I'm here.");
+  assert(result.reply.length > 10);
+});
+
+Deno.test("runCompanionAgent recovers persisted plan-day follow-up context when request state is stale", async () => {
+  const followUp = {
+    question: "Should today lean focus, recovery, or catching up?",
+    reason:
+      "That choice changes whether I protect deep work, lighten the load, or triage overdue items.",
+    expectedAnswerType: "choice",
+    options: ["Focus", "Recovery", "Catch up"],
+    blocksDrafting: true,
+  };
+  const supabase = createMockSupabase({
+    messages: [
+      {
+        id: "msg-2",
+        role: "assistant",
+        content:
+          "Absolutely. Before I shape today, should it lean focus, recovery, or catching up?",
+        created_at: "2026-04-18T15:00:01.000Z",
+        input_mode: null,
+        source: "agent",
+        surface: "journeys",
+        session_id: "session-plan-day-stale-state",
+        metadata: { agentDecision: { followUp } },
+      },
+      {
+        id: "msg-1",
+        role: "user",
+        content: "Plan my day",
+        created_at: "2026-04-18T15:00:00.000Z",
+        input_mode: "text",
+        source: "agent",
+        surface: "journeys",
+        session_id: "session-plan-day-stale-state",
+        metadata: null,
+      },
+    ],
+  });
+  let guardedFetchCalled = false;
+  const guardedFetch = (async (input: string | URL | Request) => {
+    guardedFetchCalled = true;
+    throw new Error(
+      `Persisted plan-day follow-up should not call OpenAI: ${String(input)}`,
+    );
+  }) as typeof fetch;
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-plan-day-stale-state",
+      message: "Recovery",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+    },
+  });
+
+  assertEquals(guardedFetchCalled, false);
+  assertEquals(result.intent, "plan_day");
+  assert(result.reply !== "I'm here.");
+  assertEquals(
+    result.followUp?.question,
+    "Quick check — what kind of energy are we working with?",
+  );
+});
+
 Deno.test("runCompanionAgent asks a follow-up for bare plan-day variants without OpenAI", async () => {
   const supabase = createMockSupabase();
   let guardedFetchCalled = false;
@@ -384,6 +578,80 @@ Deno.test("runCompanionAgent asks a follow-up for bare Adjust my day when the mo
     ),
     "bare adjust prompt should not create a pending action",
   );
+});
+
+Deno.test("runCompanionAgent preserves active follow-up when the model submits a thin reply", async () => {
+  const followUp = {
+    question:
+      "What are we making room for: focus work, recovery, or a specific commitment?",
+    reason: "The next step depends on what should move.",
+    expectedAnswerType: "choice" as const,
+    options: ["Focus work", "Recovery", "Specific commitment"],
+    blocksDrafting: true,
+  };
+  const supabase = createMockSupabase();
+  const { guardedFetch } = createInstructionCaptureFetch("I'm here.");
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-active-follow-up-thin-submit",
+      message: "Recovery",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      activeFollowUp: followUp,
+    },
+  });
+
+  assertEquals(result.mode, "clarify");
+  assertEquals(result.understandingState, "needs_followup");
+  assertEquals(result.followUp?.question, followUp.question);
+  assert(result.reply !== "I'm here.");
+  assert(result.reply.includes(followUp.question));
+  assertEquals(result.proposedActions, []);
+  assertEquals(result.structuredResponse, null);
+  assertEquals(result.pendingAction, undefined);
+});
+
+Deno.test("runCompanionAgent preserves active follow-up when OpenAI returns only thin output text", async () => {
+  const followUp = {
+    question:
+      "What are we making room for: focus work, recovery, or a specific commitment?",
+    reason: "The next step depends on what should move.",
+    expectedAnswerType: "choice" as const,
+    options: ["Focus work", "Recovery", "Specific commitment"],
+    blocksDrafting: true,
+  };
+  const supabase = createMockSupabase();
+  const { guardedFetch } = createOutputTextCaptureFetch("I'm here.");
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-active-follow-up-thin-output",
+      message: "Recovery",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      activeFollowUp: followUp,
+    },
+  });
+
+  assertEquals(result.mode, "clarify");
+  assertEquals(result.understandingState, "needs_followup");
+  assertEquals(result.followUp?.question, followUp.question);
+  assert(result.reply !== "I'm here.");
+  assert(result.reply.includes(followUp.question));
+  assertEquals(result.proposedActions, []);
+  assertEquals(result.structuredResponse, null);
+  assertEquals(result.pendingAction, undefined);
 });
 
 Deno.test("runCompanionAgent uses custom companion name before generated cache in model instructions", async () => {

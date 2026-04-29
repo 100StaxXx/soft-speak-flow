@@ -200,7 +200,10 @@ Deno.test("consultPlannerForAgent treats a reply after plan-day clarification as
   assertEquals(result.mode, "proposal");
   assertEquals(result.questions.length, 0);
   assertEquals(result.actionHints[0]?.actionType, "task_create");
-  assertEquals(result.actionHints[0]?.normalizedPayload?.title, "Work On My App");
+  assertEquals(
+    result.actionHints[0]?.normalizedPayload?.title,
+    "Work On My App",
+  );
 });
 
 Deno.test("consultPlannerForAgent drafts clean room after plan-day clarification on a blank account", () => {
