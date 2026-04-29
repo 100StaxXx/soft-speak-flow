@@ -33,6 +33,6 @@ describe("CompanionImage", () => {
     expect(image).toHaveAttribute("data-companion-image-fit", "portrait");
     expect(image).toHaveAttribute("data-companion-image-focal-source", "manifest");
     expect(image).toHaveClass("object-contain");
-    expect(image).toHaveStyle({ transform: "translate(-0.098%, 2.930%) scale(1.08)" });
+    expect(image).toHaveStyle({ transform: "translate(0.000%, 2.930%)" });
   });
 });

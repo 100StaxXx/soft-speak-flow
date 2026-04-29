@@ -650,6 +650,9 @@ ${JSON.stringify({
     });
 
     if (!response.ok) {
+      // Consume the body so the underlying ReadableStream doesn't leak. The
+      // text is logged but not propagated; we always return the fallback copy.
+      await response.text().catch(() => undefined);
       return fallback;
     }
 

@@ -1,4 +1,15 @@
 import "@testing-library/jest-dom";
+import { vi } from "vitest";
+
+// Placeholder Supabase env so `src/integrations/supabase/client.ts` doesn't
+// throw at module load when tests run without a `.env.local`. The values are
+// never used to make real network calls in unit tests; mocks should stand in.
+if (!import.meta.env.VITE_SUPABASE_URL) {
+  vi.stubEnv("VITE_SUPABASE_URL", "https://test.supabase.co");
+}
+if (!import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
+  vi.stubEnv("VITE_SUPABASE_PUBLISHABLE_KEY", "test-publishable-key");
+}
 
 if (typeof globalThis.indexedDB === "undefined") {
   const compareKeys = (left: unknown, right: unknown) => JSON.stringify(left) === JSON.stringify(right);

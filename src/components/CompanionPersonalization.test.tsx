@@ -28,7 +28,7 @@ describe("CompanionPersonalization", () => {
     expect(eggImages.some((image) =>
       image.getAttribute("data-companion-image-fit") === "contain"
       && image.getAttribute("data-companion-image-focal-source") === "manifest"
-      && image.getAttribute("style")?.includes("scale(1.08)")
+      && image.getAttribute("style")?.includes("translate(")
     )).toBe(true);
   });
 

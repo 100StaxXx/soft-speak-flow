@@ -39,6 +39,7 @@ const mocks = vi.hoisted(() => {
     },
     queryClient: {
       refetchQueries: vi.fn().mockResolvedValue(undefined),
+      invalidateQueries: vi.fn().mockResolvedValue(undefined),
     },
     refreshConnection: vi.fn().mockResolvedValue(undefined),
     eveningReflection: {
@@ -296,11 +297,22 @@ describe("Index onboarding guard", () => {
       selected_mentor_id: "mentor-legacy",
       onboarding_data: {},
     };
+    // A completed account has a companion image on file — without one the
+    // migration check (needsCompanionMigration in getOnboardingGateState) would
+    // override the completion step and redirect.
     mocks.companion = {
       id: "companion-egg",
       preset_id: null,
       current_stage: 0,
-    } as { id: string; preset_id: null; current_stage: number };
+      current_image_url: "https://example.com/companion-egg.png",
+      initial_image_url: "https://example.com/companion-egg-initial.png",
+    } as {
+      id: string;
+      preset_id: null;
+      current_stage: number;
+      current_image_url: string;
+      initial_image_url: string;
+    };
 
     renderIndex();
 
