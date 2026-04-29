@@ -154,9 +154,6 @@ const isExactQuestCaptureStarterMessage = (message: string): boolean =>
 const isExactPlanDayStarterMessage = (message: string): boolean =>
   message.trim().toLowerCase() === "plan my day";
 
-const isExactPlanWeekStarterMessage = (message: string): boolean =>
-  message.trim().toLowerCase() === "plan my week";
-
 const isExactPrepareTomorrowStarterMessage = (message: string): boolean =>
   message.trim().toLowerCase() === "prepare me for tomorrow";
 
@@ -681,13 +678,6 @@ export function useLegacyCompanionAssistantAdapter({
 
     if (isExactPlanDayStarterMessage(message)) {
       await planner.submitMessage(message, inputMode);
-      return;
-    }
-
-    if (isExactPlanWeekStarterMessage(message)) {
-      await planner.submitMessage(message, inputMode, {
-        starterIntent: "plan_week",
-      });
       return;
     }
 

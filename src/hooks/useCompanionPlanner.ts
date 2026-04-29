@@ -635,6 +635,13 @@ const deriveStarterIntentFromMessage = (
     return "what_matters";
   }
   if (
+    /\b(prepare me for tomorrow|prep me for tomorrow|help me prepare for tomorrow|set me up for tomorrow|tomorrow prep)\b/.test(
+      normalizedMessage,
+    )
+  ) {
+    return "briefing_followup";
+  }
+  if (
     /\b(plan my day|what does today look like|show me today|today look like)\b/
       .test(normalizedMessage)
   ) {
@@ -2191,7 +2198,7 @@ export function useCompanionPlanner({
           proposals: [],
           suggestedReminders: [],
           sessionState: nextSessionState,
-        },
+        } as unknown as Json,
       },
     ]);
   }, [enabled, persistPlannerThreadRows, sessionState]);

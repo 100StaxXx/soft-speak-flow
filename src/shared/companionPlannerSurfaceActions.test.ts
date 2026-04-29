@@ -10,7 +10,6 @@ describe("companion planner surface actions", () => {
         message: action.message,
       })),
     ).toEqual([
-      { id: "plan-week", message: "Plan my week" },
       { id: "plan-day", message: "Plan my day" },
       { id: "prepare-tomorrow", message: "Prepare me for tomorrow" },
       { id: "advance-campaign", message: "Advance my campaign" },

@@ -79,6 +79,7 @@ export interface CompanionPlannerQuestion {
     | "duration"
     | "details";
   options?: string[];
+  metadata?: Record<string, unknown>;
 }
 
 export interface CompanionPlannerProposal {
@@ -127,6 +128,18 @@ export interface CompanionPlannerDraftState {
 }
 
 export type CompanionPlanDayEnergyLevel = "low" | "medium" | "high";
+export type CompanionPlanningLauncherConsentKind =
+  | "quest"
+  | "schedule_changes"
+  | "campaign_adjustment"
+  | "planner_changes";
+
+export interface CompanionPlanningLauncherConsentState {
+  kind: CompanionPlanningLauncherConsentKind;
+  sourceStarterIntent: CompanionPlannerStarterIntent;
+  sourceMessage: string;
+  confirmed?: boolean;
+}
 
 export interface CompanionPlannerSessionState {
   draft: CompanionPlannerDraftState;
@@ -137,6 +150,7 @@ export interface CompanionPlannerSessionState {
   pendingStarterIntent?: CompanionPlannerStarterIntent | null;
   lastClassification?: IntentClassification["type"] | null;
   planDayEnergy?: CompanionPlanDayEnergyLevel | null;
+  planningConsent?: CompanionPlanningLauncherConsentState | null;
 }
 
 export interface PlannerContextTask {

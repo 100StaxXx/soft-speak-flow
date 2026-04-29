@@ -929,6 +929,53 @@ Deno.test("does not rewrite inferred plan-day clarification turns", async () => 
   assertEquals(called, false);
 });
 
+Deno.test("does not rewrite planning launcher consent follow-up turns", async () => {
+  let called = false;
+
+  const response = await buildOrchestratedPlannerResponse({
+    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) => {
+      called = true;
+      return new Response("unexpected");
+    },
+    input: {
+      ...baseInput(),
+      message: "Yes please",
+      sessionState: {
+        ...baseInput().sessionState,
+        openQuestionIds: ["planning_launcher_consent"],
+        planningConsent: {
+          kind: "quest",
+          sourceStarterIntent: "relationship_touch",
+          sourceMessage: "Relationship touch",
+        },
+      },
+    },
+    baseResult: {
+      ...baseResult("conversational"),
+      reply: "Okay - what should the quest be called?",
+      followUpQuestions: [{
+        id: "details",
+        prompt: "Okay - what should the quest be called?",
+        required: true,
+        field: "details",
+      }],
+      sessionState: {
+        ...baseResult("conversational").sessionState,
+        draft: { draftKind: "create_quest" },
+        openQuestionIds: ["details"],
+        pendingStarterIntent: "quest_capture",
+      },
+    },
+    openAIApiKey: "test-openai-key",
+    model: "test-model",
+  });
+
+  assertEquals(response.mode, "conversational");
+  assertEquals(response.reply, "Okay - what should the quest be called?");
+  assertEquals(response.followUpQuestions.length, 1);
+  assertEquals(called, false);
+});
+
 Deno.test("does not rewrite deterministic no-room plan-day replies", async () => {
   const captured = {
     called: false,

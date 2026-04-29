@@ -377,18 +377,59 @@ Deno.test("runCompanionAgent routes plan-day follow-up answers through the plann
   });
 
   assertEquals(guardedFetchCalled, false);
+  assertEquals(result.mode, "conversation");
+  assertEquals(result.intent, "plan_day");
+  assertEquals(result.understandingState, "enough_to_discuss");
+  assertEquals(result.followUp, null);
+  assertEquals(result.proposedActions, []);
+  assertEquals(result.structuredResponse?.planDay?.suggestedQuests.length, 0);
+  assertEquals(result.pendingAction, undefined);
+  assert(result.reply !== "I'm here.");
+  assert(result.reply.length > 10);
+});
+
+Deno.test("runCompanionAgent asks consent before turning a concrete plan-day reply into a quest", async () => {
+  const supabase = createMockSupabase();
+  let guardedFetchCalled = false;
+  const guardedFetch = (async (input: string | URL | Request) => {
+    guardedFetchCalled = true;
+    throw new Error(
+      `Concrete plan-day follow-up should not call OpenAI: ${String(input)}`,
+    );
+  }) as typeof fetch;
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-plan-day-concrete-consent",
+      message: "Finish my essay",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      activeFollowUp: {
+        question: "Should today lean focus, recovery, or catching up?",
+        reason:
+          "That choice changes whether I protect deep work, lighten the load, or triage overdue items.",
+        expectedAnswerType: "choice",
+        options: ["Focus", "Recovery", "Catch up"],
+        blocksDrafting: true,
+      },
+    },
+  });
+
+  assertEquals(guardedFetchCalled, false);
   assertEquals(result.mode, "clarify");
   assertEquals(result.intent, "plan_day");
   assertEquals(result.understandingState, "needs_followup");
   assertEquals(result.proposedActions, []);
-  assertEquals(result.structuredResponse, null);
   assertEquals(result.pendingAction, undefined);
-  assert(result.reply !== "I'm here.");
-  assert(result.reply.toLowerCase().includes("energy"));
-  assertEquals(
-    result.followUp?.question,
-    "Quick check — what kind of energy are we working with?",
-  );
+  assertEquals(result.followUp?.expectedAnswerType, "confirmation");
+  assertEquals(result.followUp?.options, ["Yes", "No"]);
+  assertEquals(result.followUp?.question, "Would you like to form a quest?");
+  assert(result.reply.includes("I won't turn that into a quest automatically"));
 });
 
 Deno.test("runCompanionAgent keeps plan-day energy answers out of the generic agent path", async () => {
@@ -492,11 +533,93 @@ Deno.test("runCompanionAgent recovers persisted plan-day follow-up context when 
 
   assertEquals(guardedFetchCalled, false);
   assertEquals(result.intent, "plan_day");
+  assertEquals(result.mode, "conversation");
+  assertEquals(result.followUp, null);
+  assertEquals(result.proposedActions, []);
   assert(result.reply !== "I'm here.");
-  assertEquals(
-    result.followUp?.question,
-    "Quick check — what kind of energy are we working with?",
+  assert(result.reply.length > 10);
+});
+
+Deno.test("runCompanionAgent does not resurrect cleared persisted follow-ups", async () => {
+  const oldFollowUp = {
+    question: "Should today lean focus, recovery, or catching up?",
+    reason:
+      "That choice changes whether I protect deep work, lighten the load, or triage overdue items.",
+    expectedAnswerType: "choice",
+    options: ["Focus", "Recovery", "Catch up"],
+    blocksDrafting: true,
+  };
+  const supabase = createMockSupabase({
+    messages: [
+      {
+        id: "msg-4",
+        role: "assistant",
+        content: "No problem - we'll keep this as planning context, not a quest.",
+        created_at: "2026-04-18T15:00:03.000Z",
+        input_mode: null,
+        source: "agent",
+        surface: "journeys",
+        session_id: "session-plan-day-cleared-follow-up",
+        metadata: { agentDecision: { followUp: null } },
+      },
+      {
+        id: "msg-3",
+        role: "user",
+        content: "No thanks",
+        created_at: "2026-04-18T15:00:02.000Z",
+        input_mode: "text",
+        source: "agent",
+        surface: "journeys",
+        session_id: "session-plan-day-cleared-follow-up",
+        metadata: null,
+      },
+      {
+        id: "msg-2",
+        role: "assistant",
+        content:
+          "Absolutely. Before I shape today, should it lean focus, recovery, or catching up?",
+        created_at: "2026-04-18T15:00:01.000Z",
+        input_mode: null,
+        source: "agent",
+        surface: "journeys",
+        session_id: "session-plan-day-cleared-follow-up",
+        metadata: { agentDecision: { followUp: oldFollowUp } },
+      },
+      {
+        id: "msg-1",
+        role: "user",
+        content: "Plan my day",
+        created_at: "2026-04-18T15:00:00.000Z",
+        input_mode: "text",
+        source: "agent",
+        surface: "journeys",
+        session_id: "session-plan-day-cleared-follow-up",
+        metadata: null,
+      },
+    ],
+  });
+  const { guardedFetch, responseBodies } = createOutputTextCaptureFetch(
+    "All clear.",
   );
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-plan-day-cleared-follow-up",
+      message: "What else can we talk about?",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+    },
+  });
+
+  assert(responseBodies.length > 0);
+  assertEquals(result.mode, "conversation");
+  assertEquals(result.followUp, null);
+  assertEquals(result.reply, "All clear.");
 });
 
 Deno.test("runCompanionAgent asks a follow-up for bare plan-day variants without OpenAI", async () => {

@@ -257,6 +257,7 @@ export const CompanionAgentFollowUpSchema = z.object({
   ]).default("free_text"),
   options: z.array(z.string().min(1).max(120)).max(6).optional(),
   blocksDrafting: z.boolean().default(true),
+  metadata: z.record(z.unknown()).optional(),
 });
 
 export const CompanionAgentProposedActionSchema = z.object({

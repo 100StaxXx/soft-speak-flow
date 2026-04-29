@@ -182,6 +182,17 @@ export const PlannerRequestSchema = z.object({
     pendingStarterIntent: PlannerNullableStarterIntentSchema,
     lastClassification: PlannerIntentTypeSchema.nullable().optional(),
     planDayEnergy: z.enum(["low", "medium", "high"]).nullable().optional(),
+    planningConsent: z.object({
+      kind: z.enum([
+        "quest",
+        "schedule_changes",
+        "campaign_adjustment",
+        "planner_changes",
+      ]),
+      sourceStarterIntent: PlannerStarterIntentSchema,
+      sourceMessage: z.string().min(1).max(4000),
+      confirmed: z.boolean().optional(),
+    }).nullable().optional(),
   }),
   parsedInput: z.object({
     text: z.string(),

@@ -20,9 +20,11 @@ import {
   type PlannerScheduleInsights,
   type PlannerSessionState,
   type PlannerStarterIntent,
+  type PlanningLauncherConsentKind,
 } from "../companion-planner-chat/planner.ts";
 import type { CompanionStructuredResponse } from "../../../src/shared/companionStructuredOutput.ts";
 import type {
+  CompanionAgentFollowUp,
   CompanionAgentIntent,
   CompanionPendingActionType,
   LoadedCompanionAgentContext,
@@ -968,6 +970,49 @@ const normalizePlannerStarterIntent = (
   }
 };
 
+const normalizePlanningConsentKind = (
+  value: unknown,
+): PlanningLauncherConsentKind | null => {
+  switch (value) {
+    case "quest":
+    case "schedule_changes":
+    case "campaign_adjustment":
+    case "planner_changes":
+      return value;
+    default:
+      return null;
+  }
+};
+
+const getFollowUpMetadata = (
+  followUp: CompanionAgentFollowUp | null | undefined,
+): Record<string, unknown> | null => asRecord(followUp?.metadata);
+
+const buildPlanningConsentFromFollowUp = (
+  followUp: CompanionAgentFollowUp | null | undefined,
+): PlannerSessionState["planningConsent"] => {
+  const metadata = getFollowUpMetadata(followUp);
+  if (!metadata || metadata.planningLauncherConsent !== true) return null;
+
+  const sourceStarterIntent = normalizePlannerStarterIntent(
+    asString(metadata.sourceStarterIntent),
+  );
+  const kind = normalizePlanningConsentKind(metadata.consentKind);
+  const sourceMessage = asString(metadata.sourceMessage);
+
+  if (!sourceStarterIntent || !kind || !sourceMessage) return null;
+
+  return {
+    kind,
+    sourceStarterIntent,
+    sourceMessage,
+  };
+};
+
+const getQuestionIdFromFollowUp = (
+  followUp: CompanionAgentFollowUp | null | undefined,
+): string | null => asString(getFollowUpMetadata(followUp)?.questionId);
+
 const isPlanDayStarterText = (value: string): boolean =>
   /\b(plan my day|help me plan(?: my day| today)|plan today)\b/i.test(value);
 
@@ -1014,6 +1059,7 @@ export function consultPlannerForAgent(params: {
   horizon?: PlannerHorizon;
   starterIntent?: string | null;
   forcePlanDayFollowUp?: boolean;
+  activeFollowUp?: CompanionAgentFollowUp | null;
   context: LoadedCompanionAgentContext;
 }): PlannerAssistResult {
   const normalizedMessage = normalizeScheduleReadMessage(params.message);
@@ -1091,9 +1137,23 @@ export function consultPlannerForAgent(params: {
   const modeConfig = getCompanionModeConfig(params.context.companionMode);
   const pendingPlanDayClarification = params.forcePlanDayFollowUp === true ||
     (!plannerStarterIntent && hasPendingPlanDayClarification(params.context));
+  const activeQuestionId = getQuestionIdFromFollowUp(params.activeFollowUp);
+  const planningConsent = buildPlanningConsentFromFollowUp(
+    params.activeFollowUp,
+  );
+  const isPlanDayQuestConsentAnswer =
+    activeQuestionId === "plan_day_quest_consent";
+  const isPlanningLauncherConsentAnswer =
+    activeQuestionId === "planning_launcher_consent" && planningConsent;
   const sessionState: PlannerSessionState = {
     draft: {},
-    openQuestionIds: pendingPlanDayClarification ? ["details"] : [],
+    openQuestionIds: isPlanDayQuestConsentAnswer
+      ? ["plan_day_quest_consent"]
+      : isPlanningLauncherConsentAnswer
+      ? ["planning_launcher_consent"]
+      : pendingPlanDayClarification
+      ? ["details"]
+      : [],
     preferredTimeOfDay: asString(plannerMemory?.preferredTimeOfDay),
     preferredTimeReason: asString(plannerMemory?.preferredTimeReason),
     reminderPreference: asNumber(plannerMemory?.reminderMinutesBefore)
@@ -1101,6 +1161,7 @@ export function consultPlannerForAgent(params: {
       : null,
     pendingStarterIntent: pendingPlanDayClarification ? "plan_day" : null,
     lastClassification: null,
+    planningConsent,
   };
 
   const plannerInput: PlannerBuildInput = {

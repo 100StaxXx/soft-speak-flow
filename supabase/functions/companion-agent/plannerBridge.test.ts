@@ -164,7 +164,7 @@ Deno.test("consultPlannerForAgent asks a clarifying plan-day question with no an
   assertMatch(result.reply, /what kind of day/i);
 });
 
-Deno.test("consultPlannerForAgent treats a reply after plan-day clarification as the follow-up", () => {
+Deno.test("consultPlannerForAgent treats a concrete plan-day reply as quest consent, not a draft", () => {
   const result = consultPlannerForAgent({
     message: "Work on my app",
     currentDateTime: "2026-04-18T08:00:00-07:00",
@@ -197,16 +197,14 @@ Deno.test("consultPlannerForAgent treats a reply after plan-day clarification as
     }),
   });
 
-  assertEquals(result.mode, "proposal");
-  assertEquals(result.questions.length, 0);
-  assertEquals(result.actionHints[0]?.actionType, "task_create");
-  assertEquals(
-    result.actionHints[0]?.normalizedPayload?.title,
-    "Work On My App",
-  );
+  assertEquals(result.mode, "conversational");
+  assertEquals(result.actionHints.length, 0);
+  assertEquals(result.questions.length, 1);
+  assertEquals(result.questions[0]?.id, "plan_day_quest_consent");
+  assertMatch(result.reply, /form a quest/i);
 });
 
-Deno.test("consultPlannerForAgent drafts clean room after plan-day clarification on a blank account", () => {
+Deno.test("consultPlannerForAgent keeps clean room read-only after plan-day clarification", () => {
   const result = consultPlannerForAgent({
     message: "clean room",
     currentDateTime: "2026-04-18T08:00:00-07:00",
@@ -239,60 +237,74 @@ Deno.test("consultPlannerForAgent drafts clean room after plan-day clarification
     }),
   });
 
-  assertEquals(result.mode, "proposal");
-  assertEquals(result.questions.length, 0);
-  assertEquals(result.actionHints[0]?.actionType, "task_create");
-  assertEquals(result.actionHints[0]?.normalizedPayload?.title, "Clean Room");
-  assertEquals(
-    result.actionHints[0]?.normalizedPayload?.task_date,
-    "2026-04-18",
-  );
-  assertEquals(
-    result.actionHints[0]?.normalizedPayload?.estimated_duration,
-    30,
-  );
+  assertEquals(result.mode, "conversational");
+  assertEquals(result.actionHints.length, 0);
+  assertEquals(result.questions.length, 1);
+  assertEquals(result.questions[0]?.id, "plan_day_quest_consent");
+  assertMatch(result.reply, /Clean Room/i);
 });
 
 Deno.test("consultPlannerForAgent converts at-risk campaign adjustments into campaign action hints", () => {
-  const result = consultPlannerForAgent({
+  const context = buildContext({
+    tasks: [
+      {
+        id: "task-1",
+        task_text: "Rewrite relaunch offer",
+        task_date: "2026-04-16",
+        scheduled_time: null,
+        estimated_duration: 60,
+        completed: false,
+        epic_id: "epic-1",
+        priority: "high",
+      },
+      {
+        id: "task-2",
+        task_text: "Tighten launch CTA",
+        task_date: "2026-04-17",
+        scheduled_time: null,
+        estimated_duration: 45,
+        completed: false,
+        epic_id: "epic-1",
+        priority: "medium",
+      },
+    ],
+    campaigns: [
+      {
+        id: "epic-1",
+        title: "Founder relaunch",
+        end_date: "2026-04-21",
+        progress_percentage: 22,
+      },
+    ],
+  });
+  const initial = consultPlannerForAgent({
     message: "Advance my campaign",
     currentDateTime: "2026-04-18T08:00:00-07:00",
     surface: "journeys",
     horizon: "week",
-    context: buildContext({
-      tasks: [
-        {
-          id: "task-1",
-          task_text: "Rewrite relaunch offer",
-          task_date: "2026-04-16",
-          scheduled_time: null,
-          estimated_duration: 60,
-          completed: false,
-          epic_id: "epic-1",
-          priority: "high",
-        },
-        {
-          id: "task-2",
-          task_text: "Tighten launch CTA",
-          task_date: "2026-04-17",
-          scheduled_time: null,
-          estimated_duration: 45,
-          completed: false,
-          epic_id: "epic-1",
-          priority: "medium",
-        },
-      ],
-      campaigns: [
-        {
-          id: "epic-1",
-          title: "Founder relaunch",
-          end_date: "2026-04-21",
-          progress_percentage: 22,
-        },
-      ],
-    }),
+    starterIntent: "advance_campaign_start",
+    context,
+  });
+  const result = consultPlannerForAgent({
+    message: "Yes",
+    currentDateTime: "2026-04-18T08:00:00-07:00",
+    surface: "journeys",
+    horizon: "week",
+    starterIntent: "advance_campaign_start",
+    activeFollowUp: {
+      question: initial.questions[0]?.prompt ?? "",
+      reason: initial.questions[0]?.reason ?? null,
+      expectedAnswerType: "confirmation",
+      options: ["Yes", "No"],
+      blocksDrafting: true,
+      metadata: initial.questions[0]?.metadata,
+    },
+    context,
   });
 
+  assertEquals(initial.mode, "conversational");
+  assertEquals(initial.actionHints.length, 0);
+  assertEquals(initial.questions[0]?.id, "planning_launcher_consent");
   assertEquals(result.mode, "proposal");
   assertGreater(result.actionHints.length, 0);
   assertEquals(result.actionHints[0]?.actionType, "campaign_adjust");

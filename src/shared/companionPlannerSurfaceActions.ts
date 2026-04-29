@@ -5,7 +5,6 @@ import type {
 
 export interface CompanionPlannerSurfaceAction {
   id:
-    | "plan-week"
     | "plan-day"
     | "prepare-tomorrow"
     | "advance-campaign"
@@ -25,13 +24,6 @@ export interface CompanionPlannerSurfaceAction {
 
 export const COMPANION_PLANNER_SURFACE_ACTIONS: CompanionPlannerSurfaceAction[] =
   [
-    {
-      id: "plan-week",
-      label: "Plan my week",
-      message: "Plan my week",
-      target: "planner",
-      starterIntent: "plan_week",
-    },
     {
       id: "plan-day",
       label: "Plan my day",

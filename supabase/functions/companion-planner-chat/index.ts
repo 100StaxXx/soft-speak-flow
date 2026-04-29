@@ -87,7 +87,30 @@ const shouldReturnDeterministicStarterImmediately = (
   starterIntent === "adjust_today" ||
   starterIntent === "low_energy_adjust" ||
   starterIntent === "advance_campaign_start" ||
+  starterIntent === "plan_week" ||
+  starterIntent === "make_room" ||
+  starterIntent === "what_matters" ||
+  starterIntent === "relationship_touch" ||
+  starterIntent === "briefing_followup" ||
   starterIntent === "plan_day";
+
+const PLANNING_LAUNCHER_CONSENT_QUESTION_IDS = new Set([
+  "planning_launcher_consent",
+  "plan_day_quest_consent",
+]);
+
+const hasPlanningLauncherConsentState = (
+  state: PlannerBuildInput["sessionState"],
+) =>
+  Boolean(state.planningConsent) ||
+  state.openQuestionIds.some((id) => PLANNING_LAUNCHER_CONSENT_QUESTION_IDS.has(id));
+
+const hasPlanningLauncherConsentQuestion = (
+  result: ReturnType<typeof buildPlannerResponse>,
+) =>
+  result.followUpQuestions.some((question) =>
+    PLANNING_LAUNCHER_CONSENT_QUESTION_IDS.has(question.id)
+  ) || hasPlanningLauncherConsentState(result.sessionState);
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
@@ -182,11 +205,18 @@ serve(async (req) => {
       providers: ["openai"],
     });
 
-    const starterIntent = plannerInput.plannerContext.starterIntent ??
-      result.sessionState.pendingStarterIntent ??
+    const requestStarterIntent = plannerInput.plannerContext.starterIntent;
+    const starterIntent = requestStarterIntent && requestStarterIntent !== "general"
+      ? requestStarterIntent
+      : plannerInput.sessionState.planningConsent?.sourceStarterIntent ??
+        result.sessionState.planningConsent?.sourceStarterIntent ??
+        result.sessionState.pendingStarterIntent ??
       null;
     const isDeterministicPlanDayResult = starterIntent === "plan_day" ||
       Boolean(result.structuredResponse?.planDay);
+    const isPlanningLauncherConsentTurn = hasPlanningLauncherConsentState(
+      plannerInput.sessionState,
+    ) || hasPlanningLauncherConsentQuestion(result);
 
     if (starterIntent === "upcoming_start") {
       const aiResult = await runPlannerStageWithTimeout({
@@ -226,6 +256,7 @@ serve(async (req) => {
     }
 
     if (
+      isPlanningLauncherConsentTurn ||
       isDeterministicPlanDayResult ||
       shouldReturnDeterministicStarterImmediately(starterIntent)
     ) {

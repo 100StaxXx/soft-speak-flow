@@ -364,6 +364,26 @@ const isPlanDayClarificationResponse = (
   baseResult.proposals.length === 0 &&
   baseResult.suggestedReminders.length === 0;
 
+const PLANNING_LAUNCHER_CONSENT_QUESTION_IDS = new Set([
+  "planning_launcher_consent",
+  "plan_day_quest_consent",
+]);
+
+const hasPlanningLauncherConsentQuestionId = (ids: string[]) =>
+  ids.some((id) => PLANNING_LAUNCHER_CONSENT_QUESTION_IDS.has(id));
+
+const isPlanningLauncherConsentResponse = (
+  input: PlannerBuildInput,
+  baseResult: PlannerBuildResult,
+) =>
+  Boolean(input.sessionState.planningConsent) ||
+  Boolean(baseResult.sessionState.planningConsent) ||
+  hasPlanningLauncherConsentQuestionId(input.sessionState.openQuestionIds) ||
+  hasPlanningLauncherConsentQuestionId(baseResult.sessionState.openQuestionIds) ||
+  baseResult.followUpQuestions.some((question) =>
+    PLANNING_LAUNCHER_CONSENT_QUESTION_IDS.has(question.id)
+  );
+
 const isPhaseADeterministicStarterResponse = (
   input: PlannerBuildInput,
   baseResult: PlannerBuildResult,
@@ -887,6 +907,10 @@ export async function buildOrchestratedPlannerResponse(params: {
   }
 
   if (isQuestCaptureStarterResponse(params.baseResult)) {
+    return normalizedBaseResult;
+  }
+
+  if (isPlanningLauncherConsentResponse(params.input, normalizedBaseResult)) {
     return normalizedBaseResult;
   }
 

@@ -1220,6 +1220,46 @@ describe("useCompanionPlanner", () => {
     expect(mocks.invoke).not.toHaveBeenCalled();
   });
 
+  it("does not derive typed week as a launcher but still derives tomorrow planning", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "schedule_read",
+        reply: "Planner read.",
+        followUpQuestions: [],
+        proposals: [],
+        suggestedReminders: [],
+        memoryUpdates: {},
+        sessionState: {
+          draft: {},
+          openQuestionIds: [],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          pendingStarterIntent: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
+
+    await act(async () => {
+      await result.current.submitMessage("Plan my week", "text");
+    });
+    await act(async () => {
+      await result.current.submitMessage("Prepare me for tomorrow", "text");
+    });
+
+    expect(
+      mocks.invoke.mock.calls[0]?.[1]?.body.plannerContext.starterIntent,
+    ).toBe("general");
+    expect(
+      mocks.invoke.mock.calls[1]?.[1]?.body.plannerContext.starterIntent,
+    ).toBe("briefing_followup");
+  });
+
   it("shows a rollout-aware planner error instead of a fake lost-thread message", async () => {
     mocks.invoke.mockResolvedValue({
       data: null,

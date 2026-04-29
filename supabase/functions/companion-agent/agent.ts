@@ -386,10 +386,11 @@ const deriveUnderstandingState = (params: {
 
 type BareStarterIntent =
   | "plan_day"
-  | "plan_week"
   | "advance_campaign_start"
   | "right_now_start"
   | "make_room"
+  | "what_matters"
+  | "relationship_touch"
   | "adjust_today"
   | "low_energy_adjust"
   | "briefing_followup"
@@ -403,6 +404,62 @@ interface BareStarterFollowUpConfig {
   reply: string;
   followUp: CompanionAgentFollowUp;
 }
+
+const CONSENT_FIRST_PLANNING_STARTER_INTENTS = new Set<string>([
+  "plan_day",
+  "plan_week",
+  "advance_campaign_start",
+  "right_now_start",
+  "make_room",
+  "what_matters",
+  "relationship_touch",
+  "adjust_today",
+  "low_energy_adjust",
+  "briefing_followup",
+]);
+
+const isConsentFirstPlanningStarterIntent = (
+  value: string | null | undefined,
+): boolean =>
+  Boolean(value && CONSENT_FIRST_PLANNING_STARTER_INTENTS.has(value));
+
+const withPlanningLauncherFollowUpMetadata = (
+  followUp: CompanionAgentFollowUp,
+  starterIntent: string,
+): CompanionAgentFollowUp =>
+  isConsentFirstPlanningStarterIntent(starterIntent)
+    ? {
+      ...followUp,
+      metadata: {
+        ...(followUp.metadata ?? {}),
+        planningLauncherFollowUp: true,
+        sourceStarterIntent: starterIntent,
+      },
+    }
+    : followUp;
+
+const mapPlanningStarterIntentToAgentIntent = (
+  starterIntent: string | null | undefined,
+): CompanionAgentIntent => {
+  switch (starterIntent) {
+    case "plan_week":
+      return "plan_week";
+    case "advance_campaign_start":
+      return "goal_setting";
+    case "adjust_today":
+    case "low_energy_adjust":
+    case "make_room":
+      return "update_existing_plan";
+    case "plan_day":
+    case "right_now_start":
+    case "what_matters":
+    case "relationship_touch":
+    case "briefing_followup":
+      return "plan_day";
+    default:
+      return "unknown";
+  }
+};
 
 const BARE_STARTER_FOLLOW_UPS: Record<
   BareStarterIntent,
@@ -427,21 +484,6 @@ const BARE_STARTER_FOLLOW_UPS: Record<
         "That choice changes whether I protect deep work, lighten the load, or triage overdue items.",
       expectedAnswerType: "choice",
       options: ["Focus", "Recovery", "Catch up"],
-      blocksDrafting: true,
-    },
-  },
-  plan_week: {
-    intent: "plan_week",
-    prompts: ["plan my week"],
-    reply:
-      "I can shape the week. Should I optimize for progress, stability, or recovery first?",
-    followUp: {
-      question:
-        "Should I optimize this week for progress, stability, or recovery first?",
-      reason:
-        "The week changes a lot depending on whether we push, protect, or reset capacity.",
-      expectedAnswerType: "choice",
-      options: ["Progress", "Stability", "Recovery"],
       blocksDrafting: true,
     },
   },
@@ -487,6 +529,36 @@ const BARE_STARTER_FOLLOW_UPS: Record<
         "I need the thing being protected before I decide what can move, shrink, or drop.",
       expectedAnswerType: "free_text",
       options: ["Focus work", "Recovery", "Specific commitment"],
+      blocksDrafting: true,
+    },
+  },
+  what_matters: {
+    intent: "plan_day",
+    prompts: ["what matters most", "what matters most?"],
+    reply:
+      "I can sort the signal from the noise. Are we choosing what to protect, what can move, or what to ignore?",
+    followUp: {
+      question:
+        "Are we choosing what to protect, what can move, or what to ignore?",
+      reason:
+        "That decides whether I read the day for priority, flexibility, or noise reduction.",
+      expectedAnswerType: "choice",
+      options: ["Protect", "Move", "Ignore"],
+      blocksDrafting: true,
+    },
+  },
+  relationship_touch: {
+    intent: "plan_day",
+    prompts: ["relationship touch"],
+    reply:
+      "I can check who needs attention. Are you looking for a quick reach-out, a meaningful follow-up, or just the read?",
+    followUp: {
+      question:
+        "Are you looking for a quick reach-out, a meaningful follow-up, or just the read?",
+      reason:
+        "Relationship planning should not become a quest unless you explicitly want that.",
+      expectedAnswerType: "choice",
+      options: ["Quick reach-out", "Meaningful follow-up", "Just the read"],
       blocksDrafting: true,
     },
   },
@@ -594,7 +666,7 @@ const isThinGenericAgentReply = (value: string): boolean => {
 
 const resolveBareStarterFollowUp = (
   request: CompanionAgentRequest,
-): BareStarterFollowUpConfig | null => {
+): (BareStarterFollowUpConfig & { starterIntent: BareStarterIntent }) | null => {
   if (
     request.activeFollowUp ||
     request.selectedProposalId ||
@@ -615,16 +687,36 @@ const resolveBareStarterFollowUp = (
     if (request.starterIntent && request.starterIntent !== starterIntent) {
       continue;
     }
-    return config;
+    return { ...config, starterIntent };
   }
 
   return null;
 };
 
-const isPlanDayFollowUpQuestion = (
+const getPlanningStarterIntentFromFollowUp = (
+  followUp: CompanionAgentFollowUp | null | undefined,
+): string | null => {
+  const metadata = asRecord(followUp?.metadata);
+  const sourceStarterIntent = typeof metadata?.sourceStarterIntent === "string"
+    ? metadata.sourceStarterIntent
+    : null;
+  return isConsentFirstPlanningStarterIntent(sourceStarterIntent)
+    ? sourceStarterIntent
+    : null;
+};
+
+const isPlanningLauncherFollowUpQuestion = (
   followUp: CompanionAgentFollowUp | null | undefined,
 ): boolean => {
   if (!followUp) return false;
+  if (getPlanningStarterIntentFromFollowUp(followUp)) return true;
+  const metadata = asRecord(followUp.metadata);
+  if (
+    metadata?.planningLauncherFollowUp === true ||
+    metadata?.planningLauncherConsent === true
+  ) {
+    return true;
+  }
   const normalizedQuestion = normalizeBareStarterPrompt(followUp.question);
   const normalizedOptions = (followUp.options ?? []).map((option) =>
     normalizeBareStarterPrompt(option)
@@ -641,7 +733,12 @@ const isPlanDayFollowUpQuestion = (
     normalizedOptions.some((option) => option.startsWith("medium")) &&
     normalizedOptions.some((option) => option.startsWith("high"));
 
-  return hasFocusRecoveryOptions ||
+  const isGenericPlanningConsent =
+    normalizedQuestion === "would you like to form a quest" ||
+    normalizedQuestion.includes("would you like me to draft");
+
+  return isGenericPlanningConsent ||
+    hasFocusRecoveryOptions ||
     hasBlankDayOptions ||
     hasEnergyOptions ||
     normalizedQuestion.includes("what kind of day") ||
@@ -682,6 +779,7 @@ const parsePersistedFollowUp = (
     blocksDrafting: typeof record.blocksDrafting === "boolean"
       ? record.blocksDrafting
       : true,
+    metadata: asRecord(record.metadata) ?? undefined,
   };
 };
 
@@ -692,8 +790,7 @@ const getPersistedActiveFollowUp = (
     if (message.role !== "assistant") continue;
     const metadata = asRecord(message.metadata);
     const decision = asRecord(metadata?.agentDecision);
-    const followUp = parsePersistedFollowUp(decision?.followUp);
-    if (followUp) return followUp;
+    if (decision) return parsePersistedFollowUp(decision.followUp);
   }
 
   return null;
@@ -729,7 +826,32 @@ const hasRecentPlanDayStarterBeforeLastAssistant = (
     );
 };
 
-const isPlanDayFollowUpAnswer = (
+const getPlanningStarterIntentFromActiveFollowUp = (
+  request: CompanionAgentRequest,
+  context: LoadedCompanionAgentContext,
+): string | null => {
+  const requestStarter = getPlanningStarterIntentFromFollowUp(
+    request.activeFollowUp,
+  );
+  if (requestStarter) return requestStarter;
+
+  const persistedFollowUp = getPersistedActiveFollowUp(context);
+  const persistedStarter = getPlanningStarterIntentFromFollowUp(
+    persistedFollowUp,
+  );
+  if (persistedStarter) return persistedStarter;
+
+  if (request.activeFollowUp && isPlanningLauncherFollowUpQuestion(request.activeFollowUp)) {
+    return "plan_day";
+  }
+  if (persistedFollowUp && isPlanningLauncherFollowUpQuestion(persistedFollowUp)) {
+    return "plan_day";
+  }
+
+  return hasRecentPlanDayStarterBeforeLastAssistant(context) ? "plan_day" : null;
+};
+
+const isPlanningLauncherFollowUpAnswer = (
   request: CompanionAgentRequest,
   context: LoadedCompanionAgentContext,
 ): boolean => {
@@ -740,8 +862,8 @@ const isPlanDayFollowUpAnswer = (
     return false;
   }
 
-  return isPlanDayFollowUpQuestion(request.activeFollowUp) ||
-    isPlanDayFollowUpQuestion(getPersistedActiveFollowUp(context)) ||
+  return isPlanningLauncherFollowUpQuestion(request.activeFollowUp) ||
+    isPlanningLauncherFollowUpQuestion(getPersistedActiveFollowUp(context)) ||
     hasRecentPlanDayStarterBeforeLastAssistant(context);
 };
 
@@ -768,7 +890,10 @@ function normalizeBareStarterResult(params: {
     return;
   }
 
-  const followUp = params.result.followUp ?? followUpConfig.followUp;
+  const followUp = withPlanningLauncherFollowUpMetadata(
+    params.result.followUp ?? followUpConfig.followUp,
+    followUpConfig.starterIntent,
+  );
 
   params.result.reply = keepModelClarification
     ? params.result.reply
@@ -797,7 +922,10 @@ function buildBareStarterAgentResult(params: {
       intent: followUpConfig.intent,
       confidence: 0.8,
       understandingState: "needs_followup",
-      followUp: followUpConfig.followUp,
+      followUp: withPlanningLauncherFollowUpMetadata(
+        followUpConfig.followUp,
+        followUpConfig.starterIntent,
+      ),
       proposedActions: [],
       assumptions: [],
       evidenceIds: [],
@@ -1297,9 +1425,13 @@ function buildInstructions(params: {
     "Product model: the user is talking directly to ChatGPT, with Cosmiq app powers.",
     "You are the decision layer. The app supplies context, validates actions, and executes only after allowed confirmation.",
     "Interpret intent before acting. Short launcher prompts are complete intent signals, not incomplete forms.",
-    "Prompts like 'Plan my day', 'Adjust my day', 'What should I do right now?', 'Make room', 'What matters?', 'Prepare me for tomorrow', 'Plan my week', and 'Advance my campaign' give you permission to reason from app context.",
+    "Prompts like 'Plan my day', 'Adjust my day', 'What should I do right now?', 'Make room', 'What matters?', 'Prepare me for tomorrow', and 'Advance my campaign' give you permission to reason from app context.",
     "A bare launcher prompt starts the ChatGPT-style conversation; it is not automatic permission to produce quest cards, structured planner responses, or pending drafts on the first turn.",
     "For a bare launcher prompt with no follow-up answer, selected proposal, or concrete extra details, do not call consult_planner just to generate default proposals. Ask one targeted follow-up or answer conversationally instead.",
+    "For planning launchers, keep the experience conversational and read-only until the user explicitly opts into drafting. This covers Plan my day, What should I do right now, Adjust my day, Make room, What matters, Prepare me for tomorrow, Advance my campaign, Relationship touch, and low-energy planning.",
+    "If a planning-launcher follow-up names a concrete task, ask the generic confirmation 'Would you like to form a quest?' with Yes and No options. Do not echo an inferred title, draft the quest, or carry hidden quest fields in that same turn.",
+    "If the active follow-up asks whether to form a quest and the user says no, keep the reply conversational and do not prepare a write. If they say yes, ask what the quest should be called before preparing anything.",
+    "If a planning launcher would require moving tasks, creating a campaign reset, or drafting any planner change, ask for explicit consent first, such as 'Would you like me to draft those schedule changes?' or 'Would you like me to draft a campaign adjustment?'",
     "After the user answers the follow-up or explicitly asks you to draft, create, add, save, move, or schedule something specific, you may use consult_planner and prepare tools when helpful.",
     "Your job is to choose whether to answer, ask a follow-up, show a plan, suggest quests, or prepare a confirmable action.",
     "Follow-ups are normal and often appropriate. Ask because one more answer would materially improve the plan or avoid a wrong action, not because the prompt is short.",
@@ -2807,10 +2939,12 @@ export async function runCompanionAgent(params: RunAgentParams) {
           activeFollowUp &&
           (!outputReply || isThinGenericAgentReply(outputReply))
         ) {
+          const planningStarterIntent =
+            getPlanningStarterIntentFromFollowUp(activeFollowUp);
           return buildActiveFollowUpClarifyAgentResult({
             followUp: activeFollowUp,
-            intent: isPlanDayFollowUpQuestion(activeFollowUp)
-              ? "plan_day"
+            intent: isPlanningLauncherFollowUpQuestion(activeFollowUp)
+              ? mapPlanningStarterIntentToAgentIntent(planningStarterIntent)
               : "unknown",
             confidence: 0.25,
             context,
@@ -2855,11 +2989,13 @@ export async function runCompanionAgent(params: RunAgentParams) {
           getPersistedActiveFollowUp(context);
         const followUpToPreserve = activeFollowUp ?? followUp;
         if (followUpToPreserve && isThinGenericAgentReply(payloadReply)) {
+          const planningStarterIntent =
+            getPlanningStarterIntentFromFollowUp(followUpToPreserve);
           return buildActiveFollowUpClarifyAgentResult({
             followUp: followUpToPreserve,
             intent: payload.intent === "unknown" &&
-                isPlanDayFollowUpQuestion(followUpToPreserve)
-              ? "plan_day"
+                isPlanningLauncherFollowUpQuestion(followUpToPreserve)
+              ? mapPlanningStarterIntentToAgentIntent(planningStarterIntent)
               : payload.intent,
             confidence: payload.confidence,
             context,
@@ -2958,6 +3094,8 @@ export async function runCompanionAgent(params: RunAgentParams) {
       horizon: "day",
       starterIntent: plannerStarterIntent,
       forcePlanDayFollowUp: options.forcePlanDayFollowUp,
+      activeFollowUp: params.request.activeFollowUp ??
+        getPersistedActiveFollowUp(context),
       context,
     });
 
@@ -2972,11 +3110,19 @@ export async function runCompanionAgent(params: RunAgentParams) {
       ? {
         question: plannerResult.questions[0].prompt,
         reason: plannerResult.questions[0].reason ?? null,
-        expectedAnswerType: plannerResult.questions[0].options?.length
+        expectedAnswerType: plannerResult.questions[0].id ===
+              "plan_day_quest_consent" ||
+            plannerResult.questions[0].id === "planning_launcher_consent"
+          ? "confirmation" as const
+          : plannerResult.questions[0].options?.length
           ? "choice" as const
           : "free_text" as const,
         options: plannerResult.questions[0].options ?? [],
         blocksDrafting: true,
+        metadata: {
+          ...(plannerResult.questions[0].metadata ?? {}),
+          questionId: plannerResult.questions[0].id,
+        },
       }
       : null;
 
@@ -3016,18 +3162,22 @@ export async function runCompanionAgent(params: RunAgentParams) {
     request: params.request,
     context,
   });
-  const deterministicPlanDayFollowUpResult = bareStarterResult
+  const planningFollowUpStarterIntent = getPlanningStarterIntentFromActiveFollowUp(
+    params.request,
+    context,
+  );
+  const deterministicPlanningFollowUpResult = bareStarterResult
     ? null
-    : isPlanDayFollowUpAnswer(params.request, context)
-    ? buildPlannerFallbackResult("plan_day_follow_up_answer", {
-      starterIntent: null,
-      forcePlanDayFollowUp: true,
+    : isPlanningLauncherFollowUpAnswer(params.request, context)
+    ? buildPlannerFallbackResult("planning_launcher_follow_up_answer", {
+      starterIntent: planningFollowUpStarterIntent,
+      forcePlanDayFollowUp: planningFollowUpStarterIntent === "plan_day",
       confidence: 0.78,
     })
     : null;
 
   const agentResult: AgentRunResult = bareStarterResult ??
-    deterministicPlanDayFollowUpResult ??
+    deterministicPlanningFollowUpResult ??
     await wrapSubStage("openai", async () => {
       try {
         if (context.thread?.openai_conversation_id) {

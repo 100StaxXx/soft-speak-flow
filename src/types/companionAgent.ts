@@ -53,6 +53,7 @@ export interface CompanionAgentFollowUp {
     | "confirmation";
   options?: string[];
   blocksDrafting: boolean;
+  metadata?: Record<string, Json | undefined>;
 }
 
 export interface CompanionAgentProposedAction {

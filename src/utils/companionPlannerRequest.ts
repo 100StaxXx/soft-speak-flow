@@ -134,6 +134,40 @@ const isClassificationType = (
   value === "brain dump" ||
   value === "braindump";
 
+const isPlanningLauncherConsentKind = (
+  value: unknown,
+): value is NonNullable<PlannerSessionState["planningConsent"]>["kind"] =>
+  value === "quest" ||
+  value === "schedule_changes" ||
+  value === "campaign_adjustment" ||
+  value === "planner_changes";
+
+const sanitizePlanningConsentState = (
+  value: PlannerSessionState["planningConsent"],
+): PlannerSessionState["planningConsent"] => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const kind = isPlanningLauncherConsentKind(value.kind)
+    ? value.kind
+    : null;
+  const sourceStarterIntent = isPlannerSessionStarterIntent(
+      value.sourceStarterIntent,
+    )
+    ? value.sourceStarterIntent
+    : null;
+  const sourceMessage = asNonEmptyString(value.sourceMessage);
+  if (!kind || !sourceStarterIntent || !sourceMessage) return null;
+
+  return {
+    kind,
+    sourceStarterIntent,
+    sourceMessage: sourceMessage.slice(0, 4000),
+    confirmed: value.confirmed === true ? true : undefined,
+  };
+};
+
 const isParsedInputCustomPeriod = (
   value: unknown,
 ): value is NonNullable<PlannerParsedInput["recurrenceCustomPeriod"]> =>
@@ -718,6 +752,16 @@ export const sanitizePlannerSessionState = (
       : sessionState.lastClassification === null
       ? null
       : undefined,
+    planDayEnergy: sessionState.planDayEnergy === "low" ||
+        sessionState.planDayEnergy === "medium" ||
+        sessionState.planDayEnergy === "high"
+      ? sessionState.planDayEnergy
+      : sessionState.planDayEnergy === null
+      ? null
+      : undefined,
+    planningConsent: sanitizePlanningConsentState(
+      sessionState.planningConsent,
+    ),
   };
 };
 
