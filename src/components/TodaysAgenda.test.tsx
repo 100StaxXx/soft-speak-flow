@@ -547,7 +547,7 @@ describe("TodaysAgenda touch toggles", () => {
     });
     const onToggle = vi.fn();
 
-    const { container } = render(
+    render(
       <TodaysAgenda
         tasks={[
           {
@@ -591,7 +591,7 @@ describe("TodaysAgenda touch toggles", () => {
     const onToggle = vi.fn();
     const onUndoToggle = vi.fn();
 
-    const { container } = render(
+    render(
       <TodaysAgenda
         tasks={[
           {
@@ -637,7 +637,7 @@ describe("TodaysAgenda campaign visibility", () => {
       },
     });
 
-    const { container } = render(
+    render(
       <TodaysAgenda
         tasks={[
           {
@@ -673,7 +673,7 @@ describe("TodaysAgenda campaign visibility", () => {
     expect(screen.getAllByText("Campaigns")).toHaveLength(1);
   });
 
-  it("renders campaign ritual groups collapsed by default and lets users toggle them", async () => {
+  it("renders campaign rituals as scheduled items and campaign rows without expand controls", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -681,7 +681,7 @@ describe("TodaysAgenda campaign visibility", () => {
       },
     });
 
-    const { container } = render(
+    render(
       <TodaysAgenda
         tasks={[
           {
@@ -689,6 +689,7 @@ describe("TodaysAgenda campaign visibility", () => {
             task_text: "Morning journal",
             completed: false,
             xp_reward: 15,
+            scheduled_time: "07:00",
             habit_source_id: "habit-1",
             epic_id: "epic-1",
             epic_title: "Fallback Campaign",
@@ -706,25 +707,15 @@ describe("TodaysAgenda campaign visibility", () => {
 
     expect(screen.getByText("Campaigns")).toBeInTheDocument();
     expect(screen.getByText("Fallback Campaign")).toBeInTheDocument();
-    expect(screen.queryByText("Morning journal")).not.toBeInTheDocument();
-
-    const expandChevron = container.querySelector("svg.lucide-chevron-down");
-    expect(expandChevron).toBeTruthy();
-    const expandButton = expandChevron?.closest("button");
-    expect(expandButton).toBeTruthy();
-
-    fireEvent.click(expandButton!);
-    expect(await screen.findByText("Morning journal")).toBeInTheDocument();
-
-    const collapseChevron = container.querySelector("svg.lucide-chevron-up");
-    expect(collapseChevron).toBeTruthy();
-    const collapseButton = collapseChevron?.closest("button");
-    expect(collapseButton).toBeTruthy();
-
-    fireEvent.click(collapseButton!);
-    await waitFor(() => {
-      expect(screen.queryByText("Morning journal")).not.toBeInTheDocument();
-    });
+    expect(screen.getByText("Morning journal")).toBeInTheDocument();
+    expect(screen.getByText("Campaign Ritual - Fallback Campaign")).toBeInTheDocument();
+    expect(screen.getByText("Morning journal").closest('[data-quest-card-shell="true"]')).toHaveClass(
+      "campaign-ritual-card",
+      "border-primary/35",
+      "bg-primary/[0.08]",
+    );
+    expect(screen.queryByRole("button", { name: "Expand Fallback Campaign rituals" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Collapse Fallback Campaign rituals" })).not.toBeInTheDocument();
   });
 
   it("renders hydrated campaign names as clickable buttons that open the campaign drawer flow", () => {
@@ -778,7 +769,7 @@ describe("TodaysAgenda campaign visibility", () => {
     expect(mocks.journeyPathDrawerOpenMock).toHaveBeenCalledWith("epic-1");
   });
 
-  it("keeps the ritual chevron separate from the campaign drawer trigger", async () => {
+  it("opens the campaign drawer from the campaign row without a ritual expand button", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -820,12 +811,13 @@ describe("TodaysAgenda campaign visibility", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
+    expect(screen.queryByRole("button", { name: "Expand Fallback Campaign rituals" })).not.toBeInTheDocument();
+
     fireEvent.click(screen.getByRole("button", {
-      name: "Expand Fallback Campaign rituals",
+      name: "Open campaign Fallback Campaign",
     }));
 
-    expect(await screen.findByText("Morning journal")).toBeInTheDocument();
-    expect(mocks.journeyPathDrawerOpenMock).not.toHaveBeenCalled();
+    expect(mocks.journeyPathDrawerOpenMock).toHaveBeenCalledWith("epic-1");
   });
 
   it("renders active campaigns without ritual groups when another campaign has rituals", () => {
@@ -889,7 +881,7 @@ describe("TodaysAgenda campaign visibility", () => {
     expect(mocks.journeyPathDrawerOpenMock).toHaveBeenCalledWith("epic-2");
   });
 
-  it("shows linked habit descriptions inside expanded campaign ritual rows", async () => {
+  it("shows linked habit descriptions from the scheduled campaign ritual card", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -897,7 +889,7 @@ describe("TodaysAgenda campaign visibility", () => {
       },
     });
 
-    const { container } = render(
+    render(
       <TodaysAgenda
         tasks={[
           {
@@ -905,6 +897,7 @@ describe("TodaysAgenda campaign visibility", () => {
             task_text: "Morning journal",
             completed: false,
             xp_reward: 15,
+            scheduled_time: "07:00",
             habit_source_id: "habit-1",
             epic_id: "epic-1",
             epic_title: "Fallback Campaign",
@@ -941,11 +934,7 @@ describe("TodaysAgenda campaign visibility", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    const campaignChevron = container.querySelector("svg.lucide-chevron-down");
-    expect(campaignChevron).toBeTruthy();
-    fireEvent.click(campaignChevron!.closest("button")!);
-
-    const ritualLabel = await screen.findByText("Morning journal");
+    const ritualLabel = screen.getByText("Morning journal");
     const ritualCard = ritualLabel.closest('[data-quest-card-shell="true"]');
     expect(ritualCard).toBeTruthy();
 
@@ -958,7 +947,7 @@ describe("TodaysAgenda campaign visibility", () => {
     expect(await screen.findByText("Capture wins, friction, and tomorrow's focus.")).toBeInTheDocument();
   });
 
-  it("keeps newly added campaign groups collapsed by default", () => {
+  it("renders newly added campaign rituals directly as normal scheduled rows", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -974,6 +963,7 @@ describe("TodaysAgenda campaign visibility", () => {
             task_text: "Morning journal",
             completed: false,
             xp_reward: 15,
+            scheduled_time: "07:00",
             habit_source_id: "habit-1",
             epic_id: "epic-1",
             epic_title: "Fallback Campaign",
@@ -989,7 +979,8 @@ describe("TodaysAgenda campaign visibility", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(screen.queryByText("Morning journal")).not.toBeInTheDocument();
+    expect(screen.getByText("Morning journal")).toBeInTheDocument();
+    expect(screen.getByText("Campaign Ritual - Fallback Campaign")).toBeInTheDocument();
 
     view.rerender(
       <TodaysAgenda
@@ -999,6 +990,7 @@ describe("TodaysAgenda campaign visibility", () => {
             task_text: "Morning journal",
             completed: false,
             xp_reward: 15,
+            scheduled_time: "07:00",
             habit_source_id: "habit-1",
             epic_id: "epic-1",
             epic_title: "Fallback Campaign",
@@ -1008,6 +1000,7 @@ describe("TodaysAgenda campaign visibility", () => {
             task_text: "Evening stretch",
             completed: false,
             xp_reward: 12,
+            scheduled_time: "18:00",
             habit_source_id: "habit-2",
             epic_id: "epic-2",
             epic_title: "New Campaign",
@@ -1023,8 +1016,10 @@ describe("TodaysAgenda campaign visibility", () => {
     );
 
     expect(screen.getByText("New Campaign")).toBeInTheDocument();
-    expect(screen.queryByText("Morning journal")).not.toBeInTheDocument();
-    expect(screen.queryByText("Evening stretch")).not.toBeInTheDocument();
+    expect(screen.getByText("Morning journal")).toBeInTheDocument();
+    expect(screen.getByText("Evening stretch")).toBeInTheDocument();
+    expect(screen.getByText("Campaign Ritual - New Campaign")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Expand New Campaign rituals" })).not.toBeInTheDocument();
   });
 
   it("shows campaign strip when rituals exist but none are campaign-linked", () => {
@@ -1035,7 +1030,7 @@ describe("TodaysAgenda campaign visibility", () => {
       },
     });
 
-    const { container } = render(
+    render(
       <TodaysAgenda
         tasks={[
           {
@@ -1113,7 +1108,7 @@ describe("TodaysAgenda ritual descriptions", () => {
       },
     });
 
-    const { container } = render(
+    render(
       <TodaysAgenda
         tasks={[
           {
@@ -1121,6 +1116,7 @@ describe("TodaysAgenda ritual descriptions", () => {
             task_text: "Hydrate",
             completed: false,
             xp_reward: 12,
+            scheduled_time: "07:00",
             habit_source_id: "habit-1",
             epic_id: "epic-1",
             epic_title: "Hydrated Campaign",
@@ -1157,11 +1153,7 @@ describe("TodaysAgenda ritual descriptions", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    const campaignChevron = container.querySelector("svg.lucide-chevron-down");
-    expect(campaignChevron).toBeTruthy();
-    fireEvent.click(campaignChevron!.closest("button")!);
-
-    const ritualLabel = await screen.findByText("Hydrate");
+    const ritualLabel = screen.getByText("Hydrate");
     const ritualCard = ritualLabel.closest('[data-quest-card-shell="true"]');
     expect(ritualCard).toBeTruthy();
 
@@ -1182,7 +1174,7 @@ describe("TodaysAgenda ritual descriptions", () => {
       },
     });
 
-    const { container } = render(
+    render(
       <TodaysAgenda
         tasks={[
           {
@@ -1190,6 +1182,7 @@ describe("TodaysAgenda ritual descriptions", () => {
             task_text: "Lift",
             completed: false,
             xp_reward: 18,
+            scheduled_time: "08:00",
             habit_source_id: "habit-1",
             epic_id: "epic-1",
             epic_title: "Strength Campaign",
@@ -1227,11 +1220,7 @@ describe("TodaysAgenda ritual descriptions", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    const campaignChevron = container.querySelector("svg.lucide-chevron-down");
-    expect(campaignChevron).toBeTruthy();
-    fireEvent.click(campaignChevron!.closest("button")!);
-
-    const ritualLabel = await screen.findByText("Lift");
+    const ritualLabel = screen.getByText("Lift");
     const ritualCard = ritualLabel.closest('[data-quest-card-shell="true"]');
     expect(ritualCard).toBeTruthy();
 

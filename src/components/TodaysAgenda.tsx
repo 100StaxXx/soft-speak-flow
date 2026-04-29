@@ -15,7 +15,6 @@ import {
   Pencil,
   Repeat,
   ChevronDown,
-  ChevronUp,
   Target,
   FileText,
   FileImage,
@@ -73,6 +72,10 @@ import {
 } from "@/components/calendar/dragSnap";
 import type { TaskAttachment } from "@/types/questAttachments";
 import { getEpicDaysRemaining, resolveEpicEndDate } from "@/utils/epicDates";
+import {
+  CAMPAIGN_RITUAL_CARD_CLASSES,
+  isCampaignRitualTask,
+} from "@/utils/campaignRitualStyle";
 import {
   DesktopQuestDetailsPopover,
 } from "@/components/DesktopQuestDetailsPopover";
@@ -823,7 +826,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const [sortBy, setSortBy] = useState<'custom' | 'time' | 'priority' | 'xp'>('custom');
   const [justCompletedTasks, setJustCompletedTasks] = useState<Set<string>>(new Set());
   const [optimisticCompleted, setOptimisticCompleted] = useState<Set<string>>(new Set());
-  const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
   const [comboCount, setComboCount] = useState(0);
   const [showComboFx, setShowComboFx] = useState(false);
   const lastComboAtRef = useRef<number | null>(null);
@@ -1076,26 +1078,27 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     };
   }, [tasks, sortBy, keepInPlace]);
 
-  // Only quests go into the unified timeline (rituals grouped by campaign below)
+  const schedulerItems = useMemo(
+    () => [...questTasks, ...ritualTasks],
+    [questTasks, ritualTasks],
+  );
+
   const scheduledItems = useMemo(
-    () => questTasks
+    () => schedulerItems
       .filter((task) => !!task.scheduled_time)
       .sort((a, b) => (a.scheduled_time || "").localeCompare(b.scheduled_time || "")),
-    [questTasks],
+    [schedulerItems],
   );
   const anytimeItems = useMemo(
-    () => questTasks.filter((task) => !task.scheduled_time),
-    [questTasks],
+    () => schedulerItems.filter((task) => !task.scheduled_time),
+    [schedulerItems],
   );
   const baseTimelineItems = useMemo(
     () => [...scheduledItems, ...anytimeItems],
     [scheduledItems, anytimeItems],
   );
 
-  const draggableTimelineItems = useMemo(
-    () => [...baseTimelineItems, ...ritualTasks],
-    [baseTimelineItems, ritualTasks],
-  );
+  const draggableTimelineItems = baseTimelineItems;
 
   const timelineDrag = useTimelineDrag({
     containerRef: timelineDragContainerRef,
@@ -1716,22 +1719,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     [activeEpics, campaignRitualEpicIds],
   );
 
-  const toggleCampaignExpanded = useCallback((epicId: string) => {
-    setExpandedCampaigns(prev => {
-      const next = new Set(prev);
-      if (next.has(epicId)) next.delete(epicId);
-      else next.add(epicId);
-      return next;
-    });
-  }, []);
-
   const hasScheduledTimelineRows = timelineRows.length > 0;
   const renderCampaignSection = ({ inDesktopRail = false }: { inDesktopRail?: boolean } = {}) => (
     <>
-      {/* Campaign Dropdown Folders with Rituals */}
+      {/* Campaign quick-view launchers; ritual tasks render in the normal scheduler timeline. */}
       {campaignRitualGroups.length > 0 && (
         <div className={cn(inDesktopRail ? "space-y-3" : "mt-6 pt-4 border-t border-border/30")}>
-          {/* Campaigns divider */}
           <div className="flex items-center gap-2 mb-3">
             {!inDesktopRail && <div className="w-9 flex-shrink-0" />}
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -1743,100 +1736,55 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
           <div className="space-y-2">
             {campaignRitualGroups.map((group) => {
-              const isCampaignExpanded = expandedCampaigns.has(group.epicId);
               const resolvedEndDate = group.epic ? resolveEpicEndDate(group.epic) : null;
               return (
-                <div key={group.epicId} className="rounded-xl border border-border/30 bg-card/30 overflow-hidden">
-                  {/* Campaign Header */}
-                  <div className="flex items-center gap-2 px-3 py-2.5">
-                    {group.epic && group.isHydrated ? (
-                      <JourneyPathDrawer epic={{
-                        id: group.epic.id,
-                        title: group.epic.title,
-                        description: group.epic.description ?? undefined,
-                        progress_percentage: group.epic.progress_percentage ?? 0,
-                        target_days: group.epic.target_days,
-                        start_date: group.epic.start_date,
-                        end_date: resolvedEndDate,
-                        epic_habits: group.epic.epic_habits,
-                      }}>
-                        <button
-                          type="button"
-                          aria-label={`Open campaign ${group.title}`}
-                          className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-                        >
-                          <span className="flex min-w-0 items-center gap-2">
-                            <Target className="w-4 h-4 text-primary shrink-0" />
-                            <span className="text-sm font-medium truncate">{group.title}</span>
-                          </span>
-                          <span className="flex items-center gap-2 shrink-0">
-                            {group.progress !== null && (
-                              <span className="text-primary font-bold text-xs">{group.progress}%</span>
-                            )}
-                            {group.daysLeft !== null && (
-                              <span className="text-muted-foreground text-xs">{group.daysLeft}d</span>
-                            )}
-                            <Badge variant="secondary" className="text-xs h-5 px-1.5">
-                              {group.completedCount}/{group.rituals.length}
-                            </Badge>
-                          </span>
-                        </button>
-                      </JourneyPathDrawer>
-                    ) : (
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                group.epic && group.isHydrated ? (
+                  <JourneyPathDrawer key={group.epicId} epic={{
+                    id: group.epic.id,
+                    title: group.epic.title,
+                    description: group.epic.description ?? undefined,
+                    progress_percentage: group.epic.progress_percentage ?? 0,
+                    target_days: group.epic.target_days,
+                    start_date: group.epic.start_date,
+                    end_date: resolvedEndDate,
+                    epic_habits: group.epic.epic_habits,
+                  }}>
+                    <button
+                      type="button"
+                      aria-label={`Open campaign ${group.title}`}
+                      className="flex w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-border/30 bg-card/30 px-3 py-2.5 text-left hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
                         <Target className="w-4 h-4 text-primary shrink-0" />
                         <span className="text-sm font-medium truncate">{group.title}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2 shrink-0">
-                      {(!group.epic || !group.isHydrated) && (
+                      </span>
+                      <span className="flex items-center gap-2 shrink-0">
+                        {group.progress !== null && (
+                          <span className="text-primary font-bold text-xs">{group.progress}%</span>
+                        )}
+                        {group.daysLeft !== null && (
+                          <span className="text-muted-foreground text-xs">{group.daysLeft}d</span>
+                        )}
                         <Badge variant="secondary" className="text-xs h-5 px-1.5">
                           {group.completedCount}/{group.rituals.length}
                         </Badge>
-                      )}
-                      <button
-                        type="button"
-                        aria-label={`${isCampaignExpanded ? "Collapse" : "Expand"} ${group.title} rituals`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleCampaignExpanded(group.epicId);
-                        }}
-                        className="p-1 -m-1 focus:outline-none"
-                      >
-                        {isCampaignExpanded ? (
-                          <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                        )}
-                      </button>
-                    </div>
+                      </span>
+                    </button>
+                  </JourneyPathDrawer>
+                ) : (
+                  <div
+                    key={group.epicId}
+                    className="flex min-w-0 items-center justify-between gap-2 rounded-xl border border-border/30 bg-card/30 px-3 py-2.5"
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Target className="w-4 h-4 text-primary shrink-0" />
+                      <span className="text-sm font-medium truncate">{group.title}</span>
+                    </span>
+                    <Badge variant="secondary" className="text-xs h-5 px-1.5">
+                      {group.completedCount}/{group.rituals.length}
+                    </Badge>
                   </div>
-
-                  {/* Collapsible Rituals */}
-                  {isCampaignExpanded && (
-                    <div className="border-t border-border/20 px-2 pb-1">
-                      {group.rituals.map((task) => {
-                        const isThisDragging = timelineDraggingTaskId === task.id;
-                        const isAnyDragging = timelineIsDragging;
-                        const overlapCount = timelineConflictMap.get(task.id)?.size ?? 0;
-
-                        return (
-                          <motion.div
-                            key={task.id}
-                            className={cn("relative", isThisDragging && "z-50")}
-                            style={{
-                              y: isThisDragging ? timelineDrag.dragOffsetY : 0,
-                              pointerEvents: isAnyDragging && !isThisDragging ? "none" : "auto",
-                              opacity: isAnyDragging && !isThisDragging ? 0.7 : 1,
-                            }}
-                          >
-                            {renderTaskItem(task, undefined, overlapCount)}
-                          </motion.div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                )
               );
             })}
           </div>
@@ -1960,9 +1908,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const selectedAnytimeCount = anytimeItems.length;
   const selectedRitualCount = ritualTasks.length;
   const selectedOpenCount = totalCount - completedCount;
-  const nextFocusTask = baseTimelineItems.find((task) => !task.completed)
-    ?? ritualTasks.find((task) => !task.completed)
-    ?? null;
+  const nextFocusTask = baseTimelineItems.find((task) => !task.completed) ?? null;
   const selectedDateHeading = safeFormat(selectedDate, "EEEE", "Day plan");
   const selectedDateSubheading = safeFormat(selectedDate, "MMMM d, yyyy", "");
   const isSelectedToday = isSameDay(selectedDate, new Date());
@@ -2035,6 +1981,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   ) => {
     const isComplete = !!task.completed || optimisticCompleted.has(task.id);
     const isRitual = !!task.habit_source_id;
+    const isCampaignRitual = isCampaignRitualTask(task);
+    const campaignTitle = task.epic_title?.trim() || "Campaign";
     const effectiveTaskXP = task.is_main_quest
       ? Math.round(task.xp_reward * MAIN_QUEST_XP_MULTIPLIER)
       : task.xp_reward;
@@ -2109,6 +2057,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           className={cn(
             JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME,
             "group flex h-full items-stretch gap-2 rounded-[18px] border-white/10 p-2",
+            isCampaignRitual && CAMPAIGN_RITUAL_CARD_CLASSES,
             isDesktopDetailOpen && JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME,
             isDesktopDetailOpen && "border-primary/40 bg-primary/[0.08]",
             isComplete && "opacity-70",
@@ -2156,24 +2105,36 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             }}
             anchor={(
               <button
-              type="button"
-              onClick={() => scheduleDesktopTaskSingleClick(task)}
-              onDoubleClick={() => handleDesktopTaskDoubleClick(task)}
-              className="flex h-full min-w-0 flex-1 items-center rounded-[14px] px-2 py-1.5 text-left transition-colors hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-              data-testid={`desktop-timeline-task-button-${task.id}`}
-            >
-                <div className="flex items-center gap-2">
-                  {isRitual ? (
-                    <Repeat className="h-3.5 w-3.5 flex-shrink-0 text-accent" />
+                type="button"
+                onClick={() => scheduleDesktopTaskSingleClick(task)}
+                onDoubleClick={() => handleDesktopTaskDoubleClick(task)}
+                className="flex h-full min-w-0 flex-1 items-center rounded-[14px] px-2 py-1.5 text-left transition-colors hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                data-testid={`desktop-timeline-task-button-${task.id}`}
+              >
+                <div className="min-w-0">
+                  <div className="flex min-w-0 items-center gap-2">
+                    {isRitual ? (
+                      <Repeat
+                        className={cn(
+                          "h-3.5 w-3.5 flex-shrink-0",
+                          isCampaignRitual ? "text-primary" : "text-accent",
+                        )}
+                      />
+                    ) : null}
+                    <p
+                      className={cn(
+                        "truncate text-sm font-medium text-foreground",
+                        isComplete && "text-muted-foreground line-through",
+                      )}
+                    >
+                      {task.task_text}
+                    </p>
+                  </div>
+                  {isCampaignRitual ? (
+                    <p className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-wide text-primary/80">
+                      Campaign Ritual - {campaignTitle}
+                    </p>
                   ) : null}
-                  <p
-                    className={cn(
-                      "truncate text-sm font-medium text-foreground",
-                      isComplete && "text-muted-foreground line-through",
-                    )}
-                  >
-                    {task.task_text}
-                  </p>
                 </div>
               </button>
             )}
@@ -2190,6 +2151,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           className={cn(
             JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME,
             "rounded-[22px] border-white/10 px-2",
+            isCampaignRitual && CAMPAIGN_RITUAL_CARD_CLASSES,
             isMobileQuestShellActive && JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME,
             isMobileQuestShellActive && "border-primary/35 bg-primary/[0.06]",
             isComplete && "opacity-70",
@@ -2294,7 +2256,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 {isRitual && (
-                  <Repeat className="w-4 h-4 text-accent flex-shrink-0" />
+                  <Repeat className={cn("w-4 h-4 flex-shrink-0", isCampaignRitual ? "text-primary" : "text-accent")} />
                 )}
                 <MarqueeText
                   text={task.task_text}
@@ -2306,6 +2268,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   )}
                 />
               </div>
+              {isCampaignRitual && (
+                <span className="mt-1 inline-flex max-w-full items-center rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                  <span className="truncate">Campaign Ritual - {campaignTitle}</span>
+                </span>
+              )}
               {task.scheduled_time && (
                 <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                   <Clock className="w-3 h-3" />

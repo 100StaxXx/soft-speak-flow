@@ -677,6 +677,7 @@ Deno.test("generate-mentor-audio rejects unauthenticated callers", async () => {
 
 Deno.test("generate-mentor-audio succeeds for authenticated users and records usage", async () => {
   const queryLog: QueryState[] = [];
+  let elevenLabsRequestBody: Record<string, unknown> = {};
   Deno.env.set("ELEVENLABS_API_KEY", "test-elevenlabs-key");
   const supabase = createMockSupabase({
     ai_output_validation_log: () => ({ data: null, error: null }),
@@ -693,8 +694,12 @@ Deno.test("generate-mentor-audio succeeds for authenticated users and records us
     {
       authorize: async () => ({ userId: "user-1", isInternal: false }),
       createSupabaseClient: () => supabase,
-      fetchImpl: async () =>
-        new Response(new Uint8Array([1, 2, 3]), { status: 200 }),
+      fetchImpl: async (_input, init) => {
+        elevenLabsRequestBody = JSON.parse(
+          String(init?.body ?? "{}"),
+        ) as Record<string, unknown>;
+        return new Response(new Uint8Array([1, 2, 3]), { status: 200 });
+      },
       checkRateLimitFn: async () => ({
         allowed: true,
         available: true,
@@ -723,6 +728,11 @@ Deno.test("generate-mentor-audio succeeds for authenticated users and records us
   assert(
     Boolean(logEntry?.payload),
     "Expected mentor audio usage to be logged",
+  );
+  assertEquals(
+    elevenLabsRequestBody.model_id,
+    "eleven_v3",
+    "Expected mentor audio to use ElevenLabs v3",
   );
 });
 

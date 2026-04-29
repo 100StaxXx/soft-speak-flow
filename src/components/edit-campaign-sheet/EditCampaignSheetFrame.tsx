@@ -73,6 +73,7 @@ export interface EditCampaignSheetFrameProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onDeleted?: () => void;
+  startWithAddRitual?: boolean;
   dependencies: EditCampaignSheetDependencies;
   visualPreview?: boolean;
 }
@@ -172,6 +173,7 @@ export function EditCampaignSheetFrame({
   open,
   onOpenChange,
   onDeleted,
+  startWithAddRitual = false,
   dependencies,
   visualPreview = false,
 }: EditCampaignSheetFrameProps) {
@@ -198,6 +200,11 @@ export function EditCampaignSheetFrame({
     setTitle(currentEpic.title);
     setDescription(currentEpic.description ?? "");
   }, [currentEpic, open]);
+
+  useEffect(() => {
+    if (!open || !currentEpic || !startWithAddRitual) return;
+    setShowAddRitual(true);
+  }, [currentEpic, open, startWithAddRitual]);
 
   useEffect(() => {
     if (!open) {

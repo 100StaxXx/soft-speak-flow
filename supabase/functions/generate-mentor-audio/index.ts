@@ -19,6 +19,7 @@ import {
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
 import {
+  ELEVENLABS_MENTOR_TTS_MODEL,
   type MentorVoiceConfig,
   resolveMentorVoiceConfig,
   resolveTutorialVoice,
@@ -31,11 +32,10 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-internal-key",
 };
 
-const MODEL_NAME = "eleven_multilingual_v2";
 const OPENAI_TTS_MODEL_NAME = "gpt-4o-mini-tts";
 const RATE_LIMIT_KEY = "mentor-audio";
-const ELEVENLABS_FIRST_ATTEMPT_TIMEOUT_MS = 35000;
-const ELEVENLABS_RETRY_TIMEOUT_MS = 18000;
+const ELEVENLABS_FIRST_ATTEMPT_TIMEOUT_MS = 45000;
+const ELEVENLABS_RETRY_TIMEOUT_MS = 25000;
 const ELEVENLABS_RETRY_DELAY_MS = 1500;
 
 interface AudioGenerationResult {
@@ -155,7 +155,7 @@ async function generateElevenLabsAudio({
       },
       body: JSON.stringify({
         text: script,
-        model_id: MODEL_NAME,
+        model_id: ELEVENLABS_MENTOR_TTS_MODEL,
         voice_settings: voiceSettings,
       }),
     },
@@ -242,7 +242,7 @@ async function generateMentorAudioBytes({
           timeoutMs: ELEVENLABS_FIRST_ATTEMPT_TIMEOUT_MS,
         }),
         provider: "elevenlabs",
-        model: MODEL_NAME,
+        model: ELEVENLABS_MENTOR_TTS_MODEL,
       };
     } catch (error) {
       primaryError = error instanceof Error ? error : new Error(String(error));
@@ -268,7 +268,7 @@ async function generateMentorAudioBytes({
               timeoutMs: ELEVENLABS_RETRY_TIMEOUT_MS,
             }),
             provider: "elevenlabs",
-            model: MODEL_NAME,
+            model: ELEVENLABS_MENTOR_TTS_MODEL,
           };
         } catch (retryError) {
           const retryFailure = retryError instanceof Error ? retryError : new Error(String(retryError));

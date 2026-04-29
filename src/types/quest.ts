@@ -34,6 +34,10 @@ export interface CalendarTask {
   difficulty: string | null;
   xp_reward: number;
   category?: string | null;
+  habit_source_id?: string | null;
+  epic_id?: string | null;
+  epic_title?: string | null;
+  source?: string | null;
 }
 
 /**
@@ -61,6 +65,10 @@ export interface DragTask {
   category?: string | null;
   xp_reward?: number;
   completed?: boolean | null;
+  habit_source_id?: string | null;
+  epic_id?: string | null;
+  epic_title?: string | null;
+  source?: string | null;
 }
 
 /**

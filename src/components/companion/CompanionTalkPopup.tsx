@@ -5,17 +5,23 @@
  
  import { memo, useEffect, useState, useCallback } from "react";
  import { motion, AnimatePresence } from "framer-motion";
-import { X } from "lucide-react";
+import { Sparkles, UserRound, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
 import { Progress } from "@/components/ui/progress";
 import { isCompanionPresetImageSource } from "@/lib/companionImageFocal";
+import type { CompletionCompanionTone } from "@/types/completionFeedback";
  
  interface CompanionTalkPopupProps {
    isVisible: boolean;
    onDismiss: () => void;
    message: string;
+   tone?: CompletionCompanionTone | null;
+   mentor?: {
+     personality: string;
+     message: string;
+   } | null;
    companionName: string;
    companionImageUrl: string | null;
    companionImageFocalX?: number | null;
@@ -23,26 +29,37 @@ import { isCompanionPresetImageSource } from "@/lib/companionImageFocal";
 }
 
 const usesPortraitAvatar = (imageUrl?: string | null) => isCompanionPresetImageSource(imageUrl);
+
+const toneClassName: Record<CompletionCompanionTone, string> = {
+  proud: "border-primary/25 shadow-primary/10",
+  locked_in: "border-emerald-300/30 shadow-emerald-400/10",
+  recovery: "border-amber-300/35 shadow-amber-400/10",
+  calm: "border-sky-300/30 shadow-sky-400/10",
+  hype: "border-fuchsia-300/35 shadow-fuchsia-400/10",
+};
  
  // Calculate auto-dismiss duration based on message length
- const getAutoDismissDuration = (message: string): number => {
-   const length = message.length;
+ const getAutoDismissDuration = (message: string, mentorMessage?: string | null): number => {
+   const length = message.length + (mentorMessage?.length ?? 0);
    // < 60 chars: 3.2s, 60-100: 4s, > 100: 5s
-   return Math.min(5, Math.max(3.2, 3 + (length / 50)));
+   return Math.min(6.2, Math.max(3.2, 3 + (length / 50)));
  };
  
 export const CompanionTalkPopup = memo(({
    isVisible,
    onDismiss,
    message,
+   tone,
+   mentor,
    companionName,
    companionImageUrl,
    companionImageFocalX,
    companionImageFocalY,
 }: CompanionTalkPopupProps) => {
   const [progress, setProgress] = useState(0);
-  const duration = getAutoDismissDuration(message);
+  const duration = getAutoDismissDuration(message, mentor?.message);
   const hasCompanionName = companionName.trim().length > 0;
+  const resolvedToneClassName = tone ? toneClassName[tone] : toneClassName.proud;
    
    // Check for reduced motion preference
    const prefersReducedMotion = 
@@ -56,6 +73,7 @@ export const CompanionTalkPopup = memo(({
        return;
      }
      
+     setProgress(0);
      const startTime = Date.now();
      const durationMs = duration * 1000;
      
@@ -108,14 +126,14 @@ export const CompanionTalkPopup = memo(({
            )}
          onClick={handleDismiss}
          role="dialog"
-         aria-modal="false"
-         aria-label={hasCompanionName ? `${companionName} says: ${message}` : `Companion says: ${message}`}
+          aria-modal="false"
+          aria-label={hasCompanionName ? `${companionName} says: ${message}` : `Companion says: ${message}`}
         >
            <div className={cn(
              "relative rounded-2xl overflow-hidden",
              "bg-card/95 backdrop-blur-lg",
-             "border border-primary/20",
-             "shadow-lg shadow-primary/10"
+             "border shadow-lg",
+             resolvedToneClassName
            )}>
              {/* Main content */}
              <div className="flex items-start gap-4 p-4">
@@ -165,13 +183,29 @@ export const CompanionTalkPopup = memo(({
                
                {/* Quote bubble */}
                <div className="flex-1 min-w-0 pt-1">
-                 <p className="text-foreground text-base leading-relaxed">
-                   "{message}"
-                 </p>
+                 <div className="space-y-1">
+                   <div className="flex items-start gap-2">
+                     <Sparkles className="mt-1 h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
+                     <p className="text-foreground text-base leading-relaxed">
+                       "{message}"
+                     </p>
+                   </div>
+                 </div>
                 {hasCompanionName ? (
-                  <p className="mt-2 text-sm text-muted-foreground flex items-center gap-1">
-                    — {companionName} <span className="text-primary">✨</span>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {companionName}
                   </p>
+                ) : null}
+                {mentor?.message ? (
+                  <div className="mt-3 border-t border-border/45 pt-2">
+                    <div className="mb-1 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                      <UserRound className="h-3 w-3" aria-hidden="true" />
+                      <span>{mentor.personality}</span>
+                    </div>
+                    <p className="text-sm leading-relaxed text-foreground/90">
+                      "{mentor.message}"
+                    </p>
+                  </div>
                 ) : null}
               </div>
                

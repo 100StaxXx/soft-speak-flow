@@ -12,6 +12,7 @@ import {
 } from "./mentorRoster.ts";
 import { getMentorNarrativeProfile } from "./mentorNarrativeProfiles.ts";
 import {
+  ELEVENLABS_MENTOR_TTS_MODEL,
   ELEVENLABS_MENTOR_VOICES,
   OPENAI_TUTORIAL_VOICE_MAP,
   resolveMentorVoiceConfig,
@@ -54,6 +55,11 @@ Deno.test("mentor pep talk config resolves active mentor themes", () => {
 });
 
 Deno.test("mentor pep talk config provides voices for all supported mentors", () => {
+  assert(
+    ELEVENLABS_MENTOR_TTS_MODEL === "eleven_v3",
+    "Expected mentor voices to use ElevenLabs v3",
+  );
+
   for (
     const mentorSlug of [
       ...ACTIVE_MENTOR_SLUGS,

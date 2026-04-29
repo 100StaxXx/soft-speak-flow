@@ -12,6 +12,8 @@ export interface MentorVoiceConfig {
   use_speaker_boost?: boolean;
 }
 
+export const ELEVENLABS_MENTOR_TTS_MODEL = "eleven_v3";
+
 export const ELEVENLABS_MENTOR_VOICES: Record<
   SupportedMentorSlug,
   MentorVoiceConfig

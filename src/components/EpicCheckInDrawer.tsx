@@ -18,7 +18,6 @@ import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { playStrikethrough } from "@/utils/soundEffects";
 import { useHabitSurfacing } from "@/hooks/useHabitSurfacing";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
-import { useLivingCompanionSafe } from "@/hooks/useLivingCompanion";
 import { useEpics } from "@/hooks/useEpics";
 import { getClampedMonthDays, isHabitScheduledForDate } from "@/utils/habitSchedule";
 interface Habit {
@@ -124,9 +123,6 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
   const { surfacedHabits, surfaceHabit } = useHabitSurfacing();
   const { toggleTask } = useTaskMutations(taskDate);
    
-   // Living companion reaction system - safe hook returns no-op when outside provider
-   const { triggerRitualComplete } = useLivingCompanionSafe();
-   
    // Helper to check if this is the first ritual completion today
    const checkIsFirstRitualToday = (): boolean => {
      const completedCount = todayHabits.filter(h => 
@@ -186,14 +182,14 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
         toggleTask({ 
           taskId, 
           completed: true, 
-          xpReward: 25 
+          xpReward: 25,
+          completionFeedback: {
+            completionSource: "ritual",
+            firstRitualToday: isFirstRitualToday,
+            completedAllRituals: willCompleteAllRituals,
+          },
         });
       }
-      
-      // Trigger companion reaction for ritual completion (single consolidated call)
-      triggerRitualComplete(isFirstRitualToday, willCompleteAllRituals).catch(err => 
-        console.log('[LivingCompanion] Ritual reaction failed:', err)
-      );
     } finally {
       setTimeout(() => setTogglingHabitId(null), 300);
     }

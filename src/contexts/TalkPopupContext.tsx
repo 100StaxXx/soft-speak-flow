@@ -7,9 +7,15 @@ import { createContext, useContext, ReactNode, memo, useState, useCallback, useR
 import { useCompanion } from "@/hooks/useCompanion";
 import { CompanionTalkPopup } from "@/components/companion/CompanionTalkPopup";
 import { resolveCompanionName } from "@/lib/companionName";
+import type { CompletionCompanionTone } from "@/types/completionFeedback";
  
 interface ShowOptions {
   message: string;
+  tone?: CompletionCompanionTone;
+  mentor?: {
+    personality: string;
+    message: string;
+  };
   companionName?: string | null;
   companionImageUrl?: string;
   companionImageFocalX?: number | null;
@@ -18,6 +24,7 @@ interface ShowOptions {
  
  interface TalkPopupContextType {
    show: (options: ShowOptions) => Promise<void>;
+   replaceCurrent: (options: ShowOptions, expectedCurrentMessage?: string) => Promise<boolean>;
    dismiss: () => void;
    isVisible: boolean;
  }
@@ -32,6 +39,8 @@ export const TalkPopupProvider = memo(({ children }: TalkPopupProviderProps) => 
   const { companion } = useCompanion();
   const [isVisible, setIsVisible] = useState(false);
   const [message, setMessage] = useState("");
+  const [tone, setTone] = useState<CompletionCompanionTone | null>(null);
+  const [mentor, setMentor] = useState<ShowOptions["mentor"] | null>(null);
   const [companionName, setCompanionName] = useState("");
   const [companionImageUrl, setCompanionImageUrl] = useState<string | null>(null);
   const [companionImageFocalX, setCompanionImageFocalX] = useState<number | null>(null);
@@ -40,17 +49,9 @@ export const TalkPopupProvider = memo(({ children }: TalkPopupProviderProps) => 
    // Queue for pending messages
    const queueRef = useRef<ShowOptions[]>([]);
    const isShowingRef = useRef(false);
+   const currentMessageRef = useRef("");
  
-  // Show the popup with a message
-  const show = useCallback(async (options: ShowOptions) => {
-     // If already showing, add to queue
-     if (isShowingRef.current) {
-       queueRef.current.push(options);
-       return;
-     }
-     
-     isShowingRef.current = true;
-     
+  const applyPopupOptions = useCallback(async (options: ShowOptions) => {
     const name = await resolveCompanionName({
       companion,
       overrideName: options.companionName,
@@ -60,16 +61,44 @@ export const TalkPopupProvider = memo(({ children }: TalkPopupProviderProps) => 
     const imageFocalX = options.companionImageFocalX ?? companion?.current_image_focal_x ?? null;
     const imageFocalY = options.companionImageFocalY ?? companion?.current_image_focal_y ?? null;
      
-     setMessage(options.message);
-     setCompanionName(name);
-     setCompanionImageUrl(imageUrl);
-     setCompanionImageFocalX(imageFocalX);
-     setCompanionImageFocalY(imageFocalY);
-     setIsVisible(true);
+    currentMessageRef.current = options.message;
+    setMessage(options.message);
+    setTone(options.tone ?? null);
+    setMentor(options.mentor ?? null);
+    setCompanionName(name);
+    setCompanionImageUrl(imageUrl);
+    setCompanionImageFocalX(imageFocalX);
+    setCompanionImageFocalY(imageFocalY);
   }, [companion]);
+
+  // Show the popup with a message
+  const show = useCallback(async (options: ShowOptions) => {
+     // If already showing, add to queue
+     if (isShowingRef.current) {
+       queueRef.current.push(options);
+       return;
+     }
+     
+     isShowingRef.current = true;
+     await applyPopupOptions(options);
+     setIsVisible(true);
+  }, [applyPopupOptions]);
+
+  const replaceCurrent = useCallback(async (
+    options: ShowOptions,
+    expectedCurrentMessage?: string,
+  ): Promise<boolean> => {
+    if (!isShowingRef.current) return false;
+    if (expectedCurrentMessage && currentMessageRef.current !== expectedCurrentMessage) return false;
+
+    await applyPopupOptions(options);
+    setIsVisible(true);
+    return true;
+  }, [applyPopupOptions]);
    
    // Dismiss the current popup and show next in queue
    const dismiss = useCallback(() => {
+     currentMessageRef.current = "";
      setIsVisible(false);
      isShowingRef.current = false;
      
@@ -82,12 +111,14 @@ export const TalkPopupProvider = memo(({ children }: TalkPopupProviderProps) => 
    }, [show]);
  
    return (
-     <TalkPopupContext.Provider value={{ show, dismiss, isVisible }}>
+     <TalkPopupContext.Provider value={{ show, replaceCurrent, dismiss, isVisible }}>
        {children}
        <CompanionTalkPopup
          isVisible={isVisible}
          onDismiss={dismiss}
          message={message}
+         tone={tone}
+         mentor={mentor}
          companionName={companionName}
          companionImageUrl={companionImageUrl}
          companionImageFocalX={companionImageFocalX}
@@ -114,6 +145,7 @@ export const useTalkPopupContextSafe = () => {
   if (!context) {
     return {
       show: async () => {},
+      replaceCurrent: async () => false,
       dismiss: () => {},
       isVisible: false,
     };

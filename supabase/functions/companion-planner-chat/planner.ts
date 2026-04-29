@@ -2175,9 +2175,15 @@ const isVaguePlanningPrompt = (
   if (matched.task || matched.ritual || matched.epic || matched.calendarEvent) {
     return false;
   }
+  if (
+    /\b(help me plan(?: my week| this week| the week)|plan(?: my week| this week| the week)|schedule(?: my| this| the)? week|weekly planning|week ahead|what should i do this week|what does this week look like|what(?:'s| is) my week like)\b/i
+      .test(input.message)
+  ) {
+    return true;
+  }
   if (repeated) return false;
 
-  return /\b(help me make room for what matters|make room for what matters|help me break a big goal into steps|break a big goal into steps|help me plan(?: my day| today| tomorrow| my week| this week)?|plan(?: my day| today| tomorrow| my week| this week)|help me prioritize(?: my day| today| my week| this week)?|prioritize(?: my day| today| my week| this week)?|help me organize(?: my day| today| my week| this week)?|organize(?: my day| today| my week| this week)?|help me figure out(?: my day| what matters| what to focus on)?|figure out(?: my day| what matters| what to focus on)|what matters most)\b/i
+  return /\b(help me make room for what matters|make room for what matters|help me break a big goal into steps|break a big goal into steps|help me plan(?: my day| today| tomorrow| my week| this week| the week)?|plan(?: my day| today| tomorrow| my week| this week| the week)|schedule(?: my| this| the)? week|weekly planning|week ahead|what should i do this week|what does this week look like|what(?:'s| is) my week like|help me prioritize(?: my day| today| my week| this week)?|prioritize(?: my day| today| my week| this week)?|help me organize(?: my day| today| my week| this week)?|organize(?: my day| today| my week| this week)?|help me figure out(?: my day| what matters| what to focus on)?|figure out(?: my day| what matters| what to focus on)|what matters most)\b/i
     .test(input.message);
 };
 
@@ -8342,22 +8348,6 @@ const buildPlanDayClarificationResponse = (
   };
 };
 
-const PLAN_DAY_ENERGY_OPTIONS = [
-  "Low — keep it light",
-  "Medium — balanced",
-  "High — bring it on",
-];
-
-const buildPlanDayEnergyQuestion = (): PlannerQuestion =>
-  question({
-    id: "plan_day_energy",
-    field: "details",
-    prompt: "Quick check — what kind of energy are we working with?",
-    reason: "Energy shapes how heavy I make the plan.",
-    required: true,
-    options: PLAN_DAY_ENERGY_OPTIONS,
-  });
-
 const buildPlanDayQuestConsentQuestion = (): PlannerQuestion =>
   question({
     id: PLAN_DAY_QUEST_CONSENT_QUESTION_ID,
@@ -8398,62 +8388,6 @@ const detectPlanDayEnergyFromMessage = (
     return "medium";
   }
   return null;
-};
-
-type PlanDayClarificationPhase = "energy" | "ready";
-
-const hasPlanDayPriorityFocusMatch = (input: PlannerBuildInput): boolean => {
-  const focusText = input.message;
-  return getResolvedPriorityScores(input).some((score) =>
-    scoreMatchesPlanDayFocus(score, focusText, input)
-  );
-};
-
-const getPlanDayClarificationPhase = (
-  input: PlannerBuildInput,
-  sessionState: PlannerSessionState,
-): PlanDayClarificationPhase => {
-  if (sessionState.planDayEnergy) return "ready";
-  if (getPlanDayConcreteCandidateTitle(input)) return "ready";
-  if (hasPlanDayPriorityFocusMatch(input)) return "ready";
-  return "energy";
-};
-
-const buildPlanDayEnergyClarificationResponse = (
-  input: PlannerBuildInput,
-  sessionState: PlannerSessionState,
-  classificationHint: ClassificationHint,
-): PlannerBuildResult => {
-  const energyQuestion = buildPlanDayEnergyQuestion();
-  const acknowledgement = buildPlanDayAcknowledgement(input);
-  const reply = [acknowledgement, energyQuestion.prompt]
-    .filter(Boolean)
-    .join(" ");
-  return {
-    mode: "conversational",
-    reply,
-    followUpQuestions: [energyQuestion],
-    proposals: [],
-    suggestedReminders: [],
-    structuredResponse: null,
-    memoryUpdates: {
-      preferredTimeOfDay: sessionState.preferredTimeOfDay ??
-        input.plannerContext.plannerMemory?.preferredTimeOfDay ?? null,
-      preferredTimeReason: sessionState.preferredTimeReason ??
-        input.plannerContext.plannerMemory?.preferredTimeReason ?? null,
-      reminderPreference: sessionState.reminderPreference ??
-        (input.plannerContext.plannerMemory?.reminderMinutesBefore
-          ? `${input.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
-          : null),
-    },
-    sessionState: {
-      ...sessionState,
-      draft: {},
-      openQuestionIds: [energyQuestion.id],
-      pendingStarterIntent: "plan_day",
-      lastClassification: classificationHint.type,
-    },
-  };
 };
 
 const isAffirmativeReply = (message: string): boolean => {
@@ -11357,6 +11291,27 @@ const getPlanningConsentPrompt = (
   }
 };
 
+const buildPlanningLauncherConsentLead = (
+  result: PlannerBuildResult,
+  kind: PlanningLauncherConsentKind,
+): string => {
+  const proposalCount = result.proposals.length;
+  switch (kind) {
+    case "quest":
+      return "I see a possible quest here, but I won't name or prepare it from this planning lane unless you say yes first.";
+    case "schedule_changes":
+      return proposalCount === 1
+        ? "I found a schedule change that could help, but I won't prepare it unless you say yes first."
+        : `I found ${proposalCount} schedule changes that could help, but I won't prepare them unless you say yes first.`;
+    case "campaign_adjustment":
+      return "I see a campaign adjustment that could help, but I won't prepare it unless you say yes first.";
+    case "planner_changes":
+      return proposalCount === 1
+        ? "I found a planner change that could help, but I won't prepare it unless you say yes first."
+        : `I found ${proposalCount} planner changes that could help, but I won't prepare them unless you say yes first.`;
+  }
+};
+
 const buildPlanningLauncherConsentQuestion = (
   consent: PlanningLauncherConsentState,
 ): PlannerQuestion =>
@@ -11409,7 +11364,10 @@ const maybeRequirePlanningLauncherConsent = (
     sourceMessage: input.message,
   };
   const consentQuestion = buildPlanningLauncherConsentQuestion(consent);
-  const reply = [result.reply, consentQuestion.prompt]
+  const reply = [
+    buildPlanningLauncherConsentLead(result, consent.kind),
+    consentQuestion.prompt,
+  ]
     .filter(Boolean)
     .join(" ");
 

@@ -1,5 +1,5 @@
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
-import { ChevronLeft, ChevronRight, Clock, AlertCircle, Star } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, AlertCircle, Star, Repeat } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { Badge } from "./ui/badge";
@@ -14,6 +14,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { parseScheduledTime } from "@/utils/scheduledTime";
+import {
+  CAMPAIGN_RITUAL_CARD_CLASSES,
+  isCampaignRitualTask,
+} from "@/utils/campaignRitualStyle";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -241,28 +245,43 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, t
                   ))}
                   
                   {/* Then show tasks */}
-                  {dayTasks.slice(0, Math.max(0, maxVisibleItems - dayMilestones.length)).map(task => (
-                    <div
-                      key={task.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onTaskClick(task);
-                      }}
-                      className={cn(
-                        "text-xs p-1 border-l-2 truncate transition-all hover:bg-muted/50",
-                        task.completed && "opacity-50 line-through",
-                        task.is_main_quest && "border-l-amber-500 bg-amber-500/5",
-                        !task.is_main_quest && task.difficulty === "easy" && "border-l-emerald-500 bg-emerald-500/5",
-                        !task.is_main_quest && task.difficulty === "medium" && "border-l-amber-500 bg-amber-500/5",
-                        !task.is_main_quest && task.difficulty === "hard" && "border-l-rose-500 bg-rose-500/5"
-                      )}
-                    >
-                      {task.scheduled_time && (
-                        <Clock className="h-2 w-2 inline mr-1" />
-                      )}
-                      {task.task_text}
-                    </div>
-                  ))}
+                  {dayTasks.slice(0, Math.max(0, maxVisibleItems - dayMilestones.length)).map(task => {
+                    const isCampaignRitual = isCampaignRitualTask(task);
+                    const campaignTitle = task.epic_title?.trim() || "Campaign";
+
+                    return (
+                      <div
+                        key={task.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onTaskClick(task);
+                        }}
+                        className={cn(
+                          "text-xs p-1 border-l-2 transition-all hover:bg-muted/50",
+                          task.completed && "opacity-50 line-through",
+                          isCampaignRitual && CAMPAIGN_RITUAL_CARD_CLASSES,
+                          !isCampaignRitual && task.is_main_quest && "border-l-amber-500 bg-amber-500/5",
+                          !isCampaignRitual && !task.is_main_quest && task.difficulty === "easy" && "border-l-emerald-500 bg-emerald-500/5",
+                          !isCampaignRitual && !task.is_main_quest && task.difficulty === "medium" && "border-l-amber-500 bg-amber-500/5",
+                          !isCampaignRitual && !task.is_main_quest && task.difficulty === "hard" && "border-l-rose-500 bg-rose-500/5"
+                        )}
+                      >
+                        <div className="truncate">
+                          {isCampaignRitual ? (
+                            <Repeat className="h-2 w-2 inline mr-1 text-primary" />
+                          ) : task.scheduled_time ? (
+                            <Clock className="h-2 w-2 inline mr-1" />
+                          ) : null}
+                          {task.task_text}
+                        </div>
+                        {isCampaignRitual && (
+                          <div className="truncate text-[10px] font-medium text-primary">
+                            Campaign Ritual - {campaignTitle}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                   {totalItems > maxVisibleItems && (
                     <Badge variant="secondary" className="text-[10px] py-0">
                       +{totalItems - maxVisibleItems} more

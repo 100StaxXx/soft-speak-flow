@@ -34,26 +34,62 @@ vi.mock("@/components/companion/CompanionTalkPopup", () => ({
   CompanionTalkPopup: ({
     isVisible,
     message,
+    tone,
+    mentor,
     companionName,
   }: {
     isVisible: boolean;
     message: string;
+    tone?: string | null;
+    mentor?: { personality: string; message: string } | null;
     companionName: string;
   }) => (
     <div
       data-testid="popup-props"
       data-visible={String(isVisible)}
       data-message={message}
+      data-tone={tone ?? ""}
+      data-mentor-personality={mentor?.personality ?? ""}
+      data-mentor-message={mentor?.message ?? ""}
       data-name={companionName}
     />
   ),
 }));
 
-const ShowProbe = ({ options }: { options: { message: string; companionName?: string | null } }) => {
+const ShowProbe = ({
+  options,
+}: {
+  options: {
+    message: string;
+    tone?: "proud" | "locked_in" | "recovery" | "calm" | "hype";
+    mentor?: { personality: string; message: string };
+    companionName?: string | null;
+  };
+}) => {
   const { show } = useTalkPopupContext();
 
   useEffect(() => {
     void show(options);
+  }, []);
+
+  return null;
+};
+
+const ReplaceProbe = () => {
+  const { show, replaceCurrent } = useTalkPopupContext();
+
+  useEffect(() => {
+    void (async () => {
+      await show({ message: "Fallback message", tone: "proud" });
+      await replaceCurrent({
+        message: "AI upgraded message",
+        tone: "locked_in",
+        mentor: {
+          personality: "Disciplined",
+          message: "Keep it there.",
+        },
+      }, "Fallback message");
+    })();
   }, []);
 
   return null;
@@ -193,5 +229,63 @@ describe("TalkPopupContext", () => {
     });
 
     expect(mocks.evolutionMaybeSingle).not.toHaveBeenCalled();
+  });
+
+  it("passes completion tone and mentor stack data to the popup", async () => {
+    mocks.companion = {
+      id: "comp-5",
+      current_stage: 2,
+      current_image_url: null,
+      cached_creature_name: "Nova",
+      spirit_animal: "eagle",
+    };
+
+    render(
+      <TalkPopupProvider>
+        <ShowProbe
+          options={{
+            message: "Portfolio session is done.",
+            tone: "locked_in",
+            mentor: {
+              personality: "Disciplined",
+              message: "That is the standard. Keep it there.",
+            },
+          }}
+        />
+      </TalkPopupProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("popup-props")).toHaveAttribute("data-tone", "locked_in");
+    });
+
+    expect(screen.getByTestId("popup-props")).toHaveAttribute("data-mentor-personality", "Disciplined");
+    expect(screen.getByTestId("popup-props")).toHaveAttribute(
+      "data-mentor-message",
+      "That is the standard. Keep it there.",
+    );
+  });
+
+  it("can replace the current popup when AI feedback upgrades the fallback", async () => {
+    mocks.companion = {
+      id: "comp-6",
+      current_stage: 2,
+      current_image_url: null,
+      cached_creature_name: "Nova",
+      spirit_animal: "eagle",
+    };
+
+    render(
+      <TalkPopupProvider>
+        <ReplaceProbe />
+      </TalkPopupProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("popup-props")).toHaveAttribute("data-message", "AI upgraded message");
+    });
+
+    expect(screen.getByTestId("popup-props")).toHaveAttribute("data-tone", "locked_in");
+    expect(screen.getByTestId("popup-props")).toHaveAttribute("data-mentor-message", "Keep it there.");
   });
 });

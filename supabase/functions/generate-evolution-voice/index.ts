@@ -9,12 +9,44 @@ import {
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
-import { resolveMentorVoiceConfig } from "../_shared/mentorVoiceConfig.ts";
+import {
+  ELEVENLABS_MENTOR_TTS_MODEL,
+  resolveMentorVoiceConfig,
+} from "../_shared/mentorVoiceConfig.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+const ELEVENLABS_EVOLUTION_VOICE_TIMEOUT_MS = 45000;
+
+async function fetchElevenLabsAudioWithTimeout(
+  fetchImpl: typeof fetch,
+  url: string,
+  init: RequestInit,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(
+    () => controller.abort(),
+    ELEVENLABS_EVOLUTION_VOICE_TIMEOUT_MS,
+  );
+
+  try {
+    return await fetchImpl(url, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    const err = error as { name?: string };
+    if (err?.name === "AbortError") {
+      throw new Error("Evolution voice generation timed out. Please try again.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -140,7 +172,8 @@ Make it personal to ${mentor.name}'s voice. Keep it SHORT and IMPACTFUL.`
       ?? resolveMentorVoiceConfig("sage")?.voiceId
       ?? "";
     
-    const elevenLabsResponse = await guardedFetch(
+    const elevenLabsResponse = await fetchElevenLabsAudioWithTimeout(
+      guardedFetch,
       `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
       {
         method: 'POST',
@@ -150,7 +183,7 @@ Make it personal to ${mentor.name}'s voice. Keep it SHORT and IMPACTFUL.`
         },
         body: JSON.stringify({
           text: voiceLine,
-          model_id: 'eleven_turbo_v2_5',
+          model_id: ELEVENLABS_MENTOR_TTS_MODEL,
           voice_settings: {
             stability: 0.5,
             similarity_boost: 0.75,

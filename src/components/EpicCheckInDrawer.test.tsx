@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   createCampaignRitualMock: vi.fn(),
   surfaceHabitMock: vi.fn(),
   toggleTaskMock: vi.fn(),
-  triggerRitualCompleteMock: vi.fn().mockResolvedValue(undefined),
+  surfacedHabits: [] as Array<{ habit_id: string; task_id: string | null; is_completed: boolean }>,
   drawerRootProps: [] as Array<Record<string, unknown>>,
 }));
 
@@ -28,7 +28,7 @@ vi.mock("@/hooks/useEpics", () => ({
 
 vi.mock("@/hooks/useHabitSurfacing", () => ({
   useHabitSurfacing: () => ({
-    surfacedHabits: [],
+    surfacedHabits: mocks.surfacedHabits,
     surfaceHabit: mocks.surfaceHabitMock,
   }),
 }));
@@ -36,12 +36,6 @@ vi.mock("@/hooks/useHabitSurfacing", () => ({
 vi.mock("@/hooks/useTaskMutations", () => ({
   useTaskMutations: () => ({
     toggleTask: mocks.toggleTaskMock,
-  }),
-}));
-
-vi.mock("@/hooks/useLivingCompanion", () => ({
-  useLivingCompanionSafe: () => ({
-    triggerRitualComplete: mocks.triggerRitualCompleteMock,
   }),
 }));
 
@@ -75,6 +69,7 @@ describe("EpicCheckInDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.drawerRootProps.length = 0;
+    mocks.surfacedHabits = [];
     applyCreatedHabit = null;
   });
 
@@ -181,5 +176,32 @@ describe("EpicCheckInDrawer", () => {
 
     expect(screen.getByDisplayValue("Evening Walk")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add Ritual" })).toBeInTheDocument();
+  });
+
+  it("routes ritual completion through task feedback metadata", async () => {
+    mocks.surfacedHabits = [
+      { habit_id: "habit-1", task_id: "task-1", is_completed: false },
+    ];
+
+    renderSubject();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Mark ritual as complete" }));
+
+    await waitFor(() => {
+      expect(mocks.toggleTaskMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          taskId: "task-1",
+          completed: true,
+          xpReward: 25,
+          completionFeedback: {
+            completionSource: "ritual",
+            firstRitualToday: true,
+            completedAllRituals: true,
+          },
+        }),
+      );
+    });
+
+    expect(mocks.surfaceHabitMock).not.toHaveBeenCalled();
   });
 });

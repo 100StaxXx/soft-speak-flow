@@ -51,6 +51,8 @@ import {
   type TaskCompletionDisciplineAward,
   type TaskCompletionDisciplineAwardInput,
 } from "@/shared/taskCompletionTiming";
+import { useCompletionFeedback } from "@/hooks/useCompletionFeedback";
+import type { CompletionFeedbackSource } from "@/types/completionFeedback";
 
 export {
   getTaskCompletionDisciplineAward,
@@ -152,6 +154,11 @@ interface ToggleTaskVariables {
   completed: boolean;
   xpReward: number;
   forceUndo?: boolean;
+  completionFeedback?: {
+    completionSource?: CompletionFeedbackSource;
+    completedAllRituals?: boolean;
+    firstRitualToday?: boolean;
+  };
 }
 
 type ToggleTaskRemoteState = {
@@ -166,6 +173,13 @@ type ToggleTaskRemoteState = {
   xp_reward: number | null;
   contact_id: string | null;
   auto_log_interaction: boolean | null;
+  epic_id: string | null;
+  epics?: {
+    title?: string | null;
+    progress_percentage?: number | null;
+    target_days?: number | null;
+    status?: string | null;
+  } | null;
   contact?: {
     id: string;
     name: string;
@@ -175,7 +189,8 @@ type ToggleTaskRemoteState = {
 
 const TOGGLE_TASK_REMOTE_STATE_SELECT = `
   completed_at, task_text, habit_source_id, task_date, difficulty, scheduled_time, category,
-  is_main_quest, xp_reward,
+  is_main_quest, xp_reward, epic_id,
+  epics(title, progress_percentage, target_days, status),
   contact_id, auto_log_interaction,
   contact:contacts!contact_id(id, name, avatar_url)
 `;
@@ -481,6 +496,7 @@ export const useTaskMutations = (taskDate: string) => {
   const { showXPToast } = useXPToast();
   const { awardCustomXP } = useXPRewards();
   const { trackTaskCompletion, trackTaskCreation } = useSchedulingLearner();
+  const { triggerCompletionFeedback } = useCompletionFeedback();
   const {
     state: resilienceState,
     shouldQueueWrites,
@@ -1380,6 +1396,9 @@ export const useTaskMutations = (taskDate: string) => {
           taskDifficulty: localTask?.difficulty ?? null,
           taskScheduledTime: localTask?.scheduled_time ?? null,
           taskCategory: localTask?.category ?? null,
+          taskDate: localTaskDate,
+          epicId: localTask?.epic_id ?? null,
+          epicTitle: localTask?.epic_title ?? null,
         };
       }
 
@@ -1403,6 +1422,8 @@ export const useTaskMutations = (taskDate: string) => {
       const contact = (existingTask?.contact as { id: string; name: string; avatar_url: string | null } | null)
         ?? localTask?.contact
         ?? null;
+      const epicId = existingTask?.epic_id ?? localTask?.epic_id ?? null;
+      const epicTitle = existingTask?.epics?.title ?? localTask?.epic_title ?? null;
       const reconcileCompletedTask = async (taskState: ToggleTaskRemoteState | null, completedAt?: string | null) => {
         const resolvedTaskText = taskState?.task_text || existingTask?.task_text || localTask?.task_text || 'Task';
         const resolvedHabitSourceId = taskState?.habit_source_id ?? existingTask?.habit_source_id ?? localTask?.habit_source_id ?? null;
@@ -1410,6 +1431,8 @@ export const useTaskMutations = (taskDate: string) => {
         const resolvedTaskDifficulty = taskState?.difficulty || existingTask?.difficulty || localTask?.difficulty || 'medium';
         const resolvedTaskScheduledTime = taskState?.scheduled_time || existingTask?.scheduled_time || localTask?.scheduled_time || null;
         const resolvedTaskCategory = taskState?.category || existingTask?.category || localTask?.category || null;
+        const resolvedEpicId = taskState?.epic_id ?? existingTask?.epic_id ?? localTask?.epic_id ?? null;
+        const resolvedEpicTitle = taskState?.epics?.title ?? existingTask?.epics?.title ?? localTask?.epic_title ?? null;
         const resolvedContactId = taskState?.contact_id ?? existingTask?.contact_id ?? localTask?.contact_id ?? null;
         const resolvedAutoLogInteraction = taskState?.auto_log_interaction
           ?? existingTask?.auto_log_interaction
@@ -1445,6 +1468,8 @@ export const useTaskMutations = (taskDate: string) => {
           taskDifficulty: resolvedTaskDifficulty,
           taskScheduledTime: resolvedTaskScheduledTime,
           taskCategory: resolvedTaskCategory,
+          epicId: resolvedEpicId,
+          epicTitle: resolvedEpicTitle,
           contactId: resolvedContactId,
           autoLogInteraction: resolvedAutoLogInteraction,
           contact: resolvedContact,
@@ -1560,6 +1585,9 @@ export const useTaskMutations = (taskDate: string) => {
         taskDifficulty,
         taskScheduledTime,
         taskCategory,
+        epicId,
+        epicTitle,
+        completionFeedback: variables.completionFeedback ?? null,
         contactId,
         autoLogInteraction,
         contact,
@@ -1579,6 +1607,9 @@ export const useTaskMutations = (taskDate: string) => {
         taskDifficulty,
         taskScheduledTime,
         taskCategory,
+        epicId,
+        epicTitle,
+        completionFeedback,
         contactId,
       } = result ?? {};
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
@@ -1652,6 +1683,24 @@ export const useTaskMutations = (taskDate: string) => {
 
         window.dispatchEvent(new CustomEvent('mission-completed'));
         window.dispatchEvent(new CustomEvent('quest-completed'));
+
+        void triggerCompletionFeedback({
+          taskId,
+          taskTitle: taskText,
+          completionSource: completionFeedback?.completionSource ?? (habitSourceId ? "ritual" : "quest"),
+          completedAt: now.toISOString(),
+          taskDate: taskDate ?? null,
+          scheduledTime: taskScheduledTime ?? null,
+          difficulty: taskDifficulty ?? null,
+          category: taskCategory ?? null,
+          habitSourceId: habitSourceId ?? null,
+          epicId: epicId ?? null,
+          epicTitle: epicTitle ?? null,
+          completedAllRituals: completionFeedback?.completedAllRituals === true,
+          firstRitualToday: completionFeedback?.firstRitualToday === true,
+        }).catch((feedbackError) => {
+          console.warn("[TaskMutations] Completion feedback failed:", feedbackError);
+        });
 
         console.log('[TaskMutations] About to track completion:', {
           taskId,

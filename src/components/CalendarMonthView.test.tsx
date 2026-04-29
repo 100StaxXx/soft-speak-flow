@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CalendarMonthView } from "./CalendarMonthView";
@@ -118,5 +118,43 @@ describe("CalendarMonthView", () => {
     });
 
     expect(onDateLongPress).not.toHaveBeenCalled();
+  });
+
+  it("renders campaign rituals as distinct scheduled calendar items", () => {
+    render(
+      <CalendarMonthView
+        selectedDate={selectedDate}
+        onDateSelect={vi.fn()}
+        tasks={[
+          {
+            id: "ritual-portfolio",
+            task_text: "Portfolio work",
+            task_date: "2026-03-10",
+            scheduled_time: "19:00",
+            estimated_duration: 45,
+            completed: false,
+            is_main_quest: false,
+            difficulty: "medium",
+            xp_reward: 20,
+            habit_source_id: "habit-portfolio",
+            epic_id: "epic-portfolio",
+            epic_title: "Build Portfolio Website",
+          },
+        ]}
+        milestones={[]}
+        onTaskClick={vi.fn()}
+        onDateLongPress={vi.fn()}
+      />,
+    );
+
+    const dayCell = getDayCell("10");
+    expect(within(dayCell).getByText("Portfolio work")).toBeInTheDocument();
+    const ritualBadge = within(dayCell).getByText("Campaign Ritual - Build Portfolio Website");
+    expect(ritualBadge).toBeInTheDocument();
+    expect(ritualBadge.parentElement).toHaveClass(
+      "campaign-ritual-card",
+      "border-primary/35",
+      "bg-primary/[0.08]",
+    );
   });
 });

@@ -173,6 +173,37 @@ describe("DesktopWeekPlanner", () => {
     expect(within(timedCard).queryByText("+20 XP")).not.toBeInTheDocument();
   });
 
+  it("marks campaign rituals in the week scheduler task cards", () => {
+    render(
+      <DesktopWeekPlanner
+        selectedDate={selectedDate}
+        tasks={[
+          baseTask({
+            id: "campaign-ritual",
+            task_text: "Portfolio work",
+            scheduled_time: "19:00",
+            estimated_duration: 60,
+            habit_source_id: "habit-portfolio",
+            epic_id: "epic-portfolio",
+            epic_title: "Build Portfolio Website",
+          }),
+        ]}
+        onDateSelect={vi.fn()}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+      />,
+    );
+
+    const ritualCard = screen.getByTestId("desktop-week-task-campaign-ritual");
+    expect(ritualCard).toHaveClass(
+      "campaign-ritual-card",
+      "border-primary/35",
+      "bg-primary/[0.08]",
+    );
+    expect(within(ritualCard).getByText("Portfolio work")).toBeInTheDocument();
+    expect(within(ritualCard).getByText("Campaign Ritual - Build Portfolio Website")).toBeInTheDocument();
+  });
+
   it("uses the mac fallback duration for timed task height when duration is missing", () => {
     render(
       <DesktopWeekPlanner

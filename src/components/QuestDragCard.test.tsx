@@ -39,4 +39,27 @@ describe("QuestDragCard draggable ownership", () => {
     rerender(<QuestDragCard task={baseTask()} draggable />);
     expect(getCardRoot("Card quest").draggable).toBe(true);
   });
+
+  it("marks campaign rituals with the shared campaign styling and badge", () => {
+    render(
+      <QuestDragCard
+        task={baseTask({
+          task_text: "Portfolio work",
+          habit_source_id: "habit-portfolio",
+          epic_id: "epic-portfolio",
+          epic_title: "Build Portfolio Website",
+        })}
+      />,
+    );
+
+    const cardRoot = getCardRoot("Portfolio work");
+    expect(cardRoot).toHaveClass(
+      "campaign-ritual-card",
+      "border-primary/35",
+      "bg-primary/[0.08]",
+      "border-l-4",
+      "border-l-primary",
+    );
+    expect(screen.getByText("Campaign Ritual - Build Portfolio Website")).toBeInTheDocument();
+  });
 });

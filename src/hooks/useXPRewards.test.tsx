@@ -15,7 +15,6 @@ const mocks = vi.hoisted(() => ({
   awardAlignmentForEveningReflectionMock: vi.fn(),
   updateFromStreakMilestoneMock: vi.fn(),
   awardDisciplineForHabitCompletionMock: vi.fn(),
-  triggerQuestCompleteMock: vi.fn().mockResolvedValue(undefined),
   invalidateQueriesMock: vi.fn().mockResolvedValue(undefined),
   loggerErrorMock: vi.fn(),
 }));
@@ -74,12 +73,6 @@ vi.mock("./useCompanionAttributes", () => ({
 vi.mock("./useStreakMultiplier", () => ({
   useStreakMultiplier: () => ({
     multiplier: 1,
-  }),
-}));
-
-vi.mock("./useLivingCompanion", () => ({
-  useLivingCompanionSafe: () => ({
-    triggerQuestComplete: mocks.triggerQuestCompleteMock,
   }),
 }));
 

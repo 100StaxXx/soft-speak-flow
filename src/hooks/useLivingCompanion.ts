@@ -113,33 +113,9 @@ const resolveMotionEventType = (
      });
    }, [triggerReaction, isLateNight]);
  
-   /**
-    * Trigger quest completion reaction
-    */
-   const triggerQuestComplete = useCallback(async (
-     isFirstToday: boolean = false
-   ): Promise<boolean> => {
-     // Only trigger if first quest today (per budget rules)
-     if (!isFirstToday) return false;
-     return triggerReaction('quest', { momentType: 'momentum_gain' });
-   }, [triggerReaction]);
- 
-   /**
-    * Trigger ritual completion reaction
-    */
-   const triggerRitualComplete = useCallback(async (
-     isFirstToday: boolean = false,
-     completedAllRituals: boolean = false
-   ): Promise<boolean> => {
-     if (!isFirstToday && !completedAllRituals) return false;
-     
-     const momentType: MomentType = completedAllRituals ? 'breakthrough' : 'discipline_win';
-     return triggerReaction('ritual', { momentType });
-   }, [triggerReaction]);
- 
-   /**
-    * Trigger pomodoro completion reaction
-    */
+  /**
+   * Trigger pomodoro completion reaction
+   */
    const triggerPomodoroComplete = useCallback(async (
      durationMinutes: number
    ): Promise<boolean> => {
@@ -158,8 +134,6 @@ const resolveMotionEventType = (
    return {
      triggerReaction,
      triggerResistVictory,
-     triggerQuestComplete,
-     triggerRitualComplete,
      triggerPomodoroComplete,
      triggerComeback,
      isLateNight,
@@ -238,23 +212,6 @@ export const useLivingCompanionSafe = () => {
     });
   }, [triggerReaction, isLateNight]);
 
-  const triggerQuestComplete = useCallback(async (
-    isFirstToday: boolean = false
-  ): Promise<boolean> => {
-    if (!isFirstToday) return false;
-    return triggerReaction('quest', { momentType: 'momentum_gain' });
-  }, [triggerReaction]);
-
-  const triggerRitualComplete = useCallback(async (
-    isFirstToday: boolean = false,
-    completedAllRituals: boolean = false
-  ): Promise<boolean> => {
-    if (!isFirstToday && !completedAllRituals) return false;
-    
-    const momentType: MomentType = completedAllRituals ? 'breakthrough' : 'discipline_win';
-    return triggerReaction('ritual', { momentType });
-  }, [triggerReaction]);
-
   const triggerPomodoroComplete = useCallback(async (
     durationMinutes: number
   ): Promise<boolean> => {
@@ -269,8 +226,6 @@ export const useLivingCompanionSafe = () => {
   return {
     triggerReaction,
     triggerResistVictory,
-    triggerQuestComplete,
-    triggerRitualComplete,
     triggerPomodoroComplete,
     triggerComeback,
     isLateNight,

@@ -13,6 +13,7 @@ interface EditCampaignSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onDeleted?: () => void;
+  startWithAddRitual?: boolean;
 }
 
 export function EditCampaignSheet({
@@ -20,6 +21,7 @@ export function EditCampaignSheet({
   open,
   onOpenChange,
   onDeleted,
+  startWithAddRitual = false,
 }: EditCampaignSheetProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -72,6 +74,7 @@ export function EditCampaignSheet({
       open={open}
       onOpenChange={onOpenChange}
       onDeleted={onDeleted}
+      startWithAddRitual={startWithAddRitual}
       dependencies={{
         activeEpics,
         updateEpic,

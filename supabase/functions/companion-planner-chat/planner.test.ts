@@ -454,6 +454,44 @@ Deno.test("typed plan my week does not infer an explicit planning launcher", () 
   assertEquals(result.followUpQuestions[0]?.id, "details");
 });
 
+Deno.test("typed week planning aliases stay conversational instead of quest capture", () => {
+  const cases = [
+    {
+      message: "What does this week look like?",
+      parsedText: "What does this week look like",
+    },
+    { message: "What's my week like?", parsedText: "What's my week like" },
+    { message: "Plan the week", parsedText: "" },
+    { message: "weekly planning", parsedText: "planning" },
+    { message: "What should I do this week?", parsedText: "" },
+    { message: "week ahead", parsedText: "" },
+    { message: "Schedule my week", parsedText: "" },
+  ];
+
+  for (const testCase of cases) {
+    const result = buildPlannerResponse(baseInput({
+      message: testCase.message,
+      horizon: "week",
+      parsedInput: {
+        text: testCase.parsedText,
+      },
+      plannerContext: {
+        ...campaignFollowUpContext("plan_week"),
+        starterIntent: "general",
+      },
+    }));
+
+    assertEquals(result.mode, "conversational", testCase.message);
+    assertEquals(result.proposals.length, 0, testCase.message);
+    assertEquals(
+      result.followUpQuestions[0]?.id,
+      "details",
+      testCase.message,
+    );
+    assertEquals(result.sessionState.draft, {}, testCase.message);
+  }
+});
+
 Deno.test("planning launcher consent yes releases deterministic proposals", () => {
   const initial = buildPlannerResponse(baseInput({
     message: "Adjust my day",
@@ -539,6 +577,8 @@ Deno.test("planning launcher quest consent yes asks for the quest name first", (
     initial.followUpQuestions[0]?.prompt,
     "Would you like to form a quest?",
   );
+  assertEquals(/\bdrafted\b/i.test(initial.reply), false);
+  assertEquals(/\bconfirmable\b/i.test(initial.reply), false);
   assertEquals(confirmed.mode, "conversational");
   assertEquals(confirmed.proposals.length, 0);
   assertEquals(confirmed.sessionState.pendingStarterIntent, "quest_capture");
@@ -2271,6 +2311,8 @@ Deno.test("make_room free-me-up-after asks consent before drafting moves", () =>
   assertEquals(result.proposals.length, 0);
   assertEquals(result.followUpQuestions[0]?.id, "planning_launcher_consent");
   assertEquals(result.sessionState.draft, {});
+  assertEquals(/\bdrafted\b/i.test(result.reply), false);
+  assertEquals(/\breview\b/i.test(result.reply), false);
   assertStringIncludes(
     result.followUpQuestions[0]?.prompt ?? "",
     "draft those schedule changes",

@@ -8,6 +8,7 @@ import { normalizeTaskSchedulingState } from "@/utils/taskSchedulingRules";
 import { useResilience } from "@/contexts/ResilienceContext";
 import { isQueueableWriteError } from "@/utils/networkErrors";
 import { normalizeUuidLikeId } from "@/utils/offlineId";
+import { useCompletionFeedback } from "@/hooks/useCompletionFeedback";
 
 export const INBOX_TASKS_QUERY_KEY = "inbox-tasks";
 export const INBOX_COUNT_QUERY_KEY = "inbox-count";
@@ -50,6 +51,7 @@ export const useInboxTasks = (options: InboxTasksOptions = {}) => {
   const { user } = useAuth();
   const { shouldQueueWrites, queueTaskAction, reportApiFailure } = useResilience();
   const queryClient = useQueryClient();
+  const { triggerCompletionFeedback } = useCompletionFeedback();
   const { enabled = true } = options;
   const invalidateInboxQueries = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: [INBOX_TASKS_QUERY_KEY] });
@@ -152,38 +154,142 @@ export const useInboxTasks = (options: InboxTasksOptions = {}) => {
   const toggleInboxTask = useMutation({
     mutationFn: async ({ taskId, completed }: { taskId: string; completed: boolean }) => {
       const remoteTaskId = getRemoteTaskId(taskId);
+      const completedAt = completed ? new Date().toISOString() : null;
       if (shouldQueueWrites) {
         await queueTaskAction("COMPLETE_TASK", {
           taskId,
           completed,
-          completedAt: completed ? new Date().toISOString() : null,
+          completedAt,
         });
         return { queued: true };
       }
 
-      const { error } = await supabase
+      if (!user?.id) throw new Error("User not authenticated");
+
+      let taskDetails: {
+        id: string;
+        task_text: string | null;
+        task_date: string | null;
+        scheduled_time: string | null;
+        difficulty: string | null;
+        category: string | null;
+        habit_source_id: string | null;
+        epic_id: string | null;
+        completed: boolean | null;
+        completed_at: string | null;
+        epics?: { title?: string | null } | null;
+      } | null = null;
+
+      if (completed) {
+        const { data: task, error: fetchError } = await supabase
+          .from("daily_tasks")
+          .select(`
+            id, task_text, task_date, scheduled_time, difficulty, category,
+            habit_source_id, epic_id, completed, completed_at,
+            epics(title)
+          `)
+          .eq("id", remoteTaskId)
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (fetchError) {
+          if (isQueueableWriteError(fetchError)) {
+            await queueTaskAction("COMPLETE_TASK", { taskId, completed, completedAt });
+            return { queued: true };
+          }
+          reportApiFailure(fetchError, { source: "inbox_toggle_fetch" });
+          throw fetchError;
+        }
+
+        if (!task) throw new Error("Task not found");
+        taskDetails = task as NonNullable<typeof taskDetails>;
+
+        if (taskDetails.completed === true || taskDetails.completed_at) {
+          return {
+            queued: false,
+            completed,
+            wasAlreadyCompleted: true,
+          };
+        }
+      }
+
+      let updateQuery = supabase
         .from("daily_tasks")
-        .update({ completed, completed_at: completed ? new Date().toISOString() : null })
-        .eq("id", remoteTaskId);
+        .update({ completed, completed_at: completedAt })
+        .eq("id", remoteTaskId)
+        .eq("user_id", user.id);
+
+      if (completed) {
+        updateQuery = updateQuery
+          .eq("completed", false)
+          .is("completed_at", null);
+      }
+
+      const { data: updatedTask, error } = await updateQuery
+        .select("id")
+        .maybeSingle();
+
       if (error) {
         if (isQueueableWriteError(error)) {
           await queueTaskAction("COMPLETE_TASK", {
             taskId,
             completed,
-            completedAt: completed ? new Date().toISOString() : null,
+            completedAt,
           });
           return { queued: true };
         }
         reportApiFailure(error, { source: "inbox_toggle" });
         throw error;
       }
-      return { queued: false };
+
+      if (completed && !updatedTask) {
+        return {
+          queued: false,
+          completed,
+          wasAlreadyCompleted: true,
+        };
+      }
+
+      return {
+        queued: false,
+        completed,
+        completedAt,
+        wasAlreadyCompleted: false,
+        taskId: taskDetails?.id ?? remoteTaskId,
+        taskText: taskDetails?.task_text ?? "Quest",
+        taskDate: taskDetails?.task_date ?? null,
+        scheduledTime: taskDetails?.scheduled_time ?? null,
+        difficulty: taskDetails?.difficulty ?? null,
+        category: taskDetails?.category ?? null,
+        habitSourceId: taskDetails?.habit_source_id ?? null,
+        epicId: taskDetails?.epic_id ?? null,
+        epicTitle: taskDetails?.epics?.title ?? null,
+      };
     },
     onSuccess: (data) => {
       invalidateInboxQueries();
       queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
       if ((data as { queued?: boolean } | undefined)?.queued) {
         toast("Quest completion queued. It will sync when connection is restored.");
+        return;
+      }
+
+      if (data.completed && !data.wasAlreadyCompleted) {
+        void triggerCompletionFeedback({
+          taskId: data.taskId,
+          taskTitle: data.taskText,
+          completionSource: data.habitSourceId ? "ritual" : "inbox",
+          completedAt: data.completedAt ?? undefined,
+          taskDate: data.taskDate,
+          scheduledTime: data.scheduledTime,
+          difficulty: data.difficulty,
+          category: data.category,
+          habitSourceId: data.habitSourceId,
+          epicId: data.epicId,
+          epicTitle: data.epicTitle,
+        }).catch((feedbackError) => {
+          console.warn("[InboxTasks] Completion feedback failed:", feedbackError);
+        });
       }
     },
   });

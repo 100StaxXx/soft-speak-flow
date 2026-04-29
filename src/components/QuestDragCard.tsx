@@ -1,9 +1,13 @@
 import React, { useState, useRef, useCallback } from "react";
 import { Card } from "@/components/ui/card";
-import { Clock, Zap, Flame, Mountain, Star, Brain, Dumbbell, Heart } from "lucide-react";
+import { Clock, Zap, Flame, Mountain, Star, Brain, Dumbbell, Heart, Repeat } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DragTask, isValidCategory } from "@/types/quest";
 import { playSound } from "@/utils/soundEffects";
+import {
+  CAMPAIGN_RITUAL_CARD_CLASSES,
+  isCampaignRitualTask,
+} from "@/utils/campaignRitualStyle";
 
 interface QuestDragCardProps {
   task: DragTask;
@@ -122,6 +126,8 @@ export const QuestDragCard = React.memo(({
   const config = difficulty ? difficultyConfig[difficulty] : null;
   const category = isValidCategory(task.category) ? task.category : undefined;
   const categoryInfo = category ? categoryConfig[category] : null;
+  const isCampaignRitual = isCampaignRitualTask(task);
+  const campaignTitle = task.epic_title?.trim() || "Campaign";
 
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':');
@@ -156,12 +162,14 @@ export const QuestDragCard = React.memo(({
           task.completed && "opacity-60",
           // Main Quest - gold styling
           task.is_main_quest && "border-2 border-[hsl(45,100%,60%)] shadow-[0_0_20px_hsl(45,100%,60%/0.3)]",
+          isCampaignRitual && CAMPAIGN_RITUAL_CARD_CLASSES,
+          isCampaignRitual && "border-l-4 border-l-primary shadow-[0_0_18px_hsl(var(--primary)/0.18)]",
           // Category-based left border for non-main quests
-          !task.is_main_quest && categoryInfo && `border-l-4 ${categoryInfo.colors.split(' ').find(c => c.includes('border'))}`,
+          !task.is_main_quest && !isCampaignRitual && categoryInfo && `border-l-4 ${categoryInfo.colors.split(' ').find(c => c.includes('border'))}`,
           // Difficulty-based colors for side quests
-          !task.is_main_quest && config?.borderColor,
-          !task.is_main_quest && isHovering && config?.glow,
-          !task.is_main_quest && isHovering && categoryInfo?.glow
+          !task.is_main_quest && !isCampaignRitual && config?.borderColor,
+          !task.is_main_quest && !isCampaignRitual && isHovering && config?.glow,
+          !task.is_main_quest && !isCampaignRitual && isHovering && categoryInfo?.glow
         )}
         style={{ 
           willChange: isDragging ? 'transform, opacity' : 'auto',
@@ -182,9 +190,9 @@ export const QuestDragCard = React.memo(({
         {/* Card Content */}
         <div className={cn("relative flex items-start gap-3", compact ? "p-2" : "p-3")}>
           {/* Difficulty Icon */}
-          {config && !task.is_main_quest && !compact && (
-            <div className={cn("flex-shrink-0 mt-0.5", config.textColor)}>
-              {React.createElement(config.icon, { className: "h-4 w-4" })}
+          {(isCampaignRitual || (config && !task.is_main_quest)) && !compact && (
+            <div className={cn("flex-shrink-0 mt-0.5", isCampaignRitual ? "text-primary" : config?.textColor)}>
+              {isCampaignRitual ? <Repeat className="h-4 w-4" /> : config && React.createElement(config.icon, { className: "h-4 w-4" })}
             </div>
           )}
 
@@ -203,7 +211,14 @@ export const QuestDragCard = React.memo(({
             </div>
 
             {/* Category Badge */}
-            {categoryInfo && !task.is_main_quest && !compact && (
+            {isCampaignRitual && !compact && (
+              <div className="inline-flex max-w-full items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                <Repeat className="h-3 w-3 flex-shrink-0" />
+                <span className="truncate">Campaign Ritual - {campaignTitle}</span>
+              </div>
+            )}
+
+            {categoryInfo && !task.is_main_quest && !isCampaignRitual && !compact && (
               <div className="flex items-center gap-1">
                 <div className={cn(
                   "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r border",

@@ -1,6 +1,6 @@
 import { memo, useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Target, Flame, Star, Map, Calendar, Pencil } from "lucide-react";
+import { Target, Flame, Map, Pencil, Plus, Repeat, Clock } from "lucide-react";
 import {
   Drawer,
   DrawerContent,
@@ -29,7 +29,9 @@ interface EpicHabit {
     description?: string;
     frequency?: string;
     estimated_minutes?: number;
+    preferred_time?: string | null;
     custom_days?: number[] | null;
+    custom_month_days?: number[] | null;
   };
 }
 
@@ -53,6 +55,7 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
 }: JourneyPathDrawerProps) {
   const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [editStartsWithAddRitual, setEditStartsWithAddRitual] = useState(false);
   
   const { pathImageUrl } = useJourneyPathImage(epic.id);
   const drawerImageUrl = useMemo(() => getJourneyPathDrawerImageUrl(pathImageUrl), [pathImageUrl]);
@@ -68,6 +71,45 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
       end_date: resolvedEndDate,
     });
   }, [epic.start_date, epic.target_days, resolvedEndDate]);
+
+  const rituals = useMemo(
+    () => (epic.epic_habits ?? [])
+      .map((link) => link.habits)
+      .filter((habit): habit is NonNullable<EpicHabit["habits"]> => Boolean(habit)),
+    [epic.epic_habits],
+  );
+
+  const timedRituals = useMemo(
+    () => rituals
+      .filter((ritual) => !!ritual.preferred_time)
+      .slice()
+      .sort((a, b) => (a.preferred_time ?? "").localeCompare(b.preferred_time ?? "")),
+    [rituals],
+  );
+
+  const nextRitual = timedRituals[0] ?? rituals[0] ?? null;
+  const ritualCount = rituals.length;
+  const timedRitualCount = timedRituals.length;
+
+  const formatRitualTime = (time?: string | null) => {
+    if (!time) return "Time not set";
+    const [hours, minutes = "00"] = time.split(":");
+    const hour = Number.parseInt(hours, 10);
+    if (!Number.isFinite(hour)) return time;
+    const period = hour >= 12 ? "PM" : "AM";
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${period}`;
+  };
+
+  const openEditCampaign = () => {
+    setEditStartsWithAddRitual(false);
+    setEditOpen(true);
+  };
+
+  const openAddRitual = () => {
+    setEditStartsWithAddRitual(true);
+    setEditOpen(true);
+  };
 
   // Convert milestones to trail format
   const trailMilestones = useMemo(() => {
@@ -96,13 +138,7 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
               <Target className="w-5 h-5 text-primary" />
               {epic.title}
             </DrawerTitle>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => setEditOpen(true)}
-            >
+            <Button type="button" variant="ghost" size="sm" className="gap-1.5" onClick={openEditCampaign}>
               <Pencil className="h-4 w-4" />
               Edit
             </Button>
@@ -172,20 +208,68 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
             </div>
           </motion.div>
 
-          {/* Quick Stats */}
-          <div className="flex items-center justify-center gap-6 mb-6 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <Star className="w-4 h-4 text-purple-400" />
-              <span>{totalCount} milestones</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Calendar className="w-4 h-4 text-sky-400" />
-              <span>{epic.target_days}d journey</span>
-            </span>
+          <div className="mb-4 grid grid-cols-3 gap-2">
+            <div className="rounded-xl border border-border/40 bg-card/50 p-3 text-center">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Milestones</p>
+              <p className="mt-1 text-lg font-semibold text-foreground">{totalCount}</p>
+            </div>
+            <div className="rounded-xl border border-border/40 bg-card/50 p-3 text-center">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Journey</p>
+              <p className="mt-1 text-lg font-semibold text-foreground">{epic.target_days}d</p>
+            </div>
+            <div className="rounded-xl border border-border/40 bg-card/50 p-3 text-center">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Rituals</p>
+              <p className="mt-1 text-lg font-semibold text-foreground">{ritualCount}</p>
+            </div>
           </div>
 
-          {/* Action Button */}
-          <div className="flex justify-center">
+          <div className="mb-4 rounded-xl border border-primary/25 bg-primary/5 p-3">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Repeat className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Next ritual</p>
+                {nextRitual ? (
+                  <>
+                    <p className="mt-1 truncate text-sm font-semibold text-foreground">{nextRitual.title}</p>
+                    <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      {formatRitualTime(nextRitual.preferred_time)}
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-1 text-sm text-muted-foreground">No rituals linked yet.</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-5 rounded-xl border border-border/35 bg-card/35 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">This week</p>
+                <p className="mt-1 text-sm font-medium text-foreground">
+                  {ritualCount === 0
+                    ? "No campaign rituals yet"
+                    : `${ritualCount} ritual${ritualCount === 1 ? "" : "s"} attached`}
+                </p>
+              </div>
+              <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                {timedRitualCount}/{ritualCount || 0} timed
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <Button type="button" variant="outline" className="gap-2" onClick={openEditCampaign}>
+              <Pencil className="h-4 w-4" />
+              Edit
+            </Button>
+            <Button type="button" variant="outline" className="gap-2" onClick={openAddRitual}>
+              <Plus className="h-4 w-4" />
+              Add ritual
+            </Button>
             <JourneyDetailDrawer
               epicId={epic.id}
               epicTitle={epic.title}
@@ -194,7 +278,7 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
             >
               <Button variant="outline" className="gap-2">
                 <Map className="w-4 h-4" />
-                View Milestones
+                Milestones
               </Button>
             </JourneyDetailDrawer>
           </div>
@@ -203,7 +287,13 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
       <EditCampaignSheet
         epic={epic}
         open={editOpen}
-        onOpenChange={setEditOpen}
+        onOpenChange={(nextOpen) => {
+          setEditOpen(nextOpen);
+          if (!nextOpen) {
+            setEditStartsWithAddRitual(false);
+          }
+        }}
+        startWithAddRitual={editStartsWithAddRitual}
         onDeleted={() => {
           setEditOpen(false);
           setOpen(false);

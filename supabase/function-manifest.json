@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-19T23:35:30Z",
+  "generatedAt": "2026-04-29T19:24:59Z",
   "frontendInvoked": [
     "adjust-epic-plan",
     "analyze-user-patterns",
@@ -29,6 +29,7 @@
     "generate-companion-stat-analysis",
     "generate-companion-story",
     "generate-companion-tts",
+    "generate-completion-feedback",
     "generate-cosmic-postcard",
     "generate-cosmic-postcard-test",
     "generate-daily-missions",
@@ -79,6 +80,7 @@
     "enrich-user-context",
     "generate-companion-evolution",
     "generate-companion-image",
+    "generate-completion-feedback",
     "generate-dormant-companion-image",
     "generate-epic-suggestions",
     "generate-full-mentor-audio",
@@ -136,6 +138,7 @@
     "generate-companion-stat-analysis",
     "generate-companion-story",
     "generate-companion-tts",
+    "generate-completion-feedback",
     "generate-cosmic-postcard",
     "generate-cosmic-postcard-test",
     "generate-daily-mentor-pep-talks",

@@ -7,11 +7,25 @@ const mocks = vi.hoisted(() => {
   const getAllLocalTasksForUserMock = vi.fn();
   const replaceLocalTasksForDateMock = vi.fn();
   const canSyncPlannerFromRemoteMock = vi.fn();
+  const supabaseFromMock = vi.fn();
+  const supabaseSelectMock = vi.fn();
+  const supabaseEqMock = vi.fn();
+  const supabaseGteMock = vi.fn();
+  const supabaseLteMock = vi.fn();
+  const supabaseOrderFirstMock = vi.fn();
+  const supabaseOrderSecondMock = vi.fn();
 
   return {
     getAllLocalTasksForUserMock,
     replaceLocalTasksForDateMock,
     canSyncPlannerFromRemoteMock,
+    supabaseFromMock,
+    supabaseSelectMock,
+    supabaseEqMock,
+    supabaseGteMock,
+    supabaseLteMock,
+    supabaseOrderFirstMock,
+    supabaseOrderSecondMock,
   };
 });
 
@@ -33,19 +47,7 @@ vi.mock("@/utils/plannerSync", () => ({
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    from: vi.fn(() => ({
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          gte: vi.fn(() => ({
-            lte: vi.fn(() => ({
-              order: vi.fn(() => ({
-                order: vi.fn(),
-              })),
-            })),
-          })),
-        })),
-      })),
-    })),
+    from: (...args: unknown[]) => mocks.supabaseFromMock(...args),
   },
 }));
 
@@ -68,6 +70,13 @@ describe("useCalendarTasks", () => {
     vi.clearAllMocks();
     mocks.canSyncPlannerFromRemoteMock.mockResolvedValue(false);
     mocks.replaceLocalTasksForDateMock.mockResolvedValue(undefined);
+    mocks.supabaseFromMock.mockReturnValue({ select: mocks.supabaseSelectMock });
+    mocks.supabaseSelectMock.mockReturnValue({ eq: mocks.supabaseEqMock });
+    mocks.supabaseEqMock.mockReturnValue({ gte: mocks.supabaseGteMock });
+    mocks.supabaseGteMock.mockReturnValue({ lte: mocks.supabaseLteMock });
+    mocks.supabaseLteMock.mockReturnValue({ order: mocks.supabaseOrderFirstMock });
+    mocks.supabaseOrderFirstMock.mockReturnValue({ order: mocks.supabaseOrderSecondMock });
+    mocks.supabaseOrderSecondMock.mockResolvedValue({ data: [], error: null });
   });
 
   it("loads calendar tasks from local storage and filters them to the selected range", async () => {
@@ -120,5 +129,75 @@ describe("useCalendarTasks", () => {
       "task-same-day-late",
       "task-later",
     ]);
+  });
+
+  it("hydrates campaign titles from the remote epic relation during calendar refresh", async () => {
+    mocks.canSyncPlannerFromRemoteMock.mockResolvedValue(true);
+    mocks.getAllLocalTasksForUserMock
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([
+        {
+          id: "ritual-portfolio",
+          user_id: "user-1",
+          task_text: "Portfolio work",
+          task_date: "2026-02-10",
+          scheduled_time: "19:00",
+          created_at: "2026-02-10T00:00:00.000Z",
+          habit_source_id: "habit-portfolio",
+          epic_id: "epic-portfolio",
+          epic_title: "Build Portfolio Website",
+        },
+      ]);
+    mocks.supabaseOrderSecondMock.mockResolvedValue({
+      data: [
+        {
+          id: "ritual-portfolio",
+          user_id: "user-1",
+          task_text: "Portfolio work",
+          task_date: "2026-02-10",
+          scheduled_time: "19:00",
+          created_at: "2026-02-10T00:00:00.000Z",
+          habit_source_id: "habit-portfolio",
+          epic_id: "epic-portfolio",
+          epic_title: null,
+          epics: { title: "Build Portfolio Website" },
+        },
+      ],
+      error: null,
+    });
+
+    const { result } = renderHook(
+      () => useCalendarTasks(new Date("2026-02-10T12:00:00.000Z"), "week"),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(mocks.supabaseSelectMock).toHaveBeenCalledWith("*, epics(title)");
+      expect(
+        mocks.replaceLocalTasksForDateMock.mock.calls.some(
+          (call) => call[0] === "user-1" && call[1] === "2026-02-10",
+        ),
+      ).toBe(true);
+    });
+
+    const replacementCall = mocks.replaceLocalTasksForDateMock.mock.calls.find(
+      (call) => call[0] === "user-1" && call[1] === "2026-02-10",
+    );
+    expect(replacementCall?.[2]).toEqual([
+      expect.objectContaining({
+        id: "ritual-portfolio",
+        epic_title: "Build Portfolio Website",
+      }),
+    ]);
+    expect(replacementCall?.[2][0]).not.toHaveProperty("epics");
+
+    await waitFor(() => {
+      expect(result.current.tasks).toEqual([
+        expect.objectContaining({
+          id: "ritual-portfolio",
+          epic_title: "Build Portfolio Website",
+        }),
+      ]);
+    });
   });
 });

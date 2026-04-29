@@ -23,7 +23,7 @@ describe("CompanionTalkPopup", () => {
       />,
     );
 
-    expect(screen.getByText("— Nova")).toBeInTheDocument();
+    expect(screen.getByText("Nova")).toBeInTheDocument();
     expect(screen.getByRole("dialog")).toHaveAttribute("aria-label", "Nova says: Hello, friend.");
   });
 
@@ -41,5 +41,27 @@ describe("CompanionTalkPopup", () => {
     expect(screen.queryByText(/—/)).not.toBeInTheDocument();
     expect(screen.getByRole("dialog")).toHaveAttribute("aria-label", "Companion says: Hello, friend.");
     expect(screen.getByText('"Hello, friend."')).toBeInTheDocument();
+  });
+
+  it("stacks optional mentor feedback under the companion message", () => {
+    render(
+      <CompanionTalkPopup
+        isVisible
+        onDismiss={vi.fn()}
+        message="Portfolio session is done. Launch moved closer."
+        tone="locked_in"
+        mentor={{
+          personality: "Disciplined",
+          message: "That is the standard. Keep it there.",
+        }}
+        companionName="Nova"
+        companionImageUrl={null}
+      />,
+    );
+
+    expect(screen.getByText('"Portfolio session is done. Launch moved closer."')).toBeInTheDocument();
+    expect(screen.getByText("Disciplined")).toBeInTheDocument();
+    expect(screen.getByText('"That is the standard. Keep it there."')).toBeInTheDocument();
+    expect(screen.getByText("Disciplined").closest("div")?.parentElement).toHaveClass("border-t");
   });
 });

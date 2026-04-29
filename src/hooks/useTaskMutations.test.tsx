@@ -46,6 +46,7 @@ const mocks = vi.hoisted(() => {
   const subtasksInsertExecuteMock = vi.fn();
   const withTimeoutMock = vi.fn();
   const pollWithDeadlineMock = vi.fn();
+  const triggerCompletionFeedbackMock = vi.fn();
 
   return {
     fromMock,
@@ -85,6 +86,7 @@ const mocks = vi.hoisted(() => {
     subtasksInsertExecuteMock,
     withTimeoutMock,
     pollWithDeadlineMock,
+    triggerCompletionFeedbackMock,
   };
 });
 
@@ -129,6 +131,12 @@ vi.mock("@/contexts/XPContext", () => ({
 vi.mock("@/hooks/useXPRewards", () => ({
   useXPRewards: () => ({
     awardCustomXP: mocks.awardCustomXPMock,
+  }),
+}));
+
+vi.mock("@/hooks/useCompletionFeedback", () => ({
+  useCompletionFeedback: () => ({
+    triggerCompletionFeedback: mocks.triggerCompletionFeedbackMock,
   }),
 }));
 
@@ -248,6 +256,13 @@ type MockToggleTaskRemoteState = {
   xp_reward: number;
   contact_id: string | null;
   auto_log_interaction: boolean | null;
+  epic_id: string | null;
+  epics: null | {
+    title?: string | null;
+    progress_percentage?: number | null;
+    target_days?: number | null;
+    status?: string | null;
+  };
   contact: null | {
     id: string;
     name: string;
@@ -269,6 +284,8 @@ const buildToggleTaskRemoteState = (
   xp_reward: 16,
   contact_id: null,
   auto_log_interaction: true,
+  epic_id: null,
+  epics: null,
   contact: null,
   ...overrides,
 });
@@ -364,6 +381,19 @@ const mockToggleTaskCompletionFlow = ({
     if (table === "subtasks") {
       return {
         insert: vi.fn().mockResolvedValue({ error: null }),
+      };
+    }
+
+    if (table === "habit_completions") {
+      return {
+        upsert: vi.fn().mockResolvedValue({ error: null }),
+        delete: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn().mockResolvedValue({ error: null }),
+            })),
+          })),
+        })),
       };
     }
 
@@ -480,6 +510,7 @@ describe("useTaskMutations attachment handling", () => {
     mocks.awardDisciplineForHabitCompletionMock.mockResolvedValue(undefined);
     mocks.awardDisciplineForPlannedTaskOnTimeMock.mockResolvedValue(undefined);
     mocks.calculateGuildBonusMock.mockResolvedValue({ bonusXP: 0, toastReason: "Task Complete!" });
+    mocks.triggerCompletionFeedbackMock.mockResolvedValue(undefined);
     mocks.getLocalHabitCompletionsForDateMock.mockResolvedValue([]);
     mocks.getLocalSubtasksForTaskMock.mockResolvedValue([]);
     mocks.getPlannerRecordMock.mockResolvedValue({
@@ -1317,6 +1348,57 @@ describe("useTaskMutations attachment handling", () => {
     expect(completionToastCall?.[0].action.props.altText).toBe("Undo completion");
     expect(completionToastCall?.[0].action.props.children).toBe("Undo");
     expect(completionUpdateSelectMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("passes campaign ritual metadata to completion feedback after a real completion", async () => {
+    setOnline(true);
+    mocks.awardCustomXPMock.mockResolvedValueOnce({ xpAwarded: 25 });
+
+    mockToggleTaskCompletionFlow({
+      completionReads: [
+        buildToggleTaskRemoteState({
+          task_text: "Daily portfolio sprint",
+          habit_source_id: "habit-1",
+          epic_id: "epic-1",
+          epics: { title: "Launch Week" },
+          difficulty: "hard",
+          category: "mind",
+        }),
+      ],
+    });
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.toggleTask({
+        taskId: "task-1",
+        completed: true,
+        xpReward: 25,
+        completionFeedback: {
+          completionSource: "ritual",
+          firstRitualToday: true,
+          completedAllRituals: true,
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.triggerCompletionFeedbackMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          taskId: "task-1",
+          taskTitle: "Daily portfolio sprint",
+          completionSource: "ritual",
+          habitSourceId: "habit-1",
+          epicId: "epic-1",
+          epicTitle: "Launch Week",
+          difficulty: "hard",
+          firstRitualToday: true,
+          completedAllRituals: true,
+        }),
+      );
+    });
   });
 
   it("silently reconciles when the quest is already completed before the mutation starts", async () => {

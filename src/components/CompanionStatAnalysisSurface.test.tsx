@@ -1,8 +1,9 @@
 import type { HTMLAttributes, ReactNode } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  prefersReducedMotion: true,
   refreshAnalysisMock: vi.fn().mockResolvedValue(undefined),
   useCompanionStatAnalysisMock: vi.fn(),
 }));
@@ -27,6 +28,57 @@ vi.mock("@/components/ui/drawer", () => ({
   DrawerHeader: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   DrawerTitle: ({ children }: { children: ReactNode }) => <h2>{children}</h2>,
   DrawerDescription: ({ children }: { children: ReactNode }) => <p>{children}</p>,
+}));
+
+vi.mock("framer-motion", () => ({
+  motion: {
+    div: ({
+      children,
+      variants: _variants,
+      initial: _initial,
+      animate: _animate,
+      ...props
+    }: HTMLAttributes<HTMLDivElement> & Record<string, unknown>) => (
+      <div
+        {...props}
+        data-motion-animate={_animate === undefined ? undefined : String(_animate)}
+        data-motion-initial={_initial === undefined ? undefined : String(_initial)}
+      >
+        {children}
+      </div>
+    ),
+    details: ({
+      children,
+      variants: _variants,
+      initial: _initial,
+      animate: _animate,
+      ...props
+    }: HTMLAttributes<HTMLDetailsElement> & Record<string, unknown>) => (
+      <details
+        {...props}
+        data-motion-animate={_animate === undefined ? undefined : String(_animate)}
+        data-motion-initial={_initial === undefined ? undefined : String(_initial)}
+      >
+        {children}
+      </details>
+    ),
+  },
+  useReducedMotion: () => mocks.prefersReducedMotion,
+}));
+
+vi.mock("recharts", () => ({
+  ResponsiveContainer: ({ children }: { children: ReactNode }) => (
+    <div data-testid="responsive-container">{children}</div>
+  ),
+  RadarChart: ({ children }: { children: ReactNode }) => (
+    <div data-testid="radar-chart">{children}</div>
+  ),
+  PolarGrid: () => <div data-testid="polar-grid" />,
+  PolarAngleAxis: () => <div data-testid="polar-angle-axis" />,
+  PolarRadiusAxis: ({ domain }: { domain?: number[] }) => (
+    <div data-domain={domain?.join("-")} data-testid="polar-radius-axis" />
+  ),
+  Radar: () => <div data-testid="radar-shape" />,
 }));
 
 import { CompanionStatAnalysisSurface } from "./CompanionStatAnalysisSurface";
@@ -169,6 +221,7 @@ const analysis = {
 
 describe("CompanionStatAnalysisSurface", () => {
   beforeEach(() => {
+    mocks.prefersReducedMotion = true;
     mocks.refreshAnalysisMock.mockClear();
     mocks.useCompanionStatAnalysisMock.mockReset();
     mocks.useCompanionStatAnalysisMock.mockReturnValue({
@@ -181,7 +234,7 @@ describe("CompanionStatAnalysisSurface", () => {
     });
   });
 
-  it("uses a drawer on mobile and renders the cached analysis content", () => {
+  it("uses a drawer on mobile and renders the RPG stat reading shell", () => {
     render(
       <CompanionStatAnalysisSurface
         open={true}
@@ -192,8 +245,12 @@ describe("CompanionStatAnalysisSurface", () => {
 
     expect(screen.getByTestId("drawer-root")).toBeInTheDocument();
     expect(screen.getByTestId("companion-stats-analysis-drawer")).toBeInTheDocument();
-    expect(screen.getByText("Eli says your stats make sense.")).toBeInTheDocument();
+    expect(screen.getByText("Stat Reading")).toBeInTheDocument();
+    expect(screen.getByText("Current Build")).toBeInTheDocument();
+    expect(screen.getByText("Discipline / Alignment")).toBeInTheDocument();
+    expect(screen.getByText("Eli")).toBeInTheDocument();
     expect(screen.getByText("Cached for today")).toBeInTheDocument();
+    expect(screen.getByText("Coasting")).toBeInTheDocument();
   });
 
   it("uses a dialog on desktop and refreshes on demand", () => {
@@ -207,9 +264,90 @@ describe("CompanionStatAnalysisSurface", () => {
 
     expect(screen.getByTestId("dialog-root")).toBeInTheDocument();
     expect(screen.getByTestId("companion-stats-analysis-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-stat-radar")).toBeInTheDocument();
+    expect(screen.getByTestId("radar-chart")).toBeInTheDocument();
+    expect(screen.getByTestId("polar-radius-axis")).toHaveAttribute("data-domain", "0-100");
+    expect(screen.getByText("Stat shape based on normalized 0-100 power from your 100-1000 scores.")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Refresh analysis" }));
     expect(mocks.refreshAnalysisMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders all six RPG stat cards with score ranks", () => {
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="desktop"
+      />,
+    );
+
+    const vitalityCard = screen.getByTestId("companion-rpg-stat-card-vitality");
+    expect(within(vitalityCard).getByText("Vitality")).toBeInTheDocument();
+    expect(within(vitalityCard).getByText("420")).toBeInTheDocument();
+    expect(within(vitalityCard).getByText("Rank B")).toBeInTheDocument();
+    expect(within(vitalityCard).getByRole("progressbar", { name: "Vitality score meter" })).toHaveAttribute(
+      "aria-valuenow",
+      "36",
+    );
+    expect(within(vitalityCard).getByRole("progressbar", { name: "Vitality score meter" })).toHaveAttribute(
+      "aria-valuetext",
+      "420 out of 1000",
+    );
+
+    const wisdomCard = screen.getByTestId("companion-rpg-stat-card-wisdom");
+    expect(within(wisdomCard).getByText("Wisdom")).toBeInTheDocument();
+    expect(within(wisdomCard).getByText("510")).toBeInTheDocument();
+    expect(within(wisdomCard).getByText("Rank A")).toBeInTheDocument();
+
+    expect(screen.getByTestId("companion-rpg-stat-card-discipline")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-rpg-stat-card-resolve")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-rpg-stat-card-creativity")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-rpg-stat-card-alignment")).toBeInTheDocument();
+  });
+
+  it("uses the animated reveal path when reduced motion is not preferred", () => {
+    mocks.prefersReducedMotion = false;
+
+    const { container } = render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="desktop"
+      />,
+    );
+
+    expect(container.querySelector("[data-motion-initial='hidden']")).toBeInTheDocument();
+    expect(container.querySelector("[data-motion-animate='visible']")).toBeInTheDocument();
+  });
+
+  it("skips the initial reveal state when reduced motion is preferred", () => {
+    mocks.prefersReducedMotion = true;
+
+    const { container } = render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="desktop"
+      />,
+    );
+
+    expect(container.querySelector("[data-motion-initial='false']")).toBeInTheDocument();
+    expect(container.querySelector("[data-motion-animate='visible']")).toBeInTheDocument();
+  });
+
+  it("frames the suggested action as a recommended quest", () => {
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="mobile"
+      />,
+    );
+
+    expect(screen.getByText("Recommended Quest")).toBeInTheDocument();
+    expect(screen.getByText("Pair one morning check-in with one on-time task today.")).toBeInTheDocument();
+    expect(screen.getByText("Rebalance Creativity")).toBeInTheDocument();
   });
 
   it("shows the inline unavailable card when validated analysis is missing", () => {

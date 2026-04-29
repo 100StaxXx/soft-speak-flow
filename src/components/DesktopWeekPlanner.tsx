@@ -9,6 +9,7 @@ import {
   Mic,
   MicOff,
   Plus,
+  Repeat,
   Target,
   Trophy,
 } from "lucide-react";
@@ -27,6 +28,10 @@ import {
 } from "@/components/DesktopQuestDetailsPopover";
 import { JourneyPathDrawer } from "@/components/JourneyPathDrawer";
 import { getEpicDaysRemaining } from "@/utils/epicDates";
+import {
+  CAMPAIGN_RITUAL_CARD_CLASSES,
+  isCampaignRitualTask,
+} from "@/utils/campaignRitualStyle";
 
 interface ActiveEpic {
   id: string;
@@ -261,6 +266,8 @@ function WeekPlannerTaskCard({
         }
       : undefined,
   });
+  const isCampaignRitual = isCampaignRitualTask(task);
+  const campaignTitle = task.epic_title?.trim() || "Campaign";
 
   return (
     <div
@@ -269,6 +276,7 @@ function WeekPlannerTaskCard({
       className={cn(
         JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME,
         "h-full rounded-[18px] border-white/10 p-2",
+        isCampaignRitual && CAMPAIGN_RITUAL_CARD_CLASSES,
         compact && "rounded-[16px]",
         isOpen && JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME,
         isOpen && "border-primary/40 bg-primary/[0.08]",
@@ -317,15 +325,25 @@ function WeekPlannerTaskCard({
                 compact && "px-1.5 py-1",
               )}
             >
-              <p
-                className={cn(
-                  compact ? "text-xs" : "text-sm",
-                  "truncate font-medium text-foreground",
-                  isComplete && "text-muted-foreground line-through",
-                )}
-              >
-                {task.task_text}
-              </p>
+              <div className="min-w-0">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  {isCampaignRitual ? <Repeat className="h-3.5 w-3.5 flex-shrink-0 text-primary" /> : null}
+                  <p
+                    className={cn(
+                      compact ? "text-xs" : "text-sm",
+                      "truncate font-medium text-foreground",
+                      isComplete && "text-muted-foreground line-through",
+                    )}
+                  >
+                    {task.task_text}
+                  </p>
+                </div>
+                {isCampaignRitual && !compact ? (
+                  <p className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-wide text-primary/80">
+                    Campaign Ritual - {campaignTitle}
+                  </p>
+                ) : null}
+              </div>
             </button>
           )}
         />

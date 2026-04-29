@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   useCompanionMock: vi.fn(),
   useJourneyPathImageMock: vi.fn(),
   useMilestonesMock: vi.fn(),
+  usePreloadedImageUrlMock: vi.fn(),
 }));
 
 vi.mock("framer-motion", () => ({
@@ -62,6 +63,10 @@ vi.mock("@/hooks/useJourneyPathImage", () => ({
   useJourneyPathImage: (...args: unknown[]) => mocks.useJourneyPathImageMock(...args),
 }));
 
+vi.mock("@/hooks/usePreloadedImageUrl", () => ({
+  usePreloadedImageUrl: (...args: unknown[]) => mocks.usePreloadedImageUrlMock(...args),
+}));
+
 vi.mock("@/hooks/useMilestones", () => ({
   useMilestones: (...args: unknown[]) => mocks.useMilestonesMock(...args),
 }));
@@ -83,6 +88,29 @@ const baseEpic = {
   epic_habits: [],
 };
 
+const epicWithRituals = {
+  ...baseEpic,
+  epic_habits: [
+    {
+      habit_id: "habit-portfolio",
+      habits: {
+        id: "habit-portfolio",
+        title: "Portfolio work",
+        difficulty: "medium",
+        preferred_time: "19:00",
+      },
+    },
+    {
+      habit_id: "habit-review",
+      habits: {
+        id: "habit-review",
+        title: "Weekly review",
+        difficulty: "easy",
+      },
+    },
+  ],
+};
+
 describe("JourneyPathDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -90,6 +118,12 @@ describe("JourneyPathDrawer", () => {
     mocks.useJourneyPathImageMock.mockReturnValue({
       pathImageUrl: null,
     });
+    mocks.usePreloadedImageUrlMock.mockImplementation((imageUrl: string | null) => ({
+      hasError: false,
+      isLoaded: !!imageUrl,
+      isLoading: false,
+      resolvedImageUrl: imageUrl,
+    }));
     mocks.useMilestonesMock.mockReturnValue({
       milestones: [],
       totalCount: 0,
@@ -114,6 +148,41 @@ describe("JourneyPathDrawer", () => {
     expect(screen.getByTestId("constellation-trail")).toBeInTheDocument();
   });
 
+  it("renders quick view image, progress, ritual summary, and actions", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-15T12:00:00.000Z"));
+    mocks.useJourneyPathImageMock.mockReturnValue({
+      pathImageUrl: "https://example.com/journey.png",
+    });
+    mocks.useMilestonesMock.mockReturnValue({
+      milestones: [],
+      totalCount: 3,
+    });
+
+    try {
+      const { container } = render(
+        <JourneyPathDrawer epic={epicWithRituals}>
+          <button type="button">Open</button>
+        </JourneyPathDrawer>,
+      );
+
+      expect(container.querySelector('img[src="https://example.com/journey.png"]')).toBeInTheDocument();
+      expect(screen.getByText("42% Complete")).toBeInTheDocument();
+      expect(screen.getByText("16d left")).toBeInTheDocument();
+      expect(screen.getByText("Next ritual")).toBeInTheDocument();
+      expect(screen.getByText("Portfolio work")).toBeInTheDocument();
+      expect(screen.getByText("7:00 PM")).toBeInTheDocument();
+      expect(screen.getByText("This week")).toBeInTheDocument();
+      expect(screen.getByText("2 rituals attached")).toBeInTheDocument();
+      expect(screen.getByText("1/2 timed")).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: "Edit" })).toHaveLength(2);
+      expect(screen.getByRole("button", { name: "Add ritual" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Milestones" })).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("renders an edit button and opens the campaign edit sheet", () => {
     render(
       <JourneyPathDrawer epic={baseEpic}>
@@ -121,12 +190,30 @@ describe("JourneyPathDrawer", () => {
       </JourneyPathDrawer>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Edit" })[0]);
 
     expect(screen.getByTestId("edit-campaign-sheet")).toBeInTheDocument();
     expect(mocks.editCampaignSheetMock).toHaveBeenLastCalledWith(expect.objectContaining({
       epic: expect.objectContaining({ id: "epic-1", title: "Campaign Aurora" }),
       open: true,
+      startWithAddRitual: false,
+    }));
+  });
+
+  it("opens the edit sheet directly in add ritual mode", () => {
+    render(
+      <JourneyPathDrawer epic={baseEpic}>
+        <button type="button">Open</button>
+      </JourneyPathDrawer>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add ritual" }));
+
+    expect(screen.getByTestId("edit-campaign-sheet")).toBeInTheDocument();
+    expect(mocks.editCampaignSheetMock).toHaveBeenLastCalledWith(expect.objectContaining({
+      epic: expect.objectContaining({ id: "epic-1", title: "Campaign Aurora" }),
+      open: true,
+      startWithAddRitual: true,
     }));
   });
 });

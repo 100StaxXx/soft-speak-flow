@@ -6,7 +6,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { logger } from "@/utils/logger";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
-import { useLivingCompanionSafe } from "@/hooks/useLivingCompanion";
 import {
   FOCUS_XP_REWARDS,
   SUBTASK_XP_REWARDS,
@@ -56,25 +55,6 @@ export const useXPRewards = () => {
     updateWisdomFromLearning,
     updateFromStreakMilestone,
   } = useCompanionAttributes();
-  // Living companion reaction system - safe hook returns no-op when outside provider
-  const { triggerQuestComplete } = useLivingCompanionSafe();
-
-  // Helper to check if this is the first quest completion today
-  const checkIsFirstQuestToday = async (): Promise<boolean> => {
-    if (!user?.id) return false;
-    const today = new Date().toISOString().split('T')[0];
-
-    const { count } = await supabase
-      .from('daily_tasks')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .eq('task_date', today)
-      .eq('completed', true);
-
-    // First if count is 0 (this will be the first) or 1 (just completed)
-    return (count ?? 0) <= 1;
-  };
-
   const applyStreakMultiplier = (baseAmount: number, eventType: string) => {
     if (!REPEATABLE_STREAK_EVENTS.has(eventType)) return baseAmount;
     const normalizedMultiplier = streakMultiplier ?? 1;
@@ -162,13 +142,6 @@ export const useXPRewards = () => {
           });
         }
       }
-       
-       // Trigger companion reaction for quest/habit completion with first-of-day gating
-       checkIsFirstQuestToday().then(isFirst => {
-         triggerQuestComplete(isFirst).catch(err => 
-           logger.log('[LivingCompanion] Quest reaction failed:', err)
-         );
-       });
     } catch (error) {
       logger.error('Error awarding habit completion:', error);
     }

@@ -25,6 +25,18 @@ interface CalendarTasksOptions {
   enabled?: boolean;
 }
 
+type RemoteCalendarTask = DailyTask & {
+  epics?: { title: string | null } | null;
+};
+
+const normalizeRemoteCalendarTask = (task: RemoteCalendarTask): DailyTask => {
+  const { epics, ...dailyTask } = task;
+  return {
+    ...dailyTask,
+    epic_title: dailyTask.epic_title ?? epics?.title ?? null,
+  };
+};
+
 export const useCalendarTasks = (
   selectedDate: Date,
   view: "list" | "month" | "week",
@@ -97,7 +109,7 @@ export const useCalendarTasks = (
 
         const { data, error } = await supabase
           .from("daily_tasks")
-          .select("*")
+          .select("*, epics(title)")
           .eq("user_id", user.id)
           .gte("task_date", startDate)
           .lte("task_date", endDate)
@@ -111,11 +123,12 @@ export const useCalendarTasks = (
 
         const tasksByDate = new Map<string, DailyTask[]>();
         (data ?? []).forEach((task) => {
-          if (!task.task_date) return;
-          if (!tasksByDate.has(task.task_date)) {
-            tasksByDate.set(task.task_date, []);
+          const normalizedTask = normalizeRemoteCalendarTask(task as RemoteCalendarTask);
+          if (!normalizedTask.task_date) return;
+          if (!tasksByDate.has(normalizedTask.task_date)) {
+            tasksByDate.set(normalizedTask.task_date, []);
           }
-          tasksByDate.get(task.task_date)?.push(task as DailyTask);
+          tasksByDate.get(normalizedTask.task_date)?.push(normalizedTask);
         });
 
         const datesInRange = eachDayOfInterval({ start, end }).map((date) => format(date, "yyyy-MM-dd"));
