@@ -182,7 +182,11 @@ serve(async (req) => {
       providers: ["openai"],
     });
 
-    const starterIntent = plannerInput.plannerContext.starterIntent;
+    const starterIntent = plannerInput.plannerContext.starterIntent ??
+      result.sessionState.pendingStarterIntent ??
+      null;
+    const isDeterministicPlanDayResult = starterIntent === "plan_day" ||
+      Boolean(result.structuredResponse?.planDay);
 
     if (starterIntent === "upcoming_start") {
       const aiResult = await runPlannerStageWithTimeout({
@@ -221,7 +225,10 @@ serve(async (req) => {
       );
     }
 
-    if (shouldReturnDeterministicStarterImmediately(starterIntent)) {
+    if (
+      isDeterministicPlanDayResult ||
+      shouldReturnDeterministicStarterImmediately(starterIntent)
+    ) {
       const responseResult = sanitizeReadyQuestProposalResponse(
         normalizePlannerBuildResultText(result),
       );

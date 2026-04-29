@@ -891,6 +891,44 @@ Deno.test("does not rewrite the initial deterministic plan-day clarification tur
   assertEquals(called, false);
 });
 
+Deno.test("does not rewrite inferred plan-day clarification turns", async () => {
+  let called = false;
+
+  const response = await buildOrchestratedPlannerResponse({
+    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) => {
+      called = true;
+      return new Response("unexpected");
+    },
+    input: {
+      ...baseInput(),
+      message: "Plan my day",
+    },
+    baseResult: {
+      ...baseResult("conversational"),
+      reply: "What kind of day are we making?",
+      followUpQuestions: [{
+        id: "details",
+        prompt: "What kind of day are we making?",
+        required: true,
+        field: "details",
+        options: ["Focused", "Light", "Catch-up"],
+      }],
+      sessionState: {
+        ...baseResult("conversational").sessionState,
+        openQuestionIds: ["details"],
+        pendingStarterIntent: "plan_day",
+      },
+    },
+    openAIApiKey: "test-openai-key",
+    model: "test-model",
+  });
+
+  assertEquals(response.mode, "conversational");
+  assertEquals(response.reply, "What kind of day are we making?");
+  assertEquals(response.followUpQuestions.length, 1);
+  assertEquals(called, false);
+});
+
 Deno.test("does not rewrite deterministic no-room plan-day replies", async () => {
   const captured = {
     called: false,

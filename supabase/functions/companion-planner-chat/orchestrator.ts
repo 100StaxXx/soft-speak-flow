@@ -370,6 +370,7 @@ const isPhaseADeterministicStarterResponse = (
 ) => {
   const starterIntent = input.plannerContext.starterIntent ??
     input.sessionState.pendingStarterIntent ??
+    baseResult.sessionState.pendingStarterIntent ??
     null;
   if (starterIntent === "advance_campaign_start") {
     return baseResult.followUpQuestions.length === 0 &&
