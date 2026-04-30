@@ -13,6 +13,7 @@ import {
 import {
   buildPlannerResponse,
   type ClassificationHint,
+  collectPlannerContextProtectedDataText,
   normalizePlannerBuildResultText,
   type ParsedInputHint,
   type PlannerBuildInput,
@@ -189,6 +190,9 @@ serve(async (req) => {
     } satisfies PlannerBuildInput;
 
     const result = buildPlannerResponse(plannerInput);
+    const textNormalizationOptions = {
+      protectedDataText: collectPlannerContextProtectedDataText(plannerInput),
+    };
 
     const costGuardrails = createCostGuardrailSession({
       supabase: createCostGuardrailSupabaseClient(),
@@ -237,7 +241,8 @@ serve(async (req) => {
       });
       if (aiResult) {
         const responseResult = sanitizeReadyQuestProposalResponse(
-          normalizePlannerBuildResultText(aiResult),
+          normalizePlannerBuildResultText(aiResult, textNormalizationOptions),
+          textNormalizationOptions,
         );
         return new Response(JSON.stringify(responseResult), {
           headers: {
@@ -259,7 +264,8 @@ serve(async (req) => {
       shouldReturnDeterministicStarterImmediately(starterIntent)
     ) {
       const responseResult = sanitizeReadyQuestProposalResponse(
-        normalizePlannerBuildResultText(result),
+        normalizePlannerBuildResultText(result, textNormalizationOptions),
+        textNormalizationOptions,
       );
 
       return new Response(JSON.stringify(responseResult), {
@@ -309,7 +315,8 @@ serve(async (req) => {
       },
     });
     const responseResult = sanitizeReadyQuestProposalResponse(
-      normalizePlannerBuildResultText(orchestratedResult),
+      normalizePlannerBuildResultText(orchestratedResult, textNormalizationOptions),
+      textNormalizationOptions,
     );
 
     return new Response(JSON.stringify(responseResult), {

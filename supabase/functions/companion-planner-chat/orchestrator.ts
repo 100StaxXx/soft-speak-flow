@@ -2,6 +2,8 @@ import {
   buildPlanDayCampaignGoalsAtRiskLine,
   buildPlanDayLoadReason,
   buildProposalFromDayPlanBlock,
+  collectPlannerContextProtectedDataText,
+  type PlannerTextNormalizationOptions,
   formatScheduleReference,
   getPlanDayAtRiskCampaignFacts,
   getPlanDayLoadBreakdown,
@@ -587,10 +589,11 @@ export async function buildUpcomingAIResponse(params: {
 
 export const sanitizeReadyQuestProposalResponse = (
   baseResult: PlannerBuildResult,
+  normalizationOptions?: PlannerTextNormalizationOptions,
 ): PlannerBuildResult => {
   const readyQuestProposals = getReadyQuestProposalDrafts(baseResult);
   if (readyQuestProposals.length === 0) {
-    return normalizePlannerBuildResultText(baseResult);
+    return normalizePlannerBuildResultText(baseResult, normalizationOptions);
   }
 
   const shouldReplaceReply = baseResult.followUpQuestions.length > 0 ||
@@ -598,20 +601,23 @@ export const sanitizeReadyQuestProposalResponse = (
     isQuestionLikePlannerReply(baseResult.reply);
   const preservedNotes = extractPreservedProposalReplyNotes(baseResult.reply);
 
-  return normalizePlannerBuildResultText({
-    ...baseResult,
-    reply: shouldReplaceReply
-      ? [
-        buildConfirmReadyPlannerReply(readyQuestProposals[0]?.kind ?? ""),
-        ...preservedNotes,
-      ].join("\n\n")
-      : baseResult.reply,
-    followUpQuestions: [],
-    sessionState: {
-      ...baseResult.sessionState,
-      openQuestionIds: [],
+  return normalizePlannerBuildResultText(
+    {
+      ...baseResult,
+      reply: shouldReplaceReply
+        ? [
+          buildConfirmReadyPlannerReply(readyQuestProposals[0]?.kind ?? ""),
+          ...preservedNotes,
+        ].join("\n\n")
+        : baseResult.reply,
+      followUpQuestions: [],
+      sessionState: {
+        ...baseResult.sessionState,
+        openQuestionIds: [],
+      },
     },
-  });
+    normalizationOptions,
+  );
 };
 
 const MAX_PLAN_DAY_TOOL_ITERATIONS = 4;
@@ -867,19 +873,22 @@ async function runPlanDayToolLoop(params: {
   const proposals = state.proposals.slice(0, 5);
   const targetDate = getPlanDayTargetDate(input);
   const dayPlan = synthesizeDayPlanFromProposals(targetDate, proposals);
-  return sanitizeReadyQuestProposalResponse({
-    ...baseResult,
-    mode: proposals.length > 0 ? "proposal" : "conversational",
-    reply: finalReply,
-    proposals,
-    followUpQuestions: [],
-    suggestedReminders: [],
-    dayPlan,
-    sessionState: {
-      ...baseResult.sessionState,
-      openQuestionIds: [],
+  return sanitizeReadyQuestProposalResponse(
+    {
+      ...baseResult,
+      mode: proposals.length > 0 ? "proposal" : "conversational",
+      reply: finalReply,
+      proposals,
+      followUpQuestions: [],
+      suggestedReminders: [],
+      dayPlan,
+      sessionState: {
+        ...baseResult.sessionState,
+        openQuestionIds: [],
+      },
     },
-  });
+    { protectedDataText: collectPlannerContextProtectedDataText(input) },
+  );
 }
 
 export async function buildOrchestratedPlannerResponse(params: {
@@ -889,8 +898,12 @@ export async function buildOrchestratedPlannerResponse(params: {
   openAIApiKey?: string;
   model?: string;
 }): Promise<PlannerBuildResult> {
+  const textNormalizationOptions = {
+    protectedDataText: collectPlannerContextProtectedDataText(params.input),
+  };
   const normalizedBaseResult = sanitizeReadyQuestProposalResponse(
     params.baseResult,
+    textNormalizationOptions,
   );
 
   if (
@@ -1007,7 +1020,7 @@ export async function buildOrchestratedPlannerResponse(params: {
         ? parsed.mode
         : params.baseResult.mode,
       reply: parsed.reply,
-    });
+    }, textNormalizationOptions);
   } catch (error) {
     console.warn("[companion-planner-chat] reply orchestration failed", error);
     return normalizedBaseResult;

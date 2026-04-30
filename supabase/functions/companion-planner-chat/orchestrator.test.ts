@@ -403,6 +403,49 @@ Deno.test("sanitizes leaked follow-up state when a ready quest proposal already 
   );
 });
 
+Deno.test("preserves context-protected unquoted dashed titles while sanitizing", () => {
+  const response = sanitizeReadyQuestProposalResponse(
+    {
+      ...baseResult("schedule_read"),
+      reply: "Got it. Let's lean into Budget - review.",
+    },
+    { protectedDataText: ["Budget - review"] },
+  );
+
+  assertStringIncludes(response.reply, "Budget - review");
+  assertEquals(response.reply.includes("Budget. Review"), false);
+});
+
+Deno.test("orchestration preserves context-protected dashed titles in fallback replies", async () => {
+  const response = await buildOrchestratedPlannerResponse({
+    guardedFetch: async () => {
+      throw new Error("unexpected fetch");
+    },
+    input: {
+      ...baseInput(),
+      plannerContext: {
+        ...baseInput().plannerContext,
+        priorityScores: [{
+          id: "task:task-budget-review",
+          kind: "task",
+          title: "Budget - review",
+          score: 92,
+          reasons: ["This is the clearest focus item."],
+          taskId: "task-budget-review",
+        }],
+      },
+    },
+    baseResult: {
+      ...baseResult("conversational"),
+      reply: "Got it. Let's lean into Budget - review.",
+    },
+    openAIApiKey: "",
+  });
+
+  assertStringIncludes(response.reply, "Budget - review");
+  assertEquals(response.reply.includes("Budget. Review"), false);
+});
+
 Deno.test("preserves calendar conflict notes when sanitizing ready quest proposals", () => {
   const response = sanitizeReadyQuestProposalResponse({
     ...baseResult("proposal"),

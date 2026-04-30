@@ -746,7 +746,7 @@ const normalizePlannerDataText = <T extends string | null | undefined>(
   return normalizeAssistantTimeText(value) as T;
 };
 
-type PlannerTextNormalizationOptions = {
+export type PlannerTextNormalizationOptions = {
   protectedDataText?: string[];
 };
 
@@ -897,7 +897,7 @@ const collectPlannerResultProtectedDataText = (
   ) ?? []),
 ].filter((value): value is string => typeof value === "string");
 
-const collectPlannerContextProtectedDataText = (
+export const collectPlannerContextProtectedDataText = (
   input: PlannerBuildInput,
 ): string[] => [
   ...input.plannerContext.tasks.flatMap((task) => [

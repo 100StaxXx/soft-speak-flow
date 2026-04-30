@@ -129,7 +129,13 @@ const MentorSelection = () => {
   }
 
   return (
-    <div className="min-h-screen pb-nav-safe bg-obsidian py-16 px-4 md:px-8">
+    <div
+      className="min-h-screen bg-obsidian px-4 md:px-8"
+      style={{
+        paddingTop: "calc(env(safe-area-inset-top, 0px) + 4rem)",
+        paddingBottom: "calc(var(--bottom-nav-runtime-offset, var(--bottom-nav-safe-offset)) + 2rem)",
+      }}
+    >
       <div className="max-w-7xl mx-auto space-y-16">
         {/* Header */}
         <div className="text-center space-y-6 animate-fade-in">

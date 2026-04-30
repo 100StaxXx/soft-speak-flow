@@ -4,6 +4,7 @@ import {
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
   buildPlannerResponse,
+  collectPlannerContextProtectedDataText,
   normalizePlannerBuildResultText,
   type PlannerBuildResult,
   type PlannerBuildInput,
@@ -1885,7 +1886,7 @@ Deno.test("plan_day follow-up stays conversational after a focus answer", () => 
 });
 
 Deno.test("plan_day follow-up preserves unquoted dashed task titles in prose", () => {
-  const result = buildPlannerResponse(baseInput({
+  const input = baseInput({
     message: "focused",
     currentDate: "2026-04-18",
     currentDateTime: "2026-04-18T09:00:00-07:00",
@@ -1918,7 +1919,11 @@ Deno.test("plan_day follow-up preserves unquoted dashed task titles in prose", (
         taskId: "task-budget-review",
       }],
     },
-  }));
+  });
+  const result = buildPlannerResponse(input);
+  const finalResult = normalizePlannerBuildResultText(result, {
+    protectedDataText: collectPlannerContextProtectedDataText(input),
+  });
 
   assertStringIncludes(result.reply, "Budget - review");
   assertEquals(result.reply.includes("Budget. Review"), false);
@@ -1926,6 +1931,8 @@ Deno.test("plan_day follow-up preserves unquoted dashed task titles in prose", (
     result.structuredResponse?.planDay?.message ?? "",
     "Budget - review",
   );
+  assertStringIncludes(finalResult.reply, "Budget - review");
+  assertEquals(finalResult.reply.includes("Budget. Review"), false);
 });
 
 Deno.test("plan_day keeps the consent gate alive after a conversational follow-up", () => {
