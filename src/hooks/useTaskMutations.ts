@@ -506,6 +506,7 @@ export const useTaskMutations = (taskDate: string) => {
   } = useResilience();
 
   const addInProgress = useRef(false);
+  const tasksAwaitingRedoFeedbackSuppression = useRef<Set<string>>(new Set());
   const getRequiredUserId = () => {
     if (!user?.id) throw new Error("User not authenticated");
     return user.id;
@@ -1632,6 +1633,9 @@ export const useTaskMutations = (taskDate: string) => {
 
       // Handle undo success
       if (isUndo) {
+        if (typeof taskId === "string") {
+          tasksAwaitingRedoFeedbackSuppression.current.add(taskId);
+        }
         toast({ 
           title: "Quest undone", 
           description: "XP has been adjusted",
@@ -1684,23 +1688,28 @@ export const useTaskMutations = (taskDate: string) => {
         window.dispatchEvent(new CustomEvent('mission-completed'));
         window.dispatchEvent(new CustomEvent('quest-completed'));
 
-        void triggerCompletionFeedback({
-          taskId,
-          taskTitle: taskText,
-          completionSource: completionFeedback?.completionSource ?? (habitSourceId ? "ritual" : "quest"),
-          completedAt: now.toISOString(),
-          taskDate: taskDate ?? null,
-          scheduledTime: taskScheduledTime ?? null,
-          difficulty: taskDifficulty ?? null,
-          category: taskCategory ?? null,
-          habitSourceId: habitSourceId ?? null,
-          epicId: epicId ?? null,
-          epicTitle: epicTitle ?? null,
-          completedAllRituals: completionFeedback?.completedAllRituals === true,
-          firstRitualToday: completionFeedback?.firstRitualToday === true,
-        }).catch((feedbackError) => {
-          console.warn("[TaskMutations] Completion feedback failed:", feedbackError);
-        });
+        const shouldSuppressRedoFeedback = typeof taskId === "string"
+          && tasksAwaitingRedoFeedbackSuppression.current.delete(taskId);
+
+        if (!shouldSuppressRedoFeedback) {
+          void triggerCompletionFeedback({
+            taskId,
+            taskTitle: taskText,
+            completionSource: completionFeedback?.completionSource ?? (habitSourceId ? "ritual" : "quest"),
+            completedAt: now.toISOString(),
+            taskDate: taskDate ?? null,
+            scheduledTime: taskScheduledTime ?? null,
+            difficulty: taskDifficulty ?? null,
+            category: taskCategory ?? null,
+            habitSourceId: habitSourceId ?? null,
+            epicId: epicId ?? null,
+            epicTitle: epicTitle ?? null,
+            completedAllRituals: completionFeedback?.completedAllRituals === true,
+            firstRitualToday: completionFeedback?.firstRitualToday === true,
+          }).catch((feedbackError) => {
+            console.warn("[TaskMutations] Completion feedback failed:", feedbackError);
+          });
+        }
 
         console.log('[TaskMutations] About to track completion:', {
           taskId,

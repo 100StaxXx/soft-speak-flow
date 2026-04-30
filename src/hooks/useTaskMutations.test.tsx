@@ -1350,6 +1350,70 @@ describe("useTaskMutations attachment handling", () => {
     expect(completionUpdateSelectMock).toHaveBeenCalledTimes(1);
   });
 
+  it("suppresses completion feedback when a quest is redone after undo", async () => {
+    setOnline(true);
+    mocks.awardCustomXPMock.mockResolvedValue({ xpAwarded: 16 });
+
+    const { completionUpdateSelectMock } = mockToggleTaskCompletionFlow({
+      completionReads: [
+        buildToggleTaskRemoteState(),
+        buildToggleTaskRemoteState({
+          completed_at: "2026-02-20T09:05:00.000Z",
+        }),
+        buildToggleTaskRemoteState(),
+      ],
+    });
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.toggleTask({
+        taskId: "task-1",
+        completed: true,
+        xpReward: 16,
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.triggerCompletionFeedbackMock).toHaveBeenCalledTimes(1);
+    });
+
+    await act(async () => {
+      result.current.toggleTask({
+        taskId: "task-1",
+        completed: false,
+        xpReward: 16,
+        forceUndo: true,
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({
+        title: "Quest undone",
+      }));
+    });
+
+    await act(async () => {
+      result.current.toggleTask({
+        taskId: "task-1",
+        completed: true,
+        xpReward: 16,
+      });
+    });
+
+    await waitFor(() => {
+      const completionToastCalls = mocks.toastMock.mock.calls.filter(
+        ([toastArg]) => toastArg?.title === "Quest completed! ✨",
+      );
+      expect(completionToastCalls).toHaveLength(2);
+    });
+
+    expect(mocks.triggerCompletionFeedbackMock).toHaveBeenCalledTimes(1);
+    expect(completionUpdateSelectMock).toHaveBeenCalledTimes(2);
+  });
+
   it("passes campaign ritual metadata to completion feedback after a real completion", async () => {
     setOnline(true);
     mocks.awardCustomXPMock.mockResolvedValueOnce({ xpAwarded: 25 });
