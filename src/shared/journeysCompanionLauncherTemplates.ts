@@ -6,8 +6,6 @@ import type { CompanionPlannerLaunchTarget, CompanionPlannerStarterIntent } from
 
 type JourneysCompanionLauncherSurfaceActionId =
   | "plan-day"
-  | "adjust-day"
-  | "right-now"
   | "upcoming"
   | "quest"
   | "goal";
@@ -62,8 +60,6 @@ const getStableIndex = (seed: string, length: number) => {
 
 const JOURNEYS_LAUNCHER_ACTION_IDS = [
   "plan-day",
-  "adjust-day",
-  "right-now",
   "upcoming",
   "quest",
   "goal",

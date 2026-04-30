@@ -138,6 +138,24 @@ const analysis = {
     creativity: { level: "medium", reasons: ["The week could use a little more originality and play."] },
     alignment: { level: "low", reasons: [] },
   },
+  cosmiqTitle: {
+    title: "The Oathbound Pathfinder",
+    rarity: "rare",
+    momentum: "steady",
+    dominantStat: "discipline",
+    secondaryStat: "alignment",
+    rebalanceStat: "creativity",
+    fusion: true,
+    rebalancePath: "Strengthen Creativity to evolve toward The Soulforged Creator.",
+    titleStability: "new",
+  },
+  cosmiqTitleCard: {
+    profileKey: "v1::the-oathbound-pathfinder",
+    imageUrl: "https://example.com/cosmiq-card.png",
+    status: "ready",
+    cached: true,
+    promptVersion: 1,
+  },
   fantasyTitle: {
     title: "The Oathbound Navigator",
     archetype: "Discipline / Alignment",
@@ -250,17 +268,19 @@ describe("CompanionStatAnalysisSurface", () => {
 
     expect(screen.getByTestId("drawer-root")).toBeInTheDocument();
     expect(screen.getByTestId("companion-stats-analysis-drawer")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-cosmiq-title-card")).toBeInTheDocument();
+    expect(screen.getByText("Cosmiq Title")).toBeInTheDocument();
+    expect(screen.getByText("The Oathbound Pathfinder")).toBeInTheDocument();
+    expect(screen.getByText("New Title Unlocked")).toBeInTheDocument();
+    expect(screen.getByText("Strengthen Creativity to evolve toward The Soulforged Creator.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show stat analysis" }));
+
     expect(screen.getByText("Stat Reading")).toBeInTheDocument();
-    expect(screen.getByText("Fantasy Title")).toBeInTheDocument();
-    expect(screen.getByText("The Oathbound Navigator")).toBeInTheDocument();
-    expect(
-      screen.getByText("You're carrying Discipline with Alignment close behind, and Creativity is the place your next chapter wants support."),
-    ).toBeInTheDocument();
     expect(screen.getByText("Current Build")).toBeInTheDocument();
     expect(screen.getAllByText("Discipline / Alignment").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Eli")).toBeInTheDocument();
     expect(screen.getByText("Cached for today")).toBeInTheDocument();
-    expect(screen.getByText("Coasting")).toBeInTheDocument();
   });
 
   it("uses a dialog on desktop and refreshes on demand", () => {
@@ -274,12 +294,17 @@ describe("CompanionStatAnalysisSurface", () => {
 
     expect(screen.getByTestId("dialog-root")).toBeInTheDocument();
     expect(screen.getByTestId("companion-stats-analysis-dialog")).toBeInTheDocument();
-    expect(screen.getByTestId("companion-stat-radar")).toBeInTheDocument();
-    expect(screen.getByTestId("radar-chart")).toBeInTheDocument();
-    expect(screen.getByTestId("polar-radius-axis")).toHaveAttribute("data-domain", "0-100");
+
+    fireEvent.click(screen.getByRole("button", { name: "Show stat analysis" }));
+
+    const flippedCard = screen.getByTestId("companion-cosmiq-title-card");
+    expect(within(flippedCard).getByTestId("companion-cosmiq-title-card-back")).toBeInTheDocument();
+    expect(within(flippedCard).getByTestId("companion-stat-radar")).toBeInTheDocument();
+    expect(within(flippedCard).getByTestId("radar-chart")).toBeInTheDocument();
+    expect(within(flippedCard).getByTestId("polar-radius-axis")).toHaveAttribute("data-domain", "0-100");
     expect(screen.getByText("Stat shape based on normalized 0-100 power from your 100-1000 scores.")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Refresh analysis" }));
+    fireEvent.click(within(flippedCard).getByRole("button", { name: "Refresh analysis" }));
     expect(mocks.refreshAnalysisMock).toHaveBeenCalledTimes(1);
   });
 
@@ -291,6 +316,8 @@ describe("CompanionStatAnalysisSurface", () => {
         layoutMode="desktop"
       />,
     );
+
+    fireEvent.click(screen.getByRole("button", { name: "Show stat analysis" }));
 
     const vitalityCard = screen.getByTestId("companion-rpg-stat-card-vitality");
     expect(within(vitalityCard).getByText("Vitality")).toBeInTheDocument();
@@ -354,6 +381,8 @@ describe("CompanionStatAnalysisSurface", () => {
         layoutMode="mobile"
       />,
     );
+
+    fireEvent.click(screen.getByRole("button", { name: "Show stat analysis" }));
 
     expect(screen.getByText("Recommended Quest")).toBeInTheDocument();
     expect(screen.getByText("Pair one morning check-in with one on-time task today.")).toBeInTheDocument();

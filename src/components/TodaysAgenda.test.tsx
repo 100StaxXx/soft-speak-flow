@@ -636,6 +636,7 @@ describe("TodaysAgenda campaign visibility", () => {
         mutations: { retry: false },
       },
     });
+    const onOpenCampaigns = vi.fn();
 
     render(
       <TodaysAgenda
@@ -663,6 +664,7 @@ describe("TodaysAgenda campaign visibility", () => {
         completedCount={0}
         totalCount={2}
         activeEpics={[]}
+        onOpenCampaigns={onOpenCampaigns}
       />,
       { wrapper: createWrapper(queryClient) },
     );
@@ -671,6 +673,9 @@ describe("TodaysAgenda campaign visibility", () => {
     expect(within(scheduledPane).getByText("Campaigns")).toBeInTheDocument();
     expect(within(scheduledPane).getByText("Fallback Campaign")).toBeInTheDocument();
     expect(screen.getAllByText("Campaigns")).toHaveLength(1);
+
+    fireEvent.click(within(scheduledPane).getByRole("button", { name: "Open campaigns page" }));
+    expect(onOpenCampaigns).toHaveBeenCalledTimes(1);
   });
 
   it("renders campaign rituals as scheduled items and campaign rows without expand controls", () => {

@@ -9,6 +9,15 @@ import {
   buildCompanionFantasyTitle,
   type CompanionFantasyTitle,
 } from "./companionStatFantasyTitles";
+import {
+  buildCompanionCosmiqTitle,
+  buildFantasyTitleAliasFromCosmiqTitle,
+  isCompanionCosmiqTitleMomentum,
+  isCompanionCosmiqTitleRarity,
+  isCompanionCosmiqTitleStability,
+  type CompanionCosmiqTitle,
+  type CompanionCosmiqTitleCard,
+} from "./companionStatCosmiqTitles";
 
 export type CompanionStatBand = "Emerging" | "Building" | "Strong" | "Exceptional";
 export type CompanionStatDriverSource = "attribute_event" | "activity" | "echo";
@@ -72,6 +81,8 @@ export interface CompanionStatAnalysis {
   activitySnapshot: CompanionStatActivitySnapshot;
   statProfile: CompanionStatProfileSummary;
   statNeeds: Record<CompanionStatAttribute, CompanionStatNeed>;
+  cosmiqTitle: CompanionCosmiqTitle;
+  cosmiqTitleCard?: CompanionCosmiqTitleCard;
   fantasyTitle: CompanionFantasyTitle;
   momentumState: CompanionMomentumState;
   recentMissInterpretation: CompanionMissInterpretation;
@@ -125,6 +136,7 @@ const MISS_INTERPRETATION_VALUES = new Set([
   "interruption",
   "normal_variance",
 ]);
+const COSMIQ_TITLE_CARD_STATUS_VALUES = new Set(["ready", "generating", "unavailable"]);
 
 const ACTIVITY_SNAPSHOT_KEYS: ReadonlyArray<keyof CompanionStatActivitySnapshot> = [
   "activityStartDate",
@@ -170,6 +182,7 @@ const ACTIVITY_SNAPSHOT_COUNT_KEYS = [
 ] as const satisfies readonly (keyof CompanionStatActivitySnapshot)[];
 
 const STAT_NEEDS_COMPATIBILITY_ERROR_PATTERN = /^analysis\.statNeeds(?:\.[a-z]+)? must be an object$/;
+const COSMIQ_TITLE_COMPATIBILITY_ERROR_PATTERN = /^analysis\.cosmiqTitle(?:\.| must be an object$)/;
 
 function failure(error: string): ValidationFailure {
   return { ok: false, error };
@@ -386,6 +399,82 @@ function validateFantasyTitle(value: unknown, path: string): ValidationResult<Co
   return success(value as unknown as CompanionFantasyTitle);
 }
 
+function validateCosmiqTitle(value: unknown, path: string): ValidationResult<CompanionCosmiqTitle> {
+  if (!isRecord(value)) {
+    return failure(`${path} must be an object`);
+  }
+
+  if (!isNonEmptyString(value.title)) {
+    return failure(`${path}.title must be a non-empty string`);
+  }
+
+  if (!isCompanionCosmiqTitleRarity(value.rarity)) {
+    return failure(`${path}.rarity must be a valid Cosmiq title rarity`);
+  }
+
+  if (!isCompanionCosmiqTitleMomentum(value.momentum)) {
+    return failure(`${path}.momentum must be a valid Cosmiq title momentum`);
+  }
+
+  if (!isString(value.dominantStat) || !ATTRIBUTE_KEYS.includes(value.dominantStat as CompanionStatAttribute)) {
+    return failure(`${path}.dominantStat must be a valid companion stat attribute`);
+  }
+
+  if (!isString(value.secondaryStat) || !ATTRIBUTE_KEYS.includes(value.secondaryStat as CompanionStatAttribute)) {
+    return failure(`${path}.secondaryStat must be a valid companion stat attribute`);
+  }
+
+  if (!isString(value.rebalanceStat) || !ATTRIBUTE_KEYS.includes(value.rebalanceStat as CompanionStatAttribute)) {
+    return failure(`${path}.rebalanceStat must be a valid companion stat attribute`);
+  }
+
+  if (typeof value.fusion !== "boolean") {
+    return failure(`${path}.fusion must be a boolean`);
+  }
+
+  if (!isNonEmptyString(value.rebalancePath)) {
+    return failure(`${path}.rebalancePath must be a non-empty string`);
+  }
+
+  if (!isCompanionCosmiqTitleStability(value.titleStability)) {
+    return failure(`${path}.titleStability must be a valid Cosmiq title stability`);
+  }
+
+  return success(value as unknown as CompanionCosmiqTitle);
+}
+
+function validateCosmiqTitleCard(value: unknown, path: string): ValidationResult<CompanionCosmiqTitleCard | undefined> {
+  if (value === undefined) {
+    return success(undefined);
+  }
+
+  if (!isRecord(value)) {
+    return failure(`${path} must be an object`);
+  }
+
+  if (!isNonEmptyString(value.profileKey)) {
+    return failure(`${path}.profileKey must be a non-empty string`);
+  }
+
+  if (!(value.imageUrl === null || isNonEmptyString(value.imageUrl))) {
+    return failure(`${path}.imageUrl must be a non-empty string or null`);
+  }
+
+  if (!isString(value.status) || !COSMIQ_TITLE_CARD_STATUS_VALUES.has(value.status)) {
+    return failure(`${path}.status must be ready, generating, or unavailable`);
+  }
+
+  if (typeof value.cached !== "boolean") {
+    return failure(`${path}.cached must be a boolean`);
+  }
+
+  if (!isFiniteNumber(value.promptVersion)) {
+    return failure(`${path}.promptVersion must be a number`);
+  }
+
+  return success(value as unknown as CompanionCosmiqTitleCard);
+}
+
 function validateActivitySnapshot(
   value: unknown,
   path: string,
@@ -551,6 +640,12 @@ export function validateCompanionStatAnalysis(value: unknown): ValidationResult<
   const statNeedsValidation = validateStatNeeds(value.statNeeds, "statNeeds");
   if (isValidationFailure(statNeedsValidation)) return statNeedsValidation;
 
+  const cosmiqTitleValidation = validateCosmiqTitle(value.cosmiqTitle, "cosmiqTitle");
+  if (isValidationFailure(cosmiqTitleValidation)) return cosmiqTitleValidation;
+
+  const cosmiqTitleCardValidation = validateCosmiqTitleCard(value.cosmiqTitleCard, "cosmiqTitleCard");
+  if (isValidationFailure(cosmiqTitleCardValidation)) return cosmiqTitleCardValidation;
+
   const fantasyTitleValidation = validateFantasyTitle(value.fantasyTitle, "fantasyTitle");
   if (isValidationFailure(fantasyTitleValidation)) return fantasyTitleValidation;
 
@@ -600,6 +695,8 @@ export function validateCompanionStatAnalysis(value: unknown): ValidationResult<
     activitySnapshot: activitySnapshotValidation.data,
     statProfile: statProfileValidation.data,
     statNeeds: statNeedsValidation.data,
+    cosmiqTitle: cosmiqTitleValidation.data,
+    ...(cosmiqTitleCardValidation.data ? { cosmiqTitleCard: cosmiqTitleCardValidation.data } : {}),
     fantasyTitle: fantasyTitleValidation.data,
     statBreakdowns: normalizedBreakdowns,
   });
@@ -691,6 +788,17 @@ function normalizeCompanionFantasyTitleForClient(value: unknown): unknown {
     return value;
   }
 
+  const cosmiqTitleValidation = validateCosmiqTitle(analysis.cosmiqTitle, "cosmiqTitle");
+  if (cosmiqTitleValidation.ok) {
+    return {
+      ...value,
+      analysis: {
+        ...analysis,
+        fantasyTitle: buildFantasyTitleAliasFromCosmiqTitle(cosmiqTitleValidation.data),
+      },
+    };
+  }
+
   if (!Array.isArray(analysis.statBreakdowns)) {
     return value;
   }
@@ -737,6 +845,59 @@ function normalizeCompanionFantasyTitleForClient(value: unknown): unknown {
   };
 }
 
+function normalizeCompanionCosmiqTitleForClient(value: unknown): unknown {
+  if (!isRecord(value) || !isRecord(value.analysis)) {
+    return value;
+  }
+
+  const analysis = value.analysis;
+  if (isRecord(analysis.cosmiqTitle)) {
+    return value;
+  }
+
+  if (!Array.isArray(analysis.statBreakdowns)) {
+    return value;
+  }
+
+  const normalizedBreakdowns: CompanionStatBreakdown[] = [];
+  for (const [index, breakdown] of analysis.statBreakdowns.entries()) {
+    const validation = validateBreakdown(breakdown, `statBreakdowns[${index}]`);
+    if (isValidationFailure(validation)) {
+      return value;
+    }
+    normalizedBreakdowns.push(validation.data);
+  }
+
+  const statProfileValidation = validateStatProfile(
+    analysis.statProfile,
+    normalizedBreakdowns,
+    "statProfile",
+  );
+  if (isValidationFailure(statProfileValidation)) {
+    return value;
+  }
+
+  const statNeeds = isRecord(analysis.statNeeds)
+    ? analysis.statNeeds as Partial<Record<CompanionStatAttribute, CompanionStatNeed>>
+    : null;
+  const momentumState = isString(analysis.momentumState) && MOMENTUM_VALUES.has(analysis.momentumState)
+    ? analysis.momentumState as CompanionMomentumState
+    : "coasting";
+
+  return {
+    ...value,
+    analysis: {
+      ...analysis,
+      cosmiqTitle: buildCompanionCosmiqTitle({
+        statProfile: statProfileValidation.data,
+        statNeeds,
+        statBreakdowns: normalizedBreakdowns,
+        momentumState,
+      }),
+    },
+  };
+}
+
 export function validateCompanionStatAnalysisResponseForClient(
   value: unknown,
 ): ValidationResult<CompanionStatAnalysisResponse> {
@@ -745,6 +906,7 @@ export function validateCompanionStatAnalysisResponseForClient(
 
   if (
     !STAT_NEEDS_COMPATIBILITY_ERROR_PATTERN.test(validation.error)
+    && !COSMIQ_TITLE_COMPATIBILITY_ERROR_PATTERN.test(validation.error)
     && validation.error !== "analysis.fantasyTitle must be an object"
   ) {
     return validation;
@@ -752,7 +914,9 @@ export function validateCompanionStatAnalysisResponseForClient(
 
   return validateCompanionStatAnalysisResponse(
     normalizeCompanionFantasyTitleForClient(
-      normalizeCompanionStatNeedsForClient(value),
+      normalizeCompanionCosmiqTitleForClient(
+        normalizeCompanionStatNeedsForClient(value),
+      ),
     ),
   );
 }

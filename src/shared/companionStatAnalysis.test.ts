@@ -61,6 +61,24 @@ const baseResponse = {
       creativity: { level: "medium", reasons: ["The week could use a little more originality and play."] },
       alignment: { level: "low", reasons: [] },
     },
+    cosmiqTitle: {
+      title: "The Oathbound Pathfinder",
+      rarity: "rare",
+      momentum: "steady",
+      dominantStat: "discipline",
+      secondaryStat: "alignment",
+      rebalanceStat: "creativity",
+      fusion: true,
+      rebalancePath: "Strengthen Creativity to evolve toward The Soulforged Creator.",
+      titleStability: "new",
+    },
+    cosmiqTitleCard: {
+      profileKey: "v1::the-oathbound-pathfinder",
+      imageUrl: "https://example.com/cosmiq-card.png",
+      status: "ready",
+      cached: true,
+      promptVersion: 1,
+    },
     fantasyTitle: {
       title: "The Oathbound Navigator",
       archetype: "Discipline / Alignment",
@@ -143,6 +161,17 @@ describe("companionStatAnalysis", () => {
     });
   });
 
+  it("accepts a valid Cosmiq title and card on strict responses", () => {
+    const validation = validateCompanionStatAnalysisResponse(baseResponse);
+
+    expect(validation.ok).toBe(true);
+    if (!validation.ok) return;
+
+    expect(validation.data.analysis.cosmiqTitle.title).toBe("The Oathbound Pathfinder");
+    expect(validation.data.analysis.cosmiqTitle.rarity).toBe("rare");
+    expect(validation.data.analysis.cosmiqTitleCard?.status).toBe("ready");
+  });
+
   it("rejects malformed fantasy titles on strict responses", () => {
     const validation = validateCompanionStatAnalysisResponse({
       ...baseResponse,
@@ -159,6 +188,24 @@ describe("companionStatAnalysis", () => {
     if (validation.ok) return;
 
     expect(validation.error).toBe("analysis.fantasyTitle.title must be a non-empty string");
+  });
+
+  it("rejects malformed Cosmiq titles on strict responses", () => {
+    const validation = validateCompanionStatAnalysisResponse({
+      ...baseResponse,
+      analysis: {
+        ...baseResponse.analysis,
+        cosmiqTitle: {
+          ...baseResponse.analysis.cosmiqTitle,
+          rarity: "mythic",
+        },
+      },
+    });
+
+    expect(validation.ok).toBe(false);
+    if (validation.ok) return;
+
+    expect(validation.error).toBe("analysis.cosmiqTitle.rarity must be a valid Cosmiq title rarity");
   });
 
   it("rebuilds a missing statProfile from stat breakdown scores", () => {
@@ -328,6 +375,22 @@ describe("companionStatAnalysis", () => {
     expect(validation.data.analysis.fantasyTitle.title.length).toBeGreaterThan(0);
     expect(validation.data.analysis.fantasyTitle.archetype).toBe("Discipline / Alignment");
     expect(validation.data.analysis.fantasyTitle.explanation).toContain("Creativity");
+  });
+
+  it("client compatibility fills a missing legacy Cosmiq title", () => {
+    const legacyAnalysis = { ...baseResponse.analysis } as Record<string, unknown>;
+    delete legacyAnalysis.cosmiqTitle;
+
+    const validation = validateCompanionStatAnalysisResponseForClient({
+      ...baseResponse,
+      analysis: legacyAnalysis,
+    });
+
+    expect(validation.ok).toBe(true);
+    if (!validation.ok) return;
+
+    expect(validation.data.analysis.cosmiqTitle.title.length).toBeGreaterThan(0);
+    expect(validation.data.analysis.cosmiqTitle.rebalanceStat).toBe("creativity");
   });
 
   it("client compatibility replaces a null legacy fantasy title", () => {

@@ -1,12 +1,15 @@
 import { type CSSProperties, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import {
+  BarChart3,
   Brain,
   Compass,
   Flame,
   HeartPulse,
+  ImageIcon,
   Palette,
   RefreshCw,
+  RotateCcw,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
@@ -256,26 +259,26 @@ const mentorAccentStyle = (analysis: CompanionStatAnalysis): CSSProperties | und
 
 function LoadingState() {
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader className="space-y-3">
-          <Skeleton className="h-4 w-28" />
-          <Skeleton className="h-16 w-full" />
-        </CardHeader>
-      </Card>
-      <Card>
-        <CardContent className="grid grid-cols-2 gap-3 pt-6">
+    <Card className="min-h-[62vh] overflow-hidden border-primary/20 bg-[radial-gradient(circle_at_top,hsl(var(--primary)/0.20),transparent_34%),linear-gradient(180deg,hsl(var(--background)/0.92),hsl(var(--card)/0.98))]">
+      <CardContent className="flex min-h-[62vh] flex-col items-center justify-center gap-6 p-6 text-center">
+        <div className="relative flex h-28 w-28 items-center justify-center rounded-full border border-primary/25 bg-primary/10">
+          <div className="absolute inset-2 rounded-full border border-primary/20" />
+          <Sparkles className="h-10 w-10 animate-pulse text-primary" />
+        </div>
+        <div className="space-y-2">
+          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-primary">Cosmiq reading</p>
+          <h3 className="text-2xl font-semibold">Revealing your title</h3>
+          <p className="mx-auto max-w-sm text-sm leading-6 text-muted-foreground">
+            Reading your stat shape, momentum, and next evolution path.
+          </p>
+        </div>
+        <div className="grid w-full max-w-md grid-cols-3 gap-2">
           {Array.from({ length: 6 }).map((_, index) => (
-            <Skeleton key={index} className="h-16 w-full rounded-xl" />
+            <Skeleton key={index} className="h-12 rounded-lg bg-primary/10" />
           ))}
-        </CardContent>
-      </Card>
-      <div className="grid gap-3 md:grid-cols-2">
-        {Array.from({ length: 6 }).map((_, index) => (
-          <Skeleton key={index} className="h-44 w-full rounded-2xl" />
-        ))}
-      </div>
-    </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -285,14 +288,15 @@ function StatSheetCard({ stat, index }: { stat: CompanionStatCardViewModel; inde
 
   return (
     <motion.div variants={revealItemVariants}>
-      <Card
+      <div
         data-testid={`companion-rpg-stat-card-${stat.attribute}`}
         className={cn(
           "h-full overflow-hidden border-border/60 bg-gradient-to-br bg-background/60",
+          "rounded-lg border",
           meta.gradientClassName,
         )}
       >
-        <CardHeader className="space-y-4 pb-4">
+        <div className="space-y-4 p-4 pb-3">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-2">
               <div className="rounded-lg border border-white/10 bg-white/5 p-2">
@@ -328,11 +332,11 @@ function StatSheetCard({ stat, index }: { stat: CompanionStatCardViewModel; inde
               />
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
+        </div>
+        <div className="px-4 pb-4">
           <p className="text-sm leading-6 text-foreground/85">{stat.status}</p>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </motion.div>
   );
 }
@@ -433,121 +437,73 @@ function AnalysisUnavailableCard({
   );
 }
 
-function CompanionStatAnalysisView({
+const formatRarityLabel = (value: CompanionStatAnalysis["cosmiqTitle"]["rarity"]) =>
+  value.charAt(0).toUpperCase() + value.slice(1);
+
+const STABILITY_LABELS: Record<CompanionStatAnalysis["cosmiqTitle"]["titleStability"], string> = {
+  new: "New Title Unlocked",
+  stable: "Title Held",
+  at_risk: "Title At Risk",
+  evolving: "Evolution Near",
+};
+
+function CosmiqTitleBackContent({
   analysis,
-  cached,
+  viewModel,
   isRefreshing,
   onRefresh,
 }: {
   analysis: CompanionStatAnalysis;
-  cached: boolean;
+  viewModel: ReturnType<typeof buildCompanionStatAnalysisViewModel>;
   isRefreshing: boolean;
   onRefresh: () => void;
 }) {
-  const prefersReducedMotion = useReducedMotion();
-  const viewModel = useMemo(() => buildCompanionStatAnalysisViewModel(analysis), [analysis]);
-  const dominantMeta = ATTRIBUTE_META[analysis.statProfile.dominantStat];
-  const secondaryMeta = ATTRIBUTE_META[analysis.statProfile.secondaryStat];
-  const DominantIcon = dominantMeta.icon;
-  const SecondaryIcon = secondaryMeta.icon;
-
   return (
-    <motion.div
-      className="space-y-4"
-      initial={prefersReducedMotion ? false : "hidden"}
-      animate="visible"
-      variants={revealContainerVariants}
-    >
-      <motion.div variants={revealItemVariants}>
-        <Card
-          className="overflow-hidden border-primary/20 bg-[linear-gradient(135deg,hsl(var(--primary)/0.16),hsl(var(--background)/0.72)_42%,hsl(var(--accent)/0.11))]"
-          style={mentorAccentStyle(analysis)}
-        >
-          <CardHeader className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary" className="bg-primary/10 text-primary">
-                <Sparkles className="mr-1 h-3.5 w-3.5" />
-                Stat Reading
-              </Badge>
-              <Badge variant="outline" className="bg-background/60">
-                {analysis.mentor.name}
-              </Badge>
-              {cached ? (
-                <Badge variant="outline" className="bg-background/60">
-                  Cached for today
-                </Badge>
-              ) : null}
-              <Badge variant="outline" className="bg-background/60">
-                {analysis.analysisDate}
-              </Badge>
+    <div data-testid="companion-cosmiq-title-card-back" className="space-y-4">
+      <section className="rounded-lg border border-white/10 bg-background/45 p-4">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-end">
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Current Build</p>
+              <h3 className="mt-1 text-3xl font-semibold leading-tight md:text-5xl">
+                {viewModel.currentBuild}
+              </h3>
             </div>
+            <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{analysis.summary}</p>
+            <p className="max-w-2xl text-sm leading-6 text-foreground/90">{analysis.narrativeBrief}</p>
+          </div>
 
-            <div className="rounded-lg border border-white/10 bg-background/45 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs font-semibold text-muted-foreground">Fantasy Title</p>
-                <Badge variant="outline" className="bg-background/60">
-                  {analysis.fantasyTitle.archetype}
-                </Badge>
-              </div>
-              <CardTitle className="mt-2 text-3xl leading-tight md:text-4xl">
-                {analysis.fantasyTitle.title}
-              </CardTitle>
-              <p className="mt-3 text-sm leading-6 text-foreground/90">
-                {analysis.fantasyTitle.explanation}
-              </p>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-lg border border-white/10 bg-background/45 p-3">
+              <p className="text-xs text-muted-foreground">Title</p>
+              <p className="mt-2 text-sm font-semibold">{analysis.cosmiqTitle.title}</p>
             </div>
-
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px] lg:items-end">
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Current Build</p>
-                  <CardTitle className="mt-1 text-2xl leading-tight md:text-3xl">
-                    {viewModel.currentBuild}
-                  </CardTitle>
-                </div>
-                <p className="text-sm leading-6 text-muted-foreground">{analysis.summary}</p>
-                <p className="text-sm leading-6 text-foreground/90">{analysis.narrativeBrief}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-lg border border-white/10 bg-background/40 p-3">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <DominantIcon className={cn("h-3.5 w-3.5", dominantMeta.accentClassName)} />
-                    Dominant
-                  </div>
-                  <p className="mt-2 text-sm font-semibold">{viewModel.dominantLabel}</p>
-                </div>
-                <div className="rounded-lg border border-white/10 bg-background/40 p-3">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <SecondaryIcon className={cn("h-3.5 w-3.5", secondaryMeta.accentClassName)} />
-                    Growing
-                  </div>
-                  <p className="mt-2 text-sm font-semibold">{viewModel.secondaryLabel}</p>
-                </div>
-                <div className="rounded-lg border border-white/10 bg-background/40 p-3">
-                  <p className="text-xs text-muted-foreground">Momentum</p>
-                  <p className="mt-2 text-sm font-semibold">{formatSnakeLabel(analysis.momentumState)}</p>
-                </div>
-                <div className="rounded-lg border border-white/10 bg-background/40 p-3">
-                  <p className="text-xs text-muted-foreground">Needs Support</p>
-                  <p className="mt-2 text-sm font-semibold">{viewModel.weakestStat.label}</p>
-                </div>
-              </div>
+            <div className="rounded-lg border border-white/10 bg-background/45 p-3">
+              <p className="text-xs text-muted-foreground">Rarity</p>
+              <p className="mt-2 text-sm font-semibold">{formatRarityLabel(analysis.cosmiqTitle.rarity)}</p>
             </div>
-          </CardHeader>
-        </Card>
-      </motion.div>
+            <div className="rounded-lg border border-white/10 bg-background/45 p-3">
+              <p className="text-xs text-muted-foreground">Momentum</p>
+              <p className="mt-2 text-sm font-semibold">{formatSnakeLabel(analysis.momentumState)}</p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-background/45 p-3">
+              <p className="text-xs text-muted-foreground">Needs Support</p>
+              <p className="mt-2 text-sm font-semibold">{viewModel.weakestStat.label}</p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <motion.div variants={revealItemVariants}>
-          <Card className="h-full border-border/60 bg-background/60">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Character Sheet</CardTitle>
-              <p className="text-sm text-muted-foreground">
+          <section className="h-full rounded-lg border border-border/60 bg-background/60">
+            <div className="p-4 pb-2">
+              <h3 className="text-lg font-semibold">Character Sheet</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
                 Stat shape based on normalized 0-100 power from your 100-1000 scores.
               </p>
-            </CardHeader>
-            <CardContent>
+            </div>
+            <div className="p-4 pt-2">
               <div
                 data-testid="companion-stat-radar"
                 className="h-[260px] min-h-[260px] w-full"
@@ -575,13 +531,13 @@ function CompanionStatAnalysisView({
                   </RadarChart>
                 </ResponsiveContainer>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </section>
         </motion.div>
 
         <motion.div variants={revealItemVariants}>
-          <Card className="h-full border-primary/20 bg-primary/5">
-            <CardHeader className="space-y-3">
+          <section className="h-full rounded-lg border border-primary/20 bg-primary/5">
+            <div className="space-y-3 p-4">
               <div className="flex items-center justify-between gap-3">
                 <Badge variant="secondary" className="bg-primary/10 text-primary">
                   Recommended Quest
@@ -590,10 +546,10 @@ function CompanionStatAnalysisView({
                   Rebalance {viewModel.weakestStat.label}
                 </Badge>
               </div>
-              <CardTitle className="text-xl">Best next move</CardTitle>
+              <h3 className="text-xl font-semibold">Best next move</h3>
               <p className="text-sm leading-6 text-foreground/90">{analysis.suggestedAction}</p>
-            </CardHeader>
-            <CardContent className="space-y-3">
+            </div>
+            <div className="space-y-3 px-4 pb-4">
               <div className="rounded-lg border border-white/10 bg-background/40 p-3">
                 <p className="text-xs font-medium text-muted-foreground">Today reads as</p>
                 <p className="mt-2 text-sm font-semibold">{analysis.dailyNarrative}</p>
@@ -603,8 +559,8 @@ function CompanionStatAnalysisView({
                 <p className="text-xs font-medium text-muted-foreground">Miss read</p>
                 <p className="mt-2 text-sm font-semibold">{formatSnakeLabel(analysis.recentMissInterpretation)}</p>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </section>
         </motion.div>
       </div>
 
@@ -693,6 +649,194 @@ function CompanionStatAnalysisView({
           {isRefreshing ? "Refreshing..." : "Refresh analysis"}
         </Button>
       </div>
+    </div>
+  );
+}
+
+function CosmiqTitleRevealCard({
+  analysis,
+  viewModel,
+  cached,
+  isFlipped,
+  onFlip,
+  isRefreshing,
+  onRefresh,
+}: {
+  analysis: CompanionStatAnalysis;
+  viewModel: ReturnType<typeof buildCompanionStatAnalysisViewModel>;
+  cached: boolean;
+  isFlipped: boolean;
+  onFlip: () => void;
+  isRefreshing: boolean;
+  onRefresh: () => void;
+}) {
+  const imageUrl = analysis.cosmiqTitleCard?.imageUrl ?? null;
+  const cardStatus = analysis.cosmiqTitleCard?.status ?? "unavailable";
+
+  if (isFlipped) {
+    return (
+      <Card
+        data-testid="companion-cosmiq-title-card"
+        className="flex h-[min(72vh,760px)] flex-col overflow-hidden border-primary/25 bg-[linear-gradient(135deg,hsl(var(--primary)/0.12),hsl(var(--background)/0.82)_44%,hsl(var(--accent)/0.08))]"
+        style={mentorAccentStyle(analysis)}
+      >
+        <CardHeader className="shrink-0 border-b border-white/10 p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="secondary" className="bg-primary/10 text-primary">
+                  <Sparkles className="mr-1 h-3.5 w-3.5" />
+                  Stat Reading
+                </Badge>
+                <Badge variant="outline" className="bg-background/60">
+                  {analysis.mentor.name}
+                </Badge>
+                {cached ? (
+                  <Badge variant="outline" className="bg-background/60">
+                    Cached for today
+                  </Badge>
+                ) : null}
+                <Badge variant="outline" className="bg-background/60">
+                  {analysis.analysisDate}
+                </Badge>
+              </div>
+              <CardTitle className="text-2xl leading-tight sm:text-3xl">
+                {analysis.cosmiqTitle.title}
+              </CardTitle>
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              aria-label="Show Cosmiq title card"
+              className="shrink-0 border border-white/20 bg-background/70 backdrop-blur hover:bg-background/85"
+              onClick={onFlip}
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+          <CosmiqTitleBackContent
+            analysis={analysis}
+            viewModel={viewModel}
+            isRefreshing={isRefreshing}
+            onRefresh={onRefresh}
+          />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card
+      data-testid="companion-cosmiq-title-card"
+      className="relative min-h-[min(72vh,760px)] overflow-hidden border-primary/25 bg-background"
+      style={mentorAccentStyle(analysis)}
+    >
+      {imageUrl ? (
+        <img
+          alt={`${analysis.cosmiqTitle.title} archetype illustration`}
+          className="absolute inset-0 h-full w-full object-cover"
+          src={imageUrl}
+        />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_top,hsl(var(--primary)/0.30),transparent_38%),linear-gradient(145deg,hsl(var(--background)),hsl(var(--accent)/0.18),hsl(var(--card)))]">
+          <ImageIcon className="h-20 w-20 text-primary/45" aria-hidden="true" />
+        </div>
+      )}
+
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,hsl(var(--background)/0.12),hsl(var(--background)/0.28)_42%,hsl(var(--background)/0.88))]" />
+
+      <div className="relative z-10 flex min-h-[min(72vh,760px)] flex-col justify-between p-4 sm:p-6">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-wrap gap-2">
+            <Badge className="bg-primary text-primary-foreground">
+              {formatRarityLabel(analysis.cosmiqTitle.rarity)}
+            </Badge>
+            <Badge variant="outline" className="border-white/30 bg-background/55 text-foreground backdrop-blur">
+              {STABILITY_LABELS[analysis.cosmiqTitle.titleStability]}
+            </Badge>
+            {cardStatus === "generating" ? (
+              <Badge variant="outline" className="border-white/30 bg-background/55 text-foreground backdrop-blur">
+                Art warming up
+              </Badge>
+            ) : null}
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon"
+            aria-label={isFlipped ? "Show Cosmiq title card" : "Show stat analysis"}
+            className="shrink-0 border border-white/20 bg-background/70 backdrop-blur hover:bg-background/85"
+            onClick={onFlip}
+          >
+            {isFlipped ? <RotateCcw className="h-4 w-4" /> : <BarChart3 className="h-4 w-4" />}
+          </Button>
+        </div>
+
+        <div className="space-y-4 rounded-lg border border-white/15 bg-background/72 p-4 shadow-2xl backdrop-blur-md">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Cosmiq Title</p>
+            <h3 className="mt-2 text-3xl font-semibold leading-tight md:text-5xl">
+              {analysis.cosmiqTitle.title}
+            </h3>
+            <p className="mt-2 text-sm text-muted-foreground">{analysis.cosmiqTitle.rebalancePath}</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {viewModel.statCards.map((stat) => (
+              <div
+                key={stat.attribute}
+                className="rounded-lg border border-white/10 bg-background/55 px-3 py-2"
+              >
+                <p className="text-[11px] font-medium text-muted-foreground">{stat.label}</p>
+                <div className="mt-1 flex items-end justify-between gap-2">
+                  <span className="text-lg font-semibold leading-none">{stat.score}</span>
+                  <span className="text-[10px] font-semibold uppercase text-primary">{stat.band}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function CompanionStatAnalysisView({
+  analysis,
+  cached,
+  isRefreshing,
+  onRefresh,
+}: {
+  analysis: CompanionStatAnalysis;
+  cached: boolean;
+  isRefreshing: boolean;
+  onRefresh: () => void;
+}) {
+  const prefersReducedMotion = useReducedMotion();
+  const viewModel = useMemo(() => buildCompanionStatAnalysisViewModel(analysis), [analysis]);
+  const [isFlipped, setIsFlipped] = useState(false);
+
+  return (
+    <motion.div
+      className="space-y-4"
+      initial={prefersReducedMotion ? false : "hidden"}
+      animate="visible"
+      variants={revealContainerVariants}
+    >
+      <motion.div variants={revealItemVariants}>
+        <CosmiqTitleRevealCard
+          analysis={analysis}
+          viewModel={viewModel}
+          cached={cached}
+          isFlipped={isFlipped}
+          onFlip={() => setIsFlipped((current) => !current)}
+          isRefreshing={isRefreshing}
+          onRefresh={onRefresh}
+        />
+      </motion.div>
     </motion.div>
   );
 }

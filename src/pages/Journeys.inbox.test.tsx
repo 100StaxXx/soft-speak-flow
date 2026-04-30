@@ -251,10 +251,6 @@ vi.mock("@/components/tasks/InteractionLogModal", () => ({
   InteractionLogModal: () => null,
 }));
 
-vi.mock("@/components/SmartDayPlanner/components/QuickAdjustDrawer", () => ({
-  QuickAdjustDrawer: () => null,
-}));
-
 vi.mock("@/components/Pathfinder", () => ({
   Pathfinder: () => null,
 }));

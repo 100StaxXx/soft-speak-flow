@@ -353,8 +353,6 @@ const inferStarterIntentFromStructuredResponse = (
   }
   if (response?.reflectionBridge) return "briefing_followup";
   if (response?.campaignMomentum) return "advance_campaign_start";
-  if (response?.dayAdjust) return "adjust_today";
-  if (response?.rightNow) return "right_now_start";
   if (response?.comingUp) return "upcoming_start";
   return null;
 };
@@ -380,8 +378,6 @@ const collectStructuredResponseSectionKeys = (
     response.priorityOverview ? "priorityOverview" : null,
     response.reflectionBridge ? "reflectionBridge" : null,
     response.comingUp ? "comingUp" : null,
-    response.rightNow ? "rightNow" : null,
-    response.dayAdjust ? "dayAdjust" : null,
     response.campaignMomentum ? "campaignMomentum" : null,
   ].filter((section): section is string => Boolean(section));
 };
@@ -402,15 +398,6 @@ const collectProposalIdsFromStructuredResponse = (
   if (response?.reflectionBridge?.firstAction) {
     collectQuest(response.reflectionBridge.firstAction);
   }
-  if (response?.rightNow?.recommendedAction) {
-    collectQuest(response.rightNow.recommendedAction);
-  }
-  if (response?.rightNow?.fallbackAction) {
-    collectQuest(response.rightNow.fallbackAction);
-  }
-  response?.dayAdjust?.keep.forEach(collectQuest);
-  response?.dayAdjust?.move.forEach(collectQuest);
-  response?.dayAdjust?.dropOrShrink.forEach(collectQuest);
   if (response?.comingUp?.nextBestAction) {
     collectQuest(response.comingUp.nextBestAction);
   }
@@ -1414,10 +1401,6 @@ export function useCompanionAssistant({
         ? "Prepare me for tomorrow"
         : structuredResponse?.campaignMomentum
         ? "Advance my campaign"
-        : structuredResponse?.dayAdjust
-        ? "Adjust my day"
-        : structuredResponse?.rightNow
-        ? "What should I do right now?"
         : structuredResponse?.comingUp
         ? "What do I have coming up?"
         : null);

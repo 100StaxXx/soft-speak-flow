@@ -10,11 +10,9 @@ export type PlannerPriorityStarterIntent =
   | "plan_day"
   | "plan_week"
   | "advance_campaign_start"
-  | "right_now_start"
   | "make_room"
   | "what_matters"
   | "relationship_touch"
-  | "adjust_today"
   | "low_energy_adjust"
   | "briefing_followup"
   | "goal_breakdown"
@@ -729,11 +727,6 @@ const buildRecoveryScore = (
   );
   pushReason(
     recoveryReasons,
-    input.starterIntent === "adjust_today",
-    "today needs active reshuffling",
-  );
-  pushReason(
-    recoveryReasons,
     inferredEnergy === "low",
     "energy looks low today",
   );
@@ -754,10 +747,7 @@ const buildRecoveryScore = (
   );
 
   if (input.starterIntent === "low_energy_adjust") score += 28;
-  if (
-    input.starterIntent === "make_room" ||
-    input.starterIntent === "adjust_today"
-  ) score += 18;
+  if (input.starterIntent === "make_room") score += 18;
   if (inferredEnergy === "low") score += 12;
   if (load?.status === "overloaded") score += 16;
   if (input.careSignals?.hasDormancyWarning) score += 8;

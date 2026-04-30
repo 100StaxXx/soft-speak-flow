@@ -206,21 +206,6 @@ describe("companionChatThreads service", () => {
                 busyDays: [],
                 openDays: ["Friday"],
               },
-              rightNow: {
-                message: "You have one clean move right now.",
-                currentWindow: "Next 20 minutes",
-                recommendedAction: {
-                  suggestionId: "right-now-1",
-                  proposalId: "proposal-right-now-1",
-                  title: "Adjust Course launch",
-                  type: "must",
-                  estimatedDuration: "20 min",
-                  estimatedDurationMinutes: 20,
-                  source: "campaign",
-                  reason: "This fits before the next block.",
-                },
-                fallbackAction: null,
-              },
               comingUp: {
                 message: "You have one useful move before your next event.",
                 nextEvent: {
@@ -245,23 +230,6 @@ describe("companionChatThreads service", () => {
                 remainingToday: [],
                 tomorrowSummary: "light",
                 missedItems: [],
-              },
-              dayAdjust: {
-                message: "Keep the reset, move the rest.",
-                keep: [
-                  {
-                    suggestionId: "adjust-1",
-                    proposalId: "proposal-adjust-1",
-                    title: "Adjust Course launch",
-                    type: "must",
-                    estimatedDuration: "20 min",
-                    estimatedDurationMinutes: 20,
-                    source: "campaign",
-                    reason: "This reset should stay protected.",
-                  },
-                ],
-                move: [],
-                dropOrShrink: [],
               },
               campaignMomentum: {
                 message: "Course launch needs a cleaner next move.",
@@ -311,12 +279,8 @@ describe("companionChatThreads service", () => {
     expect(messages).toHaveLength(1);
     expect(messages[0]?.structuredResponse?.weeklyPlan?.topPriorities[0]?.proposalId)
       .toBe("proposal-weekly-1");
-    expect(messages[0]?.structuredResponse?.rightNow?.recommendedAction?.proposalId)
-      .toBe("proposal-right-now-1");
     expect(messages[0]?.structuredResponse?.comingUp?.nextBestAction?.proposalId)
       .toBe("proposal-coming-up-1");
-    expect(messages[0]?.structuredResponse?.dayAdjust?.keep[0]?.proposalId)
-      .toBe("proposal-adjust-1");
     expect(messages[0]?.structuredResponse?.campaignMomentum?.nextStep?.proposalId)
       .toBe("proposal-campaign-1");
   });

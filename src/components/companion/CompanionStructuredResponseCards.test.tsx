@@ -110,41 +110,6 @@ describe("CompanionStructuredResponseCards", () => {
     expect(screen.getByText(/Day status:/)).toHaveTextContent("busy");
   });
 
-  it("shows saved right-now proposals as disabled", () => {
-    const onConfirmSuggestion = vi.fn();
-    const structuredResponse: CompanionStructuredResponse = {
-      intent: baseIntent,
-      rightNow: {
-        message: "You have one clean move before the next block.",
-        currentWindow: "Next 20 minutes",
-        recommendedAction: createQuest({
-          suggestionId: "right-now-1",
-          proposalId: "proposal-right-now-1",
-          title: "Adjust Course launch",
-          type: "must",
-          source: "campaign",
-        }),
-        fallbackAction: null,
-      },
-    };
-
-    render(
-      <CompanionStructuredResponseCards
-        structuredResponse={structuredResponse}
-        variant="companion"
-        onConfirmSuggestion={onConfirmSuggestion}
-        savedProposalIds={["proposal-right-now-1"]}
-      />,
-    );
-
-    const button = screen.getByTestId(
-      "structured-suggestion-confirm-right-now-1",
-    );
-
-    expect(button).toHaveTextContent("Saved");
-    expect(button).toBeDisabled();
-  });
-
   it("shows pending coming-up proposals as saving", () => {
     const onConfirmSuggestion = vi.fn();
     const structuredResponse: CompanionStructuredResponse = {
@@ -189,74 +154,6 @@ describe("CompanionStructuredResponseCards", () => {
 
     expect(button).toHaveTextContent("Saving");
     expect(button).toBeDisabled();
-  });
-
-  it("renders day-adjust proposal actions from keep, move, and drop or shrink buckets", () => {
-    const onConfirmSuggestion = vi.fn();
-    const structuredResponse: CompanionStructuredResponse = {
-      intent: baseIntent,
-      dayAdjust: {
-        message: "Keep the reset move, move the support work, and trim the least important piece.",
-        keep: [
-          createQuest({
-            suggestionId: "adjust-keep-1",
-            proposalId: "proposal-adjust-keep-1",
-            title: "Adjust Course launch",
-            type: "must",
-            source: "campaign",
-          }),
-        ],
-        move: [
-          createQuest({
-            suggestionId: "adjust-move-1",
-            proposalId: "proposal-adjust-move-1",
-            title: "Review analytics notes",
-            type: "should",
-            source: "optimization",
-          }),
-        ],
-        dropOrShrink: [
-          createQuest({
-            suggestionId: "adjust-trim-1",
-            proposalId: "proposal-adjust-trim-1",
-            title: "Shrink admin cleanup",
-            type: "nice",
-            source: "recovery",
-          }),
-        ],
-      },
-    };
-
-    render(
-      <CompanionStructuredResponseCards
-        structuredResponse={structuredResponse}
-        variant="journeys"
-        onConfirmSuggestion={onConfirmSuggestion}
-      />,
-    );
-
-    fireEvent.click(
-      screen.getByTestId("structured-suggestion-confirm-adjust-keep-1"),
-    );
-    fireEvent.click(
-      screen.getByTestId("structured-suggestion-confirm-adjust-move-1"),
-    );
-    fireEvent.click(
-      screen.getByTestId("structured-suggestion-confirm-adjust-trim-1"),
-    );
-
-    expect(onConfirmSuggestion).toHaveBeenNthCalledWith(
-      1,
-      "proposal-adjust-keep-1",
-    );
-    expect(onConfirmSuggestion).toHaveBeenNthCalledWith(
-      2,
-      "proposal-adjust-move-1",
-    );
-    expect(onConfirmSuggestion).toHaveBeenNthCalledWith(
-      3,
-      "proposal-adjust-trim-1",
-    );
   });
 
   it("renders weekly proposal actions and confirms them from the shared quest row", () => {

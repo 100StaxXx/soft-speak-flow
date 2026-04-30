@@ -337,6 +337,53 @@ Deno.test("runCompanionAgent asks a follow-up instead of proposing quests for ba
   );
 });
 
+Deno.test("runCompanionAgent answers typed upcoming schedule reads without OpenAI", async () => {
+  for (
+    const message of [
+      "What do I have coming up?",
+      "What do I hgave coming up?",
+    ]
+  ) {
+    const supabase = createMockSupabase();
+    let guardedFetchCalled = false;
+    const guardedFetch = (async (input: string | URL | Request) => {
+      guardedFetchCalled = true;
+      throw new Error(
+        `Upcoming schedule reads should not call OpenAI: ${String(input)}`,
+      );
+    }) as typeof fetch;
+
+    const result = await runCompanionAgent({
+      guardedFetch,
+      supabase: supabase.client,
+      userId: "00000000-0000-4000-8000-000000000001",
+      openAIApiKey: "test-openai-key",
+      request: {
+        surface: "journeys",
+        sessionId: `session-upcoming-${
+          message.includes("hgave") ? "typo" : "exact"
+        }`,
+        message,
+        inputMode: "text",
+        currentDateTime: "2026-04-18T20:32:00-07:00",
+        turnOrigin: "composer",
+      },
+    });
+
+    assertEquals(guardedFetchCalled, false);
+    assertEquals(result.mode, "schedule_read");
+    assertEquals(result.intent, "check_calendar");
+    assertEquals(result.understandingState, "ready_to_propose");
+    assertEquals(
+      result.reply,
+      "Today: nothing scheduled.\nTomorrow: nothing scheduled.",
+    );
+    assertEquals(result.structuredResponse?.comingUp?.tomorrowSummary, "open");
+    assertEquals(result.followUp, null);
+    assertEquals(result.pendingAction, undefined);
+  }
+});
+
 Deno.test("runCompanionAgent routes plan-day follow-up answers through the planner", async () => {
   const supabase = createMockSupabase();
   let guardedFetchCalled = false;
@@ -550,7 +597,10 @@ Deno.test("runCompanionAgent routes typed text after Quest? through the AI compa
   assertEquals(launchFetchCalled, false);
   assertEquals(launchResult.mode, "clarify");
   assertEquals(launchResult.intent, "schedule_task");
-  assertEquals(launchResult.followUp?.question, "What quest do you want to capture?");
+  assertEquals(
+    launchResult.followUp?.question,
+    "What quest do you want to capture?",
+  );
 
   const supabase = createMockSupabase();
   const responseBodies: unknown[] = [];
@@ -709,7 +759,8 @@ Deno.test("runCompanionAgent does not resurrect cleared persisted follow-ups", a
       {
         id: "msg-4",
         role: "assistant",
-        content: "No problem - we'll keep this as planning context, not a quest.",
+        content:
+          "No problem. We'll keep this as planning context, not a quest.",
         created_at: "2026-04-18T15:00:03.000Z",
         input_mode: null,
         source: "agent",
@@ -809,53 +860,6 @@ Deno.test("runCompanionAgent asks a follow-up for bare plan-day variants without
   assert(result.followUp?.question.includes("focus"));
   assertEquals(result.proposedActions, []);
   assertEquals(result.structuredResponse, null);
-});
-
-Deno.test("runCompanionAgent asks a follow-up for bare Adjust my day when the model gives a generic reply", async () => {
-  const supabase = createMockSupabase();
-  const { guardedFetch } = createInstructionCaptureFetch("I'm here.");
-
-  const result = await runCompanionAgent({
-    guardedFetch,
-    supabase: supabase.client,
-    userId: "00000000-0000-4000-8000-000000000001",
-    openAIApiKey: "test-openai-key",
-    request: {
-      surface: "journeys",
-      sessionId: "session-bare-adjust-day",
-      message: "Adjust my day",
-      inputMode: "text",
-      currentDateTime: "2026-04-18T08:00:00-07:00",
-      starterIntent: "adjust_today",
-    },
-  });
-
-  assertEquals(result.mode, "clarify");
-  assertEquals(result.intent, "update_existing_plan");
-  assertEquals(result.understandingState, "needs_followup");
-  assertEquals(
-    result.reply,
-    "I can adjust today. Should I protect your top priority, reduce the load, or make room for something new?",
-  );
-  assertEquals(
-    result.followUp?.question,
-    "Should I protect your top priority, reduce the load, or make room for something new?",
-  );
-  assertEquals(result.followUp?.options, [
-    "Protect priority",
-    "Reduce load",
-    "Make room",
-  ]);
-  assertEquals(result.proposedActions, []);
-  assertEquals(result.structuredResponse, null);
-  assertEquals(result.pendingAction, undefined);
-  assertEquals(result.threadState.hasPendingAction, false);
-  assert(
-    supabase.inserts.every((entry) =>
-      entry.table !== "companion_pending_actions"
-    ),
-    "bare adjust prompt should not create a pending action",
-  );
 });
 
 Deno.test("runCompanionAgent preserves active follow-up when the model submits a thin reply", async () => {

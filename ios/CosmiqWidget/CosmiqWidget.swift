@@ -164,8 +164,8 @@ struct CosmiqWidget: Widget {
                     .background(ProfileWidgetBackground(entry: entry))
             }
         }
-        .configurationDisplayName("Cosmiq Quests")
-        .description("View your daily quests and track progress.")
+        .configurationDisplayName("Cosmiq Today")
+        .description("View your daily quests, rituals, and progress.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }

@@ -98,6 +98,26 @@ function makeTask(overrides: Partial<DailyTask> = {}): DailyTask {
   };
 }
 
+function expectedWidgetTask(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "task-1",
+    text: "Daily focus",
+    completed: false,
+    xpReward: 50,
+    isMainQuest: false,
+    category: "mindset",
+    section: "morning",
+    scheduledTime: "09:00",
+    kind: "quest",
+    isRitual: false,
+    isCampaignRitual: false,
+    campaignTitle: null,
+    epicId: null,
+    habitSourceId: null,
+    ...overrides,
+  };
+}
+
 async function flushEffects() {
   await act(async () => {
     await Promise.resolve();
@@ -163,7 +183,7 @@ describe("useWidgetSync", () => {
     expect(mocks.updateWidgetDataMock).toHaveBeenCalledTimes(1);
     expect(mocks.updateWidgetDataMock).toHaveBeenCalledWith({
       tasks: [
-        {
+        expectedWidgetTask({
           id: "quest-1",
           text: "Deep work sprint",
           completed: true,
@@ -172,7 +192,14 @@ describe("useWidgetSync", () => {
           category: "work",
           section: "morning",
           scheduledTime: "08:30",
-        },
+        }),
+        expectedWidgetTask({
+          id: "ritual-1",
+          text: "Morning ritual",
+          kind: "ritual",
+          isRitual: true,
+          habitSourceId: "habit-1",
+        }),
       ],
       completedCount: 1,
       totalCount: 1,
@@ -194,16 +221,7 @@ describe("useWidgetSync", () => {
 
     expect(mocks.updateWidgetDataMock).toHaveBeenCalledWith({
       tasks: [
-        {
-          id: "task-1",
-          text: "Daily focus",
-          completed: false,
-          xpReward: 50,
-          isMainQuest: false,
-          category: "mindset",
-          section: "morning",
-          scheduledTime: "09:00",
-        },
+        expectedWidgetTask(),
       ],
       completedCount: 0,
       totalCount: 1,
@@ -291,13 +309,19 @@ describe("useWidgetSync", () => {
     });
   });
 
-  it("orders widget quests by scheduled time with unscheduled quests last", async () => {
+  it("orders widget rows by scheduled time with unscheduled rows last", async () => {
     const today = localDateString();
     const tasks: DailyTask[] = [
       makeTask({
         id: "quest-unscheduled",
         task_text: "Inbox cleanup",
         scheduled_time: null,
+      }),
+      makeTask({
+        id: "ritual-early",
+        task_text: "Morning stretch",
+        scheduled_time: "07:45",
+        habit_source_id: "habit-stretch",
       }),
       makeTask({
         id: "quest-late",
@@ -322,6 +346,7 @@ describe("useWidgetSync", () => {
     expect(mocks.updateWidgetDataMock).toHaveBeenCalledWith(
       expect.objectContaining({
         tasks: [
+          expect.objectContaining({ id: "ritual-early", scheduledTime: "07:45", kind: "ritual" }),
           expect.objectContaining({ id: "quest-early", scheduledTime: "08:15" }),
           expect.objectContaining({ id: "quest-mid", scheduledTime: "09:45" }),
           expect.objectContaining({ id: "quest-late", scheduledTime: "16:30" }),
@@ -371,14 +396,16 @@ describe("useWidgetSync", () => {
     );
   });
 
-  it("applies the 10-item widget limit after sorting quests", async () => {
+  it("applies the 10-item widget limit after sorting quests and rituals", async () => {
     const today = localDateString();
     const tasks: DailyTask[] = [
       makeTask({ id: "quest-unscheduled-1", task_text: "Unscheduled 1", scheduled_time: null }),
       makeTask({ id: "quest-unscheduled-2", task_text: "Unscheduled 2", scheduled_time: null }),
+      makeTask({ id: "ritual-unscheduled-3", task_text: "Unscheduled ritual", scheduled_time: null, habit_source_id: "habit-unscheduled" }),
       makeTask({ id: "quest-1300", task_text: "1:00 PM", scheduled_time: "13:00" }),
       makeTask({ id: "quest-0900", task_text: "9:00 AM", scheduled_time: "09:00" }),
       makeTask({ id: "quest-1500", task_text: "3:00 PM", scheduled_time: "15:00" }),
+      makeTask({ id: "ritual-0730", task_text: "7:30 ritual", scheduled_time: "07:30", habit_source_id: "habit-0730" }),
       makeTask({ id: "quest-0830", task_text: "8:30 AM", scheduled_time: "08:30" }),
       makeTask({ id: "quest-1100", task_text: "11:00 AM", scheduled_time: "11:00" }),
       makeTask({ id: "quest-1000", task_text: "10:00 AM", scheduled_time: "10:00" }),
@@ -394,6 +421,7 @@ describe("useWidgetSync", () => {
     const payload = mocks.updateWidgetDataMock.mock.calls[0]?.[0];
     expect(payload.tasks).toHaveLength(10);
     expect(payload.tasks.map((task: { id: string }) => task.id)).toEqual([
+      "ritual-0730",
       "quest-0830",
       "quest-0900",
       "quest-1000",
@@ -403,11 +431,10 @@ describe("useWidgetSync", () => {
       "quest-1400",
       "quest-1500",
       "quest-1630",
-      "quest-1700",
     ]);
   });
 
-  it("keeps rituals out of the widget list while preserving ritual counts", async () => {
+  it("includes standalone and campaign rituals while preserving separate counts", async () => {
     const today = localDateString();
     const tasks: DailyTask[] = [
       makeTask({
@@ -422,6 +449,15 @@ describe("useWidgetSync", () => {
         task_text: "Deep work",
         scheduled_time: "09:00",
         habit_source_id: null,
+      }),
+      makeTask({
+        id: "campaign-ritual-1",
+        task_text: "Portfolio work",
+        completed: true,
+        habit_source_id: "habit-campaign",
+        epic_id: "epic-portfolio",
+        epic_title: "Build Portfolio Website",
+        scheduled_time: "10:00",
       }),
       makeTask({
         id: "ritual-2",
@@ -443,31 +479,90 @@ describe("useWidgetSync", () => {
 
     expect(mocks.updateWidgetDataMock).toHaveBeenCalledWith({
       tasks: [
-        {
+        expectedWidgetTask({
+          id: "ritual-1",
+          text: "Morning ritual",
+          completed: true,
+          kind: "ritual",
+          isRitual: true,
+          habitSourceId: "habit-1",
+          section: "morning",
+          scheduledTime: "07:00",
+        }),
+        expectedWidgetTask({
           id: "quest-1",
           text: "Deep work",
-          completed: false,
-          xpReward: 50,
-          isMainQuest: false,
-          category: "mindset",
-          section: "morning",
           scheduledTime: "09:00",
-        },
-        {
-          id: "quest-2",
-          text: "Inbox zero",
-          completed: false,
-          xpReward: 50,
-          isMainQuest: false,
-          category: "mindset",
+        }),
+        expectedWidgetTask({
+          id: "campaign-ritual-1",
+          text: "Portfolio work",
+          completed: true,
+          kind: "campaign_ritual",
+          isRitual: true,
+          isCampaignRitual: true,
+          campaignTitle: "Build Portfolio Website",
+          epicId: "epic-portfolio",
+          habitSourceId: "habit-campaign",
+          section: "morning",
+          scheduledTime: "10:00",
+        }),
+        expectedWidgetTask({
+          id: "ritual-2",
+          text: "Evening ritual",
+          kind: "ritual",
+          isRitual: true,
+          habitSourceId: "habit-2",
           section: "unscheduled",
           scheduledTime: null,
-        },
+        }),
+        expectedWidgetTask({
+          id: "quest-2",
+          text: "Inbox zero",
+          section: "unscheduled",
+          scheduledTime: null,
+        }),
       ],
       completedCount: 0,
       totalCount: 2,
-      ritualCount: 2,
-      ritualCompleted: 1,
+      ritualCount: 3,
+      ritualCompleted: 2,
+      date: today,
+    });
+  });
+
+  it("falls back to Campaign when campaign ritual title is blank", async () => {
+    const today = localDateString();
+    const tasks: DailyTask[] = [
+      makeTask({
+        id: "campaign-ritual-blank-title",
+        task_text: "Campaign rhythm",
+        habit_source_id: "habit-campaign",
+        epic_id: "epic-campaign",
+        epic_title: "   ",
+      }),
+    ];
+
+    renderHook(() => useWidgetSync(tasks, today));
+    await flushEffects();
+
+    expect(mocks.updateWidgetDataMock).toHaveBeenCalledWith({
+      tasks: [
+        expectedWidgetTask({
+          id: "campaign-ritual-blank-title",
+          text: "Campaign rhythm",
+          kind: "campaign_ritual",
+          isRitual: true,
+          isCampaignRitual: true,
+          campaignTitle: "Campaign",
+          epicId: "epic-campaign",
+          habitSourceId: "habit-campaign",
+        }),
+      ],
+      completedCount: 0,
+      totalCount: 0,
+      ritualCount: 1,
+      ritualCompleted: 0,
       date: today,
     });
   });

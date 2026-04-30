@@ -121,7 +121,7 @@ async function executeAction(params: {
       if (error) throw error;
 
       return {
-        receiptMessage: `Got it — "${data.task_text}" added for ${taskScheduleLabel(data as Record<string, unknown>)}.`,
+        receiptMessage: `Got it. "${data.task_text}" added for ${taskScheduleLabel(data as Record<string, unknown>)}.`,
         executionResult: {
           task_id: data.id,
           task: data,
@@ -156,7 +156,7 @@ async function executeAction(params: {
       if (error) throw error;
 
       return {
-        receiptMessage: `Got it — "${data.task_text}" is updated.`,
+        receiptMessage: `Got it. "${data.task_text}" is updated.`,
         executionResult: {
           task_id: data.id,
           task: data,
@@ -188,7 +188,7 @@ async function executeAction(params: {
       if (error) throw error;
 
       return {
-        receiptMessage: `Got it — ritual "${data.title}" is set.`,
+        receiptMessage: `Got it. Ritual "${data.title}" is set.`,
         executionResult: {
           ritual_id: data.id,
           ritual: data,
@@ -224,7 +224,7 @@ async function executeAction(params: {
       }
 
       return {
-        receiptMessage: "Got it — reminder set.",
+        receiptMessage: "Got it. Reminder set.",
         executionResult: {
           target_type: targetType,
           target_id: targetId,
@@ -256,7 +256,7 @@ async function executeAction(params: {
       if (error) throw error;
 
       return {
-        receiptMessage: `Got it — campaign "${data.title}" is updated.`,
+        receiptMessage: `Got it. Campaign "${data.title}" is updated.`,
         executionResult: {
           campaign_id: data.id,
           campaign: data,
@@ -328,7 +328,7 @@ async function executeAction(params: {
       if (campaignError) throw campaignError;
 
       return {
-        receiptMessage: `Got it — I adjusted "${campaign.title}" so the next move is more realistic.`,
+        receiptMessage: `Got it. I adjusted "${campaign.title}" so the next move is more realistic.`,
         executionResult: {
           campaign_id: campaign.id,
           campaign,

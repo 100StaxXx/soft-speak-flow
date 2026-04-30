@@ -9,6 +9,12 @@ export interface WidgetTask {
   category: string | null;
   section: string;
   scheduledTime: string | null;
+  kind?: 'quest' | 'ritual' | 'campaign_ritual';
+  isRitual?: boolean;
+  isCampaignRitual?: boolean;
+  campaignTitle?: string | null;
+  epicId?: string | null;
+  habitSourceId?: string | null;
 }
 
 export interface WidgetSyncDiagnostics {

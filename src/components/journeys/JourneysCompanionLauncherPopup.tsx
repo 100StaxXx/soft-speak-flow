@@ -6,7 +6,6 @@ import {
   Clock3,
   MessageCircle,
   Plus,
-  RotateCcw,
   Sparkles,
 } from "lucide-react";
 import type { FABPopupAlignment } from "@/hooks/useDraggableFAB";
@@ -56,18 +55,6 @@ const OPTION_META: Record<
   "plan-day": {
     label: "Plan day",
     Icon: CalendarCheck,
-    className: "border-[#6b3416] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#3c1f10]",
-    iconClassName: "bg-[#fff7dc] text-[#b04b12]",
-  },
-  "adjust-day": {
-    label: "Adjust day",
-    Icon: RotateCcw,
-    className: "border-[#7a3b14] bg-[linear-gradient(180deg,#ffd7aa_0%,#ffae52_100%)] text-[#5b2608]",
-    iconClassName: "bg-white/55 text-[#5b2608]",
-  },
-  "right-now": {
-    label: "Right now",
-    Icon: Clock3,
     className: "border-[#6b3416] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#3c1f10]",
     iconClassName: "bg-[#fff7dc] text-[#b04b12]",
   },

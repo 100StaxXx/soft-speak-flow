@@ -238,6 +238,7 @@ interface TodaysAgendaProps {
     }>;
   }>;
   isCampaignsLoading?: boolean;
+  onOpenCampaigns?: () => void;
   onDeleteQuest?: (taskId: string) => void;
   onMoveQuestToNextDay?: (taskId: string) => void;
   onUpdateScheduledTime?: (taskId: string, newTime: string) => void;
@@ -660,6 +661,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   weekTasks = [],
   activeEpics = [],
   isCampaignsLoading = false,
+  onOpenCampaigns,
   onDeleteQuest,
   onMoveQuestToNextDay,
   onUpdateScheduledTime,
@@ -1720,6 +1722,34 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   );
 
   const hasScheduledTimelineRows = timelineRows.length > 0;
+  const renderCampaignSectionLabel = (label: string) => {
+    const className = "flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground";
+    const contents = (
+      <>
+        <Target className="h-3 w-3" />
+        {label}
+      </>
+    );
+
+    return onOpenCampaigns ? (
+      <button
+        type="button"
+        aria-label="Open campaigns page"
+        onClick={onOpenCampaigns}
+        className={cn(
+          className,
+          "transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        )}
+      >
+        {contents}
+      </button>
+    ) : (
+      <div className={className}>
+        {contents}
+      </div>
+    );
+  };
+
   const renderCampaignSection = ({ inDesktopRail = false }: { inDesktopRail?: boolean } = {}) => (
     <>
       {/* Campaign quick-view launchers; ritual tasks render in the normal scheduler timeline. */}
@@ -1727,10 +1757,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         <div className={cn(inDesktopRail ? "space-y-3" : "mt-6 pt-4 border-t border-border/30")}>
           <div className="flex items-center gap-2 mb-3">
             {!inDesktopRail && <div className="w-9 flex-shrink-0" />}
-            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              <Target className="h-3 w-3" />
-              {inDesktopRail ? "Campaigns & rituals" : "Campaigns"}
-            </div>
+            {renderCampaignSectionLabel(inDesktopRail ? "Campaigns & rituals" : "Campaigns")}
             <div className="flex-1 border-t border-dashed border-border/40" />
           </div>
 
@@ -2730,10 +2757,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           renderCampaignSection({ inDesktopRail: true })
         ) : (
           <>
-            <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              <Target className="h-3 w-3" />
-              Campaigns
-            </div>
+            {renderCampaignSectionLabel("Campaigns")}
             <p className="mt-3 text-sm text-muted-foreground">
               No campaigns or rituals are attached to this day yet.
             </p>

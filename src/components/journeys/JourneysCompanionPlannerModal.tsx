@@ -90,6 +90,7 @@ interface JourneysCompanionPlannerModalProps {
 
 type JourneysCompanionDrawerLayout = {
   shellHeight: number;
+  bottomInset: number;
 };
 
 const MOBILE_DRAWER_HEIGHT_MIN_PX = 320;
@@ -274,6 +275,26 @@ const hasRichStructuredResponse = (
       structuredResponse?.campaignMomentum,
   );
 
+const findStructuredResponseBubbleMessageId = (
+  messages: CompanionAssistantMessage[],
+  structuredResponse: CompanionStructuredResponse | null | undefined,
+) => {
+  if (!hasRichStructuredResponse(structuredResponse)) return null;
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (
+      message.role === "assistant" &&
+      !message.receipt &&
+      hasRichStructuredResponse(message.structuredResponse)
+    ) {
+      return message.id;
+    }
+  }
+
+  return null;
+};
+
 const getReducedMotionPreference = () =>
   typeof window !== "undefined" &&
   typeof window.matchMedia === "function" &&
@@ -283,13 +304,22 @@ const getDrawerLayout = (): JourneysCompanionDrawerLayout => {
   if (typeof window === "undefined") {
     return {
       shellHeight: MOBILE_DRAWER_HEIGHT_MIN_PX,
+      bottomInset: 0,
     };
   }
 
-  const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+  const visualViewport = window.visualViewport;
+  const viewportHeight = visualViewport?.height ?? window.innerHeight;
   const safeViewportHeight = Number.isFinite(viewportHeight)
     ? viewportHeight
     : window.innerHeight;
+  const viewportOffsetTop =
+    visualViewport && Number.isFinite(visualViewport.offsetTop)
+      ? visualViewport.offsetTop
+      : 0;
+  const visibleViewportBottom = viewportOffsetTop + safeViewportHeight;
+  const bottomInset = Math.max(0, window.innerHeight - visibleViewportBottom);
+
   return {
     shellHeight: Math.max(
       MOBILE_DRAWER_HEIGHT_MIN_PX,
@@ -298,6 +328,7 @@ const getDrawerLayout = (): JourneysCompanionDrawerLayout => {
         safeViewportHeight - MOBILE_DRAWER_VIEWPORT_OFFSET_PX,
       ),
     ),
+    bottomInset,
   };
 };
 
@@ -496,7 +527,18 @@ const JourneysCompanionOverlayBody = memo(({
     string | null | undefined
   >(undefined);
   const activeThreadSessionId = assistant.activeThread?.sessionId ?? null;
-  const displayMessages = visibleMessages;
+  const displayMessages = useMemo(() => {
+    const structuredResponseBubbleMessageId =
+      findStructuredResponseBubbleMessageId(
+        visibleMessages,
+        assistant.structuredResponse,
+      );
+    if (!structuredResponseBubbleMessageId) return visibleMessages;
+
+    return visibleMessages.filter((message) =>
+      message.id !== structuredResponseBubbleMessageId
+    );
+  }, [assistant.structuredResponse, visibleMessages]);
   const activeFollowUpKey = useMemo(
     () => getFollowUpKey(assistant.activeFollowUp),
     [assistant.activeFollowUp],
@@ -599,6 +641,8 @@ const JourneysCompanionOverlayBody = memo(({
     assistant.pendingAction,
     assistant.proposedActions,
     assistant.structuredResponse,
+    drawerLayout?.bottomInset,
+    drawerLayout?.shellHeight,
     displayMessages,
     prefersReducedMotion,
     scrollTranscriptToBottom,
@@ -1505,7 +1549,11 @@ export const JourneysCompanionPlannerModal = memo(
 
     return (
       <Drawer open={open} onOpenChange={onOpenChange} repositionInputs={false}>
-        <DrawerContent className="border-none bg-transparent p-0 shadow-none">
+        <DrawerContent
+          className="border-none bg-transparent p-0 shadow-none"
+          style={{ bottom: `${drawerLayout.bottomInset}px` }}
+          data-testid="journeys-companion-planner-drawer-content"
+        >
           <DrawerHeader className="sr-only">
             <DrawerTitle>Cosmiq companion</DrawerTitle>
             <DrawerDescription>

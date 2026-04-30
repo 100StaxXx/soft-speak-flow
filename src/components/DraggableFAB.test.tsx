@@ -262,33 +262,7 @@ describe("DraggableFAB", () => {
     window.removeEventListener("companion-new-goal-started", newGoalStarted);
   });
 
-  it("routes the right-now option through the planner as an immediate next-action starter", () => {
-    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
-
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-right-now"));
-
-    expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
-      target: "planner",
-      starterIntent: "right_now_start",
-      message: "What should I do right now?",
-    }));
-  });
-
-  it("routes the adjust-day option through the planner as a recovery-and-replan starter", () => {
-    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
-
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-adjust-day"));
-
-    expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
-      target: "planner",
-      starterIntent: "adjust_today",
-      message: "Adjust my day",
-    }));
-  });
-
-  it("omits the low-energy option from the journeys launcher", () => {
+  it("omits planner options that are not on the journeys launcher", () => {
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
 
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));

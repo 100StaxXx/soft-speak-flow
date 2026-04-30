@@ -76,6 +76,17 @@ const mocks = vi.hoisted(() => ({
   unsurfacedEpicHabitsCount: 0,
   pendingRecurringCount: 0,
   calendarConnections: [] as Array<{ provider: string; sync_mode: string }>,
+  epics: [] as Array<{
+    id: string;
+    title: string;
+    status: string;
+    description?: string | null;
+    progress_percentage?: number | null;
+    target_days: number;
+    start_date: string;
+    end_date: string | null;
+    epic_habits?: Array<unknown>;
+  }>,
   epicsLoading: false,
   isMacHostedIOSApp: false,
   draggableFabRenderCount: 0,
@@ -168,6 +179,9 @@ const mocks = vi.hoisted(() => ({
     scheduled_time: string;
     difficulty: string;
     is_main_quest: boolean;
+    habit_source_id?: string | null;
+    epic_id?: string | null;
+    epic_title?: string | null;
   }>,
   inboxTasks: [] as Array<{
     id: string;
@@ -396,10 +410,6 @@ vi.mock("@/components/EditRitualSheet", () => ({
   EditRitualSheet: () => null,
 }));
 
-vi.mock("@/components/SmartDayPlanner/components/QuickAdjustDrawer", () => ({
-  QuickAdjustDrawer: () => null,
-}));
-
 vi.mock("@/components/Pathfinder", () => ({
   Pathfinder: (props: { open?: boolean; initialGoal?: string; onOpenChange?: (open: boolean) => void }) => {
     mocks.lastPathfinderProps = props;
@@ -507,7 +517,7 @@ vi.mock("@/hooks/useAIInteractionTracker", () => ({
 
 vi.mock("@/hooks/useEpics", () => ({
   useEpics: () => ({
-    epics: [],
+    epics: mocks.epics,
     isLoading: mocks.epicsLoading,
     createEpic: mocks.createEpic,
     isCreating: false,
@@ -731,6 +741,7 @@ describe("Journeys row drag integration", () => {
     mocks.unsurfacedEpicHabitsCount = 0;
     mocks.pendingRecurringCount = 0;
     mocks.calendarConnections = [];
+    mocks.epics = [];
     mocks.isMacHostedIOSApp = false;
     mocks.draggableFabRenderCount = 0;
     mocks.lastDatePillSelectedDate = null;
@@ -1135,7 +1146,7 @@ describe("Journeys row drag integration", () => {
             companionPlannerLaunchIntent: {
               id: "planner-handoff-1",
               message: "Help me plan my afternoon.",
-              starterIntent: "adjust_today",
+              starterIntent: "plan_day",
               target: "planner",
               briefingContext: null,
             },
@@ -1752,6 +1763,59 @@ describe("Journeys row drag integration", () => {
     });
   });
 
+  it("navigates to campaigns from the journeys campaign section label", async () => {
+    mocks.dailyTasks = [
+      {
+        id: "ritual-1",
+        task_text: "Daily campaign ritual",
+        completed: false,
+        xp_reward: 12,
+        task_date: "2026-02-13",
+        scheduled_time: "08:00",
+        difficulty: "medium",
+        is_main_quest: false,
+        habit_source_id: "habit-1",
+        epic_id: "epic-1",
+        epic_title: "Active Campaign",
+      },
+    ];
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    const RouteHarness = () => {
+      const location = useLocation();
+
+      return (
+        <>
+          <div data-testid="route-path">{location.pathname}</div>
+          <Journeys />
+        </>
+      );
+    };
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <RouteHarness />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("route-path").textContent).toBe("/journeys");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Open campaigns page" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("route-path").textContent).toBe("/campaigns");
+    });
+  });
+
   it("requests date-pill recentering on journeys route re-entry when the selected date is already today", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -2220,6 +2284,83 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       const refreshedDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
       expect(isSameDay(refreshedDate, new Date())).toBe(true);
+    });
+  });
+
+  it("resets a manually selected stale date on app window focus sync", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "user-set-stale-day" }));
+
+    await waitFor(() => {
+      const staleDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
+      expect(isSameDay(staleDate, new Date())).toBe(false);
+    });
+
+    act(() => {
+      window.dispatchEvent(new Event("focus"));
+    });
+
+    await waitFor(() => {
+      const refreshedDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
+      expect(isSameDay(refreshedDate, new Date())).toBe(true);
+    });
+  });
+
+  it("requests date-pill recentering on app window focus when the selected date is already today", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
+      expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(0);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "set-same-day-non-current" }));
+
+    let sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+    await waitFor(() => {
+      sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      expect(isSameDay(new Date(sameDaySelectedDateIso), new Date())).toBe(true);
+    });
+    const centerKeyBeforeFocus = Number(screen.getByTestId("center-request-key").textContent);
+
+    act(() => {
+      window.dispatchEvent(new Event("focus"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-date-iso").textContent).toBe(sameDaySelectedDateIso);
+      expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeFocus);
     });
   });
 

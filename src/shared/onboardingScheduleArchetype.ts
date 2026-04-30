@@ -100,7 +100,7 @@ export const ONBOARDING_SCHEDULE_ARCHETYPE_PROFILES: Record<
     id: "variable_schedule",
     label: "variable schedule",
     plannerHint:
-      "Avoid rigid assumptions; prefer lighter plans, flexible ordering, and easy Adjust My Day recovery.",
+      "Avoid rigid assumptions; prefer lighter plans, flexible ordering, and easy recovery paths.",
     defaultWorkloadTolerance: "light",
     defaultPreferredTimeOfDay: null,
     defaultPreferredTimeReason: null,

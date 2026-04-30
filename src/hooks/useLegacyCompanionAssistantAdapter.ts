@@ -160,12 +160,6 @@ const isExactPrepareTomorrowStarterMessage = (message: string): boolean =>
 const isExactUpcomingStarterMessage = (message: string): boolean =>
   message.trim().toLowerCase() === "what do i have coming up?";
 
-const isExactRightNowStarterMessage = (message: string): boolean =>
-  message.trim().toLowerCase() === "what should i do right now?";
-
-const isExactAdjustDayStarterMessage = (message: string): boolean =>
-  message.trim().toLowerCase() === "adjust my day";
-
 const mapLegacyProposalToPendingAction = (
   proposal: {
     id: string;
@@ -259,23 +253,6 @@ const buildReadOnlyStructuredResponse = (
         nextBestAction: toReadOnlySuggestion(response.comingUp.nextBestAction),
       }
       : null,
-    rightNow: response.rightNow
-      ? {
-        ...response.rightNow,
-        recommendedAction: toReadOnlySuggestion(
-          response.rightNow.recommendedAction,
-        ),
-        fallbackAction: toReadOnlySuggestion(response.rightNow.fallbackAction),
-      }
-      : null,
-    dayAdjust: response.dayAdjust
-      ? {
-        ...response.dayAdjust,
-        keep: toReadOnlySuggestions(response.dayAdjust.keep),
-        move: toReadOnlySuggestions(response.dayAdjust.move),
-        dropOrShrink: toReadOnlySuggestions(response.dayAdjust.dropOrShrink),
-      }
-      : null,
     campaignMomentum: response.campaignMomentum
       ? {
         ...response.campaignMomentum,
@@ -303,8 +280,6 @@ const inferPlannerStarterIntentFromStructuredResponse = (
 ): CompanionPlannerStarterIntent | null => {
   if (response?.planDay) return "plan_day";
   if (response?.campaignMomentum) return "advance_campaign_start";
-  if (response?.dayAdjust) return "adjust_today";
-  if (response?.rightNow) return "right_now_start";
   if (response?.comingUp) return "upcoming_start";
   return null;
 };
@@ -337,11 +312,6 @@ const collectFallbackStructuredSuggestions = (
   };
 
   response?.planDay?.suggestedQuests.forEach(collectSuggestion);
-  collectSuggestion(response?.rightNow?.recommendedAction);
-  collectSuggestion(response?.rightNow?.fallbackAction);
-  response?.dayAdjust?.keep.forEach(collectSuggestion);
-  response?.dayAdjust?.move.forEach(collectSuggestion);
-  response?.dayAdjust?.dropOrShrink.forEach(collectSuggestion);
   collectSuggestion(response?.comingUp?.nextBestAction);
   collectSuggestion(response?.campaignMomentum?.nextStep);
   response?.campaignMomentum?.supportActions.forEach(collectSuggestion);
@@ -691,20 +661,6 @@ export function useLegacyCompanionAssistantAdapter({
     if (isExactUpcomingStarterMessage(message)) {
       await planner.submitMessage(message, inputMode, {
         starterIntent: "upcoming_start",
-      });
-      return;
-    }
-
-    if (isExactRightNowStarterMessage(message)) {
-      await planner.submitMessage(message, inputMode, {
-        starterIntent: "right_now_start",
-      });
-      return;
-    }
-
-    if (isExactAdjustDayStarterMessage(message)) {
-      await planner.submitMessage(message, inputMode, {
-        starterIntent: "adjust_today",
       });
       return;
     }

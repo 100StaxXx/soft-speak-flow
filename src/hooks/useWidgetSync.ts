@@ -59,25 +59,16 @@ export const useWidgetSync = (
       return;
     }
     
-    // Separate quests and rituals
+    // Keep quest progress counters separate, but show every due today row.
     const quests = tasks.filter(task => !task.habit_source_id);
     const rituals = tasks.filter(task => !!task.habit_source_id);
-    const sortedQuests = sortQuestsForWidget(quests);
+    const sortedWidgetTasks = sortTasksForWidget(tasks);
 
     const completedCount = quests.filter(t => !!t.completed).length;
     const ritualCompleted = rituals.filter(t => !!t.completed).length;
 
-    // Map quests to widget format (limit to 10 for performance)
-    const widgetTasks: WidgetTask[] = sortedQuests.slice(0, 10).map(task => ({
-      id: task.id,
-      text: task.task_text,
-      completed: task.completed ?? false,
-      xpReward: task.xp_reward,
-      isMainQuest: task.is_main_quest ?? false,
-      category: task.category,
-      section: getSection(task.scheduled_time),
-      scheduledTime: task.scheduled_time,
-    }));
+    // Map visible rows to widget format (limit to 10 for performance)
+    const widgetTasks: WidgetTask[] = sortedWidgetTasks.slice(0, 10).map(mapTaskForWidget);
     
     // Create a fingerprint to avoid redundant syncs
     const fingerprint = JSON.stringify({
@@ -245,8 +236,8 @@ function getSection(scheduledTime: string | null): string {
   return 'evening';
 }
 
-function sortQuestsForWidget(quests: DailyTask[]): DailyTask[] {
-  return quests
+function sortTasksForWidget(tasks: DailyTask[]): DailyTask[] {
+  return tasks
     .map((task, index) => ({ task, index }))
     .sort((left, right) => {
       const leftScheduled = !!left.task.scheduled_time;
@@ -272,6 +263,39 @@ function sortQuestsForWidget(quests: DailyTask[]): DailyTask[] {
       return left.index - right.index;
     })
     .map(({ task }) => task);
+}
+
+function mapTaskForWidget(task: DailyTask): WidgetTask {
+  const kind = getWidgetTaskKind(task);
+  const isRitual = kind !== 'quest';
+  const isCampaignRitual = kind === 'campaign_ritual';
+
+  return {
+    id: task.id,
+    text: task.task_text,
+    completed: task.completed ?? false,
+    xpReward: task.xp_reward,
+    isMainQuest: task.is_main_quest ?? false,
+    category: task.category,
+    section: getSection(task.scheduled_time),
+    scheduledTime: task.scheduled_time,
+    kind,
+    isRitual,
+    isCampaignRitual,
+    campaignTitle: isCampaignRitual ? task.epic_title?.trim() || 'Campaign' : null,
+    epicId: task.epic_id ?? null,
+    habitSourceId: task.habit_source_id ?? null,
+  };
+}
+
+function getWidgetTaskKind(task: DailyTask): NonNullable<WidgetTask['kind']> {
+  if (task.habit_source_id && task.epic_id) {
+    return 'campaign_ritual';
+  }
+  if (task.habit_source_id) {
+    return 'ritual';
+  }
+  return 'quest';
 }
 
 function getLocalDateString(date = new Date()): string {

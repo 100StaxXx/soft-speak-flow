@@ -592,8 +592,8 @@ describe("useCompanionAssistant", () => {
     });
 
     await act(async () => {
-      await result.current.submitMessage("Adjust my day", "text", {
-        starterIntent: "adjust_today",
+      await result.current.submitMessage("Plan my day", "text", {
+        starterIntent: "plan_day",
       });
     });
 
@@ -608,7 +608,7 @@ describe("useCompanionAssistant", () => {
             source: "agent",
           }),
           expect.objectContaining({
-            content: "Adjust my day",
+            content: "Plan my day",
             role: "user",
             source: "agent",
             inputMode: "text",
@@ -2441,110 +2441,6 @@ describe("useCompanionAssistant", () => {
     ]);
   });
 
-  it("recovers right-now suggestions after reload with the right starter intent", async () => {
-    mocks.loadThreadMessages.mockResolvedValue([
-      {
-        id: "m1",
-        sessionId: "persisted-session",
-        role: "assistant",
-        content: "You have a clean 20-minute window right now.",
-        createdAt: "2026-04-18T08:00:01.000Z",
-        source: "agent",
-        metadata: {
-          mode: "schedule_read",
-          intent: "check_calendar",
-          structuredResponse: {
-            intent: {
-              intentType: "conversation",
-              timeHorizon: "today",
-              isRecurring: false,
-              shouldCreateQuest: false,
-              shouldPromptCampaign: false,
-            },
-            rightNow: {
-              message: "You have a clean 20-minute window right now.",
-              currentWindow: "Next 20 minutes",
-              recommendedAction: {
-                suggestionId: "right-now-1",
-                proposalId: "proposal-right-now-1",
-                title: "Adjust Course launch",
-                type: "must",
-                estimatedDuration: "20 min",
-                estimatedDurationMinutes: 20,
-                source: "campaign",
-                reason:
-                  "The cleanest use of this gap is resetting the slipping campaign before the next block.",
-              },
-              fallbackAction: null,
-            },
-          },
-        },
-      },
-    ]);
-    mocks.supabaseInvoke.mockResolvedValueOnce({
-      data: {
-        reply:
-          "I pulled that right-now move into a confirmable action. Review it and confirm if it fits.",
-        mode: "pending_confirmation",
-        intent: "schedule_task",
-        confidence: 0.82,
-        pendingAction: {
-          id: "action-right-now-1",
-          status: "pending",
-          intent: "schedule_task",
-          actionType: "campaign_update",
-          proposalId: "proposal-right-now-1",
-          summary: 'Adjust "Course launch".',
-          confirmationMessage: "Want me to lock that in?",
-          normalizedPayload: {
-            title: "Adjust Course launch",
-          },
-          affectedEntities: null,
-          expiresAt: "2026-04-18T20:20:00.000Z",
-          createdAt: "2026-04-18T08:20:00.000Z",
-        },
-        threadState: {
-          threadId: "persisted-session",
-          sessionId: "persisted-session",
-          openaiConversationId: "conv_123",
-          lastOpenAIResponseId: "resp_125",
-          hasPendingAction: true,
-        },
-      },
-      error: null,
-    });
-
-    const { wrapper } = createWrapper();
-    const { result } = renderHook(
-      () => useCompanionAssistant({ surface: "journeys" }),
-      { wrapper },
-    );
-
-    await waitFor(() => {
-      expect(
-        result.current.structuredResponse?.rightNow?.recommendedAction
-          ?.proposalId,
-      )
-        .toBe("proposal-right-now-1");
-    });
-
-    await act(async () => {
-      await result.current.confirmSuggestedQuest("proposal-right-now-1");
-    });
-
-    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
-      "companion-agent",
-      expect.objectContaining({
-        body: expect.objectContaining({
-          message: "What should I do right now?",
-          starterIntent: "right_now_start",
-          selectedProposalId: "proposal-right-now-1",
-        }),
-      }),
-    );
-    expect(result.current.pendingAction?.id).toBe("action-right-now-1");
-  });
-
   it("recovers weekly-plan suggestions after reload and keeps them saved after confirmation", async () => {
     mocks.loadThreadMessages.mockResolvedValue([
       {
@@ -2810,143 +2706,6 @@ describe("useCompanionAssistant", () => {
       }),
     );
     expect(result.current.pendingAction?.id).toBe("action-coming-up-1");
-  });
-
-  it("recovers adjust-day suggestions after reload and keeps them saved after confirmation", async () => {
-    mocks.loadThreadMessages.mockResolvedValue([
-      {
-        id: "m1",
-        sessionId: "persisted-session",
-        role: "assistant",
-        content: "Keep the launch reset, move the rest, and trim one thing.",
-        createdAt: "2026-04-18T08:00:01.000Z",
-        source: "agent",
-        metadata: {
-          mode: "schedule_read",
-          intent: "update_existing_plan",
-          structuredResponse: {
-            intent: {
-              intentType: "quest",
-              timeHorizon: "today",
-              isRecurring: false,
-              shouldCreateQuest: false,
-              shouldPromptCampaign: false,
-            },
-            dayAdjust: {
-              message:
-                "Keep the launch reset, move the rest, and trim one thing.",
-              keep: [
-                {
-                  suggestionId: "adjust-1",
-                  proposalId: "proposal-adjust-1",
-                  title: "Adjust Course launch",
-                  type: "must",
-                  estimatedDuration: "20 min",
-                  estimatedDurationMinutes: 20,
-                  source: "campaign",
-                  reason:
-                    "This reset move should stay protected even if the rest of the day shifts.",
-                },
-              ],
-              move: [],
-              dropOrShrink: [],
-            },
-          },
-        },
-      },
-    ]);
-    mocks.supabaseInvoke
-      .mockResolvedValueOnce({
-        data: {
-          reply:
-            "I pulled that adjustment into a confirmable action. Review it and confirm if it fits.",
-          mode: "pending_confirmation",
-          intent: "schedule_task",
-          confidence: 0.82,
-          pendingAction: {
-            id: "action-adjust-1",
-            status: "pending",
-            intent: "schedule_task",
-            actionType: "campaign_update",
-            proposalId: "proposal-adjust-1",
-            summary: 'Adjust "Course launch".',
-            confirmationMessage: "Want me to lock that in?",
-            normalizedPayload: {
-              title: "Adjust Course launch",
-            },
-            affectedEntities: null,
-            expiresAt: "2026-04-18T20:20:00.000Z",
-            createdAt: "2026-04-18T08:20:00.000Z",
-          },
-          threadState: {
-            threadId: "persisted-session",
-            sessionId: "persisted-session",
-            openaiConversationId: "conv_123",
-            lastOpenAIResponseId: "resp_125",
-            hasPendingAction: true,
-          },
-        },
-        error: null,
-      })
-      .mockResolvedValueOnce({
-        data: {
-          reply: 'Got it — "Course launch" was adjusted.',
-          mode: "receipt",
-          intent: "update_existing_plan",
-          confidence: 1,
-          receipt: {
-            actionId: "action-adjust-1",
-            status: "executed",
-            proposalId: "proposal-adjust-1",
-            message: 'Got it — "Course launch" was adjusted.',
-            summary: 'Adjust "Course launch".',
-            createdAt: "2026-04-18T08:22:00.000Z",
-          },
-          threadState: {
-            threadId: "persisted-session",
-            sessionId: "persisted-session",
-            openaiConversationId: "conv_123",
-            lastOpenAIResponseId: "resp_126",
-            hasPendingAction: false,
-          },
-        },
-        error: null,
-      });
-
-    const { wrapper } = createWrapper();
-    const { result } = renderHook(
-      () => useCompanionAssistant({ surface: "journeys" }),
-      { wrapper },
-    );
-
-    await waitFor(() => {
-      expect(result.current.structuredResponse?.dayAdjust?.keep[0]?.proposalId)
-        .toBe("proposal-adjust-1");
-    });
-
-    await act(async () => {
-      await result.current.confirmSuggestedQuest("proposal-adjust-1");
-    });
-
-    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
-      "companion-agent",
-      expect.objectContaining({
-        body: expect.objectContaining({
-          message: "Adjust my day",
-          starterIntent: "adjust_today",
-          selectedProposalId: "proposal-adjust-1",
-        }),
-      }),
-    );
-    expect(result.current.pendingAction?.id).toBe("action-adjust-1");
-
-    await act(async () => {
-      await result.current.confirmPendingAction();
-    });
-
-    expect(result.current.savedSuggestionProposalIds).toEqual([
-      "proposal-adjust-1",
-    ]);
   });
 
   it("restores cached planner state when switching back to a thread in the same session", async () => {

@@ -83,8 +83,6 @@ const shouldReturnDeterministicStarterImmediately = (
     | null
     | undefined,
 ) =>
-  starterIntent === "right_now_start" ||
-  starterIntent === "adjust_today" ||
   starterIntent === "low_energy_adjust" ||
   starterIntent === "advance_campaign_start" ||
   starterIntent === "plan_week" ||

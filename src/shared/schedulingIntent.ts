@@ -27,6 +27,9 @@ export interface SchedulingIntentAnalysis {
 const SCHEDULE_QUESTION_REGEX =
   /\b(what do i have coming up|what do i have scheduled|what(?:'s| is) coming up|what(?:'s| is) on my calendar|what(?:'s| is) my schedule|what(?:'s| is) on my plate|when am i free|am i free|where do i have room|what(?:'s| is) open|what openings do i have|what time do i have free|show me (?:today|tomorrow|my|this|next|upcoming).*(?:route|schedule)|how does (?:today|tomorrow|my day|my upcoming|this|next|upcoming).*(?:look|feel))\b/i;
 
+const UPCOMING_DIGEST_QUESTION_REGEX =
+  /\b(what\s+do\s+i\s+h(?:ave|gave)\s+coming\s+up|what(?:'s| is)\s+coming\s+up|what(?:'s| is)\s+on\s+my\s+plate)\b/i;
+
 const SCHEDULE_DAY_REFERENCE_REGEX =
   /\b(?:today|tomorrow|my day|(?:my\s+)?(?:this\s+|next\s+|upcoming\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b/i;
 
@@ -86,7 +89,11 @@ const hasMeaningfulParsedSchedulingTitle = (value: string | null | undefined): b
     .some((token) => token.length > 0 && !PARSED_TITLE_SCAFFOLD_TOKENS.has(token));
 };
 
+export const isUpcomingScheduleDigestMessage = (message: string): boolean =>
+  UPCOMING_DIGEST_QUESTION_REGEX.test(message);
+
 export const isScheduleReadMessage = (message: string): boolean => {
+  if (isUpcomingScheduleDigestMessage(message)) return true;
   if (SCHEDULE_QUESTION_REGEX.test(message)) return true;
   if (!SCHEDULE_DAY_REFERENCE_REGEX.test(message)) return false;
 

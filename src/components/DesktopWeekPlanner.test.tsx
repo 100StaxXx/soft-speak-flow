@@ -291,6 +291,8 @@ describe("DesktopWeekPlanner", () => {
   });
 
   it("renders weekly campaign summaries as accessible drawer trigger buttons", () => {
+    const onOpenCampaigns = vi.fn();
+
     render(
       <DesktopWeekPlanner
         selectedDate={selectedDate}
@@ -326,8 +328,12 @@ describe("DesktopWeekPlanner", () => {
         onDateSelect={vi.fn()}
         onToggle={vi.fn()}
         onAddQuest={vi.fn()}
+        onOpenCampaigns={onOpenCampaigns}
       />,
     );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open campaigns page" }));
+    expect(onOpenCampaigns).toHaveBeenCalledTimes(1);
 
     const campaignButton = screen.getByRole("button", { name: "Open Summer Gains campaign" });
 

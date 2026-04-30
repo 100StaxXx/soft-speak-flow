@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-29T19:24:59Z",
+  "generatedAt": "2026-04-30T18:01:14Z",
   "frontendInvoked": [
     "adjust-epic-plan",
     "analyze-user-patterns",
@@ -141,6 +141,7 @@
     "generate-completion-feedback",
     "generate-cosmic-postcard",
     "generate-cosmic-postcard-test",
+    "generate-cosmiq-title-card",
     "generate-daily-mentor-pep-talks",
     "generate-daily-missions",
     "generate-daily-plan",

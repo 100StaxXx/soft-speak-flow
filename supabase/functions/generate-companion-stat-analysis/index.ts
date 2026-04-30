@@ -4,6 +4,7 @@ import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 import { errorResponse, type RequestAuth, requireRequestAuth } from "../_shared/auth.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import { getCosmiqTitleCardCacheState } from "../_shared/cosmiqTitleCard.ts";
 import {
   buildCompanionStatInterpretation,
   COMPANION_ECHO_TARGETS,
@@ -19,7 +20,12 @@ import {
   type CompanionStatDriver,
   validateCompanionStatAnalysis,
 } from "../../../src/shared/companionStatAnalysis.ts";
-import { buildCompanionFantasyTitle } from "../../../src/shared/companionStatFantasyTitles.ts";
+import {
+  buildCompanionCosmiqTitle,
+  buildFantasyTitleAliasFromCosmiqTitle,
+  type CompanionCosmiqTitleCard,
+  type CompanionCosmiqTitlePreviousState,
+} from "../../../src/shared/companionStatCosmiqTitles.ts";
 import { getTaskCompletionDisciplineAward } from "../../../src/shared/taskCompletionTiming.ts";
 
 type AttributeType = CompanionStatAttribute;
@@ -27,6 +33,7 @@ type AttributeType = CompanionStatAttribute;
 interface ProfileRow {
   selected_mentor_id: string | null;
   timezone: string | null;
+  current_habit_streak: number | null;
 }
 
 interface MentorRow {
@@ -105,6 +112,8 @@ interface BuildCompanionStatAnalysisInput {
   attributeEvents: CompanionAttributeEventRow[];
   activityStartDate: string;
   provenanceStartDate: string;
+  currentHabitStreak?: number | null;
+  previousTitle?: CompanionCosmiqTitlePreviousState | null;
 }
 
 interface GenerateMentorCopyResult {
@@ -117,6 +126,10 @@ interface GenerateCompanionStatAnalysisDeps {
   createSupabaseClient: () => any;
   fetchImpl: typeof fetch;
   now: () => Date;
+  getCosmiqTitleCardCacheState?: (params: {
+    supabase: any;
+    analysis: CompanionStatAnalysis;
+  }) => Promise<CompanionCosmiqTitleCard>;
 }
 
 const ATTRIBUTE_ORDER: readonly AttributeType[] = [
@@ -143,6 +156,31 @@ const RequestSchema = z.object({
   forceRefresh: z.boolean().optional().default(false),
 });
 
+const extractPreviousCosmiqTitle = (value: unknown): CompanionCosmiqTitlePreviousState | null => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const analysis = value as { cosmiqTitle?: unknown };
+  const cosmiqTitle = analysis.cosmiqTitle;
+  if (!cosmiqTitle || typeof cosmiqTitle !== "object" || Array.isArray(cosmiqTitle)) return null;
+
+  const candidate = cosmiqTitle as { title?: unknown; rarity?: unknown };
+  if (typeof candidate.title !== "string" || candidate.title.trim().length === 0) return null;
+  if (
+    candidate.rarity !== "common"
+    && candidate.rarity !== "uncommon"
+    && candidate.rarity !== "rare"
+    && candidate.rarity !== "epic"
+    && candidate.rarity !== "legendary"
+    && candidate.rarity !== "cosmic"
+  ) {
+    return null;
+  }
+
+  return {
+    title: candidate.title,
+    rarity: candidate.rarity,
+  };
+};
+
 const defaultDeps: GenerateCompanionStatAnalysisDeps = {
   authenticate: requireRequestAuth,
   createSupabaseClient: () => {
@@ -152,7 +190,45 @@ const defaultDeps: GenerateCompanionStatAnalysisDeps = {
   },
   fetchImpl: fetch,
   now: () => new Date(),
+  getCosmiqTitleCardCacheState,
 };
+
+async function attachCosmiqTitleCardCacheState({
+  deps,
+  supabase,
+  analysis,
+  userId,
+  analysisDate,
+}: {
+  deps: GenerateCompanionStatAnalysisDeps;
+  supabase: any;
+  analysis: CompanionStatAnalysis;
+  userId: string;
+  analysisDate: string;
+}): Promise<CompanionStatAnalysis> {
+  if (!deps.getCosmiqTitleCardCacheState) {
+    return analysis;
+  }
+
+  const cosmiqTitleCard = await deps.getCosmiqTitleCardCacheState({
+    supabase,
+    analysis,
+  }).catch((error) => {
+    console.warn("Cosmiq title card cache lookup failed", {
+      userId,
+      analysisDate,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  });
+
+  return cosmiqTitleCard
+    ? {
+      ...analysis,
+      cosmiqTitleCard,
+    }
+    : analysis;
+}
 
 function clampScore(value: number | null | undefined): number {
   const numericValue = typeof value === "number" && Number.isFinite(value) ? value : 300;
@@ -390,6 +466,68 @@ const buildDriversForAttribute = (
     .slice(0, 4);
 };
 
+const isDateInRange = (date: string | null | undefined, startDate: string, endDate: string) =>
+  typeof date === "string" && date >= startDate && date <= endDate;
+
+const getIsoDateKey = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+  return new Date(timestamp).toISOString().slice(0, 10);
+};
+
+const buildCosmiqTitleActivityMetrics = ({
+  analysisDate,
+  activityStartDate,
+  checkIns,
+  reflections,
+  habitCompletions,
+  completedTasks,
+  positiveAttributeEvents,
+  epicLinkedCompletions,
+  currentHabitStreak,
+  totalRecentExpression,
+}: {
+  analysisDate: string;
+  activityStartDate: string;
+  checkIns: DailyCheckInRow[];
+  reflections: EveningReflectionRow[];
+  habitCompletions: HabitCompletionRow[];
+  completedTasks: DailyTaskRow[];
+  positiveAttributeEvents: CompanionAttributeEventRow[];
+  epicLinkedCompletions: CompanionAttributeEventRow[];
+  currentHabitStreak?: number | null;
+  totalRecentExpression: number;
+}) => {
+  const activeDays = new Set<string>();
+  const addActiveDate = (date: string | null | undefined) => {
+    if (isDateInRange(date, activityStartDate, analysisDate)) {
+      activeDays.add(date as string);
+    }
+  };
+
+  for (const checkIn of checkIns) addActiveDate(checkIn.check_in_date);
+  for (const reflection of reflections) addActiveDate(reflection.reflection_date);
+  for (const habitCompletion of habitCompletions) addActiveDate(habitCompletion.date);
+  for (const task of completedTasks) {
+    if (task.completed === true) addActiveDate(task.task_date);
+  }
+  for (const event of positiveAttributeEvents) {
+    addActiveDate(getIsoDateKey(event.created_at));
+  }
+
+  const taskSignals = completedTasks.filter((task) => isDateInRange(task.task_date, activityStartDate, analysisDate));
+  const completedTaskSignals = taskSignals.filter((task) => task.completed === true);
+
+  return {
+    activeDays7: activeDays.size,
+    completionRate7: taskSignals.length > 0 ? completedTaskSignals.length / taskSignals.length : 0,
+    currentStreak: currentHabitStreak ?? 0,
+    epicLinkedCompletions: epicLinkedCompletions.length,
+    totalRecentExpression,
+  };
+};
+
 export function buildCompanionStatAnalysisPayload({
   analysisDate,
   timezone,
@@ -403,6 +541,8 @@ export function buildCompanionStatAnalysisPayload({
   attributeEvents,
   activityStartDate,
   provenanceStartDate,
+  currentHabitStreak,
+  previousTitle,
 }: BuildCompanionStatAnalysisInput): CompanionStatAnalysis {
   const scoredCompanion = {
     vitality: clampScore(companion.vitality),
@@ -514,6 +654,30 @@ export function buildCompanionStatAnalysisPayload({
     .flatMap((breakdown) => breakdown.recentDrivers)
     .sort((left, right) => (right.amount ?? 0) - (left.amount ?? 0) || (right.count ?? 0) - (left.count ?? 0))
     .slice(0, 4);
+  const totalRecentExpression = ATTRIBUTE_ORDER.reduce(
+    (total, attribute) => total + (interpretation.recentExpression[attribute] ?? 0),
+    0,
+  );
+  const cosmiqTitle = buildCompanionCosmiqTitle({
+    statProfile: interpretation.statProfile,
+    statNeeds: interpretation.statNeeds,
+    statBreakdowns,
+    momentumState: interpretation.momentumState,
+    recentExpression: interpretation.recentExpression,
+    activityMetrics: buildCosmiqTitleActivityMetrics({
+      analysisDate,
+      activityStartDate,
+      checkIns,
+      reflections,
+      habitCompletions,
+      completedTasks,
+      positiveAttributeEvents,
+      epicLinkedCompletions,
+      currentHabitStreak,
+      totalRecentExpression,
+    }),
+    previousTitle,
+  });
 
   return {
     analysisDate,
@@ -546,12 +710,8 @@ export function buildCompanionStatAnalysisPayload({
     },
     statProfile: interpretation.statProfile,
     statNeeds: interpretation.statNeeds,
-    fantasyTitle: buildCompanionFantasyTitle({
-      analysisDate,
-      statProfile: interpretation.statProfile,
-      statNeeds: interpretation.statNeeds,
-      momentumState: interpretation.momentumState,
-    }),
+    cosmiqTitle,
+    fantasyTitle: buildFantasyTitleAliasFromCosmiqTitle(cosmiqTitle),
     momentumState: interpretation.momentumState,
     recentMissInterpretation: interpretation.recentMissInterpretation,
     narrativeBrief: interpretation.narrativeBrief,
@@ -718,7 +878,7 @@ export async function handleGenerateCompanionStatAnalysis(
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("selected_mentor_id, timezone")
+      .select("selected_mentor_id, timezone, current_habit_streak")
       .eq("id", userId)
       .maybeSingle();
 
@@ -743,9 +903,17 @@ export async function handleGenerateCompanionStatAnalysis(
       );
 
       if (cachedAnalysisValidation.ok) {
+        const cachedAnalysis = await attachCosmiqTitleCardCacheState({
+          deps,
+          supabase,
+          analysis: cachedAnalysisValidation.data,
+          userId,
+          analysisDate,
+        });
+
         return new Response(
           JSON.stringify({
-            analysis: cachedAnalysisValidation.data,
+            analysis: cachedAnalysis,
             cached: true,
           }),
           {
@@ -760,6 +928,18 @@ export async function handleGenerateCompanionStatAnalysis(
         error: cachedAnalysisValidation.error,
       });
     }
+
+    const { data: previousAnalysisRow, error: previousAnalysisError } = await supabase
+      .from("companion_stat_analyses")
+      .select("payload")
+      .eq("user_id", userId)
+      .lt("analysis_date", analysisDate)
+      .order("analysis_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (previousAnalysisError) throw previousAnalysisError;
+    const previousTitle = extractPreviousCosmiqTitle((previousAnalysisRow as CachedAnalysisRow | null)?.payload);
 
     const { data: companion, error: companionError } = await supabase
       .from("user_companion")
@@ -866,14 +1046,24 @@ export async function handleGenerateCompanionStatAnalysis(
       attributeEvents: (attributeEventsResult.data ?? []) as CompanionAttributeEventRow[],
       activityStartDate,
       provenanceStartDate,
+      currentHabitStreak: (profile as ProfileRow | null)?.current_habit_streak ?? 0,
+      previousTitle,
     });
 
     const mentorCopy = await generateMentorCopy(analysisBase, deps.fetchImpl);
-    const analysis: CompanionStatAnalysis = {
+    let analysis: CompanionStatAnalysis = {
       ...analysisBase,
       summary: mentorCopy.summary,
       suggestedAction: mentorCopy.suggestedAction,
     };
+
+    analysis = await attachCosmiqTitleCardCacheState({
+      deps,
+      supabase,
+      analysis,
+      userId,
+      analysisDate,
+    });
 
     const analysisValidation = validateCompanionStatAnalysis(analysis);
     if (!analysisValidation.ok) {

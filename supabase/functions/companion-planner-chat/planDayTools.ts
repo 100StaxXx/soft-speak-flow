@@ -433,18 +433,18 @@ export const buildPlanDayToolSystemPrompt = (
   const planningRules = isRefining
     ? [
       "How to refine:",
-      "- candidatePlan.proposals is the user's CURRENT draft plan that they want to adjust. Treat it as load-bearing and only change what they ask for.",
-      "- Use move_quest to retime an existing block, drop_quest to remove one they don't want, and propose_quest only when they ask to add something new.",
-      "- Don't reset or rewrite the plan unless the user explicitly says start over.",
-      "- If the user's request is unrelated to the plan, send a short reply with no tool calls. The existing plan will stay as-is.",
-      "- If the request is ambiguous (e.g. 'shift it later' with no time), call ask_clarification with one focused question.",
+      "1. candidatePlan.proposals is the user's CURRENT draft plan that they want to adjust. Treat it as load-bearing and only change what they ask for.",
+      "2. Use move_quest to retime an existing block, drop_quest to remove one they don't want, and propose_quest only when they ask to add something new.",
+      "3. Don't reset or rewrite the plan unless the user explicitly says start over.",
+      "4. If the user's request is unrelated to the plan, send a short reply with no tool calls. The existing plan will stay as is.",
+      "5. If the request is ambiguous (e.g. 'shift it later' with no time), call ask_clarification with one focused question.",
     ].join("\n")
     : [
       "How to plan:",
-      "- candidatePlan.proposals is the deterministic starting plan. Keep what fits, call move_quest to retime, drop_quest to remove crowding or duplicates, and propose_quest to add anything missing. Each call mutates the working plan.",
-      "- A balanced day is usually 3-5 quests. Honor existing scheduled tasks and calendar events — do not double-book.",
-      "- Place 'deep' energy work in peakProductivityTimes when known; 'admin' or 'errand' in dips; 'recovery' near windDownTime.",
-      "- If the user's direction is genuinely too thin (no concrete focus, no anchors, no useful context) call ask_clarification with one focused question and stop. Otherwise commit to a plan.",
+      "1. candidatePlan.proposals is the deterministic starting plan. Keep what fits, call move_quest to retime, drop_quest to remove crowding or duplicates, and propose_quest to add anything missing. Each call mutates the working plan.",
+      "2. A balanced day is usually three to five quests. Honor existing scheduled tasks and calendar events. Do not double-book.",
+      "3. Place 'deep' energy work in peakProductivityTimes when known; 'admin' or 'errand' in dips; 'recovery' near windDownTime.",
+      "4. If the user's direction is genuinely too thin (no concrete focus, no anchors, no useful context) call ask_clarification with one focused question and stop. Otherwise commit to a plan.",
     ].join("\n");
 
   return [
@@ -453,6 +453,7 @@ export const buildPlanDayToolSystemPrompt = (
     "planDayContext is your read-only world model. loadFacts, atRiskCampaigns, calendar events, suggestedSlots, plannerMemory, and candidatePlan.proposals are facts. Do not invent anything outside it.",
     planningRules,
     "After you finish all tool calls, send one final assistant message (no further tool calls) with a short, conversational reply: 1-3 sentences, plain text, no markdown. Acknowledge the user's direction, briefly say what changed, and call out at-risk campaigns when atRiskCampaigns is non-empty. If you called ask_clarification, your final text should match the prompt you passed to it.",
+    "Do not use dash punctuation as a separator in user facing copy. Use commas, periods, or short sentences instead. Preserve real dates, time ranges, IDs, and user provided titles.",
     "Do not mention internal tools, JSON, or your own reasoning steps in the user-facing reply.",
   ].join("\n");
 };

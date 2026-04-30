@@ -81,6 +81,7 @@ interface DesktopWeekPlannerProps {
   onMoveQuestToNextDay?: (task: DailyTask) => void;
   onSendToCalendar?: (taskId: string) => void;
   hasCalendarLink?: (taskId: string) => boolean;
+  onOpenCampaigns?: () => void;
 }
 
 interface DayStats {
@@ -378,9 +379,26 @@ export function DesktopWeekPlanner({
   onMoveQuestToNextDay,
   onSendToCalendar,
   hasCalendarLink,
+  onOpenCampaigns,
 }: DesktopWeekPlannerProps) {
   const hasCompanionPlannerShortcut = Boolean(onOpenCompanionPlanner);
   const voiceAddButtonLabel = isVoiceAddRecording ? "Stop voice capture" : "Start voice capture";
+  const campaignSectionLabel = onOpenCampaigns ? (
+    <button
+      type="button"
+      aria-label="Open campaigns page"
+      onClick={onOpenCampaigns}
+      className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+    >
+      <Target className="h-3 w-3" />
+      Campaigns & rituals
+    </button>
+  ) : (
+    <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <Target className="h-3 w-3" />
+      Campaigns & rituals
+    </div>
+  );
   const quickCaptureControls = (
     <div
       className="flex items-center gap-2"
@@ -970,10 +988,7 @@ export function DesktopWeekPlanner({
         </section>
 
         <section className={desktopRailCardClass}>
-          <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            <Target className="h-3 w-3" />
-            Campaigns & rituals
-          </div>
+          {campaignSectionLabel}
 
           {epicProgress.length > 0 ? (
             <div className="mt-4 space-y-3">

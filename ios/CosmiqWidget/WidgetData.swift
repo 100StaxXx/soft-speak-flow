@@ -51,6 +51,44 @@ struct WidgetTask: Codable, Identifiable {
     let category: String?
     let section: String
     let scheduledTime: String?
+    let kind: String?
+    let isRitual: Bool?
+    let isCampaignRitual: Bool?
+    let campaignTitle: String?
+    let epicId: String?
+    let habitSourceId: String?
+
+    init(
+        id: String,
+        text: String,
+        completed: Bool,
+        xpReward: Int,
+        isMainQuest: Bool,
+        category: String?,
+        section: String,
+        scheduledTime: String?,
+        kind: String? = nil,
+        isRitual: Bool? = nil,
+        isCampaignRitual: Bool? = nil,
+        campaignTitle: String? = nil,
+        epicId: String? = nil,
+        habitSourceId: String? = nil
+    ) {
+        self.id = id
+        self.text = text
+        self.completed = completed
+        self.xpReward = xpReward
+        self.isMainQuest = isMainQuest
+        self.category = category
+        self.section = section
+        self.scheduledTime = scheduledTime
+        self.kind = kind
+        self.isRitual = isRitual
+        self.isCampaignRitual = isCampaignRitual
+        self.campaignTitle = campaignTitle
+        self.epicId = epicId
+        self.habitSourceId = habitSourceId
+    }
 }
 
 /// Manager for loading widget data from App Group shared container
@@ -119,14 +157,54 @@ class WidgetDataManager {
     func getPlaceholderData() -> WidgetTaskData {
         return WidgetTaskData(
             tasks: [
-                WidgetTask(id: "1", text: "Morning meditation", completed: true, xpReward: 50, isMainQuest: false, category: "wellness", section: "morning", scheduledTime: "07:00"),
-                WidgetTask(id: "2", text: "Complete daily quest", completed: false, xpReward: 100, isMainQuest: true, category: "growth", section: "morning", scheduledTime: "09:00"),
-                WidgetTask(id: "3", text: "Review goals", completed: false, xpReward: 30, isMainQuest: false, category: "productivity", section: "afternoon", scheduledTime: nil)
+                WidgetTask(
+                    id: "preview-ritual-meditation",
+                    text: "Morning meditation",
+                    completed: true,
+                    xpReward: 50,
+                    isMainQuest: false,
+                    category: "wellness",
+                    section: "morning",
+                    scheduledTime: "07:00",
+                    kind: "ritual",
+                    isRitual: true,
+                    isCampaignRitual: false,
+                    habitSourceId: "habit-meditation"
+                ),
+                WidgetTask(
+                    id: "preview-quest-daily",
+                    text: "Complete daily quest",
+                    completed: false,
+                    xpReward: 100,
+                    isMainQuest: true,
+                    category: "growth",
+                    section: "morning",
+                    scheduledTime: "09:00",
+                    kind: "quest",
+                    isRitual: false,
+                    isCampaignRitual: false
+                ),
+                WidgetTask(
+                    id: "preview-campaign-portfolio",
+                    text: "Build portfolio website",
+                    completed: false,
+                    xpReward: 30,
+                    isMainQuest: false,
+                    category: "creative",
+                    section: "afternoon",
+                    scheduledTime: "14:00",
+                    kind: "campaign_ritual",
+                    isRitual: true,
+                    isCampaignRitual: true,
+                    campaignTitle: "Portfolio",
+                    epicId: "epic-portfolio",
+                    habitSourceId: "habit-portfolio"
+                )
             ],
-            completedCount: 1,
-            totalCount: 3,
-            ritualCount: 4,
-            ritualCompleted: 2,
+            completedCount: 0,
+            totalCount: 1,
+            ritualCount: 2,
+            ritualCompleted: 1,
             date: WidgetTaskData.localDateString(),
             updatedAt: nil,
             profileWallpaperRelativePath: nil,

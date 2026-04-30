@@ -1,7 +1,7 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CompanionStatAnalysis } from "./useCompanionStatAnalysis";
 
@@ -85,6 +85,24 @@ const baseAnalysis: CompanionStatAnalysis = {
     resolve: { level: "low", reasons: [] },
     creativity: { level: "medium", reasons: ["The week could use a little more originality and play."] },
     alignment: { level: "low", reasons: [] },
+  },
+  cosmiqTitle: {
+    title: "The Oathbound Pathfinder",
+    rarity: "rare",
+    momentum: "steady",
+    dominantStat: "discipline",
+    secondaryStat: "alignment",
+    rebalanceStat: "creativity",
+    fusion: true,
+    rebalancePath: "Strengthen Creativity to evolve toward The Soulforged Creator.",
+    titleStability: "new",
+  },
+  cosmiqTitleCard: {
+    profileKey: "v1::the-oathbound-pathfinder",
+    imageUrl: "https://example.com/cosmiq-card.png",
+    status: "ready",
+    cached: true,
+    promptVersion: 1,
   },
   fantasyTitle: {
     title: "The Oathbound Navigator",
@@ -184,9 +202,24 @@ const createWrapper = () => {
     React.createElement(QueryClientProvider, { client: queryClient }, children);
 };
 
+const createDeferred = <T,>() => {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+
+  return { promise, resolve, reject };
+};
+
 describe("useCompanionStatAnalysis", () => {
   beforeEach(() => {
     mocks.invokeMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("loads today's cached analysis without forcing regeneration", async () => {
@@ -389,6 +422,265 @@ describe("useCompanionStatAnalysis", () => {
     });
 
     expect(result.current.error).toBeNull();
+  });
+
+  it("requests Cosmiq title card generation for pending card art and patches the query data", async () => {
+    const pendingAnalysis: CompanionStatAnalysis = {
+      ...baseAnalysis,
+      cosmiqTitleCard: {
+        profileKey: "v1-the-oathbound-pathfinder",
+        imageUrl: null,
+        status: "generating",
+        cached: false,
+        promptVersion: 1,
+      },
+    };
+    const readyCard = {
+      profileKey: "v1-the-oathbound-pathfinder",
+      imageUrl: "https://example.com/generated-card.png",
+      status: "ready",
+      cached: false,
+      promptVersion: 1,
+    };
+
+    mocks.invokeMock
+      .mockResolvedValueOnce({
+        data: { analysis: pendingAnalysis, cached: false },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { card: readyCard },
+        error: null,
+      });
+
+    const { result } = renderHook(() => useCompanionStatAnalysis({ enabled: true }), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.analysis?.cosmiqTitleCard?.imageUrl).toBe("https://example.com/generated-card.png");
+    });
+
+    expect(mocks.invokeMock).toHaveBeenNthCalledWith(1, "generate-companion-stat-analysis", {
+      body: { forceRefresh: false },
+    });
+    expect(mocks.invokeMock).toHaveBeenNthCalledWith(2, "generate-cosmiq-title-card", {
+      body: { analysisDate: "2026-04-18" },
+    });
+  });
+
+  it("ignores stale Cosmiq title card responses after the analysis changes", async () => {
+    const pendingAnalysis: CompanionStatAnalysis = {
+      ...baseAnalysis,
+      cosmiqTitleCard: {
+        profileKey: "v1-old-title-profile",
+        imageUrl: null,
+        status: "generating",
+        cached: false,
+        promptVersion: 1,
+      },
+    };
+    const refreshedAnalysis: CompanionStatAnalysis = {
+      ...baseAnalysis,
+      cosmiqTitle: {
+        ...baseAnalysis.cosmiqTitle,
+        title: "The Reality Weaver",
+        dominantStat: "wisdom",
+        secondaryStat: "creativity",
+      },
+      cosmiqTitleCard: {
+        profileKey: "v1-new-title-profile",
+        imageUrl: "https://example.com/new-card.png",
+        status: "ready",
+        cached: false,
+        promptVersion: 1,
+      },
+      summary: "Eli sees a fresher wave of Wisdom and Creativity momentum today.",
+    };
+    const oldReadyCard = {
+      profileKey: "v1-old-title-profile",
+      imageUrl: "https://example.com/old-card.png",
+      status: "ready",
+      cached: false,
+      promptVersion: 1,
+    };
+    const titleCardRequest = createDeferred<{
+      data: { card: typeof oldReadyCard };
+      error: null;
+    }>();
+
+    mocks.invokeMock.mockImplementation((
+      functionName: string,
+      options?: { body?: { forceRefresh?: boolean } },
+    ) => {
+      if (functionName === "generate-companion-stat-analysis") {
+        return Promise.resolve({
+          data: {
+            analysis: options?.body?.forceRefresh ? refreshedAnalysis : pendingAnalysis,
+            cached: false,
+          },
+          error: null,
+        });
+      }
+
+      if (functionName === "generate-cosmiq-title-card") {
+        return titleCardRequest.promise;
+      }
+
+      return Promise.resolve({ data: null, error: new Error(`Unexpected function ${functionName}`) });
+    });
+
+    const { result } = renderHook(() => useCompanionStatAnalysis({ enabled: true }), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(mocks.invokeMock).toHaveBeenCalledWith("generate-cosmiq-title-card", {
+        body: { analysisDate: "2026-04-18" },
+      });
+    });
+
+    await act(async () => {
+      await result.current.refreshAnalysis();
+    });
+
+    await waitFor(() => {
+      expect(result.current.analysis?.cosmiqTitleCard?.profileKey).toBe("v1-new-title-profile");
+    });
+
+    await act(async () => {
+      titleCardRequest.resolve({
+        data: { card: oldReadyCard },
+        error: null,
+      });
+      await titleCardRequest.promise;
+    });
+
+    expect(result.current.analysis?.cosmiqTitle.title).toBe("The Reality Weaver");
+    expect(result.current.analysis?.cosmiqTitleCard?.profileKey).toBe("v1-new-title-profile");
+    expect(result.current.analysis?.cosmiqTitleCard?.imageUrl).toBe("https://example.com/new-card.png");
+  });
+
+  it("retries while a shared Cosmiq title card render is still generating", async () => {
+    vi.useFakeTimers();
+
+    const pendingAnalysis: CompanionStatAnalysis = {
+      ...baseAnalysis,
+      cosmiqTitleCard: {
+        profileKey: "v1-the-oathbound-pathfinder",
+        imageUrl: null,
+        status: "generating",
+        cached: false,
+        promptVersion: 1,
+      },
+    };
+    const generatingCard = {
+      ...pendingAnalysis.cosmiqTitleCard,
+    };
+    const readyCard = {
+      ...pendingAnalysis.cosmiqTitleCard,
+      imageUrl: "https://example.com/generated-card.png",
+      status: "ready",
+      cached: false,
+    };
+
+    mocks.invokeMock
+      .mockResolvedValueOnce({
+        data: { analysis: pendingAnalysis, cached: false },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { card: generatingCard },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { card: readyCard },
+        error: null,
+      });
+
+    const { result } = renderHook(() => useCompanionStatAnalysis({ enabled: true }), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(mocks.invokeMock).toHaveBeenCalledTimes(2);
+      });
+    });
+    expect(result.current.analysis?.cosmiqTitleCard?.status).toBe("generating");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(8_000);
+    });
+
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(result.current.analysis?.cosmiqTitleCard?.status).toBe("ready");
+      });
+    });
+    expect(result.current.analysis?.cosmiqTitleCard?.imageUrl).toBe("https://example.com/generated-card.png");
+    expect(mocks.invokeMock).toHaveBeenNthCalledWith(3, "generate-cosmiq-title-card", {
+      body: { analysisDate: "2026-04-18" },
+    });
+  });
+
+  it("retries Cosmiq title card generation after a failed request", async () => {
+    vi.useFakeTimers();
+
+    const pendingAnalysis: CompanionStatAnalysis = {
+      ...baseAnalysis,
+      cosmiqTitleCard: {
+        profileKey: "v1-the-oathbound-pathfinder",
+        imageUrl: null,
+        status: "generating",
+        cached: false,
+        promptVersion: 1,
+      },
+    };
+    const readyCard = {
+      ...pendingAnalysis.cosmiqTitleCard,
+      imageUrl: "https://example.com/generated-card.png",
+      status: "ready",
+      cached: false,
+    };
+
+    mocks.invokeMock
+      .mockResolvedValueOnce({
+        data: { analysis: pendingAnalysis, cached: false },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: null,
+        error: new Error("temporary image generation outage"),
+      })
+      .mockResolvedValueOnce({
+        data: { card: readyCard },
+        error: null,
+      });
+
+    const { result } = renderHook(() => useCompanionStatAnalysis({ enabled: true }), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(mocks.invokeMock).toHaveBeenCalledTimes(2);
+      });
+    });
+    expect(result.current.analysis?.cosmiqTitleCard?.status).toBe("generating");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(8_000);
+    });
+
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(result.current.analysis?.cosmiqTitleCard?.imageUrl).toBe("https://example.com/generated-card.png");
+      });
+    });
+    expect(mocks.invokeMock).toHaveBeenNthCalledWith(3, "generate-cosmiq-title-card", {
+      body: { analysisDate: "2026-04-18" },
+    });
   });
 
   it("surfaces an error when cached and refreshed payloads are both malformed", async () => {

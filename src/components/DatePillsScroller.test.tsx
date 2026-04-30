@@ -676,7 +676,11 @@ describe("DatePillsScroller", () => {
 
   it("re-centers on an explicit center request without changing selected date", async () => {
     const onDateSelect = vi.fn();
-    const scrollToSpy = vi.fn();
+    const scrollToSpy = vi.fn(function (this: HTMLElement, options?: ScrollToOptions) {
+      if (typeof options?.left === "number") {
+        this.scrollLeft = options.left;
+      }
+    });
     const originalScrollTo = HTMLElement.prototype.scrollTo;
 
     Object.defineProperty(HTMLElement.prototype, "scrollTo", {
@@ -715,8 +719,101 @@ describe("DatePillsScroller", () => {
 
       await waitFor(() => {
         expect(scrollToSpy).toHaveBeenCalled();
+        expect(scroller.scrollLeft).toBe(280);
       });
+      const lastOptions = scrollToSpy.mock.calls.at(-1)?.[0] as ScrollToOptions;
+      expect(lastOptions.behavior).toBe("auto");
     } finally {
+      Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+        configurable: true,
+        value: originalScrollTo,
+      });
+    }
+  });
+
+  it("recomputes forced center requests across animation frames when layout shifts", async () => {
+    const onDateSelect = vi.fn();
+    const scrollToSpy = vi.fn(function (this: HTMLElement, options?: ScrollToOptions) {
+      if (typeof options?.left === "number") {
+        this.scrollLeft = options.left;
+      }
+    });
+    const originalScrollTo = HTMLElement.prototype.scrollTo;
+    const originalRequestAnimationFrame = window.requestAnimationFrame;
+    const originalCancelAnimationFrame = window.cancelAnimationFrame;
+    const rafCallbacks = new Map<number, FrameRequestCallback>();
+    let nextRafId = 0;
+
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true,
+      value: scrollToSpy,
+    });
+    window.requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
+      nextRafId += 1;
+      rafCallbacks.set(nextRafId, callback);
+      return nextRafId;
+    });
+    window.cancelAnimationFrame = vi.fn((id: number) => {
+      rafCallbacks.delete(id);
+    });
+
+    try {
+      const selectedDate = new Date("2026-02-13T12:00:00.000Z");
+      const { rerender, container } = render(
+        <DatePillsScroller
+          selectedDate={selectedDate}
+          onDateSelect={onDateSelect}
+          centerRequestKey={0}
+        />,
+      );
+
+      const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
+      let selectedButton = scroller.querySelector("button.bg-gradient-to-br") as HTMLButtonElement;
+      setCenteringMetrics(scroller, selectedButton, {
+        scrollLeft: 0,
+        scrollWidth: 1200,
+        containerWidth: 220,
+        selectedLeft: 320,
+        selectedWidth: 60,
+      });
+
+      scrollToSpy.mockClear();
+      rerender(
+        <DatePillsScroller
+          selectedDate={selectedDate}
+          onDateSelect={onDateSelect}
+          centerRequestKey={1}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(scroller.scrollLeft).toBe(240);
+      });
+
+      selectedButton = scroller.querySelector("button.bg-gradient-to-br") as HTMLButtonElement;
+      setCenteringMetrics(scroller, selectedButton, {
+        scrollLeft: scroller.scrollLeft,
+        scrollWidth: 1200,
+        containerWidth: 220,
+        selectedLeft: 430,
+        selectedWidth: 60,
+      });
+
+      await act(async () => {
+        const callbacks = Array.from(rafCallbacks.values());
+        rafCallbacks.clear();
+        callbacks.forEach((callback) => callback(16));
+      });
+
+      await waitFor(() => {
+        expect(scroller.scrollLeft).toBe(350);
+      });
+      const lastOptions = scrollToSpy.mock.calls.at(-1)?.[0] as ScrollToOptions;
+      expect(lastOptions.left).toBe(350);
+      expect(lastOptions.behavior).toBe("auto");
+    } finally {
+      window.requestAnimationFrame = originalRequestAnimationFrame;
+      window.cancelAnimationFrame = originalCancelAnimationFrame;
       Object.defineProperty(HTMLElement.prototype, "scrollTo", {
         configurable: true,
         value: originalScrollTo,

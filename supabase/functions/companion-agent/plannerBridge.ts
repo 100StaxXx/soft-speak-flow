@@ -91,7 +91,7 @@ const SCHEDULE_ARCHETYPE_DEFAULTS: Record<string, ScheduleArchetypeDefaults> = {
   variable_schedule: {
     label: "variable schedule",
     plannerHint:
-      "Avoid rigid assumptions; prefer lighter plans, flexible ordering, and easy Adjust My Day recovery.",
+      "Avoid rigid assumptions; prefer lighter plans, flexible ordering, and easy recovery paths.",
     defaultWorkloadTolerance: "light",
     defaultPreferredTimeOfDay: null,
     defaultPreferredTimeReason: null,
@@ -982,11 +982,9 @@ const normalizePlannerStarterIntent = (
     case "plan_day":
     case "plan_week":
     case "advance_campaign_start":
-    case "right_now_start":
     case "make_room":
     case "what_matters":
     case "relationship_touch":
-    case "adjust_today":
     case "low_energy_adjust":
     case "briefing_followup":
     case "goal_breakdown":

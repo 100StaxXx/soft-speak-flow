@@ -44,13 +44,9 @@ import { useDeepLink } from "@/contexts/DeepLinkContext";
 import { logger } from "@/utils/logger";
 
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
-import { QuickAdjustDrawer } from "@/components/SmartDayPlanner/components/QuickAdjustDrawer";
-
 import { Pathfinder } from "@/components/Pathfinder";
 import { CampaignCreatedAnimation } from "@/components/CampaignCreatedAnimation";
 import { QuestsErrorBoundary } from "@/components/SectionErrorBoundary";
-
-import { Wand2 } from "lucide-react";
 
 import { useTaskCompletionWithInteraction, type InteractionType } from "@/hooks/useTaskCompletionWithInteraction";
 import { InteractionLogModal } from "@/components/tasks/InteractionLogModal";
@@ -317,8 +313,7 @@ const Journeys = () => {
   const [prefilledTime, setPrefilledTime] = useState<string | null>(null);
   const [questSheetPrefillDraft, setQuestSheetPrefillDraft] = useState<QuestComposerPrefillDraft | null>(null);
   const [questSheetPrefillKey, setQuestSheetPrefillKey] = useState<string | null>(null);
-  const [showQuickAdjust, setShowQuickAdjust] = useState(false);
-  
+
   // Campaign creation state
   const [showPathfinder, setShowPathfinder] = useState(false);
   const [pathfinderInitialGoal, setPathfinderInitialGoal] = useState("");
@@ -575,14 +570,26 @@ const Journeys = () => {
     if (!isJourneysRouteActive) return;
     if (Capacitor.isNativePlatform()) return;
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState !== "visible") return;
+    const requestAppOpenDateReset = () => {
       resetSelectedDateToToday({ deferIfAddSheetOpen: true });
     };
 
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") return;
+      requestAppOpenDateReset();
+    };
+
+    if (document.visibilityState !== "hidden") {
+      requestAppOpenDateReset();
+    }
+
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", requestAppOpenDateReset);
+    window.addEventListener("pageshow", requestAppOpenDateReset);
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", requestAppOpenDateReset);
+      window.removeEventListener("pageshow", requestAppOpenDateReset);
     };
   }, [isJourneysRouteActive, resetSelectedDateToToday]);
 
@@ -591,28 +598,35 @@ const Journeys = () => {
     if (!Capacitor.isNativePlatform()) return;
 
     let isDisposed = false;
-    let listenerHandle: { remove: () => Promise<void> } | null = null;
+    let listenerHandles: Array<{ remove: () => Promise<void> }> = [];
+
+    const requestAppOpenDateReset = () => {
+      resetSelectedDateToToday({ deferIfAddSheetOpen: true });
+    };
 
     const setupListener = async () => {
-      const handle = await CapacitorApp.addListener("appStateChange", ({ isActive }) => {
+      const appStateHandle = await CapacitorApp.addListener("appStateChange", ({ isActive }) => {
         if (!isActive) return;
-        resetSelectedDateToToday({ deferIfAddSheetOpen: true });
+        requestAppOpenDateReset();
       });
+      const resumeHandle = await CapacitorApp.addListener("resume", requestAppOpenDateReset);
+      const handles = [appStateHandle, resumeHandle];
 
       if (isDisposed) {
-        await handle.remove();
+        await Promise.all(handles.map((handle) => handle.remove()));
         return;
       }
 
-      listenerHandle = handle;
+      listenerHandles = handles;
+      requestAppOpenDateReset();
     };
 
     void setupListener();
 
     return () => {
       isDisposed = true;
-      if (listenerHandle) {
-        void listenerHandle.remove();
+      if (listenerHandles.length > 0) {
+        void Promise.all(listenerHandles.map((handle) => handle.remove()));
       }
     };
   }, [isJourneysRouteActive, resetSelectedDateToToday]);
@@ -651,6 +665,10 @@ const Journeys = () => {
     closeInteractionModalRef.current = closeInteractionModal;
   }, [closeInteractionModal]);
 
+  const handleOpenCampaigns = useCallback(() => {
+    navigate("/campaigns");
+  }, [navigate]);
+
   const { 
     tasks: dailyTasks,
     isLoading: dailyTasksLoading,
@@ -680,7 +698,6 @@ const Journeys = () => {
   const isCompanionPlannerBlocked = (showAddSheet && !isPlannerCreateQuestEditActive)
     || showMonthView
     || showPageInfo
-    || showQuickAdjust
     || showPathfinder
     || (!!editingTask && !isPlannerUpdateQuestEditActive)
     || !!editingRitual
@@ -707,7 +724,6 @@ const Journeys = () => {
 
     setShowMonthView(false);
     setShowPageInfo(false);
-    setShowQuickAdjust(false);
     setEditingTask(null);
     setEditingRitual(null);
     closeInteractionModalRef.current();
@@ -823,7 +839,6 @@ const Journeys = () => {
         || showCompanionPlanner
         || showMonthView
         || showPageInfo
-        || showQuickAdjust
         || showPathfinder
         || !!editingTask
         || !!editingRitual
@@ -859,7 +874,6 @@ const Journeys = () => {
     showMonthView,
     showPageInfo,
     showPathfinder,
-    showQuickAdjust,
   ]);
   
   // Habit surfacing - auto-surface ALL active habits (not just epic-linked) as daily tasks
@@ -1712,6 +1726,7 @@ const Journeys = () => {
                 currentStreak={currentStreak}
                 activeEpics={activeEpics}
                 isCampaignsLoading={epicsLoading}
+                onOpenCampaigns={handleOpenCampaigns}
                 hideAnytimeRow={isMacDesktopSession}
                 plannerMode={desktopPlannerMode}
                 timedTaskDurationFallbackMinutes={macTimedTaskDurationFallbackMinutes}
@@ -1760,6 +1775,7 @@ const Journeys = () => {
                 weekTasks={weekCalendarTasks}
                 activeEpics={activeEpics}
                 isCampaignsLoading={epicsLoading}
+                onOpenCampaigns={handleOpenCampaigns}
                 onDeleteQuest={handleSwipeDeleteQuest}
                 onSendToCalendar={SEND_TO_CALENDAR_ENABLED ? handleSendTaskToCalendar : undefined}
                 hasCalendarLink={hasLinkedEvent}
@@ -1885,34 +1901,6 @@ const Journeys = () => {
           onSkip={skipInteraction}
         />
         
-        {/* Quick Adjust Floating Button + Drawer */}
-        {dailyTasks.some(t => t.ai_generated) && (
-          <motion.button
-            initial={prefersReducedMotion ? false : { scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
-            className="fixed bottom-24 right-4 z-40 p-3 rounded-full bg-card/92 backdrop-blur-xl border border-border/60 shadow-[0_10px_24px_rgba(0,0,0,0.28)] active:scale-95 transition-transform"
-            onClick={() => setShowQuickAdjust(true)}
-            aria-label="Open quick adjust"
-          >
-            <Wand2 className="h-5 w-5 text-primary" />
-          </motion.button>
-        )}
-
-        <QuickAdjustDrawer
-          open={showQuickAdjust}
-          onOpenChange={setShowQuickAdjust}
-          tasks={dailyTasks}
-          selectedDate={selectedDate}
-          onLaunchPlanner={(message, starterIntent) => {
-            setShowQuickAdjust(false);
-            launchPlannerIntent(message, starterIntent);
-          }}
-          onComplete={() => {
-            setShowQuickAdjust(false);
-          }}
-        />
-
         {/* Pathfinder - Campaign Creation Wizard */}
         <Pathfinder
           key={pathfinderSessionKey}

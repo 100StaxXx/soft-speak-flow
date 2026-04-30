@@ -8,11 +8,9 @@ export interface CompanionPlannerSurfaceAction {
     | "plan-day"
     | "prepare-tomorrow"
     | "advance-campaign"
-    | "adjust-day"
     | "make-room"
     | "low-energy"
     | "what-matters"
-    | "right-now"
     | "upcoming"
     | "quest"
     | "goal";
@@ -46,13 +44,6 @@ export const COMPANION_PLANNER_SURFACE_ACTIONS: CompanionPlannerSurfaceAction[] 
       starterIntent: "advance_campaign_start",
     },
     {
-      id: "adjust-day",
-      label: "Adjust my day",
-      message: "Adjust my day",
-      target: "planner",
-      starterIntent: "adjust_today",
-    },
-    {
       id: "make-room",
       label: "Make room",
       message: "Make room",
@@ -72,13 +63,6 @@ export const COMPANION_PLANNER_SURFACE_ACTIONS: CompanionPlannerSurfaceAction[] 
       message: "What matters most?",
       target: "planner",
       starterIntent: "what_matters",
-    },
-    {
-      id: "right-now",
-      label: "What should I do right now?",
-      message: "What should I do right now?",
-      target: "planner",
-      starterIntent: "right_now_start",
     },
     {
       id: "upcoming",

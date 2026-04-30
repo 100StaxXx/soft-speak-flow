@@ -4,6 +4,10 @@ import {
   isCompanionModeId,
 } from "../../../src/shared/companionModes.ts";
 import {
+  isScheduleReadMessage,
+  isUpcomingScheduleDigestMessage,
+} from "../../../src/shared/schedulingIntent.ts";
+import {
   isAssignedCompanionName,
   normalizeCompanionName,
   synthesizeAssignedCompanionName,
@@ -387,11 +391,9 @@ const deriveUnderstandingState = (params: {
 type BareStarterIntent =
   | "plan_day"
   | "advance_campaign_start"
-  | "right_now_start"
   | "make_room"
   | "what_matters"
   | "relationship_touch"
-  | "adjust_today"
   | "low_energy_adjust"
   | "briefing_followup"
   | "quest_capture"
@@ -409,11 +411,9 @@ const CONSENT_FIRST_PLANNING_STARTER_INTENTS = new Set<string>([
   "plan_day",
   "plan_week",
   "advance_campaign_start",
-  "right_now_start",
   "make_room",
   "what_matters",
   "relationship_touch",
-  "adjust_today",
   "low_energy_adjust",
   "briefing_followup",
 ]);
@@ -446,12 +446,10 @@ const mapPlanningStarterIntentToAgentIntent = (
       return "plan_week";
     case "advance_campaign_start":
       return "goal_setting";
-    case "adjust_today":
     case "low_energy_adjust":
     case "make_room":
       return "update_existing_plan";
     case "plan_day":
-    case "right_now_start":
     case "what_matters":
     case "relationship_touch":
     case "briefing_followup":
@@ -502,21 +500,6 @@ const BARE_STARTER_FOLLOW_UPS: Record<
       blocksDrafting: true,
     },
   },
-  right_now_start: {
-    intent: "plan_day",
-    prompts: ["what should i do right now"],
-    reply:
-      "I can help choose the next move. Are you trying to make progress, catch up, or keep things light right now?",
-    followUp: {
-      question:
-        "Are you trying to make progress, catch up, or keep things light right now?",
-      reason:
-        "The best next action depends on the energy and pressure of this moment.",
-      expectedAnswerType: "choice",
-      options: ["Make progress", "Catch up", "Keep it light"],
-      blocksDrafting: true,
-    },
-  },
   make_room: {
     intent: "update_existing_plan",
     prompts: ["make room"],
@@ -559,21 +542,6 @@ const BARE_STARTER_FOLLOW_UPS: Record<
         "Relationship planning should not become a quest unless you explicitly want that.",
       expectedAnswerType: "choice",
       options: ["Quick reach-out", "Meaningful follow-up", "Just the read"],
-      blocksDrafting: true,
-    },
-  },
-  adjust_today: {
-    intent: "update_existing_plan",
-    prompts: ["adjust my day"],
-    reply:
-      "I can adjust today. Should I protect your top priority, reduce the load, or make room for something new?",
-    followUp: {
-      question:
-        "Should I protect your top priority, reduce the load, or make room for something new?",
-      reason:
-        "Adjusting the day means choosing which pressure gets priority before anything moves.",
-      expectedAnswerType: "choice",
-      options: ["Protect priority", "Reduce load", "Make room"],
       blocksDrafting: true,
     },
   },
@@ -671,9 +639,23 @@ const isFollowUpOptionTurn = (request: CompanionAgentRequest): boolean =>
   request.turnOrigin === "follow_up_option" ||
   request.turnOrigin === undefined;
 
+const isDeterministicScheduleReadRequest = (
+  request: CompanionAgentRequest,
+): boolean => {
+  if (request.selectedProposalId || request.selectedProposedAction) {
+    return false;
+  }
+
+  return request.starterIntent === "upcoming_start" ||
+    isUpcomingScheduleDigestMessage(request.message) ||
+    isScheduleReadMessage(request.message);
+};
+
 const resolveBareStarterFollowUp = (
   request: CompanionAgentRequest,
-): (BareStarterFollowUpConfig & { starterIntent: BareStarterIntent }) | null => {
+):
+  | (BareStarterFollowUpConfig & { starterIntent: BareStarterIntent })
+  | null => {
   if (!isLauncherTurn(request)) {
     return null;
   }
@@ -852,14 +834,21 @@ const getPlanningStarterIntentFromActiveFollowUp = (
   );
   if (persistedStarter) return persistedStarter;
 
-  if (request.activeFollowUp && isPlanningLauncherFollowUpQuestion(request.activeFollowUp)) {
+  if (
+    request.activeFollowUp &&
+    isPlanningLauncherFollowUpQuestion(request.activeFollowUp)
+  ) {
     return "plan_day";
   }
-  if (persistedFollowUp && isPlanningLauncherFollowUpQuestion(persistedFollowUp)) {
+  if (
+    persistedFollowUp && isPlanningLauncherFollowUpQuestion(persistedFollowUp)
+  ) {
     return "plan_day";
   }
 
-  return hasRecentPlanDayStarterBeforeLastAssistant(context) ? "plan_day" : null;
+  return hasRecentPlanDayStarterBeforeLastAssistant(context)
+    ? "plan_day"
+    : null;
 };
 
 const isPlanningLauncherFollowUpAnswer = (
@@ -2439,13 +2428,7 @@ function mapPlannerFallbackIntent(
   plannerResult: ReturnType<typeof consultPlannerForAgent>,
 ): CompanionAgentIntent {
   if (plannerResult.structuredResponse?.planDay) return "plan_day";
-  if (plannerResult.structuredResponse?.dayAdjust) {
-    return "update_existing_plan";
-  }
-  if (
-    plannerResult.structuredResponse?.comingUp ||
-    plannerResult.structuredResponse?.rightNow
-  ) {
+  if (plannerResult.structuredResponse?.comingUp) {
     return "check_calendar";
   }
 
@@ -2966,8 +2949,9 @@ export async function runCompanionAgent(params: RunAgentParams) {
           activeFollowUp &&
           (!outputReply || isThinGenericAgentReply(outputReply))
         ) {
-          const planningStarterIntent =
-            getPlanningStarterIntentFromFollowUp(activeFollowUp);
+          const planningStarterIntent = getPlanningStarterIntentFromFollowUp(
+            activeFollowUp,
+          );
           return buildActiveFollowUpClarifyAgentResult({
             followUp: activeFollowUp,
             intent: isPlanningLauncherFollowUpQuestion(activeFollowUp)
@@ -3020,8 +3004,9 @@ export async function runCompanionAgent(params: RunAgentParams) {
           followUpToPreserve &&
           isThinGenericAgentReply(payloadReply)
         ) {
-          const planningStarterIntent =
-            getPlanningStarterIntentFromFollowUp(followUpToPreserve);
+          const planningStarterIntent = getPlanningStarterIntentFromFollowUp(
+            followUpToPreserve,
+          );
           return buildActiveFollowUpClarifyAgentResult({
             followUp: followUpToPreserve,
             intent: payload.intent === "unknown" &&
@@ -3108,12 +3093,16 @@ export async function runCompanionAgent(params: RunAgentParams) {
       starterIntent?: string | null;
       forcePlanDayFollowUp?: boolean;
       confidence?: number;
+      ignoreActiveFollowUp?: boolean;
+      suppressWarning?: boolean;
     } = {},
   ): AgentRunResult => {
-    console.warn("[companion-agent] planner fallback", {
-      sessionId: params.request.sessionId,
-      reason,
-    });
+    if (!options.suppressWarning) {
+      console.warn("[companion-agent] planner fallback", {
+        sessionId: params.request.sessionId,
+        reason,
+      });
+    }
 
     const plannerStarterIntent = options.starterIntent ??
       params.request.starterIntent ??
@@ -3125,7 +3114,8 @@ export async function runCompanionAgent(params: RunAgentParams) {
       horizon: "day",
       starterIntent: plannerStarterIntent,
       forcePlanDayFollowUp: options.forcePlanDayFollowUp,
-      activeFollowUp: isFollowUpOptionTurn(params.request)
+      activeFollowUp: !options.ignoreActiveFollowUp &&
+          isFollowUpOptionTurn(params.request)
         ? params.request.activeFollowUp ?? getPersistedActiveFollowUp(context)
         : null,
       context,
@@ -3194,11 +3184,25 @@ export async function runCompanionAgent(params: RunAgentParams) {
     request: params.request,
     context,
   });
-  const planningFollowUpStarterIntent = getPlanningStarterIntentFromActiveFollowUp(
-    params.request,
-    context,
-  );
-  const deterministicPlanningFollowUpResult = bareStarterResult
+  const deterministicScheduleReadResult = !bareStarterResult &&
+      isDeterministicScheduleReadRequest(params.request)
+    ? buildPlannerFallbackResult("deterministic_schedule_read", {
+      starterIntent: params.request.starterIntent === "upcoming_start" ||
+          isUpcomingScheduleDigestMessage(params.request.message)
+        ? "upcoming_start"
+        : null,
+      ignoreActiveFollowUp: true,
+      confidence: 0.82,
+      suppressWarning: true,
+    })
+    : null;
+  const planningFollowUpStarterIntent =
+    getPlanningStarterIntentFromActiveFollowUp(
+      params.request,
+      context,
+    );
+  const deterministicPlanningFollowUpResult = bareStarterResult ||
+      deterministicScheduleReadResult
     ? null
     : isPlanningLauncherFollowUpAnswer(params.request, context)
     ? buildPlannerFallbackResult("planning_launcher_follow_up_answer", {
@@ -3209,6 +3213,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
     : null;
 
   const agentResult: AgentRunResult = bareStarterResult ??
+    deterministicScheduleReadResult ??
     deterministicPlanningFollowUpResult ??
     await wrapSubStage("openai", async () => {
       try {

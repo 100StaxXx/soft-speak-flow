@@ -41,7 +41,7 @@ DrawerOverlay.displayName = DrawerPrimitive.Overlay.displayName;
 const DrawerContent = React.forwardRef<
   React.ElementRef<typeof DrawerPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+>(({ className, children, style, ...props }, ref) => (
   <DrawerPortal>
     <DrawerOverlay />
     <DrawerPrimitive.Content
@@ -54,6 +54,7 @@ const DrawerContent = React.forwardRef<
         touchAction: 'pan-y',
         WebkitTapHighlightColor: 'transparent',
         willChange: 'transform',
+        ...style,
       }}
       {...props}
     >

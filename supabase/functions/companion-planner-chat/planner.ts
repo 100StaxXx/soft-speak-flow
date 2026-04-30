@@ -16,7 +16,10 @@ import {
   cleanGeneratedTaskTitle,
   formatGeneratedTaskTitle,
 } from "../../../src/shared/taskTitleNormalization.ts";
-import { analyzeSchedulingIntent } from "../../../src/shared/schedulingIntent.ts";
+import {
+  analyzeSchedulingIntent,
+  isUpcomingScheduleDigestMessage,
+} from "../../../src/shared/schedulingIntent.ts";
 import { computePlannerPriorityScores } from "../../../src/shared/companionPlannerPriority.ts";
 import {
   fitPlannerDurationBucketWithin,
@@ -64,11 +67,9 @@ export type PlannerStarterIntent =
   | "plan_day"
   | "plan_week"
   | "advance_campaign_start"
-  | "right_now_start"
   | "make_room"
   | "what_matters"
   | "relationship_touch"
-  | "adjust_today"
   | "low_energy_adjust"
   | "briefing_followup"
   | "goal_breakdown"
@@ -738,144 +739,338 @@ export interface PlannerBuildResult {
   sessionState: PlannerSessionState;
 }
 
-const normalizePlannerDisplayText = <T extends string | null | undefined>(
+const normalizePlannerDataText = <T extends string | null | undefined>(
   value: T,
 ): T => {
   if (typeof value !== "string") return value;
   return normalizeAssistantTimeText(value) as T;
 };
 
+type PlannerTextNormalizationOptions = {
+  protectedDataText?: string[];
+};
+
+const escapeRegExp = (value: string): string =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const uniqueProtectedPlannerText = (values: string[]): string[] =>
+  [...new Set(values.map((value) => value.trim()).filter((value) =>
+    value.length >= 3
+  ))].sort((left, right) => right.length - left.length);
+
+const protectPlannerCopySegments = (
+  value: string,
+  transform: (protectedValue: string) => string,
+  options?: PlannerTextNormalizationOptions,
+): string => {
+  const protectedSegments: string[] = [];
+  const protect = (segment: string) => {
+    const token = `__PLANNER_COPY_SEGMENT_${protectedSegments.length}__`;
+    protectedSegments.push(segment);
+    return token;
+  };
+  const protectedValue = value
+    .replace(/"[^"]*"|“[^”]*”|`[^`]*`/g, protect)
+    .replace(
+      /\b\d{1,2}(?::\d{2})?\s?(?:am|pm)?\s*[-–—]\s*\d{1,2}(?::\d{2})?\s?(?:am|pm)?\b/gi,
+      protect,
+    );
+  const protectedDataValue = uniqueProtectedPlannerText(
+    options?.protectedDataText ?? [],
+  ).reduce(
+    (nextValue, segment) =>
+      nextValue.replace(new RegExp(escapeRegExp(segment), "g"), protect),
+    protectedValue,
+  );
+
+  return protectedSegments.reduce(
+    (restored, segment, index) =>
+      restored.split(`__PLANNER_COPY_SEGMENT_${index}__`).join(segment),
+    transform(protectedDataValue),
+  );
+};
+
+const capitalizePlannerSentenceStart = (value: string): string =>
+  value.length === 0 ? value : `${value[0]?.toUpperCase()}${value.slice(1)}`;
+
+const normalizePlannerProseDashSeparators = (
+  value: string,
+  options?: PlannerTextNormalizationOptions,
+): string =>
+  protectPlannerCopySegments(
+    value,
+    (protectedValue) =>
+      protectedValue.replace(
+        /\s+[-–—]\s+((?:let(?:'|’)?s|we|i|i(?:'|’)?ll|you|your|it|this|that|the|a|an|and|but|so|then|never|do|don(?:'|’)?t|what|which|when|where|why|how|review|take|keep|tell|name|pick|use|confirm|draft|save|move|shape|call|choose|answer|no|yes)\b)/gi,
+        (_match, continuation: string) =>
+          `. ${capitalizePlannerSentenceStart(continuation)}`,
+      ),
+    options,
+  );
+
+const normalizePlannerProseText = <T extends string | null | undefined>(
+  value: T,
+  options?: PlannerTextNormalizationOptions,
+): T => {
+  if (typeof value !== "string") return value;
+  return normalizePlannerProseDashSeparators(
+    normalizeAssistantTimeText(value),
+    options,
+  ) as T;
+};
+
+const normalizePlannerSuggestedQuest = (
+  quest: CompanionSuggestedQuest,
+  options?: PlannerTextNormalizationOptions,
+): CompanionSuggestedQuest => ({
+  ...quest,
+  title: normalizePlannerDataText(quest.title),
+  estimatedDuration: normalizePlannerDataText(quest.estimatedDuration),
+  reason: normalizePlannerProseText(quest.reason, options),
+});
+
+const normalizePlannerContractText = (
+  plannerContract: PlannerContract | undefined,
+  options?: PlannerTextNormalizationOptions,
+): PlannerContract | undefined =>
+  plannerContract
+    ? {
+      ...plannerContract,
+      decisionSummary: normalizePlannerProseText(
+        plannerContract.decisionSummary,
+        options,
+      ),
+      decisionPoint: {
+        ...plannerContract.decisionPoint,
+        label: normalizePlannerProseText(
+          plannerContract.decisionPoint.label,
+          options,
+        ),
+      },
+      clarifyingQuestion: normalizePlannerProseText(
+        plannerContract.clarifyingQuestion,
+        options,
+      ),
+    }
+    : plannerContract;
+
+const collectPlannerResultProtectedDataText = (
+  result: PlannerBuildResult,
+): string[] => [
+  ...result.proposals.map((proposal) => proposal.title),
+  ...result.suggestedReminders.map((proposal) => proposal.title),
+  ...(result.dayPlan?.blocks.map((block) => block.title) ?? []),
+  ...(result.structuredResponse?.planDay?.campaignFocus
+    ? [
+      result.structuredResponse.planDay.campaignFocus.campaignTitle,
+      ...result.structuredResponse.planDay.campaignFocus.focusItems,
+    ]
+    : []),
+  ...(result.structuredResponse?.planDay?.suggestedQuests.map((quest) =>
+    quest.title
+  ) ?? []),
+  result.structuredResponse?.weeklyPlan?.focusCampaignTitle ?? null,
+  ...(result.structuredResponse?.weeklyPlan?.topPriorities.map((quest) =>
+    quest.title
+  ) ?? []),
+  result.structuredResponse?.priorityOverview?.title ?? null,
+  result.structuredResponse?.priorityOverview?.focusCampaignTitle ?? null,
+  ...(result.structuredResponse?.priorityOverview?.topPriorities.map((quest) =>
+    quest.title
+  ) ?? []),
+  result.structuredResponse?.reflectionBridge?.firstAction?.title ?? null,
+  ...(result.structuredResponse?.reflectionBridge?.tomorrowSchedule.map(
+    (item) => item.title,
+  ) ?? []),
+  result.structuredResponse?.comingUp?.nextEvent?.title ?? null,
+  result.structuredResponse?.comingUp?.nextBestAction?.title ?? null,
+  ...(result.structuredResponse?.comingUp?.remainingToday.map((item) =>
+    item.title
+  ) ?? []),
+  ...(result.structuredResponse?.comingUp?.missedItems.map((item) =>
+    item.title
+  ) ?? []),
+  result.structuredResponse?.campaignMomentum?.campaignTitle ?? null,
+  result.structuredResponse?.campaignMomentum?.nextStep?.title ?? null,
+  ...(result.structuredResponse?.campaignMomentum?.supportActions.map(
+    (quest) => quest.title,
+  ) ?? []),
+].filter((value): value is string => typeof value === "string");
+
+const collectPlannerContextProtectedDataText = (
+  input: PlannerBuildInput,
+): string[] => [
+  ...input.plannerContext.tasks.flatMap((task) => [
+    task.title,
+    task.epicTitle,
+    ...(task.subtaskTitles ?? []),
+  ]),
+  ...input.plannerContext.inboxTasks.flatMap((task) => [
+    task.title,
+    task.epicTitle,
+    ...(task.subtaskTitles ?? []),
+  ]),
+  ...(input.plannerContext.recentCompletedTasks?.flatMap((task) => [
+    task.title,
+    task.epicTitle,
+    ...(task.subtaskTitles ?? []),
+  ]) ?? []),
+  ...input.plannerContext.activeEpics.map((epic) => epic.title),
+  ...input.plannerContext.rituals.flatMap((ritual) => [
+    ritual.title,
+    ritual.epicTitle,
+  ]),
+  ...input.plannerContext.calendarEvents.map((event) => event.title),
+  ...(input.plannerContext.contactsNeedingAttention?.map((contact) =>
+    contact.name
+  ) ?? []),
+  ...(input.plannerContext.priorityScores?.map((score) => score.title) ?? []),
+  ...(input.plannerContext.scheduleInsights?.conflicts.flatMap((conflict) => [
+    conflict.taskATitle,
+    conflict.taskBTitle,
+  ]) ?? []),
+  ...(input.plannerContext.scheduleInsights?.moveSuggestions.map((
+    suggestion,
+  ) => suggestion.taskTitle) ?? []),
+].filter((value): value is string => typeof value === "string");
+
 export const normalizePlannerBuildResultText = (
   result: PlannerBuildResult,
-): PlannerBuildResult => ({
+  options?: PlannerTextNormalizationOptions,
+): PlannerBuildResult => {
+  const normalizationOptions: PlannerTextNormalizationOptions = {
+    protectedDataText: uniqueProtectedPlannerText([
+      ...(options?.protectedDataText ?? []),
+      ...collectPlannerResultProtectedDataText(result),
+    ]),
+  };
+  const prose = <T extends string | null | undefined>(value: T): T =>
+    normalizePlannerProseText(value, normalizationOptions);
+  const data = <T extends string | null | undefined>(value: T): T =>
+    normalizePlannerDataText(value);
+  const normalizeQuest = (quest: CompanionSuggestedQuest) =>
+    normalizePlannerSuggestedQuest(quest, normalizationOptions);
+  const normalizeContract = (plannerContract: PlannerContract | undefined) =>
+    normalizePlannerContractText(plannerContract, normalizationOptions);
+
+  return {
   ...result,
-  reply: normalizePlannerDisplayText(result.reply),
+  reply: prose(result.reply),
+  plannerContract: normalizeContract(result.plannerContract),
   followUpQuestions: result.followUpQuestions.map((question) => ({
     ...question,
-    prompt: normalizePlannerDisplayText(question.prompt),
-    reason: normalizePlannerDisplayText(question.reason),
+    prompt: prose(question.prompt),
+    reason: prose(question.reason),
   })),
   proposals: result.proposals.map((proposal) => ({
     ...proposal,
-    summary: normalizePlannerDisplayText(proposal.summary),
+    title: data(proposal.title),
+    summary: prose(proposal.summary),
   })),
+  suggestedReminders: result.suggestedReminders.map((proposal) => ({
+    ...proposal,
+    title: data(proposal.title),
+    summary: prose(proposal.summary),
+  })),
+  dayPlan: result.dayPlan
+    ? {
+      ...result.dayPlan,
+      blocks: result.dayPlan.blocks.map((block) => ({
+        ...block,
+        title: data(block.title),
+        reasoning: prose(block.reasoning),
+      })),
+    }
+    : result.dayPlan,
   structuredResponse: result.structuredResponse
     ? {
       ...result.structuredResponse,
+      plannerContract: normalizeContract(
+        result.structuredResponse.plannerContract,
+      ),
       planDay: result.structuredResponse.planDay
         ? {
           ...result.structuredResponse.planDay,
-          message: normalizePlannerDisplayText(result.reply),
+          message: prose(result.reply),
           campaignFocus: result.structuredResponse.planDay.campaignFocus
             ? {
               ...result.structuredResponse.planDay.campaignFocus,
-              campaignTitle: normalizePlannerDisplayText(
+              campaignTitle: data(
                 result.structuredResponse.planDay.campaignFocus
                   .campaignTitle,
               ),
-              campaignReason: normalizePlannerDisplayText(
+              campaignReason: prose(
                 result.structuredResponse.planDay.campaignFocus
                   .campaignReason,
               ),
               focusItems: result.structuredResponse.planDay.campaignFocus
-                .focusItems.map((item) => normalizePlannerDisplayText(item)),
+                .focusItems.map((item) => data(item)),
             }
             : result.structuredResponse.planDay.campaignFocus,
           suggestedQuests: result.structuredResponse.planDay.suggestedQuests
-            .map((quest) => ({
-              ...quest,
-              title: normalizePlannerDisplayText(quest.title),
-              estimatedDuration: normalizePlannerDisplayText(
-                quest.estimatedDuration,
-              ),
-              reason: normalizePlannerDisplayText(quest.reason),
-            })),
+            .map(normalizeQuest),
         }
         : result.structuredResponse.planDay,
       weeklyPlan: result.structuredResponse.weeklyPlan
         ? {
           ...result.structuredResponse.weeklyPlan,
-          message: normalizePlannerDisplayText(result.reply),
-          weeklyTheme: normalizePlannerDisplayText(
+          message: prose(result.reply),
+          weeklyTheme: prose(
             result.structuredResponse.weeklyPlan.weeklyTheme,
           ),
-          focusCampaignTitle: normalizePlannerDisplayText(
+          focusCampaignTitle: data(
             result.structuredResponse.weeklyPlan.focusCampaignTitle,
           ),
-          focusCampaignReason: normalizePlannerDisplayText(
+          focusCampaignReason: prose(
             result.structuredResponse.weeklyPlan.focusCampaignReason,
           ),
           topPriorities: result.structuredResponse.weeklyPlan.topPriorities.map(
-            (quest) => ({
-              ...quest,
-              title: normalizePlannerDisplayText(quest.title),
-              estimatedDuration: normalizePlannerDisplayText(
-                quest.estimatedDuration,
-              ),
-              reason: normalizePlannerDisplayText(quest.reason),
-            }),
+            normalizeQuest,
           ),
           busyDays: result.structuredResponse.weeklyPlan.busyDays.map(
-            normalizePlannerDisplayText,
+            data,
           ),
           openDays: result.structuredResponse.weeklyPlan.openDays.map(
-            normalizePlannerDisplayText,
+            data,
           ),
         }
         : result.structuredResponse.weeklyPlan,
       priorityOverview: result.structuredResponse.priorityOverview
         ? {
           ...result.structuredResponse.priorityOverview,
-          title: normalizePlannerDisplayText(
+          title: data(
             result.structuredResponse.priorityOverview.title,
           ),
-          message: normalizePlannerDisplayText(result.reply),
-          campaignPressure: normalizePlannerDisplayText(
+          message: prose(result.reply),
+          campaignPressure: prose(
             result.structuredResponse.priorityOverview.campaignPressure,
           ),
-          focusCampaignTitle: normalizePlannerDisplayText(
+          focusCampaignTitle: data(
             result.structuredResponse.priorityOverview.focusCampaignTitle,
           ),
           topPriorities: result.structuredResponse.priorityOverview
             .topPriorities
-            .map((quest) => ({
-              ...quest,
-              title: normalizePlannerDisplayText(quest.title),
-              estimatedDuration: normalizePlannerDisplayText(
-                quest.estimatedDuration,
-              ),
-              reason: normalizePlannerDisplayText(quest.reason),
-            })),
+            .map(normalizeQuest),
         }
         : result.structuredResponse.priorityOverview,
       reflectionBridge: result.structuredResponse.reflectionBridge
         ? {
           ...result.structuredResponse.reflectionBridge,
-          message: normalizePlannerDisplayText(result.reply),
-          carryForward: normalizePlannerDisplayText(
+          message: prose(result.reply),
+          carryForward: prose(
             result.structuredResponse.reflectionBridge.carryForward,
           ),
           firstAction: result.structuredResponse.reflectionBridge.firstAction
-            ? {
-              ...result.structuredResponse.reflectionBridge.firstAction,
-              title: normalizePlannerDisplayText(
-                result.structuredResponse.reflectionBridge.firstAction.title,
-              ),
-              estimatedDuration: normalizePlannerDisplayText(
-                result.structuredResponse.reflectionBridge.firstAction
-                  .estimatedDuration,
-              ),
-              reason: normalizePlannerDisplayText(
-                result.structuredResponse.reflectionBridge.firstAction.reason,
-              ),
-            }
+            ? normalizeQuest(
+              result.structuredResponse.reflectionBridge.firstAction,
+            )
             : null,
           tomorrowSchedule: result.structuredResponse.reflectionBridge
             .tomorrowSchedule.map(
               (item) => ({
                 ...item,
-                title: normalizePlannerDisplayText(item.title),
-                label: normalizePlannerDisplayText(item.label),
+                title: data(item.title),
+                label: data(item.label),
               }),
             ),
         }
@@ -883,124 +1078,65 @@ export const normalizePlannerBuildResultText = (
       comingUp: result.structuredResponse.comingUp
         ? {
           ...result.structuredResponse.comingUp,
-          message: normalizePlannerDisplayText(result.reply),
+          message: prose(result.reply),
           nextEvent: result.structuredResponse.comingUp.nextEvent
             ? {
               ...result.structuredResponse.comingUp.nextEvent,
-              title: normalizePlannerDisplayText(
+              title: data(
                 result.structuredResponse.comingUp.nextEvent.title,
               ),
-              label: normalizePlannerDisplayText(
+              label: data(
                 result.structuredResponse.comingUp.nextEvent.label,
               ),
             }
             : null,
           nextBestAction: result.structuredResponse.comingUp.nextBestAction
-            ? {
-              ...result.structuredResponse.comingUp.nextBestAction,
-              title: normalizePlannerDisplayText(
-                result.structuredResponse.comingUp.nextBestAction.title,
-              ),
-              estimatedDuration: normalizePlannerDisplayText(
-                result.structuredResponse.comingUp.nextBestAction
-                  .estimatedDuration,
-              ),
-              reason: normalizePlannerDisplayText(
-                result.structuredResponse.comingUp.nextBestAction.reason,
-              ),
-            }
+            ? normalizeQuest(
+              result.structuredResponse.comingUp.nextBestAction,
+            )
             : null,
           remainingToday: result.structuredResponse.comingUp.remainingToday.map(
             (item) => ({
               ...item,
-              title: normalizePlannerDisplayText(item.title),
-              label: normalizePlannerDisplayText(item.label),
+              title: data(item.title),
+              label: data(item.label),
             }),
           ),
           missedItems: result.structuredResponse.comingUp.missedItems.map(
             (item) => ({
               ...item,
-              title: normalizePlannerDisplayText(item.title),
-              label: normalizePlannerDisplayText(item.label),
+              title: data(item.title),
+              label: data(item.label),
             }),
           ),
         }
         : result.structuredResponse.comingUp,
-      rightNow: result.structuredResponse.rightNow
+      campaignMomentum: result.structuredResponse.campaignMomentum
         ? {
-          ...result.structuredResponse.rightNow,
-          message: normalizePlannerDisplayText(result.reply),
-          currentWindow: normalizePlannerDisplayText(
-            result.structuredResponse.rightNow.currentWindow,
+          ...result.structuredResponse.campaignMomentum,
+          message: prose(result.reply),
+          campaignTitle: data(
+            result.structuredResponse.campaignMomentum.campaignTitle,
           ),
-          recommendedAction:
-            result.structuredResponse.rightNow.recommendedAction
-              ? {
-                ...result.structuredResponse.rightNow.recommendedAction,
-                title: normalizePlannerDisplayText(
-                  result.structuredResponse.rightNow.recommendedAction.title,
-                ),
-                estimatedDuration: normalizePlannerDisplayText(
-                  result.structuredResponse.rightNow.recommendedAction
-                    .estimatedDuration,
-                ),
-                reason: normalizePlannerDisplayText(
-                  result.structuredResponse.rightNow.recommendedAction.reason,
-                ),
-              }
-              : null,
-          fallbackAction: result.structuredResponse.rightNow.fallbackAction
-            ? {
-              ...result.structuredResponse.rightNow.fallbackAction,
-              title: normalizePlannerDisplayText(
-                result.structuredResponse.rightNow.fallbackAction.title,
-              ),
-              estimatedDuration: normalizePlannerDisplayText(
-                result.structuredResponse.rightNow.fallbackAction
-                  .estimatedDuration,
-              ),
-              reason: normalizePlannerDisplayText(
-                result.structuredResponse.rightNow.fallbackAction.reason,
-              ),
-            }
+          statusReason: prose(
+            result.structuredResponse.campaignMomentum.statusReason,
+          ),
+          pressureSignals: result.structuredResponse.campaignMomentum
+            .pressureSignals.map(prose),
+          nextStep: result.structuredResponse.campaignMomentum.nextStep
+            ? normalizeQuest(
+              result.structuredResponse.campaignMomentum.nextStep,
+            )
             : null,
+          supportActions: result.structuredResponse.campaignMomentum
+            .supportActions
+            .map(normalizeQuest),
         }
-        : result.structuredResponse.rightNow,
-      dayAdjust: result.structuredResponse.dayAdjust
-        ? {
-          ...result.structuredResponse.dayAdjust,
-          message: normalizePlannerDisplayText(result.reply),
-          keep: result.structuredResponse.dayAdjust.keep.map((quest) => ({
-            ...quest,
-            title: normalizePlannerDisplayText(quest.title),
-            estimatedDuration: normalizePlannerDisplayText(
-              quest.estimatedDuration,
-            ),
-            reason: normalizePlannerDisplayText(quest.reason),
-          })),
-          move: result.structuredResponse.dayAdjust.move.map((quest) => ({
-            ...quest,
-            title: normalizePlannerDisplayText(quest.title),
-            estimatedDuration: normalizePlannerDisplayText(
-              quest.estimatedDuration,
-            ),
-            reason: normalizePlannerDisplayText(quest.reason),
-          })),
-          dropOrShrink: result.structuredResponse.dayAdjust.dropOrShrink.map((
-            quest,
-          ) => ({
-            ...quest,
-            title: normalizePlannerDisplayText(quest.title),
-            estimatedDuration: normalizePlannerDisplayText(
-              quest.estimatedDuration,
-            ),
-            reason: normalizePlannerDisplayText(quest.reason),
-          })),
-        }
-        : result.structuredResponse.dayAdjust,
+        : result.structuredResponse.campaignMomentum,
     }
     : result.structuredResponse,
-});
+  };
+};
 
 type MatchedEntities = {
   tasks: PlannerContextTask[];
@@ -1805,6 +1941,8 @@ const hasExplicitDateReference = (
     .test(message);
 
 const isScheduleQuestion = (message: string): boolean => {
+  if (isUpcomingScheduleDigestMessage(message)) return true;
+
   if (
     /\b(what do i have coming up|what(?:'s| is) coming up|what do i have scheduled|what(?:'s| is) on my calendar|what do i have today|what do i have tomorrow|what(?:'s| is) my schedule|what(?:'s| is) on my plate)\b/i
       .test(message)
@@ -1829,8 +1967,7 @@ const isAvailabilityQuestion = (message: string): boolean =>
     .test(message);
 
 const isUpcomingDigestQuestion = (message: string): boolean =>
-  /\b(what do i have coming up|what(?:'s| is) coming up|what(?:'s| is) on my plate)\b/i
-    .test(message);
+  isUpcomingScheduleDigestMessage(message);
 
 const isQuestCollectionIntent = (message: string): boolean =>
   /\b(rest|all)\b.+\b(quests|tasks)\b/i.test(message);
@@ -1884,12 +2021,6 @@ const inferPlannerStarterIntentFromMessage = (
     return "advance_campaign_start";
   }
   if (
-    /\b(what should i do right now|what should i do now|right now|next 30 minutes|next 60 minutes|next hour)\b/
-      .test(normalizedMessage)
-  ) {
-    return "right_now_start";
-  }
-  if (
     /\b(tired|drained|fried|make it light|light day|low energy)\b/.test(
       normalizedMessage,
     )
@@ -1925,14 +2056,6 @@ const inferPlannerStarterIntentFromMessage = (
       .test(normalizedMessage)
   ) {
     return "relationship_touch";
-  }
-  if (
-    /\b(adjust my day|adjust today|rework today|reschedule today|move today around)\b/
-      .test(
-        normalizedMessage,
-      )
-  ) {
-    return "adjust_today";
   }
   if (
     /\b(break this goal down|break a big goal|turn this into steps)\b/.test(
@@ -3305,11 +3428,9 @@ const CONSENT_FIRST_PLANNING_STARTER_INTENTS = new Set<PlannerStarterIntent>([
   "plan_day",
   "plan_week",
   "advance_campaign_start",
-  "right_now_start",
   "make_room",
   "what_matters",
   "relationship_touch",
-  "adjust_today",
   "low_energy_adjust",
   "briefing_followup",
 ]);
@@ -6331,8 +6452,6 @@ const buildCampaignMomentumStructuredOutput = (
   planDay: null,
   weeklyPlan: null,
   comingUp: null,
-  rightNow: null,
-  dayAdjust: null,
   campaignMomentum: {
     message: reply,
     campaignId: options.campaignId,
@@ -6395,8 +6514,6 @@ const buildPriorityOverviewStructuredOutput = (
   },
   reflectionBridge: null,
   comingUp: null,
-  rightNow: null,
-  dayAdjust: null,
   campaignMomentum: null,
 });
 
@@ -6664,9 +6781,7 @@ const mapPlannerIntentMetadata = (
     starterIntent === "advance_campaign_start"
       ? "long_term"
       : starterIntent === "plan_day" ||
-          starterIntent === "right_now_start" ||
           starterIntent === "upcoming_start" ||
-          starterIntent === "adjust_today" ||
           starterIntent === "low_energy_adjust" ||
           /\b(today|tonight|tomorrow|right now|next hour)\b/.test(
             normalizedMessage,
@@ -6686,8 +6801,6 @@ const mapPlannerIntentMetadata = (
       classificationHint.type === "epic"
       ? "campaign"
       : starterIntent === "plan_day" ||
-          starterIntent === "right_now_start" ||
-          starterIntent === "adjust_today" ||
           starterIntent === "low_energy_adjust" ||
           classificationHint.type === "quest" ||
           classificationHint.type === "habit"
@@ -6752,8 +6865,6 @@ const buildComingUpStructuredOutput = (
       tomorrowSummary,
       missedItems: collectMissedTasksForToday(input),
     },
-    rightNow: null,
-    dayAdjust: null,
   };
 };
 
@@ -6826,27 +6937,6 @@ const stripStructuredResponseWriteIntent = (
         ),
       }
       : structuredResponse.comingUp,
-    rightNow: structuredResponse.rightNow
-      ? {
-        ...structuredResponse.rightNow,
-        recommendedAction: stripSuggestionProposal(
-          structuredResponse.rightNow.recommendedAction,
-        ),
-        fallbackAction: stripSuggestionProposal(
-          structuredResponse.rightNow.fallbackAction,
-        ),
-      }
-      : structuredResponse.rightNow,
-    dayAdjust: structuredResponse.dayAdjust
-      ? {
-        ...structuredResponse.dayAdjust,
-        keep: stripSuggestionProposalList(structuredResponse.dayAdjust.keep),
-        move: stripSuggestionProposalList(structuredResponse.dayAdjust.move),
-        dropOrShrink: stripSuggestionProposalList(
-          structuredResponse.dayAdjust.dropOrShrink,
-        ),
-      }
-      : structuredResponse.dayAdjust,
     campaignMomentum: structuredResponse.campaignMomentum
       ? {
         ...structuredResponse.campaignMomentum,
@@ -7143,8 +7233,7 @@ const derivePlannerReasonCodes = (
     reasonCodes,
     "open_window",
     Boolean(
-      structured?.rightNow?.currentWindow ||
-        result.proposals.some((proposal) => {
+      result.proposals.some((proposal) => {
           const payload = proposal.payload as Record<string, unknown>;
           return typeof payload.scheduledTime === "string" &&
             payload.scheduledTime.length > 0;
@@ -7182,8 +7271,6 @@ const buildPlannerContract = (
     decisionSummary: firstSentence(
       result.structuredResponse?.planDay?.message ??
         result.structuredResponse?.comingUp?.message ??
-        result.structuredResponse?.rightNow?.message ??
-        result.structuredResponse?.dayAdjust?.message ??
         result.structuredResponse?.priorityOverview?.message ??
         result.structuredResponse?.weeklyPlan?.message ??
         result.structuredResponse?.campaignMomentum?.message ??
@@ -7845,11 +7932,10 @@ const buildLowEnergyAdjustmentResponse = (
     return recoveryProposal;
   }
 
-  const response = buildDayAdjustResponse(
+  const response = buildPriorityOverviewResponse(
     input,
     sessionState,
     classificationHint,
-    { lowEnergy: true },
   );
 
   return {
@@ -8455,7 +8541,7 @@ const buildPlanDayQuestConsentAnswerResponse = (
 
   if (isNegativeReply(input.message)) {
     const reply =
-      "No problem - we'll keep this as planning context, not a quest.";
+      "No problem. We'll keep this as planning context, not a quest.";
     return {
       mode: "conversational",
       reply,
@@ -8485,7 +8571,7 @@ const buildPlanDayQuestConsentAnswerResponse = (
     const namingQuestion = question({
       id: "details",
       field: "details",
-      prompt: "Okay - what should the quest be called?",
+      prompt: "Okay, what should the quest be called?",
       reason:
         "Naming it after you opt in keeps quest creation deliberate instead of automatic.",
       required: true,
@@ -8654,15 +8740,15 @@ const buildPlanDayAcknowledgement = (
     !isPlanDayStarterTitle(parsedTitle) &&
     !isGenericPlanDayFocusTitle(parsedTitle)
   ) {
-    return `Got it - let's focus on ${formatGeneratedTaskTitle(parsedTitle)}.`;
+    return `Got it. Let's focus on ${formatGeneratedTaskTitle(parsedTitle)}.`;
   }
 
   const matchedScore = getPlanDayRankedScores(input)[0];
   if (matchedScore?.title) {
-    return `Got it - let's lean into ${matchedScore.title}.`;
+    return `Got it. Let's lean into ${matchedScore.title}.`;
   }
 
-  return "Got it - let's shape the day around that.";
+  return "Got it. Let's shape the day around that.";
 };
 
 const isPlanDayEnergyOnlyReply = (
@@ -9323,7 +9409,7 @@ export const buildPlanDayLoadReason = (
   }
 
   if (segments.length === 0) {
-    return `${dateLead} is already shaping up — let's not pile more on without a clear reason.`;
+    return `${dateLead} is already shaping up. Let's not pile more on without a clear reason.`;
   }
 
   const detail = segments.length === 1
@@ -9417,8 +9503,8 @@ export const buildPlanDayCampaignGoalsAtRiskLine = (
 
   const list = formatPlanDayInlineList(candidates.map(describe));
   const lead = isWittySassyTone(input.tonePack)
-    ? "Heads up though —"
-    : "Heads up —";
+    ? "Heads up though."
+    : "Heads up.";
   const closer = candidates.length === 1
     ? "and could use a touch."
     : "and could use a touch.";
@@ -9490,8 +9576,6 @@ const buildPlanDayStructuredOutput = (
   },
   weeklyPlan: null,
   comingUp: null,
-  rightNow: null,
-  dayAdjust: null,
 });
 
 const WEEKDAY_SHORT_FORMATTER = new Intl.DateTimeFormat("en-US", {
@@ -9811,8 +9895,6 @@ const buildWeeklyPlanStructuredOutput = (
     openDays,
   },
   comingUp: null,
-  rightNow: null,
-  dayAdjust: null,
 });
 
 const buildPlanWeekStarterResponse = (
@@ -10223,8 +10305,6 @@ const buildReflectionBridgeStructuredOutput = (
     tomorrowSchedule: options.tomorrowSchedule,
   },
   comingUp: null,
-  rightNow: null,
-  dayAdjust: null,
 });
 
 const buildReflectionBridgeResponse = (
@@ -10326,33 +10406,6 @@ const buildReflectionBridgeResponse = (
   );
 };
 
-const buildCurrentWindowLabel = (input: PlannerBuildInput): string => {
-  const currentMinutes = getLocalMinutesFromDateTime(input.currentDateTime);
-  if (currentMinutes === null) return "the next hour";
-
-  const intervals = buildIntervalsForDate(input, input.currentDate)
-    .filter((interval) => interval.endMinutes > currentMinutes);
-  const nextInterval = intervals.find((interval) =>
-    interval.startMinutes > currentMinutes
-  );
-  const windDownMinutes = getWindDownMinutes(
-    input.plannerContext.plannerMemory,
-  );
-  const defaultEnd = Math.min(currentMinutes + 60, windDownMinutes);
-  const endMinutes = nextInterval
-    ? Math.min(
-      nextInterval.startMinutes,
-      Math.max(defaultEnd, currentMinutes + 30),
-    )
-    : defaultEnd;
-
-  return formatAssistantTimeRange(
-    formatMinutes(currentMinutes),
-    formatMinutes(Math.max(currentMinutes + 30, endMinutes)),
-  ) ??
-    "the next hour";
-};
-
 const getTodayScoredTaskEntries = (input: PlannerBuildInput) =>
   getResolvedPriorityScores(input)
     .filter((score) => score.kind === "task" && score.taskId)
@@ -10368,606 +10421,6 @@ const getTodayScoredTaskEntries = (input: PlannerBuildInput) =>
       entry.task.completed !== true
     )
     .sort((left, right) => right.score.score - left.score.score);
-
-const buildRightNowStructuredOutput = (
-  input: PlannerBuildInput,
-  reply: string,
-  classificationHint: ClassificationHint,
-  recommendedAction: CompanionSuggestedQuest | null,
-  fallbackAction: CompanionSuggestedQuest | null,
-  currentWindow: string,
-  proposals: PlannerProposal[],
-): CompanionStructuredResponse => ({
-  intent: mapPlannerIntentMetadata(input, classificationHint, {
-    forceIntentType: getProposalDrivenIntentType("quest", proposals),
-    shouldCreateQuest: shouldCreateQuestFromProposals(proposals),
-    shouldPromptCampaign: false,
-  }),
-  planDay: null,
-  weeklyPlan: null,
-  comingUp: null,
-  rightNow: {
-    message: reply,
-    currentWindow,
-    recommendedAction,
-    fallbackAction,
-  },
-  dayAdjust: null,
-});
-
-const buildRightNowStarterResponse = (
-  input: PlannerBuildInput,
-  sessionState: PlannerSessionState,
-  classificationHint: ClassificationHint,
-): PlannerBuildResult => {
-  const currentMinutes = getLocalMinutesFromDateTime(input.currentDateTime);
-  const currentWindow = buildCurrentWindowLabel(input);
-  const entries = getTodayScoredTaskEntries(input);
-
-  const inProgress = entries.find(({ task }) => {
-    const startMinutes = parseTimeToMinutes(task.scheduledTime);
-    if (startMinutes === null || currentMinutes === null) return false;
-    return currentMinutes >= startMinutes &&
-      currentMinutes < startMinutes + getTaskDuration(task);
-  }) ?? null;
-  const upcoming = entries.find(({ task }) => {
-    const startMinutes = parseTimeToMinutes(task.scheduledTime);
-    if (startMinutes === null || currentMinutes === null) return false;
-    return startMinutes >= currentMinutes &&
-      startMinutes <= currentMinutes + 60;
-  }) ?? null;
-
-  const intervals = buildIntervalsForDate(input, input.currentDate)
-    .filter((interval) =>
-      currentMinutes === null || interval.startMinutes > currentMinutes
-    );
-  const nextIntervalStart = intervals[0]?.startMinutes ??
-    getWindDownMinutes(input.plannerContext.plannerMemory);
-  const availableMinutes = currentMinutes === null
-    ? 60
-    : Math.max(0, nextIntervalStart - currentMinutes);
-  const fitCandidate =
-    entries.find(({ task }) =>
-      parseTimeToMinutes(task.scheduledTime) === null &&
-      getTaskDuration(task) <= availableMinutes
-    ) ??
-      entries.find(({ task }) => getTaskDuration(task) <= availableMinutes) ??
-      null;
-  const campaignCandidate = buildCampaignWindowNextBestAction(input, {
-    availableMinutes,
-    context: "right_now",
-  });
-
-  const chosenTask = inProgress ?? upcoming ??
-    (
-      campaignCandidate &&
-        (!fitCandidate ||
-          campaignCandidate.priorityScore > fitCandidate.score.score)
-        ? null
-        : fitCandidate
-    );
-  const recommendedAction = chosenTask
-    ? buildSuggestedQuestFromTask(
-      chosenTask.task,
-      inProgress
-        ? "It's already in your active window, so sticking with it is the cleanest move."
-        : upcoming
-        ? "It's the next scheduled move, so starting there keeps the day on track."
-        : chosenTask.score.reasons[0] ??
-          "It fits the current window without crowding the rest of the day.",
-      {
-        type: mapPriorityScoreToSuggestedQuestType(
-          chosenTask.score.score,
-          chosenTask.task,
-        ),
-      },
-    )
-    : campaignCandidate
-    ? campaignCandidate.suggestion
-    : null;
-
-  const missedTask = collectMissedTasksForToday(input)[0];
-  const missedTaskRecord = findPlannerTaskById(input, missedTask?.id ?? null);
-  const fallbackAction = missedTaskRecord
-    ? buildSuggestedQuestFromTask(
-      missedTaskRecord,
-      "You missed this earlier, so clearing it now helps the rest of the day stop dragging behind you.",
-    )
-    : recommendedAction
-    ? null
-    : (() => {
-      const estimatedDurationMinutes = getQuickResetEstimatedDurationMinutes(
-        input,
-        availableMinutes,
-      );
-      return {
-        suggestionId: "recovery:right-now",
-        proposalId: null,
-        title:
-          `Take a ${estimatedDurationMinutes}-minute reset and clear one quick blocker`,
-        type: "nice" as const,
-        estimatedDuration: formatEstimatedDurationLabel(
-          estimatedDurationMinutes,
-        ),
-        estimatedDurationMinutes,
-        source: "recovery" as const,
-        reason:
-          "Nothing else fits cleanly right now, so the best move is to reset and create a little room.",
-      };
-    })();
-
-  const reply = recommendedAction
-    ? `For ${currentWindow}, do ${recommendedAction.title}. ${recommendedAction.reason}`
-    : `For ${currentWindow}, keep it simple. ${
-      fallbackAction?.reason ??
-        "Use the next few minutes to reset and make room for one clean move."
-    }`;
-
-  const nextSessionState = {
-    ...sessionState,
-    lastClassification: classificationHint.type,
-  };
-  const proposals = !chosenTask &&
-      campaignCandidate?.proposal &&
-      recommendedAction?.proposalId === campaignCandidate.proposal.id
-    ? [campaignCandidate.proposal]
-    : [];
-
-  if (proposals.length > 0) {
-    return {
-      mode: "proposal",
-      reply,
-      followUpQuestions: [],
-      proposals,
-      suggestedReminders: [],
-      structuredResponse: buildRightNowStructuredOutput(
-        input,
-        reply,
-        classificationHint,
-        recommendedAction,
-        fallbackAction,
-        currentWindow,
-        proposals,
-      ),
-      memoryUpdates: {
-        preferredTimeOfDay: nextSessionState.preferredTimeOfDay ??
-          input.plannerContext.plannerMemory?.preferredTimeOfDay ?? null,
-        preferredTimeReason: nextSessionState.preferredTimeReason ??
-          input.plannerContext.plannerMemory?.preferredTimeReason ?? null,
-        reminderPreference: nextSessionState.reminderPreference ??
-          (input.plannerContext.plannerMemory?.reminderMinutesBefore
-            ? `${input.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
-            : null),
-      },
-      sessionState: nextSessionState,
-    };
-  }
-
-  return buildReadOnlyResponse(
-    reply,
-    nextSessionState,
-    "schedule_read",
-    buildRightNowStructuredOutput(
-      input,
-      reply,
-      classificationHint,
-      recommendedAction,
-      fallbackAction,
-      currentWindow,
-      [],
-    ),
-  );
-};
-
-const buildMoveProposalForTask = (
-  input: PlannerBuildInput,
-  task: PlannerContextTask,
-  nextDate: string,
-  reason: string,
-): PlannerProposal => ({
-  id: createId(),
-  kind: "update_quest",
-  title: `Move ${task.title}`,
-  summary: `Move "${task.title}" to ${nextDate}${
-    task.scheduledTime ? ` at ${task.scheduledTime}` : ""
-  }.`,
-  reasoning: reason,
-  payload: {
-    taskId: task.id,
-    updates: {
-      task_date: nextDate,
-      scheduled_time: task.scheduledTime ?? undefined,
-    },
-  },
-  status: "pending",
-  readyToConfirm: true,
-  missingFields: [],
-});
-
-const buildDayAdjustStructuredOutput = (
-  input: PlannerBuildInput,
-  reply: string,
-  classificationHint: ClassificationHint,
-  keep: CompanionSuggestedQuest[],
-  move: CompanionSuggestedQuest[],
-  dropOrShrink: CompanionSuggestedQuest[],
-  proposals: PlannerProposal[],
-): CompanionStructuredResponse => ({
-  intent: mapPlannerIntentMetadata(input, classificationHint, {
-    forceIntentType: getProposalDrivenIntentType("quest", proposals),
-    shouldCreateQuest: shouldCreateQuestFromProposals(proposals),
-    shouldPromptCampaign: false,
-  }),
-  planDay: null,
-  weeklyPlan: null,
-  comingUp: null,
-  rightNow: null,
-  dayAdjust: {
-    message: reply,
-    keep,
-    move,
-    dropOrShrink,
-  },
-});
-
-const getDayAdjustCampaignProtectedTask = (
-  input: PlannerBuildInput,
-  entries: { score: PlannerPriorityScore; task: PlannerContextTask }[],
-): {
-  taskId: string;
-  campaignTitle: string;
-  status: CompanionCampaignStatus;
-  reason: string;
-} | null => {
-  const todayTaskIds = new Set(entries.map((entry) => entry.task.id));
-
-  for (const score of getResolvedPriorityScores(input)) {
-    if (score.kind !== "epic" || !score.epicId) continue;
-
-    const epic = input.plannerContext.activeEpics.find((candidate) =>
-      candidate.id === score.epicId
-    );
-    if (!epic) continue;
-
-    const campaignMomentum = buildCampaignMomentumCandidate(input, epic);
-    if (campaignMomentum.status === "moving") continue;
-
-    const linkedTask = selectCampaignNextTask(input, campaignMomentum);
-    if (!linkedTask || !todayTaskIds.has(linkedTask.id)) continue;
-
-    return {
-      taskId: linkedTask.id,
-      campaignTitle: epic.title,
-      status: campaignMomentum.status,
-      reason: campaignMomentum.tooManyCampaigns
-        ? `This is the campaign move to protect while too many active campaigns are competing for attention.`
-        : campaignMomentum.interventionLevel === "reset"
-        ? `${
-          getCampaignPressureLead(campaignMomentum, {
-            preferRepeatedSlip: true,
-          })
-        } This is the reset move to protect today.`
-        : campaignMomentum.status === "at_risk"
-        ? `This is the clearest move to stop ${epic.title} from slipping today.`
-        : campaignMomentum.status === "stalled"
-        ? `This is the concrete restart move ${epic.title} needs today.`
-        : `This keeps ${epic.title} from drifting further today.`,
-    };
-  }
-
-  return null;
-};
-
-const getDayAdjustStrategicCampaignSuggestion = (
-  input: PlannerBuildInput,
-): {
-  campaignTitle: string;
-  momentum: CampaignMomentumCandidate;
-} | null => {
-  const seenCampaignIds = new Set<string>();
-
-  for (const score of getResolvedPriorityScores(input)) {
-    const epicId = score.kind === "epic"
-      ? score.epicId
-      : score.kind === "task"
-      ? score.epicId ?? findPlannerTaskById(input, score.taskId)?.epicId ?? null
-      : null;
-    if (!epicId || seenCampaignIds.has(epicId)) continue;
-    seenCampaignIds.add(epicId);
-
-    const epic = input.plannerContext.activeEpics.find((candidate) =>
-      candidate.id === epicId
-    );
-    if (!epic) continue;
-
-    const campaignMomentum = buildCampaignMomentumCandidate(input, epic);
-    const linkedTask = selectCampaignNextTask(input, campaignMomentum);
-    if (linkedTask?.taskDate === input.currentDate) continue;
-    if (!hasRepeatedCampaignSlip(campaignMomentum)) continue;
-    if (!shouldSuggestStrategicCampaignAdjustment(campaignMomentum)) continue;
-
-    return {
-      campaignTitle: epic.title,
-      momentum: campaignMomentum,
-    };
-  }
-
-  return null;
-};
-
-const getDayAdjustCampaignFollowUpSuggestion = (
-  input: PlannerBuildInput,
-): {
-  campaignTitle: string;
-  momentum: CampaignMomentumCandidate;
-} | null => {
-  const seenCampaignIds = new Set<string>();
-
-  for (const score of getResolvedPriorityScores(input)) {
-    const epicId = score.kind === "epic"
-      ? score.epicId
-      : score.kind === "task"
-      ? score.epicId ?? findPlannerTaskById(input, score.taskId)?.epicId ?? null
-      : null;
-    if (!epicId || seenCampaignIds.has(epicId)) continue;
-    seenCampaignIds.add(epicId);
-
-    const epic = input.plannerContext.activeEpics.find((candidate) =>
-      candidate.id === epicId
-    );
-    if (!epic) continue;
-
-    const campaignMomentum = buildCampaignMomentumCandidate(input, epic);
-    if (shouldSuggestStrategicCampaignAdjustment(campaignMomentum)) continue;
-    if (!campaignNeedsFollowUpDefinition(campaignMomentum)) continue;
-
-    return {
-      campaignTitle: epic.title,
-      momentum: campaignMomentum,
-    };
-  }
-
-  return null;
-};
-
-const buildDayAdjustResponse = (
-  input: PlannerBuildInput,
-  sessionState: PlannerSessionState,
-  classificationHint: ClassificationHint,
-  options?: {
-    lowEnergy?: boolean;
-  },
-): PlannerBuildResult => {
-  const entries = getTodayScoredTaskEntries(input);
-  const protectCount = options?.lowEnergy ? 1 : 2;
-  const protectedCampaignTask = getDayAdjustCampaignProtectedTask(
-    input,
-    entries,
-  );
-  const protectedCampaignReset = protectedCampaignTask
-    ? null
-    : getDayAdjustStrategicCampaignSuggestion(input);
-  const protectedCampaignFollowUp =
-    protectedCampaignTask || protectedCampaignReset
-      ? null
-      : getDayAdjustCampaignFollowUpSuggestion(input);
-  const protectedCampaignResetProposal = protectedCampaignReset
-    ? buildCampaignAdjustmentProposalForMomentum(
-      input,
-      protectedCampaignReset.momentum,
-    )
-    : null;
-  const protectedCampaignFollowUpProposal = protectedCampaignFollowUp
-    ? buildCampaignNextStepProposal(input, protectedCampaignFollowUp.momentum, {
-      targetDate: input.currentDate,
-    })
-    : null;
-  const protectedIds = new Set(
-    entries
-      .filter((entry, index) =>
-        index < protectCount || entry.task.habitSourceId ||
-        entry.task.priority === "high" ||
-        entry.task.id === protectedCampaignTask?.taskId
-      )
-      .map((entry) => entry.task.id),
-  );
-  const keepEntries = entries
-    .filter((entry) => protectedIds.has(entry.task.id))
-    .sort((left, right) => {
-      const leftProtected = left.task.id === protectedCampaignTask?.taskId
-        ? 1
-        : 0;
-      const rightProtected = right.task.id === protectedCampaignTask?.taskId
-        ? 1
-        : 0;
-      if (rightProtected !== leftProtected) {
-        return rightProtected - leftProtected;
-      }
-      return right.score.score - left.score.score;
-    })
-    .slice(0, 3);
-  const moveEntries = entries.filter((entry) =>
-    !protectedIds.has(entry.task.id)
-  )
-    .slice(0, 3);
-  const dropEntries = entries.filter((entry) =>
-    !protectedIds.has(entry.task.id) &&
-    !moveEntries.some((candidate) => candidate.task.id === entry.task.id)
-  )
-    .filter((entry) =>
-      getTaskDuration(entry.task) >= 45 || entry.score.score < 60
-    )
-    .slice(0, 2);
-
-  const keep = [
-    ...(protectedCampaignResetProposal
-      ? [
-        buildSuggestedQuestFromProposal(
-          input,
-          protectedCampaignResetProposal,
-          `${
-            getCampaignPressureLead(protectedCampaignReset!.momentum, {
-              preferRepeatedSlip: true,
-            })
-          } Protect a reset move for ${
-            protectedCampaignReset!.campaignTitle
-          } today instead of crowding in more low-leverage work.`,
-        ),
-      ]
-      : protectedCampaignFollowUpProposal
-      ? [
-        buildSuggestedQuestFromProposal(
-          input,
-          protectedCampaignFollowUpProposal,
-          `${
-            getCampaignPressureLead(protectedCampaignFollowUp!.momentum, {
-              preferRepeatedSlip: true,
-            })
-          } Protect a concrete next step for ${
-            protectedCampaignFollowUp!.campaignTitle
-          } today before the momentum goes stale.`,
-        ),
-      ]
-      : []),
-    ...keepEntries.map((entry) =>
-      buildSuggestedQuestFromTask(
-        entry.task,
-        entry.task.id === protectedCampaignTask?.taskId
-          ? protectedCampaignTask.reason
-          : entry.score.reasons[0] ??
-            "This is one of the strongest moves left for today.",
-        {
-          type: mapPriorityScoreToSuggestedQuestType(
-            entry.score.score,
-            entry.task,
-          ),
-        },
-      )
-    ),
-  ].slice(0, 3);
-  const protectedCampaignTitle = protectedCampaignTask?.campaignTitle ??
-    protectedCampaignReset?.campaignTitle ??
-    protectedCampaignFollowUp?.campaignTitle ??
-    null;
-  const nextDate = addDaysToDateKey(input.currentDate, 1);
-  const moveProposals = moveEntries.map((entry) =>
-    buildMoveProposalForTask(
-      input,
-      entry.task,
-      nextDate,
-      options?.lowEnergy
-        ? "You asked for a lighter day, so I'm moving this to protect the stronger priorities."
-        : "Today needs less load, so I'm moving this to keep the day realistic.",
-    )
-  );
-  const move = moveProposals.map((proposal, index) =>
-    buildSuggestedQuestFromProposal(
-      input,
-      proposal,
-      options?.lowEnergy
-        ? protectedCampaignTask
-          ? `Move this out so today's core plan stays light while ${protectedCampaignTask.campaignTitle} keeps its foothold.`
-          : protectedCampaignReset
-          ? `Move this out so ${protectedCampaignReset.campaignTitle} gets the reset space it needs today.`
-          : protectedCampaignFollowUp
-          ? `Move this out so ${protectedCampaignFollowUp.campaignTitle} gets a concrete next step today.`
-          : "Move this out so today's core plan stays light."
-        : protectedCampaignTask
-        ? `Move this out so ${protectedCampaignTask.campaignTitle} keeps the cleaner slot in today's plan.`
-        : protectedCampaignReset
-        ? `Move this out so ${protectedCampaignReset.campaignTitle} gets the reset space it needs today.`
-        : protectedCampaignFollowUp
-        ? `Move this out so ${protectedCampaignFollowUp.campaignTitle} gets a concrete next step in today's plan.`
-        : "Move this out so today's core plan stays realistic.",
-    )
-  );
-  const dropOrShrink = dropEntries.map((entry) =>
-    buildSuggestedQuestFromTask(
-      entry.task,
-      protectedCampaignTask
-        ? `If time still feels tight, shrink this to a 15-minute pass or let it go so ${protectedCampaignTask.campaignTitle} keeps the space it needs.`
-        : protectedCampaignReset
-        ? `If time still feels tight, shrink this to a 15-minute pass or let it go so ${protectedCampaignReset.campaignTitle} has room for a reset move.`
-        : protectedCampaignFollowUp
-        ? `If time still feels tight, shrink this to a 15-minute pass or let it go so ${protectedCampaignFollowUp.campaignTitle} has room for a concrete next step.`
-        : "If time still feels tight, shrink this to a 15-minute pass or let it go today.",
-      { type: "nice" },
-    )
-  );
-
-  const reply = moveProposals.length > 0
-    ? options?.lowEnergy
-      ? protectedCampaignTask
-        ? `I'm lightening today by protecting the move that keeps ${protectedCampaignTask.campaignTitle} alive, shifting ${moveProposals.length}, and giving you permission to shrink the rest.`
-        : protectedCampaignReset
-        ? `I'm lightening today by protecting the reset move ${protectedCampaignReset.campaignTitle} needs, shifting ${moveProposals.length}, and giving you permission to shrink the rest.`
-        : protectedCampaignFollowUp
-        ? `I'm lightening today by protecting the next-step move ${protectedCampaignFollowUp.campaignTitle} needs, shifting ${moveProposals.length}, and giving you permission to shrink the rest.`
-        : `I'm lightening today by protecting ${keep.length || 1} core move${
-          keep.length === 1 ? "" : "s"
-        }, shifting ${moveProposals.length}, and giving you permission to shrink the rest.`
-      : protectedCampaignTask
-      ? `I'm tightening today by protecting the move that keeps ${protectedCampaignTask.campaignTitle} from slipping, shifting ${moveProposals.length}, and trimming what doesn't need to stay.`
-      : protectedCampaignReset
-      ? `I'm tightening today by protecting the reset move ${protectedCampaignReset.campaignTitle} needs, shifting ${moveProposals.length}, and trimming what doesn't need to stay.`
-      : protectedCampaignFollowUp
-      ? `I'm tightening today by protecting the next-step move ${protectedCampaignFollowUp.campaignTitle} needs, shifting ${moveProposals.length}, and trimming what doesn't need to stay.`
-      : `I'm tightening today by protecting the strongest move${
-        keep.length === 1 ? "" : "s"
-      }, shifting ${moveProposals.length}, and trimming what doesn't need to stay.`
-    : keep.length > 0
-    ? protectedCampaignTitle
-      ? protectedCampaignReset
-        ? `Today is already fairly lean. I'd protect the reset move ${protectedCampaignTitle} needs and avoid crowding the day.`
-        : protectedCampaignFollowUp
-        ? `Today is already fairly lean. I'd protect the next-step move ${protectedCampaignTitle} needs and avoid crowding the day.`
-        : `Today is already fairly lean. I'd protect the move ${protectedCampaignTitle} needs and avoid crowding the day.`
-      : "Today is already fairly lean. I'd keep the strongest move or two and avoid adding more."
-    : "There's not much cleanly schedulable work left today. The best move is to keep the day light and avoid forcing it.";
-
-  const proposals = [
-    ...(protectedCampaignResetProposal ? [protectedCampaignResetProposal] : []),
-    ...(protectedCampaignFollowUpProposal
-      ? [protectedCampaignFollowUpProposal]
-      : []),
-    ...moveProposals,
-  ];
-
-  return {
-    mode: proposals.length > 0 ? "proposal" : "schedule_read",
-    reply,
-    followUpQuestions: [],
-    proposals,
-    suggestedReminders: [],
-    structuredResponse: buildDayAdjustStructuredOutput(
-      input,
-      reply,
-      classificationHint,
-      keep,
-      move,
-      dropOrShrink,
-      proposals,
-    ),
-    memoryUpdates: {
-      preferredTimeOfDay: sessionState.preferredTimeOfDay ??
-        input.plannerContext.plannerMemory?.preferredTimeOfDay ??
-        null,
-      preferredTimeReason: sessionState.preferredTimeReason ??
-        input.plannerContext.plannerMemory?.preferredTimeReason ??
-        null,
-      reminderPreference: sessionState.reminderPreference ??
-        (input.plannerContext.plannerMemory?.reminderMinutesBefore
-          ? `${input.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
-          : null),
-    },
-    sessionState: {
-      ...sessionState,
-      openQuestionIds: [],
-      pendingStarterIntent: null,
-      lastClassification: classificationHint.type,
-    },
-  };
-};
 
 const buildPlanDayConversationResponse = (
   input: PlannerBuildInput,
@@ -10995,7 +10448,7 @@ const buildPlanDayConversationResponse = (
   if (concreteTitle) {
     const consentQuestion = buildPlanDayQuestConsentQuestion();
     const reply = [
-      acknowledgement ?? "Got it - we can keep talking through that.",
+      acknowledgement ?? "Got it. We can keep talking through that.",
       "I won't turn that into a quest automatically from Plan my day.",
       consentQuestion.prompt,
     ].filter(Boolean).join(" ");
@@ -11455,20 +10908,12 @@ const buildPlanningLauncherResponseForStarter = (
       classificationHint,
       matched,
     );
-  } else if (starterIntent === "right_now_start") {
-    result = buildRightNowStarterResponse(
-      input,
-      sessionState,
-      classificationHint,
-    );
   } else if (starterIntent === "low_energy_adjust") {
     result = buildLowEnergyAdjustmentResponse(
       input,
       sessionState,
       classificationHint,
     );
-  } else if (starterIntent === "adjust_today") {
-    result = buildDayAdjustResponse(input, sessionState, classificationHint);
   } else if (starterIntent === "briefing_followup") {
     result = buildReflectionBridgeResponse(
       input,
@@ -11541,7 +10986,7 @@ const buildPlanningLauncherConsentAnswerResponse = (
   }
 
   if (isNegativeReply(input.message)) {
-    const reply = "No problem - I'll keep this as a planner read, not a draft.";
+    const reply = "No problem. I'll keep this as a planner read, not a draft.";
     return {
       mode: "conversational",
       reply,
@@ -11586,7 +11031,7 @@ const buildPlanningLauncherConsentAnswerResponse = (
     const namingQuestion = question({
       id: "details",
       field: "details",
-      prompt: "Okay - what should the quest be called?",
+      prompt: "Okay, what should the quest be called?",
       reason:
         "Naming it after you opt in keeps quest creation deliberate instead of automatic.",
       required: true,
@@ -11791,18 +11236,6 @@ export function buildPlannerResponse(
       );
     }
 
-    if (starterIntent === "right_now_start") {
-      return maybeRequirePlanningLauncherConsent(
-        resolvedInput,
-        buildRightNowStarterResponse(
-          resolvedInput,
-          resolvedInput.sessionState,
-          classificationHint,
-        ),
-        starterIntent,
-      );
-    }
-
     const freeUpAfterResponse = buildFreeUpAfterResponse(
       resolvedInput,
       resolvedInput.sessionState,
@@ -11867,18 +11300,6 @@ export function buildPlannerResponse(
       return maybeRequirePlanningLauncherConsent(
         resolvedInput,
         buildLowEnergyAdjustmentResponse(
-          resolvedInput,
-          resolvedInput.sessionState,
-          classificationHint,
-        ),
-        starterIntent,
-      );
-    }
-
-    if (starterIntent === "adjust_today") {
-      return maybeRequirePlanningLauncherConsent(
-        resolvedInput,
-        buildDayAdjustResponse(
           resolvedInput,
           resolvedInput.sessionState,
           classificationHint,
@@ -12274,5 +11695,6 @@ export function buildPlannerResponse(
 
   return normalizePlannerBuildResultText(
     withPlannerContract(withScheduleValidation(input, rawResult)),
+    { protectedDataText: collectPlannerContextProtectedDataText(input) },
   );
 }

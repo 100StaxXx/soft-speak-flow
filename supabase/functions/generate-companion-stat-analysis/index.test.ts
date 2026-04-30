@@ -55,6 +55,10 @@ function createMockSupabase(
           calls.push({ table, operations: [...operations] });
           return Promise.resolve(nextResponse(table));
         },
+        lt(column: string, value: unknown) {
+          operations.push(["lt", column, value]);
+          return builder;
+        },
         order(column: string, options: unknown) {
           operations.push(["order", column, options]);
           return builder;
@@ -132,6 +136,17 @@ const baseAnalysis = {
     resolve: { level: "low", reasons: [] },
     creativity: { level: "medium", reasons: ["The week could use a little more originality and play."] },
     alignment: { level: "low", reasons: [] },
+  },
+  cosmiqTitle: {
+    title: "The Oathbound Pathfinder",
+    rarity: "rare",
+    momentum: "steady",
+    dominantStat: "discipline",
+    secondaryStat: "alignment",
+    rebalanceStat: "creativity",
+    fusion: true,
+    rebalancePath: "Strengthen Creativity to evolve toward The Soulforged Creator.",
+    titleStability: "new",
   },
   fantasyTitle: {
     title: "The Oathbound Navigator",
@@ -261,6 +276,50 @@ Deno.test("generate-companion-stat-analysis returns same-day cached analysis", a
   );
 });
 
+Deno.test("generate-companion-stat-analysis refreshes cached title-card state without regenerating analysis", async () => {
+  const cachedGeneratingAnalysis = {
+    ...baseAnalysis,
+    cosmiqTitleCard: {
+      profileKey: "v1-the-oathbound-pathfinder",
+      imageUrl: null,
+      status: "generating",
+      cached: false,
+      promptVersion: 1,
+    },
+  };
+  const supabase = createMockSupabase({
+    profiles: [{ data: { selected_mentor_id: "mentor-1", timezone: "America/Los_Angeles" }, error: null }],
+    companion_stat_analyses: [{ data: { payload: cachedGeneratingAnalysis }, error: null }],
+  });
+
+  const response = await module.handleGenerateCompanionStatAnalysis(
+    new Request("http://localhost", { method: "POST", body: JSON.stringify({}) }),
+    {
+      authenticate: async () => ({ userId: "user-1", isServiceRole: false }),
+      createSupabaseClient: () => supabase,
+      fetchImpl: async () => {
+        throw new Error("fetchImpl should not be called for cached responses");
+      },
+      now: () => new Date("2026-04-19T06:30:00.000Z"),
+      getCosmiqTitleCardCacheState: async () => ({
+        profileKey: "v1-the-oathbound-pathfinder",
+        imageUrl: "https://cdn.example.com/ready.png",
+        status: "ready",
+        cached: true,
+        promptVersion: 1,
+      }),
+    },
+  );
+
+  assertEquals(response.status, 200, "Cached response should succeed");
+
+  const payload = await response.json();
+  assertEquals(payload.cached, true, "Cached flag should stay true");
+  assertEquals(payload.analysis.cosmiqTitleCard.status, "ready", "Cached response should surface ready card state");
+  assertEquals(payload.analysis.cosmiqTitleCard.imageUrl, "https://cdn.example.com/ready.png", "Cached response should refresh image URL");
+  assertEquals(supabase.upserts.length, 0, "Cached title-card refresh should not rewrite analysis");
+});
+
 Deno.test("generate-companion-stat-analysis regenerates malformed same-day cached analysis rows", async () => {
   const supabase = createMockSupabase({
     companion_stat_analyses: [{
@@ -324,12 +383,21 @@ Deno.test("generate-companion-stat-analysis force refresh regenerates and overwr
   const upsertPayload = upsert.payload as {
     analysis_date: string;
     payload: {
+      cosmiqTitle: { title: string; rarity: string; rebalancePath: string };
       fantasyTitle: { title: string; archetype: string; explanation: string };
       suggestedAction: string;
     };
   };
   assertEquals(upsert.table, "companion_stat_analyses", "Fresh analysis should be persisted");
   assertEquals(upsertPayload.analysis_date, "2026-04-18", "Upsert should target the local analysis date");
+  assert(
+    typeof upsertPayload.payload.cosmiqTitle.title === "string" && upsertPayload.payload.cosmiqTitle.title.length > 0,
+    "Upserted payload should include a Cosmiq title",
+  );
+  assert(
+    typeof upsertPayload.payload.cosmiqTitle.rebalancePath === "string" && upsertPayload.payload.cosmiqTitle.rebalancePath.length > 0,
+    "Upserted payload should include a Cosmiq rebalance path",
+  );
   assert(
     typeof upsertPayload.payload.fantasyTitle.title === "string" && upsertPayload.payload.fantasyTitle.title.length > 0,
     "Upserted payload should include a fantasy title",
@@ -342,6 +410,41 @@ Deno.test("generate-companion-stat-analysis force refresh regenerates and overwr
     typeof upsertPayload.payload.suggestedAction === "string" && upsertPayload.payload.suggestedAction.length > 0,
     "Upserted payload should include mentor guidance",
   );
+});
+
+Deno.test("generate-companion-stat-analysis attaches title-card cache state without blocking on image generation", async () => {
+  const supabase = createMockSupabase({
+    companion_stat_analyses: [{ data: null, error: null }, { data: null, error: null }],
+    ...createFreshAnalysisResponseMap(),
+  });
+  let titleCardLookupCount = 0;
+
+  const response = await module.handleGenerateCompanionStatAnalysis(
+    new Request("http://localhost", { method: "POST", body: JSON.stringify({}) }),
+    {
+      authenticate: async () => ({ userId: "user-1", isServiceRole: false }),
+      createSupabaseClient: () => supabase,
+      fetchImpl: fetch,
+      now: () => new Date("2026-04-18T18:30:00.000Z"),
+      getCosmiqTitleCardCacheState: async () => {
+        titleCardLookupCount += 1;
+        return {
+          profileKey: "v1-the-oathbound-pathfinder",
+          imageUrl: null,
+          status: "generating",
+          cached: false,
+          promptVersion: 1,
+        };
+      },
+    },
+  );
+
+  assertEquals(response.status, 200, "Fresh response should succeed");
+
+  const payload = await response.json();
+  assertEquals(payload.cached, false, "Fresh response should not be cached");
+  assertEquals(payload.analysis.cosmiqTitleCard.status, "generating", "Fresh response should include nonblocking card state");
+  assertEquals(titleCardLookupCount, 1, "Fresh response should only perform a cache-state lookup");
 });
 
 Deno.test("buildCompanionStatAnalysisPayload maps drivers deterministically and stays honest for sparse stats", () => {

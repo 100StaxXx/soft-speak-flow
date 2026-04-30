@@ -73,6 +73,7 @@ import {
 import { getOnboardingScheduleArchetypeProfile } from "@/shared/onboardingScheduleArchetype";
 import { computePlannerPriorityScores } from "@/shared/companionPlannerPriority";
 import { buildCompanionStatInterpretation } from "@/shared/companionStatSignals";
+import { isUpcomingScheduleDigestMessage } from "@/shared/schedulingIntent";
 import { withTimeout } from "@/utils/asyncTimeout";
 import { normalizeUuidLikeId } from "@/utils/offlineId";
 import type {
@@ -605,17 +606,14 @@ const deriveStarterIntentFromMessage = (
   if (normalizedMessage === "quest?") {
     return "quest_capture";
   }
+  if (isUpcomingScheduleDigestMessage(normalizedMessage)) {
+    return "upcoming_start";
+  }
   if (
     /\b(advance my campaign|move my campaign forward|progress my campaign|unstick my campaign|help me progress (?:this|my) campaign)\b/
       .test(normalizedMessage)
   ) {
     return "advance_campaign_start";
-  }
-  if (
-    /\b(what should i do right now|what should i do now|right now|next 30 minutes|next 60 minutes|next hour)\b/
-      .test(normalizedMessage)
-  ) {
-    return "right_now_start";
   }
   if (
     /\b(tired|drained|fried|make it light|light day|low energy)\b/.test(
@@ -652,13 +650,6 @@ const deriveStarterIntentFromMessage = (
       .test(normalizedMessage)
   ) {
     return "relationship_touch";
-  }
-  if (
-    /\b(adjust my day|adjust today|rework today|reschedule today|move today around)\b/.test(
-      normalizedMessage,
-    )
-  ) {
-    return "adjust_today";
   }
   if (
     /\b(break this goal down|break a big goal|turn this into steps)\b/.test(
@@ -967,6 +958,37 @@ const serializeTaskContext = (task: {
   epicTitle: task.epic_title ?? null,
   contactId: task.contact_id ?? null,
 });
+
+const scopeTaskToActiveCampaigns = (
+  task: PlannerContextTask,
+  activeEpicIds: ReadonlySet<string>,
+): PlannerContextTask | null => {
+  if (!task.epicId || activeEpicIds.has(task.epicId)) {
+    return task;
+  }
+
+  if (task.habitSourceId) {
+    return null;
+  }
+
+  return {
+    ...task,
+    epicId: null,
+    epicTitle: null,
+  };
+};
+
+const scopeTasksToActiveCampaigns = (
+  tasks: PlannerContextTask[],
+  activeEpicIds: ReadonlySet<string>,
+): PlannerContextTask[] =>
+  tasks.reduce<PlannerContextTask[]>((scopedTasks, task) => {
+    const scopedTask = scopeTaskToActiveCampaigns(task, activeEpicIds);
+    if (scopedTask) {
+      scopedTasks.push(scopedTask);
+    }
+    return scopedTasks;
+  }, []);
 
 const mergePlannerTasks = (
   currentTasks: PlannerContextTask[],
@@ -1565,6 +1587,11 @@ export function useCompanionPlanner({
     },
   });
 
+  const activeEpicIds = useMemo(
+    () => new Set(activeEpics.map((epic) => epic.id)),
+    [activeEpics],
+  );
+
   const baseRituals = useMemo(
     () => mapRitualsToContext(activeEpics),
     [activeEpics],
@@ -1604,6 +1631,38 @@ export function useCompanionPlanner({
   const contextTasks = useMemo(() => (
     horizon === "month" ? monthTasksQuery.tasks : weekTasksQuery.tasks
   ), [horizon, monthTasksQuery.tasks, weekTasksQuery.tasks]);
+
+  const activePlannerTasks = useMemo(
+    () => scopeTasksToActiveCampaigns(
+      activeTasks.map(serializeTaskContext),
+      activeEpicIds,
+    ),
+    [activeEpicIds, activeTasks],
+  );
+
+  const contextPlannerTasks = useMemo(
+    () => scopeTasksToActiveCampaigns(
+      contextTasks.map(serializeTaskContext),
+      activeEpicIds,
+    ),
+    [activeEpicIds, contextTasks],
+  );
+
+  const inboxPlannerTasks = useMemo(
+    () => scopeTasksToActiveCampaigns(
+      inboxTasks.map(serializeTaskContext),
+      activeEpicIds,
+    ),
+    [activeEpicIds, inboxTasks],
+  );
+
+  const recentCompletedPlannerTasks = useMemo(
+    () => scopeTasksToActiveCampaigns(
+      (recentCompletedTasksQuery.data ?? []).map(serializeTaskContext),
+      activeEpicIds,
+    ),
+    [activeEpicIds, recentCompletedTasksQuery.data],
+  );
 
   const plannerMemory = useMemo<PlannerMemoryProfile>(() => {
     const remoteProfile = extractPlannerProfile(
@@ -1731,14 +1790,14 @@ export function useCompanionPlanner({
   const scheduleInsights = useMemo<PlannerScheduleInsights>(
     () =>
       buildCompanionPlannerScheduleInsights({
-        tasks: activeTasks.map(serializeTaskContext),
+        tasks: activePlannerTasks,
         calendarEvents: activeEventsQuery.events,
         horizon,
         selectedDate: todayIso,
         currentDateTime: formatCurrentDateTimeWithOffset(today),
         plannerMemory,
       }),
-    [activeEventsQuery.events, activeTasks, horizon, plannerMemory, today, todayIso],
+    [activeEventsQuery.events, activePlannerTasks, horizon, plannerMemory, today, todayIso],
   );
 
   const careSignals = useMemo<PlannerCareState>(() => ({
@@ -1853,8 +1912,8 @@ export function useCompanionPlanner({
     () =>
       computePlannerPriorityScores({
         currentDate: todayIso,
-        tasks: contextTasks.map(serializeTaskContext),
-        inboxTasks: inboxTasks.map(serializeTaskContext),
+        tasks: contextPlannerTasks,
+        inboxTasks: inboxPlannerTasks,
         activeEpics: mapEpicsToContext(activeEpics, todayIso),
         rituals: mapRitualsToContext(activeEpics),
         calendarEvents: contextEventsQuery
@@ -1877,9 +1936,9 @@ export function useCompanionPlanner({
       careSignals,
       contactsAttentionQuery.data,
       contextEventsQuery.events,
-      contextTasks,
+      contextPlannerTasks,
       effectivePlannerMemory,
-      inboxTasks,
+      inboxPlannerTasks,
       plannerAISignals,
       statInterpretation,
       reflectionSignalsQuery.data,
@@ -1890,12 +1949,9 @@ export function useCompanionPlanner({
 
   const plannerContext = useMemo<CompanionPlannerRequest["plannerContext"]>(
     () => sanitizePlannerContext({
-      tasks: mapTasksToContext(contextTasks.map(serializeTaskContext)),
-      inboxTasks: mapTasksToContext(inboxTasks.map(serializeTaskContext)),
-      recentCompletedTasks: mapTasksToContext(
-        (recentCompletedTasksQuery.data ?? [])
-          .map(serializeTaskContext),
-      ),
+      tasks: mapTasksToContext(contextPlannerTasks),
+      inboxTasks: mapTasksToContext(inboxPlannerTasks),
+      recentCompletedTasks: mapTasksToContext(recentCompletedPlannerTasks),
       activeEpics: mapEpicsToContext(activeEpics, todayIso),
       rituals: ritualsQuery.data ?? baseRituals,
       calendarEvents: contextEventsQuery
@@ -1915,12 +1971,12 @@ export function useCompanionPlanner({
       careSignals,
       contactsAttentionQuery.data,
       contextEventsQuery.events,
-      contextTasks,
+      contextPlannerTasks,
       effectivePlannerMemory,
-      inboxTasks,
+      inboxPlannerTasks,
       plannerAISignals,
       priorityScores,
-      recentCompletedTasksQuery.data,
+      recentCompletedPlannerTasks,
       ritualsQuery.data,
       statInterpretation,
       reflectionSignalsQuery.data,
@@ -2455,11 +2511,26 @@ export function useCompanionPlanner({
         outlookSyncPromise,
         classificationPromise,
       ]);
+      const mergedPlannerContext = mergePlannerContextWithOutlookSync(
+        plannerContext,
+        outlookPlanningContext,
+      );
       const syncedPlannerContext = sanitizePlannerContext(
-        mergePlannerContextWithOutlookSync(
-          plannerContext,
-          outlookPlanningContext,
-        ),
+        {
+          ...mergedPlannerContext,
+          tasks: scopeTasksToActiveCampaigns(
+            mergedPlannerContext.tasks,
+            activeEpicIds,
+          ),
+          inboxTasks: scopeTasksToActiveCampaigns(
+            mergedPlannerContext.inboxTasks,
+            activeEpicIds,
+          ),
+          recentCompletedTasks: scopeTasksToActiveCampaigns(
+            mergedPlannerContext.recentCompletedTasks ?? [],
+            activeEpicIds,
+          ),
+        },
       );
       const requestPriorityScores = computePlannerPriorityScores({
         currentDate: todayIso,
@@ -2681,6 +2752,7 @@ export function useCompanionPlanner({
       setIsSubmitting(false);
     }
   }, [
+    activeEpicIds,
     activeEpics,
     appendAssistantTurn,
     careSignals,

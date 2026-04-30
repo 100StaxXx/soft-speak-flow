@@ -100,13 +100,6 @@ export interface CompanionPlanDayStructuredOutput {
   } | null;
 }
 
-export interface CompanionRightNowStructuredOutput {
-  message: string;
-  currentWindow: string;
-  recommendedAction: CompanionSuggestedQuest | null;
-  fallbackAction: CompanionSuggestedQuest | null;
-}
-
 export interface CompanionWeeklyPlanStructuredOutput {
   message: string;
   weeklyTheme: string | null;
@@ -137,13 +130,6 @@ export interface CompanionReflectionBridgeStructuredOutput {
   tomorrowSummary: CompanionTomorrowSummary;
   firstAction: CompanionSuggestedQuest | null;
   tomorrowSchedule: CompanionScheduleItem[];
-}
-
-export interface CompanionDayAdjustStructuredOutput {
-  message: string;
-  keep: CompanionSuggestedQuest[];
-  move: CompanionSuggestedQuest[];
-  dropOrShrink: CompanionSuggestedQuest[];
 }
 
 export type CompanionCampaignStatus =
@@ -215,7 +201,5 @@ export interface CompanionStructuredResponse {
   priorityOverview?: CompanionPriorityOverviewStructuredOutput | null;
   reflectionBridge?: CompanionReflectionBridgeStructuredOutput | null;
   comingUp?: CompanionComingUpStructuredOutput | null;
-  rightNow?: CompanionRightNowStructuredOutput | null;
-  dayAdjust?: CompanionDayAdjustStructuredOutput | null;
   campaignMomentum?: CompanionCampaignMomentumStructuredOutput | null;
 }

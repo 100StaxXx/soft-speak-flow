@@ -22,6 +22,8 @@ interface DatePillsScrollerProps {
   onUserDateInteraction?: () => void;
 }
 
+type CenterSelectedDateResult = "centered" | "retry";
+
 const EDGE_THRESHOLD_PX = 80;
 const DEFAULT_EXTENSION_CHUNK = 14;
 const CENTER_RETRY_ATTEMPTS = 8;
@@ -59,6 +61,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     previousScrollLeft: number;
   } | null>(null);
   const isExpandingRef = useRef(false);
+  const lastCompletedCenterRequestKeyRef = useRef(centerRequestKey);
 
   const [rangeStart, setRangeStart] = useState<Date>(() => getInitialRange(selectedDate, daysToShow).start);
   const [rangeEnd, setRangeEnd] = useState<Date>(() => getInitialRange(selectedDate, daysToShow).end);
@@ -228,6 +231,54 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     };
   }, [recalculateEdgeSpacers]);
 
+  const centerSelectedDate = useCallback(({
+    behavior,
+    force,
+  }: {
+    behavior: ScrollBehavior;
+    force: boolean;
+  }): CenterSelectedDateResult => {
+    const container = scrollRef.current;
+    const selected = getSelectedPillElement();
+
+    if (!container || !selected) return "retry";
+
+    const containerWidth = container.offsetWidth;
+    const selectedWidth = selected.offsetWidth;
+
+    if (containerWidth === 0 || selectedWidth === 0) return "retry";
+
+    const nextSpacerWidth = calculateEdgeSpacerWidth();
+    if (
+      nextSpacerWidth !== null &&
+      Math.abs(nextSpacerWidth - edgeSpacerWidth) >= 0.5
+    ) {
+      setEdgeSpacerWidth(nextSpacerWidth);
+      if (!force) return "retry";
+    }
+
+    const selectedLeft = selected.offsetLeft;
+    const targetLeft = selectedLeft - containerWidth / 2 + selectedWidth / 2;
+    const maxScrollLeft = Math.max(0, container.scrollWidth - containerWidth);
+    const clampedLeft = Math.min(Math.max(targetLeft, 0), maxScrollLeft);
+
+    try {
+      container.scrollTo({
+        left: clampedLeft,
+        behavior,
+      });
+    } catch {
+      // Some WebViews/Safari states can throw; scrollLeft fallback below is deterministic.
+      container.scrollLeft = clampedLeft;
+    }
+
+    if (force) {
+      container.scrollLeft = clampedLeft;
+    }
+
+    return "centered";
+  }, [calculateEdgeSpacerWidth, edgeSpacerWidth, getSelectedPillElement]);
+
   // Center the selected pill on selected-date, activation, or explicit center requests.
   // Range extensions from edge scrolls intentionally don't re-center, so the
   // user's scroll momentum is preserved.
@@ -236,65 +287,36 @@ export const DatePillsScroller = memo(function DatePillsScroller({
 
     let frameId: number | null = null;
     let isCancelled = false;
+    const isForcedCenterRequest = centerRequestKey !== lastCompletedCenterRequestKeyRef.current;
 
-    const centerSelectedDate = (remainingAttempts: number) => {
+    const scheduleCentering = (remainingAttempts: number) => {
+      if (typeof window === "undefined") return;
+      frameId = window.requestAnimationFrame(() => {
+        frameId = null;
+        runCentering(remainingAttempts);
+      });
+    };
+
+    const runCentering = (remainingAttempts: number) => {
       if (isCancelled) return;
 
-      const container = scrollRef.current;
-      const selected = getSelectedPillElement();
+      const result = centerSelectedDate({
+        behavior: isForcedCenterRequest || prefersReducedMotion ? "auto" : "smooth",
+        force: isForcedCenterRequest,
+      });
+      const shouldRetry = result === "retry" || isForcedCenterRequest;
 
-      if (!container || !selected) {
-        if (remainingAttempts > 0 && typeof window !== "undefined") {
-          frameId = window.requestAnimationFrame(() => {
-            centerSelectedDate(remainingAttempts - 1);
-          });
-        }
+      if (shouldRetry && remainingAttempts > 0) {
+        scheduleCentering(remainingAttempts - 1);
         return;
       }
 
-      const containerWidth = container.offsetWidth;
-      const selectedWidth = selected.offsetWidth;
-
-      if ((containerWidth === 0 || selectedWidth === 0) && remainingAttempts > 0 && typeof window !== "undefined") {
-        frameId = window.requestAnimationFrame(() => {
-          centerSelectedDate(remainingAttempts - 1);
-        });
-        return;
-      }
-
-      if (containerWidth === 0 || selectedWidth === 0) return;
-
-      const nextSpacerWidth = calculateEdgeSpacerWidth();
-      if (
-        nextSpacerWidth !== null &&
-        Math.abs(nextSpacerWidth - edgeSpacerWidth) >= 0.5
-      ) {
-        setEdgeSpacerWidth(nextSpacerWidth);
-        if (remainingAttempts > 0 && typeof window !== "undefined") {
-          frameId = window.requestAnimationFrame(() => {
-            centerSelectedDate(remainingAttempts - 1);
-          });
-        }
-        return;
-      }
-
-      const selectedLeft = selected.offsetLeft;
-      const targetLeft = selectedLeft - containerWidth / 2 + selectedWidth / 2;
-      const maxScrollLeft = Math.max(0, container.scrollWidth - containerWidth);
-      const clampedLeft = Math.min(Math.max(targetLeft, 0), maxScrollLeft);
-
-      try {
-        container.scrollTo({
-          left: clampedLeft,
-          behavior: prefersReducedMotion ? "auto" : "smooth",
-        });
-      } catch {
-        // Some WebViews/Safari states can throw; scrollLeft fallback below is deterministic.
-        container.scrollLeft = clampedLeft;
+      if (isForcedCenterRequest && result === "centered") {
+        lastCompletedCenterRequestKeyRef.current = centerRequestKey;
       }
     };
 
-    centerSelectedDate(CENTER_RETRY_ATTEMPTS);
+    runCentering(CENTER_RETRY_ATTEMPTS);
 
     return () => {
       isCancelled = true;
@@ -302,7 +324,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
         window.cancelAnimationFrame(frameId);
       }
     };
-  }, [calculateEdgeSpacerWidth, centerRequestKey, edgeSpacerWidth, getSelectedPillElement, isActive, prefersReducedMotion, selectedDateKey]);
+  }, [centerRequestKey, centerSelectedDate, isActive, prefersReducedMotion, selectedDateKey]);
 
   return (
     <div

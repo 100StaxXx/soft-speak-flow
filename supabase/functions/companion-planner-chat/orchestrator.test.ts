@@ -166,63 +166,6 @@ Deno.test("skips orchestration for confirm-ready proposal responses", async () =
   );
 });
 
-Deno.test("skips orchestration for right-now starter schedule reads", async () => {
-  let fetchCalled = false;
-  const response = await buildOrchestratedPlannerResponse({
-    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) => {
-      fetchCalled = true;
-      return new Response(JSON.stringify({
-        choices: [{
-          message: {
-            content: JSON.stringify({
-              reply: "Try the intense task first.",
-              mode: "schedule_read",
-            }),
-          },
-        }],
-      }));
-    },
-    input: {
-      ...baseInput(),
-      message: "What should I do right now?",
-      plannerContext: {
-        ...baseInput().plannerContext,
-        starterIntent: "right_now_start",
-      },
-    },
-    baseResult: {
-      ...baseResult("schedule_read"),
-      reply: "For the next hour, do Reply to landlord email.",
-      structuredResponse: {
-        intent: {
-          intentType: "quest",
-          timeHorizon: "today",
-          isRecurring: false,
-          shouldCreateQuest: false,
-          shouldPromptCampaign: false,
-        },
-        planDay: null,
-        comingUp: null,
-        rightNow: {
-          message: "For the next hour, do Reply to landlord email.",
-          currentWindow: "10:30 am-11:00 am",
-          recommendedAction: null,
-          fallbackAction: null,
-        },
-        dayAdjust: null,
-      },
-    },
-    openAIApiKey: "test-openai-key",
-    model: "test-model",
-  });
-
-  assertEquals(fetchCalled, false);
-  assertEquals(
-    response.reply,
-    "For the next hour, do Reply to landlord email.",
-  );
-});
-
 Deno.test("skips orchestration for reflection bridge starter schedule reads", async () => {
   let fetchCalled = false;
   const response = await buildOrchestratedPlannerResponse({
@@ -270,8 +213,6 @@ Deno.test("skips orchestration for reflection bridge starter schedule reads", as
           tomorrowSchedule: [],
         },
         comingUp: null,
-        rightNow: null,
-        dayAdjust: null,
       },
     },
     openAIApiKey: "test-openai-key",
@@ -351,75 +292,6 @@ Deno.test("skips orchestration when a ready quest proposal is present in a mixed
   );
 });
 
-Deno.test("skips orchestration for adjust-day starter proposals", async () => {
-  let fetchCalled = false;
-  const response = await buildOrchestratedPlannerResponse({
-    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) => {
-      fetchCalled = true;
-      return new Response(JSON.stringify({
-        choices: [{
-          message: {
-            content: JSON.stringify({
-              reply: "Move everything and keep only the hard thing.",
-              mode: "proposal",
-            }),
-          },
-        }],
-      }));
-    },
-    input: {
-      ...baseInput(),
-      message: "Adjust my day",
-      plannerContext: {
-        ...baseInput().plannerContext,
-        starterIntent: "adjust_today",
-      },
-    },
-    baseResult: {
-      ...baseResult("proposal"),
-      reply:
-        "I'm tightening today by protecting the strongest moves and shifting 2 tasks.",
-      proposals: [{
-        id: "proposal-1",
-        kind: "update_quest",
-        title: "Move Inbox cleanup",
-        summary: "Move Inbox cleanup to tomorrow.",
-        payload: { taskId: "task-1" },
-        status: "pending",
-        readyToConfirm: true,
-        missingFields: [],
-      }],
-      structuredResponse: {
-        intent: {
-          intentType: "quest",
-          timeHorizon: "today",
-          isRecurring: false,
-          shouldCreateQuest: true,
-          shouldPromptCampaign: false,
-        },
-        planDay: null,
-        comingUp: null,
-        rightNow: null,
-        dayAdjust: {
-          message:
-            "I'm tightening today by protecting the strongest moves and shifting 2 tasks.",
-          keep: [],
-          move: [],
-          dropOrShrink: [],
-        },
-      },
-    },
-    openAIApiKey: "test-openai-key",
-    model: "test-model",
-  });
-
-  assertEquals(fetchCalled, false);
-  assertEquals(
-    response.reply,
-    "I'm tightening today by protecting the strongest moves and shifting 2 tasks.",
-  );
-});
-
 Deno.test("skips orchestration for advance-campaign starter responses", async () => {
   let fetchCalled = false;
   const response = await buildOrchestratedPlannerResponse({
@@ -468,8 +340,6 @@ Deno.test("skips orchestration for advance-campaign starter responses", async ()
         },
         planDay: null,
         comingUp: null,
-        rightNow: null,
-        dayAdjust: null,
         campaignMomentum: {
           message:
             "Launch prep looks stalled. I drafted the cleanest next step so you can confirm it without overthinking it.",
@@ -952,10 +822,10 @@ Deno.test("does not rewrite planning launcher consent follow-up turns", async ()
     },
     baseResult: {
       ...baseResult("conversational"),
-      reply: "Okay - what should the quest be called?",
+      reply: "Okay, what should the quest be called?",
       followUpQuestions: [{
         id: "details",
-        prompt: "Okay - what should the quest be called?",
+        prompt: "Okay, what should the quest be called?",
         required: true,
         field: "details",
       }],
@@ -971,7 +841,7 @@ Deno.test("does not rewrite planning launcher consent follow-up turns", async ()
   });
 
   assertEquals(response.mode, "conversational");
-  assertEquals(response.reply, "Okay - what should the quest be called?");
+  assertEquals(response.reply, "Okay, what should the quest be called?");
   assertEquals(response.followUpQuestions.length, 1);
   assertEquals(called, false);
 });
@@ -1014,8 +884,6 @@ Deno.test("does not rewrite deterministic no-room plan-day replies", async () =>
           campaignFocus: null,
         },
         comingUp: null,
-        rightNow: null,
-        dayAdjust: null,
       },
       sessionState: {
         ...baseResult("conversational").sessionState,
@@ -1056,7 +924,7 @@ Deno.test("ordinary plan-day turns do not enter the tool loop", async () => {
   });
 
   assertEquals(response.mode, "conversational");
-  assertEquals(response.reply, "Today is open — let's draft a few quests.");
+  assertEquals(response.reply, "Today is open. Let's draft a few quests.");
   assertEquals(response.proposals.length, 0);
   assertEquals(called, false);
 });

@@ -34,7 +34,7 @@ struct SmallWidgetView: View {
 
     private var progressSummaryText: String {
         guard totalCount > 0 else {
-            return "No quests tracked"
+            return "No tasks tracked"
         }
         return "\(completedCount)/\(totalCount) complete"
     }
@@ -85,7 +85,7 @@ struct SmallWidgetView: View {
             }
             
             if visibleTasks.isEmpty {
-                Text("No quests today")
+                Text("No tasks today")
                     .font(.caption2)
                     .foregroundColor(.cosmicSecondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
@@ -133,7 +133,7 @@ struct MediumWidgetView: View {
                 HStack {
                     Text("⚔️")
                         .font(.subheadline)
-                    Text("Today's Quests")
+                    Text("Today")
                         .font(.subheadline.bold())
                         .foregroundColor(.cosmicText)
                     Spacer()
@@ -229,7 +229,7 @@ struct LargeWidgetView: View {
                     HStack(spacing: 4) {
                         Text("⚔️")
                             .font(.headline)
-                        Text("Daily Quests")
+                        Text("Today")
                             .font(.headline.bold())
                             .foregroundColor(.cosmicText)
                     }
@@ -334,6 +334,13 @@ struct CosmicTaskRow: View {
                     .frame(width: compact ? 34 : 52, alignment: .leading)
                     .foregroundColor(.cosmicSecondary)
             }
+
+            if task.resolvedIsRitual {
+                Image(systemName: task.ritualMarkerSystemName)
+                    .font(.system(size: compact ? 7 : 8, weight: .semibold))
+                    .foregroundColor(task.ritualMarkerColor)
+                    .frame(width: compact ? 8 : 10)
+            }
             
             Text(task.text)
                 .font(compact ? .system(size: 11) : .caption)
@@ -353,6 +360,9 @@ struct CosmicTaskRow: View {
     
     private var checkColor: Color {
         if task.isMainQuest {
+            return .cosmicGold
+        }
+        if task.resolvedIsCampaignRitual && !task.completed {
             return .cosmicGold
         }
         return task.completed ? .cosmicGreen : .cosmicPurple
@@ -460,11 +470,29 @@ struct CosmicEmptyState: View {
         VStack(spacing: 4) {
             Text("✨")
                 .font(.title2)
-            Text("No quests today")
+            Text("No tasks today")
                 .font(.caption)
                 .foregroundColor(.cosmicSecondary)
         }
         .padding(.vertical, 8)
+    }
+}
+
+private extension WidgetTask {
+    var resolvedIsCampaignRitual: Bool {
+        isCampaignRitual == true || kind == "campaign_ritual"
+    }
+
+    var resolvedIsRitual: Bool {
+        isRitual == true || resolvedIsCampaignRitual || kind == "ritual" || habitSourceId != nil
+    }
+
+    var ritualMarkerSystemName: String {
+        resolvedIsCampaignRitual ? "flag.fill" : "repeat"
+    }
+
+    var ritualMarkerColor: Color {
+        resolvedIsCampaignRitual ? .cosmicGold : .cosmicPurple
     }
 }
 

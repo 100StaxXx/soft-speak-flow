@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
 import type { CompanionAgentFollowUp } from "@/types/companionAgent";
+import type { CompanionAssistantMessage } from "@/hooks/useCompanionAssistant";
 
 const mocks = vi.hoisted(() => ({
   assistant: {
@@ -34,7 +35,7 @@ const mocks = vi.hoisted(() => ({
         createdAt: "2026-04-18T08:01:00.000Z",
         source: "agent" as const,
       },
-    ],
+    ] as CompanionAssistantMessage[],
     draftInput: "Plan tomorrow for me",
     pendingAction: {
       id: "action-1",
@@ -360,6 +361,7 @@ const installTranscriptScrollTo = (viewport: HTMLElement) => {
 describe("JourneysCompanionPlannerModal", () => {
   const originalMatchMedia = window.matchMedia;
   const originalVisualViewport = window.visualViewport;
+  const originalInnerHeight = window.innerHeight;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -386,6 +388,12 @@ describe("JourneysCompanionPlannerModal", () => {
       })),
     });
 
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      writable: true,
+      value: 700,
+    });
+
     Object.defineProperty(window, "visualViewport", {
       configurable: true,
       value: {
@@ -405,6 +413,11 @@ describe("JourneysCompanionPlannerModal", () => {
     Object.defineProperty(window, "visualViewport", {
       configurable: true,
       value: originalVisualViewport,
+    });
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      writable: true,
+      value: originalInnerHeight,
     });
   });
 
@@ -436,6 +449,150 @@ describe("JourneysCompanionPlannerModal", () => {
       .toHaveAttribute("data-tour", "companion-plan-day-chat-input");
     expect(screen.getByTestId("journeys-companion-planner-send-button"))
       .toHaveAttribute("data-tour", "companion-plan-day-chat-send");
+  });
+
+  it("shows rich planner cards as the single assistant response", () => {
+    const previousMessages = mocks.state.messages;
+    const previousPendingAction = mocks.state.pendingAction;
+    const previousStructuredResponse = mocks.state.structuredResponse;
+    const structuredResponse = createBaseStructuredResponse();
+    const assistantReply = structuredResponse.planDay?.message ?? "";
+
+    mocks.state.pendingAction = null;
+    mocks.state.structuredResponse = structuredResponse;
+    mocks.state.messages = [
+      {
+        id: "m-rich-card",
+        role: "assistant",
+        content: assistantReply,
+        createdAt: "2026-04-18T08:03:00.000Z",
+        source: "agent",
+        structuredResponse,
+      },
+    ];
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    const planDayCard = screen.getByTestId("structured-plan-day");
+    const renderedCopies = screen.getAllByText(assistantReply);
+    expect(renderedCopies).toHaveLength(1);
+    expect(planDayCard).toContainElement(renderedCopies[0]!);
+    expect(screen.getByRole("button", { name: "Saved" })).toBeInTheDocument();
+
+    mocks.state.messages = previousMessages;
+    mocks.state.pendingAction = previousPendingAction;
+    mocks.state.structuredResponse = previousStructuredResponse;
+  });
+
+  it("hides the rich card origin bubble even when its text is unique", () => {
+    const previousMessages = mocks.state.messages;
+    const previousPendingAction = mocks.state.pendingAction;
+    const previousStructuredResponse = mocks.state.structuredResponse;
+    const structuredResponse = createBaseStructuredResponse();
+    const uniqueAssistantReply =
+      "I tightened the afternoon block before showing the plan.";
+    const cardMessage = structuredResponse.planDay?.message ?? "";
+
+    mocks.state.pendingAction = null;
+    mocks.state.structuredResponse = structuredResponse;
+    mocks.state.messages = [
+      {
+        id: "m-rich-card-unique-reply",
+        role: "assistant",
+        content: uniqueAssistantReply,
+        createdAt: "2026-04-18T08:04:00.000Z",
+        source: "agent",
+        structuredResponse,
+      },
+    ];
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    const planDayCard = screen.getByTestId("structured-plan-day");
+    expect(screen.queryByText(uniqueAssistantReply)).toBeNull();
+    expect(planDayCard).toContainElement(screen.getByText(cardMessage));
+    expect(screen.getByRole("button", { name: "Saved" })).toBeInTheDocument();
+
+    mocks.state.messages = previousMessages;
+    mocks.state.pendingAction = previousPendingAction;
+    mocks.state.structuredResponse = previousStructuredResponse;
+  });
+
+  it("keeps action receipt bubbles visible after rich card actions resolve", () => {
+    const previousMessages = mocks.state.messages;
+    const previousPendingAction = mocks.state.pendingAction;
+    const previousStructuredResponse = mocks.state.structuredResponse;
+    const structuredResponse = createBaseStructuredResponse();
+    const cardOriginReply = "Here is the plan I can save for you.";
+    const receiptReply = "Saved Outline the launch checklist.";
+
+    mocks.state.pendingAction = null;
+    mocks.state.structuredResponse = structuredResponse;
+    mocks.state.messages = [
+      {
+        id: "m-rich-card-origin",
+        role: "assistant",
+        content: cardOriginReply,
+        createdAt: "2026-04-18T08:05:00.000Z",
+        source: "agent",
+        structuredResponse,
+      },
+      {
+        id: "m-user-confirm",
+        role: "user",
+        content: "Confirm",
+        createdAt: "2026-04-18T08:06:00.000Z",
+        source: "agent",
+      },
+      {
+        id: "m-action-receipt",
+        role: "assistant",
+        content: receiptReply,
+        createdAt: "2026-04-18T08:06:01.000Z",
+        source: "agent",
+        structuredResponse,
+        receipt: {
+          actionId: "action-1",
+          status: "executed",
+          proposalId: "proposal-plan-1",
+          message: receiptReply,
+          summary: "Saved the planned quest.",
+          createdAt: "2026-04-18T08:06:01.000Z",
+          executionResult: null,
+          executionError: null,
+        },
+      },
+    ];
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    expect(screen.queryByText(cardOriginReply)).toBeNull();
+    expect(screen.getByText("Confirm")).toBeInTheDocument();
+    expect(screen.getByText(receiptReply)).toBeInTheDocument();
+    expect(screen.getByTestId("structured-plan-day"))
+      .toHaveTextContent("Outline the launch checklist");
+
+    mocks.state.messages = previousMessages;
+    mocks.state.pendingAction = previousPendingAction;
+    mocks.state.structuredResponse = previousStructuredResponse;
   });
 
   it("forwards Quest? launch intents through the assistant hook", async () => {
@@ -674,7 +831,25 @@ describe("JourneysCompanionPlannerModal", () => {
       .toMatchObject({ repositionInputs: false });
   });
 
+  it("keeps the mobile planner drawer flush when no keyboard inset is present", () => {
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="drawer"
+      />,
+    );
+
+    expect(screen.getByTestId("journeys-companion-planner-drawer-content"))
+      .toHaveStyle({ bottom: "0px" });
+  });
+
   it("sizes the mobile planner shell to the visible viewport when the keyboard opens", () => {
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      writable: true,
+      value: 852,
+    });
     Object.defineProperty(window, "visualViewport", {
       configurable: true,
       value: {
@@ -695,8 +870,57 @@ describe("JourneysCompanionPlannerModal", () => {
 
     expect(screen.getByTestId("journeys-companion-planner-shell"))
       .toHaveStyle({ height: "476px" });
+    expect(screen.getByTestId("journeys-companion-planner-drawer-content"))
+      .toHaveStyle({ bottom: "352px" });
     expect(mocks.drawerRootProps.find((props) => props.open === true))
       .toMatchObject({ repositionInputs: false });
+  });
+
+  it("keeps the pinned transcript anchored when the drawer layout changes", async () => {
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="drawer"
+      />,
+    );
+    const viewport = getTranscriptViewport();
+    const scrollTo = installTranscriptScrollTo(viewport);
+
+    setTranscriptViewportMetrics(viewport, {
+      scrollHeight: 900,
+      clientHeight: 300,
+      scrollTop: 600,
+    });
+    fireEvent.scroll(viewport);
+    scrollTo.mockClear();
+
+    await act(async () => {
+      Object.defineProperty(window, "innerHeight", {
+        configurable: true,
+        writable: true,
+        value: 852,
+      });
+      Object.defineProperty(window, "visualViewport", {
+        configurable: true,
+        value: {
+          height: 500,
+          offsetTop: 0,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        },
+      });
+      window.dispatchEvent(new Event("resize"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("journeys-companion-planner-shell"))
+        .toHaveStyle({ height: "476px" });
+    });
+    expect(scrollTo).toHaveBeenCalledWith({
+      top: 600,
+      behavior: "smooth",
+    });
   });
 
   it("wires inline confirm and cancel actions to the unified assistant hook", () => {

@@ -25,6 +25,11 @@ const mocks = vi.hoisted(() => ({
   syncPlanningContext: vi.fn(),
   useCalendarIntegrations: vi.fn(),
   enrichedContext: null as Record<string, unknown> | null,
+  todayTasks: [] as Array<Record<string, unknown>>,
+  weekTasks: [] as Array<Record<string, unknown>>,
+  monthTasks: [] as Array<Record<string, unknown>>,
+  inboxTasks: [] as Array<Record<string, unknown>>,
+  activeEpics: [] as Array<Record<string, unknown>>,
   user: {
     id: "user-1",
   } as { id: string } | null,
@@ -104,14 +109,14 @@ vi.mock("@/hooks/useIntentClassifier", () => ({
 
 vi.mock("@/hooks/useTasksQuery", () => ({
   useTasksQuery: () => ({
-    tasks: [],
+    tasks: mocks.todayTasks,
     isLoading: false,
   }),
 }));
 
 vi.mock("@/hooks/useCalendarTasks", () => ({
-  useCalendarTasks: () => ({
-    tasks: [],
+  useCalendarTasks: (_date: Date, view: string) => ({
+    tasks: view === "month" ? mocks.monthTasks : mocks.weekTasks,
     isLoading: false,
   }),
 }));
@@ -128,13 +133,13 @@ vi.mock("@/hooks/useExternalCalendarEvents", () => ({
 
 vi.mock("@/hooks/useInboxTasks", () => ({
   useInboxTasks: () => ({
-    inboxTasks: [],
+    inboxTasks: mocks.inboxTasks,
   }),
 }));
 
 vi.mock("@/hooks/useEpics", () => ({
   useEpics: () => ({
-    activeEpics: [],
+    activeEpics: mocks.activeEpics,
     createEpic: vi.fn(),
     renameEpic: vi.fn(),
     createCampaignRitual: vi.fn(),
@@ -263,6 +268,11 @@ describe("useCompanionPlanner", () => {
       defaultProvider: null,
     });
     mocks.enrichedContext = null;
+    mocks.todayTasks = [];
+    mocks.weekTasks = [];
+    mocks.monthTasks = [];
+    mocks.inboxTasks = [];
+    mocks.activeEpics = [];
     Object.defineProperty(window, "localStorage", {
       configurable: true,
       writable: true,
@@ -1260,6 +1270,46 @@ describe("useCompanionPlanner", () => {
     ).toBe("briefing_followup");
   });
 
+  it("derives typed coming-up prompts as the upcoming starter", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "schedule_read",
+        reply: "Today: nothing scheduled.\nTomorrow: nothing scheduled.",
+        followUpQuestions: [],
+        proposals: [],
+        suggestedReminders: [],
+        memoryUpdates: {},
+        sessionState: {
+          draft: {},
+          openQuestionIds: [],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          pendingStarterIntent: null,
+          lastClassification: "conversation",
+        },
+      },
+      error: null,
+    });
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
+
+    await act(async () => {
+      await result.current.submitMessage("What do I have coming up?", "text");
+    });
+    await act(async () => {
+      await result.current.submitMessage("What do I hgave coming up?", "text");
+    });
+
+    expect(
+      mocks.invoke.mock.calls[0]?.[1]?.body.plannerContext.starterIntent,
+    ).toBe("upcoming_start");
+    expect(
+      mocks.invoke.mock.calls[1]?.[1]?.body.plannerContext.starterIntent,
+    ).toBe("upcoming_start");
+  });
+
   it("shows a rollout-aware planner error instead of a fake lost-thread message", async () => {
     mocks.invoke.mockResolvedValue({
       data: null,
@@ -1456,6 +1506,157 @@ describe("useCompanionPlanner", () => {
     });
     expect(request?.body.plannerContext.inboxTasks).toEqual([]);
     expect(request?.body.plannerContext.calendarEvents).toEqual([]);
+  });
+
+  it("keeps planner campaign context limited to currently active campaigns", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-19T09:30:00.000Z"));
+    const activeCampaign = {
+      id: "epic-active",
+      user_id: "user-1",
+      title: "Active Campaign",
+      description: null,
+      status: "active",
+      progress_percentage: 25,
+      target_days: 30,
+      start_date: "2026-04-01",
+      end_date: "2026-05-01",
+      created_at: "2026-04-01T00:00:00.000Z",
+      epic_habits: [
+        {
+          habit_id: "habit-active",
+          habits: {
+            id: "habit-active",
+            title: "Active ritual",
+            difficulty: "medium",
+            frequency: "daily",
+            preferred_time: "08:00",
+            estimated_minutes: 15,
+          },
+        },
+      ],
+    };
+    const staleRitual = {
+      id: "stale-ritual",
+      task_text: "Old campaign ritual",
+      task_date: "2026-04-19",
+      category: null,
+      difficulty: "easy",
+      priority: null,
+      flexibility: null,
+      energy_type: null,
+      must_calendar_block: false,
+      deadline_at: null,
+      completed: false,
+      scheduled_time: "07:00",
+      completed_at: null,
+      estimated_duration: 15,
+      actual_time_spent: null,
+      notes: null,
+      recurrence_pattern: null,
+      recurrence_end_date: null,
+      source: "habit",
+      contact_id: null,
+      habit_source_id: "habit-stale",
+      epic_id: "epic-deleted",
+      epic_title: "Deleted Campaign",
+      subtasks: [],
+    };
+    const staleQuest = {
+      ...staleRitual,
+      id: "stale-quest",
+      task_text: "Leftover campaign quest",
+      difficulty: "medium",
+      priority: "high",
+      scheduled_time: "10:00",
+      estimated_duration: 30,
+      source: "manual",
+      habit_source_id: null,
+    };
+    const activeRitual = {
+      ...staleRitual,
+      id: "active-ritual-task",
+      task_text: "Active campaign ritual",
+      habit_source_id: "habit-active",
+      epic_id: "epic-active",
+      epic_title: "Active Campaign",
+    };
+    mocks.activeEpics = [activeCampaign];
+    mocks.todayTasks = [staleRitual, staleQuest, activeRitual];
+    mocks.weekTasks = [staleRitual, staleQuest, activeRitual];
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "schedule_read",
+        reply: "Here is the active campaign context.",
+        followUpQuestions: [],
+        proposals: [],
+        suggestedReminders: [],
+        memoryUpdates: {},
+        sessionState: {
+          draft: {},
+          openQuestionIds: [],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
+
+    await act(async () => {
+      await result.current.submitMessage("Plan with my campaigns", "text");
+    });
+
+    const request = mocks.invoke.mock.calls[0]?.[1];
+    const plannerContext = request?.body.plannerContext;
+    expect(plannerContext.tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "active-ritual-task",
+          epicId: "epic-active",
+          epicTitle: "Active Campaign",
+        }),
+        expect.objectContaining({
+          id: "stale-quest",
+          epicId: null,
+          epicTitle: null,
+        }),
+      ]),
+    );
+    expect(plannerContext.tasks).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "stale-ritual" }),
+      ]),
+    );
+    expect(plannerContext.activeEpics).toEqual([
+      expect.objectContaining({ id: "epic-active", title: "Active Campaign" }),
+    ]);
+    expect(plannerContext.rituals).toEqual([
+      expect.objectContaining({
+        id: "habit-active",
+        epicId: "epic-active",
+        epicTitle: "Active Campaign",
+      }),
+    ]);
+    expect(plannerContext.priorityScores).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "task:stale-quest",
+          epicId: null,
+        }),
+      ]),
+    );
+    expect(plannerContext.priorityScores).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "task:stale-ritual" }),
+        expect.objectContaining({ epicId: "epic-deleted" }),
+      ]),
+    );
   });
 
   it("falls back to backend classification when client-side classification preflight times out", async () => {

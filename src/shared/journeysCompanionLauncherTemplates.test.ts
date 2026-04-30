@@ -68,22 +68,6 @@ describe("journeys companion launcher greetings", () => {
       starterIntent: "plan_day",
     });
 
-    expect(templates.find((template) => template.id === "adjust-day")).toMatchObject({
-      id: "adjust-day",
-      label: "Adjust my day",
-      message: "Adjust my day",
-      target: "planner",
-      starterIntent: "adjust_today",
-    });
-
-    expect(templates.find((template) => template.id === "right-now")).toMatchObject({
-      id: "right-now",
-      label: "What should I do right now?",
-      message: "What should I do right now?",
-      target: "planner",
-      starterIntent: "right_now_start",
-    });
-
     expect(templates.find((template) => template.id === "upcoming")).toMatchObject({
       id: "upcoming",
       label: "What do I have coming up?",
@@ -111,8 +95,6 @@ describe("journeys companion launcher greetings", () => {
     expect(templates.map((template) => template.id)).toEqual([
       "free-talk",
       "plan-day",
-      "adjust-day",
-      "right-now",
       "upcoming",
       "quest",
       "goal",

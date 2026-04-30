@@ -1,6 +1,7 @@
 # Functions that are invoked dynamically and cannot be discovered by static grep.
 ai-orchestrator
 generate-weekly-plan
+generate-cosmiq-title-card
 google-calendar-auth
 google-calendar-events
 optimize-weekly-plan
