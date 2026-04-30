@@ -28,6 +28,7 @@ Deno.test("normalizeJourneyRitual preserves explicit monthly day selections", ()
       customMonthDays: [1],
       difficulty: "medium",
       estimatedMinutes: 30,
+      preferredTime: "19:00",
     },
     "fallback-id",
     normalizeDifficulty,
@@ -36,6 +37,8 @@ Deno.test("normalizeJourneyRitual preserves explicit monthly day selections", ()
   assert(ritual.frequency === "monthly", "Expected monthly frequency to survive normalization");
   assert(JSON.stringify(ritual.customMonthDays) === JSON.stringify([1]), "Expected monthly day to be preserved");
   assert(ritual.customPeriod === "month", "Expected monthly rituals to carry month period metadata");
+  assert(ritual.estimatedMinutes === 30, "Expected estimated minutes to be preserved");
+  assert(ritual.preferredTime === "19:00", "Expected preferred time to be preserved");
 });
 
 Deno.test("normalizeJourneyRitual defaults monthly cadence to day one when omitted", () => {
@@ -53,4 +56,50 @@ Deno.test("normalizeJourneyRitual defaults monthly cadence to day one when omitt
   assert(ritual.frequency === "monthly", "Expected monthly frequency to survive normalization");
   assert(JSON.stringify(ritual.customMonthDays) === JSON.stringify([1]), "Expected missing month day to default to day one");
   assert(ritual.customPeriod === "month", "Expected monthly rituals to be treated as month-based");
+});
+
+Deno.test("normalizeJourneyRitual pads compact preferred times", () => {
+  const ritual = normalizeJourneyRitual(
+    {
+      title: "Morning Review",
+      description: "Review the plan.",
+      frequency: "daily",
+      difficulty: "easy",
+      preferredTime: "8:05",
+    },
+    "fallback-id",
+    normalizeDifficulty,
+  );
+
+  assert(ritual.preferredTime === "08:05", "Expected compact hour to be padded");
+});
+
+Deno.test("normalizeJourneyRitual falls back when preferred time is invalid or omitted", () => {
+  const invalidTime = normalizeJourneyRitual(
+    {
+      title: "Deep Work",
+      description: "Work on the main goal.",
+      frequency: "daily",
+      difficulty: "medium",
+      preferredTime: "tomorrow morning",
+    },
+    "fallback-id",
+    normalizeDifficulty,
+    "14:00",
+  );
+
+  const missingTime = normalizeJourneyRitual(
+    {
+      title: "Evening Review",
+      description: "Close open loops.",
+      frequency: "daily",
+      difficulty: "medium",
+    },
+    "fallback-id",
+    normalizeDifficulty,
+    "17:00",
+  );
+
+  assert(invalidTime.preferredTime === "14:00", "Expected invalid preferred time to use fallback");
+  assert(missingTime.preferredTime === "17:00", "Expected missing preferred time to use fallback");
 });

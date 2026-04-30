@@ -133,6 +133,11 @@ const baseAnalysis = {
     creativity: { level: "medium", reasons: ["The week could use a little more originality and play."] },
     alignment: { level: "low", reasons: [] },
   },
+  fantasyTitle: {
+    title: "The Oathbound Navigator",
+    archetype: "Discipline / Alignment",
+    explanation: "You're carrying Discipline with Alignment close behind, and Creativity is the place your next chapter wants support.",
+  },
   momentumState: "coasting",
   recentMissInterpretation: "normal_variance",
   narrativeBrief: "You've kept Discipline online, but Vitality wants a little more intentional support.",
@@ -316,9 +321,23 @@ Deno.test("generate-companion-stat-analysis force refresh regenerates and overwr
   assertEquals(supabase.upserts.length, 1, "Force refresh should upsert the daily analysis row");
 
   const [upsert] = supabase.upserts;
-  const upsertPayload = upsert.payload as { analysis_date: string; payload: { suggestedAction: string } };
+  const upsertPayload = upsert.payload as {
+    analysis_date: string;
+    payload: {
+      fantasyTitle: { title: string; archetype: string; explanation: string };
+      suggestedAction: string;
+    };
+  };
   assertEquals(upsert.table, "companion_stat_analyses", "Fresh analysis should be persisted");
   assertEquals(upsertPayload.analysis_date, "2026-04-18", "Upsert should target the local analysis date");
+  assert(
+    typeof upsertPayload.payload.fantasyTitle.title === "string" && upsertPayload.payload.fantasyTitle.title.length > 0,
+    "Upserted payload should include a fantasy title",
+  );
+  assert(
+    typeof upsertPayload.payload.fantasyTitle.explanation === "string" && upsertPayload.payload.fantasyTitle.explanation.length > 0,
+    "Upserted payload should explain the fantasy title",
+  );
   assert(
     typeof upsertPayload.payload.suggestedAction === "string" && upsertPayload.payload.suggestedAction.length > 0,
     "Upserted payload should include mentor guidance",

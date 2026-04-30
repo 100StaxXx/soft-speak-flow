@@ -5,6 +5,7 @@ import { Calendar, Flame, Loader2, Mountain, Pencil, Plus, Repeat, Target, Trash
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { DurationPickerField, TimePickerField, getNextTimeForStep } from "@/components/scheduling";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -64,6 +65,8 @@ export type EditCampaignSheetDependencies = {
     difficulty: "easy" | "medium" | "hard";
     frequency: string;
     customDays: number[];
+    preferredTime?: string | null;
+    estimatedMinutes?: number | null;
   }) => Promise<void>;
   deleteRitual: (habitId: string) => Promise<boolean>;
 };
@@ -193,6 +196,8 @@ export function EditCampaignSheetFrame({
   const [newRitualTitle, setNewRitualTitle] = useState("");
   const [newRitualDifficulty, setNewRitualDifficulty] = useState<QuestFormDifficulty>("medium");
   const [newRitualDays, setNewRitualDays] = useState<number[]>(DEFAULT_RITUAL_DAYS);
+  const [newRitualPreferredTime, setNewRitualPreferredTime] = useState<string | null>(null);
+  const [newRitualEstimatedMinutes, setNewRitualEstimatedMinutes] = useState<number | null>(null);
   const [isAddingRitual, setIsAddingRitual] = useState(false);
 
   useEffect(() => {
@@ -304,10 +309,14 @@ export function EditCampaignSheetFrame({
         difficulty: newRitualDifficulty,
         frequency: newRitualDays.length === 7 ? "daily" : "custom",
         customDays: newRitualDays.length === 7 ? [] : newRitualDays,
+        preferredTime: newRitualPreferredTime,
+        estimatedMinutes: newRitualEstimatedMinutes,
       });
       setNewRitualTitle("");
       setNewRitualDifficulty("medium");
       setNewRitualDays(DEFAULT_RITUAL_DAYS);
+      setNewRitualPreferredTime(null);
+      setNewRitualEstimatedMinutes(null);
       setShowAddRitual(false);
     } finally {
       setIsAddingRitual(false);
@@ -442,6 +451,23 @@ export function EditCampaignSheetFrame({
                       variant="quest-soft"
                       activeTone={DIFFICULTY_COLORS.medium.pill}
                     />
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <TimePickerField
+                        value={newRitualPreferredTime}
+                        onChange={setNewRitualPreferredTime}
+                        label="Ritual time"
+                        placeholder="No time"
+                        ariaLabel="New ritual time"
+                        variant="quest-soft"
+                        seedValueOnOpen={() => getNextTimeForStep(30)}
+                      />
+                      <DurationPickerField
+                        value={newRitualEstimatedMinutes}
+                        onChange={setNewRitualEstimatedMinutes}
+                        label="Duration"
+                        variant="quest-soft"
+                      />
+                    </div>
                     <div className="flex gap-3">
                       <Button
                         type="button"
@@ -462,6 +488,8 @@ export function EditCampaignSheetFrame({
                           setNewRitualTitle("");
                           setNewRitualDifficulty("medium");
                           setNewRitualDays(DEFAULT_RITUAL_DAYS);
+                          setNewRitualPreferredTime(null);
+                          setNewRitualEstimatedMinutes(null);
                         }}
                       >
                         Cancel

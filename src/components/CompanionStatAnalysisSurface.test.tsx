@@ -138,6 +138,11 @@ const analysis = {
     creativity: { level: "medium", reasons: ["The week could use a little more originality and play."] },
     alignment: { level: "low", reasons: [] },
   },
+  fantasyTitle: {
+    title: "The Oathbound Navigator",
+    archetype: "Discipline / Alignment",
+    explanation: "You're carrying Discipline with Alignment close behind, and Creativity is the place your next chapter wants support.",
+  },
   momentumState: "coasting",
   recentMissInterpretation: "normal_variance",
   narrativeBrief: "You've kept Discipline online, but Vitality wants a little more intentional support.",
@@ -246,8 +251,13 @@ describe("CompanionStatAnalysisSurface", () => {
     expect(screen.getByTestId("drawer-root")).toBeInTheDocument();
     expect(screen.getByTestId("companion-stats-analysis-drawer")).toBeInTheDocument();
     expect(screen.getByText("Stat Reading")).toBeInTheDocument();
+    expect(screen.getByText("Fantasy Title")).toBeInTheDocument();
+    expect(screen.getByText("The Oathbound Navigator")).toBeInTheDocument();
+    expect(
+      screen.getByText("You're carrying Discipline with Alignment close behind, and Creativity is the place your next chapter wants support."),
+    ).toBeInTheDocument();
     expect(screen.getByText("Current Build")).toBeInTheDocument();
-    expect(screen.getByText("Discipline / Alignment")).toBeInTheDocument();
+    expect(screen.getAllByText("Discipline / Alignment").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Eli")).toBeInTheDocument();
     expect(screen.getByText("Cached for today")).toBeInTheDocument();
     expect(screen.getByText("Coasting")).toBeInTheDocument();

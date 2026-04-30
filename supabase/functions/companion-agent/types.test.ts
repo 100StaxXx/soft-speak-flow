@@ -52,6 +52,7 @@ Deno.test("companion agent request accepts active follow-up context", () => {
     message: "Progress",
     inputMode: "text",
     currentDateTime: "2026-04-18T08:05:00-07:00",
+    turnOrigin: "follow_up_option",
     activeFollowUp: {
       question: "Do you want today to lean progress or recovery?",
       reason: "The calendar has room for either shape.",
@@ -84,6 +85,7 @@ Deno.test("companion agent request accepts active follow-up context", () => {
     parsed.activeFollowUp?.question,
     "Do you want today to lean progress or recovery?",
   );
+  assertEquals(parsed.turnOrigin, "follow_up_option");
   assertEquals(parsed.activeFollowUp?.options, ["Progress", "Recovery"]);
   assertEquals(parsed.selectedProposedAction?.type, "quest.create");
   assertEquals(parsed.selectedProposedActionIntent, "draft");

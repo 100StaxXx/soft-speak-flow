@@ -86,6 +86,11 @@ const baseAnalysis: CompanionStatAnalysis = {
     creativity: { level: "medium", reasons: ["The week could use a little more originality and play."] },
     alignment: { level: "low", reasons: [] },
   },
+  fantasyTitle: {
+    title: "The Oathbound Navigator",
+    archetype: "Discipline / Alignment",
+    explanation: "You're carrying Discipline with Alignment close behind, and Creativity is the place your next chapter wants support.",
+  },
   momentumState: "coasting",
   recentMissInterpretation: "normal_variance",
   narrativeBrief: "You've kept Discipline online, but Vitality wants a little more intentional support.",

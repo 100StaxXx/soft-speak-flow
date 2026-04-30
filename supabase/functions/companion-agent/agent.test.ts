@@ -358,6 +358,7 @@ Deno.test("runCompanionAgent routes plan-day follow-up answers through the plann
       message: "Recovery",
       inputMode: "text",
       currentDateTime: "2026-04-18T08:00:00-07:00",
+      turnOrigin: "follow_up_option",
       activeFollowUp: {
         question: "Should today lean focus, recovery, or catching up?",
         reason:
@@ -386,6 +387,56 @@ Deno.test("runCompanionAgent routes plan-day follow-up answers through the plann
   assertEquals(result.pendingAction, undefined);
   assert(result.reply !== "I'm here.");
   assert(result.reply.length > 10);
+});
+
+Deno.test("runCompanionAgent lets composer text pivot from a plan-day follow-up through OpenAI", async () => {
+  const supabase = createMockSupabase();
+  const { guardedFetch, responseBodies } = createInstructionCaptureFetch(
+    "Totally. We can talk through the essay without turning it into a quest yet.",
+  );
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-plan-day-composer-pivot",
+      message: "Finish my essay",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      turnOrigin: "composer",
+      activeFollowUp: {
+        question: "Should today lean focus, recovery, or catching up?",
+        reason:
+          "That choice changes whether I protect deep work, lighten the load, or triage overdue items.",
+        expectedAnswerType: "choice",
+        options: ["Focus", "Recovery", "Catch up"],
+        blocksDrafting: true,
+      },
+    },
+  });
+
+  assertEquals(responseBodies.length, 1);
+  assertEquals(result.mode, "conversation");
+  assertEquals(result.intent, "unknown");
+  assertEquals(result.followUp, null);
+  assertEquals(result.pendingAction, undefined);
+  assert(
+    !result.reply.includes("Would you like to form a quest?"),
+    "composer text should not be forced into the quest-consent follow-up",
+  );
+
+  const contextInput =
+    (responseBodies[0] as { input: Array<{ content?: string }> })
+      .input.find((entry) => entry.content?.startsWith("APP_CONTEXT_PACKET"));
+  assert(contextInput?.content, "expected context packet input");
+  const contextPacket = JSON.parse(
+    contextInput.content.replace("APP_CONTEXT_PACKET\n", ""),
+  );
+  assertEquals(contextPacket.turnOrigin, "composer");
+  assertEquals(contextPacket.latestUserMessageAnswersFollowUp, false);
 });
 
 Deno.test("runCompanionAgent asks consent before turning a concrete plan-day reply into a quest", async () => {
@@ -471,6 +522,110 @@ Deno.test("runCompanionAgent keeps plan-day energy answers out of the generic ag
   assertEquals(result.intent, "plan_day");
   assert(result.reply !== "I'm here.");
   assert(result.reply.length > 10);
+});
+
+Deno.test("runCompanionAgent routes typed text after Quest? through the AI companion before pending confirmation", async () => {
+  const launchSupabase = createMockSupabase();
+  let launchFetchCalled = false;
+
+  const launchResult = await runCompanionAgent({
+    guardedFetch: (async () => {
+      launchFetchCalled = true;
+      throw new Error("Quest launcher should use the deterministic opener");
+    }) as typeof fetch,
+    supabase: launchSupabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-quest-chat",
+      message: "Quest?",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      starterIntent: "quest_capture",
+      turnOrigin: "launcher",
+    },
+  });
+
+  assertEquals(launchFetchCalled, false);
+  assertEquals(launchResult.mode, "clarify");
+  assertEquals(launchResult.intent, "schedule_task");
+  assertEquals(launchResult.followUp?.question, "What quest do you want to capture?");
+
+  const supabase = createMockSupabase();
+  const responseBodies: unknown[] = [];
+  const guardedFetch =
+    (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/conversations")) {
+        return jsonResponse({ id: "conv_quest_chat" });
+      }
+
+      if (url.endsWith("/responses")) {
+        responseBodies.push(JSON.parse(String(init?.body ?? "{}")));
+        return jsonResponse({
+          id: "resp_quest_chat",
+          conversation: { id: "conv_quest_chat" },
+          output: [
+            {
+              type: "function_call",
+              call_id: "call_submit",
+              name: "submit_companion_result",
+              arguments: JSON.stringify({
+                reply: "I can draft that as a quest for tomorrow morning.",
+                mode: "pending_confirmation",
+                intent: "schedule_task",
+                confidence: 0.9,
+                understanding_state: "ready_to_draft",
+                proposed_actions: [
+                  {
+                    type: "quest.create",
+                    title: "Pilates",
+                    summary: "Add Pilates tomorrow at 8am.",
+                    normalizedPayload: {
+                      title: "Pilates",
+                      date: "2026-04-19",
+                      startTime: "08:00",
+                      durationMinutes: 30,
+                    },
+                    confidence: 0.88,
+                  },
+                ],
+              }),
+            },
+          ],
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-quest-chat",
+      message: "Pilates tomorrow at 8am",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      turnOrigin: "composer",
+      activeFollowUp: launchResult.followUp,
+    },
+  });
+
+  assertEquals(responseBodies.length, 1);
+  assertEquals(result.mode, "pending_confirmation");
+  assertEquals(result.pendingAction?.actionType, "task_create");
+  assertEquals(result.pendingAction?.normalizedPayload.title, "Pilates");
+  assert(
+    supabase.inserts.some((entry) =>
+      entry.table === "companion_pending_actions"
+    ),
+    "typed quest text should become a confirmable pending action, not a direct write",
+  );
 });
 
 Deno.test("runCompanionAgent recovers persisted plan-day follow-up context when request state is stale", async () => {

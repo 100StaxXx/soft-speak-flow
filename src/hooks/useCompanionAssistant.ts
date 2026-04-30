@@ -35,6 +35,7 @@ import type {
   CompanionAgentProposedAction,
   CompanionAgentResponse,
   CompanionAgentSelectedProposedActionIntent,
+  CompanionAgentTurnOrigin,
   CompanionAgentUnderstandingState,
   PendingActionView,
 } from "@/types/companionAgent";
@@ -102,6 +103,13 @@ type ThreadsQueryResult = {
 };
 
 const MAX_ACTIVE_PROPOSED_ACTIONS = 8;
+
+type CompanionAgentSubmitOptions = {
+  starterIntent?: CompanionPlannerLaunchIntent["starterIntent"];
+  turnOrigin?: CompanionAgentTurnOrigin;
+  selectedProposedAction?: CompanionAgentProposedAction | null;
+  selectedProposedActionIntent?: CompanionAgentSelectedProposedActionIntent;
+};
 
 const generateMessageId = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -1098,11 +1106,7 @@ export function useCompanionAssistant({
   const submitMessage = useCallback(async (
     rawMessage: string,
     inputMode: CompanionChatInputMode = "text",
-    options?: {
-      starterIntent?: CompanionPlannerLaunchIntent["starterIntent"];
-      selectedProposedAction?: CompanionAgentProposedAction | null;
-      selectedProposedActionIntent?: CompanionAgentSelectedProposedActionIntent;
-    },
+    options?: CompanionAgentSubmitOptions,
   ) => {
     const message = rawMessage.trim();
     if (!message || isSubmitting || isResolvingAction) return false;
@@ -1147,6 +1151,7 @@ export function useCompanionAssistant({
             message,
             inputMode,
             currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
+            turnOrigin: options?.turnOrigin,
             starterIntent: options?.starterIntent,
             activeFollowUp,
             activeProposedActions: proposedActions.slice(
@@ -1186,6 +1191,7 @@ export function useCompanionAssistant({
         userAction: "accepted",
         modifications: {
           surface,
+          turnOrigin: options?.turnOrigin ?? null,
           starterIntent: options?.starterIntent ?? null,
           selectedProposedActionType: options?.selectedProposedAction?.type ??
             null,
@@ -1438,6 +1444,7 @@ export function useCompanionAssistant({
             message: latestUserMessage,
             inputMode: "text",
             currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
+            turnOrigin: "proposed_action",
             starterIntent,
             selectedProposalId: proposalId,
           },
@@ -1463,6 +1470,7 @@ export function useCompanionAssistant({
         userAction: "accepted",
         modifications: {
           proposalId,
+          turnOrigin: "proposed_action",
           starterIntent: starterIntent ?? null,
           surface,
         },
@@ -1631,6 +1639,7 @@ export function useCompanionAssistant({
 
         const submitted = await submitMessage(launchMessage, "text", {
           starterIntent: launchIntent.starterIntent,
+          turnOrigin: "launcher",
         });
         if (submitted && launchIntent.starterIntent === "plan_day") {
           window.dispatchEvent(
@@ -1672,7 +1681,7 @@ export function useCompanionAssistant({
     onFinalResult: (text) => {
       const nextMessage = text.trim();
       if (!nextMessage) return;
-      void submitMessage(nextMessage, "voice");
+      void submitMessage(nextMessage, "voice", { turnOrigin: "composer" });
     },
     onError: (message) => {
       toast.error(message);
@@ -1738,7 +1747,8 @@ export function useCompanionAssistant({
       isSubmitting: legacyAssistant.isSubmitting,
       isResolvingAction: legacyAssistant.isResolvingAction,
       submitMessage,
-      submitTypedMessage: () => submitMessage(draftInput, "text"),
+      submitTypedMessage: () =>
+        submitMessage(draftInput, "text", { turnOrigin: "composer" }),
       confirmPendingAction: () => resolvePendingAction("confirm"),
       cancelPendingAction: () => resolvePendingAction("cancel"),
       confirmSuggestedQuest,
@@ -1798,7 +1808,8 @@ export function useCompanionAssistant({
     isSubmitting,
     isResolvingAction,
     submitMessage,
-    submitTypedMessage: () => submitMessage(draftInput, "text"),
+    submitTypedMessage: () =>
+      submitMessage(draftInput, "text", { turnOrigin: "composer" }),
     confirmPendingAction: () => resolvePendingAction("confirm"),
     cancelPendingAction: () => resolvePendingAction("cancel"),
     confirmSuggestedQuest,

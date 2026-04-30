@@ -7,6 +7,7 @@ import { useXPRewards } from "@/hooks/useXPRewards";
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
 import { useAchievements } from "@/hooks/useAchievements";
 import { format } from "date-fns";
+import type { DailyTask } from "@/services/dailyTasksRemote";
 import type { StoryTypeSlug } from "@/types/narrativeTypes";
 import { getEpicsQueryKey, type EpicRecord } from "@/hooks/epicsQuery";
 import { DAILY_PLAN_OPTIMIZATION_QUERY_KEY } from "@/hooks/useDailyPlanOptimization";
@@ -48,6 +49,12 @@ import {
   isValidCampaignMilestonePercent,
   normalizeCampaignMilestonePercentArray,
 } from "@/utils/campaignMilestones";
+import {
+  normalizeRitualSchedule,
+  reconcileHabitLinkedTasks,
+  type HabitTaskReconciliationResult,
+  type HabitTaskTemplate,
+} from "@/hooks/habitTaskReconciliation";
 
 const normalizeDifficulty = (value: string): "easy" | "medium" | "hard" => {
   const lower = value?.toLowerCase()?.trim() || "medium";
@@ -232,6 +239,13 @@ type LocalCampaignRitualPayload = {
   epicHabit: LocalEpicHabitRow;
 };
 
+type TaskQueueAction = (
+  type: "CREATE_TASK" | "UPDATE_TASK" | "DELETE_TASK",
+  payload: unknown,
+) => Promise<unknown>;
+
+type HabitTaskReconciliationAggregate = HabitTaskReconciliationResult;
+
 type CreateEpicInput = {
   title: string;
   description?: string;
@@ -246,10 +260,10 @@ type CreateEpicInput = {
     frequency: string;
     custom_days: number[];
     custom_month_days?: number[];
-    preferred_time?: string;
+    preferred_time?: string | null;
     reminder_enabled?: boolean;
     reminder_minutes_before?: number;
-    estimated_minutes?: number;
+    estimated_minutes?: number | null;
     category?: string | null;
   }>;
   milestones?: Array<{
@@ -827,6 +841,14 @@ async function rollbackLocalCampaignRitualPayload(payload: LocalCampaignRitualPa
 }
 
 async function rollbackRemoteCampaignRitualPayload(userId: string, payload: LocalCampaignRitualPayload) {
+  const { error: tasksError } = await supabase
+    .from("daily_tasks")
+    .delete()
+    .eq("habit_source_id", payload.habit.id)
+    .eq("user_id", userId)
+    .eq("completed", false);
+  if (tasksError) throw tasksError;
+
   const { error: linkError } = await supabase
     .from("epic_habits")
     .delete()
@@ -839,6 +861,229 @@ async function rollbackRemoteCampaignRitualPayload(userId: string, payload: Loca
     .eq("id", payload.habit.id)
     .eq("user_id", userId);
   if (habitError) throw habitError;
+}
+
+function buildTaskCreatePayload(task: DailyTask): Record<string, unknown> {
+  return {
+    id: task.id,
+    user_id: task.user_id,
+    task_text: task.task_text,
+    difficulty: task.difficulty,
+    xp_reward: task.xp_reward,
+    task_date: task.task_date,
+    completed: task.completed,
+    completed_at: task.completed_at,
+    is_main_quest: task.is_main_quest,
+    scheduled_time: task.scheduled_time,
+    estimated_duration: task.estimated_duration,
+    recurrence_pattern: task.recurrence_pattern,
+    recurrence_days: task.recurrence_days,
+    recurrence_month_days: task.recurrence_month_days ?? null,
+    recurrence_custom_period: task.recurrence_custom_period ?? null,
+    recurrence_end_date: task.recurrence_end_date ?? null,
+    is_recurring: task.is_recurring,
+    reminder_enabled: task.reminder_enabled,
+    reminder_minutes_before: task.reminder_minutes_before,
+    category: task.category,
+    notes: task.notes,
+    contact_id: task.contact_id,
+    auto_log_interaction: task.auto_log_interaction,
+    image_url: task.image_url,
+    location: task.location,
+    source: task.source,
+    habit_source_id: task.habit_source_id,
+    epic_id: task.epic_id,
+    parent_template_id: task.parent_template_id,
+    sort_order: task.sort_order ?? null,
+  };
+}
+
+function createEmptyHabitTaskReconciliation(): HabitTaskReconciliationAggregate {
+  return {
+    createdTasks: [],
+    updatedTasks: [],
+    deletedTasks: [],
+    touchedDates: [],
+  };
+}
+
+function mergeHabitTaskReconciliation(
+  aggregate: HabitTaskReconciliationAggregate,
+  next: HabitTaskReconciliationResult,
+): HabitTaskReconciliationAggregate {
+  return {
+    createdTasks: [...aggregate.createdTasks, ...next.createdTasks],
+    updatedTasks: [...aggregate.updatedTasks, ...next.updatedTasks],
+    deletedTasks: [...aggregate.deletedTasks, ...next.deletedTasks],
+    touchedDates: [...new Set([...aggregate.touchedDates, ...next.touchedDates])].sort(),
+  };
+}
+
+function toHabitTaskTemplate(userId: string, habit: LocalHabitRow): HabitTaskTemplate {
+  const normalizedSchedule = normalizeRitualSchedule({
+    frequency: habit.frequency,
+    customDays: habit.custom_days,
+    customMonthDays: habit.custom_month_days,
+  });
+
+  return {
+    habitId: habit.id,
+    userId,
+    title: habit.title,
+    difficulty: habit.difficulty,
+    estimated_minutes: habit.estimated_minutes,
+    preferred_time: habit.preferred_time,
+    category: habit.category,
+    reminder_enabled: habit.reminder_enabled,
+    reminder_minutes_before: habit.reminder_minutes_before,
+    frequency: normalizedSchedule.frequency,
+    custom_days: normalizedSchedule.custom_days,
+    custom_month_days: normalizedSchedule.custom_month_days,
+    customPeriod: normalizedSchedule.customPeriod,
+  };
+}
+
+async function applyLocalHabitTaskReconciliation(reconciliation: HabitTaskReconciliationResult): Promise<void> {
+  const nextTasks = [
+    ...reconciliation.createdTasks,
+    ...reconciliation.updatedTasks.map(({ nextTask }) => nextTask),
+  ];
+
+  if (nextTasks.length > 0) {
+    await upsertPlannerRecords("daily_tasks", nextTasks);
+  }
+
+  if (reconciliation.deletedTasks.length > 0) {
+    await removePlannerRecords("daily_tasks", reconciliation.deletedTasks.map((task) => task.id));
+  }
+}
+
+async function rollbackLocalHabitTaskReconciliation(
+  reconciliation: HabitTaskReconciliationAggregate | null,
+): Promise<void> {
+  if (!reconciliation) return;
+
+  if (reconciliation.createdTasks.length > 0) {
+    await removePlannerRecords("daily_tasks", reconciliation.createdTasks.map((task) => task.id));
+  }
+
+  const restoredTasks = [
+    ...reconciliation.updatedTasks.map(({ existingTask }) => existingTask),
+    ...reconciliation.deletedTasks,
+  ];
+
+  if (restoredTasks.length > 0) {
+    await upsertPlannerRecords("daily_tasks", restoredTasks);
+  }
+}
+
+async function reconcileAndApplyLocalCampaignHabitTasks(
+  userId: string,
+  habits: LocalHabitRow[],
+): Promise<HabitTaskReconciliationAggregate> {
+  let aggregate = createEmptyHabitTaskReconciliation();
+
+  for (const habit of habits.filter((candidate) => candidate.preferred_time || candidate.estimated_minutes !== null)) {
+    const reconciliation = await reconcileHabitLinkedTasks(toHabitTaskTemplate(userId, habit));
+    await applyLocalHabitTaskReconciliation(reconciliation);
+    aggregate = mergeHabitTaskReconciliation(aggregate, reconciliation);
+  }
+
+  return aggregate;
+}
+
+async function queueHabitTaskReconciliation(
+  reconciliation: HabitTaskReconciliationAggregate,
+  queueTaskAction: TaskQueueAction,
+): Promise<void> {
+  await Promise.all([
+    ...reconciliation.createdTasks.map((task) =>
+      queueTaskAction("CREATE_TASK", buildTaskCreatePayload(task)),
+    ),
+    ...reconciliation.updatedTasks.map(({ existingTask, updates }) =>
+      queueTaskAction("UPDATE_TASK", {
+        taskId: existingTask.id,
+        updates,
+      }),
+    ),
+    ...reconciliation.deletedTasks.map((task) =>
+      queueTaskAction("DELETE_TASK", {
+        taskId: task.id,
+      }),
+    ),
+  ]);
+}
+
+async function persistRemoteHabitTaskReconciliation(
+  userId: string,
+  reconciliation: HabitTaskReconciliationAggregate,
+  options: {
+    queueTaskAction: TaskQueueAction;
+    retryNow: () => void | Promise<unknown>;
+  },
+): Promise<boolean> {
+  let queued = false;
+
+  if (reconciliation.createdTasks.length > 0) {
+    const { error } = await supabase
+      .from("daily_tasks")
+      .upsert(
+        reconciliation.createdTasks.map((task) => buildTaskCreatePayload(task)) as never,
+        {
+          onConflict: "user_id,task_date,habit_source_id",
+          ignoreDuplicates: true,
+        },
+      );
+
+    if (error) {
+      if (!isQueueableWriteError(error)) throw error;
+      await Promise.all(
+        reconciliation.createdTasks.map((task) =>
+          options.queueTaskAction("CREATE_TASK", buildTaskCreatePayload(task)),
+        ),
+      );
+      queued = true;
+    }
+  }
+
+  for (const { existingTask, updates } of reconciliation.updatedTasks) {
+    const { error } = await supabase
+      .from("daily_tasks")
+      .update(updates)
+      .eq("id", existingTask.id)
+      .eq("user_id", userId);
+
+    if (!error) continue;
+    if (!isQueueableWriteError(error)) throw error;
+
+    await options.queueTaskAction("UPDATE_TASK", {
+      taskId: existingTask.id,
+      updates,
+    });
+    queued = true;
+  }
+
+  for (const task of reconciliation.deletedTasks) {
+    const { error } = await supabase
+      .from("daily_tasks")
+      .delete()
+      .eq("id", task.id)
+      .eq("user_id", userId);
+
+    if (!error) continue;
+    if (!isQueueableWriteError(error)) throw error;
+
+    await options.queueTaskAction("DELETE_TASK", {
+      taskId: task.id,
+    });
+    queued = true;
+  }
+
+  if (queued) {
+    void options.retryNow();
+  }
+
+  return queued;
 }
 
 async function refreshEpicsQueryFromLocalStore(queryClient: ReturnType<typeof useQueryClient>, userId: string) {
@@ -1194,7 +1439,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
   const { awardCustomXP } = useXPRewards();
   const { checkFirstTimeAchievements, checkStoryCompletionAchievement } = useAchievements();
   const { trackEpicOutcome } = useAIInteractionTracker();
-  const { queueAction, shouldQueueWrites, retryNow, reportApiFailure } = useResilience();
+  const { queueAction, queueTaskAction, shouldQueueWrites, retryNow, reportApiFailure } = useResilience();
   const { enabled = true } = options;
   const [hasHydratedFromRemote, setHasHydratedFromRemote] = useState(() => !enabled || !user?.id);
 
@@ -1392,6 +1637,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
 
         const { epic, habits, epicHabits, phases, milestones } = payload;
         const shouldUseIdempotentRemoteWrite = Boolean(rememberedPayload);
+        let taskReconciliation: HabitTaskReconciliationAggregate | null = null;
 
         const reconcileAfterRemoteRefresh = async (): Promise<EpicCreateMatch | null> => {
           const retryDelaysMs = [0, 350, 1200];
@@ -1424,6 +1670,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
         if (shouldQueueWrites) {
           const localPersistStartedAt = Date.now();
           await applyLocalEpicPayload(payload);
+          taskReconciliation = await reconcileAndApplyLocalCampaignHabitTasks(user.id, habits);
           localPersistMs = Date.now() - localPersistStartedAt;
           await queueAction({
             actionKind: "EPIC_CREATE",
@@ -1431,6 +1678,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
             entityId: epic.id,
             payload,
           });
+          await queueHabitTaskReconciliation(taskReconciliation, queueTaskAction);
           trackResilienceEvent("campaign_create_result", {
             attemptId: createAttemptId,
             result: "queued_offline",
@@ -1452,6 +1700,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
 
         const localPersistStartedAt = Date.now();
         await applyLocalEpicPayload(payload);
+        taskReconciliation = await reconcileAndApplyLocalCampaignHabitTasks(user.id, habits);
         localPersistMs = Date.now() - localPersistStartedAt;
 
         try {
@@ -1487,6 +1736,11 @@ export const useEpics = (options: EpicsOptions = {}) => {
             if (milestonesError) throw milestonesError;
           }
 
+          await persistRemoteHabitTaskReconciliation(user.id, taskReconciliation, {
+            queueTaskAction,
+            retryNow,
+          });
+
           remotePersistMs = Date.now() - remotePersistStartedAt;
           trackResilienceEvent("campaign_create_result", {
             attemptId: createAttemptId,
@@ -1508,6 +1762,9 @@ export const useEpics = (options: EpicsOptions = {}) => {
                 payload,
               });
             }
+            if (taskReconciliation) {
+              await queueHabitTaskReconciliation(taskReconciliation, queueTaskAction);
+            }
             void retryNow();
             trackResilienceEvent("campaign_create_result", {
               attemptId: createAttemptId,
@@ -1521,6 +1778,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
           }
 
           try {
+            await rollbackLocalHabitTaskReconciliation(taskReconciliation);
             await rollbackLocalEpicPayload(payload);
             await refreshEpicsQueryFromLocalStore(queryClient, user.id);
           } catch (rollbackError) {
@@ -1988,6 +2246,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
         payload.epicHabit.habit_id = payload.habit.id;
 
         await applyLocalCampaignRitualPayload(payload);
+        const taskReconciliation = await reconcileAndApplyLocalCampaignHabitTasks(user.id, [payload.habit]);
         await refreshEpicsQueryFromLocalStore(queryClient, user.id);
         await queryClient.invalidateQueries({ queryKey: ["epics"] });
         dispatchPlannerSyncFinished();
@@ -1999,6 +2258,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
             entityId: input.epicId,
             payload,
           });
+          await queueHabitTaskReconciliation(taskReconciliation, queueTaskAction);
           return {
             queued: true,
             habit: payload.habit,
@@ -2017,6 +2277,11 @@ export const useEpics = (options: EpicsOptions = {}) => {
             .insert(payload.epicHabit);
           if (epicHabitError) throw epicHabitError;
 
+          await persistRemoteHabitTaskReconciliation(user.id, taskReconciliation, {
+            queueTaskAction,
+            retryNow,
+          });
+
           return {
             queued: false,
             habit: payload.habit,
@@ -2025,6 +2290,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
         } catch (error) {
           if (!isQueueableWriteError(error)) {
             try {
+              await rollbackLocalHabitTaskReconciliation(taskReconciliation);
               await rollbackLocalCampaignRitualPayload(payload);
               await refreshEpicsQueryFromLocalStore(queryClient, user.id);
               await queryClient.invalidateQueries({ queryKey: ["epics"] });
@@ -2048,6 +2314,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
             entityId: input.epicId,
             payload,
           });
+          await queueHabitTaskReconciliation(taskReconciliation, queueTaskAction);
           void retryNow();
           return {
             queued: true,
@@ -2061,6 +2328,9 @@ export const useEpics = (options: EpicsOptions = {}) => {
       queryClient.invalidateQueries({ queryKey: ["epics"] });
       queryClient.invalidateQueries({ queryKey: ["habits"] });
       queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
+      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["calendar-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
 
       toast.success(queued ? "Ritual saved offline" : "Ritual added to campaign!", {

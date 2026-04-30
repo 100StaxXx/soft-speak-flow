@@ -5,6 +5,10 @@ import type {
   CompanionStatNeed,
   CompanionStatProfileSummary,
 } from "./companionStatSignals";
+import {
+  buildCompanionFantasyTitle,
+  type CompanionFantasyTitle,
+} from "./companionStatFantasyTitles";
 
 export type CompanionStatBand = "Emerging" | "Building" | "Strong" | "Exceptional";
 export type CompanionStatDriverSource = "attribute_event" | "activity" | "echo";
@@ -68,6 +72,7 @@ export interface CompanionStatAnalysis {
   activitySnapshot: CompanionStatActivitySnapshot;
   statProfile: CompanionStatProfileSummary;
   statNeeds: Record<CompanionStatAttribute, CompanionStatNeed>;
+  fantasyTitle: CompanionFantasyTitle;
   momentumState: CompanionMomentumState;
   recentMissInterpretation: CompanionMissInterpretation;
   narrativeBrief: string;
@@ -361,6 +366,26 @@ function validateStatNeeds(
   return success(value as Record<CompanionStatAttribute, CompanionStatNeed>);
 }
 
+function validateFantasyTitle(value: unknown, path: string): ValidationResult<CompanionFantasyTitle> {
+  if (!isRecord(value)) {
+    return failure(`${path} must be an object`);
+  }
+
+  if (!isNonEmptyString(value.title)) {
+    return failure(`${path}.title must be a non-empty string`);
+  }
+
+  if (!isNonEmptyString(value.archetype)) {
+    return failure(`${path}.archetype must be a non-empty string`);
+  }
+
+  if (!isNonEmptyString(value.explanation)) {
+    return failure(`${path}.explanation must be a non-empty string`);
+  }
+
+  return success(value as unknown as CompanionFantasyTitle);
+}
+
 function validateActivitySnapshot(
   value: unknown,
   path: string,
@@ -526,6 +551,9 @@ export function validateCompanionStatAnalysis(value: unknown): ValidationResult<
   const statNeedsValidation = validateStatNeeds(value.statNeeds, "statNeeds");
   if (isValidationFailure(statNeedsValidation)) return statNeedsValidation;
 
+  const fantasyTitleValidation = validateFantasyTitle(value.fantasyTitle, "fantasyTitle");
+  if (isValidationFailure(fantasyTitleValidation)) return fantasyTitleValidation;
+
   if (!isString(value.momentumState) || !MOMENTUM_VALUES.has(value.momentumState)) {
     return failure(`momentumState must be a valid companion momentum state`);
   }
@@ -571,6 +599,8 @@ export function validateCompanionStatAnalysis(value: unknown): ValidationResult<
     ...(value as unknown as CompanionStatAnalysis),
     activitySnapshot: activitySnapshotValidation.data,
     statProfile: statProfileValidation.data,
+    statNeeds: statNeedsValidation.data,
+    fantasyTitle: fantasyTitleValidation.data,
     statBreakdowns: normalizedBreakdowns,
   });
 }
@@ -651,17 +681,78 @@ function normalizeCompanionStatNeedsForClient(value: unknown): unknown {
   };
 }
 
+function normalizeCompanionFantasyTitleForClient(value: unknown): unknown {
+  if (!isRecord(value) || !isRecord(value.analysis)) {
+    return value;
+  }
+
+  const analysis = value.analysis;
+  if ("fantasyTitle" in analysis) {
+    return value;
+  }
+
+  if (!Array.isArray(analysis.statBreakdowns)) {
+    return value;
+  }
+
+  const normalizedBreakdowns: CompanionStatBreakdown[] = [];
+  for (const [index, breakdown] of analysis.statBreakdowns.entries()) {
+    const validation = validateBreakdown(breakdown, `statBreakdowns[${index}]`);
+    if (isValidationFailure(validation)) {
+      return value;
+    }
+    normalizedBreakdowns.push(validation.data);
+  }
+
+  const statProfileValidation = validateStatProfile(
+    analysis.statProfile,
+    normalizedBreakdowns,
+    "statProfile",
+  );
+  if (isValidationFailure(statProfileValidation)) {
+    return value;
+  }
+
+  const statNeeds = isRecord(analysis.statNeeds)
+    ? analysis.statNeeds as Partial<Record<CompanionStatAttribute, CompanionStatNeed>>
+    : null;
+  const momentumState = isString(analysis.momentumState) && MOMENTUM_VALUES.has(analysis.momentumState)
+    ? analysis.momentumState as CompanionMomentumState
+    : "coasting";
+  const analysisDate = isNonEmptyString(analysis.analysisDate)
+    ? analysis.analysisDate
+    : "1970-01-01";
+
+  return {
+    ...value,
+    analysis: {
+      ...analysis,
+      fantasyTitle: buildCompanionFantasyTitle({
+        analysisDate,
+        statProfile: statProfileValidation.data,
+        statNeeds,
+        momentumState,
+      }),
+    },
+  };
+}
+
 export function validateCompanionStatAnalysisResponseForClient(
   value: unknown,
 ): ValidationResult<CompanionStatAnalysisResponse> {
   const validation = validateCompanionStatAnalysisResponse(value);
-  if (validation.ok) {
+  if (validation.ok) return validation;
+
+  if (
+    !STAT_NEEDS_COMPATIBILITY_ERROR_PATTERN.test(validation.error)
+    && validation.error !== "analysis.fantasyTitle must be an object"
+  ) {
     return validation;
   }
 
-  if (!STAT_NEEDS_COMPATIBILITY_ERROR_PATTERN.test(validation.error)) {
-    return validation;
-  }
-
-  return validateCompanionStatAnalysisResponse(normalizeCompanionStatNeedsForClient(value));
+  return validateCompanionStatAnalysisResponse(
+    normalizeCompanionFantasyTitleForClient(
+      normalizeCompanionStatNeedsForClient(value),
+    ),
+  );
 }

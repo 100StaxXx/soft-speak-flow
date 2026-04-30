@@ -34,6 +34,7 @@ export interface JourneyRitual {
   customPeriod?: 'week' | 'month';
   difficulty: 'easy' | 'medium' | 'hard';
   estimatedMinutes?: number;
+  preferredTime?: string | null;
 }
 
 export interface FeasibilityAssessment {

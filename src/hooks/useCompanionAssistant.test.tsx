@@ -664,6 +664,64 @@ describe("useCompanionAssistant", () => {
     );
   });
 
+  it("marks typed composer submissions with the composer turn origin", async () => {
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("persisted-session");
+    });
+
+    act(() => {
+      result.current.setDraftInput("Can we talk through today?");
+    });
+
+    await act(async () => {
+      await result.current.submitTypedMessage();
+    });
+
+    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+      "companion-agent",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          message: "Can we talk through today?",
+          turnOrigin: "composer",
+        }),
+      }),
+    );
+  });
+
+  it("marks follow-up option submissions with the follow-up turn origin", async () => {
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("persisted-session");
+    });
+
+    await act(async () => {
+      await result.current.submitMessage("Recovery", "text", {
+        turnOrigin: "follow_up_option",
+      });
+    });
+
+    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+      "companion-agent",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          message: "Recovery",
+          turnOrigin: "follow_up_option",
+        }),
+      }),
+    );
+  });
+
   it("sends selected proposed action context with draft requests", async () => {
     const selectedProposedAction = {
       type: "quest.create",
@@ -689,6 +747,7 @@ describe("useCompanionAssistant", () => {
         "Draft this: Draft launch email",
         "text",
         {
+          turnOrigin: "proposed_action",
           selectedProposedAction,
           selectedProposedActionIntent: "draft",
         },
@@ -700,6 +759,7 @@ describe("useCompanionAssistant", () => {
       expect.objectContaining({
         body: expect.objectContaining({
           message: "Draft this: Draft launch email",
+          turnOrigin: "proposed_action",
           selectedProposedAction,
           selectedProposedActionIntent: "draft",
         }),
@@ -1170,6 +1230,7 @@ describe("useCompanionAssistant", () => {
           body: expect.objectContaining({
             message: "Plan my day",
             starterIntent: "plan_day",
+            turnOrigin: "launcher",
           }),
         }),
       );
@@ -1513,7 +1574,7 @@ describe("useCompanionAssistant", () => {
       expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
         "Plan my day",
         "text",
-        { starterIntent: "plan_day" },
+        { starterIntent: "plan_day", turnOrigin: "launcher" },
       );
     });
     expect(mocks.listThreads).not.toHaveBeenCalled();
@@ -1727,6 +1788,7 @@ describe("useCompanionAssistant", () => {
         body: expect.objectContaining({
           sessionId: "persisted-session",
           message: "Plan my day",
+          turnOrigin: "proposed_action",
           starterIntent: "plan_day",
           selectedProposalId: "proposal-plan-1",
         }),
@@ -1740,6 +1802,7 @@ describe("useCompanionAssistant", () => {
         userAction: "accepted",
         modifications: expect.objectContaining({
           proposalId: "proposal-plan-1",
+          turnOrigin: "proposed_action",
           starterIntent: "plan_day",
           surface: "journeys",
         }),

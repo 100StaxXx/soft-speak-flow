@@ -19,6 +19,7 @@ import {
   type CompanionStatDriver,
   validateCompanionStatAnalysis,
 } from "../../../src/shared/companionStatAnalysis.ts";
+import { buildCompanionFantasyTitle } from "../../../src/shared/companionStatFantasyTitles.ts";
 import { getTaskCompletionDisciplineAward } from "../../../src/shared/taskCompletionTiming.ts";
 
 type AttributeType = CompanionStatAttribute;
@@ -545,6 +546,12 @@ export function buildCompanionStatAnalysisPayload({
     },
     statProfile: interpretation.statProfile,
     statNeeds: interpretation.statNeeds,
+    fantasyTitle: buildCompanionFantasyTitle({
+      analysisDate,
+      statProfile: interpretation.statProfile,
+      statNeeds: interpretation.statNeeds,
+      momentumState: interpretation.momentumState,
+    }),
     momentumState: interpretation.momentumState,
     recentMissInterpretation: interpretation.recentMissInterpretation,
     narrativeBrief: interpretation.narrativeBrief,

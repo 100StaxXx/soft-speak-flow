@@ -61,6 +61,11 @@ const baseResponse = {
       creativity: { level: "medium", reasons: ["The week could use a little more originality and play."] },
       alignment: { level: "low", reasons: [] },
     },
+    fantasyTitle: {
+      title: "The Oathbound Navigator",
+      archetype: "Discipline / Alignment",
+      explanation: "You're carrying Discipline with Alignment close behind, and Creativity is the place your next chapter wants support.",
+    },
     momentumState: "coasting",
     recentMissInterpretation: "normal_variance",
     narrativeBrief: "You've kept Discipline online, but Vitality wants a little more intentional support.",
@@ -125,6 +130,37 @@ const baseResponse = {
 };
 
 describe("companionStatAnalysis", () => {
+  it("accepts a valid fantasy title on strict responses", () => {
+    const validation = validateCompanionStatAnalysisResponse(baseResponse);
+
+    expect(validation.ok).toBe(true);
+    if (!validation.ok) return;
+
+    expect(validation.data.analysis.fantasyTitle).toEqual({
+      title: "The Oathbound Navigator",
+      archetype: "Discipline / Alignment",
+      explanation: "You're carrying Discipline with Alignment close behind, and Creativity is the place your next chapter wants support.",
+    });
+  });
+
+  it("rejects malformed fantasy titles on strict responses", () => {
+    const validation = validateCompanionStatAnalysisResponse({
+      ...baseResponse,
+      analysis: {
+        ...baseResponse.analysis,
+        fantasyTitle: {
+          ...baseResponse.analysis.fantasyTitle,
+          title: "",
+        },
+      },
+    });
+
+    expect(validation.ok).toBe(false);
+    if (validation.ok) return;
+
+    expect(validation.error).toBe("analysis.fantasyTitle.title must be a non-empty string");
+  });
+
   it("rebuilds a missing statProfile from stat breakdown scores", () => {
     const legacyAnalysis = { ...baseResponse.analysis } as Record<string, unknown>;
     delete legacyAnalysis.statProfile;
@@ -275,5 +311,22 @@ describe("companionStatAnalysis", () => {
       baseResponse.analysis.statNeeds.vitality,
     );
     expect(validation.data.analysis.statNeeds.resolve).toEqual({ level: "low", reasons: [] });
+  });
+
+  it("client compatibility fills a missing legacy fantasy title", () => {
+    const legacyAnalysis = { ...baseResponse.analysis } as Record<string, unknown>;
+    delete legacyAnalysis.fantasyTitle;
+
+    const validation = validateCompanionStatAnalysisResponseForClient({
+      ...baseResponse,
+      analysis: legacyAnalysis,
+    });
+
+    expect(validation.ok).toBe(true);
+    if (!validation.ok) return;
+
+    expect(validation.data.analysis.fantasyTitle.title.length).toBeGreaterThan(0);
+    expect(validation.data.analysis.fantasyTitle.archetype).toBe("Discipline / Alignment");
+    expect(validation.data.analysis.fantasyTitle.explanation).toContain("Creativity");
   });
 });

@@ -3,7 +3,7 @@
   * Clean, simple design: image + quote + tap to dismiss
   */
  
- import { memo, useEffect, useState, useCallback } from "react";
+ import { memo, useEffect, useState, useCallback, useRef } from "react";
  import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, UserRound, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -29,6 +29,20 @@ import type { CompletionCompanionTone } from "@/types/completionFeedback";
 }
 
 const usesPortraitAvatar = (imageUrl?: string | null) => isCompanionPresetImageSource(imageUrl);
+
+const COMPLETION_FEEDBACK_POPUP_BOTTOM_OFFSET_TERMS = "64px + env(safe-area-inset-bottom, 0px) + 12px";
+const COMPLETION_FEEDBACK_POPUP_BOTTOM_OFFSET = `calc(${COMPLETION_FEEDBACK_POPUP_BOTTOM_OFFSET_TERMS})`;
+const COMPLETION_FEEDBACK_TOAST_GAP_PX = 12;
+const COMPLETION_FEEDBACK_TOAST_STACK_OFFSET_VAR = "--completion-feedback-toast-stack-offset";
+const COMPLETION_FEEDBACK_TOAST_BOTTOM_OFFSET_VAR = "--completion-feedback-toast-bottom-offset";
+
+const clearCompletionFeedbackToastOffsets = () => {
+  if (typeof document === "undefined") return;
+
+  const rootStyle = document.documentElement.style;
+  rootStyle.removeProperty(COMPLETION_FEEDBACK_TOAST_STACK_OFFSET_VAR);
+  rootStyle.removeProperty(COMPLETION_FEEDBACK_TOAST_BOTTOM_OFFSET_VAR);
+};
 
 const toneClassName: Record<CompletionCompanionTone, string> = {
   proud: "border-primary/25 shadow-primary/10",
@@ -56,6 +70,7 @@ export const CompanionTalkPopup = memo(({
    companionImageFocalX,
    companionImageFocalY,
 }: CompanionTalkPopupProps) => {
+  const popupRef = useRef<HTMLDivElement | null>(null);
   const [progress, setProgress] = useState(0);
   const duration = getAutoDismissDuration(message, mentor?.message);
   const hasCompanionName = companionName.trim().length > 0;
@@ -90,6 +105,59 @@ export const CompanionTalkPopup = memo(({
      
      return () => clearInterval(interval);
    }, [isVisible, duration, onDismiss]);
+
+  useEffect(() => clearCompletionFeedbackToastOffsets, []);
+
+  useEffect(() => {
+    if (!isVisible || typeof window === "undefined") return;
+
+    const popupElement = popupRef.current;
+    if (!popupElement) return;
+
+    const updateToastStackOffsets = () => {
+      const popupHeight = Math.ceil(
+        popupElement.getBoundingClientRect().height || popupElement.offsetHeight,
+      );
+      if (!Number.isFinite(popupHeight) || popupHeight <= 0) return;
+
+      const stackOffset = `${popupHeight + COMPLETION_FEEDBACK_TOAST_GAP_PX}px`;
+      const rootStyle = document.documentElement.style;
+      rootStyle.setProperty(COMPLETION_FEEDBACK_TOAST_STACK_OFFSET_VAR, stackOffset);
+      rootStyle.setProperty(
+        COMPLETION_FEEDBACK_TOAST_BOTTOM_OFFSET_VAR,
+        `calc(${COMPLETION_FEEDBACK_POPUP_BOTTOM_OFFSET_TERMS} + ${stackOffset})`,
+      );
+    };
+
+    updateToastStackOffsets();
+
+    let animationFrame: number | null = null;
+    if (typeof window.requestAnimationFrame === "function") {
+      animationFrame = window.requestAnimationFrame(updateToastStackOffsets);
+    }
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(updateToastStackOffsets);
+      resizeObserver.observe(popupElement);
+    } else {
+      window.addEventListener("resize", updateToastStackOffsets);
+      window.addEventListener("orientationchange", updateToastStackOffsets);
+    }
+
+    return () => {
+      if (animationFrame !== null && typeof window.cancelAnimationFrame === "function") {
+        window.cancelAnimationFrame(animationFrame);
+      }
+
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      } else {
+        window.removeEventListener("resize", updateToastStackOffsets);
+        window.removeEventListener("orientationchange", updateToastStackOffsets);
+      }
+    };
+  }, [isVisible, message, mentor?.message]);
    
    const handleDismiss = useCallback(() => {
      onDismiss();
@@ -111,18 +179,18 @@ export const CompanionTalkPopup = memo(({
    }, [isVisible, handleDismiss]);
  
    return (
-     <AnimatePresence>
+     <AnimatePresence onExitComplete={clearCompletionFeedbackToastOffsets}>
        {isVisible && (
          <motion.div
+           ref={popupRef}
            initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
            animate={{ opacity: 1, y: 0 }}
            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 10 }}
            transition={{ duration: 0.2, ease: "easeOut" }}
+           style={{ bottom: COMPLETION_FEEDBACK_POPUP_BOTTOM_OFFSET }}
            className={cn(
              "fixed left-4 right-4 z-50 cursor-pointer",
-             "max-w-[680px] mx-auto",
-             // Position above nav bar with safe area
-             "bottom-[calc(64px+env(safe-area-inset-bottom,0px)+12px)]"
+             "max-w-[680px] mx-auto"
            )}
          onClick={handleDismiss}
          role="dialog"

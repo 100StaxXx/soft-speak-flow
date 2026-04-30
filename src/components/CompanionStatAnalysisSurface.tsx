@@ -482,6 +482,21 @@ function CompanionStatAnalysisView({
               </Badge>
             </div>
 
+            <div className="rounded-lg border border-white/10 bg-background/45 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-semibold text-muted-foreground">Fantasy Title</p>
+                <Badge variant="outline" className="bg-background/60">
+                  {analysis.fantasyTitle.archetype}
+                </Badge>
+              </div>
+              <CardTitle className="mt-2 text-3xl leading-tight md:text-4xl">
+                {analysis.fantasyTitle.title}
+              </CardTitle>
+              <p className="mt-3 text-sm leading-6 text-foreground/90">
+                {analysis.fantasyTitle.explanation}
+              </p>
+            </div>
+
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px] lg:items-end">
               <div className="space-y-3">
                 <div>

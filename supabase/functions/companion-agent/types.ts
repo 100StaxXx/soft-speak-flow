@@ -77,6 +77,13 @@ export const COMPANION_AGENT_SELECTED_PROPOSED_ACTION_INTENTS = [
   "discuss",
 ] as const;
 
+export const COMPANION_AGENT_TURN_ORIGINS = [
+  "launcher",
+  "composer",
+  "follow_up_option",
+  "proposed_action",
+] as const;
+
 const CompanionIntentMetadataSchema = z.object({
   intentType: z.enum(["conversation", "quest", "campaign", "clarification"]),
   timeHorizon: z.enum(["today", "short_term", "long_term"]),
@@ -241,6 +248,7 @@ export const UnderstandingStateSchema = z.enum(
 export const SelectedProposedActionIntentSchema = z.enum(
   COMPANION_AGENT_SELECTED_PROPOSED_ACTION_INTENTS,
 );
+export const TurnOriginSchema = z.enum(COMPANION_AGENT_TURN_ORIGINS);
 export const CampaignLifecycleStatusSchema = z.enum(
   COMPANION_CAMPAIGN_LIFECYCLE_STATUSES,
 );
@@ -283,6 +291,7 @@ export const CompanionAgentRequestSchema = z.object({
   message: z.string().min(1).max(4000).trim(),
   inputMode: InputModeSchema.default("text"),
   currentDateTime: z.string().datetime({ offset: true }),
+  turnOrigin: TurnOriginSchema.optional(),
   starterIntent: StarterIntentSchema.optional(),
   selectedProposalId: z.string().min(1).max(200).optional(),
   visibleDateStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -335,6 +344,7 @@ export type CompanionAgentUnderstandingState = z.infer<
 export type CompanionAgentSelectedProposedActionIntent = z.infer<
   typeof SelectedProposedActionIntentSchema
 >;
+export type CompanionAgentTurnOrigin = z.infer<typeof TurnOriginSchema>;
 export type CompanionAgentFollowUp = z.infer<
   typeof CompanionAgentFollowUpSchema
 >;

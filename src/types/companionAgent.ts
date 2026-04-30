@@ -42,6 +42,12 @@ export type CompanionAgentUnderstandingState =
 
 export type CompanionAgentSelectedProposedActionIntent = "draft" | "discuss";
 
+export type CompanionAgentTurnOrigin =
+  | "launcher"
+  | "composer"
+  | "follow_up_option"
+  | "proposed_action";
+
 export interface CompanionAgentFollowUp {
   question: string;
   reason?: string | null;
@@ -125,6 +131,7 @@ export interface CompanionAgentRequest {
   message: string;
   inputMode: CompanionChatInputMode;
   currentDateTime: string;
+  turnOrigin?: CompanionAgentTurnOrigin;
   starterIntent?: CompanionPlannerStarterIntent;
   selectedProposalId?: string;
   visibleDateStart?: string;

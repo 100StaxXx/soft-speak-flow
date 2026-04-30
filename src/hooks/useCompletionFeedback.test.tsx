@@ -49,6 +49,8 @@ const createDeferred = <T,>() => {
   return { promise, resolve, reject };
 };
 
+const getTodayTaskDate = () => new Date().toISOString().slice(0, 10);
+
 describe("useCompletionFeedback", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -69,7 +71,7 @@ describe("useCompletionFeedback", () => {
       taskId: "task-1",
       taskTitle: "Portfolio session",
       completionSource: "quest",
-      taskDate: "2026-04-29",
+      taskDate: getTodayTaskDate(),
     });
 
     await waitFor(() => {
@@ -121,7 +123,7 @@ describe("useCompletionFeedback", () => {
       taskId: "task-1",
       taskTitle: "Portfolio session",
       completionSource: "quest",
-      taskDate: "2026-04-29",
+      taskDate: getTodayTaskDate(),
     });
 
     await waitFor(() => {

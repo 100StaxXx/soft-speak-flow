@@ -19,11 +19,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { DurationPickerField } from '@/components/scheduling';
+import { DurationPickerField, TimePickerField, getNextTimeForStep } from '@/components/scheduling';
 import { cn } from '@/lib/utils';
 import type { JourneyRitual } from '@/hooks/useJourneySchedule';
 import { FrequencyPresets, formatDaysShort, getDefaultDaysForFrequency, getDefaultMonthDays } from './FrequencyPresets';
 import { formatScheduleLabel, inferCustomPeriod } from '@/utils/habitSchedule';
+import { formatTime12 } from '@/components/quest-shared';
 
 interface RitualCardProps {
   ritual: JourneyRitual;
@@ -108,6 +109,47 @@ export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete,
         />
 
         <div className="grid grid-cols-2 gap-2">
+          <TimePickerField
+            value={editedRitual.preferredTime ?? null}
+            onChange={(time) => setEditedRitual({
+              ...editedRitual,
+              preferredTime: time,
+            })}
+            label="Time"
+            placeholder="No time"
+            ariaLabel="Ritual time"
+            variant="compact"
+            seedValueOnOpen={() => getNextTimeForStep(30)}
+            suggestionAction={editedRitual.preferredTime ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-10 px-2 text-xs text-[#7f4a1d]/80 hover:bg-white/60 hover:text-[#4f240c]"
+                onClick={() => setEditedRitual({
+                  ...editedRitual,
+                  preferredTime: null,
+                })}
+              >
+                Clear
+              </Button>
+            ) : null}
+            className="min-w-0"
+          />
+
+          <DurationPickerField
+            value={editedRitual.estimatedMinutes ?? null}
+            onChange={(duration) => setEditedRitual({
+              ...editedRitual,
+              estimatedMinutes: duration ?? undefined,
+            })}
+            label="Minutes"
+            variant="compact"
+            className="min-w-0"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-2">
           <div>
             <label className={cn("mb-1 block text-[10px]", plannerPathfinderTheme.sectionEyebrow)}>Difficulty</label>
             <Select
@@ -126,17 +168,6 @@ export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete,
               </SelectContent>
             </Select>
           </div>
-
-          <DurationPickerField
-            value={editedRitual.estimatedMinutes ?? null}
-            onChange={(duration) => setEditedRitual({
-              ...editedRitual,
-              estimatedMinutes: duration ?? undefined,
-            })}
-            label="Minutes"
-            variant="compact"
-            className="min-w-0"
-          />
         </div>
 
         <div className="flex gap-2">
@@ -195,10 +226,16 @@ export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete,
               <span className="text-[10px] opacity-70">({displayDays})</span>
             </>
           )}
-          {ritual.estimatedMinutes && (
+          {ritual.preferredTime && (
             <>
               <span>•</span>
               <Clock className="w-3 h-3" />
+              <span>{formatTime12(ritual.preferredTime)}</span>
+            </>
+          )}
+          {ritual.estimatedMinutes && (
+            <>
+              <span>•</span>
               <span>{ritual.estimatedMinutes}min</span>
             </>
           )}

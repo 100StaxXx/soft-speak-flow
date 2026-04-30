@@ -12,6 +12,7 @@ import {
   type ExecutionModel,
 } from "./planner.ts";
 import {
+  DEFAULT_RITUAL_TIME_SLOTS,
   normalizeJourneyRitual,
   type JourneyRitual,
 } from "./ritualNormalization.ts";
@@ -219,15 +220,16 @@ Your job is to:
 4. Create postcard milestones with specific target dates - one per chapter, evenly distributed
 5. You may also create 1-3 additional non-postcard milestones as intermediate goals
 6. Create 3-6 RITUALS (recurring habits)
-7. Estimate weekly time commitment
-8. INFER THE BEST STORY TYPE based on the goal:
+7. Give every ritual a local preferredTime in "HH:mm" 24-hour format
+8. Estimate weekly time commitment
+9. INFER THE BEST STORY TYPE based on the goal:
    - "treasure_hunt": Finding/acquiring something (job, house, money, items, certifications)
    - "mystery": Learning/understanding (studying, research, problem-solving, exams)
    - "pilgrimage": Inner growth/wellness (meditation, health, spirituality, mental health)
    - "heroes_journey": Becoming something (career change, mastering skills, transformation)
    - "rescue_mission": Urgency/helping others (deadlines, caregiving, emergencies)
    - "exploration": Discovery/creativity (travel, art, trying new things, hobbies)
-9. SELECT A MATCHING THEME COLOR based on story type:
+10. SELECT A MATCHING THEME COLOR based on story type:
    - "heroic" (gold): treasure_hunt, heroes_journey
    - "warrior" (red): rescue_mission
    - "mystic" (pink): mystery
@@ -284,7 +286,8 @@ CRITICAL: Return ONLY valid JSON with this exact structure:
       "customMonthDays": [1],
       "customPeriod": "week" | "month",
       "difficulty": "medium",
-      "estimatedMinutes": 30
+      "estimatedMinutes": 30,
+      "preferredTime": "08:00"
     }
   ],
   "weeklyHoursEstimate": <number>,
@@ -319,7 +322,8 @@ Generate a phased schedule working backwards from the deadline. Make sure:
 8. executionModel matches the kind of work: use overlap_early for repeatable goals where setup and action can run together, otherwise use sequential
 9. Use "customDays" only for week-based rituals (0 = Monday through 6 = Sunday)
 10. Use "customMonthDays" for monthly or month-based rituals (1-31). If a ritual is monthly and no specific day is obvious, use [1]
-${timelineContext ? '11. Adjust the schedule based on the user\'s context (existing skills, constraints, etc.)' : ''}`;
+11. Give each ritual a preferredTime in local 24-hour "HH:mm" format, spreading rituals across sensible dayparts when there are multiple
+${timelineContext ? '12. Adjust the schedule based on the user\'s context (existing skills, constraints, etc.)' : ''}`;
 
     console.log('Generating journey schedule for goal:', goal, 'deadline:', deadline, 'days:', daysAvailable, 'context:', timelineContext);
 
@@ -390,6 +394,7 @@ ${timelineContext ? '11. Adjust the schedule based on the user\'s context (exist
           ritual,
           ritual.id || `ritual-${Date.now()}-${index}`,
           normalizeDifficulty,
+          DEFAULT_RITUAL_TIME_SLOTS[index % DEFAULT_RITUAL_TIME_SLOTS.length],
         ),
       );
 

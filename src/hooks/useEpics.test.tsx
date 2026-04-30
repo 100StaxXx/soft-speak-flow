@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => {
   const orderCreatedAtMock = vi.fn();
   const loadLocalEpicsMock = vi.fn();
   const queueActionMock = vi.fn();
+  const queueTaskActionMock = vi.fn();
   const requestJourneyPathGenerationMock = vi.fn();
   const retryNowMock = vi.fn();
   const dispatchPlannerSyncFinishedMock = vi.fn();
@@ -41,6 +42,7 @@ const mocks = vi.hoisted(() => {
     orderCreatedAtMock,
     loadLocalEpicsMock,
     queueActionMock,
+    queueTaskActionMock,
     requestJourneyPathGenerationMock,
     retryNowMock,
     dispatchPlannerSyncFinishedMock,
@@ -93,6 +95,7 @@ vi.mock("@/hooks/useAIInteractionTracker", () => ({
 vi.mock("@/contexts/ResilienceContext", () => ({
   useResilience: () => ({
     queueAction: (...args: unknown[]) => mocks.queueActionMock(...args),
+    queueTaskAction: (...args: unknown[]) => mocks.queueTaskActionMock(...args),
     shouldQueueWrites: mocks.shouldQueueWrites,
     retryNow: (...args: unknown[]) => mocks.retryNowMock(...args),
     reportApiFailure: (...args: unknown[]) => mocks.reportApiFailureMock(...args),
@@ -205,6 +208,7 @@ describe("useEpics", () => {
     mocks.shouldQueueWrites = false;
     mocks.loadLocalEpicsMock.mockResolvedValue([]);
     mocks.queueActionMock.mockResolvedValue(undefined);
+    mocks.queueTaskActionMock.mockResolvedValue(undefined);
     mocks.requestJourneyPathGenerationMock.mockResolvedValue(null);
     mocks.retryNowMock.mockResolvedValue(undefined);
     mocks.dispatchPlannerSyncFinishedMock.mockReset();
@@ -740,6 +744,138 @@ describe("useEpics", () => {
     });
   });
 
+  it("spawns campaign ritual tasks with time and duration during campaign creation", async () => {
+    let localEpics: Array<Record<string, unknown>> = [];
+    let localHabits: Array<Record<string, unknown>> = [];
+    let localEpicHabits: Array<{ id: string; epic_id: string; habit_id: string }> = [];
+    let localDailyTasks: Array<Record<string, unknown>> = [];
+
+    const buildLocalEpics = () => localEpics.map((epic) => ({
+      ...epic,
+      epic_habits: localEpicHabits
+        .filter((link) => link.epic_id === epic.id)
+        .map((link) => ({
+          habit_id: link.habit_id,
+          habits: localHabits.find((habit) => habit.id === link.habit_id) ?? null,
+        })),
+    }));
+
+    mocks.loadLocalEpicsMock.mockImplementation(async () => buildLocalEpics());
+    mocks.getAllLocalTasksForUserMock.mockImplementation(async () => localDailyTasks);
+    mocks.upsertPlannerRecordMock.mockImplementation(async (storeName: string, record: Record<string, unknown>) => {
+      if (storeName === "epics") {
+        localEpics = [...localEpics.filter((epic) => epic.id !== record.id), record];
+      }
+    });
+    mocks.upsertPlannerRecordsMock.mockImplementation(async (storeName: string, records: Array<Record<string, unknown>>) => {
+      if (storeName === "habits") {
+        localHabits = [
+          ...localHabits.filter((habit) => !records.some((record) => record.id === habit.id)),
+          ...records,
+        ];
+      }
+      if (storeName === "epic_habits") {
+        localEpicHabits = [
+          ...localEpicHabits.filter((link) => !records.some((record) => record.id === link.id)),
+          ...(records as Array<{ id: string; epic_id: string; habit_id: string }>),
+        ];
+      }
+      if (storeName === "daily_tasks") {
+        localDailyTasks = [
+          ...localDailyTasks.filter((task) => !records.some((record) => record.id === task.id)),
+          ...records,
+        ];
+      }
+    });
+
+    const habitsInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const epicsInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const linksInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const dailyTasksUpsertMock = vi.fn().mockResolvedValue({ error: null });
+
+    mocks.fromMock.mockImplementation((table: string) => {
+      if (table === "habits") {
+        return {
+          insert: habitsInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "epics") {
+        return {
+          insert: epicsInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "epic_habits") {
+        return {
+          insert: linksInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "daily_tasks") {
+        return {
+          upsert: dailyTasksUpsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      return {
+        insert: vi.fn().mockResolvedValue({ error: null }),
+        select: mocks.selectMock,
+      };
+    });
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.createEpic({
+        title: "Timed Campaign",
+        target_days: 14,
+        habits: [
+          {
+            title: "Morning focus",
+            difficulty: "easy",
+            frequency: "daily",
+            custom_days: [0, 1, 2, 3, 4, 5, 6],
+            preferred_time: "08:30",
+            estimated_minutes: 45,
+          },
+        ],
+      });
+    });
+
+    expect(localDailyTasks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        task_text: "Morning focus",
+        scheduled_time: "08:30",
+        estimated_duration: 45,
+        epic_id: expect.any(String),
+      }),
+    ]));
+    expect(dailyTasksUpsertMock).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          task_text: "Morning focus",
+          scheduled_time: "08:30",
+          estimated_duration: 45,
+          epic_id: expect.any(String),
+        }),
+      ]),
+      expect.objectContaining({
+        onConflict: "user_id,task_date,habit_source_id",
+      }),
+    );
+  });
+
   it("computes a local end date before inserting a newly created campaign", async () => {
     const habitsInsertMock = vi.fn().mockResolvedValue({ error: null });
     const epicsInsertMock = vi.fn().mockResolvedValue({ error: null });
@@ -954,12 +1090,22 @@ describe("useEpics", () => {
             difficulty: "medium",
             frequency: "daily",
             custom_days: [0, 1, 2, 3, 4, 5, 6],
+            preferred_time: "20:00",
+            estimated_minutes: 20,
           },
         ],
       });
     });
 
     expect(mocks.queueActionMock).toHaveBeenCalled();
+    expect(mocks.queueTaskActionMock).toHaveBeenCalledWith(
+      "CREATE_TASK",
+      expect.objectContaining({
+        task_text: "Evening reflection",
+        scheduled_time: "20:00",
+        estimated_duration: 20,
+      }),
+    );
     expect(mocks.requestJourneyPathGenerationMock).not.toHaveBeenCalled();
   });
 
@@ -1929,6 +2075,7 @@ describe("useEpics", () => {
 
     const habitsInsertMock = vi.fn().mockResolvedValue({ error: null });
     const linksInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const dailyTasksUpsertMock = vi.fn().mockResolvedValue({ error: null });
 
     mocks.fromMock.mockImplementation((table: string) => {
       if (table === "habits") {
@@ -1941,6 +2088,13 @@ describe("useEpics", () => {
       if (table === "epic_habits") {
         return {
           insert: linksInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "daily_tasks") {
+        return {
+          upsert: dailyTasksUpsertMock,
           select: mocks.selectMock,
         };
       }
@@ -1969,6 +2123,8 @@ describe("useEpics", () => {
         difficulty: "easy",
         frequency: "daily",
         customDays: [0, 1, 2, 3, 4, 5, 6],
+        preferredTime: "19:00",
+        estimatedMinutes: 30,
       });
     });
 
@@ -1979,6 +2135,34 @@ describe("useEpics", () => {
       expect.objectContaining({
         title: "Evening Walk",
         frequency: "daily",
+        preferred_time: "19:00",
+        estimated_minutes: 30,
+      }),
+    );
+    expect(mocks.upsertPlannerRecordsMock).toHaveBeenCalledWith(
+      "daily_tasks",
+      expect.arrayContaining([
+        expect.objectContaining({
+          task_text: "Evening Walk",
+          scheduled_time: "19:00",
+          estimated_duration: 30,
+          habit_source_id: expect.any(String),
+          epic_id: "epic-1",
+        }),
+      ]),
+    );
+    expect(dailyTasksUpsertMock).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          task_text: "Evening Walk",
+          scheduled_time: "19:00",
+          estimated_duration: 30,
+          habit_source_id: expect.any(String),
+          epic_id: "epic-1",
+        }),
+      ]),
+      expect.objectContaining({
+        onConflict: "user_id,task_date,habit_source_id",
       }),
     );
     expect(mocks.upsertPlannerRecordMock).toHaveBeenCalledWith(
@@ -2047,6 +2231,9 @@ describe("useEpics", () => {
     const linksInsertMock = vi.fn().mockResolvedValue({ error: linksInsertError });
     const deleteLinkEqMock = vi.fn().mockResolvedValue({ error: null });
     const deleteHabitUserEqMock = vi.fn().mockResolvedValue({ error: null });
+    const deleteTaskCompletedEqMock = vi.fn().mockResolvedValue({ error: null });
+    const deleteTaskUserEqMock = vi.fn().mockReturnValue({ eq: deleteTaskCompletedEqMock });
+    const deleteTaskHabitEqMock = vi.fn().mockReturnValue({ eq: deleteTaskUserEqMock });
 
     mocks.fromMock.mockImplementation((table: string) => {
       if (table === "habits") {
@@ -2066,6 +2253,15 @@ describe("useEpics", () => {
           insert: linksInsertMock,
           delete: () => ({
             eq: deleteLinkEqMock,
+          }),
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "daily_tasks") {
+        return {
+          delete: () => ({
+            eq: deleteTaskHabitEqMock,
           }),
           select: mocks.selectMock,
         };

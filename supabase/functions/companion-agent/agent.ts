@@ -664,9 +664,20 @@ const isThinGenericAgentReply = (value: string): boolean => {
     normalized === "here";
 };
 
+const isLauncherTurn = (request: CompanionAgentRequest): boolean =>
+  request.turnOrigin === "launcher" || request.turnOrigin === undefined;
+
+const isFollowUpOptionTurn = (request: CompanionAgentRequest): boolean =>
+  request.turnOrigin === "follow_up_option" ||
+  request.turnOrigin === undefined;
+
 const resolveBareStarterFollowUp = (
   request: CompanionAgentRequest,
 ): (BareStarterFollowUpConfig & { starterIntent: BareStarterIntent }) | null => {
+  if (!isLauncherTurn(request)) {
+    return null;
+  }
+
   if (
     request.activeFollowUp ||
     request.selectedProposalId ||
@@ -855,6 +866,10 @@ const isPlanningLauncherFollowUpAnswer = (
   request: CompanionAgentRequest,
   context: LoadedCompanionAgentContext,
 ): boolean => {
+  if (!isFollowUpOptionTurn(request)) {
+    return false;
+  }
+
   if (
     request.selectedProposalId ||
     request.selectedProposedAction
@@ -1428,6 +1443,9 @@ function buildInstructions(params: {
     "Prompts like 'Plan my day', 'Adjust my day', 'What should I do right now?', 'Make room', 'What matters?', 'Prepare me for tomorrow', and 'Advance my campaign' give you permission to reason from app context.",
     "A bare launcher prompt starts the ChatGPT-style conversation; it is not automatic permission to produce quest cards, structured planner responses, or pending drafts on the first turn.",
     "For a bare launcher prompt with no follow-up answer, selected proposal, or concrete extra details, do not call consult_planner just to generate default proposals. Ask one targeted follow-up or answer conversationally instead.",
+    "Turn origin matters: launcher means an app template started the turn, composer means the user freely typed or dictated into chat, follow_up_option means the user clicked a follow-up chip, and proposed_action means the user chose a suggestion control.",
+    "For composer turns, treat activeFollowUp as context only. The user may answer it, refine it, ignore it, ask something else, or pivot naturally like ChatGPT; do not force them back into the template form.",
+    "Only treat latestUserMessageAnswersFollowUp as true when the context packet says it is true.",
     "For planning launchers, keep the experience conversational and read-only until the user explicitly opts into drafting. This covers Plan my day, What should I do right now, Adjust my day, Make room, What matters, Prepare me for tomorrow, Advance my campaign, Relationship touch, and low-energy planning.",
     "If a planning-launcher follow-up names a concrete task, ask the generic confirmation 'Would you like to form a quest?' with Yes and No options. Do not echo an inferred title, draft the quest, or carry hidden quest fields in that same turn.",
     "If the active follow-up asks whether to form a quest and the user says no, keep the reply conversational and do not prepare a write. If they say yes, ask what the quest should be called before preparing anything.",
@@ -1465,6 +1483,9 @@ function buildInstructions(params: {
       ? `Launcher starter intent: ${
         params.request.starterIntent.replaceAll("_", " ")
       }.`
+      : null,
+    params.request.turnOrigin
+      ? `Latest turn origin: ${params.request.turnOrigin.replaceAll("_", " ")}.`
       : null,
     `Companion state: mood ${currentMood}, stage ${
       params.companion.current_stage ?? 0
@@ -1557,6 +1578,9 @@ function buildAgentContextPacket(params: {
       ),
     ].slice(0, 8)
     : baseProposedActions.slice(0, 8);
+  const latestUserMessageAnswersFollowUp =
+    params.request.turnOrigin === "follow_up_option" ||
+    (params.request.turnOrigin === undefined && Boolean(activeFollowUp));
 
   return {
     packetType: "cosmiq_companion_context_v1",
@@ -1564,6 +1588,7 @@ function buildAgentContextPacket(params: {
     timezone: params.context.timezone,
     surface: params.request.surface,
     latestUserMessage: params.request.message,
+    turnOrigin: params.request.turnOrigin ?? null,
     launcherStarterIntent: params.request.starterIntent ?? null,
     selectedEntityIds: params.request.selectedEntityIds ?? null,
     visibleDateRange: {
@@ -1571,7 +1596,7 @@ function buildAgentContextPacket(params: {
       end: params.context.visibleDateEnd,
     },
     activeFollowUp,
-    latestUserMessageAnswersFollowUp: Boolean(activeFollowUp),
+    latestUserMessageAnswersFollowUp,
     activeProposedActions,
     selectedProposedAction: requestSelectedProposedAction,
     selectedProposedActionIntent,
@@ -2936,6 +2961,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
         const activeFollowUp = params.request.activeFollowUp ??
           getPersistedActiveFollowUp(context);
         if (
+          isFollowUpOptionTurn(params.request) &&
           activeFollowUp &&
           (!outputReply || isThinGenericAgentReply(outputReply))
         ) {
@@ -2988,7 +3014,11 @@ export async function runCompanionAgent(params: RunAgentParams) {
         const activeFollowUp = params.request.activeFollowUp ??
           getPersistedActiveFollowUp(context);
         const followUpToPreserve = activeFollowUp ?? followUp;
-        if (followUpToPreserve && isThinGenericAgentReply(payloadReply)) {
+        if (
+          isFollowUpOptionTurn(params.request) &&
+          followUpToPreserve &&
+          isThinGenericAgentReply(payloadReply)
+        ) {
           const planningStarterIntent =
             getPlanningStarterIntentFromFollowUp(followUpToPreserve);
           return buildActiveFollowUpClarifyAgentResult({
@@ -3094,8 +3124,9 @@ export async function runCompanionAgent(params: RunAgentParams) {
       horizon: "day",
       starterIntent: plannerStarterIntent,
       forcePlanDayFollowUp: options.forcePlanDayFollowUp,
-      activeFollowUp: params.request.activeFollowUp ??
-        getPersistedActiveFollowUp(context),
+      activeFollowUp: isFollowUpOptionTurn(params.request)
+        ? params.request.activeFollowUp ?? getPersistedActiveFollowUp(context)
+        : null,
       context,
     });
 

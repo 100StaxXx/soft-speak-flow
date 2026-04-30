@@ -171,6 +171,7 @@ describe("Pathfinder", () => {
           customMonthDays: [],
           customPeriod: null,
           estimatedMinutes: 30,
+          preferredTime: "08:30",
         },
       ],
       weeklyHoursEstimate: 5,
@@ -192,6 +193,7 @@ describe("Pathfinder", () => {
           customMonthDays: [],
           customPeriod: null,
           estimatedMinutes: 30,
+          preferredTime: "08:30",
         },
       ],
       suggestedStoryType: null,
@@ -396,6 +398,7 @@ describe("Pathfinder", () => {
           customMonthDays: [],
           customPeriod: null,
           estimatedMinutes: 45,
+          preferredTime: "07:15",
         },
       ],
       weeklyHoursEstimate: 5,
@@ -432,11 +435,16 @@ describe("Pathfinder", () => {
     });
 
     const payload = mocks.onCreateEpic.mock.calls[0]?.[0] as {
+      habits?: Array<{ preferred_time?: string | null; estimated_minutes?: number | null }>;
       milestones?: Array<{ milestone_percent: number }>;
     };
     const percents = payload.milestones?.map((milestone) => milestone.milestone_percent);
 
     expect(percents).toEqual([33, 67, 100]);
     expect(percents?.every((percent) => Number.isInteger(percent))).toBe(true);
+    expect(payload.habits?.[0]).toEqual(expect.objectContaining({
+      preferred_time: "07:15",
+      estimated_minutes: 45,
+    }));
   });
 });

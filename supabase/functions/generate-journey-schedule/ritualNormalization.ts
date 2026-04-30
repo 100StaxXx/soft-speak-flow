@@ -18,6 +18,7 @@ export interface JourneyRitual {
   customPeriod?: JourneyRitualCustomPeriod;
   difficulty: "easy" | "medium" | "hard";
   estimatedMinutes?: number;
+  preferredTime?: string | null;
 }
 
 interface JourneyRitualInput {
@@ -30,7 +31,10 @@ interface JourneyRitualInput {
   customPeriod?: unknown;
   difficulty?: unknown;
   estimatedMinutes?: unknown;
+  preferredTime?: unknown;
 }
+
+export const DEFAULT_RITUAL_TIME_SLOTS = ["08:00", "10:00", "14:00", "17:00", "19:00", "20:30"];
 
 function normalizeNumberList(values: unknown, min: number, max: number): number[] {
   if (!Array.isArray(values)) return [];
@@ -63,6 +67,16 @@ function inferCustomPeriod(
   return undefined;
 }
 
+function normalizePreferredTime(value: unknown, fallbackTime: string): string {
+  if (typeof value !== "string") return fallbackTime;
+
+  const trimmed = value.trim();
+  const match = trimmed.match(/^([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/);
+  if (!match) return fallbackTime;
+
+  return `${match[1].padStart(2, "0")}:${match[2]}`;
+}
+
 export function normalizeFrequency(value: unknown): JourneyRitualFrequency {
   if (typeof value !== "string") return "daily";
 
@@ -82,6 +96,7 @@ export function normalizeJourneyRitual(
   ritual: JourneyRitualInput,
   defaultId: string,
   normalizeDifficulty: (value: unknown) => "easy" | "medium" | "hard",
+  fallbackTime = DEFAULT_RITUAL_TIME_SLOTS[0],
 ): JourneyRitual {
   const frequency = normalizeFrequency(ritual.frequency);
   let customDays = normalizeNumberList(ritual.customDays, 0, 6);
@@ -132,6 +147,7 @@ export function normalizeJourneyRitual(
     description: typeof ritual.description === "string" ? ritual.description : "",
     frequency,
     difficulty: normalizeDifficulty(ritual.difficulty),
+    preferredTime: normalizePreferredTime(ritual.preferredTime, fallbackTime),
   };
 
   if (customDays.length > 0) {

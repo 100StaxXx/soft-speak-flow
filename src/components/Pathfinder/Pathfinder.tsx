@@ -101,6 +101,7 @@ interface PathfinderProps {
       custom_days: number[];
       custom_month_days?: number[];
       estimated_minutes?: number;
+      preferred_time?: string | null;
     }>;
     milestones?: Array<{
       title: string;
@@ -278,7 +279,7 @@ export function Pathfinder({
     () => {
       // Use schedule rituals if available, otherwise fall back to suggestions
       if (schedule?.rituals) {
-        console.log('[Pathfinder] Mapping schedule rituals:', schedule.rituals.length, schedule.rituals.map(r => ({ title: r.title, estimatedMinutes: r.estimatedMinutes })));
+        console.log('[Pathfinder] Mapping schedule rituals:', schedule.rituals.length, schedule.rituals.map(r => ({ title: r.title, estimatedMinutes: r.estimatedMinutes, preferredTime: r.preferredTime })));
         return schedule.rituals.map(r => ({
           id: r.id,
           title: r.title,
@@ -290,6 +291,7 @@ export function Pathfinder({
           customMonthDays: r.customMonthDays,
           customPeriod: r.customPeriod,
           estimatedMinutes: r.estimatedMinutes,
+          preferredTime: r.preferredTime ?? null,
           isSelected: true,
         }));
       }
@@ -464,6 +466,7 @@ export function Pathfinder({
       custom_days: h.customDays || getDefaultWeekdaysForFrequency(h.frequency || 'daily'),
       custom_month_days: h.customMonthDays || getDefaultMonthDaysForFrequency(h.frequency || 'daily'),
       estimated_minutes: h.estimatedMinutes,
+      preferred_time: h.preferredTime ?? null,
     }));
 
     // Log for debugging ritual count issues

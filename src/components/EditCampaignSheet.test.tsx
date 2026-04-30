@@ -200,6 +200,38 @@ describe("EditCampaignSheet", () => {
         difficulty: "medium",
         frequency: "daily",
         customDays: [],
+        preferredTime: null,
+        estimatedMinutes: null,
+      });
+    });
+  });
+
+  it("passes time and duration when adding a new ritual", async () => {
+    renderSheet();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add ritual" }));
+    fireEvent.change(screen.getByLabelText("Ritual name"), {
+      target: { value: "Evening review" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "No time" }));
+    fireEvent.change(screen.getByLabelText("New ritual time"), {
+      target: { value: "19:00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "No duration" }));
+    fireEvent.click(screen.getByRole("button", { name: "45m" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Save ritual" }));
+
+    await waitFor(() => {
+      expect(mocks.createCampaignRitualMock).toHaveBeenCalledWith({
+        epicId: "epic-1",
+        title: "Evening review",
+        difficulty: "medium",
+        frequency: "daily",
+        customDays: [],
+        preferredTime: "19:00",
+        estimatedMinutes: 45,
       });
     });
   });

@@ -318,44 +318,40 @@ describe("JourneysCompanionPlannerModal", () => {
       .toHaveAttribute("data-tour", "companion-plan-day-chat-send");
   });
 
-  it("starts quest capture locally without forwarding Quest? to the assistant hook", async () => {
+  it("forwards Quest? launch intents through the assistant hook", async () => {
     const onLaunchIntentConsumed = vi.fn();
+    const launchIntent = {
+      id: "quest-launch-1",
+      message: "Quest?",
+      starterIntent: "quest_capture" as const,
+      target: "planner" as const,
+      briefingContext: null,
+    };
 
     render(
       <JourneysCompanionPlannerModal
         open
         onOpenChange={vi.fn()}
         presentation="dialog"
-        launchIntent={{
-          id: "quest-launch-1",
-          message: "Quest?",
-          starterIntent: "quest_capture",
-          target: "planner",
-          briefingContext: null,
-        }}
+        launchIntent={launchIntent}
         onLaunchIntentConsumed={onLaunchIntentConsumed}
         onQuestCaptureSubmit={vi.fn()}
       />,
     );
 
     expect(
-      await screen.findByText("What would you like to do for your quest?"),
-    ).toBeInTheDocument();
-    expect(onLaunchIntentConsumed).toHaveBeenCalledWith("quest-launch-1");
-    expect(mocks.assistant.startTemplateThread).toHaveBeenCalledWith({
-      greetingText: null,
-    });
-    expect(
-      screen.queryByText(
+      await screen.findByText(
         "I can help you shape that into something concrete when you're ready.",
       ),
-    ).not.toBeInTheDocument();
+    ).toBeInTheDocument();
+    expect(mocks.assistantOptions.at(-1)?.launchIntent).toEqual(launchIntent);
+    expect(onLaunchIntentConsumed).not.toHaveBeenCalled();
+    expect(mocks.assistant.startTemplateThread).not.toHaveBeenCalled();
     expect(mocks.assistant.submitMessage).not.toHaveBeenCalled();
     expect(mocks.assistant.submitTypedMessage).not.toHaveBeenCalled();
-    expect(mocks.assistantOptions.at(-1)?.launchIntent).toBeNull();
   });
 
-  it("submits the user's quest capture text to the local handoff instead of chat", async () => {
+  it("submits text after Quest? through normal assistant chat", async () => {
     const onQuestCaptureSubmit = vi.fn();
     mocks.state.draftInput = "Pilates tomorrow at 8am";
 
@@ -375,15 +371,15 @@ describe("JourneysCompanionPlannerModal", () => {
       />,
     );
 
-    await screen.findByText("What would you like to do for your quest?");
+    await screen.findByText(
+      "I can help you shape that into something concrete when you're ready.",
+    );
 
     fireEvent.click(screen.getByTestId("journeys-companion-planner-send-button"));
 
-    expect(onQuestCaptureSubmit).toHaveBeenCalledWith(
-      "Pilates tomorrow at 8am",
-    );
+    expect(onQuestCaptureSubmit).not.toHaveBeenCalled();
     expect(mocks.assistant.submitMessage).not.toHaveBeenCalled();
-    expect(mocks.assistant.submitTypedMessage).not.toHaveBeenCalled();
+    expect(mocks.assistant.submitTypedMessage).toHaveBeenCalledTimes(1);
   });
 
   it("opens thread history from the thread-history launch intent and resumes a selected thread", async () => {
@@ -514,6 +510,9 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(mocks.assistant.submitMessage).toHaveBeenCalledWith(
       "Progress",
       "text",
+      {
+        turnOrigin: "follow_up_option",
+      },
     );
 
     mocks.state.pendingAction = previousPendingAction;
@@ -560,6 +559,7 @@ describe("JourneysCompanionPlannerModal", () => {
       "Draft this: Draft launch email",
       "text",
       {
+        turnOrigin: "proposed_action",
         selectedProposedAction: proposedAction,
         selectedProposedActionIntent: "draft",
       },
@@ -613,6 +613,7 @@ describe("JourneysCompanionPlannerModal", () => {
       "Draft this: Draft launch email",
       "text",
       {
+        turnOrigin: "proposed_action",
         selectedProposedAction: firstProposedAction,
         selectedProposedActionIntent: "draft",
       },
@@ -657,6 +658,7 @@ describe("JourneysCompanionPlannerModal", () => {
       "Tell me more about: Move dentist appointment",
       "text",
       {
+        turnOrigin: "proposed_action",
         selectedProposedAction: proposedAction,
         selectedProposedActionIntent: "discuss",
       },

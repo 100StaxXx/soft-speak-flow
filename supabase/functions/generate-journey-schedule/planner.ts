@@ -422,6 +422,7 @@ export function createFallbackScheduleParts(
         frequency: "daily" as const,
         difficulty: "medium" as const,
         estimatedMinutes: 30,
+        preferredTime: "08:00",
       },
       {
         id: `ritual-${Date.now()}-2`,
@@ -431,6 +432,7 @@ export function createFallbackScheduleParts(
         customDays: [0],
         difficulty: "easy" as const,
         estimatedMinutes: 20,
+        preferredTime: "17:00",
       },
     ]
     : [
@@ -441,6 +443,7 @@ export function createFallbackScheduleParts(
         frequency: "daily" as const,
         difficulty: "medium" as const,
         estimatedMinutes: 30,
+        preferredTime: "08:00",
       },
       {
         id: `ritual-${Date.now()}-2`,
@@ -450,6 +453,7 @@ export function createFallbackScheduleParts(
         customDays: [0],
         difficulty: "easy" as const,
         estimatedMinutes: 20,
+        preferredTime: "17:00",
       },
     ];
 

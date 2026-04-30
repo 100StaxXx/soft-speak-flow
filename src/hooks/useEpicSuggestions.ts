@@ -14,6 +14,8 @@ export interface EpicSuggestion {
   difficulty: 'easy' | 'medium' | 'hard';
   suggestedWeek?: number;
   category?: string;
+  estimatedMinutes?: number;
+  preferredTime?: string | null;
   selected?: boolean;
 }
 
