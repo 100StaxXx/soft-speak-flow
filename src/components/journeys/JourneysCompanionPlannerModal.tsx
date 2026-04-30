@@ -773,6 +773,7 @@ const JourneysCompanionOverlayBody = memo(({
                   <div
                     className="flex w-full justify-start"
                     data-testid="journeys-companion-follow-up"
+                    data-tutorial-avoid="true"
                   >
                     <div
                       className={cn(
@@ -812,6 +813,7 @@ const JourneysCompanionOverlayBody = memo(({
                                 onClick={() => handleFollowUpOption(option)}
                                 disabled={assistantActionDisabled}
                                 data-tour="companion-plan-day-follow-up-option"
+                                data-tour-shape="rounded-rect"
                               >
                                 {pendingFollowUpOption === option
                                   ? (
@@ -949,6 +951,7 @@ const JourneysCompanionOverlayBody = memo(({
                   <div
                     className="flex w-full justify-start"
                     data-testid="journeys-companion-pending-action"
+                    data-tutorial-avoid="true"
                   >
                     <div
                       className={cn(
@@ -1013,6 +1016,7 @@ const JourneysCompanionOverlayBody = memo(({
                               onClick={assistant.confirmAllPendingActions}
                               disabled={assistantActionDisabled}
                               data-tour="companion-plan-day-pending-confirm-all"
+                              data-tour-shape="rounded-rect"
                             >
                               Confirm All ({assistant.readyPendingActionCount})
                             </Button>
@@ -1025,6 +1029,7 @@ const JourneysCompanionOverlayBody = memo(({
                           onClick={assistant.confirmPendingAction}
                           disabled={assistantActionDisabled}
                           data-tour="companion-plan-day-pending-confirm"
+                          data-tour-shape="rounded-rect"
                         >
                           <Check className="mr-2 h-4 w-4" />
                           Confirm
@@ -1050,7 +1055,10 @@ const JourneysCompanionOverlayBody = memo(({
             </div>
           </ScrollArea>
 
-          <div className={cn(plannerPathfinderTheme.footerBar, "p-3")}>
+          <div
+            className={cn(plannerPathfinderTheme.footerBar, "p-3")}
+            data-tutorial-avoid="true"
+          >
             {assistant.isRecording || assistant.interimText
               ? (
                 <div
@@ -1105,6 +1113,7 @@ const JourneysCompanionOverlayBody = memo(({
                 plannerPathfinderTheme.composerBar,
                 "flex-col items-stretch gap-2",
               )}
+              data-tutorial-avoid="true"
             >
               <label
                 htmlFor="journeys-companion-chat-input"
@@ -1129,6 +1138,7 @@ const JourneysCompanionOverlayBody = memo(({
                 )}
                 style={{ height: "72px", overflowY: "hidden" }}
                 data-tour="companion-plan-day-chat-input"
+                data-tour-shape="rounded-rect"
                 data-testid="journeys-companion-planner-text-input"
               />
               <div className="flex items-center justify-between gap-2">
@@ -1158,6 +1168,7 @@ const JourneysCompanionOverlayBody = memo(({
                     "h-11 shrink-0 px-4",
                   )}
                   data-tour="companion-plan-day-chat-send"
+                  data-tour-shape="rounded-rect"
                   data-testid="journeys-companion-planner-send-button"
                 >
                   {assistant.isSubmitting || assistant.isResolvingAction

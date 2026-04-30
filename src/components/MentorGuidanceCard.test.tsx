@@ -95,7 +95,7 @@ describe("MentorGuidanceCard", () => {
     });
     const rectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
       const element = this as HTMLElement;
-      if (element.dataset.tutorial === "mentor-dialogue-panel") {
+      if (element.dataset.tutorial === "mentor-dialogue-panel" || element.dataset.testid === "mentor-guidance-card-panel") {
         return rect({ top: 620, left: 0, width: 390, height: 224 });
       }
       if (element.dataset.kind === "hidden") {
@@ -111,8 +111,50 @@ describe("MentorGuidanceCard", () => {
 
     const wrapper = container.querySelector('[data-tutorial="mentor-dialogue-panel"]');
     await waitFor(() => {
-      expect(wrapper).toHaveStyle({ bottom: "166px" });
+      expect(wrapper).toHaveAttribute("data-placement", "floating");
+      expect(wrapper).toHaveStyle({ top: "454px" });
     });
+
+    rectSpy.mockRestore();
+  });
+
+  it("constrains the compact dock to the measured nonblocking height", async () => {
+    document.body.innerHTML = `
+      <button data-tour="companion-launcher-option-plan-day">plan</button>
+      <div data-tutorial-avoid="true">right rail</div>
+    `;
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      value: 844,
+    });
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+    const rectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
+      const element = this as HTMLElement;
+      if (element.dataset.tutorial === "mentor-dialogue-panel" || element.dataset.testid === "mentor-guidance-card-panel") {
+        return rect({ top: 620, left: 0, width: 390, height: 224 });
+      }
+      if (element.dataset.tour === "companion-launcher-option-plan-day") {
+        return rect({ top: 700, left: 24, width: 180, height: 48 });
+      }
+      if (element.dataset.tutorialAvoid === "true") {
+        return rect({ top: 64, left: 350, width: 40, height: 768 });
+      }
+      return rect({ top: 0, left: 0, width: 0, height: 0 });
+    });
+
+    const { container } = render(<MentorGuidanceCard />);
+
+    const wrapper = container.querySelector('[data-tutorial="mentor-dialogue-panel"]');
+    const panel = container.querySelector('[data-testid="mentor-guidance-card-panel"]');
+    await waitFor(() => {
+      expect(wrapper).toHaveAttribute("data-compact", "true");
+      expect(wrapper).toHaveStyle({ height: "104px" });
+      expect(panel).toHaveClass("h-full", "overflow-hidden");
+    });
+    expect(screen.queryByRole("button", { name: "Skip tutorial" })).not.toBeInTheDocument();
 
     rectSpy.mockRestore();
   });
@@ -237,10 +279,20 @@ describe("resolveMentorGuidancePlacement", () => {
     placement: ReturnType<typeof resolveMentorGuidancePlacement>,
     baseRect = panelRect
   ) => {
+    if (placement.anchor === "floating") {
+      return {
+        top: placement.topPx,
+        bottom: placement.topPx + (placement.heightPx ?? baseRect.height),
+        left: placement.leftPx,
+        right: placement.leftPx + placement.widthPx,
+      };
+    }
     if (placement.anchor === "top") {
       return {
         top: placement.topPx,
         bottom: placement.topPx + baseRect.height,
+        left: baseRect.left,
+        right: baseRect.right,
       };
     }
 
@@ -248,6 +300,8 @@ describe("resolveMentorGuidancePlacement", () => {
     return {
       top,
       bottom: top + baseRect.height,
+      left: baseRect.left,
+      right: baseRect.right,
     };
   };
 
@@ -343,9 +397,66 @@ describe("resolveMentorGuidancePlacement", () => {
       minTopPx,
     });
 
-    expect(placement.anchor).toBe("top");
-    if (placement.anchor === "top") {
-      expect(placement.topPx).toBe(minTopPx);
+    const rect = placedRect(placement, topOnlyPanelRect);
+    expect(rect.top).toBe(minTopPx);
+    expect(rect.top - topTargetRect.bottom).toBeGreaterThanOrEqual(12);
+  });
+
+  it("avoids every active target and tutorial avoid rectangle before choosing placement", () => {
+    const activeTargetRect = {
+      top: 690,
+      right: 360,
+      bottom: 748,
+      left: 30,
+      width: 330,
+      height: 58,
+    };
+    const avoidFooterRect = {
+      top: 430,
+      right: 390,
+      bottom: 690,
+      left: 0,
+      width: 390,
+      height: 260,
+    };
+
+    const placement = resolveMentorGuidancePlacement({
+      panelRect,
+      targetRect: activeTargetRect,
+      avoidRects: [avoidFooterRect],
+      viewportHeight,
+      viewportWidth: 390,
+      minTopPx,
+    });
+
+    const rect = placedRect(placement);
+    expect(rect.bottom <= avoidFooterRect.top - 12 || rect.top >= activeTargetRect.bottom + 12).toBe(true);
+  });
+
+  it("collapses to a compact dock when no full placement is clear", () => {
+    const fullWidthAvoidRect = {
+      top: 52,
+      right: 390,
+      bottom: 844,
+      left: 0,
+      width: 390,
+      height: 792,
+    };
+
+    const placement = resolveMentorGuidancePlacement({
+      panelRect,
+      targetRect: fullWidthAvoidRect,
+      avoidRects: [fullWidthAvoidRect],
+      viewportHeight,
+      viewportWidth: 390,
+      minTopPx,
+    });
+
+    expect(placement.anchor).toBe("floating");
+    if (placement.anchor === "floating") {
+      expect(placement.compact).toBe(true);
+      expect(placement.widthPx).toBeLessThanOrEqual(320);
+      expect(placement.heightPx).toBeLessThanOrEqual(104);
     }
   });
 });
@@ -406,7 +517,7 @@ describe("MentorGuidanceCard CSS var", () => {
     });
     const rectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
       const element = this as HTMLElement;
-      if (element.dataset.tutorial === "mentor-dialogue-panel") {
+      if (element.dataset.tutorial === "mentor-dialogue-panel" || element.dataset.testid === "mentor-guidance-card-panel") {
         return rect({ top: 620, left: 0, width: 390, height: 224 });
       }
       return rect({ top: 0, left: 0, width: 0, height: 0 });
@@ -430,7 +541,7 @@ describe("MentorGuidanceCard CSS var", () => {
     });
     const rectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
       const element = this as HTMLElement;
-      if (element.dataset.tutorial === "mentor-dialogue-panel") {
+      if (element.dataset.tutorial === "mentor-dialogue-panel" || element.dataset.testid === "mentor-guidance-card-panel") {
         return rect({ top: 620, left: 0, width: 390, height: 224 });
       }
       return rect({ top: 0, left: 0, width: 0, height: 0 });
@@ -460,7 +571,7 @@ describe("MentorGuidanceCard CSS var", () => {
     });
     const rectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
       const element = this as HTMLElement;
-      if (element.dataset.tutorial === "mentor-dialogue-panel") {
+      if (element.dataset.tutorial === "mentor-dialogue-panel" || element.dataset.testid === "mentor-guidance-card-panel") {
         return rect({ top: 620, left: 0, width: 390, height: 224 });
       }
       return rect({ top: 0, left: 0, width: 0, height: 0 });

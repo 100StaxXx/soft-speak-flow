@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback, useLayoutEffect } from "react";
 import { format, addDays, isSameDay } from "date-fns";
 import { motion, useReducedMotion } from "framer-motion";
 import { Compass } from "lucide-react";
@@ -306,6 +306,7 @@ const Journeys = () => {
     ? MAC_TIMED_TASK_DURATION_FALLBACK_MINUTES
     : undefined;
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [datePillCenterRequestKey, setDatePillCenterRequestKey] = useState(0);
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [isCompanionPlannerPinned, setIsCompanionPlannerPinned] = useState(false);
@@ -325,7 +326,8 @@ const Journeys = () => {
   const [showCreatedAnimation, setShowCreatedAnimation] = useState(false);
   const [createdCampaignData, setCreatedCampaignData] = useState<CreatedCampaignData | null>(null);
   const [isInboxExpanded, setIsInboxExpanded] = useState(false);
-  const previousIsTabActiveRef = useRef(isTabActive);
+  const previousIsJourneysRouteActiveRef = useRef(false);
+  const showAddSheetRef = useRef(showAddSheet);
   const scheduledTimeUpdateQueueRef = useRef<Map<string, Promise<void>>>(new Map());
   const inboxSectionRef = useRef<HTMLDivElement | null>(null);
   const hasInitializedInboxVisibilityRef = useRef(false);
@@ -339,6 +341,7 @@ const Journeys = () => {
     () => new URLSearchParams(location.search).get("section") === "inbox",
     [location.search],
   );
+  const isJourneysRouteActive = isTabActive && location.pathname === JOURNEYS_ROUTE;
   
   // Auth and profile for onboarding
   const { user } = useAuth();
@@ -370,8 +373,13 @@ const Journeys = () => {
     resolver?.(result);
   }, []);
 
-  const handleAddQuestSheetOpenChange = useCallback((nextOpen: boolean) => {
+  const setAddQuestSheetOpen = useCallback((nextOpen: boolean) => {
+    showAddSheetRef.current = nextOpen;
     setShowAddSheet(nextOpen);
+  }, []);
+
+  const handleAddQuestSheetOpenChange = useCallback((nextOpen: boolean) => {
+    setAddQuestSheetOpen(nextOpen);
     if (!nextOpen) {
       setPrefilledTime(null);
       setQuestSheetPrefillDraft(null);
@@ -380,7 +388,7 @@ const Journeys = () => {
         finishPlannerQuestEdit({ saved: false });
       }
     }
-  }, [finishPlannerQuestEdit, plannerQuestEditSession?.editor]);
+  }, [finishPlannerQuestEdit, plannerQuestEditSession?.editor, setAddQuestSheetOpen]);
 
   const openAddQuestSheet = useCallback((options?: {
     date?: Date;
@@ -394,8 +402,8 @@ const Journeys = () => {
     setPrefilledTime(options?.time ?? options?.prefillDraft?.scheduledTime ?? null);
     setQuestSheetPrefillDraft(options?.prefillDraft ?? null);
     setQuestSheetPrefillKey(options?.prefillKey ?? null);
-    setShowAddSheet(true);
-  }, []);
+    setAddQuestSheetOpen(true);
+  }, [setAddQuestSheetOpen]);
 
   const handleEditQuestDialogOpenChange = useCallback((nextOpen: boolean) => {
     if (nextOpen) return;
@@ -487,23 +495,28 @@ const Journeys = () => {
     }
   }, []);
 
+  useEffect(() => {
+    showAddSheetRef.current = showAddSheet;
+  }, [showAddSheet]);
+
   const resetSelectedDateToToday = useCallback(() => {
-    if (showAddSheet) return;
+    if (showAddSheetRef.current) return;
+    setDatePillCenterRequestKey((currentKey) => currentKey + 1);
     setSelectedDate((current) => {
       const today = new Date();
       return isSameDay(current, today) ? current : today;
     });
-  }, [showAddSheet]);
+  }, []);
 
-  useEffect(() => {
-    if (isTabActive && !previousIsTabActiveRef.current) {
+  useLayoutEffect(() => {
+    if (isJourneysRouteActive && !previousIsJourneysRouteActiveRef.current) {
       resetSelectedDateToToday();
     }
-    previousIsTabActiveRef.current = isTabActive;
-  }, [isTabActive, resetSelectedDateToToday]);
+    previousIsJourneysRouteActiveRef.current = isJourneysRouteActive;
+  }, [isJourneysRouteActive, resetSelectedDateToToday]);
 
   useEffect(() => {
-    if (!isTabActive) return;
+    if (!isJourneysRouteActive) return;
     if (Capacitor.isNativePlatform()) return;
 
     const handleVisibilityChange = () => {
@@ -515,10 +528,10 @@ const Journeys = () => {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [isTabActive, resetSelectedDateToToday]);
+  }, [isJourneysRouteActive, resetSelectedDateToToday]);
 
   useEffect(() => {
-    if (!isTabActive) return;
+    if (!isJourneysRouteActive) return;
     if (!Capacitor.isNativePlatform()) return;
 
     let isDisposed = false;
@@ -546,7 +559,7 @@ const Journeys = () => {
         void listenerHandle.remove();
       }
     };
-  }, [isTabActive, resetSelectedDateToToday]);
+  }, [isJourneysRouteActive, resetSelectedDateToToday]);
 
   // Combo tracking
   
@@ -644,7 +657,7 @@ const Journeys = () => {
     closeInteractionModalRef.current();
 
     if (tutorialStep !== "create_quest") {
-      setShowAddSheet(false);
+      setAddQuestSheetOpen(false);
       setPrefilledTime(null);
       setQuestSheetPrefillDraft(null);
       setQuestSheetPrefillKey(null);
@@ -666,6 +679,7 @@ const Journeys = () => {
     isTabActive,
     location.pathname,
     plannerQuestEditSession?.editor,
+    setAddQuestSheetOpen,
     tutorialActive,
     tutorialStep,
   ]);
@@ -915,7 +929,7 @@ const Journeys = () => {
     }
 
     if (plannerQuestEditSession?.editor === "create") {
-      setShowAddSheet(false);
+      setAddQuestSheetOpen(false);
     }
     if (plannerQuestEditSession?.editor === "update") {
       setEditingTask(null);
@@ -940,7 +954,7 @@ const Journeys = () => {
         prefillKey: `${proposal.id}:${Date.now()}`,
       });
       setPrefilledTime(null);
-      setShowAddSheet(true);
+      setAddQuestSheetOpen(true);
       return promise;
     }
 
@@ -974,7 +988,7 @@ const Journeys = () => {
     });
     setEditingTask(nextDraft.task);
     return promise;
-  }, [dailyTasks, finishPlannerQuestEdit, inboxTasks, plannerQuestEditSession?.editor]);
+  }, [dailyTasks, finishPlannerQuestEdit, inboxTasks, plannerQuestEditSession?.editor, setAddQuestSheetOpen]);
 
   // Deep link handling - open task from widget tap
   const { pendingTaskId, clearPendingTask } = useDeepLink();
@@ -1159,7 +1173,7 @@ const Journeys = () => {
       });
     }
 
-    setShowAddSheet(false);
+    setAddQuestSheetOpen(false);
 
     if (SEND_TO_CALENDAR_ENABLED && data.sendToCalendar && createdTask?.id) {
       const calendarSyncStartedAt = Date.now();
@@ -1176,7 +1190,7 @@ const Journeys = () => {
         inboxSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     }
-  }, [selectedDate, addTask, finishPlannerQuestEdit, handleSendTaskToCalendar, plannerQuestEditSession?.editor]);
+  }, [selectedDate, addTask, finishPlannerQuestEdit, handleSendTaskToCalendar, plannerQuestEditSession?.editor, setAddQuestSheetOpen]);
 
   const handleToggleTask = useCallback((taskId: string, completed: boolean, xpReward: number, taskData?: { scheduled_time?: string | null; difficulty?: string | null; category?: string | null; ai_generated?: boolean | null; task_text?: string | null }) => {
     if (completed) {
@@ -1514,6 +1528,14 @@ const Journeys = () => {
   const handleCreateCampaign = useCallback(async (data: Parameters<typeof createEpic>[0]) => {
     try {
       await createEpic(data);
+      window.dispatchEvent(
+        new CustomEvent("pathfinder-campaign-created", {
+          detail: {
+            title: data.title,
+            habitCount: data.habits.length,
+          },
+        }),
+      );
       setPathfinderInitialGoal("");
       setShowPathfinder(false);
       setCreatedCampaignData({
@@ -1583,7 +1605,8 @@ const Journeys = () => {
                 selectedDate={selectedDate}
                 onDateSelect={handleDatePillClick}
                 tasksPerDay={tasksPerDay}
-                isActive={isTabActive}
+                isActive={isJourneysRouteActive}
+                centerRequestKey={datePillCenterRequestKey}
               />
             </motion.div>
           ) : null}
@@ -1755,7 +1778,7 @@ const Journeys = () => {
           onTimeSlotLongPress={(date, time) => {
             setSelectedDate(date);
             setPrefilledTime(time);
-            setShowAddSheet(true);
+            setAddQuestSheetOpen(true);
           }}
         />
 

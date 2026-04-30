@@ -79,6 +79,7 @@ const mocks = vi.hoisted(() => ({
   isMacHostedIOSApp: false,
   draggableFabRenderCount: 0,
   lastDatePillSelectedDate: null as Date | null,
+  lastDatePillCenterRequestKey: null as number | null,
   lastAddQuestSheetProps: null as null | {
     autoFillTimeOnFirstTap?: boolean;
     open?: boolean;
@@ -197,14 +198,18 @@ vi.mock("@/components/DatePillsScroller", () => ({
   DatePillsScroller: ({
     selectedDate,
     onDateSelect,
+    centerRequestKey,
   }: {
     selectedDate: Date;
     onDateSelect: (date: Date) => void;
+    centerRequestKey?: number;
   }) => {
     mocks.lastDatePillSelectedDate = selectedDate;
+    mocks.lastDatePillCenterRequestKey = centerRequestKey ?? 0;
     return (
       <div data-testid="date-pills">
         <span data-testid="selected-date-iso">{selectedDate.toISOString()}</span>
+        <span data-testid="center-request-key">{centerRequestKey ?? 0}</span>
         <button
           type="button"
           onClick={() => {
@@ -718,6 +723,7 @@ describe("Journeys row drag integration", () => {
     mocks.isMacHostedIOSApp = false;
     mocks.draggableFabRenderCount = 0;
     mocks.lastDatePillSelectedDate = null;
+    mocks.lastDatePillCenterRequestKey = null;
     mocks.lastAddQuestSheetProps = null;
     mocks.lastCompanionPlannerModalProps = null;
     mocks.lastEditQuestDialogProps = null;
@@ -1720,7 +1726,7 @@ describe("Journeys row drag integration", () => {
     });
   });
 
-  it("does not reset selected date from pathname changes alone", async () => {
+  it("resets stale selected date when returning to the journeys route", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1786,7 +1792,73 @@ describe("Journeys row drag integration", () => {
 
     await waitFor(() => {
       const reenteredDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(reenteredDateIso).toBe(staleSelectedDateIso);
+      const reenteredDate = new Date(reenteredDateIso);
+      expect(reenteredDateIso).not.toBe(staleSelectedDateIso);
+      expect(isSameDay(reenteredDate, new Date())).toBe(true);
+    });
+  });
+
+  it("requests date-pill recentering on journeys route re-entry when the selected date is already today", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    const RouteHarness = () => {
+      const navigate = useNavigate();
+      const location = useLocation();
+
+      return (
+        <>
+          <div data-testid="route-path">{location.pathname}</div>
+          <button type="button" onClick={() => navigate("/inbox")}>
+            go-inbox
+          </button>
+          <button type="button" onClick={() => navigate("/journeys")}>
+            go-journeys
+          </button>
+          <Journeys />
+        </>
+      );
+    };
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <RouteHarness />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("route-path").textContent).toBe("/journeys");
+      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "set-same-day-non-current" }));
+
+    let sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+    await waitFor(() => {
+      sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      expect(isSameDay(new Date(sameDaySelectedDateIso), new Date())).toBe(true);
+    });
+    const centerKeyBeforeReentry = Number(screen.getByTestId("center-request-key").textContent);
+
+    fireEvent.click(screen.getByRole("button", { name: "go-inbox" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("route-path").textContent).toBe("/inbox");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "go-journeys" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("route-path").textContent).toBe("/journeys");
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-date-iso").textContent).toBe(sameDaySelectedDateIso);
+      expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeReentry);
     });
   });
 

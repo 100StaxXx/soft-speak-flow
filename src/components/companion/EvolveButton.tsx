@@ -57,6 +57,7 @@ export const EvolveButton = memo(({
         onClick={handleClick}
         disabled={isProcessing}
         data-tour="evolve-companion-button"
+        data-tour-shape="rounded-rect"
         className="
           relative w-full py-5 rounded-xl
           font-heading font-black text-3xl sm:text-4xl tracking-[0.35em]

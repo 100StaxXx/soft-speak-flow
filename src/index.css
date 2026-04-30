@@ -2245,36 +2245,35 @@ All colors MUST be HSL.
     background: transparent;
   }
 
-  .mentor-spotlight-mask {
+  .mentor-spotlight-svg {
     position: fixed;
+    inset: 0;
     pointer-events: none;
-    background: transparent;
-    /* Spotlight via box-shadow: the element body is transparent, the
-       enormous spread paints everything outside the rounded rect dark.
-       Do not "clean up" the 9999px spread — it carves the cutout. */
-    box-shadow: 0 0 0 9999px hsl(0 0% 0% / 0.65);
+    z-index: 101;
+    overflow: visible;
+  }
+
+  .mentor-spotlight-mask {
+    pointer-events: none;
+    fill: hsl(0 0% 0% / 0.65);
   }
 
   .mentor-spotlight-ring {
-    position: fixed;
     pointer-events: none;
-    z-index: 101;
+    fill: transparent;
+    vector-effect: non-scaling-stroke;
   }
 
   .mentor-spotlight-ring--spotlight {
-    border: 2px solid hsl(var(--primary) / 0.92);
-    box-shadow:
-      0 0 0 8px hsl(var(--primary) / 0.2),
-      0 16px 35px rgba(0, 0, 0, 0.35);
+    stroke: hsl(var(--primary) / 0.92);
+    stroke-width: 2px;
+    filter: drop-shadow(0 0 8px hsl(var(--primary) / 0.38)) drop-shadow(0 16px 18px rgba(0, 0, 0, 0.35));
   }
 
   .mentor-spotlight-ring--outline {
-    border: 3px solid hsl(var(--primary) / 0.95);
-    box-shadow:
-      0 0 0 2px hsl(var(--primary) / 0.32),
-      0 0 0 8px hsl(var(--primary) / 0.16),
-      0 0 28px hsl(var(--primary) / 0.42),
-      0 10px 24px rgba(0, 0, 0, 0.22);
+    stroke: hsl(var(--primary) / 0.95);
+    stroke-width: 3px;
+    filter: drop-shadow(0 0 3px hsl(var(--primary) / 0.32)) drop-shadow(0 0 14px hsl(var(--primary) / 0.42)) drop-shadow(0 10px 14px rgba(0, 0, 0, 0.22));
   }
 
   .mentor-spotlight-target-elevated {

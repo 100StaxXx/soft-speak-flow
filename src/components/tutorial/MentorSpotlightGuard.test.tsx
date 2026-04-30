@@ -144,13 +144,11 @@ describe("MentorSpotlightGuard", () => {
     document.body.removeEventListener("click", clickSpy);
   });
 
-  it("derives the spotlight border-radius from the target's computed style", () => {
-    // jsdom does not expand the `border-radius` shorthand to per-corner longhands,
-    // so set the longhand the parser actually reads.
+  it("derives the spotlight path from the target's computed corner radii", () => {
     document.body.innerHTML = `
       <button
         data-tour="rounded-target"
-        style="position:fixed;left:20px;top:20px;width:120px;height:64px;border-top-left-radius:16px;"
+        style="position:fixed;left:20px;top:20px;width:120px;height:64px;border-top-left-radius:16px;border-top-right-radius:8px;border-bottom-right-radius:20px;border-bottom-left-radius:4px;"
       >rounded</button>
       <section data-tutorial="mentor-dialogue-panel"><button>panel</button></section>
     `;
@@ -167,11 +165,40 @@ describe("MentorSpotlightGuard", () => {
     );
 
     const guard = screen.getByTestId("mentor-spotlight-guard");
-    const mask = guard.querySelector(".mentor-spotlight-mask") as HTMLElement;
-    const ring = guard.querySelector(".mentor-spotlight-ring") as HTMLElement;
-    // 16px target radius + 10px padding = 26px outer radius.
-    expect(mask).toHaveStyle({ borderRadius: "26px" });
-    expect(ring).toHaveStyle({ borderRadius: "26px" });
+    const path = guard.querySelector(".mentor-spotlight-ring") as SVGPathElement;
+    expect(path.getAttribute("d")).toContain("A 16 16");
+    expect(path.getAttribute("d")).toContain("A 8 8");
+    expect(path.getAttribute("d")).toContain("A 20 20");
+    expect(path.getAttribute("d")).toContain("A 4 4");
+  });
+
+  it("draws square, pill, and circle targets with matching SVG geometry", () => {
+    document.body.innerHTML = `
+      <button data-tour="square-target" style="position:fixed;left:20px;top:20px;width:80px;height:40px;">square</button>
+      <button data-tour="pill-target" data-tour-shape="pill" style="position:fixed;left:20px;top:80px;width:120px;height:40px;">pill</button>
+      <button data-tour="circle-target" data-tour-shape="circle" style="position:fixed;left:20px;top:140px;width:40px;height:40px;">circle</button>
+      <section data-tutorial="mentor-dialogue-panel"><button>panel</button></section>
+    `;
+    const square = document.querySelector('[data-tour="square-target"]') as HTMLElement;
+    const pill = document.querySelector('[data-tour="pill-target"]') as HTMLElement;
+    const circle = document.querySelector('[data-tour="circle-target"]') as HTMLElement;
+    setRect(square, rect({ top: 20, left: 20, width: 80, height: 40 }));
+    setRect(pill, rect({ top: 80, left: 20, width: 120, height: 40 }));
+    setRect(circle, rect({ top: 140, left: 20, width: 40, height: 40 }));
+
+    const { rerender } = render(
+      <MentorSpotlightGuard active targetSelector='[data-tour="square-target"]' />
+    );
+    let path = screen.getByTestId("mentor-spotlight-path") as SVGPathElement;
+    expect(path.getAttribute("d")).toBe("M 20 20 H 100 L 100 20 V 60 L 100 60 H 20 L 20 60 V 20 L 20 20 Z");
+
+    rerender(<MentorSpotlightGuard active targetSelector='[data-tour="pill-target"]' />);
+    path = screen.getByTestId("mentor-spotlight-path") as SVGPathElement;
+    expect(path.getAttribute("d")).toContain("A 60 20");
+
+    rerender(<MentorSpotlightGuard active targetSelector='[data-tour="circle-target"]' />);
+    path = screen.getByTestId("mentor-spotlight-path") as SVGPathElement;
+    expect(path.getAttribute("d")).toContain("A 20 20");
   });
 
   it("renders a non-blocking outline without masks", () => {
@@ -222,13 +249,8 @@ describe("MentorSpotlightGuard", () => {
       />
     );
 
-    const ring = screen.getByTestId("mentor-spotlight-guard").querySelector(".mentor-spotlight-ring");
-    expect(ring).toHaveStyle({
-      top: "10px",
-      left: "10px",
-      width: "60px",
-      height: "60px",
-      borderRadius: "10px",
-    });
+    const ring = screen.getByTestId("mentor-spotlight-path");
+    expect(ring.getAttribute("d")).toContain("M 20 20");
+    expect(ring.getAttribute("d")).toContain("H 60");
   });
 });

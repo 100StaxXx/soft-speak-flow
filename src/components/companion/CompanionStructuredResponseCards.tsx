@@ -156,6 +156,7 @@ const renderQuestRow = (
               }}
               disabled={options.actionDisabled || isSaved || isPending}
               data-tour="companion-plan-day-suggestion-save"
+              data-tour-shape="pill"
               data-testid={`structured-suggestion-confirm-${quest.suggestionId}`}
             >
               {actionLabel}

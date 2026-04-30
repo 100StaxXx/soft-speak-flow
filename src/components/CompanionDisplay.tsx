@@ -983,16 +983,18 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
           />
 
           {/* Evolve Button - shows when ready */}
-          <AnimatePresence>
-            {displayCanEvolve && (
-              <EvolveButton
-                onEvolve={handleEvolvePress}
-                isEvolving={isEvolutionBusy}
-                actionLabel={isStageZeroEgg ? "HATCH" : "EVOLVE"}
-                loadingLabel={isStageZeroEgg ? "HATCHING..." : "EVOLVING..."}
-              />
-            )}
-          </AnimatePresence>
+          <div data-tutorial-avoid="true">
+            <AnimatePresence>
+              {displayCanEvolve && (
+                <EvolveButton
+                  onEvolve={handleEvolvePress}
+                  isEvolving={isEvolutionBusy}
+                  actionLabel={isStageZeroEgg ? "HATCH" : "EVOLVE"}
+                  loadingLabel={isStageZeroEgg ? "HATCHING..." : "EVOLVING..."}
+                />
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </Card>
 

@@ -772,12 +772,18 @@ export function Pathfinder({
                     </div>
 
                     {!showClarification && (
-                      <div className={cn(plannerPathfinderTheme.footerBar, "space-y-3")} data-testid="pathfinder-footer">
+                      <div
+                        className={cn(plannerPathfinderTheme.footerBar, "space-y-3")}
+                        data-testid="pathfinder-footer"
+                        data-tutorial-avoid="true"
+                      >
                         <Button
                           onClick={handleProceedToTimeline}
                           disabled={!goalInput.trim() || !deadline || isClassifying || isScheduleLoading}
                           className={cn(plannerPathfinderTheme.primaryButton, "h-12 w-full text-base")}
                           size="lg"
+                          data-tour="pathfinder-primary-action"
+                          data-tour-shape="rounded-rect"
                         >
                           {isClassifying ? (
                             <>
@@ -835,10 +841,16 @@ export function Pathfinder({
                       </div>
                     </div>
 
-                    <div className={cn(plannerPathfinderTheme.footerBar, "space-y-3")} data-testid="pathfinder-footer">
+                    <div
+                      className={cn(plannerPathfinderTheme.footerBar, "space-y-3")}
+                      data-testid="pathfinder-footer"
+                      data-tutorial-avoid="true"
+                    >
                       <Button
                         onClick={handleProceedToSuggestions}
                         className={cn(plannerPathfinderTheme.primaryButton, "w-full")}
+                        data-tour="pathfinder-primary-action"
+                        data-tour-shape="rounded-rect"
                       >
                         Continue with this plan
                         <ChevronRight className="ml-1 h-4 w-4" />
@@ -901,10 +913,16 @@ export function Pathfinder({
                       </div>
                     </div>
 
-                    <div className={cn(plannerPathfinderTheme.footerBar, "space-y-3")} data-testid="pathfinder-footer">
+                    <div
+                      className={cn(plannerPathfinderTheme.footerBar, "space-y-3")}
+                      data-testid="pathfinder-footer"
+                      data-tutorial-avoid="true"
+                    >
                       <Button
                         onClick={handleProceedToReview}
                         className={cn(plannerPathfinderTheme.primaryButton, "w-full")}
+                        data-tour="pathfinder-primary-action"
+                        data-tour-shape="rounded-rect"
                       >
                         Continue to Review
                         <ChevronRight className="ml-1 h-4 w-4" />
@@ -982,11 +1000,17 @@ export function Pathfinder({
                       </div>
                     </div>
 
-                    <div className={cn(plannerPathfinderTheme.footerBar, "space-y-3")} data-testid="pathfinder-footer">
+                    <div
+                      className={cn(plannerPathfinderTheme.footerBar, "space-y-3")}
+                      data-testid="pathfinder-footer"
+                      data-tutorial-avoid="true"
+                    >
                       <Button
                         onClick={handleCreateEpic}
                         disabled={hasReachedCampaignLimit || isCreating || isSubmittingCreate || selectedHabits.length === 0 || epicWhy.trim().length === 0 || epicTitle.trim().length === 0}
                         className={cn(plannerPathfinderTheme.primaryButton, "w-full")}
+                        data-tour="pathfinder-primary-action"
+                        data-tour-shape="rounded-rect"
                       >
                         {isCreating || isSubmittingCreate ? (
                           <>
