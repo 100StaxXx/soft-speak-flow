@@ -34,6 +34,9 @@ jobs:
       - name: Start local Supabase stack
         run: supabase start --exclude edge-runtime
 
+      - name: Run migration regression suite
+        run: npm run test:migrations:habit-index
+
       - name: Run database security regression suite
         run: npm run test:security:db
 

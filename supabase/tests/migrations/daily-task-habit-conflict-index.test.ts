@@ -6,7 +6,7 @@ function assert(condition: boolean, message: string): void {
 
 Deno.test("habit task conflict index migration replaces the partial index with a full arbiter", async () => {
   const source = await Deno.readTextFile(
-    new URL("../migrations/20260430120000_replace_partial_habit_task_conflict_index.sql", import.meta.url),
+    new URL("../../migrations/20260430120000_replace_partial_habit_task_conflict_index.sql", import.meta.url),
   );
 
   assert(
