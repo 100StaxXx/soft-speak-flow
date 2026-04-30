@@ -202,6 +202,23 @@ const createDailyTasksRollbackDeleteMock = () => {
   };
 };
 
+const createDefaultSupabaseTableMock = () => {
+  const terminalEqMock = vi.fn().mockResolvedValue({ error: null });
+  const eqChainMock = vi.fn().mockReturnValue({ eq: terminalEqMock });
+  const inChainMock = vi.fn().mockReturnValue({ eq: eqChainMock });
+
+  return {
+    insert: vi.fn().mockResolvedValue({ error: null }),
+    upsert: vi.fn().mockResolvedValue({ error: null }),
+    update: vi.fn().mockReturnValue({ eq: eqChainMock }),
+    delete: vi.fn().mockReturnValue({
+      eq: eqChainMock,
+      in: inChainMock,
+    }),
+    select: mocks.selectMock,
+  };
+};
+
 describe("useEpics", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -429,9 +446,7 @@ describe("useEpics", () => {
         };
       }
 
-      return {
-        select: mocks.selectMock,
-      };
+      return createDefaultSupabaseTableMock();
     });
 
     const { result } = renderHook(() => useEpics(), {
@@ -640,6 +655,7 @@ describe("useEpics", () => {
 
       if (table === "daily_tasks") {
         return {
+          upsert: vi.fn().mockResolvedValue({ error: null }),
           delete: dailyTasksRollbackDeleteMock.deleteMock,
           select: mocks.selectMock,
         };
@@ -656,9 +672,7 @@ describe("useEpics", () => {
         };
       }
 
-      return {
-        select: mocks.selectMock,
-      };
+      return createDefaultSupabaseTableMock();
     });
 
     const { result } = renderHook(() => useEpics(), {
@@ -706,9 +720,7 @@ describe("useEpics", () => {
         return tableWithInsert();
       }
 
-      return {
-        select: mocks.selectMock,
-      };
+      return createDefaultSupabaseTableMock();
     });
 
     const { result } = renderHook(() => useEpics(), {
@@ -880,6 +892,7 @@ describe("useEpics", () => {
     const habitsInsertMock = vi.fn().mockResolvedValue({ error: null });
     const epicsInsertMock = vi.fn().mockResolvedValue({ error: null });
     const linksInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const dailyTasksUpsertMock = vi.fn().mockResolvedValue({ error: null });
 
     mocks.fromMock.mockImplementation((table: string) => {
       if (table === "habits") {
@@ -903,9 +916,14 @@ describe("useEpics", () => {
         };
       }
 
-      return {
-        select: mocks.selectMock,
-      };
+      if (table === "daily_tasks") {
+        return {
+          upsert: dailyTasksUpsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      return createDefaultSupabaseTableMock();
     });
 
     const { result } = renderHook(() => useEpics(), {
@@ -940,6 +958,18 @@ describe("useEpics", () => {
     }));
     expect(insertedEpic.end_date).toBe(resolveEpicEndDate(insertedEpic));
     expect(insertedEpic).not.toHaveProperty("epic_habits");
+    expect(dailyTasksUpsertMock).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          task_text: "Morning focus",
+          scheduled_time: null,
+          estimated_duration: null,
+        }),
+      ]),
+      expect.objectContaining({
+        onConflict: "user_id,task_date,habit_source_id",
+      }),
+    );
   });
 
   it("persists shared-epic visibility when campaign creation requests a public invite flow", async () => {
@@ -969,9 +999,7 @@ describe("useEpics", () => {
         };
       }
 
-      return {
-        select: mocks.selectMock,
-      };
+      return createDefaultSupabaseTableMock();
     });
 
     const { result } = renderHook(() => useEpics(), {
@@ -1030,9 +1058,7 @@ describe("useEpics", () => {
         };
       }
 
-      return {
-        select: mocks.selectMock,
-      };
+      return createDefaultSupabaseTableMock();
     });
 
     const { result } = renderHook(() => useEpics(), {
@@ -1146,9 +1172,7 @@ describe("useEpics", () => {
         };
       }
 
-      return {
-        select: mocks.selectMock,
-      };
+      return createDefaultSupabaseTableMock();
     });
 
     const { result } = renderHook(() => useEpics(), {
@@ -1321,6 +1345,7 @@ describe("useEpics", () => {
 
       if (table === "daily_tasks") {
         return {
+          upsert: vi.fn().mockResolvedValue({ error: null }),
           delete: dailyTasksRollbackDeleteMock.deleteMock,
           select: mocks.selectMock,
         };
@@ -1337,9 +1362,7 @@ describe("useEpics", () => {
         };
       }
 
-      return {
-        select: mocks.selectMock,
-      };
+      return createDefaultSupabaseTableMock();
     });
 
     const { result } = renderHook(() => useEpics(), {
@@ -1451,9 +1474,7 @@ describe("useEpics", () => {
         };
       }
 
-      return {
-        select: mocks.selectMock,
-      };
+      return createDefaultSupabaseTableMock();
     });
 
     const { result } = renderHook(() => useEpics(), {
@@ -1564,14 +1585,13 @@ describe("useEpics", () => {
 
       if (table === "daily_tasks") {
         return {
+          upsert: vi.fn().mockResolvedValue({ error: null }),
           delete: dailyTasksRollbackDeleteMock.deleteMock,
           select: mocks.selectMock,
         };
       }
 
-      return {
-        select: mocks.selectMock,
-      };
+      return createDefaultSupabaseTableMock();
     });
 
     const { result } = renderHook(() => useEpics(), {
@@ -1672,9 +1692,7 @@ describe("useEpics", () => {
         };
       }
 
-      return {
-        select: mocks.selectMock,
-      };
+      return createDefaultSupabaseTableMock();
     });
 
     const queryClient = new QueryClient({
@@ -1753,9 +1771,7 @@ describe("useEpics", () => {
         };
       }
 
-      return {
-        select: mocks.selectMock,
-      };
+      return createDefaultSupabaseTableMock();
     });
 
     const { result } = renderHook(() => useEpics(), {
@@ -1843,9 +1859,7 @@ describe("useEpics", () => {
         };
       }
 
-      return {
-        select: mocks.selectMock,
-      };
+      return createDefaultSupabaseTableMock();
     });
 
     const { result } = renderHook(() => useEpics(), {
@@ -2099,9 +2113,7 @@ describe("useEpics", () => {
         };
       }
 
-      return {
-        select: mocks.selectMock,
-      };
+      return createDefaultSupabaseTableMock();
     });
 
     const queryClient = new QueryClient({
@@ -2267,9 +2279,7 @@ describe("useEpics", () => {
         };
       }
 
-      return {
-        select: mocks.selectMock,
-      };
+      return createDefaultSupabaseTableMock();
     });
 
     const queryClient = new QueryClient({
@@ -2364,9 +2374,7 @@ describe("useEpics", () => {
         };
       }
 
-      return {
-        select: mocks.selectMock,
-      };
+      return createDefaultSupabaseTableMock();
     });
 
     const queryClient = new QueryClient({

@@ -35,6 +35,7 @@ interface JourneyRitualInput {
 }
 
 export const DEFAULT_RITUAL_TIME_SLOTS = ["08:00", "10:00", "14:00", "17:00", "19:00", "20:30"];
+export const MAX_RITUAL_ESTIMATED_MINUTES = 1440;
 
 function normalizeNumberList(values: unknown, min: number, max: number): number[] {
   if (!Array.isArray(values)) return [];
@@ -75,6 +76,20 @@ function normalizePreferredTime(value: unknown, fallbackTime: string): string {
   if (!match) return fallbackTime;
 
   return `${match[1].padStart(2, "0")}:${match[2]}`;
+}
+
+function normalizeEstimatedMinutes(value: unknown): number | undefined {
+  if (
+    typeof value === "number"
+    && Number.isFinite(value)
+    && Number.isInteger(value)
+    && value > 0
+    && value <= MAX_RITUAL_ESTIMATED_MINUTES
+  ) {
+    return value;
+  }
+
+  return undefined;
 }
 
 export function normalizeFrequency(value: unknown): JourneyRitualFrequency {
@@ -162,8 +177,9 @@ export function normalizeJourneyRitual(
     normalizedRitual.customPeriod = customPeriod;
   }
 
-  if (typeof ritual.estimatedMinutes === "number" && Number.isFinite(ritual.estimatedMinutes)) {
-    normalizedRitual.estimatedMinutes = ritual.estimatedMinutes;
+  const estimatedMinutes = normalizeEstimatedMinutes(ritual.estimatedMinutes);
+  if (estimatedMinutes !== undefined) {
+    normalizedRitual.estimatedMinutes = estimatedMinutes;
   }
 
   return normalizedRitual;

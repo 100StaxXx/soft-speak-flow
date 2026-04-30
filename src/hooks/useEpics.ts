@@ -983,7 +983,7 @@ async function reconcileAndApplyLocalCampaignHabitTasks(
 ): Promise<HabitTaskReconciliationAggregate> {
   let aggregate = createEmptyHabitTaskReconciliation();
 
-  for (const habit of habits.filter((candidate) => candidate.preferred_time || candidate.estimated_minutes !== null)) {
+  for (const habit of habits) {
     const reconciliation = await reconcileHabitLinkedTasks(toHabitTaskTemplate(userId, habit));
     await applyLocalHabitTaskReconciliation(reconciliation);
     aggregate = mergeHabitTaskReconciliation(aggregate, reconciliation);
