@@ -19,6 +19,7 @@ interface DatePillsScrollerProps {
   daysToShow?: number;
   isActive?: boolean;
   centerRequestKey?: number;
+  onUserDateInteraction?: () => void;
 }
 
 const EDGE_THRESHOLD_PX = 80;
@@ -49,6 +50,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
   daysToShow = 14,
   isActive = true,
   centerRequestKey = 0,
+  onUserDateInteraction,
 }: DatePillsScrollerProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
@@ -65,6 +67,9 @@ export const DatePillsScroller = memo(function DatePillsScroller({
 
   const extensionChunk = Math.max(DEFAULT_EXTENSION_CHUNK, daysToShow);
   const selectedDateKey = useMemo(() => format(selectedDate, "yyyy-MM-dd"), [selectedDate]);
+  const handleUserDateInteraction = useCallback(() => {
+    onUserDateInteraction?.();
+  }, [onUserDateInteraction]);
 
   useEffect(() => {
     const nextRange = getInitialRange(selectedDate, daysToShow);
@@ -303,6 +308,10 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     <div
       ref={scrollRef}
       onScroll={handleScroll}
+      onKeyDownCapture={handleUserDateInteraction}
+      onPointerDownCapture={handleUserDateInteraction}
+      onTouchStartCapture={handleUserDateInteraction}
+      onWheelCapture={handleUserDateInteraction}
       className={cn("flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-1 px-1")}
       style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
     >
@@ -325,6 +334,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
             data-date-pill="true"
             data-date-key={dateKey}
             onClick={async () => {
+              handleUserDateInteraction();
               await triggerHaptic(ImpactStyle.Light);
               onDateSelect(date);
             }}

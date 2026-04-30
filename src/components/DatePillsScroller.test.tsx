@@ -724,6 +724,29 @@ describe("DatePillsScroller", () => {
     }
   });
 
+  it("reports user date interactions from pill selection and scroller gestures", async () => {
+    const onDateSelect = vi.fn();
+    const onUserDateInteraction = vi.fn();
+    const { container } = render(
+      <DatePillsScroller
+        selectedDate={new Date("2026-02-13T12:00:00.000Z")}
+        onDateSelect={onDateSelect}
+        onUserDateInteraction={onUserDateInteraction}
+      />,
+    );
+
+    const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
+    const selectedButton = scroller.querySelector("button.bg-gradient-to-br") as HTMLButtonElement;
+
+    fireEvent.wheel(scroller);
+    fireEvent.click(selectedButton);
+
+    expect(onUserDateInteraction).toHaveBeenCalledTimes(2);
+    await waitFor(() => {
+      expect(onDateSelect).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("computes symmetric edge spacer widths from container and pill size", async () => {
     const onDateSelect = vi.fn();
     const { rerender, container } = render(

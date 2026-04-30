@@ -164,6 +164,64 @@ Deno.test("consultPlannerForAgent asks a clarifying plan-day question with no an
   assertMatch(result.reply, /what kind of day/i);
 });
 
+Deno.test("consultPlannerForAgent ignores abandoned campaigns with null completed_at", () => {
+  const result = consultPlannerForAgent({
+    message: "Focus",
+    currentDateTime: "2026-04-18T08:00:00-07:00",
+    surface: "journeys",
+    horizon: "day",
+    context: buildContext({
+      messages: [
+        {
+          id: "msg-1",
+          role: "user",
+          content: "Plan my day",
+          created_at: "2026-04-18T15:00:00.000Z",
+          input_mode: "text",
+          source: "agent",
+          surface: "journeys",
+          session_id: "session-1",
+        },
+        {
+          id: "msg-2",
+          role: "assistant",
+          content: "What are you feeling like focusing on this morning?",
+          created_at: "2026-04-18T15:00:01.000Z",
+          input_mode: null,
+          source: "agent",
+          surface: "journeys",
+          session_id: "session-1",
+        },
+      ],
+      tasks: [
+        {
+          id: "task-stale-campaign",
+          task_text: "Review old training plan",
+          task_date: "2026-04-18",
+          scheduled_time: null,
+          estimated_duration: 45,
+          completed: false,
+          epic_id: "epic-abandoned",
+        },
+      ],
+      campaigns: [
+        {
+          id: "epic-abandoned",
+          title: "Ghost campaign",
+          status: "abandoned",
+          completed_at: null,
+          end_date: "2026-05-01",
+          progress_percentage: 10,
+        },
+      ],
+    }),
+  });
+
+  assertEquals(result.structuredResponse?.planDay?.campaignFocus, null);
+  assertEquals(result.reply.includes("Ghost campaign"), false);
+  assertEquals(result.reply.includes("campaign drawer"), false);
+});
+
 Deno.test("consultPlannerForAgent treats a concrete plan-day reply as quest consent, not a draft", () => {
   const result = consultPlannerForAgent({
     message: "Work on my app",

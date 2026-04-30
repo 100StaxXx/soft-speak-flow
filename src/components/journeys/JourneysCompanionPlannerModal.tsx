@@ -55,12 +55,20 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useCompanionAssistant } from "@/hooks/useCompanionAssistant";
+import {
+  type CompanionAssistantMessage,
+  useCompanionAssistant,
+} from "@/hooks/useCompanionAssistant";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
 import { cn, stripMarkdown } from "@/lib/utils";
+import type { QuestComposerPrefillDraft } from "@/features/quests/types";
+import { buildQuestPrefillFromNaturalLanguage } from "@/features/quests/utils/voiceQuestPrefill";
 import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
 import type { CompanionChatThreadSummary } from "@/types/companionConversation";
-import type { CompanionAgentProposedAction } from "@/types/companionAgent";
+import type {
+  CompanionAgentFollowUp,
+  CompanionAgentProposedAction,
+} from "@/types/companionAgent";
 import type {
   CompanionPlannerLaunchIntent,
   CompanionPlannerProposal,
@@ -87,6 +95,7 @@ type JourneysCompanionDrawerLayout = {
 const MOBILE_DRAWER_HEIGHT_MIN_PX = 320;
 const MOBILE_DRAWER_HEIGHT_MAX_PX = 736;
 const MOBILE_DRAWER_VIEWPORT_OFFSET_PX = 24;
+const TRANSCRIPT_BOTTOM_THRESHOLD_PX = 96;
 
 const formatProposedActionType = (type: string) =>
   type.trim().replace(/[._-]+/g, " ") || "suggestion";
@@ -130,6 +139,126 @@ const getProposedActionKey = (action: CompanionAgentProposedAction) =>
     getProposedActionSummary(action) ?? "",
     action.reason?.trim() ?? "",
   ].join("::");
+
+const PLAN_DAY_QUEST_CONSENT_QUESTION_ID = "plan_day_quest_consent";
+
+const getFollowUpMetadataString = (
+  followUp: CompanionAgentFollowUp | null | undefined,
+  key: string,
+) => {
+  const value = followUp?.metadata?.[key];
+  return typeof value === "string" ? value : null;
+};
+
+const getFollowUpKey = (
+  followUp: CompanionAgentFollowUp | null | undefined,
+) => {
+  if (!followUp) return null;
+
+  return [
+    followUp.question.trim().toLowerCase(),
+    getFollowUpMetadataString(followUp, "questionId") ?? "",
+    getFollowUpMetadataString(followUp, "sourceStarterIntent") ?? "",
+    getFollowUpMetadataString(followUp, "consentKind") ?? "",
+    getFollowUpMetadataString(followUp, "sourceMessage") ?? "",
+  ].join("::");
+};
+
+const isPlanDayQuestConsentFollowUp = (
+  followUp: CompanionAgentFollowUp | null | undefined,
+) => {
+  if (!followUp) return false;
+
+  const questionId = getFollowUpMetadataString(followUp, "questionId");
+  const consentKind = getFollowUpMetadataString(followUp, "consentKind");
+  const sourceStarterIntent = getFollowUpMetadataString(
+    followUp,
+    "sourceStarterIntent",
+  );
+
+  if (questionId === PLAN_DAY_QUEST_CONSENT_QUESTION_ID) {
+    return consentKind === null || consentKind === "quest";
+  }
+
+  return followUp.metadata?.planningLauncherConsent === true &&
+    consentKind === "quest" &&
+    sourceStarterIntent === "plan_day";
+};
+
+const isAffirmativeFollowUpOption = (option: string) =>
+  /^(yes|yep|yeah|sure|ok|okay|please)\b/i.test(option.trim());
+
+const isConfirmationOnlyMessage = (content: string) =>
+  /^(yes|yep|yeah|sure|ok|okay|please|no|nope|nah)\b[.!?]*$/i.test(
+    content.trim(),
+  );
+
+const resolveQuestConsentSourceText = (
+  followUp: CompanionAgentFollowUp,
+  messages: CompanionAssistantMessage[],
+) => {
+  const metadataSource = getFollowUpMetadataString(
+    followUp,
+    "sourceMessage",
+  )?.trim();
+  if (metadataSource) return stripMarkdown(metadataSource).trim();
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message?.role !== "user") continue;
+
+    const content = stripMarkdown(message.content).trim();
+    if (!content || isConfirmationOnlyMessage(content)) continue;
+    return content;
+  }
+
+  return "";
+};
+
+const buildCreateQuestProposalFromDraft = (
+  draft: QuestComposerPrefillDraft,
+): CompanionPlannerProposal => {
+  const taskText = draft.text?.trim() ?? "";
+  const proposalId = `plan-day-quest-handoff-${Date.now()}-${
+    Math.random().toString(36).slice(2, 8)
+  }`;
+
+  return {
+    id: proposalId,
+    kind: "create_quest",
+    title: taskText || "New quest",
+    summary: taskText
+      ? `Review "${taskText}" before saving.`
+      : "Review this quest before saving.",
+    payload: {
+      taskText,
+      taskDate: draft.taskDate ?? null,
+      difficulty: draft.difficulty ?? "medium",
+      scheduledTime: draft.scheduledTime ?? null,
+      estimatedDuration: draft.estimatedDuration ?? 30,
+      recurrencePattern: draft.recurrencePattern ?? null,
+      recurrenceDays: draft.recurrenceDays ?? [],
+      recurrenceMonthDays: draft.recurrenceMonthDays ?? [],
+      recurrenceCustomPeriod: draft.recurrenceCustomPeriod ?? null,
+      reminderEnabled: draft.reminderEnabled ?? false,
+      reminderMinutesBefore: draft.reminderMinutesBefore ?? 15,
+      notes: draft.moreInformation ?? null,
+      location: draft.location ?? null,
+      subtasks: draft.subtasks ?? [],
+    },
+    status: "pending",
+    readyToConfirm: true,
+  };
+};
+
+const buildQuestConsentCreateProposal = (sourceText: string) => {
+  const cleanedSourceText = sourceText.trim();
+  const prefillDraft = cleanedSourceText
+    ? buildQuestPrefillFromNaturalLanguage(cleanedSourceText, "nlp")
+    : ({ creationSource: "nlp" } satisfies QuestComposerPrefillDraft);
+
+  return buildCreateQuestProposalFromDraft(prefillDraft);
+};
 
 const hasRichStructuredResponse = (
   structuredResponse: CompanionStructuredResponse | null | undefined,
@@ -314,12 +443,16 @@ const JourneysCompanionOverlayBody = memo(({
   launchIntent,
   onLaunchIntentConsumed,
   onOpenCampaignBuilder,
+  onQuestProposalEditHandoff,
   drawerLayout,
 }: {
   presentation: JourneysCompanionPlannerModalPresentation;
   launchIntent?: CompanionPlannerLaunchIntent | null;
   onLaunchIntentConsumed?: (intentId: string) => void;
   onOpenCampaignBuilder?: (message: string) => void;
+  onQuestProposalEditHandoff?: (
+    proposal: CompanionPlannerProposal,
+  ) => Promise<{ saved: boolean; savedTitle?: string | null }>;
   drawerLayout?: JourneysCompanionDrawerLayout;
 }) => {
   const {
@@ -351,13 +484,23 @@ const JourneysCompanionOverlayBody = memo(({
   const [pendingProposedActionKey, setPendingProposedActionKey] = useState<
     string | null
   >(null);
+  const [handledLocalFollowUpKey, setHandledLocalFollowUpKey] = useState<
+    string | null
+  >(null);
 
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
-  const transcriptEndRef = useRef<HTMLDivElement | null>(null);
   const transcriptScrollAreaRef = useRef<HTMLDivElement | null>(null);
   const transcriptInnerRef = useRef<HTMLDivElement | null>(null);
+  const transcriptPinnedToBottomRef = useRef(true);
+  const lastAutoScrolledThreadSessionIdRef = useRef<
+    string | null | undefined
+  >(undefined);
   const activeThreadSessionId = assistant.activeThread?.sessionId ?? null;
   const displayMessages = visibleMessages;
+  const activeFollowUpKey = useMemo(
+    () => getFollowUpKey(assistant.activeFollowUp),
+    [assistant.activeFollowUp],
+  );
 
   useEffect(() => {
     if (!launchIntent?.id || launchIntent.starterIntent !== "thread_history") {
@@ -367,63 +510,118 @@ const JourneysCompanionOverlayBody = memo(({
     onLaunchIntentConsumed?.(launchIntent.id);
   }, [launchIntent, onLaunchIntentConsumed]);
 
-  const keepBottomContentVisible = useCallback(
+  useEffect(() => {
+    if (!activeFollowUpKey) {
+      setHandledLocalFollowUpKey(null);
+    }
+  }, [activeFollowUpKey]);
+
+  const getTranscriptViewport = useCallback(
+    () =>
+      transcriptScrollAreaRef.current?.querySelector<HTMLElement>(
+        "[data-radix-scroll-area-viewport]",
+      ) ?? null,
+    [],
+  );
+
+  const updateTranscriptPinnedState = useCallback((
+    transcriptViewport = getTranscriptViewport(),
+  ) => {
+    if (!transcriptViewport) {
+      return transcriptPinnedToBottomRef.current;
+    }
+
+    const distanceFromBottom = transcriptViewport.scrollHeight -
+      (transcriptViewport.scrollTop + transcriptViewport.clientHeight);
+    const isPinnedToBottom = distanceFromBottom <=
+      TRANSCRIPT_BOTTOM_THRESHOLD_PX;
+    transcriptPinnedToBottomRef.current = isPinnedToBottom;
+    return isPinnedToBottom;
+  }, [getTranscriptViewport]);
+
+  const scrollTranscriptToBottom = useCallback(
     (behavior: ScrollBehavior = prefersReducedMotion ? "auto" : "smooth") => {
-      const transcriptViewport = transcriptScrollAreaRef.current?.querySelector<
-        HTMLElement
-      >("[data-radix-scroll-area-viewport]");
-      if (transcriptViewport) {
-        const nextTop = Math.max(
-          0,
-          transcriptViewport.scrollHeight - transcriptViewport.clientHeight,
-        );
-        if (typeof transcriptViewport.scrollTo === "function") {
-          transcriptViewport.scrollTo({ top: nextTop, behavior });
-        } else {
-          transcriptViewport.scrollTop = nextTop;
-        }
+      const transcriptViewport = getTranscriptViewport();
+      if (!transcriptViewport) {
         return;
       }
 
-      if (typeof transcriptEndRef.current?.scrollIntoView === "function") {
-        transcriptEndRef.current.scrollIntoView({ behavior, block: "end" });
+      const nextTop = Math.max(
+        0,
+        transcriptViewport.scrollHeight - transcriptViewport.clientHeight,
+      );
+      if (typeof transcriptViewport.scrollTo === "function") {
+        transcriptViewport.scrollTo({ top: nextTop, behavior });
+      } else {
+        transcriptViewport.scrollTop = nextTop;
       }
+      transcriptPinnedToBottomRef.current = true;
     },
-    [prefersReducedMotion],
+    [getTranscriptViewport, prefersReducedMotion],
   );
 
   useEffect(() => {
-    keepBottomContentVisible("auto");
+    const transcriptViewport = getTranscriptViewport();
+    if (!transcriptViewport) return;
+
+    const handleScroll = () => {
+      updateTranscriptPinnedState(transcriptViewport);
+    };
+
+    transcriptViewport.addEventListener("scroll", handleScroll, {
+      passive: true,
+    });
+    updateTranscriptPinnedState(transcriptViewport);
+
+    return () => {
+      transcriptViewport.removeEventListener("scroll", handleScroll);
+    };
+  }, [getTranscriptViewport, updateTranscriptPinnedState]);
+
+  useEffect(() => {
+    const activeThreadChanged =
+      lastAutoScrolledThreadSessionIdRef.current !== activeThreadSessionId;
+
+    if (activeThreadChanged) {
+      lastAutoScrolledThreadSessionIdRef.current = activeThreadSessionId;
+      transcriptPinnedToBottomRef.current = true;
+      scrollTranscriptToBottom("auto");
+      return;
+    }
+
+    if (transcriptPinnedToBottomRef.current) {
+      scrollTranscriptToBottom(prefersReducedMotion ? "auto" : "smooth");
+    }
   }, [
     activeThreadSessionId,
     assistant.activeFollowUp,
+    assistant.dayPlan,
     assistant.pendingAction,
+    assistant.proposedActions,
+    assistant.structuredResponse,
     displayMessages,
-    keepBottomContentVisible,
+    prefersReducedMotion,
+    scrollTranscriptToBottom,
   ]);
 
   useEffect(() => {
     if (typeof ResizeObserver === "undefined") return;
     const inner = transcriptInnerRef.current;
-    const transcriptViewport = transcriptScrollAreaRef.current?.querySelector<
-      HTMLElement
-    >("[data-radix-scroll-area-viewport]");
+    const transcriptViewport = getTranscriptViewport();
     if (!inner || !transcriptViewport) return;
 
-    const reanchorIfNearBottom = () => {
-      const distanceFromBottom = transcriptViewport.scrollHeight -
-        (transcriptViewport.scrollTop + transcriptViewport.clientHeight);
-      if (distanceFromBottom < 96) {
-        keepBottomContentVisible(prefersReducedMotion ? "auto" : "smooth");
+    const reanchorIfPinnedToBottom = () => {
+      if (transcriptPinnedToBottomRef.current) {
+        scrollTranscriptToBottom(prefersReducedMotion ? "auto" : "smooth");
       }
     };
 
     const observer = new ResizeObserver(() => {
-      reanchorIfNearBottom();
+      reanchorIfPinnedToBottom();
     });
     observer.observe(inner);
     return () => observer.disconnect();
-  }, [keepBottomContentVisible, prefersReducedMotion]);
+  }, [getTranscriptViewport, prefersReducedMotion, scrollTranscriptToBottom]);
 
   const syncComposerHeight = useCallback(() => {
     const composer = composerRef.current;
@@ -451,10 +649,6 @@ const JourneysCompanionOverlayBody = memo(({
   const handleComposerSubmit = useCallback(() => {
     assistant.submitTypedMessage();
   }, [assistant]);
-
-  const handleComposerFocus = useCallback(() => {
-    keepBottomContentVisible("auto");
-  }, [keepBottomContentVisible]);
 
   const handleVoiceToggle = useCallback(() => {
     assistant.toggleRecording();
@@ -484,6 +678,32 @@ const JourneysCompanionOverlayBody = memo(({
   const handleFollowUpOption = useCallback(async (option: string) => {
     if (localActionPending) return;
 
+    const activeFollowUp = assistant.activeFollowUp;
+    if (
+      activeFollowUp &&
+      onQuestProposalEditHandoff &&
+      isPlanDayQuestConsentFollowUp(activeFollowUp) &&
+      isAffirmativeFollowUpOption(option)
+    ) {
+      const followUpKey = activeFollowUpKey;
+      const sourceText = resolveQuestConsentSourceText(
+        activeFollowUp,
+        displayMessages,
+      );
+      const proposal = buildQuestConsentCreateProposal(sourceText);
+
+      setPendingFollowUpOption(option);
+      if (followUpKey) {
+        setHandledLocalFollowUpKey(followUpKey);
+      }
+      try {
+        await onQuestProposalEditHandoff(proposal);
+      } finally {
+        setPendingFollowUpOption(null);
+      }
+      return;
+    }
+
     setPendingFollowUpOption(option);
     try {
       await assistant.submitMessage(option, "text", {
@@ -492,7 +712,13 @@ const JourneysCompanionOverlayBody = memo(({
     } finally {
       setPendingFollowUpOption(null);
     }
-  }, [assistant, localActionPending]);
+  }, [
+    activeFollowUpKey,
+    assistant,
+    displayMessages,
+    localActionPending,
+    onQuestProposalEditHandoff,
+  ]);
 
   const handleProposedActionDraft = useCallback((
     action: CompanionAgentProposedAction,
@@ -545,7 +771,9 @@ const JourneysCompanionOverlayBody = memo(({
     option.trim().length > 0
   ) ?? [];
   const hasFollowUpPanel = Boolean(
-    assistant.activeFollowUp && !assistant.pendingAction,
+    assistant.activeFollowUp &&
+      !assistant.pendingAction &&
+      activeFollowUpKey !== handledLocalFollowUpKey,
   );
   const visibleProposedActions = hasRichStructuredResponse(
       assistant.structuredResponse,
@@ -1050,8 +1278,6 @@ const JourneysCompanionOverlayBody = memo(({
                   </div>
                 )
                 : null}
-
-              <div ref={transcriptEndRef} />
             </div>
           </ScrollArea>
 
@@ -1130,7 +1356,6 @@ const JourneysCompanionOverlayBody = memo(({
                   assistant.setDraftInput(event.target.value);
                 }}
                 onKeyDown={handleComposerKeyDown}
-                onFocus={handleComposerFocus}
                 placeholder={assistant.placeholder}
                 className={cn(
                   plannerPathfinderTheme.textField,
@@ -1223,6 +1448,7 @@ export const JourneysCompanionPlannerModal = memo(
     launchIntent,
     onLaunchIntentConsumed,
     onOpenCampaignBuilder,
+    onQuestProposalEditHandoff,
   }: JourneysCompanionPlannerModalProps) {
     const [drawerLayout, setDrawerLayout] = useState<
       JourneysCompanionDrawerLayout
@@ -1253,6 +1479,7 @@ export const JourneysCompanionPlannerModal = memo(
         launchIntent={launchIntent}
         onLaunchIntentConsumed={onLaunchIntentConsumed}
         onOpenCampaignBuilder={onOpenCampaignBuilder}
+        onQuestProposalEditHandoff={onQuestProposalEditHandoff}
         drawerLayout={presentation === "drawer" ? drawerLayout : undefined}
       />
     );

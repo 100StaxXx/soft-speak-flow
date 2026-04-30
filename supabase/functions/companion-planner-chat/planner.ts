@@ -8108,8 +8108,21 @@ const calendarEventOverlapsDate = (
   return end > dayStart && start < dayEnd;
 };
 
-const isCampaignRitualTask = (task: PlannerContextTask): boolean =>
-  Boolean(task.epicId && task.habitSourceId);
+const getActiveCampaignIdSet = (
+  input: PlannerBuildInput,
+): Set<string> =>
+  new Set(input.plannerContext.activeEpics.map((epic) => epic.id));
+
+const hasActiveCampaignLink = (
+  task: PlannerContextTask,
+  activeCampaignIds: Set<string>,
+): boolean => Boolean(task.epicId && activeCampaignIds.has(task.epicId));
+
+const isCampaignRitualTask = (
+  task: PlannerContextTask,
+  activeCampaignIds: Set<string>,
+): boolean =>
+  hasActiveCampaignLink(task, activeCampaignIds) && Boolean(task.habitSourceId);
 
 export const getPlanDayLoadBreakdown = (
   input: PlannerBuildInput,
@@ -8124,12 +8137,16 @@ export const getPlanDayLoadBreakdown = (
   const undatedInboxItems = input.plannerContext.inboxTasks.filter((task) =>
     task.completed !== true && !task.taskDate
   );
-  const surfacedCampaignRituals = datedTasks.filter(isCampaignRitualTask);
+  const activeCampaignIds = getActiveCampaignIdSet(input);
+  const surfacedCampaignRituals = datedTasks.filter((task) =>
+    isCampaignRitualTask(task, activeCampaignIds)
+  );
   const campaignLinkedQuests = datedTasks.filter((task) =>
-    Boolean(task.epicId) && !isCampaignRitualTask(task)
+    hasActiveCampaignLink(task, activeCampaignIds) &&
+    !isCampaignRitualTask(task, activeCampaignIds)
   );
   const visibleStandaloneQuests = datedTasks.filter((task) =>
-    !task.epicId && !task.habitSourceId
+    !hasActiveCampaignLink(task, activeCampaignIds) && !task.habitSourceId
   );
   const calendarBlocks = input.plannerContext.calendarEvents.filter((event) =>
     calendarEventOverlapsDate(event, targetDate)
@@ -9111,6 +9128,7 @@ const buildPlanDayCampaignFocus = (
 ): PlanDayCampaignFocus | null => {
   const campaignTasks = getPlanDayHiddenCampaignTasks(loadBreakdown);
   if (campaignTasks.length === 0) return null;
+  const activeCampaignIds = getActiveCampaignIdSet(input);
 
   const groups = new Map<
     string,
@@ -9137,7 +9155,9 @@ const buildPlanDayCampaignFocus = (
       ritualCount: 0,
     };
     existing.tasks.push(task);
-    if (isCampaignRitualTask(task)) existing.ritualCount += 1;
+    if (isCampaignRitualTask(task, activeCampaignIds)) {
+      existing.ritualCount += 1;
+    }
     groups.set(key, existing);
   }
 

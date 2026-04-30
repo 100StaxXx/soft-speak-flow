@@ -2,6 +2,7 @@ import type { HTMLAttributes, ReactNode } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
+import type { CompanionAgentFollowUp } from "@/types/companionAgent";
 
 const mocks = vi.hoisted(() => ({
   assistant: {
@@ -100,18 +101,7 @@ const mocks = vi.hoisted(() => ({
         ],
       },
     } as CompanionStructuredResponse | null,
-    activeFollowUp: null as null | {
-      question: string;
-      reason?: string | null;
-      expectedAnswerType:
-        | "free_text"
-        | "choice"
-        | "time"
-        | "priority"
-        | "confirmation";
-      options?: string[];
-      blocksDrafting: boolean;
-    },
+    activeFollowUp: null as CompanionAgentFollowUp | null,
     understandingState: null as null | string,
     proposedActions: [] as Array<{ type: string }>,
     savedSuggestionProposalIds: ["proposal-plan-1"],
@@ -243,6 +233,130 @@ vi.mock("@/components/ui/tooltip", () => ({
 
 import { JourneysCompanionPlannerModal } from "./JourneysCompanionPlannerModal";
 
+const createBaseAssistantMessage = () => ({
+  id: "m1",
+  role: "assistant" as const,
+  content:
+    "I can help you shape that into something concrete when you're ready.",
+  createdAt: "2026-04-18T08:01:00.000Z",
+  source: "agent" as const,
+});
+
+const createBasePendingAction = () => ({
+  id: "action-1",
+  status: "pending" as const,
+  intent: "schedule_task" as const,
+  actionType: "task_create" as const,
+  proposalId: null,
+  summary: 'Add "Focus block" for 2026-04-19 at 14:00.',
+  confirmationMessage:
+    'Want me to add "Focus block" for 2026-04-19 at 14:00?',
+  normalizedPayload: {},
+  affectedEntities: null,
+  expiresAt: "2026-04-19T20:00:00.000Z",
+  createdAt: "2026-04-18T08:02:00.000Z",
+});
+
+const createBaseActiveThread = () => ({
+  sessionId: "journeys-session-1",
+  companionId: "companion-1",
+  surface: "journeys" as const,
+  title: "Current thread",
+  previewText:
+    "I can help you shape that into something concrete when you're ready.",
+  createdAt: "2026-04-18T08:00:00.000Z",
+  lastMessageAt: "2026-04-18T08:01:00.000Z",
+  archivedAt: null,
+  messageCount: 2,
+});
+
+const createBaseStructuredResponse = (): CompanionStructuredResponse => ({
+  intent: {
+    intentType: "conversation",
+    timeHorizon: "today",
+    isRecurring: false,
+    shouldCreateQuest: false,
+    shouldPromptCampaign: false,
+  },
+  planDay: {
+    message: "Today is best as a balanced push with one clear focus block.",
+    dayAssessment: "balanced",
+    suggestedQuests: [
+      {
+        suggestionId: "plan-1",
+        proposalId: "proposal-plan-1",
+        title: "Outline the launch checklist",
+        type: "must",
+        estimatedDuration: "45 min",
+        estimatedDurationMinutes: 45,
+        source: "campaign",
+        reason:
+          "It keeps the launch campaign moving without crowding the afternoon.",
+      },
+    ],
+  },
+});
+
+const getTranscriptViewport = () => {
+  const transcript = screen.getByTestId(
+    "journeys-companion-planner-transcript",
+  );
+  const viewport = transcript.closest<HTMLElement>(
+    "[data-radix-scroll-area-viewport]",
+  );
+  if (!viewport) {
+    throw new Error("Expected the planner transcript to render in a viewport.");
+  }
+  return viewport;
+};
+
+const setTranscriptViewportMetrics = (
+  viewport: HTMLElement,
+  metrics: {
+    scrollHeight: number;
+    clientHeight: number;
+    scrollTop: number;
+  },
+) => {
+  Object.defineProperty(viewport, "scrollHeight", {
+    configurable: true,
+    value: metrics.scrollHeight,
+  });
+  Object.defineProperty(viewport, "clientHeight", {
+    configurable: true,
+    value: metrics.clientHeight,
+  });
+  Object.defineProperty(viewport, "scrollTop", {
+    configurable: true,
+    writable: true,
+    value: metrics.scrollTop,
+  });
+};
+
+const installTranscriptScrollTo = (viewport: HTMLElement) => {
+  const scrollTo = vi.fn((options?: ScrollToOptions | number, y?: number) => {
+    if (typeof options === "number") {
+      viewport.scrollLeft = options;
+      viewport.scrollTop = typeof y === "number" ? y : viewport.scrollTop;
+      return;
+    }
+
+    if (typeof options?.top === "number") {
+      viewport.scrollTop = options.top;
+    }
+    if (typeof options?.left === "number") {
+      viewport.scrollLeft = options.left;
+    }
+  });
+
+  Object.defineProperty(viewport, "scrollTo", {
+    configurable: true,
+    value: scrollTo,
+  });
+
+  return scrollTo;
+};
+
 describe("JourneysCompanionPlannerModal", () => {
   const originalMatchMedia = window.matchMedia;
   const originalVisualViewport = window.visualViewport;
@@ -252,10 +366,16 @@ describe("JourneysCompanionPlannerModal", () => {
     mocks.assistant.submitMessage.mockResolvedValue(true);
     mocks.drawerRootProps.length = 0;
     mocks.assistantOptions.length = 0;
+    mocks.state.messages = [createBaseAssistantMessage()];
+    mocks.state.pendingAction = createBasePendingAction();
+    mocks.state.activeThread = createBaseActiveThread();
+    mocks.state.structuredResponse = createBaseStructuredResponse();
     mocks.state.draftInput = "Plan tomorrow for me";
     mocks.state.activeFollowUp = null;
     mocks.state.understandingState = null;
     mocks.state.proposedActions = [];
+    mocks.state.savedSuggestionProposalIds = ["proposal-plan-1"];
+    mocks.state.pendingSuggestionProposalId = null;
 
     Object.defineProperty(window, "matchMedia", {
       writable: true,
@@ -376,6 +496,134 @@ describe("JourneysCompanionPlannerModal", () => {
 
     expect(mocks.assistant.submitMessage).not.toHaveBeenCalled();
     expect(mocks.assistant.submitTypedMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the transcript in place when messages arrive after the user scrolls up", () => {
+    const { rerender } = render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        onOpenCampaignBuilder={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+    const viewport = getTranscriptViewport();
+    const scrollTo = installTranscriptScrollTo(viewport);
+
+    setTranscriptViewportMetrics(viewport, {
+      scrollHeight: 900,
+      clientHeight: 300,
+      scrollTop: 120,
+    });
+    fireEvent.scroll(viewport);
+    scrollTo.mockClear();
+
+    mocks.state.messages = [
+      ...mocks.state.messages,
+      {
+        id: "m2",
+        role: "assistant" as const,
+        content: "I added more detail while you were reading above.",
+        createdAt: "2026-04-18T08:03:00.000Z",
+        source: "agent" as const,
+      },
+    ];
+    setTranscriptViewportMetrics(viewport, {
+      scrollHeight: 1200,
+      clientHeight: 300,
+      scrollTop: 120,
+    });
+
+    rerender(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        onOpenCampaignBuilder={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    expect(screen.getByText("I added more detail while you were reading above."))
+      .toBeInTheDocument();
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(viewport.scrollTop).toBe(120);
+  });
+
+  it("follows new messages when the transcript is already pinned to the bottom", () => {
+    const { rerender } = render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        onOpenCampaignBuilder={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+    const viewport = getTranscriptViewport();
+    const scrollTo = installTranscriptScrollTo(viewport);
+
+    setTranscriptViewportMetrics(viewport, {
+      scrollHeight: 900,
+      clientHeight: 300,
+      scrollTop: 600,
+    });
+    fireEvent.scroll(viewport);
+    scrollTo.mockClear();
+
+    mocks.state.messages = [
+      ...mocks.state.messages,
+      {
+        id: "m2",
+        role: "assistant" as const,
+        content: "Here is the next thing at the bottom.",
+        createdAt: "2026-04-18T08:03:00.000Z",
+        source: "agent" as const,
+      },
+    ];
+    setTranscriptViewportMetrics(viewport, {
+      scrollHeight: 1200,
+      clientHeight: 300,
+      scrollTop: 600,
+    });
+
+    rerender(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        onOpenCampaignBuilder={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    expect(scrollTo).toHaveBeenCalledWith({
+      top: 900,
+      behavior: "smooth",
+    });
+    expect(viewport.scrollTop).toBe(900);
+  });
+
+  it("does not scroll the transcript when the composer receives focus", () => {
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+    const viewport = getTranscriptViewport();
+    const scrollTo = installTranscriptScrollTo(viewport);
+
+    setTranscriptViewportMetrics(viewport, {
+      scrollHeight: 900,
+      clientHeight: 300,
+      scrollTop: 120,
+    });
+    fireEvent.scroll(viewport);
+    scrollTo.mockClear();
+
+    fireEvent.focus(screen.getByTestId("journeys-companion-planner-text-input"));
+
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(viewport.scrollTop).toBe(120);
   });
 
   it("opens thread history from the thread-history launch intent and resumes a selected thread", async () => {
@@ -505,6 +753,123 @@ describe("JourneysCompanionPlannerModal", () => {
 
     expect(mocks.assistant.submitMessage).toHaveBeenCalledWith(
       "Progress",
+      "text",
+      {
+        turnOrigin: "follow_up_option",
+      },
+    );
+
+    mocks.state.pendingAction = previousPendingAction;
+    mocks.state.activeFollowUp = null;
+  });
+
+  it("opens a quest draft instead of submitting when Plan My Day quest consent is accepted", async () => {
+    const previousPendingAction = mocks.state.pendingAction;
+    const previousMessages = mocks.state.messages;
+    const onQuestProposalEditHandoff = vi.fn().mockResolvedValue({
+      saved: false,
+    });
+    mocks.state.pendingAction = null;
+    mocks.state.messages = [
+      createBaseAssistantMessage(),
+      {
+        id: "u1",
+        role: "user" as const,
+        content: "Review project at 3pm for 45 minutes",
+        createdAt: "2026-04-18T08:02:00.000Z",
+        source: "agent" as const,
+      },
+      {
+        id: "m2",
+        role: "assistant" as const,
+        content: "Would you like to form a quest?",
+        createdAt: "2026-04-18T08:03:00.000Z",
+        source: "agent" as const,
+      },
+    ];
+    mocks.state.activeFollowUp = {
+      question: "Would you like to form a quest?",
+      reason:
+        "Plan my day stays conversational unless you explicitly want this to become a quest.",
+      expectedAnswerType: "confirmation",
+      options: ["Yes", "No"],
+      blocksDrafting: true,
+      metadata: {
+        questionId: "plan_day_quest_consent",
+        planningLauncherConsent: true,
+        consentKind: "quest",
+        sourceStarterIntent: "plan_day",
+      },
+    };
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+        onQuestProposalEditHandoff={onQuestProposalEditHandoff}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Yes" }));
+    });
+
+    expect(mocks.assistant.submitMessage).not.toHaveBeenCalled();
+    expect(onQuestProposalEditHandoff).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "create_quest",
+        status: "pending",
+        readyToConfirm: true,
+        payload: expect.objectContaining({
+          taskText: "Review Project",
+          scheduledTime: "15:00",
+          estimatedDuration: 45,
+        }),
+      }),
+    );
+    expect(screen.queryByTestId("journeys-companion-follow-up")).toBeNull();
+
+    mocks.state.pendingAction = previousPendingAction;
+    mocks.state.messages = previousMessages;
+    mocks.state.activeFollowUp = null;
+  });
+
+  it("keeps negative Plan My Day quest consent in the normal chat flow", async () => {
+    const previousPendingAction = mocks.state.pendingAction;
+    const onQuestProposalEditHandoff = vi.fn().mockResolvedValue({
+      saved: false,
+    });
+    mocks.state.pendingAction = null;
+    mocks.state.activeFollowUp = {
+      question: "Would you like to form a quest?",
+      expectedAnswerType: "confirmation",
+      options: ["Yes", "No"],
+      blocksDrafting: true,
+      metadata: {
+        questionId: "plan_day_quest_consent",
+        planningLauncherConsent: true,
+        consentKind: "quest",
+        sourceStarterIntent: "plan_day",
+      },
+    };
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+        onQuestProposalEditHandoff={onQuestProposalEditHandoff}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "No" }));
+    });
+
+    expect(onQuestProposalEditHandoff).not.toHaveBeenCalled();
+    expect(mocks.assistant.submitMessage).toHaveBeenCalledWith(
+      "No",
       "text",
       {
         turnOrigin: "follow_up_option",

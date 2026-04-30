@@ -329,6 +329,7 @@ const Journeys = () => {
   const previousIsJourneysRouteActiveRef = useRef(false);
   const previousJourneysLocationSignatureRef = useRef<string | null>(null);
   const pendingSelectedDateResetRef = useRef(false);
+  const hasUserDateInteractionRef = useRef(false);
   const showAddSheetRef = useRef(showAddSheet);
   const scheduledTimeUpdateQueueRef = useRef<Map<string, Promise<void>>>(new Map());
   const inboxSectionRef = useRef<HTMLDivElement | null>(null);
@@ -511,12 +512,27 @@ const Journeys = () => {
     }
 
     pendingSelectedDateResetRef.current = false;
+    hasUserDateInteractionRef.current = false;
     setDatePillCenterRequestKey((currentKey) => currentKey + 1);
     setSelectedDate((current) => {
       const today = new Date();
       return isSameDay(current, today) ? current : today;
     });
   }, []);
+
+  const handleUserDateInteraction = useCallback(() => {
+    hasUserDateInteractionRef.current = true;
+  }, []);
+
+  const handleUserDateSelect = useCallback((date: Date) => {
+    hasUserDateInteractionRef.current = true;
+    setSelectedDate(date);
+  }, []);
+
+  const requestTaskActivityDateSnap = useCallback(() => {
+    if (!isJourneysRouteActive || hasUserDateInteractionRef.current) return;
+    resetSelectedDateToToday({ deferIfAddSheetOpen: true });
+  }, [isJourneysRouteActive, resetSelectedDateToToday]);
 
   useLayoutEffect(() => {
     const shouldResetForRouteEntry =
@@ -1246,6 +1262,9 @@ const Journeys = () => {
     }
     toggleTask({ taskId, completed, xpReward }, {
       onSuccess: (result) => {
+        if (completed) {
+          requestTaskActivityDateSnap();
+        }
         // If completed and has a contact with auto-log enabled, trigger interaction modal
         if (result.completed && result.contact && result.autoLogInteraction) {
           handleTaskCompleted(
@@ -1257,7 +1276,7 @@ const Journeys = () => {
         }
       },
     });
-  }, [toggleTask, trackDailyPlanOutcome, handleTaskCompleted]);
+  }, [toggleTask, trackDailyPlanOutcome, handleTaskCompleted, requestTaskActivityDateSnap]);
   
   const handleUndoToggle = useCallback((taskId: string, xpReward: number) => {
     toggleTask({ taskId, completed: false, xpReward, forceUndo: true });
@@ -1462,8 +1481,14 @@ const Journeys = () => {
   }, [moveTaskToDate]);
 
   const handleToggleInboxQuest = useCallback((taskId: string, completed: boolean) => {
-    toggleInboxTask({ taskId, completed });
-  }, [toggleInboxTask]);
+    toggleInboxTask({ taskId, completed }, {
+      onSuccess: () => {
+        if (completed) {
+          requestTaskActivityDateSnap();
+        }
+      },
+    });
+  }, [requestTaskActivityDateSnap, toggleInboxTask]);
 
   const handleDeleteInboxQuest = useCallback(async (taskId: string) => {
     await syncTaskDelete.mutateAsync({ taskId }).catch(() => {
@@ -1644,6 +1669,7 @@ const Journeys = () => {
               <DatePillsScroller
                 selectedDate={selectedDate}
                 onDateSelect={handleDatePillClick}
+                onUserDateInteraction={handleUserDateInteraction}
                 tasksPerDay={tasksPerDay}
                 isActive={isJourneysRouteActive}
                 centerRequestKey={datePillCenterRequestKey}
@@ -1690,7 +1716,7 @@ const Journeys = () => {
                 plannerMode={desktopPlannerMode}
                 timedTaskDurationFallbackMinutes={macTimedTaskDurationFallbackMinutes}
                 desktopInteractionResetKey={desktopInteractionResetKey}
-                onDateSelect={setSelectedDate}
+                onDateSelect={handleUserDateSelect}
                 onPlannerModeChange={setDesktopPlannerMode}
                 onToggle={handleToggleTask}
                 onAddQuest={() => openAddQuestSheet()}
@@ -1714,7 +1740,7 @@ const Journeys = () => {
                 layoutMode={journeysLayoutMode}
                 hideDesktopRailAddButton={isMacHostedIOSApp}
                 isVisible={location.pathname === JOURNEYS_ROUTE}
-                disableTimelineDrag={showAddSheet || !!editingTask || !!editingRitual}
+                disableTimelineDrag
                 onToggle={handleToggleTask}
                 onAddQuest={() => openAddQuestSheet()}
                 onOpenCompanionPlanner={openCompanionPlanner}
@@ -1739,7 +1765,7 @@ const Journeys = () => {
                 hasCalendarLink={hasLinkedEvent}
                 onMoveQuestToNextDay={handleSwipeMoveToNextDay}
                 onUpdateScheduledTime={handleTimelineScheduledTimeUpdate}
-                onDateSelect={setSelectedDate}
+                onDateSelect={handleUserDateSelect}
                 onDesktopPlannerModeChange={setDesktopPlannerMode}
                 onOpenMonthView={() => setShowMonthView(true)}
                 onTimeSlotLongPress={(date, time) => {
@@ -1811,12 +1837,12 @@ const Journeys = () => {
           open={showMonthView}
           onOpenChange={setShowMonthView}
           selectedDate={selectedDate}
-          onDateSelect={setSelectedDate}
+          onDateSelect={handleUserDateSelect}
           tasks={allCalendarTasks}
           milestones={[]}
           onTaskDrop={() => {}}
           onTimeSlotLongPress={(date, time) => {
-            setSelectedDate(date);
+            handleUserDateSelect(date);
             setPrefilledTime(time);
             setAddQuestSheetOpen(true);
           }}

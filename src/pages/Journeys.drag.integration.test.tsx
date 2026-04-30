@@ -200,10 +200,12 @@ vi.mock("@/components/DatePillsScroller", () => ({
     selectedDate,
     onDateSelect,
     centerRequestKey,
+    onUserDateInteraction,
   }: {
     selectedDate: Date;
     onDateSelect: (date: Date) => void;
     centerRequestKey?: number;
+    onUserDateInteraction?: () => void;
   }) => {
     mocks.lastDatePillSelectedDate = selectedDate;
     mocks.lastDatePillCenterRequestKey = centerRequestKey ?? 0;
@@ -232,6 +234,24 @@ vi.mock("@/components/DatePillsScroller", () => ({
           }}
         >
           set-stale-day
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            onUserDateInteraction?.();
+            const staleDate = new Date();
+            staleDate.setDate(staleDate.getDate() - 3);
+            staleDate.setHours(12, 0, 0, 0);
+            onDateSelect(staleDate);
+          }}
+        >
+          user-set-stale-day
+        </button>
+        <button
+          type="button"
+          onClick={() => onUserDateInteraction?.()}
+        >
+          user-slide-date-pills
         </button>
         <button
           type="button"
@@ -694,16 +714,6 @@ const performTouchTimelineDrag = (row: HTMLElement, moveY: number, startY = 100)
     dispatchTouchEnd();
   });
   vi.useRealTimers();
-};
-
-const createDeferred = <T,>() => {
-  let resolve!: (value: T | PromiseLike<T>) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
 };
 
 import Journeys from "./Journeys";
@@ -1378,7 +1388,7 @@ describe("Journeys row drag integration", () => {
     expect(mocks.syncTaskUpdateMutateAsync).not.toHaveBeenCalled();
   });
 
-  it("reschedules a quest from the timeline row touch drag path on /journeys", async () => {
+  it("does not reschedule a quest from the timeline row touch drag path on /journeys", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1398,19 +1408,11 @@ describe("Journeys row drag integration", () => {
 
     performTouchTimelineDrag(row, 820);
 
-    await waitFor(() => {
-      expect(mocks.updateTask).toHaveBeenCalledTimes(1);
-    });
-    const firstUpdate = mocks.updateTask.mock.calls[0]?.[0];
-    expect(firstUpdate?.taskId).toBe("task-1");
-    expect(firstUpdate?.updates?.scheduled_time).toMatch(/^([01]\d|2[0-3]):([0-5]\d)$/);
-    expect(firstUpdate?.updates?.scheduled_time).not.toBe("08:00");
+    expect(mocks.updateTask).not.toHaveBeenCalled();
+    expect(mocks.syncTaskUpdateMutateAsync).not.toHaveBeenCalled();
   });
 
-  it("waits for the local scheduled-time update before syncing calendar", async () => {
-    const deferredUpdate = createDeferred<{ queued?: boolean }>();
-    mocks.updateTask.mockImplementationOnce(() => deferredUpdate.promise);
-
+  it("does not start the scheduled-time update queue from touch drag", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1430,27 +1432,11 @@ describe("Journeys row drag integration", () => {
 
     performTouchTimelineDrag(row, 825);
 
-    await waitFor(() => {
-      expect(mocks.updateTask).toHaveBeenCalledTimes(1);
-    });
-    const firstUpdate = mocks.updateTask.mock.calls[0]?.[0];
-    expect(firstUpdate?.taskId).toBe("task-1");
-    expect(firstUpdate?.updates?.scheduled_time).toMatch(/^([01]\d|2[0-3]):([0-5]\d)$/);
-    expect(firstUpdate?.updates?.scheduled_time).not.toBe("08:00");
-
+    expect(mocks.updateTask).not.toHaveBeenCalled();
     expect(mocks.syncTaskUpdateMutateAsync).not.toHaveBeenCalled();
-
-    await act(async () => {
-      deferredUpdate.resolve({ queued: false });
-      await Promise.resolve();
-    });
-
-    await waitFor(() => {
-      expect(mocks.syncTaskUpdateMutateAsync).toHaveBeenCalledWith({ taskId: "task-1" });
-    });
   });
 
-  it("skips calendar sync after drag when the local update is queued", async () => {
+  it("does not run calendar sync after touch drag", async () => {
     mocks.updateTask.mockResolvedValueOnce({ queued: true });
 
     const queryClient = new QueryClient({
@@ -1472,18 +1458,7 @@ describe("Journeys row drag integration", () => {
 
     performTouchTimelineDrag(row, 825);
 
-    await waitFor(() => {
-      expect(mocks.updateTask).toHaveBeenCalledTimes(1);
-    });
-    const firstUpdate = mocks.updateTask.mock.calls[0]?.[0];
-    expect(firstUpdate?.taskId).toBe("task-1");
-    expect(firstUpdate?.updates?.scheduled_time).toMatch(/^([01]\d|2[0-3]):([0-5]\d)$/);
-    expect(firstUpdate?.updates?.scheduled_time).not.toBe("08:00");
-
-    await act(async () => {
-      await Promise.resolve();
-    });
-
+    expect(mocks.updateTask).not.toHaveBeenCalled();
     expect(mocks.syncTaskUpdateMutateAsync).not.toHaveBeenCalled();
   });
 
@@ -1514,7 +1489,7 @@ describe("Journeys row drag integration", () => {
     expect(mocks.syncTaskUpdateMutateAsync).not.toHaveBeenCalled();
   });
 
-  it("updates only the dragged quest once when multiple quests are present", async () => {
+  it("does not reschedule any quest from touch drag when multiple quests are present", async () => {
     mocks.dailyTasks = [
       {
         id: "task-1",
@@ -1558,22 +1533,11 @@ describe("Journeys row drag integration", () => {
 
     performTouchTimelineDrag(rowTaskOne, 825);
 
-    await waitFor(() => {
-      expect(mocks.updateTask).toHaveBeenCalledTimes(1);
-    });
-
-    const firstUpdate = mocks.updateTask.mock.calls[0]?.[0];
-    expect(firstUpdate?.taskId).toBe("task-1");
-    expect(firstUpdate?.updates?.scheduled_time).toMatch(/^([01]\d|2[0-3]):([0-5]\d)$/);
-    expect(firstUpdate?.updates?.scheduled_time).not.toBe("08:00");
-    expect(mocks.updateTask).not.toHaveBeenCalledWith(
-      expect.objectContaining({ taskId: "task-2" }),
-    );
-    expect(mocks.syncTaskUpdateMutateAsync).toHaveBeenCalledTimes(1);
-    expect(mocks.syncTaskUpdateMutateAsync).toHaveBeenCalledWith({ taskId: "task-1" });
+    expect(mocks.updateTask).not.toHaveBeenCalled();
+    expect(mocks.syncTaskUpdateMutateAsync).not.toHaveBeenCalled();
   });
 
-  it("clamps far-below drag movement to end-of-day and still updates only the dragged quest", async () => {
+  it("does not clamp far-below touch drag movement into a quest time update", async () => {
     mocks.dailyTasks = [
       {
         id: "task-1",
@@ -1617,19 +1581,8 @@ describe("Journeys row drag integration", () => {
 
     performTouchTimelineDrag(rowTaskOne, 6000);
 
-    await waitFor(() => {
-      expect(mocks.updateTask).toHaveBeenCalledTimes(1);
-    });
-
-    expect(mocks.updateTask).toHaveBeenCalledWith({
-      taskId: "task-1",
-      updates: { scheduled_time: "23:59" },
-    });
-    expect(mocks.updateTask).not.toHaveBeenCalledWith(
-      expect.objectContaining({ taskId: "task-2" }),
-    );
-    expect(mocks.syncTaskUpdateMutateAsync).toHaveBeenCalledTimes(1);
-    expect(mocks.syncTaskUpdateMutateAsync).toHaveBeenCalledWith({ taskId: "task-1" });
+    expect(mocks.updateTask).not.toHaveBeenCalled();
+    expect(mocks.syncTaskUpdateMutateAsync).not.toHaveBeenCalled();
   });
 
   it("skips polling and auto-surface side effects while tab is inactive", async () => {
@@ -1939,6 +1892,115 @@ describe("Journeys row drag integration", () => {
       expect(screen.getByTestId("selected-date-iso").textContent).toBe(sameDaySelectedDateIso);
       expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeResetRequest);
     });
+  });
+
+  it("snaps back to today after completing a task when the date has not been manually adjusted", async () => {
+    mocks.toggleTask.mockImplementation((
+      payload: { taskId: string; completed: boolean },
+      options?: { onSuccess?: (result: { completed: boolean; contact: null; autoLogInteraction: boolean }) => void },
+    ) => {
+      options?.onSuccess?.({
+        completed: payload.completed,
+        contact: null,
+        autoLogInteraction: false,
+      });
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
+
+    let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+    await waitFor(() => {
+      staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
+    });
+    const centerKeyBeforeTaskCompletion = Number(screen.getByTestId("center-request-key").textContent);
+
+    const completeCheckbox = (await screen.findAllByRole("checkbox", { name: /mark task as complete/i }))[0];
+    fireEvent.click(completeCheckbox);
+
+    await waitFor(() => {
+      expect(mocks.toggleTask).toHaveBeenCalledWith(
+        expect.objectContaining({ taskId: "task-1", completed: true }),
+        expect.any(Object),
+      );
+      const refreshedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      expect(refreshedDateIso).not.toBe(staleSelectedDateIso);
+      expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
+      expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeTaskCompletion);
+    });
+  });
+
+  it("does not snap back after completing a task when the user manually adjusted the date pills", async () => {
+    mocks.toggleTask.mockImplementation((
+      payload: { taskId: string; completed: boolean },
+      options?: { onSuccess?: (result: { completed: boolean; contact: null; autoLogInteraction: boolean }) => void },
+    ) => {
+      options?.onSuccess?.({
+        completed: payload.completed,
+        contact: null,
+        autoLogInteraction: false,
+      });
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "user-set-stale-day" }));
+
+    let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+    await waitFor(() => {
+      staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
+    });
+    const centerKeyBeforeTaskCompletion = Number(screen.getByTestId("center-request-key").textContent);
+
+    const completeCheckbox = (await screen.findAllByRole("checkbox", { name: /mark task as complete/i }))[0];
+    fireEvent.click(completeCheckbox);
+
+    await waitFor(() => {
+      expect(mocks.toggleTask).toHaveBeenCalledWith(
+        expect.objectContaining({ taskId: "task-1", completed: true }),
+        expect.any(Object),
+      );
+    });
+
+    expect(screen.getByTestId("selected-date-iso").textContent).toBe(staleSelectedDateIso);
+    expect(Number(screen.getByTestId("center-request-key").textContent)).toBe(centerKeyBeforeTaskCompletion);
   });
 
   it("resets stale selected date on journeys query page changes", async () => {

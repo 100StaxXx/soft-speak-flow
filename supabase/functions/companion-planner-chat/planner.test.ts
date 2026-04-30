@@ -1741,6 +1741,62 @@ Deno.test("plan_day no-room copy explains hidden campaign ritual load", () => {
   );
 });
 
+Deno.test("plan_day ignores stale campaign links when the campaign is not active", () => {
+  const staleTasks = Array.from({ length: 4 }, (_, index) =>
+    plannerTask({
+      id: `stale-campaign-task-${index + 1}`,
+      title: [
+        "Stretch review",
+        "Nutrition cleanup",
+        "Mileage note",
+        "Recovery pass",
+      ][index] ?? "Old campaign task",
+      taskDate: "2026-04-18",
+      epicId: "epic-gone",
+      epicTitle: "Ghost campaign",
+      estimatedDuration: 30,
+    }));
+  const result = buildPlannerResponse(baseInput({
+    message: "Focus",
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T16:38:00-07:00",
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+      openQuestionIds: ["details"],
+    },
+    parsedInput: {
+      text: "Focus",
+    },
+    plannerContext: {
+      starterIntent: undefined,
+      activeEpics: [],
+      tasks: staleTasks,
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [{
+          date: "2026-04-18",
+          totalMinutes: 0,
+          taskCount: 0,
+          status: "open",
+        }],
+        overloadedDates: [],
+        emptyDates: ["2026-04-18"],
+        conflicts: [],
+        suggestedSlots: [],
+        moveSuggestions: [],
+      },
+      statInterpretation: plannerStatInterpretation("locked_in"),
+    },
+  }));
+
+  assertEquals(result.mode, "conversational");
+  assertEquals(result.structuredResponse?.planDay?.campaignFocus, null);
+  assertEquals(result.reply.includes("campaign drawer"), false);
+  assertEquals(result.reply.includes("Ghost campaign"), false);
+  assertEquals(result.reply.includes("stalled"), false);
+});
+
 Deno.test("plan_day no-room reply names what is loading the day when no campaign focus dominates", () => {
   const result = buildPlannerResponse(baseInput({
     message: "Focus",

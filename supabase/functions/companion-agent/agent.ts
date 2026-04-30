@@ -1157,7 +1157,7 @@ async function loadCompanionAgentContext(params: {
     params.supabase
       .from("daily_tasks")
       .select(
-        "id, task_text, task_date, category, scheduled_time, estimated_duration, actual_time_spent, completed, completed_at, epic_id, priority, location, notes, reminder_enabled, reminder_minutes_before, recurrence_pattern, recurrence_end_date",
+        "id, task_text, task_date, category, scheduled_time, estimated_duration, actual_time_spent, completed, completed_at, epic_id, habit_source_id, priority, location, notes, reminder_enabled, reminder_minutes_before, recurrence_pattern, recurrence_end_date",
       )
       .eq("user_id", params.userId)
       .gte("task_date", range.start)
@@ -1168,7 +1168,7 @@ async function loadCompanionAgentContext(params: {
     params.supabase
       .from("daily_tasks")
       .select(
-        "id, task_text, task_date, category, scheduled_time, estimated_duration, actual_time_spent, completed, completed_at, epic_id, priority, location, notes, reminder_enabled, reminder_minutes_before, recurrence_pattern, recurrence_end_date",
+        "id, task_text, task_date, category, scheduled_time, estimated_duration, actual_time_spent, completed, completed_at, epic_id, habit_source_id, priority, location, notes, reminder_enabled, reminder_minutes_before, recurrence_pattern, recurrence_end_date",
       )
       .eq("user_id", params.userId)
       .is("task_date", null)
@@ -1177,7 +1177,7 @@ async function loadCompanionAgentContext(params: {
     params.supabase
       .from("daily_tasks")
       .select(
-        "id, task_text, task_date, category, scheduled_time, estimated_duration, actual_time_spent, completed, completed_at, epic_id, priority, location, notes, reminder_enabled, reminder_minutes_before, recurrence_pattern, recurrence_end_date",
+        "id, task_text, task_date, category, scheduled_time, estimated_duration, actual_time_spent, completed, completed_at, epic_id, habit_source_id, priority, location, notes, reminder_enabled, reminder_minutes_before, recurrence_pattern, recurrence_end_date",
       )
       .eq("user_id", params.userId)
       .eq("completed", true)
@@ -1209,6 +1209,7 @@ async function loadCompanionAgentContext(params: {
         "id, title, description, start_date, end_date, status, target_days, progress_percentage",
       )
       .eq("user_id", params.userId)
+      .eq("status", "active")
       .is("completed_at", null)
       .order("updated_at", { ascending: false })
       .limit(MAX_CAMPAIGNS),

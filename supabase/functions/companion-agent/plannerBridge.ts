@@ -706,6 +706,7 @@ const mapTask = (task: Record<string, unknown>): PlannerContextTask => ({
   completedAt: asString(task.completed_at),
   priority: asString(task.priority),
   source: asString(task.source),
+  habitSourceId: asString(task.habit_source_id),
   epicId: asString(task.epic_id),
   epicTitle: asString(task.epic_title),
 });
@@ -718,6 +719,35 @@ const mapCampaign = (
   endDate: asString(campaign.end_date),
   progressPercentage: asNumber(campaign.progress_percentage),
 });
+
+const isActiveCampaignContextRow = (
+  campaign: Record<string, unknown>,
+): boolean => {
+  const status = asString(campaign.status);
+  return !status || status === "active";
+};
+
+const detachInactiveCampaignTaskLink = (
+  task: PlannerContextTask,
+  activeCampaignById: Map<string, PlannerContextEpic>,
+): PlannerContextTask => {
+  if (!task.epicId) return task;
+
+  const activeCampaign = activeCampaignById.get(task.epicId);
+  if (!activeCampaign) {
+    return {
+      ...task,
+      epicId: null,
+      epicTitle: null,
+      habitSourceId: null,
+    };
+  }
+
+  return {
+    ...task,
+    epicTitle: task.epicTitle ?? activeCampaign.title,
+  };
+};
 
 const mapRitual = (ritual: Record<string, unknown>): PlannerContextRitual => ({
   id: String(ritual.id),
@@ -1072,11 +1102,20 @@ export function consultPlannerForAgent(params: {
     ...(plannerMemory ?? {}),
     workloadTolerance: asString(plannerMemory?.workloadTolerance),
   };
-  const tasks = params.context.tasks.map(mapTask);
-  const recentCompletedTasks = params.context.recentCompletedTasks.map(mapTask);
+  const activeEpics = params.context.campaigns
+    .filter(isActiveCampaignContextRow)
+    .map(mapCampaign);
+  const activeCampaignById = new Map(
+    activeEpics.map((campaign) => [campaign.id, campaign]),
+  );
+  const tasks = params.context.tasks
+    .map(mapTask)
+    .map((task) => detachInactiveCampaignTaskLink(task, activeCampaignById));
+  const recentCompletedTasks = params.context.recentCompletedTasks
+    .map(mapTask)
+    .map((task) => detachInactiveCampaignTaskLink(task, activeCampaignById));
   const scheduledTasks = tasks.filter((task) => task.taskDate !== null);
   const inboxTasks = tasks.filter((task) => task.taskDate === null);
-  const activeEpics = params.context.campaigns.map(mapCampaign);
   const rituals = params.context.rituals.map(mapRitual);
   const calendarEvents = params.context.calendarEvents.map(mapCalendarEvent);
   const horizon = params.horizon ??
