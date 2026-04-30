@@ -30,7 +30,7 @@ const TITLE_POOLS_BY_ATTRIBUTE: Record<CompanionStatAttribute, string[]> = {
     "The Rest-Bright Sentinel",
     "The Wild Pulse Bearer",
     "The Sunwell Warden",
-    "The Recovery Paladin",
+    "The Body-Bright Champion",
   ],
   wisdom: [
     "The Star-Scribe",

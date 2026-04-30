@@ -329,4 +329,20 @@ describe("companionStatAnalysis", () => {
     expect(validation.data.analysis.fantasyTitle.archetype).toBe("Discipline / Alignment");
     expect(validation.data.analysis.fantasyTitle.explanation).toContain("Creativity");
   });
+
+  it("client compatibility replaces a null legacy fantasy title", () => {
+    const validation = validateCompanionStatAnalysisResponseForClient({
+      ...baseResponse,
+      analysis: {
+        ...baseResponse.analysis,
+        fantasyTitle: null,
+      },
+    });
+
+    expect(validation.ok).toBe(true);
+    if (!validation.ok) return;
+
+    expect(validation.data.analysis.fantasyTitle.title.length).toBeGreaterThan(0);
+    expect(validation.data.analysis.fantasyTitle.archetype).toBe("Discipline / Alignment");
+  });
 });

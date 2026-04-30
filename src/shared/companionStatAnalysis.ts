@@ -687,7 +687,7 @@ function normalizeCompanionFantasyTitleForClient(value: unknown): unknown {
   }
 
   const analysis = value.analysis;
-  if ("fantasyTitle" in analysis) {
+  if (isRecord(analysis.fantasyTitle)) {
     return value;
   }
 
