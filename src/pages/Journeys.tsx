@@ -59,7 +59,7 @@ import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
 import { HourlyViewModal } from "@/components/HourlyViewModal";
 import { JourneysCompanionPlannerModal } from "@/components/journeys/JourneysCompanionPlannerModal";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
-import { JOURNEYS_ROUTE } from "@/pages/journeysDateSync";
+import { JOURNEYS_RESET_TO_TODAY_EVENT, JOURNEYS_ROUTE } from "@/pages/journeysDateSync";
 import { isOnboardingCleanupEligible } from "@/pages/journeysCleanupEligibility";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 import { SEND_TO_CALENDAR_ENABLED } from "@/utils/calendarFeatureFlags";
@@ -327,6 +327,8 @@ const Journeys = () => {
   const [createdCampaignData, setCreatedCampaignData] = useState<CreatedCampaignData | null>(null);
   const [isInboxExpanded, setIsInboxExpanded] = useState(false);
   const previousIsJourneysRouteActiveRef = useRef(false);
+  const previousJourneysLocationSignatureRef = useRef<string | null>(null);
+  const pendingSelectedDateResetRef = useRef(false);
   const showAddSheetRef = useRef(showAddSheet);
   const scheduledTimeUpdateQueueRef = useRef<Map<string, Promise<void>>>(new Map());
   const inboxSectionRef = useRef<HTMLDivElement | null>(null);
@@ -342,6 +344,7 @@ const Journeys = () => {
     [location.search],
   );
   const isJourneysRouteActive = isTabActive && location.pathname === JOURNEYS_ROUTE;
+  const journeysLocationSignature = `${location.pathname}${location.search}`;
   
   // Auth and profile for onboarding
   const { user } = useAuth();
@@ -499,8 +502,15 @@ const Journeys = () => {
     showAddSheetRef.current = showAddSheet;
   }, [showAddSheet]);
 
-  const resetSelectedDateToToday = useCallback(() => {
-    if (showAddSheetRef.current) return;
+  const resetSelectedDateToToday = useCallback((options?: { deferIfAddSheetOpen?: boolean }) => {
+    if (showAddSheetRef.current) {
+      if (options?.deferIfAddSheetOpen) {
+        pendingSelectedDateResetRef.current = true;
+      }
+      return;
+    }
+
+    pendingSelectedDateResetRef.current = false;
     setDatePillCenterRequestKey((currentKey) => currentKey + 1);
     setSelectedDate((current) => {
       const today = new Date();
@@ -509,10 +519,40 @@ const Journeys = () => {
   }, []);
 
   useLayoutEffect(() => {
-    if (isJourneysRouteActive && !previousIsJourneysRouteActiveRef.current) {
-      resetSelectedDateToToday();
+    const shouldResetForRouteEntry =
+      isJourneysRouteActive &&
+      (
+        !previousIsJourneysRouteActiveRef.current ||
+        previousJourneysLocationSignatureRef.current !== journeysLocationSignature
+      );
+
+    if (shouldResetForRouteEntry) {
+      resetSelectedDateToToday({ deferIfAddSheetOpen: true });
     }
+
     previousIsJourneysRouteActiveRef.current = isJourneysRouteActive;
+    if (isJourneysRouteActive) {
+      previousJourneysLocationSignatureRef.current = journeysLocationSignature;
+    }
+  }, [isJourneysRouteActive, journeysLocationSignature, resetSelectedDateToToday]);
+
+  useLayoutEffect(() => {
+    if (!isJourneysRouteActive || showAddSheet || !pendingSelectedDateResetRef.current) return;
+    resetSelectedDateToToday();
+  }, [isJourneysRouteActive, resetSelectedDateToToday, showAddSheet]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleResetToTodayRequest = () => {
+      if (!isJourneysRouteActive) return;
+      resetSelectedDateToToday({ deferIfAddSheetOpen: true });
+    };
+
+    window.addEventListener(JOURNEYS_RESET_TO_TODAY_EVENT, handleResetToTodayRequest);
+    return () => {
+      window.removeEventListener(JOURNEYS_RESET_TO_TODAY_EVENT, handleResetToTodayRequest);
+    };
   }, [isJourneysRouteActive, resetSelectedDateToToday]);
 
   useEffect(() => {
@@ -521,7 +561,7 @@ const Journeys = () => {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState !== "visible") return;
-      resetSelectedDateToToday();
+      resetSelectedDateToToday({ deferIfAddSheetOpen: true });
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -540,7 +580,7 @@ const Journeys = () => {
     const setupListener = async () => {
       const handle = await CapacitorApp.addListener("appStateChange", ({ isActive }) => {
         if (!isActive) return;
-        resetSelectedDateToToday();
+        resetSelectedDateToToday({ deferIfAddSheetOpen: true });
       });
 
       if (isDisposed) {

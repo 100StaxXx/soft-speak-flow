@@ -279,20 +279,30 @@ export function Pathfinder({
     () => {
       // Use schedule rituals if available, otherwise fall back to suggestions
       if (schedule?.rituals) {
-        return schedule.rituals.map(r => ({
-          id: r.id,
-          title: r.title,
-          description: r.description,
-          type: 'habit' as const,
-          difficulty: r.difficulty,
-          frequency: r.frequency,
-          customDays: r.customDays,
-          customMonthDays: r.customMonthDays,
-          customPeriod: r.customPeriod,
-          estimatedMinutes: r.estimatedMinutes,
-          preferredTime: r.preferredTime ?? null,
-          isSelected: true,
-        }));
+        return schedule.rituals.map(r => {
+          const ritual = r as typeof r & {
+            custom_days?: number[];
+            custom_month_days?: number[];
+            custom_period?: 'week' | 'month';
+            estimated_minutes?: number | null;
+            preferred_time?: string | null;
+          };
+
+          return {
+            id: ritual.id,
+            title: ritual.title,
+            description: ritual.description,
+            type: 'habit' as const,
+            difficulty: ritual.difficulty,
+            frequency: ritual.frequency,
+            customDays: ritual.customDays ?? ritual.custom_days,
+            customMonthDays: ritual.customMonthDays ?? ritual.custom_month_days,
+            customPeriod: ritual.customPeriod ?? ritual.custom_period,
+            estimatedMinutes: ritual.estimatedMinutes ?? ritual.estimated_minutes ?? undefined,
+            preferredTime: ritual.preferredTime ?? ritual.preferred_time ?? null,
+            isSelected: true,
+          };
+        });
       }
       return [...selectedSuggestions.filter((s) => s.type === 'habit'), ...customHabits];
     },

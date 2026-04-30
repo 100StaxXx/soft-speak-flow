@@ -221,15 +221,16 @@ Your job is to:
 5. You may also create 1-3 additional non-postcard milestones as intermediate goals
 6. Create 3-6 RITUALS (recurring habits)
 7. Give every ritual a local preferredTime in "HH:mm" 24-hour format
-8. Estimate weekly time commitment
-9. INFER THE BEST STORY TYPE based on the goal:
+8. Give every ritual an estimatedMinutes integer between 1 and 1440
+9. Estimate weekly time commitment
+10. INFER THE BEST STORY TYPE based on the goal:
    - "treasure_hunt": Finding/acquiring something (job, house, money, items, certifications)
    - "mystery": Learning/understanding (studying, research, problem-solving, exams)
    - "pilgrimage": Inner growth/wellness (meditation, health, spirituality, mental health)
    - "heroes_journey": Becoming something (career change, mastering skills, transformation)
    - "rescue_mission": Urgency/helping others (deadlines, caregiving, emergencies)
    - "exploration": Discovery/creativity (travel, art, trying new things, hobbies)
-10. SELECT A MATCHING THEME COLOR based on story type:
+11. SELECT A MATCHING THEME COLOR based on story type:
    - "heroic" (gold): treasure_hunt, heroes_journey
    - "warrior" (red): rescue_mission
    - "mystic" (pink): mystery
@@ -241,6 +242,12 @@ POSTCARD MILESTONE GUIDELINES:
 - Distribute them evenly across the timeline
 - Minimum 3 chapters (for short/simple goals), maximum 7 (for long/complex goals)
 - Each should have isPostcardMilestone: true and a unique milestonePercent
+
+RITUAL TIMING RULES:
+- You must choose a real preferredTime for every ritual based on the ritual's purpose, likely user energy, and the goal context.
+- Use local wall-clock "HH:mm" values only. Do not use words like "morning", null, or empty strings.
+- Spread multiple rituals across sensible dayparts instead of clustering them at the same time.
+- Choose estimatedMinutes realistically for the ritual workload as an integer between 1 and 1440.
 
 ${getExecutionModelInstructions(planningShape.executionModel)}
 
@@ -322,8 +329,10 @@ Generate a phased schedule working backwards from the deadline. Make sure:
 8. executionModel matches the kind of work: use overlap_early for repeatable goals where setup and action can run together, otherwise use sequential
 9. Use "customDays" only for week-based rituals (0 = Monday through 6 = Sunday)
 10. Use "customMonthDays" for monthly or month-based rituals (1-31). If a ritual is monthly and no specific day is obvious, use [1]
-11. Give each ritual a preferredTime in local 24-hour "HH:mm" format, spreading rituals across sensible dayparts when there are multiple
-${timelineContext ? '12. Adjust the schedule based on the user\'s context (existing skills, constraints, etc.)' : ''}`;
+11. Every ritual object must include both "preferredTime" and "estimatedMinutes"
+12. Give each ritual a preferredTime in local 24-hour "HH:mm" format, spreading rituals across sensible dayparts when there are multiple
+13. Give each ritual an estimatedMinutes integer between 1 and 1440
+${timelineContext ? '14. Adjust the schedule based on the user\'s context (existing skills, constraints, etc.)' : ''}`;
 
     console.log('Generating journey schedule for goal:', goal, 'deadline:', deadline, 'days:', daysAvailable, 'context:', timelineContext);
 
@@ -340,6 +349,7 @@ ${timelineContext ? '12. Adjust the schedule based on the user\'s context (exist
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.7,
+        response_format: { type: 'json_object' },
       }),
     });
 

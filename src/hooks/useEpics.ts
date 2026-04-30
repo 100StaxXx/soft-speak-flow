@@ -261,9 +261,11 @@ type CreateEpicInput = {
     custom_days: number[];
     custom_month_days?: number[];
     preferred_time?: string | null;
+    preferredTime?: string | null;
     reminder_enabled?: boolean;
     reminder_minutes_before?: number;
     estimated_minutes?: number | null;
+    estimatedMinutes?: number | null;
     category?: string | null;
   }>;
   milestones?: Array<{
@@ -401,6 +403,41 @@ const normalizeFingerprintText = (value: string | null | undefined): string | nu
   return normalized.length > 0 ? normalized.toLowerCase() : null;
 };
 
+const CAMPAIGN_RITUAL_TIME_FALLBACKS = ["08:00", "10:00", "14:00", "17:00", "19:00", "20:30"];
+const MAX_CAMPAIGN_RITUAL_ESTIMATED_MINUTES = 1440;
+
+const normalizeCampaignHabitPreferredTime = (
+  values: Array<string | null | undefined>,
+  fallbackTime: string | null = null,
+): string | null => {
+  for (const value of values) {
+    if (typeof value !== "string") continue;
+
+    const match = value.trim().match(/^([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/);
+    if (match) {
+      return `${match[1].padStart(2, "0")}:${match[2]}`;
+    }
+  }
+
+  return fallbackTime;
+};
+
+const normalizeCampaignHabitEstimatedMinutes = (...values: Array<number | null | undefined>): number | null => {
+  for (const value of values) {
+    if (
+      typeof value === "number"
+      && Number.isFinite(value)
+      && Number.isInteger(value)
+      && value > 0
+      && value <= MAX_CAMPAIGN_RITUAL_ESTIMATED_MINUTES
+    ) {
+      return value;
+    }
+  }
+
+  return null;
+};
+
 const sortNumbers = (values: number[] | null | undefined): number[] | null =>
   values?.length ? [...values].sort((left, right) => left - right) : null;
 
@@ -440,6 +477,7 @@ const normalizeFingerprintHabit = (
 
 const normalizeFingerprintInputHabit = (
   habit: CreateEpicInput["habits"][number],
+  index: number,
 ): FingerprintHabit =>
   normalizeFingerprintHabit({
     title: habit.title,
@@ -448,8 +486,11 @@ const normalizeFingerprintInputHabit = (
     frequency: habit.frequency,
     custom_days: habit.custom_days ?? null,
     custom_month_days: habit.custom_month_days ?? null,
-    preferred_time: habit.preferred_time ?? null,
-    estimated_minutes: habit.estimated_minutes ?? null,
+    preferred_time: normalizeCampaignHabitPreferredTime(
+      [habit.preferred_time, habit.preferredTime],
+      CAMPAIGN_RITUAL_TIME_FALLBACKS[index % CAMPAIGN_RITUAL_TIME_FALLBACKS.length],
+    ),
+    estimated_minutes: normalizeCampaignHabitEstimatedMinutes(habit.estimated_minutes, habit.estimatedMinutes),
     category: habit.category ?? null,
     reminder_enabled: habit.reminder_enabled ?? false,
     reminder_minutes_before: habit.reminder_minutes_before ?? 15,
@@ -1549,7 +1590,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
             const startDate = nowIso.split("T")[0];
             const epicId = createOfflinePlannerId("epic");
             const inviteCode = `EPIC-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-            const habits = epicData.habits.map((habit) => ({
+            const habits = epicData.habits.map((habit, index) => ({
               id: createOfflinePlannerId("habit"),
               user_id: user.id,
               title: habit.title,
@@ -1558,10 +1599,13 @@ export const useEpics = (options: EpicsOptions = {}) => {
               frequency: normalizeFrequency(habit.frequency),
               custom_days: habit.custom_days?.length ? habit.custom_days : null,
               custom_month_days: habit.custom_month_days?.length ? habit.custom_month_days : null,
-              preferred_time: habit.preferred_time || null,
+              preferred_time: normalizeCampaignHabitPreferredTime(
+                [habit.preferred_time, habit.preferredTime],
+                CAMPAIGN_RITUAL_TIME_FALLBACKS[index % CAMPAIGN_RITUAL_TIME_FALLBACKS.length],
+              ),
               reminder_enabled: habit.reminder_enabled || false,
               reminder_minutes_before: habit.reminder_minutes_before || 15,
-              estimated_minutes: habit.estimated_minutes ?? null,
+              estimated_minutes: normalizeCampaignHabitEstimatedMinutes(habit.estimated_minutes, habit.estimatedMinutes),
               category: habit.category?.trim() || null,
               is_active: true,
               current_streak: 0,

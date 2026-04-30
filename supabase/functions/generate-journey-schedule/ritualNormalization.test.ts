@@ -74,6 +74,26 @@ Deno.test("normalizeJourneyRitual pads compact preferred times", () => {
   assert(ritual.preferredTime === "08:05", "Expected compact hour to be padded");
 });
 
+Deno.test("normalizeJourneyRitual preserves snake_case timing fields", () => {
+  const ritual = normalizeJourneyRitual(
+    {
+      id: "ritual-1",
+      title: "Review",
+      description: "Check the plan",
+      frequency: "daily",
+      difficulty: "easy",
+      preferred_time: "7:30",
+      estimated_minutes: 25,
+    },
+    "fallback-id",
+    normalizeDifficulty,
+    "14:00",
+  );
+
+  assert(ritual.preferredTime === "07:30", "Expected snake_case preferred time to be preserved");
+  assert(ritual.estimatedMinutes === 25, "Expected snake_case estimated minutes to be preserved");
+});
+
 Deno.test("normalizeJourneyRitual falls back when preferred time is invalid or omitted", () => {
   const invalidTime = normalizeJourneyRitual(
     {

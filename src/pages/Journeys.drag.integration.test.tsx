@@ -4,6 +4,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { isSameDay } from "date-fns";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { JOURNEYS_RESET_TO_TODAY_EVENT } from "@/pages/journeysDateSync";
 
 vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
   useJourneysCompanionVisual: () => ({
@@ -1859,6 +1860,211 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       expect(screen.getByTestId("selected-date-iso").textContent).toBe(sameDaySelectedDateIso);
       expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeReentry);
+    });
+  });
+
+  it("resets stale selected date when the active quests tab requests today", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
+
+    let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+    await waitFor(() => {
+      staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
+    });
+
+    act(() => {
+      window.dispatchEvent(new Event(JOURNEYS_RESET_TO_TODAY_EVENT));
+    });
+
+    await waitFor(() => {
+      const refreshedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      expect(refreshedDateIso).not.toBe(staleSelectedDateIso);
+      expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
+    });
+  });
+
+  it("requests date-pill recentering when the active quests tab requests today and the selected date is already today", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "set-same-day-non-current" }));
+
+    let sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+    await waitFor(() => {
+      sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      expect(isSameDay(new Date(sameDaySelectedDateIso), new Date())).toBe(true);
+    });
+    const centerKeyBeforeResetRequest = Number(screen.getByTestId("center-request-key").textContent);
+
+    act(() => {
+      window.dispatchEvent(new Event(JOURNEYS_RESET_TO_TODAY_EVENT));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-date-iso").textContent).toBe(sameDaySelectedDateIso);
+      expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeResetRequest);
+    });
+  });
+
+  it("resets stale selected date on journeys query page changes", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    const RouteHarness = () => {
+      const navigate = useNavigate();
+      const location = useLocation();
+
+      return (
+        <>
+          <div data-testid="route-path">{location.pathname}</div>
+          <div data-testid="route-search">{location.search}</div>
+          <button type="button" onClick={() => navigate("/journeys?section=inbox")}>
+            go-inbox-section
+          </button>
+          <Journeys />
+        </>
+      );
+    };
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <RouteHarness />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("route-path").textContent).toBe("/journeys");
+      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
+
+    let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+    await waitFor(() => {
+      staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "go-inbox-section" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("route-search").textContent).toBe("?section=inbox");
+    });
+
+    await waitFor(() => {
+      const refreshedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      expect(refreshedDateIso).not.toBe(staleSelectedDateIso);
+      expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
+    });
+  });
+
+  it("defers a page-change reset while the add quest sheet is open and applies it when closed", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    const RouteHarness = () => {
+      const navigate = useNavigate();
+      const location = useLocation();
+
+      return (
+        <>
+          <div data-testid="route-path">{location.pathname}</div>
+          <div data-testid="route-search">{location.search}</div>
+          <button type="button" onClick={() => navigate("/journeys?section=inbox")}>
+            go-inbox-section
+          </button>
+          <Journeys />
+        </>
+      );
+    };
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <RouteHarness />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
+      expect(mocks.lastAddQuestSheetProps?.onOpenChange).toBeTypeOf("function");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
+
+    let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+    await waitFor(() => {
+      staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
+    });
+
+    act(() => {
+      mocks.lastAddQuestSheetProps?.onOpenChange?.(true);
+    });
+    await waitFor(() => {
+      expect(mocks.lastAddQuestSheetProps?.open).toBe(true);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "go-inbox-section" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("route-search").textContent).toBe("?section=inbox");
+    });
+
+    expect(screen.getByTestId("selected-date-iso").textContent).toBe(staleSelectedDateIso);
+
+    act(() => {
+      mocks.lastAddQuestSheetProps?.onOpenChange?.(false);
+    });
+
+    await waitFor(() => {
+      const refreshedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      expect(refreshedDateIso).not.toBe(staleSelectedDateIso);
+      expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
     });
   });
 

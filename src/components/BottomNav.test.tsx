@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
+import { JOURNEYS_RESET_TO_TODAY_EVENT } from "@/pages/journeysDateSync";
 
 const mocks = vi.hoisted(() => ({
   warmDailyTasksQueryFromRemote: vi.fn().mockResolvedValue([]),
@@ -168,6 +169,26 @@ describe("BottomNav", () => {
 
     expect(mocks.warmDailyTasksQueryFromRemote).toHaveBeenCalledWith(expect.any(Object), "user-1", expect.any(String));
     expect(mocks.warmEpicsQueryFromRemote).not.toHaveBeenCalled();
+  });
+
+  it("signals journeys to reset to today when the quests tab is tapped", () => {
+    const resetEvents: Event[] = [];
+    const handleResetRequest = (event: Event) => {
+      resetEvents.push(event);
+    };
+    window.addEventListener(JOURNEYS_RESET_TO_TODAY_EVENT, handleResetRequest);
+
+    try {
+      renderBottomNav("/journeys");
+
+      fireEvent.click(screen.getByText("Quests"));
+
+      expect(mocks.hapticsLight).toHaveBeenCalledTimes(1);
+      expect(resetEvents).toHaveLength(1);
+      expect(resetEvents[0].type).toBe(JOURNEYS_RESET_TO_TODAY_EVENT);
+    } finally {
+      window.removeEventListener(JOURNEYS_RESET_TO_TODAY_EVENT, handleResetRequest);
+    }
   });
 
   it("renders quests before companion in the bottom nav", () => {

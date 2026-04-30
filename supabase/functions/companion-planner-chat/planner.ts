@@ -3271,10 +3271,16 @@ const missingFieldsForKind = (
     if (!draft.endDate && !draft.durationMinutes) {
       missing.add("target timeline");
     }
+    if (!effectiveTime) {
+      missing.add("time of day");
+    }
   }
 
   if (kind === "create_ritual" && !draft.epicId) {
     missing.add("campaign link");
+  }
+  if (kind === "create_ritual" && !effectiveTime) {
+    missing.add("time of day");
   }
 
   return [...missing];
@@ -3483,11 +3489,20 @@ const buildFollowUpQuestions = (
   const keepCreateQuestConfirmable = kind === "create_quest";
 
   if (
+    (kind === "create_campaign" || kind === "create_ritual") &&
+    !effectiveTime
+  ) {
+    questions.push(buildTimeQuestion(input));
+  }
+
+  if (
     !keepCreateQuestConfirmable &&
     askTimingQuestions &&
     (!effectiveTime || shouldConfirmLearnedTime)
   ) {
-    questions.push(buildTimeQuestion(input));
+    if (!questions.some((candidate) => candidate.id === "time_of_day")) {
+      questions.push(buildTimeQuestion(input));
+    }
   }
 
   if (

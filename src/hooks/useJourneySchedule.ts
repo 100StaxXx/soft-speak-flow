@@ -57,6 +57,67 @@ export interface JourneySchedule {
   planningStyleReason?: string;
 }
 
+export const JOURNEY_RITUAL_TIME_FALLBACKS = ["08:00", "10:00", "14:00", "17:00", "19:00", "20:30"];
+export const MAX_JOURNEY_RITUAL_ESTIMATED_MINUTES = 1440;
+
+type JourneyRitualResponse = JourneyRitual & {
+  custom_days?: number[];
+  custom_month_days?: number[];
+  custom_period?: 'week' | 'month';
+  estimated_minutes?: number | null;
+  preferred_time?: string | null;
+};
+
+const normalizePreferredTime = (value: unknown, fallbackTime: string): string => {
+  if (typeof value !== 'string') return fallbackTime;
+
+  const trimmed = value.trim();
+  const match = trimmed.match(/^([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/);
+  if (!match) return fallbackTime;
+
+  return `${match[1].padStart(2, '0')}:${match[2]}`;
+};
+
+const normalizeEstimatedMinutes = (value: unknown): number | undefined => {
+  if (
+    typeof value === 'number'
+    && Number.isFinite(value)
+    && Number.isInteger(value)
+    && value > 0
+    && value <= MAX_JOURNEY_RITUAL_ESTIMATED_MINUTES
+  ) {
+    return value;
+  }
+
+  return undefined;
+};
+
+const normalizeJourneyRitualResponse = (ritual: JourneyRitualResponse, index: number): JourneyRitual => {
+  const preferredTime = normalizePreferredTime(
+    ritual.preferredTime ?? ritual.preferred_time,
+    JOURNEY_RITUAL_TIME_FALLBACKS[index % JOURNEY_RITUAL_TIME_FALLBACKS.length],
+  );
+  const estimatedMinutes = normalizeEstimatedMinutes(ritual.estimatedMinutes ?? ritual.estimated_minutes);
+
+  return {
+    ...ritual,
+    customDays: ritual.customDays ?? ritual.custom_days,
+    customMonthDays: ritual.customMonthDays ?? ritual.custom_month_days,
+    customPeriod: ritual.customPeriod ?? ritual.custom_period,
+    preferredTime,
+    estimatedMinutes,
+  };
+};
+
+export const normalizeJourneySchedule = (schedule: JourneySchedule): JourneySchedule => ({
+  ...schedule,
+  rituals: Array.isArray(schedule.rituals)
+    ? schedule.rituals.map((ritual, index) =>
+      normalizeJourneyRitualResponse(ritual as JourneyRitualResponse, index)
+    )
+    : [],
+});
+
 interface GenerateScheduleParams {
   goal: string;
   deadline: string;
@@ -93,7 +154,7 @@ export function useJourneySchedule() {
       if (fnError) throw fnError;
       if (data?.error) throw new Error(data.error);
 
-      const generatedSchedule = data as JourneySchedule;
+      const generatedSchedule = normalizeJourneySchedule(data as JourneySchedule);
       setSchedule(generatedSchedule);
       return generatedSchedule;
     } catch (err) {
@@ -118,7 +179,7 @@ export function useJourneySchedule() {
       if (fnError) throw fnError;
       if (data?.error) throw new Error(data.error);
 
-      const adjustedSchedule = data as JourneySchedule;
+      const adjustedSchedule = normalizeJourneySchedule(data as JourneySchedule);
       setSchedule(adjustedSchedule);
       return adjustedSchedule;
     } catch (err) {

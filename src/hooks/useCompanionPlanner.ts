@@ -690,7 +690,8 @@ const inferScheduledTimeFromProposal = (
     const firstHabit = habits[0];
     if (firstHabit && typeof firstHabit === "object" && firstHabit !== null) {
       const preferredTime =
-        (firstHabit as Record<string, unknown>).preferred_time;
+        (firstHabit as Record<string, unknown>).preferred_time
+        ?? (firstHabit as Record<string, unknown>).preferredTime;
       return typeof preferredTime === "string" ? preferredTime : null;
     }
   }
@@ -2859,9 +2860,10 @@ export function useCompanionPlanner({
           const payload = proposal.payload as Parameters<typeof createEpic>[0];
           await createEpic(payload);
           const starterHabit = payload.habits?.[0];
-          if (starterHabit?.preferred_time) {
+          const starterHabitTime = starterHabit?.preferred_time ?? starterHabit?.preferredTime;
+          if (starterHabitTime) {
             await trackTaskCreation(
-              starterHabit.preferred_time,
+              starterHabitTime,
               starterHabit.difficulty ?? "medium",
               starterHabit.category ?? undefined,
               starterHabit.title,

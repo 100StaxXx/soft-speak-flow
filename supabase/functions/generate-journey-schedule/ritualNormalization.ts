@@ -27,11 +27,16 @@ interface JourneyRitualInput {
   description?: unknown;
   frequency?: unknown;
   customDays?: unknown;
+  custom_days?: unknown;
   customMonthDays?: unknown;
+  custom_month_days?: unknown;
   customPeriod?: unknown;
+  custom_period?: unknown;
   difficulty?: unknown;
   estimatedMinutes?: unknown;
+  estimated_minutes?: unknown;
   preferredTime?: unknown;
+  preferred_time?: unknown;
 }
 
 export const DEFAULT_RITUAL_TIME_SLOTS = ["08:00", "10:00", "14:00", "17:00", "19:00", "20:30"];
@@ -114,9 +119,9 @@ export function normalizeJourneyRitual(
   fallbackTime = DEFAULT_RITUAL_TIME_SLOTS[0],
 ): JourneyRitual {
   const frequency = normalizeFrequency(ritual.frequency);
-  let customDays = normalizeNumberList(ritual.customDays, 0, 6);
-  let customMonthDays = normalizeNumberList(ritual.customMonthDays, 1, 31);
-  let customPeriod = inferCustomPeriod(ritual.customPeriod, frequency, customMonthDays);
+  let customDays = normalizeNumberList(ritual.customDays ?? ritual.custom_days, 0, 6);
+  let customMonthDays = normalizeNumberList(ritual.customMonthDays ?? ritual.custom_month_days, 1, 31);
+  let customPeriod = inferCustomPeriod(ritual.customPeriod ?? ritual.custom_period, frequency, customMonthDays);
 
   switch (frequency) {
     case "daily":
@@ -162,7 +167,7 @@ export function normalizeJourneyRitual(
     description: typeof ritual.description === "string" ? ritual.description : "",
     frequency,
     difficulty: normalizeDifficulty(ritual.difficulty),
-    preferredTime: normalizePreferredTime(ritual.preferredTime, fallbackTime),
+    preferredTime: normalizePreferredTime(ritual.preferredTime ?? ritual.preferred_time, fallbackTime),
   };
 
   if (customDays.length > 0) {
@@ -177,7 +182,7 @@ export function normalizeJourneyRitual(
     normalizedRitual.customPeriod = customPeriod;
   }
 
-  const estimatedMinutes = normalizeEstimatedMinutes(ritual.estimatedMinutes);
+  const estimatedMinutes = normalizeEstimatedMinutes(ritual.estimatedMinutes ?? ritual.estimated_minutes);
   if (estimatedMinutes !== undefined) {
     normalizedRitual.estimatedMinutes = estimatedMinutes;
   }

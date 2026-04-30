@@ -4388,6 +4388,9 @@ Deno.test("promotes multi-step goals to campaigns", () => {
   }));
 
   assertEquals(result.proposals[0].kind, "create_campaign");
+  assertEquals(result.proposals[0].readyToConfirm, false);
+  assertEquals(result.proposals[0].missingFields?.includes("time of day"), true);
+  assertEquals(result.followUpQuestions.some((question) => question.field === "time_of_day"), true);
   assertEquals(result.sessionState.lastClassification, "epic");
 });
 
@@ -4613,6 +4616,9 @@ Deno.test("ties repeated campaign work to a ritual when an active campaign is re
   }));
 
   assertEquals(result.proposals[0].kind, "create_ritual");
+  assertEquals(result.proposals[0].readyToConfirm, false);
+  assertEquals(result.proposals[0].missingFields?.includes("time of day"), true);
+  assertEquals(result.followUpQuestions.some((question) => question.field === "time_of_day"), true);
   assertStringIncludes(result.proposals[0].summary, "Launch Sprint");
   assertEquals(
     (

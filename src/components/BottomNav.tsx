@@ -17,6 +17,7 @@ import {
   warmDailyTasksQueryFromRemote,
 } from "@/utils/plannerSync";
 import { useMentorConnection } from "@/contexts/MentorConnectionContext";
+import { dispatchJourneysResetToToday } from "@/pages/journeysDateSync";
 
 type PrefetchTarget = "mentor" | "journeys" | "companion";
 
@@ -111,6 +112,11 @@ export const BottomNav = memo(() => {
     haptics.light();
   }, [clearGuideNavigationSuppression]);
 
+  const handleJourneysTabClick = useCallback(() => {
+    haptics.light();
+    dispatchJourneysResetToToday();
+  }, []);
+
   const {
     handlers: guideAvatarLongPressHandlers,
     isActivated: isGuideAvatarLongPressed,
@@ -200,7 +206,7 @@ export const BottomNav = memo(() => {
             className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[58px] min-h-[56px]"
             activeClassName="bg-cosmiq-glow/12"
             data-tour="quests-tab"
-            onClick={() => haptics.light()}
+            onClick={handleJourneysTabClick}
             onPointerDown={prefetchJourneysTasks}
             onMouseEnter={() => handlePrefetch('journeys')}
             onFocus={() => handlePrefetch('journeys')}

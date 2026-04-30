@@ -524,7 +524,7 @@ describe("useEpics", () => {
               frequency: "daily",
               custom_days: [1, 2, 3, 4, 5],
               custom_month_days: null,
-              preferred_time: null,
+              preferred_time: "08:00",
               reminder_enabled: false,
               reminder_minutes_before: 15,
               estimated_minutes: null,
@@ -614,7 +614,7 @@ describe("useEpics", () => {
           frequency: "daily",
           custom_days: [1, 2, 3, 4, 5],
           custom_month_days: null,
-          preferred_time: null,
+          preferred_time: "08:00",
           reminder_enabled: false,
           reminder_minutes_before: 15,
           estimated_minutes: null,
@@ -861,6 +861,14 @@ describe("useEpics", () => {
             preferred_time: "08:30",
             estimated_minutes: 45,
           },
+          {
+            title: "Evening wind-down",
+            difficulty: "medium",
+            frequency: "daily",
+            custom_days: [0, 1, 2, 3, 4, 5, 6],
+            preferredTime: "20:30",
+            estimatedMinutes: 25,
+          },
         ],
       });
     });
@@ -872,6 +880,19 @@ describe("useEpics", () => {
         estimated_duration: 45,
         epic_id: expect.any(String),
       }),
+      expect.objectContaining({
+        task_text: "Evening wind-down",
+        scheduled_time: "20:30",
+        estimated_duration: 25,
+        epic_id: expect.any(String),
+      }),
+    ]));
+    expect(habitsInsertMock).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({
+        title: "Evening wind-down",
+        preferred_time: "20:30",
+        estimated_minutes: 25,
+      }),
     ]));
     expect(dailyTasksUpsertMock).toHaveBeenCalledWith(
       expect.arrayContaining([
@@ -879,6 +900,12 @@ describe("useEpics", () => {
           task_text: "Morning focus",
           scheduled_time: "08:30",
           estimated_duration: 45,
+          epic_id: expect.any(String),
+        }),
+        expect.objectContaining({
+          task_text: "Evening wind-down",
+          scheduled_time: "20:30",
+          estimated_duration: 25,
           epic_id: expect.any(String),
         }),
       ]),
@@ -958,11 +985,17 @@ describe("useEpics", () => {
     }));
     expect(insertedEpic.end_date).toBe(resolveEpicEndDate(insertedEpic));
     expect(insertedEpic).not.toHaveProperty("epic_habits");
+    expect(habitsInsertMock).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({
+        title: "Morning focus",
+        preferred_time: "08:00",
+      }),
+    ]));
     expect(dailyTasksUpsertMock).toHaveBeenCalledWith(
       expect.arrayContaining([
         expect.objectContaining({
           task_text: "Morning focus",
-          scheduled_time: null,
+          scheduled_time: "08:00",
           estimated_duration: null,
         }),
       ]),
