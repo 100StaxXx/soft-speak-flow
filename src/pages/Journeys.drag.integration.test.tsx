@@ -135,7 +135,6 @@ const mocks = vi.hoisted(() => ({
       status: "pending";
       readyToConfirm: boolean;
     }) => Promise<{ saved: boolean; savedTitle?: string | null }>;
-    onQuestCaptureSubmit?: (rawQuest: string) => void;
   },
   lastEditQuestDialogProps: null as null | {
     open?: boolean;
@@ -299,7 +298,6 @@ vi.mock("@/components/journeys/JourneysCompanionPlannerModal", () => ({
     presentation?: string;
     launchIntent?: unknown;
     onLaunchIntentConsumed?: (intentId: string) => void;
-    onQuestCaptureSubmit?: (rawQuest: string) => void;
     onQuestProposalEditHandoff?: (proposal: {
       id: string;
       kind: "create_quest" | "update_quest" | "suggest_reminder";
@@ -1060,7 +1058,7 @@ describe("Journeys row drag integration", () => {
     expect(mocks.lastPathfinderProps?.open).toBe(true);
   });
 
-  it("opens the add quest sheet with NLP-prefilled values from companion quest capture", async () => {
+  it("opens the companion planner with Quest? without local quest-capture handoff", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date("2026-04-09T12:00:00"));
 
@@ -1094,24 +1092,14 @@ describe("Journeys row drag integration", () => {
       expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
     });
 
-    act(() => {
-      mocks.lastCompanionPlannerModalProps?.onQuestCaptureSubmit?.(
-        "Pilates tomorrow at 8am",
-      );
-    });
-
-    await waitFor(() => {
-      expect(mocks.lastAddQuestSheetProps?.open).toBe(true);
-    });
-    expect(mocks.lastCompanionPlannerModalProps?.open).toBe(false);
-    expect(mocks.lastAddQuestSheetProps?.prefillDraft).toEqual(
+    expect(mocks.lastCompanionPlannerModalProps?.launchIntent).toEqual(
       expect.objectContaining({
-        text: "Pilates",
-        taskDate: "2026-04-10",
-        scheduledTime: "08:00",
-        creationSource: "nlp",
+        id: "quest-capture-route-1",
+        message: "Quest?",
+        starterIntent: "quest_capture",
       }),
     );
+    expect(mocks.lastAddQuestSheetProps?.open).not.toBe(true);
   });
 
   it("keeps the planner open while a planner quest edit handoff is active and resolves back after save", async () => {

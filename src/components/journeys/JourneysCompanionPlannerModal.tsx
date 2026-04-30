@@ -75,7 +75,6 @@ interface JourneysCompanionPlannerModalProps {
   launchIntent?: CompanionPlannerLaunchIntent | null;
   onLaunchIntentConsumed?: (intentId: string) => void;
   onOpenCampaignBuilder?: (message: string) => void;
-  onQuestCaptureSubmit?: (rawQuest: string) => void;
   onQuestProposalEditHandoff?: (
     proposal: CompanionPlannerProposal,
   ) => Promise<{ saved: boolean; savedTitle?: string | null }>;
