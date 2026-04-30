@@ -279,7 +279,6 @@ export function Pathfinder({
     () => {
       // Use schedule rituals if available, otherwise fall back to suggestions
       if (schedule?.rituals) {
-        console.log('[Pathfinder] Mapping schedule rituals:', schedule.rituals.length, schedule.rituals.map(r => ({ title: r.title, estimatedMinutes: r.estimatedMinutes, preferredTime: r.preferredTime })));
         return schedule.rituals.map(r => ({
           id: r.id,
           title: r.title,
@@ -398,16 +397,6 @@ export function Pathfinder({
     // Classify the goal to check if clarification is needed
     const result = await classify(goalInput);
     
-    // Debug logging for classification results
-    console.log('[Pathfinder] Classification result:', {
-      input: goalInput,
-      type: result?.type,
-      confidence: result?.confidence,
-      needsClarification: result?.needsClarification,
-      questionsCount: result?.epicClarifyingQuestions?.length,
-      epicContext: result?.epicContext,
-    });
-    
     // For epics, ALWAYS show clarification - use AI questions or fallback defaults
     if (result?.type === 'epic') {
       const questions = result.epicClarifyingQuestions?.length 
@@ -469,12 +458,6 @@ export function Pathfinder({
       preferred_time: h.preferredTime ?? null,
     }));
 
-    // Log for debugging ritual count issues
-    console.log('[Pathfinder] Creating epic with habits:', habits.length, habits.map(h => h.title));
-    if (habits.length < 2 && schedule?.rituals && schedule.rituals.length > habits.length) {
-      console.warn('[Pathfinder] Habit count mismatch! Schedule has', schedule.rituals.length, 'but habits array has', habits.length);
-    }
-
     const normalizedMilestonePercents = schedule?.milestones
       ? normalizeCampaignMilestonePercentArray(schedule.milestones.map((m) => m.milestonePercent))
       : [];
@@ -494,9 +477,6 @@ export function Pathfinder({
       });
       return;
     }
-    
-    console.log('[Pathfinder] Creating epic with milestones:', milestones?.length || 0, milestones);
-
     // Include phases from schedule
     const phases = schedule?.phases.map(p => ({
       name: p.name,
@@ -792,12 +772,18 @@ export function Pathfinder({
                     </div>
 
                     {!showClarification && (
-                      <div className={cn(plannerPathfinderTheme.footerBar, "space-y-3")} data-testid="pathfinder-footer">
+                      <div
+                        className={cn(plannerPathfinderTheme.footerBar, "space-y-3")}
+                        data-testid="pathfinder-footer"
+                        data-tutorial-avoid="true"
+                      >
                         <Button
                           onClick={handleProceedToTimeline}
                           disabled={!goalInput.trim() || !deadline || isClassifying || isScheduleLoading}
                           className={cn(plannerPathfinderTheme.primaryButton, "h-12 w-full text-base")}
                           size="lg"
+                          data-tour="pathfinder-primary-action"
+                          data-tour-shape="rounded-rect"
                         >
                           {isClassifying ? (
                             <>
@@ -855,10 +841,16 @@ export function Pathfinder({
                       </div>
                     </div>
 
-                    <div className={cn(plannerPathfinderTheme.footerBar, "space-y-3")} data-testid="pathfinder-footer">
+                    <div
+                      className={cn(plannerPathfinderTheme.footerBar, "space-y-3")}
+                      data-testid="pathfinder-footer"
+                      data-tutorial-avoid="true"
+                    >
                       <Button
                         onClick={handleProceedToSuggestions}
                         className={cn(plannerPathfinderTheme.primaryButton, "w-full")}
+                        data-tour="pathfinder-primary-action"
+                        data-tour-shape="rounded-rect"
                       >
                         Continue with this plan
                         <ChevronRight className="ml-1 h-4 w-4" />
@@ -921,10 +913,16 @@ export function Pathfinder({
                       </div>
                     </div>
 
-                    <div className={cn(plannerPathfinderTheme.footerBar, "space-y-3")} data-testid="pathfinder-footer">
+                    <div
+                      className={cn(plannerPathfinderTheme.footerBar, "space-y-3")}
+                      data-testid="pathfinder-footer"
+                      data-tutorial-avoid="true"
+                    >
                       <Button
                         onClick={handleProceedToReview}
                         className={cn(plannerPathfinderTheme.primaryButton, "w-full")}
+                        data-tour="pathfinder-primary-action"
+                        data-tour-shape="rounded-rect"
                       >
                         Continue to Review
                         <ChevronRight className="ml-1 h-4 w-4" />
@@ -1002,11 +1000,17 @@ export function Pathfinder({
                       </div>
                     </div>
 
-                    <div className={cn(plannerPathfinderTheme.footerBar, "space-y-3")} data-testid="pathfinder-footer">
+                    <div
+                      className={cn(plannerPathfinderTheme.footerBar, "space-y-3")}
+                      data-testid="pathfinder-footer"
+                      data-tutorial-avoid="true"
+                    >
                       <Button
                         onClick={handleCreateEpic}
                         disabled={hasReachedCampaignLimit || isCreating || isSubmittingCreate || selectedHabits.length === 0 || epicWhy.trim().length === 0 || epicTitle.trim().length === 0}
                         className={cn(plannerPathfinderTheme.primaryButton, "w-full")}
+                        data-tour="pathfinder-primary-action"
+                        data-tour-shape="rounded-rect"
                       >
                         {isCreating || isSubmittingCreate ? (
                           <>

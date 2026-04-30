@@ -674,6 +674,56 @@ describe("DatePillsScroller", () => {
     }
   });
 
+  it("re-centers on an explicit center request without changing selected date", async () => {
+    const onDateSelect = vi.fn();
+    const scrollToSpy = vi.fn();
+    const originalScrollTo = HTMLElement.prototype.scrollTo;
+
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true,
+      value: scrollToSpy,
+    });
+
+    try {
+      const selectedDate = new Date("2026-02-13T12:00:00.000Z");
+      const { rerender, container } = render(
+        <DatePillsScroller
+          selectedDate={selectedDate}
+          onDateSelect={onDateSelect}
+          centerRequestKey={0}
+        />,
+      );
+
+      const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
+      const selectedButton = scroller.querySelector("button.bg-gradient-to-br") as HTMLButtonElement;
+      setCenteringMetrics(scroller, selectedButton, {
+        scrollLeft: 0,
+        scrollWidth: 1200,
+        containerWidth: 220,
+        selectedLeft: 360,
+        selectedWidth: 60,
+      });
+
+      scrollToSpy.mockClear();
+      rerender(
+        <DatePillsScroller
+          selectedDate={selectedDate}
+          onDateSelect={onDateSelect}
+          centerRequestKey={1}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(scrollToSpy).toHaveBeenCalled();
+      });
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+        configurable: true,
+        value: originalScrollTo,
+      });
+    }
+  });
+
   it("computes symmetric edge spacer widths from container and pill size", async () => {
     const onDateSelect = vi.fn();
     const { rerender, container } = render(

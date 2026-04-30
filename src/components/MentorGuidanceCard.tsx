@@ -1,20 +1,32 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { MentorAvatar } from "@/components/MentorAvatar";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { resolveTutorialTarget } from "@/utils/tutorialTargets";
 
 const PANEL_GAP_PX = 12;
 const PANEL_TOP_MARGIN_PX = 12;
 const PANEL_TOP_SAFE_BUFFER_PX = 8;
 const PANEL_BASE_BOTTOM_PX = 0;
+const PANEL_SIDE_MARGIN_PX = 12;
+const COMPACT_PANEL_MAX_WIDTH_PX = 320;
+const COMPACT_PANEL_HEIGHT_PX = 104;
 const BOTTOM_INSET_CSS_VAR = "--mentor-guidance-bottom-inset";
 const BOTTOM_INSET_MAX_VIEWPORT_RATIO = 0.4;
 const BOTTOM_INSET_UPDATE_THRESHOLD_PX = 1;
 
 type PanelPlacement =
   | { anchor: "bottom"; bottomPx: number }
-  | { anchor: "top"; topPx: number };
+  | { anchor: "top"; topPx: number }
+  | {
+      anchor: "floating";
+      topPx: number;
+      leftPx: number;
+      widthPx: number;
+      heightPx?: number;
+      compact?: boolean;
+    };
 
 interface RectLike {
   top: number;
@@ -28,32 +40,60 @@ interface RectLike {
 const normalizePlacement = (placement: PanelPlacement): PanelPlacement =>
   placement.anchor === "bottom"
     ? { anchor: "bottom", bottomPx: Math.max(0, Math.round(placement.bottomPx)) }
-    : { anchor: "top", topPx: Math.max(0, Math.round(placement.topPx)) };
+    : placement.anchor === "top"
+      ? { anchor: "top", topPx: Math.max(0, Math.round(placement.topPx)) }
+      : {
+          anchor: "floating",
+          topPx: Math.max(0, Math.round(placement.topPx)),
+          leftPx: Math.max(0, Math.round(placement.leftPx)),
+          widthPx: Math.max(0, Math.round(placement.widthPx)),
+          heightPx: placement.heightPx ? Math.max(0, Math.round(placement.heightPx)) : undefined,
+          compact: placement.compact,
+        };
 
 const arePlacementsEqual = (a: PanelPlacement, b: PanelPlacement) =>
   a.anchor === b.anchor &&
-  (a.anchor === "bottom" ? a.bottomPx === (b as { bottomPx: number }).bottomPx : a.topPx === (b as { topPx: number }).topPx);
+  (a.anchor === "bottom"
+    ? a.bottomPx === (b as { bottomPx: number }).bottomPx
+    : a.anchor === "top"
+      ? a.topPx === (b as { topPx: number }).topPx
+      : a.topPx === (b as { topPx: number }).topPx &&
+        a.leftPx === (b as { leftPx: number }).leftPx &&
+        a.widthPx === (b as { widthPx: number }).widthPx &&
+        a.heightPx === (b as { heightPx?: number }).heightPx &&
+        a.compact === (b as { compact?: boolean }).compact);
 
 const rectsOverlapWithGap = (a: RectLike, b: RectLike, gapPx: number) =>
   !(a.right + gapPx <= b.left || a.left - gapPx >= b.right || a.bottom + gapPx <= b.top || a.top - gapPx >= b.bottom);
 
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
+
 const getRectForPlacement = (
   panelRect: RectLike,
   placement: PanelPlacement,
-  viewportHeight: number
+  viewportHeight: number,
+  viewportTopPx = 0
 ): RectLike => {
+  const height = placement.anchor === "floating" && placement.heightPx
+    ? placement.heightPx
+    : panelRect.height;
+  const width = placement.anchor === "floating" && placement.widthPx
+    ? placement.widthPx
+    : panelRect.width;
   const top =
     placement.anchor === "bottom"
-      ? viewportHeight - placement.bottomPx - panelRect.height
+      ? viewportTopPx + viewportHeight - placement.bottomPx - height
       : placement.topPx;
+  const left = placement.anchor === "floating" ? placement.leftPx : panelRect.left;
 
   return {
     top,
-    bottom: top + panelRect.height,
-    left: panelRect.left,
-    right: panelRect.right,
-    width: panelRect.width,
-    height: panelRect.height,
+    bottom: top + height,
+    left,
+    right: left + width,
+    width,
+    height,
   };
 };
 
@@ -128,6 +168,49 @@ const readSafeAreaInsetTopPx = (): number => {
   return fromProbe;
 };
 
+const isVisibleElement = (element: HTMLElement): boolean => {
+  const style = window.getComputedStyle(element);
+  return style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0";
+};
+
+const rectFromElement = (element: HTMLElement): RectLike | null => {
+  if (!isVisibleElement(element)) return null;
+  const rect = element.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return null;
+  return rect;
+};
+
+const queryElementsForSelector = (selector: string): HTMLElement[] => {
+  try {
+    return Array.from(document.querySelectorAll<HTMLElement>(selector));
+  } catch {
+    return [];
+  }
+};
+
+const collectAvoidRects = (selectors: string[]): RectLike[] => {
+  const seen = new Set<HTMLElement>();
+  const elements: HTMLElement[] = [];
+
+  selectors.forEach((selector) => {
+    queryElementsForSelector(selector).forEach((element) => {
+      if (seen.has(element)) return;
+      seen.add(element);
+      elements.push(element);
+    });
+  });
+
+  queryElementsForSelector('[data-tutorial-avoid="true"]').forEach((element) => {
+    if (seen.has(element)) return;
+    seen.add(element);
+    elements.push(element);
+  });
+
+  return elements
+    .map(rectFromElement)
+    .filter((rect): rect is RectLike => Boolean(rect));
+};
+
 export const resolveMentorGuidanceMinTopPx = ({
   safeAreaInsetTopPx,
   topMarginPx = PANEL_TOP_MARGIN_PX,
@@ -143,7 +226,11 @@ export const resolveMentorGuidanceMinTopPx = ({
 export const resolveMentorGuidancePlacement = ({
   panelRect,
   targetRect,
+  avoidRects = [],
   viewportHeight,
+  viewportWidth = Math.max(panelRect.right, panelRect.width),
+  viewportTopPx = 0,
+  viewportLeftPx = 0,
   baseBottomPx = PANEL_BASE_BOTTOM_PX,
   gapPx = PANEL_GAP_PX,
   topMarginPx = PANEL_TOP_MARGIN_PX,
@@ -151,7 +238,11 @@ export const resolveMentorGuidancePlacement = ({
 }: {
   panelRect: RectLike;
   targetRect: RectLike | null;
+  avoidRects?: RectLike[];
   viewportHeight: number;
+  viewportWidth?: number;
+  viewportTopPx?: number;
+  viewportLeftPx?: number;
   baseBottomPx?: number;
   gapPx?: number;
   topMarginPx?: number;
@@ -162,32 +253,141 @@ export const resolveMentorGuidancePlacement = ({
     Math.round(Math.max(topMarginPx, minTopPx ?? topMarginPx))
   );
   const baseline: PanelPlacement = { anchor: "bottom", bottomPx: baseBottomPx };
+  const allAvoidRects = [
+    ...(targetRect ? [targetRect] : []),
+    ...avoidRects,
+  ];
 
-  if (!targetRect) {
+  if (allAvoidRects.length === 0) {
     return normalizePlacement(baseline);
   }
 
-  const maxBottomPx = Math.max(baseBottomPx, viewportHeight - panelRect.height - resolvedMinTopPx);
-  const desiredBottomPx = Math.max(baseBottomPx, viewportHeight - targetRect.top + gapPx);
+  const viewportRight = viewportLeftPx + viewportWidth;
+  const viewportBottom = viewportTopPx + viewportHeight;
+  const panelWidth = Math.min(panelRect.width, Math.max(0, viewportWidth - PANEL_SIDE_MARGIN_PX * 2));
+  const primaryRect = targetRect ?? allAvoidRects[0];
+  const maxBottomPx = Math.max(
+    baseBottomPx,
+    viewportHeight - panelRect.height - Math.max(0, resolvedMinTopPx - viewportTopPx),
+  );
+  const desiredBottomPx = Math.max(baseBottomPx, viewportBottom - primaryRect.top + gapPx);
   const lifted: PanelPlacement = { anchor: "bottom", bottomPx: Math.min(desiredBottomPx, maxBottomPx) };
   const topFallback: PanelPlacement = { anchor: "top", topPx: resolvedMinTopPx };
+  const clampLeft = (leftPx: number, widthPx = panelWidth) =>
+    clamp(leftPx, viewportLeftPx + PANEL_SIDE_MARGIN_PX, Math.max(viewportLeftPx + PANEL_SIDE_MARGIN_PX, viewportRight - PANEL_SIDE_MARGIN_PX - widthPx));
+  const clampTop = (topPx: number, heightPx = panelRect.height) =>
+    clamp(topPx, resolvedMinTopPx, Math.max(resolvedMinTopPx, viewportBottom - PANEL_SIDE_MARGIN_PX - heightPx));
+  const centeredLeft = clampLeft(primaryRect.left + primaryRect.width / 2 - panelWidth / 2);
+  const centeredTop = clampTop(primaryRect.top + primaryRect.height / 2 - panelRect.height / 2);
 
-  const candidates = [baseline, lifted, topFallback].map(normalizePlacement).filter((placement, index, arr) => {
+  const fullCandidates: PanelPlacement[] = [
+    baseline,
+    lifted,
+    topFallback,
+    {
+      anchor: "floating",
+      topPx: clampTop(primaryRect.top - gapPx - panelRect.height),
+      leftPx: centeredLeft,
+      widthPx: panelWidth,
+    },
+    {
+      anchor: "floating",
+      topPx: clampTop(primaryRect.bottom + gapPx),
+      leftPx: centeredLeft,
+      widthPx: panelWidth,
+    },
+    {
+      anchor: "floating",
+      topPx: centeredTop,
+      leftPx: clampLeft(primaryRect.left - gapPx - panelWidth),
+      widthPx: panelWidth,
+    },
+    {
+      anchor: "floating",
+      topPx: centeredTop,
+      leftPx: clampLeft(primaryRect.right + gapPx),
+      widthPx: panelWidth,
+    },
+  ];
+
+  const candidates = fullCandidates.map(normalizePlacement).filter((placement, index, arr) => {
     return index === arr.findIndex((item) => arePlacementsEqual(item, placement));
   });
 
+  const rectFitsViewport = (rect: RectLike) =>
+    rect.top >= resolvedMinTopPx &&
+    rect.bottom <= viewportBottom - PANEL_SIDE_MARGIN_PX &&
+    rect.left >= viewportLeftPx + PANEL_SIDE_MARGIN_PX &&
+    rect.right <= viewportRight - PANEL_SIDE_MARGIN_PX;
+
+  const rectIsClear = (rect: RectLike) =>
+    rectFitsViewport(rect) &&
+    !allAvoidRects.some((avoidRect) => rectsOverlapWithGap(rect, avoidRect, gapPx));
+
   for (const candidate of candidates) {
-    const rect = getRectForPlacement(panelRect, candidate, viewportHeight);
-    if (!rectsOverlapWithGap(rect, targetRect, gapPx)) {
+    const rect = getRectForPlacement(panelRect, candidate, viewportHeight, viewportTopPx);
+    if (rectIsClear(rect)) {
       return candidate;
     }
   }
 
+  const compactWidth = Math.min(
+    panelWidth,
+    COMPACT_PANEL_MAX_WIDTH_PX,
+    Math.max(0, viewportWidth - PANEL_SIDE_MARGIN_PX * 2),
+  );
+  const compactHeight = Math.min(panelRect.height, COMPACT_PANEL_HEIGHT_PX);
+  const compactCandidates: PanelPlacement[] = [
+    {
+      anchor: "floating",
+      topPx: resolvedMinTopPx,
+      leftPx: viewportLeftPx + PANEL_SIDE_MARGIN_PX,
+      widthPx: compactWidth,
+      heightPx: compactHeight,
+      compact: true,
+    },
+    {
+      anchor: "floating",
+      topPx: resolvedMinTopPx,
+      leftPx: viewportRight - PANEL_SIDE_MARGIN_PX - compactWidth,
+      widthPx: compactWidth,
+      heightPx: compactHeight,
+      compact: true,
+    },
+    {
+      anchor: "floating",
+      topPx: viewportBottom - PANEL_SIDE_MARGIN_PX - compactHeight,
+      leftPx: viewportLeftPx + PANEL_SIDE_MARGIN_PX,
+      widthPx: compactWidth,
+      heightPx: compactHeight,
+      compact: true,
+    },
+    {
+      anchor: "floating",
+      topPx: viewportBottom - PANEL_SIDE_MARGIN_PX - compactHeight,
+      leftPx: viewportRight - PANEL_SIDE_MARGIN_PX - compactWidth,
+      widthPx: compactWidth,
+      heightPx: compactHeight,
+      compact: true,
+    },
+  ].map(normalizePlacement);
+
+  const clearCompact = compactCandidates.find((candidate) =>
+    rectIsClear(getRectForPlacement(panelRect, candidate, viewportHeight, viewportTopPx))
+  );
+  if (clearCompact) {
+    return clearCompact;
+  }
+
   let best = candidates[0];
   let bestScore = Number.NEGATIVE_INFINITY;
-  for (const candidate of candidates) {
-    const rect = getRectForPlacement(panelRect, candidate, viewportHeight);
-    const score = placementScore(rect, targetRect);
+  for (const candidate of [...compactCandidates, ...candidates]) {
+    const rect = getRectForPlacement(panelRect, candidate, viewportHeight, viewportTopPx);
+    const overlapPenalty = allAvoidRects.reduce(
+      (total, avoidRect) => total + (rectsOverlapWithGap(rect, avoidRect, gapPx) ? 1 : 0),
+      0,
+    );
+    const score = placementScore(rect, primaryRect) - overlapPenalty * 1_000_000;
     if (score > bestScore) {
       best = candidate;
       bestScore = score;
@@ -201,6 +401,7 @@ export const MentorGuidanceCard = () => {
   const {
     isActive,
     activeTargetSelector,
+    activeTargetSelectors,
     canTemporarilyHide,
     progressText,
     dialogueText,
@@ -216,6 +417,7 @@ export const MentorGuidanceCard = () => {
   } = usePostOnboardingMentorGuidance();
 
   const wrapperRef = useRef<HTMLElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const [placement, setPlacement] = useState<PanelPlacement>({
     anchor: "bottom",
     bottomPx: PANEL_BASE_BOTTOM_PX,
@@ -227,33 +429,43 @@ export const MentorGuidanceCard = () => {
     const wrapper = wrapperRef.current;
     if (!wrapper) return;
 
-    const panelRect = wrapper.getBoundingClientRect();
+    const panelRect = (panelRef.current ?? wrapper).getBoundingClientRect();
     if (panelRect.height <= 0) return;
 
     const targetElement = activeTargetSelector
       ? resolveTutorialTarget(activeTargetSelector)?.element ?? null
       : null;
-    const targetRect = targetElement?.getBoundingClientRect() ?? null;
+    const targetRect = targetElement ? rectFromElement(targetElement) : null;
+    const avoidRects = collectAvoidRects(activeTargetSelectors);
     const safeAreaInsetTopPx = readSafeAreaInsetTopPx();
     const minTopPx = resolveMentorGuidanceMinTopPx({ safeAreaInsetTopPx });
+    const visualViewport = window.visualViewport;
+    const viewportHeight = visualViewport?.height ?? window.innerHeight;
+    const viewportWidth = visualViewport?.width ?? window.innerWidth;
+    const viewportTopPx = visualViewport?.offsetTop ?? 0;
+    const viewportLeftPx = visualViewport?.offsetLeft ?? 0;
 
     const next = resolveMentorGuidancePlacement({
       panelRect,
       targetRect,
-      viewportHeight: window.innerHeight,
+      avoidRects,
+      viewportHeight,
+      viewportWidth,
+      viewportTopPx,
+      viewportLeftPx,
       minTopPx,
     });
 
     writeBottomInsetVar(
       resolveMentorGuidanceBottomInsetPx({
         panelHeight: panelRect.height,
-        viewportHeight: window.innerHeight,
+        viewportHeight,
         anchor: next.anchor,
       })
     );
 
     setPlacement((prev) => (arePlacementsEqual(prev, next) ? prev : next));
-  }, [activeTargetSelector, isActive]);
+  }, [activeTargetSelector, activeTargetSelectors, isActive]);
 
   useEffect(() => {
     if (!isActive) {
@@ -267,13 +479,16 @@ export const MentorGuidanceCard = () => {
     window.addEventListener("resize", handleRelayout);
     window.addEventListener("scroll", handleRelayout, true);
     window.addEventListener("orientationchange", handleRelayout);
+    window.visualViewport?.addEventListener("resize", handleRelayout);
+    window.visualViewport?.addEventListener("scroll", handleRelayout);
 
     const observer = typeof ResizeObserver !== "undefined"
       ? new ResizeObserver(() => updatePlacement())
       : null;
 
-    if (observer && wrapperRef.current) {
-      observer.observe(wrapperRef.current);
+    if (observer) {
+      if (wrapperRef.current) observer.observe(wrapperRef.current);
+      if (panelRef.current) observer.observe(panelRef.current);
     }
 
     return () => {
@@ -281,6 +496,8 @@ export const MentorGuidanceCard = () => {
       window.removeEventListener("resize", handleRelayout);
       window.removeEventListener("scroll", handleRelayout, true);
       window.removeEventListener("orientationchange", handleRelayout);
+      window.visualViewport?.removeEventListener("resize", handleRelayout);
+      window.visualViewport?.removeEventListener("scroll", handleRelayout);
       observer?.disconnect();
     };
   }, [isActive, updatePlacement]);
@@ -303,12 +520,37 @@ export const MentorGuidanceCard = () => {
   useEffect(() => () => clearBottomInsetVar(), []);
 
   const placementStyle = useMemo(
-    () =>
-      placement.anchor === "bottom"
-        ? { top: "auto", bottom: `${placement.bottomPx}px` }
-        : { bottom: "auto", top: `${placement.topPx}px` },
+    (): CSSProperties => {
+      if (placement.anchor === "bottom") {
+        return {
+          top: undefined,
+          bottom: `${placement.bottomPx}px`,
+          left: 0,
+          right: 0,
+          width: undefined,
+        };
+      }
+      if (placement.anchor === "top") {
+        return {
+          bottom: undefined,
+          top: `${placement.topPx}px`,
+          left: 0,
+          right: 0,
+          width: undefined,
+        };
+      }
+      return {
+        bottom: undefined,
+        right: undefined,
+        top: `${placement.topPx}px`,
+        left: `${placement.leftPx}px`,
+        width: `${placement.widthPx}px`,
+        height: placement.heightPx ? `${placement.heightPx}px` : undefined,
+      };
+    },
     [placement]
   );
+  const isCompact = placement.anchor === "floating" && placement.compact;
 
   if (!isActive || !dialogueText || (canTemporarilyHide && isTemporarilyHidden)) {
     return null;
@@ -318,13 +560,29 @@ export const MentorGuidanceCard = () => {
     <section
       ref={wrapperRef}
       data-tutorial="mentor-dialogue-panel"
-      className="pointer-events-none fixed left-0 right-0 z-[105] px-3 pb-[calc(env(safe-area-inset-bottom,0px)+10px)] transition-[top,bottom] duration-200"
+      data-placement={placement.anchor}
+      data-compact={isCompact ? "true" : undefined}
+      className={cn(
+        "pointer-events-none fixed z-[105] transition-[top,bottom,left,width] duration-200",
+        placement.anchor === "floating"
+          ? "px-0 pb-0"
+          : "px-3 pb-[calc(env(safe-area-inset-bottom,0px)+10px)]",
+      )}
       style={placementStyle}
       aria-live="polite"
     >
-      <div className="pointer-events-none mx-auto w-full max-w-[22rem] rounded-2xl border border-white/20 bg-black/65 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-md sm:max-w-4xl">
-        <div className="flex items-end gap-3 p-3 sm:p-4">
-          <div className="shrink-0">
+      <div
+        ref={panelRef}
+        data-testid="mentor-guidance-card-panel"
+        className={cn(
+          "pointer-events-none rounded-2xl border border-white/20 bg-black/65 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-md",
+          isCompact
+            ? "h-full w-full overflow-hidden rounded-xl"
+            : "mx-auto w-full max-w-[22rem] sm:max-w-4xl",
+        )}
+      >
+        <div className={cn("flex gap-3", isCompact ? "h-full items-center p-3" : "items-end p-3 sm:p-4")}>
+          <div className={cn("shrink-0", isCompact && "hidden")}>
             <MentorAvatar
               mentorSlug={(speakerSlug || "").toLowerCase()}
               mentorName={speakerName}
@@ -338,23 +596,26 @@ export const MentorGuidanceCard = () => {
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-amber-200/90">{progressText}</p>
-            <p className="mt-1 inline-flex rounded-md bg-black/45 px-2 py-0.5 text-xs font-semibold text-amber-100">
+            <p className={cn("text-[10px] uppercase tracking-[0.16em] text-amber-200/90", isCompact && "sr-only")}>{progressText}</p>
+            <p className={cn("mt-1 inline-flex rounded-md bg-black/45 px-2 py-0.5 text-xs font-semibold text-amber-100", isCompact && "mt-0")}>
               {speakerName}
             </p>
-            <p className="mt-2 text-base leading-relaxed text-white sm:text-lg">{dialogueText}</p>
-            {dialogueSupportText ? (
+            <p className={cn("mt-2 text-base leading-relaxed text-white sm:text-lg", isCompact && "mt-1 line-clamp-2 text-sm leading-snug sm:text-sm")}>{dialogueText}</p>
+            {dialogueSupportText && !isCompact ? (
               <p className="mt-1 text-sm leading-relaxed text-white/80">{dialogueSupportText}</p>
             ) : null}
-            {canTemporarilyHide || onSecondaryAction || onDialogueAction ? (
-              <div className="mt-3 flex flex-wrap gap-2">
+            {!isCompact && (canTemporarilyHide || onSecondaryAction || onDialogueAction) ? (
+              <div className={cn("mt-3 flex flex-wrap gap-2", isCompact && "mt-2")}>
                 {canTemporarilyHide ? (
                   <Button
                     type="button"
                     variant="ghost"
                     aria-label="Hide tutorial"
                     onClick={() => setIsTemporarilyHidden(true)}
-                    className="pointer-events-auto h-9 rounded-xl border border-white/25 bg-black/45 text-white hover:bg-black/60"
+                    className={cn(
+                      "pointer-events-auto h-9 rounded-xl border border-white/25 bg-black/45 text-white hover:bg-black/60",
+                      isCompact && "h-8 px-2 text-xs",
+                    )}
                   >
                     Hide tutorial
                   </Button>
@@ -365,7 +626,10 @@ export const MentorGuidanceCard = () => {
                     variant="ghost"
                     aria-label={secondaryActionLabel || "Skip tutorial"}
                     onClick={onSecondaryAction}
-                    className="pointer-events-auto h-9 rounded-xl border border-white/25 bg-black/45 text-white hover:bg-black/60"
+                    className={cn(
+                      "pointer-events-auto h-9 rounded-xl border border-white/25 bg-black/45 text-white hover:bg-black/60",
+                      isCompact && "h-8 px-2 text-xs",
+                    )}
                   >
                     {secondaryActionLabel || "Skip tutorial"}
                   </Button>
@@ -374,7 +638,10 @@ export const MentorGuidanceCard = () => {
                   <Button
                     type="button"
                     onClick={onDialogueAction}
-                    className="pointer-events-auto h-9 rounded-xl bg-amber-500 text-black hover:bg-amber-400"
+                    className={cn(
+                      "pointer-events-auto h-9 rounded-xl bg-amber-500 text-black hover:bg-amber-400",
+                      isCompact && "h-8 px-2 text-xs",
+                    )}
                   >
                     {dialogueActionLabel || "Continue"}
                   </Button>

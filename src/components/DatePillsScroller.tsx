@@ -18,6 +18,7 @@ interface DatePillsScrollerProps {
   tasksPerDay?: Record<string, number>;
   daysToShow?: number;
   isActive?: boolean;
+  centerRequestKey?: number;
 }
 
 const EDGE_THRESHOLD_PX = 80;
@@ -47,6 +48,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
   tasksPerDay = {},
   daysToShow = 14,
   isActive = true,
+  centerRequestKey = 0,
 }: DatePillsScrollerProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
@@ -59,7 +61,6 @@ export const DatePillsScroller = memo(function DatePillsScroller({
   const [rangeStart, setRangeStart] = useState<Date>(() => getInitialRange(selectedDate, daysToShow).start);
   const [rangeEnd, setRangeEnd] = useState<Date>(() => getInitialRange(selectedDate, daysToShow).end);
   const [edgeSpacerWidth, setEdgeSpacerWidth] = useState(0);
-  const [centerRequestVersion] = useState(0);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
   const extensionChunk = Math.max(DEFAULT_EXTENSION_CHUNK, daysToShow);
@@ -222,7 +223,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     };
   }, [recalculateEdgeSpacers]);
 
-  // Center the selected pill on selected-date and activation changes only.
+  // Center the selected pill on selected-date, activation, or explicit center requests.
   // Range extensions from edge scrolls intentionally don't re-center, so the
   // user's scroll momentum is preserved.
   useLayoutEffect(() => {
@@ -296,7 +297,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
         window.cancelAnimationFrame(frameId);
       }
     };
-  }, [calculateEdgeSpacerWidth, centerRequestVersion, edgeSpacerWidth, getSelectedPillElement, isActive, prefersReducedMotion, selectedDateKey]);
+  }, [calculateEdgeSpacerWidth, centerRequestKey, edgeSpacerWidth, getSelectedPillElement, isActive, prefersReducedMotion, selectedDateKey]);
 
   return (
     <div

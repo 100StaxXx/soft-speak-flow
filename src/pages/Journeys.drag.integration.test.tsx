@@ -79,6 +79,7 @@ const mocks = vi.hoisted(() => ({
   isMacHostedIOSApp: false,
   draggableFabRenderCount: 0,
   lastDatePillSelectedDate: null as Date | null,
+  lastDatePillCenterRequestKey: null as number | null,
   lastAddQuestSheetProps: null as null | {
     autoFillTimeOnFirstTap?: boolean;
     open?: boolean;
@@ -135,7 +136,6 @@ const mocks = vi.hoisted(() => ({
       status: "pending";
       readyToConfirm: boolean;
     }) => Promise<{ saved: boolean; savedTitle?: string | null }>;
-    onQuestCaptureSubmit?: (rawQuest: string) => void;
   },
   lastEditQuestDialogProps: null as null | {
     open?: boolean;
@@ -198,14 +198,18 @@ vi.mock("@/components/DatePillsScroller", () => ({
   DatePillsScroller: ({
     selectedDate,
     onDateSelect,
+    centerRequestKey,
   }: {
     selectedDate: Date;
     onDateSelect: (date: Date) => void;
+    centerRequestKey?: number;
   }) => {
     mocks.lastDatePillSelectedDate = selectedDate;
+    mocks.lastDatePillCenterRequestKey = centerRequestKey ?? 0;
     return (
       <div data-testid="date-pills">
         <span data-testid="selected-date-iso">{selectedDate.toISOString()}</span>
+        <span data-testid="center-request-key">{centerRequestKey ?? 0}</span>
         <button
           type="button"
           onClick={() => {
@@ -299,7 +303,6 @@ vi.mock("@/components/journeys/JourneysCompanionPlannerModal", () => ({
     presentation?: string;
     launchIntent?: unknown;
     onLaunchIntentConsumed?: (intentId: string) => void;
-    onQuestCaptureSubmit?: (rawQuest: string) => void;
     onQuestProposalEditHandoff?: (proposal: {
       id: string;
       kind: "create_quest" | "update_quest" | "suggest_reminder";
@@ -720,6 +723,7 @@ describe("Journeys row drag integration", () => {
     mocks.isMacHostedIOSApp = false;
     mocks.draggableFabRenderCount = 0;
     mocks.lastDatePillSelectedDate = null;
+    mocks.lastDatePillCenterRequestKey = null;
     mocks.lastAddQuestSheetProps = null;
     mocks.lastCompanionPlannerModalProps = null;
     mocks.lastEditQuestDialogProps = null;
@@ -1060,7 +1064,7 @@ describe("Journeys row drag integration", () => {
     expect(mocks.lastPathfinderProps?.open).toBe(true);
   });
 
-  it("opens the add quest sheet with NLP-prefilled values from companion quest capture", async () => {
+  it("opens the companion planner with Quest? without local quest-capture handoff", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date("2026-04-09T12:00:00"));
 
@@ -1094,24 +1098,14 @@ describe("Journeys row drag integration", () => {
       expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
     });
 
-    act(() => {
-      mocks.lastCompanionPlannerModalProps?.onQuestCaptureSubmit?.(
-        "Pilates tomorrow at 8am",
-      );
-    });
-
-    await waitFor(() => {
-      expect(mocks.lastAddQuestSheetProps?.open).toBe(true);
-    });
-    expect(mocks.lastCompanionPlannerModalProps?.open).toBe(false);
-    expect(mocks.lastAddQuestSheetProps?.prefillDraft).toEqual(
+    expect(mocks.lastCompanionPlannerModalProps?.launchIntent).toEqual(
       expect.objectContaining({
-        text: "Pilates",
-        taskDate: "2026-04-10",
-        scheduledTime: "08:00",
-        creationSource: "nlp",
+        id: "quest-capture-route-1",
+        message: "Quest?",
+        starterIntent: "quest_capture",
       }),
     );
+    expect(mocks.lastAddQuestSheetProps?.open).not.toBe(true);
   });
 
   it("keeps the planner open while a planner quest edit handoff is active and resolves back after save", async () => {
@@ -1732,7 +1726,7 @@ describe("Journeys row drag integration", () => {
     });
   });
 
-  it("does not reset selected date from pathname changes alone", async () => {
+  it("resets stale selected date when returning to the journeys route", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1798,7 +1792,73 @@ describe("Journeys row drag integration", () => {
 
     await waitFor(() => {
       const reenteredDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(reenteredDateIso).toBe(staleSelectedDateIso);
+      const reenteredDate = new Date(reenteredDateIso);
+      expect(reenteredDateIso).not.toBe(staleSelectedDateIso);
+      expect(isSameDay(reenteredDate, new Date())).toBe(true);
+    });
+  });
+
+  it("requests date-pill recentering on journeys route re-entry when the selected date is already today", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    const RouteHarness = () => {
+      const navigate = useNavigate();
+      const location = useLocation();
+
+      return (
+        <>
+          <div data-testid="route-path">{location.pathname}</div>
+          <button type="button" onClick={() => navigate("/inbox")}>
+            go-inbox
+          </button>
+          <button type="button" onClick={() => navigate("/journeys")}>
+            go-journeys
+          </button>
+          <Journeys />
+        </>
+      );
+    };
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <RouteHarness />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("route-path").textContent).toBe("/journeys");
+      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "set-same-day-non-current" }));
+
+    let sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+    await waitFor(() => {
+      sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      expect(isSameDay(new Date(sameDaySelectedDateIso), new Date())).toBe(true);
+    });
+    const centerKeyBeforeReentry = Number(screen.getByTestId("center-request-key").textContent);
+
+    fireEvent.click(screen.getByRole("button", { name: "go-inbox" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("route-path").textContent).toBe("/inbox");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "go-journeys" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("route-path").textContent).toBe("/journeys");
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-date-iso").textContent).toBe(sameDaySelectedDateIso);
+      expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeReentry);
     });
   });
 

@@ -170,6 +170,7 @@ export function JourneysCompanionLauncherPopup({
                     )}
                     onClick={() => onSelect(option)}
                     data-tour={`companion-launcher-option-${option.id}`}
+                    data-tour-shape="rounded-rect"
                     data-testid={`journeys-companion-launcher-option-${option.id}`}
                   >
                     <span

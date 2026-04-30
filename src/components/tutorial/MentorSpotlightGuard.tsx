@@ -1,12 +1,25 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { resolveTutorialTarget } from "@/utils/tutorialTargets";
 
-interface SpotlightRect {
+interface CornerRadius {
+  x: number;
+  y: number;
+}
+
+interface CornerRadii {
+  topLeft: CornerRadius;
+  topRight: CornerRadius;
+  bottomRight: CornerRadius;
+  bottomLeft: CornerRadius;
+}
+
+interface SpotlightGeometry {
   top: number;
   left: number;
   width: number;
   height: number;
-  borderRadius: number;
+  radii: CornerRadii;
+  pathD: string;
 }
 
 type MentorSpotlightMode = "spotlight" | "outline";
@@ -21,44 +34,174 @@ interface MentorSpotlightGuardProps {
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
 
-const parseLengthPx = (value: string, fallback: number): number => {
+const parseLengthValue = (value: string, reference: number, fallback: number): number => {
   if (!value) return fallback;
-  if (value.includes("%")) return fallback;
+  const trimmed = value.trim();
+  if (!trimmed) return fallback;
+  if (trimmed.endsWith("%")) {
+    const percent = Number.parseFloat(trimmed);
+    return Number.isFinite(percent) ? (percent / 100) * reference : fallback;
+  }
   const n = Number.parseFloat(value);
   return Number.isFinite(n) ? n : fallback;
 };
 
-const readTargetBorderRadius = (element: HTMLElement): number => {
-  const computed = window.getComputedStyle(element);
-  return Math.max(0, parseLengthPx(computed.borderTopLeftRadius, 0));
+const parseCornerRadius = (value: string, width: number, height: number): CornerRadius => {
+  const [xValue, yValue = xValue] = value.trim().split(/\s+/);
+  return {
+    x: Math.max(0, parseLengthValue(xValue, width, 0)),
+    y: Math.max(0, parseLengthValue(yValue, height, 0)),
+  };
 };
 
-const toSpotlightRect = (targetElement: HTMLElement, padding: number): SpotlightRect => {
+const scaleCornerRadii = (radii: CornerRadii, width: number, height: number): CornerRadii => {
+  const maxHorizontalSum = Math.max(
+    radii.topLeft.x + radii.topRight.x,
+    radii.bottomLeft.x + radii.bottomRight.x,
+  );
+  const maxVerticalSum = Math.max(
+    radii.topLeft.y + radii.bottomLeft.y,
+    radii.topRight.y + radii.bottomRight.y,
+  );
+  const scale = Math.min(
+    1,
+    maxHorizontalSum > 0 ? width / maxHorizontalSum : 1,
+    maxVerticalSum > 0 ? height / maxVerticalSum : 1,
+  );
+
+  const applyScale = (radius: CornerRadius): CornerRadius => ({
+    x: radius.x * scale,
+    y: radius.y * scale,
+  });
+
+  return {
+    topLeft: applyScale(radii.topLeft),
+    topRight: applyScale(radii.topRight),
+    bottomRight: applyScale(radii.bottomRight),
+    bottomLeft: applyScale(radii.bottomLeft),
+  };
+};
+
+export const readTargetBorderRadii = (
+  element: HTMLElement,
+  width: number,
+  height: number,
+): CornerRadii => {
+  const shape = element.dataset.tourShape;
+  if (shape === "circle" || shape === "pill") {
+    const radius = { x: width / 2, y: height / 2 };
+    return {
+      topLeft: radius,
+      topRight: radius,
+      bottomRight: radius,
+      bottomLeft: radius,
+    };
+  }
+
+  const computed = window.getComputedStyle(element);
+  return scaleCornerRadii(
+    {
+      topLeft: parseCornerRadius(computed.borderTopLeftRadius, width, height),
+      topRight: parseCornerRadius(computed.borderTopRightRadius, width, height),
+      bottomRight: parseCornerRadius(computed.borderBottomRightRadius, width, height),
+      bottomLeft: parseCornerRadius(computed.borderBottomLeftRadius, width, height),
+    },
+    width,
+    height,
+  );
+};
+
+const roundPathNumber = (value: number) => {
+  const rounded = Math.round(value * 1000) / 1000;
+  return Object.is(rounded, -0) ? 0 : rounded;
+};
+
+const formatPathNumber = (value: number) => String(roundPathNumber(value));
+
+export const buildRoundedRectPath = ({
+  left,
+  top,
+  width,
+  height,
+  radii,
+}: {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  radii: CornerRadii;
+}): string => {
+  const right = left + width;
+  const bottom = top + height;
+  const tl = radii.topLeft;
+  const tr = radii.topRight;
+  const br = radii.bottomRight;
+  const bl = radii.bottomLeft;
+
+  const parts = [
+    `M ${formatPathNumber(left + tl.x)} ${formatPathNumber(top)}`,
+    `H ${formatPathNumber(right - tr.x)}`,
+  ];
+
+  if (tr.x > 0 && tr.y > 0) {
+    parts.push(`A ${formatPathNumber(tr.x)} ${formatPathNumber(tr.y)} 0 0 1 ${formatPathNumber(right)} ${formatPathNumber(top + tr.y)}`);
+  } else {
+    parts.push(`L ${formatPathNumber(right)} ${formatPathNumber(top)}`);
+  }
+
+  parts.push(`V ${formatPathNumber(bottom - br.y)}`);
+  if (br.x > 0 && br.y > 0) {
+    parts.push(`A ${formatPathNumber(br.x)} ${formatPathNumber(br.y)} 0 0 1 ${formatPathNumber(right - br.x)} ${formatPathNumber(bottom)}`);
+  } else {
+    parts.push(`L ${formatPathNumber(right)} ${formatPathNumber(bottom)}`);
+  }
+
+  parts.push(`H ${formatPathNumber(left + bl.x)}`);
+  if (bl.x > 0 && bl.y > 0) {
+    parts.push(`A ${formatPathNumber(bl.x)} ${formatPathNumber(bl.y)} 0 0 1 ${formatPathNumber(left)} ${formatPathNumber(bottom - bl.y)}`);
+  } else {
+    parts.push(`L ${formatPathNumber(left)} ${formatPathNumber(bottom)}`);
+  }
+
+  parts.push(`V ${formatPathNumber(top + tl.y)}`);
+  if (tl.x > 0 && tl.y > 0) {
+    parts.push(`A ${formatPathNumber(tl.x)} ${formatPathNumber(tl.y)} 0 0 1 ${formatPathNumber(left + tl.x)} ${formatPathNumber(top)}`);
+  } else {
+    parts.push(`L ${formatPathNumber(left)} ${formatPathNumber(top)}`);
+  }
+
+  parts.push("Z");
+  return parts.join(" ");
+};
+
+const toSpotlightGeometry = (targetElement: HTMLElement): SpotlightGeometry => {
   const rect = targetElement.getBoundingClientRect();
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
 
-  const left = clamp(rect.left - padding, 0, viewportWidth);
-  const top = clamp(rect.top - padding, 0, viewportHeight);
-  const right = clamp(rect.right + padding, 0, viewportWidth);
-  const bottom = clamp(rect.bottom + padding, 0, viewportHeight);
+  const left = clamp(rect.left, 0, viewportWidth);
+  const top = clamp(rect.top, 0, viewportHeight);
+  const right = clamp(rect.right, 0, viewportWidth);
+  const bottom = clamp(rect.bottom, 0, viewportHeight);
 
   const width = Math.max(0, right - left);
   const height = Math.max(0, bottom - top);
-  const innerRadius = readTargetBorderRadius(targetElement);
-  const maxRadius = Math.max(0, Math.min(width, height) / 2);
-  const borderRadius = Math.min(innerRadius + padding, maxRadius);
+  const radii = readTargetBorderRadii(targetElement, width, height);
 
   return {
     top,
     left,
     width,
     height,
-    borderRadius,
+    radii,
+    pathD: buildRoundedRectPath({ left, top, width, height, radii }),
   };
 };
 
-const areSpotlightRectsEqual = (a: SpotlightRect | null, b: SpotlightRect | null): boolean => {
+const areSpotlightGeometriesEqual = (
+  a: SpotlightGeometry | null,
+  b: SpotlightGeometry | null,
+): boolean => {
   if (a === b) return true;
   if (!a || !b) return false;
 
@@ -66,7 +209,7 @@ const areSpotlightRectsEqual = (a: SpotlightRect | null, b: SpotlightRect | null
     && a.left === b.left
     && a.width === b.width
     && a.height === b.height
-    && a.borderRadius === b.borderRadius;
+    && a.pathD === b.pathD;
 };
 
 const TUTORIAL_LAYER_MUTATION_SELECTOR = [
@@ -136,22 +279,24 @@ export const MentorSpotlightGuard = ({
   targetSelector,
   panelSelector = '[data-tutorial="mentor-dialogue-panel"]',
 }: MentorSpotlightGuardProps) => {
+  const rawMaskId = useId();
+  const maskId = `mentor-spotlight-mask-${rawMaskId.replace(/:/g, "")}`;
   const [targetElement, setTargetElement] = useState<HTMLElement | null>(null);
   const [panelElement, setPanelElement] = useState<HTMLElement | null>(null);
-  const [spotlightRect, setSpotlightRect] = useState<SpotlightRect | null>(null);
+  const [spotlightGeometry, setSpotlightGeometry] = useState<SpotlightGeometry | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const initialFocusAppliedRef = useRef(false);
   const focusFrameRef = useRef<number | null>(null);
   const focusedTargetRef = useRef<HTMLElement | null>(null);
   const measuredTargetRef = useRef<HTMLElement | null>(null);
-  const measuredSpotlightRectRef = useRef<SpotlightRect | null>(null);
+  const measuredSpotlightGeometryRef = useRef<SpotlightGeometry | null>(null);
 
   useEffect(() => {
     if (!active || !targetSelector) {
       measuredTargetRef.current = null;
-      measuredSpotlightRectRef.current = null;
+      measuredSpotlightGeometryRef.current = null;
       setTargetElement(null);
-      setSpotlightRect(null);
+      setSpotlightGeometry(null);
       return;
     }
 
@@ -161,14 +306,14 @@ export const MentorSpotlightGuard = ({
 
     const update = () => {
       const target = resolveTutorialTarget(targetSelector)?.element ?? null;
-      const nextSpotlightRect = target ? toSpotlightRect(target, 10) : null;
+      const nextSpotlightGeometry = target ? toSpotlightGeometry(target) : null;
       if (measuredTargetRef.current !== target) {
         measuredTargetRef.current = target;
         setTargetElement(target);
       }
-      if (!areSpotlightRectsEqual(measuredSpotlightRectRef.current, nextSpotlightRect)) {
-        measuredSpotlightRectRef.current = nextSpotlightRect;
-        setSpotlightRect(nextSpotlightRect);
+      if (!areSpotlightGeometriesEqual(measuredSpotlightGeometryRef.current, nextSpotlightGeometry)) {
+        measuredSpotlightGeometryRef.current = nextSpotlightGeometry;
+        setSpotlightGeometry(nextSpotlightGeometry);
       }
       if (target && resizeObserver) {
         resizeObserver.disconnect();
@@ -209,7 +354,7 @@ export const MentorSpotlightGuard = ({
     return () => {
       window.cancelAnimationFrame(animationFrame);
       measuredTargetRef.current = null;
-      measuredSpotlightRectRef.current = null;
+      measuredSpotlightGeometryRef.current = null;
       resizeObserver?.disconnect();
       mutationObserver?.disconnect();
       window.removeEventListener("scroll", scheduleUpdate, true);
@@ -364,9 +509,12 @@ export const MentorSpotlightGuard = ({
     },
   };
 
-  const ready = useMemo(() => active && targetElement && spotlightRect, [active, targetElement, spotlightRect]);
+  const ready = useMemo(
+    () => active && targetElement && spotlightGeometry,
+    [active, targetElement, spotlightGeometry],
+  );
 
-  if (!ready || !spotlightRect) {
+  if (!ready || !spotlightGeometry) {
     return null;
   }
 
@@ -391,62 +539,71 @@ export const MentorSpotlightGuard = ({
           <>
             <div
               className="mentor-spotlight-blocker"
-              style={{ top: 0, left: 0, width: "100%", height: `${spotlightRect.top}px` }}
+              style={{ top: 0, left: 0, width: "100%", height: `${spotlightGeometry.top}px` }}
               {...blockedClickProps}
             />
             <div
               className="mentor-spotlight-blocker"
               style={{
-                top: `${spotlightRect.top}px`,
+                top: `${spotlightGeometry.top}px`,
                 left: 0,
-                width: `${spotlightRect.left}px`,
-                height: `${spotlightRect.height}px`,
+                width: `${spotlightGeometry.left}px`,
+                height: `${spotlightGeometry.height}px`,
               }}
               {...blockedClickProps}
             />
             <div
               className="mentor-spotlight-blocker"
               style={{
-                top: `${spotlightRect.top}px`,
-                left: `${spotlightRect.left + spotlightRect.width}px`,
-                width: `${Math.max(0, viewportWidth - (spotlightRect.left + spotlightRect.width))}px`,
-                height: `${spotlightRect.height}px`,
+                top: `${spotlightGeometry.top}px`,
+                left: `${spotlightGeometry.left + spotlightGeometry.width}px`,
+                width: `${Math.max(0, viewportWidth - (spotlightGeometry.left + spotlightGeometry.width))}px`,
+                height: `${spotlightGeometry.height}px`,
               }}
               {...blockedClickProps}
             />
             <div
               className="mentor-spotlight-blocker"
               style={{
-                top: `${spotlightRect.top + spotlightRect.height}px`,
+                top: `${spotlightGeometry.top + spotlightGeometry.height}px`,
                 left: 0,
                 width: "100%",
-                height: `${Math.max(0, viewportHeight - (spotlightRect.top + spotlightRect.height))}px`,
+                height: `${Math.max(0, viewportHeight - (spotlightGeometry.top + spotlightGeometry.height))}px`,
               }}
               {...blockedClickProps}
-            />
-            <div
-              className="mentor-spotlight-mask"
-              style={{
-                top: `${spotlightRect.top}px`,
-                left: `${spotlightRect.left}px`,
-                width: `${spotlightRect.width}px`,
-                height: `${spotlightRect.height}px`,
-                borderRadius: `${spotlightRect.borderRadius}px`,
-              }}
             />
           </>
         ) : null}
 
-        <div
-          className={`mentor-spotlight-ring mentor-spotlight-ring--${mode}`}
-          style={{
-            top: `${spotlightRect.top}px`,
-            left: `${spotlightRect.left}px`,
-            width: `${spotlightRect.width}px`,
-            height: `${spotlightRect.height}px`,
-            borderRadius: `${spotlightRect.borderRadius}px`,
-          }}
-        />
+        <svg
+          aria-hidden="true"
+          className="mentor-spotlight-svg"
+          width={viewportWidth}
+          height={viewportHeight}
+          viewBox={`0 0 ${viewportWidth} ${viewportHeight}`}
+        >
+          {mode === "spotlight" ? (
+            <>
+              <defs>
+                <mask id={maskId}>
+                  <rect width="100%" height="100%" fill="white" />
+                  <path d={spotlightGeometry.pathD} fill="black" />
+                </mask>
+              </defs>
+              <rect
+                className="mentor-spotlight-mask"
+                width="100%"
+                height="100%"
+                mask={`url(#${maskId})`}
+              />
+            </>
+          ) : null}
+          <path
+            className={`mentor-spotlight-ring mentor-spotlight-ring--${mode}`}
+            d={spotlightGeometry.pathD}
+            data-testid="mentor-spotlight-path"
+          />
+        </svg>
       </div>
     </>
   );

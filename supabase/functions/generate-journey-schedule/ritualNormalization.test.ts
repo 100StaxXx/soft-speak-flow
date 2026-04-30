@@ -103,3 +103,23 @@ Deno.test("normalizeJourneyRitual falls back when preferred time is invalid or o
   assert(invalidTime.preferredTime === "14:00", "Expected invalid preferred time to use fallback");
   assert(missingTime.preferredTime === "17:00", "Expected missing preferred time to use fallback");
 });
+
+Deno.test("normalizeJourneyRitual omits invalid estimated minutes", () => {
+  const invalidDurations = [Number.NaN, -30, 0, 30.5, 1441, "30", undefined];
+
+  for (const estimatedMinutes of invalidDurations) {
+    const ritual = normalizeJourneyRitual(
+      {
+        title: "Invalid Duration",
+        description: "Duration should be ignored.",
+        frequency: "daily",
+        difficulty: "medium",
+        estimatedMinutes,
+      },
+      "fallback-id",
+      normalizeDifficulty,
+    );
+
+    assert(ritual.estimatedMinutes === undefined, `Expected ${String(estimatedMinutes)} to be omitted`);
+  }
+});

@@ -335,7 +335,6 @@ describe("JourneysCompanionPlannerModal", () => {
         presentation="dialog"
         launchIntent={launchIntent}
         onLaunchIntentConsumed={onLaunchIntentConsumed}
-        onQuestCaptureSubmit={vi.fn()}
       />,
     );
 
@@ -352,7 +351,6 @@ describe("JourneysCompanionPlannerModal", () => {
   });
 
   it("submits text after Quest? through normal assistant chat", async () => {
-    const onQuestCaptureSubmit = vi.fn();
     mocks.state.draftInput = "Pilates tomorrow at 8am";
 
     render(
@@ -367,7 +365,6 @@ describe("JourneysCompanionPlannerModal", () => {
           target: "planner",
           briefingContext: null,
         }}
-        onQuestCaptureSubmit={onQuestCaptureSubmit}
       />,
     );
 
@@ -377,7 +374,6 @@ describe("JourneysCompanionPlannerModal", () => {
 
     fireEvent.click(screen.getByTestId("journeys-companion-planner-send-button"));
 
-    expect(onQuestCaptureSubmit).not.toHaveBeenCalled();
     expect(mocks.assistant.submitMessage).not.toHaveBeenCalled();
     expect(mocks.assistant.submitTypedMessage).toHaveBeenCalledTimes(1);
   });

@@ -5,11 +5,13 @@
 import type { OnboardingScheduleArchetype } from "@/shared/onboardingScheduleArchetype";
 
 export type GuidedTutorialStepId =
+  | "new_goal"
   | "quests_campaigns_intro"
   | "create_quest"
   | "meet_companion"
   | "plan_my_day"
   | "first_plan_closeout"
+  | "hatch_companion"
   | "morning_checkin"
   | "companion_tab_intro"
   | "evolve_companion"
@@ -25,12 +27,16 @@ export type CreateQuestSubstepId =
 
 export type GuidedMilestoneId =
   | "mentor_intro_hello"
+  | "start_new_goal"
+  | "complete_pathfinder_campaign"
   | "stay_on_quests" // legacy
   | "quests_campaigns_intro"
   | "meet_companion_intro"
   | "start_plan_my_day"
   | "answer_plan_day_ai"
   | "save_plan_day_action"
+  | "tap_hatch_companion"
+  | "complete_companion_hatch"
   | "first_plan_closeout_message"
   | "open_add_quest"
   | "enter_title"
