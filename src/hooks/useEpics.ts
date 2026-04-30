@@ -1561,7 +1561,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
               preferred_time: habit.preferred_time || null,
               reminder_enabled: habit.reminder_enabled || false,
               reminder_minutes_before: habit.reminder_minutes_before || 15,
-              estimated_minutes: habit.estimated_minutes || null,
+              estimated_minutes: habit.estimated_minutes ?? null,
               category: habit.category?.trim() || null,
               is_active: true,
               current_streak: 0,

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import type { HTMLAttributes, ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -36,24 +36,29 @@ vi.mock("framer-motion", async () => {
   };
 });
 
-const mockPopupHeight = (height: number) =>
-  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(() => ({
-    bottom: height,
-    height,
-    left: 0,
-    right: 320,
-    top: 0,
-    width: 320,
-    x: 0,
-    y: 0,
-    toJSON: () => ({}),
-  } as DOMRect));
+const mockPopupHeight = (height: number | (() => number)) =>
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(() => {
+    const resolvedHeight = typeof height === "function" ? height() : height;
+
+    return {
+      bottom: resolvedHeight,
+      height: resolvedHeight,
+      left: 0,
+      right: 320,
+      top: 0,
+      width: 320,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect;
+  });
 
 describe("CompanionTalkPopup", () => {
   afterEach(() => {
     document.documentElement.style.removeProperty(STACK_OFFSET_VAR);
     document.documentElement.style.removeProperty(BOTTOM_OFFSET_VAR);
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("renders companion byline when name exists", () => {
@@ -128,6 +133,51 @@ describe("CompanionTalkPopup", () => {
     expect(document.documentElement.style.getPropertyValue(BOTTOM_OFFSET_VAR)).toBe(
       "calc(64px + env(safe-area-inset-bottom, 0px) + 12px + 132px)",
     );
+  });
+
+  it("updates toast stacking offsets after ResizeObserver reports a size change", async () => {
+    let popupHeight = 80;
+    let resizeCallback: ResizeObserverCallback | null = null;
+    const observeMock = vi.fn();
+    const disconnectMock = vi.fn();
+
+    class MockResizeObserver {
+      constructor(callback: ResizeObserverCallback) {
+        resizeCallback = callback;
+      }
+
+      observe = observeMock;
+      disconnect = disconnectMock;
+      unobserve = vi.fn();
+    }
+
+    vi.stubGlobal("ResizeObserver", MockResizeObserver);
+    mockPopupHeight(() => popupHeight);
+
+    render(
+      <CompanionTalkPopup
+        isVisible
+        onDismiss={vi.fn()}
+        message="Quest complete."
+        companionName="Nova"
+        companionImageUrl={null}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(document.documentElement.style.getPropertyValue(STACK_OFFSET_VAR)).toBe("92px");
+    });
+    expect(observeMock).toHaveBeenCalled();
+
+    popupHeight = 140;
+
+    act(() => {
+      resizeCallback?.([], {} as ResizeObserver);
+    });
+
+    await waitFor(() => {
+      expect(document.documentElement.style.getPropertyValue(STACK_OFFSET_VAR)).toBe("152px");
+    });
   });
 
   it("clears toast stacking offsets when hidden or unmounted", async () => {

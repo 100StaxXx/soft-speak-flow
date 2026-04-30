@@ -146,6 +146,11 @@ vi.mock("@/features/tasks/components/EpicClarificationFlow", () => ({
   EpicClarificationFlow: () => null,
 }));
 
+const clickPathfinderButton = async (name: RegExp | string) => {
+  const button = await screen.findByRole("button", { name }, { timeout: 5000 });
+  fireEvent.click(button);
+};
+
 describe("Pathfinder", () => {
   afterEach(() => {
     cleanup();
@@ -263,9 +268,8 @@ describe("Pathfinder", () => {
     fireEvent.click(screen.getByText("Pick Deadline"));
     fireEvent.click(screen.getByRole("button", { name: "Build My Plan" }));
 
-    await screen.findByRole("button", { name: /Continue with this plan/i });
-    fireEvent.click(screen.getByRole("button", { name: /Continue with this plan/i }));
-    fireEvent.click(await screen.findByRole("button", { name: /Continue to Review/i }));
+    await clickPathfinderButton(/Continue with this plan/i);
+    await clickPathfinderButton(/Continue to Review/i);
 
     fireEvent.change(await screen.findByLabelText("Your Why"), {
       target: { value: "Get licensed and start practicing." },
@@ -304,9 +308,8 @@ describe("Pathfinder", () => {
     fireEvent.click(screen.getByText("Pick Deadline"));
     fireEvent.click(screen.getByRole("button", { name: "Build My Plan" }));
 
-    await screen.findByRole("button", { name: /Continue with this plan/i });
-    fireEvent.click(screen.getByRole("button", { name: /Continue with this plan/i }));
-    fireEvent.click(await screen.findByRole("button", { name: /Continue to Review/i }));
+    await clickPathfinderButton(/Continue with this plan/i);
+    await clickPathfinderButton(/Continue to Review/i);
 
     fireEvent.change(await screen.findByLabelText("Your Why"), {
       target: { value: "Get licensed and start practicing." },
@@ -420,9 +423,8 @@ describe("Pathfinder", () => {
     fireEvent.click(screen.getByText("Pick Deadline"));
     fireEvent.click(screen.getByRole("button", { name: "Build My Plan" }));
 
-    await screen.findByRole("button", { name: /Continue with this plan/i });
-    fireEvent.click(screen.getByRole("button", { name: /Continue with this plan/i }));
-    fireEvent.click(await screen.findByRole("button", { name: /Continue to Review/i }));
+    await clickPathfinderButton(/Continue with this plan/i);
+    await clickPathfinderButton(/Continue to Review/i);
 
     fireEvent.change(await screen.findByLabelText("Your Why"), {
       target: { value: "Prove to myself I can do it" },

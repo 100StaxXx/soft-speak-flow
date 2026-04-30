@@ -30,6 +30,7 @@ import type { CompletionCompanionTone } from "@/types/completionFeedback";
 
 const usesPortraitAvatar = (imageUrl?: string | null) => isCompanionPresetImageSource(imageUrl);
 
+// Keep the popup bottom and the toast stacking vars in lockstep so fixed layers do not drift.
 const COMPLETION_FEEDBACK_POPUP_BOTTOM_OFFSET_TERMS = "64px + env(safe-area-inset-bottom, 0px) + 12px";
 const COMPLETION_FEEDBACK_POPUP_BOTTOM_OFFSET = `calc(${COMPLETION_FEEDBACK_POPUP_BOTTOM_OFFSET_TERMS})`;
 const COMPLETION_FEEDBACK_TOAST_GAP_PX = 12;
@@ -75,59 +76,64 @@ export const CompanionTalkPopup = memo(({
   const duration = getAutoDismissDuration(message, mentor?.message);
   const hasCompanionName = companionName.trim().length > 0;
   const resolvedToneClassName = tone ? toneClassName[tone] : toneClassName.proud;
-   
-   // Check for reduced motion preference
-   const prefersReducedMotion = 
-     typeof window !== 'undefined' && 
-     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-   
-   // Auto-dismiss timer with progress bar
-   useEffect(() => {
-     if (!isVisible) {
-       setProgress(0);
-       return;
-     }
-     
-     setProgress(0);
-     const startTime = Date.now();
-     const durationMs = duration * 1000;
-     
-     const interval = setInterval(() => {
-       const elapsed = Date.now() - startTime;
-       const newProgress = Math.min(100, (elapsed / durationMs) * 100);
-       setProgress(newProgress);
-       
-       if (elapsed >= durationMs) {
-         clearInterval(interval);
-         onDismiss();
-       }
-     }, 50);
-     
-     return () => clearInterval(interval);
-   }, [isVisible, duration, onDismiss]);
 
-  useEffect(() => clearCompletionFeedbackToastOffsets, []);
+  const updateToastStackOffsets = useCallback(() => {
+    const popupElement = popupRef.current;
+    if (!popupElement || typeof document === "undefined") return;
+
+    const popupHeight = Math.ceil(
+      popupElement.getBoundingClientRect().height || popupElement.offsetHeight,
+    );
+    if (!Number.isFinite(popupHeight) || popupHeight <= 0) return;
+
+    const stackOffset = `${popupHeight + COMPLETION_FEEDBACK_TOAST_GAP_PX}px`;
+    const rootStyle = document.documentElement.style;
+    rootStyle.setProperty(COMPLETION_FEEDBACK_TOAST_STACK_OFFSET_VAR, stackOffset);
+    rootStyle.setProperty(
+      COMPLETION_FEEDBACK_TOAST_BOTTOM_OFFSET_VAR,
+      `calc(${COMPLETION_FEEDBACK_POPUP_BOTTOM_OFFSET_TERMS} + ${stackOffset})`,
+    );
+  }, []);
+
+  // Check for reduced motion preference
+  const prefersReducedMotion =
+    typeof window !== 'undefined' &&
+    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+  // Auto-dismiss timer with progress bar
+  useEffect(() => {
+    if (!isVisible) {
+      setProgress(0);
+      return;
+    }
+
+    setProgress(0);
+    const startTime = Date.now();
+    const durationMs = duration * 1000;
+
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const newProgress = Math.min(100, (elapsed / durationMs) * 100);
+      setProgress(newProgress);
+
+      if (elapsed >= durationMs) {
+        clearInterval(interval);
+        onDismiss();
+      }
+    }, 50);
+
+    return () => clearInterval(interval);
+  }, [isVisible, duration, onDismiss]);
+
+  useEffect(() => {
+    return clearCompletionFeedbackToastOffsets;
+  }, []);
 
   useEffect(() => {
     if (!isVisible || typeof window === "undefined") return;
 
     const popupElement = popupRef.current;
     if (!popupElement) return;
-
-    const updateToastStackOffsets = () => {
-      const popupHeight = Math.ceil(
-        popupElement.getBoundingClientRect().height || popupElement.offsetHeight,
-      );
-      if (!Number.isFinite(popupHeight) || popupHeight <= 0) return;
-
-      const stackOffset = `${popupHeight + COMPLETION_FEEDBACK_TOAST_GAP_PX}px`;
-      const rootStyle = document.documentElement.style;
-      rootStyle.setProperty(COMPLETION_FEEDBACK_TOAST_STACK_OFFSET_VAR, stackOffset);
-      rootStyle.setProperty(
-        COMPLETION_FEEDBACK_TOAST_BOTTOM_OFFSET_VAR,
-        `calc(${COMPLETION_FEEDBACK_POPUP_BOTTOM_OFFSET_TERMS} + ${stackOffset})`,
-      );
-    };
 
     updateToastStackOffsets();
 
@@ -145,6 +151,7 @@ export const CompanionTalkPopup = memo(({
       window.addEventListener("orientationchange", updateToastStackOffsets);
     }
 
+    // Leave active offsets in place across re-measurement setup; exit/unmount owns clearing them.
     return () => {
       if (animationFrame !== null && typeof window.cancelAnimationFrame === "function") {
         window.cancelAnimationFrame(animationFrame);
@@ -157,7 +164,13 @@ export const CompanionTalkPopup = memo(({
         window.removeEventListener("orientationchange", updateToastStackOffsets);
       }
     };
-  }, [isVisible, message, mentor?.message]);
+  }, [isVisible, updateToastStackOffsets]);
+
+  useEffect(() => {
+    if (isVisible) {
+      updateToastStackOffsets();
+    }
+  }, [isVisible, message, mentor?.message, updateToastStackOffsets]);
    
    const handleDismiss = useCallback(() => {
      onDismiss();
