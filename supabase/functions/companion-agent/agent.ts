@@ -4,6 +4,10 @@ import {
   isCompanionModeId,
 } from "../../../src/shared/companionModes.ts";
 import {
+  isScheduleReadMessage,
+  isUpcomingScheduleDigestMessage,
+} from "../../../src/shared/schedulingIntent.ts";
+import {
   isAssignedCompanionName,
   normalizeCompanionName,
   synthesizeAssignedCompanionName,
@@ -670,6 +674,26 @@ const isLauncherTurn = (request: CompanionAgentRequest): boolean =>
 const isFollowUpOptionTurn = (request: CompanionAgentRequest): boolean =>
   request.turnOrigin === "follow_up_option" ||
   request.turnOrigin === undefined;
+
+const isDeterministicScheduleReadRequest = (
+  request: CompanionAgentRequest,
+): boolean => {
+  if (request.selectedProposalId || request.selectedProposedAction) {
+    return false;
+  }
+
+  return request.starterIntent === "upcoming_start" ||
+    isUpcomingScheduleDigestMessage(request.message) ||
+    isScheduleReadMessage(request.message);
+};
+
+const getScheduleReadStarterIntent = (
+  request: CompanionAgentRequest,
+): string | null =>
+  request.starterIntent === "upcoming_start" ||
+    isUpcomingScheduleDigestMessage(request.message)
+    ? "upcoming_start"
+    : null;
 
 const resolveBareStarterFollowUp = (
   request: CompanionAgentRequest,
@@ -3107,12 +3131,16 @@ export async function runCompanionAgent(params: RunAgentParams) {
       starterIntent?: string | null;
       forcePlanDayFollowUp?: boolean;
       confidence?: number;
+      ignoreActiveFollowUp?: boolean;
+      suppressWarning?: boolean;
     } = {},
   ): AgentRunResult => {
-    console.warn("[companion-agent] planner fallback", {
-      sessionId: params.request.sessionId,
-      reason,
-    });
+    if (!options.suppressWarning) {
+      console.warn("[companion-agent] planner fallback", {
+        sessionId: params.request.sessionId,
+        reason,
+      });
+    }
 
     const plannerStarterIntent = options.starterIntent ??
       params.request.starterIntent ??
@@ -3124,7 +3152,8 @@ export async function runCompanionAgent(params: RunAgentParams) {
       horizon: "day",
       starterIntent: plannerStarterIntent,
       forcePlanDayFollowUp: options.forcePlanDayFollowUp,
-      activeFollowUp: isFollowUpOptionTurn(params.request)
+      activeFollowUp: !options.ignoreActiveFollowUp &&
+          isFollowUpOptionTurn(params.request)
         ? params.request.activeFollowUp ?? getPersistedActiveFollowUp(context)
         : null,
       context,
@@ -3193,11 +3222,22 @@ export async function runCompanionAgent(params: RunAgentParams) {
     request: params.request,
     context,
   });
-  const planningFollowUpStarterIntent = getPlanningStarterIntentFromActiveFollowUp(
-    params.request,
-    context,
-  );
-  const deterministicPlanningFollowUpResult = bareStarterResult
+  const deterministicScheduleReadResult = !bareStarterResult &&
+      isDeterministicScheduleReadRequest(params.request)
+    ? buildPlannerFallbackResult("deterministic_schedule_read", {
+      starterIntent: getScheduleReadStarterIntent(params.request),
+      ignoreActiveFollowUp: true,
+      confidence: 0.82,
+      suppressWarning: true,
+    })
+    : null;
+  const planningFollowUpStarterIntent =
+    getPlanningStarterIntentFromActiveFollowUp(
+      params.request,
+      context,
+    );
+  const deterministicPlanningFollowUpResult = bareStarterResult ||
+      deterministicScheduleReadResult
     ? null
     : isPlanningLauncherFollowUpAnswer(params.request, context)
     ? buildPlannerFallbackResult("planning_launcher_follow_up_answer", {
@@ -3208,6 +3248,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
     : null;
 
   const agentResult: AgentRunResult = bareStarterResult ??
+    deterministicScheduleReadResult ??
     deterministicPlanningFollowUpResult ??
     await wrapSubStage("openai", async () => {
       try {
