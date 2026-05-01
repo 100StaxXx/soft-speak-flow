@@ -6,7 +6,7 @@ import {
   type CompanionStatNeed,
   type CompanionStatNeedLevel,
   type CompanionStatProfileSummary,
-} from "./companionStatSignals";
+} from "./companionStatSignals.ts";
 
 export interface CompanionFantasyTitle {
   title: string;

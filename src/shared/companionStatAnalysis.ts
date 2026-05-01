@@ -4,11 +4,11 @@ import type {
   CompanionStatAttribute,
   CompanionStatNeed,
   CompanionStatProfileSummary,
-} from "./companionStatSignals";
+} from "./companionStatSignals.ts";
 import {
   buildCompanionFantasyTitle,
   type CompanionFantasyTitle,
-} from "./companionStatFantasyTitles";
+} from "./companionStatFantasyTitles.ts";
 import {
   buildCompanionCosmiqTitle,
   buildFantasyTitleAliasFromCosmiqTitle,
@@ -17,7 +17,7 @@ import {
   isCompanionCosmiqTitleStability,
   type CompanionCosmiqTitle,
   type CompanionCosmiqTitleCard,
-} from "./companionStatCosmiqTitles";
+} from "./companionStatCosmiqTitles.ts";
 
 export type CompanionStatBand = "Emerging" | "Building" | "Strong" | "Exceptional";
 export type CompanionStatDriverSource = "attribute_event" | "activity" | "echo";

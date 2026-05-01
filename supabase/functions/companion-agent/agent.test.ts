@@ -436,6 +436,47 @@ Deno.test("runCompanionAgent answers upcoming reads even with stale UI follow-up
   assertEquals(result.pendingAction, undefined);
 });
 
+Deno.test("runCompanionAgent answers launcher upcoming schedule reads without OpenAI", async () => {
+  const supabase = createMockSupabase();
+  let guardedFetchCalled = false;
+  const guardedFetch = (async (input: string | URL | Request) => {
+    guardedFetchCalled = true;
+    throw new Error(
+      `Upcoming launcher schedule reads should not call OpenAI: ${
+        String(input)
+      }`,
+    );
+  }) as typeof fetch;
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-upcoming-launcher",
+      message: "What do I have coming up?",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T20:32:00-07:00",
+      turnOrigin: "launcher",
+      starterIntent: "upcoming_start",
+    },
+  });
+
+  assertEquals(guardedFetchCalled, false);
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.intent, "check_calendar");
+  assertEquals(
+    result.reply,
+    "Today: nothing scheduled.\nTomorrow: nothing scheduled.",
+  );
+  assertEquals(result.structuredResponse?.comingUp?.tomorrowSummary, "open");
+  assertEquals(result.followUp, null);
+  assertEquals(result.proposedActions, []);
+  assertEquals(result.pendingAction, undefined);
+});
+
 Deno.test("runCompanionAgent routes plan-day follow-up answers through the planner", async () => {
   const supabase = createMockSupabase();
   let guardedFetchCalled = false;

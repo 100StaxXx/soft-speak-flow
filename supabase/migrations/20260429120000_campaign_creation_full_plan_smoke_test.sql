@@ -3,6 +3,7 @@
 DO $$
 DECLARE
   v_user_id uuid := gen_random_uuid();
+  v_user_email text := 'smoke-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 12) || '@example.invalid';
   v_epic_id uuid;
   v_invite_code text := 'SMOKE-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 8);
   v_habit_ids uuid[];
@@ -11,6 +12,33 @@ DECLARE
   v_milestone_count integer;
   v_distinct_milestone_count integer;
 BEGIN
+  INSERT INTO auth.users (
+    instance_id,
+    id,
+    aud,
+    role,
+    email,
+    encrypted_password,
+    email_confirmed_at,
+    raw_app_meta_data,
+    raw_user_meta_data,
+    created_at,
+    updated_at
+  )
+  VALUES (
+    '00000000-0000-0000-0000-000000000000',
+    v_user_id,
+    'authenticated',
+    'authenticated',
+    v_user_email,
+    crypt('password', gen_salt('bf')),
+    now(),
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{}'::jsonb,
+    now(),
+    now()
+  );
+
   WITH inserted AS (
     INSERT INTO public.habits (
       user_id,
@@ -121,5 +149,6 @@ BEGIN
   DELETE FROM public.epic_habits WHERE epic_id = v_epic_id;
   DELETE FROM public.epics WHERE id = v_epic_id;
   DELETE FROM public.habits WHERE id = ANY (v_habit_ids);
+  DELETE FROM auth.users WHERE id = v_user_id;
 END;
 $$;
