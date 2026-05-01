@@ -335,14 +335,18 @@ jobs:
           deno test supabase/functions/outlook-todo-tasks/index.test.ts
 
       - name: Deno check companion stats analysis function
+        env:
+          DENO_NO_PACKAGE_JSON: "1"
         run: |
           set -euo pipefail
-          deno check supabase/functions/generate-companion-stat-analysis/index.ts
+          deno check --sloppy-imports supabase/functions/generate-companion-stat-analysis/index.ts
 
       - name: Deno test companion stats analysis function
+        env:
+          DENO_NO_PACKAGE_JSON: "1"
         run: |
           set -euo pipefail
-          deno test --allow-env supabase/functions/generate-companion-stat-analysis/index.test.ts
+          deno test --allow-env --sloppy-imports supabase/functions/generate-companion-stat-analysis/index.test.ts
 
       - name: Deploy allow-listed Edge Functions
         run: |
