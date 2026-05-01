@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => {
   const getAllLocalTasksForUserMock = vi.fn();
   const replaceLocalTasksForDateMock = vi.fn();
   const canSyncPlannerFromRemoteMock = vi.fn();
+  const getPlannerRemoteSyncEpochMock = vi.fn();
+  const withPlannerRemoteSnapshotApplyMock = vi.fn();
   const supabaseFromMock = vi.fn();
   const supabaseSelectMock = vi.fn();
   const supabaseEqMock = vi.fn();
@@ -19,6 +21,8 @@ const mocks = vi.hoisted(() => {
     getAllLocalTasksForUserMock,
     replaceLocalTasksForDateMock,
     canSyncPlannerFromRemoteMock,
+    getPlannerRemoteSyncEpochMock,
+    withPlannerRemoteSnapshotApplyMock,
     supabaseFromMock,
     supabaseSelectMock,
     supabaseEqMock,
@@ -43,6 +47,8 @@ vi.mock("@/utils/plannerLocalStore", () => ({
 vi.mock("@/utils/plannerSync", () => ({
   PLANNER_SYNC_EVENT: "planner-sync-finished",
   canSyncPlannerFromRemote: (...args: unknown[]) => mocks.canSyncPlannerFromRemoteMock(...args),
+  getPlannerRemoteSyncEpoch: (...args: unknown[]) => mocks.getPlannerRemoteSyncEpochMock(...args),
+  withPlannerRemoteSnapshotApply: (...args: unknown[]) => mocks.withPlannerRemoteSnapshotApplyMock(...args),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -69,6 +75,11 @@ describe("useCalendarTasks", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.canSyncPlannerFromRemoteMock.mockResolvedValue(false);
+    mocks.getPlannerRemoteSyncEpochMock.mockReturnValue(0);
+    mocks.withPlannerRemoteSnapshotApplyMock.mockImplementation(
+      async (_userId: string, _epoch: number, operation: () => Promise<unknown>) =>
+        operation(),
+    );
     mocks.replaceLocalTasksForDateMock.mockResolvedValue(undefined);
     mocks.supabaseFromMock.mockReturnValue({ select: mocks.supabaseSelectMock });
     mocks.supabaseSelectMock.mockReturnValue({ eq: mocks.supabaseEqMock });
@@ -199,5 +210,42 @@ describe("useCalendarTasks", () => {
         }),
       ]);
     });
+  });
+
+  it("does not apply remote calendar rows when a local planner mutation happened during the fetch", async () => {
+    mocks.canSyncPlannerFromRemoteMock.mockResolvedValue(true);
+    mocks.withPlannerRemoteSnapshotApplyMock.mockResolvedValue(null);
+    mocks.getAllLocalTasksForUserMock.mockResolvedValue([]);
+    mocks.supabaseOrderSecondMock.mockResolvedValue({
+      data: [
+        {
+          id: "stale-habit-task",
+          user_id: "user-1",
+          task_text: "Daily Hydration",
+          task_date: "2026-02-10",
+          completed: null,
+          completed_at: null,
+          habit_source_id: "habit-deleted",
+          epic_id: null,
+        },
+      ],
+      error: null,
+    });
+
+    renderHook(
+      () => useCalendarTasks(new Date("2026-02-10T12:00:00.000Z"), "week"),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(mocks.supabaseOrderSecondMock).toHaveBeenCalled();
+      expect(mocks.withPlannerRemoteSnapshotApplyMock).toHaveBeenCalledWith(
+        "user-1",
+        0,
+        expect.any(Function),
+      );
+    });
+
+    expect(mocks.replaceLocalTasksForDateMock).not.toHaveBeenCalled();
   });
 });

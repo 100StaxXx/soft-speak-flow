@@ -401,23 +401,26 @@ describe("useOfflineQueue", () => {
     const epicHabitsSelectMock = vi.fn().mockReturnValue({
       eq: epicHabitsEqMock,
     });
-    const dailyTasksCompletedEqMock = vi.fn().mockResolvedValue({ error: null });
+    const dailyTasksCompletedOrMock = vi.fn().mockResolvedValue({ error: null });
     const dailyTasksEpicIdEqMock = vi.fn().mockReturnValue({
-      eq: dailyTasksCompletedEqMock,
+      or: dailyTasksCompletedOrMock,
     });
     const dailyTasksUserEqMock = vi.fn().mockReturnValue({
       eq: dailyTasksEpicIdEqMock,
     });
-    const dailyTasksHabitCompletedEqMock = vi.fn().mockResolvedValue({ error: null });
+    const dailyTasksHabitCompletedOrMock = vi.fn().mockResolvedValue({ error: null });
     const dailyTasksHabitInMock = vi.fn().mockReturnValue({
-      eq: dailyTasksHabitCompletedEqMock,
+      or: dailyTasksHabitCompletedOrMock,
     });
     const dailyTasksHabitUserEqMock = vi.fn().mockReturnValue({
       in: dailyTasksHabitInMock,
     });
-    const dailyTasksDeleteCompletedEqMock = vi.fn().mockResolvedValue({ error: null });
+    const dailyTasksDeleteCompletedOrMock = vi.fn().mockResolvedValue({ error: null });
+    const dailyTasksDeleteCompletedAtIsMock = vi.fn().mockReturnValue({
+      or: dailyTasksDeleteCompletedOrMock,
+    });
     const dailyTasksDeleteInMock = vi.fn().mockReturnValue({
-      eq: dailyTasksDeleteCompletedEqMock,
+      is: dailyTasksDeleteCompletedAtIsMock,
     });
     const dailyTasksDeleteUserEqMock = vi.fn().mockReturnValue({
       in: dailyTasksDeleteInMock,
@@ -506,10 +509,12 @@ describe("useOfflineQueue", () => {
 
     expect(dailyTasksUpdateMock).toHaveBeenNthCalledWith(1, {
       epic_id: null,
+      epic_title: null,
       habit_source_id: null,
     });
     expect(dailyTasksUpdateMock).toHaveBeenNthCalledWith(2, {
       epic_id: null,
+      epic_title: null,
       habit_source_id: null,
     });
     expect(dailyTasksDeleteMock).toHaveBeenCalled();

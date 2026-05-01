@@ -14,16 +14,181 @@ import confetti from "canvas-confetti";
 import { format } from "date-fns";
 import { categorizeQuest } from "@/utils/questCategorization";
 import { useResilience } from "@/contexts/ResilienceContext";
-import { createOfflinePlannerId, removePlannerRecord, upsertPlannerRecord } from "@/utils/plannerLocalStore";
+import type { DailyTask } from "@/services/dailyTasksRemote";
+import { getEpicsQueryKey } from "@/hooks/epicsQuery";
+import { DAILY_PLAN_OPTIMIZATION_QUERY_KEY } from "@/hooks/useDailyPlanOptimization";
+import {
+  createOfflinePlannerId,
+  getAllLocalTasksForUser,
+  getLocalEpicHabits,
+  getLocalHabitCompletions,
+  removePlannerRecord,
+  removePlannerRecords,
+  upsertPlannerRecord,
+  upsertPlannerRecords,
+} from "@/utils/plannerLocalStore";
 import {
   PLANNER_SYNC_EVENT,
+  dispatchPlannerSyncFinished,
   loadLocalHabitCompletions,
   loadLocalHabits,
+  loadLocalEpics,
   syncLocalHabitsFromRemote,
+  withPlannerRemoteSyncLock,
 } from "@/utils/plannerSync";
 import type { Habit, HabitCompletion, HabitDifficulty, HabitCategory } from "../types";
 
 const getToday = () => format(new Date(), "yyyy-MM-dd");
+
+type LocalEpicHabitRow = {
+  id: string;
+  epic_id: string;
+  habit_id: string;
+};
+
+type LocalTaskHabitCleanupRow = {
+  id: string;
+  user_id: string;
+  habit_source_id: string | null;
+  epic_id: string | null;
+  epic_title?: string | null;
+  task_date: string | null;
+  completed: boolean | null;
+  completed_at?: string | null;
+};
+
+function scrubDeletedHabitTaskRows<T>(rows: T | undefined, habitId: string): T | undefined {
+  if (!Array.isArray(rows)) return rows;
+
+  let changed = false;
+  const nextRows = (rows as DailyTask[]).reduce<DailyTask[]>((next, task) => {
+    if (task.habit_source_id !== habitId) {
+      next.push(task);
+      return next;
+    }
+
+    changed = true;
+    if (task.completed === true || task.completed_at) {
+      next.push({
+        ...task,
+        epic_id: null,
+        epic_title: null,
+        habit_source_id: null,
+      });
+    }
+    return next;
+  }, []);
+
+  return changed ? (nextRows as T) : rows;
+}
+
+function scrubDeletedHabitTaskCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  habitId: string,
+) {
+  queryClient.setQueriesData({ queryKey: ["daily-tasks"] }, (old) =>
+    scrubDeletedHabitTaskRows(old, habitId)
+  );
+  queryClient.setQueriesData({ queryKey: ["calendar-tasks"] }, (old) =>
+    scrubDeletedHabitTaskRows(old, habitId)
+  );
+}
+
+async function applyLocalHabitDelete(userId: string, habitId: string) {
+  const localEpics = await loadLocalEpics(userId);
+  const [epicHabits, localTasks, habitCompletions] = await Promise.all([
+    getLocalEpicHabits<LocalEpicHabitRow>(localEpics.map((epic) => epic.id)),
+    getAllLocalTasksForUser<LocalTaskHabitCleanupRow>(userId),
+    getLocalHabitCompletions<Array<{ id: string; habit_id: string | null; user_id: string; date: string }>[number]>(userId),
+  ]);
+
+  const linkIdsToDelete = epicHabits
+    .filter((link) => link.habit_id === habitId)
+    .map((link) => link.id);
+  const linkedTasks = localTasks.filter((task) => task.habit_source_id === habitId);
+  const tasksToDelete = linkedTasks
+    .filter((task) => task.completed !== true && !task.completed_at)
+    .map((task) => task.id);
+  const taskIdsToDelete = new Set(tasksToDelete);
+  const tasksToDetach = linkedTasks
+    .filter((task) => !taskIdsToDelete.has(task.id))
+    .map((task) => ({
+      ...task,
+      epic_id: null,
+      epic_title: null,
+      habit_source_id: null,
+    }));
+  const completionsToDelete = habitCompletions
+    .filter((completion) => completion.habit_id === habitId)
+    .map((completion) => completion.id);
+
+  if (tasksToDetach.length > 0) {
+    await upsertPlannerRecords("daily_tasks", tasksToDetach);
+  }
+  if (tasksToDelete.length > 0) {
+    await removePlannerRecords("daily_tasks", tasksToDelete);
+  }
+  if (linkIdsToDelete.length > 0) {
+    await removePlannerRecords("epic_habits", linkIdsToDelete);
+  }
+  if (completionsToDelete.length > 0) {
+    await removePlannerRecords("habit_completions", completionsToDelete);
+  }
+
+  await removePlannerRecord("habits", habitId);
+}
+
+async function applyRemoteHabitDelete(userId: string, habitId: string) {
+  const { data: matchingLinks, error: linkLookupError } = await supabase
+    .from("epic_habits")
+    .select("id")
+    .eq("habit_id", habitId);
+  if (linkLookupError) throw linkLookupError;
+
+  const { error: detachCompletedTasksError } = await supabase
+    .from("daily_tasks")
+    .update({
+      epic_id: null,
+      epic_title: null,
+      habit_source_id: null,
+    })
+    .eq("habit_source_id", habitId)
+    .eq("user_id", userId)
+    .or("completed.eq.true,completed_at.not.is.null");
+  if (detachCompletedTasksError) throw detachCompletedTasksError;
+
+  const { error: deleteIncompleteTasksError } = await supabase
+    .from("daily_tasks")
+    .delete()
+    .eq("habit_source_id", habitId)
+    .eq("user_id", userId)
+    .is("completed_at", null)
+    .or("completed.is.null,completed.eq.false");
+  if (deleteIncompleteTasksError) throw deleteIncompleteTasksError;
+
+  const { error: completionError } = await supabase
+    .from("habit_completions")
+    .delete()
+    .eq("habit_id", habitId)
+    .eq("user_id", userId);
+  if (completionError) throw completionError;
+
+  const linkIds = (matchingLinks ?? []).map((link) => link.id);
+  if (linkIds.length > 0) {
+    const { error: linkDeleteError } = await supabase
+      .from("epic_habits")
+      .delete()
+      .in("id", linkIds);
+    if (linkDeleteError) throw linkDeleteError;
+  }
+
+  const { error } = await supabase
+    .from("habits")
+    .delete()
+    .eq("id", habitId)
+    .eq("user_id", userId);
+  if (error) throw error;
+}
 
 export function useHabits() {
   const { user } = useAuth();
@@ -464,39 +629,52 @@ export function useHabits() {
     mutationFn: async (habitId: string) => {
       if (!user?.id) throw new Error("User not authenticated");
 
-      await removePlannerRecord("habits", habitId);
+      return withPlannerRemoteSyncLock(user.id, async () => {
+        await applyLocalHabitDelete(user.id, habitId);
+        queryClient.setQueryData(["habits", user.id], await loadLocalHabits(user.id));
+        queryClient.setQueryData(
+          ["habit-completions", user.id, getToday()],
+          await loadLocalHabitCompletions(user.id, getToday()),
+        );
+        queryClient.setQueryData(getEpicsQueryKey(user.id), await loadLocalEpics(user.id));
+        scrubDeletedHabitTaskCaches(queryClient, habitId);
 
-      if (shouldQueueWrites) {
-        await queueAction({
-          actionKind: "HABIT_DELETE",
-          entityType: "habit",
-          entityId: habitId,
-          payload: { habitId },
-        });
-        return { queued: true };
-      }
+        if (shouldQueueWrites) {
+          await queueAction({
+            actionKind: "HABIT_DELETE",
+            entityType: "habit",
+            entityId: habitId,
+            payload: { habitId },
+          });
+          return { queued: true };
+        }
 
-      const { error } = await supabase
-        .from("habits")
-        .delete()
-        .eq("id", habitId)
-        .eq("user_id", user.id);
+        try {
+          await applyRemoteHabitDelete(user.id, habitId);
+        } catch (error) {
+          await queueAction({
+            actionKind: "HABIT_DELETE",
+            entityType: "habit",
+            entityId: habitId,
+            payload: { habitId },
+          });
+          void retryNow();
+          return { queued: true };
+        }
 
-      if (error) {
-        await queueAction({
-          actionKind: "HABIT_DELETE",
-          entityType: "habit",
-          entityId: habitId,
-          payload: { habitId },
-        });
-        void retryNow();
-        return { queued: true };
-      }
-
-      return { queued: false };
+        return { queued: false };
+      });
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["habits"] });
+      queryClient.invalidateQueries({ queryKey: ["habit-completions"] });
+      queryClient.invalidateQueries({ queryKey: ["epics"] });
+      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["calendar-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
+      queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
+      queryClient.resetQueries({ queryKey: DAILY_PLAN_OPTIMIZATION_QUERY_KEY });
+      dispatchPlannerSyncFinished();
       toast({
         title: result.queued ? "Habit deleted offline" : "Habit deleted permanently",
         description: result.queued ? "We'll remove it from the server when you're back online." : undefined,

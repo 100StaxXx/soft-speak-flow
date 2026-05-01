@@ -188,8 +188,9 @@ const createWrapper = (queryClient = new QueryClient({
 };
 
 const createDailyTasksRollbackDeleteMock = () => {
-  const eqCompletedMock = vi.fn().mockResolvedValue({ error: null });
-  const eqUserMock = vi.fn().mockReturnValue({ eq: eqCompletedMock });
+  const orCompletedMock = vi.fn().mockResolvedValue({ error: null });
+  const isCompletedAtMock = vi.fn().mockReturnValue({ or: orCompletedMock });
+  const eqUserMock = vi.fn().mockReturnValue({ is: isCompletedAtMock });
   const inHabitSourceMock = vi.fn().mockReturnValue({ eq: eqUserMock });
   const deleteMock = vi.fn().mockReturnValue({ in: inHabitSourceMock });
 
@@ -197,7 +198,8 @@ const createDailyTasksRollbackDeleteMock = () => {
     deleteMock,
     inHabitSourceMock,
     eqUserMock,
-    eqCompletedMock,
+    isCompletedAtMock,
+    orCompletedMock,
   };
 };
 
@@ -1429,9 +1431,10 @@ describe("useEpics", () => {
     expect(deleteEpicHabitsInMock).toHaveBeenCalled();
     expect(dailyTasksRollbackDeleteMock.inHabitSourceMock).toHaveBeenCalledWith("habit_source_id", expect.any(Array));
     expect(dailyTasksRollbackDeleteMock.eqUserMock).toHaveBeenCalledWith("user_id", "user-1");
-    expect(dailyTasksRollbackDeleteMock.eqCompletedMock).toHaveBeenCalledWith("completed", false);
+    expect(dailyTasksRollbackDeleteMock.isCompletedAtMock).toHaveBeenCalledWith("completed_at", null);
+    expect(dailyTasksRollbackDeleteMock.orCompletedMock).toHaveBeenCalledWith("completed.is.null,completed.eq.false");
     expect(deleteHabitsInMock).toHaveBeenCalled();
-    expect(dailyTasksRollbackDeleteMock.eqCompletedMock.mock.invocationCallOrder[0])
+    expect(dailyTasksRollbackDeleteMock.orCompletedMock.mock.invocationCallOrder[0])
       .toBeLessThan(deleteHabitsInMock.mock.invocationCallOrder[0]);
     expect(deleteEpicsEqIdMock).toHaveBeenCalledWith("id", expect.any(String));
     expect(deleteEpicsEqUserMock).toHaveBeenCalledWith("user_id", "user-1");
@@ -1568,8 +1571,9 @@ describe("useEpics", () => {
     expect(milestonePayload.map((milestone) => milestone.milestone_percent)).toEqual([33, 67, 100]);
     expect(dailyTasksRollbackDeleteMock.inHabitSourceMock).toHaveBeenCalledWith("habit_source_id", expect.any(Array));
     expect(dailyTasksRollbackDeleteMock.eqUserMock).toHaveBeenCalledWith("user_id", "user-1");
-    expect(dailyTasksRollbackDeleteMock.eqCompletedMock).toHaveBeenCalledWith("completed", false);
-    expect(dailyTasksRollbackDeleteMock.eqCompletedMock.mock.invocationCallOrder[0])
+    expect(dailyTasksRollbackDeleteMock.isCompletedAtMock).toHaveBeenCalledWith("completed_at", null);
+    expect(dailyTasksRollbackDeleteMock.orCompletedMock).toHaveBeenCalledWith("completed.is.null,completed.eq.false");
+    expect(dailyTasksRollbackDeleteMock.orCompletedMock.mock.invocationCallOrder[0])
       .toBeLessThan(deleteHabitsInMock.mock.invocationCallOrder[0]);
   });
 
@@ -2364,6 +2368,149 @@ describe("useEpics", () => {
     );
   });
 
+  it("unlinks a campaign habit with lock protection and detaches cached task campaign metadata", async () => {
+    const baseEpic = {
+      id: "epic-1",
+      user_id: "user-1",
+      title: "Campaign Alpha",
+      description: null,
+      status: "active",
+      progress_percentage: 40,
+      target_days: 14,
+      start_date: "2026-02-10",
+      end_date: null,
+      created_at: "2026-02-10T00:00:00.000Z",
+    };
+    let localEpicHabits = [
+      {
+        id: "link-1",
+        epic_id: "epic-1",
+        habit_id: "habit-linked",
+      },
+    ];
+    let localTasks = [
+      {
+        id: "task-linked",
+        user_id: "user-1",
+        habit_source_id: "habit-linked",
+        epic_id: "epic-1",
+        epic_title: "Campaign Alpha",
+        task_date: "2026-04-30",
+        completed: false,
+        completed_at: null,
+      },
+    ];
+    const loadEpicsFromLocalState = () => [{
+      ...baseEpic,
+      epic_habits: localEpicHabits.map((link) => ({
+        habit_id: link.habit_id,
+        habits: {
+          id: link.habit_id,
+          title: "Linked habit",
+          difficulty: "easy",
+        },
+      })),
+    }];
+
+    mocks.shouldQueueWrites = true;
+    mocks.loadLocalEpicsMock.mockImplementation(async () => loadEpicsFromLocalState());
+    mocks.getLocalEpicHabitsMock.mockImplementation(async () => localEpicHabits);
+    mocks.getAllLocalTasksForUserMock.mockImplementation(async () => localTasks);
+    mocks.removePlannerRecordsMock.mockImplementation(async (storeName: string, recordIds: string[]) => {
+      if (storeName === "epic_habits") {
+        localEpicHabits = localEpicHabits.filter((link) => !recordIds.includes(link.id));
+      }
+    });
+    mocks.upsertPlannerRecordsMock.mockImplementation(async (storeName: string, records: typeof localTasks) => {
+      if (storeName === "daily_tasks") {
+        const updatesById = new Map(records.map((record) => [record.id, record]));
+        localTasks = localTasks.map((task) => updatesById.get(task.id) ?? task);
+      }
+    });
+    mocks.warmEpicsQueryFromRemoteMock.mockImplementationOnce(async (queryClient: QueryClient, userId: string) => {
+      queryClient.setQueryData(["epics", userId], loadEpicsFromLocalState());
+      return loadEpicsFromLocalState();
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    const dailyTaskCacheKey = ["daily-tasks", "user-1", "2026-04-30"];
+    const calendarTaskCacheKey = [
+      "calendar-tasks",
+      "user-1",
+      "2026-04-26",
+      "2026-05-02",
+      "week",
+    ];
+    queryClient.setQueryData(dailyTaskCacheKey, localTasks);
+    queryClient.setQueryData(calendarTaskCacheKey, localTasks);
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeEpics[0]?.epic_habits).toHaveLength(1);
+    });
+
+    act(() => {
+      result.current.removeHabitFromEpic({
+        epicId: "epic-1",
+        habitId: "habit-linked",
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.queueActionMock).toHaveBeenCalledWith({
+        actionKind: "EPIC_HABIT_UNLINK",
+        entityType: "epic",
+        entityId: "epic-1",
+        payload: {
+          epicId: "epic-1",
+          habitId: "habit-linked",
+        },
+      });
+    });
+
+    expect(localEpicHabits).toHaveLength(0);
+    expect(localTasks).toEqual([
+      expect.objectContaining({
+        id: "task-linked",
+        epic_id: null,
+        epic_title: null,
+        habit_source_id: "habit-linked",
+      }),
+    ]);
+    expect(queryClient.getQueryData(dailyTaskCacheKey)).toEqual([
+      expect.objectContaining({
+        id: "task-linked",
+        epic_id: null,
+        epic_title: null,
+        habit_source_id: "habit-linked",
+      }),
+    ]);
+    expect(queryClient.getQueryData(calendarTaskCacheKey)).toEqual([
+      expect.objectContaining({
+        id: "task-linked",
+        epic_id: null,
+        epic_title: null,
+        habit_source_id: "habit-linked",
+      }),
+    ]);
+    expect(mocks.withPlannerRemoteSyncLockMock).toHaveBeenCalledWith(
+      "user-1",
+      expect.any(Function),
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["daily-tasks"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["calendar-tasks"] });
+    expect(mocks.dispatchPlannerSyncFinishedMock).toHaveBeenCalled();
+  });
+
   it("creates a campaign ritual locally, syncs it remotely, and updates the cached epics immediately", async () => {
     let localHabits: Array<Record<string, unknown>> = [];
     let localEpicHabits: Array<{ id: string; epic_id: string; habit_id: string }> = [];
@@ -2556,8 +2703,9 @@ describe("useEpics", () => {
     const linksInsertMock = vi.fn().mockResolvedValue({ error: linksInsertError });
     const deleteLinkEqMock = vi.fn().mockResolvedValue({ error: null });
     const deleteHabitUserEqMock = vi.fn().mockResolvedValue({ error: null });
-    const deleteTaskCompletedEqMock = vi.fn().mockResolvedValue({ error: null });
-    const deleteTaskUserEqMock = vi.fn().mockReturnValue({ eq: deleteTaskCompletedEqMock });
+    const deleteTaskCompletedOrMock = vi.fn().mockResolvedValue({ error: null });
+    const deleteTaskCompletedAtIsMock = vi.fn().mockReturnValue({ or: deleteTaskCompletedOrMock });
+    const deleteTaskUserEqMock = vi.fn().mockReturnValue({ is: deleteTaskCompletedAtIsMock });
     const deleteTaskHabitEqMock = vi.fn().mockReturnValue({ eq: deleteTaskUserEqMock });
 
     mocks.fromMock.mockImplementation((table: string) => {

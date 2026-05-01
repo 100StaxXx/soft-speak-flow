@@ -38,6 +38,8 @@ export const getDailyTasksQueryKey = (userId: string | undefined, taskDate: stri
   ["daily-tasks", userId, taskDate] as const;
 
 const plannerRemoteSyncLockCounts = new Map<string, number>();
+const plannerRemoteSyncEpochs = new Map<string, number>();
+const plannerLocalWriteTails = new Map<string, Promise<void>>();
 
 interface HabitRemoteRow extends Habit {
   description?: string | null;
@@ -62,11 +64,22 @@ function getPlannerRemoteSyncLockCount(userId: string): number {
   return plannerRemoteSyncLockCounts.get(userId) ?? 0;
 }
 
+export function getPlannerRemoteSyncEpoch(userId: string): number {
+  return plannerRemoteSyncEpochs.get(userId) ?? 0;
+}
+
+export function markPlannerLocalMutation(userId: string): number {
+  const nextEpoch = getPlannerRemoteSyncEpoch(userId) + 1;
+  plannerRemoteSyncEpochs.set(userId, nextEpoch);
+  return nextEpoch;
+}
+
 export function hasPlannerRemoteSyncLock(userId: string): boolean {
   return getPlannerRemoteSyncLockCount(userId) > 0;
 }
 
 export function acquirePlannerRemoteSyncLock(userId: string): () => void {
+  markPlannerLocalMutation(userId);
   plannerRemoteSyncLockCounts.set(userId, getPlannerRemoteSyncLockCount(userId) + 1);
 
   let released = false;
@@ -85,23 +98,65 @@ export function acquirePlannerRemoteSyncLock(userId: string): () => void {
   };
 }
 
+function enqueuePlannerLocalWrite<T>(
+  userId: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const previousTail = plannerLocalWriteTails.get(userId) ?? Promise.resolve();
+  const run = previousTail.catch(() => undefined).then(operation);
+  const nextTail = run.then(() => undefined, () => undefined);
+
+  plannerLocalWriteTails.set(userId, nextTail);
+  void nextTail.finally(() => {
+    if (plannerLocalWriteTails.get(userId) === nextTail) {
+      plannerLocalWriteTails.delete(userId);
+    }
+  });
+
+  return run;
+}
+
 export async function withPlannerRemoteSyncLock<T>(
   userId: string,
   operation: () => Promise<T>,
 ): Promise<T> {
-  const release = acquirePlannerRemoteSyncLock(userId);
+  return enqueuePlannerLocalWrite(userId, async () => {
+    const release = acquirePlannerRemoteSyncLock(userId);
 
-  try {
-    return await operation();
-  } finally {
-    release();
-  }
+    try {
+      return await operation();
+    } finally {
+      release();
+    }
+  });
 }
 
 export async function canSyncPlannerFromRemote(userId: string): Promise<boolean> {
   if (typeof navigator !== "undefined" && !navigator.onLine) return false;
   if (hasPlannerRemoteSyncLock(userId)) return false;
   return (await getPendingActionCount(userId)) === 0;
+}
+
+export async function canApplyPlannerRemoteSnapshot(
+  userId: string,
+  startedAtEpoch: number,
+): Promise<boolean> {
+  if (getPlannerRemoteSyncEpoch(userId) !== startedAtEpoch) return false;
+  return canSyncPlannerFromRemote(userId);
+}
+
+export async function withPlannerRemoteSnapshotApply<T>(
+  userId: string,
+  startedAtEpoch: number,
+  operation: () => Promise<T>,
+): Promise<T | null> {
+  return enqueuePlannerLocalWrite(userId, async () => {
+    if (!(await canApplyPlannerRemoteSnapshot(userId, startedAtEpoch))) {
+      return null;
+    }
+
+    return operation();
+  });
 }
 
 export async function loadLocalDailyTasks(userId: string, taskDate: string): Promise<DailyTask[]> {
@@ -137,24 +192,24 @@ export async function loadAllLocalTaskDates(userId: string): Promise<string[]> {
 }
 
 export async function syncLocalDailyTasksFromRemote(userId: string, taskDate: string): Promise<DailyTask[] | null> {
+  const syncEpoch = getPlannerRemoteSyncEpoch(userId);
   if (!(await canSyncPlannerFromRemote(userId))) {
     return null;
   }
 
   const remoteTasks = await fetchDailyTasksRemote(userId, taskDate);
-  if (!(await canSyncPlannerFromRemote(userId))) {
-    return null;
-  }
-  await replaceLocalTasksForDate(userId, taskDate, remoteTasks as Array<DailyTask & { subtasks?: Array<{
-    id: string;
-    task_id: string;
-    user_id: string;
-    title: string;
-    completed: boolean | null;
-    sort_order: number | null;
-  }> }>);
+  return withPlannerRemoteSnapshotApply(userId, syncEpoch, async () => {
+    await replaceLocalTasksForDate(userId, taskDate, remoteTasks as Array<DailyTask & { subtasks?: Array<{
+      id: string;
+      task_id: string;
+      user_id: string;
+      title: string;
+      completed: boolean | null;
+      sort_order: number | null;
+    }> }>);
 
-  return remoteTasks;
+    return remoteTasks;
+  });
 }
 
 export async function warmDailyTasksQueryFromRemote(
@@ -181,6 +236,7 @@ export async function loadLocalHabitCompletions(userId: string, date: string): P
 }
 
 export async function syncLocalHabitsFromRemote(userId: string, today: string): Promise<void> {
+  const syncEpoch = getPlannerRemoteSyncEpoch(userId);
   if (!(await canSyncPlannerFromRemote(userId))) {
     return;
   }
@@ -202,8 +258,10 @@ export async function syncLocalHabitsFromRemote(userId: string, today: string): 
   if (habitsError) throw habitsError;
   if (completionsError) throw completionsError;
 
-  await replaceLocalHabitsForUser(userId, (habits ?? []) as HabitRemoteRow[]);
-  await replaceLocalHabitCompletionsForDate(userId, today, (completions ?? []) as HabitCompletion[]);
+  await withPlannerRemoteSnapshotApply(userId, syncEpoch, async () => {
+    await replaceLocalHabitsForUser(userId, (habits ?? []) as HabitRemoteRow[]);
+    await replaceLocalHabitCompletionsForDate(userId, today, (completions ?? []) as HabitCompletion[]);
+  });
 }
 
 export async function loadLocalEpics(userId: string): Promise<EpicRecord[]> {
@@ -269,12 +327,15 @@ export async function loadLocalEpics(userId: string): Promise<EpicRecord[]> {
 }
 
 export async function syncLocalEpicsFromRemote(userId: string): Promise<void> {
+  const syncEpoch = getPlannerRemoteSyncEpoch(userId);
   if (!(await canSyncPlannerFromRemote(userId))) {
     return;
   }
 
   const epics = await fetchEpics(userId);
-  await replaceLocalEpicsForUser(userId, epics);
+  if (!(await canApplyPlannerRemoteSnapshot(userId, syncEpoch))) {
+    return;
+  }
 
   const epicIds = epics.map((epic) => epic.id);
   const [
@@ -317,53 +378,56 @@ export async function syncLocalEpicsFromRemote(userId: string): Promise<void> {
     );
   });
 
-  await replaceLocalJourneyPathsForEpics(userId, epicIds, [...latestJourneyPathByEpicId.values()]);
+  await withPlannerRemoteSnapshotApply(userId, syncEpoch, async () => {
+    await replaceLocalEpicsForUser(userId, epics);
+    await replaceLocalJourneyPathsForEpics(userId, epicIds, [...latestJourneyPathByEpicId.values()]);
 
-  const habitsToUpsert: HabitRemoteRow[] = [];
-  for (const epic of epics) {
-    const links = (epic.epic_habits ?? []).map((link) => ({
-      id: `${epic.id}:${link.habit_id}`,
-      epic_id: epic.id,
-      habit_id: link.habit_id,
-    }));
-    await replaceLocalEpicHabits(epic.id, links);
-    await replaceLocalJourneyPhases(
-      epic.id,
-      ((phases ?? []).filter((phase) => phase.epic_id === epic.id) as Array<{
-        id: string;
-        user_id: string;
-        epic_id: string;
-      }>),
-    );
-    await replaceLocalEpicMilestones(
-      epic.id,
-      ((milestones ?? []).filter((milestone) => milestone.epic_id === epic.id) as Array<{
-        id: string;
-        user_id: string;
-        epic_id: string;
-      }>),
-    );
+    const habitsToUpsert: HabitRemoteRow[] = [];
+    for (const epic of epics) {
+      const links = (epic.epic_habits ?? []).map((link) => ({
+        id: `${epic.id}:${link.habit_id}`,
+        epic_id: epic.id,
+        habit_id: link.habit_id,
+      }));
+      await replaceLocalEpicHabits(epic.id, links);
+      await replaceLocalJourneyPhases(
+        epic.id,
+        ((phases ?? []).filter((phase) => phase.epic_id === epic.id) as Array<{
+          id: string;
+          user_id: string;
+          epic_id: string;
+        }>),
+      );
+      await replaceLocalEpicMilestones(
+        epic.id,
+        ((milestones ?? []).filter((milestone) => milestone.epic_id === epic.id) as Array<{
+          id: string;
+          user_id: string;
+          epic_id: string;
+        }>),
+      );
 
-    (epic.epic_habits ?? []).forEach((link) => {
-      if (link.habits) {
-        habitsToUpsert.push({
-          ...link.habits,
-          user_id: userId,
-          frequency: link.habits.frequency ?? "daily",
-          custom_days: link.habits.custom_days ?? null,
-          custom_month_days: link.habits.custom_month_days ?? null,
-          current_streak: null,
-          longest_streak: null,
-          created_at: null,
-          is_active: true,
-        } as HabitRemoteRow);
-      }
-    });
-  }
+      (epic.epic_habits ?? []).forEach((link) => {
+        if (link.habits) {
+          habitsToUpsert.push({
+            ...link.habits,
+            user_id: userId,
+            frequency: link.habits.frequency ?? "daily",
+            custom_days: link.habits.custom_days ?? null,
+            custom_month_days: link.habits.custom_month_days ?? null,
+            current_streak: null,
+            longest_streak: null,
+            created_at: null,
+            is_active: true,
+          } as HabitRemoteRow);
+        }
+      });
+    }
 
-  if (habitsToUpsert.length > 0) {
-    await upsertPlannerRecords("habits", habitsToUpsert);
-  }
+    if (habitsToUpsert.length > 0) {
+      await upsertPlannerRecords("habits", habitsToUpsert);
+    }
+  });
 }
 
 export async function warmEpicsQueryFromRemote(

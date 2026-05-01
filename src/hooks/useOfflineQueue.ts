@@ -352,6 +352,49 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
     case "HABIT_DELETE": {
       const { habitId } = action.payload as { habitId: string };
 
+      const { data: matchingLinks, error: linkLookupError } = await supabase
+        .from("epic_habits")
+        .select("id")
+        .eq("habit_id", habitId);
+      if (linkLookupError) throw linkLookupError;
+
+      const { error: detachCompletedTasksError } = await supabase
+        .from("daily_tasks")
+        .update({
+          epic_id: null,
+          epic_title: null,
+          habit_source_id: null,
+        })
+        .eq("habit_source_id", habitId)
+        .eq("user_id", userId)
+        .or("completed.eq.true,completed_at.not.is.null");
+      if (detachCompletedTasksError) throw detachCompletedTasksError;
+
+      const { error: deleteIncompleteTasksError } = await supabase
+        .from("daily_tasks")
+        .delete()
+        .eq("habit_source_id", habitId)
+        .eq("user_id", userId)
+        .is("completed_at", null)
+        .or("completed.is.null,completed.eq.false");
+      if (deleteIncompleteTasksError) throw deleteIncompleteTasksError;
+
+      const { error: completionError } = await supabase
+        .from("habit_completions")
+        .delete()
+        .eq("habit_id", habitId)
+        .eq("user_id", userId);
+      if (completionError) throw completionError;
+
+      const linkIds = (matchingLinks ?? []).map((link) => link.id);
+      if (linkIds.length > 0) {
+        const { error: linkDeleteError } = await supabase
+          .from("epic_habits")
+          .delete()
+          .in("id", linkIds);
+        if (linkDeleteError) throw linkDeleteError;
+      }
+
       const { error } = await supabase
         .from("habits")
         .delete()
@@ -520,11 +563,12 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
         .from("daily_tasks")
         .update({
           epic_id: null,
+          epic_title: null,
           habit_source_id: null,
         })
         .eq("habit_source_id", habitId)
         .eq("user_id", userId)
-        .eq("completed", true);
+        .or("completed.eq.true,completed_at.not.is.null");
       if (detachCompletedTasksError) throw detachCompletedTasksError;
 
       const { error: deleteIncompleteTasksError } = await supabase
@@ -532,7 +576,8 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
         .delete()
         .eq("habit_source_id", habitId)
         .eq("user_id", userId)
-        .eq("completed", false);
+        .is("completed_at", null)
+        .or("completed.is.null,completed.eq.false");
       if (deleteIncompleteTasksError) throw deleteIncompleteTasksError;
 
       const { error: completionError } = await supabase
@@ -542,12 +587,45 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
         .eq("user_id", userId);
       if (completionError) throw completionError;
 
+      const { error: linkDeleteError } = await supabase
+        .from("epic_habits")
+        .delete()
+        .in("id", matchingLinks.map((link) => link.id));
+      if (linkDeleteError) throw linkDeleteError;
+
       const { error: habitError } = await supabase
         .from("habits")
         .delete()
         .eq("id", habitId)
         .eq("user_id", userId);
       if (habitError) throw habitError;
+
+      return;
+    }
+
+    case "EPIC_HABIT_UNLINK": {
+      const { epicId, habitId } = action.payload as {
+        epicId: string;
+        habitId: string;
+      };
+
+      const { error: detachTasksError } = await supabase
+        .from("daily_tasks")
+        .update({
+          epic_id: null,
+          epic_title: null,
+        })
+        .eq("user_id", userId)
+        .eq("epic_id", epicId)
+        .eq("habit_source_id", habitId);
+      if (detachTasksError) throw detachTasksError;
+
+      const { error } = await supabase
+        .from("epic_habits")
+        .delete()
+        .eq("epic_id", epicId)
+        .eq("habit_id", habitId);
+      if (error) throw error;
 
       return;
     }
@@ -568,11 +646,12 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
         .from("daily_tasks")
         .update({
           epic_id: null,
+          epic_title: null,
           habit_source_id: null,
         })
         .eq("user_id", userId)
         .eq("epic_id", epicId)
-        .eq("completed", true);
+        .or("completed.eq.true,completed_at.not.is.null");
       if (detachCompletedEpicTasksError) throw detachCompletedEpicTasksError;
 
       if (habitIds.length > 0) {
@@ -580,11 +659,12 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
           .from("daily_tasks")
           .update({
             epic_id: null,
+            epic_title: null,
             habit_source_id: null,
           })
           .eq("user_id", userId)
           .in("habit_source_id", habitIds)
-          .eq("completed", true);
+          .or("completed.eq.true,completed_at.not.is.null");
         if (detachCompletedHabitTasksError) throw detachCompletedHabitTasksError;
 
         const { error: deleteIncompleteTasksError } = await supabase
@@ -592,7 +672,8 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
           .delete()
           .eq("user_id", userId)
           .in("habit_source_id", habitIds)
-          .eq("completed", false);
+          .is("completed_at", null)
+          .or("completed.is.null,completed.eq.false");
         if (deleteIncompleteTasksError) throw deleteIncompleteTasksError;
 
         const { error: deleteHabitsError } = await supabase
@@ -665,11 +746,12 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
             .from("daily_tasks")
             .update({
               epic_id: null,
+              epic_title: null,
               habit_source_id: null,
             })
             .in("habit_source_id", habitIds)
             .eq("user_id", userId)
-            .eq("completed", true);
+            .or("completed.eq.true,completed_at.not.is.null");
           if (detachCompletedHabitTasksError) throw detachCompletedHabitTasksError;
 
           const { error: habitsError } = await supabase
@@ -685,8 +767,9 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
             .delete()
             .in("habit_source_id", habitIds)
             .gte("task_date", today)
-            .eq("completed", false)
-            .eq("user_id", userId);
+            .eq("user_id", userId)
+            .is("completed_at", null)
+            .or("completed.is.null,completed.eq.false");
           if (tasksError) throw tasksError;
 
           const linkIds = epicHabits?.map((row) => row.id) ?? [];
@@ -700,14 +783,15 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
         }
 
         const { error: detachCompletedEpicTasksError } = await supabase
-          .from("daily_tasks")
-          .update({
-            epic_id: null,
-            habit_source_id: null,
-          })
-          .eq("user_id", userId)
-          .eq("epic_id", epicId)
-          .eq("completed", true);
+            .from("daily_tasks")
+            .update({
+              epic_id: null,
+              epic_title: null,
+              habit_source_id: null,
+            })
+            .eq("user_id", userId)
+            .eq("epic_id", epicId)
+            .or("completed.eq.true,completed_at.not.is.null");
         if (detachCompletedEpicTasksError) throw detachCompletedEpicTasksError;
 
         const { error: milestonesError } = await supabase

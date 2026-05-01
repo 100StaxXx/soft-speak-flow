@@ -44,7 +44,10 @@ import {
   loadLocalEpics,
   acquirePlannerRemoteSyncLock,
   canSyncPlannerFromRemote,
+  getPlannerRemoteSyncEpoch,
   syncLocalDailyTasksFromRemote,
+  withPlannerRemoteSnapshotApply,
+  withPlannerRemoteSyncLock,
 } from "./plannerSync";
 import {
   __resetPlannerLocalDBForTests,
@@ -111,6 +114,51 @@ describe("plannerSync", () => {
 
     expect(result).toBeNull();
     expect(mocks.replaceLocalTasksForDateMock).not.toHaveBeenCalled();
+  });
+
+  it("skips replacing local tasks if a write lock happened during the remote fetch", async () => {
+    mocks.fetchDailyTasksRemoteMock.mockImplementation(async () => {
+      const release = acquirePlannerRemoteSyncLock("user-1");
+      release();
+
+      return [
+        {
+          id: "stale-task",
+          user_id: "user-1",
+          task_date: "2026-03-25",
+        },
+      ];
+    });
+
+    const result = await syncLocalDailyTasksFromRemote("user-1", "2026-03-25");
+
+    expect(result).toBeNull();
+    expect(mocks.replaceLocalTasksForDateMock).not.toHaveBeenCalled();
+  });
+
+  it("serializes remote snapshot applies before later local planner mutations", async () => {
+    let mutationRan = false;
+    let mutationPromise: Promise<void> | null = null;
+    const syncEpoch = getPlannerRemoteSyncEpoch("user-1");
+
+    const snapshotPromise = withPlannerRemoteSnapshotApply(
+      "user-1",
+      syncEpoch,
+      async () => {
+        mutationPromise = withPlannerRemoteSyncLock("user-1", async () => {
+          mutationRan = true;
+        });
+
+        await Promise.resolve();
+        expect(mutationRan).toBe(false);
+        return "applied";
+      },
+    );
+
+    await expect(snapshotPromise).resolves.toBe("applied");
+    await mutationPromise;
+
+    expect(mutationRan).toBe(true);
   });
 
   it("replaces local tasks when sync is clear to proceed", async () => {

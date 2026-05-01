@@ -15,6 +15,8 @@ import type { DailyTask } from "@/services/dailyTasksRemote";
 import {
   PLANNER_SYNC_EVENT,
   canSyncPlannerFromRemote,
+  getPlannerRemoteSyncEpoch,
+  withPlannerRemoteSnapshotApply,
 } from "@/utils/plannerSync";
 import {
   getAllLocalTasksForUser,
@@ -103,6 +105,7 @@ export const useCalendarTasks = (
 
     const refreshFromRemote = async () => {
       try {
+        const syncEpoch = getPlannerRemoteSyncEpoch(user.id);
         if (!(await canSyncPlannerFromRemote(user.id))) {
           return;
         }
@@ -131,34 +134,38 @@ export const useCalendarTasks = (
           tasksByDate.get(normalizedTask.task_date)?.push(normalizedTask);
         });
 
-        const datesInRange = eachDayOfInterval({ start, end }).map((date) => format(date, "yyyy-MM-dd"));
-        for (const date of datesInRange) {
-          if (!(await canSyncPlannerFromRemote(user.id))) {
+        await withPlannerRemoteSnapshotApply(user.id, syncEpoch, async () => {
+          const datesInRange = eachDayOfInterval({ start, end }).map((date) => format(date, "yyyy-MM-dd"));
+          for (const date of datesInRange) {
+            if (disposed) {
+              return;
+            }
+            await replaceLocalTasksForDate(user.id, date, tasksByDate.get(date) ?? []);
+          }
+
+          if (disposed) {
             return;
           }
-          await replaceLocalTasksForDate(user.id, date, tasksByDate.get(date) ?? []);
-        }
 
-        if (disposed) return;
+          queryClient.setQueryData(
+            ['calendar-tasks', user.id, startDate, endDate, view],
+            await getAllLocalTasksForUser<DailyTask>(user.id).then((tasks) =>
+              tasks
+                .filter((task) => task.task_date && task.task_date >= startDate && task.task_date <= endDate)
+                .slice()
+                .sort((a, b) => {
+                  const dateCompare = (a.task_date ?? "").localeCompare(b.task_date ?? "");
+                  if (dateCompare !== 0) return dateCompare;
 
-        queryClient.setQueryData(
-          ['calendar-tasks', user.id, startDate, endDate, view],
-          await getAllLocalTasksForUser<DailyTask>(user.id).then((tasks) =>
-            tasks
-              .filter((task) => task.task_date && task.task_date >= startDate && task.task_date <= endDate)
-              .slice()
-              .sort((a, b) => {
-                const dateCompare = (a.task_date ?? "").localeCompare(b.task_date ?? "");
-                if (dateCompare !== 0) return dateCompare;
+                  const timeA = a.scheduled_time ?? "99:99";
+                  const timeB = b.scheduled_time ?? "99:99";
+                  if (timeA !== timeB) return timeA.localeCompare(timeB);
 
-                const timeA = a.scheduled_time ?? "99:99";
-                const timeB = b.scheduled_time ?? "99:99";
-                if (timeA !== timeB) return timeA.localeCompare(timeB);
-
-                return (b.created_at ?? "").localeCompare(a.created_at ?? "");
-              }),
-          ),
-        );
+                  return (b.created_at ?? "").localeCompare(a.created_at ?? "");
+                }),
+            ),
+          );
+        });
       } catch (error) {
         console.warn("Failed to refresh local calendar tasks from remote:", error);
       }

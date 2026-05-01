@@ -440,6 +440,41 @@ function scrubCampaignRitualTaskCaches(
   );
 }
 
+function scrubUnlinkedCampaignHabitTaskRows<T>(
+  rows: T | undefined,
+  { epicId, habitId }: DeleteCampaignRitualInput,
+): T | undefined {
+  if (!Array.isArray(rows)) return rows;
+
+  let changed = false;
+  const nextRows = (rows as DailyTask[]).map((task) => {
+    if (task.habit_source_id !== habitId || task.epic_id !== epicId) {
+      return task;
+    }
+
+    changed = true;
+    return {
+      ...task,
+      epic_id: null,
+      epic_title: null,
+    };
+  });
+
+  return changed ? (nextRows as T) : rows;
+}
+
+function scrubUnlinkedCampaignHabitTaskCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  input: DeleteCampaignRitualInput,
+) {
+  queryClient.setQueriesData({ queryKey: ["daily-tasks"] }, (old) =>
+    scrubUnlinkedCampaignHabitTaskRows(old, input)
+  );
+  queryClient.setQueriesData({ queryKey: ["calendar-tasks"] }, (old) =>
+    scrubUnlinkedCampaignHabitTaskRows(old, input)
+  );
+}
+
 const normalizeFingerprintText = (value: string | null | undefined): string | null => {
   const normalized = value?.trim().replace(/\s+/g, " ") ?? "";
   return normalized.length > 0 ? normalized.toLowerCase() : null;
@@ -901,7 +936,8 @@ async function rollbackRemoteEpicPayload(userId: string, payload: LocalEpicPaylo
       .delete()
       .in("habit_source_id", habitIds)
       .eq("user_id", userId)
-      .eq("completed", false);
+      .is("completed_at", null)
+      .or("completed.is.null,completed.eq.false");
     if (tasksError) throw tasksError;
 
     const { error } = await supabase
@@ -929,7 +965,8 @@ async function rollbackRemoteCampaignRitualPayload(userId: string, payload: Loca
     .delete()
     .eq("habit_source_id", payload.habit.id)
     .eq("user_id", userId)
-    .eq("completed", false);
+    .is("completed_at", null)
+    .or("completed.is.null,completed.eq.false");
   if (tasksError) throw tasksError;
 
   const { error: linkError } = await supabase
@@ -1027,7 +1064,7 @@ async function applyRemoteCampaignRitualDelete(
     })
     .eq("habit_source_id", habitId)
     .eq("user_id", userId)
-    .eq("completed", true);
+    .or("completed.eq.true,completed_at.not.is.null");
   if (detachCompletedTasksError) throw detachCompletedTasksError;
 
   const { error: deleteIncompleteTasksError } = await supabase
@@ -1035,7 +1072,8 @@ async function applyRemoteCampaignRitualDelete(
     .delete()
     .eq("habit_source_id", habitId)
     .eq("user_id", userId)
-    .eq("completed", false);
+    .is("completed_at", null)
+    .or("completed.is.null,completed.eq.false");
   if (deleteIncompleteTasksError) throw deleteIncompleteTasksError;
 
   const { error: completionError } = await supabase
@@ -1057,6 +1095,57 @@ async function applyRemoteCampaignRitualDelete(
     .eq("id", habitId)
     .eq("user_id", userId);
   if (habitError) throw habitError;
+}
+
+async function applyLocalCampaignHabitUnlink(
+  userId: string,
+  { epicId, habitId }: DeleteCampaignRitualInput,
+) {
+  const [epicHabits, localTasks] = await Promise.all([
+    getLocalEpicHabits<LocalEpicHabitRow>([epicId]),
+    getAllLocalTasksForUser<LocalTaskCampaignCleanupRow>(userId),
+  ]);
+
+  const linkIdsToDelete = epicHabits
+    .filter((link) => link.habit_id === habitId)
+    .map((link) => link.id);
+  const tasksToDetach = localTasks
+    .filter((task) => task.habit_source_id === habitId && task.epic_id === epicId)
+    .map((task) => ({
+      ...task,
+      epic_id: null,
+      epic_title: null,
+    }));
+
+  if (tasksToDetach.length > 0) {
+    await upsertPlannerRecords("daily_tasks", tasksToDetach);
+  }
+  if (linkIdsToDelete.length > 0) {
+    await removePlannerRecords("epic_habits", linkIdsToDelete);
+  }
+}
+
+async function applyRemoteCampaignHabitUnlink(
+  userId: string,
+  { epicId, habitId }: DeleteCampaignRitualInput,
+) {
+  const { error: detachTasksError } = await supabase
+    .from("daily_tasks")
+    .update({
+      epic_id: null,
+      epic_title: null,
+    })
+    .eq("user_id", userId)
+    .eq("epic_id", epicId)
+    .eq("habit_source_id", habitId);
+  if (detachTasksError) throw detachTasksError;
+
+  const { error } = await supabase
+    .from("epic_habits")
+    .delete()
+    .eq("epic_id", epicId)
+    .eq("habit_id", habitId);
+  if (error) throw error;
 }
 
 function buildTaskCreatePayload(task: DailyTask): Record<string, unknown> {
@@ -1519,11 +1608,12 @@ async function applyRemoteEpicStatusChange(userId: string, epicId: string, statu
       .from("daily_tasks")
       .update({
         epic_id: null,
+        epic_title: null,
         habit_source_id: null,
       })
       .in("habit_source_id", habitIds)
       .eq("user_id", userId)
-      .eq("completed", true);
+      .or("completed.eq.true,completed_at.not.is.null");
     if (detachCompletedHabitTasksError) throw detachCompletedHabitTasksError;
 
     const { error: habitsError } = await supabase
@@ -1539,8 +1629,9 @@ async function applyRemoteEpicStatusChange(userId: string, epicId: string, statu
       .delete()
       .in("habit_source_id", habitIds)
       .gte("task_date", today)
-      .eq("completed", false)
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .is("completed_at", null)
+      .or("completed.is.null,completed.eq.false");
     if (tasksError) throw tasksError;
 
     const linkIds = epicHabits?.map((row) => row.id) ?? [];
@@ -1557,11 +1648,12 @@ async function applyRemoteEpicStatusChange(userId: string, epicId: string, statu
     .from("daily_tasks")
     .update({
       epic_id: null,
+      epic_title: null,
       habit_source_id: null,
     })
     .eq("user_id", userId)
     .eq("epic_id", epicId)
-    .eq("completed", true);
+    .or("completed.eq.true,completed_at.not.is.null");
   if (detachCompletedEpicTasksError) throw detachCompletedEpicTasksError;
 
   const { error: milestonesError } = await supabase
@@ -1604,11 +1696,12 @@ async function applyRemoteEpicDelete(userId: string, epicId: string) {
       .from("daily_tasks")
       .update({
         epic_id: null,
+        epic_title: null,
         habit_source_id: null,
       })
       .in("habit_source_id", habitIds)
       .eq("user_id", userId)
-      .eq("completed", true);
+      .or("completed.eq.true,completed_at.not.is.null");
     if (detachCompletedHabitTasksError) throw detachCompletedHabitTasksError;
 
     const { error: deleteFutureTasksError } = await supabase
@@ -1616,7 +1709,8 @@ async function applyRemoteEpicDelete(userId: string, epicId: string) {
       .delete()
       .in("habit_source_id", habitIds)
       .eq("user_id", userId)
-      .eq("completed", false);
+      .is("completed_at", null)
+      .or("completed.is.null,completed.eq.false");
     if (deleteFutureTasksError) throw deleteFutureTasksError;
 
     const { error: deleteHabitsError } = await supabase
@@ -1631,11 +1725,12 @@ async function applyRemoteEpicDelete(userId: string, epicId: string) {
     .from("daily_tasks")
     .update({
       epic_id: null,
+      epic_title: null,
       habit_source_id: null,
     })
     .eq("user_id", userId)
     .eq("epic_id", epicId)
-    .eq("completed", true);
+    .or("completed.eq.true,completed_at.not.is.null");
   if (detachCompletedTasksError) throw detachCompletedTasksError;
 
   const { error: milestonesError } = await supabase
@@ -2713,26 +2808,51 @@ export const useEpics = (options: EpicsOptions = {}) => {
         throw new Error("Invalid epic or habit ID");
       }
 
-      const existing = await getLocalEpicHabits<Array<{ id: string; epic_id: string; habit_id: string }>[number]>([epicId]);
-      const match = existing.find((row) => row.habit_id === habitId);
-      if (match) {
-        await removePlannerRecord("epic_habits", match.id);
+      if (!user?.id) {
+        throw new Error("User not authenticated");
       }
 
-      const { error } = await supabase
-        .from("epic_habits")
-        .delete()
-        .eq("epic_id", epicId)
-        .eq("habit_id", habitId);
+      return withPlannerRemoteSyncLock(user.id, async () => {
+        const input = { epicId, habitId };
+        await applyLocalCampaignHabitUnlink(user.id, input);
+        await refreshEpicsQueryFromLocalStore(queryClient, user.id);
+        scrubUnlinkedCampaignHabitTaskCaches(queryClient, input);
 
-      if (error) {
-        console.error("Failed to remove habit from epic:", error);
-        throw error;
-      }
+        if (shouldQueueWrites) {
+          await queueAction({
+            actionKind: "EPIC_HABIT_UNLINK",
+            entityType: "epic",
+            entityId: epicId,
+            payload: input,
+          });
+          return { queued: true };
+        }
+
+        try {
+          await applyRemoteCampaignHabitUnlink(user.id, input);
+        } catch (error) {
+          await queueAction({
+            actionKind: "EPIC_HABIT_UNLINK",
+            entityType: "epic",
+            entityId: epicId,
+            payload: input,
+          });
+          void retryNow();
+          return { queued: true };
+        }
+
+        return { queued: false };
+      });
     },
-    onSuccess: () => {
+    onSuccess: ({ queued }) => {
       queryClient.invalidateQueries({ queryKey: ["epics"] });
-      toast("Habit removed from epic");
+      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["calendar-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
+      queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
+      queryClient.resetQueries({ queryKey: DAILY_PLAN_OPTIMIZATION_QUERY_KEY });
+      dispatchPlannerSyncFinished();
+      toast(queued ? "Habit unlink saved offline" : "Habit removed from epic");
     },
     onError: (error) => {
       console.error("Failed to remove habit:", error);

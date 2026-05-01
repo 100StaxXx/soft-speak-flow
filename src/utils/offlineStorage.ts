@@ -28,6 +28,7 @@ export type QueueActionKind =
   | "EPIC_CREATE"
   | "EPIC_RITUAL_CREATE"
   | "EPIC_RITUAL_DELETE"
+  | "EPIC_HABIT_UNLINK"
   | "EPIC_UPDATE"
   | "EPIC_DELETE"
   | "EPIC_STATUS_UPDATE"
@@ -111,6 +112,7 @@ const toQueueActionKind = (value: unknown): QueueActionKind | null => {
     || value === "EPIC_CREATE"
     || value === "EPIC_RITUAL_CREATE"
     || value === "EPIC_RITUAL_DELETE"
+    || value === "EPIC_HABIT_UNLINK"
     || value === "EPIC_UPDATE"
     || value === "EPIC_DELETE"
     || value === "EPIC_STATUS_UPDATE"
@@ -181,6 +183,7 @@ const defaultEntityTypeForAction = (actionKind: QueueActionKind): QueueEntityTyp
     case "EPIC_CREATE":
     case "EPIC_RITUAL_CREATE":
     case "EPIC_RITUAL_DELETE":
+    case "EPIC_HABIT_UNLINK":
     case "EPIC_UPDATE":
     case "EPIC_DELETE":
     case "EPIC_STATUS_UPDATE":
