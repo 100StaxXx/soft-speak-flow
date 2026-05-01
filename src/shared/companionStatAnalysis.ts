@@ -4,11 +4,11 @@ import type {
   CompanionStatAttribute,
   CompanionStatNeed,
   CompanionStatProfileSummary,
-} from "./companionStatSignals";
+} from "./companionStatSignals.ts";
 import {
   buildCompanionFantasyTitle,
   type CompanionFantasyTitle,
-} from "./companionStatFantasyTitles";
+} from "./companionStatFantasyTitles.ts";
 
 export type CompanionStatBand = "Emerging" | "Building" | "Strong" | "Exceptional";
 export type CompanionStatDriverSource = "attribute_event" | "activity" | "echo";
