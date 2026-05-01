@@ -29,6 +29,7 @@ import {
   stopCompanionSpeech,
 } from "@/services/companionSpeech";
 import { getCompanionPlannerOpener } from "@/shared/companionPlannerCopy";
+import { isUpcomingScheduleDigestMessage } from "@/shared/schedulingIntent";
 import type {
   ActionReceiptView,
   CompanionAgentFollowUp,
@@ -110,6 +111,11 @@ type CompanionAgentSubmitOptions = {
   selectedProposedAction?: CompanionAgentProposedAction | null;
   selectedProposedActionIntent?: CompanionAgentSelectedProposedActionIntent;
 };
+
+const inferStarterIntentFromMessage = (
+  message: string,
+): CompanionPlannerLaunchIntent["starterIntent"] | undefined =>
+  isUpcomingScheduleDigestMessage(message) ? "upcoming_start" : undefined;
 
 const generateMessageId = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -1097,8 +1103,10 @@ export function useCompanionAssistant({
   ) => {
     const message = rawMessage.trim();
     if (!message || isSubmitting || isResolvingAction) return false;
+    const starterIntent = options?.starterIntent ??
+      inferStarterIntentFromMessage(message);
     const shouldEmitPlanDayAiAnswered =
-      !options?.starterIntent &&
+      !starterIntent &&
       Boolean(activeFollowUp) &&
       (
         lastStarterIntentRef.current === "plan_day" ||
@@ -1127,7 +1135,7 @@ export function useCompanionAssistant({
     const nextUnifiedMessages = [...messages, optimisticUserMessage];
 
     try {
-      lastStarterIntentRef.current = options?.starterIntent ?? null;
+      lastStarterIntentRef.current = starterIntent ?? null;
       lastReplayablePlannerMessageRef.current = message;
       const { data, error } = await supabase.functions.invoke(
         "companion-agent",
@@ -1139,7 +1147,7 @@ export function useCompanionAssistant({
             inputMode,
             currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
             turnOrigin: options?.turnOrigin,
-            starterIntent: options?.starterIntent,
+            starterIntent,
             activeFollowUp,
             activeProposedActions: proposedActions.slice(
               0,
@@ -1179,7 +1187,7 @@ export function useCompanionAssistant({
         modifications: {
           surface,
           turnOrigin: options?.turnOrigin ?? null,
-          starterIntent: options?.starterIntent ?? null,
+          starterIntent: starterIntent ?? null,
           selectedProposedActionType: options?.selectedProposedAction?.type ??
             null,
           selectedProposedActionIntent: options?.selectedProposedAction

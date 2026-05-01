@@ -175,13 +175,12 @@ const buildActiveEpic = (id: string) => ({
   epic_habits: [],
 });
 
-const createWrapper = () => {
-  const queryClient = new QueryClient({
+const createWrapper = (queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
       mutations: { retry: false },
     },
-  });
+  })) => {
 
   return ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -2046,8 +2045,15 @@ describe("useEpics", () => {
       }
     });
 
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries");
     const { result } = renderHook(() => useEpics(), {
-      wrapper: createWrapper(),
+      wrapper: createWrapper(queryClient),
     });
 
     await waitFor(() => {
@@ -2082,6 +2088,280 @@ describe("useEpics", () => {
         epicId: "epic-1",
       },
     });
+    expect(mocks.withPlannerRemoteSyncLockMock).toHaveBeenCalledWith(
+      "user-1",
+      expect.any(Function),
+    );
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+      queryKey: ["calendar-tasks"],
+    });
+  });
+
+  it("deletes a campaign ritual locally before it can leak into planner context", async () => {
+    const baseEpic = {
+      id: "epic-1",
+      user_id: "user-1",
+      title: "Campaign Alpha",
+      description: null,
+      status: "active",
+      progress_percentage: 40,
+      target_days: 14,
+      start_date: "2026-02-10",
+      end_date: null,
+      created_at: "2026-02-10T00:00:00.000Z",
+      epic_habits: [],
+    };
+    let localHabits = [
+      {
+        id: "habit-hydration",
+        user_id: "user-1",
+        title: "Daily Hydration",
+        description: null,
+        difficulty: "easy",
+        frequency: "daily",
+        custom_days: [],
+        custom_month_days: null,
+        preferred_time: null,
+        reminder_enabled: false,
+        reminder_minutes_before: 15,
+        estimated_minutes: 5,
+        category: null,
+        is_active: true,
+        current_streak: 0,
+        longest_streak: 0,
+        created_at: "2026-02-01T00:00:00.000Z",
+      },
+    ];
+    let localEpicHabits = [
+      {
+        id: "link-hydration",
+        epic_id: "epic-1",
+        habit_id: "habit-hydration",
+      },
+    ];
+    let localTasks = [
+      {
+        id: "task-hydration-open",
+        user_id: "user-1",
+        habit_source_id: "habit-hydration",
+        epic_id: "epic-1",
+        epic_title: "Campaign Alpha",
+        task_date: "2026-04-30",
+        completed: false,
+        completed_at: null,
+      },
+      {
+        id: "task-hydration-complete",
+        user_id: "user-1",
+        habit_source_id: "habit-hydration",
+        epic_id: "epic-1",
+        epic_title: "Campaign Alpha",
+        task_date: "2026-04-29",
+        completed: true,
+        completed_at: "2026-04-29T12:00:00.000Z",
+      },
+    ];
+    let localCompletions = [
+      {
+        id: "completion-hydration",
+        habit_id: "habit-hydration",
+        user_id: "user-1",
+        date: "2026-04-29",
+      },
+    ];
+    const loadEpicsFromLocalState = () => [{
+      ...baseEpic,
+      epic_habits: localEpicHabits.map((link) => ({
+        habit_id: link.habit_id,
+        habits: localHabits.find((habit) => habit.id === link.habit_id) ?? null,
+      })),
+    }];
+
+    mocks.shouldQueueWrites = true;
+    mocks.loadLocalEpicsMock.mockImplementation(async () => loadEpicsFromLocalState());
+    mocks.getLocalEpicHabitsMock.mockImplementation(async () => localEpicHabits);
+    mocks.getAllLocalTasksForUserMock.mockImplementation(async () => localTasks);
+    mocks.getLocalHabitCompletionsMock.mockImplementation(async () => localCompletions);
+    mocks.removePlannerRecordMock.mockImplementation(async (storeName: string, recordId: string) => {
+      if (storeName === "habits") {
+        localHabits = localHabits.filter((habit) => habit.id !== recordId);
+      }
+    });
+    mocks.removePlannerRecordsMock.mockImplementation(async (storeName: string, recordIds: string[]) => {
+      if (storeName === "daily_tasks") {
+        localTasks = localTasks.filter((task) => !recordIds.includes(task.id));
+      }
+      if (storeName === "epic_habits") {
+        localEpicHabits = localEpicHabits.filter((link) => !recordIds.includes(link.id));
+      }
+      if (storeName === "habit_completions") {
+        localCompletions = localCompletions.filter((completion) => !recordIds.includes(completion.id));
+      }
+    });
+    mocks.upsertPlannerRecordsMock.mockImplementation(async (storeName: string, records: typeof localTasks) => {
+      if (storeName === "daily_tasks") {
+        const updatesById = new Map(records.map((record) => [record.id, record]));
+        localTasks = localTasks.map((task) => updatesById.get(task.id) ?? task);
+      }
+    });
+    mocks.warmEpicsQueryFromRemoteMock.mockImplementationOnce(async (queryClient: QueryClient, userId: string) => {
+      const epics = loadEpicsFromLocalState();
+      queryClient.setQueryData(["epics", userId], epics);
+      return epics;
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    const dailyTaskCacheKey = ["daily-tasks", "user-1", "2026-04-30"];
+    const calendarTaskCacheKey = [
+      "calendar-tasks",
+      "user-1",
+      "2026-04-26",
+      "2026-05-02",
+      "week",
+    ];
+    queryClient.setQueryData(dailyTaskCacheKey, localTasks);
+    queryClient.setQueryData(calendarTaskCacheKey, localTasks);
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeEpics[0]?.epic_habits).toHaveLength(1);
+    });
+
+    await act(async () => {
+      await result.current.deleteCampaignRitual({
+        epicId: "epic-1",
+        habitId: "habit-hydration",
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeEpics[0]?.epic_habits).toHaveLength(0);
+    });
+
+    expect(localTasks).toEqual([
+      expect.objectContaining({
+        id: "task-hydration-complete",
+        epic_id: null,
+        epic_title: null,
+        habit_source_id: null,
+      }),
+    ]);
+    expect(localHabits).toHaveLength(0);
+    expect(localEpicHabits).toHaveLength(0);
+    expect(localCompletions).toHaveLength(0);
+    expect(queryClient.getQueryData(dailyTaskCacheKey)).toEqual([
+      expect.objectContaining({
+        id: "task-hydration-complete",
+        epic_id: null,
+        epic_title: null,
+        habit_source_id: null,
+      }),
+    ]);
+    expect(queryClient.getQueryData(calendarTaskCacheKey)).toEqual([
+      expect.objectContaining({
+        id: "task-hydration-complete",
+        epic_id: null,
+        epic_title: null,
+        habit_source_id: null,
+      }),
+    ]);
+    expect(mocks.queueActionMock).toHaveBeenCalledWith({
+      actionKind: "EPIC_RITUAL_DELETE",
+      entityType: "epic",
+      entityId: "epic-1",
+      payload: {
+        epicId: "epic-1",
+        habitId: "habit-hydration",
+      },
+    });
+    expect(mocks.dispatchPlannerSyncFinishedMock).toHaveBeenCalled();
+  });
+
+  it("refuses to delete a habit that is not linked to the campaign", async () => {
+    const localEpics = [{
+      id: "epic-1",
+      user_id: "user-1",
+      title: "Campaign Alpha",
+      description: null,
+      status: "active",
+      progress_percentage: 40,
+      target_days: 14,
+      start_date: "2026-02-10",
+      end_date: null,
+      created_at: "2026-02-10T00:00:00.000Z",
+      epic_habits: [],
+    }];
+    const localHabits = [{
+      id: "habit-loose",
+      user_id: "user-1",
+      title: "Loose habit",
+      description: null,
+      difficulty: "easy",
+      frequency: "daily",
+      custom_days: [],
+      custom_month_days: null,
+      preferred_time: null,
+      reminder_enabled: false,
+      reminder_minutes_before: 15,
+      estimated_minutes: 5,
+      category: null,
+      is_active: true,
+      current_streak: 0,
+      longest_streak: 0,
+      created_at: "2026-02-01T00:00:00.000Z",
+    }];
+
+    mocks.shouldQueueWrites = true;
+    mocks.loadLocalEpicsMock.mockImplementation(async () => localEpics);
+    mocks.getLocalEpicHabitsMock.mockImplementation(async () => []);
+    mocks.getAllLocalTasksForUserMock.mockImplementation(async () => []);
+    mocks.getLocalHabitCompletionsMock.mockImplementation(async () => []);
+    mocks.warmEpicsQueryFromRemoteMock.mockImplementationOnce(async (queryClient: QueryClient, userId: string) => {
+      queryClient.setQueryData(["epics", userId], localEpics);
+      return localEpics;
+    });
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeEpics[0]?.id).toBe("epic-1");
+    });
+
+    let caughtError: unknown = null;
+    await act(async () => {
+      try {
+        await result.current.deleteCampaignRitual({
+          epicId: "epic-1",
+          habitId: "habit-loose",
+        });
+      } catch (error) {
+        caughtError = error;
+      }
+    });
+
+    expect(caughtError).toEqual(expect.objectContaining({
+      message: "Campaign ritual link not found",
+    }));
+    expect(localHabits).toHaveLength(1);
+    expect(mocks.removePlannerRecordMock).not.toHaveBeenCalledWith(
+      "habits",
+      "habit-loose",
+    );
+    expect(mocks.queueActionMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        actionKind: "EPIC_RITUAL_DELETE",
+      }),
+    );
   });
 
   it("creates a campaign ritual locally, syncs it remotely, and updates the cached epics immediately", async () => {

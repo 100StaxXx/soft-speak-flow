@@ -380,6 +380,11 @@ export interface CreateCampaignRitualResult {
   epicHabit: LocalEpicHabitRow;
 }
 
+export interface DeleteCampaignRitualInput {
+  epicId: string;
+  habitId: string;
+}
+
 type LocalTaskEpicTitleRow = {
   id: string;
   user_id: string;
@@ -397,6 +402,43 @@ type LocalTaskCampaignCleanupRow = {
   completed: boolean | null;
   completed_at?: string | null;
 };
+
+function scrubCampaignRitualTaskRows<T>(rows: T | undefined, habitId: string): T | undefined {
+  if (!Array.isArray(rows)) return rows;
+
+  let changed = false;
+  const nextRows = (rows as DailyTask[]).reduce<DailyTask[]>((next, task) => {
+    if (task.habit_source_id !== habitId) {
+      next.push(task);
+      return next;
+    }
+
+    changed = true;
+    if (task.completed === true || task.completed_at) {
+      next.push({
+        ...task,
+        epic_id: null,
+        epic_title: null,
+        habit_source_id: null,
+      });
+    }
+    return next;
+  }, []);
+
+  return changed ? (nextRows as T) : rows;
+}
+
+function scrubCampaignRitualTaskCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  habitId: string,
+) {
+  queryClient.setQueriesData({ queryKey: ["daily-tasks"] }, (old) =>
+    scrubCampaignRitualTaskRows(old, habitId)
+  );
+  queryClient.setQueriesData({ queryKey: ["calendar-tasks"] }, (old) =>
+    scrubCampaignRitualTaskRows(old, habitId)
+  );
+}
 
 const normalizeFingerprintText = (value: string | null | undefined): string | null => {
   const normalized = value?.trim().replace(/\s+/g, " ") ?? "";
@@ -904,6 +946,112 @@ async function rollbackRemoteCampaignRitualPayload(userId: string, payload: Loca
   if (habitError) throw habitError;
 }
 
+async function applyLocalCampaignRitualDelete(
+  userId: string,
+  { epicId, habitId }: DeleteCampaignRitualInput,
+) {
+  const [epicHabits, localTasks, habitCompletions] = await Promise.all([
+    getLocalEpicHabits<LocalEpicHabitRow>([epicId]),
+    getAllLocalTasksForUser<LocalTaskCampaignCleanupRow>(userId),
+    getLocalHabitCompletions<Array<{ id: string; habit_id: string | null; user_id: string; date: string }>[number]>(userId),
+  ]);
+
+  const linkIdsToDelete = epicHabits
+    .filter((link) => link.habit_id === habitId)
+    .map((link) => link.id);
+  if (linkIdsToDelete.length === 0) {
+    throw new Error("Campaign ritual link not found");
+  }
+
+  const linkedTasks = localTasks.filter((task) => task.habit_source_id === habitId);
+  const tasksToDelete = linkedTasks
+    .filter((task) => task.completed !== true && !task.completed_at)
+    .map((task) => task.id);
+  const taskIdsToDelete = new Set(tasksToDelete);
+  const tasksToDetach = linkedTasks
+    .filter((task) => !taskIdsToDelete.has(task.id))
+    .map((task) => ({
+      ...task,
+      epic_id: null,
+      epic_title: null,
+      habit_source_id: null,
+    }));
+  const completionsToDelete = habitCompletions
+    .filter((completion) => completion.habit_id === habitId)
+    .map((completion) => completion.id);
+
+  if (tasksToDetach.length > 0) {
+    await upsertPlannerRecords("daily_tasks", tasksToDetach);
+  }
+  if (tasksToDelete.length > 0) {
+    await removePlannerRecords("daily_tasks", tasksToDelete);
+  }
+  if (linkIdsToDelete.length > 0) {
+    await removePlannerRecords("epic_habits", linkIdsToDelete);
+  }
+  if (completionsToDelete.length > 0) {
+    await removePlannerRecords("habit_completions", completionsToDelete);
+  }
+
+  await removePlannerRecord("habits", habitId);
+}
+
+async function applyRemoteCampaignRitualDelete(
+  userId: string,
+  { epicId, habitId }: DeleteCampaignRitualInput,
+) {
+  const { data: matchingLinks, error: linkLookupError } = await supabase
+    .from("epic_habits")
+    .select("id")
+    .eq("epic_id", epicId)
+    .eq("habit_id", habitId);
+  if (linkLookupError) throw linkLookupError;
+  if (!matchingLinks || matchingLinks.length === 0) {
+    const { data: matchingHabits, error: habitLookupError } = await supabase
+      .from("habits")
+      .select("id")
+      .eq("id", habitId)
+      .eq("user_id", userId);
+    if (habitLookupError) throw habitLookupError;
+    if (!matchingHabits || matchingHabits.length === 0) return;
+
+    throw new Error("Campaign ritual link not found");
+  }
+
+  const { error: detachCompletedTasksError } = await supabase
+    .from("daily_tasks")
+    .update({
+      epic_id: null,
+      habit_source_id: null,
+    })
+    .eq("habit_source_id", habitId)
+    .eq("user_id", userId)
+    .eq("completed", true);
+  if (detachCompletedTasksError) throw detachCompletedTasksError;
+
+  const { error: deleteIncompleteTasksError } = await supabase
+    .from("daily_tasks")
+    .delete()
+    .eq("habit_source_id", habitId)
+    .eq("user_id", userId)
+    .eq("completed", false);
+  if (deleteIncompleteTasksError) throw deleteIncompleteTasksError;
+
+  const { error: completionError } = await supabase
+    .from("habit_completions")
+    .delete()
+    .eq("habit_id", habitId)
+    .eq("user_id", userId);
+  if (completionError) throw completionError;
+
+  const { error: habitError } = await supabase
+    .from("habits")
+    .delete()
+    .eq("id", habitId)
+    .eq("user_id", userId);
+  if (habitError) throw habitError;
+}
+
 function buildTaskCreatePayload(task: DailyTask): Record<string, unknown> {
   return {
     id: task.id,
@@ -1154,7 +1302,7 @@ async function applyLocalEpicStatusChange(userId: string, epicId: string, status
     getLocalEpicHabits<Array<{ id: string; epic_id: string; habit_id: string }>[number]>([epicId]),
     getLocalHabits<LocalHabitRow>(userId),
     getLocalEpicMilestones<Array<{ id: string; epic_id: string; user_id: string }>[number]>(epicId),
-    getAllLocalTasksForUser<Array<{ id: string; habit_source_id: string | null; task_date: string | null; completed: boolean | null }>[number]>(userId),
+    getAllLocalTasksForUser<LocalTaskCampaignCleanupRow>(userId),
   ]);
 
   const today = format(new Date(), "yyyy-MM-dd");
@@ -1173,12 +1321,29 @@ async function applyLocalEpicStatusChange(userId: string, epicId: string, status
 
   const tasksToDelete = tasks
     .filter((task) =>
-      task.habit_source_id
-      && habitIds.includes(task.habit_source_id)
+      (task.epic_id === epicId ||
+        (task.habit_source_id && habitIds.includes(task.habit_source_id)))
       && task.task_date
       && task.task_date >= today
       && task.completed !== true)
     .map((task) => task.id);
+  const taskIdsToDelete = new Set(tasksToDelete);
+  const tasksToDetach = tasks
+    .filter((task) => {
+      const linkedToCampaign = task.epic_id === epicId ||
+        (task.habit_source_id ? habitIds.includes(task.habit_source_id) : false);
+      return linkedToCampaign && !taskIdsToDelete.has(task.id);
+    })
+    .map((task) => ({
+      ...task,
+      epic_id: null,
+      epic_title: null,
+      habit_source_id: null,
+    }));
+
+  if (tasksToDetach.length > 0) {
+    await upsertPlannerRecords("daily_tasks", tasksToDetach);
+  }
 
   if (tasksToDelete.length > 0) {
     await removePlannerRecords("daily_tasks", tasksToDelete);
@@ -1343,6 +1508,17 @@ async function applyRemoteEpicStatusChange(userId: string, epicId: string, statu
 
   const habitIds = epicHabits?.map((row) => row.habit_id) ?? [];
   if (habitIds.length > 0) {
+    const { error: detachCompletedHabitTasksError } = await supabase
+      .from("daily_tasks")
+      .update({
+        epic_id: null,
+        habit_source_id: null,
+      })
+      .in("habit_source_id", habitIds)
+      .eq("user_id", userId)
+      .eq("completed", true);
+    if (detachCompletedHabitTasksError) throw detachCompletedHabitTasksError;
+
     const { error: habitsError } = await supabase
       .from("habits")
       .update({ is_active: false })
@@ -1369,6 +1545,17 @@ async function applyRemoteEpicStatusChange(userId: string, epicId: string, statu
       if (linksError) throw linksError;
     }
   }
+
+  const { error: detachCompletedEpicTasksError } = await supabase
+    .from("daily_tasks")
+    .update({
+      epic_id: null,
+      habit_source_id: null,
+    })
+    .eq("user_id", userId)
+    .eq("epic_id", epicId)
+    .eq("completed", true);
+  if (detachCompletedEpicTasksError) throw detachCompletedEpicTasksError;
 
   const { error: milestonesError } = await supabase
     .from("epic_milestones")
@@ -1957,49 +2144,54 @@ export const useEpics = (options: EpicsOptions = {}) => {
         throw new Error("User not authenticated");
       }
 
-      const epic = epics.find((candidate) => candidate.id === epicId);
-      if (!epic) {
-        throw new Error("Epic not found or you don't have permission");
-      }
+      return withPlannerRemoteSyncLock(user.id, async () => {
+        const epic = epics.find((candidate) => candidate.id === epicId);
+        if (!epic) {
+          throw new Error("Epic not found or you don't have permission");
+        }
 
-      if (epic.status === "completed" && status === "completed") {
-        throw new Error("Epic is already completed");
-      }
+        if (epic.status === "completed" && status === "completed") {
+          throw new Error("Epic is already completed");
+        }
 
-      await applyLocalEpicStatusChange(user.id, epicId, status);
+        await applyLocalEpicStatusChange(user.id, epicId, status);
+        await refreshEpicsQueryFromLocalStore(queryClient, user.id);
 
-      if (shouldQueueWrites) {
-        await queueAction({
-          actionKind: "EPIC_STATUS_UPDATE",
-          entityType: "epic",
-          entityId: epicId,
-          payload: { epicId, status },
-        });
-        return { epic, status, wasAlreadyCompleted: epic.status === "completed", queued: true };
-      }
+        if (shouldQueueWrites) {
+          await queueAction({
+            actionKind: "EPIC_STATUS_UPDATE",
+            entityType: "epic",
+            entityId: epicId,
+            payload: { epicId, status },
+          });
+          return { epic, status, wasAlreadyCompleted: epic.status === "completed", queued: true };
+        }
 
-      try {
-        await applyRemoteEpicStatusChange(user.id, epicId, status);
-      } catch (error) {
-        await queueAction({
-          actionKind: "EPIC_STATUS_UPDATE",
-          entityType: "epic",
-          entityId: epicId,
-          payload: { epicId, status },
-        });
-        void retryNow();
-        return { epic, status, wasAlreadyCompleted: epic.status === "completed", queued: true };
-      }
+        try {
+          await applyRemoteEpicStatusChange(user.id, epicId, status);
+        } catch (error) {
+          await queueAction({
+            actionKind: "EPIC_STATUS_UPDATE",
+            entityType: "epic",
+            entityId: epicId,
+            payload: { epicId, status },
+          });
+          void retryNow();
+          return { epic, status, wasAlreadyCompleted: epic.status === "completed", queued: true };
+        }
 
-      return { epic, status, wasAlreadyCompleted: epic.status === "completed", queued: false };
+        return { epic, status, wasAlreadyCompleted: epic.status === "completed", queued: false };
+      });
     },
     onSuccess: async ({ epic, status, wasAlreadyCompleted, queued }, variables) => {
       queryClient.invalidateQueries({ queryKey: ["epics"] });
       queryClient.invalidateQueries({ queryKey: ["habits"] });
       queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
       queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["calendar-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
       queryClient.resetQueries({ queryKey: DAILY_PLAN_OPTIMIZATION_QUERY_KEY });
+      dispatchPlannerSyncFinished();
 
       if (status === "completed" || status === "abandoned") {
         trackEpicOutcome(variables.epicId, status).catch((err) => {
@@ -2056,95 +2248,99 @@ export const useEpics = (options: EpicsOptions = {}) => {
         throw new Error("User not authenticated");
       }
 
-      const normalizedUpdates: { title?: string; description?: string | null } = {};
-      if (updates.title !== undefined) {
-        const trimmedTitle = updates.title.trim();
-        if (!trimmedTitle) {
+      return withPlannerRemoteSyncLock(user.id, async () => {
+        const normalizedUpdates: { title?: string; description?: string | null } = {};
+        if (updates.title !== undefined) {
+          const trimmedTitle = updates.title.trim();
+          if (!trimmedTitle) {
+            throw new Error("Campaign title cannot be empty");
+          }
+          normalizedUpdates.title = trimmedTitle;
+        }
+
+        if (updates.description !== undefined) {
+          const trimmedDescription = updates.description?.trim() ?? "";
+          normalizedUpdates.description = trimmedDescription.length > 0 ? trimmedDescription : null;
+        }
+
+        if (Object.keys(normalizedUpdates).length === 0) {
+          throw new Error("No campaign changes were provided");
+        }
+
+        if (normalizedUpdates.title !== undefined && normalizedUpdates.title.length === 0) {
           throw new Error("Campaign title cannot be empty");
         }
-        normalizedUpdates.title = trimmedTitle;
-      }
 
-      if (updates.description !== undefined) {
-        const trimmedDescription = updates.description?.trim() ?? "";
-        normalizedUpdates.description = trimmedDescription.length > 0 ? trimmedDescription : null;
-      }
+        const epic = epics.find((candidate) => candidate.id === epicId);
+        if (!epic) {
+          throw new Error("Epic not found or you don't have permission");
+        }
 
-      if (Object.keys(normalizedUpdates).length === 0) {
-        throw new Error("No campaign changes were provided");
-      }
+        if (epic.status !== "active") {
+          throw new Error("Only active campaigns can be edited");
+        }
 
-      if (normalizedUpdates.title !== undefined && normalizedUpdates.title.length === 0) {
-        throw new Error("Campaign title cannot be empty");
-      }
+        const hasTitleChange = normalizedUpdates.title !== undefined && epic.title !== normalizedUpdates.title;
+        const hasDescriptionChange = normalizedUpdates.description !== undefined && (epic.description ?? null) !== normalizedUpdates.description;
 
-      const epic = epics.find((candidate) => candidate.id === epicId);
-      if (!epic) {
-        throw new Error("Epic not found or you don't have permission");
-      }
+        if (!hasTitleChange && !hasDescriptionChange) {
+          return { epic, updates: normalizedUpdates, queued: false };
+        }
 
-      if (epic.status !== "active") {
-        throw new Error("Only active campaigns can be edited");
-      }
+        const nextEpic = await applyLocalEpicUpdate(user.id, epicId, normalizedUpdates);
 
-      const hasTitleChange = normalizedUpdates.title !== undefined && epic.title !== normalizedUpdates.title;
-      const hasDescriptionChange = normalizedUpdates.description !== undefined && (epic.description ?? null) !== normalizedUpdates.description;
+        queryClient.setQueryData<EpicRecord[] | undefined>(getEpicsQueryKey(user.id), (previous) =>
+          previous?.map((candidate) => (
+            candidate.id === epicId
+              ? {
+                  ...candidate,
+                  ...(normalizedUpdates.title !== undefined ? { title: normalizedUpdates.title } : {}),
+                  ...(normalizedUpdates.description !== undefined ? { description: normalizedUpdates.description } : {}),
+                }
+              : candidate
+          )) ?? previous,
+        );
 
-      if (!hasTitleChange && !hasDescriptionChange) {
-        return { epic, updates: normalizedUpdates, queued: false };
-      }
+        if (shouldQueueWrites) {
+          await queueAction({
+            actionKind: "EPIC_UPDATE",
+            entityType: "epic",
+            entityId: epicId,
+            payload: {
+              epicId,
+              updates: normalizedUpdates,
+            },
+          });
+          return { epic: nextEpic, updates: normalizedUpdates, queued: true };
+        }
 
-      const nextEpic = await applyLocalEpicUpdate(user.id, epicId, normalizedUpdates);
+        try {
+          await applyRemoteEpicUpdate(user.id, epicId, normalizedUpdates);
+        } catch (error) {
+          await queueAction({
+            actionKind: "EPIC_UPDATE",
+            entityType: "epic",
+            entityId: epicId,
+            payload: {
+              epicId,
+              updates: normalizedUpdates,
+            },
+          });
+          void retryNow();
+          return { epic: nextEpic, updates: normalizedUpdates, queued: true };
+        }
 
-      queryClient.setQueryData<EpicRecord[] | undefined>(getEpicsQueryKey(user.id), (previous) =>
-        previous?.map((candidate) => (
-          candidate.id === epicId
-            ? {
-                ...candidate,
-                ...(normalizedUpdates.title !== undefined ? { title: normalizedUpdates.title } : {}),
-                ...(normalizedUpdates.description !== undefined ? { description: normalizedUpdates.description } : {}),
-              }
-            : candidate
-        )) ?? previous,
-      );
-
-      if (shouldQueueWrites) {
-        await queueAction({
-          actionKind: "EPIC_UPDATE",
-          entityType: "epic",
-          entityId: epicId,
-          payload: {
-            epicId,
-            updates: normalizedUpdates,
-          },
-        });
-        return { epic: nextEpic, updates: normalizedUpdates, queued: true };
-      }
-
-      try {
-        await applyRemoteEpicUpdate(user.id, epicId, normalizedUpdates);
-      } catch (error) {
-        await queueAction({
-          actionKind: "EPIC_UPDATE",
-          entityType: "epic",
-          entityId: epicId,
-          payload: {
-            epicId,
-            updates: normalizedUpdates,
-          },
-        });
-        void retryNow();
-        return { epic: nextEpic, updates: normalizedUpdates, queued: true };
-      }
-
-      return { epic: nextEpic, updates: normalizedUpdates, queued: false };
+        return { epic: nextEpic, updates: normalizedUpdates, queued: false };
+      });
     },
     onSuccess: ({ queued, updates }) => {
       queryClient.invalidateQueries({ queryKey: ["epics"] });
       queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["calendar-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
       queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
       queryClient.invalidateQueries({ queryKey: DAILY_PLAN_OPTIMIZATION_QUERY_KEY });
+      dispatchPlannerSyncFinished();
 
       const changedKeys = Object.keys(updates);
       const titleOnly = changedKeys.length === 1 && changedKeys[0] === "title";
@@ -2179,52 +2375,55 @@ export const useEpics = (options: EpicsOptions = {}) => {
         throw new Error("User not authenticated");
       }
 
-      const epic = epics.find((candidate) => candidate.id === epicId);
-      if (!epic) {
-        throw new Error("Epic not found or you don't have permission");
-      }
+      return withPlannerRemoteSyncLock(user.id, async () => {
+        const epic = epics.find((candidate) => candidate.id === epicId);
+        if (!epic) {
+          throw new Error("Epic not found or you don't have permission");
+        }
 
-      if (epic.status !== "active") {
-        throw new Error("Only active campaigns can be deleted");
-      }
+        if (epic.status !== "active") {
+          throw new Error("Only active campaigns can be deleted");
+        }
 
-      await applyLocalEpicDelete(user.id, epicId);
-      await refreshEpicsQueryFromLocalStore(queryClient, user.id);
-      dispatchPlannerSyncFinished();
+        await applyLocalEpicDelete(user.id, epicId);
+        await refreshEpicsQueryFromLocalStore(queryClient, user.id);
 
-      if (shouldQueueWrites) {
-        await queueAction({
-          actionKind: "EPIC_DELETE",
-          entityType: "epic",
-          entityId: epicId,
-          payload: { epicId },
-        });
-        return { epic, queued: true };
-      }
+        if (shouldQueueWrites) {
+          await queueAction({
+            actionKind: "EPIC_DELETE",
+            entityType: "epic",
+            entityId: epicId,
+            payload: { epicId },
+          });
+          return { epic, queued: true };
+        }
 
-      try {
-        await applyRemoteEpicDelete(user.id, epicId);
-      } catch (error) {
-        await queueAction({
-          actionKind: "EPIC_DELETE",
-          entityType: "epic",
-          entityId: epicId,
-          payload: { epicId },
-        });
-        void retryNow();
-        return { epic, queued: true };
-      }
+        try {
+          await applyRemoteEpicDelete(user.id, epicId);
+        } catch (error) {
+          await queueAction({
+            actionKind: "EPIC_DELETE",
+            entityType: "epic",
+            entityId: epicId,
+            payload: { epicId },
+          });
+          void retryNow();
+          return { epic, queued: true };
+        }
 
-      return { epic, queued: false };
+        return { epic, queued: false };
+      });
     },
     onSuccess: ({ epic, queued }) => {
       queryClient.invalidateQueries({ queryKey: ["epics"] });
       queryClient.invalidateQueries({ queryKey: ["habits"] });
       queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["calendar-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
       queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
       queryClient.invalidateQueries({ queryKey: ["milestones", epic.id] });
       queryClient.resetQueries({ queryKey: DAILY_PLAN_OPTIMIZATION_QUERY_KEY });
+      dispatchPlannerSyncFinished();
 
       toast.success(queued ? "Campaign deletion saved offline" : "Campaign deleted", {
         description: queued
@@ -2235,6 +2434,69 @@ export const useEpics = (options: EpicsOptions = {}) => {
     onError: (error) => {
       console.error("Failed to delete epic:", error);
       toast.error("Failed to delete campaign");
+    },
+  });
+
+  const deleteCampaignRitual = useMutation({
+    mutationFn: async (input: DeleteCampaignRitualInput): Promise<{ queued: boolean }> => {
+      if (!user?.id) {
+        throw new Error("User not authenticated");
+      }
+
+      return withPlannerRemoteSyncLock(user.id, async () => {
+        const localEpics = await loadLocalEpics(user.id);
+        const epic = localEpics.find((candidate) => candidate.id === input.epicId);
+        if (!epic) {
+          throw new Error("Campaign not found");
+        }
+
+        if (epic.status !== "active") {
+          throw new Error("Only active campaign rituals can be deleted");
+        }
+
+        await applyLocalCampaignRitualDelete(user.id, input);
+        await refreshEpicsQueryFromLocalStore(queryClient, user.id);
+        scrubCampaignRitualTaskCaches(queryClient, input.habitId);
+
+        if (shouldQueueWrites) {
+          await queueAction({
+            actionKind: "EPIC_RITUAL_DELETE",
+            entityType: "epic",
+            entityId: input.epicId,
+            payload: input,
+          });
+          return { queued: true };
+        }
+
+        try {
+          await applyRemoteCampaignRitualDelete(user.id, input);
+        } catch (error) {
+          await queueAction({
+            actionKind: "EPIC_RITUAL_DELETE",
+            entityType: "epic",
+            entityId: input.epicId,
+            payload: input,
+          });
+          void retryNow();
+          return { queued: true };
+        }
+
+        return { queued: false };
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["epics"] });
+      queryClient.invalidateQueries({ queryKey: ["habits"] });
+      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["calendar-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
+      queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
+      queryClient.resetQueries({ queryKey: DAILY_PLAN_OPTIMIZATION_QUERY_KEY });
+      dispatchPlannerSyncFinished();
+    },
+    onError: (error) => {
+      console.error("Failed to delete campaign ritual:", error);
+      toast.error("Failed to delete ritual");
     },
   });
 
@@ -2489,7 +2751,9 @@ export const useEpics = (options: EpicsOptions = {}) => {
       updateEpic.mutateAsync({ epicId, updates: { title } }),
     deleteEpic: deleteEpic.mutateAsync,
     updateEpicStatus: updateEpicStatus.mutate,
+    deleteCampaignRitual: deleteCampaignRitual.mutateAsync,
     createCampaignRitual: createCampaignRitual.mutateAsync,
+    isDeletingCampaignRitual: deleteCampaignRitual.isPending,
     isCreatingCampaignRitual: createCampaignRitual.isPending,
     addHabitToEpic: addHabitToEpic.mutate,
     removeHabitFromEpic: removeHabitFromEpic.mutate,

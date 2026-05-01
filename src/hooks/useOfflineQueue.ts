@@ -492,6 +492,66 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
       return;
     }
 
+    case "EPIC_RITUAL_DELETE": {
+      const { epicId, habitId } = action.payload as {
+        epicId: string;
+        habitId: string;
+      };
+
+      const { data: matchingLinks, error: linkLookupError } = await supabase
+        .from("epic_habits")
+        .select("id")
+        .eq("epic_id", epicId)
+        .eq("habit_id", habitId);
+      if (linkLookupError) throw linkLookupError;
+      if (!matchingLinks || matchingLinks.length === 0) {
+        const { data: matchingHabits, error: habitLookupError } = await supabase
+          .from("habits")
+          .select("id")
+          .eq("id", habitId)
+          .eq("user_id", userId);
+        if (habitLookupError) throw habitLookupError;
+        if (!matchingHabits || matchingHabits.length === 0) return;
+
+        throw new Error("Campaign ritual link not found");
+      }
+
+      const { error: detachCompletedTasksError } = await supabase
+        .from("daily_tasks")
+        .update({
+          epic_id: null,
+          habit_source_id: null,
+        })
+        .eq("habit_source_id", habitId)
+        .eq("user_id", userId)
+        .eq("completed", true);
+      if (detachCompletedTasksError) throw detachCompletedTasksError;
+
+      const { error: deleteIncompleteTasksError } = await supabase
+        .from("daily_tasks")
+        .delete()
+        .eq("habit_source_id", habitId)
+        .eq("user_id", userId)
+        .eq("completed", false);
+      if (deleteIncompleteTasksError) throw deleteIncompleteTasksError;
+
+      const { error: completionError } = await supabase
+        .from("habit_completions")
+        .delete()
+        .eq("habit_id", habitId)
+        .eq("user_id", userId);
+      if (completionError) throw completionError;
+
+      const { error: habitError } = await supabase
+        .from("habits")
+        .delete()
+        .eq("id", habitId)
+        .eq("user_id", userId);
+      if (habitError) throw habitError;
+
+      return;
+    }
+
     case "EPIC_DELETE": {
       const { epicId } = action.payload as { epicId: string };
 
@@ -601,6 +661,17 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
         const habitIds = epicHabits?.map((row) => row.habit_id) ?? [];
 
         if (habitIds.length > 0) {
+          const { error: detachCompletedHabitTasksError } = await supabase
+            .from("daily_tasks")
+            .update({
+              epic_id: null,
+              habit_source_id: null,
+            })
+            .in("habit_source_id", habitIds)
+            .eq("user_id", userId)
+            .eq("completed", true);
+          if (detachCompletedHabitTasksError) throw detachCompletedHabitTasksError;
+
           const { error: habitsError } = await supabase
             .from("habits")
             .update({ is_active: false })
@@ -627,6 +698,17 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
             if (linksError) throw linksError;
           }
         }
+
+        const { error: detachCompletedEpicTasksError } = await supabase
+          .from("daily_tasks")
+          .update({
+            epic_id: null,
+            habit_source_id: null,
+          })
+          .eq("user_id", userId)
+          .eq("epic_id", epicId)
+          .eq("completed", true);
+        if (detachCompletedEpicTasksError) throw detachCompletedEpicTasksError;
 
         const { error: milestonesError } = await supabase
           .from("epic_milestones")

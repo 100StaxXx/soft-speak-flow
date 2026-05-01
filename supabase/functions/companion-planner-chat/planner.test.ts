@@ -10,6 +10,7 @@ import {
   type PlannerBuildInput,
   synthesizeDayPlanFromProposals,
 } from "./planner.ts";
+import { buildPlanDayToolUserPrompt } from "./planDayTools.ts";
 
 type PlannerBuildInputOverrides =
   & Partial<
@@ -1710,6 +1711,97 @@ Deno.test("plan_day ignores stale campaign links when the campaign is not active
   assertEquals(result.reply.includes("campaign drawer"), false);
   assertEquals(result.reply.includes("Ghost campaign"), false);
   assertEquals(result.reply.includes("stalled"), false);
+});
+
+Deno.test("plan_day tool prompt strips stale campaign ritual context", () => {
+  const input = baseInput({
+    message: "Focus",
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T16:38:00-07:00",
+    plannerContext: {
+      starterIntent: undefined,
+      activeEpics: [{
+        id: "epic-active",
+        title: "Active Campaign",
+        endDate: "2026-05-01",
+        progressPercentage: 20,
+        habitCount: 1,
+      }],
+      tasks: [
+        plannerTask({
+          id: "stale-ritual",
+          title: "Daily Hydration",
+          taskDate: "2026-04-18",
+          habitSourceId: "habit-hydration",
+          epicId: "epic-deleted",
+          epicTitle: "Gain 10 pounds of muscle",
+          estimatedDuration: 5,
+        }),
+        plannerTask({
+          id: "stale-quest",
+          title: "Old campaign admin",
+          taskDate: "2026-04-18",
+          epicId: "epic-deleted",
+          epicTitle: "Gain 10 pounds of muscle",
+          estimatedDuration: 20,
+        }),
+      ],
+      inboxTasks: [
+        plannerTask({
+          id: "stale-inbox",
+          title: "Deleted campaign inbox",
+          taskDate: null,
+          epicId: "epic-deleted",
+          epicTitle: "Gain 10 pounds of muscle",
+        }),
+      ],
+      rituals: [{
+        id: "habit-hydration",
+        title: "Daily Hydration",
+        epicId: "epic-deleted",
+        epicTitle: "Gain 10 pounds of muscle",
+        frequency: "daily",
+        preferredTime: null,
+      }],
+      priorityScores: [
+        {
+          id: "epic:orphan-deleted",
+          kind: "epic",
+          title: "Gain 10 pounds of muscle",
+          score: 91,
+          reasons: ["legacy orphan campaign score"],
+          epicId: null,
+        },
+        {
+          id: "ritual:orphan-hydration",
+          kind: "ritual",
+          title: "Daily Hydration",
+          score: 88,
+          reasons: ["legacy orphan ritual score"],
+          ritualId: "habit-hydration",
+          epicId: null,
+        },
+      ],
+    },
+  });
+
+  const prompt = JSON.parse(buildPlanDayToolUserPrompt(input, []));
+  const planDayContext = prompt.planDayContext;
+  const protectedData = collectPlannerContextProtectedDataText(input);
+
+  assertEquals(
+    planDayContext.pendingTasksToday.some((task: { title: string }) =>
+      task.title === "Daily Hydration"
+    ),
+    false,
+  );
+  assertEquals(planDayContext.pendingTasksToday[0]?.title, "Old campaign admin");
+  assertEquals(planDayContext.pendingTasksToday[0]?.epicTitle, null);
+  assertEquals(planDayContext.inboxTasks[0]?.epicTitle, null);
+  assertEquals(planDayContext.rituals.length, 0);
+  assertEquals(JSON.stringify(prompt).includes("Gain 10 pounds of muscle"), false);
+  assertEquals(protectedData.includes("Daily Hydration"), false);
+  assertEquals(protectedData.includes("Gain 10 pounds of muscle"), false);
 });
 
 Deno.test("plan_day no-room reply names what is loading the day when no campaign focus dominates", () => {
@@ -5560,7 +5652,27 @@ Deno.test("plan_week keeps ritual priorities at the ritual's estimated duration"
     sessionState: confirmedPlanningConsent("plan_week", "Plan my week"),
     plannerContext: {
       starterIntent: "plan_week",
-      activeEpics: [],
+      activeEpics: [{
+        id: "epic-week-ritual-1",
+        title: "Website relaunch",
+        endDate: "2026-05-01",
+        progressPercentage: 30,
+        habitCount: 1,
+      }],
+      tasks: [
+        {
+          id: "task-week-ritual-support-1",
+          title: "Review relaunch notes",
+          taskDate: "2026-04-18",
+          scheduledTime: "09:30",
+          estimatedDuration: 20,
+          recurrencePattern: null,
+          completed: false,
+          priority: "medium",
+          epicId: "epic-week-ritual-1",
+          epicTitle: "Website relaunch",
+        },
+      ],
       rituals: [
         {
           id: "ritual-week-1",

@@ -6,10 +6,13 @@ import {
   type PlannerTextNormalizationOptions,
   formatScheduleReference,
   getPlanDayAtRiskCampaignFacts,
+  getActiveCampaignIdSet,
   getPlanDayLoadBreakdown,
   getPlanDayLoadFacts,
   getPlanDayTargetDate,
   normalizePlannerBuildResultText,
+  scopePlannerPriorityScoresToActiveCampaigns,
+  scopePlannerTasksToActiveCampaigns,
   synthesizeDayPlanFromProposals,
 } from "./planner.ts";
 import {
@@ -245,8 +248,22 @@ const buildPlanDayContextForPrompt = (
 const buildUserPrompt = (
   input: PlannerBuildInput,
   baseResult: PlannerBuildResult,
-) =>
-  JSON.stringify({
+) => {
+  const activeCampaignIds = getActiveCampaignIdSet(input);
+  const scopedTasks = scopePlannerTasksToActiveCampaigns(
+    input.plannerContext.tasks,
+    activeCampaignIds,
+  );
+  const scopedInboxTasks = scopePlannerTasksToActiveCampaigns(
+    input.plannerContext.inboxTasks,
+    activeCampaignIds,
+  );
+  const scopedPriorityScores = scopePlannerPriorityScoresToActiveCampaigns(
+    input.plannerContext.priorityScores ?? [],
+    activeCampaignIds,
+  );
+
+  return JSON.stringify({
     targetMode: baseResult.mode,
     tonePack: input.tonePack,
     latestUserMessage: input.message,
@@ -272,7 +289,7 @@ const buildUserPrompt = (
             [],
         }
         : null,
-      priorityScores: (input.plannerContext.priorityScores ?? []).slice(0, 6)
+      priorityScores: scopedPriorityScores.slice(0, 6)
         .map((score) => ({
           kind: score.kind,
           title: score.title,
@@ -290,14 +307,14 @@ const buildUserPrompt = (
         missingFields: proposal.missingFields ?? [],
       })),
       scheduleSummary: input.plannerContext.scheduleInsights?.summary ?? null,
-      tasks: input.plannerContext.tasks.slice(0, 12).map((task) => ({
+      tasks: scopedTasks.slice(0, 12).map((task) => ({
         title: task.title,
         taskDate: task.taskDate,
         scheduledTime: task.scheduledTime,
         completed: task.completed ?? false,
         epicTitle: task.epicTitle ?? null,
       })),
-      inboxTasks: input.plannerContext.inboxTasks.slice(0, 8).map((task) => ({
+      inboxTasks: scopedInboxTasks.slice(0, 8).map((task) => ({
         title: task.title,
         taskDate: task.taskDate,
         scheduledTime: task.scheduledTime,
@@ -325,6 +342,7 @@ const buildUserPrompt = (
         : null,
     },
   });
+};
 
 const normalizeReply = (value: unknown): PlannerLLMReply | null => {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;

@@ -3,11 +3,14 @@ import {
   buildPlanDayCampaignGoalsAtRiskLine,
   buildPlanDayLoadReason,
   formatScheduleReference,
+  getActiveCampaignIdSet,
   getPlanDayAtRiskCampaignFacts,
   getPlanDayLoadBreakdown,
   getPlanDayLoadFacts,
   getPlanDayTargetDate,
   inferEnergyTypeFromTitle,
+  scopePlannerRitualsToActiveCampaigns,
+  scopePlannerTasksToActiveCampaigns,
 } from "./planner.ts";
 import type {
   OptimizerDraftCandidate,
@@ -482,6 +485,19 @@ export const buildPlanDayToolUserPrompt = (
   const loadBreakdown = getPlanDayLoadBreakdown(input, targetDate);
   const dateLabel = formatScheduleReference(input.currentDate, targetDate);
   const ctx = input.plannerContext;
+  const activeCampaignIds = getActiveCampaignIdSet(input);
+  const scopedTasks = scopePlannerTasksToActiveCampaigns(
+    ctx.tasks,
+    activeCampaignIds,
+  );
+  const scopedInboxTasks = scopePlannerTasksToActiveCampaigns(
+    ctx.inboxTasks,
+    activeCampaignIds,
+  );
+  const scopedRituals = scopePlannerRitualsToActiveCampaigns(
+    ctx.rituals,
+    activeCampaignIds,
+  );
   return JSON.stringify({
     currentDate: input.currentDate,
     currentDateTime: input.currentDateTime,
@@ -500,7 +516,7 @@ export const buildPlanDayToolUserPrompt = (
       candidatePlan: {
         proposals: baseProposals.map(summarizeProposalForPrompt),
       },
-      pendingTasksToday: ctx.tasks
+      pendingTasksToday: scopedTasks
         .filter((t) =>
           t.completed !== true && t.taskDate === input.currentDate
         )
@@ -511,7 +527,7 @@ export const buildPlanDayToolUserPrompt = (
           durationMinutes: t.estimatedDuration,
           epicTitle: t.epicTitle ?? null,
         })),
-      missedTasks: ctx.tasks
+      missedTasks: scopedTasks
         .filter((t) =>
           t.completed !== true &&
           t.taskDate !== null &&
@@ -519,7 +535,7 @@ export const buildPlanDayToolUserPrompt = (
         )
         .slice(0, 6)
         .map((t) => ({ title: t.title, taskDate: t.taskDate })),
-      inboxTasks: ctx.inboxTasks.slice(0, 8).map((t) => ({
+      inboxTasks: scopedInboxTasks.slice(0, 8).map((t) => ({
         title: t.title,
         epicTitle: t.epicTitle ?? null,
       })),
@@ -528,7 +544,7 @@ export const buildPlanDayToolUserPrompt = (
         endDate: e.endDate,
         progressPercentage: e.progressPercentage ?? null,
       })),
-      rituals: ctx.rituals.slice(0, 5).map((r) => ({
+      rituals: scopedRituals.slice(0, 5).map((r) => ({
         title: r.title,
         epicTitle: r.epicTitle,
         frequency: r.frequency,

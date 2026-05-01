@@ -270,8 +270,6 @@ const hasRichStructuredResponse = (
       structuredResponse?.priorityOverview ||
       structuredResponse?.reflectionBridge ||
       structuredResponse?.comingUp ||
-      structuredResponse?.rightNow ||
-      structuredResponse?.dayAdjust ||
       structuredResponse?.campaignMomentum,
   );
 

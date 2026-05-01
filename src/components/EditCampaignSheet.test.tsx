@@ -1,12 +1,13 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   activeEpics: [] as Array<Record<string, unknown>>,
   updateEpicMock: vi.fn(),
   deleteEpicMock: vi.fn(),
+  deleteCampaignRitualMock: vi.fn(),
   createCampaignRitualMock: vi.fn(),
   editRitualSheetMock: vi.fn(),
   fromMock: vi.fn(),
@@ -25,6 +26,7 @@ vi.mock("@/hooks/useEpics", () => ({
     activeEpics: mocks.activeEpics,
     updateEpic: (...args: unknown[]) => mocks.updateEpicMock(...args),
     deleteEpic: (...args: unknown[]) => mocks.deleteEpicMock(...args),
+    deleteCampaignRitual: (...args: unknown[]) => mocks.deleteCampaignRitualMock(...args),
     createCampaignRitual: (...args: unknown[]) => mocks.createCampaignRitualMock(...args),
   }),
 }));
@@ -117,6 +119,7 @@ describe("EditCampaignSheet", () => {
     mocks.activeEpics = [baseEpic];
     mocks.updateEpicMock.mockResolvedValue(undefined);
     mocks.deleteEpicMock.mockResolvedValue(undefined);
+    mocks.deleteCampaignRitualMock.mockResolvedValue(undefined);
     mocks.createCampaignRitualMock.mockResolvedValue(undefined);
     mocks.fromMock.mockReturnValue({
       delete: vi.fn().mockReturnValue({
@@ -177,6 +180,29 @@ describe("EditCampaignSheet", () => {
         title: "Morning focus",
       }),
     }));
+  });
+
+  it("deletes rituals through useEpics campaign ritual cleanup", async () => {
+    renderSheet();
+
+    fireEvent.click(screen.getByRole("button", { name: /Morning focus/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("edit-ritual-sheet")).toBeInTheDocument();
+    });
+
+    const props = mocks.editRitualSheetMock.mock.lastCall?.[0] as {
+      onDelete: (habitId: string) => Promise<void>;
+    };
+    await act(async () => {
+      await props.onDelete("habit-1");
+    });
+
+    expect(mocks.deleteCampaignRitualMock).toHaveBeenCalledWith({
+      epicId: "epic-1",
+      habitId: "habit-1",
+    });
+    expect(mocks.fromMock).not.toHaveBeenCalled();
   });
 
   it("adds a new ritual through createCampaignRitual", async () => {

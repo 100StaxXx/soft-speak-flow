@@ -12,6 +12,7 @@ import { useJourneysCompanionThreads } from "@/hooks/useJourneysCompanionThreads
 import { stripMarkdown } from "@/lib/utils";
 import {
   analyzeSchedulingIntent,
+  isUpcomingScheduleDigestMessage,
   shouldRouteMessageToPlanner,
 } from "@/shared/schedulingIntent";
 import {
@@ -158,7 +159,7 @@ const isExactPrepareTomorrowStarterMessage = (message: string): boolean =>
   message.trim().toLowerCase() === "prepare me for tomorrow";
 
 const isExactUpcomingStarterMessage = (message: string): boolean =>
-  message.trim().toLowerCase() === "what do i have coming up?";
+  isUpcomingScheduleDigestMessage(message);
 
 const mapLegacyProposalToPendingAction = (
   proposal: {

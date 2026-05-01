@@ -115,6 +115,116 @@ describe("sanitizePlannerContext", () => {
       suggestedWorkload: "normal",
     });
   });
+
+  it("strips stale deleted campaign context before building a planner request", () => {
+    const context: CompanionPlannerRequest["plannerContext"] = {
+      tasks: [
+        {
+          id: "task-stale-ritual",
+          title: "Daily Hydration",
+          taskDate: "2026-04-21",
+          scheduledTime: null,
+          estimatedDuration: 10,
+          recurrencePattern: "daily",
+          epicId: "deleted-epic",
+          epicTitle: "Gain 10 pounds of muscle",
+          habitSourceId: "deleted-habit",
+        },
+        {
+          id: "task-stale-standalone",
+          title: "Buy running shoes",
+          taskDate: "2026-04-21",
+          scheduledTime: null,
+          estimatedDuration: 20,
+          recurrencePattern: null,
+          epicId: "deleted-epic",
+          epicTitle: "Gain 10 pounds of muscle",
+          habitSourceId: null,
+        },
+      ] as CompanionPlannerRequest["plannerContext"]["tasks"],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [
+        {
+          id: "deleted-habit",
+          epicId: "deleted-epic",
+          epicTitle: "Gain 10 pounds of muscle",
+          title: "Daily Hydration",
+          frequency: "daily",
+          preferredTime: "08:00",
+          currentStreak: 2,
+        },
+      ],
+      calendarEvents: [],
+      priorityScores: [
+        {
+          id: "epic:deleted-epic",
+          kind: "epic",
+          title: "Gain 10 pounds of muscle",
+          score: 91,
+          reasons: ["stale campaign"],
+          epicId: "deleted-epic",
+        },
+        {
+          id: "ritual:deleted-habit",
+          kind: "ritual",
+          title: "Daily Hydration",
+          score: 88,
+          reasons: ["stale ritual"],
+          ritualId: "deleted-habit",
+          epicId: "deleted-epic",
+        },
+        {
+          id: "epic:orphan-deleted",
+          kind: "epic",
+          title: "Gain 10 pounds of muscle",
+          score: 75,
+          reasons: ["legacy orphan score"],
+          epicId: null,
+        },
+        {
+          id: "ritual:orphan-deleted",
+          kind: "ritual",
+          title: "Daily Hydration",
+          score: 74,
+          reasons: ["legacy orphan ritual score"],
+          ritualId: "deleted-habit",
+          epicId: null,
+        },
+        {
+          id: "task:task-stale-standalone",
+          kind: "task",
+          title: "Buy running shoes",
+          score: 70,
+          reasons: ["still useful as standalone"],
+          taskId: "task-stale-standalone",
+          epicId: "deleted-epic",
+        },
+      ],
+      aiSignals: {
+        commonContexts: [],
+      },
+    };
+
+    const sanitized = sanitizePlannerContext(context);
+
+    expect(sanitized.tasks).toEqual([
+      expect.objectContaining({
+        id: "task-stale-standalone",
+        epicId: null,
+        epicTitle: null,
+      }),
+    ]);
+    expect(sanitized.rituals).toEqual([]);
+    expect(sanitized.priorityScores).toEqual([
+      expect.objectContaining({
+        id: "task:task-stale-standalone",
+        epicId: null,
+      }),
+    ]);
+    expect(JSON.stringify(sanitized)).not.toContain("Daily Hydration");
+    expect(JSON.stringify(sanitized)).not.toContain("Gain 10 pounds of muscle");
+  });
 });
 
 describe("sanitizePlannerSessionState", () => {
@@ -137,6 +247,8 @@ describe("sanitizePlannerSessionState", () => {
       reminderPreference: null,
       pendingStarterIntent: undefined,
       lastClassification: "brain-dump",
+      planDayEnergy: undefined,
+      planningConsent: null,
     });
   });
 });

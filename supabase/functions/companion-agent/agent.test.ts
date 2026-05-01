@@ -384,6 +384,58 @@ Deno.test("runCompanionAgent answers typed upcoming schedule reads without OpenA
   }
 });
 
+Deno.test("runCompanionAgent answers upcoming reads even with stale UI follow-up context", async () => {
+  const supabase = createMockSupabase();
+  let guardedFetchCalled = false;
+  const guardedFetch = (async (input: string | URL | Request) => {
+    guardedFetchCalled = true;
+    throw new Error(
+      `Upcoming schedule reads should not call OpenAI: ${String(input)}`,
+    );
+  }) as typeof fetch;
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-upcoming-stale-follow-up",
+      message: "What do I have coming up?",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T20:32:00-07:00",
+      turnOrigin: "composer",
+      activeFollowUp: {
+        question: "Should today lean focus, recovery, or catching up?",
+        reason:
+          "That choice changes whether I protect deep work, lighten the load, or triage overdue items.",
+        expectedAnswerType: "choice",
+        options: ["Focus", "Recovery", "Catch up"],
+        blocksDrafting: true,
+      },
+      activeProposedActions: [
+        {
+          type: "task_create",
+          summary: "Stale previous suggestion",
+          normalizedPayload: { title: "Stale previous suggestion" },
+        },
+      ],
+    },
+  });
+
+  assertEquals(guardedFetchCalled, false);
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.intent, "check_calendar");
+  assertEquals(
+    result.reply,
+    "Today: nothing scheduled.\nTomorrow: nothing scheduled.",
+  );
+  assertEquals(result.followUp, null);
+  assertEquals(result.proposedActions, []);
+  assertEquals(result.pendingAction, undefined);
+});
+
 Deno.test("runCompanionAgent routes plan-day follow-up answers through the planner", async () => {
   const supabase = createMockSupabase();
   let guardedFetchCalled = false;
@@ -930,6 +982,44 @@ Deno.test("runCompanionAgent preserves active follow-up when OpenAI returns only
   assertEquals(result.understandingState, "needs_followup");
   assertEquals(result.followUp?.question, followUp.question);
   assert(result.reply !== "I'm here.");
+  assert(result.reply.includes(followUp.question));
+  assertEquals(result.proposedActions, []);
+  assertEquals(result.structuredResponse, null);
+  assertEquals(result.pendingAction, undefined);
+});
+
+Deno.test("runCompanionAgent treats the need-more fallback as a thin reply", async () => {
+  const followUp = {
+    question:
+      "What are we making room for: focus work, recovery, or a specific commitment?",
+    reason: "The next step depends on what should move.",
+    expectedAnswerType: "choice" as const,
+    options: ["Focus work", "Recovery", "Specific commitment"],
+    blocksDrafting: true,
+  };
+  const supabase = createMockSupabase();
+  const { guardedFetch } = createOutputTextCaptureFetch(
+    "I need a little more to help. Tell me what you want to do next.",
+  );
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-active-follow-up-need-more-output",
+      message: "Recovery",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      activeFollowUp: followUp,
+    },
+  });
+
+  assertEquals(result.mode, "clarify");
+  assertEquals(result.understandingState, "needs_followup");
+  assertEquals(result.followUp?.question, followUp.question);
   assert(result.reply.includes(followUp.question));
   assertEquals(result.proposedActions, []);
   assertEquals(result.structuredResponse, null);

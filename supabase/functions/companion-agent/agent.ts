@@ -626,10 +626,16 @@ const normalizeBareStarterPrompt = (value: string): string =>
 
 const isThinGenericAgentReply = (value: string): boolean => {
   const normalized = normalizeBareStarterPrompt(value);
+  const withoutSentencePunctuation = normalized
+    .replace(/[.!?]+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
   return normalized === "i'm here" ||
     normalized === "im here" ||
     normalized === "i am here" ||
-    normalized === "here";
+    normalized === "here" ||
+    withoutSentencePunctuation ===
+      "i need a little more to help tell me what you want to do next";
 };
 
 const isLauncherTurn = (request: CompanionAgentRequest): boolean =>
@@ -650,6 +656,14 @@ const isDeterministicScheduleReadRequest = (
     isUpcomingScheduleDigestMessage(request.message) ||
     isScheduleReadMessage(request.message);
 };
+
+const getScheduleReadStarterIntent = (
+  request: CompanionAgentRequest,
+): string | null =>
+  request.starterIntent === "upcoming_start" ||
+    isUpcomingScheduleDigestMessage(request.message)
+    ? "upcoming_start"
+    : null;
 
 const resolveBareStarterFollowUp = (
   request: CompanionAgentRequest,
@@ -2945,6 +2959,17 @@ export async function runCompanionAgent(params: RunAgentParams) {
         const activeFollowUp = params.request.activeFollowUp ??
           getPersistedActiveFollowUp(context);
         if (
+          (!outputReply || isThinGenericAgentReply(outputReply)) &&
+          isDeterministicScheduleReadRequest(params.request)
+        ) {
+          return buildPlannerFallbackResult("thin_schedule_read_output", {
+            starterIntent: getScheduleReadStarterIntent(params.request),
+            ignoreActiveFollowUp: true,
+            confidence: 0.82,
+            suppressWarning: true,
+          });
+        }
+        if (
           isFollowUpOptionTurn(params.request) &&
           activeFollowUp &&
           (!outputReply || isThinGenericAgentReply(outputReply))
@@ -2999,6 +3024,17 @@ export async function runCompanionAgent(params: RunAgentParams) {
         const activeFollowUp = params.request.activeFollowUp ??
           getPersistedActiveFollowUp(context);
         const followUpToPreserve = activeFollowUp ?? followUp;
+        if (
+          isThinGenericAgentReply(payloadReply) &&
+          isDeterministicScheduleReadRequest(params.request)
+        ) {
+          return buildPlannerFallbackResult("thin_schedule_read_result", {
+            starterIntent: getScheduleReadStarterIntent(params.request),
+            ignoreActiveFollowUp: true,
+            confidence: 0.82,
+            suppressWarning: true,
+          });
+        }
         if (
           isFollowUpOptionTurn(params.request) &&
           followUpToPreserve &&
@@ -3087,7 +3123,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
       },
     );
 
-  const buildPlannerFallbackResult = (
+  function buildPlannerFallbackResult(
     reason: string,
     options: {
       starterIntent?: string | null;
@@ -3096,7 +3132,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
       ignoreActiveFollowUp?: boolean;
       suppressWarning?: boolean;
     } = {},
-  ): AgentRunResult => {
+  ): AgentRunResult {
     if (!options.suppressWarning) {
       console.warn("[companion-agent] planner fallback", {
         sessionId: params.request.sessionId,
@@ -3178,7 +3214,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
       openaiConversationId: context.thread?.openai_conversation_id ?? null,
       lastOpenAIResponseId: context.thread?.last_openai_response_id ?? null,
     };
-  };
+  }
 
   const bareStarterResult = buildBareStarterAgentResult({
     request: params.request,
@@ -3187,10 +3223,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
   const deterministicScheduleReadResult = !bareStarterResult &&
       isDeterministicScheduleReadRequest(params.request)
     ? buildPlannerFallbackResult("deterministic_schedule_read", {
-      starterIntent: params.request.starterIntent === "upcoming_start" ||
-          isUpcomingScheduleDigestMessage(params.request.message)
-        ? "upcoming_start"
-        : null,
+      starterIntent: getScheduleReadStarterIntent(params.request),
       ignoreActiveFollowUp: true,
       confidence: 0.82,
       suppressWarning: true,

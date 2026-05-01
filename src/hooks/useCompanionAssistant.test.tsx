@@ -694,6 +694,44 @@ describe("useCompanionAssistant", () => {
     );
   });
 
+  it("tags typed upcoming schedule reads with the upcoming starter intent", async () => {
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("persisted-session");
+    });
+
+    act(() => {
+      result.current.setDraftInput("What do I have coming up?");
+    });
+
+    await act(async () => {
+      await result.current.submitTypedMessage();
+    });
+
+    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+      "companion-agent",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          message: "What do I have coming up?",
+          turnOrigin: "composer",
+          starterIntent: "upcoming_start",
+        }),
+      }),
+    );
+    expect(mocks.trackInteraction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modifications: expect.objectContaining({
+          starterIntent: "upcoming_start",
+        }),
+      }),
+    );
+  });
+
   it("marks follow-up option submissions with the follow-up turn origin", async () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(
