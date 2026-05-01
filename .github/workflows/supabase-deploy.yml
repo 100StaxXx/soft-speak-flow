@@ -20,6 +20,11 @@ on:
         description: Active wallpaper date for the repair flow (YYYY-MM-DD)
         required: false
         default: "2026-04-09"
+      allow_new_functions:
+        description: Allow deploy to create Edge Functions missing from the Supabase project
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   repair-wallpapers:
@@ -349,12 +354,63 @@ jobs:
           deno test --allow-env --sloppy-imports supabase/functions/generate-companion-stat-analysis/index.test.ts
 
       - name: Deploy allow-listed Edge Functions
+        env:
+          ALLOW_NEW_FUNCTIONS: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_new_functions == true }}
         run: |
           set -euo pipefail
+
+          supabase functions list --project-ref "$PROJECT_REF" -o json > /tmp/supabase-functions.json
+
+          jq -r '
+            if type == "array" then .[]
+            elif type == "object" and has("functions") and (.functions | type == "array") then .functions[]
+            elif type == "object" and has("data") and (.data | type == "array") then .data[]
+            else empty end
+            | .name // .slug // .id // empty
+          ' /tmp/supabase-functions.json | sort -u > /tmp/existing-functions.txt
+
+          existing_count="$(wc -l < /tmp/existing-functions.txt | tr -d ' ')"
+          echo "Found ${existing_count} deployed Edge Functions in Supabase"
+
+          if [ "$existing_count" -eq 0 ] && [ "${ALLOW_NEW_FUNCTIONS}" != "true" ]; then
+            echo "Supabase returned no deployed functions; refusing to skip the entire allow-list." >&2
+            exit 1
+          fi
+
+          jq -r '.allowList[]' supabase/function-manifest.json > /tmp/allow-listed-functions.txt
+          sort -u /tmp/allow-listed-functions.txt > /tmp/allow-listed-functions.sorted.txt
+          comm -23 /tmp/existing-functions.txt /tmp/allow-listed-functions.sorted.txt > /tmp/deployed-outside-allow-list.txt
+          : > /tmp/skipped-new-functions.txt
+
           while IFS= read -r fn; do
             if [ -z "$fn" ]; then
               continue
             fi
-            echo "Deploying function: $fn"
-            supabase functions deploy "$fn" --project-ref "$PROJECT_REF"
-          done < <(jq -r '.allowList[]' supabase/function-manifest.json)
+
+            if grep -Fxq "$fn" /tmp/existing-functions.txt; then
+              echo "Deploying function: $fn"
+              supabase functions deploy "$fn" --project-ref "$PROJECT_REF"
+              continue
+            fi
+
+            if [ "${ALLOW_NEW_FUNCTIONS}" = "true" ]; then
+              echo "Deploying new function with explicit override: $fn"
+              supabase functions deploy "$fn" --project-ref "$PROJECT_REF"
+              continue
+            fi
+
+            echo "Skipping undeployed function under function quota guard: $fn"
+            echo "$fn" >> /tmp/skipped-new-functions.txt
+          done < /tmp/allow-listed-functions.txt
+
+          if [ -s /tmp/skipped-new-functions.txt ]; then
+            skipped_count="$(wc -l < /tmp/skipped-new-functions.txt | tr -d ' ')"
+            echo "::warning title=Skipped undeployed Edge Functions::Skipped ${skipped_count} allow-listed functions that do not exist in Supabase. Set allow_new_functions=true after pruning functions or upgrading the project quota to create them."
+            sed 's/^/Skipped function: /' /tmp/skipped-new-functions.txt
+          fi
+
+          if [ -s /tmp/deployed-outside-allow-list.txt ]; then
+            outside_count="$(wc -l < /tmp/deployed-outside-allow-list.txt | tr -d ' ')"
+            echo "::warning title=Deployed functions outside manifest::Supabase has ${outside_count} deployed functions that are not in supabase/function-manifest.json. Audit these before pruning production functions."
+            sed 's/^/Deployed outside manifest: /' /tmp/deployed-outside-allow-list.txt
+          fi
