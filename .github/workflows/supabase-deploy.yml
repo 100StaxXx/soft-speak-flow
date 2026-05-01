@@ -6,6 +6,11 @@ on:
       - main
     paths:
       - "supabase/**"
+      - "src/config/**"
+      - "src/lib/**"
+      - "src/shared/**"
+      - "src/types/**"
+      - "src/utils/**"
       - "scripts/check-function-manifest.sh"
       - "scripts/generate-function-manifest.sh"
       - "supabase/function-manifest.json"
