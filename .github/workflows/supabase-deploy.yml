@@ -377,6 +377,27 @@ jobs:
             exit 1
           fi
 
+          deploy_function() {
+            local fn="$1"
+            local attempt
+            local delay
+
+            for attempt in 1 2 3; do
+              if supabase functions deploy "$fn" --project-ref "$PROJECT_REF"; then
+                return 0
+              fi
+
+              if [ "$attempt" -eq 3 ]; then
+                echo "Deploy failed after ${attempt} attempts: ${fn}" >&2
+                return 1
+              fi
+
+              delay=$((attempt * 15))
+              echo "::warning title=Retrying Edge Function deploy::Deploy of ${fn} failed on attempt ${attempt}; retrying in ${delay}s."
+              sleep "$delay"
+            done
+          }
+
           jq -r '.allowList[]' supabase/function-manifest.json > /tmp/allow-listed-functions.txt
           sort -u /tmp/allow-listed-functions.txt > /tmp/allow-listed-functions.sorted.txt
           comm -23 /tmp/existing-functions.txt /tmp/allow-listed-functions.sorted.txt > /tmp/deployed-outside-allow-list.txt
@@ -389,13 +410,13 @@ jobs:
 
             if grep -Fxq "$fn" /tmp/existing-functions.txt; then
               echo "Deploying function: $fn"
-              supabase functions deploy "$fn" --project-ref "$PROJECT_REF"
+              deploy_function "$fn"
               continue
             fi
 
             if [ "${ALLOW_NEW_FUNCTIONS}" = "true" ]; then
               echo "Deploying new function with explicit override: $fn"
-              supabase functions deploy "$fn" --project-ref "$PROJECT_REF"
+              deploy_function "$fn"
               continue
             fi
 
