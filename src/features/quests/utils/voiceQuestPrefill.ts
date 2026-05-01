@@ -225,6 +225,7 @@ export function buildQuestPrefillFromNaturalLanguage(
     recurrenceCustomPeriod: recurrencePrefill.recurrenceCustomPeriod,
     reminderEnabled: parsed.reminderEnabled,
     reminderMinutesBefore: parsed.reminderMinutesBefore ?? undefined,
+    reminderOffsetsMinutes: parsed.reminderOffsetsMinutes,
     moreInformation: trimOrNull(parsed.notes),
     location: null,
     creationSource,

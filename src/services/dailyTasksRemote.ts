@@ -29,6 +29,8 @@ export interface DailyTask {
   is_recurring: boolean | null;
   reminder_enabled: boolean | null;
   reminder_minutes_before: number | null;
+  reminder_offsets_minutes?: number[] | null;
+  reminder_sent_offsets_minutes?: number[] | null;
   reminder_sent: boolean | null;
   parent_template_id: string | null;
   category: string | null;

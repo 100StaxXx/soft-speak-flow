@@ -145,13 +145,19 @@ const baseAnalysis = {
   suggestedAction: "Pair one morning check-in with one on-time task today.",
 };
 
-function createMockSupabase(analysisRow: unknown) {
+function createMockSupabase(
+  analysisRow: unknown,
+  visualPersonaRow: unknown = null,
+) {
   const operations: Array<[string, ...unknown[]]> = [];
 
   return {
     operations,
     from(table: string) {
-      assertEquals(table, "companion_stat_analyses", "Unexpected table lookup");
+      assert(
+        table === "companion_stat_analyses" || table === "questionnaire_responses",
+        `Unexpected table lookup: ${table}`,
+      );
       const builder = {
         select(columns: string) {
           operations.push(["select", columns]);
@@ -171,7 +177,10 @@ function createMockSupabase(analysisRow: unknown) {
         },
         maybeSingle() {
           operations.push(["maybeSingle"]);
-          return Promise.resolve({ data: analysisRow, error: null });
+          return Promise.resolve({
+            data: table === "companion_stat_analyses" ? analysisRow : visualPersonaRow,
+            error: null,
+          });
         },
       };
       return builder;
@@ -204,8 +213,12 @@ Deno.test("generate-cosmiq-title-card ignores client-supplied analysis and requi
 });
 
 Deno.test("generate-cosmiq-title-card loads the authenticated user's saved analysis", async () => {
-  const supabase = createMockSupabase({ payload: baseAnalysis, analysis_date: "2026-04-30" });
+  const supabase = createMockSupabase(
+    { payload: baseAnalysis, analysis_date: "2026-04-30" },
+    { answer_tags: ["visual_persona_female"] },
+  );
   let resolvedAnalysisTitle = "";
+  let resolvedVisualPersona = "";
 
   const response = await module.handleGenerateCosmiqTitleCard(
     new Request("http://localhost", {
@@ -216,8 +229,9 @@ Deno.test("generate-cosmiq-title-card loads the authenticated user's saved analy
       authenticate: async () => ({ userId: "user-1", isServiceRole: false }),
       createSupabaseClient: () => supabase,
       fetchImpl: fetch,
-      resolveCosmiqTitleCard: async ({ analysis }) => {
+      resolveCosmiqTitleCard: async ({ analysis, visualPersona }) => {
         resolvedAnalysisTitle = analysis.cosmiqTitle.title;
+        resolvedVisualPersona = visualPersona ?? "";
         return {
           profileKey: "v1-the-oathbound-pathfinder",
           imageUrl: "https://cdn.example.com/card.png",
@@ -233,6 +247,7 @@ Deno.test("generate-cosmiq-title-card loads the authenticated user's saved analy
   const payload = await response.json();
   assertEquals(payload.card.status, "ready", "Expected resolver card payload");
   assertEquals(resolvedAnalysisTitle, "The Oathbound Pathfinder", "Expected saved analysis to reach resolver");
+  assertEquals(resolvedVisualPersona, "female", "Expected visual persona to reach resolver");
   assert(
     supabase.operations.some(([operation, column, value]) =>
       operation === "eq" && column === "user_id" && value === "user-1"
@@ -245,6 +260,36 @@ Deno.test("generate-cosmiq-title-card loads the authenticated user's saved analy
     ),
     "Expected query to scope by requested analysis date",
   );
+});
+
+Deno.test("generate-cosmiq-title-card passes forced refresh through to the resolver", async () => {
+  const supabase = createMockSupabase({ payload: baseAnalysis, analysis_date: "2026-04-30" });
+  let resolvedForceRefresh = false;
+
+  const response = await module.handleGenerateCosmiqTitleCard(
+    new Request("http://localhost", {
+      method: "POST",
+      body: JSON.stringify({ analysisDate: "2026-04-30", forceRefresh: true }),
+    }),
+    {
+      authenticate: async () => ({ userId: "user-1", isServiceRole: false }),
+      createSupabaseClient: () => supabase,
+      fetchImpl: fetch,
+      resolveCosmiqTitleCard: async ({ forceRefresh }) => {
+        resolvedForceRefresh = forceRefresh === true;
+        return {
+          profileKey: "v1-the-oathbound-pathfinder-neutral",
+          imageUrl: "https://cdn.example.com/card.png",
+          status: "ready",
+          cached: false,
+          promptVersion: 1,
+        };
+      },
+    },
+  );
+
+  assertEquals(response.status, 200, "Forced refresh should still return a card response");
+  assertEquals(resolvedForceRefresh, true, "Expected forced refresh to reach resolver");
 });
 
 Deno.test("generate-cosmiq-title-card rejects malformed analysis dates", async () => {

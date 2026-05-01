@@ -297,6 +297,10 @@ export const PlannerRequestSchema = z.object({
       daysRemaining: z.number().nullable().optional(),
       habitCount: z.number().nullable().optional(),
     })),
+    activeHabitIds: z.array(z.string()).optional(),
+    pendingLocalTaskIds: z.array(z.string()).optional(),
+    pendingLocalEpicIds: z.array(z.string()).optional(),
+    pendingLocalHabitIds: z.array(z.string()).optional(),
     rituals: z.array(z.object({
       id: z.string(),
       epicId: z.string(),

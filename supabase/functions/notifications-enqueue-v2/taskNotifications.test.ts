@@ -1,4 +1,15 @@
-import { buildTaskNotificationCandidates } from "./taskNotifications.ts";
+import {
+  buildTaskNotificationCandidates,
+  buildTaskNotificationScanDateRange,
+} from "./taskNotifications.ts";
+
+Deno.test("task notification scan range covers week-long reminders plus timezone buffer", () => {
+  const range = buildTaskNotificationScanDateRange(new Date("2026-04-11T12:00:00.000Z"));
+
+  if (range.startDateIso !== "2026-04-10" || range.endDateIso !== "2026-04-19") {
+    throw new Error(`Expected scan range to cover yesterday through eight days out, got ${JSON.stringify(range)}`);
+  }
+});
 
 Deno.test("enqueues only the early reminder before the quest start time", () => {
   const rows = buildTaskNotificationCandidates({
@@ -54,6 +65,38 @@ Deno.test("enqueues both early reminder and quest start after the start time", (
   const types = rows.map((row) => row.type).sort();
   if (types.join(",") !== "task_reminder,task_start") {
     throw new Error(`Expected both task notifications after start, got ${JSON.stringify(rows)}`);
+  }
+});
+
+Deno.test("enqueues one quest reminder per due configured offset", () => {
+  const rows = buildTaskNotificationCandidates({
+    now: new Date("2026-04-11T21:50:00.000Z"),
+    profilesByUser: new Map([
+      ["user-1", { id: "user-1", timezone: "UTC", task_reminders_enabled: true }],
+    ]),
+    tasks: [{
+      id: "task-1",
+      user_id: "user-1",
+      task_text: "Quest",
+      xp_reward: 50,
+      task_date: "2026-04-11",
+      scheduled_time: "22:00:00",
+      start_notification_sent: false,
+      reminder_enabled: true,
+      reminder_sent: false,
+      reminder_minutes_before: 10,
+      reminder_offsets_minutes: [10, 60],
+      reminder_sent_offsets_minutes: [60],
+      completed: false,
+    }],
+  });
+
+  if (rows.length !== 1 || rows[0]?.dedupeKey !== "task_reminder:task-1:10") {
+    throw new Error(`Expected only the unsent 10-minute reminder, got ${JSON.stringify(rows)}`);
+  }
+
+  if (rows[0].payload.reminder_offset_minutes !== 10) {
+    throw new Error(`Expected reminder payload to carry the delivered offset, got ${JSON.stringify(rows[0].payload)}`);
   }
 });
 

@@ -47,6 +47,7 @@ const isQuestDraftSnapshot = (value: unknown): value is QuestDraftSnapshot => {
     && (recurrenceCustomPeriod === null || recurrenceCustomPeriod === "week" || recurrenceCustomPeriod === "month")
     && typeof candidate.reminderEnabled === "boolean"
     && typeof candidate.reminderMinutesBefore === "number"
+    && (candidate.reminderOffsetsMinutes === undefined || isNumberArray(candidate.reminderOffsetsMinutes))
     && (candidate.moreInformation === null || typeof candidate.moreInformation === "string")
     && (candidate.location === null || typeof candidate.location === "string")
     && typeof candidate.sendToCalendar === "boolean"

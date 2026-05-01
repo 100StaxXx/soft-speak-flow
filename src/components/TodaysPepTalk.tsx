@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback, memo, useMemo } from "react";
+import { flushSync } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { StaticBackgroundImage } from "@/components/StaticBackgroundImage";
@@ -203,6 +204,7 @@ export const TodaysPepTalk = memo(() => {
   const isAwardingXPRef = useRef(false);
   const hasAwardedXPRef = useRef(false);
   const previousTabActiveRef = useRef(isTabActive);
+  const generatePepTalkInFlightRef = useRef(false);
   const isNativeIOS = useMemo(
     () => typeof window !== "undefined" && Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios",
     [],
@@ -384,56 +386,66 @@ export const TodaysPepTalk = memo(() => {
   }, [pepTalk?.id, pepTalkQueryKey, queryClient, timedTranscript.length]);
 
   const generatePepTalkMutation = useMutation({
+    retry: false,
     mutationFn: async (nextMentorSlug: string) => {
       setGenerationStage("script");
-      const { data, error: generationError } = await supabase.functions.invoke(
-        "generate-single-daily-pep-talk",
-        { body: { mentorSlug: nextMentorSlug } },
-      );
+      let audioStageTimer: number | null = window.setTimeout(() => {
+        setGenerationStage("audio");
+      }, 1200);
 
-      setGenerationStage("audio");
+      try {
+        const { data, error: generationError } = await supabase.functions.invoke(
+          "generate-single-daily-pep-talk",
+          { body: { mentorSlug: nextMentorSlug } },
+        );
 
-      if (generationError) {
-        const parsedError = await parseFunctionInvokeError(generationError);
-        const userMessage = toUserFacingFunctionError(parsedError, {
-          action: "refresh today's pep talk",
-        });
+        if (generationError) {
+          const parsedError = await parseFunctionInvokeError(generationError);
+          const userMessage = toUserFacingFunctionError(parsedError, {
+            action: "refresh today's pep talk",
+          });
 
-        log.warn("Pep talk generation returned HTTP error", {
-          status: parsedError.status,
-          backendMessage: parsedError.backendMessage,
-          category: parsedError.category,
-          code: parsedError.code,
-          upstreamStatus: parsedError.upstreamStatus,
-          upstreamError: parsedError.upstreamError,
-          requestId: parsedError.requestId,
-        });
+          log.warn("Pep talk generation returned HTTP error", {
+            status: parsedError.status,
+            backendMessage: parsedError.backendMessage,
+            category: parsedError.category,
+            code: parsedError.code,
+            upstreamStatus: parsedError.upstreamStatus,
+            upstreamError: parsedError.upstreamError,
+            requestId: parsedError.requestId,
+          });
 
-        throw new Error(userMessage);
+          throw new Error(userMessage);
+        }
+
+        const generatedPepTalk =
+          data && typeof data === "object" && "pepTalk" in data
+            ? (data as { pepTalk?: Record<string, unknown> }).pepTalk
+            : null;
+
+        if (!generatedPepTalk) {
+          throw new Error("No pep talk data returned");
+        }
+
+        setGenerationStage("loading");
+
+        const { data: mentor } = await supabase
+          .from("mentors")
+          .select("name")
+          .eq("slug", nextMentorSlug)
+          .maybeSingle();
+
+        return {
+          pepTalk: normalizeDailyPepTalk(generatedPepTalk, mentor?.name),
+          mentorSlug: nextMentorSlug,
+          isFallback: false,
+        } satisfies TodayPepTalkQueryData;
+      } finally {
+        if (audioStageTimer !== null) {
+          window.clearTimeout(audioStageTimer);
+          audioStageTimer = null;
+        }
       }
-
-      const generatedPepTalk =
-        data && typeof data === "object" && "pepTalk" in data
-          ? (data as { pepTalk?: Record<string, unknown> }).pepTalk
-          : null;
-
-      if (!generatedPepTalk) {
-        throw new Error("No pep talk data returned");
-      }
-
-      setGenerationStage("loading");
-
-      const { data: mentor } = await supabase
-        .from("mentors")
-        .select("name")
-        .eq("slug", nextMentorSlug)
-        .maybeSingle();
-
-      return {
-        pepTalk: normalizeDailyPepTalk(generatedPepTalk, mentor?.name),
-        mentorSlug: nextMentorSlug,
-        isFallback: false,
-      } satisfies TodayPepTalkQueryData;
     },
     onSuccess: (nextData) => {
       transcriptSyncAttemptedIdsRef.current.delete(nextData.pepTalk?.id ?? "");
@@ -455,26 +467,39 @@ export const TodaysPepTalk = memo(() => {
         });
       }
 
+      generatePepTalkInFlightRef.current = false;
+      flushSync(() => {
+        setGenerationStage("idle");
+      });
       toast.error(errorMessage);
     },
-    onSettled: async () => {
+    onSettled: async (_nextData, mutationError) => {
       try {
-        await queryClient.invalidateQueries({ queryKey: pepTalkQueryKey });
-        await queryClient.refetchQueries({ queryKey: pepTalkQueryKey });
+        if (!mutationError) {
+          await queryClient.invalidateQueries({ queryKey: pepTalkQueryKey });
+          await queryClient.refetchQueries({ queryKey: pepTalkQueryKey });
+        }
       } finally {
+        generatePepTalkInFlightRef.current = false;
         setGenerationStage("idle");
       }
     },
   });
 
-  const isGenerating = generatePepTalkMutation.isPending;
+  const isGenerating = generatePepTalkMutation.isPending || generatePepTalkInFlightRef.current;
 
   const handleGeneratePepTalk = () => {
+    if (generatePepTalkInFlightRef.current || generatePepTalkMutation.isPending) {
+      return;
+    }
+
     if (!mentorSlug) {
       toast.error("No guide selected");
       return;
     }
 
+    generatePepTalkInFlightRef.current = true;
+    setGenerationStage("script");
     generatePepTalkMutation.mutate(mentorSlug);
   };
 
@@ -869,6 +894,7 @@ export const TodaysPepTalk = memo(() => {
               {isGenerating ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  {generationStage === "idle" && "Preparing..."}
                   {generationStage === "script" && "Preparing script..."}
                   {generationStage === "audio" && "Creating audio..."}
                   {generationStage === "loading" && "Loading..."}
@@ -930,6 +956,7 @@ export const TodaysPepTalk = memo(() => {
                 {isGenerating ? (
                   <>
                     <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    {generationStage === "idle" && "Refreshing..."}
                     {generationStage === "script" && "Writing..."}
                     {generationStage === "audio" && "Recording..."}
                     {generationStage === "loading" && "Loading..."}

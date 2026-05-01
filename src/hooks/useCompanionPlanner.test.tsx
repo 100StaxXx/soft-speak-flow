@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => ({
   monthTasks: [] as Array<Record<string, unknown>>,
   inboxTasks: [] as Array<Record<string, unknown>>,
   activeEpics: [] as Array<Record<string, unknown>>,
+  queuedReceipts: [] as Array<Record<string, unknown>>,
   user: {
     id: "user-1",
   } as { id: string } | null,
@@ -197,6 +198,7 @@ vi.mock("@/hooks/useSchedulingLearner", () => ({
 vi.mock("@/contexts/ResilienceContext", () => ({
   useResilience: () => ({
     queueAction: mocks.queueAction,
+    receipts: mocks.queuedReceipts,
     shouldQueueWrites: false,
     retryNow: mocks.retryNow,
   }),
@@ -273,6 +275,7 @@ describe("useCompanionPlanner", () => {
     mocks.monthTasks = [];
     mocks.inboxTasks = [];
     mocks.activeEpics = [];
+    mocks.queuedReceipts = [];
     Object.defineProperty(window, "localStorage", {
       configurable: true,
       writable: true,
@@ -1678,6 +1681,101 @@ describe("useCompanionPlanner", () => {
       ]),
     );
     expect(JSON.stringify(plannerContext)).not.toContain("Daily Hydration");
+  });
+
+  it("marks queued campaign ritual creates as pending local habits", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-19T09:30:00.000Z"));
+    mocks.activeEpics = [{
+      id: "epic-active",
+      user_id: "user-1",
+      title: "Active Campaign",
+      description: null,
+      status: "active",
+      progress_percentage: 25,
+      target_days: 30,
+      start_date: "2026-04-01",
+      end_date: "2026-05-01",
+      created_at: "2026-04-01T00:00:00.000Z",
+      epic_habits: [
+        {
+          habit_id: "habit-pending-ritual",
+          habits: {
+            id: "habit-pending-ritual",
+            title: "Pending ritual",
+            difficulty: "medium",
+            frequency: "daily",
+            preferred_time: "08:00",
+            estimated_minutes: 15,
+          },
+        },
+      ],
+    }];
+    mocks.todayTasks = [{
+      id: "task-pending-ritual",
+      task_text: "Pending ritual",
+      task_date: "2026-04-19",
+      completed: false,
+      completed_at: null,
+      scheduled_time: "08:00",
+      estimated_duration: 15,
+      habit_source_id: "habit-pending-ritual",
+      epic_id: "epic-active",
+      epic_title: "Active Campaign",
+      subtasks: [],
+    }];
+    mocks.weekTasks = [...mocks.todayTasks];
+    mocks.queuedReceipts = [{
+      id: "queue-ritual",
+      actionKind: "EPIC_RITUAL_CREATE",
+      entityType: "epic",
+      entityId: "epic-active",
+      status: "queued",
+      payload: {
+        habit: { id: "habit-pending-ritual" },
+      },
+    }];
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "schedule_read",
+        reply: "I still see the pending ritual.",
+        followUpQuestions: [],
+        proposals: [],
+        suggestedReminders: [],
+        memoryUpdates: {},
+        sessionState: {
+          draft: {},
+          openQuestionIds: [],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
+
+    await act(async () => {
+      await result.current.submitMessage("What do I have coming up?", "text");
+    });
+
+    const request = mocks.invoke.mock.calls[0]?.[1];
+    const plannerContext = request?.body.plannerContext;
+    expect(plannerContext.pendingLocalHabitIds).toEqual(["habit-pending-ritual"]);
+    expect(plannerContext.rituals).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "habit-pending-ritual" }),
+      ]),
+    );
+    expect(plannerContext.tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ habitSourceId: "habit-pending-ritual" }),
+      ]),
+    );
   });
 
   it("falls back to backend classification when client-side classification preflight times out", async () => {

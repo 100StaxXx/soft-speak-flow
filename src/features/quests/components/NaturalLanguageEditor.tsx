@@ -134,7 +134,11 @@ export function NaturalLanguageEditor({ onApply }: NaturalLanguageEditorProps) {
           )}
           {parsed.reminderEnabled && (
             <Badge color="blue">
-              🔔 {parsed.reminderMinutesBefore ? `${parsed.reminderMinutesBefore}min before` : 'reminder'}
+              🔔 {(parsed.reminderOffsetsMinutes?.length ?? 0) > 1
+                ? `${parsed.reminderOffsetsMinutes.length} reminders`
+                : parsed.reminderMinutesBefore
+                  ? `${parsed.reminderMinutesBefore}min before`
+                  : 'reminder'}
             </Badge>
           )}
           {parsed.isBonus === true && (

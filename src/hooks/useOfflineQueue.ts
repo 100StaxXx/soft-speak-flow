@@ -22,6 +22,10 @@ import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
 import { dispatchPlannerSyncFinished } from "@/utils/plannerSync";
 import { toRemoteEpicInsertPayload } from "@/utils/epicRemotePayload";
 import { normalizeCampaignMilestonePercentArray } from "@/utils/campaignMilestones";
+import {
+  getPrimaryQuestReminderOffset,
+  resolveQuestReminderOffsets,
+} from "@/utils/questReminders";
 
 export type SyncStatus = "idle" | "syncing" | "success" | "error";
 
@@ -110,6 +114,13 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
 
     case "TASK_CREATE": {
       const taskData = action.payload as Record<string, unknown>;
+      const reminderOffsets = resolveQuestReminderOffsets({
+        reminderEnabled: taskData.reminder_enabled as boolean | null,
+        reminderMinutesBefore: taskData.reminder_minutes_before as number | null,
+        reminderOffsetsMinutes: taskData.reminder_offsets_minutes as number[] | null,
+      });
+      const reminderEnabled = reminderOffsets.length > 0;
+      const reminderMinutesBefore = getPrimaryQuestReminderOffset(reminderOffsets);
       const insertPayload = {
         id: (taskData.id as string | undefined) ?? undefined,
         task_text: taskData.task_text as string,
@@ -128,8 +139,10 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
         recurrence_custom_period: (taskData.recurrence_custom_period as string | null) ?? null,
         recurrence_end_date: (taskData.recurrence_end_date as string | null) ?? null,
         is_recurring: (taskData.is_recurring as boolean | null) ?? Boolean(taskData.recurrence_pattern),
-        reminder_enabled: (taskData.reminder_enabled as boolean | null) ?? false,
-        reminder_minutes_before: (taskData.reminder_minutes_before as number | null) ?? 15,
+        reminder_enabled: reminderEnabled,
+        reminder_minutes_before: reminderMinutesBefore,
+        reminder_offsets_minutes: reminderOffsets,
+        reminder_sent_offsets_minutes: (taskData.reminder_sent_offsets_minutes as number[] | null) ?? [],
         category: (taskData.category as string | null) ?? null,
         notes: (taskData.notes as string | null) ?? null,
         contact_id: (taskData.contact_id as string | null) ?? null,

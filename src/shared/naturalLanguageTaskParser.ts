@@ -21,6 +21,7 @@ export interface ParsedTask {
   isTopThree: boolean;
   reminderEnabled: boolean;
   reminderMinutesBefore: number | null;
+  reminderOffsetsMinutes: number[];
   notes: string | null;
   
   // Contact linking
@@ -215,8 +216,10 @@ const NUMBER_WORD_MAP: Record<string, number> = {
 const NUMBER_WORD_PATTERN = String.raw`(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety(?:[-\s](?:one|two|three|four|five|six|seven|eight|nine))?)`;
 const DURATION_AMOUNT_PATTERN = String.raw`(?:\d+(?:\.\d+)?|a|an|couple|few|${NUMBER_WORD_PATTERN})`;
 const DURATION_PREFIX_PATTERN = String.raw`(?:for\s+|(?:it(?:'s| is)\s+)?(?:gonna|going\s+to|will|should|can|could)?\s*(?:last|take|run|be)\s+|(?:lasting|taking|running)\s+)?`;
-const DURATION_SUFFIX_GUARD = String.raw`(?!\s*(?:before|early|prior|remind(?:er)?))`;
+const DURATION_SUFFIX_GUARD = String.raw`(?!\s*(?:(?:and\s+)?${DURATION_AMOUNT_PATTERN}\s*m(?:in(?:ute)?s?)?\s*)?(?:before|early|prior|remind(?:er)?))`;
 const DAY_REFERENCE_PATTERN = String.raw`(?:today|tomorrow)(?:['’]?s)?`;
+const MAX_PARSED_REMINDER_OFFSETS = 5;
+const MAX_PARSED_REMINDER_MINUTES = 10080;
 
 function parseSpokenNumberToken(value: string): number | null {
   const normalized = value.trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ');
@@ -654,6 +657,13 @@ const CONTEXT_PATTERNS = [
 
 // Reminder patterns
 const REMINDER_PATTERNS: Array<{ regex: RegExp; handler: (m: RegExpMatchArray) => number }> = [
+  {
+    regex: new RegExp(
+      String.raw`remind\s*(?:me\s+)?(?:at\s+least\s+)?${DURATION_AMOUNT_PATTERN}\s*h(?:ou)?rs?\s*(?:and\s+)?${DURATION_AMOUNT_PATTERN}\s*m(?:in(?:ute)?s?)?\s*(?:before|early|prior)`,
+      'i',
+    ),
+    handler: () => 15,
+  },
   { regex: /remind\s*(?:me\s+)?(\d+)\s*(?:min(?:ute)?s?)\s*(?:before|early|prior)/i, handler: (m) => parseInt(m[1]) },
   { regex: /remind\s*(?:me\s+)?(?:at\s+least\s+)?(\d+)\s*(?:h(?:ou)?rs?)\s*(?:before|early|prior)/i, handler: (m) => parseInt(m[1]) * 60 },
   { regex: /(?:with\s+)?(?:a\s+)?(\d+)\s*(?:min(?:ute)?s?)\s*remind(?:er)?/i, handler: (m) => parseInt(m[1]) },
@@ -665,6 +675,75 @@ const REMINDER_PATTERNS: Array<{ regex: RegExp; handler: (m: RegExpMatchArray) =
   { regex: /remind\s*me\b/i, handler: () => 15 },
   { regex: /(?:set|with)\s*(?:a\s+)?reminder/i, handler: () => 15 },
 ];
+
+const REMINDER_CONTEXT_PATTERN = new RegExp(
+  String.raw`(?:remind(?:er)?\s*(?:me\s+)?(?:at\s+least\s+|for\s+)?|with\s+(?:a\s+)?|set\s+(?:a\s+)?)((?:(?!\b(?:notes?|tomorrow|today|at\s+\d|on\s+\d{4}-\d{2}-\d{2})\b).){0,80}?(?:before|early|prior|reminder))`,
+  'gi',
+);
+
+const REMINDER_HOUR_PATTERN = new RegExp(
+  String.raw`(${DURATION_AMOUNT_PATTERN})\s*h(?:ours?|rs?)\b|(?:an?|one)\s+hour\b`,
+  'gi',
+);
+
+const REMINDER_MINUTE_PATTERN = new RegExp(
+  String.raw`(${DURATION_AMOUNT_PATTERN})\s*m(?:in(?:ute)?s?)?\b`,
+  'gi',
+);
+
+function normalizeReminderOffsets(values: readonly unknown[]): number[] {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => {
+          if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+          const minutes = Math.trunc(value);
+          return minutes >= 1 && minutes <= MAX_PARSED_REMINDER_MINUTES ? minutes : null;
+        })
+        .filter((value): value is number => value !== null),
+    ),
+  )
+    .sort((a, b) => a - b)
+    .slice(0, MAX_PARSED_REMINDER_OFFSETS);
+}
+
+function extractReminderOffsets(input: string): number[] {
+  const offsets: number[] = [];
+  let contextMatch: RegExpExecArray | null;
+
+  REMINDER_CONTEXT_PATTERN.lastIndex = 0;
+  while ((contextMatch = REMINDER_CONTEXT_PATTERN.exec(input)) !== null) {
+    const context = contextMatch[0];
+
+    if (/\bhalf\s*(?:an?\s+)?h(?:ou)?r\b/i.test(context)) {
+      offsets.push(30);
+    }
+
+    let hourMatch: RegExpExecArray | null;
+    REMINDER_HOUR_PATTERN.lastIndex = 0;
+    while ((hourMatch = REMINDER_HOUR_PATTERN.exec(context)) !== null) {
+      if (hourMatch[1]) {
+        const minutes = parseDurationAmount(hourMatch[1], 60);
+        if (minutes !== null) offsets.push(minutes);
+      } else {
+        offsets.push(60);
+      }
+    }
+
+    let minuteMatch: RegExpExecArray | null;
+    REMINDER_MINUTE_PATTERN.lastIndex = 0;
+    while ((minuteMatch = REMINDER_MINUTE_PATTERN.exec(context)) !== null) {
+      const minutes = parseDurationAmount(minuteMatch[1], 1);
+      if (minutes !== null) offsets.push(minutes);
+    }
+
+    if (contextMatch[0].length === 0) {
+      REMINDER_CONTEXT_PATTERN.lastIndex += 1;
+    }
+  }
+
+  return normalizeReminderOffsets(offsets);
+}
 
 // Notes patterns
 const NOTE_PATTERNS: Array<{ regex: RegExp; handler: (m: RegExpMatchArray) => string }> = [
@@ -982,13 +1061,13 @@ function cleanTaskText(text: string): string {
     ...TIME_PATTERNS_FOR_TITLE_CLEANUP,
     ...RELATIVE_TIME_PATTERNS.map(p => p.regex),
     ...DATE_PATTERNS.map(p => p.regex),
+    ...REMINDER_PATTERNS.map(p => p.regex),
     ...DURATION_PATTERNS.map(p => p.regex),
     ...DIFFICULTY_PATTERNS.map(p => p.regex),
     ...PRIORITY_PATTERNS.map(p => p.regex),
     ...RECURRENCE_PATTERNS.map(p => p.regex),
     ...FREQUENCY_PATTERNS.map(p => p.regex),
     ...CONTEXT_PATTERNS.map(p => p.regex),
-    ...REMINDER_PATTERNS.map(p => p.regex),
     ...NOTE_PATTERNS.map(p => p.regex),
     ...CLEAR_PATTERNS.map(p => p.regex),
     ...CATEGORY_CLEANUP_PATTERNS,
@@ -1058,6 +1137,7 @@ export function parseNaturalLanguage(
       isTopThree: false,
       reminderEnabled: false,
       reminderMinutesBefore: null,
+      reminderOffsetsMinutes: [],
       notes: null,
       contactId: null,
       autoLogInteraction: true,
@@ -1184,11 +1264,20 @@ export function parseNaturalLanguage(
       }
     }
 
+    const parsedReminderOffsets = extractReminderOffsets(input);
+    if (parsedReminderOffsets.length > 0) {
+      result.reminderEnabled = true;
+      result.reminderOffsetsMinutes = parsedReminderOffsets;
+      result.reminderMinutesBefore = parsedReminderOffsets[0];
+    }
+
     for (const pattern of REMINDER_PATTERNS) {
+      if (result.reminderEnabled) break;
       const match = input.match(pattern.regex);
       if (match) {
         result.reminderEnabled = true;
-        result.reminderMinutesBefore = pattern.handler(match);
+        result.reminderOffsetsMinutes = normalizeReminderOffsets([pattern.handler(match)]);
+        result.reminderMinutesBefore = result.reminderOffsetsMinutes[0] ?? null;
         break;
       }
     }

@@ -3018,7 +3018,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 <JourneysCompanionLauncher
                   variant="inline"
                   data-tour="add-quest-launcher"
-                  text="Chat with companion"
+                  caption="New quest"
+                  text="Add Quest"
                   className="w-full max-w-xs justify-center"
                   onClick={plannerLauncherAction}
                 />

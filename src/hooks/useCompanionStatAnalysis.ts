@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useRef } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -151,12 +151,14 @@ export const useCompanionStatAnalysis = ({ enabled = true }: UseCompanionStatAna
     mutationFn: async ({
       analysisDate,
       expectedProfileKey,
+      forceRefresh = false,
     }: {
       analysisDate: string;
       expectedProfileKey: string;
+      forceRefresh?: boolean;
     }) => {
       const { data, error } = await supabase.functions.invoke("generate-cosmiq-title-card", {
-        body: { analysisDate },
+        body: forceRefresh ? { analysisDate, forceRefresh: true } : { analysisDate },
       });
 
       if (error) throw error;
@@ -189,6 +191,15 @@ export const useCompanionStatAnalysis = ({ enabled = true }: UseCompanionStatAna
   });
   const generateTitleCard = titleCardMutation.mutateAsync;
   const isTitleCardGenerationPending = titleCardMutation.isPending;
+
+  const regenerateTitleCard = useCallback(async (analysis: CompanionStatAnalysis) => {
+    const expectedProfileKey = getCosmiqTitleCardProfileKey(analysis);
+    return await generateTitleCard({
+      analysisDate: analysis.analysisDate,
+      expectedProfileKey,
+      forceRefresh: true,
+    });
+  }, [generateTitleCard]);
 
   useEffect(() => {
     titleCardMountedRef.current = true;
@@ -281,5 +292,7 @@ export const useCompanionStatAnalysis = ({ enabled = true }: UseCompanionStatAna
     refreshAnalysis: refreshMutation.mutateAsync,
     isRefreshing: refreshMutation.isPending,
     refetchAnalysis: query.refetch,
+    regenerateTitleCard,
+    isRegeneratingTitleCard: titleCardMutation.isPending,
   };
 };

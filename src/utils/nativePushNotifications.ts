@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
 import { isNativeIOSHandheld } from '@/utils/platformTargets';
 import { safeLocalStorage } from '@/utils/storage';
+import { toast } from '@/components/ui/sonner';
 
 let currentPushUserId: string | null = null;
 let initializedUserId: string | null = null;
@@ -16,6 +17,8 @@ let initializationPromise: Promise<void> | null = null;
 let listenerHandles: PluginListenerHandle[] = [];
 let listenersBound = false;
 const PUSH_INSTALLATION_ID_STORAGE_KEY = 'native_push_installation_id';
+const FOREGROUND_PUSH_TOAST_DEDUPE_MS = 10_000;
+const foregroundPushToastShownAt = new Map<string, number>();
 
 interface PushDeviceTokenRow {
   id: string;
@@ -37,6 +40,20 @@ export interface ClaimPushDeviceTokenArgs {
   p_device_token: string;
   p_platform: 'ios';
   p_user_agent: string | null;
+}
+
+interface ForegroundPushNotificationInput {
+  id?: unknown;
+  title?: unknown;
+  body?: unknown;
+  data?: unknown;
+}
+
+export interface ForegroundPushToastDetails {
+  title: string;
+  description?: string;
+  url?: string;
+  dedupeKey: string;
 }
 
 function readPushInstallationId(): string | null {
@@ -68,6 +85,98 @@ function previewValue(value: string | null): string | null {
   if (!value) return null;
   if (value.length <= 12) return value;
   return `${value.slice(0, 8)}...${value.slice(-4)}`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function readNonEmptyString(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function pruneForegroundPushToastHistory(now: number): void {
+  foregroundPushToastShownAt.forEach((seenAt, key) => {
+    if (now - seenAt >= FOREGROUND_PUSH_TOAST_DEDUPE_MS) {
+      foregroundPushToastShownAt.delete(key);
+    }
+  });
+}
+
+export function buildForegroundPushToast(
+  notification: ForegroundPushNotificationInput,
+): ForegroundPushToastDetails | null {
+  const data = isRecord(notification.data) ? notification.data : {};
+  const aps = isRecord(data.aps) ? data.aps : {};
+  const alert = isRecord(aps.alert) ? aps.alert : {};
+
+  const title =
+    readNonEmptyString(notification.title) ??
+    readNonEmptyString(data.title) ??
+    readNonEmptyString(alert.title);
+  const description =
+    readNonEmptyString(notification.body) ??
+    readNonEmptyString(data.body) ??
+    readNonEmptyString(data.message) ??
+    readNonEmptyString(alert.body);
+
+  if (!title && !description) {
+    return null;
+  }
+
+  const type = readNonEmptyString(data.type);
+  const url = readNonEmptyString(data.url) ?? undefined;
+  const stableId =
+    readNonEmptyString(notification.id) ??
+    readNonEmptyString(data.queue_id) ??
+    readNonEmptyString(data.notification_id) ??
+    readNonEmptyString(data.nudge_id) ??
+    readNonEmptyString(data.pep_talk_id);
+  const dedupeKey =
+    stableId !== null
+      ? `${type ?? 'push'}:${stableId}`
+      : [type, title, description, url].filter(Boolean).join('|');
+
+  return {
+    title: title ?? 'Notification',
+    description: description ?? undefined,
+    url,
+    dedupeKey,
+  };
+}
+
+export function showForegroundPushNotificationToast(
+  notification: ForegroundPushNotificationInput,
+  now = Date.now(),
+): boolean {
+  const toastDetails = buildForegroundPushToast(notification);
+  if (!toastDetails) return false;
+
+  pruneForegroundPushToastHistory(now);
+
+  const lastSeenAt = foregroundPushToastShownAt.get(toastDetails.dedupeKey);
+  if (lastSeenAt !== undefined && now - lastSeenAt < FOREGROUND_PUSH_TOAST_DEDUPE_MS) {
+    return false;
+  }
+
+  foregroundPushToastShownAt.set(toastDetails.dedupeKey, now);
+
+  toast(toastDetails.title, {
+    id: `foreground-push:${toastDetails.dedupeKey}`,
+    description: toastDetails.description,
+    action: toastDetails.url
+      ? {
+          label: 'Open',
+          onClick: () => {
+            window.dispatchEvent(new CustomEvent('native-push-navigation', { detail: toastDetails.url }));
+          },
+        }
+      : undefined,
+  });
+
+  return true;
 }
 
 export function buildPushDeviceTokenClaimArgs(input: {
@@ -160,6 +269,7 @@ async function bindPushListenersOnce(): Promise<void> {
   handles.push(await PushNotifications.addListener('pushNotificationReceived', (notification) => {
     console.log('[NativePush] Notification received:', notification);
     logger.log('Push notification received:', notification);
+    showForegroundPushNotificationToast(notification);
   }));
 
   handles.push(await PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {

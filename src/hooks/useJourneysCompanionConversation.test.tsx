@@ -163,6 +163,24 @@ describe("useJourneysCompanionConversation", () => {
     expect(result.current.hasRealMessages).toBe(false);
   });
 
+  it("can inject a visible companion-authored template opener", async () => {
+    const { result } = renderHook(() => useJourneysCompanionConversation());
+
+    await act(async () => {
+      result.current.injectAssistantOpening("What's good, buddy?", {
+        visibleAssistantOpening: true,
+      });
+    });
+
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0]).toMatchObject({
+      role: "assistant",
+      content: "What's good, buddy?",
+    });
+    expect(result.current.messages[0]?.isSeed).toBeUndefined();
+    expect(result.current.hasRealMessages).toBe(true);
+  });
+
   it("seeds resetThread greeting text without counting it as a real exchange", async () => {
     const { result } = renderHook(() => useJourneysCompanionConversation());
 

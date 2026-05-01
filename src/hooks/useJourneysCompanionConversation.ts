@@ -103,7 +103,10 @@ export function useJourneysCompanionConversation(
     setPendingPlannerHandoffMessage(null);
   }, []);
 
-  const injectAssistantOpening = useCallback((content: string) => {
+  const injectAssistantOpening = useCallback((
+    content: string,
+    options?: { visibleAssistantOpening?: boolean },
+  ) => {
     const trimmedContent = content.trim();
     if (!trimmedContent) return;
 
@@ -111,7 +114,11 @@ export function useJourneysCompanionConversation(
       const hasRealMessages = previous.some((message) => !message.isSeed);
 
       if (!hasRealMessages) {
-        return [createSeedAssistantMessage(trimmedContent)];
+        return [
+          options?.visibleAssistantOpening
+            ? createMessage("assistant", trimmedContent)
+            : createSeedAssistantMessage(trimmedContent),
+        ];
       }
 
       return [...previous, createMessage("assistant", trimmedContent)];

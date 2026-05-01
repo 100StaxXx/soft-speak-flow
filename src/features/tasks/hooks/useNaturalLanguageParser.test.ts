@@ -83,6 +83,19 @@ describe("parseNaturalLanguage duration parsing", () => {
     }));
   });
 
+  it("parses compound reminder offsets and keeps the smallest legacy reminder", () => {
+    const parsed = parseNaturalLanguage("Read report tomorrow at 3pm remind me 1 hour and 10 minutes before");
+
+    expect(parsed).toEqual(expect.objectContaining({
+      text: "Read report",
+      scheduledDate: "2026-04-10",
+      scheduledTime: "15:00",
+      reminderEnabled: true,
+      reminderMinutesBefore: 10,
+      reminderOffsetsMinutes: [10, 60],
+    }));
+  });
+
   it("rolls the date over when a relative time crosses midnight", () => {
     vi.setSystemTime(new Date("2026-04-09T23:45:00"));
 

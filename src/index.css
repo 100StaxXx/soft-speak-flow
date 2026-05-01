@@ -936,6 +936,7 @@ All colors MUST be HSL.
     /* Shared layout tokens for fixed bottom navigation clearance */
     --bottom-nav-safe-offset: calc(6.5rem + env(safe-area-inset-bottom, 0px));
     --bottom-nav-runtime-offset: var(--bottom-nav-safe-offset);
+    --sonner-bottom-offset: calc(env(safe-area-inset-bottom, 0px) + 16px);
 
     /* Canonical safe area inset tokens */
     --safe-area-inset-top: env(safe-area-inset-top, 0px);

@@ -30,6 +30,10 @@ import {
   removePlannerRecords,
   upsertPlannerRecords,
 } from "@/utils/plannerLocalStore";
+import {
+  getPrimaryQuestReminderOffset,
+  resolveQuestReminderOffsets,
+} from "@/utils/questReminders";
 
 export interface RecurringTask {
   id: string;
@@ -49,6 +53,7 @@ export interface RecurringTask {
   epic_id: string | null;
   reminder_enabled: boolean | null;
   reminder_minutes_before: number | null;
+  reminder_offsets_minutes?: number[] | null;
   sort_order?: number | null;
 }
 
@@ -82,6 +87,7 @@ interface RecurringTaskInsertPayload {
   epic_id: string | null;
   reminder_enabled: boolean | null;
   reminder_minutes_before: number | null;
+  reminder_offsets_minutes?: number[] | null;
   parent_template_id: string;
   source: "recurring";
   is_recurring: false;
@@ -112,6 +118,7 @@ const RECURRING_TEMPLATE_SELECT_WITH_MONTH_RECURRENCE = `
   epic_id,
   reminder_enabled,
   reminder_minutes_before,
+  reminder_offsets_minutes,
   sort_order
 `;
 const RECURRING_TEMPLATE_SELECT_LEGACY_RECURRENCE = `
@@ -130,6 +137,7 @@ const RECURRING_TEMPLATE_SELECT_LEGACY_RECURRENCE = `
   epic_id,
   reminder_enabled,
   reminder_minutes_before,
+  reminder_offsets_minutes,
   sort_order
 `;
 
@@ -177,6 +185,24 @@ function isUniqueViolationError(error: SupabaseLikeError | null | undefined): bo
     || haystack.includes("unique constraint");
 }
 
+function resolveRecurringReminderFields(task: Pick<RecurringTask, "reminder_enabled" | "reminder_minutes_before" | "reminder_offsets_minutes">): {
+  reminderEnabled: boolean;
+  reminderMinutesBefore: number;
+  reminderOffsetsMinutes: number[];
+} {
+  const reminderOffsetsMinutes = resolveQuestReminderOffsets({
+    reminderEnabled: task.reminder_enabled,
+    reminderMinutesBefore: task.reminder_minutes_before,
+    reminderOffsetsMinutes: task.reminder_offsets_minutes,
+  });
+
+  return {
+    reminderEnabled: reminderOffsetsMinutes.length > 0,
+    reminderMinutesBefore: getPrimaryQuestReminderOffset(reminderOffsetsMinutes),
+    reminderOffsetsMinutes,
+  };
+}
+
 async function fetchRecurringTemplatesRemote(userId: string): Promise<RecurringTask[]> {
   const fetchTemplates = (selectClause: string) => supabase
     .from("daily_tasks")
@@ -204,6 +230,8 @@ async function fetchRecurringTemplatesRemote(userId: string): Promise<RecurringT
 }
 
 function toLocalRecurringTemplateRow(userId: string, template: RecurringTask): DailyTask {
+  const reminder = resolveRecurringReminderFields(template);
+
   return {
     id: template.id,
     user_id: userId,
@@ -221,8 +249,10 @@ function toLocalRecurringTemplateRow(userId: string, template: RecurringTask): D
     recurrence_month_days: template.recurrence_month_days,
     recurrence_custom_period: template.recurrence_custom_period,
     is_recurring: true,
-    reminder_enabled: template.reminder_enabled,
-    reminder_minutes_before: template.reminder_minutes_before,
+    reminder_enabled: reminder.reminderEnabled,
+    reminder_minutes_before: reminder.reminderMinutesBefore,
+    reminder_offsets_minutes: reminder.reminderOffsetsMinutes,
+    reminder_sent_offsets_minutes: [],
     reminder_sent: false,
     parent_template_id: null,
     category: template.category,
@@ -305,6 +335,7 @@ async function loadPendingRecurringTemplates(
       epic_id: task.epic_id,
       reminder_enabled: task.reminder_enabled,
       reminder_minutes_before: task.reminder_minutes_before,
+      reminder_offsets_minutes: task.reminder_offsets_minutes ?? [],
       sort_order: task.sort_order ?? null,
     })) satisfies RecurringTask[];
 
@@ -334,6 +365,8 @@ function buildSpawnedTaskRow(
   template: RecurringTask,
   sortOrder: number,
 ): DailyTask {
+  const reminder = resolveRecurringReminderFields(template);
+
   return {
     id: createOfflinePlannerId("task"),
     user_id: userId,
@@ -351,8 +384,10 @@ function buildSpawnedTaskRow(
     recurrence_month_days: null,
     recurrence_custom_period: null,
     is_recurring: false,
-    reminder_enabled: template.reminder_enabled,
-    reminder_minutes_before: template.reminder_minutes_before,
+    reminder_enabled: reminder.reminderEnabled,
+    reminder_minutes_before: reminder.reminderMinutesBefore,
+    reminder_offsets_minutes: reminder.reminderOffsetsMinutes,
+    reminder_sent_offsets_minutes: [],
     reminder_sent: false,
     parent_template_id: template.id,
     category: template.category,
@@ -488,6 +523,7 @@ export function useRecurringTaskSpawner(selectedDate?: Date) {
           epic_id: task.epic_id,
           reminder_enabled: task.reminder_enabled,
           reminder_minutes_before: task.reminder_minutes_before,
+          reminder_offsets_minutes: task.reminder_offsets_minutes ?? [],
           parent_template_id: task.parent_template_id as string,
           source: "recurring",
           is_recurring: false,
@@ -508,6 +544,7 @@ export function useRecurringTaskSpawner(selectedDate?: Date) {
                 category: task.category,
                 reminder_enabled: task.reminder_enabled,
                 reminder_minutes_before: task.reminder_minutes_before,
+                reminder_offsets_minutes: task.reminder_offsets_minutes ?? [],
                 parent_template_id: task.parent_template_id,
                 epic_id: task.epic_id,
                 source: task.source,
@@ -602,6 +639,7 @@ export function useRecurringTaskSpawner(selectedDate?: Date) {
                   category: task.category,
                   reminder_enabled: task.reminder_enabled,
                   reminder_minutes_before: task.reminder_minutes_before,
+                  reminder_offsets_minutes: task.reminder_offsets_minutes ?? [],
                   parent_template_id: task.parent_template_id,
                   epic_id: task.epic_id,
                   source: task.source,

@@ -391,6 +391,10 @@ export interface CompanionPlannerRequest {
     inboxTasks: PlannerContextTask[];
     recentCompletedTasks?: PlannerContextTask[];
     activeEpics: PlannerContextEpic[];
+    activeHabitIds?: string[];
+    pendingLocalTaskIds?: string[];
+    pendingLocalEpicIds?: string[];
+    pendingLocalHabitIds?: string[];
     rituals: PlannerContextRitual[];
     calendarEvents: PlannerContextCalendarEvent[];
     contactsNeedingAttention?: PlannerContactNeedingAttention[];

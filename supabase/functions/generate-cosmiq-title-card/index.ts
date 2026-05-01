@@ -5,6 +5,10 @@ import { type RequestAuth, requireRequestAuth } from "../_shared/auth.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { resolveCosmiqTitleCard } from "../_shared/cosmiqTitleCard.ts";
 import { validateCompanionStatAnalysis } from "../../../src/shared/companionStatAnalysis.ts";
+import {
+  getOnboardingVisualPersonaFromTags,
+  ONBOARDING_VISUAL_PERSONA_QUESTION_ID,
+} from "../../../src/shared/onboardingVisualPersona.ts";
 
 interface GenerateCosmiqTitleCardDeps {
   authenticate: (req: Request, corsHeaders: HeadersInit) => Promise<RequestAuth | Response>;
@@ -33,6 +37,10 @@ const parseAnalysisDate = (value: unknown): string | null => {
   }
   return value;
 };
+
+interface QuestionnaireResponseRow {
+  answer_tags: string[] | null;
+}
 
 export async function handleGenerateCosmiqTitleCard(
   req: Request,
@@ -67,6 +75,7 @@ export async function handleGenerateCosmiqTitleCard(
         },
       );
     }
+    const forceRefresh = body?.forceRefresh === true;
 
     const supabase = deps.createSupabaseClient();
     let analysisQuery = supabase
@@ -93,6 +102,18 @@ export async function handleGenerateCosmiqTitleCard(
       );
     }
 
+    const { data: visualPersonaRow, error: visualPersonaError } = await supabase
+      .from("questionnaire_responses")
+      .select("answer_tags")
+      .eq("user_id", auth.userId)
+      .eq("question_id", ONBOARDING_VISUAL_PERSONA_QUESTION_ID)
+      .maybeSingle();
+
+    if (visualPersonaError) throw visualPersonaError;
+    const visualPersona = getOnboardingVisualPersonaFromTags(
+      (visualPersonaRow as QuestionnaireResponseRow | null)?.answer_tags,
+    );
+
     const analysisValidation = validateCompanionStatAnalysis(analysisRow.payload);
     if (!analysisValidation.ok) {
       return new Response(
@@ -108,6 +129,8 @@ export async function handleGenerateCosmiqTitleCard(
       supabase,
       userId: auth.userId,
       analysis: analysisValidation.data,
+      visualPersona,
+      forceRefresh,
       fetchImpl: deps.fetchImpl,
     });
 

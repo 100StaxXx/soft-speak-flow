@@ -26,6 +26,11 @@ import {
   type CompanionCosmiqTitleCard,
   type CompanionCosmiqTitlePreviousState,
 } from "../../../src/shared/companionStatCosmiqTitles.ts";
+import {
+  getOnboardingVisualPersonaFromTags,
+  ONBOARDING_VISUAL_PERSONA_QUESTION_ID,
+  type OnboardingVisualPersona,
+} from "../../../src/shared/onboardingVisualPersona.ts";
 import { getTaskCompletionDisciplineAward } from "../../../src/shared/taskCompletionTiming.ts";
 
 type AttributeType = CompanionStatAttribute;
@@ -58,6 +63,10 @@ interface CompanionRow {
 
 interface CachedAnalysisRow {
   payload: CompanionStatAnalysis;
+}
+
+interface QuestionnaireResponseRow {
+  answer_tags: string[] | null;
 }
 
 interface DailyCheckInRow {
@@ -129,6 +138,7 @@ interface GenerateCompanionStatAnalysisDeps {
   getCosmiqTitleCardCacheState?: (params: {
     supabase: any;
     analysis: CompanionStatAnalysis;
+    visualPersona?: OnboardingVisualPersona;
   }) => Promise<CompanionCosmiqTitleCard>;
 }
 
@@ -199,12 +209,14 @@ async function attachCosmiqTitleCardCacheState({
   analysis,
   userId,
   analysisDate,
+  visualPersona,
 }: {
   deps: GenerateCompanionStatAnalysisDeps;
   supabase: any;
   analysis: CompanionStatAnalysis;
   userId: string;
   analysisDate: string;
+  visualPersona: OnboardingVisualPersona;
 }): Promise<CompanionStatAnalysis> {
   if (!deps.getCosmiqTitleCardCacheState) {
     return analysis;
@@ -213,6 +225,7 @@ async function attachCosmiqTitleCardCacheState({
   const cosmiqTitleCard = await deps.getCosmiqTitleCardCacheState({
     supabase,
     analysis,
+    visualPersona,
   }).catch((error) => {
     console.warn("Cosmiq title card cache lookup failed", {
       userId,
@@ -888,6 +901,18 @@ export async function handleGenerateCompanionStatAnalysis(
     const now = deps.now();
     const analysisDate = formatDateInTimezone(now, timezone);
 
+    const { data: visualPersonaRow, error: visualPersonaError } = await supabase
+      .from("questionnaire_responses")
+      .select("answer_tags")
+      .eq("user_id", userId)
+      .eq("question_id", ONBOARDING_VISUAL_PERSONA_QUESTION_ID)
+      .maybeSingle();
+
+    if (visualPersonaError) throw visualPersonaError;
+    const visualPersona = getOnboardingVisualPersonaFromTags(
+      (visualPersonaRow as QuestionnaireResponseRow | null)?.answer_tags,
+    );
+
     const { data: existingAnalysis, error: existingAnalysisError } = await supabase
       .from("companion_stat_analyses")
       .select("payload")
@@ -909,6 +934,7 @@ export async function handleGenerateCompanionStatAnalysis(
           analysis: cachedAnalysisValidation.data,
           userId,
           analysisDate,
+          visualPersona,
         });
 
         return new Response(
@@ -1063,6 +1089,7 @@ export async function handleGenerateCompanionStatAnalysis(
       analysis,
       userId,
       analysisDate,
+      visualPersona,
     });
 
     const analysisValidation = validateCompanionStatAnalysis(analysis);

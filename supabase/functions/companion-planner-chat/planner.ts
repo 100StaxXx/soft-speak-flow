@@ -451,6 +451,10 @@ export interface PlannerBuildInput {
     inboxTasks: PlannerContextTask[];
     recentCompletedTasks?: PlannerContextTask[];
     activeEpics: PlannerContextEpic[];
+    activeHabitIds?: string[];
+    pendingLocalTaskIds?: string[];
+    pendingLocalEpicIds?: string[];
+    pendingLocalHabitIds?: string[];
     rituals: PlannerContextRitual[];
     calendarEvents: PlannerContextCalendarEvent[];
     contactsNeedingAttention?: PlannerContactNeedingAttention[];
@@ -901,36 +905,57 @@ export const collectPlannerContextProtectedDataText = (
   input: PlannerBuildInput,
 ): string[] => {
   const activeCampaignIds = getActiveCampaignIdSet(input);
+  const activeHabitIds = getActiveHabitIdSet(input);
   const activeCampaignRitualIds = getActiveCampaignRitualIdSet(input);
   const tasks = scopePlannerTasksToActiveCampaigns(
     input.plannerContext.tasks,
     activeCampaignIds,
     activeCampaignRitualIds,
+    activeHabitIds,
   );
   const inboxTasks = scopePlannerTasksToActiveCampaigns(
     input.plannerContext.inboxTasks,
     activeCampaignIds,
     activeCampaignRitualIds,
+    activeHabitIds,
   );
   const recentCompletedTasks = scopePlannerTasksToActiveCampaigns(
     input.plannerContext.recentCompletedTasks ?? [],
     activeCampaignIds,
     activeCampaignRitualIds,
+    activeHabitIds,
   );
   const rituals = scopePlannerRitualsToActiveCampaigns(
     input.plannerContext.rituals,
     activeCampaignIds,
+    activeHabitIds,
   );
   const activeTaskIds = new Set([
     ...tasks,
     ...inboxTasks,
     ...recentCompletedTasks,
   ].map((task) => task.id));
+  const activeTaskTitleById = new Map([
+    ...tasks,
+    ...inboxTasks,
+    ...recentCompletedTasks,
+  ].map((task) => [task.id, task.title]));
+  const activeEpicTitleById = new Map(
+    input.plannerContext.activeEpics.map((epic) => [epic.id, epic.title]),
+  );
+  const activeRitualTitleById = new Map(
+    rituals.map((ritual) => [ritual.id, ritual.title]),
+  );
   const priorityScores = scopePlannerPriorityScoresToActiveCampaigns(
     input.plannerContext.priorityScores ?? [],
     activeCampaignIds,
     activeCampaignRitualIds,
     activeTaskIds,
+    {
+      activeEpicTitleById,
+      activeRitualTitleById,
+      activeTaskTitleById,
+    },
   );
 
   return [
@@ -2134,25 +2159,39 @@ const getResolvedPriorityScores = (
   input: PlannerBuildInput,
 ): PlannerPriorityScore[] => {
   const activeCampaignIds = getActiveCampaignIdSet(input);
+  const activeHabitIds = getActiveHabitIdSet(input);
   const activeCampaignRitualIds = getActiveCampaignRitualIdSet(input);
   const scopedTasks = scopePlannerTasksToActiveCampaigns(
     input.plannerContext.tasks,
     activeCampaignIds,
     activeCampaignRitualIds,
+    activeHabitIds,
   );
   const scopedInboxTasks = scopePlannerTasksToActiveCampaigns(
     input.plannerContext.inboxTasks,
     activeCampaignIds,
     activeCampaignRitualIds,
+    activeHabitIds,
   );
   const scopedRituals = scopePlannerRitualsToActiveCampaigns(
     input.plannerContext.rituals,
     activeCampaignIds,
+    activeHabitIds,
   );
   const activeTaskIds = new Set([
     ...scopedTasks,
     ...scopedInboxTasks,
   ].map((task) => task.id));
+  const activeTaskTitleById = new Map([
+    ...scopedTasks,
+    ...scopedInboxTasks,
+  ].map((task) => [task.id, task.title]));
+  const activeEpicTitleById = new Map(
+    input.plannerContext.activeEpics.map((epic) => [epic.id, epic.title]),
+  );
+  const activeRitualTitleById = new Map(
+    scopedRituals.map((ritual) => [ritual.id, ritual.title]),
+  );
 
   return input.plannerContext.priorityScores?.length
     ? scopePlannerPriorityScoresToActiveCampaigns(
@@ -2160,6 +2199,11 @@ const getResolvedPriorityScores = (
       activeCampaignIds,
       activeCampaignRitualIds,
       activeTaskIds,
+      {
+        activeEpicTitleById,
+        activeRitualTitleById,
+        activeTaskTitleById,
+      },
     )
     : computePlannerPriorityScores({
       currentDate: input.currentDate,
@@ -4250,10 +4294,7 @@ const buildIntervalsForDate = (
   input: PlannerBuildInput,
   date: string,
 ): TimelineInterval[] => ([
-  ...buildTaskIntervalsForDate([
-    ...input.plannerContext.tasks,
-    ...input.plannerContext.inboxTasks,
-  ], date),
+  ...buildTaskIntervalsForDate(getScopedPlannerTasks(input), date),
   ...buildCalendarIntervalsForDate(
     input.plannerContext.calendarEvents,
     date,
@@ -4313,10 +4354,7 @@ const collectScheduleItemsForDate = (
   const now = new Date(input.currentDateTime);
   const currentDateKey = getLocalDateFromDateTime(input.currentDateTime);
   const currentMinutes = getLocalMinutesFromDateTime(input.currentDateTime);
-  const tasks = [
-    ...input.plannerContext.tasks,
-    ...input.plannerContext.inboxTasks,
-  ]
+  const tasks = getScopedPlannerTasks(input)
     .filter((task) => task.completed !== true && task.taskDate === date)
     .filter((task) => {
       if (!remainingOnly || date !== currentDateKey) return true;
@@ -4394,10 +4432,7 @@ const collectStructuredScheduleItemsForDate = (
   const currentDateKey = getLocalDateFromDateTime(input.currentDateTime);
   const currentMinutes = getLocalMinutesFromDateTime(input.currentDateTime);
 
-  const tasks = [
-    ...input.plannerContext.tasks,
-    ...input.plannerContext.inboxTasks,
-  ]
+  const tasks = getScopedPlannerTasks(input)
     .filter((task) => task.completed !== true && task.taskDate === date)
     .filter((task) => {
       if (!remainingOnly || date !== currentDateKey) return true;
@@ -4467,10 +4502,7 @@ const collectMissedTasksForToday = (
 ): CompanionMissedItem[] => {
   const currentMinutes = getLocalMinutesFromDateTime(input.currentDateTime);
 
-  return [
-    ...input.plannerContext.tasks,
-    ...input.plannerContext.inboxTasks,
-  ]
+  return getScopedPlannerTasks(input)
     .filter((task) =>
       task.completed !== true &&
       task.taskDate === input.currentDate &&
@@ -5055,10 +5087,8 @@ const findPlannerTaskById = (
   taskId: string | null | undefined,
 ): PlannerContextTask | null => {
   if (!taskId) return null;
-  return [
-    ...input.plannerContext.tasks,
-    ...input.plannerContext.inboxTasks,
-  ].find((task) => task.id === taskId) ?? null;
+  return getScopedPlannerTasks(input).find((task) => task.id === taskId) ??
+    null;
 };
 
 const getProposalTaskId = (proposal: PlannerProposal): string | null => {
@@ -5534,30 +5564,36 @@ const buildCampaignMomentumCandidate = (
   },
 ): CampaignMomentumCandidate => {
   const activeCampaignIds = getActiveCampaignIdSet(input);
+  const activeHabitIds = getActiveHabitIdSet(input);
   const activeCampaignRitualIds = getActiveCampaignRitualIdSet(input);
   const scopedTasks = scopePlannerTasksToActiveCampaigns(
     input.plannerContext.tasks,
     activeCampaignIds,
     activeCampaignRitualIds,
+    activeHabitIds,
   );
   const scopedInboxTasks = scopePlannerTasksToActiveCampaigns(
     input.plannerContext.inboxTasks,
     activeCampaignIds,
     activeCampaignRitualIds,
+    activeHabitIds,
   );
   const scopedRecentCompletedTasks = scopePlannerTasksToActiveCampaigns(
     input.plannerContext.recentCompletedTasks ?? [],
     activeCampaignIds,
     activeCampaignRitualIds,
+    activeHabitIds,
   );
   const linkedTasks = [
     ...scopedTasks,
     ...scopedInboxTasks,
   ]
     .filter((task) => task.completed !== true && task.epicId === epic.id);
-  const linkedRituals = input.plannerContext.rituals.filter((ritual) =>
-    ritual.epicId === epic.id
-  );
+  const linkedRituals = scopePlannerRitualsToActiveCampaigns(
+    input.plannerContext.rituals,
+    activeCampaignIds,
+    activeHabitIds,
+  ).filter((ritual) => ritual.epicId === epic.id);
   const recentCompletedTasks = scopedRecentCompletedTasks
     .filter((task) =>
       task.completed === true &&
@@ -8280,13 +8316,32 @@ export const getActiveCampaignIdSet = (
 ): Set<string> =>
   new Set(input.plannerContext.activeEpics.map((epic) => epic.id));
 
+const getActiveHabitIdSet = (
+  input: PlannerBuildInput,
+): Set<string> | null => {
+  const hasKnownHabitScope =
+    input.plannerContext.activeHabitIds !== undefined ||
+    input.plannerContext.pendingLocalHabitIds !== undefined;
+  if (!hasKnownHabitScope) return null;
+
+  const ids = [
+    ...(input.plannerContext.activeHabitIds ?? []),
+    ...(input.plannerContext.pendingLocalHabitIds ?? []),
+  ];
+  return new Set(ids);
+};
+
 export const getActiveCampaignRitualIdSet = (
   input: PlannerBuildInput,
 ): Set<string> => {
   const activeCampaignIds = getActiveCampaignIdSet(input);
+  const activeHabitIds = getActiveHabitIdSet(input);
   return new Set(
     input.plannerContext.rituals
-      .filter((ritual) => activeCampaignIds.has(ritual.epicId))
+      .filter((ritual) =>
+        activeCampaignIds.has(ritual.epicId) &&
+        (!activeHabitIds || activeHabitIds.has(ritual.id))
+      )
       .map((ritual) => ritual.id),
   );
 };
@@ -8295,7 +8350,16 @@ export const scopePlannerTaskToActiveCampaigns = (
   task: PlannerContextTask,
   activeCampaignIds: ReadonlySet<string>,
   activeCampaignRitualIds: ReadonlySet<string>,
+  activeHabitIds: ReadonlySet<string> | null = null,
 ): PlannerContextTask | null => {
+  if (
+    task.habitSourceId &&
+    activeHabitIds &&
+    !activeHabitIds.has(task.habitSourceId)
+  ) {
+    return null;
+  }
+
   if (!task.epicId) {
     return task;
   }
@@ -8325,12 +8389,14 @@ export const scopePlannerTasksToActiveCampaigns = (
   tasks: PlannerContextTask[],
   activeCampaignIds: ReadonlySet<string>,
   activeCampaignRitualIds: ReadonlySet<string>,
+  activeHabitIds: ReadonlySet<string> | null = null,
 ): PlannerContextTask[] =>
   tasks.reduce<PlannerContextTask[]>((scopedTasks, task) => {
     const scopedTask = scopePlannerTaskToActiveCampaigns(
       task,
       activeCampaignIds,
       activeCampaignRitualIds,
+      activeHabitIds,
     );
     if (scopedTask) scopedTasks.push(scopedTask);
     return scopedTasks;
@@ -8339,14 +8405,25 @@ export const scopePlannerTasksToActiveCampaigns = (
 export const scopePlannerRitualsToActiveCampaigns = (
   rituals: PlannerContextRitual[],
   activeCampaignIds: ReadonlySet<string>,
+  activeHabitIds: ReadonlySet<string> | null = null,
 ): PlannerContextRitual[] =>
-  rituals.filter((ritual) => activeCampaignIds.has(ritual.epicId));
+  rituals.filter((ritual) =>
+    activeCampaignIds.has(ritual.epicId) &&
+    (!activeHabitIds || activeHabitIds.has(ritual.id))
+  );
+
+type PlannerPriorityScoreTitleMaps = {
+  activeEpicTitleById?: ReadonlyMap<string, string>;
+  activeRitualTitleById?: ReadonlyMap<string, string>;
+  activeTaskTitleById?: ReadonlyMap<string, string>;
+};
 
 export const scopePlannerPriorityScoresToActiveCampaigns = (
   priorityScores: PlannerPriorityScore[],
   activeCampaignIds: ReadonlySet<string>,
   activeCampaignRitualIds: ReadonlySet<string>,
   activeTaskIds: ReadonlySet<string>,
+  titleMaps: PlannerPriorityScoreTitleMaps = {},
 ): PlannerPriorityScore[] =>
   priorityScores.reduce<PlannerPriorityScore[]>((scopedScores, score) => {
     if (score.kind === "ritual" || score.ritualId) {
@@ -8356,25 +8433,40 @@ export const scopePlannerPriorityScoresToActiveCampaigns = (
         score.epicId &&
         activeCampaignIds.has(score.epicId)
       ) {
-        scopedScores.push(score);
+        scopedScores.push({
+          ...score,
+          title: titleMaps.activeRitualTitleById?.get(score.ritualId) ??
+            score.title,
+        });
       }
       return scopedScores;
     }
 
     if (score.kind === "epic") {
       if (score.epicId && activeCampaignIds.has(score.epicId)) {
-        scopedScores.push(score);
+        scopedScores.push({
+          ...score,
+          title: titleMaps.activeEpicTitleById?.get(score.epicId) ??
+            score.title,
+        });
       }
       return scopedScores;
     }
 
     if (score.kind === "task") {
-      if (score.taskId && !activeTaskIds.has(score.taskId)) {
-        return scopedScores;
+      if (score.taskId && activeTaskIds.has(score.taskId)) {
+        const canonicalScore = {
+          ...score,
+          title: titleMaps.activeTaskTitleById?.get(score.taskId) ??
+            score.title,
+        };
+        scopedScores.push(
+          canonicalScore.epicId && !activeCampaignIds.has(canonicalScore.epicId)
+            ? { ...canonicalScore, epicId: null }
+            : canonicalScore,
+        );
       }
-      if (!score.taskId && score.epicId) {
-        return scopedScores;
-      }
+      return scopedScores;
     }
 
     if (!score.epicId || activeCampaignIds.has(score.epicId)) {
@@ -8388,6 +8480,92 @@ export const scopePlannerPriorityScoresToActiveCampaigns = (
     });
     return scopedScores;
   }, []);
+
+const getScopedPlannerTaskGroups = (input: PlannerBuildInput): {
+  tasks: PlannerContextTask[];
+  inboxTasks: PlannerContextTask[];
+  recentCompletedTasks: PlannerContextTask[];
+  rituals: PlannerContextRitual[];
+  priorityScores: PlannerPriorityScore[];
+} => {
+  const activeCampaignIds = getActiveCampaignIdSet(input);
+  const activeHabitIds = getActiveHabitIdSet(input);
+  const activeCampaignRitualIds = getActiveCampaignRitualIdSet(input);
+  const tasks = scopePlannerTasksToActiveCampaigns(
+    input.plannerContext.tasks,
+    activeCampaignIds,
+    activeCampaignRitualIds,
+    activeHabitIds,
+  );
+  const inboxTasks = scopePlannerTasksToActiveCampaigns(
+    input.plannerContext.inboxTasks,
+    activeCampaignIds,
+    activeCampaignRitualIds,
+    activeHabitIds,
+  );
+  const recentCompletedTasks = scopePlannerTasksToActiveCampaigns(
+    input.plannerContext.recentCompletedTasks ?? [],
+    activeCampaignIds,
+    activeCampaignRitualIds,
+    activeHabitIds,
+  );
+  const rituals = scopePlannerRitualsToActiveCampaigns(
+    input.plannerContext.rituals,
+    activeCampaignIds,
+    activeHabitIds,
+  );
+  const activeTaskIds = new Set([
+    ...tasks,
+    ...inboxTasks,
+    ...recentCompletedTasks,
+  ].map((task) => task.id));
+  const activeTaskTitleById = new Map([
+    ...tasks,
+    ...inboxTasks,
+    ...recentCompletedTasks,
+  ].map((task) => [task.id, task.title]));
+  const activeEpicTitleById = new Map(
+    input.plannerContext.activeEpics.map((epic) => [epic.id, epic.title]),
+  );
+  const activeRitualTitleById = new Map(
+    rituals.map((ritual) => [ritual.id, ritual.title]),
+  );
+  const priorityScores = scopePlannerPriorityScoresToActiveCampaigns(
+    input.plannerContext.priorityScores ?? [],
+    activeCampaignIds,
+    activeCampaignRitualIds,
+    activeTaskIds,
+    {
+      activeEpicTitleById,
+      activeRitualTitleById,
+      activeTaskTitleById,
+    },
+  );
+
+  return { tasks, inboxTasks, recentCompletedTasks, rituals, priorityScores };
+};
+
+const getScopedPlannerTasks = (input: PlannerBuildInput): PlannerContextTask[] => {
+  const scoped = getScopedPlannerTaskGroups(input);
+  return [...scoped.tasks, ...scoped.inboxTasks];
+};
+
+export const scopePlannerInputContext = (
+  input: PlannerBuildInput,
+): PlannerBuildInput => {
+  const scoped = getScopedPlannerTaskGroups(input);
+  return {
+    ...input,
+    plannerContext: {
+      ...input.plannerContext,
+      tasks: scoped.tasks,
+      inboxTasks: scoped.inboxTasks,
+      recentCompletedTasks: scoped.recentCompletedTasks,
+      rituals: scoped.rituals,
+      priorityScores: scoped.priorityScores,
+    },
+  };
+};
 
 const hasActiveCampaignLink = (
   task: PlannerContextTask,
@@ -8409,16 +8587,19 @@ export const getPlanDayLoadBreakdown = (
   targetDate: string,
 ): PlanDayLoadBreakdown => {
   const activeCampaignIds = getActiveCampaignIdSet(input);
+  const activeHabitIds = getActiveHabitIdSet(input);
   const activeCampaignRitualIds = getActiveCampaignRitualIdSet(input);
   const scopedTasks = scopePlannerTasksToActiveCampaigns(
     input.plannerContext.tasks,
     activeCampaignIds,
     activeCampaignRitualIds,
+    activeHabitIds,
   );
   const scopedInboxTasks = scopePlannerTasksToActiveCampaigns(
     input.plannerContext.inboxTasks,
     activeCampaignIds,
     activeCampaignRitualIds,
+    activeHabitIds,
   );
   const datedTasks = scopedTasks.filter((task) =>
     task.completed !== true && task.taskDate === targetDate
@@ -8550,20 +8731,24 @@ const getPlanDayFocusLabels = (input: PlannerBuildInput): string[] => {
   const labels: string[] = [];
   const seen = new Set<string>();
   const activeCampaignIds = getActiveCampaignIdSet(input);
+  const activeHabitIds = getActiveHabitIdSet(input);
   const activeCampaignRitualIds = getActiveCampaignRitualIdSet(input);
   const scopedTasks = scopePlannerTasksToActiveCampaigns(
     input.plannerContext.tasks,
     activeCampaignIds,
     activeCampaignRitualIds,
+    activeHabitIds,
   );
   const scopedInboxTasks = scopePlannerTasksToActiveCampaigns(
     input.plannerContext.inboxTasks,
     activeCampaignIds,
     activeCampaignRitualIds,
+    activeHabitIds,
   );
   const scopedRituals = scopePlannerRitualsToActiveCampaigns(
     input.plannerContext.rituals,
     activeCampaignIds,
+    activeHabitIds,
   );
   const pushLabel = (value: string | null | undefined) => {
     if (!value) return;

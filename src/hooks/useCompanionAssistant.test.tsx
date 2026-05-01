@@ -1275,6 +1275,47 @@ describe("useCompanionAssistant", () => {
     });
   });
 
+  it("opens free-talk launcher templates as companion-authored visible openers", async () => {
+    const consumed = vi.fn();
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () =>
+        useCompanionAssistant({
+          surface: "journeys",
+          launchIntent: {
+            id: "launch-free-talk-1",
+            message: "What's good, buddy?",
+            starterIntent: "free_talk_start",
+            target: "conversation",
+          },
+          onLaunchIntentConsumed: consumed,
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(consumed).toHaveBeenCalledWith("launch-free-talk-1");
+    });
+
+    expect(mocks.supabaseInvoke).not.toHaveBeenCalled();
+    expect(result.current.activeThread?.sessionId).toBe("fresh-session");
+    expect(result.current.messages).toEqual([
+      expect.objectContaining({
+        role: "assistant",
+        content: "What's good, buddy?",
+        source: "agent",
+      }),
+    ]);
+    expect(result.current.messages[0]?.isSeed).toBeUndefined();
+
+    await waitFor(() => {
+      expect(mocks.archiveThread).toHaveBeenCalledWith(
+        "persisted-session",
+        true,
+      );
+    });
+  });
+
   it("defers persisted bootstrap while a launcher template intent is pending", async () => {
     mocks.supabaseInvoke.mockImplementation(async (_functionName, options) => {
       const sessionId = options?.body?.sessionId ?? "missing-session";
@@ -1615,6 +1656,37 @@ describe("useCompanionAssistant", () => {
         { starterIntent: "plan_day", turnOrigin: "launcher" },
       );
     });
+    expect(mocks.listThreads).not.toHaveBeenCalled();
+  });
+
+  it("starts free-talk launcher templates in legacy fallback without submitting the opener", async () => {
+    mocks.agentSurfaceEnabled = false;
+    const consumed = vi.fn();
+
+    const { wrapper } = createWrapper();
+    renderHook(
+      () =>
+        useCompanionAssistant({
+          surface: "journeys",
+          launchIntent: {
+            id: "launch-free-talk-fallback-1",
+            message: "What's good, buddy?",
+            starterIntent: "free_talk_start",
+            target: "conversation",
+          },
+          onLaunchIntentConsumed: consumed,
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(mocks.legacyStartTemplateThread).toHaveBeenCalledWith({
+        greetingText: "What's good, buddy?",
+        visibleAssistantOpening: true,
+      });
+    });
+    expect(mocks.legacySubmitMessage).not.toHaveBeenCalled();
+    expect(consumed).toHaveBeenCalledWith("launch-free-talk-fallback-1");
     expect(mocks.listThreads).not.toHaveBeenCalled();
   });
 

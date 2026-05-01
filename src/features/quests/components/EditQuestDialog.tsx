@@ -42,6 +42,11 @@ import {
 import { parseScheduledTime } from "@/utils/scheduledTime";
 import type { QuestAttachmentInput, TaskAttachment } from "@/types/questAttachments";
 import { recurrenceRequiresScheduledTime } from "@/utils/recurrenceValidation";
+import {
+  getPrimaryQuestReminderOffset,
+  normalizeQuestReminderOffsets,
+  resolveQuestReminderOffsets,
+} from "@/utils/questReminders";
 
 interface Task {
   id: string;
@@ -56,6 +61,7 @@ interface Task {
   recurrence_custom_period?: "week" | "month" | null;
   reminder_enabled?: boolean | null;
   reminder_minutes_before?: number | null;
+  reminder_offsets_minutes?: number[] | null;
   category?: string | null;
   notes?: string | null;
   habit_source_id?: string | null;
@@ -80,6 +86,7 @@ interface EditQuestDialogProps {
     recurrence_custom_period: "week" | "month" | null;
     reminder_enabled: boolean;
     reminder_minutes_before: number;
+    reminder_offsets_minutes: number[];
     notes: string | null;
     category: string | null;
     image_url: string | null;
@@ -122,6 +129,7 @@ export function EditQuestDialog({
   const [recurrenceCustomPeriod, setRecurrenceCustomPeriod] = useState<"week" | "month" | null>(null);
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderMinutesBefore, setReminderMinutesBefore] = useState(15);
+  const [reminderOffsetsMinutes, setReminderOffsetsMinutes] = useState<number[]>([]);
   const [moreInformation, setMoreInformation] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -190,12 +198,14 @@ export function EditQuestDialog({
           ? normalizedCustomPeriod
           : null
       );
-      setReminderEnabled(Boolean(task.reminder_enabled));
-      setReminderMinutesBefore(
-        typeof task.reminder_minutes_before === "number" && task.reminder_minutes_before > 0
-          ? task.reminder_minutes_before
-          : 15,
-      );
+      const resolvedReminderOffsets = resolveQuestReminderOffsets({
+        reminderEnabled: task.reminder_enabled,
+        reminderMinutesBefore: task.reminder_minutes_before,
+        reminderOffsetsMinutes: task.reminder_offsets_minutes,
+      });
+      setReminderEnabled(resolvedReminderOffsets.length > 0);
+      setReminderMinutesBefore(getPrimaryQuestReminderOffset(resolvedReminderOffsets));
+      setReminderOffsetsMinutes(resolvedReminderOffsets);
       setMoreInformation(task.notes || null);
       const taskAttachments = (task.attachments ?? []).map((attachment, index) => ({
         fileUrl: attachment.fileUrl,
@@ -262,6 +272,26 @@ export function EditQuestDialog({
     { value: "hard" as const, icon: Mountain, label: "Hard" },
   ];
 
+  const applyReminderOffsets = useCallback((offsets: readonly unknown[]) => {
+    const normalizedOffsets = normalizeQuestReminderOffsets(offsets);
+    setReminderOffsetsMinutes(normalizedOffsets);
+    setReminderEnabled(normalizedOffsets.length > 0);
+    setReminderMinutesBefore(getPrimaryQuestReminderOffset(normalizedOffsets));
+  }, []);
+
+  const handleReminderEnabledChange = useCallback((enabled: boolean) => {
+    if (!enabled) {
+      applyReminderOffsets([]);
+      return;
+    }
+
+    applyReminderOffsets(reminderOffsetsMinutes.length > 0 ? reminderOffsetsMinutes : [reminderMinutesBefore]);
+  }, [applyReminderOffsets, reminderMinutesBefore, reminderOffsetsMinutes]);
+
+  const handleReminderMinutesBeforeChange = useCallback((minutes: number) => {
+    applyReminderOffsets([minutes]);
+  }, [applyReminderOffsets]);
+
   const handleSave = useCallback(async () => {
     if (!task || !taskText.trim() || hasRecurrenceWithoutTime) return;
     await onSave(task.id, {
@@ -276,6 +306,7 @@ export function EditQuestDialog({
       recurrence_custom_period: recurrencePattern === "custom" ? (recurrenceCustomPeriod ?? "week") : null,
       reminder_enabled: reminderEnabled,
       reminder_minutes_before: Number.isFinite(reminderMinutesBefore) && reminderMinutesBefore > 0 ? reminderMinutesBefore : 15,
+      reminder_offsets_minutes: reminderOffsetsMinutes,
       notes: moreInformation,
       category: task.category || null,
       image_url: attachments.find((attachment) => attachment.isImage)?.fileUrl ?? null,
@@ -299,6 +330,7 @@ export function EditQuestDialog({
     recurrenceCustomPeriod,
     reminderEnabled,
     reminderMinutesBefore,
+    reminderOffsetsMinutes,
     moreInformation,
     attachments,
     location,
@@ -494,14 +526,16 @@ export function EditQuestDialog({
                 recurrenceCustomPeriod={recurrenceCustomPeriod}
                 reminderEnabled={reminderEnabled}
                 reminderMinutesBefore={reminderMinutesBefore}
+                reminderOffsetsMinutes={reminderOffsetsMinutes}
                 onScheduledTimeChange={setScheduledTime}
                 onEstimatedDurationChange={setEstimatedDuration}
                 onRecurrencePatternChange={setRecurrencePattern}
                 onRecurrenceDaysChange={setRecurrenceDays}
                 onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
                 onRecurrenceCustomPeriodChange={setRecurrenceCustomPeriod}
-                onReminderEnabledChange={setReminderEnabled}
-                onReminderMinutesBeforeChange={setReminderMinutesBefore}
+                onReminderEnabledChange={handleReminderEnabledChange}
+                onReminderMinutesBeforeChange={handleReminderMinutesBeforeChange}
+                onReminderOffsetsMinutesChange={applyReminderOffsets}
                 moreInformation={moreInformation}
                 onMoreInformationChange={setMoreInformation}
                 location={location}
@@ -618,14 +652,16 @@ export function EditQuestDialog({
                     recurrenceCustomPeriod={recurrenceCustomPeriod}
                     reminderEnabled={reminderEnabled}
                     reminderMinutesBefore={reminderMinutesBefore}
+                    reminderOffsetsMinutes={reminderOffsetsMinutes}
                     onScheduledTimeChange={setScheduledTime}
                     onEstimatedDurationChange={setEstimatedDuration}
                     onRecurrencePatternChange={setRecurrencePattern}
                     onRecurrenceDaysChange={setRecurrenceDays}
                     onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
                     onRecurrenceCustomPeriodChange={setRecurrenceCustomPeriod}
-                    onReminderEnabledChange={setReminderEnabled}
-                    onReminderMinutesBeforeChange={setReminderMinutesBefore}
+                    onReminderEnabledChange={handleReminderEnabledChange}
+                    onReminderMinutesBeforeChange={handleReminderMinutesBeforeChange}
+                    onReminderOffsetsMinutesChange={applyReminderOffsets}
                     moreInformation={moreInformation}
                     onMoreInformationChange={setMoreInformation}
                     location={location}

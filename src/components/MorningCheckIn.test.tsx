@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getMorningCheckInDraftStorageKey } from "@/utils/accountLocalState";
 
 const mocks = vi.hoisted(() => ({
@@ -36,6 +36,13 @@ const mocks = vi.hoisted(() => ({
   checkFirstTimeAchievements: vi.fn().mockResolvedValue(undefined),
   triggerReaction: vi.fn().mockResolvedValue(undefined),
   setPendingMentorMood: vi.fn(),
+  logger: {
+    error: vi.fn(),
+    log: vi.fn(),
+    warn: vi.fn(),
+  },
+  queryError: null as Error | null,
+  refetchExistingCheckIn: vi.fn(),
   insertCheckIn: vi.fn(),
   countCheckIns: vi.fn(),
   invokeFunction: vi.fn(),
@@ -64,6 +71,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({
     data: mocks.existingCheckIn,
+    error: mocks.queryError,
+    refetch: mocks.refetchExistingCheckIn,
   }),
   useQueryClient: () => mocks.queryClient,
 }));
@@ -122,6 +131,10 @@ vi.mock("@/utils/supabaseFunctionErrors", () => ({
   toUserFacingFunctionError: mocks.toUserFacingFunctionError,
 }));
 
+vi.mock("@/utils/logger", () => ({
+  logger: mocks.logger,
+}));
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (table: string) => {
@@ -132,7 +145,16 @@ vi.mock("@/integrations/supabase/client", () => ({
           then: undefined,
         };
         return {
-          select: () => selectChain,
+          select: (_columns?: string, options?: { count?: string; head?: boolean }) => {
+            if (options?.count === "exact" && options?.head) {
+              const countChain = {
+                eq: vi.fn(() => mocks.countCheckIns()),
+              };
+              return countChain;
+            }
+
+            return selectChain;
+          },
           insert: () => ({
             select: () => ({
               maybeSingle: mocks.insertCheckIn,
@@ -168,7 +190,10 @@ vi.mock("@/components/ErrorBoundary", () => ({
 import { MorningCheckIn } from "./MorningCheckIn";
 
 describe("MorningCheckIn completion portrait", () => {
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
+    consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     mocks.user = { id: "user-1" };
     mocks.safeLocalStorage.clear();
     mocks.existingCheckIn = {
@@ -192,13 +217,23 @@ describe("MorningCheckIn completion portrait", () => {
     mocks.checkFirstTimeAchievements.mockClear();
     mocks.triggerReaction.mockClear();
     mocks.setPendingMentorMood.mockClear();
+    mocks.logger.error.mockClear();
+    mocks.logger.log.mockClear();
+    mocks.logger.warn.mockClear();
+    mocks.queryError = null;
+    mocks.refetchExistingCheckIn.mockReset();
     mocks.insertCheckIn.mockReset();
     mocks.countCheckIns.mockReset();
+    mocks.countCheckIns.mockResolvedValue({ count: 2, error: null });
     mocks.invokeFunction.mockReset();
     mocks.guidance = {
       isActive: false,
       currentStep: null,
     };
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
   });
 
   it("renders portrait tile and quote with direct avatar URL", async () => {
@@ -231,6 +266,25 @@ describe("MorningCheckIn completion portrait", () => {
     expect((portrait as HTMLImageElement).src).toContain("/assets/sage-fallback.png");
   });
 
+  it("shows a persistent error when today's check-in cannot be loaded", async () => {
+    mocks.existingCheckIn = null;
+    mocks.queryError = new Error("RLS denied");
+    mocks.refetchExistingCheckIn.mockResolvedValueOnce({ data: null });
+
+    render(<MorningCheckIn />);
+
+    expect(screen.getByText("Couldn't load today's check-in.")).toBeInTheDocument();
+    expect(screen.getByText("Please try again before checking in.")).toBeInTheDocument();
+    expect(screen.queryByText("RLS denied")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^check in/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+
+    await waitFor(() => {
+      expect(mocks.refetchExistingCheckIn).toHaveBeenCalled();
+    });
+  });
+
   it("keeps mentor copy visible when portrait loading fails", async () => {
     mocks.personality = {
       name: "The Sage",
@@ -249,7 +303,7 @@ describe("MorningCheckIn completion portrait", () => {
 
   it("shows pending message in flow-root wrapper while response is preparing", async () => {
     mocks.existingCheckIn = {
-      completed_at: "2026-02-21T12:00:00.000Z",
+      completed_at: new Date().toISOString(),
       intention: "Ship the thing",
       mentor_response: null,
     };
@@ -259,6 +313,20 @@ describe("MorningCheckIn completion portrait", () => {
     expect(screen.getByText("Preparing your personalized message...")).toBeInTheDocument();
     expect(screen.getByTestId("mentor-response-body")).toHaveClass("flow-root");
     expect(await screen.findByTestId("mentor-portrait-tile")).toHaveClass("float-right");
+  });
+
+  it("shows timeout copy for stale pending mentor responses after remount", () => {
+    mocks.existingCheckIn = {
+      completed_at: new Date(Date.now() - 31_000).toISOString(),
+      intention: "Ship the thing",
+      mentor_response: null,
+    };
+
+    render(<MorningCheckIn />);
+
+    expect(screen.getByTestId("mentor-response-status")).toHaveTextContent(
+      "Your check-in was saved, but your guide's personalized reply is taking longer than expected.",
+    );
   });
 
   it("adds the tutorial highlight treatment to the submit button during Step 3", () => {
@@ -337,6 +405,33 @@ describe("MorningCheckIn completion portrait", () => {
     );
   });
 
+  it("shows static copy when saving the check-in fails", async () => {
+    mocks.existingCheckIn = null;
+    mocks.insertCheckIn
+      .mockResolvedValueOnce({ data: null, error: null })
+      .mockResolvedValueOnce({
+        data: null,
+        error: new Error("new row violates row-level security policy"),
+      });
+
+    render(<MorningCheckIn />);
+
+    fireEvent.click(screen.getByRole("button", { name: /motivated/i }));
+    fireEvent.change(screen.getByPlaceholderText("I will..."), {
+      target: { value: "Ship the thing" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /check in/i }));
+
+    await waitFor(() => {
+      expect(mocks.toast).toHaveBeenCalledWith({
+        title: "Couldn't save check-in",
+        description: "Please try again. We couldn't save your check-in.",
+        variant: "destructive",
+      });
+    });
+    expect(JSON.stringify(mocks.toast.mock.calls)).not.toContain("row-level security");
+  });
+
   it("restores an unfinished morning check-in draft after remount", async () => {
     mocks.existingCheckIn = null;
 
@@ -412,5 +507,49 @@ describe("MorningCheckIn completion portrait", () => {
     });
 
     expect(mocks.safeLocalStorage.getItem(getMorningCheckInDraftStorageKey("user-1"))).toBeNull();
+  });
+
+  it("keeps the submitted state when achievement side-effects fail", async () => {
+    mocks.existingCheckIn = null;
+    mocks.insertCheckIn
+      .mockResolvedValueOnce({ data: null, error: null })
+      .mockResolvedValueOnce({
+        data: {
+          id: "check-in-1",
+          user_id: "user-1",
+          completed_at: "2026-02-21T12:00:00.000Z",
+        },
+        error: null,
+      });
+    mocks.countCheckIns.mockResolvedValueOnce({ count: 1, error: null });
+    mocks.checkFirstTimeAchievements.mockRejectedValueOnce(new Error("achievement down"));
+    mocks.checkDailyCompletionAchievement.mockRejectedValueOnce(new Error("daily down"));
+    mocks.invokeFunction.mockResolvedValue({ error: null });
+
+    render(<MorningCheckIn />);
+
+    fireEvent.click(screen.getByRole("button", { name: /motivated/i }));
+    fireEvent.change(screen.getByPlaceholderText("I will..."), {
+      target: { value: "Ship it" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /check in/i }));
+
+    await waitFor(() => {
+      expect(mocks.queryClient.invalidateQueries).toHaveBeenCalledWith({
+        queryKey: ["morning-check-in"],
+      });
+    });
+
+    expect(mocks.toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Couldn't save check-in" }),
+    );
+    expect(mocks.logger.warn).toHaveBeenCalledWith(
+      "First-time check-in achievement check failed:",
+      expect.any(Error),
+    );
+    expect(mocks.logger.warn).toHaveBeenCalledWith(
+      "Daily completion achievement check failed:",
+      expect.any(Error),
+    );
   });
 });

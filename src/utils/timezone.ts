@@ -10,18 +10,62 @@ type DateParts = {
   day: string;
 };
 
-function resolveTimezone(userTimezone?: string): string {
-  const fallback = Intl.DateTimeFormat().resolvedOptions().timeZone;
+function resolveTimezone(userTimezone?: string, fallbackTimezone = "UTC"): string {
   if (!userTimezone) {
-    return fallback;
+    return fallbackTimezone;
   }
 
   try {
     Intl.DateTimeFormat("en-US", { timeZone: userTimezone });
     return userTimezone;
   } catch {
-    return fallback;
+    return fallbackTimezone;
   }
+}
+
+function resolveDeviceTimezone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+}
+
+function getLocalHour(date: Date, timezone: string): number {
+  const hour = parseInt(
+    new Intl.DateTimeFormat('en-US', {
+      hour: 'numeric',
+      hour12: false,
+      timeZone: timezone
+    }).format(date),
+    10
+  );
+
+  return Number.isFinite(hour) ? hour : 0;
+}
+
+function shiftIsoDate(isoDate: string, dayOffset: number): string {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  const anchorDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
+  anchorDate.setUTCDate(anchorDate.getUTCDate() + dayOffset);
+
+  return anchorDate.toISOString().slice(0, 10);
+}
+
+function getDayOfWeekForIsoDate(isoDate: string): number {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0)).getUTCDay();
+}
+
+function getEffectiveDailyDateForNow(
+  now: Date,
+  timezone: string,
+  resetHour: number,
+): string {
+  const localHour = getLocalHour(now, timezone);
+  const localDate = formatDateForTimezone(now, timezone);
+
+  if (localHour < resetHour) {
+    return shiftIsoDate(localDate, -1);
+  }
+
+  return localDate;
 }
 
 /**
@@ -34,24 +78,8 @@ export function getEffectiveDailyDate(
 ): string {
   const now = new Date();
   const tz = resolveTimezone(userTimezone);
-  
-  // Get local hour in user's timezone
-  const localHour = parseInt(
-    new Intl.DateTimeFormat('en-US', { 
-      hour: 'numeric', 
-      hour12: false, 
-      timeZone: tz 
-    }).format(now)
-  );
-  
-  // If before reset hour, use previous day's date
-  if (localHour < resetHour) {
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    return formatDateForTimezone(yesterday, tz);
-  }
-  
-  return formatDateForTimezone(now, tz);
+
+  return getEffectiveDailyDateForNow(now, tz, resetHour);
 }
 
 /**
@@ -60,7 +88,7 @@ export function getEffectiveDailyDate(
  * This allows users who stay up past midnight to still see the same missions.
  */
 export function getEffectiveMissionDate(userTimezone?: string): string {
-  return getEffectiveDailyDate(userTimezone, RESET_HOUR);
+  return getEffectiveDailyDate(userTimezone || getUserTimezone(), RESET_HOUR);
 }
 
 /**
@@ -69,35 +97,10 @@ export function getEffectiveMissionDate(userTimezone?: string): string {
  */
 export function getEffectiveDayOfWeek(userTimezone?: string): number {
   const now = new Date();
-  const tz = resolveTimezone(userTimezone);
-  
-  // Get local hour in user's timezone
-  const localHour = parseInt(
-    new Intl.DateTimeFormat('en-US', { 
-      hour: 'numeric', 
-      hour12: false, 
-      timeZone: tz 
-    }).format(now)
-  );
-  
-  // Get the day of week in user's timezone
-  const dayFormatter = new Intl.DateTimeFormat('en-US', {
-    weekday: 'short',
-    timeZone: tz
-  });
-  
-  let targetDate = now;
-  if (localHour < RESET_HOUR) {
-    targetDate = new Date(now);
-    targetDate.setDate(targetDate.getDate() - 1);
-  }
-  
-  const dayName = dayFormatter.format(targetDate);
-  const dayMap: Record<string, number> = {
-    'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6
-  };
-  
-  return dayMap[dayName] ?? 0;
+  const tz = resolveTimezone(userTimezone || getUserTimezone());
+  const effectiveDate = getEffectiveDailyDateForNow(now, tz, RESET_HOUR);
+
+  return getDayOfWeekForIsoDate(effectiveDate);
 }
 
 /**
@@ -129,5 +132,5 @@ function formatDateForTimezone(date: Date, timezone: string): string {
  * Get the user's current timezone string
  */
 export function getUserTimezone(): string {
-  return resolveTimezone();
+  return resolveDeviceTimezone();
 }

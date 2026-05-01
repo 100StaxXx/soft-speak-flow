@@ -108,6 +108,14 @@ describe("sonner toast wrapper", () => {
     expect(sonnerProps).toEqual(expect.objectContaining({
       className: "toaster group",
       duration: MAX_TOAST_DURATION_MS,
+      mobileOffset: {
+        bottom: "var(--sonner-bottom-offset, calc(env(safe-area-inset-bottom, 0px) + 16px))",
+        left: "1rem",
+        right: "1rem",
+      },
+      offset: {
+        bottom: "var(--sonner-bottom-offset, calc(env(safe-area-inset-bottom, 0px) + 16px))",
+      },
       pauseWhenPageIsHidden: false,
       position: "bottom-center",
       swipeDirections: ["bottom", "left", "right"],

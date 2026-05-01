@@ -26,7 +26,24 @@ describe("buildVoiceQuestPrefillFromTranscript", () => {
       estimatedDuration: 120,
       reminderEnabled: true,
       reminderMinutesBefore: 30,
+      reminderOffsetsMinutes: [30],
       moreInformation: "bring roadmap",
+      creationSource: "voice",
+    }));
+  });
+
+  it("passes compound spoken reminder offsets into the quest prefill", () => {
+    const prefill = buildVoiceQuestPrefillFromTranscript(
+      "Read report tomorrow at 3pm remind me 1 hour and 10 minutes before",
+    );
+
+    expect(prefill).toEqual(expect.objectContaining({
+      text: "Read Report",
+      taskDate: "2026-04-10",
+      scheduledTime: "15:00",
+      reminderEnabled: true,
+      reminderMinutesBefore: 10,
+      reminderOffsetsMinutes: [10, 60],
       creationSource: "voice",
     }));
   });

@@ -11,6 +11,12 @@ import {
 
 const QUESTIONNAIRE_ANSWERS = [
   {
+    questionId: "visual_persona",
+    optionId: "visual_persona_neutral",
+    answer: "Prefer not to say",
+    tags: ["visual_persona_neutral"],
+  },
+  {
     questionId: "mentor_energy",
     optionId: "either_works",
     answer: "Either works for me",
@@ -565,7 +571,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
       });
 
       expect(screen.getByRole("button", { name: "questionnaire-submit" })).toBeInTheDocument();
-      expect(mocks.questionnaireUpsert).toHaveBeenCalledTimes(5);
+      expect(mocks.questionnaireUpsert).toHaveBeenCalledTimes(6);
       expect(mocks.toastError).toHaveBeenCalledWith(
         "We hit a temporary snag matching your guide. Please try again.",
         expect.objectContaining({ duration: expect.any(Number) }),
@@ -688,7 +694,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
       const guidedTutorial = JSON.parse(rawProgress ?? "{}");
       expect(guidedTutorial).toMatchObject({
         version: 2,
-        flowVersion: 8,
+        flowVersion: 9,
         eligible: true,
         completed: false,
         dismissed: false,

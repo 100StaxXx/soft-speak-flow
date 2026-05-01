@@ -46,6 +46,7 @@ export interface PendingTaskData {
   recurrenceEndDate: string | null;
   reminderEnabled: boolean;
   reminderMinutesBefore: number;
+  reminderOffsetsMinutes?: number[];
   moreInformation: string | null;
 }
 
@@ -61,6 +62,7 @@ export interface QuestComposerPrefillDraft {
   recurrenceCustomPeriod?: "week" | "month" | null;
   reminderEnabled?: boolean;
   reminderMinutesBefore?: number;
+  reminderOffsetsMinutes?: number[];
   moreInformation?: string | null;
   location?: string | null;
   subtasks?: string[];
@@ -79,6 +81,7 @@ export interface QuestDraftSnapshot {
   recurrenceCustomPeriod: "week" | "month" | null;
   reminderEnabled: boolean;
   reminderMinutesBefore: number;
+  reminderOffsetsMinutes?: number[];
   moreInformation: string | null;
   location: string | null;
   sendToCalendar: boolean;
@@ -102,5 +105,6 @@ export interface QuestFormState {
   recurrenceEndDate: string | null;
   reminderEnabled: boolean;
   reminderMinutesBefore: number;
+  reminderOffsetsMinutes?: number[];
   moreInformation: string | null;
 }

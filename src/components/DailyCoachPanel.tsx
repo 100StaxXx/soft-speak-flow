@@ -117,6 +117,7 @@ export const DailyCoachPanel = memo(function DailyCoachPanel({
   const { 
     insights, 
     isLoading,
+    error,
   } = useDailyPlanOptimization();
 
   if (isLoading) {
@@ -125,6 +126,20 @@ export const DailyCoachPanel = memo(function DailyCoachPanel({
         <div className="flex items-center gap-2 text-muted-foreground">
           <Sparkles className="h-4 w-4 animate-pulse" />
           <span className="text-sm">Analyzing your day...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-2xl bg-card/25 backdrop-blur-2xl border border-white/[0.08] p-4">
+        <div className="flex items-start gap-2 text-muted-foreground">
+          <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500" />
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-foreground">Couldn't load coach guidance</p>
+            <p className="text-xs leading-relaxed">{error}</p>
+          </div>
         </div>
       </div>
     );

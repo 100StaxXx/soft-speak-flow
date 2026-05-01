@@ -40,7 +40,7 @@ export const ELEVENLABS_MENTOR_VOICES: Record<
     use_speaker_boost: true,
   },
   charles: {
-    voiceId: "wGkprrTXgBM5EC3Znt6U",
+    voiceId: "goT3UYdM9bhm0n2lmKQx",
     stability: 0.76,
     similarity_boost: 0.86,
     style_exaggeration: 0.52,

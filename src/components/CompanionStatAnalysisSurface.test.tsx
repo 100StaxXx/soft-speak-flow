@@ -1,12 +1,34 @@
 import type { HTMLAttributes, ReactNode } from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   prefersReducedMotion: true,
   refreshAnalysisMock: vi.fn().mockResolvedValue(undefined),
+  regenerateTitleCardMock: vi.fn().mockResolvedValue(undefined),
   useCompanionStatAnalysisMock: vi.fn(),
 }));
+
+const originalImage = globalThis.Image;
+let imageLoadMode: "load" | "error" | "idle" = "load";
+
+class MockImage {
+  complete = false;
+  naturalWidth = 0;
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+
+  set src(_value: string) {
+    if (imageLoadMode === "idle") return;
+    this.complete = true;
+    this.naturalWidth = imageLoadMode === "load" ? 100 : 0;
+    if (imageLoadMode === "load") {
+      this.onload?.();
+    } else {
+      this.onerror?.();
+    }
+  }
+}
 
 vi.mock("@/hooks/useCompanionStatAnalysis", () => ({
   useCompanionStatAnalysis: (...args: unknown[]) => mocks.useCompanionStatAnalysisMock(...args),
@@ -245,7 +267,10 @@ const analysis = {
 describe("CompanionStatAnalysisSurface", () => {
   beforeEach(() => {
     mocks.prefersReducedMotion = true;
+    imageLoadMode = "load";
+    globalThis.Image = MockImage as unknown as typeof Image;
     mocks.refreshAnalysisMock.mockClear();
+    mocks.regenerateTitleCardMock.mockClear();
     mocks.useCompanionStatAnalysisMock.mockReset();
     mocks.useCompanionStatAnalysisMock.mockReturnValue({
       analysis,
@@ -253,8 +278,14 @@ describe("CompanionStatAnalysisSurface", () => {
       error: null,
       isLoading: false,
       isRefreshing: false,
+      isRegeneratingTitleCard: false,
       refreshAnalysis: mocks.refreshAnalysisMock,
+      regenerateTitleCard: mocks.regenerateTitleCardMock,
     });
+  });
+
+  afterEach(() => {
+    globalThis.Image = originalImage;
   });
 
   it("uses a drawer on mobile and renders the RPG stat reading shell", () => {
@@ -389,6 +420,71 @@ describe("CompanionStatAnalysisSurface", () => {
     expect(screen.getByText("Rebalance Creativity")).toBeInTheDocument();
   });
 
+  it("keeps the loading state while title-card art is still generating", () => {
+    mocks.useCompanionStatAnalysisMock.mockReturnValue({
+      analysis: {
+        ...analysis,
+        cosmiqTitleCard: {
+          ...analysis.cosmiqTitleCard,
+          imageUrl: null,
+          status: "generating",
+        },
+      },
+      cached: false,
+      error: null,
+      isLoading: false,
+      isRefreshing: false,
+      isRegeneratingTitleCard: false,
+      refreshAnalysis: mocks.refreshAnalysisMock,
+      regenerateTitleCard: mocks.regenerateTitleCardMock,
+    });
+
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="desktop"
+      />,
+    );
+
+    expect(screen.getByText("Revealing your title")).toBeInTheDocument();
+    expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
+  });
+
+  it("keeps loading until a ready title-card image actually loads", () => {
+    imageLoadMode = "idle";
+
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="desktop"
+      />,
+    );
+
+    expect(screen.getByText("Revealing your title")).toBeInTheDocument();
+    expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
+  });
+
+  it("forces one title-card regeneration when a ready image fails to load", async () => {
+    imageLoadMode = "error";
+    mocks.regenerateTitleCardMock.mockRejectedValueOnce(new Error("image retry failed"));
+
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="desktop"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(mocks.regenerateTitleCardMock).toHaveBeenCalledWith(analysis);
+    });
+    expect(await screen.findByText("We couldn't load the generated title art. Try regenerating it.")).toBeInTheDocument();
+    expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
+  });
+
   it("shows the inline unavailable card when validated analysis is missing", () => {
     mocks.useCompanionStatAnalysisMock.mockReturnValue({
       analysis: null,
@@ -396,7 +492,9 @@ describe("CompanionStatAnalysisSurface", () => {
       error: "Received malformed stat analysis data: analysis.summary must be a non-empty string",
       isLoading: false,
       isRefreshing: false,
+      isRegeneratingTitleCard: false,
       refreshAnalysis: mocks.refreshAnalysisMock,
+      regenerateTitleCard: mocks.regenerateTitleCardMock,
     });
 
     render(
@@ -428,7 +526,9 @@ describe("CompanionStatAnalysisSurface", () => {
       error: null,
       isLoading: false,
       isRefreshing: false,
+      isRegeneratingTitleCard: false,
       refreshAnalysis: mocks.refreshAnalysisMock,
+      regenerateTitleCard: mocks.regenerateTitleCardMock,
     });
 
     render(

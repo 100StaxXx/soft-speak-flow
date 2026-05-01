@@ -112,6 +112,11 @@ type CompanionAgentSubmitOptions = {
   selectedProposedActionIntent?: CompanionAgentSelectedProposedActionIntent;
 };
 
+type CompanionTemplateThreadOptions = {
+  greetingText?: string | null;
+  visibleAssistantOpening?: boolean;
+};
+
 const inferStarterIntentFromMessage = (
   message: string,
 ): CompanionPlannerLaunchIntent["starterIntent"] | undefined =>
@@ -761,6 +766,7 @@ export function useCompanionAssistant({
     sessionId?: string;
     greetingText?: string;
     markBootstrapped?: boolean;
+    visibleAssistantOpening?: boolean;
   }) => {
     threadMutationVersionRef.current += 1;
     const nextSessionId = options?.sessionId ??
@@ -783,7 +789,7 @@ export function useCompanionAssistant({
       greetingText
         ? [
           createMessage("assistant", greetingText, {
-            isSeed: true,
+            ...(options?.visibleAssistantOpening ? {} : { isSeed: true }),
             source: "agent",
           }),
         ]
@@ -1506,7 +1512,7 @@ export function useCompanionAssistant({
   }, [baseGreeting, invalidateThreads, openFreshThread, persistedActiveThread]);
 
   const startNewChat = useCallback(
-    async (options?: { greetingText?: string | null }) => {
+    async (options?: CompanionTemplateThreadOptions) => {
       const threadToArchive = persistedActiveThread ??
         threadsQuery.data?.threads.find((thread) =>
           thread.archivedAt === null
@@ -1528,6 +1534,7 @@ export function useCompanionAssistant({
       return openFreshThread({
         greetingText,
         markBootstrapped: true,
+        visibleAssistantOpening: options?.visibleAssistantOpening,
       });
     },
     [
@@ -1540,7 +1547,7 @@ export function useCompanionAssistant({
   );
 
   const startTemplateThread = useCallback(
-    (options?: { greetingText?: string | null }) => {
+    (options?: CompanionTemplateThreadOptions) => {
       const threadToArchive = persistedActiveThread ??
         threadsQuery.data?.threads.find((thread) =>
           thread.archivedAt === null
@@ -1552,6 +1559,7 @@ export function useCompanionAssistant({
       const nextSessionId = openFreshThread({
         greetingText,
         markBootstrapped: true,
+        visibleAssistantOpening: options?.visibleAssistantOpening,
       });
 
       void (async () => {
@@ -1617,11 +1625,30 @@ export function useCompanionAssistant({
 
     const launchMessage = launchIntent.message;
     const intentId = launchIntent.id;
+    const isCompanionAuthoredConversationStarter =
+      launchIntent.target === "conversation" &&
+      launchIntent.starterIntent === "free_talk_start";
 
     void (async () => {
       threadMutationVersionRef.current += 1;
 
       try {
+        if (isCompanionAuthoredConversationStarter) {
+          const greetingText = launchMessage.trim() || null;
+          if (useLegacyFallback) {
+            legacyAssistant.startTemplateThread?.({
+              greetingText,
+              visibleAssistantOpening: true,
+            });
+          } else {
+            startTemplateThread({
+              greetingText,
+              visibleAssistantOpening: true,
+            });
+          }
+          return;
+        }
+
         if (useLegacyFallback) {
           legacyAssistant.startTemplateThread?.();
         } else {
@@ -1653,6 +1680,7 @@ export function useCompanionAssistant({
     onLaunchIntentConsumed,
     onOpenCampaignBuilder,
     startNewChat,
+    startTemplateThread,
     submitMessage,
     threadsQuery.isSuccess,
     useLegacyFallback,
@@ -1769,8 +1797,8 @@ export function useCompanionAssistant({
       archiveDisabledReason: legacyAssistant.archiveDisabledReason,
       startNewChat: legacyAssistant.startNewChat,
       startTemplateThread: (
-        _options?: { greetingText?: string | null },
-      ) => legacyAssistant.startTemplateThread?.(),
+        options?: CompanionTemplateThreadOptions,
+      ) => legacyAssistant.startTemplateThread?.(options),
       canStartNewChat: legacyAssistant.canStartNewChat,
       newChatDisabledReason: legacyAssistant.newChatDisabledReason,
     };

@@ -254,6 +254,12 @@ describe("supabaseFunctionErrors", () => {
       isOffline: false,
       retryAfterSeconds: 30,
     };
+    const genericRateLimitWithRetryHint: ParsedFunctionInvokeError = {
+      category: "rate_limit",
+      isOffline: false,
+      backendMessage: "Rate limit exceeded",
+      retryAfterSeconds: 45,
+    };
     const pepTalkInProgress: ParsedFunctionInvokeError = {
       category: "http",
       isOffline: false,
@@ -286,6 +292,7 @@ describe("supabaseFunctionErrors", () => {
     expect(toUserFacingFunctionError(audioProviderAuthError)).toContain("provider authentication failed");
     expect(toUserFacingFunctionError(audioProviderCreditsError)).toContain("credits are exhausted");
     expect(toUserFacingFunctionError(rateLimitWithRetryHint)).toContain("30 seconds");
+    expect(toUserFacingFunctionError(genericRateLimitWithRetryHint)).toContain("45 seconds");
     expect(toUserFacingFunctionError(pepTalkInProgress)).toContain("still being prepared");
     expect(toUserFacingFunctionError(rateLimitWithPipelineWrapper)).toContain("45 seconds");
     expect(toUserFacingFunctionError(technicalAudioPipelineWrapper)).toContain("temporarily unavailable");

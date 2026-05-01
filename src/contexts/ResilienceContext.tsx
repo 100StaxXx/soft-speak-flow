@@ -344,6 +344,7 @@ export function ResilienceProvider({ children }: { children: ReactNode }) {
         lastError: receipt.last_error,
         createdAt: receipt.created_at,
         updatedAt: receipt.updated_at,
+        payload: receipt.payload,
       })),
       syncStatus,
       lastSyncError,

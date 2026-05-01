@@ -8,6 +8,7 @@ import { MoodSelector } from "./MoodSelector";
 import { Sunrise, Target, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -32,6 +33,7 @@ import {
   parseFunctionInvokeError,
   toUserFacingFunctionError,
 } from "@/utils/supabaseFunctionErrors";
+import { getEffectiveDailyDate } from "@/utils/timezone";
 
 type MentorResponseIssue =
   | {
@@ -49,6 +51,7 @@ const CHECK_IN_TIMEOUT_MESSAGE =
 
 const MorningCheckInContent = () => {
   const { user } = useAuth();
+  const { profile } = useProfile();
   const { toast } = useToast();
   const personality = useMentorPersonality();
   const { isActive: isTutorialActive, currentStep: tutorialStep } = usePostOnboardingMentorGuidance();
@@ -66,7 +69,7 @@ const MorningCheckInContent = () => {
   const hasHydratedDraftRef = useRef(false);
   const isTutorialMorningCheckinStep = isTutorialActive && tutorialStep === "morning_checkin";
 
-  const today = new Date().toLocaleDateString('en-CA');
+  const today = getEffectiveDailyDate(profile?.timezone ?? undefined);
   const MAX_POLL_DURATION = 30000; // 30 seconds max polling
 
   useEffect(() => {
@@ -122,18 +125,24 @@ const MorningCheckInContent = () => {
       });
   };
 
-  const { data: existingCheckIn } = useQuery({
+  const {
+    data: existingCheckIn,
+    error: existingCheckInError,
+    refetch: refetchExistingCheckIn,
+  } = useQuery({
     queryKey: ['morning-check-in', today, user?.id],
     queryFn: async () => {
       if (!user) return null;
       
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('daily_check_ins')
         .select('*')
         .eq('user_id', user.id)
         .eq('check_in_type', 'morning')
         .eq('check_in_date', today)
         .maybeSingle();
+
+      if (error) throw error;
       return data;
     },
     enabled: !!user,
@@ -142,7 +151,9 @@ const MorningCheckInContent = () => {
       const data = query.state.data;
       if (data?.completed_at && !data?.mentor_response) {
         // Check if we've exceeded max poll duration (use ref to avoid stale closure)
-        const startTime = pollStartTimeRef.current;
+        const completedAtTime = new Date(data.completed_at).getTime();
+        const startTime = pollStartTimeRef.current
+          ?? (Number.isFinite(completedAtTime) ? completedAtTime : null);
         if (startTime && Date.now() - startTime > MAX_POLL_DURATION) {
           logger.warn('Mentor response polling timeout exceeded');
           return false; // Stop polling after 30 seconds
@@ -220,18 +231,27 @@ const MorningCheckInContent = () => {
       return;
     }
 
-    if (
-      existingCheckIn?.completed_at &&
-      pollStartTimeRef.current &&
-      Date.now() - pollStartTimeRef.current > MAX_POLL_DURATION &&
-      !mentorResponseIssue
-    ) {
+    if (!existingCheckIn?.completed_at || mentorResponseIssue) {
+      return;
+    }
+
+    const completedAtTime = new Date(existingCheckIn.completed_at).getTime();
+    const startTime = pollStartTimeRef.current
+      ?? (Number.isFinite(completedAtTime) ? completedAtTime : null);
+
+    if (startTime && Date.now() - startTime > MAX_POLL_DURATION) {
       setMentorResponseIssue({
         kind: "timeout",
         message: CHECK_IN_TIMEOUT_MESSAGE,
       });
     }
   }, [existingCheckIn?.completed_at, existingCheckIn?.mentor_response, mentorResponseIssue, MAX_POLL_DURATION]);
+
+  useEffect(() => {
+    if (existingCheckInError) {
+      console.error("Failed to load morning check-in:", existingCheckInError);
+    }
+  }, [existingCheckInError]);
 
   const submitCheckIn = async () => {
     if (!user || !mood || !intention.trim()) {
@@ -254,13 +274,15 @@ const MorningCheckInContent = () => {
 
     try {
       // Double-check right before insert (cache could be stale)
-      const { data: recentCheck } = await supabase
+      const { data: recentCheck, error: recentCheckError } = await supabase
         .from('daily_check_ins')
         .select('id')
         .eq('user_id', user.id)
         .eq('check_in_type', 'morning')
         .eq('check_in_date', today)
         .maybeSingle();
+
+      if (recentCheckError) throw recentCheckError;
 
       if (recentCheck) {
         toast({ 
@@ -291,25 +313,42 @@ const MorningCheckInContent = () => {
         throw error;
       }
 
+      if (!checkIn) {
+        throw new Error("Check-in row was inserted but could not be read back");
+      }
+
       // Award XP only on successful INSERT (not update)
-      awardCheckInComplete();
+      void Promise.resolve(awardCheckInComplete()).catch((err) => {
+        logger.warn("XP award failed after check-in:", err);
+      });
       
       // Trigger mentor companion reaction for check-in completion
       triggerReaction('mentor', { momentType: 'discipline_win' }).catch(err => 
         logger.log('[LivingCompanion] Mentor reaction failed:', err)
       );
       
-      // Check for first check-in achievement
-      const { count } = await supabase
-        .from('daily_check_ins')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id);
-      
-      if (count === 1) {
-        await checkFirstTimeAchievements('checkin');
+      try {
+        const { count, error: countError } = await supabase
+          .from('daily_check_ins')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id);
+
+        if (countError) {
+          throw countError;
+        }
+
+        if (count === 1) {
+          await checkFirstTimeAchievements('checkin');
+        }
+      } catch (achievementErr) {
+        logger.warn('First-time check-in achievement check failed:', achievementErr);
       }
 
-      await checkDailyCompletionAchievement(today);
+      try {
+        await checkDailyCompletionAchievement(today);
+      } catch (achievementErr) {
+        logger.warn('Daily completion achievement check failed:', achievementErr);
+      }
 
       // Trigger astral encounter check
       window.dispatchEvent(new CustomEvent('quest-completed'));
@@ -351,14 +390,45 @@ const MorningCheckInContent = () => {
     } catch (error) {
       logger.error('Check-in save error:', error);
       toast({ 
-        title: "Error", 
-        description: error instanceof Error ? error.message : "Failed to save check-in", 
+        title: "Couldn't save check-in",
+        description: "Please try again. We couldn't save your check-in.",
         variant: "destructive" 
       });
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  if (existingCheckInError) {
+    return (
+      <div
+        data-tour="morning-checkin"
+        data-testid="morning-checkin-shell"
+        className={cn(
+          "rounded-2xl border border-white/[0.08] overflow-hidden",
+          clearShellCardClassName,
+        )}
+      >
+        <div data-testid="morning-checkin-header" className="px-5 py-4 border-b border-white/[0.06]">
+          <div className="flex items-center gap-3">
+            <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center border border-primary/30">
+              <Sunrise className="h-5 w-5 text-primary" />
+            </div>
+            <h3 className="font-heading font-black text-2xl tracking-wide text-primary">CHECK-IN</h3>
+          </div>
+        </div>
+        <div className="p-5 space-y-3">
+          <p className="text-sm font-medium text-destructive">Couldn't load today's check-in.</p>
+          <p className="text-sm text-muted-foreground">
+            Please try again before checking in.
+          </p>
+          <Button variant="outline" onClick={() => void refetchExistingCheckIn()}>
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (existingCheckIn?.completed_at) {
     return (

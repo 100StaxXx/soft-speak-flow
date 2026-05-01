@@ -29,7 +29,7 @@ const EXPECTED_VOICE_IDS: Record<SupportedMentorSlug, string> = {
   sage: "mcuuWJIofmzgKEGk3EMA",
   lyra: "fgDJOgmENIR82PueQrVs",
   icon: "6p0P6gezgvY1v6xbLzmU",
-  charles: "wGkprrTXgBM5EC3Znt6U",
+  charles: "goT3UYdM9bhm0n2lmKQx",
   princess: "nBKdbSdaLWZTX0tYSgvZ",
   operator: "pNInz6obpgDQGcFmaJgB",
   rival: "V33LkP9pVLdcjeB2y5Na",

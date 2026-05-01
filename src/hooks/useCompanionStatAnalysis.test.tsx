@@ -469,6 +469,45 @@ describe("useCompanionStatAnalysis", () => {
     });
   });
 
+  it("can force-regenerate Cosmiq title card art for a loaded analysis", async () => {
+    const refreshedCard = {
+      profileKey: "v1::the-oathbound-pathfinder",
+      imageUrl: "https://example.com/replacement-card.png",
+      status: "ready",
+      cached: false,
+      promptVersion: 1,
+    };
+
+    mocks.invokeMock
+      .mockResolvedValueOnce({
+        data: { analysis: baseAnalysis, cached: true },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { card: refreshedCard },
+        error: null,
+      });
+
+    const { result } = renderHook(() => useCompanionStatAnalysis({ enabled: true }), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.analysis?.cosmiqTitleCard?.imageUrl).toBe("https://example.com/cosmiq-card.png");
+    });
+
+    await act(async () => {
+      await result.current.regenerateTitleCard(result.current.analysis!);
+    });
+
+    expect(mocks.invokeMock).toHaveBeenNthCalledWith(2, "generate-cosmiq-title-card", {
+      body: { analysisDate: "2026-04-18", forceRefresh: true },
+    });
+    await waitFor(() => {
+      expect(result.current.analysis?.cosmiqTitleCard?.imageUrl).toBe("https://example.com/replacement-card.png");
+    });
+  });
+
   it("ignores stale Cosmiq title card responses after the analysis changes", async () => {
     const pendingAnalysis: CompanionStatAnalysis = {
       ...baseAnalysis,

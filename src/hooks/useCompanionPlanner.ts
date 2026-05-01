@@ -76,6 +76,7 @@ import { buildCompanionStatInterpretation } from "@/shared/companionStatSignals"
 import { isUpcomingScheduleDigestMessage } from "@/shared/schedulingIntent";
 import { withTimeout } from "@/utils/asyncTimeout";
 import { normalizeUuidLikeId } from "@/utils/offlineId";
+import { loadLocalHabits } from "@/utils/plannerSync";
 import type {
   CompanionPlannerContextStarterIntent,
   CompanionPlannerMessage,
@@ -963,7 +964,16 @@ const scopeTaskToActiveCampaigns = (
   task: PlannerContextTask,
   activeEpicIds: ReadonlySet<string>,
   activeRitualIds: ReadonlySet<string>,
+  activeHabitIds: ReadonlySet<string> | null = null,
 ): PlannerContextTask | null => {
+  if (
+    task.habitSourceId &&
+    activeHabitIds &&
+    !activeHabitIds.has(task.habitSourceId)
+  ) {
+    return null;
+  }
+
   if (!task.epicId) {
     return task;
   }
@@ -990,12 +1000,14 @@ const scopeTasksToActiveCampaigns = (
   tasks: PlannerContextTask[],
   activeEpicIds: ReadonlySet<string>,
   activeRitualIds: ReadonlySet<string>,
+  activeHabitIds: ReadonlySet<string> | null = null,
 ): PlannerContextTask[] =>
   tasks.reduce<PlannerContextTask[]>((scopedTasks, task) => {
     const scopedTask = scopeTaskToActiveCampaigns(
       task,
       activeEpicIds,
       activeRitualIds,
+      activeHabitIds,
     );
     if (scopedTask) {
       scopedTasks.push(scopedTask);
@@ -1277,6 +1289,16 @@ export function useCompanionPlanner({
     { enabled },
   );
   const { inboxTasks } = useInboxTasks({ enabled });
+  const habitsQuery = useQuery({
+    queryKey: ["habits", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      return loadLocalHabits(user.id);
+    },
+    enabled: enabled && !!user?.id,
+    placeholderData: (previousData) => previousData,
+    refetchOnWindowFocus: false,
+  });
   const { activeEpics, createEpic, renameEpic, createCampaignRitual } =
     useEpics({ enabled });
   const { addTask, updateTask } = useTaskMutations(todayIso);
@@ -1291,7 +1313,12 @@ export function useCompanionPlanner({
   const { trackInteraction } = useAIInteractionTracker();
   const { trackTaskCreation, trackScheduleModification } =
     useSchedulingLearner();
-  const { queueAction, shouldQueueWrites, retryNow } = useResilience();
+  const {
+    queueAction,
+    receipts: queuedActionReceipts = [],
+    shouldQueueWrites,
+    retryNow,
+  } = useResilience();
   const outlookConnection = connectedByProvider.outlook ?? null;
   const shouldAutoPublishToOutlook = defaultProvider === "outlook" &&
     outlookConnection?.sync_mode === "full_sync";
@@ -1604,10 +1631,65 @@ export function useCompanionPlanner({
     () => new Set(activeEpics.map((epic) => epic.id)),
     [activeEpics],
   );
+  const pendingPlannerCreateIds = useMemo(() => {
+    const activeQueueStatuses = new Set(["queued", "syncing", "failed"]);
+    const taskIds: string[] = [];
+    const epicIds: string[] = [];
+    const habitIds: string[] = [];
+
+    queuedActionReceipts.forEach((receipt) => {
+      if (!receipt.entityId || !activeQueueStatuses.has(receipt.status)) {
+        return;
+      }
+      if (receipt.actionKind === "TASK_CREATE") {
+        taskIds.push(receipt.entityId);
+      } else if (receipt.actionKind === "EPIC_CREATE") {
+        epicIds.push(receipt.entityId);
+      } else if (receipt.actionKind === "HABIT_CREATE") {
+        habitIds.push(receipt.entityId);
+      } else if (receipt.actionKind === "EPIC_RITUAL_CREATE") {
+        const habitId = typeof receipt.payload?.habit === "object" &&
+            receipt.payload.habit !== null &&
+            !Array.isArray(receipt.payload.habit) &&
+            typeof (receipt.payload.habit as { id?: unknown }).id === "string"
+          ? (receipt.payload.habit as { id: string }).id
+          : null;
+        if (habitId) {
+          habitIds.push(habitId);
+        }
+      }
+    });
+
+    return {
+      taskIds: [...new Set(taskIds)],
+      epicIds: [...new Set(epicIds)],
+      habitIds: [...new Set(habitIds)],
+    };
+  }, [queuedActionReceipts]);
+  const activeHabitIdsList = useMemo(
+    () => [...new Set([
+      ...(habitsQuery.data ?? [])
+        .filter((habit) => habit.is_active !== false)
+        .map((habit) => habit.id),
+      ...pendingPlannerCreateIds.habitIds,
+    ])],
+    [habitsQuery.data, pendingPlannerCreateIds.habitIds],
+  );
+  const activeHabitIds = useMemo(
+    () => new Set(activeHabitIdsList),
+    [activeHabitIdsList],
+  );
+  const activeHabitIdScope = habitsQuery.data || pendingPlannerCreateIds.habitIds.length > 0
+    ? activeHabitIds
+    : null;
 
   const baseRituals = useMemo(
-    () => mapRitualsToContext(activeEpics),
-    [activeEpics],
+    () => {
+      const rituals = mapRitualsToContext(activeEpics);
+      if (!activeHabitIdScope) return rituals;
+      return rituals.filter((ritual) => activeHabitIdScope.has(ritual.id));
+    },
+    [activeEpics, activeHabitIdScope],
   );
   const activeRitualIds = useMemo(
     () => new Set(baseRituals.map((ritual) => ritual.id)),
@@ -1654,8 +1736,9 @@ export function useCompanionPlanner({
       activeTasks.map(serializeTaskContext),
       activeEpicIds,
       activeRitualIds,
+      activeHabitIdScope,
     ),
-    [activeEpicIds, activeRitualIds, activeTasks],
+    [activeEpicIds, activeHabitIdScope, activeRitualIds, activeTasks],
   );
 
   const contextPlannerTasks = useMemo(
@@ -1663,8 +1746,9 @@ export function useCompanionPlanner({
       contextTasks.map(serializeTaskContext),
       activeEpicIds,
       activeRitualIds,
+      activeHabitIdScope,
     ),
-    [activeEpicIds, activeRitualIds, contextTasks],
+    [activeEpicIds, activeHabitIdScope, activeRitualIds, contextTasks],
   );
 
   const inboxPlannerTasks = useMemo(
@@ -1672,8 +1756,9 @@ export function useCompanionPlanner({
       inboxTasks.map(serializeTaskContext),
       activeEpicIds,
       activeRitualIds,
+      activeHabitIdScope,
     ),
-    [activeEpicIds, activeRitualIds, inboxTasks],
+    [activeEpicIds, activeHabitIdScope, activeRitualIds, inboxTasks],
   );
 
   const recentCompletedPlannerTasks = useMemo(
@@ -1681,8 +1766,9 @@ export function useCompanionPlanner({
       (recentCompletedTasksQuery.data ?? []).map(serializeTaskContext),
       activeEpicIds,
       activeRitualIds,
+      activeHabitIdScope,
     ),
-    [activeEpicIds, activeRitualIds, recentCompletedTasksQuery.data],
+    [activeEpicIds, activeHabitIdScope, activeRitualIds, recentCompletedTasksQuery.data],
   );
 
   const plannerMemory = useMemo<PlannerMemoryProfile>(() => {
@@ -1936,7 +2022,7 @@ export function useCompanionPlanner({
         tasks: contextPlannerTasks,
         inboxTasks: inboxPlannerTasks,
         activeEpics: mapEpicsToContext(activeEpics, todayIso),
-        rituals: mapRitualsToContext(activeEpics),
+        rituals: baseRituals,
         calendarEvents: contextEventsQuery
           .events as PlannerContextCalendarEvent[],
         contactsNeedingAttention: contactsAttentionQuery.data ?? [],
@@ -1954,6 +2040,7 @@ export function useCompanionPlanner({
       }),
     [
       activeEpics,
+      baseRituals,
       careSignals,
       contactsAttentionQuery.data,
       contextEventsQuery.events,
@@ -1974,6 +2061,16 @@ export function useCompanionPlanner({
       inboxTasks: mapTasksToContext(inboxPlannerTasks),
       recentCompletedTasks: mapTasksToContext(recentCompletedPlannerTasks),
       activeEpics: mapEpicsToContext(activeEpics, todayIso),
+      ...(habitsQuery.data ? { activeHabitIds: activeHabitIdsList } : {}),
+      ...(pendingPlannerCreateIds.taskIds.length > 0
+        ? { pendingLocalTaskIds: pendingPlannerCreateIds.taskIds }
+        : {}),
+      ...(pendingPlannerCreateIds.epicIds.length > 0
+        ? { pendingLocalEpicIds: pendingPlannerCreateIds.epicIds }
+        : {}),
+      ...(pendingPlannerCreateIds.habitIds.length > 0
+        ? { pendingLocalHabitIds: pendingPlannerCreateIds.habitIds }
+        : {}),
       rituals: ritualsQuery.data ?? baseRituals,
       calendarEvents: contextEventsQuery
         .events as PlannerContextCalendarEvent[],
@@ -1988,6 +2085,7 @@ export function useCompanionPlanner({
     }),
     [
       activeEpics,
+      activeHabitIdsList,
       baseRituals,
       careSignals,
       contactsAttentionQuery.data,
@@ -1995,6 +2093,8 @@ export function useCompanionPlanner({
       contextPlannerTasks,
       effectivePlannerMemory,
       inboxPlannerTasks,
+      habitsQuery.data,
+      pendingPlannerCreateIds,
       plannerAISignals,
       priorityScores,
       recentCompletedPlannerTasks,
@@ -2528,7 +2628,10 @@ export function useCompanionPlanner({
         );
         return null;
       });
-      const [outlookPlanningContext, classification] = await Promise.all([
+      const [
+        outlookPlanningContext,
+        classification,
+      ] = await Promise.all([
         outlookSyncPromise,
         classificationPromise,
       ]);
@@ -2536,23 +2639,40 @@ export function useCompanionPlanner({
         plannerContext,
         outlookPlanningContext,
       );
+      const mergedActiveEpicIds = new Set(
+        mergedPlannerContext.activeEpics.map((epic) => epic.id),
+      );
+      const mergedActiveHabitIds = mergedPlannerContext.activeHabitIds
+        ? new Set(mergedPlannerContext.activeHabitIds)
+        : null;
+      const mergedActiveRitualIds = new Set(
+        mergedPlannerContext.rituals
+          .filter((ritual) =>
+            mergedActiveEpicIds.has(ritual.epicId) &&
+            (!mergedActiveHabitIds || mergedActiveHabitIds.has(ritual.id))
+          )
+          .map((ritual) => ritual.id),
+      );
       const syncedPlannerContext = sanitizePlannerContext(
         {
           ...mergedPlannerContext,
           tasks: scopeTasksToActiveCampaigns(
             mergedPlannerContext.tasks,
-            activeEpicIds,
-            activeRitualIds,
+            mergedActiveEpicIds,
+            mergedActiveRitualIds,
+            mergedActiveHabitIds,
           ),
           inboxTasks: scopeTasksToActiveCampaigns(
             mergedPlannerContext.inboxTasks,
-            activeEpicIds,
-            activeRitualIds,
+            mergedActiveEpicIds,
+            mergedActiveRitualIds,
+            mergedActiveHabitIds,
           ),
           recentCompletedTasks: scopeTasksToActiveCampaigns(
             mergedPlannerContext.recentCompletedTasks ?? [],
-            activeEpicIds,
-            activeRitualIds,
+            mergedActiveEpicIds,
+            mergedActiveRitualIds,
+            mergedActiveHabitIds,
           ),
         },
       );

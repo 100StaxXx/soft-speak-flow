@@ -266,11 +266,28 @@ const buildUserPrompt = (
     ...scopedTasks,
     ...scopedInboxTasks,
   ].map((task) => task.id));
+  const activeTaskTitleById = new Map([
+    ...scopedTasks,
+    ...scopedInboxTasks,
+  ].map((task) => [task.id, task.title]));
+  const activeEpicTitleById = new Map(
+    input.plannerContext.activeEpics.map((epic) => [epic.id, epic.title]),
+  );
+  const activeRitualTitleById = new Map(
+    input.plannerContext.rituals
+      .filter((ritual) => activeCampaignRitualIds.has(ritual.id))
+      .map((ritual) => [ritual.id, ritual.title]),
+  );
   const scopedPriorityScores = scopePlannerPriorityScoresToActiveCampaigns(
     input.plannerContext.priorityScores ?? [],
     activeCampaignIds,
     activeCampaignRitualIds,
     activeTaskIds,
+    {
+      activeEpicTitleById,
+      activeRitualTitleById,
+      activeTaskTitleById,
+    },
   );
 
   return JSON.stringify({

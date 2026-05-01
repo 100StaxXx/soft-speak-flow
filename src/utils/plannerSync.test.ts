@@ -3,12 +3,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => {
   const getPendingActionCountMock = vi.fn();
   const fetchDailyTasksRemoteMock = vi.fn();
+  const fetchEpicsMock = vi.fn();
   const replaceLocalTasksForDateMock = vi.fn();
+  const supabaseTables: Record<string, Array<Record<string, unknown>>> = {};
+  const supabaseErrors: Record<string, Error | null> = {};
 
   return {
     getPendingActionCountMock,
     fetchDailyTasksRemoteMock,
+    fetchEpicsMock,
     replaceLocalTasksForDateMock,
+    supabaseTables,
+    supabaseErrors,
   };
 });
 
@@ -20,14 +26,47 @@ vi.mock("@/services/dailyTasksRemote", () => ({
   fetchDailyTasksRemote: (...args: unknown[]) => mocks.fetchDailyTasksRemoteMock(...args),
 }));
 
+vi.mock("@/hooks/epicsQuery", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/hooks/epicsQuery")>();
+
+  return {
+    ...actual,
+    fetchEpics: (...args: unknown[]) => mocks.fetchEpicsMock(...args),
+  };
+});
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    from: vi.fn(() => ({
-      select: vi.fn(),
-      eq: vi.fn(),
-      in: vi.fn(),
-      order: vi.fn(),
-    })),
+    from: vi.fn((tableName: string) => {
+      const filters: Record<string, unknown> = {};
+      const inFilters: Record<string, unknown[]> = {};
+      const builder = {
+        select: vi.fn(() => builder),
+        eq: vi.fn((column: string, value: unknown) => {
+          filters[column] = value;
+          return builder;
+        }),
+        in: vi.fn((column: string, values: unknown[]) => {
+          inFilters[column] = values;
+          return builder;
+        }),
+        order: vi.fn(() => builder),
+        then: (
+          resolve: (value: { data: Array<Record<string, unknown>> | null; error: Error | null }) => unknown,
+          reject: (reason?: unknown) => unknown,
+        ) => {
+          const error = mocks.supabaseErrors[tableName] ?? null;
+          const rows = error
+            ? null
+            : (mocks.supabaseTables[tableName] ?? []).filter((row) =>
+              Object.entries(filters).every(([key, value]) => row[key] === value) &&
+              Object.entries(inFilters).every(([key, values]) => values.includes(row[key]))
+            );
+          return Promise.resolve({ data: rows, error }).then(resolve, reject);
+        },
+      };
+      return builder;
+    }),
   },
 }));
 
@@ -46,14 +85,18 @@ import {
   canSyncPlannerFromRemote,
   getPlannerRemoteSyncEpoch,
   syncLocalDailyTasksFromRemote,
+  syncLocalEpicsFromRemote,
+  syncLocalHabitsFromRemote,
   withPlannerRemoteSnapshotApply,
   withPlannerRemoteSyncLock,
 } from "./plannerSync";
 import {
   __resetPlannerLocalDBForTests,
   clearPlannerLocalStateForUser,
+  getAllLocalTasksForUser,
   upsertPlannerRecord,
 } from "@/utils/plannerLocalStore";
+import type { DailyTask } from "@/services/dailyTasksRemote";
 
 const originalOnlineDescriptor = Object.getOwnPropertyDescriptor(Navigator.prototype, "onLine");
 
@@ -77,6 +120,13 @@ describe("plannerSync", () => {
     setOnline(true);
     mocks.getPendingActionCountMock.mockResolvedValue(0);
     mocks.replaceLocalTasksForDateMock.mockResolvedValue(undefined);
+    mocks.fetchEpicsMock.mockResolvedValue([]);
+    Object.keys(mocks.supabaseTables).forEach((key) => {
+      delete mocks.supabaseTables[key];
+    });
+    Object.keys(mocks.supabaseErrors).forEach((key) => {
+      delete mocks.supabaseErrors[key];
+    });
   });
 
   afterEach(async () => {
@@ -237,5 +287,183 @@ describe("plannerSync", () => {
     const epics = await loadLocalEpics("user-1");
 
     expect(epics[0]?.end_date).toBe("2026-03-22");
+  });
+
+  it("does not prune standalone habit tasks from the habit snapshot path", async () => {
+    mocks.supabaseTables.habits = [];
+    mocks.supabaseTables.habit_completions = [];
+
+    await upsertPlannerRecord("habits", {
+      id: "habit-deleted",
+      user_id: "user-1",
+      title: "Daily Hydration",
+      is_active: true,
+      frequency: "daily",
+      custom_days: null,
+      custom_month_days: null,
+      created_at: "2026-05-01T00:00:00.000Z",
+    });
+    await upsertPlannerRecord("daily_tasks", {
+      id: "task-habit-deleted",
+      user_id: "user-1",
+      task_text: "Daily Hydration",
+      task_date: "2026-05-01",
+      completed: false,
+      completed_at: null,
+      habit_source_id: "habit-deleted",
+      epic_id: null,
+      epic_title: null,
+      subtasks: [],
+    });
+
+    await syncLocalHabitsFromRemote("user-1", "2026-05-01");
+
+    const tasks = await getAllLocalTasksForUser<DailyTask>("user-1");
+    expect(tasks).toEqual([
+      expect.objectContaining({
+        id: "task-habit-deleted",
+        habit_source_id: "habit-deleted",
+        epic_id: null,
+        epic_title: null,
+      }),
+    ]);
+  });
+
+  it("does not prune campaign-linked tasks from habit sync when local epics are stale", async () => {
+    mocks.supabaseTables.habits = [];
+    mocks.supabaseTables.habit_completions = [];
+
+    await upsertPlannerRecord("daily_tasks", {
+      id: "task-live-campaign",
+      user_id: "user-1",
+      task_text: "Live campaign quest",
+      task_date: "2026-05-01",
+      completed: false,
+      completed_at: null,
+      habit_source_id: null,
+      epic_id: "epic-live",
+      epic_title: "Live Campaign",
+      subtasks: [],
+    });
+
+    await syncLocalHabitsFromRemote("user-1", "2026-05-01");
+
+    const tasks = await getAllLocalTasksForUser<DailyTask>("user-1");
+    expect(tasks).toEqual([
+      expect.objectContaining({
+        id: "task-live-campaign",
+        epic_id: "epic-live",
+        epic_title: "Live Campaign",
+      }),
+    ]);
+  });
+
+  it("detaches incomplete local tasks linked to epics missing from the remote snapshot", async () => {
+    mocks.fetchEpicsMock.mockResolvedValue([]);
+
+    await upsertPlannerRecord("epics", {
+      id: "epic-deleted",
+      user_id: "user-1",
+      title: "Deleted Campaign",
+      description: null,
+      status: "active",
+      progress_percentage: 18,
+      target_days: 30,
+      start_date: "2026-03-01",
+      end_date: "2026-03-31",
+      created_at: "2026-03-01T00:00:00.000Z",
+      epic_habits: [],
+    });
+    await upsertPlannerRecord("daily_tasks", {
+      id: "task-epic-deleted",
+      user_id: "user-1",
+      task_text: "Deleted Campaign Quest",
+      task_date: "2026-05-01",
+      completed: false,
+      completed_at: null,
+      habit_source_id: null,
+      epic_id: "epic-deleted",
+      epic_title: "Deleted Campaign",
+      subtasks: [],
+    });
+
+    await syncLocalEpicsFromRemote("user-1");
+
+    const tasks = await getAllLocalTasksForUser<DailyTask>("user-1");
+    expect(tasks).toEqual([
+      expect.objectContaining({
+        id: "task-epic-deleted",
+        epic_id: null,
+        epic_title: null,
+        habit_source_id: null,
+      }),
+    ]);
+  });
+
+  it("detaches completed local history linked to epics missing from the remote snapshot", async () => {
+    mocks.fetchEpicsMock.mockResolvedValue([]);
+
+    await upsertPlannerRecord("epics", {
+      id: "epic-deleted",
+      user_id: "user-1",
+      title: "Deleted Campaign",
+      description: null,
+      status: "active",
+      progress_percentage: 18,
+      target_days: 30,
+      start_date: "2026-03-01",
+      end_date: "2026-03-31",
+      created_at: "2026-03-01T00:00:00.000Z",
+      epic_habits: [],
+    });
+    await upsertPlannerRecord("daily_tasks", {
+      id: "task-epic-history",
+      user_id: "user-1",
+      task_text: "Completed Campaign Quest",
+      task_date: "2026-04-30",
+      completed: true,
+      completed_at: "2026-04-30T12:00:00.000Z",
+      habit_source_id: "habit-deleted",
+      epic_id: "epic-deleted",
+      epic_title: "Deleted Campaign",
+      subtasks: [],
+    });
+
+    await syncLocalEpicsFromRemote("user-1");
+
+    const tasks = await getAllLocalTasksForUser<DailyTask>("user-1");
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]?.epic_id).toBeNull();
+    expect(tasks[0]?.epic_title).toBeNull();
+    expect(tasks[0]?.habit_source_id).toBe("habit-deleted");
+  });
+
+  it("keeps standalone habit task links while detaching orphaned campaign metadata", async () => {
+    mocks.fetchEpicsMock.mockResolvedValue([]);
+
+    await upsertPlannerRecord("daily_tasks", {
+      id: "task-standalone-habit",
+      user_id: "user-1",
+      task_text: "Daily Stretching",
+      task_date: "2026-05-01",
+      completed: false,
+      completed_at: null,
+      habit_source_id: "habit-standalone",
+      epic_id: "epic-deleted",
+      epic_title: "Deleted Campaign",
+      subtasks: [],
+    });
+
+    await syncLocalEpicsFromRemote("user-1");
+
+    const tasks = await getAllLocalTasksForUser<DailyTask>("user-1");
+    expect(tasks).toEqual([
+      expect.objectContaining({
+        id: "task-standalone-habit",
+        epic_id: null,
+        epic_title: null,
+        habit_source_id: "habit-standalone",
+      }),
+    ]);
   });
 });

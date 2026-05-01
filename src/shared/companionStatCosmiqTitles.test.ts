@@ -333,4 +333,48 @@ describe("companionStatCosmiqTitles", () => {
     expect(risingKey).not.toContain("rising");
     expect(steadyKey).not.toContain("steady");
   });
+
+  it("separates shared card keys by visual persona", () => {
+    const statProfile: CompanionStatProfileSummary = {
+      scores: {
+        vitality: 420,
+        wisdom: 510,
+        discipline: 560,
+        resolve: 480,
+        creativity: 360,
+        alignment: 530,
+      },
+      dominantStat: "discipline",
+      secondaryStat: "alignment",
+    };
+    const cosmiqTitle = buildCompanionCosmiqTitle({
+      statProfile,
+      statNeeds,
+      statBreakdowns: buildBreakdowns(statProfile.scores),
+      momentumState: "coasting",
+    });
+    const sharedInput = {
+      cosmiqTitle,
+      statBreakdowns: buildBreakdowns(statProfile.scores),
+      promptVersion: 1,
+    };
+
+    const maleKey = buildCompanionCosmiqTitleCardProfileKey({
+      ...sharedInput,
+      visualPersona: "male",
+    });
+    const femaleKey = buildCompanionCosmiqTitleCardProfileKey({
+      ...sharedInput,
+      visualPersona: "female",
+    });
+    const neutralKey = buildCompanionCosmiqTitleCardProfileKey({
+      ...sharedInput,
+      visualPersona: "neutral",
+    });
+
+    expect(new Set([maleKey, femaleKey, neutralKey]).size).toBe(3);
+    expect(maleKey).toContain("male");
+    expect(femaleKey).toContain("female");
+    expect(neutralKey).toContain("neutral");
+  });
 });

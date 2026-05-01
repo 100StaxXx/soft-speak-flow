@@ -22,6 +22,7 @@ export interface QueuedActionReceipt {
   lastError: string | null;
   createdAt: number;
   updatedAt: number;
+  payload?: Record<string, unknown>;
 }
 
 export interface SupportReportDiagnostics {

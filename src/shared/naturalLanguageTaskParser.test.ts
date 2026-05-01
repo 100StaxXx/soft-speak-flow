@@ -22,6 +22,15 @@ describe("shared natural-language task parser scheduling coverage", () => {
     }));
   });
 
+  it("infers PM for 'Gym at 6' and strips the time from the title", () => {
+    const parsed = parseNaturalLanguage("Gym at 6");
+
+    expect(parsed).toEqual(expect.objectContaining({
+      text: "Gym",
+      scheduledTime: "18:00",
+    }));
+  });
+
   it("parses bare 24-hour times", () => {
     const parsed = parseNaturalLanguage("gym 17:00 tomorrow");
 

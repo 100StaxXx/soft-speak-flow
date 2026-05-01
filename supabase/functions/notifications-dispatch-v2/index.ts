@@ -21,6 +21,7 @@ import {
   buildNoDeviceTokenFailureUpdate,
   resolveDeliveryCopy,
   resolveSourceAcknowledgement,
+  resolveTaskReminderOffsetMinutes,
   TERMINAL_NO_DEVICE_ERROR,
 } from "./queueDelivery.ts";
 import {
@@ -137,6 +138,22 @@ async function acknowledgeSourceDelivery(
   row: QueueRow,
   deliveredAtIso: string,
 ): Promise<void> {
+  if (row.source_table === "daily_tasks" && row.notification_type === "task_reminder") {
+    const deliveredOffsetMinutes = resolveTaskReminderOffsetMinutes(row.payload);
+    if (!deliveredOffsetMinutes) return;
+
+    const { error } = await supabase.rpc("acknowledge_task_reminder_delivery", {
+      p_task_id: row.source_id,
+      p_delivered_offset_minutes: deliveredOffsetMinutes,
+    });
+
+    if (error) {
+      console.error("[notifications-dispatch-v2] task reminder acknowledgement failed", row.source_id, error);
+    }
+
+    return;
+  }
+
   const acknowledgement = resolveSourceAcknowledgement(row, deliveredAtIso);
   if (!acknowledgement) return;
 

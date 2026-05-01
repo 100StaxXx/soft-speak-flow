@@ -53,6 +53,10 @@ import {
 } from "@/shared/taskCompletionTiming";
 import { useCompletionFeedback } from "@/hooks/useCompletionFeedback";
 import type { CompletionFeedbackSource } from "@/types/completionFeedback";
+import {
+  getPrimaryQuestReminderOffset,
+  resolveQuestReminderOffsets,
+} from "@/utils/questReminders";
 
 export {
   getTaskCompletionDisciplineAward,
@@ -99,6 +103,7 @@ export interface AddTaskParams {
   recurrenceEndDate?: string | null;
   reminderEnabled?: boolean;
   reminderMinutesBefore?: number;
+  reminderOffsetsMinutes?: number[];
   category?: string;
   notes?: string | null;
   contactId?: string | null;
@@ -208,6 +213,7 @@ interface TaskUpdateInput {
   recurrence_end_date?: string | null;
   reminder_enabled?: boolean;
   reminder_minutes_before?: number;
+  reminder_offsets_minutes?: number[];
   category?: string | null;
   notes?: string | null;
   image_url?: string | null;
@@ -877,6 +883,13 @@ export const useTaskMutations = (taskDate: string) => {
         recurrenceCustomPeriod: params.recurrenceCustomPeriod,
         recurrenceEndDate: params.recurrenceEndDate,
       });
+      const reminderOffsets = resolveQuestReminderOffsets({
+        reminderEnabled: params.reminderEnabled,
+        reminderMinutesBefore: params.reminderMinutesBefore,
+        reminderOffsetsMinutes: params.reminderOffsetsMinutes,
+      });
+      const reminderEnabled = reminderOffsets.length > 0;
+      const reminderMinutesBefore = getPrimaryQuestReminderOffset(reminderOffsets);
 
       if (recurrenceWrite.hasRecurrence && !normalizedScheduling.scheduled_time) {
         throw buildRecurrenceRequiresScheduledTimeError();
@@ -918,8 +931,10 @@ export const useTaskMutations = (taskDate: string) => {
         recurrence_custom_period: (recurrenceWrite.fields.recurrence_custom_period as "week" | "month" | null | undefined) ?? null,
         recurrence_end_date: (recurrenceWrite.fields.recurrence_end_date as string | null | undefined) ?? null,
         is_recurring: recurrenceWrite.hasRecurrence,
-        reminder_enabled: params.reminderEnabled ?? false,
-        reminder_minutes_before: params.reminderMinutesBefore ?? 15,
+        reminder_enabled: reminderEnabled,
+        reminder_minutes_before: reminderMinutesBefore,
+        reminder_offsets_minutes: reminderOffsets,
+        reminder_sent_offsets_minutes: [],
         reminder_sent: false,
         parent_template_id: null,
         category: detectedCategory,
@@ -967,8 +982,10 @@ export const useTaskMutations = (taskDate: string) => {
         estimated_duration: params.estimatedDuration || null,
         ...recurrenceWrite.fields,
         is_recurring: recurrenceWrite.hasRecurrence,
-        reminder_enabled: params.reminderEnabled ?? false,
-        reminder_minutes_before: params.reminderMinutesBefore ?? 15,
+        reminder_enabled: reminderEnabled,
+        reminder_minutes_before: reminderMinutesBefore,
+        reminder_offsets_minutes: reminderOffsets,
+        reminder_sent_offsets_minutes: [],
         category: detectedCategory,
         notes: params.notes || null,
         contact_id: params.contactId || null,
@@ -1059,8 +1076,10 @@ export const useTaskMutations = (taskDate: string) => {
           estimated_duration: params.estimatedDuration || null,
           ...recurrenceWrite.fields,
           is_recurring: recurrenceWrite.hasRecurrence,
-          reminder_enabled: params.reminderEnabled ?? false,
-          reminder_minutes_before: params.reminderMinutesBefore ?? 15,
+          reminder_enabled: reminderEnabled,
+          reminder_minutes_before: reminderMinutesBefore,
+          reminder_offsets_minutes: reminderOffsets,
+          reminder_sent_offsets_minutes: [],
           category: detectedCategory,
           is_bonus: false,
           notes: params.notes || null,
@@ -1244,6 +1263,13 @@ export const useTaskMutations = (taskDate: string) => {
         recurrenceCustomPeriod: params.recurrenceCustomPeriod,
         recurrenceEndDate: params.recurrenceEndDate,
       });
+      const reminderOffsets = resolveQuestReminderOffsets({
+        reminderEnabled: params.reminderEnabled,
+        reminderMinutesBefore: params.reminderMinutesBefore,
+        reminderOffsetsMinutes: params.reminderOffsetsMinutes,
+      });
+      const reminderEnabled = reminderOffsets.length > 0;
+      const reminderMinutesBefore = getPrimaryQuestReminderOffset(reminderOffsets);
 
       // Create optimistic task with all required fields
       const primaryImageUrl = firstImageFromAttachments(params.attachments) ?? params.imageUrl ?? null;
@@ -1268,8 +1294,10 @@ export const useTaskMutations = (taskDate: string) => {
         recurrence_month_days: (recurrenceWrite.fields.recurrence_month_days as number[] | null | undefined) ?? null,
         recurrence_custom_period: (recurrenceWrite.fields.recurrence_custom_period as RecurrenceCustomPeriod | null | undefined) ?? null,
         recurrence_end_date: (recurrenceWrite.fields.recurrence_end_date as string | null | undefined) ?? null,
-        reminder_enabled: params.reminderEnabled ?? false,
-        reminder_minutes_before: params.reminderMinutesBefore ?? 15,
+        reminder_enabled: reminderEnabled,
+        reminder_minutes_before: reminderMinutesBefore,
+        reminder_offsets_minutes: reminderOffsets,
+        reminder_sent_offsets_minutes: [],
         reminder_sent: false,
         parent_template_id: null,
         notes: params.notes || null,
@@ -1884,6 +1912,7 @@ export const useTaskMutations = (taskDate: string) => {
       recurrence_end_date?: string | null;
       reminder_enabled?: boolean;
       reminder_minutes_before?: number | null;
+      reminder_offsets_minutes?: number[] | null;
       source?: string | null;
     }) => withTaskSyncLock(async () => {
       if (!user?.id) throw new Error('User not authenticated');
@@ -1902,6 +1931,13 @@ export const useTaskMutations = (taskDate: string) => {
         recurrenceCustomPeriod: taskData.recurrence_custom_period,
         recurrenceEndDate: taskData.recurrence_end_date,
       });
+      const reminderOffsets = resolveQuestReminderOffsets({
+        reminderEnabled: taskData.reminder_enabled,
+        reminderMinutesBefore: taskData.reminder_minutes_before,
+        reminderOffsetsMinutes: taskData.reminder_offsets_minutes,
+      });
+      const reminderEnabled = reminderOffsets.length > 0;
+      const reminderMinutesBefore = getPrimaryQuestReminderOffset(reminderOffsets);
       const insertPayload = {
         id: getRemoteTaskId(restoredTaskId),
         user_id: user.id,
@@ -1920,8 +1956,10 @@ export const useTaskMutations = (taskDate: string) => {
         habit_source_id: taskData.habit_source_id,
         is_recurring: taskData.is_recurring ?? recurrenceWrite.hasRecurrence,
         ...recurrenceWrite.fields,
-        reminder_enabled: taskData.reminder_enabled ?? false,
-        reminder_minutes_before: taskData.reminder_minutes_before,
+        reminder_enabled: reminderEnabled,
+        reminder_minutes_before: reminderMinutesBefore,
+        reminder_offsets_minutes: reminderOffsets,
+        reminder_sent_offsets_minutes: [],
         source: normalizedScheduling.source ?? (normalizedScheduling.task_date === null ? 'inbox' : 'manual'),
       };
 
@@ -1931,6 +1969,7 @@ export const useTaskMutations = (taskDate: string) => {
         completed: false,
         completed_at: null,
         reminder_sent: false,
+        reminder_sent_offsets_minutes: [],
         contact_id: null,
         auto_log_interaction: true,
         image_url: null,
@@ -2112,11 +2151,40 @@ export const useTaskMutations = (taskDate: string) => {
       if (updates.recurrence_end_date !== undefined) {
         updateData.recurrence_end_date = updates.recurrence_end_date;
       }
-      if (updates.reminder_enabled !== undefined) {
-        updateData.reminder_enabled = updates.reminder_enabled;
-      }
-      if (updates.reminder_minutes_before !== undefined) {
-        updateData.reminder_minutes_before = updates.reminder_minutes_before;
+      if (
+        updates.reminder_enabled !== undefined
+        || updates.reminder_minutes_before !== undefined
+        || updates.reminder_offsets_minutes !== undefined
+      ) {
+        let reminderOffsets: number[];
+
+        if (updates.reminder_enabled === false) {
+          reminderOffsets = [];
+        } else if (updates.reminder_offsets_minutes !== undefined) {
+          reminderOffsets = resolveQuestReminderOffsets({
+            reminderEnabled: updates.reminder_enabled ?? false,
+            reminderMinutesBefore: updates.reminder_minutes_before ?? localTask?.reminder_minutes_before,
+            reminderOffsetsMinutes: updates.reminder_offsets_minutes,
+          });
+        } else if (updates.reminder_minutes_before !== undefined) {
+          reminderOffsets = resolveQuestReminderOffsets({
+            reminderEnabled: updates.reminder_enabled ?? true,
+            reminderMinutesBefore: updates.reminder_minutes_before,
+            reminderOffsetsMinutes: null,
+          });
+        } else {
+          reminderOffsets = resolveQuestReminderOffsets({
+            reminderEnabled: updates.reminder_enabled ?? localTask?.reminder_enabled,
+            reminderMinutesBefore: localTask?.reminder_minutes_before,
+            reminderOffsetsMinutes: localTask?.reminder_offsets_minutes,
+          });
+        }
+
+        updateData.reminder_enabled = reminderOffsets.length > 0;
+        updateData.reminder_minutes_before = getPrimaryQuestReminderOffset(reminderOffsets);
+        updateData.reminder_offsets_minutes = reminderOffsets;
+        updateData.reminder_sent = false;
+        updateData.reminder_sent_offsets_minutes = [];
       }
       if (updates.notes !== undefined) {
         updateData.notes = updates.notes;

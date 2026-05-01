@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
     threadPersistenceReady: true,
     threadPersistenceUnavailableReason: null,
     submitMessage: vi.fn(),
+    injectAssistantOpening: vi.fn(),
     resetThread: vi.fn(),
     hydrateThread: vi.fn(),
   },
@@ -136,6 +137,7 @@ describe("useLegacyCompanionAssistantAdapter", () => {
     vi.clearAllMocks();
     mocks.companionChat.hydrateThread.mockReset();
     mocks.journeysConversation.hydrateThread.mockReset();
+    mocks.journeysConversation.injectAssistantOpening.mockReset();
     mocks.planner.hydrateThread.mockReset();
     mocks.useJourneysCompanionThreads.mockReset();
   });
@@ -242,6 +244,31 @@ describe("useLegacyCompanionAssistantAdapter", () => {
         }),
       ],
     });
+  });
+
+  it("starts free-talk template threads with a visible companion opener", () => {
+    const { result } = renderHook(() =>
+      useLegacyCompanionAssistantAdapter({
+        enabled: true,
+        surface: "journeys",
+      })
+    );
+
+    act(() => {
+      result.current.startTemplateThread({
+        greetingText: "What's good, buddy?",
+        visibleAssistantOpening: true,
+      });
+    });
+
+    expect(mocks.journeysThreads.startTemplateThread).toHaveBeenCalledWith({
+      greetingText: null,
+    });
+    expect(mocks.journeysConversation.injectAssistantOpening)
+      .toHaveBeenCalledWith("What's good, buddy?", {
+        visibleAssistantOpening: true,
+      });
+    expect(mocks.journeysConversation.submitMessage).not.toHaveBeenCalled();
   });
 
   it("exposes planner suggestions as read-only guidance in fallback mode", async () => {

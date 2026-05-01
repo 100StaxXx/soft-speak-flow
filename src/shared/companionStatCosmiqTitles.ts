@@ -6,6 +6,7 @@ import {
   type CompanionStatNeed,
   type CompanionStatProfileSummary,
 } from "./companionStatSignals";
+import type { OnboardingVisualPersona } from "./onboardingVisualPersona";
 
 export type CompanionCosmiqTitleRarity =
   | "common"
@@ -596,10 +597,12 @@ export const buildCompanionCosmiqTitleCardProfileKey = ({
   cosmiqTitle,
   statBreakdowns,
   promptVersion,
+  visualPersona = "neutral",
 }: {
   cosmiqTitle: CompanionCosmiqTitle;
   statBreakdowns: CompanionCosmiqTitleStatBreakdownInput[];
   promptVersion: number;
+  visualPersona?: OnboardingVisualPersona;
 }) => {
   const bandSignature = [...statBreakdowns]
     .sort((left, right) =>
@@ -617,6 +620,7 @@ export const buildCompanionCosmiqTitleCardProfileKey = ({
     cosmiqTitle.secondaryStat,
     cosmiqTitle.rebalanceStat,
     cosmiqTitle.fusion ? "fusion" : "solo",
+    visualPersona,
     bandSignature,
   ]
     .join("::")

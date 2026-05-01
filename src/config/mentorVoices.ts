@@ -62,7 +62,7 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
     mentorSlug: "charles",
     mentorName: "Charles",
     voiceName: "Charles",
-    voiceId: "wGkprrTXgBM5EC3Znt6U",
+    voiceId: "goT3UYdM9bhm0n2lmKQx",
     defaultIntensity: "medium",
     categories: ["accountability", "procrastination", "momentum"],
     voiceSettings: {

@@ -771,6 +771,59 @@ describe("useTaskMutations attachment handling", () => {
     }));
   });
 
+  it("persists normalized multiple reminder offsets during quest creation", async () => {
+    setOnline(true);
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.addTask({
+        taskText: "Multi reminder quest",
+        difficulty: "medium",
+        taskDate: "2026-02-20",
+        scheduledTime: "09:00",
+        reminderEnabled: true,
+        reminderMinutesBefore: 60,
+        reminderOffsetsMinutes: [60, 10, 10, 0, 20000],
+      });
+    });
+
+    expect(mocks.dailyTasksInsertMock).toHaveBeenCalledWith(expect.objectContaining({
+      reminder_enabled: true,
+      reminder_minutes_before: 10,
+      reminder_offsets_minutes: [10, 60],
+      reminder_sent_offsets_minutes: [],
+    }));
+  });
+
+  it("keeps legacy reminder-minute updates enabled when no local task row is available", async () => {
+    setOnline(true);
+    mocks.getPlannerRecordMock.mockResolvedValueOnce(null);
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.updateTask({
+        taskId: "task-1",
+        updates: {
+          reminder_minutes_before: 45,
+        },
+      });
+    });
+
+    expect(mocks.dailyTasksUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+      reminder_enabled: true,
+      reminder_minutes_before: 45,
+      reminder_offsets_minutes: [45],
+      reminder_sent: false,
+      reminder_sent_offsets_minutes: [],
+    }));
+  });
+
   it("normalizes legacy prefixed UUID-like fields before live quest creation", async () => {
     setOnline(true);
     const legacyTaskId = "task-e47e5651-7522-4888-a04d-6eff518fa4ba";

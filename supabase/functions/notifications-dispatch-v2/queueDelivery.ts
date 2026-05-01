@@ -34,6 +34,51 @@ export interface QueueDeliveryCopyRow {
 }
 
 export const TERMINAL_NO_DEVICE_ERROR = "no_device_tokens";
+const MAX_TASK_REMINDER_MINUTES = 10080;
+
+function normalizeTaskReminderOffsets(values: readonly unknown[] | null | undefined): number[] {
+  if (!Array.isArray(values)) return [];
+
+  return Array.from(
+    new Set(
+      values
+        .map((value) => {
+          if (typeof value !== "number" || !Number.isFinite(value)) return null;
+          const minutes = Math.trunc(value);
+          return minutes >= 1 && minutes <= MAX_TASK_REMINDER_MINUTES ? minutes : null;
+        })
+        .filter((value): value is number => value !== null),
+    ),
+  ).sort((a, b) => a - b);
+}
+
+export function resolveTaskReminderOffsetMinutes(payload: Record<string, unknown> | null): number | null {
+  const rawOffset = payload?.reminder_offset_minutes ?? payload?.reminder_minutes_before;
+  return normalizeTaskReminderOffsets([rawOffset])[0] ?? null;
+}
+
+export function buildTaskReminderDeliveryUpdate(input: {
+  configuredOffsets?: readonly unknown[] | null;
+  sentOffsets?: readonly unknown[] | null;
+  legacyReminderMinutesBefore?: number | null;
+  deliveredOffsetMinutes: number;
+}): { reminder_sent_offsets_minutes: number[]; reminder_sent: boolean } | null {
+  const deliveredOffset = normalizeTaskReminderOffsets([input.deliveredOffsetMinutes])[0];
+  if (!deliveredOffset) return null;
+
+  const configuredOffsets = normalizeTaskReminderOffsets(input.configuredOffsets);
+  const legacyOffset = normalizeTaskReminderOffsets([input.legacyReminderMinutesBefore])[0] ?? deliveredOffset;
+  const effectiveOffsets = configuredOffsets.length > 0 ? configuredOffsets : [legacyOffset];
+  const nextSentOffsets = normalizeTaskReminderOffsets([
+    ...normalizeTaskReminderOffsets(input.sentOffsets),
+    deliveredOffset,
+  ]);
+
+  return {
+    reminder_sent_offsets_minutes: nextSentOffsets,
+    reminder_sent: effectiveOffsets.every((offset) => nextSentOffsets.includes(offset)),
+  };
+}
 
 function shouldRefreshCompanionLedCopy(notificationType: NotificationType): boolean {
   return notificationType === "daily_pep" || notificationType === "mentor_nudge";
@@ -107,13 +152,7 @@ export function resolveSourceAcknowledgement(
       };
     }
 
-    if (row.notification_type === "task_reminder") {
-      return {
-        table: "daily_tasks",
-        id: row.source_id,
-        updates: { reminder_sent: true },
-      };
-    }
+    if (row.notification_type === "task_reminder") return null;
   }
 
   if (row.source_table === "habits") {

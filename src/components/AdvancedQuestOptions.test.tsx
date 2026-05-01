@@ -110,8 +110,46 @@ function ReminderHarness() {
   );
 }
 
+function MultiReminderHarness({ initialOffsets = [] }: { initialOffsets?: number[] }) {
+  const [reminderOffsetsMinutes, setReminderOffsetsMinutes] = useState(initialOffsets);
+
+  return (
+    <div>
+      <AdvancedQuestOptions
+        scheduledTime="09:00"
+        onScheduledTimeChange={vi.fn()}
+        estimatedDuration={30}
+        onEstimatedDurationChange={vi.fn()}
+        recurrencePattern={null}
+        onRecurrencePatternChange={vi.fn()}
+        recurrenceDays={[]}
+        onRecurrenceDaysChange={vi.fn()}
+        recurrenceMonthDays={[]}
+        onRecurrenceMonthDaysChange={vi.fn()}
+        recurrenceCustomPeriod={null}
+        onRecurrenceCustomPeriodChange={vi.fn()}
+        reminderEnabled={reminderOffsetsMinutes.length > 0}
+        onReminderEnabledChange={(enabled) => {
+          if (!enabled) {
+            setReminderOffsetsMinutes([]);
+          }
+        }}
+        reminderMinutesBefore={reminderOffsetsMinutes[0] ?? 15}
+        onReminderMinutesBeforeChange={vi.fn()}
+        reminderOffsetsMinutes={reminderOffsetsMinutes}
+        onReminderOffsetsMinutesChange={setReminderOffsetsMinutes}
+        moreInformation={null}
+        onMoreInformationChange={vi.fn()}
+        location={null}
+        onLocationChange={vi.fn()}
+      />
+      <div data-testid="reminder-offsets-state">{reminderOffsetsMinutes.join(",") || "none"}</div>
+    </div>
+  );
+}
+
 function getReminderSection() {
-  const helperText = screen.getByText("You'll be notified when the quest starts. Add an early reminder for a little breathing room.");
+  const helperText = screen.getByText(/Add up to 5 early reminders/i);
   const section = helperText.parentElement;
   if (!section) {
     throw new Error("Reminder section not found");
@@ -324,7 +362,7 @@ describe("AdvancedQuestOptions reminder picker", () => {
       expect(screen.getByTestId("reminder-state")).toHaveTextContent("true|30");
     });
 
-    expect(screen.getByRole("button", { name: "30 minutes before" })).toBeInTheDocument();
+    expect(getReminderSection().getByRole("button", { name: "30 minutes before" })).toBeInTheDocument();
   });
 
   it("disables reminders when selecting None", async () => {
@@ -337,11 +375,12 @@ describe("AdvancedQuestOptions reminder picker", () => {
       expect(screen.getByTestId("reminder-state")).toHaveTextContent("true|10");
     });
 
-    fireEvent.click(getReminderSection().getByRole("button", { name: "10 minutes before" }));
-    fireEvent.click(screen.getAllByRole("button", { name: "None" }).at(-1)!);
+    fireEvent.click(screen.getAllByRole("button", { name: "None" }).find(
+      (button) => button.getAttribute("aria-haspopup") !== "dialog",
+    )!);
 
     await waitFor(() => {
-      expect(screen.getByTestId("reminder-state")).toHaveTextContent("false|10");
+      expect(screen.getByTestId("reminder-state")).toHaveTextContent("false|15");
     });
 
     expect(getReminderSection().getByRole("button", { name: "None" })).toBeInTheDocument();
@@ -359,7 +398,36 @@ describe("AdvancedQuestOptions reminder picker", () => {
       expect(screen.getByTestId("reminder-state")).toHaveTextContent("true|180");
     });
 
-    expect(screen.getByRole("button", { name: /180 minutes before \(Custom\)/i })).toBeInTheDocument();
+    expect(getReminderSection().getByRole("button", { name: "3 hours before" })).toBeInTheDocument();
+  });
+
+  it("supports selecting multiple reminder offsets", async () => {
+    render(<MultiReminderHarness />);
+
+    fireEvent.click(getReminderSection().getByRole("button", { name: "None" }));
+    fireEvent.click(screen.getByRole("button", { name: "1 hour before" }));
+    fireEvent.click(screen.getByRole("button", { name: "10 minutes before" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("reminder-offsets-state")).toHaveTextContent("10,60");
+    });
+
+    expect(getReminderSection().getByRole("button", {
+      name: "2 reminders: 10 minutes before, 1 hour before",
+    })).toBeInTheDocument();
+  });
+
+  it("caps reminder offsets at five selections", async () => {
+    render(<MultiReminderHarness initialOffsets={[5, 10, 15, 30, 60]} />);
+
+    fireEvent.click(getReminderSection().getByRole("button", { name: /5 reminders:/i }));
+
+    expect(screen.getByText("Limit reached")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "2 hours before" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("reminder-offsets-state")).toHaveTextContent("5,10,15,30,60");
+    });
   });
 
   it("shows an existing custom reminder label when reminders are enabled", () => {
@@ -388,6 +456,6 @@ describe("AdvancedQuestOptions reminder picker", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /180 minutes before \(Custom\)/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "3 hours before" })).toBeInTheDocument();
   });
 });

@@ -283,6 +283,7 @@ Deno.test("resolveCosmiqTitleCard generates, uploads, and completes a first imag
       supabase,
       userId: "user-1",
       analysis: baseAnalysis,
+      visualPersona: "female",
       fetchImpl: ((_input: string | URL | Request, init?: RequestInit) => {
         const requestBody = typeof init?.body === "string"
           ? JSON.parse(init.body) as { messages?: Array<{ content?: unknown }> }
@@ -303,12 +304,16 @@ Deno.test("resolveCosmiqTitleCard generates, uploads, and completes a first imag
     });
 
     const completeCall = supabase.rpcCalls.find((call) => call.name === "complete_cosmiq_title_card_generation");
+    const beginCall = supabase.rpcCalls.find((call) => call.name === "begin_cosmiq_title_card_generation");
     assertEquals(card.status, "ready", "Expected generated card to be ready");
     assertEquals(card.cached, false, "Expected fresh card to not be cached");
     assert(card.imageUrl?.startsWith("https://cdn.example.com/cosmiq-title-cards/"), "Expected public storage URL");
     assertEquals(supabase.uploaded.length, 1, "Expected one storage upload");
     assert(supabase.uploaded[0].path.endsWith(".png"), "Expected PNG upload path");
+    assertEquals(beginCall?.args.p_visual_persona, "female", "Expected visual persona in generation claim");
+    assert(String(beginCall?.args.p_profile_key).includes("female"), "Expected visual persona in shared cache key");
     assertEquals(completeCall?.args.p_status, "ready", "Expected generation completion to be marked ready");
+    assert(requestPrompt.includes("female fantasy character"), "Expected female visual persona prompt guidance");
     assert(!requestPrompt.includes("Momentum:"), "Shared card prompt should not include momentum-only UI state");
   } finally {
     restoreEnv("OPENAI_API_KEY", originalApiKey);
@@ -364,6 +369,47 @@ Deno.test("resolveCosmiqTitleCard logs completion RPC result errors", async () =
     );
   } finally {
     console.warn = originalWarn;
+    restoreEnv("OPENAI_API_KEY", originalApiKey);
+  }
+});
+
+Deno.test("resolveCosmiqTitleCard sends forced refresh claims and writes a replacement image path", async () => {
+  const originalApiKey = Deno.env.get("OPENAI_API_KEY");
+  Deno.env.set("OPENAI_API_KEY", "test-key");
+
+  try {
+    const supabase = createMockSupabase([
+      [{
+        action: "started",
+        status: "generating",
+        image_url: null,
+        prompt_version: COSMIQ_TITLE_CARD_PROMPT_VERSION,
+      }],
+    ]);
+    const generatedDataUrl = `data:image/png;base64,${btoa("replacement-image")}`;
+
+    const card = await resolveCosmiqTitleCard({
+      supabase,
+      userId: "user-1",
+      analysis: baseAnalysis,
+      forceRefresh: true,
+      fetchImpl: ((_input: string | URL | Request, _init?: RequestInit) =>
+        Promise.resolve(createJsonResponse({
+          choices: [{
+            message: {
+              images: [{
+                image_url: { url: generatedDataUrl },
+              }],
+            },
+          }],
+        }))) as typeof fetch,
+    });
+
+    const beginCall = supabase.rpcCalls.find((call) => call.name === "begin_cosmiq_title_card_generation");
+    assertEquals(beginCall?.args.p_force_refresh, true, "Expected forced refresh to reach generation claim");
+    assertEquals(card.status, "ready", "Expected forced refresh card to become ready");
+    assert(supabase.uploaded[0].path.includes("__"), "Expected forced refresh to avoid reusing the broken storage path");
+  } finally {
     restoreEnv("OPENAI_API_KEY", originalApiKey);
   }
 });

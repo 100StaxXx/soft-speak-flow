@@ -207,6 +207,7 @@ const InboxPage = memo(function InboxPage() {
       recurrenceCustomPeriod: data.recurrenceCustomPeriod,
       reminderEnabled: data.reminderEnabled,
       reminderMinutesBefore: data.reminderMinutesBefore,
+      reminderOffsetsMinutes: data.reminderOffsetsMinutes,
       notes: data.moreInformation,
       location: data.location,
       contactId: data.contactId,

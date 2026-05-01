@@ -3,6 +3,10 @@ import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { PlanMyDayAnswers } from '@/features/tasks/components/PlanMyDayClarification';
+import {
+  parseFunctionInvokeError,
+  toUserFacingFunctionError,
+} from '@/utils/supabaseFunctionErrors';
 
 interface DailyInsight {
   type: 'optimization' | 'warning' | 'encouragement' | 'suggestion';
@@ -53,6 +57,11 @@ interface GeneratedPlanResponse {
 
 export const DAILY_PLAN_OPTIMIZATION_QUERY_KEY = ['daily-plan-optimization'] as const;
 
+const toDailyPlanError = async (error: unknown, action: string): Promise<Error> => {
+  const parsedError = await parseFunctionInvokeError(error);
+  return new Error(toUserFacingFunctionError(parsedError, { action }));
+};
+
 export function useDailyPlanOptimization() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -71,7 +80,7 @@ export function useDailyPlanOptimization() {
       
       if (error) {
         console.error('Error fetching daily plan optimization:', error);
-        throw error;
+        throw await toDailyPlanError(error, 'load coach guidance');
       }
 
       return data as DailyPlanOptimization;
@@ -93,7 +102,7 @@ export function useDailyPlanOptimization() {
 
       if (error) {
         console.error('Error generating daily plan:', error);
-        throw error;
+        throw await toDailyPlanError(error, 'generate your daily plan');
       }
 
       return data as GeneratedPlanResponse;
@@ -124,7 +133,7 @@ export function useDailyPlanOptimization() {
 
     if (error) {
       console.error('Error fetching daily plan optimization with answers:', error);
-      throw error;
+      throw await toDailyPlanError(error, 'load coach guidance');
     }
 
     return data as DailyPlanOptimization;

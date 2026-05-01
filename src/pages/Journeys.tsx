@@ -133,6 +133,7 @@ const toEditableQuestTask = (
   recurrence_custom_period: task.recurrence_custom_period ?? null,
   reminder_enabled: task.reminder_enabled ?? false,
   reminder_minutes_before: task.reminder_minutes_before ?? 15,
+  reminder_offsets_minutes: task.reminder_offsets_minutes ?? [],
   category: task.category ?? null,
   notes: task.notes ?? null,
   habit_source_id: task.habit_source_id ?? null,
@@ -162,6 +163,7 @@ const buildCreateQuestPrefillDraft = (
     recurrenceCustomPeriod: (asString(payload.recurrenceCustomPeriod) as "week" | "month" | null) ?? null,
     reminderEnabled: asBoolean(payload.reminderEnabled) ?? false,
     reminderMinutesBefore: asNumber(payload.reminderMinutesBefore) ?? 15,
+    reminderOffsetsMinutes: [],
     moreInformation: asString(payload.notes),
     location: asString(payload.location),
     subtasks: normalizeSubtaskTitles(asStringArray(payload.subtasks)),
@@ -179,6 +181,15 @@ const buildPlannerEditDraft = (
 
   const payload = asRecord(proposal.payload);
   const updates = asRecord(payload?.updates) ?? {};
+  const nextReminderEnabled = asBoolean(updates.reminder_enabled) ?? task.reminder_enabled;
+  const nextReminderMinutesBefore = updates.reminder_minutes_before === null
+    ? null
+    : asNumber(updates.reminder_minutes_before) ?? task.reminder_minutes_before;
+  const nextReminderOffsets = nextReminderEnabled === false
+    ? []
+    : updates.reminder_minutes_before !== undefined
+      ? []
+      : task.reminder_offsets_minutes;
   const nextTask = toEditableQuestTask({
     ...task,
     task_text: asString(updates.task_text) ?? task.task_text,
@@ -200,10 +211,9 @@ const buildPlannerEditDraft = (
     recurrence_custom_period: updates.recurrence_custom_period === null
       ? null
       : ((asString(updates.recurrence_custom_period) as "week" | "month" | null) ?? task.recurrence_custom_period),
-    reminder_enabled: asBoolean(updates.reminder_enabled) ?? task.reminder_enabled,
-    reminder_minutes_before: updates.reminder_minutes_before === null
-      ? null
-      : asNumber(updates.reminder_minutes_before) ?? task.reminder_minutes_before,
+    reminder_enabled: nextReminderEnabled,
+    reminder_minutes_before: nextReminderMinutesBefore,
+    reminder_offsets_minutes: nextReminderOffsets,
     category: updates.category === null ? null : asString(updates.category) ?? task.category,
     notes: updates.notes === null ? null : asString(updates.notes) ?? task.notes,
     image_url: updates.image_url === null ? null : asString(updates.image_url) ?? task.image_url,
@@ -255,6 +265,7 @@ type EditableQuestTask = Pick<
   | "recurrence_custom_period"
   | "reminder_enabled"
   | "reminder_minutes_before"
+  | "reminder_offsets_minutes"
   | "category"
   | "notes"
   | "habit_source_id"
@@ -948,6 +959,7 @@ const Journeys = () => {
     recurrence_custom_period?: "week" | "month" | null;
     reminder_enabled?: boolean | null;
     reminder_minutes_before?: number | null;
+    reminder_offsets_minutes?: number[] | null;
     category?: string | null;
     notes?: string | null;
     habit_source_id?: string | null;
@@ -1225,6 +1237,7 @@ const Journeys = () => {
       recurrenceDays: data.recurrenceDays,
       reminderEnabled: data.reminderEnabled,
       reminderMinutesBefore: data.reminderMinutesBefore,
+      reminderOffsetsMinutes: data.reminderOffsetsMinutes,
       notes: data.moreInformation,
       location: data.location,
       contactId: data.contactId,
@@ -1308,6 +1321,7 @@ const Journeys = () => {
     recurrence_custom_period: "week" | "month" | null;
     reminder_enabled: boolean;
     reminder_minutes_before: number;
+    reminder_offsets_minutes: number[];
     notes: string | null;
     category: string | null;
     image_url: string | null;
@@ -1429,6 +1443,7 @@ const Journeys = () => {
     recurrence_end_date: task.recurrence_end_date,
     reminder_enabled: !!task.reminder_enabled,
     reminder_minutes_before: task.reminder_minutes_before,
+    reminder_offsets_minutes: task.reminder_offsets_minutes ?? [],
     notes: task.notes,
     source: task.source,
   }), []);

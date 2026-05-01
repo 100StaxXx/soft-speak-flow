@@ -276,7 +276,9 @@ function isLikelyTechnicalMessage(message: string): boolean {
     normalized.includes("failed to prepare pep talk audio") ||
     normalized.includes("failed to generate audio") ||
     normalized.includes("failed to generate script") ||
-    normalized.includes("ai gateway error")
+    normalized.includes("ai gateway error") ||
+    normalized.includes("rate limit exceeded") ||
+    normalized.includes("too many requests")
   );
 }
 

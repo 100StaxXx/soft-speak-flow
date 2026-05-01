@@ -1,8 +1,10 @@
 import { shouldApplyEngagementBudget, decideEngagementBudget } from "../_shared/notificationsV2.ts";
 import {
+  buildTaskReminderDeliveryUpdate,
   buildNoDeviceTokenFailureUpdate,
   resolveDeliveryCopy,
   resolveSourceAcknowledgement,
+  resolveTaskReminderOffsetMinutes,
   TERMINAL_NO_DEVICE_ERROR,
 } from "./queueDelivery.ts";
 
@@ -29,7 +31,7 @@ Deno.test("task notifications remain exempt from skipped_budget decisions", () =
   }
 });
 
-Deno.test("acknowledges the correct daily task field for quest start and reminder sends", () => {
+Deno.test("acknowledges the correct daily task field for quest start sends", () => {
   const startAck = resolveSourceAcknowledgement({
     source_table: "daily_tasks",
     source_id: "task-1",
@@ -41,15 +43,54 @@ Deno.test("acknowledges the correct daily task field for quest start and reminde
     source_table: "daily_tasks",
     source_id: "task-1",
     notification_type: "task_reminder",
-    payload: null,
+    payload: { reminder_offset_minutes: 10 },
   }, "2026-04-11T21:45:00.000Z");
 
   if (JSON.stringify(startAck?.updates) !== JSON.stringify({ start_notification_sent: true })) {
     throw new Error(`Expected task_start to update start_notification_sent, got ${JSON.stringify(startAck)}`);
   }
 
-  if (JSON.stringify(reminderAck?.updates) !== JSON.stringify({ reminder_sent: true })) {
-    throw new Error(`Expected task_reminder to update reminder_sent, got ${JSON.stringify(reminderAck)}`);
+  if (reminderAck !== null) {
+    throw new Error(`Expected task_reminder acknowledgement to use offset-specific handling, got ${JSON.stringify(reminderAck)}`);
+  }
+});
+
+Deno.test("builds offset-specific quest reminder acknowledgement updates", () => {
+  const parsedOffset = resolveTaskReminderOffsetMinutes({
+    reminder_minutes_before: 10,
+    reminder_offset_minutes: 60,
+  });
+
+  if (parsedOffset !== 60) {
+    throw new Error(`Expected reminder_offset_minutes to win, got ${parsedOffset}`);
+  }
+
+  const firstUpdate = buildTaskReminderDeliveryUpdate({
+    configuredOffsets: [10, 60],
+    sentOffsets: [],
+    legacyReminderMinutesBefore: 10,
+    deliveredOffsetMinutes: 10,
+  });
+
+  if (JSON.stringify(firstUpdate) !== JSON.stringify({
+    reminder_sent_offsets_minutes: [10],
+    reminder_sent: false,
+  })) {
+    throw new Error(`Expected first reminder to append offset without completing, got ${JSON.stringify(firstUpdate)}`);
+  }
+
+  const finalUpdate = buildTaskReminderDeliveryUpdate({
+    configuredOffsets: [10, 60],
+    sentOffsets: [10],
+    legacyReminderMinutesBefore: 10,
+    deliveredOffsetMinutes: 60,
+  });
+
+  if (JSON.stringify(finalUpdate) !== JSON.stringify({
+    reminder_sent_offsets_minutes: [10, 60],
+    reminder_sent: true,
+  })) {
+    throw new Error(`Expected final reminder to complete the reminder set, got ${JSON.stringify(finalUpdate)}`);
   }
 });
 

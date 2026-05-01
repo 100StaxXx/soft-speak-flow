@@ -47,6 +47,10 @@ export type LegacyCompanionAssistantMessage = {
 };
 
 type CompanionAssistantSurface = "companion" | "journeys";
+type CompanionTemplateThreadOptions = {
+  greetingText?: string | null;
+  visibleAssistantOpening?: boolean;
+};
 
 type UseLegacyCompanionAssistantAdapterOptions = {
   enabled: boolean;
@@ -707,6 +711,27 @@ export function useLegacyCompanionAssistantAdapter({
     conversation,
   ]);
 
+  const startTemplateThread = useCallback((
+    options?: CompanionTemplateThreadOptions,
+  ) => {
+    if (surface !== "journeys") return "";
+
+    const nextSessionId = journeysThreads.startTemplateThread({
+      greetingText: options?.visibleAssistantOpening
+        ? null
+        : options?.greetingText,
+    });
+    const greetingText = options?.greetingText?.trim();
+
+    if (options?.visibleAssistantOpening && greetingText) {
+      journeysConversation.injectAssistantOpening(greetingText, {
+        visibleAssistantOpening: true,
+      });
+    }
+
+    return nextSessionId;
+  }, [journeysConversation, journeysThreads, surface]);
+
   return {
     greeting: surface === "journeys"
       ? journeysConversation.greeting
@@ -797,7 +822,7 @@ export function useLegacyCompanionAssistantAdapter({
       ? journeysThreads.newChatDisabledReason
       : null,
     startTemplateThread: surface === "journeys"
-      ? journeysThreads.startTemplateThread
+      ? startTemplateThread
       : () => "",
     hydrateFromUnifiedState,
   };

@@ -50,6 +50,11 @@ import {
   readQuestDraftSnapshot,
   writeQuestDraftSnapshot,
 } from "@/utils/draftPersistence";
+import {
+  getPrimaryQuestReminderOffset,
+  normalizeQuestReminderOffsets,
+  resolveQuestReminderOffsets,
+} from "@/utils/questReminders";
 
 export interface AddQuestData {
   text: string;
@@ -63,6 +68,7 @@ export interface AddQuestData {
   recurrenceCustomPeriod: "week" | "month" | null;
   reminderEnabled: boolean;
   reminderMinutesBefore: number;
+  reminderOffsetsMinutes: number[];
   moreInformation: string | null;
   location: string | null;
   contactId: string | null;
@@ -130,6 +136,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const [recurrenceCustomPeriod, setRecurrenceCustomPeriod] = useState<"week" | "month" | null>(null);
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderMinutesBefore, setReminderMinutesBefore] = useState(15);
+  const [reminderOffsetsMinutes, setReminderOffsetsMinutes] = useState<number[]>([]);
   const [moreInformation, setMoreInformation] = useState<string | null>(null);
   const [location, setLocation] = useState<string | null>(null);
   const [taskDate, setTaskDate] = useState<string | null>(format(selectedDate, "yyyy-MM-dd"));
@@ -175,6 +182,11 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const lastPrefillKeyRef = useRef<string | null>(null);
 
   const applyQuestDraftSnapshot = useCallback((snapshot: QuestDraftSnapshot) => {
+    const resolvedReminderOffsets = resolveQuestReminderOffsets({
+      reminderEnabled: snapshot.reminderEnabled,
+      reminderMinutesBefore: snapshot.reminderMinutesBefore,
+      reminderOffsetsMinutes: snapshot.reminderOffsetsMinutes,
+    });
     setTaskText(snapshot.text);
     setDifficulty(snapshot.difficulty);
     setScheduledTime(snapshot.scheduledTime);
@@ -183,8 +195,9 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     setRecurrenceDays(snapshot.recurrenceDays);
     setRecurrenceMonthDays(snapshot.recurrenceMonthDays);
     setRecurrenceCustomPeriod(snapshot.recurrenceCustomPeriod);
-    setReminderEnabled(snapshot.reminderEnabled);
-    setReminderMinutesBefore(snapshot.reminderMinutesBefore);
+    setReminderEnabled(resolvedReminderOffsets.length > 0);
+    setReminderMinutesBefore(getPrimaryQuestReminderOffset(resolvedReminderOffsets));
+    setReminderOffsetsMinutes(resolvedReminderOffsets);
     setMoreInformation(snapshot.moreInformation);
     setLocation(snapshot.location);
     setTaskDate(snapshot.taskDate);
@@ -218,6 +231,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     || snapshot.estimatedDuration !== 30
     || snapshot.reminderEnabled
     || snapshot.reminderMinutesBefore !== 15
+    || (snapshot.reminderOffsetsMinutes?.length ?? 0) > 0
     || snapshot.difficulty !== "medium"
     || snapshot.recurrencePattern !== null
     || snapshot.recurrenceDays.length > 0
@@ -246,6 +260,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       setRecurrenceCustomPeriod(null);
       setReminderEnabled(false);
       setReminderMinutesBefore(15);
+      setReminderOffsetsMinutes([]);
       setMoreInformation(null);
       setLocation(null);
       setShowDatePicker(false);
@@ -283,8 +298,14 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     setRecurrenceDays(prefillDraft.recurrenceDays ?? []);
     setRecurrenceMonthDays(prefillDraft.recurrenceMonthDays ?? []);
     setRecurrenceCustomPeriod(prefillDraft.recurrenceCustomPeriod ?? null);
-    setReminderEnabled(prefillDraft.reminderEnabled ?? false);
-    setReminderMinutesBefore(prefillDraft.reminderMinutesBefore ?? 15);
+    const resolvedReminderOffsets = resolveQuestReminderOffsets({
+      reminderEnabled: prefillDraft.reminderEnabled,
+      reminderMinutesBefore: prefillDraft.reminderMinutesBefore,
+      reminderOffsetsMinutes: prefillDraft.reminderOffsetsMinutes,
+    });
+    setReminderEnabled(resolvedReminderOffsets.length > 0);
+    setReminderMinutesBefore(getPrimaryQuestReminderOffset(resolvedReminderOffsets));
+    setReminderOffsetsMinutes(resolvedReminderOffsets);
     setMoreInformation(prefillDraft.moreInformation ?? null);
     setLocation(prefillDraft.location ?? null);
     setSubtasks(prefillDraft.subtasks ?? []);
@@ -370,6 +391,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     recurrenceCustomPeriod,
     reminderEnabled,
     reminderMinutesBefore,
+    reminderOffsetsMinutes,
     moreInformation,
     location,
     sendToCalendar,
@@ -391,6 +413,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     recurrencePattern,
     reminderEnabled,
     reminderMinutesBefore,
+    reminderOffsetsMinutes,
     scheduledTime,
     selectedTemplate,
     sendToCalendar,
@@ -427,6 +450,26 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     { value: "medium" as const, icon: Flame, label: "Medium" },
     { value: "hard" as const, icon: Mountain, label: "Hard" },
   ];
+
+  const applyReminderOffsets = useCallback((offsets: readonly unknown[]) => {
+    const normalizedOffsets = normalizeQuestReminderOffsets(offsets);
+    setReminderOffsetsMinutes(normalizedOffsets);
+    setReminderEnabled(normalizedOffsets.length > 0);
+    setReminderMinutesBefore(getPrimaryQuestReminderOffset(normalizedOffsets));
+  }, []);
+
+  const handleReminderEnabledChange = useCallback((enabled: boolean) => {
+    if (!enabled) {
+      applyReminderOffsets([]);
+      return;
+    }
+
+    applyReminderOffsets(reminderOffsetsMinutes.length > 0 ? reminderOffsetsMinutes : [reminderMinutesBefore]);
+  }, [applyReminderOffsets, reminderMinutesBefore, reminderOffsetsMinutes]);
+
+  const handleReminderMinutesBeforeChange = useCallback((minutes: number) => {
+    applyReminderOffsets([minutes]);
+  }, [applyReminderOffsets]);
 
   // --- Subtask helpers ---
   const handleSubtaskChange = useCallback((index: number, value: string) => {
@@ -536,12 +579,13 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       recurrenceCustomPeriod,
       reminderEnabled,
       reminderMinutesBefore,
+      reminderOffsetsMinutes,
       moreInformation,
       location,
       contactId: null,
       autoLogInteraction: true,
       sendToInbox: intent === "inbox",
-      sendToCalendar: intent === "scheduled" && sendToCalendar && canShowCalendarSendOption,
+      sendToCalendar: intent === "scheduled" && isDesktopPanel && sendToCalendar && canShowCalendarSendOption,
       subtasks: subtasks.filter(s => s.trim()),
       imageUrl: attachments.find((attachment) => attachment.isImage)?.fileUrl ?? null,
       attachments,
@@ -549,7 +593,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     });
     clearQuestDraftSnapshot(user?.id);
     onOpenChange(false);
-  }, [taskText, recurrencePattern, creationSource, scheduledTime, onAdd, taskDate, difficulty, estimatedDuration, recurrenceDays, recurrenceMonthDays, recurrenceCustomPeriod, reminderEnabled, reminderMinutesBefore, moreInformation, location, sendToCalendar, canShowCalendarSendOption, subtasks, attachments, onOpenChange, user?.id]);
+  }, [taskText, recurrencePattern, creationSource, scheduledTime, onAdd, taskDate, difficulty, estimatedDuration, recurrenceDays, recurrenceMonthDays, recurrenceCustomPeriod, reminderEnabled, reminderMinutesBefore, reminderOffsetsMinutes, moreInformation, location, isDesktopPanel, sendToCalendar, canShowCalendarSendOption, subtasks, attachments, onOpenChange, user?.id]);
 
   const submitWithTemplateHandling = useCallback(async (intent: SubmitIntent) => {
     if (selectedTemplate && hasTemplateCustomizations) {
@@ -985,14 +1029,16 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   recurrenceCustomPeriod={recurrenceCustomPeriod}
                   reminderEnabled={reminderEnabled}
                   reminderMinutesBefore={reminderMinutesBefore}
+                  reminderOffsetsMinutes={reminderOffsetsMinutes}
                   onScheduledTimeChange={setScheduledTime}
                   onEstimatedDurationChange={setEstimatedDuration}
                   onRecurrencePatternChange={setRecurrencePattern}
                   onRecurrenceDaysChange={setRecurrenceDays}
                   onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
                   onRecurrenceCustomPeriodChange={setRecurrenceCustomPeriod}
-                  onReminderEnabledChange={setReminderEnabled}
-                  onReminderMinutesBeforeChange={setReminderMinutesBefore}
+                  onReminderEnabledChange={handleReminderEnabledChange}
+                  onReminderMinutesBeforeChange={handleReminderMinutesBeforeChange}
+                  onReminderOffsetsMinutesChange={applyReminderOffsets}
                   moreInformation={moreInformation}
                   onMoreInformationChange={setMoreInformation}
                   location={location}
@@ -1066,14 +1112,16 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   recurrenceCustomPeriod={recurrenceCustomPeriod}
                   reminderEnabled={reminderEnabled}
                   reminderMinutesBefore={reminderMinutesBefore}
+                  reminderOffsetsMinutes={reminderOffsetsMinutes}
                   onScheduledTimeChange={setScheduledTime}
                   onEstimatedDurationChange={setEstimatedDuration}
                   onRecurrencePatternChange={setRecurrencePattern}
                   onRecurrenceDaysChange={setRecurrenceDays}
                   onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
                   onRecurrenceCustomPeriodChange={setRecurrenceCustomPeriod}
-                  onReminderEnabledChange={setReminderEnabled}
-                  onReminderMinutesBeforeChange={setReminderMinutesBefore}
+                  onReminderEnabledChange={handleReminderEnabledChange}
+                  onReminderMinutesBeforeChange={handleReminderMinutesBeforeChange}
+                  onReminderOffsetsMinutesChange={applyReminderOffsets}
                   moreInformation={moreInformation}
                   onMoreInformationChange={setMoreInformation}
                   location={location}
@@ -1125,14 +1173,16 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                       recurrenceCustomPeriod={recurrenceCustomPeriod}
                       reminderEnabled={reminderEnabled}
                       reminderMinutesBefore={reminderMinutesBefore}
+                      reminderOffsetsMinutes={reminderOffsetsMinutes}
                       onScheduledTimeChange={setScheduledTime}
                       onEstimatedDurationChange={setEstimatedDuration}
                       onRecurrencePatternChange={setRecurrencePattern}
                       onRecurrenceDaysChange={setRecurrenceDays}
                       onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
                       onRecurrenceCustomPeriodChange={setRecurrenceCustomPeriod}
-                      onReminderEnabledChange={setReminderEnabled}
-                      onReminderMinutesBeforeChange={setReminderMinutesBefore}
+                      onReminderEnabledChange={handleReminderEnabledChange}
+                      onReminderMinutesBeforeChange={handleReminderMinutesBeforeChange}
+                      onReminderOffsetsMinutesChange={applyReminderOffsets}
                       moreInformation={moreInformation}
                       onMoreInformationChange={setMoreInformation}
                       location={location}
@@ -1165,21 +1215,27 @@ export const AddQuestSheet = memo(function AddQuestSheet({
           <div
             className={cn(
               "flex-shrink-0 flex flex-col gap-3 px-5 pt-4",
-              isDesktopPanel ? `${QUEST_FORM_STYLES.desktopPanelFooter} pb-5` : "border-t-[3px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,248,225,0.18),rgba(255,193,90,0.14))] pb-6",
+              isDesktopPanel
+                ? `${QUEST_FORM_STYLES.desktopPanelFooter} pb-5`
+                : "bg-transparent pb-[calc(1rem+env(safe-area-inset-bottom))]",
             )}
           >
-            <div className={QUEST_FORM_STYLES.footerReview}>
-              <p className="text-xs text-[#5d2a0f]">
-                {reviewTitle} · {reviewTimeLabel} · {reviewDateLabel}
-              </p>
-            </div>
-            {canShowCalendarSendOption && (
-              <div className={cn(QUEST_FORM_STYLES.sectionCardSoft, "flex items-center justify-between px-4 py-3")}>
-                <div className="text-xs text-[#7f4a1d]/80">
-                  Send to {effectiveProvider === "apple" ? "Apple" : effectiveProvider === "google" ? "Google" : "Outlook"} Calendar after create
+            {isDesktopPanel && (
+              <>
+                <div className={QUEST_FORM_STYLES.footerReview}>
+                  <p className="text-xs text-[#5d2a0f]">
+                    {reviewTitle} · {reviewTimeLabel} · {reviewDateLabel}
+                  </p>
                 </div>
-                <Switch checked={sendToCalendar} onCheckedChange={setSendToCalendar} />
-              </div>
+                {canShowCalendarSendOption && (
+                  <div className={cn(QUEST_FORM_STYLES.sectionCardSoft, "flex items-center justify-between px-4 py-3")}>
+                    <div className="text-xs text-[#7f4a1d]/80">
+                      Send to {effectiveProvider === "apple" ? "Apple" : effectiveProvider === "google" ? "Google" : "Outlook"} Calendar after create
+                    </div>
+                    <Switch checked={sendToCalendar} onCheckedChange={setSendToCalendar} />
+                  </div>
+                )}
+              </>
             )}
             <Button
               onClick={handleSubmit}
@@ -1201,12 +1257,12 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               <Inbox className="mr-2 h-4 w-4" />
               Add to Inbox instead
             </Button>
-            {hasRecurrence && (
+            {isDesktopPanel && hasRecurrence && (
               <p className={cn("text-center", QUEST_FORM_STYLES.helperText)}>
                 Recurring quests must stay scheduled with a time.
               </p>
             )}
-            {onCreateCampaign && (
+            {isDesktopPanel && onCreateCampaign && (
               <button
                 onClick={() => {
                   onOpenChange(false);

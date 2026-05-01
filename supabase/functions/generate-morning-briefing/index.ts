@@ -4,6 +4,11 @@ installOpenAICompatibilityShim();
 import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import {
+  formatDateInTimezone,
+  getEffectiveDailyDate,
+  getLocalDateOffsetInTimezone,
+} from "../_shared/effectiveDailyDate.ts";
+import {
   buildCostGuardrailBlockedResponse,
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
@@ -53,17 +58,19 @@ interface XPEventData {
   created_at: string;
 }
 
-const formatDateInTimezone = (date: Date, timezone: string): string => {
-  try {
-    return new Intl.DateTimeFormat("en-CA", {
-      timeZone: timezone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(date);
-  } catch {
-    return date.toISOString().split("T")[0];
-  }
+const toTrimmedStringOrNull = (value: unknown): string | null => {
+  if (typeof value !== "string") return null;
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const toStringArray = (value: unknown): string[] => {
+  const values = Array.isArray(value) ? value : [value];
+
+  return values
+    .map(toTrimmedStringOrNull)
+    .filter((item): item is string => item !== null);
 };
 
 Deno.serve(async (req) => {
@@ -97,23 +104,54 @@ Deno.serve(async (req) => {
       capabilities: ["text"],
       providers: ["openai"],
     });
+
+    if (!OPENAI_API_KEY) {
+      console.error("OPENAI_API_KEY is not configured");
+      return createSafeErrorResponse(req, {
+        status: 500,
+        code: "AI_NOT_CONFIGURED",
+        error: "AI service not configured",
+        requestId,
+      });
+    }
+
     // Resolve profile and timezone first so "today" matches the user's configured timezone.
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('selected_mentor_id, timezone')
       .eq('id', user.id)
       .maybeSingle();
 
+    if (profileError) {
+      console.error("Failed to load profile for morning briefing:", profileError);
+      return createSafeErrorResponse(req, {
+        status: 500,
+        code: "PROFILE_READ_FAILED",
+        error: "Failed to load profile",
+        requestId,
+      });
+    }
+
     const userTimezone = profile?.timezone || "UTC";
-    const today = formatDateInTimezone(new Date(), userTimezone);
+    const today = getEffectiveDailyDate(userTimezone);
 
     // Check if briefing already exists for today
-    const { data: existingBriefing } = await supabase
+    const { data: existingBriefing, error: existingBriefingError } = await supabase
       .from('morning_briefings')
       .select('*')
       .eq('user_id', user.id)
       .eq('briefing_date', today)
       .maybeSingle();
+
+    if (existingBriefingError) {
+      console.error("Failed to check existing morning briefing:", existingBriefingError);
+      return createSafeErrorResponse(req, {
+        status: 500,
+        code: "BRIEFING_LOOKUP_FAILED",
+        error: "Failed to check existing morning briefing",
+        requestId,
+      });
+    }
 
     if (existingBriefing) {
       return new Response(
@@ -127,21 +165,27 @@ Deno.serve(async (req) => {
 
     let mentor = null;
     if (profile?.selected_mentor_id) {
-      const { data: mentorData } = await supabase
+      const { data: mentorData, error: mentorError } = await supabase
         .from('mentors')
         .select('id, name, tone_description, personality_traits')
         .eq('id', profile.selected_mentor_id)
-        .single();
+        .maybeSingle();
+      if (mentorError) {
+        console.warn("Selected mentor lookup failed; falling back to default mentor:", mentorError);
+      }
       mentor = mentorData;
     }
 
     // If no mentor selected, get a default mentor
     if (!mentor) {
-      const { data: defaultMentor } = await supabase
+      const { data: defaultMentor, error: defaultMentorError } = await supabase
         .from('mentors')
         .select('id, name, tone_description, personality_traits')
         .limit(1)
-        .single();
+        .maybeSingle();
+      if (defaultMentorError) {
+        console.warn("Default mentor lookup failed; using hardcoded fallback mentor:", defaultMentorError);
+      }
       mentor = defaultMentor;
     }
 
@@ -154,9 +198,7 @@ Deno.serve(async (req) => {
     };
 
     // Gather comprehensive user activity data
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const sevenDaysAgoStr = formatDateInTimezone(sevenDaysAgo, userTimezone);
+    const sevenDaysAgoStr = getLocalDateOffsetInTimezone(userTimezone, -7);
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -217,15 +259,32 @@ Deno.serve(async (req) => {
         .limit(7)
     ]);
 
+    [
+      { source: "habits", error: habitsResult.error },
+      { source: "epics", error: epicsResult.error },
+      { source: "challenges", error: challengesResult.error },
+      { source: "reflections", error: reflectionsResult.error },
+      { source: "xp_events", error: xpEventsResult.error },
+      { source: "daily_check_ins", error: checkInsResult.error },
+    ].forEach(({ source, error }) => {
+      if (error) {
+        console.warn(`Morning briefing ${source} query failed:`, error);
+      }
+    });
+
     // Get habit completions for last 7 days
     const habitIds = habitsResult.data?.map(h => h.id) || [];
-    const { data: habitCompletions } = habitIds.length > 0 
+    const { data: habitCompletions, error: habitCompletionsError } = habitIds.length > 0
       ? await supabase
           .from('habit_completions')
           .select('habit_id, date')
           .in('habit_id', habitIds)
           .gte('date', sevenDaysAgoStr)
-      : { data: [] };
+      : { data: [], error: null };
+
+    if (habitCompletionsError) {
+      console.warn("Morning briefing habit_completions query failed:", habitCompletionsError);
+    }
 
     // Combine habits with their completions
     const habits: HabitData[] = (habitsResult.data || []).map(habit => ({
@@ -297,16 +356,16 @@ const challenges: ChallengeData[] = (challengesResult.data || []).map(c => ({
     };
 
     const calculateXPSummary = () => {
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = formatDateInTimezone(yesterday, userTimezone);
-      
+      const yesterdayStr = getLocalDateOffsetInTimezone(userTimezone, -1);
+
       const yesterdayXP = xpEvents
-        .filter(e => e.created_at.startsWith(yesterdayStr))
+        .filter(
+          (e) => formatDateInTimezone(new Date(e.created_at), userTimezone) === yesterdayStr,
+        )
         .reduce((sum, e) => sum + e.xp_earned, 0);
-      
+
       const weekXP = xpEvents.reduce((sum, e) => sum + e.xp_earned, 0);
-      
+
       return `Yesterday: ${yesterdayXP} XP earned. Last 30 days: ${weekXP} XP total.`;
     };
 
@@ -365,14 +424,6 @@ ${calculateXPSummary()}
 
 Based on this data, generate a personalized morning briefing. Infer their life goals, celebrate their progress, and give them actionable guidance for today.`;
 
-    if (!OPENAI_API_KEY) {
-      console.error("OPENAI_API_KEY is not configured");
-      return new Response(
-        JSON.stringify({ error: "AI service not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     // Call OpenAI GPT-5
     const openaiResponse = await guardedFetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -397,31 +448,65 @@ Based on this data, generate a personalized morning briefing. Infer their life g
       console.error("OpenAI API error:", openaiResponse.status, errorText);
       
       if (openaiResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded, please try again later." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return createSafeErrorResponse(req, {
+          status: 429,
+          code: "RATE_LIMIT_EXCEEDED",
+          error: "Rate limit exceeded, please try again later.",
+          requestId,
+        });
       }
       
-      return new Response(
-        JSON.stringify({ error: "AI service error" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return createSafeErrorResponse(req, {
+        status: 500,
+        code: "AI_PROVIDER_ERROR",
+        error: "AI service error",
+        requestId,
+      });
     }
 
     const aiData = await openaiResponse.json();
-    const aiContent = aiData.choices[0].message.content;
+    const aiContent = aiData?.choices?.[0]?.message?.content;
+
+    if (typeof aiContent !== "string" || aiContent.trim().length === 0) {
+      console.error("OpenAI returned an empty morning briefing response:", aiData);
+      return createSafeErrorResponse(req, {
+        status: 500,
+        code: "AI_RESPONSE_EMPTY",
+        error: "AI service returned an empty response",
+        requestId,
+      });
+    }
     
     let parsedResponse;
     try {
       parsedResponse = JSON.parse(aiContent);
     } catch (e) {
       console.error("Failed to parse AI response:", aiContent);
-      return new Response(
-        JSON.stringify({ error: "Failed to parse AI response" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return createSafeErrorResponse(req, {
+        status: 500,
+        code: "AI_RESPONSE_PARSE_FAILED",
+        error: "Failed to parse AI response",
+        requestId,
+      });
     }
+
+    if (
+      typeof parsedResponse?.briefing !== "string" ||
+      parsedResponse.briefing.trim().length === 0
+    ) {
+      console.error("AI response missing briefing field:", parsedResponse);
+      return createSafeErrorResponse(req, {
+        status: 500,
+        code: "AI_RESPONSE_INVALID_SHAPE",
+        error: "AI response did not include a briefing",
+        requestId,
+      });
+    }
+
+    const sanitizedBriefing = parsedResponse.briefing.trim();
+    const sanitizedInferredGoals = toStringArray(parsedResponse.inferredGoals);
+    const sanitizedTodaysFocus = toTrimmedStringOrNull(parsedResponse.todaysFocus);
+    const sanitizedActionPrompt = toTrimmedStringOrNull(parsedResponse.actionPrompt);
 
     // Store the data snapshot for debugging/context
     const dataSnapshot = {
@@ -439,30 +524,63 @@ Based on this data, generate a personalized morning briefing. Infer their life g
         user_id: user.id,
         briefing_date: today,
         mentor_id: mentorInfo.id,
-        content: parsedResponse.briefing,
-        inferred_goals: parsedResponse.inferredGoals || [],
-        todays_focus: parsedResponse.todaysFocus,
-        action_prompt: parsedResponse.actionPrompt,
+        content: sanitizedBriefing,
+        inferred_goals: sanitizedInferredGoals,
+        todays_focus: sanitizedTodaysFocus,
+        action_prompt: sanitizedActionPrompt,
         data_snapshot: dataSnapshot,
       })
       .select()
       .single();
 
     if (insertError) {
+      if (insertError.code === "23505" || insertError.code === "PGRST409") {
+        const { data: existingRow, error: existingRowError } = await supabase
+          .from('morning_briefings')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('briefing_date', today)
+          .maybeSingle();
+
+        if (existingRow) {
+          return new Response(
+            JSON.stringify({
+              briefing: existingRow,
+              cached: true
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        if (existingRowError) {
+          console.error("Failed to recover existing briefing after insert conflict:", existingRowError);
+        }
+      }
+
       console.error("Failed to save briefing:", insertError);
-      // Still return the briefing even if save fails
+      return createSafeErrorResponse(req, {
+        status: 500,
+        code: "BRIEFING_PERSIST_FAILED",
+        error: "Failed to save morning briefing",
+        requestId,
+      });
+    }
+
+    if (!newBriefing) {
+      console.error("Failed to save briefing: No briefing row returned after insert");
+      return createSafeErrorResponse(req, {
+        status: 500,
+        code: "BRIEFING_PERSIST_FAILED",
+        error: "Failed to save morning briefing",
+        requestId,
+      });
     }
 
     console.log(`Generated morning briefing for user ${user.id} with mentor ${mentorInfo.name}`);
 
     return new Response(
       JSON.stringify({ 
-        briefing: newBriefing || {
-          content: parsedResponse.briefing,
-          inferred_goals: parsedResponse.inferredGoals,
-          todays_focus: parsedResponse.todaysFocus,
-          action_prompt: parsedResponse.actionPrompt,
-        },
+        briefing: newBriefing,
         cached: false 
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

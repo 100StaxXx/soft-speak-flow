@@ -13,6 +13,10 @@ const supabaseMocks = vi.hoisted(() => ({
   rpc: vi.fn(),
 }));
 
+const sonnerMocks = vi.hoisted(() => ({
+  toast: vi.fn(() => "toast-id"),
+}));
+
 vi.mock("@capacitor/core", () => ({
   Capacitor: {
     isNativePlatform: capacitorMocks.isNativePlatform,
@@ -28,6 +32,10 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     rpc: supabaseMocks.rpc,
   },
+}));
+
+vi.mock("@/components/ui/sonner", () => ({
+  toast: sonnerMocks.toast,
 }));
 
 vi.mock("@/utils/storage", () => ({
@@ -49,9 +57,11 @@ vi.mock("@/utils/storage", () => ({
 }));
 
 import {
+  buildForegroundPushToast,
   buildPushDeviceTokenClaimArgs,
   getOrCreatePushInstallationId,
   saveDeviceTokenForInstallation,
+  showForegroundPushNotificationToast,
 } from "@/utils/nativePushNotifications";
 
 describe("native push registration", () => {
@@ -59,6 +69,8 @@ describe("native push registration", () => {
     storageState.store.clear();
     supabaseMocks.rpc.mockReset();
     supabaseMocks.rpc.mockResolvedValue({ data: null, error: null });
+    sonnerMocks.toast.mockReset();
+    sonnerMocks.toast.mockReturnValue("toast-id");
   });
 
   afterEach(() => {
@@ -108,5 +120,84 @@ describe("native push registration", () => {
     await expect(
       saveDeviceTokenForInstallation("user-1", "token-a", "install-a"),
     ).rejects.toMatchObject({ message: "duplicate claim failed" });
+  });
+
+  it("builds foreground toast copy from native push payloads", () => {
+    expect(
+      buildForegroundPushToast({
+        id: "native-id",
+        title: "Epic Falling Behind",
+        body: "Focus on its habits today.",
+        data: {
+          type: "mentor_nudge",
+          queue_id: "queue-1",
+          url: "/companion",
+        },
+      }),
+    ).toEqual({
+      title: "Epic Falling Behind",
+      description: "Focus on its habits today.",
+      url: "/companion",
+      dedupeKey: "mentor_nudge:native-id",
+    });
+  });
+
+  it("shows an in-app foreground push toast with navigation action", () => {
+    const navigationEvents: string[] = [];
+    const handleNavigation = (event: Event) => {
+      navigationEvents.push((event as CustomEvent<string>).detail);
+    };
+    window.addEventListener("native-push-navigation", handleNavigation);
+
+    try {
+      expect(
+        showForegroundPushNotificationToast(
+          {
+            title: "Epic Falling Behind",
+            body: "Focus on its habits today.",
+            data: {
+              type: "mentor_nudge",
+              queue_id: "queue-2",
+              url: "/companion",
+            },
+          },
+          1_000,
+        ),
+      ).toBe(true);
+
+      expect(sonnerMocks.toast).toHaveBeenCalledWith(
+        "Epic Falling Behind",
+        expect.objectContaining({
+          id: "foreground-push:mentor_nudge:queue-2",
+          description: "Focus on its habits today.",
+          action: expect.objectContaining({ label: "Open" }),
+        }),
+      );
+
+      const options = sonnerMocks.toast.mock.calls[0]?.[1] as
+        | { action?: { onClick?: () => void } }
+        | undefined;
+      options?.action?.onClick?.();
+
+      expect(navigationEvents).toEqual(["/companion"]);
+    } finally {
+      window.removeEventListener("native-push-navigation", handleNavigation);
+    }
+  });
+
+  it("deduplicates repeated foreground push toasts briefly", () => {
+    const notification = {
+      title: "Epic Falling Behind",
+      body: "Focus on its habits today.",
+      data: {
+        type: "mentor_nudge",
+        queue_id: "queue-3",
+        url: "/companion",
+      },
+    };
+
+    expect(showForegroundPushNotificationToast(notification, 2_000)).toBe(true);
+    expect(showForegroundPushNotificationToast(notification, 2_100)).toBe(false);
+    expect(sonnerMocks.toast).toHaveBeenCalledTimes(1);
   });
 });

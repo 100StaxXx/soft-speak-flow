@@ -472,8 +472,16 @@ export function useJourneysCompanionThreads({
     threadsQueryKey,
   ]);
 
-  const startTemplateThread = useCallback(() => {
-    const nextSessionId = openFreshThread({ markBootstrapped: true });
+  const startTemplateThread = useCallback((options?: {
+    greetingText?: string | null;
+  }) => {
+    const greetingText = options?.greetingText === null
+      ? undefined
+      : options?.greetingText;
+    const nextSessionId = openFreshThread({
+      greetingText,
+      markBootstrapped: true,
+    });
 
     void (async () => {
       try {

@@ -35,7 +35,7 @@ INSERT INTO public.mentors (
   'Synthetic Oracle',
   'oracle',
   'She speaks like an intelligence already three steps ahead, turning noise into signal and uncertainty into elegant direction.',
-  'Builders, overthinkers, and strategists who want a brilliant feminine AI voice that makes complexity feel legible.',
+  'Builders, overthinkers, and strategists who want a brilliant feminine voice that makes complexity feel legible.',
   'Builders and strategists seeking elegant clarity',
   'medium',
   'feminine',

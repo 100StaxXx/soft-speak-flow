@@ -5235,6 +5235,163 @@ Deno.test("upcoming_start returns the today-and-tomorrow digest immediately", ()
   );
 });
 
+Deno.test("upcoming_start drops standalone habit tasks whose habit is no longer active", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What do I have coming up?",
+    parsedInput: {
+      text: "What do I have coming up?",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      activeHabitIds: ["habit-active"],
+      tasks: [
+        {
+          id: "task-deleted-habit",
+          title: "Daily Hydration",
+          taskDate: "2026-04-18",
+          scheduledTime: null,
+          estimatedDuration: 10,
+          recurrencePattern: "daily",
+          habitSourceId: "habit-deleted",
+        },
+        {
+          id: "task-active-habit",
+          title: "Daily Stretching",
+          taskDate: "2026-04-18",
+          scheduledTime: null,
+          estimatedDuration: 15,
+          recurrencePattern: "daily",
+          habitSourceId: "habit-active",
+        },
+      ],
+      starterIntent: "upcoming_start",
+    },
+  }));
+
+  assertEquals(result.mode, "schedule_read");
+  assertStringIncludes(result.reply, "Daily Stretching");
+  assertEquals(result.reply.includes("Daily Hydration"), false);
+  assertEquals(
+    result.structuredResponse?.comingUp?.remainingToday.some((item) =>
+      item.title === "Daily Hydration"
+    ),
+    false,
+  );
+});
+
+Deno.test("upcoming_start treats an empty active habit scope as authoritative", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What do I have coming up?",
+    parsedInput: {
+      text: "What do I have coming up?",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      activeHabitIds: [],
+      tasks: [
+        {
+          id: "task-deleted-habit",
+          title: "Daily Hydration",
+          taskDate: "2026-04-18",
+          scheduledTime: null,
+          estimatedDuration: 10,
+          recurrencePattern: "daily",
+          habitSourceId: "habit-deleted",
+        },
+      ],
+      starterIntent: "upcoming_start",
+    },
+  }));
+
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.reply.includes("Daily Hydration"), false);
+  assertEquals(
+    JSON.stringify(result.structuredResponse).includes("Daily Hydration"),
+    false,
+  );
+});
+
+Deno.test("upcoming_start drops orphan task priority scores without an active task id", () => {
+  const input = baseInput({
+    message: "What do I have coming up?",
+    parsedInput: {
+      text: "What do I have coming up?",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      tasks: [
+        {
+          id: "task-active",
+          title: "Daily Stretching",
+          taskDate: "2026-04-18",
+          scheduledTime: null,
+          estimatedDuration: 15,
+          recurrencePattern: null,
+        },
+      ],
+      priorityScores: [
+        {
+          id: "task:orphan",
+          kind: "task",
+          title: "Daily Hydration",
+          score: 88,
+          reasons: ["stale orphan score"],
+        },
+        {
+          id: "task:task-active",
+          kind: "task",
+          title: "Daily Hydration",
+          score: 60,
+          reasons: ["live task"],
+          taskId: "task-active",
+        },
+      ],
+      starterIntent: "upcoming_start",
+    },
+  });
+  const result = buildPlannerResponse(input);
+  const protectedData = collectPlannerContextProtectedDataText(input);
+
+  assertEquals(result.mode, "schedule_read");
+  assertStringIncludes(result.reply, "Daily Stretching");
+  assertEquals(result.reply.includes("Daily Hydration"), false);
+  assertEquals(protectedData.includes("Daily Hydration"), false);
+  assertEquals(
+    JSON.stringify(result.structuredResponse).includes("Daily Hydration"),
+    false,
+  );
+});
+
 Deno.test("plan_week returns a structured weekly summary with priorities and load signals", () => {
   const result = buildPlannerResponse(baseInput({
     message: "Plan my week",

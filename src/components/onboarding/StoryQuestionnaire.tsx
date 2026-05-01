@@ -11,6 +11,10 @@ import {
   ONBOARDING_SCHEDULE_ARCHETYPE_OPTIONS,
   ONBOARDING_SCHEDULE_ARCHETYPE_QUESTION_ID,
 } from "@/shared/onboardingScheduleArchetype";
+import {
+  ONBOARDING_VISUAL_PERSONA_OPTIONS,
+  ONBOARDING_VISUAL_PERSONA_QUESTION_ID,
+} from "@/shared/onboardingVisualPersona";
 
 interface QuestionOption {
   optionId: string;
@@ -30,10 +34,11 @@ type InteractionSource = "click" | "pointerdown" | "touchstart";
 const NATIVE_PRESS_DEDUPE_WINDOW_MS = 800;
 const questionnaireLog = logger.scope("StoryQuestionnaire");
 
-// Faction-themed narratives (4 per faction for 4 questions)
+// Faction-themed narratives (1 per questionnaire step)
 const getFactionNarrative = (faction: FactionType, questionIndex: number): string => {
   const narratives: Record<FactionType, string[]> = {
     starfall: [
+      "Before your title art takes shape, the cosmos tunes its portrait lens...",
       "Before you chart your course, the cosmos asks one question...",
       "As flames dance in the distance, your ship awaits its next destination...",
       "The engines hum with potential energy. Your crew looks to you for direction...",
@@ -41,6 +46,7 @@ const getFactionNarrative = (faction: FactionType, questionIndex: number): strin
       "One last calibration: the map needs to know the terrain of your real days...",
     ],
     void: [
+      "In the dark between stars, a silhouette waits to be drawn...",
       "In the stillness, a presence awaits. What form does it take?",
       "In the silent depths between stars, clarity emerges from stillness...",
       "The void speaks to those who listen. A whisper guides your path...",
@@ -48,6 +54,7 @@ const getFactionNarrative = (faction: FactionType, questionIndex: number): strin
       "The void studies the shape of your time before it offers a path...",
     ],
     stellar: [
+      "The first constellation sketches the form your title art will take...",
       "The stars align to reveal your guide. Who do you see among them?",
       "Nebulas paint the cosmos in infinite colors. Each holds a dream...",
       "Your companion gazes at the stars with wonder. What do you see?",
@@ -59,6 +66,15 @@ const getFactionNarrative = (faction: FactionType, questionIndex: number): strin
 };
 
 const questions: StoryQuestion[] = [
+  {
+    id: ONBOARDING_VISUAL_PERSONA_QUESTION_ID,
+    narrative: "",
+    question: "For generated title art, what kind of persona should we show?",
+    options: ONBOARDING_VISUAL_PERSONA_OPTIONS.map((option) => ({
+      ...option,
+      tags: [...option.tags],
+    })),
+  },
   {
     id: "mentor_energy",
     narrative: "",
@@ -133,14 +149,28 @@ export const StoryQuestionnaire = ({
   isSubmitting = false,
   initialAnswers = [],
 }: StoryQuestionnaireProps) => {
-  const seededAnswers = useMemo(
-    () => initialAnswers.slice(0, questions.length),
-    [initialAnswers],
-  );
-  const initialQuestionIndex = useMemo(
-    () => Math.min(seededAnswers.length, questions.length - 1),
-    [seededAnswers.length],
-  );
+  const seededAnswers = useMemo(() => {
+    const answersByQuestionId = new Map(
+      initialAnswers.map((answer) => [answer.questionId, answer]),
+    );
+    const nextAnswers: OnboardingAnswer[] = [];
+
+    questions.forEach((question, index) => {
+      const answer = answersByQuestionId.get(question.id);
+      if (
+        answer
+        && question.options.some((option) => option.optionId === answer.optionId)
+      ) {
+        nextAnswers[index] = answer;
+      }
+    });
+
+    return nextAnswers;
+  }, [initialAnswers]);
+  const initialQuestionIndex = useMemo(() => {
+    const firstUnansweredIndex = questions.findIndex((_, index) => !seededAnswers[index]);
+    return firstUnansweredIndex === -1 ? questions.length - 1 : firstUnansweredIndex;
+  }, [seededAnswers]);
   const [currentIndex, setCurrentIndex] = useState(initialQuestionIndex);
   const [answers, setAnswers] = useState<OnboardingAnswer[]>(seededAnswers);
   const [isTransitioning, setIsTransitioning] = useState(false);

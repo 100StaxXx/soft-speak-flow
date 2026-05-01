@@ -82,6 +82,7 @@ const buildVoicePrefill = (overrides: Partial<QuestComposerPrefillDraft> = {}): 
   estimatedDuration: 60,
   reminderEnabled: true,
   reminderMinutesBefore: 30,
+  reminderOffsetsMinutes: [30],
   moreInformation: "Bring roadmap",
   location: "Library",
   subtasks: ["Draft outline", "Send recap"],
@@ -176,6 +177,7 @@ describe("AddQuestSheet", () => {
     expect(screen.getByRole("button", { name: "Time" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add Quest" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add to Inbox instead" })).toBeInTheDocument();
+    expect(screen.queryByText(/Name your quest.*Select a time/i)).not.toBeInTheDocument();
     expectElementToIncludeClasses(
       screen.getByTestId("add-quest-mobile-sheet"),
       "border-[#4d2811] text-[#4f240c]",
@@ -205,6 +207,7 @@ describe("AddQuestSheet", () => {
     );
     expect(screen.queryByTestId("add-quest-mobile-sheet")).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText("Quest Title")).toBeInTheDocument();
+    expect(screen.getByText(/Name your quest.*Select a time.*Thu, Jan 15/i)).toBeInTheDocument();
   });
 
   it("renders Advanced Settings below Photo / Files", () => {
@@ -299,10 +302,32 @@ describe("AddQuestSheet", () => {
     }
   });
 
-  it("shows campaign creation CTA with inline max cap hint", () => {
+  it("keeps footer extras out of the default mobile sheet", () => {
+    mocks.integrationVisible = true;
+    mocks.defaultProvider = "google";
+    mocks.connections = [{ provider: "google" }];
+
     render(
       <AddQuestSheet
         open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+        onCreateCampaign={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByText(/Name your quest.*Select a time/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("Or create a Campaign")).not.toBeInTheDocument();
+    expect(screen.queryByText("Max 2 active")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Send to .* Calendar after create/i)).not.toBeInTheDocument();
+  });
+
+  it("shows campaign creation CTA with inline max cap hint in the desktop footer", () => {
+    render(
+      <AddQuestSheet
+        open
+        presentation="desktop-panel"
         onOpenChange={vi.fn()}
         selectedDate={selectedDate}
         onAdd={vi.fn().mockResolvedValue(undefined)}
@@ -1184,7 +1209,7 @@ describe("AddQuestSheet", () => {
 
     const inboxButton = screen.getByRole("button", { name: "Add to Inbox instead" });
     expect(inboxButton).toBeDisabled();
-    expect(screen.getByText("Recurring quests must stay scheduled with a time.")).toBeInTheDocument();
+    expect(screen.queryByText("Recurring quests must stay scheduled with a time.")).not.toBeInTheDocument();
 
     fireEvent.click(inboxButton);
 
@@ -1342,6 +1367,7 @@ describe("AddQuestSheet", () => {
       creationSource: "voice",
       reminderEnabled: true,
       reminderMinutesBefore: 30,
+      reminderOffsetsMinutes: [30],
       moreInformation: "Bring roadmap",
       subtasks: ["Draft outline", "Send recap"],
     }));

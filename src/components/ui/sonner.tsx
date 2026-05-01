@@ -5,6 +5,7 @@ import { MAX_TOAST_DURATION_MS, clampToastDuration } from "@/constants/toast";
 
 const dismissTimeouts = new Map<string | number, ReturnType<typeof globalThis.setTimeout>>();
 type PromiseData<T> = NonNullable<Parameters<typeof sonnerToast.promise<T>>[1]>;
+const DEFAULT_BOTTOM_OFFSET = "var(--sonner-bottom-offset, calc(env(safe-area-inset-bottom, 0px) + 16px))";
 
 const capToastOptions = (options?: ExternalToast): ExternalToast => ({
   ...options,
@@ -92,7 +93,7 @@ const toast = Object.assign(
 const Toaster = ({ ...props }: ToasterProps) => {
   // Hardcoded dark theme - removes next-themes dependency that causes iOS WKWebView crash
   const theme = "dark";
-  const { duration, toastOptions, ...restProps } = props;
+  const { duration, toastOptions, offset, mobileOffset, ...restProps } = props;
   const cappedDuration = clampToastDuration(duration);
 
   return (
@@ -101,6 +102,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
       className="toaster group"
       duration={cappedDuration}
       position="bottom-center"
+      offset={offset ?? { bottom: DEFAULT_BOTTOM_OFFSET }}
+      mobileOffset={mobileOffset ?? { bottom: DEFAULT_BOTTOM_OFFSET, left: "1rem", right: "1rem" }}
       pauseWhenPageIsHidden={false}
       swipeDirections={['bottom', 'left', 'right']}
       toastOptions={{

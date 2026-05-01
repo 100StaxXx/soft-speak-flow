@@ -3,6 +3,7 @@ import {
   getDateAnchorForIsoDate,
   getEffectiveDailyDate,
   getEffectiveDailyDateAnchor,
+  getLocalDateOffsetInTimezone,
   getUtcIsoDate,
   normalizeTimezone,
 } from "./effectiveDailyDate.ts";
@@ -30,6 +31,22 @@ Deno.test("getEffectiveDailyDate keeps the current day at or after the 2 AM rese
   const effectiveDate = getEffectiveDailyDate("Pacific/Honolulu", 2, now);
 
   assert(effectiveDate === "2026-03-10", `Expected same day after reset, got ${effectiveDate}`);
+});
+
+Deno.test("getEffectiveDailyDate handles spring DST without skipping two local days", () => {
+  const now = new Date("2026-03-09T04:00:00.000Z");
+  const effectiveDate = getEffectiveDailyDate("America/New_York", 2, now);
+
+  assert(effectiveDate === "2026-03-08", `Expected previous local day after DST jump, got ${effectiveDate}`);
+});
+
+Deno.test("getLocalDateOffsetInTimezone shifts from the target timezone calendar date", () => {
+  const now = new Date("2026-03-10T18:00:00.000Z");
+  const yesterday = getLocalDateOffsetInTimezone("America/Los_Angeles", -1, now);
+  const eventLocalDate = formatDateInTimezone(new Date("2026-03-10T06:00:00.000Z"), "America/Los_Angeles");
+
+  assert(yesterday === "2026-03-09", `Expected local yesterday to be 2026-03-09, got ${yesterday}`);
+  assert(eventLocalDate === yesterday, `Expected UTC event to fall on local yesterday, got ${eventLocalDate}`);
 });
 
 Deno.test("getEffectiveDailyDateAnchor preserves UTC+14 and UTC-10 boundaries", () => {

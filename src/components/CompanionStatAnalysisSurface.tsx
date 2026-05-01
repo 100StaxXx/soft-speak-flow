@@ -1,4 +1,4 @@
-import { type CSSProperties, useMemo, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   BarChart3,
@@ -280,6 +280,121 @@ function LoadingState() {
       </CardContent>
     </Card>
   );
+}
+
+type TitleCardImageGateState = "idle" | "loading" | "loaded" | "failed";
+
+const getTitleCardImageKey = (profileKey: string | null | undefined, imageUrl: string | null | undefined) =>
+  profileKey && imageUrl ? `${profileKey}:${imageUrl}` : null;
+
+function useTitleCardImageGate({
+  analysis,
+  onRegenerateTitleCard,
+}: {
+  analysis: CompanionStatAnalysis;
+  onRegenerateTitleCard: (analysis: CompanionStatAnalysis) => Promise<unknown>;
+}) {
+  const card = analysis.cosmiqTitleCard;
+  const profileKey = card?.profileKey ?? null;
+  const imageUrl = card?.imageUrl ?? null;
+  const imageKey = getTitleCardImageKey(profileKey, imageUrl);
+  const forcedRetryProfileKeysRef = useRef<Set<string>>(new Set());
+  const [loadedImageKey, setLoadedImageKey] = useState<string | null>(null);
+  const [failedImageKey, setFailedImageKey] = useState<string | null>(null);
+  const [imageState, setImageState] = useState<TitleCardImageGateState>("idle");
+
+  useEffect(() => {
+    if (card?.status === "unavailable") {
+      setImageState("failed");
+      setLoadedImageKey(null);
+      return;
+    }
+
+    if (card?.status !== "ready" || !profileKey || !imageUrl || !imageKey) {
+      setImageState("loading");
+      setLoadedImageKey(null);
+      return;
+    }
+
+    if (loadedImageKey === imageKey) {
+      setImageState("loaded");
+      return;
+    }
+
+    let cancelled = false;
+    let settled = false;
+    setImageState("loading");
+    setFailedImageKey(null);
+
+    const preloadImage = new Image();
+    const markLoaded = () => {
+      if (cancelled || settled) return;
+      settled = true;
+      setLoadedImageKey(imageKey);
+      setImageState("loaded");
+    };
+    const markFailed = () => {
+      if (cancelled || settled) return;
+      settled = true;
+      setLoadedImageKey(null);
+
+      if (!forcedRetryProfileKeysRef.current.has(profileKey)) {
+        forcedRetryProfileKeysRef.current.add(profileKey);
+        setImageState("loading");
+        void onRegenerateTitleCard(analysis).catch(() => {
+          if (cancelled) return;
+          setFailedImageKey(imageKey);
+          setImageState("failed");
+        });
+        return;
+      }
+
+      setFailedImageKey(imageKey);
+      setImageState("failed");
+    };
+
+    preloadImage.onload = () => {
+      if (typeof preloadImage.decode === "function") {
+        void preloadImage.decode().then(markLoaded, markFailed);
+        return;
+      }
+      markLoaded();
+    };
+    preloadImage.onerror = markFailed;
+    preloadImage.src = imageUrl;
+
+    if (preloadImage.complete) {
+      if (preloadImage.naturalWidth > 0) {
+        markLoaded();
+      } else {
+        markFailed();
+      }
+    }
+
+    return () => {
+      cancelled = true;
+      preloadImage.onload = null;
+      preloadImage.onerror = null;
+    };
+  }, [analysis, card?.status, imageKey, imageUrl, loadedImageKey, onRegenerateTitleCard, profileKey]);
+
+  const retry = () => {
+    if (!profileKey) return;
+    forcedRetryProfileKeysRef.current.delete(profileKey);
+    setFailedImageKey(null);
+    setImageState("loading");
+    void onRegenerateTitleCard(analysis).catch(() => {
+      setFailedImageKey(imageKey);
+      setImageState("failed");
+    });
+  };
+
+  return {
+    failedImageKey,
+    imageState,
+    isLoaded: card?.status === "ready" && loadedImageKey === imageKey,
+    retry,
+  };
 }
 
 function StatSheetCard({ stat, index }: { stat: CompanionStatCardViewModel; index: number }) {
@@ -808,16 +923,53 @@ function CompanionStatAnalysisView({
   analysis,
   cached,
   isRefreshing,
+  isRegeneratingTitleCard,
   onRefresh,
+  onRegenerateTitleCard,
 }: {
   analysis: CompanionStatAnalysis;
   cached: boolean;
   isRefreshing: boolean;
+  isRegeneratingTitleCard: boolean;
   onRefresh: () => void;
+  onRegenerateTitleCard: (analysis: CompanionStatAnalysis) => Promise<unknown>;
 }) {
   const prefersReducedMotion = useReducedMotion();
   const viewModel = useMemo(() => buildCompanionStatAnalysisViewModel(analysis), [analysis]);
   const [isFlipped, setIsFlipped] = useState(false);
+  const {
+    failedImageKey,
+    imageState,
+    isLoaded: isTitleCardImageLoaded,
+    retry: retryTitleCardImage,
+  } = useTitleCardImageGate({
+    analysis,
+    onRegenerateTitleCard,
+  });
+  const titleCardStatus = analysis.cosmiqTitleCard?.status ?? "generating";
+
+  if (titleCardStatus === "unavailable" || imageState === "failed") {
+    return (
+      <AnalysisUnavailableCard
+        message={
+          failedImageKey
+            ? "We couldn't load the generated title art. Try regenerating it."
+            : "Generated title art is unavailable right now. Try again in a moment."
+        }
+        isRefreshing={isRefreshing || isRegeneratingTitleCard}
+        onRetry={failedImageKey ? retryTitleCardImage : onRefresh}
+      />
+    );
+  }
+
+  if (
+    titleCardStatus !== "ready"
+    || !analysis.cosmiqTitleCard?.imageUrl
+    || !isTitleCardImageLoaded
+    || isRegeneratingTitleCard
+  ) {
+    return <LoadingState />;
+  }
 
   return (
     <motion.div
@@ -848,7 +1000,9 @@ function AnalysisContent() {
     error,
     isLoading,
     isRefreshing,
+    isRegeneratingTitleCard,
     refreshAnalysis,
+    regenerateTitleCard,
   } = useCompanionStatAnalysis({ enabled: true });
   const [renderBoundaryKey, setRenderBoundaryKey] = useState(0);
 
@@ -894,7 +1048,9 @@ function AnalysisContent() {
         analysis={analysis}
         cached={cached}
         isRefreshing={isRefreshing}
+        isRegeneratingTitleCard={isRegeneratingTitleCard}
         onRefresh={handleRefresh}
+        onRegenerateTitleCard={regenerateTitleCard}
       />
     </SectionErrorBoundary>
   );

@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { getEffectiveDailyDate } from "@/utils/timezone";
 
 export interface MorningBriefing {
   id: string;
@@ -23,19 +24,10 @@ export const useMorningBriefing = () => {
   const { user } = useAuth();
   const { profile } = useProfile();
   const queryClient = useQueryClient();
-  const today = useMemo(() => {
-    const timezone = profile?.timezone || "UTC";
-    try {
-      return new Intl.DateTimeFormat("en-CA", {
-        timeZone: timezone,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(new Date());
-    } catch {
-      return new Date().toLocaleDateString("en-CA");
-    }
-  }, [profile?.timezone]);
+  const today = useMemo(
+    () => getEffectiveDailyDate(profile?.timezone ?? undefined),
+    [profile?.timezone],
+  );
 
   // Fetch today's briefing
   const { data: briefing, isLoading, error, refetch } = useQuery({
@@ -43,12 +35,14 @@ export const useMorningBriefing = () => {
     queryFn: async () => {
       if (!user) return null;
       
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('morning_briefings')
         .select('*')
         .eq('user_id', user.id)
         .eq('briefing_date', today)
         .maybeSingle();
+
+      if (error) throw error;
       
       return data as MorningBriefing | null;
     },
@@ -59,13 +53,17 @@ export const useMorningBriefing = () => {
   // Generate a new briefing (only if none exists for today)
   const generateBriefing = useMutation({
     mutationFn: async () => {
+      if (!user?.id) return null;
+
       // Double-check we don't already have one (prevents race conditions)
-      const { data: existing } = await supabase
+      const { data: existing, error: existingError } = await supabase
         .from('morning_briefings')
         .select('id')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .eq('briefing_date', today)
         .maybeSingle();
+
+      if (existingError) throw existingError;
       
       if (existing) {
         // Refetch to get full data
@@ -76,9 +74,9 @@ export const useMorningBriefing = () => {
       const { data, error } = await supabase.functions.invoke('generate-morning-briefing');
       
       if (error) throw error;
-      if (data.error) throw new Error(data.error);
+      if (data?.error) throw new Error(data.error);
       
-      return data.briefing as MorningBriefing;
+      return (data?.briefing ?? null) as MorningBriefing | null;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['morning-briefing'] });

@@ -15,6 +15,14 @@ import {
 } from "@/components/ui/popover";
 import { DIFFICULTY_COLORS, QUEST_FORM_STYLES, getQuestOptionPillClasses } from "@/components/quest-shared";
 import { DurationPickerField, TimePickerField } from "@/components/scheduling";
+import {
+  MAX_QUEST_REMINDER_MINUTES,
+  MAX_QUEST_REMINDER_OFFSETS,
+  formatQuestReminderOffset,
+  getPrimaryQuestReminderOffset,
+  normalizeQuestReminderOffsets,
+  resolveQuestReminderOffsets,
+} from "@/utils/questReminders";
 
 interface AdvancedQuestOptionsProps {
   scheduledTime: string | null;
@@ -33,6 +41,8 @@ interface AdvancedQuestOptionsProps {
   onReminderEnabledChange: (enabled: boolean) => void;
   reminderMinutesBefore: number;
   onReminderMinutesBeforeChange: (minutes: number) => void;
+  reminderOffsetsMinutes?: number[];
+  onReminderOffsetsMinutesChange?: (minutes: number[]) => void;
   moreInformation: string | null;
   onMoreInformationChange: (info: string | null) => void;
   location: string | null;
@@ -110,12 +120,30 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
     props.requireScheduledTimeForRecurrence && !hasScheduledTimeValue(props.scheduledTime),
   );
 
-  const hasPresetReminder = reminderOptions.some((option) => option.value === props.reminderMinutesBefore);
+  const reminderPresetValues = useMemo(
+    () => reminderOptions
+      .map((option) => option.value)
+      .filter((value): value is number => typeof value === "number"),
+    [],
+  );
+  const reminderOffsets = useMemo(
+    () => resolveQuestReminderOffsets({
+      reminderEnabled: props.reminderEnabled,
+      reminderMinutesBefore: props.reminderMinutesBefore,
+      reminderOffsetsMinutes: props.reminderOffsetsMinutes,
+    }),
+    [props.reminderEnabled, props.reminderMinutesBefore, props.reminderOffsetsMinutes],
+  );
+  const selectedReminderOffsets = useMemo(() => new Set(reminderOffsets), [reminderOffsets]);
+  const customReminderOffsets = useMemo(
+    () => reminderOffsets.filter((offset) => !reminderPresetValues.includes(offset)),
+    [reminderOffsets, reminderPresetValues],
+  );
   const reminderTriggerLabel = useMemo(() => {
-    if (!props.reminderEnabled) return "None";
-    const presetOption = reminderOptions.find((option) => option.value === props.reminderMinutesBefore);
-    return presetOption?.label ?? `${props.reminderMinutesBefore} minutes before (Custom)`;
-  }, [props.reminderEnabled, props.reminderMinutesBefore]);
+    if (reminderOffsets.length === 0) return "None";
+    if (reminderOffsets.length === 1) return formatQuestReminderOffset(reminderOffsets[0]);
+    return `${reminderOffsets.length} reminders: ${reminderOffsets.map(formatQuestReminderOffset).join(", ")}`;
+  }, [reminderOffsets]);
   const isQuestSoft = props.visualStyle === "quest-soft";
   const tone = props.taskDifficulty ?? "medium";
   const toneColors = DIFFICULTY_COLORS[tone];
@@ -170,11 +198,10 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
       return;
     }
 
-    if (props.reminderEnabled && !hasPresetReminder && props.reminderMinutesBefore > 0) {
-      setCustomReminderInput(String(props.reminderMinutesBefore));
-      setIsEditingCustomReminder(true);
+    if (customReminderOffsets.length > 0) {
+      setCustomReminderInput(String(customReminderOffsets[0]));
     }
-  }, [hasPresetReminder, props.reminderEnabled, props.reminderMinutesBefore, showReminderOptions]);
+  }, [customReminderOffsets, showReminderOptions]);
 
   const handleSuggestClick = async () => {
     if (!props.selectedDate) return;
@@ -339,15 +366,36 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
     props.onRecurrenceMonthDaysChange(nextDays);
   }, [props]);
 
+  const applyReminderOffsets = useCallback((offsets: readonly unknown[]) => {
+    const normalizedOffsets = normalizeQuestReminderOffsets(offsets);
+    if (props.onReminderOffsetsMinutesChange) {
+      props.onReminderOffsetsMinutesChange(normalizedOffsets);
+      return;
+    }
+
+    props.onReminderEnabledChange(normalizedOffsets.length > 0);
+    props.onReminderMinutesBeforeChange(getPrimaryQuestReminderOffset(normalizedOffsets));
+  }, [props]);
+
+  const toggleReminderOffset = useCallback((minutes: number) => {
+    const isSelected = selectedReminderOffsets.has(minutes);
+    const nextOffsets = isSelected
+      ? reminderOffsets.filter((offset) => offset !== minutes)
+      : [...reminderOffsets, minutes];
+
+    if (!isSelected && reminderOffsets.length >= MAX_QUEST_REMINDER_OFFSETS) return;
+
+    applyReminderOffsets(nextOffsets);
+  }, [applyReminderOffsets, reminderOffsets, selectedReminderOffsets]);
+
   const applyCustomReminder = useCallback(() => {
     const minutes = Number.parseInt(customReminderInput, 10);
-    if (!Number.isFinite(minutes) || minutes <= 0) return;
+    if (!Number.isFinite(minutes) || minutes <= 0 || minutes > MAX_QUEST_REMINDER_MINUTES) return;
 
-    props.onReminderEnabledChange(true);
-    props.onReminderMinutesBeforeChange(minutes);
-    setShowReminderOptions(false);
+    applyReminderOffsets([...reminderOffsets, minutes]);
+    setCustomReminderInput("");
     setIsEditingCustomReminder(false);
-  }, [customReminderInput, props]);
+  }, [applyReminderOffsets, customReminderInput, reminderOffsets]);
 
   const handleCustomReminderKeyDown = useCallback((event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== "Enter") return;
@@ -462,7 +510,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
             <Label className={labelClassName}>Early Reminder</Label>
           </div>
           <p className={helperClassName}>
-            You'll be notified when the quest starts. Add an early reminder for a little breathing room.
+            You'll be notified when the quest starts. Add up to {MAX_QUEST_REMINDER_OFFSETS} early reminders for a little breathing room.
           </p>
 
           <Popover open={showReminderOptions} onOpenChange={setShowReminderOptions}>
@@ -489,18 +537,16 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                     type="button"
                     onClick={() => {
                       if (option.value === "none") {
-                        props.onReminderEnabledChange(false);
+                        applyReminderOffsets([]);
                       } else if (typeof option.value === "number") {
-                        props.onReminderEnabledChange(true);
-                        props.onReminderMinutesBeforeChange(option.value);
+                        toggleReminderOffset(option.value);
                       }
-                      setShowReminderOptions(false);
                       setIsEditingCustomReminder(false);
                     }}
                     className={dropdownItemClassName(
                       option.value === "none"
-                        ? !props.reminderEnabled
-                        : props.reminderEnabled && props.reminderMinutesBefore === option.value
+                        ? reminderOffsets.length === 0
+                        : selectedReminderOffsets.has(option.value)
                     )}
                   >
                     {option.label}
@@ -510,16 +556,19 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                 <button
                   type="button"
                   onClick={() => {
-                    setIsEditingCustomReminder(true);
-                    setCustomReminderInput(
-                      props.reminderEnabled && !hasPresetReminder ? String(props.reminderMinutesBefore || "") : ""
-                    );
+                    setIsEditingCustomReminder((current) => !current);
                   }}
-                  className={dropdownItemClassName(props.reminderEnabled && !hasPresetReminder)}
+                  className={dropdownItemClassName(customReminderOffsets.length > 0)}
                 >
                   Custom
                 </button>
               </div>
+
+              {reminderOffsets.length >= MAX_QUEST_REMINDER_OFFSETS && (
+                <p className={cn("px-2 pt-2 text-xs", isQuestSoft ? "text-[#7f4a1d]/80" : "text-muted-foreground")}>
+                  Limit reached
+                </p>
+              )}
 
               {isEditingCustomReminder && (
                 <div className={cn("mt-1 space-y-2 border-t pt-3 px-2 pb-2", isQuestSoft ? "border-[#6b3416]/20" : "border-border/60")}>
@@ -531,6 +580,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                       id="custom-reminder-minutes"
                       type="number"
                       min={1}
+                      max={MAX_QUEST_REMINDER_MINUTES}
                       inputMode="numeric"
                       value={customReminderInput}
                       onChange={(event) => setCustomReminderInput(event.target.value)}
@@ -542,7 +592,15 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                       type="button"
                       size="sm"
                       onClick={applyCustomReminder}
-                      disabled={!customReminderInput.trim() || Number.parseInt(customReminderInput, 10) <= 0}
+                      disabled={
+                        !customReminderInput.trim()
+                        || Number.parseInt(customReminderInput, 10) <= 0
+                        || Number.parseInt(customReminderInput, 10) > MAX_QUEST_REMINDER_MINUTES
+                        || (
+                          reminderOffsets.length >= MAX_QUEST_REMINDER_OFFSETS
+                          && !selectedReminderOffsets.has(Number.parseInt(customReminderInput, 10))
+                        )
+                      }
                       className={isQuestSoft ? cn("font-fredoka", toneColors.primaryButton) : undefined}
                     >
                       Apply

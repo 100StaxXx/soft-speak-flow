@@ -76,6 +76,7 @@ describe("sanitizePlannerContext", () => {
           title: "Plan my day",
           score: 42,
           reasons: ["due today"],
+          taskId: "task-1",
         },
         {
           id: "priority-bad",
@@ -306,7 +307,7 @@ describe("sanitizePlannerContext", () => {
         {
           id: "ritual:active-habit",
           kind: "ritual",
-          title: "Mobility Flow",
+          title: "Daily Hydration",
           score: 70,
           reasons: ["active ritual"],
           ritualId: "active-habit",
@@ -334,11 +335,159 @@ describe("sanitizePlannerContext", () => {
       expect.objectContaining({ id: "task-active-quest" }),
     ]);
     expect(sanitized.priorityScores).toEqual([
-      expect.objectContaining({ id: "ritual:active-habit" }),
+      expect.objectContaining({
+        id: "ritual:active-habit",
+        title: "Mobility Flow",
+      }),
       expect.objectContaining({ id: "task:task-active-quest" }),
     ]);
     expect(JSON.stringify(sanitized)).not.toContain("Daily Hydration");
     expect(JSON.stringify(sanitized)).not.toContain("deleted-habit");
+  });
+
+  it("drops standalone habit tasks when the source habit is no longer active", () => {
+    const context: CompanionPlannerRequest["plannerContext"] = {
+      tasks: [
+        {
+          id: "task-deleted-standalone-habit",
+          title: "Daily Hydration",
+          taskDate: "2026-04-21",
+          scheduledTime: null,
+          estimatedDuration: 10,
+          recurrencePattern: "daily",
+          habitSourceId: "habit-deleted",
+        },
+        {
+          id: "task-active-standalone-habit",
+          title: "Daily Stretching",
+          taskDate: "2026-04-21",
+          scheduledTime: null,
+          estimatedDuration: 15,
+          recurrencePattern: "daily",
+          habitSourceId: "habit-active",
+        },
+      ] as CompanionPlannerRequest["plannerContext"]["tasks"],
+      inboxTasks: [],
+      activeEpics: [],
+      activeHabitIds: ["habit-active"],
+      rituals: [],
+      calendarEvents: [],
+      priorityScores: [
+        {
+          id: "task:task-deleted-standalone-habit",
+          kind: "task",
+          title: "Daily Hydration",
+          score: 80,
+          reasons: ["stale deleted habit task"],
+          taskId: "task-deleted-standalone-habit",
+        },
+        {
+          id: "task:task-active-standalone-habit",
+          kind: "task",
+          title: "Daily Hydration",
+          score: 75,
+          reasons: ["live habit task"],
+          taskId: "task-active-standalone-habit",
+        },
+      ],
+    };
+
+    const sanitized = sanitizePlannerContext(context);
+
+    expect(sanitized.tasks).toEqual([
+      expect.objectContaining({ id: "task-active-standalone-habit" }),
+    ]);
+    expect(sanitized.priorityScores).toEqual([
+      expect.objectContaining({
+        id: "task:task-active-standalone-habit",
+        title: "Daily Stretching",
+      }),
+    ]);
+    expect(JSON.stringify(sanitized)).not.toContain("Daily Hydration");
+  });
+
+  it("treats an empty active habit scope as authoritative", () => {
+    const context: CompanionPlannerRequest["plannerContext"] = {
+      tasks: [
+        {
+          id: "task-deleted-standalone-habit",
+          title: "Daily Hydration",
+          taskDate: "2026-04-21",
+          scheduledTime: null,
+          estimatedDuration: 10,
+          recurrencePattern: "daily",
+          habitSourceId: "habit-deleted",
+        },
+      ] as CompanionPlannerRequest["plannerContext"]["tasks"],
+      inboxTasks: [],
+      activeEpics: [],
+      activeHabitIds: [],
+      rituals: [],
+      calendarEvents: [],
+      priorityScores: [
+        {
+          id: "task:task-deleted-standalone-habit",
+          kind: "task",
+          title: "Daily Hydration",
+          score: 80,
+          reasons: ["stale deleted habit task"],
+          taskId: "task-deleted-standalone-habit",
+        },
+      ],
+    };
+
+    const sanitized = sanitizePlannerContext(context);
+
+    expect(sanitized.activeHabitIds).toEqual([]);
+    expect(sanitized.tasks).toEqual([]);
+    expect(sanitized.priorityScores).toEqual([]);
+    expect(JSON.stringify(sanitized)).not.toContain("Daily Hydration");
+  });
+
+  it("drops orphan task priority scores without an active task id", () => {
+    const context: CompanionPlannerRequest["plannerContext"] = {
+      tasks: [
+        {
+          id: "task-active",
+          title: "Daily Stretching",
+          taskDate: "2026-04-21",
+          scheduledTime: null,
+          estimatedDuration: 15,
+          recurrencePattern: null,
+        },
+      ] as CompanionPlannerRequest["plannerContext"]["tasks"],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [],
+      calendarEvents: [],
+      priorityScores: [
+        {
+          id: "task:orphan",
+          kind: "task",
+          title: "Daily Hydration",
+          score: 80,
+          reasons: ["stale orphan score"],
+        },
+        {
+          id: "task:task-active",
+          kind: "task",
+          title: "Daily Hydration",
+          score: 75,
+          reasons: ["live task"],
+          taskId: "task-active",
+        },
+      ],
+    };
+
+    const sanitized = sanitizePlannerContext(context);
+
+    expect(sanitized.priorityScores).toEqual([
+      expect.objectContaining({
+        id: "task:task-active",
+        title: "Daily Stretching",
+      }),
+    ]);
+    expect(JSON.stringify(sanitized)).not.toContain("Daily Hydration");
   });
 });
 

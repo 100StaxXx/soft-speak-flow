@@ -66,6 +66,23 @@ function parseIsoDate(date: string): DateParts {
   };
 }
 
+function shiftIsoDate(isoDate: string, dayOffset: number): string {
+  const value = getDateAnchorForIsoDate(isoDate);
+  value.setUTCDate(value.getUTCDate() + dayOffset);
+
+  return value.toISOString().slice(0, 10);
+}
+
+export function getLocalDateOffsetInTimezone(
+  timezoneRaw: string | null | undefined,
+  dayOffset: number,
+  now = new Date(),
+): string {
+  const localDate = formatDateInTimezone(now, timezoneRaw);
+
+  return shiftIsoDate(localDate, dayOffset);
+}
+
 export function getEffectiveDailyDate(
   timezoneRaw: string | null | undefined,
   resetHour = DEFAULT_RESET_HOUR,
@@ -74,14 +91,13 @@ export function getEffectiveDailyDate(
   const timezone = normalizeTimezone(timezoneRaw);
   const safeResetHour = assertValidResetHour(resetHour);
   const localHour = getLocalHour(now, timezone);
+  const localDate = formatDateInTimezone(now, timezone);
 
   if (localHour < safeResetHour) {
-    const yesterday = new Date(now);
-    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-    return formatDateInTimezone(yesterday, timezone);
+    return shiftIsoDate(localDate, -1);
   }
 
-  return formatDateInTimezone(now, timezone);
+  return localDate;
 }
 
 export function getDateAnchorForIsoDate(isoDate: string): Date {

@@ -181,6 +181,9 @@ const MentorTutorialLayer = memo(() => {
 
 MentorTutorialLayer.displayName = "MentorTutorialLayer";
 
+const DEFAULT_SONNER_BOTTOM_OFFSET = "calc(env(safe-area-inset-bottom, 0px) + 16px)";
+const BOTTOM_NAV_SONNER_BOTTOM_OFFSET = "calc(var(--bottom-nav-runtime-offset, var(--bottom-nav-safe-offset)) + 12px)";
+
 const MentorConnectedThemeProvider = memo(({ children }: { children: ReactNode }) => {
   const { mentorId } = useMentorConnection();
 
@@ -298,13 +301,25 @@ const AppContent = memo(() => {
     }
   }, [profileLoading, splashHidden]);
 
+  const activeMainTabPath = isMainTabPath(location.pathname) ? location.pathname : null;
+  const showBottomNav = shouldShowBottomNav(location.pathname, Boolean(session?.user));
+
+  useEffect(() => {
+    const rootStyle = document.documentElement.style;
+    rootStyle.setProperty(
+      "--sonner-bottom-offset",
+      showBottomNav ? BOTTOM_NAV_SONNER_BOTTOM_OFFSET : DEFAULT_SONNER_BOTTOM_OFFSET,
+    );
+
+    return () => {
+      rootStyle.removeProperty("--sonner-bottom-offset");
+    };
+  }, [showBottomNav]);
+
   // Block route rendering until recovery check is complete - prevents paywall flash
   if (!recoveryChecked && window.location.hash.includes('type=recovery')) {
     return <LoadingFallback />;
   }
-  
-  const activeMainTabPath = isMainTabPath(location.pathname) ? location.pathname : null;
-  const showBottomNav = shouldShowBottomNav(location.pathname, Boolean(session?.user));
 
   return (
     <ResilienceProvider>

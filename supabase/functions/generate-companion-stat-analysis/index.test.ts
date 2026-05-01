@@ -168,6 +168,7 @@ const baseAnalysis = {
 function createFreshAnalysisResponseMap(): Record<string, MockResponse[]> {
   return {
     profiles: [{ data: { selected_mentor_id: "mentor-1", timezone: "America/Los_Angeles" }, error: null }],
+    questionnaire_responses: [{ data: null, error: null }],
     user_companion: [{
       data: {
         id: "companion-1",
@@ -289,8 +290,10 @@ Deno.test("generate-companion-stat-analysis refreshes cached title-card state wi
   };
   const supabase = createMockSupabase({
     profiles: [{ data: { selected_mentor_id: "mentor-1", timezone: "America/Los_Angeles" }, error: null }],
+    questionnaire_responses: [{ data: { answer_tags: ["visual_persona_female"] }, error: null }],
     companion_stat_analyses: [{ data: { payload: cachedGeneratingAnalysis }, error: null }],
   });
+  let resolvedVisualPersona = "";
 
   const response = await module.handleGenerateCompanionStatAnalysis(
     new Request("http://localhost", { method: "POST", body: JSON.stringify({}) }),
@@ -301,13 +304,16 @@ Deno.test("generate-companion-stat-analysis refreshes cached title-card state wi
         throw new Error("fetchImpl should not be called for cached responses");
       },
       now: () => new Date("2026-04-19T06:30:00.000Z"),
-      getCosmiqTitleCardCacheState: async () => ({
-        profileKey: "v1-the-oathbound-pathfinder",
-        imageUrl: "https://cdn.example.com/ready.png",
-        status: "ready",
-        cached: true,
-        promptVersion: 1,
-      }),
+      getCosmiqTitleCardCacheState: async ({ visualPersona }) => {
+        resolvedVisualPersona = visualPersona ?? "";
+        return {
+          profileKey: "v1-the-oathbound-pathfinder",
+          imageUrl: "https://cdn.example.com/ready.png",
+          status: "ready",
+          cached: true,
+          promptVersion: 1,
+        };
+      },
     },
   );
 
@@ -317,6 +323,7 @@ Deno.test("generate-companion-stat-analysis refreshes cached title-card state wi
   assertEquals(payload.cached, true, "Cached flag should stay true");
   assertEquals(payload.analysis.cosmiqTitleCard.status, "ready", "Cached response should surface ready card state");
   assertEquals(payload.analysis.cosmiqTitleCard.imageUrl, "https://cdn.example.com/ready.png", "Cached response should refresh image URL");
+  assertEquals(resolvedVisualPersona, "female", "Cached title-card state should use onboarding visual persona");
   assertEquals(supabase.upserts.length, 0, "Cached title-card refresh should not rewrite analysis");
 });
 
@@ -418,6 +425,7 @@ Deno.test("generate-companion-stat-analysis attaches title-card cache state with
     ...createFreshAnalysisResponseMap(),
   });
   let titleCardLookupCount = 0;
+  let resolvedVisualPersona = "";
 
   const response = await module.handleGenerateCompanionStatAnalysis(
     new Request("http://localhost", { method: "POST", body: JSON.stringify({}) }),
@@ -426,8 +434,9 @@ Deno.test("generate-companion-stat-analysis attaches title-card cache state with
       createSupabaseClient: () => supabase,
       fetchImpl: fetch,
       now: () => new Date("2026-04-18T18:30:00.000Z"),
-      getCosmiqTitleCardCacheState: async () => {
+      getCosmiqTitleCardCacheState: async ({ visualPersona }) => {
         titleCardLookupCount += 1;
+        resolvedVisualPersona = visualPersona ?? "";
         return {
           profileKey: "v1-the-oathbound-pathfinder",
           imageUrl: null,
@@ -445,6 +454,7 @@ Deno.test("generate-companion-stat-analysis attaches title-card cache state with
   assertEquals(payload.cached, false, "Fresh response should not be cached");
   assertEquals(payload.analysis.cosmiqTitleCard.status, "generating", "Fresh response should include nonblocking card state");
   assertEquals(titleCardLookupCount, 1, "Fresh response should only perform a cache-state lookup");
+  assertEquals(resolvedVisualPersona, "neutral", "Fresh title-card lookup should default missing visual persona to neutral");
 });
 
 Deno.test("buildCompanionStatAnalysisPayload maps drivers deterministically and stays honest for sparse stats", () => {

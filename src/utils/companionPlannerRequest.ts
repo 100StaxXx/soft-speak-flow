@@ -313,7 +313,16 @@ const scopePlannerTaskToActiveCampaigns = (
   task: PlannerContext["tasks"][number],
   activeEpicIds: ReadonlySet<string>,
   activeRitualIds: ReadonlySet<string>,
+  activeHabitIds: ReadonlySet<string> | null = null,
 ): PlannerContext["tasks"][number] | null => {
+  if (
+    task.habitSourceId &&
+    activeHabitIds &&
+    !activeHabitIds.has(task.habitSourceId)
+  ) {
+    return null;
+  }
+
   if (!task.epicId) {
     return task;
   }
@@ -342,12 +351,14 @@ const scopePlannerTasksToActiveCampaigns = <
   tasks: T[],
   activeEpicIds: ReadonlySet<string>,
   activeRitualIds: ReadonlySet<string>,
+  activeHabitIds: ReadonlySet<string> | null = null,
 ): T[] =>
   tasks.reduce<T[]>((scopedTasks, task) => {
     const scopedTask = scopePlannerTaskToActiveCampaigns(
       task,
       activeEpicIds,
       activeRitualIds,
+      activeHabitIds,
     );
     if (scopedTask) {
       scopedTasks.push(scopedTask as T);
@@ -358,14 +369,23 @@ const scopePlannerTasksToActiveCampaigns = <
 const scopePlannerRitualsToActiveCampaigns = (
   rituals: PlannerContext["rituals"],
   activeEpicIds: ReadonlySet<string>,
+  activeHabitIds: ReadonlySet<string> | null = null,
 ): PlannerContext["rituals"] =>
-  rituals.filter((ritual) => activeEpicIds.has(ritual.epicId));
+  rituals.filter((ritual) =>
+    activeEpicIds.has(ritual.epicId) &&
+    (!activeHabitIds || activeHabitIds.has(ritual.id))
+  );
 
 const scopePriorityScoresToActiveCampaigns = (
   priorityScores: NonNullable<PlannerContext["priorityScores"]>,
   activeEpicIds: ReadonlySet<string>,
   activeRitualIds: ReadonlySet<string>,
   activeTaskIds: ReadonlySet<string>,
+  titleMaps: {
+    activeEpicTitleById?: ReadonlyMap<string, string>;
+    activeRitualTitleById?: ReadonlyMap<string, string>;
+    activeTaskTitleById?: ReadonlyMap<string, string>;
+  } = {},
 ): NonNullable<PlannerContext["priorityScores"]> =>
   priorityScores.reduce<NonNullable<PlannerContext["priorityScores"]>>(
     (scopedScores, score) => {
@@ -376,25 +396,40 @@ const scopePriorityScoresToActiveCampaigns = (
           score.epicId &&
           activeEpicIds.has(score.epicId)
         ) {
-          scopedScores.push(score);
+          scopedScores.push({
+            ...score,
+            title: titleMaps.activeRitualTitleById?.get(score.ritualId) ??
+              score.title,
+          });
         }
         return scopedScores;
       }
 
       if (score.kind === "epic") {
         if (score.epicId && activeEpicIds.has(score.epicId)) {
-          scopedScores.push(score);
+          scopedScores.push({
+            ...score,
+            title: titleMaps.activeEpicTitleById?.get(score.epicId) ??
+              score.title,
+          });
         }
         return scopedScores;
       }
 
       if (score.kind === "task") {
-        if (score.taskId && !activeTaskIds.has(score.taskId)) {
-          return scopedScores;
+        if (score.taskId && activeTaskIds.has(score.taskId)) {
+          const canonicalScore = {
+            ...score,
+            title: titleMaps.activeTaskTitleById?.get(score.taskId) ??
+              score.title,
+          };
+          scopedScores.push(
+            canonicalScore.epicId && !activeEpicIds.has(canonicalScore.epicId)
+              ? { ...canonicalScore, epicId: null }
+              : canonicalScore,
+          );
         }
-        if (!score.taskId && score.epicId) {
-          return scopedScores;
-        }
+        return scopedScores;
       }
 
       if (!score.epicId || activeEpicIds.has(score.epicId)) {
@@ -912,6 +947,20 @@ export const sanitizePlannerContext = (
       Boolean(entry)
     );
   const activeEpicIds = new Set(activeEpics.map((epic) => epic.id));
+  const activeHabitIdsList = asStringArray(context.activeHabitIds);
+  const pendingLocalTaskIds = asStringArray(context.pendingLocalTaskIds);
+  const pendingLocalEpicIds = asStringArray(context.pendingLocalEpicIds);
+  const pendingLocalHabitIds = asStringArray(context.pendingLocalHabitIds);
+  const activeHabitScopeIds = [
+    ...(activeHabitIdsList ?? []),
+    ...(pendingLocalHabitIds ?? []),
+  ];
+  const hasKnownHabitScope =
+    activeHabitIdsList !== undefined ||
+    pendingLocalHabitIds !== undefined;
+  const activeHabitIds = hasKnownHabitScope
+    ? new Set(activeHabitScopeIds)
+    : null;
   const rituals = scopePlannerRitualsToActiveCampaigns(
     context.rituals
       .map(sanitizeRitual)
@@ -919,6 +968,7 @@ export const sanitizePlannerContext = (
         Boolean(entry)
       ),
     activeEpicIds,
+    activeHabitIds,
   );
   const activeRitualIds = new Set(rituals.map((ritual) => ritual.id));
   const tasks = scopePlannerTasksToActiveCampaigns(
@@ -929,6 +979,7 @@ export const sanitizePlannerContext = (
       ),
     activeEpicIds,
     activeRitualIds,
+    activeHabitIds,
   );
   const inboxTasks = scopePlannerTasksToActiveCampaigns(
     context.inboxTasks
@@ -938,6 +989,7 @@ export const sanitizePlannerContext = (
       ),
     activeEpicIds,
     activeRitualIds,
+    activeHabitIds,
   );
   const recentCompletedTasks = scopePlannerTasksToActiveCampaigns(
     (context.recentCompletedTasks ?? [])
@@ -947,12 +999,24 @@ export const sanitizePlannerContext = (
       >[number] => Boolean(entry)),
     activeEpicIds,
     activeRitualIds,
+    activeHabitIds,
   );
   const activeTaskIds = new Set([
     ...tasks,
     ...inboxTasks,
     ...recentCompletedTasks,
   ].map((task) => task.id));
+  const activeTaskTitleById = new Map([
+    ...tasks,
+    ...inboxTasks,
+    ...recentCompletedTasks,
+  ].map((task) => [task.id, task.title]));
+  const activeEpicTitleById = new Map(
+    activeEpics.map((epic) => [epic.id, epic.title]),
+  );
+  const activeRitualTitleById = new Map(
+    rituals.map((ritual) => [ritual.id, ritual.title]),
+  );
   const priorityScores = scopePriorityScoresToActiveCampaigns(
     (context.priorityScores ?? [])
       .map(sanitizePriorityScore)
@@ -962,6 +1026,11 @@ export const sanitizePlannerContext = (
     activeEpicIds,
     activeRitualIds,
     activeTaskIds,
+    {
+      activeEpicTitleById,
+      activeRitualTitleById,
+      activeTaskTitleById,
+    },
   );
 
   return {
@@ -969,6 +1038,10 @@ export const sanitizePlannerContext = (
     inboxTasks,
     recentCompletedTasks,
     activeEpics,
+    ...(activeHabitIdsList ? { activeHabitIds: activeHabitIdsList } : {}),
+    ...(pendingLocalTaskIds ? { pendingLocalTaskIds } : {}),
+    ...(pendingLocalEpicIds ? { pendingLocalEpicIds } : {}),
+    ...(pendingLocalHabitIds ? { pendingLocalHabitIds } : {}),
     rituals,
     calendarEvents: context.calendarEvents
       .map(sanitizeCalendarEvent)
@@ -993,6 +1066,10 @@ export const summarizePlannerContextForDebug = (context: PlannerContext) => ({
   inboxTasks: context.inboxTasks.length,
   recentCompletedTasks: context.recentCompletedTasks?.length ?? 0,
   activeEpics: context.activeEpics.length,
+  activeHabitIds: context.activeHabitIds?.length ?? 0,
+  pendingLocalTaskIds: context.pendingLocalTaskIds?.length ?? 0,
+  pendingLocalEpicIds: context.pendingLocalEpicIds?.length ?? 0,
+  pendingLocalHabitIds: context.pendingLocalHabitIds?.length ?? 0,
   rituals: context.rituals.length,
   calendarEvents: context.calendarEvents.length,
   contactsNeedingAttention: context.contactsNeedingAttention?.length ?? 0,

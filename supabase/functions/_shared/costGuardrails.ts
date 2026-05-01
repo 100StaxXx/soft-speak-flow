@@ -16,7 +16,7 @@ export type CostEventStatus = "success" | "error" | "blocked";
 export type CostAlertType = "threshold" | "anomaly";
 
 type JsonObject = Record<string, unknown>;
-type SupabaseClientLike = any;
+export type SupabaseClientLike = any;
 
 interface GuardrailScopeKey {
   scopeType: CostScopeType;

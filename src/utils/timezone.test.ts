@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getEffectiveDailyDate, getEffectiveMissionDate } from "./timezone";
+import {
+  getEffectiveDailyDate,
+  getEffectiveDayOfWeek,
+  getEffectiveMissionDate,
+  getUserTimezone,
+} from "./timezone";
 
 describe("getEffectiveMissionDate", () => {
   afterEach(() => {
@@ -36,5 +41,38 @@ describe("getEffectiveMissionDate", () => {
 
     expect(getEffectiveDailyDate("America/Los_Angeles")).toBe("2026-03-09");
     expect(getEffectiveDailyDate("UTC")).toBe("2026-03-10");
+  });
+
+  it("subtracts from the target timezone calendar date before reset", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-29T22:00:00Z"));
+
+    expect(getEffectiveDailyDate("Europe/Berlin")).toBe("2026-03-29");
+    expect(getEffectiveDayOfWeek("Europe/Berlin")).toBe(0);
+  });
+
+  it("handles offset-boundary dates without using the device timezone", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-01T15:00:00Z"));
+
+    expect(getEffectiveDailyDate("Asia/Tokyo")).toBe("2026-11-01");
+  });
+
+  it("falls back to UTC for date math when no timezone is provided", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-10T08:30:00Z"));
+
+    expect(getEffectiveDailyDate()).toBe(getEffectiveDailyDate("UTC"));
+  });
+
+  it("uses the device timezone for mission helpers when no timezone is provided", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-10T08:30:00Z"));
+
+    expect(getEffectiveMissionDate()).toBe(getEffectiveDailyDate(getUserTimezone()));
+  });
+
+  it("still exposes the device timezone for profile bootstrapping", () => {
+    expect(getUserTimezone()).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
   });
 });

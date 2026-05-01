@@ -11,6 +11,7 @@ import {
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "./costGuardrails.ts";
+import type { OnboardingVisualPersona } from "../../../src/shared/onboardingVisualPersona.ts";
 
 installOpenAICompatibilityShim();
 
@@ -23,12 +24,15 @@ interface ResolveCosmiqTitleCardParams {
   supabase: any;
   userId: string;
   analysis: CompanionStatAnalysis;
+  visualPersona?: OnboardingVisualPersona;
+  forceRefresh?: boolean;
   fetchImpl?: typeof fetch;
 }
 
 interface GetCosmiqTitleCardCacheStateParams {
   supabase: any;
   analysis: CompanionStatAnalysis;
+  visualPersona?: OnboardingVisualPersona;
 }
 
 interface BeginGenerationRow {
@@ -56,15 +60,22 @@ const toCachedCardRow = (value: unknown): CachedCardRow | null =>
     ? value as CachedCardRow
     : null;
 
-const buildProfileKey = (analysis: CompanionStatAnalysis) =>
+const buildProfileKey = (
+  analysis: CompanionStatAnalysis,
+  visualPersona: OnboardingVisualPersona = "neutral",
+) =>
   buildCompanionCosmiqTitleCardProfileKey({
     cosmiqTitle: analysis.cosmiqTitle,
     statBreakdowns: analysis.statBreakdowns,
     promptVersion: COSMIQ_TITLE_CARD_PROMPT_VERSION,
+    visualPersona,
   });
 
-export const buildPendingCosmiqTitleCard = (analysis: CompanionStatAnalysis): CompanionCosmiqTitleCard => ({
-  profileKey: buildProfileKey(analysis),
+export const buildPendingCosmiqTitleCard = (
+  analysis: CompanionStatAnalysis,
+  visualPersona: OnboardingVisualPersona = "neutral",
+): CompanionCosmiqTitleCard => ({
+  profileKey: buildProfileKey(analysis, visualPersona),
   imageUrl: null,
   status: "generating",
   cached: false,
@@ -82,8 +93,9 @@ const buildUnavailableCard = (profileKey: string): CompanionCosmiqTitleCard => (
 export async function getCosmiqTitleCardCacheState({
   supabase,
   analysis,
+  visualPersona = "neutral",
 }: GetCosmiqTitleCardCacheStateParams): Promise<CompanionCosmiqTitleCard> {
-  const pending = buildPendingCosmiqTitleCard(analysis);
+  const pending = buildPendingCosmiqTitleCard(analysis, visualPersona);
 
   const { data, error } = await supabase
     .from("companion_cosmiq_title_cards")
@@ -159,7 +171,20 @@ const fetchWithTimeout = async (
   }
 };
 
-const buildPrompt = (analysis: CompanionStatAnalysis) => {
+const getVisualPersonaPromptLine = (visualPersona: OnboardingVisualPersona) => {
+  if (visualPersona === "male") {
+    return "Visual persona: portray the archetype as a masculine-presenting male fantasy character/avatar.";
+  }
+  if (visualPersona === "female") {
+    return "Visual persona: portray the archetype as a feminine-presenting female fantasy character/avatar.";
+  }
+  return "Visual persona: portray the archetype as a non-gendered or androgynous fantasy character/avatar.";
+};
+
+const buildPrompt = (
+  analysis: CompanionStatAnalysis,
+  visualPersona: OnboardingVisualPersona,
+) => {
   const title = analysis.cosmiqTitle;
   const dominant = title.dominantStat;
   const secondary = title.secondaryStat;
@@ -176,6 +201,7 @@ Fusion title: ${title.fusion ? "yes" : "no"}
 
 Art direction:
 - Single heroic fantasy character/avatar representing the title archetype, not a specific real person
+- ${getVisualPersonaPromptLine(visualPersona)}
 - Cosmic fantasy style, premium collectible card art, luminous but readable silhouette
 - Full-body or three-quarter character portrait, centered, portrait orientation
 - Include visual motifs for ${dominant} and ${secondary}; subtly hint at ${rebalance} as a path of growth
@@ -225,15 +251,18 @@ export async function resolveCosmiqTitleCard({
   supabase,
   userId,
   analysis,
+  visualPersona = "neutral",
+  forceRefresh = false,
   fetchImpl = fetch,
 }: ResolveCosmiqTitleCardParams): Promise<CompanionCosmiqTitleCard> {
-  const pending = buildPendingCosmiqTitleCard(analysis);
+  const pending = buildPendingCosmiqTitleCard(analysis, visualPersona);
   const { profileKey } = pending;
   const unavailable = () => buildUnavailableCard(profileKey);
 
   const { data: beginData, error: beginError } = await supabase.rpc("begin_cosmiq_title_card_generation", {
     p_profile_key: profileKey,
     p_prompt_version: COSMIQ_TITLE_CARD_PROMPT_VERSION,
+    p_visual_persona: visualPersona,
     p_title: analysis.cosmiqTitle.title,
     p_rarity: analysis.cosmiqTitle.rarity,
     p_momentum: analysis.cosmiqTitle.momentum,
@@ -245,6 +274,7 @@ export async function resolveCosmiqTitleCard({
       .map((breakdown) => `${breakdown.attribute}:${breakdown.band}`)
       .sort()
       .join("|"),
+    p_force_refresh: forceRefresh,
   });
 
   if (beginError) {
@@ -313,7 +343,7 @@ export async function resolveCosmiqTitleCard({
         },
         body: JSON.stringify({
           model: "google/gemini-2.5-flash-image-preview",
-          messages: [{ role: "user", content: buildPrompt(analysis) }],
+          messages: [{ role: "user", content: buildPrompt(analysis, visualPersona) }],
           modalities: ["image", "text"],
         }),
       },
@@ -337,7 +367,8 @@ export async function resolveCosmiqTitleCard({
       throw new Error("Generated image was not returned as a data URL");
     }
 
-    const storagePath = `${COSMIQ_TITLE_CARD_PROMPT_VERSION}/${profileKey}.${parsedImage.extension}`;
+    const storageKey = forceRefresh ? `${profileKey}__${crypto.randomUUID()}` : profileKey;
+    const storagePath = `${COSMIQ_TITLE_CARD_PROMPT_VERSION}/${storageKey}.${parsedImage.extension}`;
     const { error: uploadError } = await supabase.storage
       .from(COSMIQ_TITLE_CARD_BUCKET)
       .upload(storagePath, parsedImage.bytes, {

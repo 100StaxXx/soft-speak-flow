@@ -24,6 +24,7 @@ import { scanPaginatedRows } from "./pagination.ts";
 import { getCheckinReminderUrl } from "./reflectionNavigation.ts";
 import {
   buildTaskNotificationCandidates,
+  buildTaskNotificationScanDateRange,
   type TaskCandidateRow,
   type TaskProfileRow,
 } from "./taskNotifications.ts";
@@ -204,7 +205,8 @@ serve(async (req) => {
 
     const maxPep = parseIntEnv("NOTIFICATIONS_V2_PEP_SCAN_LIMIT", 300);
     const maxQuote = parseIntEnv("NOTIFICATIONS_V2_QUOTE_SCAN_LIMIT", 300);
-    const maxTask = parseIntEnv("NOTIFICATIONS_V2_TASK_SCAN_LIMIT", 400);
+    const taskPageSize = parseIntEnv("NOTIFICATIONS_V2_TASK_SCAN_LIMIT", 400);
+    const queueInsertBatchSize = parseIntEnv("NOTIFICATIONS_V2_QUEUE_INSERT_BATCH_SIZE", 500);
     const maxHabit = parseIntEnv("NOTIFICATIONS_V2_HABIT_SCAN_LIMIT", 200);
     const maxContact = parseIntEnv("NOTIFICATIONS_V2_CONTACT_SCAN_LIMIT", 200);
     const maxNudge = parseIntEnv("NOTIFICATIONS_V2_NUDGE_SCAN_LIMIT", 200);
@@ -214,9 +216,10 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const now = new Date();
     const nowIso = now.toISOString();
-    const todayIso = nowIso.slice(0, 10);
-    const yesterdayIso = new Date(now.getTime() - 24 * 60 * 60_000).toISOString().slice(0, 10);
-    const tomorrowIso = new Date(now.getTime() + 24 * 60 * 60_000).toISOString().slice(0, 10);
+    const {
+      startDateIso: taskScanStartIso,
+      endDateIso: taskScanEndIso,
+    } = buildTaskNotificationScanDateRange(now);
 
     const inserts: QueueInsertRow[] = [];
     const createdSources = {
@@ -230,6 +233,20 @@ serve(async (req) => {
     let generatedDailyQuotes = 0;
     let queuedTaskStarts = 0;
     let queuedTaskReminders = 0;
+    let taskCandidatesScanned = 0;
+    let queuedRowsAttempted = 0;
+
+    const flushQueueInserts = async () => {
+      while (inserts.length > 0) {
+        const batch = inserts.splice(0, Math.max(1, queueInsertBatchSize));
+        const { error: insertError } = await supabase
+          .from("push_notification_queue")
+          .upsert(batch, { onConflict: "dedupe_key", ignoreDuplicates: true });
+
+        if (insertError) throw insertError;
+        queuedRowsAttempted += batch.length;
+      }
+    };
 
     let dailyProfilesScanned = 0;
 
@@ -582,46 +599,64 @@ serve(async (req) => {
     }
 
     // 3) Task start + reminder notifications
-    const { data: taskCandidates, error: taskError } = await supabase
-      .from("daily_tasks")
-      .select("id, user_id, task_text, xp_reward, task_date, scheduled_time, start_notification_sent, reminder_enabled, reminder_sent, reminder_minutes_before, completed")
-      .in("task_date", [yesterdayIso, todayIso, tomorrowIso])
-      .eq("completed", false)
-      .not("scheduled_time", "is", null)
-      .limit(maxTask);
+    await scanPaginatedRows<TaskCandidateRow>({
+      pageSize: taskPageSize,
+      fetchPage: async (afterId, pageSize) => {
+        let query = supabase
+          .from("daily_tasks")
+          .select("id, user_id, task_text, xp_reward, task_date, scheduled_time, start_notification_sent, reminder_enabled, reminder_sent, reminder_minutes_before, reminder_offsets_minutes, reminder_sent_offsets_minutes, completed")
+          .gte("task_date", taskScanStartIso)
+          .lte("task_date", taskScanEndIso)
+          .eq("completed", false)
+          .not("scheduled_time", "is", null)
+          .order("id", { ascending: true })
+          .limit(pageSize);
 
-    if (taskError) throw taskError;
+        if (afterId) {
+          query = query.gt("id", afterId);
+        }
 
-    const taskUserIds = [...new Set((taskCandidates ?? []).map((row) => row.user_id as string))];
-    const taskProfiles = taskUserIds.length > 0
-      ? (await supabase
-        .from("profiles")
-        .select("id, timezone, task_reminders_enabled")
-        .in("id", taskUserIds)).data as TaskProfileRow[] | null
-      : [];
-    const taskProfileByUser = new Map((taskProfiles ?? []).map((row) => [row.id, row]));
+        const { data, error } = await query;
+        if (error) throw error;
+        return (data as TaskCandidateRow[] | null) ?? [];
+      },
+      processPage: async (taskCandidates) => {
+        taskCandidatesScanned += taskCandidates.length;
 
-    for (const taskNotification of buildTaskNotificationCandidates({
-      tasks: (taskCandidates ?? []) as TaskCandidateRow[],
-      profilesByUser: taskProfileByUser,
-      now,
-    })) {
-      if (taskNotification.type === "task_start") {
-        queuedTaskStarts += 1;
-      } else if (taskNotification.type === "task_reminder") {
-        queuedTaskReminders += 1;
-      }
+        const taskUserIds = [...new Set(taskCandidates.map((row) => row.user_id as string))];
+        const taskProfiles = taskUserIds.length > 0
+          ? (await supabase
+            .from("profiles")
+            .select("id, timezone, task_reminders_enabled")
+            .in("id", taskUserIds)).data as TaskProfileRow[] | null
+          : [];
+        const taskProfileByUser = new Map((taskProfiles ?? []).map((row) => [row.id, row]));
 
-      inserts.push(rowForQueue({
-        userId: taskNotification.userId,
-        type: taskNotification.type,
-        sourceTable: "daily_tasks",
-        sourceId: taskNotification.sourceId,
-        dedupeKey: taskNotification.dedupeKey,
-        scheduledFor: taskNotification.scheduledFor,
-        payload: taskNotification.payload,
-      }));
-    }
+        for (const taskNotification of buildTaskNotificationCandidates({
+          tasks: taskCandidates,
+          profilesByUser: taskProfileByUser,
+          now,
+        })) {
+          if (taskNotification.type === "task_start") {
+            queuedTaskStarts += 1;
+          } else if (taskNotification.type === "task_reminder") {
+            queuedTaskReminders += 1;
+          }
+
+          inserts.push(rowForQueue({
+            userId: taskNotification.userId,
+            type: taskNotification.type,
+            sourceTable: "daily_tasks",
+            sourceId: taskNotification.sourceId,
+            dedupeKey: taskNotification.dedupeKey,
+            scheduledFor: taskNotification.scheduledFor,
+            payload: taskNotification.payload,
+          }));
+        }
+
+        await flushQueueInserts();
+      },
+    });
 
     // 4) Habit reminders
     const { data: habitCandidates, error: habitError } = await supabase
@@ -875,18 +910,12 @@ serve(async (req) => {
       },
     });
 
-    if (inserts.length > 0) {
-      const { error: insertError } = await supabase
-        .from("push_notification_queue")
-        .upsert(inserts, { onConflict: "dedupe_key", ignoreDuplicates: true });
-
-      if (insertError) throw insertError;
-    }
+    await flushQueueInserts();
 
     return new Response(
       JSON.stringify({
         success: true,
-        queued: inserts.length,
+        queued: queuedRowsAttempted,
         created_sources: createdSources,
         generated_content: {
           daily_quote: generatedDailyQuotes,
@@ -896,7 +925,7 @@ serve(async (req) => {
           daily_profiles: dailyProfilesScanned,
           daily_pep: duePepPushes?.length ?? 0,
           daily_quote: dueQuotePushes?.length ?? 0,
-          tasks: taskCandidates?.length ?? 0,
+          tasks: taskCandidatesScanned,
           task_start_candidates: queuedTaskStarts,
           task_reminder_candidates: queuedTaskReminders,
           habits: habitCandidates?.length ?? 0,

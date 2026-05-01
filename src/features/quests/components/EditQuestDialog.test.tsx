@@ -302,6 +302,43 @@ describe("EditQuestDialog", () => {
     );
   });
 
+  it("saves multiple early reminder offsets", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <EditQuestDialog
+        task={legacyTask}
+        open
+        onOpenChange={vi.fn()}
+        onSave={onSave}
+        isSaving={false}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "None" }));
+    fireEvent.click(screen.getByRole("button", { name: "1 hour before" }));
+    await waitFor(() => {
+      expect(screen.getAllByRole("button", { name: "1 hour before" }).some(
+        (button) => button.getAttribute("aria-haspopup") === "dialog",
+      )).toBe(true);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "10 minutes before" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledTimes(1);
+    });
+
+    expect(onSave).toHaveBeenCalledWith(
+      "task-1",
+      expect.objectContaining({
+        reminder_enabled: true,
+        reminder_minutes_before: 10,
+        reminder_offsets_minutes: [10, 60],
+      }),
+    );
+  });
+
   it("keeps time picker scrolling local and does not call scrollIntoView", () => {
     vi.useFakeTimers();
     const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;

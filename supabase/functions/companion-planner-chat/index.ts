@@ -18,6 +18,7 @@ import {
   type ParsedInputHint,
   type PlannerBuildInput,
   type PlannerSessionState,
+  scopePlannerInputContext,
 } from "./planner.ts";
 import {
   buildOrchestratedPlannerResponse,
@@ -36,6 +37,7 @@ import {
   runPlannerStageWithTimeout,
   UPCOMING_AI_TIMEOUT_MS,
 } from "./latencyBudget.ts";
+import { validateAndPrunePlannerContext } from "./plannerContextValidator.ts";
 
 const getClassificationHint = async (
   req: Request,
@@ -173,7 +175,16 @@ serve(async (req) => {
       normalizePlannerClassificationHint(parsed.data.classificationHint),
     );
 
-    const plannerInput = {
+    const parsedPlannerContext = parsed.data
+      .plannerContext as unknown as PlannerBuildInput["plannerContext"];
+    const validatorClient = createCostGuardrailSupabaseClient();
+    const validatedPlannerContext = await validateAndPrunePlannerContext(
+      validatorClient,
+      protectedRequest.auth.userId,
+      parsedPlannerContext,
+    );
+
+    const plannerInput = scopePlannerInputContext({
       message: parsed.data.message,
       currentDate: parsed.data.currentDate,
       currentDateTime: parsed.data.currentDateTime,
@@ -185,9 +196,9 @@ serve(async (req) => {
       parsedInput: (parsed.data.parsedInput as ParsedInputHint | undefined) ??
         null,
       classificationHint,
-      plannerContext: parsed.data.plannerContext,
+      plannerContext: validatedPlannerContext,
       activeDayPlan: parsed.data.activeDayPlan ?? null,
-    } satisfies PlannerBuildInput;
+    } satisfies PlannerBuildInput);
 
     const result = buildPlannerResponse(plannerInput);
     const textNormalizationOptions = {

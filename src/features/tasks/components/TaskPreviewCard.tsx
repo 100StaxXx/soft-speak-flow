@@ -241,7 +241,11 @@ export function TaskPreviewCard({
             {parsed.reminderEnabled && parsed.reminderMinutesBefore && (
               <MetaBadge 
                 icon={Bell} 
-                label={formatReminderTime(parsed.reminderMinutesBefore)} 
+                label={
+                  (parsed.reminderOffsetsMinutes?.length ?? 0) > 1
+                    ? `${parsed.reminderOffsetsMinutes.length} reminders`
+                    : formatReminderTime(parsed.reminderMinutesBefore)
+                }
                 colorClass="text-amber-500 bg-amber-500/10"
               />
             )}

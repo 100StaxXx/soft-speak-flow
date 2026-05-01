@@ -1657,7 +1657,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(screen.queryByRole("button", { name: /drag to reschedule/i })).not.toBeInTheDocument();
   });
 
-  it("routes the visible companion launcher through the planner entry callback", () => {
+  it("routes the empty-state add quest CTA through the planner entry callback", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1679,11 +1679,12 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    const launcher = screen.getByRole("button", { name: /Chat with companion/i });
+    const launcher = within(screen.getByTestId("empty-state-pane")).getByRole("button", { name: /Add Quest/i });
     fireEvent.click(launcher);
 
     expect(onOpenCompanionPlanner).toHaveBeenCalledTimes(1);
     expect(launcher).toHaveAttribute("data-tour", "add-quest-launcher");
+    expect(screen.getByText("New quest")).toBeInTheDocument();
   });
 
   it("adds mobile timeline clearance for the stacked quest launchers", () => {

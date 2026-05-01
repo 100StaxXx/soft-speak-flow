@@ -235,6 +235,28 @@ export async function loadLocalHabitCompletions(userId: string, date: string): P
   return getLocalHabitCompletionsForDate<HabitCompletion>(userId, date);
 }
 
+async function pruneOrphanedLocalTasks(
+  userId: string,
+  validEpicIds: ReadonlySet<string>,
+): Promise<void> {
+  // Remote snapshot applies are already gated by an empty queue; re-check before pruning
+  // so local-only queued creations are never mistaken for server orphans.
+  if ((await getPendingActionCount(userId)) !== 0) return;
+
+  const tasks = await getAllLocalTasksForUser<DailyTask>(userId);
+  const tasksToDetach = tasks
+    .filter((task) => Boolean(task.epic_id && !validEpicIds.has(task.epic_id)))
+    .map((task) => ({
+      ...task,
+      epic_id: null,
+      epic_title: null,
+    }));
+
+  if (tasksToDetach.length > 0) {
+    await upsertPlannerRecords("daily_tasks", tasksToDetach);
+  }
+}
+
 export async function syncLocalHabitsFromRemote(userId: string, today: string): Promise<void> {
   const syncEpoch = getPlannerRemoteSyncEpoch(userId);
   if (!(await canSyncPlannerFromRemote(userId))) {
@@ -427,6 +449,8 @@ export async function syncLocalEpicsFromRemote(userId: string): Promise<void> {
     if (habitsToUpsert.length > 0) {
       await upsertPlannerRecords("habits", habitsToUpsert);
     }
+
+    await pruneOrphanedLocalTasks(userId, new Set(epicIds));
   });
 }
 

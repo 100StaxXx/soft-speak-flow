@@ -710,6 +710,54 @@ describe("TodaysPepTalk transcript expand behavior", () => {
     });
   });
 
+  it("does not leave fallback refreshes in the recording state after rate limits", async () => {
+    const generationDeferred = createDeferred<InvokeResult>();
+    mocks.state.todayPepTalk = null;
+    mocks.state.fallbackPepTalk = makePepTalk({
+      id: "pep-talk-fallback",
+      for_date: "2026-02-19",
+      title: "Yesterday's Message",
+    });
+    mocks.state.generationResponse = generationDeferred.promise;
+    const wasRecordingWhenToastFired: boolean[] = [];
+    mocks.toastError.mockImplementationOnce(() => {
+      wasRecordingWhenToastFired.push(screen.queryByText("Recording...") !== null);
+    });
+
+    renderComponent();
+
+    fireEvent.click(await screen.findByRole("button", { name: /refresh today's/i }));
+
+    expect(await screen.findByText("Recording...", {}, { timeout: 2_000 })).toBeInTheDocument();
+
+    await act(async () => {
+      generationDeferred.resolve({
+        data: null,
+        error: {
+          name: "FunctionsHttpError",
+          message: "Edge Function returned a non-2xx status code",
+          context: new Response(
+            JSON.stringify({ error: "Rate limit exceeded", retryAfterSeconds: 45 }),
+            {
+              status: 429,
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+        },
+      });
+      await generationDeferred.promise;
+    });
+
+    await waitFor(() => {
+      expect(mocks.toastError).toHaveBeenCalled();
+      expect(mocks.toastError.mock.calls.at(-1)?.[0]).toContain("45 seconds");
+      expect(wasRecordingWhenToastFired).toEqual([false]);
+    });
+
+    expect(screen.queryByText("Recording...")).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /refresh today's/i })).toBeEnabled();
+  });
+
   it("refetches when the mentor tab becomes active again", async () => {
     const rendered = renderComponent();
 
@@ -772,6 +820,48 @@ describe("TodaysPepTalk transcript expand behavior", () => {
     rendered.rerenderComponent();
 
     expect(await screen.findByText("Fresh Server Result")).toBeInTheDocument();
+  });
+
+  it("ignores duplicate refresh taps while a pep talk request is already running", async () => {
+    const generationDeferred = createDeferred<InvokeResult>();
+    const oldFallback = makePepTalk({
+      id: "pep-talk-old-fallback",
+      for_date: "2026-02-19",
+      title: "Yesterday's Message",
+    });
+    const generatedPepTalk = makePepTalk({
+      id: "pep-talk-generated",
+      title: "Refreshed Message",
+    });
+
+    mocks.state.todayPepTalk = null;
+    mocks.state.fallbackPepTalk = oldFallback;
+    mocks.state.generationResponse = generationDeferred.promise;
+
+    renderComponent();
+
+    const refreshButton = await screen.findByRole("button", { name: /refresh today's/i });
+    fireEvent.click(refreshButton);
+    fireEvent.click(refreshButton);
+
+    await waitFor(() => {
+      const generationCalls = mocks.supabase.functions.invoke.mock.calls.filter(
+        ([functionName]) => functionName === "generate-single-daily-pep-talk",
+      );
+      expect(generationCalls).toHaveLength(1);
+    });
+
+    mocks.state.todayPepTalk = generatedPepTalk;
+
+    await act(async () => {
+      generationDeferred.resolve({
+        data: { pepTalk: generatedPepTalk },
+        error: null,
+      });
+      await generationDeferred.promise;
+    });
+
+    expect(await screen.findByText("Refreshed Message")).toBeInTheDocument();
   });
 
   it("keeps pep talk XP retriable after a failed award attempt", async () => {

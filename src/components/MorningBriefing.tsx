@@ -18,6 +18,10 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import {
+  parseFunctionInvokeError,
+  toUserFacingFunctionError,
+} from "@/utils/supabaseFunctionErrors";
 
 interface MorningBriefingProps {
   onAskMore?: (context: string, actionPrompt: string) => void;
@@ -31,6 +35,8 @@ export const MorningBriefing = memo(({ onAskMore, className }: MorningBriefingPr
   const { 
     briefing, 
     isLoading, 
+    error: briefingError,
+    refetch: refetchBriefing,
     generateBriefing, 
     dismissBriefing,
     markViewed,
@@ -39,6 +45,7 @@ export const MorningBriefing = memo(({ onAskMore, className }: MorningBriefingPr
   
   const [showFull, setShowFull] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [lastErrorMessage, setLastErrorMessage] = useState<string | null>(null);
 
   // Mark as viewed when component mounts with a briefing
   useEffect(() => {
@@ -46,6 +53,12 @@ export const MorningBriefing = memo(({ onAskMore, className }: MorningBriefingPr
       markViewed.mutate(briefing.id);
     }
   }, [briefing?.id]);
+
+  useEffect(() => {
+    if (briefingError) {
+      console.error("Failed to load morning briefing:", briefingError);
+    }
+  }, [briefingError]);
 
   // Start collapsed if already dismissed
   useEffect(() => {
@@ -56,12 +69,18 @@ export const MorningBriefing = memo(({ onAskMore, className }: MorningBriefingPr
 
   const handleGenerate = async () => {
     try {
+      setLastErrorMessage(null);
       await generateBriefing.mutateAsync();
     } catch (error) {
       console.error('Failed to generate briefing:', error);
+      const parsedError = await parseFunctionInvokeError(error);
+      const message = toUserFacingFunctionError(parsedError, {
+        action: "prepare your briefing",
+      });
+      setLastErrorMessage(message);
       toast({
         title: "Couldn't prepare briefing",
-        description: error instanceof Error ? error.message : "Please try again later",
+        description: message,
         variant: "destructive",
       });
     }
@@ -185,28 +204,53 @@ export const MorningBriefing = memo(({ onAskMore, className }: MorningBriefingPr
               </div>
             )}
             <div className="w-full space-y-4 text-center">
-              <p className="text-sm text-muted-foreground">
-                Get personalized insights from {personality?.name || 'your guide'} based on your activity
-              </p>
-              <Button
-                onClick={handleGenerate}
-                disabled={isGenerating}
-                variant="gradient"
-                className="w-full h-10 sm:h-12"
-                size="lg"
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Analyzing your progress...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-5 w-5" />
-                    Prepare My Briefing
-                  </>
-                )}
-              </Button>
+              {briefingError ? (
+                <div className="rounded-xl border border-destructive/35 bg-destructive/10 px-3 py-2 text-left">
+                  <p className="text-sm font-medium text-destructive">Couldn't load today's briefing.</p>
+                  <p className="mt-1 text-xs leading-relaxed text-destructive/90">
+                    Please try again before preparing a new briefing.
+                  </p>
+                  <Button
+                    onClick={() => void refetchBriefing()}
+                    variant="outline"
+                    className="mt-3 w-full"
+                  >
+                    Try Again
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Get personalized insights from {personality?.name || 'your guide'} based on your activity
+                  </p>
+                  <Button
+                    onClick={handleGenerate}
+                    disabled={isGenerating}
+                    variant="gradient"
+                    className="w-full h-10 sm:h-12"
+                    size="lg"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Analyzing your progress...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-5 w-5" />
+                        Prepare My Briefing
+                      </>
+                    )}
+                  </Button>
+                  {lastErrorMessage && (
+                    <div className="rounded-xl border border-destructive/35 bg-destructive/10 px-3 py-2 text-left">
+                      <p className="text-xs font-medium leading-relaxed text-destructive">
+                        {lastErrorMessage}
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
