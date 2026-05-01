@@ -1022,6 +1022,7 @@ async function applyRemoteCampaignRitualDelete(
     .from("daily_tasks")
     .update({
       epic_id: null,
+      epic_title: null,
       habit_source_id: null,
     })
     .eq("habit_source_id", habitId)
@@ -1043,6 +1044,12 @@ async function applyRemoteCampaignRitualDelete(
     .eq("habit_id", habitId)
     .eq("user_id", userId);
   if (completionError) throw completionError;
+
+  const { error: linkDeleteError } = await supabase
+    .from("epic_habits")
+    .delete()
+    .in("id", matchingLinks.map((link) => link.id));
+  if (linkDeleteError) throw linkDeleteError;
 
   const { error: habitError } = await supabase
     .from("habits")

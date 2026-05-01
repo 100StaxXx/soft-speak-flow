@@ -425,6 +425,14 @@ Deno.test("orchestration preserves context-protected dashed titles in fallback r
       ...baseInput(),
       plannerContext: {
         ...baseInput().plannerContext,
+        tasks: [{
+          id: "task-budget-review",
+          title: "Budget - review",
+          taskDate: "2026-04-18",
+          scheduledTime: null,
+          estimatedDuration: 20,
+          recurrencePattern: null,
+        }],
         priorityScores: [{
           id: "task:task-budget-review",
           kind: "task",

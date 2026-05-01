@@ -283,6 +283,7 @@ export const serializeTaskToPlannerContext = (task: {
   completed_at?: string | null;
   priority?: string | null;
   source?: string | null;
+  habit_source_id?: string | null;
   epic_id?: string | null;
   epic_title?: string | null;
 }): PlannerContextTask => ({
@@ -303,6 +304,7 @@ export const serializeTaskToPlannerContext = (task: {
   completedAt: task.completed_at ?? null,
   priority: task.priority ?? null,
   source: task.source ?? null,
+  habitSourceId: task.habit_source_id ?? null,
   epicId: task.epic_id ?? null,
   epicTitle: task.epic_title ?? null,
 });

@@ -962,8 +962,16 @@ const serializeTaskContext = (task: {
 const scopeTaskToActiveCampaigns = (
   task: PlannerContextTask,
   activeEpicIds: ReadonlySet<string>,
+  activeRitualIds: ReadonlySet<string>,
 ): PlannerContextTask | null => {
-  if (!task.epicId || activeEpicIds.has(task.epicId)) {
+  if (!task.epicId) {
+    return task;
+  }
+
+  if (activeEpicIds.has(task.epicId)) {
+    if (task.habitSourceId && !activeRitualIds.has(task.habitSourceId)) {
+      return null;
+    }
     return task;
   }
 
@@ -981,9 +989,14 @@ const scopeTaskToActiveCampaigns = (
 const scopeTasksToActiveCampaigns = (
   tasks: PlannerContextTask[],
   activeEpicIds: ReadonlySet<string>,
+  activeRitualIds: ReadonlySet<string>,
 ): PlannerContextTask[] =>
   tasks.reduce<PlannerContextTask[]>((scopedTasks, task) => {
-    const scopedTask = scopeTaskToActiveCampaigns(task, activeEpicIds);
+    const scopedTask = scopeTaskToActiveCampaigns(
+      task,
+      activeEpicIds,
+      activeRitualIds,
+    );
     if (scopedTask) {
       scopedTasks.push(scopedTask);
     }
@@ -1596,6 +1609,10 @@ export function useCompanionPlanner({
     () => mapRitualsToContext(activeEpics),
     [activeEpics],
   );
+  const activeRitualIds = useMemo(
+    () => new Set(baseRituals.map((ritual) => ritual.id)),
+    [baseRituals],
+  );
   const durationHistoryStartIso = `${format(addDays(today, -59), "yyyy-MM-dd")}T00:00:00.000Z`;
 
   const ritualsQuery = useQuery({
@@ -1636,32 +1653,36 @@ export function useCompanionPlanner({
     () => scopeTasksToActiveCampaigns(
       activeTasks.map(serializeTaskContext),
       activeEpicIds,
+      activeRitualIds,
     ),
-    [activeEpicIds, activeTasks],
+    [activeEpicIds, activeRitualIds, activeTasks],
   );
 
   const contextPlannerTasks = useMemo(
     () => scopeTasksToActiveCampaigns(
       contextTasks.map(serializeTaskContext),
       activeEpicIds,
+      activeRitualIds,
     ),
-    [activeEpicIds, contextTasks],
+    [activeEpicIds, activeRitualIds, contextTasks],
   );
 
   const inboxPlannerTasks = useMemo(
     () => scopeTasksToActiveCampaigns(
       inboxTasks.map(serializeTaskContext),
       activeEpicIds,
+      activeRitualIds,
     ),
-    [activeEpicIds, inboxTasks],
+    [activeEpicIds, activeRitualIds, inboxTasks],
   );
 
   const recentCompletedPlannerTasks = useMemo(
     () => scopeTasksToActiveCampaigns(
       (recentCompletedTasksQuery.data ?? []).map(serializeTaskContext),
       activeEpicIds,
+      activeRitualIds,
     ),
-    [activeEpicIds, recentCompletedTasksQuery.data],
+    [activeEpicIds, activeRitualIds, recentCompletedTasksQuery.data],
   );
 
   const plannerMemory = useMemo<PlannerMemoryProfile>(() => {
@@ -2521,14 +2542,17 @@ export function useCompanionPlanner({
           tasks: scopeTasksToActiveCampaigns(
             mergedPlannerContext.tasks,
             activeEpicIds,
+            activeRitualIds,
           ),
           inboxTasks: scopeTasksToActiveCampaigns(
             mergedPlannerContext.inboxTasks,
             activeEpicIds,
+            activeRitualIds,
           ),
           recentCompletedTasks: scopeTasksToActiveCampaigns(
             mergedPlannerContext.recentCompletedTasks ?? [],
             activeEpicIds,
+            activeRitualIds,
           ),
         },
       );
@@ -2754,6 +2778,7 @@ export function useCompanionPlanner({
   }, [
     activeEpicIds,
     activeEpics,
+    activeRitualIds,
     appendAssistantTurn,
     careSignals,
     classify,

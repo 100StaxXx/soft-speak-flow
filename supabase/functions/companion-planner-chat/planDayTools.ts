@@ -4,6 +4,7 @@ import {
   buildPlanDayLoadReason,
   formatScheduleReference,
   getActiveCampaignIdSet,
+  getActiveCampaignRitualIdSet,
   getPlanDayAtRiskCampaignFacts,
   getPlanDayLoadBreakdown,
   getPlanDayLoadFacts,
@@ -486,13 +487,16 @@ export const buildPlanDayToolUserPrompt = (
   const dateLabel = formatScheduleReference(input.currentDate, targetDate);
   const ctx = input.plannerContext;
   const activeCampaignIds = getActiveCampaignIdSet(input);
+  const activeCampaignRitualIds = getActiveCampaignRitualIdSet(input);
   const scopedTasks = scopePlannerTasksToActiveCampaigns(
     ctx.tasks,
     activeCampaignIds,
+    activeCampaignRitualIds,
   );
   const scopedInboxTasks = scopePlannerTasksToActiveCampaigns(
     ctx.inboxTasks,
     activeCampaignIds,
+    activeCampaignRitualIds,
   );
   const scopedRituals = scopePlannerRitualsToActiveCampaigns(
     ctx.rituals,

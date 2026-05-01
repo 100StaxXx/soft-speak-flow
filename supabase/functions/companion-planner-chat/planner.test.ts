@@ -1619,6 +1619,56 @@ Deno.test("plan_day no-room copy explains hidden campaign ritual load", () => {
           estimatedDuration: 15,
         }),
       ],
+      rituals: [
+        {
+          id: "habit-meal-prep",
+          title: "Weekly Meal Prep",
+          epicId: "epic-muscle",
+          epicTitle: "Gain 10 pounds of muscle",
+          frequency: "weekly",
+          preferredTime: null,
+        },
+        {
+          id: "habit-progress",
+          title: "Progress Tracking",
+          epicId: "epic-muscle",
+          epicTitle: "Gain 10 pounds of muscle",
+          frequency: "daily",
+          preferredTime: null,
+        },
+        {
+          id: "habit-strength",
+          title: "Strength Session",
+          epicId: "epic-muscle",
+          epicTitle: "Gain 10 pounds of muscle",
+          frequency: "daily",
+          preferredTime: null,
+        },
+        {
+          id: "habit-protein",
+          title: "Protein Check",
+          epicId: "epic-muscle",
+          epicTitle: "Gain 10 pounds of muscle",
+          frequency: "daily",
+          preferredTime: null,
+        },
+        {
+          id: "habit-hydration",
+          title: "Hydration Check",
+          epicId: "epic-muscle",
+          epicTitle: "Gain 10 pounds of muscle",
+          frequency: "daily",
+          preferredTime: null,
+        },
+        {
+          id: "habit-recovery",
+          title: "Recovery Stretch",
+          epicId: "epic-muscle",
+          epicTitle: "Gain 10 pounds of muscle",
+          frequency: "daily",
+          preferredTime: null,
+        },
+      ],
       scheduleInsights: {
         horizon: "day",
         selectedDate: "2026-04-18",
@@ -1745,6 +1795,15 @@ Deno.test("plan_day tool prompt strips stale campaign ritual context", () => {
           epicTitle: "Gain 10 pounds of muscle",
           estimatedDuration: 20,
         }),
+        plannerTask({
+          id: "stale-active-ritual",
+          title: "Daily Hydration",
+          taskDate: "2026-04-18",
+          habitSourceId: "habit-hydration",
+          epicId: "epic-active",
+          epicTitle: "Active Campaign",
+          estimatedDuration: 5,
+        }),
       ],
       inboxTasks: [
         plannerTask({
@@ -1781,6 +1840,24 @@ Deno.test("plan_day tool prompt strips stale campaign ritual context", () => {
           ritualId: "habit-hydration",
           epicId: null,
         },
+        {
+          id: "ritual:active-hydration",
+          kind: "ritual",
+          title: "Daily Hydration",
+          score: 87,
+          reasons: ["stale active campaign ritual score"],
+          ritualId: "habit-hydration",
+          epicId: "epic-active",
+        },
+        {
+          id: "task:stale-active-ritual",
+          kind: "task",
+          title: "Daily Hydration",
+          score: 86,
+          reasons: ["stale active campaign ritual task"],
+          taskId: "stale-active-ritual",
+          epicId: "epic-active",
+        },
       ],
     },
   });
@@ -1799,6 +1876,8 @@ Deno.test("plan_day tool prompt strips stale campaign ritual context", () => {
   assertEquals(planDayContext.pendingTasksToday[0]?.epicTitle, null);
   assertEquals(planDayContext.inboxTasks[0]?.epicTitle, null);
   assertEquals(planDayContext.rituals.length, 0);
+  assertEquals(planDayContext.loadFacts.ritualCount, 0);
+  assertEquals(planDayContext.loadReason.includes("campaign habit"), false);
   assertEquals(JSON.stringify(prompt).includes("Gain 10 pounds of muscle"), false);
   assertEquals(protectedData.includes("Daily Hydration"), false);
   assertEquals(protectedData.includes("Gain 10 pounds of muscle"), false);

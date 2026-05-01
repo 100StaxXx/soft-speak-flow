@@ -225,6 +225,121 @@ describe("sanitizePlannerContext", () => {
     expect(JSON.stringify(sanitized)).not.toContain("Daily Hydration");
     expect(JSON.stringify(sanitized)).not.toContain("Gain 10 pounds of muscle");
   });
+
+  it("drops deleted ritual tasks and scores even when their campaign is still active", () => {
+    const context: CompanionPlannerRequest["plannerContext"] = {
+      tasks: [
+        {
+          id: "task-deleted-ritual",
+          title: "Daily Hydration",
+          taskDate: "2026-04-21",
+          scheduledTime: null,
+          estimatedDuration: 10,
+          recurrencePattern: "daily",
+          epicId: "epic-active",
+          epicTitle: "Active Campaign",
+          habitSourceId: "deleted-habit",
+        },
+        {
+          id: "task-active-ritual",
+          title: "Mobility Flow",
+          taskDate: "2026-04-21",
+          scheduledTime: null,
+          estimatedDuration: 15,
+          recurrencePattern: "daily",
+          epicId: "epic-active",
+          epicTitle: "Active Campaign",
+          habitSourceId: "active-habit",
+        },
+        {
+          id: "task-active-quest",
+          title: "Campaign admin",
+          taskDate: "2026-04-21",
+          scheduledTime: null,
+          estimatedDuration: 20,
+          recurrencePattern: null,
+          epicId: "epic-active",
+          epicTitle: "Active Campaign",
+          habitSourceId: null,
+        },
+      ] as CompanionPlannerRequest["plannerContext"]["tasks"],
+      inboxTasks: [],
+      activeEpics: [
+        {
+          id: "epic-active",
+          title: "Active Campaign",
+          endDate: "2026-05-01",
+          progressPercentage: 20,
+        },
+      ],
+      rituals: [
+        {
+          id: "active-habit",
+          epicId: "epic-active",
+          epicTitle: "Active Campaign",
+          title: "Mobility Flow",
+          frequency: "daily",
+          preferredTime: "08:00",
+          currentStreak: 2,
+        },
+      ],
+      calendarEvents: [],
+      priorityScores: [
+        {
+          id: "task:task-deleted-ritual",
+          kind: "task",
+          title: "Daily Hydration",
+          score: 80,
+          reasons: ["stale cached ritual task"],
+          taskId: "task-deleted-ritual",
+          epicId: "epic-active",
+        },
+        {
+          id: "ritual:deleted-habit",
+          kind: "ritual",
+          title: "Daily Hydration",
+          score: 75,
+          reasons: ["stale cached ritual score"],
+          ritualId: "deleted-habit",
+          epicId: "epic-active",
+        },
+        {
+          id: "ritual:active-habit",
+          kind: "ritual",
+          title: "Mobility Flow",
+          score: 70,
+          reasons: ["active ritual"],
+          ritualId: "active-habit",
+          epicId: "epic-active",
+        },
+        {
+          id: "task:task-active-quest",
+          kind: "task",
+          title: "Campaign admin",
+          score: 65,
+          reasons: ["active campaign quest"],
+          taskId: "task-active-quest",
+          epicId: "epic-active",
+        },
+      ],
+      aiSignals: {
+        commonContexts: [],
+      },
+    };
+
+    const sanitized = sanitizePlannerContext(context);
+
+    expect(sanitized.tasks).toEqual([
+      expect.objectContaining({ id: "task-active-ritual" }),
+      expect.objectContaining({ id: "task-active-quest" }),
+    ]);
+    expect(sanitized.priorityScores).toEqual([
+      expect.objectContaining({ id: "ritual:active-habit" }),
+      expect.objectContaining({ id: "task:task-active-quest" }),
+    ]);
+    expect(JSON.stringify(sanitized)).not.toContain("Daily Hydration");
+    expect(JSON.stringify(sanitized)).not.toContain("deleted-habit");
+  });
 });
 
 describe("sanitizePlannerSessionState", () => {

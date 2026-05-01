@@ -312,8 +312,16 @@ const sanitizeRitual = (
 const scopePlannerTaskToActiveCampaigns = (
   task: PlannerContext["tasks"][number],
   activeEpicIds: ReadonlySet<string>,
+  activeRitualIds: ReadonlySet<string>,
 ): PlannerContext["tasks"][number] | null => {
-  if (!task.epicId || activeEpicIds.has(task.epicId)) {
+  if (!task.epicId) {
+    return task;
+  }
+
+  if (activeEpicIds.has(task.epicId)) {
+    if (task.habitSourceId && !activeRitualIds.has(task.habitSourceId)) {
+      return null;
+    }
     return task;
   }
 
@@ -333,11 +341,13 @@ const scopePlannerTasksToActiveCampaigns = <
 >(
   tasks: T[],
   activeEpicIds: ReadonlySet<string>,
+  activeRitualIds: ReadonlySet<string>,
 ): T[] =>
   tasks.reduce<T[]>((scopedTasks, task) => {
     const scopedTask = scopePlannerTaskToActiveCampaigns(
       task,
       activeEpicIds,
+      activeRitualIds,
     );
     if (scopedTask) {
       scopedTasks.push(scopedTask as T);
@@ -354,14 +364,37 @@ const scopePlannerRitualsToActiveCampaigns = (
 const scopePriorityScoresToActiveCampaigns = (
   priorityScores: NonNullable<PlannerContext["priorityScores"]>,
   activeEpicIds: ReadonlySet<string>,
+  activeRitualIds: ReadonlySet<string>,
+  activeTaskIds: ReadonlySet<string>,
 ): NonNullable<PlannerContext["priorityScores"]> =>
   priorityScores.reduce<NonNullable<PlannerContext["priorityScores"]>>(
     (scopedScores, score) => {
-      if (score.kind === "ritual" || score.kind === "epic" || score.ritualId) {
+      if (score.kind === "ritual" || score.ritualId) {
+        if (
+          score.ritualId &&
+          activeRitualIds.has(score.ritualId) &&
+          score.epicId &&
+          activeEpicIds.has(score.epicId)
+        ) {
+          scopedScores.push(score);
+        }
+        return scopedScores;
+      }
+
+      if (score.kind === "epic") {
         if (score.epicId && activeEpicIds.has(score.epicId)) {
           scopedScores.push(score);
         }
         return scopedScores;
+      }
+
+      if (score.kind === "task") {
+        if (score.taskId && !activeTaskIds.has(score.taskId)) {
+          return scopedScores;
+        }
+        if (!score.taskId && score.epicId) {
+          return scopedScores;
+        }
       }
 
       if (!score.epicId || activeEpicIds.has(score.epicId)) {
@@ -879,30 +912,6 @@ export const sanitizePlannerContext = (
       Boolean(entry)
     );
   const activeEpicIds = new Set(activeEpics.map((epic) => epic.id));
-  const tasks = scopePlannerTasksToActiveCampaigns(
-    context.tasks
-      .map(sanitizeTaskLikeEntry)
-      .filter((entry): entry is PlannerContext["tasks"][number] =>
-        Boolean(entry)
-      ),
-    activeEpicIds,
-  );
-  const inboxTasks = scopePlannerTasksToActiveCampaigns(
-    context.inboxTasks
-      .map(sanitizeTaskLikeEntry)
-      .filter((entry): entry is PlannerContext["inboxTasks"][number] =>
-        Boolean(entry)
-      ),
-    activeEpicIds,
-  );
-  const recentCompletedTasks = scopePlannerTasksToActiveCampaigns(
-    (context.recentCompletedTasks ?? [])
-      .map(sanitizeTaskLikeEntry)
-      .filter((entry): entry is NonNullable<
-        PlannerContext["recentCompletedTasks"]
-      >[number] => Boolean(entry)),
-    activeEpicIds,
-  );
   const rituals = scopePlannerRitualsToActiveCampaigns(
     context.rituals
       .map(sanitizeRitual)
@@ -911,6 +920,39 @@ export const sanitizePlannerContext = (
       ),
     activeEpicIds,
   );
+  const activeRitualIds = new Set(rituals.map((ritual) => ritual.id));
+  const tasks = scopePlannerTasksToActiveCampaigns(
+    context.tasks
+      .map(sanitizeTaskLikeEntry)
+      .filter((entry): entry is PlannerContext["tasks"][number] =>
+        Boolean(entry)
+      ),
+    activeEpicIds,
+    activeRitualIds,
+  );
+  const inboxTasks = scopePlannerTasksToActiveCampaigns(
+    context.inboxTasks
+      .map(sanitizeTaskLikeEntry)
+      .filter((entry): entry is PlannerContext["inboxTasks"][number] =>
+        Boolean(entry)
+      ),
+    activeEpicIds,
+    activeRitualIds,
+  );
+  const recentCompletedTasks = scopePlannerTasksToActiveCampaigns(
+    (context.recentCompletedTasks ?? [])
+      .map(sanitizeTaskLikeEntry)
+      .filter((entry): entry is NonNullable<
+        PlannerContext["recentCompletedTasks"]
+      >[number] => Boolean(entry)),
+    activeEpicIds,
+    activeRitualIds,
+  );
+  const activeTaskIds = new Set([
+    ...tasks,
+    ...inboxTasks,
+    ...recentCompletedTasks,
+  ].map((task) => task.id));
   const priorityScores = scopePriorityScoresToActiveCampaigns(
     (context.priorityScores ?? [])
       .map(sanitizePriorityScore)
@@ -918,6 +960,8 @@ export const sanitizePlannerContext = (
         PlannerContext["priorityScores"]
       >[number] => Boolean(entry)),
     activeEpicIds,
+    activeRitualIds,
+    activeTaskIds,
   );
 
   return {

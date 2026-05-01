@@ -1581,9 +1581,27 @@ describe("useCompanionPlanner", () => {
       epic_id: "epic-active",
       epic_title: "Active Campaign",
     };
+    const staleActiveDeletedRitual = {
+      ...staleRitual,
+      id: "stale-active-deleted-ritual",
+      task_text: "Daily Hydration",
+      habit_source_id: "habit-deleted",
+      epic_id: "epic-active",
+      epic_title: "Active Campaign",
+    };
     mocks.activeEpics = [activeCampaign];
-    mocks.todayTasks = [staleRitual, staleQuest, activeRitual];
-    mocks.weekTasks = [staleRitual, staleQuest, activeRitual];
+    mocks.todayTasks = [
+      staleRitual,
+      staleQuest,
+      activeRitual,
+      staleActiveDeletedRitual,
+    ];
+    mocks.weekTasks = [
+      staleRitual,
+      staleQuest,
+      activeRitual,
+      staleActiveDeletedRitual,
+    ];
     mocks.invoke.mockResolvedValue({
       data: {
         mode: "schedule_read",
@@ -1631,6 +1649,7 @@ describe("useCompanionPlanner", () => {
     expect(plannerContext.tasks).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: "stale-ritual" }),
+        expect.objectContaining({ id: "stale-active-deleted-ritual" }),
       ]),
     );
     expect(plannerContext.activeEpics).toEqual([
@@ -1654,9 +1673,11 @@ describe("useCompanionPlanner", () => {
     expect(plannerContext.priorityScores).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: "task:stale-ritual" }),
+        expect.objectContaining({ id: "task:stale-active-deleted-ritual" }),
         expect.objectContaining({ epicId: "epic-deleted" }),
       ]),
     );
+    expect(JSON.stringify(plannerContext)).not.toContain("Daily Hydration");
   });
 
   it("falls back to backend classification when client-side classification preflight times out", async () => {

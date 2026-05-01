@@ -7,6 +7,7 @@ import {
   formatScheduleReference,
   getPlanDayAtRiskCampaignFacts,
   getActiveCampaignIdSet,
+  getActiveCampaignRitualIdSet,
   getPlanDayLoadBreakdown,
   getPlanDayLoadFacts,
   getPlanDayTargetDate,
@@ -250,17 +251,26 @@ const buildUserPrompt = (
   baseResult: PlannerBuildResult,
 ) => {
   const activeCampaignIds = getActiveCampaignIdSet(input);
+  const activeCampaignRitualIds = getActiveCampaignRitualIdSet(input);
   const scopedTasks = scopePlannerTasksToActiveCampaigns(
     input.plannerContext.tasks,
     activeCampaignIds,
+    activeCampaignRitualIds,
   );
   const scopedInboxTasks = scopePlannerTasksToActiveCampaigns(
     input.plannerContext.inboxTasks,
     activeCampaignIds,
+    activeCampaignRitualIds,
   );
+  const activeTaskIds = new Set([
+    ...scopedTasks,
+    ...scopedInboxTasks,
+  ].map((task) => task.id));
   const scopedPriorityScores = scopePlannerPriorityScoresToActiveCampaigns(
     input.plannerContext.priorityScores ?? [],
     activeCampaignIds,
+    activeCampaignRitualIds,
+    activeTaskIds,
   );
 
   return JSON.stringify({
