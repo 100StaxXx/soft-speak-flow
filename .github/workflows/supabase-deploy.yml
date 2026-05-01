@@ -318,6 +318,8 @@ jobs:
         run: supabase db push --linked --password "$SUPABASE_DB_PASSWORD" --yes --include-all
 
       - name: Deno check Outlook functions
+        env:
+          DENO_NO_PACKAGE_JSON: "1"
         run: |
           set -euo pipefail
           deno check supabase/functions/outlook-calendar-auth/index.ts
@@ -325,6 +327,8 @@ jobs:
           deno check supabase/functions/outlook-todo-tasks/index.ts
 
       - name: Deno test Outlook sync helpers
+        env:
+          DENO_NO_PACKAGE_JSON: "1"
         run: |
           set -euo pipefail
           deno test supabase/functions/outlook-calendar-events/index.test.ts
