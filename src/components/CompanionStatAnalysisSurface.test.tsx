@@ -59,6 +59,7 @@ vi.mock("framer-motion", () => ({
       variants: _variants,
       initial: _initial,
       animate: _animate,
+      transition: _transition,
       ...props
     }: HTMLAttributes<HTMLDivElement> & Record<string, unknown>) => (
       <div
@@ -74,6 +75,7 @@ vi.mock("framer-motion", () => ({
       variants: _variants,
       initial: _initial,
       animate: _animate,
+      transition: _transition,
       ...props
     }: HTMLAttributes<HTMLDetailsElement> & Record<string, unknown>) => (
       <details
@@ -300,6 +302,10 @@ describe("CompanionStatAnalysisSurface", () => {
     expect(screen.getByTestId("drawer-root")).toBeInTheDocument();
     expect(screen.getByTestId("companion-stats-analysis-drawer")).toBeInTheDocument();
     expect(screen.getByTestId("companion-cosmiq-title-card")).toBeInTheDocument();
+    expect(screen.getByAltText("The Oathbound Pathfinder archetype illustration")).toHaveAttribute(
+      "src",
+      "https://example.com/cosmiq-card.png",
+    );
     expect(screen.getByText("Cosmiq Title")).toBeInTheDocument();
     expect(screen.getByText("The Oathbound Pathfinder")).toBeInTheDocument();
     expect(screen.getByText("New Title Unlocked")).toBeInTheDocument();
@@ -447,7 +453,12 @@ describe("CompanionStatAnalysisSurface", () => {
       />,
     );
 
-    expect(screen.getByText("Revealing your title")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-title-art-loading")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-title-art-placeholder")).toBeInTheDocument();
+    expect(screen.getByText("Generating title art")).toBeInTheDocument();
+    expect(screen.getByText("The Oathbound Pathfinder")).toBeInTheDocument();
+    expect(screen.getByText("Discipline")).toBeInTheDocument();
+    expect(screen.getByText("Alignment")).toBeInTheDocument();
     expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
   });
 
@@ -462,7 +473,10 @@ describe("CompanionStatAnalysisSurface", () => {
       />,
     );
 
-    expect(screen.getByText("Revealing your title")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-title-art-loading")).toBeInTheDocument();
+    expect(screen.getByText("Art preview received")).toBeInTheDocument();
+    const preview = screen.getByTestId("companion-title-art-loading-preview");
+    expect(preview.querySelector("img")?.getAttribute("src")).toBe("https://example.com/cosmiq-card.png");
     expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
   });
 

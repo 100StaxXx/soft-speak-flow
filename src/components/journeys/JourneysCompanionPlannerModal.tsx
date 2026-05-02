@@ -95,6 +95,7 @@ type JourneysCompanionDrawerLayout = {
 
 const MOBILE_DRAWER_HEIGHT_MIN_PX = 320;
 const MOBILE_DRAWER_HEIGHT_MAX_PX = 736;
+const MOBILE_DRAWER_HANDLE_SPACE_PX = 22;
 const MOBILE_DRAWER_VIEWPORT_OFFSET_PX = 24;
 const TRANSCRIPT_BOTTOM_THRESHOLD_PX = 96;
 
@@ -317,14 +318,21 @@ const getDrawerLayout = (): JourneysCompanionDrawerLayout => {
       : 0;
   const visibleViewportBottom = viewportOffsetTop + safeViewportHeight;
   const bottomInset = Math.max(0, window.innerHeight - visibleViewportBottom);
+  const availableShellHeight = Math.max(
+    0,
+    safeViewportHeight -
+      MOBILE_DRAWER_VIEWPORT_OFFSET_PX -
+      MOBILE_DRAWER_HANDLE_SPACE_PX,
+  );
+  const boundedShellHeight = Math.min(
+    MOBILE_DRAWER_HEIGHT_MAX_PX,
+    availableShellHeight,
+  );
 
   return {
     shellHeight: Math.max(
-      MOBILE_DRAWER_HEIGHT_MIN_PX,
-      Math.min(
-        MOBILE_DRAWER_HEIGHT_MAX_PX,
-        safeViewportHeight - MOBILE_DRAWER_VIEWPORT_OFFSET_PX,
-      ),
+      Math.min(MOBILE_DRAWER_HEIGHT_MIN_PX, availableShellHeight),
+      boundedShellHeight,
     ),
     bottomInset,
   };
@@ -1324,8 +1332,14 @@ const JourneysCompanionOverlayBody = memo(({
           </ScrollArea>
 
           <div
-            className={cn(plannerPathfinderTheme.footerBar, "p-3")}
+            className={cn(
+              plannerPathfinderTheme.footerBar,
+              "p-3",
+              isDrawerPresentation &&
+                "pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))]",
+            )}
             data-tutorial-avoid="true"
+            data-testid="journeys-companion-planner-footer"
           >
             {assistant.isRecording || assistant.interimText
               ? (
@@ -1548,7 +1562,7 @@ export const JourneysCompanionPlannerModal = memo(
     return (
       <Drawer open={open} onOpenChange={onOpenChange} repositionInputs={false}>
         <DrawerContent
-          className="border-none bg-transparent p-0 shadow-none"
+          className="max-h-none border-none bg-transparent p-0 shadow-none"
           style={{ bottom: `${drawerLayout.bottomInset}px` }}
           data-testid="journeys-companion-planner-drawer-content"
         >

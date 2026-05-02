@@ -4,6 +4,7 @@ import {
   getJourneysCompanionLauncherGreeting,
   getJourneysCompanionLauncherTemplates,
 } from "@/shared/journeysCompanionLauncherTemplates";
+import { COMPANION_PLANNER_QUEST_CAPTURE_OPENING } from "@/shared/companionPlannerSurfaceActions";
 
 describe("journeys companion launcher greetings", () => {
   it("keeps the free-talk greeting pool mostly English with only a little multilingual flavor", () => {
@@ -79,7 +80,7 @@ describe("journeys companion launcher greetings", () => {
     expect(templates.find((template) => template.id === "quest")).toMatchObject({
       id: "quest",
       label: "Quest?",
-      message: "",
+      message: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
       target: "planner",
       starterIntent: "quest_capture",
     });

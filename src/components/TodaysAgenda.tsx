@@ -81,6 +81,8 @@ import {
   DesktopQuestDetailsPopover,
 } from "@/components/DesktopQuestDetailsPopover";
 import { QUEST_LAUNCHER_SCROLL_CLEARANCE_PX } from "@/components/quest-launchers/metrics";
+import { createCompanionPlannerQuestCaptureLaunchIntent } from "@/shared/companionPlannerSurfaceActions";
+import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
 import type { Habit } from "@/features/habits/types";
 
 // Helper to calculate days remaining
@@ -210,7 +212,7 @@ interface TodaysAgendaProps {
   desktopInteractionResetKey?: string | number;
   onToggle: (taskId: string, completed: boolean, xpReward: number) => void;
   onAddQuest: () => void;
-  onOpenCompanionPlanner?: () => void;
+  onOpenCompanionPlanner?: (intent?: CompanionPlannerLaunchIntent | null) => void;
   onVoiceAddQuest?: () => void;
   isVoiceAddRecording?: boolean;
   isVoiceAddSupported?: boolean;
@@ -680,6 +682,17 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 }: TodaysAgendaProps) {
   const { user } = useAuth();
   const plannerLauncherAction = onOpenCompanionPlanner ?? onVoiceAddQuest ?? onAddQuest;
+  const openQuestCaptureThread = useCallback(() => {
+    if (onOpenCompanionPlanner) {
+      onOpenCompanionPlanner(createCompanionPlannerQuestCaptureLaunchIntent());
+      return;
+    }
+    if (onVoiceAddQuest) {
+      onVoiceAddQuest();
+      return;
+    }
+    onAddQuest();
+  }, [onAddQuest, onOpenCompanionPlanner, onVoiceAddQuest]);
   const voiceAddButtonLabel = isVoiceAddRecording ? "Stop voice capture" : "Start voice capture";
   const quickCaptureControls = (
     <div className="flex items-center gap-2">
@@ -3041,7 +3054,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   caption="New quest"
                   text="Add Quest"
                   className="w-full max-w-xs justify-center"
-                  onClick={plannerLauncherAction}
+                  onClick={openQuestCaptureThread}
                 />
               </div>
             </div>

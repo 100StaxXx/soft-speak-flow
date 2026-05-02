@@ -28,6 +28,7 @@ import {
   speakCompanionReply,
   stopCompanionSpeech,
 } from "@/services/companionSpeech";
+import { COMPANION_PLANNER_QUEST_CAPTURE_OPENING } from "@/shared/companionPlannerSurfaceActions";
 import { getCompanionPlannerOpener } from "@/shared/companionPlannerCopy";
 import { isUpcomingScheduleDigestMessage } from "@/shared/schedulingIntent";
 import type {
@@ -716,6 +717,9 @@ export function useCompanionAssistant({
     CompanionPlannerLaunchIntent["starterIntent"] | null
   >(null);
   const lastReplayablePlannerMessageRef = useRef<string | null>(null);
+  const pendingStarterIntentRef = useRef<
+    CompanionPlannerLaunchIntent["starterIntent"] | null
+  >(null);
 
   const scopeKey = `${surface}:${user?.id ?? "anon"}:${
     companion?.id ?? "none"
@@ -785,6 +789,7 @@ export function useCompanionAssistant({
     setPendingSuggestionProposalId(null);
     lastStarterIntentRef.current = null;
     lastReplayablePlannerMessageRef.current = null;
+    pendingStarterIntentRef.current = null;
     setMessages(
       greetingText
         ? [
@@ -883,6 +888,7 @@ export function useCompanionAssistant({
       null;
     lastReplayablePlannerMessageRef.current =
       cachedThreadUiState?.lastReplayablePlannerMessage ?? null;
+    pendingStarterIntentRef.current = null;
     return true;
   }, [applyActiveSessionId, surface]);
 
@@ -1109,8 +1115,10 @@ export function useCompanionAssistant({
   ) => {
     const message = rawMessage.trim();
     if (!message || isSubmitting || isResolvingAction) return false;
-    const starterIntent = options?.starterIntent ??
+    const pendingStarterIntent = pendingStarterIntentRef.current;
+    const starterIntent = options?.starterIntent ?? pendingStarterIntent ??
       inferStarterIntentFromMessage(message);
+    const shouldConsumePendingStarterIntent = pendingStarterIntent !== null;
     const shouldEmitPlanDayAiAnswered =
       !starterIntent &&
       Boolean(activeFollowUp) &&
@@ -1120,7 +1128,20 @@ export function useCompanionAssistant({
       );
 
     if (useLegacyFallback) {
-      await legacyAssistant.submitMessage(message, inputMode, options);
+      const legacyStarterIntent =
+        pendingStarterIntent === "quest_capture" && !options?.starterIntent
+          ? undefined
+          : starterIntent;
+      const legacySubmitOptions = legacyStarterIntent === undefined && !options
+        ? undefined
+        : { ...options, starterIntent: legacyStarterIntent };
+      await legacyAssistant.submitMessage(message, inputMode, legacySubmitOptions);
+      if (
+        shouldConsumePendingStarterIntent &&
+        pendingStarterIntentRef.current === pendingStarterIntent
+      ) {
+        pendingStarterIntentRef.current = null;
+      }
       return true;
     }
 
@@ -1205,6 +1226,12 @@ export function useCompanionAssistant({
       if (shouldEmitPlanDayAiAnswered) {
         emitPlanDayAiAnsweredEvent();
       }
+      if (
+        shouldConsumePendingStarterIntent &&
+        pendingStarterIntentRef.current === pendingStarterIntent
+      ) {
+        pendingStarterIntentRef.current = null;
+      }
       void invalidateThreads();
       return true;
     } catch (error) {
@@ -1231,7 +1258,20 @@ export function useCompanionAssistant({
           pendingSuggestionProposalId,
         });
         setUseLegacyFallback(true);
-        await legacyAssistant.submitMessage(message, inputMode, options);
+        const legacyStarterIntent =
+          pendingStarterIntent === "quest_capture" && !options?.starterIntent
+            ? undefined
+            : starterIntent;
+        const legacySubmitOptions = legacyStarterIntent === undefined && !options
+          ? undefined
+          : { ...options, starterIntent: legacyStarterIntent };
+        await legacyAssistant.submitMessage(message, inputMode, legacySubmitOptions);
+        if (
+          shouldConsumePendingStarterIntent &&
+          pendingStarterIntentRef.current === pendingStarterIntent
+        ) {
+          pendingStarterIntentRef.current = null;
+        }
         return true;
       }
 
@@ -1612,6 +1652,9 @@ export function useCompanionAssistant({
   useEffect(() => {
     if (!launchIntent?.id) return;
     if (handledLaunchIntentIdRef.current === launchIntent.id) return;
+    if (launchIntent.starterIntent !== "quest_capture") {
+      pendingStarterIntentRef.current = null;
+    }
     if (launchIntent.starterIntent === "thread_history") return;
     if (!useLegacyFallback && !threadsQuery.isSuccess) return;
 
@@ -1628,6 +1671,8 @@ export function useCompanionAssistant({
     const isCompanionAuthoredConversationStarter =
       launchIntent.target === "conversation" &&
       launchIntent.starterIntent === "free_talk_start";
+    const isQuestCaptureStarter =
+      launchIntent.starterIntent === "quest_capture";
 
     void (async () => {
       threadMutationVersionRef.current += 1;
@@ -1646,6 +1691,24 @@ export function useCompanionAssistant({
               visibleAssistantOpening: true,
             });
           }
+          return;
+        }
+
+        if (isQuestCaptureStarter) {
+          const greetingText = launchMessage.trim() ||
+            COMPANION_PLANNER_QUEST_CAPTURE_OPENING;
+          if (useLegacyFallback) {
+            legacyAssistant.startTemplateThread?.({
+              greetingText,
+              visibleAssistantOpening: true,
+            });
+          } else {
+            startTemplateThread({
+              greetingText,
+              visibleAssistantOpening: true,
+            });
+          }
+          pendingStarterIntentRef.current = "quest_capture";
           return;
         }
 

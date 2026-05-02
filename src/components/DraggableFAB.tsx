@@ -6,6 +6,10 @@ import { JourneysCompanionLauncherPopup } from "@/components/journeys/JourneysCo
 import { useDraggableFAB } from "@/hooks/useDraggableFAB";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
 import { cn } from "@/lib/utils";
+import {
+  createCompanionPlannerLaunchIntentId,
+  createCompanionPlannerQuestCaptureLaunchIntent,
+} from "@/shared/companionPlannerSurfaceActions";
 import { getJourneysCompanionLauncherTemplates } from "@/shared/journeysCompanionLauncherTemplates";
 import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
 
@@ -160,10 +164,12 @@ export const DraggableFAB = ({ onOpenCompanionPlanner, onTap }: DraggableFABProp
     if (template.id === "goal" && typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("companion-new-goal-started"));
     }
+    if (template.id === "quest") {
+      onOpenCompanionPlanner(createCompanionPlannerQuestCaptureLaunchIntent());
+      return;
+    }
     const launchIntent: CompanionPlannerLaunchIntent = {
-      id: typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      id: createCompanionPlannerLaunchIntentId(),
       message: template.message,
       starterIntent: template.starterIntent,
       target: template.target,
@@ -179,9 +185,7 @@ export const DraggableFAB = ({ onOpenCompanionPlanner, onTap }: DraggableFABProp
     }
     closeMenu();
     const launchIntent: CompanionPlannerLaunchIntent = {
-      id: typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      id: createCompanionPlannerLaunchIntentId(),
       message: "",
       starterIntent: "thread_history",
       target: "planner",

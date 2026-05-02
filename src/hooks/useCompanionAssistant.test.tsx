@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
 
 const mocks = vi.hoisted(() => ({
   agentSurfaceEnabled: true,
@@ -167,6 +168,7 @@ vi.mock("@/utils/supabaseFunctionErrors", () => ({
 }));
 
 import { useCompanionAssistant } from "./useCompanionAssistant";
+import { COMPANION_PLANNER_QUEST_CAPTURE_OPENING } from "@/shared/companionPlannerSurfaceActions";
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
@@ -1316,6 +1318,87 @@ describe("useCompanionAssistant", () => {
     });
   });
 
+  it("opens quest-capture launcher intents as companion-authored visible openers without submitting", async () => {
+    const consumed = vi.fn();
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () =>
+        useCompanionAssistant({
+          surface: "journeys",
+          launchIntent: {
+            id: "launch-quest-1",
+            message: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
+            starterIntent: "quest_capture",
+            target: "planner",
+          },
+          onLaunchIntentConsumed: consumed,
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(consumed).toHaveBeenCalledWith("launch-quest-1");
+    });
+
+    expect(mocks.supabaseInvoke).not.toHaveBeenCalled();
+    expect(result.current.activeThread?.sessionId).toBe("fresh-session");
+    expect(result.current.messages).toEqual([
+      expect.objectContaining({
+        role: "assistant",
+        content: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
+        source: "agent",
+      }),
+    ]);
+    expect(result.current.messages[0]?.isSeed).toBeUndefined();
+
+    await waitFor(() => {
+      expect(mocks.archiveThread).toHaveBeenCalledWith(
+        "persisted-session",
+        true,
+      );
+    });
+  });
+
+  it("sends the first reply after a quest-capture opener with the quest starter intent", async () => {
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () =>
+        useCompanionAssistant({
+          surface: "journeys",
+          launchIntent: {
+            id: "launch-quest-2",
+            message: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
+            starterIntent: "quest_capture",
+            target: "planner",
+          },
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.messages[0]?.content).toBe(
+        COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
+      );
+    });
+
+    expect(mocks.supabaseInvoke).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.submitMessage("Pilates tomorrow at 8am", "text");
+    });
+
+    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+      "companion-agent",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          message: "Pilates tomorrow at 8am",
+          starterIntent: "quest_capture",
+          sessionId: "fresh-session",
+        }),
+      }),
+    );
+  });
+
   it("defers persisted bootstrap while a launcher template intent is pending", async () => {
     mocks.supabaseInvoke.mockImplementation(async (_functionName, options) => {
       const sessionId = options?.body?.sessionId ?? "missing-session";
@@ -1687,6 +1770,112 @@ describe("useCompanionAssistant", () => {
     });
     expect(mocks.legacySubmitMessage).not.toHaveBeenCalled();
     expect(consumed).toHaveBeenCalledWith("launch-free-talk-fallback-1");
+    expect(mocks.listThreads).not.toHaveBeenCalled();
+  });
+
+  it("does not pass pending quest-capture as an explicit starter to legacy fallback replies", async () => {
+    mocks.agentSurfaceEnabled = false;
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () =>
+        useCompanionAssistant({
+          surface: "journeys",
+          launchIntent: {
+            id: "launch-quest-fallback-reply-1",
+            message: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
+            starterIntent: "quest_capture",
+            target: "planner",
+            briefingContext: null,
+          },
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(mocks.legacyStartTemplateThread).toHaveBeenCalledWith({
+        greetingText: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
+        visibleAssistantOpening: true,
+      });
+    });
+
+    mocks.legacySubmitMessage.mockClear();
+
+    await act(async () => {
+      await result.current.submitMessage("Pilates tomorrow at 8am", "text");
+    });
+
+    expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
+      "Pilates tomorrow at 8am",
+      "text",
+      undefined,
+    );
+    expect(mocks.listThreads).not.toHaveBeenCalled();
+  });
+
+  it("clears stale quest-capture context when legacy fallback handles another launcher", async () => {
+    mocks.agentSurfaceEnabled = false;
+    const questLaunchIntent: CompanionPlannerLaunchIntent = {
+      id: "launch-quest-fallback-1",
+      message: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
+      starterIntent: "quest_capture",
+      target: "planner",
+      briefingContext: null,
+    };
+    const planLaunchIntent: CompanionPlannerLaunchIntent = {
+      id: "launch-plan-fallback-1",
+      message: "Plan my day",
+      starterIntent: "plan_day",
+      target: "planner",
+      briefingContext: null,
+    };
+
+    const { wrapper } = createWrapper();
+    const { result, rerender } = renderHook(
+      ({ launchIntent }) =>
+        useCompanionAssistant({
+          surface: "journeys",
+          launchIntent,
+        }),
+      {
+        wrapper,
+        initialProps: {
+          launchIntent: questLaunchIntent as CompanionPlannerLaunchIntent | null,
+        },
+      },
+    );
+
+    await waitFor(() => {
+      expect(mocks.legacyStartTemplateThread).toHaveBeenCalledWith({
+        greetingText: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
+        visibleAssistantOpening: true,
+      });
+    });
+
+    mocks.legacyStartTemplateThread.mockClear();
+    mocks.legacySubmitMessage.mockClear();
+
+    rerender({ launchIntent: planLaunchIntent });
+
+    await waitFor(() => {
+      expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
+        "Plan my day",
+        "text",
+        { starterIntent: "plan_day", turnOrigin: "launcher" },
+      );
+    });
+
+    mocks.legacySubmitMessage.mockClear();
+
+    await act(async () => {
+      await result.current.submitMessage("Just checking in", "text");
+    });
+
+    expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
+      "Just checking in",
+      "text",
+      undefined,
+    );
     expect(mocks.listThreads).not.toHaveBeenCalled();
   });
 

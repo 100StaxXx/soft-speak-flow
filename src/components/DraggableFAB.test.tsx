@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DraggableFAB } from "./DraggableFAB";
 import { DRAGGABLE_FAB_STORAGE_KEY_V2 } from "@/hooks/useDraggableFAB";
+import { COMPANION_PLANNER_QUEST_CAPTURE_OPENING } from "@/shared/companionPlannerSurfaceActions";
 import { getJourneysCompanionLauncherGreeting } from "@/shared/journeysCompanionLauncherTemplates";
 
 const storage = vi.hoisted(() => {
@@ -279,7 +280,8 @@ describe("DraggableFAB", () => {
     expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
       target: "planner",
       starterIntent: "quest_capture",
-      message: "",
+      message: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
+      briefingContext: null,
     }));
   });
 

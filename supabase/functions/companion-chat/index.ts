@@ -17,6 +17,10 @@ import { withCompanionChatPersistenceCapability } from "./persistenceCapability.
 import { persistCompanionChatTurn } from "./threadPersistence.ts";
 import { shouldHandoffToPlanner } from "./handoff.ts";
 import {
+  buildCompanionChatCompletionBody,
+  type CompanionChatSurface,
+} from "./requestBody.ts";
+import {
   buildAssistantEventScheduleLabel,
   buildAssistantTaskScheduleLabel,
   classifyEventTemporalStatus,
@@ -484,33 +488,28 @@ async function generateCompanionReply(params: {
   systemPrompt: string;
   conversationHistory: Array<{ role: "assistant" | "user"; content: string }>;
   message: string;
-  surface: "companion" | "journeys";
+  surface: CompanionChatSurface;
 }) {
   const openAIApiKey = Deno.env.get("OPENAI_API_KEY");
   if (!openAIApiKey) {
     throw new Error("OPENAI_API_KEY not configured");
   }
 
-  const model = Deno.env.get("OPENAI_COMPANION_CHAT_MODEL") ?? "gpt-4.1";
+  const model = Deno.env.get("OPENAI_COMPANION_CHAT_MODEL") ?? "gpt-5.5";
+  const requestBody = buildCompanionChatCompletionBody({
+    model,
+    systemPrompt: params.systemPrompt,
+    conversationHistory: params.conversationHistory,
+    message: params.message,
+    surface: params.surface,
+  });
   const response = await params.guardedFetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${openAIApiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      model,
-      temperature: params.surface === "journeys" ? 0.35 : 0.9,
-      max_tokens: 260,
-      messages: [
-        { role: "system", content: params.systemPrompt },
-        ...params.conversationHistory.map((entry) => ({
-          role: entry.role,
-          content: entry.content,
-        })),
-        { role: "user", content: params.message },
-      ],
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {
@@ -684,7 +683,7 @@ async function persistConversation(params: {
   }
 }
 
-serve(async (req) => {
+export const handleCompanionChatRequest = async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
 
   if (req.method === "OPTIONS") {
@@ -789,6 +788,12 @@ serve(async (req) => {
       });
     }
 
+    const memoryExtractionPromise = maybeExtractConversationMemory({
+      guardedFetch,
+      message: parsed.data.message,
+      existingProfile,
+    });
+
     let reply = planningIntent
       ? surface === "journeys"
         ? "Switching into planning for that."
@@ -814,11 +819,7 @@ serve(async (req) => {
       });
     }
 
-    const memoryExtraction = await maybeExtractConversationMemory({
-      guardedFetch,
-      message: parsed.data.message,
-      existingProfile,
-    });
+    const memoryExtraction = await memoryExtractionPromise;
     profileUpdated = memoryExtraction.updated;
     memorableMoment = memoryExtraction.memorableMoment;
     shouldRemember = memoryExtraction.shouldRemember
@@ -871,4 +872,8 @@ serve(async (req) => {
       requestId,
     });
   }
-});
+};
+
+if (Deno.env.get("SUPABASE_FUNCTIONS_TEST") !== "1") {
+  serve(handleCompanionChatRequest);
+}

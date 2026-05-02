@@ -1,4 +1,5 @@
 import type {
+  CompanionPlannerLaunchIntent,
   CompanionPlannerLaunchTarget,
   CompanionPlannerStarterIntent,
 } from "@/types/companionPlanner";
@@ -19,6 +20,22 @@ export interface CompanionPlannerSurfaceAction {
   target: CompanionPlannerLaunchTarget;
   starterIntent: CompanionPlannerStarterIntent;
 }
+
+export const COMPANION_PLANNER_QUEST_CAPTURE_OPENING = "New Quest";
+
+export const createCompanionPlannerLaunchIntentId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+export const createCompanionPlannerQuestCaptureLaunchIntent =
+  (): CompanionPlannerLaunchIntent => ({
+    id: createCompanionPlannerLaunchIntentId(),
+    message: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
+    starterIntent: "quest_capture",
+    target: "planner",
+    briefingContext: null,
+  });
 
 export const COMPANION_PLANNER_SURFACE_ACTIONS: CompanionPlannerSurfaceAction[] =
   [
@@ -74,7 +91,7 @@ export const COMPANION_PLANNER_SURFACE_ACTIONS: CompanionPlannerSurfaceAction[] 
     {
       id: "quest",
       label: "Quest?",
-      message: "",
+      message: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
       target: "planner",
       starterIntent: "quest_capture",
     },

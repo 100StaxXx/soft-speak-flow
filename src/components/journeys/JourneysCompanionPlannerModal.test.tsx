@@ -2,6 +2,7 @@ import type { HTMLAttributes, ReactNode } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
+import { COMPANION_PLANNER_QUEST_CAPTURE_OPENING } from "@/shared/companionPlannerSurfaceActions";
 import type { CompanionAgentFollowUp } from "@/types/companionAgent";
 import type { CompanionAssistantMessage } from "@/hooks/useCompanionAssistant";
 
@@ -595,11 +596,11 @@ describe("JourneysCompanionPlannerModal", () => {
     mocks.state.structuredResponse = previousStructuredResponse;
   });
 
-  it("forwards Quest? launch intents through the assistant hook", async () => {
+  it("forwards New Quest launch intents through the assistant hook", async () => {
     const onLaunchIntentConsumed = vi.fn();
     const launchIntent = {
       id: "quest-launch-1",
-      message: "Quest?",
+      message: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
       starterIntent: "quest_capture" as const,
       target: "planner" as const,
       briefingContext: null,
@@ -627,7 +628,7 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(mocks.assistant.submitTypedMessage).not.toHaveBeenCalled();
   });
 
-  it("submits text after Quest? through normal assistant chat", async () => {
+  it("submits text after New Quest through normal assistant chat", async () => {
     mocks.state.draftInput = "Pilates tomorrow at 8am";
 
     render(
@@ -637,7 +638,7 @@ describe("JourneysCompanionPlannerModal", () => {
         presentation="dialog"
         launchIntent={{
           id: "quest-launch-2",
-          message: "Quest?",
+          message: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
           starterIntent: "quest_capture",
           target: "planner",
           briefingContext: null,
@@ -844,6 +845,60 @@ describe("JourneysCompanionPlannerModal", () => {
       .toHaveStyle({ bottom: "0px" });
   });
 
+  it.each([
+    ["390x844", 844, 736],
+    ["393x852", 852, 736],
+    ["430x932", 932, 736],
+    ["375x667", 667, 621],
+  ])(
+    "keeps the self-sized mobile planner drawer within a %s viewport",
+    (_label, viewportHeight, expectedShellHeight) => {
+      Object.defineProperty(window, "innerHeight", {
+        configurable: true,
+        writable: true,
+        value: viewportHeight,
+      });
+      Object.defineProperty(window, "visualViewport", {
+        configurable: true,
+        value: {
+          height: viewportHeight,
+          offsetTop: 0,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        },
+      });
+
+      render(
+        <JourneysCompanionPlannerModal
+          open
+          onOpenChange={vi.fn()}
+          presentation="drawer"
+        />,
+      );
+
+      expect(screen.getByTestId("journeys-companion-planner-shell"))
+        .toHaveStyle({ height: `${expectedShellHeight}px` });
+      expect(screen.getByTestId("journeys-companion-planner-drawer-content"))
+        .toHaveClass("max-h-none");
+    },
+  );
+
+  it("adds bottom safe-area padding to the mobile planner composer", () => {
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="drawer"
+      />,
+    );
+
+    expect(screen.getByTestId("journeys-companion-planner-footer"))
+      .toHaveClass(
+        "pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]",
+        "sm:pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))]",
+      );
+  });
+
   it("sizes the mobile planner shell to the visible viewport when the keyboard opens", () => {
     Object.defineProperty(window, "innerHeight", {
       configurable: true,
@@ -869,7 +924,7 @@ describe("JourneysCompanionPlannerModal", () => {
     );
 
     expect(screen.getByTestId("journeys-companion-planner-shell"))
-      .toHaveStyle({ height: "476px" });
+      .toHaveStyle({ height: "454px" });
     expect(screen.getByTestId("journeys-companion-planner-drawer-content"))
       .toHaveStyle({ bottom: "352px" });
     expect(mocks.drawerRootProps.find((props) => props.open === true))
@@ -915,7 +970,7 @@ describe("JourneysCompanionPlannerModal", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("journeys-companion-planner-shell"))
-        .toHaveStyle({ height: "476px" });
+        .toHaveStyle({ height: "454px" });
     });
     expect(scrollTo).toHaveBeenCalledWith({
       top: 600,

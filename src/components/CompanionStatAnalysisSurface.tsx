@@ -257,13 +257,143 @@ const mentorAccentStyle = (analysis: CompanionStatAnalysis): CSSProperties | und
   };
 };
 
-function LoadingState() {
+type TitleCardImageGateState = "idle" | "loading" | "loaded" | "failed";
+
+type LoadingStatePhase = "analysis" | "title-card";
+
+interface LoadingStateProps {
+  phase?: LoadingStatePhase;
+  analysis?: CompanionStatAnalysis;
+  viewModel?: ReturnType<typeof buildCompanionStatAnalysisViewModel>;
+  imageUrl?: string | null;
+  titleCardStatus?: NonNullable<CompanionStatAnalysis["cosmiqTitleCard"]>["status"];
+  imageState?: TitleCardImageGateState;
+  prefersReducedMotion: boolean;
+}
+
+function LoadingState({
+  phase = "analysis",
+  analysis,
+  viewModel,
+  imageUrl,
+  titleCardStatus = "generating",
+  imageState = "loading",
+  prefersReducedMotion,
+}: LoadingStateProps) {
+  if (phase === "title-card" && analysis && viewModel) {
+    const hasImagePreview = Boolean(imageUrl);
+    const dominantLabel = ATTRIBUTE_META[analysis.cosmiqTitle.dominantStat].label;
+    const secondaryLabel = ATTRIBUTE_META[analysis.cosmiqTitle.secondaryStat].label;
+    const loadingStatus = hasImagePreview
+      ? "Art preview received"
+      : titleCardStatus === "ready"
+        ? "Polishing title art"
+        : "Generating title art";
+    const loadingCopy = hasImagePreview
+      ? "Generated art is here. Polishing the reveal before it lands."
+      : `Composing ${dominantLabel} and ${secondaryLabel} into your generated title card.`;
+    const topStats = viewModel.rankedStats.slice(0, 3);
+    const remainingStats = viewModel.statCards.filter((stat) => !topStats.includes(stat)).slice(0, 3);
+
+    return (
+      <Card
+        data-testid="companion-title-art-loading"
+        className="relative min-h-[min(72vh,760px)] overflow-hidden border-primary/25 bg-background"
+        style={mentorAccentStyle(analysis)}
+      >
+        {hasImagePreview ? (
+          <div className="absolute inset-0" data-testid="companion-title-art-loading-preview">
+            <img
+              alt=""
+              aria-hidden="true"
+              className="h-full w-full scale-105 object-cover opacity-55 blur-md"
+              src={imageUrl ?? undefined}
+            />
+          </div>
+        ) : (
+          <div
+            data-testid="companion-title-art-placeholder"
+            className="absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,hsl(var(--primary)/0.34),transparent_30%),radial-gradient(circle_at_18%_74%,hsl(var(--accent)/0.20),transparent_30%),linear-gradient(145deg,hsl(var(--background)),hsl(var(--card)),hsl(var(--background)))]"
+          />
+        )}
+
+        <motion.div
+          aria-hidden="true"
+          className="absolute inset-y-0 left-[-35%] w-1/2 rotate-12 bg-[linear-gradient(90deg,transparent,hsl(var(--primary)/0.24),transparent)] blur-xl"
+          animate={prefersReducedMotion ? undefined : { x: ["0%", "220%", "0%"], opacity: [0.12, 0.32, 0.12] }}
+          transition={prefersReducedMotion ? undefined : { duration: 5.8, ease: "easeInOut", repeat: Infinity }}
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,hsl(var(--background)/0.16),hsl(var(--background)/0.42)_44%,hsl(var(--background)/0.90))]" />
+
+        <CardContent className="relative z-10 flex min-h-[min(72vh,760px)] flex-col justify-between gap-6 p-4 text-center sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 text-left">
+            <div className="flex flex-wrap gap-2">
+              <Badge className="bg-primary text-primary-foreground">{loadingStatus}</Badge>
+              <Badge variant="outline" className="border-white/30 bg-background/55 text-foreground backdrop-blur">
+                {imageState === "idle" ? "Preparing preview" : hasImagePreview ? "Preview warming" : "Render in progress"}
+              </Badge>
+            </div>
+            <Badge variant="outline" className="border-white/30 bg-background/55 text-foreground backdrop-blur">
+              {analysis.mentor.name}
+            </Badge>
+          </div>
+
+          <div className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center gap-6">
+            <div className="relative flex h-36 w-36 items-center justify-center">
+              <motion.div
+                aria-hidden="true"
+                className="absolute inset-0 rounded-full border border-primary/30 bg-primary/10"
+                animate={prefersReducedMotion ? undefined : { rotate: 360 }}
+                transition={prefersReducedMotion ? undefined : { duration: 16, ease: "linear", repeat: Infinity }}
+              />
+              <motion.div
+                aria-hidden="true"
+                className="absolute inset-5 rounded-full border border-primary/25"
+                animate={prefersReducedMotion ? undefined : { rotate: -360 }}
+                transition={prefersReducedMotion ? undefined : { duration: 12, ease: "linear", repeat: Infinity }}
+              />
+              <div className="relative flex h-20 w-20 items-center justify-center rounded-full border border-white/15 bg-background/70 shadow-2xl backdrop-blur">
+                <Sparkles className={cn("h-9 w-9 text-primary", !prefersReducedMotion && "animate-pulse")} />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Cosmiq Title</p>
+              <h3 className="text-3xl font-semibold leading-tight sm:text-4xl">
+                {analysis.cosmiqTitle.title}
+              </h3>
+              <p className="mx-auto max-w-md text-sm leading-6 text-muted-foreground">{loadingCopy}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {[...topStats, ...remainingStats].map((stat) => (
+              <div
+                key={stat.attribute}
+                className="rounded-lg border border-white/10 bg-background/60 px-3 py-2 text-left backdrop-blur"
+              >
+                <p className="text-[11px] font-medium text-muted-foreground">{stat.label}</p>
+                <div className="mt-1 flex items-end justify-between gap-2">
+                  <span className="text-lg font-semibold leading-none">{stat.score}</span>
+                  <span className="text-[10px] font-semibold uppercase text-primary">{stat.band}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card className="min-h-[62vh] overflow-hidden border-primary/20 bg-[radial-gradient(circle_at_top,hsl(var(--primary)/0.20),transparent_34%),linear-gradient(180deg,hsl(var(--background)/0.92),hsl(var(--card)/0.98))]">
+    <Card
+      data-testid="companion-stat-analysis-loading"
+      className="min-h-[62vh] overflow-hidden border-primary/20 bg-[radial-gradient(circle_at_top,hsl(var(--primary)/0.20),transparent_34%),linear-gradient(180deg,hsl(var(--background)/0.92),hsl(var(--card)/0.98))]"
+    >
       <CardContent className="flex min-h-[62vh] flex-col items-center justify-center gap-6 p-6 text-center">
         <div className="relative flex h-28 w-28 items-center justify-center rounded-full border border-primary/25 bg-primary/10">
           <div className="absolute inset-2 rounded-full border border-primary/20" />
-          <Sparkles className="h-10 w-10 animate-pulse text-primary" />
+          <Sparkles className={cn("h-10 w-10 text-primary", !prefersReducedMotion && "animate-pulse")} />
         </div>
         <div className="space-y-2">
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-primary">Cosmiq reading</p>
@@ -281,8 +411,6 @@ function LoadingState() {
     </Card>
   );
 }
-
-type TitleCardImageGateState = "idle" | "loading" | "loaded" | "failed";
 
 const getTitleCardImageKey = (profileKey: string | null | undefined, imageUrl: string | null | undefined) =>
   profileKey && imageUrl ? `${profileKey}:${imageUrl}` : null;
@@ -776,6 +904,7 @@ function CosmiqTitleRevealCard({
   onFlip,
   isRefreshing,
   onRefresh,
+  prefersReducedMotion,
 }: {
   analysis: CompanionStatAnalysis;
   viewModel: ReturnType<typeof buildCompanionStatAnalysisViewModel>;
@@ -784,6 +913,7 @@ function CosmiqTitleRevealCard({
   onFlip: () => void;
   isRefreshing: boolean;
   onRefresh: () => void;
+  prefersReducedMotion: boolean;
 }) {
   const imageUrl = analysis.cosmiqTitleCard?.imageUrl ?? null;
   const cardStatus = analysis.cosmiqTitleCard?.status ?? "unavailable";
@@ -850,11 +980,18 @@ function CosmiqTitleRevealCard({
       style={mentorAccentStyle(analysis)}
     >
       {imageUrl ? (
-        <img
-          alt={`${analysis.cosmiqTitle.title} archetype illustration`}
-          className="absolute inset-0 h-full w-full object-cover"
-          src={imageUrl}
-        />
+        <motion.div
+          className="absolute inset-0"
+          initial={prefersReducedMotion ? false : { opacity: 0, scale: 1.04, filter: "blur(14px)" }}
+          animate={prefersReducedMotion ? undefined : { opacity: 1, scale: 1, filter: "blur(0px)" }}
+          transition={prefersReducedMotion ? undefined : { duration: 0.5, ease: "easeOut" }}
+        >
+          <img
+            alt={`${analysis.cosmiqTitle.title} archetype illustration`}
+            className="h-full w-full object-cover"
+            src={imageUrl}
+          />
+        </motion.div>
       ) : (
         <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_top,hsl(var(--primary)/0.30),transparent_38%),linear-gradient(145deg,hsl(var(--background)),hsl(var(--accent)/0.18),hsl(var(--card)))]">
           <ImageIcon className="h-20 w-20 text-primary/45" aria-hidden="true" />
@@ -890,7 +1027,12 @@ function CosmiqTitleRevealCard({
           </Button>
         </div>
 
-        <div className="space-y-4 rounded-lg border border-white/15 bg-background/72 p-4 shadow-2xl backdrop-blur-md">
+        <motion.div
+          className="space-y-4 rounded-lg border border-white/15 bg-background/72 p-4 shadow-2xl backdrop-blur-md"
+          initial={prefersReducedMotion ? false : { opacity: 0, y: 12 }}
+          animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
+          transition={prefersReducedMotion ? undefined : { duration: 0.32, delay: 0.12, ease: "easeOut" }}
+        >
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Cosmiq Title</p>
             <h3 className="mt-2 text-3xl font-semibold leading-tight md:text-5xl">
@@ -913,7 +1055,7 @@ function CosmiqTitleRevealCard({
               </div>
             ))}
           </div>
-        </div>
+        </motion.div>
       </div>
     </Card>
   );
@@ -968,7 +1110,17 @@ function CompanionStatAnalysisView({
     || !isTitleCardImageLoaded
     || isRegeneratingTitleCard
   ) {
-    return <LoadingState />;
+    return (
+      <LoadingState
+        phase="title-card"
+        analysis={analysis}
+        viewModel={viewModel}
+        imageUrl={analysis.cosmiqTitleCard?.imageUrl ?? null}
+        titleCardStatus={titleCardStatus}
+        imageState={imageState}
+        prefersReducedMotion={prefersReducedMotion}
+      />
+    );
   }
 
   return (
@@ -987,6 +1139,7 @@ function CompanionStatAnalysisView({
           onFlip={() => setIsFlipped((current) => !current)}
           isRefreshing={isRefreshing}
           onRefresh={onRefresh}
+          prefersReducedMotion={prefersReducedMotion}
         />
       </motion.div>
     </motion.div>
@@ -1004,6 +1157,7 @@ function AnalysisContent() {
     refreshAnalysis,
     regenerateTitleCard,
   } = useCompanionStatAnalysis({ enabled: true });
+  const prefersReducedMotion = useReducedMotion();
   const [renderBoundaryKey, setRenderBoundaryKey] = useState(0);
 
   const handleRefresh = () => {
@@ -1019,7 +1173,7 @@ function AnalysisContent() {
   };
 
   if (isLoading && !analysis) {
-    return <LoadingState />;
+    return <LoadingState prefersReducedMotion={prefersReducedMotion} />;
   }
 
   if (!analysis) {

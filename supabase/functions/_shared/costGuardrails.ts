@@ -17,6 +17,7 @@ export type CostAlertType = "threshold" | "anomaly";
 
 type JsonObject = Record<string, unknown>;
 export type SupabaseClientLike = any;
+type EnvGetter = (name: string) => string | null | undefined;
 
 interface GuardrailScopeKey {
   scopeType: CostScopeType;
@@ -100,6 +101,7 @@ interface CreateCostGuardrailSessionParams {
   featureKey: string;
   userId?: string | null;
   requestId?: string;
+  getEnv?: EnvGetter;
 }
 
 interface EnforceCostGuardrailOptions {
@@ -131,8 +133,8 @@ function parseNumber(value: unknown, fallback = 0): number {
   return fallback;
 }
 
-function truthyEnv(name: string): boolean {
-  const raw = (getEnv(name) ?? "").trim().toLowerCase();
+function truthyEnv(name: string, env: EnvGetter = getEnv): boolean {
+  const raw = (env(name) ?? "").trim().toLowerCase();
   return raw === "1" || raw === "true" || raw === "yes" || raw === "on";
 }
 
@@ -147,6 +149,30 @@ function unique<T>(values: T[]): T[] {
 
 function roundUsd(value: number): number {
   return Math.round(value * 1_000_000) / 1_000_000;
+}
+
+export function getOpenAITextTokenRatesPerThousand(model: string | null): {
+  inputRate: number;
+  outputRate: number;
+} {
+  const modelName = (model ?? "").toLowerCase();
+  // OpenAI publishes GPT-5.5 text prices per 1M tokens; guardrails store per-1K rates.
+  // Sources: https://developers.openai.com/api/docs/models/gpt-5.5
+  // and https://developers.openai.com/api/docs/models/gpt-5.5-pro.
+  if (modelName.includes("gpt-5.5-pro")) {
+    return { inputRate: 0.03, outputRate: 0.18 };
+  }
+
+  if (modelName.includes("gpt-5.5")) {
+    return { inputRate: 0.005, outputRate: 0.03 };
+  }
+
+  const isLargeModel = modelName.includes("gpt-5") ||
+    modelName.includes("gpt-4o");
+  return {
+    inputRate: isLargeModel ? 0.005 : 0.001,
+    outputRate: isLargeModel ? 0.015 : 0.002,
+  };
 }
 
 export function getCurrentCostPeriodStart(now = new Date()): string {
@@ -166,7 +192,9 @@ export function normalizeThresholds(candidate: unknown): number[] {
     .map((item) => Math.min(100, Math.max(1, Math.round(item))));
 
   const thresholds = unique(parsed).sort((a, b) => a - b);
-  return thresholds.length > 0 ? thresholds : [...DEFAULT_COST_ALERT_THRESHOLDS];
+  return thresholds.length > 0
+    ? thresholds
+    : [...DEFAULT_COST_ALERT_THRESHOLDS];
 }
 
 export function computeCrossedThresholds(params: {
@@ -178,11 +206,13 @@ export function computeCrossedThresholds(params: {
   const previous = Math.max(0, params.previousPercent);
   const next = Math.max(0, params.nextPercent);
   if (next <= previous) return [];
-  return thresholds.filter((threshold) => previous < threshold && next >= threshold);
+  return thresholds.filter((threshold) =>
+    previous < threshold && next >= threshold
+  );
 }
 
-function getEndpointKillSwitches(): Set<string> {
-  const raw = getEnv("COST_KILL_SWITCH_ENDPOINTS") ?? "";
+function getEndpointKillSwitches(env: EnvGetter = getEnv): Set<string> {
+  const raw = env("COST_KILL_SWITCH_ENDPOINTS") ?? "";
   return new Set(
     raw
       .split(",")
@@ -191,8 +221,12 @@ function getEndpointKillSwitches(): Set<string> {
   );
 }
 
-function resolveEnvBlock(endpointKey: string, capabilities: CostCapability[]): GuardrailBlockDetails | null {
-  if (truthyEnv("COST_KILL_SWITCH_ALL")) {
+function resolveEnvBlock(
+  endpointKey: string,
+  capabilities: CostCapability[],
+  env: EnvGetter = getEnv,
+): GuardrailBlockDetails | null {
+  if (truthyEnv("COST_KILL_SWITCH_ALL", env)) {
     return {
       reason: "Global cost kill switch is enabled",
       scopeType: "endpoint",
@@ -200,7 +234,7 @@ function resolveEnvBlock(endpointKey: string, capabilities: CostCapability[]): G
     };
   }
 
-  if (getEndpointKillSwitches().has(normalizeKey(endpointKey))) {
+  if (getEndpointKillSwitches(env).has(normalizeKey(endpointKey))) {
     return {
       reason: `Endpoint kill switch is enabled for ${endpointKey}`,
       scopeType: "endpoint",
@@ -219,7 +253,7 @@ function resolveEnvBlock(endpointKey: string, capabilities: CostCapability[]): G
 
   for (const capability of capabilities) {
     const envName = capabilityEnvMap[capability];
-    if (truthyEnv(envName)) {
+    if (truthyEnv(envName, env)) {
       return {
         reason: `Capability kill switch is enabled for ${capability}`,
         scopeType: "endpoint",
@@ -245,7 +279,9 @@ export class CostGuardrailBlockedError extends Error {
   }
 }
 
-export function isCostGuardrailBlockedError(error: unknown): error is CostGuardrailBlockedError {
+export function isCostGuardrailBlockedError(
+  error: unknown,
+): error is CostGuardrailBlockedError {
   return error instanceof CostGuardrailBlockedError;
 }
 
@@ -275,7 +311,9 @@ function readFormDataValue(formData: FormData, key: string): string | null {
   return typeof value === "string" ? value : null;
 }
 
-async function parseRequestBody(body: BodyInit | null | undefined): Promise<JsonObject | null> {
+async function parseRequestBody(
+  body: BodyInit | null | undefined,
+): Promise<JsonObject | null> {
   if (!body) return null;
 
   if (typeof body === "string") {
@@ -310,7 +348,10 @@ async function parseRequestBody(body: BodyInit | null | undefined): Promise<Json
   return null;
 }
 
-function resolveOpenAIModel(rawModel: unknown, capability: CostCapability): string | null {
+function resolveOpenAIModel(
+  rawModel: unknown,
+  capability: CostCapability,
+): string | null {
   const raw = typeof rawModel === "string" ? rawModel.trim() : "";
   if (!raw) {
     if (capability === "image") {
@@ -334,20 +375,27 @@ function resolveOpenAIModel(rawModel: unknown, capability: CostCapability): stri
   return raw;
 }
 
-function resolveCapabilityFromOpenAIRequest(pathname: string, body: JsonObject | null): CostCapability | null {
+function resolveCapabilityFromOpenAIRequest(
+  pathname: string,
+  body: JsonObject | null,
+): CostCapability | null {
   if (pathname.includes("/audio/transcriptions")) return "transcription";
   if (pathname.includes("/audio/speech")) return "tts";
   if (pathname.includes("/images/generations")) return "image";
   if (pathname.includes("/videos")) return "video";
-  if (!pathname.includes("/chat/completions") && !pathname.includes("/responses")) return null;
+  if (
+    !pathname.includes("/chat/completions") && !pathname.includes("/responses")
+  ) return null;
 
   const modalities = body?.modalities;
-  const wantsImage =
-    Array.isArray(modalities) &&
-    modalities.some((modality) => typeof modality === "string" && modality.toLowerCase() === "image");
+  const wantsImage = Array.isArray(modalities) &&
+    modalities.some((modality) =>
+      typeof modality === "string" && modality.toLowerCase() === "image"
+    );
 
   const model = typeof body?.model === "string" ? body.model.toLowerCase() : "";
-  const hasImageSize = typeof body?.image_size === "string" && body.image_size.length > 0;
+  const hasImageSize = typeof body?.image_size === "string" &&
+    body.image_size.length > 0;
 
   if (wantsImage || hasImageSize || model.includes("image")) {
     return "image";
@@ -356,7 +404,9 @@ function resolveCapabilityFromOpenAIRequest(pathname: string, body: JsonObject |
   return "text";
 }
 
-function resolveCapabilityFromElevenLabsRequest(pathname: string): CostCapability | null {
+function resolveCapabilityFromElevenLabsRequest(
+  pathname: string,
+): CostCapability | null {
   if (pathname.includes("/v1/text-to-speech/")) return "tts";
   if (pathname.includes("/v1/music")) return "music";
   if (pathname.includes("/v1/video")) return "video";
@@ -373,7 +423,10 @@ async function resolveProviderRequestContext(
   const requestBody = await parseRequestBody(init?.body);
 
   if (hostname === "api.openai.com") {
-    const capability = resolveCapabilityFromOpenAIRequest(pathname, requestBody);
+    const capability = resolveCapabilityFromOpenAIRequest(
+      pathname,
+      requestBody,
+    );
     if (!capability) return null;
     return {
       provider: "openai",
@@ -391,7 +444,9 @@ async function resolveProviderRequestContext(
       provider: "elevenlabs",
       capability,
       url: url.toString(),
-      model: typeof requestBody?.model_id === "string" ? requestBody.model_id : null,
+      model: typeof requestBody?.model_id === "string"
+        ? requestBody.model_id
+        : null,
       requestBody,
     };
   }
@@ -413,28 +468,38 @@ async function extractResponseMetrics(
 
   const contentType = response.headers.get("Content-Type")?.toLowerCase() ?? "";
   if (!contentType.includes("application/json")) {
-    if (providerContext.provider === "elevenlabs" && providerContext.capability === "music") {
-      metrics.audioSeconds = parseNumber(providerContext.requestBody?.duration_seconds, 0) || null;
+    if (
+      providerContext.provider === "elevenlabs" &&
+      providerContext.capability === "music"
+    ) {
+      metrics.audioSeconds =
+        parseNumber(providerContext.requestBody?.duration_seconds, 0) || null;
     }
     return metrics;
   }
 
   try {
     const payload = await response.clone().json() as JsonObject;
-    const usage = payload.usage && typeof payload.usage === "object" ? payload.usage as JsonObject : null;
+    const usage = payload.usage && typeof payload.usage === "object"
+      ? payload.usage as JsonObject
+      : null;
     metrics.inputTokens = toInt(usage?.prompt_tokens ?? usage?.input_tokens);
-    metrics.outputTokens = toInt(usage?.completion_tokens ?? usage?.output_tokens);
+    metrics.outputTokens = toInt(
+      usage?.completion_tokens ?? usage?.output_tokens,
+    );
     metrics.totalTokens = toInt(usage?.total_tokens);
     metrics.audioSeconds = parseNumber(payload.duration, 0) || null;
 
     const dataImages = Array.isArray(payload.data) ? payload.data.length : 0;
     const messageImages = Array.isArray(
-      (payload.choices as JsonObject[] | undefined)?.[0]?.message &&
-      typeof (payload.choices as JsonObject[] | undefined)?.[0]?.message === "object"
-        ? ((payload.choices as JsonObject[])[0].message as JsonObject).images
-        : null,
-    )
-      ? (((payload.choices as JsonObject[])[0].message as JsonObject).images as unknown[]).length
+        (payload.choices as JsonObject[] | undefined)?.[0]?.message &&
+          typeof (payload.choices as JsonObject[] | undefined)?.[0]?.message ===
+            "object"
+          ? ((payload.choices as JsonObject[])[0].message as JsonObject).images
+          : null,
+      )
+      ? (((payload.choices as JsonObject[])[0].message as JsonObject)
+        .images as unknown[]).length
       : 0;
     metrics.imageCount = dataImages || messageImages || null;
   } catch {
@@ -453,17 +518,17 @@ function estimateOpenAICost(
   if (capability === "text") {
     const inputTokens = metrics.inputTokens ?? 0;
     const outputTokens = metrics.outputTokens ?? 0;
-    const modelName = (model ?? "").toLowerCase();
-    const isLargeModel = modelName.includes("gpt-5") || modelName.includes("gpt-4o");
-    const inputRate = isLargeModel ? 0.005 : 0.001;
-    const outputRate = isLargeModel ? 0.015 : 0.002;
-    return roundUsd((inputTokens / 1000) * inputRate + (outputTokens / 1000) * outputRate);
+    const { inputRate, outputRate } = getOpenAITextTokenRatesPerThousand(model);
+    return roundUsd(
+      (inputTokens / 1000) * inputRate + (outputTokens / 1000) * outputRate,
+    );
   }
 
   if (capability === "image") {
-    const size = typeof requestBody?.image_size === "string" ? requestBody.image_size : "1024x1024";
-    const imageCount =
-      metrics.imageCount ??
+    const size = typeof requestBody?.image_size === "string"
+      ? requestBody.image_size
+      : "1024x1024";
+    const imageCount = metrics.imageCount ??
       (parseNumber(requestBody?.n, 0) || 1);
     const unitCost = size === "1536x1024" ? 0.08 : 0.05;
     return roundUsd(imageCount * unitCost);
@@ -478,8 +543,8 @@ function estimateOpenAICost(
     const textLength = typeof requestBody?.input === "string"
       ? requestBody.input.length
       : typeof requestBody?.text === "string"
-        ? requestBody.text.length
-        : 0;
+      ? requestBody.text.length
+      : 0;
     return roundUsd((textLength / 1000) * 0.02);
   }
 
@@ -496,12 +561,17 @@ function estimateElevenLabsCost(
   metrics: ProviderResponseMetrics,
 ): number {
   if (capability === "tts") {
-    const textLength = typeof requestBody?.text === "string" ? requestBody.text.length : 0;
+    const textLength = typeof requestBody?.text === "string"
+      ? requestBody.text.length
+      : 0;
     return roundUsd((textLength / 1000) * 0.3);
   }
 
   if (capability === "music") {
-    const seconds = parseNumber(requestBody?.duration_seconds, metrics.audioSeconds ?? 0);
+    const seconds = parseNumber(
+      requestBody?.duration_seconds,
+      metrics.audioSeconds ?? 0,
+    );
     return roundUsd(seconds * 0.025);
   }
 
@@ -529,7 +599,11 @@ function estimateProviderRequestCost(
   }
 
   if (providerContext.provider === "elevenlabs") {
-    return estimateElevenLabsCost(providerContext.capability, providerContext.requestBody, metrics);
+    return estimateElevenLabsCost(
+      providerContext.capability,
+      providerContext.requestBody,
+      metrics,
+    );
   }
 
   return 0;
@@ -543,7 +617,9 @@ async function loadConfigRows(
   if (scopeKeys.length === 0) return [];
   const { data, error } = await supabase
     .from("cost_guardrail_config")
-    .select("scope_type, scope_key, enabled, monthly_budget_usd, alert_thresholds, metadata")
+    .select(
+      "scope_type, scope_key, enabled, monthly_budget_usd, alert_thresholds, metadata",
+    )
     .eq("scope_type", scopeType)
     .in("scope_key", scopeKeys);
 
@@ -560,7 +636,9 @@ async function loadStateRows(
   if (scopeKeys.length === 0) return [];
   const { data, error } = await supabase
     .from("cost_guardrail_state")
-    .select("scope_type, scope_key, period_start, total_estimated_cost_usd, request_count, blocked_count, last_threshold_percent")
+    .select(
+      "scope_type, scope_key, period_start, total_estimated_cost_usd, request_count, blocked_count, last_threshold_percent",
+    )
     .eq("scope_type", scopeType)
     .eq("period_start", periodStart)
     .in("scope_key", scopeKeys);
@@ -609,7 +687,9 @@ async function upsertStateRow(
       scope_type: row.scope_type,
       scope_key: row.scope_key,
       period_start: row.period_start,
-      total_estimated_cost_usd: roundUsd(parseNumber(row.total_estimated_cost_usd)),
+      total_estimated_cost_usd: roundUsd(
+        parseNumber(row.total_estimated_cost_usd),
+      ),
       request_count: Math.max(0, Math.round(parseNumber(row.request_count))),
       blocked_count: Math.max(0, Math.round(parseNumber(row.blocked_count))),
       last_threshold_percent: row.last_threshold_percent,
@@ -776,10 +856,13 @@ export function detectCostAnomalies(
         window: "hour",
         recentSpendUsd: roundUsd(lastHourSpend),
         baselineSpendUsd: roundUsd(trailingHourlyAverage),
-        multiplier: Math.round((lastHourSpend / trailingHourlyAverage) * 100) / 100,
+        multiplier: Math.round((lastHourSpend / trailingHourlyAverage) * 100) /
+          100,
         deltaUsd: roundUsd(lastHourSpend - trailingHourlyAverage),
         message:
-          `Last 1h spend for ${endpointKey} is ${roundUsd(lastHourSpend)} USD ` +
+          `Last 1h spend for ${endpointKey} is ${
+            roundUsd(lastHourSpend)
+          } USD ` +
           `vs ${roundUsd(trailingHourlyAverage)} USD trailing hourly average.`,
       });
     }
@@ -795,10 +878,13 @@ export function detectCostAnomalies(
         window: "day",
         recentSpendUsd: roundUsd(lastDaySpend),
         baselineSpendUsd: roundUsd(trailingDailyAverage),
-        multiplier: Math.round((lastDaySpend / trailingDailyAverage) * 100) / 100,
+        multiplier: Math.round((lastDaySpend / trailingDailyAverage) * 100) /
+          100,
         deltaUsd: roundUsd(lastDaySpend - trailingDailyAverage),
         message:
-          `Last 24h spend for ${endpointKey} is ${roundUsd(lastDaySpend)} USD ` +
+          `Last 24h spend for ${endpointKey} is ${
+            roundUsd(lastDaySpend)
+          } USD ` +
           `vs ${roundUsd(trailingDailyAverage)} USD trailing daily average.`,
       });
     }
@@ -811,20 +897,27 @@ export function createCostGuardrailSupabaseClient(): SupabaseClientLike {
   const supabaseUrl = getEnv("SUPABASE_URL");
   const serviceRoleKey = getEnv("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error("Supabase service-role configuration missing for cost guardrails");
+    throw new Error(
+      "Supabase service-role configuration missing for cost guardrails",
+    );
   }
   return createClient(supabaseUrl, serviceRoleKey);
 }
 
-export function createCostGuardrailSession(params: CreateCostGuardrailSessionParams) {
+export function createCostGuardrailSession(
+  params: CreateCostGuardrailSessionParams,
+) {
   const endpointKey = normalizeKey(params.endpointKey);
   const featureKey = normalizeKey(params.featureKey);
   const requestId = params.requestId ?? crypto.randomUUID();
   const periodStart = getCurrentCostPeriodStart();
+  const sessionEnv = params.getEnv ?? getEnv;
   const configCache = new Map<string, CostGuardrailConfigRow | null>();
   const stateCache = new Map<string, CostGuardrailStateRow | null>();
+  let recordEventQueue: Promise<void> = Promise.resolve();
 
-  const cacheKeyForScope = (scope: GuardrailScopeKey) => `${scope.scopeType}:${scope.scopeKey}`;
+  const cacheKeyForScope = (scope: GuardrailScopeKey) =>
+    `${scope.scopeType}:${scope.scopeKey}`;
 
   const ensureScopeRowsLoaded = async (scopes: GuardrailScopeKey[]) => {
     const byType: Record<CostScopeType, string[]> = {
@@ -839,27 +932,35 @@ export function createCostGuardrailSession(params: CreateCostGuardrailSessionPar
       byType[scope.scopeType].push(scope.scopeKey);
     }
 
-    await Promise.all((["provider", "feature", "endpoint"] as CostScopeType[]).map(async (scopeType) => {
-      const scopeKeys = unique(byType[scopeType]);
-      if (scopeKeys.length === 0) return;
+    await Promise.all(
+      (["provider", "feature", "endpoint"] as CostScopeType[]).map(
+        async (scopeType) => {
+          const scopeKeys = unique(byType[scopeType]);
+          if (scopeKeys.length === 0) return;
 
-      const [configRows, stateRows] = await Promise.all([
-        loadConfigRows(params.supabase, scopeType, scopeKeys),
-        loadStateRows(params.supabase, scopeType, scopeKeys, periodStart),
-      ]);
+          const [configRows, stateRows] = await Promise.all([
+            loadConfigRows(params.supabase, scopeType, scopeKeys),
+            loadStateRows(params.supabase, scopeType, scopeKeys, periodStart),
+          ]);
 
-      for (const scopeKey of scopeKeys) {
-        const cacheKey = `${scopeType}:${scopeKey}`;
-        configCache.set(
-          cacheKey,
-          configRows.find((row) => normalizeKey(row.scope_key) === scopeKey) ?? null,
-        );
-        stateCache.set(
-          cacheKey,
-          stateRows.find((row) => normalizeKey(row.scope_key) === scopeKey) ?? null,
-        );
-      }
-    }));
+          for (const scopeKey of scopeKeys) {
+            const cacheKey = `${scopeType}:${scopeKey}`;
+            configCache.set(
+              cacheKey,
+              configRows.find((row) =>
+                normalizeKey(row.scope_key) === scopeKey
+              ) ?? null,
+            );
+            stateCache.set(
+              cacheKey,
+              stateRows.find((row) =>
+                normalizeKey(row.scope_key) === scopeKey
+              ) ?? null,
+            );
+          }
+        },
+      ),
+    );
   };
 
   const scopesForEvent = (providers: CostProvider[]): GuardrailScopeKey[] => {
@@ -877,7 +978,18 @@ export function createCostGuardrailSession(params: CreateCostGuardrailSessionPar
     return scopes;
   };
 
-  const recordEvent = async (event: CostEventRecord, providers: CostProvider[]) => {
+  const recordEvent = async (
+    event: CostEventRecord,
+    providers: CostProvider[],
+  ) => {
+    const previousRecordEvent = recordEventQueue;
+    let releaseRecordEvent: () => void = () => {};
+    recordEventQueue = new Promise<void>((resolve) => {
+      releaseRecordEvent = resolve;
+    });
+
+    await previousRecordEvent;
+
     try {
       await insertCostEvent(params.supabase, periodStart, event);
 
@@ -888,7 +1000,9 @@ export function createCostGuardrailSession(params: CreateCostGuardrailSessionPar
         const cacheKey = cacheKeyForScope(scope);
         const configRow = configCache.get(cacheKey);
         const previousState = stateCache.get(cacheKey);
-        const previousTotal = parseNumber(previousState?.total_estimated_cost_usd);
+        const previousTotal = parseNumber(
+          previousState?.total_estimated_cost_usd,
+        );
         const previousPercent = configRow?.monthly_budget_usd
           ? (previousTotal / parseNumber(configRow.monthly_budget_usd)) * 100
           : 0;
@@ -897,9 +1011,12 @@ export function createCostGuardrailSession(params: CreateCostGuardrailSessionPar
           scope_type: scope.scopeType,
           scope_key: scope.scopeKey,
           period_start: periodStart,
-          total_estimated_cost_usd: previousTotal + (event.status === "success" ? event.estimatedCostUsd : 0),
-          request_count: parseNumber(previousState?.request_count) + (event.status === "blocked" ? 0 : 1),
-          blocked_count: parseNumber(previousState?.blocked_count) + (event.status === "blocked" ? 1 : 0),
+          total_estimated_cost_usd: previousTotal +
+            (event.status === "success" ? event.estimatedCostUsd : 0),
+          request_count: parseNumber(previousState?.request_count) +
+            (event.status === "blocked" ? 0 : 1),
+          blocked_count: parseNumber(previousState?.blocked_count) +
+            (event.status === "blocked" ? 1 : 0),
           last_threshold_percent: previousState?.last_threshold_percent ?? null,
         };
 
@@ -933,11 +1050,14 @@ export function createCostGuardrailSession(params: CreateCostGuardrailSessionPar
             scopeKey: scope.scopeKey,
             alertType: "threshold",
             thresholdPercent: threshold,
-            currentEstimatedCostUsd: parseNumber(nextState.total_estimated_cost_usd),
+            currentEstimatedCostUsd: parseNumber(
+              nextState.total_estimated_cost_usd,
+            ),
             message:
               `${scope.scopeType}:${scope.scopeKey} reached ${threshold}% of its ` +
               `${budget.toFixed(2)} USD monthly budget.`,
-            dedupeKey: `${periodStart}:threshold:${scope.scopeType}:${scope.scopeKey}:${threshold}`,
+            dedupeKey:
+              `${periodStart}:threshold:${scope.scopeType}:${scope.scopeKey}:${threshold}`,
             metadata: {
               endpoint_key: endpointKey,
               feature_key: featureKey,
@@ -947,7 +1067,12 @@ export function createCostGuardrailSession(params: CreateCostGuardrailSessionPar
         }
       }
     } catch (error) {
-      console.error("[cost-guardrails] Failed to persist cost telemetry", error);
+      console.error(
+        "[cost-guardrails] Failed to persist cost telemetry",
+        error,
+      );
+    } finally {
+      releaseRecordEvent();
     }
   };
 
@@ -957,10 +1082,12 @@ export function createCostGuardrailSession(params: CreateCostGuardrailSessionPar
       (options.providers ?? []).map((provider) => provider ?? "unknown"),
     );
 
-    const envBlock = resolveEnvBlock(endpointKey, capabilities);
+    const envBlock = resolveEnvBlock(endpointKey, capabilities, sessionEnv);
     if (envBlock) {
       await recordEvent({
-        provider: providers[0] && providers[0] !== "unknown" ? providers[0] : null,
+        provider: providers[0] && providers[0] !== "unknown"
+          ? providers[0]
+          : null,
         featureKey,
         endpointKey,
         userId: params.userId ?? null,
@@ -988,9 +1115,12 @@ export function createCostGuardrailSession(params: CreateCostGuardrailSessionPar
       if (!configRow) continue;
 
       if (configRow.enabled === false) {
-        const reason = `${scope.scopeType}:${scope.scopeKey} is disabled by runtime guardrail config`;
+        const reason =
+          `${scope.scopeType}:${scope.scopeKey} is disabled by runtime guardrail config`;
         await recordEvent({
-          provider: providers[0] && providers[0] !== "unknown" ? providers[0] : null,
+          provider: providers[0] && providers[0] !== "unknown"
+            ? providers[0]
+            : null,
           featureKey,
           endpointKey,
           userId: params.userId ?? null,
@@ -1010,11 +1140,17 @@ export function createCostGuardrailSession(params: CreateCostGuardrailSessionPar
       }
 
       const budget = parseNumber(configRow.monthly_budget_usd, 0);
-      const currentTotal = parseNumber(stateCache.get(cacheKey)?.total_estimated_cost_usd, 0);
+      const currentTotal = parseNumber(
+        stateCache.get(cacheKey)?.total_estimated_cost_usd,
+        0,
+      );
       if (budget > 0 && currentTotal >= budget) {
-        const reason = `${scope.scopeType}:${scope.scopeKey} has exhausted its monthly budget`;
+        const reason =
+          `${scope.scopeType}:${scope.scopeKey} has exhausted its monthly budget`;
         await recordEvent({
-          provider: providers[0] && providers[0] !== "unknown" ? providers[0] : null,
+          provider: providers[0] && providers[0] !== "unknown"
+            ? providers[0]
+            : null,
           featureKey,
           endpointKey,
           userId: params.userId ?? null,
@@ -1060,7 +1196,11 @@ export function createCostGuardrailSession(params: CreateCostGuardrailSessionPar
       try {
         const response = await baseFetch(input, init);
         const metrics = await extractResponseMetrics(response, providerContext);
-        const estimatedCostUsd = estimateProviderRequestCost(providerContext, metrics, response.ok);
+        const estimatedCostUsd = estimateProviderRequestCost(
+          providerContext,
+          metrics,
+          response.ok,
+        );
 
         await recordEvent({
           provider: providerContext.provider,

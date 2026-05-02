@@ -25,7 +25,7 @@ import { resolveCompanionChatError } from "@/utils/companionChatErrors";
 import { safeLocalStorage } from "@/utils/storage";
 
 const SPOKEN_REPLY_COUNT_KEY = "companion-chat-spoken-replies-v1";
-const MAX_HISTORY_MESSAGES = 18;
+const MAX_HISTORY_MESSAGES = 8;
 const DEFAULT_SPOKEN_REPLY_LIMIT = Number(import.meta.env.VITE_COMPANION_SPOKEN_REPLY_LIMIT ?? 60);
 
 type CompanionChatRow = Tables<"companion_chats">;
