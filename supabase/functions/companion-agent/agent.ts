@@ -4,10 +4,6 @@ import {
   isCompanionModeId,
 } from "../../../src/shared/companionModes.ts";
 import {
-  isScheduleReadMessage,
-  isUpcomingScheduleDigestMessage,
-} from "../../../src/shared/schedulingIntent.ts";
-import {
   isAssignedCompanionName,
   normalizeCompanionName,
   synthesizeAssignedCompanionName,
@@ -38,6 +34,10 @@ import {
   persistAgentTurn,
   replacePendingAction,
 } from "./persistence.ts";
+import {
+  getScheduleReadStarterIntent,
+  isDeterministicScheduleReadRequest,
+} from "./runtimeRouting.ts";
 
 type AgentRunSubStage = "context_load" | "openai" | "persistence";
 
@@ -644,26 +644,6 @@ const isLauncherTurn = (request: CompanionAgentRequest): boolean =>
 const isFollowUpOptionTurn = (request: CompanionAgentRequest): boolean =>
   request.turnOrigin === "follow_up_option" ||
   request.turnOrigin === undefined;
-
-const isDeterministicScheduleReadRequest = (
-  request: CompanionAgentRequest,
-): boolean => {
-  if (request.selectedProposalId || request.selectedProposedAction) {
-    return false;
-  }
-
-  return request.starterIntent === "upcoming_start" ||
-    isUpcomingScheduleDigestMessage(request.message) ||
-    isScheduleReadMessage(request.message);
-};
-
-const getScheduleReadStarterIntent = (
-  request: CompanionAgentRequest,
-): string | null =>
-  request.starterIntent === "upcoming_start" ||
-    isUpcomingScheduleDigestMessage(request.message)
-    ? "upcoming_start"
-    : null;
 
 const resolveBareStarterFollowUp = (
   request: CompanionAgentRequest,

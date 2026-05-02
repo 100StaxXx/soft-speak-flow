@@ -637,6 +637,45 @@ const shouldFallbackToLegacyAgent = (parsed: ParsedFunctionInvokeError) => {
     ));
 };
 
+const shouldFallbackToLegacyScheduleRead = (
+  parsed: ParsedFunctionInvokeError,
+  input: {
+    message: string;
+    starterIntent?: CompanionPlannerLaunchIntent["starterIntent"];
+  },
+) => {
+  const isUpcomingRead = input.starterIntent === "upcoming_start" ||
+    isUpcomingScheduleDigestMessage(input.message);
+  if (!isUpcomingRead) return false;
+
+  const code = getParsedFunctionCode(parsed)?.toUpperCase() ?? "";
+  const failureReason = [
+    parsed.failureReason,
+    parsed.responsePayload?.failureReason,
+  ]
+    .filter((value): value is string =>
+      typeof value === "string" && value.length > 0
+    )
+    .join(" ")
+    .toLowerCase();
+
+  if (
+    code === "ABUSE_CHECK_FAILED" ||
+    code === "COST_GUARDRAIL_BLOCKED" ||
+    code === "INVALID_REQUEST" ||
+    code === "RATE_LIMITED" ||
+    code === "COOLDOWN_ACTIVE" ||
+    code === "UNAUTHORIZED" ||
+    code === "FORBIDDEN" ||
+    failureReason.includes("schema_mismatch")
+  ) {
+    return false;
+  }
+
+  return code === "COMPANION_AGENT_FAILED" ||
+    (!code && typeof parsed.status === "number" && parsed.status >= 500);
+};
+
 export function useCompanionAssistant({
   surface,
   conversationEnabled = true,
@@ -1209,7 +1248,11 @@ export function useCompanionAssistant({
       return true;
     } catch (error) {
       const parsed = await parseFunctionInvokeError(error);
-      const shouldFallback = shouldFallbackToLegacyAgent(parsed);
+      const shouldFallback = shouldFallbackToLegacyAgent(parsed) ||
+        shouldFallbackToLegacyScheduleRead(parsed, {
+          message,
+          starterIntent,
+        });
       console.error("Failed to submit companion agent message:", {
         status: parsed.status ?? null,
         code: getParsedFunctionCode(parsed) ?? null,

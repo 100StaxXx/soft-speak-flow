@@ -61,7 +61,10 @@ import {
 } from "@/hooks/useCompanionAssistant";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
 import { cn, stripMarkdown } from "@/lib/utils";
-import type { QuestComposerPrefillDraft } from "@/features/quests/types";
+import type {
+  QuestComposerPrefillDraft,
+  QuestDifficulty,
+} from "@/features/quests/types";
 import { buildQuestPrefillFromNaturalLanguage } from "@/features/quests/utils/voiceQuestPrefill";
 import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
 import type { CompanionChatThreadSummary } from "@/types/companionConversation";
@@ -140,6 +143,290 @@ const getProposedActionKey = (action: CompanionAgentProposedAction) =>
     getProposedActionSummary(action) ?? "",
     action.reason?.trim() ?? "",
   ].join("::");
+
+const getProposedActionPayload = (
+  action: CompanionAgentProposedAction,
+): Record<string, unknown> => {
+  const normalizedPayload = action.normalizedPayload;
+  return typeof normalizedPayload === "object" &&
+      normalizedPayload !== null &&
+      !Array.isArray(normalizedPayload)
+    ? normalizedPayload as Record<string, unknown>
+    : {};
+};
+
+const getProposedActionSource = (
+  action: CompanionAgentProposedAction,
+): Record<string, unknown> => {
+  return {
+    ...(action as unknown as Record<string, unknown>),
+    ...getProposedActionPayload(action),
+  };
+};
+
+const readFirstString = (
+  source: Record<string, unknown>,
+  keys: string[],
+) => {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return null;
+};
+
+const readFirstNullableString = (
+  source: Record<string, unknown>,
+  keys: string[],
+) => {
+  for (const key of keys) {
+    if (!Object.prototype.hasOwnProperty.call(source, key)) continue;
+    const value = source[key];
+    if (value === null) return null;
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return undefined;
+};
+
+const readFirstNumber = (
+  source: Record<string, unknown>,
+  keys: string[],
+) => {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim().length > 0) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return null;
+};
+
+const readFirstBoolean = (
+  source: Record<string, unknown>,
+  keys: string[],
+) => {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "boolean") return value;
+  }
+  return null;
+};
+
+const readFirstStringArray = (
+  source: Record<string, unknown>,
+  keys: string[],
+) => {
+  for (const key of keys) {
+    const value = source[key];
+    if (!Array.isArray(value)) continue;
+    const strings = value
+      .map((entry) => typeof entry === "string" ? entry.trim() : "")
+      .filter((entry) => entry.length > 0);
+    if (strings.length > 0) return strings;
+  }
+  return [];
+};
+
+const toQuestDifficulty = (value: string | null): QuestDifficulty | null =>
+  value === "easy" || value === "medium" || value === "hard" ? value : null;
+
+const createLocalProposalId = (actionType: string) =>
+  `proposed-action-${actionType}-${Date.now()}-${
+    Math.random().toString(36).slice(2, 8)
+  }`;
+
+const setUpdateField = (
+  updates: Record<string, unknown>,
+  key: string,
+  value: unknown,
+) => {
+  if (value !== undefined) {
+    updates[key] = value;
+  }
+};
+
+const buildQuestProposalFromProposedAction = (
+  action: CompanionAgentProposedAction,
+): CompanionPlannerProposal | null => {
+  const actionType = normalizeProposedActionType(action.type);
+  const payloadSource = getProposedActionPayload(action);
+  const source = getProposedActionSource(action);
+  const title = readFirstString(source, [
+    "taskText",
+    "task_text",
+    "title",
+    "name",
+  ]);
+  const summary = getProposedActionSummary(action) ??
+    (title ? `Review "${title}" before saving.` : null);
+  const reasoning = action.reason?.trim() || null;
+
+  if (actionType === "quest_create" || actionType === "task_create") {
+    if (!title) return null;
+
+    return {
+      id: createLocalProposalId(actionType),
+      kind: "create_quest",
+      title,
+      summary: summary ?? `Review "${title}" before saving.`,
+      reasoning,
+      payload: {
+        taskText: title,
+        taskDate: readFirstString(source, [
+          "taskDate",
+          "task_date",
+          "date",
+        ]),
+        difficulty: toQuestDifficulty(
+          readFirstString(source, ["difficulty"]),
+        ) ?? "medium",
+        scheduledTime: readFirstString(source, [
+          "scheduledTime",
+          "scheduled_time",
+          "startTime",
+          "start_time",
+          "time",
+        ]),
+        estimatedDuration: readFirstNumber(source, [
+          "estimatedDuration",
+          "estimated_duration",
+          "durationMinutes",
+          "duration_minutes",
+          "duration",
+        ]),
+        recurrencePattern: readFirstString(source, [
+          "recurrencePattern",
+          "recurrence_pattern",
+        ]),
+        recurrenceDays: [],
+        recurrenceMonthDays: [],
+        recurrenceCustomPeriod: null,
+        reminderEnabled: readFirstBoolean(source, [
+          "reminderEnabled",
+          "reminder_enabled",
+        ]) ?? false,
+        reminderMinutesBefore: readFirstNumber(source, [
+          "reminderMinutesBefore",
+          "reminder_minutes_before",
+        ]) ?? 15,
+        notes: readFirstString(source, [
+          "notes",
+          "note",
+          "description",
+        ]),
+        location: readFirstString(source, ["location"]),
+        subtasks: readFirstStringArray(source, ["subtasks", "subtaskTitles"]),
+      },
+      status: "pending",
+      readyToConfirm: true,
+    };
+  }
+
+  if (
+    actionType === "quest_update" ||
+    actionType === "task_update" ||
+    actionType === "quest_move" ||
+    actionType === "task_move"
+  ) {
+    const taskId = readFirstString(source, [
+      "taskId",
+      "task_id",
+      "id",
+    ]);
+    if (!taskId) return null;
+
+    const updateTitle = readFirstString(payloadSource, [
+      "taskText",
+      "task_text",
+      "title",
+      "name",
+    ]);
+    const updates: Record<string, unknown> = {};
+    setUpdateField(updates, "task_text", updateTitle ?? undefined);
+    setUpdateField(
+      updates,
+      "task_date",
+      readFirstNullableString(source, [
+        "taskDate",
+        "task_date",
+        "date",
+      ]),
+    );
+    setUpdateField(
+      updates,
+      "scheduled_time",
+      readFirstNullableString(source, [
+        "scheduledTime",
+        "scheduled_time",
+        "startTime",
+        "start_time",
+        "time",
+      ]),
+    );
+    setUpdateField(
+      updates,
+      "estimated_duration",
+      readFirstNumber(source, [
+        "estimatedDuration",
+        "estimated_duration",
+        "durationMinutes",
+        "duration_minutes",
+        "duration",
+      ]) ?? undefined,
+    );
+    setUpdateField(
+      updates,
+      "difficulty",
+      toQuestDifficulty(readFirstString(source, ["difficulty"])) ?? undefined,
+    );
+    setUpdateField(
+      updates,
+      "notes",
+      readFirstNullableString(source, ["notes", "note", "description"]),
+    );
+    setUpdateField(
+      updates,
+      "location",
+      readFirstNullableString(source, ["location"]),
+    );
+    setUpdateField(
+      updates,
+      "reminder_enabled",
+      readFirstBoolean(source, ["reminderEnabled", "reminder_enabled"]) ??
+        undefined,
+    );
+    setUpdateField(
+      updates,
+      "reminder_minutes_before",
+      readFirstNumber(source, [
+        "reminderMinutesBefore",
+        "reminder_minutes_before",
+      ]) ?? undefined,
+    );
+
+    return {
+      id: createLocalProposalId(actionType),
+      kind: "update_quest",
+      title: updateTitle ?? getProposedActionTitle(action),
+      summary: summary ?? "Review this quest update before saving.",
+      reasoning,
+      payload: {
+        taskId,
+        updates,
+      },
+      status: "pending",
+      readyToConfirm: true,
+    };
+  }
+
+  return null;
+};
 
 const PLAN_DAY_QUEST_CONSENT_QUESTION_ID = "plan_day_quest_consent";
 
@@ -767,7 +1054,24 @@ const JourneysCompanionOverlayBody = memo(({
   ) => {
     if (localActionPending) return;
 
-    setPendingProposedActionKey(getProposedActionKey(action));
+    const actionKey = getProposedActionKey(action);
+    const questProposal = onQuestProposalEditHandoff
+      ? buildQuestProposalFromProposedAction(action)
+      : null;
+
+    setPendingProposedActionKey(actionKey);
+
+    if (questProposal && onQuestProposalEditHandoff) {
+      void onQuestProposalEditHandoff(questProposal)
+        .catch((error) => {
+          console.error("Failed to open proposed quest draft:", error);
+        })
+        .finally(() => {
+          setPendingProposedActionKey(null);
+        });
+      return;
+    }
+
     void assistant
       .submitMessage(
         `Draft this: ${getProposedActionTitle(action)}`,
@@ -781,7 +1085,7 @@ const JourneysCompanionOverlayBody = memo(({
       .finally(() => {
         setPendingProposedActionKey(null);
       });
-  }, [assistant, localActionPending]);
+  }, [assistant, localActionPending, onQuestProposalEditHandoff]);
 
   const handleProposedActionDiscuss = useCallback((
     action: CompanionAgentProposedAction,

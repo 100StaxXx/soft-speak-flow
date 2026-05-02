@@ -40,7 +40,7 @@
     "planner:optimizer:test": ". .venv/bin/activate && python3 -m unittest services/planner_optimizer_service/test_optimizer.py",
     "planner:rollout:smoke": "deno test --allow-net=127.0.0.1 supabase/functions/companion-planner-chat/rollout.smoke.ts",
     "planner:phase-a:ui": "npx vitest run src/services/companionChatThreads.test.ts src/hooks/useCompanionAssistant.test.tsx src/hooks/useCompanionPlanner.test.tsx src/hooks/useLegacyCompanionAssistantAdapter.test.tsx src/components/companion/CompanionStructuredResponseCards.test.tsx src/components/journeys/JourneysCompanionPlannerModal.test.tsx",
-    "planner:phase-a:backend": "deno test supabase/functions/companion-planner-chat/planner.test.ts supabase/functions/companion-planner-chat/orchestrator.test.ts supabase/functions/companion-planner-chat/latencyBudget.test.ts supabase/functions/companion-agent/plannerBridge.test.ts supabase/functions/companion-agent/types.test.ts supabase/functions/companion-agent/agent.test.ts",
+    "planner:phase-a:backend": "deno test supabase/functions/companion-planner-chat/planner.test.ts supabase/functions/companion-planner-chat/orchestrator.test.ts supabase/functions/companion-planner-chat/latencyBudget.test.ts supabase/functions/companion-agent/plannerBridge.test.ts supabase/functions/companion-agent/types.test.ts supabase/functions/companion-agent/runtimeRouting.test.ts supabase/functions/companion-agent/agent.test.ts",
     "planner:phase-a:typecheck": "node scripts/check-planner-phase-a-slice.mjs",
     "planner:phase-a:check": "npm run planner:phase-a:ui && npm run planner:phase-a:backend && npm run planner:phase-a:typecheck",
     "previews:manifest": "node --import tsx scripts/generate-badge-reward-manifests.ts",

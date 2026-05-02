@@ -14,6 +14,7 @@ import {
   type CompanionAgentFailureStage,
   getCompanionAgentFailureReason,
 } from "./failureDiagnostics.ts";
+import { shouldUseCostGuardrailPreflight } from "./runtimeRouting.ts";
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
@@ -51,22 +52,32 @@ serve(async (req) => {
       });
     }
 
-    stage = "cost_guardrail";
-    const costGuardrails = createCostGuardrailSession({
-      supabase: createCostGuardrailSupabaseClient(),
-      endpointKey: "companion-agent",
-      featureKey: "ai_companion_agent",
-      userId: protectedRequest.auth.userId,
-      requestId,
-    });
-    await costGuardrails.enforceAccess({
-      capabilities: ["text"],
-      providers: ["openai"],
-    });
+    const shouldPreflightCostGuardrails = shouldUseCostGuardrailPreflight(
+      parsed.data,
+    );
+    const costGuardrails = shouldPreflightCostGuardrails
+      ? (() => {
+        stage = "cost_guardrail";
+        return createCostGuardrailSession({
+          supabase: createCostGuardrailSupabaseClient(),
+          endpointKey: "companion-agent",
+          featureKey: "ai_companion_agent",
+          userId: protectedRequest.auth.userId,
+          requestId,
+        });
+      })()
+      : null;
+
+    if (costGuardrails) {
+      await costGuardrails.enforceAccess({
+        capabilities: ["text"],
+        providers: ["openai"],
+      });
+    }
 
     stage = "agent_run";
     const result = await runCompanionAgent({
-      guardedFetch: costGuardrails.wrapFetch(fetch),
+      guardedFetch: costGuardrails?.wrapFetch(fetch) ?? fetch,
       supabase: protectedRequest.supabase,
       userId: protectedRequest.auth.userId,
       request: parsed.data,

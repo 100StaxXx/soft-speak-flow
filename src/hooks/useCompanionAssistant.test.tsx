@@ -917,6 +917,72 @@ describe("useCompanionAssistant", () => {
     consoleError.mockRestore();
   });
 
+  it("falls back to the read-only legacy planner for generic upcoming agent failures", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(
+      () => {},
+    );
+    mocks.supabaseInvoke.mockRejectedValueOnce(
+      Object.assign(new Error("Edge Function returned a non-2xx status code"), {
+        name: "FunctionsHttpError",
+      }),
+    );
+    mocks.parseFunctionInvokeError.mockResolvedValueOnce({
+      name: "FunctionsHttpError",
+      message: "Edge Function returned a non-2xx status code",
+      status: 500,
+      code: "COMPANION_AGENT_FAILED",
+      requestId: "req-upcoming-fallback",
+      responsePayload: {
+        code: "COMPANION_AGENT_FAILED",
+        error: "Companion agent hit a snag. Please try again.",
+        requestId: "req-upcoming-fallback",
+        stage: "agent_run",
+        failureReason: "cost_guardrail_failed",
+      },
+      backendMessage: "Companion agent hit a snag. Please try again.",
+      isOffline: false,
+      category: "http",
+    });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("persisted-session");
+    });
+
+    let submitted: boolean | undefined;
+    await act(async () => {
+      submitted = await result.current.submitMessage(
+        "What do I have coming up?",
+        "text",
+      );
+    });
+
+    expect(submitted).toBe(true);
+    expect(mocks.legacyHydrateFromUnifiedState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: "persisted-session",
+        messages: expect.arrayContaining([
+          expect.objectContaining({
+            role: "user",
+            content: "What do I have coming up?",
+          }),
+        ]),
+      }),
+    );
+    expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
+      "What do I have coming up?",
+      "text",
+      undefined,
+    );
+    expect(mocks.toastError).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
   it("shows a companion-agent setup message for backend setup failures", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(
       () => {},

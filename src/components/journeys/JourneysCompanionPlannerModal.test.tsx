@@ -1104,7 +1104,196 @@ describe("JourneysCompanionPlannerModal", () => {
     mocks.state.activeFollowUp = null;
   });
 
-  it("renders model proposed actions and sends the selected draft context", async () => {
+  it("opens the local quest editor handoff for model quest draft actions", async () => {
+    const previousPendingAction = mocks.state.pendingAction;
+    const previousStructuredResponse = mocks.state.structuredResponse;
+    const previousProposedActions = mocks.state.proposedActions;
+    const onQuestProposalEditHandoff = vi.fn().mockResolvedValue({
+      saved: false,
+    });
+    const proposedAction = {
+      type: "quest.create",
+      title: "Draft launch email",
+      summary: "Protect one launch block before the afternoon fills.",
+      reason: "It fits the cleanest open window.",
+      normalizedPayload: {
+        title: "Draft launch email",
+        date: "2026-04-18",
+        startTime: "10:00",
+        durationMinutes: 45,
+        notes: "Start with the VIP list.",
+        location: "Desk",
+        reminderEnabled: true,
+        reminderMinutesBefore: 10,
+      },
+    };
+    mocks.state.pendingAction = null;
+    mocks.state.structuredResponse = null;
+    mocks.state.proposedActions = [proposedAction];
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+        onQuestProposalEditHandoff={onQuestProposalEditHandoff}
+      />,
+    );
+
+    expect(screen.getByTestId("journeys-companion-proposed-actions"))
+      .toHaveTextContent("Draft launch email");
+    expect(screen.getByText("It fits the cleanest open window."))
+      .toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Draft/i }));
+    });
+
+    expect(onQuestProposalEditHandoff).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "create_quest",
+        title: "Draft launch email",
+        summary: "Protect one launch block before the afternoon fills.",
+        reasoning: "It fits the cleanest open window.",
+        status: "pending",
+        readyToConfirm: true,
+        payload: expect.objectContaining({
+          taskText: "Draft launch email",
+          taskDate: "2026-04-18",
+          scheduledTime: "10:00",
+          estimatedDuration: 45,
+          notes: "Start with the VIP list.",
+          location: "Desk",
+          reminderEnabled: true,
+          reminderMinutesBefore: 10,
+        }),
+      }),
+    );
+    expect(mocks.assistant.submitMessage).not.toHaveBeenCalled();
+
+    mocks.state.pendingAction = previousPendingAction;
+    mocks.state.structuredResponse = previousStructuredResponse;
+    mocks.state.proposedActions = previousProposedActions;
+  });
+
+  it("opens the local quest editor handoff for model quest update actions", async () => {
+    const previousPendingAction = mocks.state.pendingAction;
+    const previousStructuredResponse = mocks.state.structuredResponse;
+    const previousProposedActions = mocks.state.proposedActions;
+    const onQuestProposalEditHandoff = vi.fn().mockResolvedValue({
+      saved: false,
+    });
+    const proposedAction = {
+      type: "task.move",
+      title: "Move the cleanup quest",
+      summary: "Shift it to tomorrow morning.",
+      normalizedPayload: {
+        taskId: "task-123",
+        date: "2026-04-19",
+        startTime: "09:00",
+        durationMinutes: 30,
+      },
+    };
+    mocks.state.pendingAction = null;
+    mocks.state.structuredResponse = null;
+    mocks.state.proposedActions = [proposedAction];
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+        onQuestProposalEditHandoff={onQuestProposalEditHandoff}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Draft/i }));
+    });
+
+    const proposal = onQuestProposalEditHandoff.mock.calls[0]?.[0];
+    expect(proposal).toEqual(
+      expect.objectContaining({
+        kind: "update_quest",
+        title: "Move the cleanup quest",
+        payload: expect.objectContaining({
+          taskId: "task-123",
+          updates: expect.objectContaining({
+            task_date: "2026-04-19",
+            scheduled_time: "09:00",
+            estimated_duration: 30,
+          }),
+        }),
+      }),
+    );
+    expect(
+      (
+        proposal?.payload as { updates?: Record<string, unknown> } | undefined
+      )?.updates,
+    ).not.toHaveProperty("task_text");
+    expect(mocks.assistant.submitMessage).not.toHaveBeenCalled();
+
+    mocks.state.pendingAction = previousPendingAction;
+    mocks.state.structuredResponse = previousStructuredResponse;
+    mocks.state.proposedActions = previousProposedActions;
+  });
+
+  it("prevents duplicate local quest handoffs while a draft selection is in flight", async () => {
+    const previousPendingAction = mocks.state.pendingAction;
+    const previousStructuredResponse = mocks.state.structuredResponse;
+    const previousProposedActions = mocks.state.proposedActions;
+    const onQuestProposalEditHandoff = vi.fn().mockReturnValue(
+      new Promise(() => undefined),
+    );
+    const firstProposedAction = {
+      type: "quest.create",
+      title: "Draft launch email",
+      summary: "Protect one launch block before the afternoon fills.",
+    };
+    const secondProposedAction = {
+      type: "quest.create",
+      title: "Outline sales page",
+      summary: "Use the next clean focus block.",
+    };
+    mocks.state.pendingAction = null;
+    mocks.state.structuredResponse = null;
+    mocks.state.proposedActions = [firstProposedAction, secondProposedAction];
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+        onQuestProposalEditHandoff={onQuestProposalEditHandoff}
+      />,
+    );
+
+    const draftButtons = screen.getAllByRole("button", { name: /Draft/i });
+    expect(draftButtons).toHaveLength(2);
+    fireEvent.click(draftButtons[0]!);
+    fireEvent.click(draftButtons[1]!);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Drafting/i }))
+        .toBeDisabled();
+    });
+    expect(onQuestProposalEditHandoff).toHaveBeenCalledTimes(1);
+    expect(onQuestProposalEditHandoff).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "create_quest",
+        payload: expect.objectContaining({
+          taskText: "Draft launch email",
+        }),
+      }),
+    );
+    expect(mocks.assistant.submitMessage).not.toHaveBeenCalled();
+
+    mocks.state.pendingAction = previousPendingAction;
+    mocks.state.structuredResponse = previousStructuredResponse;
+    mocks.state.proposedActions = previousProposedActions;
+  });
+
+  it("falls back to chat draft requests when no local quest handoff is available", async () => {
     const previousPendingAction = mocks.state.pendingAction;
     const previousStructuredResponse = mocks.state.structuredResponse;
     const previousProposedActions = mocks.state.proposedActions;
@@ -1112,7 +1301,6 @@ describe("JourneysCompanionPlannerModal", () => {
       type: "quest.create",
       title: "Draft launch email",
       summary: "Protect one launch block before the afternoon fills.",
-      reason: "It fits the cleanest open window.",
       normalizedPayload: {
         title: "Draft launch email",
         date: "2026-04-18",
@@ -1131,11 +1319,6 @@ describe("JourneysCompanionPlannerModal", () => {
       />,
     );
 
-    expect(screen.getByTestId("journeys-companion-proposed-actions"))
-      .toHaveTextContent("Draft launch email");
-    expect(screen.getByText("It fits the cleanest open window."))
-      .toBeInTheDocument();
-
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /Draft/i }));
     });
@@ -1146,60 +1329,6 @@ describe("JourneysCompanionPlannerModal", () => {
       {
         turnOrigin: "proposed_action",
         selectedProposedAction: proposedAction,
-        selectedProposedActionIntent: "draft",
-      },
-    );
-
-    mocks.state.pendingAction = previousPendingAction;
-    mocks.state.structuredResponse = previousStructuredResponse;
-    mocks.state.proposedActions = previousProposedActions;
-  });
-
-  it("prevents duplicate proposed action submits while a selection is in flight", async () => {
-    const previousPendingAction = mocks.state.pendingAction;
-    const previousStructuredResponse = mocks.state.structuredResponse;
-    const previousProposedActions = mocks.state.proposedActions;
-    const firstProposedAction = {
-      type: "quest.create",
-      title: "Draft launch email",
-      summary: "Protect one launch block before the afternoon fills.",
-    };
-    const secondProposedAction = {
-      type: "quest.create",
-      title: "Outline sales page",
-      summary: "Use the next clean focus block.",
-    };
-    mocks.assistant.submitMessage.mockReturnValueOnce(
-      new Promise<boolean>(() => undefined),
-    );
-    mocks.state.pendingAction = null;
-    mocks.state.structuredResponse = null;
-    mocks.state.proposedActions = [firstProposedAction, secondProposedAction];
-
-    render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        presentation="dialog"
-      />,
-    );
-
-    const draftButtons = screen.getAllByRole("button", { name: /Draft/i });
-    expect(draftButtons).toHaveLength(2);
-    fireEvent.click(draftButtons[0]!);
-    fireEvent.click(draftButtons[1]!);
-
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /Drafting/i }))
-        .toBeDisabled();
-    });
-    expect(mocks.assistant.submitMessage).toHaveBeenCalledTimes(1);
-    expect(mocks.assistant.submitMessage).toHaveBeenCalledWith(
-      "Draft this: Draft launch email",
-      "text",
-      {
-        turnOrigin: "proposed_action",
-        selectedProposedAction: firstProposedAction,
         selectedProposedActionIntent: "draft",
       },
     );
