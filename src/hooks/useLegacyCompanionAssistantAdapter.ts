@@ -732,6 +732,21 @@ export function useLegacyCompanionAssistantAdapter({
     return nextSessionId;
   }, [journeysConversation, journeysThreads, surface]);
 
+  const startQuestCaptureThread = useCallback((greetingText: string) => {
+    if (surface !== "journeys") return "";
+
+    const nextSessionId = journeysThreads.startTemplateThread({
+      greetingText: null,
+    });
+    const trimmedGreetingText = greetingText.trim();
+
+    if (trimmedGreetingText) {
+      planner.primeQuestCapture(trimmedGreetingText);
+    }
+
+    return nextSessionId;
+  }, [journeysThreads, planner, surface]);
+
   return {
     greeting: surface === "journeys"
       ? journeysConversation.greeting
@@ -823,6 +838,9 @@ export function useLegacyCompanionAssistantAdapter({
       : null,
     startTemplateThread: surface === "journeys"
       ? startTemplateThread
+      : () => "",
+    startQuestCaptureThread: surface === "journeys"
+      ? startQuestCaptureThread
       : () => "",
     hydrateFromUnifiedState,
   };

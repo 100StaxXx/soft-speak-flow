@@ -271,6 +271,26 @@ describe("useLegacyCompanionAssistantAdapter", () => {
     expect(mocks.journeysConversation.submitMessage).not.toHaveBeenCalled();
   });
 
+  it("starts quest-capture template threads by priming the planner", () => {
+    const { result } = renderHook(() =>
+      useLegacyCompanionAssistantAdapter({
+        enabled: true,
+        surface: "journeys",
+      })
+    );
+
+    act(() => {
+      result.current.startQuestCaptureThread("New Quest");
+    });
+
+    expect(mocks.journeysThreads.startTemplateThread).toHaveBeenCalledWith({
+      greetingText: null,
+    });
+    expect(mocks.planner.primeQuestCapture).toHaveBeenCalledWith("New Quest");
+    expect(mocks.journeysConversation.injectAssistantOpening)
+      .not.toHaveBeenCalled();
+  });
+
   it("exposes planner suggestions as read-only guidance in fallback mode", async () => {
     mocks.planner.structuredResponse = {
       intent: {

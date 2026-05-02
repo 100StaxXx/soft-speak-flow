@@ -34,6 +34,7 @@ const mocks = vi.hoisted(() => ({
   legacyConfirmSuggestedQuest: vi.fn().mockResolvedValue(undefined),
   legacyConfirmAllPendingActions: vi.fn().mockResolvedValue(undefined),
   legacyStartTemplateThread: vi.fn(),
+  legacyStartQuestCaptureThread: vi.fn(),
   legacyHydrateFromUnifiedState: vi.fn(),
   legacySavedSuggestionProposalIds: [] as string[],
   legacyPendingSuggestionProposalId: null as string | null,
@@ -103,6 +104,7 @@ vi.mock("@/hooks/useLegacyCompanionAssistantAdapter", () => ({
     confirmSuggestedQuest: mocks.legacyConfirmSuggestedQuest,
     confirmAllPendingActions: mocks.legacyConfirmAllPendingActions,
     startTemplateThread: mocks.legacyStartTemplateThread,
+    startQuestCaptureThread: mocks.legacyStartQuestCaptureThread,
     hydrateFromUnifiedState: mocks.legacyHydrateFromUnifiedState,
     isSpeaking: false,
     speechProvider: "none" as const,
@@ -1793,10 +1795,9 @@ describe("useCompanionAssistant", () => {
     );
 
     await waitFor(() => {
-      expect(mocks.legacyStartTemplateThread).toHaveBeenCalledWith({
-        greetingText: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
-        visibleAssistantOpening: true,
-      });
+      expect(mocks.legacyStartQuestCaptureThread).toHaveBeenCalledWith(
+        COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
+      );
     });
 
     mocks.legacySubmitMessage.mockClear();
@@ -1846,13 +1847,12 @@ describe("useCompanionAssistant", () => {
     );
 
     await waitFor(() => {
-      expect(mocks.legacyStartTemplateThread).toHaveBeenCalledWith({
-        greetingText: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
-        visibleAssistantOpening: true,
-      });
+      expect(mocks.legacyStartQuestCaptureThread).toHaveBeenCalledWith(
+        COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
+      );
     });
 
-    mocks.legacyStartTemplateThread.mockClear();
+    mocks.legacyStartQuestCaptureThread.mockClear();
     mocks.legacySubmitMessage.mockClear();
 
     rerender({ launchIntent: planLaunchIntent });

@@ -1698,10 +1698,7 @@ export function useCompanionAssistant({
           const greetingText = launchMessage.trim() ||
             COMPANION_PLANNER_QUEST_CAPTURE_OPENING;
           if (useLegacyFallback) {
-            legacyAssistant.startTemplateThread?.({
-              greetingText,
-              visibleAssistantOpening: true,
-            });
+            legacyAssistant.startQuestCaptureThread?.(greetingText);
           } else {
             startTemplateThread({
               greetingText,
