@@ -316,13 +316,18 @@ function LoadingState({
   const copy = LOADING_PHASE_COPY[phase];
   const activeSlide = slides.length > 0 ? slides[slideIndex % slides.length] : null;
   const galleryReady = readyCount >= targetCount;
+  const galleryColumnCount = Math.max(1, Math.min(targetCount, 5));
+  const activeSlideDescription = phase === "analysis"
+    ? "Recent title cards are passing through while your stats read comes together."
+    : "Recent title cards are passing through while yours forms.";
 
   useEffect(() => {
+    if (prefersReducedMotion) return;
     if (slides.length <= 1) return;
 
     const interval = window.setInterval(() => {
       setSlideIndex((current) => (current + 1) % slides.length);
-    }, prefersReducedMotion ? 6500 : 4200);
+    }, 4200);
 
     return () => window.clearInterval(interval);
   }, [prefersReducedMotion, slides.length]);
@@ -400,7 +405,7 @@ function LoadingState({
           </p>
           {activeSlide ? (
             <p className="mx-auto max-w-sm text-xs leading-5 text-muted-foreground">
-              Recent title cards are passing through while yours forms.
+              {activeSlideDescription}
             </p>
           ) : (
             <p className="mx-auto max-w-sm text-xs leading-5 text-muted-foreground">
@@ -422,7 +427,12 @@ function LoadingState({
                 : `${readyCount} / ${targetCount} cards${isSeeding ? " - expanding" : ""}`}
             </span>
           </div>
-          <div className="grid grid-cols-5 gap-2" aria-hidden="true">
+          <div
+            className="grid gap-2"
+            style={{ gridTemplateColumns: `repeat(${galleryColumnCount}, minmax(0, 1fr))` }}
+            aria-hidden="true"
+            data-testid="companion-stat-loading-gallery-dots"
+          >
             {Array.from({ length: targetCount }).map((_, index) => (
               <div
                 key={index}

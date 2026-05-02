@@ -473,8 +473,12 @@ describe("CompanionStatAnalysisSurface", () => {
     expect(screen.getByTestId("companion-stat-loading-state").className).toContain("min-h-[min(72vh,760px)]");
     expect(screen.getByTestId("companion-stat-loading-slide")).toBeInTheDocument();
     expect(screen.getByText("Reading your stat shape")).toBeInTheDocument();
+    expect(screen.getByText("Recent title cards are passing through while your stats read comes together.")).toBeInTheDocument();
     expect(screen.getByText("Current step")).toBeInTheDocument();
     expect(screen.getByText("Shared gallery")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-stat-loading-gallery-dots")).toHaveStyle({
+      gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+    });
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
     expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
   });
@@ -501,6 +505,64 @@ describe("CompanionStatAnalysisSurface", () => {
     );
 
     expect(container.querySelector("svg.animate-pulse")).not.toBeInTheDocument();
+  });
+
+  it("keeps the slideshow on the first slide when reduced motion is preferred", async () => {
+    vi.useFakeTimers();
+    mocks.prefersReducedMotion = true;
+    mocks.useCosmiqTitleCardLoadingGalleryMock.mockReturnValue({
+      slides: [
+        {
+          profileKey: "shared-title-1",
+          imageUrl: "https://cdn.example.com/shared-title-1.png",
+          title: "Shared Title 1",
+          rarity: "rare",
+          generatedAt: "2026-04-18T00:00:00.000Z",
+        },
+        {
+          profileKey: "shared-title-2",
+          imageUrl: "https://cdn.example.com/shared-title-2.png",
+          title: "Shared Title 2",
+          rarity: "epic",
+          generatedAt: "2026-04-19T00:00:00.000Z",
+        },
+      ],
+      readyCount: 2,
+      targetCount: 10,
+      isLoading: false,
+      isSeeding: false,
+      error: null,
+    });
+    mocks.useCompanionStatAnalysisMock.mockReturnValue({
+      analysis: null,
+      cached: false,
+      error: null,
+      isLoading: true,
+      isRefreshing: false,
+      isRegeneratingTitleCard: false,
+      refreshAnalysis: mocks.refreshAnalysisMock,
+      regenerateTitleCard: mocks.regenerateTitleCardMock,
+    });
+
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="desktop"
+      />,
+    );
+
+    expect(screen.getByTestId("companion-stat-loading-slide")).toHaveStyle({
+      backgroundImage: 'url("https://cdn.example.com/shared-title-1.png")',
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(20_000);
+    });
+
+    expect(screen.getByTestId("companion-stat-loading-slide")).toHaveStyle({
+      backgroundImage: 'url("https://cdn.example.com/shared-title-1.png")',
+    });
   });
 
   it("keeps the loading state while title-card art is still generating", () => {
