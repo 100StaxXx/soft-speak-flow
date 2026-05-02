@@ -80,7 +80,7 @@ const getCosmiqTitleCardProfileKey = (analysis: CompanionStatAnalysis) =>
   });
 
 export const useCompanionStatAnalysis = ({ enabled = true }: UseCompanionStatAnalysisOptions = {}) => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { profile } = useProfile();
   const queryClient = useQueryClient();
   const activeTitleCardRequestKeyRef = useRef<string | null>(null);
@@ -287,7 +287,7 @@ export const useCompanionStatAnalysis = ({ enabled = true }: UseCompanionStatAna
   return {
     analysis: query.data?.analysis ?? null,
     cached: query.data?.cached ?? false,
-    isLoading: query.isLoading,
+    isLoading: query.isLoading || (enabled && authLoading && !query.data?.analysis),
     error: query.error ? getAnalysisErrorMessage(query.error) : null,
     refreshAnalysis: refreshMutation.mutateAsync,
     isRefreshing: refreshMutation.isPending,

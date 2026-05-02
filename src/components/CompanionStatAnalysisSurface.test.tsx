@@ -1,5 +1,5 @@
 import type { HTMLAttributes, ReactNode } from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -314,6 +314,7 @@ describe("CompanionStatAnalysisSurface", () => {
 
   afterEach(() => {
     globalThis.Image = originalImage;
+    vi.useRealTimers();
   });
 
   it("uses a drawer on mobile and renders the RPG stat reading shell", () => {
@@ -469,9 +470,37 @@ describe("CompanionStatAnalysisSurface", () => {
     );
 
     expect(screen.getByTestId("companion-stat-loading-state")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-stat-loading-state").className).toContain("min-h-[min(72vh,760px)]");
     expect(screen.getByTestId("companion-stat-loading-slide")).toBeInTheDocument();
     expect(screen.getByText("Reading your stat shape")).toBeInTheDocument();
+    expect(screen.getByText("Current step")).toBeInTheDocument();
+    expect(screen.getByText("Shared gallery")).toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
     expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
+  });
+
+  it("does not pulse the loader icon when reduced motion is preferred", () => {
+    mocks.prefersReducedMotion = true;
+    mocks.useCompanionStatAnalysisMock.mockReturnValue({
+      analysis: null,
+      cached: false,
+      error: null,
+      isLoading: true,
+      isRefreshing: false,
+      isRegeneratingTitleCard: false,
+      refreshAnalysis: mocks.refreshAnalysisMock,
+      regenerateTitleCard: mocks.regenerateTitleCardMock,
+    });
+
+    const { container } = render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="desktop"
+      />,
+    );
+
+    expect(container.querySelector("svg.animate-pulse")).not.toBeInTheDocument();
   });
 
   it("keeps the loading state while title-card art is still generating", () => {
@@ -503,6 +532,46 @@ describe("CompanionStatAnalysisSurface", () => {
 
     expect(screen.getByTestId("companion-stat-loading-state")).toBeInTheDocument();
     expect(screen.getByText("Forging your title card")).toBeInTheDocument();
+    expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
+  });
+
+  it("escalates long title-card waits with a regenerate control", async () => {
+    vi.useFakeTimers();
+    mocks.useCompanionStatAnalysisMock.mockReturnValue({
+      analysis: {
+        ...analysis,
+        cosmiqTitleCard: {
+          ...analysis.cosmiqTitleCard,
+          imageUrl: null,
+          status: "generating",
+        },
+      },
+      cached: false,
+      error: null,
+      isLoading: false,
+      isRefreshing: false,
+      isRegeneratingTitleCard: false,
+      refreshAnalysis: mocks.refreshAnalysisMock,
+      regenerateTitleCard: mocks.regenerateTitleCardMock,
+    });
+
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="desktop"
+      />,
+    );
+
+    expect(screen.getByText("Forging your title card")).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(20_000);
+    });
+
+    expect(screen.getByText("Taking longer than usual")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Regenerate title art" }));
+    expect(mocks.regenerateTitleCardMock).toHaveBeenCalledTimes(1);
     expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
   });
 

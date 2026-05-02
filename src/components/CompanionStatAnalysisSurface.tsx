@@ -40,7 +40,6 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Progress } from "@/components/ui/progress";
 import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
 import { useCosmiqTitleCardLoadingGallery } from "@/hooks/useCosmiqTitleCardLoadingGallery";
@@ -112,6 +111,9 @@ const ATTRIBUTE_ORDER: CompanionStatAttribute[] = [
 
 const STAT_MIN = 100;
 const STAT_MAX = 1000;
+const TITLE_CARD_LONG_WAIT_MS = 20_000;
+const TITLE_CARD_PANEL_MIN_HEIGHT_CLASS = "min-h-[min(72vh,760px)]";
+const TITLE_CARD_PANEL_HEIGHT_CLASS = "h-[min(72vh,760px)]";
 
 const RANK_BY_BAND: Record<CompanionStatBand, string> = {
   Emerging: "C",
@@ -259,7 +261,7 @@ const mentorAccentStyle = (analysis: CompanionStatAnalysis): CSSProperties | und
   };
 };
 
-type LoadingStatePhase = "analysis" | "title-generating" | "image-warmup" | "retrying";
+type LoadingStatePhase = "analysis" | "title-generating" | "image-warmup" | "retrying" | "long-wait";
 
 const LOADING_PHASE_COPY: Record<
   LoadingStatePhase,
@@ -289,6 +291,12 @@ const LOADING_PHASE_COPY: Record<
     description: "The card needs another pass. The reveal will stay here until real title art is ready.",
     ariaLabel: "Retrying Cosmiq title card art",
   },
+  "long-wait": {
+    eyebrow: "Still working",
+    title: "Taking longer than usual",
+    description: "The title art is still forming. You can retry the art pass while the reveal stays protected.",
+    ariaLabel: "Cosmiq title card is taking longer than usual",
+  },
 };
 
 function LoadingState({
@@ -307,10 +315,7 @@ function LoadingState({
   const [slideIndex, setSlideIndex] = useState(0);
   const copy = LOADING_PHASE_COPY[phase];
   const activeSlide = slides.length > 0 ? slides[slideIndex % slides.length] : null;
-  const libraryProgress = Math.max(
-    activeSlide ? 18 : 8,
-    Math.min(100, Math.round((readyCount / targetCount) * 100)),
-  );
+  const galleryReady = readyCount >= targetCount;
 
   useEffect(() => {
     if (slides.length <= 1) return;
@@ -333,7 +338,7 @@ function LoadingState({
       aria-live="polite"
       data-testid="companion-stat-loading-state"
       role="status"
-      className="relative min-h-[62vh] overflow-hidden border-primary/25 bg-background"
+      className={cn("relative overflow-hidden border-primary/25 bg-background", TITLE_CARD_PANEL_MIN_HEIGHT_CLASS)}
     >
       <div className="absolute inset-0">
         {activeSlide ? (
@@ -367,7 +372,10 @@ function LoadingState({
       />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,hsl(var(--primary)/0.16),transparent_38%)]" />
 
-      <CardContent className="relative z-10 flex min-h-[62vh] flex-col items-center justify-center gap-6 p-6 text-center">
+      <CardContent className={cn(
+        "relative z-10 flex flex-col items-center justify-center gap-6 p-6 text-center",
+        TITLE_CARD_PANEL_MIN_HEIGHT_CLASS,
+      )}>
         <div className="relative flex h-28 w-28 items-center justify-center rounded-full border border-primary/35 bg-background/55 shadow-2xl backdrop-blur-md">
           <motion.div
             aria-hidden="true"
@@ -381,7 +389,7 @@ function LoadingState({
             animate={prefersReducedMotion ? undefined : { rotate: 360 }}
             transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
           />
-          <Sparkles className="h-10 w-10 animate-pulse text-primary" />
+          <Sparkles className={cn("h-10 w-10 text-primary", !prefersReducedMotion && "animate-pulse")} />
         </div>
 
         <div className="space-y-2 rounded-lg border border-white/10 bg-background/70 p-4 shadow-2xl backdrop-blur-md">
@@ -402,12 +410,19 @@ function LoadingState({
         </div>
 
         <div className="w-full max-w-md space-y-3 rounded-lg border border-white/10 bg-background/55 p-4 backdrop-blur">
-          <Progress value={libraryProgress} className="h-2" />
           <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-            <span>{readyCount} / {targetCount} shared cards ready</span>
-            <span>{isSeeding ? "Expanding library..." : "Syncing library..."}</span>
+            <span>Current step</span>
+            <span>{copy.eyebrow}</span>
           </div>
-          <div className="grid grid-cols-5 gap-2">
+          <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+            <span>Shared gallery</span>
+            <span>
+              {galleryReady
+                ? "Ready"
+                : `${readyCount} / ${targetCount} cards${isSeeding ? " - expanding" : ""}`}
+            </span>
+          </div>
+          <div className="grid grid-cols-5 gap-2" aria-hidden="true">
             {Array.from({ length: targetCount }).map((_, index) => (
               <div
                 key={index}
@@ -953,7 +968,10 @@ function CosmiqTitleRevealCard({
     return (
       <Card
         data-testid="companion-cosmiq-title-card"
-        className="flex h-[min(72vh,760px)] flex-col overflow-hidden border-primary/25 bg-[linear-gradient(135deg,hsl(var(--primary)/0.12),hsl(var(--background)/0.82)_44%,hsl(var(--accent)/0.08))]"
+        className={cn(
+          "flex flex-col overflow-hidden border-primary/25 bg-[linear-gradient(135deg,hsl(var(--primary)/0.12),hsl(var(--background)/0.82)_44%,hsl(var(--accent)/0.08))]",
+          TITLE_CARD_PANEL_HEIGHT_CLASS,
+        )}
         style={mentorAccentStyle(analysis)}
       >
         <CardHeader className="shrink-0 border-b border-white/10 p-4 sm:p-5">
@@ -1007,7 +1025,7 @@ function CosmiqTitleRevealCard({
   return (
     <Card
       data-testid="companion-cosmiq-title-card"
-      className="relative min-h-[min(72vh,760px)] overflow-hidden border-primary/25 bg-background"
+      className={cn("relative overflow-hidden border-primary/25 bg-background", TITLE_CARD_PANEL_MIN_HEIGHT_CLASS)}
       style={mentorAccentStyle(analysis)}
     >
       {imageUrl ? (
@@ -1024,7 +1042,7 @@ function CosmiqTitleRevealCard({
 
       <div className="absolute inset-0 bg-[linear-gradient(180deg,hsl(var(--background)/0.12),hsl(var(--background)/0.28)_42%,hsl(var(--background)/0.88))]" />
 
-      <div className="relative z-10 flex min-h-[min(72vh,760px)] flex-col justify-between p-4 sm:p-6">
+      <div className={cn("relative z-10 flex flex-col justify-between p-4 sm:p-6", TITLE_CARD_PANEL_MIN_HEIGHT_CLASS)}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-wrap gap-2">
             <Badge className="bg-primary text-primary-foreground">
@@ -1108,17 +1126,40 @@ function CompanionStatAnalysisView({
     onRegenerateTitleCard,
   });
   const titleCardStatus = analysis.cosmiqTitleCard?.status ?? "generating";
+  const [titleCardWaitRetryNonce, setTitleCardWaitRetryNonce] = useState(0);
+  const titleCardWaitKey = titleCardStatus === "ready" && isTitleCardImageLoaded
+    ? null
+    : [
+      analysis.analysisDate,
+      analysis.cosmiqTitleCard?.profileKey ?? analysis.cosmiqTitle.title,
+      analysis.cosmiqTitleCard?.imageUrl ?? "pending-image",
+      titleCardWaitRetryNonce,
+    ].join(":");
+  const [hasTitleCardWaitExceeded, setHasTitleCardWaitExceeded] = useState(false);
+
+  useEffect(() => {
+    setHasTitleCardWaitExceeded(false);
+    if (!titleCardWaitKey || titleCardStatus === "unavailable" || imageState === "failed") return;
+
+    const timeout = window.setTimeout(() => {
+      setHasTitleCardWaitExceeded(true);
+    }, TITLE_CARD_LONG_WAIT_MS);
+
+    return () => window.clearTimeout(timeout);
+  }, [imageState, titleCardStatus, titleCardWaitKey]);
+
+  const handleRetryTitleArt = () => {
+    setHasTitleCardWaitExceeded(false);
+    setTitleCardWaitRetryNonce((current) => current + 1);
+    if (failedImageKey) {
+      retryTitleCardImage();
+      return;
+    }
+
+    void onRegenerateTitleCard(analysis).catch(() => undefined);
+  };
 
   if (titleCardStatus === "unavailable" || imageState === "failed") {
-    const handleRetryTitleArt = () => {
-      if (failedImageKey) {
-        retryTitleCardImage();
-        return;
-      }
-
-      void onRegenerateTitleCard(analysis).catch(() => undefined);
-    };
-
     return (
       <LoadingState
         phase="retrying"
@@ -1129,7 +1170,24 @@ function CompanionStatAnalysisView({
   }
 
   if (isRegeneratingTitleCard) {
-    return <LoadingState phase="retrying" />;
+    return (
+      <LoadingState
+        phase="retrying"
+        isRetrying={true}
+        onRetry={handleRetryTitleArt}
+      />
+    );
+  }
+
+  if (hasTitleCardWaitExceeded && (titleCardStatus !== "ready" || !isTitleCardImageLoaded)) {
+    return (
+      <LoadingState
+        phase="long-wait"
+        isRetrying={isRefreshing || isRegeneratingTitleCard}
+        onRetry={handleRetryTitleArt}
+        retryLabel="Regenerate title art"
+      />
+    );
   }
 
   if (titleCardStatus !== "ready" || !analysis.cosmiqTitleCard?.imageUrl) {

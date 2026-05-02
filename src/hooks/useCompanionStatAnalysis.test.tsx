@@ -7,6 +7,10 @@ import type { CompanionStatAnalysis } from "./useCompanionStatAnalysis";
 
 const mocks = vi.hoisted(() => ({
   invokeMock: vi.fn(),
+  authState: {
+    user: { id: "user-1" } as { id: string } | null,
+    loading: false,
+  },
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -18,9 +22,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 vi.mock("./useAuth", () => ({
-  useAuth: () => ({
-    user: { id: "user-1" },
-  }),
+  useAuth: () => mocks.authState,
 }));
 
 vi.mock("./useProfile", () => ({
@@ -216,6 +218,8 @@ const createDeferred = <T,>() => {
 describe("useCompanionStatAnalysis", () => {
   beforeEach(() => {
     mocks.invokeMock.mockReset();
+    mocks.authState.user = { id: "user-1" };
+    mocks.authState.loading = false;
   });
 
   afterEach(() => {
@@ -240,6 +244,19 @@ describe("useCompanionStatAnalysis", () => {
       body: { forceRefresh: false },
     });
     expect(result.current.cached).toBe(true);
+  });
+
+  it("reports loading while auth is still resolving", () => {
+    mocks.authState.user = null;
+    mocks.authState.loading = true;
+
+    const { result } = renderHook(() => useCompanionStatAnalysis({ enabled: true }), {
+      wrapper: createWrapper(),
+    });
+
+    expect(result.current.analysis).toBeNull();
+    expect(result.current.isLoading).toBe(true);
+    expect(mocks.invokeMock).not.toHaveBeenCalled();
   });
 
   it("refreshes analysis by forcing regeneration and replaces cached data", async () => {
