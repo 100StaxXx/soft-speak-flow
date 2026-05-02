@@ -2090,6 +2090,8 @@ describe("useEpics", () => {
       entityId: "epic-1",
       payload: {
         epicId: "epic-1",
+        epicTitle: "Campaign Alpha",
+        epicCreatedAt: "2026-02-10T00:00:00.000Z",
       },
     });
     expect(mocks.withPlannerRemoteSyncLockMock).toHaveBeenCalledWith(

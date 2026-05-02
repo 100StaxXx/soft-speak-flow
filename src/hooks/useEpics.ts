@@ -29,6 +29,7 @@ import {
 import { resolveEpicEndDate } from "@/utils/epicDates";
 import { isQueueableWriteError } from "@/utils/networkErrors";
 import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
+import { scrubCompanionChatsForDeletedEpic } from "@/utils/companionChatScrub";
 import {
   createOfflinePlannerId,
   getAllLocalTasksForUser,
@@ -2490,12 +2491,20 @@ export const useEpics = (options: EpicsOptions = {}) => {
         await applyLocalEpicDelete(user.id, epicId);
         await refreshEpicsQueryFromLocalStore(queryClient, user.id);
 
+        const epicCreatedAt = typeof epic.created_at === "string"
+          ? epic.created_at
+          : null;
+
         if (shouldQueueWrites) {
           await queueAction({
             actionKind: "EPIC_DELETE",
             entityType: "epic",
             entityId: epicId,
-            payload: { epicId },
+            payload: {
+              epicId,
+              epicTitle: epic.title,
+              epicCreatedAt,
+            },
           });
           return { epic, queued: true };
         }
@@ -2507,11 +2516,21 @@ export const useEpics = (options: EpicsOptions = {}) => {
             actionKind: "EPIC_DELETE",
             entityType: "epic",
             entityId: epicId,
-            payload: { epicId },
+            payload: {
+              epicId,
+              epicTitle: epic.title,
+              epicCreatedAt,
+            },
           });
           void retryNow();
           return { epic, queued: true };
         }
+
+        await scrubCompanionChatsForDeletedEpic(
+          user.id,
+          epic.title,
+          epicCreatedAt,
+        );
 
         return { epic, queued: false };
       });
