@@ -60,7 +60,8 @@ const getMalformedAnalysisMessage = (error: string, refreshed: boolean) =>
     ? `Received malformed refreshed stat analysis data: ${error}`
     : `Received malformed stat analysis data: ${error}`;
 
-const TITLE_CARD_RETRY_DELAY_MS = 8_000;
+const TITLE_CARD_RETRY_DELAY_MS = 5_000;
+const TITLE_CARD_MAX_FAILED_ATTEMPTS = 3;
 
 const isCosmiqTitleCard = (value: unknown): value is NonNullable<CompanionStatAnalysis["cosmiqTitleCard"]> =>
   isRecord(value)
@@ -89,6 +90,7 @@ export const useCompanionStatAnalysis = ({ enabled = true }: UseCompanionStatAna
   const queryClient = useQueryClient();
   const activeTitleCardRequestKeyRef = useRef<string | null>(null);
   const lastTitleCardAttemptKeyRef = useRef<string | null>(null);
+  const titleCardFailureCountsRef = useRef<Map<string, number>>(new Map());
   const titleCardRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const titleCardRetryKeyRef = useRef<string | null>(null);
   const titleCardMountedRef = useRef(true);
@@ -98,7 +100,39 @@ export const useCompanionStatAnalysis = ({ enabled = true }: UseCompanionStatAna
     return formatDateInTimezone(new Date(), timezone);
   }, [profile?.timezone]);
 
-  const queryKey = ["companion-stat-analysis", user?.id, analysisDateKey] as const;
+  const queryKey = useMemo(
+    () => ["companion-stat-analysis", user?.id, analysisDateKey] as const,
+    [analysisDateKey, user?.id],
+  );
+
+  const markTitleCardUnavailable = useCallback(({
+    analysisDate,
+    expectedProfileKey,
+  }: {
+    analysisDate: string;
+    expectedProfileKey: string;
+  }) => {
+    queryClient.setQueryData<CompanionStatAnalysisResponse | undefined>(queryKey, (current) => {
+      if (!current) return current;
+      if (current.analysis.analysisDate !== analysisDate) return current;
+      if (getCosmiqTitleCardProfileKey(current.analysis) !== expectedProfileKey) return current;
+
+      return {
+        ...current,
+        analysis: {
+          ...current.analysis,
+          cosmiqTitleCard: {
+            profileKey: expectedProfileKey,
+            imageUrl: null,
+            imageUrls: [],
+            status: "unavailable",
+            cached: false,
+            promptVersion: COMPANION_COSMIQ_TITLE_CARD_PROMPT_VERSION,
+          },
+        },
+      };
+    });
+  }, [queryClient, queryKey]);
 
   const invokeAnalysis = async (forceRefresh: boolean) => {
     const { data, error } = await supabase.functions.invoke("generate-companion-stat-analysis", {
@@ -147,6 +181,7 @@ export const useCompanionStatAnalysis = ({ enabled = true }: UseCompanionStatAna
   const refreshMutation = useMutation({
     mutationFn: () => loadAnalysis({ forceRefresh: true, allowMalformedCacheRecovery: false }),
     onSuccess: (data) => {
+      titleCardFailureCountsRef.current.delete(`${data.analysis.analysisDate}:${getCosmiqTitleCardProfileKey(data.analysis)}`);
       queryClient.setQueryData(queryKey, data);
     },
   });
@@ -177,6 +212,7 @@ export const useCompanionStatAnalysis = ({ enabled = true }: UseCompanionStatAna
       };
     },
     onSuccess: ({ analysisDate, expectedProfileKey, card }) => {
+      titleCardFailureCountsRef.current.delete(`${analysisDate}:${expectedProfileKey}`);
       queryClient.setQueryData<CompanionStatAnalysisResponse | undefined>(queryKey, (current) => {
         if (!current) return current;
         if (current.analysis.analysisDate !== analysisDate) return current;
@@ -251,7 +287,18 @@ export const useCompanionStatAnalysis = ({ enabled = true }: UseCompanionStatAna
         analysisDate: analysis.analysisDate,
         expectedProfileKey,
       })
-        .catch(() => undefined)
+        .catch(() => {
+          const failedAttempts = (titleCardFailureCountsRef.current.get(requestKey) ?? 0) + 1;
+          titleCardFailureCountsRef.current.set(requestKey, failedAttempts);
+
+          if (failedAttempts >= TITLE_CARD_MAX_FAILED_ATTEMPTS) {
+            titleCardFailureCountsRef.current.delete(requestKey);
+            markTitleCardUnavailable({
+              analysisDate: analysis.analysisDate,
+              expectedProfileKey,
+            });
+          }
+        })
         .finally(() => {
           if (activeTitleCardRequestKeyRef.current === requestKey) {
             activeTitleCardRequestKeyRef.current = null;
@@ -283,6 +330,7 @@ export const useCompanionStatAnalysis = ({ enabled = true }: UseCompanionStatAna
     enabled,
     generateTitleCard,
     isTitleCardGenerationPending,
+    markTitleCardUnavailable,
     query.data?.analysis,
     titleCardRequestSettledCount,
     user?.id,

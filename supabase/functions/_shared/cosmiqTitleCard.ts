@@ -18,14 +18,11 @@ installOpenAICompatibilityShim();
 export const COSMIQ_TITLE_CARD_PROMPT_VERSION = COMPANION_COSMIQ_TITLE_CARD_PROMPT_VERSION;
 
 const COSMIQ_TITLE_CARD_BUCKET = "cosmiq-title-cards";
-const IMAGE_GENERATION_TIMEOUT_MS = 90_000;
-// Three variants are intentional for the title-art slideshow and multiply image generation/storage cost.
-const COSMIQ_TITLE_CARD_VARIANT_COUNT = 3;
-const COSMIQ_TITLE_CARD_VARIANT_DIRECTIONS = [
-  "Variant 1: luminous heroic portrait, clear silhouette, balanced cosmic aura.",
-  "Variant 2: more dynamic composition, stronger motion, dramatic lighting, same archetype identity.",
-  "Variant 3: quieter mystical composition, refined materials, contemplative premium card-art feel.",
-];
+const IMAGE_GENERATION_TIMEOUT_MS = 45_000;
+const GENERATION_STALE_AFTER = "75 seconds";
+const COSMIQ_TITLE_CARD_IMAGE_SIZE = "1024x1536";
+const COSMIQ_TITLE_CARD_PRIMARY_DIRECTION =
+  "Fast primary render: luminous heroic portrait, clear silhouette, balanced cosmic aura.";
 
 interface ResolveCosmiqTitleCardParams {
   supabase: any;
@@ -302,6 +299,7 @@ async function generateCosmiqTitleCardImage({
         model: "google/gemini-2.5-flash-image-preview",
         messages: [{ role: "user", content: buildPrompt(analysis, visualPersona, variantDirection) }],
         modalities: ["image", "text"],
+        image_size: COSMIQ_TITLE_CARD_IMAGE_SIZE,
       }),
     },
     IMAGE_GENERATION_TIMEOUT_MS,
@@ -355,6 +353,7 @@ export async function resolveCosmiqTitleCard({
       .sort()
       .join("|"),
     p_force_refresh: forceRefresh,
+    p_stale_after: GENERATION_STALE_AFTER,
   });
 
   if (beginError) {
@@ -417,74 +416,32 @@ export async function resolveCosmiqTitleCard({
       providers: ["openai"],
     });
 
+    const parsedImage = await generateCosmiqTitleCardImage({
+      analysis,
+      visualPersona,
+      openAiApiKey,
+      guardedFetch,
+      variantDirection: COSMIQ_TITLE_CARD_PRIMARY_DIRECTION,
+    });
+
     const storageKey = forceRefresh ? `${profileKey}__${crypto.randomUUID()}` : profileKey;
-    const imageUrls: string[] = [];
+    const storagePath = `${COSMIQ_TITLE_CARD_PROMPT_VERSION}/${storageKey}.${parsedImage.extension}`;
+    const { error: uploadError } = await supabase.storage
+      .from(COSMIQ_TITLE_CARD_BUCKET)
+      .upload(storagePath, parsedImage.bytes, {
+        contentType: parsedImage.contentType,
+        upsert: true,
+      });
 
-    for (let index = 0; index < COSMIQ_TITLE_CARD_VARIANT_COUNT; index += 1) {
-      let parsedImage: Awaited<ReturnType<typeof generateCosmiqTitleCardImage>>;
-      try {
-        parsedImage = await generateCosmiqTitleCardImage({
-          analysis,
-          visualPersona,
-          openAiApiKey,
-          guardedFetch,
-          variantDirection: COSMIQ_TITLE_CARD_VARIANT_DIRECTIONS[index],
-        });
-      } catch (error) {
-        if (isCostGuardrailBlockedError(error)) {
-          if (imageUrls.length === 0) {
-            throw error;
-          }
-
-          console.warn("[CosmiqTitleCard] Variant generation stopped by cost guardrail", {
-            profileKey,
-            nextVariant: index + 1,
-            generatedVariants: imageUrls.length,
-            scopeType: error.scopeType,
-            scopeKey: error.scopeKey,
-          });
-          break;
-        }
-
-        console.warn("[CosmiqTitleCard] Variant generation failed", {
-          profileKey,
-          variant: index + 1,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        continue;
-      }
-
-      try {
-        const variantSuffix = index === 0 && !forceRefresh ? "" : `__v${index + 1}`;
-        const storagePath = `${COSMIQ_TITLE_CARD_PROMPT_VERSION}/${storageKey}${variantSuffix}.${parsedImage.extension}`;
-        const { error: uploadError } = await supabase.storage
-          .from(COSMIQ_TITLE_CARD_BUCKET)
-          .upload(storagePath, parsedImage.bytes, {
-            contentType: parsedImage.contentType,
-            upsert: true,
-          });
-
-        if (uploadError) {
-          throw new Error(`Cosmiq title card upload failed: ${uploadError.message}`);
-        }
-
-        const { data: publicUrlData } = supabase.storage
-          .from(COSMIQ_TITLE_CARD_BUCKET)
-          .getPublicUrl(storagePath);
-        imageUrls.push(publicUrlData.publicUrl);
-      } catch (error) {
-        console.warn("[CosmiqTitleCard] Variant upload failed", {
-          profileKey,
-          variant: index + 1,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
+    if (uploadError) {
+      throw new Error(`Cosmiq title card upload failed: ${uploadError.message}`);
     }
 
-    const imageUrl = imageUrls[0];
-    if (!imageUrl) {
-      throw new Error("No Cosmiq title card variants generated");
-    }
+    const { data: publicUrlData } = supabase.storage
+      .from(COSMIQ_TITLE_CARD_BUCKET)
+      .getPublicUrl(storagePath);
+    const imageUrl = publicUrlData.publicUrl;
+    const imageUrls = [imageUrl];
 
     await completeGenerationBestEffort({
       supabase,

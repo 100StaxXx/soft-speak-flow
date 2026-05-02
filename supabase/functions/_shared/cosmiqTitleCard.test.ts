@@ -292,11 +292,12 @@ Deno.test("resolveCosmiqTitleCard generates, uploads, and completes a first imag
       visualPersona: "female",
       fetchImpl: ((_input: string | URL | Request, init?: RequestInit) => {
         const requestBody = typeof init?.body === "string"
-          ? JSON.parse(init.body) as { messages?: Array<{ content?: unknown }> }
+          ? JSON.parse(init.body) as { image_size?: unknown; messages?: Array<{ content?: unknown }> }
           : {};
         requestPrompt = typeof requestBody.messages?.[0]?.content === "string"
           ? requestBody.messages[0].content
           : "";
+        assertEquals(requestBody.image_size, "1024x1536", "Expected portrait image generation size");
         return Promise.resolve(createJsonResponse({
           choices: [{
             message: {
@@ -314,13 +315,19 @@ Deno.test("resolveCosmiqTitleCard generates, uploads, and completes a first imag
     assertEquals(card.status, "ready", "Expected generated card to be ready");
     assertEquals(card.cached, false, "Expected fresh card to not be cached");
     assert(card.imageUrl?.startsWith("https://cdn.example.com/cosmiq-title-cards/"), "Expected public storage URL");
-    assertEquals(card.imageUrls?.length, 3, "Expected generated slideshow image URLs");
-    assertEquals(supabase.uploaded.length, 3, "Expected three storage uploads");
+    assertEquals(card.imageUrls?.length, 1, "Expected one fast-path image URL");
+    assertEquals(card.imageUrls?.[0], card.imageUrl, "Expected imageUrls to preserve the primary image");
+    assertEquals(supabase.uploaded.length, 1, "Expected one storage upload");
     assert(supabase.uploaded[0].path.endsWith(".png"), "Expected PNG upload path");
     assertEquals(beginCall?.args.p_visual_persona, "female", "Expected visual persona in generation claim");
     assert(String(beginCall?.args.p_profile_key).includes("female"), "Expected visual persona in shared cache key");
+    assertEquals(beginCall?.args.p_stale_after, "75 seconds", "Expected quick stale-generation recovery");
     assertEquals(completeCall?.args.p_status, "ready", "Expected generation completion to be marked ready");
-    assert(Array.isArray(completeCall?.args.p_image_urls), "Expected generated slideshow URLs to be persisted");
+    assertEquals(
+      JSON.stringify(completeCall?.args.p_image_urls),
+      JSON.stringify([card.imageUrl]),
+      "Expected primary image URL to be persisted in image_urls",
+    );
     assert(requestPrompt.includes("female fantasy character"), "Expected female visual persona prompt guidance");
     assert(!requestPrompt.includes("Momentum:"), "Shared card prompt should not include momentum-only UI state");
   } finally {
@@ -328,7 +335,7 @@ Deno.test("resolveCosmiqTitleCard generates, uploads, and completes a first imag
   }
 });
 
-Deno.test("resolveCosmiqTitleCard generates title-card variants sequentially", async () => {
+Deno.test("resolveCosmiqTitleCard generates one blocking image request for the fast path", async () => {
   const originalApiKey = Deno.env.get("OPENAI_API_KEY");
   Deno.env.set("OPENAI_API_KEY", "test-key");
 
@@ -371,16 +378,16 @@ Deno.test("resolveCosmiqTitleCard generates title-card variants sequentially", a
       }) as typeof fetch,
     });
 
-    assertEquals(card.status, "ready", "Expected sequential generation to complete");
-    assertEquals(card.imageUrls?.length, 3, "Expected all variants to be generated");
-    assertEquals(fetchCount, 3, "Expected three upstream image requests");
+    assertEquals(card.status, "ready", "Expected fast-path generation to complete");
+    assertEquals(card.imageUrls?.length, 1, "Expected only the primary image to be generated");
+    assertEquals(fetchCount, 1, "Expected one upstream image request");
     assertEquals(maxActiveFetches, 1, "Expected image requests to avoid concurrent budget checks");
   } finally {
     restoreEnv("OPENAI_API_KEY", originalApiKey);
   }
 });
 
-Deno.test("resolveCosmiqTitleCard keeps safe variants when guardrails stop the slideshow", async () => {
+Deno.test("resolveCosmiqTitleCard falls back when primary image generation is blocked", async () => {
   const originalApiKey = Deno.env.get("OPENAI_API_KEY");
   const originalWarn = console.warn;
   Deno.env.set("OPENAI_API_KEY", "test-key");
@@ -395,7 +402,6 @@ Deno.test("resolveCosmiqTitleCard keeps safe variants when guardrails stop the s
         prompt_version: COSMIQ_TITLE_CARD_PROMPT_VERSION,
       }],
     ]);
-    const generatedDataUrl = `data:image/png;base64,${btoa("image-bytes")}`;
     let fetchCount = 0;
 
     const card = await resolveCosmiqTitleCard({
@@ -404,31 +410,19 @@ Deno.test("resolveCosmiqTitleCard keeps safe variants when guardrails stop the s
       analysis: baseAnalysis,
       fetchImpl: ((_input: string | URL | Request, _init?: RequestInit) => {
         fetchCount += 1;
-        if (fetchCount === 2) {
-          throw new CostGuardrailBlockedError("budget exhausted", {
-            scopeType: "endpoint",
-            scopeKey: "generate-cosmiq-title-card",
-          });
-        }
-
-        return Promise.resolve(createJsonResponse({
-          choices: [{
-            message: {
-              images: [{
-                image_url: { url: generatedDataUrl },
-              }],
-            },
-          }],
-        }));
+        throw new CostGuardrailBlockedError("budget exhausted", {
+          scopeType: "endpoint",
+          scopeKey: "generate-cosmiq-title-card",
+        });
       }) as typeof fetch,
     });
 
     const completeCall = supabase.rpcCalls.find((call) => call.name === "complete_cosmiq_title_card_generation");
-    assertEquals(card.status, "ready", "Expected completed variants to remain usable");
-    assertEquals(card.imageUrls?.length, 1, "Expected only guardrail-safe variants to be returned");
-    assertEquals(supabase.uploaded.length, 1, "Expected only generated variants to be uploaded");
-    assertEquals(fetchCount, 2, "Expected generation to stop after the guardrail block");
-    assertEquals(completeCall?.args.p_status, "ready", "Expected partial slideshow to be persisted as ready");
+    assertEquals(card.status, "unavailable", "Expected blocked primary generation to be unavailable");
+    assertEquals(card.imageUrl, null, "Expected no image URL when blocked");
+    assertEquals(supabase.uploaded.length, 0, "Expected no upload when primary generation is blocked");
+    assertEquals(fetchCount, 1, "Expected one primary generation attempt");
+    assertEquals(completeCall?.args.p_status, "unavailable", "Expected unavailable state to be persisted");
   } finally {
     console.warn = originalWarn;
     restoreEnv("OPENAI_API_KEY", originalApiKey);

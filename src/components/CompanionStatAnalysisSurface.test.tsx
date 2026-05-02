@@ -181,11 +181,7 @@ const analysis = {
   cosmiqTitleCard: {
     profileKey: "v1::the-oathbound-pathfinder",
     imageUrl: "https://example.com/cosmiq-card.png",
-    imageUrls: [
-      "https://example.com/cosmiq-card.png",
-      "https://example.com/cosmiq-card-variant-2.png",
-      "https://example.com/cosmiq-card-variant-3.png",
-    ],
+    imageUrls: ["https://example.com/cosmiq-card.png"],
     status: "ready",
     cached: true,
     promptVersion: 1,
@@ -495,7 +491,7 @@ describe("CompanionStatAnalysisSurface", () => {
     expect(screen.getByText("Art preview received")).toBeInTheDocument();
     const preview = screen.getByTestId("companion-title-art-loading-preview");
     expect(preview.querySelector("img")?.getAttribute("src")).toBe("https://example.com/cosmiq-card.png");
-    expect(preview.querySelectorAll("img")).toHaveLength(3);
+    expect(preview.querySelectorAll("img")).toHaveLength(1);
     expect(screen.getByText("Preview warming")).toBeInTheDocument();
     expect(screen.queryByLabelText("Generated title art preview slides")).not.toBeInTheDocument();
     expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
@@ -535,9 +531,9 @@ describe("CompanionStatAnalysisSurface", () => {
     expect(screen.queryByTestId("companion-title-art-loading")).not.toBeInTheDocument();
   });
 
-  it("lets the generated-art slideshow advance before the final reveal", () => {
+  it("reveals fast-path title art as soon as the primary image loads", async () => {
     mocks.prefersReducedMotion = false;
-    vi.useFakeTimers();
+    imageLoadMode = "idle";
 
     render(
       <CompanionStatAnalysisSurface
@@ -547,43 +543,45 @@ describe("CompanionStatAnalysisSurface", () => {
       />,
     );
 
-    const preview = screen.getByTestId("companion-title-art-loading-preview");
-    act(() => {
-      preview.querySelectorAll("img").forEach((previewImage) => {
-        fireEvent.load(previewImage);
-      });
-    });
-
     expect(screen.getByTestId("companion-title-art-loading")).toBeInTheDocument();
-    expect(screen.getByText("Preview 1/3")).toBeInTheDocument();
-    expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
+    expect(screen.getByText("Preview warming")).toBeInTheDocument();
 
     act(() => {
-      vi.advanceTimersByTime(1_800);
+      const preloadImage = mockImageInstances[0];
+      preloadImage.complete = true;
+      preloadImage.naturalWidth = 100;
+      preloadImage.onload?.();
     });
 
-    expect(screen.getByText("Preview 2/3")).toBeInTheDocument();
-    expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
-
-    act(() => {
-      vi.advanceTimersByTime(1_800);
-    });
-
-    expect(screen.getByText("Preview 3/3")).toBeInTheDocument();
-    expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
-
-    act(() => {
-      vi.advanceTimersByTime(900);
-    });
-
-    expect(screen.getByTestId("companion-cosmiq-title-card")).toBeInTheDocument();
+    expect(await screen.findByTestId("companion-cosmiq-title-card")).toBeInTheDocument();
     expect(screen.queryByTestId("companion-title-art-loading")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Generated title art preview slides")).not.toBeInTheDocument();
   });
 
-  it("starts the generated-art slideshow dwell only after the ready image loads", () => {
+  it("still lets legacy multi-image title art preview dwell before reveal", () => {
     mocks.prefersReducedMotion = false;
     imageLoadMode = "idle";
     vi.useFakeTimers();
+    mocks.useCompanionStatAnalysisMock.mockReturnValue({
+      analysis: {
+        ...analysis,
+        cosmiqTitleCard: {
+          ...analysis.cosmiqTitleCard,
+          imageUrls: [
+            "https://example.com/cosmiq-card.png",
+            "https://example.com/cosmiq-card-variant-2.png",
+            "https://example.com/cosmiq-card-variant-3.png",
+          ],
+        },
+      },
+      cached: true,
+      error: null,
+      isLoading: false,
+      isRefreshing: false,
+      isRegeneratingTitleCard: false,
+      refreshAnalysis: mocks.refreshAnalysisMock,
+      regenerateTitleCard: mocks.regenerateTitleCardMock,
+    });
 
     render(
       <CompanionStatAnalysisSurface

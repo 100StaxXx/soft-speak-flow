@@ -649,7 +649,7 @@ describe("useCompanionStatAnalysis", () => {
     expect(result.current.analysis?.cosmiqTitleCard?.status).toBe("generating");
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(8_000);
+      await vi.advanceTimersByTimeAsync(5_000);
     });
 
     await act(async () => {
@@ -709,7 +709,7 @@ describe("useCompanionStatAnalysis", () => {
     expect(result.current.analysis?.cosmiqTitleCard?.status).toBe("generating");
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(8_000);
+      await vi.advanceTimersByTimeAsync(5_000);
     });
 
     await act(async () => {
@@ -720,6 +720,69 @@ describe("useCompanionStatAnalysis", () => {
     expect(mocks.invokeMock).toHaveBeenNthCalledWith(3, "generate-cosmiq-title-card", {
       body: { analysisDate: "2026-04-18" },
     });
+  });
+
+  it("marks Cosmiq title card art unavailable after repeated fetch failures", async () => {
+    vi.useFakeTimers();
+
+    const pendingAnalysis: CompanionStatAnalysis = {
+      ...baseAnalysis,
+      cosmiqTitleCard: {
+        profileKey: "v1-the-oathbound-pathfinder",
+        imageUrl: null,
+        imageUrls: [],
+        status: "generating",
+        cached: false,
+        promptVersion: 1,
+      },
+    };
+    const fetchError = Object.assign(new Error("Failed to fetch"), {
+      name: "FunctionsFetchError",
+    });
+
+    mocks.invokeMock
+      .mockResolvedValueOnce({
+        data: { analysis: pendingAnalysis, cached: false },
+        error: null,
+      })
+      .mockResolvedValue({
+        data: null,
+        error: fetchError,
+      });
+
+    const { result } = renderHook(() => useCompanionStatAnalysis({ enabled: true }), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(mocks.invokeMock).toHaveBeenCalledTimes(2);
+      });
+    });
+    expect(result.current.analysis?.cosmiqTitleCard?.status).toBe("generating");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+      await vi.waitFor(() => {
+        expect(mocks.invokeMock).toHaveBeenCalledTimes(3);
+      });
+    });
+    expect(result.current.analysis?.cosmiqTitleCard?.status).toBe("generating");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+      await vi.waitFor(() => {
+        expect(mocks.invokeMock).toHaveBeenCalledTimes(4);
+      });
+    });
+
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(result.current.analysis?.cosmiqTitleCard?.status).toBe("unavailable");
+      });
+    });
+    expect(result.current.analysis?.cosmiqTitleCard?.imageUrl).toBeNull();
+    expect(result.current.analysis?.cosmiqTitleCard?.imageUrls).toEqual([]);
   });
 
   it("surfaces an error when cached and refreshed payloads are both malformed", async () => {
