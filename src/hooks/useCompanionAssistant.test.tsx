@@ -1275,6 +1275,74 @@ describe("useCompanionAssistant", () => {
     });
   });
 
+  it("primes empty quest_capture launchers with a synthetic backend turn and no user echo", async () => {
+    mocks.supabaseInvoke.mockResolvedValueOnce({
+      data: {
+        reply: "Glacireon's ready. What quest are we capturing?",
+        mode: "ask_followup",
+        intent: "schedule_task",
+        confidence: 0.9,
+        threadState: {
+          threadId: "fresh-session",
+          sessionId: "fresh-session",
+          openaiConversationId: "conv_q",
+          lastOpenAIResponseId: "resp_q",
+          hasPendingAction: false,
+        },
+        followUp: {
+          question: "What quest do you want to capture?",
+          expectedAnswerType: "free_text",
+          options: [],
+          blocksDrafting: true,
+        },
+      },
+      error: null,
+    });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () =>
+        useCompanionAssistant({
+          surface: "journeys",
+          launchIntent: {
+            id: "launch-quest-1",
+            message: "",
+            starterIntent: "quest_capture",
+            target: "planner",
+          },
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+        "companion-agent",
+        expect.objectContaining({
+          body: expect.objectContaining({
+            message: "quest",
+            starterIntent: "quest_capture",
+            turnOrigin: "launcher",
+          }),
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(
+        result.current.messages.some((message) =>
+          message.role === "assistant" &&
+          message.content.includes("What quest are we capturing?")
+        ),
+      ).toBe(true);
+    });
+
+    expect(
+      result.current.messages.some((message) =>
+        message.role === "user" && message.content === "quest"
+      ),
+    ).toBe(false);
+  });
+
   it("opens free-talk launcher templates as companion-authored visible openers", async () => {
     const consumed = vi.fn();
     const { wrapper } = createWrapper();
