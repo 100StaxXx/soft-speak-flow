@@ -67,6 +67,10 @@ const isCosmiqTitleCard = (value: unknown): value is NonNullable<CompanionStatAn
   && typeof value.profileKey === "string"
   && value.profileKey.length > 0
   && (typeof value.imageUrl === "string" || value.imageUrl === null)
+  && (
+    value.imageUrls === undefined
+    || (Array.isArray(value.imageUrls) && value.imageUrls.every((imageUrl) => typeof imageUrl === "string" && imageUrl.length > 0))
+  )
   && (value.status === "ready" || value.status === "generating" || value.status === "unavailable")
   && typeof value.cached === "boolean"
   && typeof value.promptVersion === "number";

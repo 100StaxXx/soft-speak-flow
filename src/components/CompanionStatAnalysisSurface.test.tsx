@@ -1,5 +1,5 @@
 import type { HTMLAttributes, ReactNode } from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -11,12 +11,17 @@ const mocks = vi.hoisted(() => ({
 
 const originalImage = globalThis.Image;
 let imageLoadMode: "load" | "error" | "idle" = "load";
+let mockImageInstances: MockImage[] = [];
 
 class MockImage {
   complete = false;
   naturalWidth = 0;
   onload: (() => void) | null = null;
   onerror: (() => void) | null = null;
+
+  constructor() {
+    mockImageInstances.push(this);
+  }
 
   set src(_value: string) {
     if (imageLoadMode === "idle") return;
@@ -176,6 +181,11 @@ const analysis = {
   cosmiqTitleCard: {
     profileKey: "v1::the-oathbound-pathfinder",
     imageUrl: "https://example.com/cosmiq-card.png",
+    imageUrls: [
+      "https://example.com/cosmiq-card.png",
+      "https://example.com/cosmiq-card-variant-2.png",
+      "https://example.com/cosmiq-card-variant-3.png",
+    ],
     status: "ready",
     cached: true,
     promptVersion: 1,
@@ -270,6 +280,7 @@ describe("CompanionStatAnalysisSurface", () => {
   beforeEach(() => {
     mocks.prefersReducedMotion = true;
     imageLoadMode = "load";
+    mockImageInstances = [];
     globalThis.Image = MockImage as unknown as typeof Image;
     mocks.refreshAnalysisMock.mockClear();
     mocks.regenerateTitleCardMock.mockClear();
@@ -287,6 +298,7 @@ describe("CompanionStatAnalysisSurface", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     globalThis.Image = originalImage;
   });
 
@@ -382,6 +394,7 @@ describe("CompanionStatAnalysisSurface", () => {
 
   it("uses the animated reveal path when reduced motion is not preferred", () => {
     mocks.prefersReducedMotion = false;
+    vi.useFakeTimers();
 
     const { container } = render(
       <CompanionStatAnalysisSurface
@@ -390,6 +403,10 @@ describe("CompanionStatAnalysisSurface", () => {
         layoutMode="desktop"
       />,
     );
+
+    act(() => {
+      vi.advanceTimersByTime(4_500);
+    });
 
     expect(container.querySelector("[data-motion-initial='hidden']")).toBeInTheDocument();
     expect(container.querySelector("[data-motion-animate='visible']")).toBeInTheDocument();
@@ -433,6 +450,7 @@ describe("CompanionStatAnalysisSurface", () => {
         cosmiqTitleCard: {
           ...analysis.cosmiqTitleCard,
           imageUrl: null,
+          imageUrls: [],
           status: "generating",
         },
       },
@@ -477,7 +495,125 @@ describe("CompanionStatAnalysisSurface", () => {
     expect(screen.getByText("Art preview received")).toBeInTheDocument();
     const preview = screen.getByTestId("companion-title-art-loading-preview");
     expect(preview.querySelector("img")?.getAttribute("src")).toBe("https://example.com/cosmiq-card.png");
+    expect(preview.querySelectorAll("img")).toHaveLength(3);
+    expect(screen.getByText("Preview warming")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Generated title art preview slides")).not.toBeInTheDocument();
     expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
+  });
+
+  it("lets the generated-art slideshow advance before the final reveal", () => {
+    mocks.prefersReducedMotion = false;
+    vi.useFakeTimers();
+
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="desktop"
+      />,
+    );
+
+    const preview = screen.getByTestId("companion-title-art-loading-preview");
+    act(() => {
+      preview.querySelectorAll("img").forEach((previewImage) => {
+        fireEvent.load(previewImage);
+      });
+    });
+
+    expect(screen.getByTestId("companion-title-art-loading")).toBeInTheDocument();
+    expect(screen.getByText("Preview 1/3")).toBeInTheDocument();
+    expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(1_800);
+    });
+
+    expect(screen.getByText("Preview 2/3")).toBeInTheDocument();
+    expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(1_800);
+    });
+
+    expect(screen.getByText("Preview 3/3")).toBeInTheDocument();
+    expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(900);
+    });
+
+    expect(screen.getByTestId("companion-cosmiq-title-card")).toBeInTheDocument();
+    expect(screen.queryByTestId("companion-title-art-loading")).not.toBeInTheDocument();
+  });
+
+  it("starts the generated-art slideshow dwell only after the ready image loads", () => {
+    mocks.prefersReducedMotion = false;
+    imageLoadMode = "idle";
+    vi.useFakeTimers();
+
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="desktop"
+      />,
+    );
+
+    expect(screen.getByTestId("companion-title-art-loading")).toBeInTheDocument();
+    expect(screen.getByText("Preview warming")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+
+    expect(screen.getByTestId("companion-title-art-loading")).toBeInTheDocument();
+    expect(screen.getByText("Preview warming")).toBeInTheDocument();
+    expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
+
+    act(() => {
+      const preloadImage = mockImageInstances[0];
+      preloadImage.complete = true;
+      preloadImage.naturalWidth = 100;
+      preloadImage.onload?.();
+    });
+
+    expect(screen.getByText("Preview 1/1")).toBeInTheDocument();
+    expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(1_800);
+    });
+
+    expect(screen.getByText("Preview 1/1")).toBeInTheDocument();
+    expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
+
+    const preview = screen.getByTestId("companion-title-art-loading-preview");
+    act(() => {
+      preview.querySelectorAll("img").forEach((previewImage) => {
+        fireEvent.load(previewImage);
+      });
+    });
+
+    expect(screen.getByText("Preview 1/3")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(1_800);
+    });
+
+    expect(screen.getByText("Preview 2/3")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(1_800);
+    });
+
+    expect(screen.getByText("Preview 3/3")).toBeInTheDocument();
+    expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(900);
+    });
+
+    expect(screen.getByTestId("companion-cosmiq-title-card")).toBeInTheDocument();
   });
 
   it("forces one title-card regeneration when a ready image fails to load", async () => {

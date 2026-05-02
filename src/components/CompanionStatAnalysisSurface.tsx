@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   BarChart3,
@@ -110,6 +110,10 @@ const ATTRIBUTE_ORDER: CompanionStatAttribute[] = [
 
 const STAT_MIN = 100;
 const STAT_MAX = 1000;
+const EMPTY_IMAGE_URLS: string[] = [];
+const TITLE_ART_SLIDE_INTERVAL_MS = 1_800;
+const TITLE_ART_SLIDES_BEFORE_REVEAL = 2;
+const TITLE_ART_REVEAL_SETTLE_MS = 900;
 
 const RANK_BY_BAND: Record<CompanionStatBand, string> = {
   Emerging: "C",
@@ -257,6 +261,23 @@ const mentorAccentStyle = (analysis: CompanionStatAnalysis): CSSProperties | und
   };
 };
 
+const getTitleCardImageUrls = (
+  card: CompanionStatAnalysis["cosmiqTitleCard"] | null | undefined,
+): string[] => {
+  const urls = [
+    ...(Array.isArray(card?.imageUrls) ? card.imageUrls : []),
+    card?.imageUrl ?? null,
+  ].filter((imageUrl): imageUrl is string => typeof imageUrl === "string" && imageUrl.length > 0);
+
+  return Array.from(new Set(urls));
+};
+
+const getTitleArtPreviewDwellMs = (imageCount: number): number => {
+  if (imageCount <= 1) return 0;
+  return (Math.min(TITLE_ART_SLIDES_BEFORE_REVEAL, imageCount - 1) * TITLE_ART_SLIDE_INTERVAL_MS)
+    + TITLE_ART_REVEAL_SETTLE_MS;
+};
+
 type TitleCardImageGateState = "idle" | "loading" | "loaded" | "failed";
 
 type LoadingStatePhase = "analysis" | "title-card";
@@ -266,8 +287,10 @@ interface LoadingStateProps {
   analysis?: CompanionStatAnalysis;
   viewModel?: ReturnType<typeof buildCompanionStatAnalysisViewModel>;
   imageUrl?: string | null;
+  imageUrls?: string[];
   titleCardStatus?: NonNullable<CompanionStatAnalysis["cosmiqTitleCard"]>["status"];
   imageState?: TitleCardImageGateState;
+  onVerifiedPreviewCountChange?: (verifiedCount: number) => void;
   prefersReducedMotion: boolean;
 }
 
@@ -276,12 +299,76 @@ function LoadingState({
   analysis,
   viewModel,
   imageUrl,
+  imageUrls = EMPTY_IMAGE_URLS,
   titleCardStatus = "generating",
   imageState = "loading",
+  onVerifiedPreviewCountChange,
   prefersReducedMotion,
 }: LoadingStateProps) {
+  const slideshowUrls = useMemo(() => {
+    const urls = [...imageUrls, imageUrl ?? null]
+      .filter((candidate): candidate is string => typeof candidate === "string" && candidate.length > 0);
+    return Array.from(new Set(urls));
+  }, [imageUrl, imageUrls]);
+  const slideshowKey = useMemo(() => slideshowUrls.join("|"), [slideshowUrls]);
+  const [activeSlideIndex, setActiveSlideIndex] = useState(0);
+  const [loadedPreviewUrls, setLoadedPreviewUrls] = useState<Set<string>>(() => new Set());
+  const verifiedSlideshowUrls = useMemo(
+    () =>
+      slideshowUrls.filter((slideUrl, index) =>
+        loadedPreviewUrls.has(slideUrl) || (index === 0 && imageState === "loaded")
+      ),
+    [imageState, loadedPreviewUrls, slideshowUrls],
+  );
+  const previewSlideshowUrls = verifiedSlideshowUrls.length > 0
+    ? verifiedSlideshowUrls
+    : slideshowUrls.slice(0, 1);
+  const previewSlideshowKey = useMemo(() => previewSlideshowUrls.join("|"), [previewSlideshowUrls]);
+  const verifiedPreviewCount = imageState === "loaded" ? verifiedSlideshowUrls.length : 0;
+  const markPreviewUrlLoaded = useCallback((slideUrl: string) => {
+    setLoadedPreviewUrls((current) => {
+      if (current.has(slideUrl)) return current;
+      const next = new Set(current);
+      next.add(slideUrl);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    setActiveSlideIndex(0);
+    setLoadedPreviewUrls(new Set());
+  }, [slideshowKey]);
+
+  useEffect(() => {
+    onVerifiedPreviewCountChange?.(verifiedPreviewCount);
+  }, [onVerifiedPreviewCountChange, verifiedPreviewCount]);
+
+  useEffect(() => {
+    if (phase === "title-card" && imageState === "loaded" && slideshowUrls[0]) {
+      markPreviewUrlLoaded(slideshowUrls[0]);
+      setActiveSlideIndex(0);
+    }
+  }, [phase, imageState, markPreviewUrlLoaded, slideshowKey, slideshowUrls]);
+
+  useEffect(() => {
+    if (
+      phase !== "title-card"
+      || imageState !== "loaded"
+      || prefersReducedMotion
+      || previewSlideshowUrls.length <= 1
+    ) return;
+
+    const intervalId = window.setInterval(() => {
+      setActiveSlideIndex((current) => (current + 1) % previewSlideshowUrls.length);
+    }, TITLE_ART_SLIDE_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [phase, imageState, prefersReducedMotion, previewSlideshowKey, previewSlideshowUrls.length]);
+
   if (phase === "title-card" && analysis && viewModel) {
-    const hasImagePreview = Boolean(imageUrl);
+    const hasImagePreview = slideshowUrls.length > 0;
     const dominantLabel = ATTRIBUTE_META[analysis.cosmiqTitle.dominantStat].label;
     const secondaryLabel = ATTRIBUTE_META[analysis.cosmiqTitle.secondaryStat].label;
     const loadingStatus = hasImagePreview
@@ -294,6 +381,19 @@ function LoadingState({
       : `Composing ${dominantLabel} and ${secondaryLabel} into your generated title card.`;
     const topStats = viewModel.rankedStats.slice(0, 3);
     const remainingStats = viewModel.statCards.filter((stat) => !topStats.includes(stat)).slice(0, 3);
+    const hasVerifiedPreview = previewSlideshowUrls.length > 0;
+    const hasSlideshow = previewSlideshowUrls.length > 1;
+    const activeSafeSlideIndex = hasVerifiedPreview
+      ? activeSlideIndex % previewSlideshowUrls.length
+      : 0;
+    const activeSlideUrl = previewSlideshowUrls[activeSafeSlideIndex] ?? null;
+    const previewBadgeLabel = imageState === "loaded" && hasVerifiedPreview
+      ? `Preview ${activeSafeSlideIndex + 1}/${previewSlideshowUrls.length}`
+      : imageState === "idle"
+        ? "Preparing preview"
+        : hasImagePreview
+          ? "Preview warming"
+          : "Render in progress";
 
     return (
       <Card
@@ -303,12 +403,19 @@ function LoadingState({
       >
         {hasImagePreview ? (
           <div className="absolute inset-0" data-testid="companion-title-art-loading-preview">
-            <img
-              alt=""
-              aria-hidden="true"
-              className="h-full w-full scale-105 object-cover opacity-55 blur-md"
-              src={imageUrl ?? undefined}
-            />
+            {slideshowUrls.map((slideUrl, index) => (
+              <img
+                key={slideUrl}
+                alt=""
+                aria-hidden="true"
+                className={cn(
+                  "absolute inset-0 h-full w-full scale-105 object-cover opacity-0 blur-md transition-opacity duration-700",
+                  slideUrl === activeSlideUrl && "opacity-55",
+                )}
+                onLoad={() => markPreviewUrlLoaded(slideUrl)}
+                src={slideUrl}
+              />
+            ))}
           </div>
         ) : (
           <div
@@ -330,7 +437,7 @@ function LoadingState({
             <div className="flex flex-wrap gap-2">
               <Badge className="bg-primary text-primary-foreground">{loadingStatus}</Badge>
               <Badge variant="outline" className="border-white/30 bg-background/55 text-foreground backdrop-blur">
-                {imageState === "idle" ? "Preparing preview" : hasImagePreview ? "Preview warming" : "Render in progress"}
+                {previewBadgeLabel}
               </Badge>
             </div>
             <Badge variant="outline" className="border-white/30 bg-background/55 text-foreground backdrop-blur">
@@ -363,6 +470,22 @@ function LoadingState({
                 {analysis.cosmiqTitle.title}
               </h3>
               <p className="mx-auto max-w-md text-sm leading-6 text-muted-foreground">{loadingCopy}</p>
+              {hasSlideshow ? (
+                <div
+                  aria-label="Generated title art preview slides"
+                  className="flex justify-center gap-1.5"
+                >
+                  {previewSlideshowUrls.map((slideUrl, index) => (
+                    <span
+                      key={slideUrl}
+                      className={cn(
+                        "h-1.5 w-5 rounded-full bg-primary/25 transition-colors",
+                        index === activeSafeSlideIndex && "bg-primary",
+                      )}
+                    />
+                  ))}
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -424,7 +547,7 @@ function useTitleCardImageGate({
 }) {
   const card = analysis.cosmiqTitleCard;
   const profileKey = card?.profileKey ?? null;
-  const imageUrl = card?.imageUrl ?? null;
+  const imageUrl = getTitleCardImageUrls(card)[0] ?? null;
   const imageKey = getTitleCardImageKey(profileKey, imageUrl);
   const forcedRetryProfileKeysRef = useRef<Set<string>>(new Set());
   const [loadedImageKey, setLoadedImageKey] = useState<string | null>(null);
@@ -915,7 +1038,7 @@ function CosmiqTitleRevealCard({
   onRefresh: () => void;
   prefersReducedMotion: boolean;
 }) {
-  const imageUrl = analysis.cosmiqTitleCard?.imageUrl ?? null;
+  const imageUrl = getTitleCardImageUrls(analysis.cosmiqTitleCard)[0] ?? null;
   const cardStatus = analysis.cosmiqTitleCard?.status ?? "unavailable";
 
   if (isFlipped) {
@@ -1089,6 +1212,43 @@ function CompanionStatAnalysisView({
     onRegenerateTitleCard,
   });
   const titleCardStatus = analysis.cosmiqTitleCard?.status ?? "generating";
+  const titleCardImageUrls = useMemo(
+    () => getTitleCardImageUrls(analysis.cosmiqTitleCard),
+    [analysis.cosmiqTitleCard],
+  );
+  const titleCardPreviewKey = titleCardImageUrls.join("|");
+  const titleCardPreviewDwellMs = prefersReducedMotion
+    ? 0
+    : getTitleArtPreviewDwellMs(titleCardImageUrls.length);
+  const [isTitleCardPreviewDwellComplete, setIsTitleCardPreviewDwellComplete] = useState(false);
+  const [verifiedTitleCardPreviewCount, setVerifiedTitleCardPreviewCount] = useState(0);
+  const handleVerifiedPreviewCountChange = useCallback((verifiedCount: number) => {
+    setVerifiedTitleCardPreviewCount(verifiedCount);
+  }, []);
+
+  useEffect(() => {
+    if (titleCardPreviewDwellMs <= 0 || titleCardPreviewKey.length === 0) {
+      setIsTitleCardPreviewDwellComplete(true);
+      setVerifiedTitleCardPreviewCount(0);
+      return;
+    }
+
+    if (!isTitleCardImageLoaded) {
+      setIsTitleCardPreviewDwellComplete(false);
+      setVerifiedTitleCardPreviewCount(0);
+      return;
+    }
+
+    setIsTitleCardPreviewDwellComplete(false);
+    const timeoutId = window.setTimeout(() => {
+      setIsTitleCardPreviewDwellComplete(true);
+    }, titleCardPreviewDwellMs);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [isTitleCardImageLoaded, titleCardPreviewDwellMs, titleCardPreviewKey, verifiedTitleCardPreviewCount]);
+  const isTitleCardPreviewDwellSatisfied = titleCardPreviewDwellMs <= 0 || isTitleCardPreviewDwellComplete;
 
   if (titleCardStatus === "unavailable" || imageState === "failed") {
     return (
@@ -1108,6 +1268,7 @@ function CompanionStatAnalysisView({
     titleCardStatus !== "ready"
     || !analysis.cosmiqTitleCard?.imageUrl
     || !isTitleCardImageLoaded
+    || !isTitleCardPreviewDwellSatisfied
     || isRegeneratingTitleCard
   ) {
     return (
@@ -1116,8 +1277,10 @@ function CompanionStatAnalysisView({
         analysis={analysis}
         viewModel={viewModel}
         imageUrl={analysis.cosmiqTitleCard?.imageUrl ?? null}
+        imageUrls={titleCardImageUrls}
         titleCardStatus={titleCardStatus}
         imageState={imageState}
+        onVerifiedPreviewCountChange={handleVerifiedPreviewCountChange}
         prefersReducedMotion={prefersReducedMotion}
       />
     );
