@@ -1,5 +1,5 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   BarChart3,
   Brain,
@@ -40,8 +40,10 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
 import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
+import { useCosmiqTitleCardLoadingGallery } from "@/hooks/useCosmiqTitleCardLoadingGallery";
 import {
   type CompanionStatAnalysis,
   type CompanionStatAttribute,
@@ -257,24 +259,183 @@ const mentorAccentStyle = (analysis: CompanionStatAnalysis): CSSProperties | und
   };
 };
 
-function LoadingState() {
+type LoadingStatePhase = "analysis" | "title-generating" | "image-warmup" | "retrying";
+
+const LOADING_PHASE_COPY: Record<
+  LoadingStatePhase,
+  { eyebrow: string; title: string; description: string; ariaLabel: string }
+> = {
+  analysis: {
+    eyebrow: "Cosmiq reading",
+    title: "Reading your stat shape",
+    description: "Gathering your companion stats, recent momentum, and next evolution path.",
+    ariaLabel: "Loading stat analysis",
+  },
+  "title-generating": {
+    eyebrow: "Title art forming",
+    title: "Forging your title card",
+    description: "Your reading is taking shape. The final reveal waits for the title art to finish.",
+    ariaLabel: "Generating Cosmiq title card art",
+  },
+  "image-warmup": {
+    eyebrow: "Reveal warming up",
+    title: "Preparing the final reveal",
+    description: "The title art is ready. Preloading the image now so everything appears together.",
+    ariaLabel: "Preparing Cosmiq title card reveal",
+  },
+  retrying: {
+    eyebrow: "Title art retry",
+    title: "Recasting your title card",
+    description: "The card needs another pass. The reveal will stay here until real title art is ready.",
+    ariaLabel: "Retrying Cosmiq title card art",
+  },
+};
+
+function LoadingState({
+  phase = "analysis",
+  isRetrying = false,
+  onRetry,
+  retryLabel = "Retry title art",
+}: {
+  phase?: LoadingStatePhase;
+  isRetrying?: boolean;
+  onRetry?: () => void;
+  retryLabel?: string;
+}) {
+  const prefersReducedMotion = useReducedMotion();
+  const { slides, readyCount, targetCount, isSeeding } = useCosmiqTitleCardLoadingGallery({ enabled: true });
+  const [slideIndex, setSlideIndex] = useState(0);
+  const copy = LOADING_PHASE_COPY[phase];
+  const activeSlide = slides.length > 0 ? slides[slideIndex % slides.length] : null;
+  const libraryProgress = Math.max(
+    activeSlide ? 18 : 8,
+    Math.min(100, Math.round((readyCount / targetCount) * 100)),
+  );
+
+  useEffect(() => {
+    if (slides.length <= 1) return;
+
+    const interval = window.setInterval(() => {
+      setSlideIndex((current) => (current + 1) % slides.length);
+    }, prefersReducedMotion ? 6500 : 4200);
+
+    return () => window.clearInterval(interval);
+  }, [prefersReducedMotion, slides.length]);
+
+  useEffect(() => {
+    setSlideIndex(0);
+  }, [slides.length]);
+
   return (
-    <Card className="min-h-[62vh] overflow-hidden border-primary/20 bg-[radial-gradient(circle_at_top,hsl(var(--primary)/0.20),transparent_34%),linear-gradient(180deg,hsl(var(--background)/0.92),hsl(var(--card)/0.98))]">
-      <CardContent className="flex min-h-[62vh] flex-col items-center justify-center gap-6 p-6 text-center">
-        <div className="relative flex h-28 w-28 items-center justify-center rounded-full border border-primary/25 bg-primary/10">
-          <div className="absolute inset-2 rounded-full border border-primary/20" />
+    <Card
+      aria-busy="true"
+      aria-label={copy.ariaLabel}
+      aria-live="polite"
+      data-testid="companion-stat-loading-state"
+      role="status"
+      className="relative min-h-[62vh] overflow-hidden border-primary/25 bg-background"
+    >
+      <div className="absolute inset-0">
+        {activeSlide ? (
+          <AnimatePresence initial={false} mode="wait">
+            <motion.div
+              key={activeSlide.imageUrl}
+              data-testid="companion-stat-loading-slide"
+              aria-hidden="true"
+              className="absolute inset-0 bg-cover bg-center"
+              initial={prefersReducedMotion ? false : { opacity: 0, scale: 1.04 }}
+              animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1.12 }}
+              exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 1.02 }}
+              transition={prefersReducedMotion ? { duration: 0.001 } : { duration: 4.2, ease: "easeOut" }}
+              style={{ backgroundImage: `url("${activeSlide.imageUrl}")` }}
+            />
+          </AnimatePresence>
+        ) : (
+          <div
+            data-testid="companion-stat-loading-library-placeholder"
+            className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,hsl(var(--primary)/0.42),transparent_30%),radial-gradient(circle_at_82%_18%,hsl(var(--accent)/0.30),transparent_28%),linear-gradient(145deg,hsl(var(--background)),hsl(var(--card)),hsl(var(--background)))]"
+          />
+        )}
+      </div>
+
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,hsl(var(--background)/0.18),hsl(var(--background)/0.55)_42%,hsl(var(--background)/0.92))]" />
+      <motion.div
+        aria-hidden="true"
+        className="absolute inset-y-0 left-[-45%] w-1/2 rotate-12 bg-gradient-to-r from-transparent via-white/18 to-transparent blur-sm"
+        animate={prefersReducedMotion ? undefined : { x: ["0%", "320%"] }}
+        transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,hsl(var(--primary)/0.16),transparent_38%)]" />
+
+      <CardContent className="relative z-10 flex min-h-[62vh] flex-col items-center justify-center gap-6 p-6 text-center">
+        <div className="relative flex h-28 w-28 items-center justify-center rounded-full border border-primary/35 bg-background/55 shadow-2xl backdrop-blur-md">
+          <motion.div
+            aria-hidden="true"
+            className="absolute inset-0 rounded-full border border-primary/35"
+            animate={prefersReducedMotion ? undefined : { scale: [1, 1.26, 1], opacity: [0.55, 0.1, 0.55] }}
+            transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.div
+            aria-hidden="true"
+            className="absolute inset-3 rounded-full border border-primary/25"
+            animate={prefersReducedMotion ? undefined : { rotate: 360 }}
+            transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+          />
           <Sparkles className="h-10 w-10 animate-pulse text-primary" />
         </div>
-        <div className="space-y-2">
-          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-primary">Cosmiq reading</p>
-          <h3 className="text-2xl font-semibold">Revealing your title</h3>
+
+        <div className="space-y-2 rounded-lg border border-white/10 bg-background/70 p-4 shadow-2xl backdrop-blur-md">
+          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-primary">{copy.eyebrow}</p>
+          <h3 className="text-2xl font-semibold">{copy.title}</h3>
           <p className="mx-auto max-w-sm text-sm leading-6 text-muted-foreground">
-            Reading your stat shape, momentum, and next evolution path.
+            {copy.description}
           </p>
+          {activeSlide ? (
+            <p className="mx-auto max-w-sm text-xs leading-5 text-muted-foreground">
+              Recent title cards are passing through while yours forms.
+            </p>
+          ) : (
+            <p className="mx-auto max-w-sm text-xs leading-5 text-muted-foreground">
+              Building the shared title-card library now.
+            </p>
+          )}
         </div>
+
+        <div className="w-full max-w-md space-y-3 rounded-lg border border-white/10 bg-background/55 p-4 backdrop-blur">
+          <Progress value={libraryProgress} className="h-2" />
+          <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+            <span>{readyCount} / {targetCount} shared cards ready</span>
+            <span>{isSeeding ? "Expanding library..." : "Syncing library..."}</span>
+          </div>
+          <div className="grid grid-cols-5 gap-2">
+            {Array.from({ length: targetCount }).map((_, index) => (
+              <div
+                key={index}
+                className={cn(
+                  "h-1.5 rounded-full transition-colors",
+                  index < readyCount ? "bg-primary" : "bg-white/12",
+                )}
+              />
+            ))}
+          </div>
+        </div>
+
+        {onRetry ? (
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onRetry}
+            disabled={isRetrying}
+            className="border border-white/15 bg-background/75 backdrop-blur hover:bg-background/90"
+          >
+            <RefreshCw className={cn("h-4 w-4", isRetrying && "animate-spin")} />
+            {isRetrying ? "Retrying..." : retryLabel}
+          </Button>
+        ) : null}
+
         <div className="grid w-full max-w-md grid-cols-3 gap-2">
           {Array.from({ length: 6 }).map((_, index) => (
-            <Skeleton key={index} className="h-12 rounded-lg bg-primary/10" />
+            <Skeleton key={index} className="h-10 rounded-lg bg-primary/10" />
           ))}
         </div>
       </CardContent>
@@ -949,26 +1110,34 @@ function CompanionStatAnalysisView({
   const titleCardStatus = analysis.cosmiqTitleCard?.status ?? "generating";
 
   if (titleCardStatus === "unavailable" || imageState === "failed") {
+    const handleRetryTitleArt = () => {
+      if (failedImageKey) {
+        retryTitleCardImage();
+        return;
+      }
+
+      void onRegenerateTitleCard(analysis).catch(() => undefined);
+    };
+
     return (
-      <AnalysisUnavailableCard
-        message={
-          failedImageKey
-            ? "We couldn't load the generated title art. Try regenerating it."
-            : "Generated title art is unavailable right now. Try again in a moment."
-        }
-        isRefreshing={isRefreshing || isRegeneratingTitleCard}
-        onRetry={failedImageKey ? retryTitleCardImage : onRefresh}
+      <LoadingState
+        phase="retrying"
+        isRetrying={isRefreshing || isRegeneratingTitleCard}
+        onRetry={handleRetryTitleArt}
       />
     );
   }
 
-  if (
-    titleCardStatus !== "ready"
-    || !analysis.cosmiqTitleCard?.imageUrl
-    || !isTitleCardImageLoaded
-    || isRegeneratingTitleCard
-  ) {
-    return <LoadingState />;
+  if (isRegeneratingTitleCard) {
+    return <LoadingState phase="retrying" />;
+  }
+
+  if (titleCardStatus !== "ready" || !analysis.cosmiqTitleCard?.imageUrl) {
+    return <LoadingState phase="title-generating" />;
+  }
+
+  if (!isTitleCardImageLoaded) {
+    return <LoadingState phase="image-warmup" />;
   }
 
   return (
@@ -1019,7 +1188,7 @@ function AnalysisContent() {
   };
 
   if (isLoading && !analysis) {
-    return <LoadingState />;
+    return <LoadingState phase="analysis" />;
   }
 
   if (!analysis) {

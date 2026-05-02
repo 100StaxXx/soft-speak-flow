@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-30T18:01:14Z",
+  "generatedAt": "2026-05-02T01:03:19Z",
   "frontendInvoked": [
     "adjust-epic-plan",
     "analyze-user-patterns",
@@ -32,6 +32,7 @@
     "generate-completion-feedback",
     "generate-cosmic-postcard",
     "generate-cosmic-postcard-test",
+    "generate-cosmiq-title-card",
     "generate-daily-missions",
     "generate-daily-plan",
     "generate-epic-narrative-seed",
@@ -62,6 +63,7 @@
     "resolve-streak-freeze",
     "retry-failed-payouts",
     "rotate-daily-wallpapers",
+    "seed-cosmiq-title-card-library",
     "send-shout-notification",
     "submit-support-report",
     "suggest-task-times",
@@ -191,6 +193,7 @@
     "retry-missing-pep-talk-transcripts",
     "rotate-daily-wallpapers",
     "schedule-daily-mentor-pushes",
+    "seed-cosmiq-title-card-library",
     "send-shout-notification",
     "submit-support-report",
     "suggest-task-times",

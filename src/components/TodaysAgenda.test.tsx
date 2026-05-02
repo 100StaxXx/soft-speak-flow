@@ -629,6 +629,45 @@ describe("TodaysAgenda touch toggles", () => {
 });
 
 describe("TodaysAgenda campaign visibility", () => {
+  it("renders a campaign header for scheduled quests even when no campaigns exist", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    const onOpenCampaigns = vi.fn();
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "quest-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 20,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-14T16:34:00")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+        activeEpics={[]}
+        onOpenCampaigns={onOpenCampaigns}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const scheduledPane = screen.getByTestId("scheduled-timeline-pane");
+    expect(within(scheduledPane).getByText("Campaigns")).toBeInTheDocument();
+    expect(screen.getAllByText("Campaigns")).toHaveLength(1);
+
+    fireEvent.click(within(scheduledPane).getByRole("button", { name: "Open campaigns page" }));
+    expect(onOpenCampaigns).toHaveBeenCalledTimes(1);
+  });
+
   it("renders campaigns inside the scheduled timeline pane when scheduled rows exist", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -1067,7 +1106,8 @@ describe("TodaysAgenda campaign visibility", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(screen.queryByText("Campaigns")).not.toBeInTheDocument();
+    expect(screen.getByText("Campaigns")).toBeInTheDocument();
+    expect(screen.getAllByText("Campaigns")).toHaveLength(1);
     expect(screen.getByText("Hydrated Epic")).toBeInTheDocument();
   });
 
@@ -1100,6 +1140,7 @@ describe("TodaysAgenda campaign visibility", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
+    expect(screen.getByText("Campaigns")).toBeInTheDocument();
     expect(screen.getByText("Loading campaigns...")).toBeInTheDocument();
   });
 });

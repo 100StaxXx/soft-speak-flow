@@ -214,6 +214,9 @@ verify_jwt = true
 [functions.generate-companion-stat-analysis]
 verify_jwt = true
 
+[functions.seed-cosmiq-title-card-library]
+verify_jwt = true
+
 [functions.send-apns-notification]
 verify_jwt = false
 

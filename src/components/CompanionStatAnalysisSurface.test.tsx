@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   refreshAnalysisMock: vi.fn().mockResolvedValue(undefined),
   regenerateTitleCardMock: vi.fn().mockResolvedValue(undefined),
   useCompanionStatAnalysisMock: vi.fn(),
+  useCosmiqTitleCardLoadingGalleryMock: vi.fn(),
 }));
 
 const originalImage = globalThis.Image;
@@ -34,6 +35,11 @@ vi.mock("@/hooks/useCompanionStatAnalysis", () => ({
   useCompanionStatAnalysis: (...args: unknown[]) => mocks.useCompanionStatAnalysisMock(...args),
 }));
 
+vi.mock("@/hooks/useCosmiqTitleCardLoadingGallery", () => ({
+  useCosmiqTitleCardLoadingGallery: (...args: unknown[]) =>
+    mocks.useCosmiqTitleCardLoadingGalleryMock(...args),
+}));
+
 vi.mock("@/components/ui/dialog", () => ({
   Dialog: ({ open, children }: { open?: boolean; children: ReactNode }) =>
     open ? <div data-testid="dialog-root">{children}</div> : null,
@@ -53,12 +59,15 @@ vi.mock("@/components/ui/drawer", () => ({
 }));
 
 vi.mock("framer-motion", () => ({
+  AnimatePresence: ({ children }: { children: ReactNode }) => <>{children}</>,
   motion: {
     div: ({
       children,
       variants: _variants,
       initial: _initial,
       animate: _animate,
+      exit: _exit,
+      transition: _transition,
       ...props
     }: HTMLAttributes<HTMLDivElement> & Record<string, unknown>) => (
       <div
@@ -74,6 +83,8 @@ vi.mock("framer-motion", () => ({
       variants: _variants,
       initial: _initial,
       animate: _animate,
+      exit: _exit,
+      transition: _transition,
       ...props
     }: HTMLAttributes<HTMLDetailsElement> & Record<string, unknown>) => (
       <details
@@ -272,6 +283,23 @@ describe("CompanionStatAnalysisSurface", () => {
     mocks.refreshAnalysisMock.mockClear();
     mocks.regenerateTitleCardMock.mockClear();
     mocks.useCompanionStatAnalysisMock.mockReset();
+    mocks.useCosmiqTitleCardLoadingGalleryMock.mockReset();
+    mocks.useCosmiqTitleCardLoadingGalleryMock.mockReturnValue({
+      slides: [
+        {
+          profileKey: "shared-title-1",
+          imageUrl: "https://cdn.example.com/shared-title-1.png",
+          title: "Shared Title",
+          rarity: "rare",
+          generatedAt: "2026-04-18T00:00:00.000Z",
+        },
+      ],
+      readyCount: 1,
+      targetCount: 10,
+      isLoading: false,
+      isSeeding: false,
+      error: null,
+    });
     mocks.useCompanionStatAnalysisMock.mockReturnValue({
       analysis,
       cached: true,
@@ -420,6 +448,32 @@ describe("CompanionStatAnalysisSurface", () => {
     expect(screen.getByText("Rebalance Creativity")).toBeInTheDocument();
   });
 
+  it("shows the shared-library slideshow while initial stats are loading", () => {
+    mocks.useCompanionStatAnalysisMock.mockReturnValue({
+      analysis: null,
+      cached: false,
+      error: null,
+      isLoading: true,
+      isRefreshing: false,
+      isRegeneratingTitleCard: false,
+      refreshAnalysis: mocks.refreshAnalysisMock,
+      regenerateTitleCard: mocks.regenerateTitleCardMock,
+    });
+
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="desktop"
+      />,
+    );
+
+    expect(screen.getByTestId("companion-stat-loading-state")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-stat-loading-slide")).toBeInTheDocument();
+    expect(screen.getByText("Reading your stat shape")).toBeInTheDocument();
+    expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
+  });
+
   it("keeps the loading state while title-card art is still generating", () => {
     mocks.useCompanionStatAnalysisMock.mockReturnValue({
       analysis: {
@@ -447,7 +501,8 @@ describe("CompanionStatAnalysisSurface", () => {
       />,
     );
 
-    expect(screen.getByText("Revealing your title")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-stat-loading-state")).toBeInTheDocument();
+    expect(screen.getByText("Forging your title card")).toBeInTheDocument();
     expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
   });
 
@@ -462,7 +517,8 @@ describe("CompanionStatAnalysisSurface", () => {
       />,
     );
 
-    expect(screen.getByText("Revealing your title")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-stat-loading-state")).toBeInTheDocument();
+    expect(screen.getByText("Preparing the final reveal")).toBeInTheDocument();
     expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
   });
 
@@ -481,7 +537,41 @@ describe("CompanionStatAnalysisSurface", () => {
     await waitFor(() => {
       expect(mocks.regenerateTitleCardMock).toHaveBeenCalledWith(analysis);
     });
-    expect(await screen.findByText("We couldn't load the generated title art. Try regenerating it.")).toBeInTheDocument();
+    expect(await screen.findByText("Recasting your title card")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry title art" })).toBeInTheDocument();
+    expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
+  });
+
+  it("keeps the slideshow loader with retry when title-card art is unavailable", () => {
+    mocks.useCompanionStatAnalysisMock.mockReturnValue({
+      analysis: {
+        ...analysis,
+        cosmiqTitleCard: {
+          ...analysis.cosmiqTitleCard,
+          imageUrl: null,
+          status: "unavailable",
+        },
+      },
+      cached: false,
+      error: null,
+      isLoading: false,
+      isRefreshing: false,
+      isRegeneratingTitleCard: false,
+      refreshAnalysis: mocks.refreshAnalysisMock,
+      regenerateTitleCard: mocks.regenerateTitleCardMock,
+    });
+
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="desktop"
+      />,
+    );
+
+    expect(screen.getByText("Recasting your title card")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry title art" }));
+    expect(mocks.regenerateTitleCardMock).toHaveBeenCalledTimes(1);
     expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
   });
 

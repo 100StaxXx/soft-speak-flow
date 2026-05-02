@@ -279,7 +279,7 @@ describe("DraggableFAB", () => {
     expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
       target: "planner",
       starterIntent: "quest_capture",
-      message: "",
+      message: "Quest?",
     }));
   });
 

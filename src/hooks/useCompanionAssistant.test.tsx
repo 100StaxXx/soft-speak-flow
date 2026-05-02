@@ -1341,6 +1341,36 @@ describe("useCompanionAssistant", () => {
     });
   });
 
+  it("launches Quest? as a companion-agent quest capture opener", async () => {
+    const { wrapper } = createWrapper();
+
+    renderHook(
+      () =>
+        useCompanionAssistant({
+          surface: "journeys",
+          launchIntent: {
+            id: "launch-quest-1",
+            message: "Quest?",
+            starterIntent: "quest_capture",
+          },
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+        "companion-agent",
+        expect.objectContaining({
+          body: expect.objectContaining({
+            message: "Quest?",
+            starterIntent: "quest_capture",
+            turnOrigin: "launcher",
+          }),
+        }),
+      );
+    });
+  });
+
   it("opens free-talk launcher templates as companion-authored visible openers", async () => {
     const consumed = vi.fn();
     const { wrapper } = createWrapper();

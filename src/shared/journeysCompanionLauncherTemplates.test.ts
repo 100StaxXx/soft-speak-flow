@@ -79,7 +79,7 @@ describe("journeys companion launcher greetings", () => {
     expect(templates.find((template) => template.id === "quest")).toMatchObject({
       id: "quest",
       label: "Quest?",
-      message: "",
+      message: "Quest?",
       target: "planner",
       starterIntent: "quest_capture",
     });

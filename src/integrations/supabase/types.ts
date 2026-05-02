@@ -1213,6 +1213,69 @@ export type Database = {
           },
         ]
       }
+      companion_cosmiq_title_cards: {
+        Row: {
+          band_signature: string
+          created_at: string
+          dominant_stat: string
+          error_message: string | null
+          fusion: boolean
+          generated_at: string | null
+          generation_started_at: string | null
+          image_url: string | null
+          momentum: string
+          profile_key: string
+          prompt_version: number
+          rarity: string
+          rebalance_stat: string
+          secondary_stat: string
+          status: string
+          title: string
+          updated_at: string
+          visual_persona: string
+        }
+        Insert: {
+          band_signature: string
+          created_at?: string
+          dominant_stat: string
+          error_message?: string | null
+          fusion?: boolean
+          generated_at?: string | null
+          generation_started_at?: string | null
+          image_url?: string | null
+          momentum: string
+          profile_key: string
+          prompt_version: number
+          rarity: string
+          rebalance_stat: string
+          secondary_stat: string
+          status?: string
+          title: string
+          updated_at?: string
+          visual_persona?: string
+        }
+        Update: {
+          band_signature?: string
+          created_at?: string
+          dominant_stat?: string
+          error_message?: string | null
+          fusion?: boolean
+          generated_at?: string | null
+          generation_started_at?: string | null
+          image_url?: string | null
+          momentum?: string
+          profile_key?: string
+          prompt_version?: number
+          rarity?: string
+          rebalance_stat?: string
+          secondary_stat?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          visual_persona?: string
+        }
+        Relationships: []
+      }
       companion_stat_analyses: {
         Row: {
           analysis_date: string
