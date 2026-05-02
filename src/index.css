@@ -1152,6 +1152,39 @@ All colors MUST be HSL.
     opacity: 1;
   }
 
+  .journeys-quest-card-shell--readable {
+    background: rgba(23, 21, 34, 0.76) !important;
+    border-color: rgba(255, 255, 255, 0.18) !important;
+    box-shadow: 0 16px 30px rgba(0, 0, 0, 0.24) !important;
+  }
+
+  .journeys-quest-card-shell--readable::after {
+    border-color: rgba(255, 255, 255, 0.14);
+    opacity: 1;
+  }
+
+  .campaign-ritual-card.journeys-quest-card-shell--readable {
+    background: linear-gradient(
+      180deg,
+      hsl(var(--primary) / 0.18),
+      rgba(23, 21, 34, 0.8)
+    ) !important;
+    border-color: hsl(var(--primary) / 0.45) !important;
+  }
+
+  .journeys-quest-card-shell--readable.journeys-quest-card-shell--active {
+    background: linear-gradient(
+      180deg,
+      hsl(var(--primary) / 0.16),
+      rgba(23, 21, 34, 0.82)
+    ) !important;
+    border-color: hsl(var(--primary) / 0.52) !important;
+  }
+
+  .journeys-quest-card-shell--readable.journeys-quest-card-shell--active::after {
+    border-color: hsl(var(--primary) / 0.38);
+  }
+
   /* iOS Touch Optimizations */
   .ios-scroll-container {
     -webkit-overflow-scrolling: touch;

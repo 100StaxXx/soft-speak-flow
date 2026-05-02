@@ -358,6 +358,7 @@ const Journeys = () => {
   const queryClient = useQueryClient();
   const { queueAction, shouldQueueWrites, retryNow } = useResilience();
   const { profile, loading: profileLoading } = useProfile();
+  const readableQuestCardsEnabled = profile?.readable_quest_cards_enabled ?? false;
   
   // Streak freeze
   const { 
@@ -1738,6 +1739,7 @@ const Journeys = () => {
               <DesktopWeekPlanner
                 selectedDate={selectedDate}
                 tasks={weekCalendarTasks}
+                readableQuestCardsEnabled={readableQuestCardsEnabled}
                 currentStreak={currentStreak}
                 activeEpics={activeEpics}
                 isCampaignsLoading={epicsLoading}
@@ -1767,6 +1769,7 @@ const Journeys = () => {
               <TodaysAgenda
                 tasks={dailyTasks}
                 selectedDate={selectedDate}
+                readableQuestCardsEnabled={readableQuestCardsEnabled}
                 layoutMode={journeysLayoutMode}
                 hideDesktopRailAddButton={isMacHostedIOSApp}
                 isVisible={location.pathname === JOURNEYS_ROUTE}

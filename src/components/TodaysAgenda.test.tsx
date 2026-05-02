@@ -2031,9 +2031,47 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     const mobileRow = within(pane).getByTestId("timeline-row-task-scheduled-1");
     expect(mobileRow).toBeInTheDocument();
     expect(getQuestCardShell(mobileRow)).toHaveClass("journeys-quest-card-shell");
+    expect(getQuestCardShell(mobileRow)).not.toHaveClass("journeys-quest-card-shell--readable");
     expect(screen.queryByTestId("timeline-row-task-unscheduled-1")).not.toBeInTheDocument();
     expect(screen.queryByText("Anytime focus")).not.toBeInTheDocument();
     expect(screen.queryByText("Anytime")).not.toBeInTheDocument();
+  });
+
+  it("adds the readable shell class when readable quest cards are enabled", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-readable-1",
+            task_text: "Readable morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        readableQuestCardsEnabled
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const pane = screen.getByTestId("scheduled-timeline-pane");
+    const mobileRow = within(pane).getByTestId("timeline-row-task-readable-1");
+    expect(getQuestCardShell(mobileRow)).toHaveClass(
+      "journeys-quest-card-shell",
+      "journeys-quest-card-shell--readable",
+    );
   });
 
   it("uses row drag wiring for scheduled quests", () => {

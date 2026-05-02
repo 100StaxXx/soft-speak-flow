@@ -103,6 +103,7 @@ const TOUCH_CLICK_SUPPRESSION_RESET_MS = 750;
 const JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME =
   "journeys-quest-card-shell overflow-hidden border bg-white/[0.04] shadow-[0_12px_22px_rgba(0,0,0,0.14)] transition-colors";
 const JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME = "journeys-quest-card-shell--active";
+const JOURNEYS_QUEST_CARD_SHELL_READABLE_CLASS_NAME = "journeys-quest-card-shell--readable";
 
 interface Task {
   id: string;
@@ -198,6 +199,7 @@ interface TodaysAgendaProps {
   tasks: Task[];
   selectedDate: Date;
   layoutMode?: JourneysLayoutMode;
+  readableQuestCardsEnabled?: boolean;
   hideDesktopRailAddButton?: boolean;
   isVisible?: boolean;
   disableTimelineDrag?: boolean;
@@ -639,6 +641,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   tasks,
   selectedDate,
   layoutMode,
+  readableQuestCardsEnabled = false,
   hideDesktopRailAddButton = false,
   isVisible = true,
   disableTimelineDrag = false,
@@ -2112,6 +2115,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           className={cn(
             JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME,
             "group flex h-full items-stretch gap-2 rounded-[18px] border-white/10 p-2",
+            readableQuestCardsEnabled && JOURNEYS_QUEST_CARD_SHELL_READABLE_CLASS_NAME,
             isCampaignRitual && CAMPAIGN_RITUAL_CARD_CLASSES,
             isDesktopDetailOpen && JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME,
             isDesktopDetailOpen && "border-primary/40 bg-primary/[0.08]",
@@ -2206,6 +2210,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           className={cn(
             JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME,
             "rounded-[22px] border-white/10 px-2",
+            readableQuestCardsEnabled && JOURNEYS_QUEST_CARD_SHELL_READABLE_CLASS_NAME,
             isCampaignRitual && CAMPAIGN_RITUAL_CARD_CLASSES,
             isMobileQuestShellActive && JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME,
             isMobileQuestShellActive && "border-primary/35 bg-primary/[0.06]",
@@ -2640,6 +2645,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     openDesktopDetailTaskId,
     scheduleDesktopTaskSingleClick,
     handleDesktopTaskDoubleClick,
+    readableQuestCardsEnabled,
   ]);
 
   const desktopRailCardClass = "journeys-desktop-rail-card rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,20,38,0.94),rgba(16,13,27,0.9))] p-5 shadow-[0_20px_40px_rgba(0,0,0,0.2)]";

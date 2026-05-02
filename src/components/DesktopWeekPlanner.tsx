@@ -58,6 +58,7 @@ interface ActiveEpic {
 interface DesktopWeekPlannerProps {
   selectedDate: Date;
   tasks: DailyTask[];
+  readableQuestCardsEnabled?: boolean;
   currentStreak?: number;
   activeEpics?: ActiveEpic[];
   isCampaignsLoading?: boolean;
@@ -98,6 +99,7 @@ interface DayBuckets {
 interface WeekPlannerTaskCardProps {
   task: DailyTask;
   compact?: boolean;
+  readableQuestCardsEnabled?: boolean;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onToggle: (taskId: string, completed: boolean, xpReward: number) => void;
@@ -117,6 +119,7 @@ const TASK_PAD_PX = 4;
 const JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME =
   "journeys-quest-card-shell overflow-hidden border bg-white/[0.04] shadow-[0_12px_22px_rgba(0,0,0,0.14)] transition-colors";
 const JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME = "journeys-quest-card-shell--active";
+const JOURNEYS_QUEST_CARD_SHELL_READABLE_CLASS_NAME = "journeys-quest-card-shell--readable";
 
 const formatHourLabel = (hour: number) => format(new Date(2000, 0, 1, hour, 0), "h a");
 
@@ -246,6 +249,7 @@ const computeOverlapColumns = (
 function WeekPlannerTaskCard({
   task,
   compact = false,
+  readableQuestCardsEnabled = false,
   isOpen,
   onOpenChange,
   onToggle,
@@ -277,6 +281,7 @@ function WeekPlannerTaskCard({
       className={cn(
         JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME,
         "h-full rounded-[18px] border-white/10 p-2",
+        readableQuestCardsEnabled && JOURNEYS_QUEST_CARD_SHELL_READABLE_CLASS_NAME,
         isCampaignRitual && CAMPAIGN_RITUAL_CARD_CLASSES,
         compact && "rounded-[16px]",
         isOpen && JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME,
@@ -356,6 +361,7 @@ function WeekPlannerTaskCard({
 export function DesktopWeekPlanner({
   selectedDate,
   tasks,
+  readableQuestCardsEnabled = false,
   currentStreak = 0,
   activeEpics = [],
   isCampaignsLoading = false,
@@ -605,6 +611,7 @@ export function DesktopWeekPlanner({
       key={task.id}
       task={task}
       compact={compact}
+      readableQuestCardsEnabled={readableQuestCardsEnabled}
       isOpen={openDetailsTaskId === task.id}
       onOpenChange={(open) => {
         setOpenDetailsTaskId(open ? task.id : null);
@@ -626,6 +633,7 @@ export function DesktopWeekPlanner({
     onToggle,
     onUndoToggle,
     openDetailsTaskId,
+    readableQuestCardsEnabled,
   ]);
 
   return (

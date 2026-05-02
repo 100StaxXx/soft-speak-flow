@@ -167,10 +167,36 @@ describe("DesktopWeekPlanner", () => {
     expect(timedCard).toBeInTheDocument();
     expect(timedCard).toHaveAttribute("data-quest-card-shell", "true");
     expect(timedCard).toHaveClass("journeys-quest-card-shell");
+    expect(timedCard).not.toHaveClass("journeys-quest-card-shell--readable");
     expect(within(screen.getByTestId("desktop-week-anytime-2026-03-31")).getByText("Loose planning")).toBeInTheDocument();
     expect(screen.getByText("Wednesday review")).toBeInTheDocument();
     expect(within(timedCard).queryByText("8:00 AM")).not.toBeInTheDocument();
     expect(within(timedCard).queryByText("+20 XP")).not.toBeInTheDocument();
+  });
+
+  it("adds the readable shell class when readable quest cards are enabled", () => {
+    render(
+      <DesktopWeekPlanner
+        selectedDate={selectedDate}
+        tasks={[
+          baseTask({
+            id: "readable-task",
+            task_text: "Readable week quest",
+            task_date: "2026-03-31",
+            scheduled_time: "08:00",
+          }),
+        ]}
+        readableQuestCardsEnabled
+        onDateSelect={vi.fn()}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("desktop-week-task-readable-task")).toHaveClass(
+      "journeys-quest-card-shell",
+      "journeys-quest-card-shell--readable",
+    );
   });
 
   it("marks campaign rituals in the week scheduler task cards", () => {

@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Target } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+type QuestBehaviorPreference = "completed_tasks_stay_in_place" | "readable_quest_cards_enabled";
+
 export const QuestBehaviorSettings = () => {
   const { user } = useAuth();
   const { profile } = useProfile();
@@ -18,15 +20,20 @@ export const QuestBehaviorSettings = () => {
 
   // Default to true (stay in place) if not set
   const keepInPlace = profile?.completed_tasks_stay_in_place ?? true;
+  const readableQuestCards = profile?.readable_quest_cards_enabled ?? false;
 
-  const handleToggle = useCallback(async (checked: boolean) => {
+  const handleToggle = useCallback(async (
+    preference: QuestBehaviorPreference,
+    checked: boolean,
+    description: string,
+  ) => {
     if (!user || isUpdating) return;
     
     setIsUpdating(true);
     try {
       const { error } = await supabase
         .from("profiles")
-        .update({ completed_tasks_stay_in_place: checked })
+        .update({ [preference]: checked })
         .eq("id", user.id);
 
       if (error) throw error;
@@ -36,9 +43,7 @@ export const QuestBehaviorSettings = () => {
       
       toast({
         title: "Preference Updated",
-        description: checked 
-          ? "Completed quests will stay in place" 
-          : "Completed quests will move to the bottom",
+        description,
       });
     } catch (error) {
       console.error("Error updating preference:", error);
@@ -60,10 +65,10 @@ export const QuestBehaviorSettings = () => {
           Quest Behavior
         </CardTitle>
         <CardDescription className="text-xs">
-          Customize how completed quests are displayed
+          Customize how quests and rituals are displayed
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         <div className="flex items-center justify-between gap-4">
           <div className="space-y-0.5">
             <Label htmlFor="keep-in-place" className="text-sm font-medium">
@@ -76,7 +81,36 @@ export const QuestBehaviorSettings = () => {
           <Switch
             id="keep-in-place"
             checked={keepInPlace}
-            onCheckedChange={handleToggle}
+            onCheckedChange={(checked) => handleToggle(
+              "completed_tasks_stay_in_place",
+              checked,
+              checked
+                ? "Completed quests will stay in place"
+                : "Completed quests will move to the bottom",
+            )}
+            disabled={isUpdating}
+          />
+        </div>
+
+        <div className="flex items-center justify-between gap-4 border-t border-border/50 pt-4">
+          <div className="space-y-0.5">
+            <Label htmlFor="readable-quest-cards" className="text-sm font-medium">
+              Readable quest cards
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Use a sturdier backing for today&apos;s quest and ritual cards
+            </p>
+          </div>
+          <Switch
+            id="readable-quest-cards"
+            checked={readableQuestCards}
+            onCheckedChange={(checked) => handleToggle(
+              "readable_quest_cards_enabled",
+              checked,
+              checked
+                ? "Quest and ritual cards will use a sturdier backing"
+                : "Quest and ritual cards will use the standard look",
+            )}
             disabled={isUpdating}
           />
         </div>

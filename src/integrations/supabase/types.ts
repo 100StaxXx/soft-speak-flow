@@ -5906,6 +5906,7 @@ export type Database = {
           referral_count: number | null
           referred_by: string | null
           referred_by_code: string | null
+          readable_quest_cards_enabled: boolean | null
           rising_sign: string | null
           selected_mentor_id: string | null
           stat_mode: string
@@ -5961,6 +5962,7 @@ export type Database = {
           referral_count?: number | null
           referred_by?: string | null
           referred_by_code?: string | null
+          readable_quest_cards_enabled?: boolean | null
           rising_sign?: string | null
           selected_mentor_id?: string | null
           stat_mode?: string
@@ -6016,6 +6018,7 @@ export type Database = {
           referral_count?: number | null
           referred_by?: string | null
           referred_by_code?: string | null
+          readable_quest_cards_enabled?: boolean | null
           rising_sign?: string | null
           selected_mentor_id?: string | null
           stat_mode?: string
