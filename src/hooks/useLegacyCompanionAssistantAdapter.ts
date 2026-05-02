@@ -602,11 +602,13 @@ export function useLegacyCompanionAssistantAdapter({
     inputMode: CompanionChatInputMode = "text",
     options?: {
       starterIntent?: CompanionPlannerLaunchIntent["starterIntent"];
+      skipUserEcho?: boolean;
     },
   ) => {
     const message = rawMessage.trim();
     if (!enabled || !message) return;
     const starterIntent = options?.starterIntent;
+    const skipUserEcho = options?.skipUserEcho;
     const shouldEmitPlanDayAiAnswered =
       !starterIntent &&
       planner.sessionState.pendingStarterIntent === "plan_day" &&
@@ -642,6 +644,7 @@ export function useLegacyCompanionAssistantAdapter({
     ) {
       await planner.submitMessage(message, inputMode, {
         starterIntent,
+        skipUserEcho,
       });
       return;
     }

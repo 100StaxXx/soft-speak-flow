@@ -110,6 +110,7 @@ type CompanionAgentSubmitOptions = {
   turnOrigin?: CompanionAgentTurnOrigin;
   selectedProposedAction?: CompanionAgentProposedAction | null;
   selectedProposedActionIntent?: CompanionAgentSelectedProposedActionIntent;
+  skipUserEcho?: boolean;
 };
 
 type CompanionTemplateThreadOptions = {
@@ -1137,8 +1138,12 @@ export function useCompanionAssistant({
       inputMode,
       source: "agent",
     });
-    setMessages((previous) => [...previous, optimisticUserMessage]);
-    const nextUnifiedMessages = [...messages, optimisticUserMessage];
+    if (!options?.skipUserEcho) {
+      setMessages((previous) => [...previous, optimisticUserMessage]);
+    }
+    const nextUnifiedMessages = options?.skipUserEcho
+      ? [...messages]
+      : [...messages, optimisticUserMessage];
 
     try {
       lastStarterIntentRef.current = starterIntent ?? null;
@@ -1628,6 +1633,9 @@ export function useCompanionAssistant({
     const isCompanionAuthoredConversationStarter =
       launchIntent.target === "conversation" &&
       launchIntent.starterIntent === "free_talk_start";
+    const isQuestCapturePrime =
+      launchIntent.starterIntent === "quest_capture" &&
+      launchMessage.trim() === "";
 
     void (async () => {
       threadMutationVersionRef.current += 1;
@@ -1653,6 +1661,15 @@ export function useCompanionAssistant({
           legacyAssistant.startTemplateThread?.();
         } else {
           await startNewChat({ greetingText: null });
+        }
+
+        if (isQuestCapturePrime) {
+          await submitMessage("quest", "text", {
+            starterIntent: "quest_capture",
+            turnOrigin: "launcher",
+            skipUserEcho: true,
+          });
+          return;
         }
 
         const submitted = await submitMessage(launchMessage, "text", {

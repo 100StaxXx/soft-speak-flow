@@ -271,6 +271,32 @@ describe("useLegacyCompanionAssistantAdapter", () => {
     expect(mocks.journeysConversation.submitMessage).not.toHaveBeenCalled();
   });
 
+  it("forwards skipUserEcho through to the planner for quest_capture priming", async () => {
+    const { result } = renderHook(() =>
+      useLegacyCompanionAssistantAdapter({
+        enabled: true,
+        surface: "journeys",
+      })
+    );
+
+    await act(async () => {
+      await result.current.submitMessage("quest", "text", {
+        starterIntent: "quest_capture",
+        skipUserEcho: true,
+      });
+    });
+
+    expect(mocks.planner.submitMessage).toHaveBeenCalledWith(
+      "quest",
+      "text",
+      expect.objectContaining({
+        starterIntent: "quest_capture",
+        skipUserEcho: true,
+      }),
+    );
+    expect(mocks.planner.primeQuestCapture).not.toHaveBeenCalled();
+  });
+
   it("exposes planner suggestions as read-only guidance in fallback mode", async () => {
     mocks.planner.structuredResponse = {
       intent: {
