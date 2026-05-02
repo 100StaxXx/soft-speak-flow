@@ -3,15 +3,15 @@ import {
   buildPlanDayLoadReason,
   buildProposalFromDayPlanBlock,
   collectPlannerContextProtectedDataText,
-  type PlannerTextNormalizationOptions,
   formatScheduleReference,
-  getPlanDayAtRiskCampaignFacts,
   getActiveCampaignIdSet,
   getActiveCampaignRitualIdSet,
+  getPlanDayAtRiskCampaignFacts,
   getPlanDayLoadBreakdown,
   getPlanDayLoadFacts,
   getPlanDayTargetDate,
   normalizePlannerBuildResultText,
+  type PlannerTextNormalizationOptions,
   scopePlannerPriorityScoresToActiveCampaigns,
   scopePlannerTasksToActiveCampaigns,
   synthesizeDayPlanFromProposals,
@@ -37,6 +37,24 @@ import {
 } from "../../../src/shared/companionPlannerReadyProposal.ts";
 
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
+export const DEFAULT_COMPANION_PLANNER_MODEL = "gpt-5.5";
+
+const getOptionalEnv = (name: string): string | null => {
+  try {
+    return Deno.env.get(name) ?? null;
+  } catch (error) {
+    if (error instanceof Error && error.name === "NotCapable") {
+      return null;
+    }
+
+    throw error;
+  }
+};
+
+export const resolveCompanionPlannerModel = (
+  env: (name: string) => string | null | undefined = getOptionalEnv,
+): string =>
+  env("OPENAI_COMPANION_PLANNER_MODEL") ?? DEFAULT_COMPANION_PLANNER_MODEL;
 
 type PlannerLLMReply = {
   reply: string;
@@ -400,7 +418,7 @@ const normalizeReply = (value: unknown): PlannerLLMReply | null => {
 
 const isQuestCaptureStarterResponse = (baseResult: PlannerBuildResult) =>
   baseResult.mode === "conversational" &&
-  baseResult.reply.trim() === "Quest?" &&
+  baseResult.reply.trim().length > 0 &&
   baseResult.sessionState.pendingStarterIntent === "quest_capture" &&
   baseResult.followUpQuestions.length === 0 &&
   baseResult.proposals.length === 0 &&
@@ -431,7 +449,9 @@ const isPlanningLauncherConsentResponse = (
   Boolean(input.sessionState.planningConsent) ||
   Boolean(baseResult.sessionState.planningConsent) ||
   hasPlanningLauncherConsentQuestionId(input.sessionState.openQuestionIds) ||
-  hasPlanningLauncherConsentQuestionId(baseResult.sessionState.openQuestionIds) ||
+  hasPlanningLauncherConsentQuestionId(
+    baseResult.sessionState.openQuestionIds,
+  ) ||
   baseResult.followUpQuestions.some((question) =>
     PLANNING_LAUNCHER_CONSENT_QUESTION_IDS.has(question.id)
   );
@@ -571,12 +591,10 @@ export async function buildUpcomingAIResponse(params: {
   openAIApiKey?: string;
   model?: string;
 }): Promise<PlannerBuildResult | null> {
-  const openAIApiKey = params.openAIApiKey ?? Deno.env.get("OPENAI_API_KEY");
+  const openAIApiKey = params.openAIApiKey ?? getOptionalEnv("OPENAI_API_KEY");
   if (!openAIApiKey) return null;
 
-  const model = params.model ??
-    Deno.env.get("OPENAI_COMPANION_PLANNER_MODEL") ??
-    "gpt-5";
+  const model = params.model ?? resolveCompanionPlannerModel();
 
   try {
     const response = await params.guardedFetch(OPENAI_API_URL, {
@@ -980,13 +998,12 @@ export async function buildOrchestratedPlannerResponse(params: {
     return normalizedBaseResult;
   }
 
-  const openAIApiKey = params.openAIApiKey ?? Deno.env.get("OPENAI_API_KEY");
+  const openAIApiKey = params.openAIApiKey ?? getOptionalEnv("OPENAI_API_KEY");
   if (!openAIApiKey) {
     return normalizedBaseResult;
   }
 
-  const model = params.model ??
-    Deno.env.get("OPENAI_COMPANION_PLANNER_MODEL") ?? "gpt-5";
+  const model = params.model ?? resolveCompanionPlannerModel();
 
   if (shouldUsePlanDayToolLoop(params.input, normalizedBaseResult)) {
     try {

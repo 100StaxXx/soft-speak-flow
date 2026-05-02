@@ -1113,7 +1113,9 @@ describe("useCompanionPlanner", () => {
     );
 
     act(() => {
-      result.current.primeQuestCapture();
+      result.current.primeQuestCapture("Quest?", {
+        selectedDate: "2026-02-13",
+      });
     });
 
     expect(mocks.persistCompanionThreadMessages).toHaveBeenCalledWith(
@@ -1129,6 +1131,7 @@ describe("useCompanionPlanner", () => {
               followUpQuestions: [],
               proposals: [],
               suggestedReminders: [],
+              questCaptureSelectedDate: "2026-02-13",
               sessionState: expect.objectContaining({
                 pendingStarterIntent: "quest_capture",
                 draft: expect.objectContaining({
@@ -1212,6 +1215,156 @@ describe("useCompanionPlanner", () => {
         content: "Quest?",
       },
     ]);
+  });
+
+  it("anchors selected-date quest capture requests and relative parsing to that day", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-02-10T09:30:00.000-08:00"));
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "proposal",
+        reply: "Drafted.",
+        followUpQuestions: [],
+        proposals: [
+          {
+            id: "proposal-selected-date-1",
+            kind: "create_quest",
+            title: "Pilates",
+            payload: {
+              title: "Pilates",
+              taskDate: "2026-02-14",
+              scheduledTime: "08:00",
+            },
+            status: "pending",
+            readyToConfirm: true,
+            missingFields: [],
+          },
+        ],
+        suggestedReminders: [],
+        memoryUpdates: {},
+        sessionState: {
+          draft: {
+            title: "Pilates",
+            draftKind: "create_quest",
+          },
+          openQuestionIds: [],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          pendingStarterIntent: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
+
+    await act(async () => {
+      await result.current.submitMessage("Pilates tomorrow at 8am", "text", {
+        selectedDate: "2026-02-13",
+      });
+    });
+
+    const request = mocks.invoke.mock.calls.at(-1)?.[1];
+    expect(request?.body.currentDate).toBe("2026-02-13");
+    expect(request?.body.parsedInput.scheduledDate).toBe("2026-02-14");
+    expect(request?.body.plannerContext.scheduleInsights.selectedDate).toBe(
+      "2026-02-13",
+    );
+  });
+
+  it("restores persisted quest-capture selected dates after thread hydration", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-02-10T09:30:00.000-08:00"));
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "proposal",
+        reply: "Drafted.",
+        followUpQuestions: [],
+        proposals: [
+          {
+            id: "proposal-hydrated-selected-date-1",
+            kind: "create_quest",
+            title: "Pilates",
+            payload: {
+              title: "Pilates",
+              taskDate: "2026-02-14",
+              scheduledTime: "08:00",
+            },
+            status: "pending",
+            readyToConfirm: true,
+            missingFields: [],
+          },
+        ],
+        suggestedReminders: [],
+        memoryUpdates: {},
+        sessionState: {
+          draft: {
+            title: "Pilates",
+            draftKind: "create_quest",
+          },
+          openQuestionIds: [],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          pendingStarterIntent: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
+
+    act(() => {
+      result.current.hydrateThread({
+        sessionId: "hydrated-quest-session",
+        messages: [
+          {
+            id: "planner-quest-opener",
+            sessionId: "hydrated-quest-session",
+            role: "assistant",
+            content: "Clean slate for Friday, February 13. What quest should we add?",
+            createdAt: "2026-02-10T17:30:00.000Z",
+            source: "plan",
+            metadata: {
+              structuredResponse: null,
+              followUpQuestions: [],
+              proposals: [],
+              suggestedReminders: [],
+              questCaptureSelectedDate: "2026-02-13",
+              sessionState: {
+                draft: {
+                  draftKind: "create_quest",
+                },
+                openQuestionIds: [],
+                preferredTimeOfDay: null,
+                preferredTimeReason: null,
+                reminderPreference: null,
+                pendingStarterIntent: "quest_capture",
+                lastClassification: null,
+              },
+            },
+          },
+        ],
+      });
+    });
+
+    await act(async () => {
+      await result.current.submitMessage("Pilates tomorrow at 8am", "text");
+    });
+
+    const request = mocks.invoke.mock.calls.at(-1)?.[1];
+    expect(request?.body.currentDate).toBe("2026-02-13");
+    expect(request?.body.parsedInput.scheduledDate).toBe("2026-02-14");
+    expect(request?.body.plannerContext.scheduleInsights.selectedDate).toBe(
+      "2026-02-13",
+    );
   });
 
   it("treats an exact typed quest starter like a local quest-capture seed", async () => {

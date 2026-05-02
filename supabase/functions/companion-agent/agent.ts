@@ -72,6 +72,7 @@ const wrapSubStage = async <T>(
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const OPENAI_CONVERSATIONS_URL = "https://api.openai.com/v1/conversations";
+export const DEFAULT_COMPANION_AGENT_MODEL = "gpt-5.5";
 
 const MAX_TOOL_LOOPS = 6;
 const MAX_TASKS = 18;
@@ -94,6 +95,13 @@ const getOptionalEnv = (name: string): string | null => {
     throw error;
   }
 };
+
+export const resolveCompanionAgentModel = (
+  env: (name: string) => string | null | undefined = getOptionalEnv,
+): string =>
+  env("OPENAI_COMPANION_AGENT_MODEL") ??
+    env("OPENAI_TEXT_MODEL") ??
+    DEFAULT_COMPANION_AGENT_MODEL;
 
 const medianDuration = (durations: number[]): number | null => {
   if (durations.length === 0) return null;
@@ -350,6 +358,7 @@ interface AgentRunResult {
   };
   openaiConversationId: string | null;
   lastOpenAIResponseId: string | null;
+  draftDecisionSource?: "model" | "deterministic";
 }
 
 const readSelectedProposalId = (
@@ -577,7 +586,7 @@ const BARE_STARTER_FOLLOW_UPS: Record<
   },
   quest_capture: {
     intent: "schedule_task",
-    prompts: ["quest"],
+    prompts: ["quest", "new quest"],
     reply: "Sure. What quest do you want to capture?",
     followUp: {
       question: "What quest do you want to capture?",
@@ -1036,7 +1045,7 @@ const addDays = (dateOnly: string, days: number) => {
 };
 
 const buildDateRange = (request: CompanionAgentRequest) => {
-  const baseDate = toDateOnly(request.currentDateTime);
+  const baseDate = request.selectedDate ?? toDateOnly(request.currentDateTime);
   const start = request.visibleDateStart ?? baseDate;
   const end = request.visibleDateEnd ??
     addDays(start, (request.horizonDays ?? 7) - 1);
@@ -1732,9 +1741,7 @@ async function createOpenAIResponse(params: {
   if (!openAIApiKey) throw new Error("OPENAI_API_KEY not configured");
 
   const body: Record<string, unknown> = {
-    model: getOptionalEnv("OPENAI_COMPANION_AGENT_MODEL") ??
-      getOptionalEnv("OPENAI_TEXT_MODEL") ??
-      "gpt-4.1",
+    model: resolveCompanionAgentModel(),
     instructions: params.instructions,
     input: params.input,
     tools: params.tools,
@@ -2230,6 +2237,7 @@ function buildToolExecutor(params: {
         const plannerResult = consultPlannerForAgent({
           message: params.requestMessage,
           currentDateTime: params.context.currentDateTime,
+          selectedDate: params.request.selectedDate ?? null,
           surface: params.surface,
           horizon: parsed.horizon === "week" ? "week" : "day",
           starterIntent: params.request.starterIntent ?? null,
@@ -2805,6 +2813,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
     const plannerResult = consultPlannerForAgent({
       message: params.request.message,
       currentDateTime: context.currentDateTime,
+      selectedDate: params.request.selectedDate ?? null,
       surface: params.request.surface,
       horizon: "day",
       starterIntent: params.request.starterIntent ?? null,
@@ -3008,6 +3017,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
           },
           openaiConversationId: currentConversationId,
           lastOpenAIResponseId: currentPreviousResponseId,
+          draftDecisionSource: "model",
         };
       }
 
@@ -3080,6 +3090,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
           },
           openaiConversationId: currentConversationId,
           lastOpenAIResponseId: currentPreviousResponseId,
+          draftDecisionSource: "model",
         };
       }
 
@@ -3146,6 +3157,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
     const plannerResult = consultPlannerForAgent({
       message: params.request.message,
       currentDateTime: context.currentDateTime,
+      selectedDate: params.request.selectedDate ?? null,
       surface: params.request.surface,
       horizon: "day",
       starterIntent: plannerStarterIntent,
@@ -3180,6 +3192,13 @@ export async function runCompanionAgent(params: RunAgentParams) {
         metadata: {
           ...(plannerResult.questions[0].metadata ?? {}),
           questionId: plannerResult.questions[0].id,
+          ...(plannerStarterIntent === "quest_capture" &&
+              params.request.selectedDate
+            ? {
+              selectedDate: params.request.selectedDate,
+              sourceStarterIntent: "quest_capture",
+            }
+            : {}),
         },
       }
       : null;
@@ -3213,6 +3232,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
       },
       openaiConversationId: context.thread?.openai_conversation_id ?? null,
       lastOpenAIResponseId: context.thread?.last_openai_response_id ?? null,
+      draftDecisionSource: "deterministic",
     };
   }
 
@@ -3322,8 +3342,11 @@ export async function runCompanionAgent(params: RunAgentParams) {
   );
   const selectedProposedActionIsDiscussion =
     selectedProposedActionIntent === "discuss";
+  const modelAuthoredDraftDecision =
+    agentResult.draftDecisionSource === "model";
 
   if (
+    modelAuthoredDraftDecision &&
     agentResult.result.mode === "pending_confirmation" &&
     agentResult.result.preparedActionId
   ) {
@@ -3347,6 +3370,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
   if (
     !persistedPendingAction &&
     !candidateToPersist &&
+    modelAuthoredDraftDecision &&
     !selectedProposedActionIsDiscussion &&
     agentResult.result.understandingState === "ready_to_draft" &&
     !agentResult.result.followUp

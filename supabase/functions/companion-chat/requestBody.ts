@@ -1,5 +1,11 @@
 export type CompanionChatSurface = "companion" | "journeys";
 type CompanionChatMessageRole = "assistant" | "developer" | "system" | "user";
+type EnvGetter = (name: string) => string | null | undefined;
+
+export const DEFAULT_COMPANION_CHAT_MODEL = "gpt-5.5";
+
+export const resolveCompanionChatModel = (env: EnvGetter): string =>
+  env("OPENAI_COMPANION_CHAT_MODEL") ?? DEFAULT_COMPANION_CHAT_MODEL;
 
 export interface CompanionChatCompletionBody {
   model: string;

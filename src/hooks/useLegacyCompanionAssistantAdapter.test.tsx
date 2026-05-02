@@ -66,6 +66,7 @@ const mocks = vi.hoisted(() => ({
     newChatDisabledReason: null,
     startTemplateThread: vi.fn(() => "template-session"),
   },
+  routeMessageToPlanner: false,
   useJourneysCompanionThreads: vi.fn(),
 }));
 
@@ -118,7 +119,8 @@ vi.mock("@/features/tasks/hooks/useNaturalLanguageParser", () => ({
 
 vi.mock("@/shared/schedulingIntent", () => ({
   analyzeSchedulingIntent: () => ({ kind: "conversation" }),
-  shouldRouteMessageToPlanner: () => false,
+  isUpcomingScheduleDigestMessage: () => false,
+  shouldRouteMessageToPlanner: () => mocks.routeMessageToPlanner,
 }));
 
 vi.mock("@/shared/bigGoalIntent", () => ({
@@ -140,6 +142,11 @@ describe("useLegacyCompanionAssistantAdapter", () => {
     mocks.journeysConversation.injectAssistantOpening.mockReset();
     mocks.planner.hydrateThread.mockReset();
     mocks.useJourneysCompanionThreads.mockReset();
+    mocks.routeMessageToPlanner = false;
+    mocks.planner.sessionState = { pendingStarterIntent: null };
+    mocks.planner.questions = [];
+    mocks.planner.proposals = [];
+    mocks.planner.pendingProposals = [];
   });
 
   it("passes journeys conversation and planner session ids into the thread manager", () => {
@@ -280,15 +287,44 @@ describe("useLegacyCompanionAssistantAdapter", () => {
     );
 
     act(() => {
-      result.current.startQuestCaptureThread("New Quest");
+      result.current.startQuestCaptureThread("New Quest", {
+        selectedDate: "2026-02-13",
+      });
     });
 
     expect(mocks.journeysThreads.startTemplateThread).toHaveBeenCalledWith({
       greetingText: null,
     });
-    expect(mocks.planner.primeQuestCapture).toHaveBeenCalledWith("New Quest");
+    expect(mocks.planner.primeQuestCapture).toHaveBeenCalledWith(
+      "New Quest",
+      { selectedDate: "2026-02-13" },
+    );
     expect(mocks.journeysConversation.injectAssistantOpening)
       .not.toHaveBeenCalled();
+  });
+
+  it("passes selected dates into legacy planner quest-capture replies", async () => {
+    mocks.routeMessageToPlanner = true;
+    mocks.planner.sessionState = { pendingStarterIntent: "quest_capture" };
+
+    const { result } = renderHook(() =>
+      useLegacyCompanionAssistantAdapter({
+        enabled: true,
+        surface: "journeys",
+      })
+    );
+
+    await act(async () => {
+      await result.current.submitMessage("Pilates at 8am", "text", {
+        selectedDate: "2026-02-13",
+      });
+    });
+
+    expect(mocks.planner.submitMessage).toHaveBeenCalledWith(
+      "Pilates at 8am",
+      "text",
+      { selectedDate: "2026-02-13" },
+    );
   });
 
   it("exposes planner suggestions as read-only guidance in fallback mode", async () => {

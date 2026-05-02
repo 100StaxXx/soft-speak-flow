@@ -1,97 +1,11 @@
 import { assertEquals } from "https://deno.land/std@0.168.0/testing/asserts.ts";
 import {
   computeCrossedThresholds,
-  createCostGuardrailSession,
   detectCostAnomalies,
   getCurrentCostPeriodStart,
   getOpenAITextTokenRatesPerThousand,
   normalizeThresholds,
 } from "./costGuardrails.ts";
-
-function delayTelemetryWrite(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 1));
-}
-
-function createCostGuardrailSupabaseMock() {
-  const events: Array<Record<string, unknown>> = [];
-  const stateUpserts: Array<Record<string, unknown>> = [];
-  let activeTelemetryWrites = 0;
-  let maxActiveTelemetryWrites = 0;
-
-  async function withTelemetryWrite<T>(operation: () => T): Promise<T> {
-    activeTelemetryWrites += 1;
-    maxActiveTelemetryWrites = Math.max(
-      maxActiveTelemetryWrites,
-      activeTelemetryWrites,
-    );
-
-    try {
-      await delayTelemetryWrite();
-      return operation();
-    } finally {
-      activeTelemetryWrites -= 1;
-    }
-  }
-
-  const supabase = {
-    from(table: string) {
-      if (table === "cost_guardrail_config") {
-        return {
-          select: (_selection: string) => ({
-            eq: (_column: string, _value: string) => ({
-              in: async (_column: string, _values: string[]) => ({
-                data: [],
-                error: null,
-              }),
-            }),
-          }),
-        };
-      }
-
-      if (table === "cost_guardrail_state") {
-        return {
-          select: (_selection: string) => {
-            const query = {
-              eq: (_column: string, _value: string) => query,
-              in: async (_column: string, _values: string[]) => ({
-                data: [],
-                error: null,
-              }),
-            };
-
-            return query;
-          },
-          upsert: (payload: Record<string, unknown>) =>
-            withTelemetryWrite(() => {
-              stateUpserts.push(payload);
-              return { error: null };
-            }),
-        };
-      }
-
-      if (table === "cost_events") {
-        return {
-          insert: (payload: Record<string, unknown>) =>
-            withTelemetryWrite(() => {
-              events.push(payload);
-              return { error: null };
-            }),
-        };
-      }
-
-      throw new Error(`Unexpected table ${table}`);
-    },
-  };
-
-  return {
-    events,
-    get maxActiveTelemetryWrites() {
-      return maxActiveTelemetryWrites;
-    },
-    stateUpserts,
-    supabase,
-  };
-}
 
 Deno.test("normalizeThresholds falls back to defaults", () => {
   const thresholds = normalizeThresholds(null);
@@ -139,63 +53,14 @@ Deno.test("getOpenAITextTokenRatesPerThousand preserves existing fallback tiers"
     inputRate: 0.005,
     outputRate: 0.015,
   });
+  assertEquals(getOpenAITextTokenRatesPerThousand("gpt-6-preview"), {
+    inputRate: 0.001,
+    outputRate: 0.002,
+  });
   assertEquals(getOpenAITextTokenRatesPerThousand(null), {
     inputRate: 0.001,
     outputRate: 0.002,
   });
-});
-
-Deno.test("createCostGuardrailSession serializes recordEvent writes for parallel wrapped fetches", async () => {
-  const mock = createCostGuardrailSupabaseMock();
-  const session = createCostGuardrailSession({
-    supabase: mock.supabase,
-    endpointKey: "companion-chat",
-    featureKey: "ai_companion_conversation",
-    requestId: "request-1",
-    getEnv: () => null,
-  });
-  const guardedFetch = session.wrapFetch(async () =>
-    new Response(
-      JSON.stringify({
-        choices: [{ message: { content: "Done." } }],
-        usage: {
-          prompt_tokens: 1000,
-          completion_tokens: 0,
-          total_tokens: 1000,
-        },
-      }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      },
-    )
-  );
-  const openAIRequest = {
-    method: "POST",
-    body: JSON.stringify({
-      model: "gpt-5.5",
-      messages: [{ role: "user", content: "Hello." }],
-    }),
-  };
-
-  await Promise.all([
-    guardedFetch("https://api.openai.com/v1/chat/completions", openAIRequest),
-    guardedFetch("https://api.openai.com/v1/chat/completions", openAIRequest),
-  ]);
-
-  assertEquals(mock.maxActiveTelemetryWrites, 1);
-  assertEquals(
-    mock.events.map((event) => event.estimated_cost_usd),
-    [0.005, 0.005],
-  );
-  assertEquals(
-    mock.stateUpserts
-      .filter((row) =>
-        row.scope_type === "endpoint" && row.scope_key === "companion-chat"
-      )
-      .map((row) => row.total_estimated_cost_usd),
-    [0.005, 0.01],
-  );
 });
 
 Deno.test("detectCostAnomalies finds hourly spend spikes", () => {

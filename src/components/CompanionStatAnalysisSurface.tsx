@@ -1216,6 +1216,7 @@ function CompanionStatAnalysisView({
     () => getTitleCardImageUrls(analysis.cosmiqTitleCard),
     [analysis.cosmiqTitleCard],
   );
+  const primaryTitleCardImageUrl = titleCardImageUrls[0] ?? null;
   const titleCardPreviewKey = titleCardImageUrls.join("|");
   const titleCardPreviewDwellMs = prefersReducedMotion
     ? 0
@@ -1226,6 +1227,7 @@ function CompanionStatAnalysisView({
     setVerifiedTitleCardPreviewCount(verifiedCount);
   }, []);
 
+  // The verified count dependency intentionally restarts dwell when another preview image becomes slideshow-safe.
   useEffect(() => {
     if (titleCardPreviewDwellMs <= 0 || titleCardPreviewKey.length === 0) {
       setIsTitleCardPreviewDwellComplete(true);
@@ -1266,7 +1268,7 @@ function CompanionStatAnalysisView({
 
   if (
     titleCardStatus !== "ready"
-    || !analysis.cosmiqTitleCard?.imageUrl
+    || !primaryTitleCardImageUrl
     || !isTitleCardImageLoaded
     || !isTitleCardPreviewDwellSatisfied
     || isRegeneratingTitleCard
@@ -1276,7 +1278,7 @@ function CompanionStatAnalysisView({
         phase="title-card"
         analysis={analysis}
         viewModel={viewModel}
-        imageUrl={analysis.cosmiqTitleCard?.imageUrl ?? null}
+        imageUrl={primaryTitleCardImageUrl}
         imageUrls={titleCardImageUrls}
         titleCardStatus={titleCardStatus}
         imageState={imageState}

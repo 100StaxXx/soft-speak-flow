@@ -106,6 +106,15 @@ const STORAGE_KEY = "companion-planner-preferences-v1";
 const MAX_CONTEXT_TASKS = 18;
 const OUTLOOK_PLANNER_SYNC_INTERVAL_MS = 90_000;
 const PLANNER_PREFLIGHT_TIMEOUT_MS = 3_000;
+const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+const normalizeSelectedDateKey = (value: string | null | undefined) => {
+  const trimmed = value?.trim() ?? "";
+  return DATE_KEY_PATTERN.test(trimmed) ? trimmed : null;
+};
+
+const buildSelectedDateReferenceDateTime = (selectedDate: string) =>
+  `${selectedDate}T12:00:00`;
 
 type StoredPlannerPreferences = {
   tonePack?: PlannerTonePack;
@@ -486,6 +495,12 @@ const readPersistedPlannerSessionState = (
   }
 
   return sanitizePlannerSessionState(value as CompanionPlannerSessionState);
+};
+
+const readPersistedQuestCaptureSelectedDate = (metadata: unknown) => {
+  const record = asUnknownRecord(metadata);
+  const value = record?.questCaptureSelectedDate;
+  return typeof value === "string" ? normalizeSelectedDateKey(value) : null;
 };
 
 const readPersistedDayPlan = (
@@ -1359,6 +1374,7 @@ export function useCompanionPlanner({
     starterIntent: null,
     briefingContext: null,
   });
+  const pendingQuestCaptureSelectedDateRef = useRef<string | null>(null);
   const outlookPlannerSyncPromiseRef = useRef<
     Promise<OutlookPlanningContextSyncResult | null> | null
   >(null);
@@ -2332,10 +2348,17 @@ export function useCompanionPlanner({
     [],
   );
 
-  const primeQuestCapture = useCallback((prompt = "Quest?") => {
+  const primeQuestCapture = useCallback((
+    prompt = "Quest?",
+    options?: { selectedDate?: string | null },
+  ) => {
     if (!enabled) return;
     const trimmedPrompt = stripMarkdown(prompt).trim();
     if (!trimmedPrompt) return;
+    const questCaptureSelectedDate = normalizeSelectedDateKey(
+      options?.selectedDate,
+    );
+    pendingQuestCaptureSelectedDateRef.current = questCaptureSelectedDate;
 
     const questCaptureMessage = createMessage("companion", trimmedPrompt, {
       questions: [],
@@ -2376,6 +2399,7 @@ export function useCompanionPlanner({
           proposals: [],
           suggestedReminders: [],
           sessionState: nextSessionState,
+          questCaptureSelectedDate,
         } as unknown as Json,
       },
     ]);
@@ -2548,18 +2572,24 @@ export function useCompanionPlanner({
       skipUserEcho?: boolean;
       starterIntent?: CompanionPlannerStarterIntent;
       briefingContext?: PlannerBriefingContext | null;
+      selectedDate?: string | null;
     },
   ) => {
     if (!enabled) return;
     const message = rawMessage.trim();
     if (!message || isSubmitting) return;
+    const selectedDate = normalizeSelectedDateKey(options?.selectedDate) ??
+      (sessionState.pendingStarterIntent === "quest_capture"
+        ? pendingQuestCaptureSelectedDateRef.current
+        : null);
+    const requestDate = selectedDate ?? todayIso;
 
     const resolvedStarterIntent: CompanionPlannerContextStarterIntent =
       normalizeStarterIntentForPlanner(
       options?.starterIntent,
     ) ?? deriveStarterIntentFromMessage(message);
     if (resolvedStarterIntent === "quest_capture" && !options?.skipUserEcho) {
-      primeQuestCapture(message);
+      primeQuestCapture(message, { selectedDate });
       return;
     }
 
@@ -2574,7 +2604,12 @@ export function useCompanionPlanner({
       ]);
     }
 
-    const parsedInput = parseNaturalLanguage(message);
+    const parsedInput = parseNaturalLanguage(
+      message,
+      selectedDate
+        ? { referenceDateTime: buildSelectedDateReferenceDateTime(selectedDate) }
+        : undefined,
+    );
     const sanitizedConversationHistory = sanitizePlannerConversationHistory(
       conversationHistory,
     );
@@ -2601,6 +2636,7 @@ export function useCompanionPlanner({
         ...plannerMemory,
         workloadTolerance: effectiveWorkloadTolerance,
       };
+      const requestCurrentDateTime = formatCurrentDateTimeWithOffset(new Date());
       const outlookSyncPromise = withTimeout(
         () => syncOutlookPlanningContext(),
         {
@@ -2676,11 +2712,23 @@ export function useCompanionPlanner({
           ),
         },
       );
+      const requestActiveEpics = mapEpicsToContext(activeEpics, requestDate);
+      const requestScheduleInsights = requestDate === todayIso
+        ? scheduleInsights
+        : buildCompanionPlannerScheduleInsights({
+          tasks: syncedPlannerContext.tasks,
+          calendarEvents: syncedPlannerContext
+            .calendarEvents as PlannerContextCalendarEvent[],
+          horizon,
+          selectedDate: requestDate,
+          currentDateTime: requestCurrentDateTime,
+          plannerMemory: resolvedPlannerMemory,
+        });
       const requestPriorityScores = computePlannerPriorityScores({
-        currentDate: todayIso,
+        currentDate: requestDate,
         tasks: syncedPlannerContext.tasks,
         inboxTasks: syncedPlannerContext.inboxTasks,
-        activeEpics: syncedPlannerContext.activeEpics,
+        activeEpics: requestActiveEpics,
         rituals: syncedPlannerContext.rituals,
         calendarEvents: syncedPlannerContext
           .calendarEvents as PlannerContextCalendarEvent[],
@@ -2689,7 +2737,7 @@ export function useCompanionPlanner({
         careSignals,
         briefingContext: resolvedBriefingContext,
         starterIntent: resolvedStarterIntent,
-        scheduleInsights,
+        scheduleInsights: requestScheduleInsights,
         plannerMemory: resolvedPlannerMemory,
         aiSignals: plannerAISignals?.suggestedWorkload
           ? {
@@ -2704,15 +2752,17 @@ export function useCompanionPlanner({
       const classificationHint = normalizeClassificationHint(classification);
       const requestPlannerContext = sanitizePlannerContext({
         ...syncedPlannerContext,
+        activeEpics: requestActiveEpics,
         starterIntent: resolvedStarterIntent,
         briefingContext: resolvedBriefingContext,
         priorityScores: requestPriorityScores,
+        scheduleInsights: requestScheduleInsights,
         plannerMemory: resolvedPlannerMemory,
       });
       requestBody = {
         message,
-        currentDate: todayIso,
-        currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
+        currentDate: requestDate,
+        currentDateTime: requestCurrentDateTime,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
         horizon,
         tonePack,
@@ -2749,6 +2799,11 @@ export function useCompanionPlanner({
         response.sessionState,
         response.memoryUpdates,
       );
+      if (nextSession.pendingStarterIntent === "quest_capture") {
+        pendingQuestCaptureSelectedDateRef.current = selectedDate;
+      } else {
+        pendingQuestCaptureSelectedDateRef.current = null;
+      }
       const assistantMessage = appendAssistantTurn({
         ...response,
         sessionState: nextSession,
@@ -2774,6 +2829,10 @@ export function useCompanionPlanner({
             suggestedReminders: response.suggestedReminders,
             sessionState: response.sessionState,
             dayPlan: response.dayPlan ?? null,
+            questCaptureSelectedDate:
+              nextSession.pendingStarterIntent === "quest_capture"
+                ? selectedDate
+                : null,
           } as unknown as Json,
         },
       ];
@@ -3657,6 +3716,7 @@ export function useCompanionPlanner({
 
   const resetThread = useCallback((options?: { sessionId?: string }) => {
     bootstrappedGreetingRef.current = true;
+    pendingQuestCaptureSelectedDateRef.current = null;
     sessionIdRef.current = options?.sessionId ??
       generateCompanionThreadSessionId();
     setMessages(
@@ -3689,6 +3749,7 @@ export function useCompanionPlanner({
     messages: CompanionChatThreadMessage[];
   }) => {
     bootstrappedGreetingRef.current = true;
+    pendingQuestCaptureSelectedDateRef.current = null;
     sessionIdRef.current = options.sessionId;
     const nextMessages: CompanionPlannerMessage[] = options.messages.map((
       message,
@@ -3719,6 +3780,10 @@ export function useCompanionPlanner({
     const nextSessionState = readPersistedPlannerSessionState(
       latestPlannerSnapshot?.metadata.sessionState,
     ) ?? createInitialSessionState(storedPreferences);
+    pendingQuestCaptureSelectedDateRef.current =
+      nextSessionState.pendingStarterIntent === "quest_capture"
+        ? readPersistedQuestCaptureSelectedDate(latestPlannerSnapshot?.metadata)
+        : null;
     const nextProposals = [
       ...readPersistedPlannerProposals(latestPlannerSnapshot?.metadata.proposals),
       ...readPersistedPlannerProposals(

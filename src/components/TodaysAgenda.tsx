@@ -681,10 +681,18 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   onOpenMonthView,
 }: TodaysAgendaProps) {
   const { user } = useAuth();
+  const questCaptureDateLabel = isSameDay(selectedDate, new Date())
+    ? "today"
+    : safeFormat(selectedDate, "EEEE, MMMM d", "that day");
+  const questCaptureSelectedDate = safeFormat(selectedDate, "yyyy-MM-dd");
   const plannerLauncherAction = onOpenCompanionPlanner ?? onVoiceAddQuest ?? onAddQuest;
   const openQuestCaptureThread = useCallback(() => {
     if (onOpenCompanionPlanner) {
-      onOpenCompanionPlanner(createCompanionPlannerQuestCaptureLaunchIntent());
+      onOpenCompanionPlanner(createCompanionPlannerQuestCaptureLaunchIntent({
+        source: "empty_journeys",
+        dateLabel: questCaptureDateLabel,
+        selectedDate: questCaptureSelectedDate,
+      }));
       return;
     }
     if (onVoiceAddQuest) {
@@ -692,7 +700,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       return;
     }
     onAddQuest();
-  }, [onAddQuest, onOpenCompanionPlanner, onVoiceAddQuest]);
+  }, [onAddQuest, onOpenCompanionPlanner, onVoiceAddQuest, questCaptureDateLabel, questCaptureSelectedDate]);
   const voiceAddButtonLabel = isVoiceAddRecording ? "Stop voice capture" : "Start voice capture";
   const quickCaptureControls = (
     <div className="flex items-center gap-2">

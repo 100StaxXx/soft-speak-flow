@@ -105,10 +105,17 @@ type ThreadsQueryResult = {
 };
 
 const MAX_ACTIVE_PROPOSED_ACTIONS = 8;
+const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+const normalizeSelectedDateKey = (value: string | null | undefined) => {
+  const trimmed = value?.trim() ?? "";
+  return DATE_KEY_PATTERN.test(trimmed) ? trimmed : null;
+};
 
 type CompanionAgentSubmitOptions = {
   starterIntent?: CompanionPlannerLaunchIntent["starterIntent"];
   turnOrigin?: CompanionAgentTurnOrigin;
+  selectedDate?: string | null;
   selectedProposedAction?: CompanionAgentProposedAction | null;
   selectedProposedActionIntent?: CompanionAgentSelectedProposedActionIntent;
 };
@@ -116,6 +123,13 @@ type CompanionAgentSubmitOptions = {
 type CompanionTemplateThreadOptions = {
   greetingText?: string | null;
   visibleAssistantOpening?: boolean;
+};
+
+const readFollowUpSelectedDate = (
+  followUp: CompanionAgentFollowUp | null | undefined,
+) => {
+  const value = followUp?.metadata?.selectedDate;
+  return typeof value === "string" ? normalizeSelectedDateKey(value) : null;
 };
 
 const inferStarterIntentFromMessage = (
@@ -296,6 +310,11 @@ const mapLoadedMessage = (
       blocksDrafting: typeof followUp.blocksDrafting === "boolean"
         ? followUp.blocksDrafting
         : true,
+      metadata: isJsonValue(followUp.metadata) &&
+          typeof followUp.metadata === "object" &&
+          !Array.isArray(followUp.metadata)
+        ? followUp.metadata as Record<string, Json>
+        : undefined,
     };
   };
 
@@ -720,6 +739,7 @@ export function useCompanionAssistant({
   const pendingStarterIntentRef = useRef<
     CompanionPlannerLaunchIntent["starterIntent"] | null
   >(null);
+  const pendingQuestCaptureSelectedDateRef = useRef<string | null>(null);
 
   const scopeKey = `${surface}:${user?.id ?? "anon"}:${
     companion?.id ?? "none"
@@ -790,6 +810,7 @@ export function useCompanionAssistant({
     lastStarterIntentRef.current = null;
     lastReplayablePlannerMessageRef.current = null;
     pendingStarterIntentRef.current = null;
+    pendingQuestCaptureSelectedDateRef.current = null;
     setMessages(
       greetingText
         ? [
@@ -889,6 +910,7 @@ export function useCompanionAssistant({
     lastReplayablePlannerMessageRef.current =
       cachedThreadUiState?.lastReplayablePlannerMessage ?? null;
     pendingStarterIntentRef.current = null;
+    pendingQuestCaptureSelectedDateRef.current = null;
     return true;
   }, [applyActiveSessionId, surface]);
 
@@ -1116,6 +1138,13 @@ export function useCompanionAssistant({
     const message = rawMessage.trim();
     if (!message || isSubmitting || isResolvingAction) return false;
     const pendingStarterIntent = pendingStarterIntentRef.current;
+    const activeFollowUpSelectedDate = readFollowUpSelectedDate(activeFollowUp);
+    const selectedDate = normalizeSelectedDateKey(options?.selectedDate) ??
+      (pendingStarterIntent === "quest_capture"
+        ? pendingQuestCaptureSelectedDateRef.current
+        : null) ??
+      activeFollowUpSelectedDate ??
+      (activeFollowUp ? pendingQuestCaptureSelectedDateRef.current : null);
     const starterIntent = options?.starterIntent ?? pendingStarterIntent ??
       inferStarterIntentFromMessage(message);
     const shouldConsumePendingStarterIntent = pendingStarterIntent !== null;
@@ -1132,15 +1161,21 @@ export function useCompanionAssistant({
         pendingStarterIntent === "quest_capture" && !options?.starterIntent
           ? undefined
           : starterIntent;
-      const legacySubmitOptions = legacyStarterIntent === undefined && !options
+      const legacySubmitOptions =
+        legacyStarterIntent === undefined && !options && !selectedDate
         ? undefined
-        : { ...options, starterIntent: legacyStarterIntent };
+        : {
+          ...options,
+          starterIntent: legacyStarterIntent,
+          ...(selectedDate ? { selectedDate } : {}),
+        };
       await legacyAssistant.submitMessage(message, inputMode, legacySubmitOptions);
       if (
         shouldConsumePendingStarterIntent &&
         pendingStarterIntentRef.current === pendingStarterIntent
       ) {
         pendingStarterIntentRef.current = null;
+        pendingQuestCaptureSelectedDateRef.current = null;
       }
       return true;
     }
@@ -1175,6 +1210,7 @@ export function useCompanionAssistant({
             currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
             turnOrigin: options?.turnOrigin,
             starterIntent,
+            selectedDate: selectedDate ?? undefined,
             activeFollowUp,
             activeProposedActions: proposedActions.slice(
               0,
@@ -1194,6 +1230,9 @@ export function useCompanionAssistant({
       const response = data as CompanionAgentResponse;
       applyActiveSessionId(response.threadState.sessionId);
       appendAssistantResponse(response);
+      const nextQuestCaptureSelectedDate =
+        readFollowUpSelectedDate(response.followUp ?? null) ??
+          (response.followUp && selectedDate ? selectedDate : null);
       await trackInteraction({
         interactionType: "companion_agent",
         inputText: message,
@@ -1232,6 +1271,8 @@ export function useCompanionAssistant({
       ) {
         pendingStarterIntentRef.current = null;
       }
+      pendingQuestCaptureSelectedDateRef.current =
+        nextQuestCaptureSelectedDate ?? null;
       void invalidateThreads();
       return true;
     } catch (error) {
@@ -1262,15 +1303,21 @@ export function useCompanionAssistant({
           pendingStarterIntent === "quest_capture" && !options?.starterIntent
             ? undefined
             : starterIntent;
-        const legacySubmitOptions = legacyStarterIntent === undefined && !options
+        const legacySubmitOptions =
+          legacyStarterIntent === undefined && !options && !selectedDate
           ? undefined
-          : { ...options, starterIntent: legacyStarterIntent };
+          : {
+            ...options,
+            starterIntent: legacyStarterIntent,
+            ...(selectedDate ? { selectedDate } : {}),
+          };
         await legacyAssistant.submitMessage(message, inputMode, legacySubmitOptions);
         if (
           shouldConsumePendingStarterIntent &&
           pendingStarterIntentRef.current === pendingStarterIntent
         ) {
           pendingStarterIntentRef.current = null;
+          pendingQuestCaptureSelectedDateRef.current = null;
         }
         return true;
       }
@@ -1654,6 +1701,7 @@ export function useCompanionAssistant({
     if (handledLaunchIntentIdRef.current === launchIntent.id) return;
     if (launchIntent.starterIntent !== "quest_capture") {
       pendingStarterIntentRef.current = null;
+      pendingQuestCaptureSelectedDateRef.current = null;
     }
     if (launchIntent.starterIntent === "thread_history") return;
     if (!useLegacyFallback && !threadsQuery.isSuccess) return;
@@ -1698,7 +1746,9 @@ export function useCompanionAssistant({
           const greetingText = launchMessage.trim() ||
             COMPANION_PLANNER_QUEST_CAPTURE_OPENING;
           if (useLegacyFallback) {
-            legacyAssistant.startQuestCaptureThread?.(greetingText);
+            legacyAssistant.startQuestCaptureThread?.(greetingText, {
+              selectedDate: launchIntent.selectedDate ?? null,
+            });
           } else {
             startTemplateThread({
               greetingText,
@@ -1706,6 +1756,8 @@ export function useCompanionAssistant({
             });
           }
           pendingStarterIntentRef.current = "quest_capture";
+          pendingQuestCaptureSelectedDateRef.current =
+            launchIntent.selectedDate ?? null;
           return;
         }
 

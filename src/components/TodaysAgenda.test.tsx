@@ -296,7 +296,6 @@ vi.mock("@/components/ui/marquee-text", () => ({
 }));
 
 import { TodaysAgenda } from "./TodaysAgenda";
-import { COMPANION_PLANNER_QUEST_CAPTURE_OPENING } from "@/shared/companionPlannerSurfaceActions";
 
 const createWrapper = (client: QueryClient) => {
   return ({ children }: { children: ReactNode }) => (
@@ -1684,10 +1683,12 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     fireEvent.click(launcher);
 
     expect(onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
-      message: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
+      message:
+        "Clean slate for Friday, February 13. What quest should we add?",
       starterIntent: "quest_capture",
       target: "planner",
       briefingContext: null,
+      selectedDate: "2026-02-13",
     }));
     expect(launcher).toHaveAttribute("data-tour", "add-quest-launcher");
     expect(screen.getByText("New quest")).toBeInTheDocument();

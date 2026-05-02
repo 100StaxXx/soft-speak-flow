@@ -283,6 +283,29 @@ const normalizeScheduleReadMessage = (message: string): string => {
   return `what do i have ${match[1]}`;
 };
 
+const normalizeQuestCaptureStarterText = (value: string): string =>
+  value.trim().toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(
+    /\s+/g,
+    " ",
+  ).trim();
+
+const isQuestCaptureStarterText = (message: string): boolean => {
+  const normalized = normalizeQuestCaptureStarterText(message);
+  if (
+    normalized === "quest" ||
+    normalized === "new quest" ||
+    normalized === "what quest do you want to capture" ||
+    normalized === "sure what quest do you want to capture"
+  ) {
+    return true;
+  }
+
+  return (
+    /^(.+\s)?ready what quest are we capturing$/.test(normalized) ||
+    /^clean slate( for .+)? what quest should we add$/.test(normalized)
+  );
+};
+
 const buildTaskIntervals = (tasks: PlannerContextTask[]): TimelineInterval[] =>
   tasks
     .filter((task) =>
@@ -1083,6 +1106,7 @@ const hasPendingPlanDayClarification = (
 export function consultPlannerForAgent(params: {
   message: string;
   currentDateTime: string;
+  selectedDate?: string | null;
   surface: "companion" | "journeys";
   horizon?: PlannerHorizon;
   starterIntent?: string | null;
@@ -1091,7 +1115,7 @@ export function consultPlannerForAgent(params: {
   context: LoadedCompanionAgentContext;
 }): PlannerAssistResult {
   const normalizedMessage = normalizeScheduleReadMessage(params.message);
-  const currentDate = params.currentDateTime.slice(0, 10);
+  const currentDate = params.selectedDate ?? params.currentDateTime.slice(0, 10);
   const plannerMemory = buildPlannerMemory(params.context);
   const plannerStarterIntent = normalizePlannerStarterIntent(
     params.starterIntent,
@@ -1178,12 +1202,18 @@ export function consultPlannerForAgent(params: {
   const planningConsent = buildPlanningConsentFromFollowUp(
     params.activeFollowUp,
   );
+  const isConcreteQuestCaptureTurn = plannerStarterIntent === "quest_capture" &&
+    !isQuestCaptureStarterText(normalizedMessage);
   const isPlanDayQuestConsentAnswer =
     activeQuestionId === "plan_day_quest_consent";
   const isPlanningLauncherConsentAnswer =
     activeQuestionId === "planning_launcher_consent" && planningConsent;
   const sessionState: PlannerSessionState = {
-    draft: {},
+    draft: isConcreteQuestCaptureTurn
+      ? {
+        draftKind: "create_quest",
+      }
+      : {},
     openQuestionIds: isPlanDayQuestConsentAnswer
       ? ["plan_day_quest_consent"]
       : isPlanningLauncherConsentAnswer
@@ -1196,7 +1226,11 @@ export function consultPlannerForAgent(params: {
     reminderPreference: asNumber(plannerMemory?.reminderMinutesBefore)
       ? `${plannerMemory?.reminderMinutesBefore} minutes`
       : null,
-    pendingStarterIntent: pendingPlanDayClarification ? "plan_day" : null,
+    pendingStarterIntent: isConcreteQuestCaptureTurn
+      ? "quest_capture"
+      : pendingPlanDayClarification
+      ? "plan_day"
+      : null,
     lastClassification: null,
     planningConsent,
   };

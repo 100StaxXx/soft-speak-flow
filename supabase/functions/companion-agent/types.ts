@@ -277,6 +277,7 @@ export const CompanionAgentRequestSchema = z.object({
   message: z.string().min(1).max(4000).trim(),
   inputMode: InputModeSchema.default("text"),
   currentDateTime: z.string().datetime({ offset: true }),
+  selectedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   turnOrigin: TurnOriginSchema.optional(),
   starterIntent: StarterIntentSchema.optional(),
   selectedProposalId: z.string().min(1).max(200).optional(),

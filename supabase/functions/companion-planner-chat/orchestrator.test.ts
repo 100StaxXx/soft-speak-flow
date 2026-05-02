@@ -4,6 +4,8 @@ import {
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
   buildOrchestratedPlannerResponse,
+  DEFAULT_COMPANION_PLANNER_MODEL,
+  resolveCompanionPlannerModel,
   sanitizeReadyQuestProposalResponse,
 } from "./orchestrator.ts";
 import type { PlannerBuildInput, PlannerBuildResult } from "./planner.ts";
@@ -92,6 +94,46 @@ Deno.test("uses the model-authored conversational reply when orchestration succe
     response.reply,
     "Let's look at the day together and keep it simple.",
   );
+});
+
+Deno.test("resolveCompanionPlannerModel uses default unless an override is set", () => {
+  assertEquals(
+    resolveCompanionPlannerModel(() => null),
+    DEFAULT_COMPANION_PLANNER_MODEL,
+  );
+  assertEquals(
+    resolveCompanionPlannerModel((name) =>
+      name === "OPENAI_COMPANION_PLANNER_MODEL" ? "gpt-5" : null
+    ),
+    "gpt-5",
+  );
+});
+
+Deno.test("planner orchestration request body uses the resolved default model", async () => {
+  const requestBodies: Array<Record<string, unknown>> = [];
+
+  await buildOrchestratedPlannerResponse({
+    guardedFetch: async (_input: RequestInfo | URL, init?: RequestInit) => {
+      requestBodies.push(
+        JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>,
+      );
+      return new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              reply: "Let's keep today simple.",
+              mode: "conversational",
+            }),
+          },
+        }],
+      }));
+    },
+    input: baseInput(),
+    baseResult: baseResult("conversational"),
+    openAIApiKey: "test-openai-key",
+  });
+
+  assertEquals(requestBodies[0]?.model, DEFAULT_COMPANION_PLANNER_MODEL);
 });
 
 Deno.test("normalizes 24-hour times in model-authored planner replies", async () => {
@@ -700,7 +742,7 @@ Deno.test("does not rewrite the quest-capture starter prompt", async () => {
     },
     baseResult: {
       ...baseResult("conversational"),
-      reply: "Quest?",
+      reply: "Sure. What quest do you want to capture?",
       sessionState: {
         ...baseResult("conversational").sessionState,
         draft: {
@@ -714,7 +756,7 @@ Deno.test("does not rewrite the quest-capture starter prompt", async () => {
   });
 
   assertEquals(response.mode, "conversational");
-  assertEquals(response.reply, "Quest?");
+  assertEquals(response.reply, "Sure. What quest do you want to capture?");
   assertEquals(captured.called, false);
 });
 

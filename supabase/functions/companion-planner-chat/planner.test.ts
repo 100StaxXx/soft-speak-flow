@@ -2179,7 +2179,7 @@ Deno.test("plan_day lingering conversation state does not override explicit ques
   }));
 
   assertEquals(result.mode, "conversational");
-  assertEquals(result.reply, "Quest?");
+  assertEquals(result.reply, "Sure. What quest do you want to capture?");
   assertEquals(result.proposals.length, 0);
   assertEquals(result.sessionState.pendingStarterIntent, "quest_capture");
   assertEquals(result.sessionState.draft, { draftKind: "create_quest" });
@@ -4422,7 +4422,68 @@ Deno.test("quest_capture asks for the quest and timing before drafting", () => {
   assertEquals(result.followUpQuestions.length, 0);
   assertEquals(result.sessionState.pendingStarterIntent, "quest_capture");
   assertEquals(result.sessionState.draft.draftKind, "create_quest");
-  assertEquals(result.reply, "Quest?");
+  assertEquals(result.reply, "Sure. What quest do you want to capture?");
+});
+
+Deno.test("quest_capture concrete starter drafts on the first turn", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Pilates tomorrow at 8am",
+    parsedInput: {
+      text: "Pilates",
+      scheduledTime: "08:00",
+      scheduledDate: "2026-04-19",
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      starterIntent: "quest_capture",
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0]?.kind, "create_quest");
+  assertEquals(result.proposals[0]?.readyToConfirm, true);
+  assertEquals(result.sessionState.draft.draftKind, "create_quest");
+  assertEquals(result.sessionState.draft.title, "Pilates");
+});
+
+Deno.test("quest_capture keeps epic-looking text as a quest", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Launch new app",
+    parsedInput: {
+      text: "Launch new app",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    classificationHint: {
+      type: "epic",
+      confidence: 0.7,
+      reasoning: "Longer-term goal detected.",
+    },
+    plannerContext: {
+      starterIntent: "quest_capture",
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0]?.kind, "create_quest");
+  assertEquals(result.sessionState.draft.draftKind, "create_quest");
 });
 
 Deno.test("quest_capture turns a complete follow-up answer into a ready quest draft", () => {

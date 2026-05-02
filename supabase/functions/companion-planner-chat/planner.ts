@@ -1482,11 +1482,28 @@ const shouldUseServerSchedulePayload = (
   return hasExplicitSlotSignal(input.message) || input.parsedInput == null;
 };
 
+const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+const getNaturalLanguageReferenceDateTime = (
+  input: PlannerBuildInput,
+): string => {
+  const referenceDate =
+    input.plannerContext.scheduleInsights?.selectedDate ?? input.currentDate;
+  if (
+    DATE_KEY_PATTERN.test(referenceDate) &&
+    referenceDate !== input.currentDateTime.slice(0, 10)
+  ) {
+    return `${referenceDate}T12:00:00`;
+  }
+
+  return input.currentDateTime;
+};
+
 const normalizeParsedInput = (
   input: PlannerBuildInput,
 ): ParsedInputHint | null => {
   const serverParsed = parseNaturalLanguage(input.message, {
-    referenceDateTime: input.currentDateTime,
+    referenceDateTime: getNaturalLanguageReferenceDateTime(input),
   });
   const clientParsed = input.parsedInput ?? null;
   const schedulingIntent = analyzeSchedulingIntent(input.message, serverParsed);
@@ -3241,6 +3258,13 @@ const resolveKind = (
     draft,
     repeated,
   );
+
+  if (
+    input.sessionState.pendingStarterIntent === "quest_capture" ||
+    input.plannerContext.starterIntent === "quest_capture"
+  ) {
+    return "create_quest";
+  }
 
   if (matched.ritual && reminderOnlyIntent) return "update_ritual";
   if (matched.task && reminderOnlyIntent) return "suggest_reminder";
@@ -11072,13 +11096,47 @@ const buildUpcomingStarterResponse = (
     buildUpcomingDigestReply(input),
   );
 
+const QUEST_CAPTURE_STARTER_REPLY = "Sure. What quest do you want to capture?";
+
+const isQuestCaptureStarterMessage = (message: string): boolean => {
+  const normalized = normalizeText(message);
+  if (
+    normalized === "quest" ||
+    normalized === "new quest" ||
+    normalized === "what quest do you want to capture" ||
+    normalized === "sure what quest do you want to capture"
+  ) {
+    return true;
+  }
+
+  return (
+    /^(.+\s)?ready what quest are we capturing$/.test(normalized) ||
+    /^clean slate( for .+)? what quest should we add$/.test(normalized)
+  );
+};
+
+const seedQuestCaptureSessionState = (
+  input: PlannerBuildInput,
+): PlannerBuildInput => ({
+  ...input,
+  sessionState: {
+    ...input.sessionState,
+    draft: {
+      ...input.sessionState.draft,
+      draftKind: "create_quest",
+    },
+    openQuestionIds: [],
+    pendingStarterIntent: "quest_capture",
+  },
+});
+
 const buildQuestCaptureStarterResponse = (
   input: PlannerBuildInput,
   sessionState: PlannerSessionState,
   classificationHint: ClassificationHint,
 ): PlannerBuildResult => ({
   mode: "conversational",
-  reply: "Quest?",
+  reply: QUEST_CAPTURE_STARTER_REPLY,
   followUpQuestions: [],
   proposals: [],
   suggestedReminders: [],
@@ -11550,7 +11608,7 @@ export function buildPlannerResponse(
 ): PlannerBuildResult {
   const rawResult = ((): PlannerBuildResult => {
     const normalizedParsedInput = normalizeParsedInput(input);
-    const resolvedInput = withResolvedTimeQuestionAnswer({
+    let resolvedInput = withResolvedTimeQuestionAnswer({
       ...input,
       parsedInput: normalizedParsedInput,
     });
@@ -11667,11 +11725,15 @@ export function buildPlannerResponse(
     }
 
     if (starterIntent === "quest_capture") {
-      return buildQuestCaptureStarterResponse(
-        resolvedInput,
-        resolvedInput.sessionState,
-        classificationHint,
-      );
+      if (isQuestCaptureStarterMessage(resolvedInput.message)) {
+        return buildQuestCaptureStarterResponse(
+          resolvedInput,
+          resolvedInput.sessionState,
+          classificationHint,
+        );
+      }
+
+      resolvedInput = seedQuestCaptureSessionState(resolvedInput);
     }
 
     if (starterIntent === "goal_breakdown_start") {

@@ -77,13 +77,15 @@ describe("journeys companion launcher greetings", () => {
       starterIntent: "upcoming_start",
     });
 
-    expect(templates.find((template) => template.id === "quest")).toMatchObject({
+    const questTemplate = templates.find((template) => template.id === "quest");
+    expect(questTemplate).toMatchObject({
       id: "quest",
       label: "Quest?",
       message: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
       target: "planner",
       starterIntent: "quest_capture",
     });
+    expect(questTemplate?.message).not.toBe(questTemplate?.label);
 
     expect(templates.find((template) => template.id === "goal")).toMatchObject({
       id: "goal",

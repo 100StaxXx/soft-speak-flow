@@ -254,6 +254,7 @@ export interface CompanionPlannerLaunchIntent {
   starterIntent: CompanionPlannerStarterIntent;
   target?: CompanionPlannerLaunchTarget;
   briefingContext?: PlannerBriefingContext | null;
+  selectedDate?: string | null;
 }
 
 export interface PlannerContextCalendarEvent {

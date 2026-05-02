@@ -501,6 +501,40 @@ describe("CompanionStatAnalysisSurface", () => {
     expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
   });
 
+  it("reveals a ready title card from imageUrls when legacy imageUrl is absent", async () => {
+    mocks.useCompanionStatAnalysisMock.mockReturnValue({
+      analysis: {
+        ...analysis,
+        cosmiqTitleCard: {
+          ...analysis.cosmiqTitleCard,
+          imageUrl: null,
+        },
+      },
+      cached: true,
+      error: null,
+      isLoading: false,
+      isRefreshing: false,
+      isRegeneratingTitleCard: false,
+      refreshAnalysis: mocks.refreshAnalysisMock,
+      regenerateTitleCard: mocks.regenerateTitleCardMock,
+    });
+
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="desktop"
+      />,
+    );
+
+    expect(await screen.findByTestId("companion-cosmiq-title-card")).toBeInTheDocument();
+    expect(screen.getByAltText("The Oathbound Pathfinder archetype illustration")).toHaveAttribute(
+      "src",
+      "https://example.com/cosmiq-card.png",
+    );
+    expect(screen.queryByTestId("companion-title-art-loading")).not.toBeInTheDocument();
+  });
+
   it("lets the generated-art slideshow advance before the final reveal", () => {
     mocks.prefersReducedMotion = false;
     vi.useFakeTimers();

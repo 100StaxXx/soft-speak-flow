@@ -93,6 +93,61 @@ Deno.test("consultPlannerForAgent converts planner proposals into v1 task action
   assertEquals(result.actionHints[0]?.actionType, "task_update");
 });
 
+Deno.test("consultPlannerForAgent drafts concrete quest-capture starter text immediately", () => {
+  const result = consultPlannerForAgent({
+    message: "Pilates tomorrow at 8am",
+    currentDateTime: "2026-04-18T08:00:00-07:00",
+    surface: "journeys",
+    horizon: "week",
+    starterIntent: "quest_capture",
+    context: buildContext(),
+  });
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.reply.includes("Quest?"), false);
+  assertEquals(result.actionHints[0]?.actionType, "task_create");
+  assertEquals(result.actionHints[0]?.normalizedPayload?.title, "Pilates");
+});
+
+Deno.test("consultPlannerForAgent preserves selected date for quest-capture replies", () => {
+  const consultSelectedDatePlanner = (message: string) =>
+    consultPlannerForAgent({
+      message,
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      selectedDate: "2026-04-21",
+      surface: "journeys",
+      horizon: "day",
+      starterIntent: "quest_capture",
+      context: buildContext(),
+    });
+
+  const result = consultSelectedDatePlanner("Pilates at 8am");
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.scheduleInsights.selectedDate, "2026-04-21");
+  assertEquals(result.actionHints[0]?.actionType, "task_create");
+  assertEquals(result.actionHints[0]?.normalizedPayload?.title, "Pilates");
+  assertEquals(
+    result.actionHints[0]?.normalizedPayload?.task_date,
+    "2026-04-21",
+  );
+  assertEquals(
+    result.actionHints[0]?.normalizedPayload?.scheduled_time,
+    "08:00",
+  );
+
+  const tomorrowResult = consultSelectedDatePlanner("Pilates tomorrow at 8am");
+  assertEquals(
+    tomorrowResult.actionHints[0]?.normalizedPayload?.task_date,
+    "2026-04-22",
+  );
+
+  const todayResult = consultSelectedDatePlanner("Pilates today at 8am");
+  assertEquals(
+    todayResult.actionHints[0]?.normalizedPayload?.task_date,
+    "2026-04-21",
+  );
+});
+
 Deno.test("consultPlannerForAgent uses actual completed time for learned quest duration", () => {
   const result = consultPlannerForAgent({
     message: "Workout tomorrow",

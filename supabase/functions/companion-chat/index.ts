@@ -18,6 +18,7 @@ import { persistCompanionChatTurn } from "./threadPersistence.ts";
 import { shouldHandoffToPlanner } from "./handoff.ts";
 import {
   buildCompanionChatCompletionBody,
+  resolveCompanionChatModel,
   type CompanionChatSurface,
 } from "./requestBody.ts";
 import {
@@ -495,7 +496,7 @@ async function generateCompanionReply(params: {
     throw new Error("OPENAI_API_KEY not configured");
   }
 
-  const model = Deno.env.get("OPENAI_COMPANION_CHAT_MODEL") ?? "gpt-5.5";
+  const model = resolveCompanionChatModel((name) => Deno.env.get(name));
   const requestBody = buildCompanionChatCompletionBody({
     model,
     systemPrompt: params.systemPrompt,

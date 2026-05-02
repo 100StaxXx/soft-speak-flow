@@ -1,9 +1,26 @@
 import { assertEquals } from "https://deno.land/std@0.168.0/testing/asserts.ts";
-import { buildCompanionChatCompletionBody } from "./requestBody.ts";
+import {
+  buildCompanionChatCompletionBody,
+  DEFAULT_COMPANION_CHAT_MODEL,
+  resolveCompanionChatModel,
+} from "./requestBody.ts";
 
-Deno.test("buildCompanionChatCompletionBody uses GPT-5.5 chat completions shape", () => {
+Deno.test("resolveCompanionChatModel uses the default unless an override is set", () => {
+  assertEquals(
+    resolveCompanionChatModel(() => null),
+    DEFAULT_COMPANION_CHAT_MODEL,
+  );
+  assertEquals(
+    resolveCompanionChatModel((name) =>
+      name === "OPENAI_COMPANION_CHAT_MODEL" ? "gpt-4.1" : null
+    ),
+    "gpt-4.1",
+  );
+});
+
+Deno.test("buildCompanionChatCompletionBody uses GPT-5.5 no-reasoning shape for the default model", () => {
   const body = buildCompanionChatCompletionBody({
-    model: "gpt-5.5",
+    model: DEFAULT_COMPANION_CHAT_MODEL,
     systemPrompt: "Stay warm and concise.",
     conversationHistory: [
       { role: "user", content: "Hey." },
@@ -13,7 +30,7 @@ Deno.test("buildCompanionChatCompletionBody uses GPT-5.5 chat completions shape"
     surface: "companion",
   });
 
-  assertEquals(body.model, "gpt-5.5");
+  assertEquals(body.model, DEFAULT_COMPANION_CHAT_MODEL);
   assertEquals(body.reasoning_effort, "none");
   assertEquals(body.max_completion_tokens, 260);
   assertEquals("temperature" in body, false);
@@ -24,6 +41,22 @@ Deno.test("buildCompanionChatCompletionBody uses GPT-5.5 chat completions shape"
     { role: "assistant", content: "I'm here." },
     { role: "user", content: "Can you help me think?" },
   ]);
+});
+
+Deno.test("buildCompanionChatCompletionBody supports explicit GPT-5.5 no-reasoning shape", () => {
+  const body = buildCompanionChatCompletionBody({
+    model: "gpt-5.5",
+    systemPrompt: "Stay warm and concise.",
+    conversationHistory: [],
+    message: "Hello.",
+    surface: "companion",
+  });
+
+  assertEquals(body.reasoning_effort, "none");
+  assertEquals(body.max_completion_tokens, 260);
+  assertEquals("temperature" in body, false);
+  assertEquals("max_tokens" in body, false);
+  assertEquals(body.messages[0].role, "developer");
 });
 
 Deno.test("buildCompanionChatCompletionBody allows documented GPT-5.5 snapshots to use no reasoning", () => {
@@ -40,9 +73,16 @@ Deno.test("buildCompanionChatCompletionBody allows documented GPT-5.5 snapshots 
   assertEquals(body.messages[0].role, "developer");
 });
 
-Deno.test("buildCompanionChatCompletionBody omits no-reasoning for GPT-5.5 pro and keeps legacy params for non-reasoning models", () => {
+Deno.test("buildCompanionChatCompletionBody omits no-reasoning for unsupported reasoning models and keeps legacy params for non-reasoning models", () => {
   const proBody = buildCompanionChatCompletionBody({
     model: "gpt-5.5-pro",
+    systemPrompt: "Stay warm and concise.",
+    conversationHistory: [],
+    message: "Hello.",
+    surface: "companion",
+  });
+  const unsupportedReasoningBody = buildCompanionChatCompletionBody({
+    model: "gpt-5",
     systemPrompt: "Stay warm and concise.",
     conversationHistory: [],
     message: "Hello.",
@@ -59,6 +99,9 @@ Deno.test("buildCompanionChatCompletionBody omits no-reasoning for GPT-5.5 pro a
   assertEquals("reasoning_effort" in proBody, false);
   assertEquals(proBody.max_completion_tokens, 260);
   assertEquals(proBody.messages[0].role, "developer");
+  assertEquals("reasoning_effort" in unsupportedReasoningBody, false);
+  assertEquals(unsupportedReasoningBody.max_completion_tokens, 260);
+  assertEquals(unsupportedReasoningBody.messages[0].role, "developer");
   assertEquals(legacyBody.temperature, 0.35);
   assertEquals(legacyBody.max_tokens, 260);
   assertEquals("max_completion_tokens" in legacyBody, false);

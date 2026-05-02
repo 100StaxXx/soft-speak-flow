@@ -4,6 +4,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
 
+const PERSONALIZED_QUEST_CAPTURE_OPENING =
+  "Nova's ready. What quest are we capturing?";
+
 const mocks = vi.hoisted(() => ({
   agentSurfaceEnabled: true,
   toastError: vi.fn(),
@@ -170,7 +173,6 @@ vi.mock("@/utils/supabaseFunctionErrors", () => ({
 }));
 
 import { useCompanionAssistant } from "./useCompanionAssistant";
-import { COMPANION_PLANNER_QUEST_CAPTURE_OPENING } from "@/shared/companionPlannerSurfaceActions";
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
@@ -1329,7 +1331,7 @@ describe("useCompanionAssistant", () => {
           surface: "journeys",
           launchIntent: {
             id: "launch-quest-1",
-            message: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
+            message: PERSONALIZED_QUEST_CAPTURE_OPENING,
             starterIntent: "quest_capture",
             target: "planner",
           },
@@ -1347,7 +1349,7 @@ describe("useCompanionAssistant", () => {
     expect(result.current.messages).toEqual([
       expect.objectContaining({
         role: "assistant",
-        content: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
+        content: PERSONALIZED_QUEST_CAPTURE_OPENING,
         source: "agent",
       }),
     ]);
@@ -1369,9 +1371,10 @@ describe("useCompanionAssistant", () => {
           surface: "journeys",
           launchIntent: {
             id: "launch-quest-2",
-            message: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
+            message: PERSONALIZED_QUEST_CAPTURE_OPENING,
             starterIntent: "quest_capture",
             target: "planner",
+            selectedDate: "2026-02-13",
           },
         }),
       { wrapper },
@@ -1379,7 +1382,7 @@ describe("useCompanionAssistant", () => {
 
     await waitFor(() => {
       expect(result.current.messages[0]?.content).toBe(
-        COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
+        PERSONALIZED_QUEST_CAPTURE_OPENING,
       );
     });
 
@@ -1395,7 +1398,110 @@ describe("useCompanionAssistant", () => {
         body: expect.objectContaining({
           message: "Pilates tomorrow at 8am",
           starterIntent: "quest_capture",
+          selectedDate: "2026-02-13",
           sessionId: "fresh-session",
+        }),
+      }),
+    );
+  });
+
+  it("keeps the selected date on quest-capture follow-up replies", async () => {
+    mocks.supabaseInvoke
+      .mockResolvedValueOnce({
+        data: {
+          reply: "What should I call this quest?",
+          mode: "clarify",
+          intent: "schedule_task",
+          confidence: 0.55,
+          understandingState: "needs_followup",
+          followUp: {
+            question: "What should I call this quest?",
+            reason: null,
+            expectedAnswerType: "free_text",
+            options: [],
+            blocksDrafting: true,
+            metadata: {
+              questionId: "details",
+              selectedDate: "2026-02-13",
+              sourceStarterIntent: "quest_capture",
+            },
+          },
+          proposedActions: [],
+          assumptions: [],
+          evidenceIds: [],
+          threadState: {
+            threadId: "fresh-session",
+            sessionId: "fresh-session",
+            openaiConversationId: null,
+            lastOpenAIResponseId: null,
+            hasPendingAction: false,
+          },
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          reply: "Drafted.",
+          mode: "schedule_read",
+          intent: "schedule_task",
+          confidence: 0.55,
+          understandingState: "ready_to_propose",
+          proposedActions: [],
+          assumptions: [],
+          evidenceIds: [],
+          threadState: {
+            threadId: "fresh-session",
+            sessionId: "fresh-session",
+            openaiConversationId: null,
+            lastOpenAIResponseId: null,
+            hasPendingAction: false,
+          },
+        },
+        error: null,
+      });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () =>
+        useCompanionAssistant({
+          surface: "journeys",
+          launchIntent: {
+            id: "launch-quest-follow-up-selected-date",
+            message: PERSONALIZED_QUEST_CAPTURE_OPENING,
+            starterIntent: "quest_capture",
+            target: "planner",
+            selectedDate: "2026-02-13",
+          },
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.messages[0]?.content).toBe(
+        PERSONALIZED_QUEST_CAPTURE_OPENING,
+      );
+    });
+
+    await act(async () => {
+      await result.current.submitMessage("tomorrow at 8am", "text");
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeFollowUp?.question).toBe(
+        "What should I call this quest?",
+      );
+    });
+
+    await act(async () => {
+      await result.current.submitMessage("Pilates", "text");
+    });
+
+    expect(mocks.supabaseInvoke).toHaveBeenLastCalledWith(
+      "companion-agent",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          message: "Pilates",
+          selectedDate: "2026-02-13",
         }),
       }),
     );
@@ -1785,10 +1891,11 @@ describe("useCompanionAssistant", () => {
           surface: "journeys",
           launchIntent: {
             id: "launch-quest-fallback-reply-1",
-            message: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
+            message: PERSONALIZED_QUEST_CAPTURE_OPENING,
             starterIntent: "quest_capture",
             target: "planner",
             briefingContext: null,
+            selectedDate: "2026-02-13",
           },
         }),
       { wrapper },
@@ -1796,7 +1903,8 @@ describe("useCompanionAssistant", () => {
 
     await waitFor(() => {
       expect(mocks.legacyStartQuestCaptureThread).toHaveBeenCalledWith(
-        COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
+        PERSONALIZED_QUEST_CAPTURE_OPENING,
+        { selectedDate: "2026-02-13" },
       );
     });
 
@@ -1809,7 +1917,10 @@ describe("useCompanionAssistant", () => {
     expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
       "Pilates tomorrow at 8am",
       "text",
-      undefined,
+      {
+        starterIntent: undefined,
+        selectedDate: "2026-02-13",
+      },
     );
     expect(mocks.listThreads).not.toHaveBeenCalled();
   });
@@ -1818,7 +1929,7 @@ describe("useCompanionAssistant", () => {
     mocks.agentSurfaceEnabled = false;
     const questLaunchIntent: CompanionPlannerLaunchIntent = {
       id: "launch-quest-fallback-1",
-      message: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
+      message: PERSONALIZED_QUEST_CAPTURE_OPENING,
       starterIntent: "quest_capture",
       target: "planner",
       briefingContext: null,
@@ -1848,7 +1959,8 @@ describe("useCompanionAssistant", () => {
 
     await waitFor(() => {
       expect(mocks.legacyStartQuestCaptureThread).toHaveBeenCalledWith(
-        COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
+        PERSONALIZED_QUEST_CAPTURE_OPENING,
+        { selectedDate: null },
       );
     });
 

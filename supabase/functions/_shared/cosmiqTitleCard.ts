@@ -19,6 +19,7 @@ export const COSMIQ_TITLE_CARD_PROMPT_VERSION = COMPANION_COSMIQ_TITLE_CARD_PROM
 
 const COSMIQ_TITLE_CARD_BUCKET = "cosmiq-title-cards";
 const IMAGE_GENERATION_TIMEOUT_MS = 90_000;
+// Three variants are intentional for the title-art slideshow and multiply image generation/storage cost.
 const COSMIQ_TITLE_CARD_VARIANT_COUNT = 3;
 const COSMIQ_TITLE_CARD_VARIANT_DIRECTIONS = [
   "Variant 1: luminous heroic portrait, clear silhouette, balanced cosmic aura.",

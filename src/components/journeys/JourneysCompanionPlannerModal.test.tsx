@@ -2,7 +2,6 @@ import type { HTMLAttributes, ReactNode } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
-import { COMPANION_PLANNER_QUEST_CAPTURE_OPENING } from "@/shared/companionPlannerSurfaceActions";
 import type { CompanionAgentFollowUp } from "@/types/companionAgent";
 import type { CompanionAssistantMessage } from "@/hooks/useCompanionAssistant";
 
@@ -110,6 +109,9 @@ const mocks = vi.hoisted(() => ({
     pendingSuggestionProposalId: null as string | null,
   },
 }));
+
+const PERSONALIZED_QUEST_CAPTURE_OPENING =
+  "Nova's ready. What quest are we capturing?";
 
 vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
   useJourneysCompanionVisual: () => ({
@@ -452,6 +454,31 @@ describe("JourneysCompanionPlannerModal", () => {
       .toHaveAttribute("data-tour", "companion-plan-day-chat-send");
   });
 
+  it("keeps text entry local until the user sends", () => {
+    mocks.state.pendingAction = null;
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    fireEvent.change(
+      screen.getByTestId("journeys-companion-planner-text-input"),
+      {
+        target: { value: "Ok start creating tasks" },
+      },
+    );
+
+    expect(mocks.assistant.setDraftInput).toHaveBeenCalledWith(
+      "Ok start creating tasks",
+    );
+    expect(mocks.assistant.submitTypedMessage).not.toHaveBeenCalled();
+    expect(mocks.assistant.submitMessage).not.toHaveBeenCalled();
+  });
+
   it("shows rich planner cards as the single assistant response", () => {
     const previousMessages = mocks.state.messages;
     const previousPendingAction = mocks.state.pendingAction;
@@ -600,7 +627,7 @@ describe("JourneysCompanionPlannerModal", () => {
     const onLaunchIntentConsumed = vi.fn();
     const launchIntent = {
       id: "quest-launch-1",
-      message: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
+      message: PERSONALIZED_QUEST_CAPTURE_OPENING,
       starterIntent: "quest_capture" as const,
       target: "planner" as const,
       briefingContext: null,
@@ -638,7 +665,7 @@ describe("JourneysCompanionPlannerModal", () => {
         presentation="dialog"
         launchIntent={{
           id: "quest-launch-2",
-          message: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
+          message: PERSONALIZED_QUEST_CAPTURE_OPENING,
           starterIntent: "quest_capture",
           target: "planner",
           briefingContext: null,

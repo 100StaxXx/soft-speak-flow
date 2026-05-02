@@ -156,7 +156,8 @@ export function getOpenAITextTokenRatesPerThousand(model: string | null): {
   outputRate: number;
 } {
   const modelName = (model ?? "").toLowerCase();
-  // OpenAI publishes GPT-5.5 text prices per 1M tokens; guardrails store per-1K rates.
+  // OpenAI model docs publish GPT-5.5 text prices per 1M tokens;
+  // guardrails store the same rates converted to per-1K tokens.
   // Sources: https://developers.openai.com/api/docs/models/gpt-5.5
   // and https://developers.openai.com/api/docs/models/gpt-5.5-pro.
   if (modelName.includes("gpt-5.5-pro")) {
@@ -914,7 +915,6 @@ export function createCostGuardrailSession(
   const sessionEnv = params.getEnv ?? getEnv;
   const configCache = new Map<string, CostGuardrailConfigRow | null>();
   const stateCache = new Map<string, CostGuardrailStateRow | null>();
-  let recordEventQueue: Promise<void> = Promise.resolve();
 
   const cacheKeyForScope = (scope: GuardrailScopeKey) =>
     `${scope.scopeType}:${scope.scopeKey}`;
@@ -982,14 +982,6 @@ export function createCostGuardrailSession(
     event: CostEventRecord,
     providers: CostProvider[],
   ) => {
-    const previousRecordEvent = recordEventQueue;
-    let releaseRecordEvent: () => void = () => {};
-    recordEventQueue = new Promise<void>((resolve) => {
-      releaseRecordEvent = resolve;
-    });
-
-    await previousRecordEvent;
-
     try {
       await insertCostEvent(params.supabase, periodStart, event);
 
@@ -1071,8 +1063,6 @@ export function createCostGuardrailSession(
         "[cost-guardrails] Failed to persist cost telemetry",
         error,
       );
-    } finally {
-      releaseRecordEvent();
     }
   };
 

@@ -3,7 +3,12 @@ import {
   assertEquals,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
 
-import { buildToolDefinitions, runCompanionAgent } from "./agent.ts";
+import {
+  buildToolDefinitions,
+  DEFAULT_COMPANION_AGENT_MODEL,
+  resolveCompanionAgentModel,
+  runCompanionAgent,
+} from "./agent.ts";
 
 type QueryResult = {
   data?: unknown;
@@ -255,6 +260,62 @@ Deno.test("companion agent tools explicitly opt out of strict Responses schemas"
     assertEquals(tool.type, "function");
     assertEquals(tool.strict, false);
   }
+});
+
+Deno.test("resolveCompanionAgentModel uses default and env precedence", () => {
+  assertEquals(
+    resolveCompanionAgentModel(() => null),
+    DEFAULT_COMPANION_AGENT_MODEL,
+  );
+  assertEquals(
+    resolveCompanionAgentModel((name) =>
+      name === "OPENAI_TEXT_MODEL" ? "gpt-4.1-mini" : null
+    ),
+    "gpt-4.1-mini",
+  );
+  assertEquals(
+    resolveCompanionAgentModel((name) =>
+      name === "OPENAI_COMPANION_AGENT_MODEL"
+        ? "gpt-4.1"
+        : name === "OPENAI_TEXT_MODEL"
+        ? "gpt-4.1-mini"
+        : null
+    ),
+    "gpt-4.1",
+  );
+});
+
+Deno.test("runCompanionAgent keeps composer conversation chat-only when model does not draft", async () => {
+  const supabase = createMockSupabase();
+  const { guardedFetch } = createInstructionCaptureFetch(
+    "Yeah, talk to me. What are you trying to untangle?",
+  );
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-composer-chat-only",
+      message: "I feel scattered today",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      turnOrigin: "composer",
+    },
+  });
+
+  assertEquals(result.mode, "conversation");
+  assertEquals(result.understandingState, "enough_to_discuss");
+  assertEquals(result.pendingAction, undefined);
+  assertEquals(result.threadState.hasPendingAction, false);
+  assertEquals(
+    supabase.inserts.some((entry) =>
+      entry.table === "companion_pending_actions"
+    ),
+    false,
+  );
 });
 
 Deno.test("runCompanionAgent uses bare starter follow-up when OpenAI is not configured", async () => {
@@ -768,6 +829,102 @@ Deno.test("runCompanionAgent routes typed text after Quest? through the AI compa
       entry.table === "companion_pending_actions"
     ),
     "typed quest text should become a confirmable pending action, not a direct write",
+  );
+});
+
+Deno.test("runCompanionAgent does not create a composer draft from deterministic fallback", async () => {
+  const supabase = createMockSupabase();
+  let guardedFetchCalled = false;
+  const guardedFetch = (async (input: string | URL | Request) => {
+    guardedFetchCalled = true;
+    throw new Error(`Fallback test should not call OpenAI: ${String(input)}`);
+  }) as typeof fetch;
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    request: {
+      surface: "journeys",
+      sessionId: "session-composer-fallback-no-draft",
+      message: "Pilates tomorrow at 8am",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      turnOrigin: "composer",
+    },
+  });
+
+  assertEquals(guardedFetchCalled, false);
+  assertEquals(result.pendingAction, undefined);
+  assertEquals(result.threadState.hasPendingAction, false);
+  assert(
+    supabase.inserts.every((entry) =>
+      entry.table !== "companion_pending_actions"
+    ),
+    "deterministic fallback should not prepare a pending draft",
+  );
+});
+
+Deno.test("runCompanionAgent planner fallback drafts concrete quest-capture starter text", async () => {
+  const supabase = createMockSupabase();
+  let fetchCalled = false;
+
+  const result = await runCompanionAgent({
+    guardedFetch: (async () => {
+      fetchCalled = true;
+      throw new Error("server error");
+    }) as typeof fetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-quest-fallback",
+      message: "Pilates tomorrow at 8am",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      starterIntent: "quest_capture",
+      turnOrigin: "composer",
+    },
+  });
+
+  assertEquals(fetchCalled, true);
+  assertEquals(result.reply.includes("Quest?"), false);
+  assertEquals(result.proposedActions[0]?.type, "task_create");
+  assertEquals(
+    (result.proposedActions[0]?.normalizedPayload as Record<string, unknown>)
+      ?.title,
+    "Pilates",
+  );
+});
+
+Deno.test("runCompanionAgent carries selected date on quest-capture follow-ups", async () => {
+  const supabase = createMockSupabase();
+
+  const result = await runCompanionAgent({
+    guardedFetch: (async () => {
+      throw new Error("server error");
+    }) as typeof fetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-quest-selected-date-follow-up",
+      message: "tomorrow at 8am",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      selectedDate: "2026-04-21",
+      starterIntent: "quest_capture",
+      turnOrigin: "composer",
+    },
+  });
+
+  assertEquals(result.mode, "clarify");
+  assertEquals(result.followUp?.metadata?.selectedDate, "2026-04-21");
+  assertEquals(
+    result.followUp?.metadata?.sourceStarterIntent,
+    "quest_capture",
   );
 });
 

@@ -602,6 +602,7 @@ export function useLegacyCompanionAssistantAdapter({
     inputMode: CompanionChatInputMode = "text",
     options?: {
       starterIntent?: CompanionPlannerLaunchIntent["starterIntent"];
+      selectedDate?: string | null;
     },
   ) => {
     const message = rawMessage.trim();
@@ -642,23 +643,29 @@ export function useLegacyCompanionAssistantAdapter({
     ) {
       await planner.submitMessage(message, inputMode, {
         starterIntent,
+        selectedDate: options?.selectedDate ?? null,
       });
       return;
     }
 
     if (isExactQuestCaptureStarterMessage(message)) {
-      planner.primeQuestCapture(message);
+      planner.primeQuestCapture(message, {
+        selectedDate: options?.selectedDate ?? null,
+      });
       return;
     }
 
     if (isExactPlanDayStarterMessage(message)) {
-      await planner.submitMessage(message, inputMode);
+      await planner.submitMessage(message, inputMode, {
+        selectedDate: options?.selectedDate ?? null,
+      });
       return;
     }
 
     if (isExactPrepareTomorrowStarterMessage(message)) {
       await planner.submitMessage(message, inputMode, {
         starterIntent: "briefing_followup",
+        selectedDate: options?.selectedDate ?? null,
       });
       return;
     }
@@ -666,6 +673,7 @@ export function useLegacyCompanionAssistantAdapter({
     if (isExactUpcomingStarterMessage(message)) {
       await planner.submitMessage(message, inputMode, {
         starterIntent: "upcoming_start",
+        selectedDate: options?.selectedDate ?? null,
       });
       return;
     }
@@ -678,7 +686,9 @@ export function useLegacyCompanionAssistantAdapter({
     }
 
     if (routeToPlanner) {
-      await planner.submitMessage(message, inputMode);
+      await planner.submitMessage(message, inputMode, {
+        selectedDate: options?.selectedDate ?? null,
+      });
       if (shouldEmitPlanDayAiAnswered) {
         emitPlanDayAiAnsweredEvent();
       }
@@ -732,7 +742,10 @@ export function useLegacyCompanionAssistantAdapter({
     return nextSessionId;
   }, [journeysConversation, journeysThreads, surface]);
 
-  const startQuestCaptureThread = useCallback((greetingText: string) => {
+  const startQuestCaptureThread = useCallback((
+    greetingText: string,
+    options?: { selectedDate?: string | null },
+  ) => {
     if (surface !== "journeys") return "";
 
     const nextSessionId = journeysThreads.startTemplateThread({
@@ -741,7 +754,9 @@ export function useLegacyCompanionAssistantAdapter({
     const trimmedGreetingText = greetingText.trim();
 
     if (trimmedGreetingText) {
-      planner.primeQuestCapture(trimmedGreetingText);
+      planner.primeQuestCapture(trimmedGreetingText, {
+        selectedDate: options?.selectedDate ?? null,
+      });
     }
 
     return nextSessionId;

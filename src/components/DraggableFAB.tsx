@@ -165,7 +165,10 @@ export const DraggableFAB = ({ onOpenCompanionPlanner, onTap }: DraggableFABProp
       window.dispatchEvent(new CustomEvent("companion-new-goal-started"));
     }
     if (template.id === "quest") {
-      onOpenCompanionPlanner(createCompanionPlannerQuestCaptureLaunchIntent());
+      onOpenCompanionPlanner(createCompanionPlannerQuestCaptureLaunchIntent({
+        source: "companion_planner",
+        companionLabel,
+      }));
       return;
     }
     const launchIntent: CompanionPlannerLaunchIntent = {
@@ -176,7 +179,7 @@ export const DraggableFAB = ({ onOpenCompanionPlanner, onTap }: DraggableFABProp
       briefingContext: null,
     };
     onOpenCompanionPlanner(launchIntent);
-  }, [closeMenu, launcherTemplates, onOpenCompanionPlanner]);
+  }, [closeMenu, companionLabel, launcherTemplates, onOpenCompanionPlanner]);
 
   const handleOpenHistory = useCallback(() => {
     if (!onOpenCompanionPlanner) {
