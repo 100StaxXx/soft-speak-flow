@@ -19,6 +19,7 @@ const profileState = vi.hoisted(() => ({
     onboarding_data: Record<string, unknown>;
   },
   loading: false,
+  error: null as unknown,
 }));
 
 const accessState = vi.hoisted(() => ({
@@ -43,8 +44,8 @@ vi.mock("@/hooks/useAccessState", () => ({
   useAccessState: () => accessState,
 }));
 
-vi.mock("@/components/TrialExpiredPaywall", () => ({
-  TrialExpiredPaywall: ({ variant }: { variant?: "pre_trial_signup" | "trial_expired" }) => (
+vi.mock("@/components/Paywall", () => ({
+  Paywall: ({ variant }: { variant?: "pre_trial_signup" | "trial_expired" }) => (
     <div>{`Paywall:${variant ?? "pre_trial_signup"}`}</div>
   ),
 }));
@@ -82,6 +83,7 @@ describe("ProtectedRoute post-tutorial gating", () => {
     accessState.isLoading = false;
 
     profileState.loading = false;
+    profileState.error = null;
     profileState.profile = {
       created_at: "2026-02-01T00:00:00.000Z",
       onboarding_data: {

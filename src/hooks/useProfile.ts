@@ -4,6 +4,19 @@ import { useAuth } from "./useAuth";
 
 import { ProfilePreferences } from "@/types/profile";
 
+const NON_RETRYABLE_PROFILE_SCHEMA_ERROR_CODES = new Set([
+  "42703", // undefined_column
+  "42P01", // undefined_table
+]);
+
+export const isPostgresSchemaError = (error: unknown): boolean => {
+  if (!error || typeof error !== "object") return false;
+  if (!("code" in error)) return false;
+
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "string" && NON_RETRYABLE_PROFILE_SCHEMA_ERROR_CODES.has(code);
+};
+
 export interface Profile {
   id: string;
   email: string | null;
@@ -166,6 +179,7 @@ export const useProfile = () => {
     enabled: !!user,
     staleTime: 2 * 60 * 1000, // 2 minutes - balance between performance and freshness
     refetchOnWindowFocus: false, // Prevent unnecessary refetches on tab switch
+    retry: (failureCount, error) => !isPostgresSchemaError(error) && failureCount < 2,
   });
 
   return { profile: profile ?? null, loading, error, refetch };

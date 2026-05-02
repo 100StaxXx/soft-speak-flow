@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   profile: null as Record<string, unknown> | null,
   profileLoading: false,
+  profileError: null as unknown,
   accessState: {
     has_access: false,
     access_source: "none",
@@ -21,6 +22,7 @@ vi.mock("./useProfile", () => ({
   useProfile: () => ({
     profile: mocks.profile,
     loading: mocks.profileLoading,
+    error: mocks.profileError,
   }),
 }));
 
@@ -67,6 +69,7 @@ describe("useAccessStatus", () => {
     installLocalStorageMock();
     localStorageState.store.clear();
     mocks.profileLoading = false;
+    mocks.profileError = null;
     mocks.accessLoading = false;
     mocks.accessState = {
       has_access: false,
@@ -185,6 +188,21 @@ describe("useAccessStatus", () => {
 
     const { result } = renderHook(() => useAccessStatus());
 
+    expect(result.current.hasAccess).toBe(true);
+    expect(result.current.gateReason).toBe("none");
+  });
+
+  it("fails open instead of staying loading after a terminal profile error", () => {
+    mocks.profile = null;
+    mocks.profileLoading = true;
+    mocks.profileError = {
+      code: "42703",
+      message: "column profiles.readable_quest_cards_enabled does not exist",
+    };
+
+    const { result } = renderHook(() => useAccessStatus());
+
+    expect(result.current.loading).toBe(false);
     expect(result.current.hasAccess).toBe(true);
     expect(result.current.gateReason).toBe("none");
   });
