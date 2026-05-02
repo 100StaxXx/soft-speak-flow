@@ -22,15 +22,48 @@ export function QuestAttachmentPicker({
   helperText = true,
   visualStyle = "default",
 }: QuestAttachmentPickerProps) {
-  const { pickAttachments, deleteAttachment, isUploading } = useQuestImagePicker();
+  const {
+    pickAttachments,
+    pickPhotoAttachments,
+    pickFileAttachments,
+    deleteAttachment,
+    isNativeAttachmentPicker,
+    isUploading,
+  } = useQuestImagePicker();
   const isQuestSoft = visualStyle === "quest-soft";
 
   const remaining = Math.max(0, MAX_ATTACHMENTS_PER_TASK - attachments.length);
   const canAdd = !disabled && remaining > 0 && !isUploading;
+  const addButtonClassName = cn(
+    "gap-2",
+    isQuestSoft
+      ? "rounded-[16px] border-[3px] border-[#6b3416] bg-white/60 text-[#6b3416] shadow-[0_4px_0_rgba(77,40,17,0.16)] hover:bg-white/75 hover:text-[#4f240c]"
+      : "",
+  );
 
   const handleAdd = async () => {
     if (!canAdd) return;
     const picked = await pickAttachments({
+      currentCount: attachments.length,
+      maxCount: MAX_ATTACHMENTS_PER_TASK,
+    });
+    if (picked.length === 0) return;
+    onAttachmentsChange([...attachments, ...picked]);
+  };
+
+  const handleAddPhotos = async () => {
+    if (!canAdd) return;
+    const picked = await pickPhotoAttachments({
+      currentCount: attachments.length,
+      maxCount: MAX_ATTACHMENTS_PER_TASK,
+    });
+    if (picked.length === 0) return;
+    onAttachmentsChange([...attachments, ...picked]);
+  };
+
+  const handleAddFiles = async () => {
+    if (!canAdd) return;
+    const picked = await pickFileAttachments({
       currentCount: attachments.length,
       maxCount: MAX_ATTACHMENTS_PER_TASK,
     });
@@ -48,22 +81,46 @@ export function QuestAttachmentPicker({
   return (
     <div className={cn("space-y-2", className)}>
       <div className="flex items-center justify-between gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={!canAdd}
-          onClick={handleAdd}
-          className={cn(
-            "gap-2",
-            isQuestSoft
-              ? "rounded-[16px] border-[3px] border-[#6b3416] bg-white/60 text-[#6b3416] shadow-[0_4px_0_rgba(77,40,17,0.16)] hover:bg-white/75 hover:text-[#4f240c]"
-              : "",
+        <div className="flex flex-wrap items-center gap-2">
+          {isNativeAttachmentPicker ? (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!canAdd}
+                onClick={handleAddPhotos}
+                className={addButtonClassName}
+              >
+                {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileImage className="h-4 w-4" />}
+                {isUploading ? "Uploading..." : "Add Photos"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!canAdd}
+                onClick={handleAddFiles}
+                className={addButtonClassName}
+              >
+                {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                {isUploading ? "Uploading..." : "Add Files"}
+              </Button>
+            </>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!canAdd}
+              onClick={handleAdd}
+              className={addButtonClassName}
+            >
+              {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+              {isUploading ? "Uploading..." : "Add Photo/File"}
+            </Button>
           )}
-        >
-          {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
-          {isUploading ? "Uploading..." : "Add Photo/File"}
-        </Button>
+        </div>
         <span className={cn("text-xs", isQuestSoft ? "text-[#7f4a1d]/80" : "text-muted-foreground")}>
           {attachments.length}/{MAX_ATTACHMENTS_PER_TASK}
         </span>

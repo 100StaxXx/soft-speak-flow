@@ -18,6 +18,7 @@ import { DurationPickerField, TimePickerField } from "@/components/scheduling";
 import {
   MAX_QUEST_REMINDER_MINUTES,
   MAX_QUEST_REMINDER_OFFSETS,
+  QUEST_REMINDER_PRESET_OPTIONS,
   formatQuestReminderOffset,
   getPrimaryQuestReminderOffset,
   normalizeQuestReminderOffsets,
@@ -92,15 +93,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
 
   const reminderOptions = [
     { value: "none", label: "None" },
-    { value: 5, label: "5 minutes before" },
-    { value: 10, label: "10 minutes before" },
-    { value: 15, label: "15 minutes before" },
-    { value: 30, label: "30 minutes before" },
-    { value: 60, label: "1 hour before" },
-    { value: 120, label: "2 hours before" },
-    { value: 1440, label: "1 day before" },
-    { value: 2880, label: "2 days before" },
-    { value: 10080, label: "1 week before" },
+    ...QUEST_REMINDER_PRESET_OPTIONS,
   ];
 
   const monthDays = useMemo(() => Array.from({ length: 31 }, (_, index) => index + 1), []);

@@ -37,6 +37,7 @@
 		"ScreenOrientationPlugin",
 		"SharePlugin",
 		"SplashScreenPlugin",
+		"FilePickerPlugin",
 		"SocialLoginPlugin"
 	]
 }

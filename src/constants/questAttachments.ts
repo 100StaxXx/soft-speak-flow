@@ -23,3 +23,7 @@ export const ALLOWED_ATTACHMENT_MIME_TYPES = [
 ] as const;
 
 export const ATTACHMENT_INPUT_ACCEPT = "image/*,.pdf,.doc,.docx,.txt,.csv";
+
+export const NATIVE_ATTACHMENT_FILE_PICKER_TYPES = [
+  ...ALLOWED_ATTACHMENT_MIME_TYPES,
+] as const;

@@ -5,14 +5,20 @@ import type { QuestAttachmentInput } from "@/types/questAttachments";
 
 const mocks = vi.hoisted(() => ({
   pickAttachments: vi.fn(),
+  pickPhotoAttachments: vi.fn(),
+  pickFileAttachments: vi.fn(),
   deleteAttachment: vi.fn().mockResolvedValue(true),
+  isNativeAttachmentPicker: false,
   isUploading: false,
 }));
 
 vi.mock("@/hooks/useQuestImagePicker", () => ({
   useQuestImagePicker: () => ({
     pickAttachments: mocks.pickAttachments,
+    pickPhotoAttachments: mocks.pickPhotoAttachments,
+    pickFileAttachments: mocks.pickFileAttachments,
     deleteAttachment: mocks.deleteAttachment,
+    isNativeAttachmentPicker: mocks.isNativeAttachmentPicker,
     isUploading: mocks.isUploading,
   }),
 }));
@@ -31,6 +37,7 @@ const buildAttachments = (count: number): QuestAttachmentInput[] =>
 describe("QuestAttachmentPicker", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.isNativeAttachmentPicker = false;
     mocks.isUploading = false;
   });
 
@@ -78,5 +85,83 @@ describe("QuestAttachmentPicker", () => {
     expect(screen.getByRole("button", { name: "Add Photo/File" })).toBeDisabled();
     expect(mocks.pickAttachments).not.toHaveBeenCalled();
   });
-});
 
+  it("shows native photo and file buttons on native platforms", async () => {
+    const onAttachmentsChange = vi.fn();
+    mocks.isNativeAttachmentPicker = true;
+    mocks.pickPhotoAttachments.mockResolvedValueOnce(buildAttachments(2));
+
+    render(
+      <QuestAttachmentPicker
+        attachments={[]}
+        onAttachmentsChange={onAttachmentsChange}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Add Photo/File" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add Photos" }));
+
+    await waitFor(() => {
+      expect(onAttachmentsChange).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mocks.pickPhotoAttachments).toHaveBeenCalledWith({
+      currentCount: 0,
+      maxCount: 10,
+    });
+    expect(onAttachmentsChange.mock.calls[0][0]).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Add Files" })).toBeInTheDocument();
+  });
+
+  it("adds native files without replacing existing attachments", async () => {
+    const onAttachmentsChange = vi.fn();
+    mocks.isNativeAttachmentPicker = true;
+    const existing = buildAttachments(1);
+    const pickedFile: QuestAttachmentInput = {
+      fileUrl: "https://example.com/manual.pdf",
+      filePath: "user/manual.pdf",
+      fileName: "manual.pdf",
+      mimeType: "application/pdf",
+      fileSizeBytes: 1000,
+      isImage: false,
+      sortOrder: 1,
+    };
+    mocks.pickFileAttachments.mockResolvedValueOnce([pickedFile]);
+
+    render(
+      <QuestAttachmentPicker
+        attachments={existing}
+        onAttachmentsChange={onAttachmentsChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add Files" }));
+
+    await waitFor(() => {
+      expect(onAttachmentsChange).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mocks.pickFileAttachments).toHaveBeenCalledWith({
+      currentCount: 1,
+      maxCount: 10,
+    });
+    expect(onAttachmentsChange.mock.calls[0][0]).toEqual([...existing, pickedFile]);
+  });
+
+  it("disables both native buttons when full", () => {
+    mocks.isNativeAttachmentPicker = true;
+
+    render(
+      <QuestAttachmentPicker
+        attachments={buildAttachments(10)}
+        onAttachmentsChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Add Photos" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add Files" })).toBeDisabled();
+    expect(mocks.pickPhotoAttachments).not.toHaveBeenCalled();
+    expect(mocks.pickFileAttachments).not.toHaveBeenCalled();
+  });
+});

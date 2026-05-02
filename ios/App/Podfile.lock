@@ -32,6 +32,8 @@ PODS:
     - Capacitor
   - CapacitorSplashScreen (7.0.3):
     - Capacitor
+  - CapawesomeCapacitorFilePicker (7.2.0):
+    - Capacitor
   - CapgoCapacitorSocialLogin (7.20.0):
     - Alamofire (~> 5.10.2)
     - Capacitor
@@ -69,6 +71,7 @@ DEPENDENCIES:
   - "CapacitorScreenOrientation (from `../../node_modules/@capacitor/screen-orientation`)"
   - "CapacitorShare (from `../../node_modules/@capacitor/share`)"
   - "CapacitorSplashScreen (from `../../node_modules/@capacitor/splash-screen`)"
+  - "CapawesomeCapacitorFilePicker (from `../../node_modules/@capawesome/capacitor-file-picker`)"
   - "CapgoCapacitorSocialLogin (from `../../node_modules/@capgo/capacitor-social-login`)"
   - IONFilesystemLib (from `../IONFilesystemLib`)
 
@@ -106,6 +109,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/share"
   CapacitorSplashScreen:
     :path: "../../node_modules/@capacitor/splash-screen"
+  CapawesomeCapacitorFilePicker:
+    :path: "../../node_modules/@capawesome/capacitor-file-picker"
   CapgoCapacitorSocialLogin:
     :path: "../../node_modules/@capgo/capacitor-social-login"
   IONFilesystemLib:
@@ -126,6 +131,7 @@ SPEC CHECKSUMS:
   CapacitorScreenOrientation: e0d5b9ef293b269b8f93373355d5b276f50fabea
   CapacitorShare: be166411fa995ead2d39b104aa0aae56d8615c66
   CapacitorSplashScreen: e388b8e0ed0e982a9d3a40417f478e7a018a8763
+  CapawesomeCapacitorFilePicker: 0f4a913a00e39dd77213449f0d917e92f35a5ca9
   CapgoCapacitorSocialLogin: 27bccb5e6c6f8aaa54af8189dcc9d9fb56073c29
   GoogleSignIn: c7f09cfbc85a1abf69187be091997c317cc33b77
   GoogleUtilities: 00c88b9a86066ef77f0da2fab05f65d7768ed8e1
@@ -134,6 +140,6 @@ SPEC CHECKSUMS:
   IONFilesystemLib: e53d0bd6dd0048c17f966bde2be02f017ee0d10c
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
 
-PODFILE CHECKSUM: f4b6ad2d032c22c657493e6f8042604c56eb5c9e
+PODFILE CHECKSUM: 46456c6bb04f7072795c6a51c8f41fd669890f06
 
 COCOAPODS: 1.16.2

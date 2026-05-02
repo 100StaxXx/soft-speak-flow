@@ -5,8 +5,14 @@ import {
   MAX_ATTACHMENT_SIZE_BYTES,
 } from "@/constants/questAttachments";
 
-interface ValidateAttachmentsResult {
-  accepted: File[];
+interface AttachmentFileLike {
+  name: string;
+  size: number;
+  type?: string;
+}
+
+interface ValidateAttachmentsResult<TFile extends AttachmentFileLike> {
+  accepted: TFile[];
   errors: string[];
 }
 
@@ -18,7 +24,7 @@ const getFileExtension = (name: string): string => {
   return name.slice(dotIndex).toLowerCase();
 };
 
-export const isAllowedAttachmentType = (file: File): boolean => {
+export const isAllowedAttachmentType = (file: AttachmentFileLike): boolean => {
   const extension = getFileExtension(file.name);
   if (ALLOWED_ATTACHMENT_EXTENSIONS.includes(extension as (typeof ALLOWED_ATTACHMENT_EXTENSIONS)[number])) {
     return true;
@@ -33,13 +39,13 @@ export const isAllowedAttachmentType = (file: File): boolean => {
   );
 };
 
-export const validateAttachmentFiles = (
-  files: File[],
+export const validateAttachmentFiles = <TFile extends AttachmentFileLike>(
+  files: TFile[],
   currentCount = 0,
   maxCount = MAX_ATTACHMENTS_PER_TASK,
-): ValidateAttachmentsResult => {
+): ValidateAttachmentsResult<TFile> => {
   const errors: string[] = [];
-  const accepted: File[] = [];
+  const accepted: TFile[] = [];
   const remaining = Math.max(0, maxCount - currentCount);
 
   if (remaining === 0) {
@@ -71,4 +77,3 @@ export const validateAttachmentFiles = (
 
   return { accepted, errors };
 };
-

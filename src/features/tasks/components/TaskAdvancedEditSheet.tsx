@@ -31,6 +31,13 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import type { QuestAttachmentInput } from '@/types/questAttachments';
+import {
+  MAX_QUEST_REMINDER_MINUTES,
+  QUEST_REMINDER_PRESET_OPTIONS,
+  formatQuestReminderOffset,
+  getPrimaryQuestReminderOffset,
+  normalizeQuestReminderOffsets,
+} from '@/utils/questReminders';
 
 interface TaskAdvancedEditSheetProps {
   open: boolean;
@@ -63,19 +70,9 @@ const durationOptions = [
   { value: 180, label: '3 hours' },
 ];
 
-const reminderOptions = [
-  { value: 5, label: '5 min before' },
-  { value: 10, label: '10 min before' },
-  { value: 15, label: '15 min before' },
-  { value: 30, label: '30 min before' },
-  { value: 60, label: '1 hour before' },
-  { value: 120, label: '2 hours before' },
-  { value: 1440, label: '1 day before' },
-  { value: 10080, label: '1 week before' },
-];
-
 const WEEKDAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MONTH_DAYS = Array.from({ length: 31 }, (_, index) => index + 1);
+const REMINDER_PRESET_VALUES = new Set(QUEST_REMINDER_PRESET_OPTIONS.map((option) => option.value));
 
 function toAppDayIndex(jsDay: number): number {
   return jsDay === 0 ? 6 : jsDay - 1;
@@ -94,6 +91,13 @@ export function TaskAdvancedEditSheet({
   const safeReferenceDate = Number.isNaN(parsedReferenceDate.getTime()) ? new Date() : parsedReferenceDate;
   const defaultWeekday = toAppDayIndex(safeReferenceDate.getDay());
   const defaultMonthDay = Math.min(31, Math.max(1, safeReferenceDate.getDate()));
+  const initialReminderOffsets = normalizeQuestReminderOffsets(
+    parsed.reminderOffsetsMinutes.length > 0
+      ? parsed.reminderOffsetsMinutes
+      : parsed.reminderMinutesBefore
+        ? [parsed.reminderMinutesBefore]
+        : [],
+  );
 
   const [text, setText] = useState(parsed.text);
   const [scheduledDate, setScheduledDate] = useState(parsed.scheduledDate || '');
@@ -102,8 +106,11 @@ export function TaskAdvancedEditSheet({
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>(parsed.difficulty || 'medium');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent' | null>(parsed.priority || null);
   const [notes, setNotes] = useState(parsed.notes || '');
-  const [reminderEnabled, setReminderEnabled] = useState(parsed.reminderEnabled || false);
-  const [reminderMinutes, setReminderMinutes] = useState(parsed.reminderMinutesBefore || 15);
+  const [reminderEnabled, setReminderEnabled] = useState(parsed.reminderEnabled || initialReminderOffsets.length > 0);
+  const [reminderMinutes, setReminderMinutes] = useState(getPrimaryQuestReminderOffset(initialReminderOffsets));
+  const [reminderOffsetsMinutes, setReminderOffsetsMinutes] = useState<number[]>(initialReminderOffsets);
+  const [customReminderInput, setCustomReminderInput] = useState('');
+  const [showCustomReminderInput, setShowCustomReminderInput] = useState(false);
   const [recurrencePattern, setRecurrencePattern] = useState(parsed.recurrencePattern || '');
   const [recurrenceDays, setRecurrenceDays] = useState<number[]>(() => {
     const parsedDays = parsed.recurrenceDays ?? parsed.customDays ?? [];
@@ -145,6 +152,16 @@ export function TaskAdvancedEditSheet({
         : [],
   );
   const [showReminderPicker, setShowReminderPicker] = useState(false);
+  const activeReminderOffsets = reminderEnabled
+    ? normalizeQuestReminderOffsets(
+      reminderOffsetsMinutes.length > 0 ? reminderOffsetsMinutes : [reminderMinutes],
+    )
+    : [];
+  const activeReminderLabel = activeReminderOffsets.length > 1
+    ? `${activeReminderOffsets.length} reminders: ${activeReminderOffsets.map(formatQuestReminderOffset).join(', ')}`
+    : formatQuestReminderOffset(activeReminderOffsets[0] ?? reminderMinutes);
+  const selectedReminderOffsets = new Set(activeReminderOffsets);
+  const hasCustomReminderOffset = activeReminderOffsets.some((offset) => !REMINDER_PRESET_VALUES.has(offset));
 
   const getReferenceDate = () => {
     if (scheduledDate) {
@@ -228,6 +245,40 @@ export function TaskAdvancedEditSheet({
     });
   };
 
+  const applyReminderOffsets = (offsets: readonly unknown[]) => {
+    const normalizedOffsets = normalizeQuestReminderOffsets(offsets);
+    setReminderOffsetsMinutes(normalizedOffsets);
+    setReminderMinutes(getPrimaryQuestReminderOffset(normalizedOffsets));
+    setReminderEnabled(normalizedOffsets.length > 0);
+  };
+
+  const handleReminderEnabledChange = (enabled: boolean) => {
+    if (!enabled) {
+      setReminderEnabled(false);
+      setShowReminderPicker(false);
+      setShowCustomReminderInput(false);
+      return;
+    }
+
+    applyReminderOffsets(reminderOffsetsMinutes.length > 0 ? reminderOffsetsMinutes : [reminderMinutes]);
+  };
+
+  const handlePresetReminderSelect = (minutes: number) => {
+    applyReminderOffsets([minutes]);
+    setShowReminderPicker(false);
+    setShowCustomReminderInput(false);
+  };
+
+  const applyCustomReminder = () => {
+    const minutes = Number.parseInt(customReminderInput, 10);
+    if (!Number.isFinite(minutes) || minutes < 1 || minutes > MAX_QUEST_REMINDER_MINUTES) return;
+
+    applyReminderOffsets([minutes]);
+    setCustomReminderInput('');
+    setShowReminderPicker(false);
+    setShowCustomReminderInput(false);
+  };
+
   const handleSave = () => {
     const normalizedRecurrenceDays =
       recurrencePattern === 'weekdays'
@@ -241,6 +292,11 @@ export function TaskAdvancedEditSheet({
       recurrencePattern === 'monthly' || isCustomMonth
         ? recurrenceMonthDays
         : [];
+    const normalizedReminderOffsets = reminderEnabled
+      ? normalizeQuestReminderOffsets(
+        reminderOffsetsMinutes.length > 0 ? reminderOffsetsMinutes : [reminderMinutes],
+      )
+      : [];
 
     const updated: ParsedTask = {
       ...parsed,
@@ -251,8 +307,11 @@ export function TaskAdvancedEditSheet({
       difficulty,
       priority,
       notes: notes || null,
-      reminderEnabled,
-      reminderMinutesBefore: reminderEnabled ? reminderMinutes : null,
+      reminderEnabled: normalizedReminderOffsets.length > 0,
+      reminderMinutesBefore: normalizedReminderOffsets.length > 0
+        ? getPrimaryQuestReminderOffset(normalizedReminderOffsets)
+        : null,
+      reminderOffsetsMinutes: normalizedReminderOffsets,
       recurrencePattern: recurrencePattern || null,
       recurrenceDays: normalizedRecurrenceDays,
       recurrenceMonthDays: normalizedRecurrenceMonthDays,
@@ -394,7 +453,7 @@ export function TaskAdvancedEditSheet({
               </Label>
               <Switch
                 checked={reminderEnabled}
-                onCheckedChange={setReminderEnabled}
+                onCheckedChange={handleReminderEnabledChange}
               />
             </div>
             {reminderEnabled && (
@@ -405,22 +464,71 @@ export function TaskAdvancedEditSheet({
                   className="w-full justify-start"
                   onClick={() => setShowReminderPicker(!showReminderPicker)}
                 >
-                  {reminderOptions.find(o => o.value === reminderMinutes)?.label || `${reminderMinutes} min before`}
+                  {activeReminderLabel}
                 </Button>
                 {showReminderPicker && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 p-1">
-                    {reminderOptions.map(opt => (
+                    {QUEST_REMINDER_PRESET_OPTIONS.map(opt => (
                       <button
                         key={opt.value}
+                        type="button"
                         className={cn(
                           "w-full text-left px-3 py-2 text-sm hover:bg-muted rounded-md",
-                          reminderMinutes === opt.value && "bg-primary/10 text-primary"
+                          selectedReminderOffsets.has(opt.value) && "bg-primary/10 text-primary"
                         )}
-                        onClick={() => { setReminderMinutes(opt.value); setShowReminderPicker(false); }}
+                        onClick={() => handlePresetReminderSelect(opt.value)}
                       >
                         {opt.label}
                       </button>
                     ))}
+                    <button
+                      type="button"
+                      className={cn(
+                        "w-full text-left px-3 py-2 text-sm hover:bg-muted rounded-md",
+                        (showCustomReminderInput || hasCustomReminderOffset) && "bg-primary/10 text-primary"
+                      )}
+                      onClick={() => setShowCustomReminderInput((current) => !current)}
+                    >
+                      Custom
+                    </button>
+                    {showCustomReminderInput && (
+                      <div className="space-y-2 border-t border-border/60 px-2 py-3">
+                        <Label htmlFor="task-custom-reminder-minutes" className="text-xs text-muted-foreground">
+                          Minutes before
+                        </Label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            id="task-custom-reminder-minutes"
+                            type="number"
+                            min={1}
+                            max={MAX_QUEST_REMINDER_MINUTES}
+                            inputMode="numeric"
+                            value={customReminderInput}
+                            onChange={(event) => setCustomReminderInput(event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter') {
+                                event.preventDefault();
+                                applyCustomReminder();
+                              }
+                            }}
+                            placeholder="e.g. 180"
+                            className="h-9 text-sm"
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={applyCustomReminder}
+                            disabled={
+                              !customReminderInput.trim()
+                              || Number.parseInt(customReminderInput, 10) <= 0
+                              || Number.parseInt(customReminderInput, 10) > MAX_QUEST_REMINDER_MINUTES
+                            }
+                          >
+                            Apply
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

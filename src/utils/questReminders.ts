@@ -1,6 +1,7 @@
 export const DEFAULT_QUEST_REMINDER_MINUTES = 15;
 export const MAX_QUEST_REMINDER_MINUTES = 10080;
 export const MAX_QUEST_REMINDER_OFFSETS = 5;
+export const QUEST_REMINDER_PRESET_MINUTES = [5, 10, 15, 30, 60, 120, 1440, 2880, 10080] as const;
 
 export function normalizeQuestReminderOffsets(values: readonly unknown[] | null | undefined): number[] {
   if (!Array.isArray(values)) return [];
@@ -47,3 +48,8 @@ export function formatQuestReminderOffset(minutes: number): string {
   if (minutes === 10080) return "1 week before";
   return `${minutes} minutes before`;
 }
+
+export const QUEST_REMINDER_PRESET_OPTIONS = QUEST_REMINDER_PRESET_MINUTES.map((value) => ({
+  value,
+  label: formatQuestReminderOffset(value),
+}));
