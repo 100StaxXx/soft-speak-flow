@@ -151,23 +151,23 @@ const mentorAudioModule = await import("./generate-mentor-audio/index.ts");
 
 const EXPECTED_MENTOR_VOICE_IDS = [
   ["sage", "sage", "mcuuWJIofmzgKEGk3EMA"],
-  ["lyra", "lyra", "fgDJOgmENIR82PueQrVs"],
-  ["icon", "icon", "6p0P6gezgvY1v6xbLzmU"],
-  ["charles", "charles", "goT3UYdM9bhm0n2lmKQx"],
-  ["princess", "princess", "nBKdbSdaLWZTX0tYSgvZ"],
+  ["lyra", "lyra", "pq3wL6Xv3fuEM14W6ZCg"],
+  ["icon", "icon", "GaCzJ7BKVn8XQp1mZYIn"],
+  ["charles", "charles", "jRAAK67SEFE9m7ci5DhD"],
+  ["princess", "princess", "uIZsnBL0YK1S5j69bAih"],
   ["operator", "operator", "pNInz6obpgDQGcFmaJgB"],
-  ["rival", "rival", "V33LkP9pVLdcjeB2y5Na"],
+  ["rival", "rival", "ch0vU2DwfJVmFG2iZy89"],
   ["reign", "reign", "GTQ4ImqrRljZAa9VJX6B"],
 ] as const;
 
 const EXPECTED_ALIAS_VOICE_IDS = [
   ["atlas", "sage", "mcuuWJIofmzgKEGk3EMA"],
-  ["carmen", "icon", "6p0P6gezgvY1v6xbLzmU"],
-  ["solace", "charles", "goT3UYdM9bhm0n2lmKQx"],
-  ["elizabeth", "charles", "goT3UYdM9bhm0n2lmKQx"],
-  ["sienna", "princess", "nBKdbSdaLWZTX0tYSgvZ"],
+  ["carmen", "icon", "GaCzJ7BKVn8XQp1mZYIn"],
+  ["solace", "charles", "jRAAK67SEFE9m7ci5DhD"],
+  ["elizabeth", "charles", "jRAAK67SEFE9m7ci5DhD"],
+  ["sienna", "princess", "uIZsnBL0YK1S5j69bAih"],
   ["stryker", "operator", "pNInz6obpgDQGcFmaJgB"],
-  ["eli", "rival", "V33LkP9pVLdcjeB2y5Na"],
+  ["eli", "rival", "ch0vU2DwfJVmFG2iZy89"],
 ] as const;
 
 Deno.test("retry-failed-payouts rejects unauthenticated callers", async () => {

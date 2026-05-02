@@ -27,12 +27,12 @@ function assert(condition: boolean, message: string): void {
 
 const EXPECTED_VOICE_IDS: Record<SupportedMentorSlug, string> = {
   sage: "mcuuWJIofmzgKEGk3EMA",
-  lyra: "fgDJOgmENIR82PueQrVs",
-  icon: "6p0P6gezgvY1v6xbLzmU",
-  charles: "goT3UYdM9bhm0n2lmKQx",
-  princess: "nBKdbSdaLWZTX0tYSgvZ",
+  lyra: "pq3wL6Xv3fuEM14W6ZCg",
+  icon: "GaCzJ7BKVn8XQp1mZYIn",
+  charles: "jRAAK67SEFE9m7ci5DhD",
+  princess: "uIZsnBL0YK1S5j69bAih",
   operator: "pNInz6obpgDQGcFmaJgB",
-  rival: "V33LkP9pVLdcjeB2y5Na",
+  rival: "ch0vU2DwfJVmFG2iZy89",
   reign: "GTQ4ImqrRljZAa9VJX6B",
 };
 
@@ -139,7 +139,7 @@ Deno.test("mentor pep talk config includes Lyra across backend mentor surfaces",
     "Expected Lyra to have a mentor voice config",
   );
   assert(
-    voiceConfig?.voiceId === "fgDJOgmENIR82PueQrVs",
+    voiceConfig?.voiceId === "pq3wL6Xv3fuEM14W6ZCg",
     "Expected Lyra to use her dedicated ElevenLabs voice",
   );
   assert(

@@ -34,7 +34,7 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
     mentorSlug: "lyra",
     mentorName: "Lyra",
     voiceName: "Lyra",
-    voiceId: "fgDJOgmENIR82PueQrVs",
+    voiceId: "pq3wL6Xv3fuEM14W6ZCg",
     defaultIntensity: "gentle",
     categories: ["clarity", "signal", "insight"],
     voiceSettings: {
@@ -48,7 +48,7 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
     mentorSlug: "icon",
     mentorName: "The Icon",
     voiceName: "The Icon",
-    voiceId: "6p0P6gezgvY1v6xbLzmU",
+    voiceId: "GaCzJ7BKVn8XQp1mZYIn",
     defaultIntensity: "medium",
     categories: ["standards", "identity", "boundaries"],
     voiceSettings: {
@@ -62,7 +62,7 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
     mentorSlug: "charles",
     mentorName: "Charles",
     voiceName: "Charles",
-    voiceId: "goT3UYdM9bhm0n2lmKQx",
+    voiceId: "jRAAK67SEFE9m7ci5DhD",
     defaultIntensity: "medium",
     categories: ["accountability", "procrastination", "momentum"],
     voiceSettings: {
@@ -76,7 +76,7 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
     mentorSlug: "princess",
     mentorName: "The Princess",
     voiceName: "The Princess",
-    voiceId: "nBKdbSdaLWZTX0tYSgvZ",
+    voiceId: "uIZsnBL0YK1S5j69bAih",
     defaultIntensity: "gentle",
     categories: ["self-care", "habits", "soft-discipline"],
     voiceSettings: {
@@ -104,7 +104,7 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
     mentorSlug: "rival",
     mentorName: "The Rival",
     voiceName: "The Rival",
-    voiceId: "V33LkP9pVLdcjeB2y5Na",
+    voiceId: "ch0vU2DwfJVmFG2iZy89",
     defaultIntensity: "high",
     categories: ["competition", "performance", "intensity"],
     voiceSettings: {
