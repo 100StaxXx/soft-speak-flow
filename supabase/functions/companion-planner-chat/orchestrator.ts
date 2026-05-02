@@ -211,6 +211,7 @@ const buildSystemPrompt = (
     "If deterministicContext.availabilityFacts says the day is open, balanced, or has zero/one scheduled items, say that clearly and do not describe the day as packed, slammed, crowded, or overbooked.",
     "Preserve the deterministic meaning of fallbackReply. Rewrite for voice, but do not contradict schedule truth, proposal state, or missing details.",
     "If deterministicContext.planDayContext is present, it is the source of truth for what is on the user's day. Use loadFacts (totalQuestCount, campaignBreakdown, ritualCount, calendarBlockCount) to name what is loading the day rather than vague phrasing. If atRiskCampaigns has entries, briefly surface the top one or two by title with a one-fragment hint about the deadline or progress. Never invent quest counts, campaign names, or events that are not in planDayContext.",
+    "deterministicContext.validCampaignTitles is the authoritative whitelist of campaigns that currently exist for this user. Only reference a campaign by title if it appears in validCampaignTitles. conversationHistory may contain prior turns that mention campaign titles which have since been deleted, do NOT reference those titles. If a campaign isn't in validCampaignTitles, treat it as if it never existed for this turn.",
     "When planDayContext.suggestedQuests is non-empty, treat those as the proposals being shown. Frame the reply as a brief offer of those quests; do not list every title verbatim if the cards already render them.",
     modeInstructions[mode],
     "Return minified JSON with keys reply and mode only.",
@@ -359,6 +360,9 @@ const buildUserPrompt = (
         title: epic.title,
         endDate: epic.endDate,
       })),
+      validCampaignTitles: input.plannerContext.activeEpics.map((epic) =>
+        epic.title
+      ),
       plannerMemory: input.plannerContext.plannerMemory
         ? {
           preferredTimeOfDay:

@@ -22,6 +22,7 @@ import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
 import { dispatchPlannerSyncFinished } from "@/utils/plannerSync";
 import { toRemoteEpicInsertPayload } from "@/utils/epicRemotePayload";
 import { normalizeCampaignMilestonePercentArray } from "@/utils/campaignMilestones";
+import { scrubCompanionChatsForDeletedEpic } from "@/utils/companionChatScrub";
 import {
   getPrimaryQuestReminderOffset,
   resolveQuestReminderOffsets,
@@ -644,7 +645,11 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
     }
 
     case "EPIC_DELETE": {
-      const { epicId } = action.payload as { epicId: string };
+      const { epicId, epicTitle, epicCreatedAt } = action.payload as {
+        epicId: string;
+        epicTitle?: string | null;
+        epicCreatedAt?: string | null;
+      };
 
       const { data: epicHabits, error: epicHabitsError } = await supabase
         .from("epic_habits")
@@ -725,6 +730,12 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
         .eq("id", epicId)
         .eq("user_id", userId);
       if (epicError) throw epicError;
+
+      await scrubCompanionChatsForDeletedEpic(
+        userId,
+        epicTitle ?? null,
+        epicCreatedAt ?? null,
+      );
 
       return;
     }
