@@ -91,6 +91,10 @@ function shouldLoadCompanionContext(notificationType: NotificationType): boolean
   return notificationType === "daily_pep" || notificationType === "mentor_nudge";
 }
 
+function isDisabledContactReminder(row: QueueRow): boolean {
+  return row.notification_type === "contact_reminder" || row.source_table === "contact_reminders";
+}
+
 async function claimQueueRow(supabase: any, rowId: string, workerId: string): Promise<QueueRow | null> {
   const nowIso = new Date().toISOString();
 
@@ -282,6 +286,19 @@ serve(async (req) => {
 
       processed += 1;
       const attemptCount = (row.attempt_count ?? 0) + 1;
+
+      if (isDisabledContactReminder(row)) {
+        failedTerminal += 1;
+        await updateQueueStatus(supabase, row.id, {
+          status: "failed_terminal",
+          delivered: true,
+          delivered_at: nowIso,
+          attempt_count: attemptCount,
+          last_error: "contact_reminders_disabled",
+          next_retry_at: null,
+        });
+        continue;
+      }
 
       if (rollbackEnabled) {
         skippedRollout += 1;

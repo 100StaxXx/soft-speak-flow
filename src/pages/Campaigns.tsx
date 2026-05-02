@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Plus, Sparkles, Target, Trophy } from "lucide-react";
 import { PageTransition } from "@/components/PageTransition";
@@ -12,8 +12,17 @@ import { Button } from "@/components/ui/button";
 import { clearShellCardClassName } from "@/components/ui/card";
 import { ACTIVE_CAMPAIGN_LIMIT_MESSAGE, hasReachedActiveCampaignLimit } from "@/features/epics/constants";
 import { useEpics } from "@/hooks/useEpics";
+import { useAuth } from "@/hooks/useAuth";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 import { cn } from "@/lib/utils";
+import {
+  clearCampaignBuilderDraftSnapshot,
+  clearCreationPopupMarker,
+  readCampaignBuilderDraftSnapshot,
+  readCreationPopupMarker,
+  type CampaignBuilderDraftSnapshot,
+  writeCreationPopupMarker,
+} from "@/utils/creationPopupPersistence";
 
 interface CreatedCampaignData {
   title: string;
@@ -38,10 +47,14 @@ const Campaigns = () => {
     renameEpic,
     updateEpicStatus,
   } = useEpics({ enabled: isTabActive });
+  const { user } = useAuth();
   const [showPathfinder, setShowPathfinder] = useState(false);
+  const [pathfinderResumeDraft, setPathfinderResumeDraft] = useState<CampaignBuilderDraftSnapshot | null>(null);
+  const [pathfinderResumeDraftKey, setPathfinderResumeDraftKey] = useState<string | null>(null);
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showCreatedAnimation, setShowCreatedAnimation] = useState(false);
   const [createdCampaignData, setCreatedCampaignData] = useState<CreatedCampaignData | null>(null);
+  const hasConsumedResumeRef = useRef(false);
 
   const hasCampaigns = activeEpics.length > 0 || completedEpics.length > 0;
   const hasReachedLimit = hasReachedActiveCampaignLimit(activeEpics.length);
@@ -50,12 +63,50 @@ const Campaigns = () => {
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("campaign-builder-opened"));
     }
+    setPathfinderResumeDraft(null);
+    setPathfinderResumeDraftKey(null);
     setShowPathfinder(true);
   }, []);
+
+  const clearCampaignCreationPopupState = useCallback(() => {
+    clearCreationPopupMarker(user?.id, "campaign");
+    clearCampaignBuilderDraftSnapshot(user?.id);
+    setPathfinderResumeDraft(null);
+    setPathfinderResumeDraftKey(null);
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || !showPathfinder) return;
+
+    writeCreationPopupMarker(user.id, {
+      surface: "campaign",
+      route: "/campaigns",
+      selectedDate: null,
+      updatedAt: new Date().toISOString(),
+    });
+  }, [showPathfinder, user?.id]);
+
+  useEffect(() => {
+    if (hasConsumedResumeRef.current) return;
+    if (!isTabActive) return;
+    if (!user?.id) return;
+    if (showPathfinder) return;
+
+    const marker = readCreationPopupMarker(user.id);
+    if (!marker || marker.surface !== "campaign" || marker.route !== "/campaigns") return;
+
+    hasConsumedResumeRef.current = true;
+
+    const draft = readCampaignBuilderDraftSnapshot(user.id);
+    setPathfinderResumeDraft(draft);
+    setPathfinderResumeDraftKey(`resume-${marker.updatedAt}`);
+    setShowPathfinder(true);
+  }, [isTabActive, showPathfinder, user?.id]);
 
   const handleCreateCampaign = useCallback(async (data: Parameters<typeof createEpic>[0]) => {
     try {
       await createEpic(data);
+      clearCampaignCreationPopupState();
       setShowPathfinder(false);
       setCreatedCampaignData({
         title: data.title,
@@ -64,8 +115,9 @@ const Campaigns = () => {
       setShowCreatedAnimation(true);
     } catch (error) {
       console.error("Failed to create campaign:", error);
+      throw error;
     }
-  }, [createEpic]);
+  }, [clearCampaignCreationPopupState, createEpic]);
 
   const handleAnimationComplete = useCallback(() => {
     setShowCreatedAnimation(false);
@@ -211,9 +263,18 @@ const Campaigns = () => {
 
           <Pathfinder
             open={showPathfinder}
-            onOpenChange={setShowPathfinder}
+            onOpenChange={(open) => {
+              setShowPathfinder(open);
+              if (!open) {
+                clearCampaignCreationPopupState();
+              }
+            }}
             onCreateEpic={handleCreateCampaign}
             isCreating={isCreating}
+            resumeDraft={pathfinderResumeDraft}
+            resumeDraftKey={pathfinderResumeDraftKey}
+            persistenceRoute="/campaigns"
+            userId={user?.id}
             showTemplatesFirst={false}
           />
 

@@ -8,6 +8,7 @@ import { parseFunctionInvokeError, toUserFacingFunctionError } from '@/utils/sup
 
 export type CalendarProvider = 'google' | 'outlook' | 'apple';
 export type CalendarSyncMode = 'send_only' | 'full_sync';
+export type CalendarOAuthSource = 'web' | 'native';
 
 export interface ConnectedCalendar {
   id: string;
@@ -171,14 +172,16 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
       provider,
       redirectUri,
       syncMode = 'send_only',
+      source = 'web',
     }: {
       provider: Exclude<CalendarProvider, 'apple'>;
       redirectUri: string;
       syncMode?: CalendarSyncMode;
+      source?: CalendarOAuthSource;
     }) => {
       const fn = providerToFunction(provider);
       const { data, error } = await supabase.functions.invoke(fn, {
-        body: { action: 'getAuthUrl', redirectUri, syncMode },
+        body: { action: 'getAuthUrl', redirectUri, syncMode, source },
       });
 
       if (error) {

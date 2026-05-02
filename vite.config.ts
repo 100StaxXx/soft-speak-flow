@@ -80,14 +80,8 @@ export default defineConfig(() => ({
     minify: 'esbuild', // 3-5x faster than terser
     cssMinify: 'lightningcss',
     rollupOptions: {
-      external: ['@capacitor-community/contacts'],
       output: {
         manualChunks: (id) => {
-          // Skip externalized modules (contacts has no web implementation)
-          if (id.includes('@capacitor-community/contacts')) {
-            return undefined;
-          }
-          
           // CRITICAL: Keep React and all React-dependent libraries in a SINGLE chunk
           // iOS WKWebView can load chunks out of order, causing "createContext" errors
           // when React isn't loaded before components that use it

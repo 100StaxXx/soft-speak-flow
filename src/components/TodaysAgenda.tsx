@@ -73,6 +73,7 @@ import {
 import type { TaskAttachment } from "@/types/questAttachments";
 import { getEpicDaysRemaining, resolveEpicEndDate } from "@/utils/epicDates";
 import {
+  CAMPAIGN_RITUAL_CARD_CLASS_NAME,
   CAMPAIGN_RITUAL_CARD_CLASSES,
   isCampaignRitualTask,
 } from "@/utils/campaignRitualStyle";
@@ -101,8 +102,11 @@ const safeFormat = (date: Date, fmt: string, fallback = "") => {
 
 const TOUCH_CLICK_SUPPRESSION_RESET_MS = 750;
 const JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME =
-  "journeys-quest-card-shell overflow-hidden border bg-white/[0.04] shadow-[0_12px_22px_rgba(0,0,0,0.14)] transition-colors";
+  "journeys-quest-card-shell overflow-hidden border transition-colors";
+const JOURNEYS_QUEST_CARD_SHELL_STANDARD_TONE_CLASS_NAME =
+  "border-white/10 bg-white/[0.04] shadow-[0_12px_22px_rgba(0,0,0,0.14)]";
 const JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME = "journeys-quest-card-shell--active";
+const JOURNEYS_QUEST_CARD_SHELL_READABLE_CLASS_NAME = "journeys-quest-card-shell--readable";
 
 interface Task {
   id: string;
@@ -197,6 +201,7 @@ const patchSubtaskCompletionInTaskList = <T extends { id: string; subtasks?: Tas
 interface TodaysAgendaProps {
   tasks: Task[];
   selectedDate: Date;
+  readableQuestCardsEnabled?: boolean;
   layoutMode?: JourneysLayoutMode;
   hideDesktopRailAddButton?: boolean;
   isVisible?: boolean;
@@ -638,6 +643,7 @@ const buildPlaceholderEmphasis = (
 export const TodaysAgenda = memo(function TodaysAgenda({
   tasks,
   selectedDate,
+  readableQuestCardsEnabled = false,
   layoutMode,
   hideDesktopRailAddButton = false,
   isVisible = true,
@@ -2083,10 +2089,17 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           data-quest-card-shell="true"
           className={cn(
             JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME,
-            "group flex h-full items-stretch gap-2 rounded-[18px] border-white/10 p-2",
-            isCampaignRitual && CAMPAIGN_RITUAL_CARD_CLASSES,
+            "group flex h-full items-stretch gap-2 rounded-[18px] p-2",
+            readableQuestCardsEnabled
+              ? JOURNEYS_QUEST_CARD_SHELL_READABLE_CLASS_NAME
+              : JOURNEYS_QUEST_CARD_SHELL_STANDARD_TONE_CLASS_NAME,
+            isCampaignRitual && (
+              readableQuestCardsEnabled
+                ? CAMPAIGN_RITUAL_CARD_CLASS_NAME
+                : CAMPAIGN_RITUAL_CARD_CLASSES
+            ),
             isDesktopDetailOpen && JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME,
-            isDesktopDetailOpen && "border-primary/40 bg-primary/[0.08]",
+            isDesktopDetailOpen && !readableQuestCardsEnabled && "border-primary/40 bg-primary/[0.08]",
             isComplete && "opacity-70",
           )}
           onContextMenu={suppressNativeContextMenu}
@@ -2177,10 +2190,17 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           data-quest-card-shell="true"
           className={cn(
             JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME,
-            "rounded-[22px] border-white/10 px-2",
-            isCampaignRitual && CAMPAIGN_RITUAL_CARD_CLASSES,
+            "rounded-[22px] px-2",
+            readableQuestCardsEnabled
+              ? JOURNEYS_QUEST_CARD_SHELL_READABLE_CLASS_NAME
+              : JOURNEYS_QUEST_CARD_SHELL_STANDARD_TONE_CLASS_NAME,
+            isCampaignRitual && (
+              readableQuestCardsEnabled
+                ? CAMPAIGN_RITUAL_CARD_CLASS_NAME
+                : CAMPAIGN_RITUAL_CARD_CLASSES
+            ),
             isMobileQuestShellActive && JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME,
-            isMobileQuestShellActive && "border-primary/35 bg-primary/[0.06]",
+            isMobileQuestShellActive && !readableQuestCardsEnabled && "border-primary/35 bg-primary/[0.06]",
             isComplete && "opacity-70",
           )}
         >

@@ -1152,6 +1152,52 @@ All colors MUST be HSL.
     opacity: 1;
   }
 
+  .journeys-quest-card-shell--readable {
+    background: rgba(23, 21, 34, 0.76);
+    border-color: rgba(255, 255, 255, 0.18);
+    box-shadow: 0 16px 30px rgba(0, 0, 0, 0.24);
+  }
+
+  .journeys-quest-card-shell--readable::after {
+    border-color: rgba(255, 255, 255, 0.14);
+    opacity: 1;
+  }
+
+  .campaign-ritual-card.journeys-quest-card-shell--readable {
+    background: linear-gradient(
+      180deg,
+      hsl(var(--primary) / 0.18),
+      rgba(23, 21, 34, 0.8)
+    );
+    border-color: hsl(var(--primary) / 0.45);
+  }
+
+  .journeys-quest-card-shell--readable.journeys-quest-card-shell--active {
+    background: linear-gradient(
+      180deg,
+      hsl(var(--primary) / 0.16),
+      rgba(23, 21, 34, 0.82)
+    );
+    border-color: hsl(var(--primary) / 0.52);
+  }
+
+  .journeys-quest-card-shell--readable.journeys-quest-card-shell--active::after {
+    border-color: hsl(var(--primary) / 0.38);
+  }
+
+  .campaign-ritual-card.journeys-quest-card-shell--readable.journeys-quest-card-shell--active {
+    background: linear-gradient(
+      180deg,
+      hsl(var(--primary) / 0.26),
+      rgba(23, 21, 34, 0.84)
+    );
+    border-color: hsl(var(--primary) / 0.6);
+  }
+
+  .campaign-ritual-card.journeys-quest-card-shell--readable.journeys-quest-card-shell--active::after {
+    border-color: hsl(var(--primary) / 0.48);
+  }
+
   /* iOS Touch Optimizations */
   .ios-scroll-container {
     -webkit-overflow-scrolling: touch;

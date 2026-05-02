@@ -1,5 +1,6 @@
 export type OAuthProvider = "google" | "outlook";
 export type OAuthSyncMode = "send_only" | "full_sync";
+export type OAuthSource = "web" | "native";
 
 const OAUTH_STATE_VERSION = 1;
 const DEFAULT_TTL_SECONDS = 10 * 60;
@@ -9,6 +10,7 @@ export interface OAuthStatePayload {
   provider: OAuthProvider;
   userId: string;
   syncMode: OAuthSyncMode;
+  source: OAuthSource;
   exp: number;
   nonce: string;
 }
@@ -63,6 +65,10 @@ function isProvider(value: unknown): value is OAuthProvider {
   return value === "google" || value === "outlook";
 }
 
+function isSource(value: unknown): value is OAuthSource {
+  return value === "web" || value === "native";
+}
+
 function randomNonce(): string {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
@@ -73,10 +79,12 @@ export async function createSignedOAuthState(args: {
   provider: OAuthProvider;
   userId: string;
   syncMode: OAuthSyncMode;
+  source?: OAuthSource;
   secret: string;
   ttlSeconds?: number;
 }): Promise<string> {
   const { provider, userId, syncMode, secret } = args;
+  const source = args.source ?? "web";
   const ttlSeconds = args.ttlSeconds ?? DEFAULT_TTL_SECONDS;
   const nowSeconds = Math.floor(Date.now() / 1000);
 
@@ -85,6 +93,7 @@ export async function createSignedOAuthState(args: {
     provider,
     userId,
     syncMode,
+    source,
     exp: nowSeconds + ttlSeconds,
     nonce: randomNonce(),
   };
@@ -122,6 +131,11 @@ function parsePayload(rawPayload: string): OAuthStatePayload {
     throw new Error("Invalid OAuth state");
   }
 
+  const source = payload.source === undefined ? "web" : payload.source;
+  if (!isSource(source)) {
+    throw new Error("Invalid OAuth state");
+  }
+
   if (typeof payload.exp !== "number" || !Number.isFinite(payload.exp)) {
     throw new Error("Invalid OAuth state");
   }
@@ -135,6 +149,7 @@ function parsePayload(rawPayload: string): OAuthStatePayload {
     provider: payload.provider,
     userId: payload.userId,
     syncMode: payload.syncMode,
+    source,
     exp: payload.exp,
     nonce: payload.nonce,
   };

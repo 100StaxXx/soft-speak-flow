@@ -2,9 +2,25 @@ import type { ReactNode } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { passthroughProvider, isMainTabPathMock } = vi.hoisted(() => ({
+const { passthroughProvider, isMainTabPathMock, authMock, profileMock, storageMock } = vi.hoisted(() => ({
   passthroughProvider: ({ children }: { children?: ReactNode }) => <>{children}</>,
   isMainTabPathMock: vi.fn((pathname: string) => pathname === "/mentor"),
+  authMock: {
+    session: null as null | { user: { id: string } },
+    status: "unauthenticated",
+    loading: false,
+    user: null as null | { id: string },
+  },
+  profileMock: {
+    profile: null as unknown,
+    loading: false,
+  },
+  storageMock: {
+    getItem: vi.fn(() => null as string | null),
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+    clear: vi.fn(),
+  },
 }));
 
 vi.mock("@/components/ui/toaster", () => ({
@@ -70,6 +86,18 @@ vi.mock("@/contexts/MentorConnectionContext", () => ({
   }),
 }));
 
+vi.mock("@/contexts/WallpaperManifestContext", () => ({
+  WallpaperManifestProvider: passthroughProvider,
+}));
+
+vi.mock("@/components/GlobalWidgetSyncBridge", () => ({
+  GlobalWidgetSyncBridge: () => null,
+}));
+
+vi.mock("@/providers/StoreKitProvider", () => ({
+  StoreKitProvider: passthroughProvider,
+}));
+
 vi.mock("@/hooks/usePostOnboardingMentorGuidance", () => ({
   PostOnboardingMentorGuidanceProvider: passthroughProvider,
   usePostOnboardingMentorGuidance: () => ({
@@ -80,20 +108,12 @@ vi.mock("@/hooks/usePostOnboardingMentorGuidance", () => ({
 }));
 
 vi.mock("@/hooks/useProfile", () => ({
-  useProfile: () => ({
-    profile: null,
-    loading: false,
-  }),
+  useProfile: () => profileMock,
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
   AuthProvider: passthroughProvider,
-  useAuth: () => ({
-    session: null,
-    status: "unauthenticated",
-    loading: false,
-    user: null,
-  }),
+  useAuth: () => authMock,
 }));
 
 vi.mock("@/components/ProtectedRoute", () => ({
@@ -155,6 +175,10 @@ vi.mock("@/hooks/useAppResumeRefresh", () => ({
   useAppResumeRefresh: () => undefined,
 }));
 
+vi.mock("@/hooks/useWinWinKitSync", () => ({
+  useWinWinKitSync: () => undefined,
+}));
+
 vi.mock("@/hooks/useGlobalWidgetSync", () => ({
   useGlobalWidgetSync: () => undefined,
 }));
@@ -189,10 +213,10 @@ vi.mock("@/utils/profileOnboarding", () => ({
 
 vi.mock("@/utils/storage", () => ({
   safeLocalStorage: {
-    getItem: vi.fn(() => null),
-    setItem: vi.fn(),
-    removeItem: vi.fn(),
-    clear: vi.fn(),
+    getItem: (...args: unknown[]) => storageMock.getItem(...args),
+    setItem: (...args: unknown[]) => storageMock.setItem(...args),
+    removeItem: (...args: unknown[]) => storageMock.removeItem(...args),
+    clear: (...args: unknown[]) => storageMock.clear(...args),
   },
   safeSessionStorage: {
     getItem: vi.fn(() => null),
@@ -214,6 +238,17 @@ import App from "./App";
 
 describe("App preview route", () => {
   beforeEach(() => {
+    authMock.session = null;
+    authMock.status = "unauthenticated";
+    authMock.loading = false;
+    authMock.user = null;
+    profileMock.profile = null;
+    profileMock.loading = false;
+    storageMock.getItem.mockReset();
+    storageMock.getItem.mockReturnValue(null);
+    storageMock.setItem.mockReset();
+    storageMock.removeItem.mockReset();
+    storageMock.clear.mockReset();
     isMainTabPathMock.mockImplementation((pathname: string) => pathname === "/mentor");
   });
 
@@ -236,5 +271,26 @@ describe("App preview route", () => {
     });
 
     expect(screen.getByTestId("main-tabs")).toHaveTextContent("/mentor");
+  });
+
+  it("navigates once to the route with a persisted creation popup marker", async () => {
+    authMock.session = { user: { id: "user-1" } };
+    authMock.user = { id: "user-1" };
+    authMock.status = "authenticated";
+    isMainTabPathMock.mockImplementation((pathname: string) => pathname === "/campaigns" || pathname === "/journeys");
+    storageMock.getItem.mockReturnValue(JSON.stringify({
+      surface: "quest",
+      route: "/journeys",
+      selectedDate: "2026-05-01",
+      updatedAt: "2026-05-01T12:00:00.000Z",
+    }));
+    window.history.pushState({}, "", "/campaigns");
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe("/journeys");
+    });
+    expect(screen.getByTestId("main-tabs")).toHaveTextContent("/journeys");
   });
 });

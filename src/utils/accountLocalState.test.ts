@@ -33,6 +33,8 @@ vi.mock("@/utils/guidedTutorial", () => ({
 
 import {
   clearUserAccountLocalState,
+  getCampaignBuilderDraftStorageKey,
+  getCreationPopupMarkerStorageKey,
   getMorningCheckInDraftStorageKey,
   getQuestDraftStorageKey,
 } from "@/utils/accountLocalState";
@@ -75,15 +77,23 @@ describe("accountLocalState", () => {
 
   it("removes persisted drafts for the signed-out user only", () => {
     localStorage.setItem(getQuestDraftStorageKey("user-1"), "quest-1");
+    localStorage.setItem(getCreationPopupMarkerStorageKey("user-1"), "marker-1");
+    localStorage.setItem(getCampaignBuilderDraftStorageKey("user-1"), "campaign-1");
     localStorage.setItem(getMorningCheckInDraftStorageKey("user-1"), "checkin-1");
     localStorage.setItem(getQuestDraftStorageKey("user-2"), "quest-2");
+    localStorage.setItem(getCreationPopupMarkerStorageKey("user-2"), "marker-2");
+    localStorage.setItem(getCampaignBuilderDraftStorageKey("user-2"), "campaign-2");
     localStorage.setItem(getMorningCheckInDraftStorageKey("user-2"), "checkin-2");
 
     clearUserAccountLocalState("user-1");
 
     expect(safeLocalStorage.getItem(getQuestDraftStorageKey("user-1"))).toBeNull();
+    expect(safeLocalStorage.getItem(getCreationPopupMarkerStorageKey("user-1"))).toBeNull();
+    expect(safeLocalStorage.getItem(getCampaignBuilderDraftStorageKey("user-1"))).toBeNull();
     expect(safeLocalStorage.getItem(getMorningCheckInDraftStorageKey("user-1"))).toBeNull();
     expect(safeLocalStorage.getItem(getQuestDraftStorageKey("user-2"))).toBe("quest-2");
+    expect(safeLocalStorage.getItem(getCreationPopupMarkerStorageKey("user-2"))).toBe("marker-2");
+    expect(safeLocalStorage.getItem(getCampaignBuilderDraftStorageKey("user-2"))).toBe("campaign-2");
     expect(safeLocalStorage.getItem(getMorningCheckInDraftStorageKey("user-2"))).toBe("checkin-2");
   });
 });

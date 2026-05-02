@@ -50,6 +50,7 @@ import { GlobalWidgetSyncBridge } from "@/components/GlobalWidgetSyncBridge";
 import { StoreKitProvider } from "@/providers/StoreKitProvider";
 import { EVENING_REFLECTION_CANONICAL_PATH } from "@/utils/eveningReflectionNavigation";
 import { useWinWinKitSync } from "@/hooks/useWinWinKitSync";
+import { useCreationPopupResume } from "@/hooks/useCreationPopupResume";
 
 // Lazy load pages for code splitting
 const Home = lazy(() => import("./pages/Home"));
@@ -82,7 +83,6 @@ const Recaps = lazy(() => import("./pages/Recaps"));
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
 const TestDayPlanner = lazy(() => import("./pages/TestDayPlanner"));
 const TestScroll = lazy(() => import("./pages/TestScroll"));
-const Contacts = lazy(() => import("./pages/Contacts"));
 const IAPTest = lazy(() => import("./pages/IAPTest"));
 const SupportReport = lazy(() => import("./pages/SupportReport"));
 
@@ -209,6 +209,7 @@ const AppContent = memo(() => {
   
   // Refresh critical data on app resume (iOS/Android) or tab visibility (web)
   useAppResumeRefresh({ enabled: status === "authenticated" && Boolean(session?.user) });
+  useCreationPopupResume();
   
   // Handle password recovery tokens BEFORE routes render - prevents paywall from blocking reset
   useEffect(() => {
@@ -382,7 +383,7 @@ const AppContent = memo(() => {
                   <Route path="/recaps" element={<ProtectedRoute><Recaps /></ProtectedRoute>} />
                   <Route path="/help" element={<ProtectedRoute><HelpCenter /></ProtectedRoute>} />
                   <Route path="/inbox" element={<Navigate to="/journeys?section=inbox" replace />} />
-                  <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
+                  <Route path="/contacts" element={<Navigate to="/profile" replace />} />
                   <Route path="/iap-test" element={<IAPTest />} />
                   <Route path="/support/report" element={<ProtectedRoute><SupportReport /></ProtectedRoute>} />
                   <Route path="/guilds" element={<Navigate to="/campaigns" replace />} />

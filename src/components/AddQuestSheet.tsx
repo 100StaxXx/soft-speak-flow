@@ -50,6 +50,7 @@ import {
   readQuestDraftSnapshot,
   writeQuestDraftSnapshot,
 } from "@/utils/draftPersistence";
+import type { CreationPopupRoute } from "@/utils/creationPopupPersistence";
 import {
   getPrimaryQuestReminderOffset,
   normalizeQuestReminderOffsets,
@@ -95,6 +96,8 @@ interface AddQuestSheetProps {
   onCreateCampaign?: () => void;
   preventClose?: boolean;
   onPreventedCloseAttempt?: () => void;
+  autoRestoreDraftOnOpen?: boolean;
+  persistenceRoute?: CreationPopupRoute;
 }
 
 import {
@@ -122,6 +125,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   onCreateCampaign,
   preventClose = false,
   onPreventedCloseAttempt,
+  autoRestoreDraftOnOpen = false,
+  persistenceRoute: _persistenceRoute = "/journeys",
 }: AddQuestSheetProps) {
   const [sheetView, setSheetView] = useState<"editor" | "templates">("editor");
   const [templateBrowserInitialTab, setTemplateBrowserInitialTab] = useState<QuestTemplateBrowserTab>("common");
@@ -330,10 +335,26 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       return;
     }
 
+    if (autoRestoreDraftOnOpen) {
+      applyQuestDraftSnapshot(savedDraft);
+      setPendingQuestDraftRestore(null);
+      setShowDraftRestorePrompt(false);
+      setDraftRestoreStatus("ready");
+      return;
+    }
+
     setPendingQuestDraftRestore(savedDraft);
     setShowDraftRestorePrompt(true);
     setDraftRestoreStatus("prompt");
-  }, [draftRestoreStatus, open, prefillDraft, prefillKey, user?.id]);
+  }, [
+    applyQuestDraftSnapshot,
+    autoRestoreDraftOnOpen,
+    draftRestoreStatus,
+    open,
+    prefillDraft,
+    prefillKey,
+    user?.id,
+  ]);
 
   const endTime = useMemo(() => {
     if (!scheduledTime || !estimatedDuration) return null;
@@ -823,17 +844,17 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               </div>
             </div>
           ) : (
-            <div className={cn("px-4 pt-4 pb-4 flex-shrink-0", QUEST_FORM_STYLES.mobileHeader)}>
+            <div className={cn("px-4 pt-2 pb-2 flex-shrink-0", QUEST_FORM_STYLES.mobileHeader)}>
               <div className={QUEST_FORM_STYLES.mobileHeaderGlow} />
               <button
                 onClick={() => requestOpenChange(false)}
-                className={cn("absolute top-4 right-4 z-10", QUEST_FORM_STYLES.mobileHeaderUtilityButton)}
+                className={cn("absolute top-2 right-4 z-10", QUEST_FORM_STYLES.mobileHeaderUtilityButton)}
                 aria-label="Close"
               >
                 <X className="h-4 w-4" />
               </button>
 
-              <div data-testid="add-quest-editor-header" className="pt-1 text-[#fff8e8]">
+              <div data-testid="add-quest-editor-header" className="pt-0 text-[#fff8e8]">
                 <div className="pr-12">
                   <div className={QUEST_FORM_STYLES.titleFieldShell}>
                     <div className={QUEST_FORM_STYLES.titleFieldInner}>
@@ -849,21 +870,21 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                       />
                     </div>
                   </div>
-                  <p className={QUEST_FORM_STYLES.mobileHeaderSummary}>{summaryLine}</p>
+                  <p className={cn(QUEST_FORM_STYLES.mobileHeaderSummary, "mt-0.5 text-[13px]")}>{summaryLine}</p>
                 </div>
 
-                <div className={QUEST_FORM_STYLES.mobileHeaderToolbar}>
+                <div className={cn(QUEST_FORM_STYLES.mobileHeaderToolbar, "mt-1.5")}>
                   <button
                     type="button"
                     onClick={() => openTemplateBrowser("common")}
-                    className={QUEST_FORM_STYLES.heroAction}
+                    className={cn(QUEST_FORM_STYLES.heroAction, "py-1")}
                   >
                     <Sparkles className="h-3.5 w-3.5" />
                     Browse common quests
                   </button>
                 </div>
 
-                <div className={QUEST_FORM_STYLES.mobileDifficultyGroup}>
+                <div className={cn(QUEST_FORM_STYLES.mobileDifficultyGroup, "mt-2 gap-1 p-1")}>
                   {difficultyOptions.map(({ value, icon: Icon, label }) => (
                     <button
                       key={value}
@@ -1214,10 +1235,9 @@ export const AddQuestSheet = memo(function AddQuestSheet({
         {sheetView === "editor" && (
           <div
             className={cn(
-              "flex-shrink-0 flex flex-col gap-3 px-5 pt-4",
               isDesktopPanel
-                ? `${QUEST_FORM_STYLES.desktopPanelFooter} pb-5`
-                : "bg-transparent pb-[calc(1rem+env(safe-area-inset-bottom))]",
+                ? `flex-shrink-0 flex flex-col gap-3 px-5 pt-4 ${QUEST_FORM_STYLES.desktopPanelFooter} pb-5`
+                : "flex-shrink-0 flex flex-col gap-2 px-5 pt-3 bg-transparent pb-[calc(0.75rem+env(safe-area-inset-bottom))]",
             )}
           >
             {isDesktopPanel && (
@@ -1242,7 +1262,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               data-tour="add-quest-create-button"
               disabled={isAdding || !canCreateTask}
               className={cn(
-                "h-14 w-full rounded-[28px] font-fredoka text-[1.05rem] tracking-[0.01em] disabled:opacity-100",
+                isDesktopPanel ? "h-14" : "h-12",
+                "w-full rounded-[28px] font-fredoka text-[1.05rem] tracking-[0.01em] disabled:opacity-100",
                 canCreateTask ? colors.primaryButton : colors.primaryButtonDisabled,
               )}
             >
@@ -1252,7 +1273,11 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               variant="outline"
               onClick={handleAddToInbox}
               disabled={isAdding || !canAddToInbox}
-              className={cn("h-12 w-full rounded-[26px] border font-semibold disabled:opacity-45", QUEST_FORM_STYLES.secondaryButton)}
+              className={cn(
+                isDesktopPanel ? "h-12" : "h-10",
+                "w-full rounded-[26px] border font-semibold disabled:opacity-45",
+                QUEST_FORM_STYLES.secondaryButton,
+              )}
             >
               <Inbox className="mr-2 h-4 w-4" />
               Add to Inbox instead

@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { User, Users, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Trash2, Sparkles, HelpCircle, ChevronRight, ExternalLink, MessageSquare, type LucideIcon } from "lucide-react";
+import { User, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Trash2, Sparkles, HelpCircle, ChevronRight, ExternalLink, MessageSquare, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -414,12 +414,6 @@ const Profile = () => {
                 description="Guides & tutorials"
                 onClick={() => navigate("/help")} 
                 variant="info"
-              />
-              <QuickActionCard 
-                icon={Users} 
-                label="Contacts" 
-                description="Manage your CRM"
-                onClick={() => navigate("/contacts")} 
               />
             </div>
           </section>

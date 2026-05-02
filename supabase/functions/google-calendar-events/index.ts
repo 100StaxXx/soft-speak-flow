@@ -81,7 +81,7 @@ function getBearerToken(req: Request): string | null {
   return authHeader.replace("Bearer ", "").trim() || null;
 }
 
-async function getAuthedUserId(supabaseAdmin: ReturnType<typeof createClient>, req: Request): Promise<string> {
+async function getAuthedUserId(supabaseAdmin: any, req: Request): Promise<string> {
   const token = getBearerToken(req);
   if (!token) {
     throw new Error("Missing Authorization bearer token");
@@ -100,7 +100,7 @@ async function getAuthedUserId(supabaseAdmin: ReturnType<typeof createClient>, r
 }
 
 async function refreshAccessTokenIfNeeded(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   connection: CalendarConnection,
   googleClientId: string,
   googleClientSecret: string,
@@ -287,7 +287,7 @@ async function googleApi(
 }
 
 async function getTaskById(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   userId: string,
   taskId: string,
 ): Promise<DailyTask> {
@@ -306,7 +306,7 @@ async function getTaskById(
 }
 
 async function getGoogleConnection(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   userId: string,
 ): Promise<CalendarConnection> {
   const { data, error } = await supabase

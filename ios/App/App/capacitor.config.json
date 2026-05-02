@@ -29,7 +29,6 @@
 	},
 	"packageClassList": [
 		"SignInWithApple",
-		"ContactsPlugin",
 		"AppPlugin",
 		"CAPCameraPlugin",
 		"FilesystemPlugin",

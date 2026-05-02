@@ -1995,6 +1995,46 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(screen.queryByText("Anytime")).not.toBeInTheDocument();
   });
 
+  it("adds the readable shell class when readable quest cards are enabled", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-readable-1",
+            task_text: "Readable morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        readableQuestCardsEnabled
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const pane = screen.getByTestId("scheduled-timeline-pane");
+    const mobileRow = within(pane).getByTestId("timeline-row-task-readable-1");
+    const readableShell = getQuestCardShell(mobileRow);
+    expect(readableShell).toHaveClass(
+      "journeys-quest-card-shell",
+      "journeys-quest-card-shell--readable",
+    );
+    expect(readableShell).not.toHaveClass("border-white/10");
+    expect(readableShell).not.toHaveClass("bg-white/[0.04]");
+  });
+
   it("uses row drag wiring for scheduled quests", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -3499,6 +3539,99 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     fireEvent.doubleClick(screen.getByTestId("desktop-timeline-task-button-task-scheduled-1"));
 
     expect(onEditQuest).toHaveBeenCalledWith(expect.objectContaining({ id: "task-scheduled-1" }));
+  });
+
+  it("adds the readable shell class to desktop day cards when readable quest cards are enabled", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-readable-desktop-1",
+            task_text: "Desktop readable focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        layoutMode="desktop"
+        readableQuestCardsEnabled
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const readableShell = getQuestCardShell(screen.getByTestId("timeline-row-task-readable-desktop-1"));
+    expect(readableShell).toHaveClass(
+      "journeys-quest-card-shell",
+      "journeys-quest-card-shell--readable",
+    );
+    expect(readableShell).not.toHaveClass("border-white/10");
+    expect(readableShell).not.toHaveClass("bg-white/[0.04]");
+  });
+
+  it("keeps readable campaign desktop day cards on the readable shell treatment when active", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-readable-campaign-desktop-1",
+            task_text: "Campaign readable focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+            habit_source_id: "habit-1",
+            epic_id: "epic-1",
+            epic_title: "Build Portfolio Website",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        layoutMode="desktop"
+        readableQuestCardsEnabled
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const readableShell = getQuestCardShell(screen.getByTestId("timeline-row-task-readable-campaign-desktop-1"));
+    expect(readableShell).toHaveClass(
+      "campaign-ritual-card",
+      "journeys-quest-card-shell--readable",
+    );
+    expect(readableShell).not.toHaveClass("border-primary/35");
+    expect(readableShell).not.toHaveClass("bg-primary/[0.08]");
+    expect(readableShell).not.toHaveClass("border-white/10");
+    expect(readableShell).not.toHaveClass("bg-white/[0.04]");
+
+    fireEvent.click(screen.getByTestId("desktop-timeline-task-button-task-readable-campaign-desktop-1"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("desktop-quest-popover-task-readable-campaign-desktop-1")).toBeInTheDocument();
+    });
+
+    expect(readableShell).toHaveClass("journeys-quest-card-shell--active");
+    expect(readableShell).not.toHaveClass("border-primary/40");
+    expect(readableShell).not.toHaveClass("bg-primary/[0.08]");
   });
 
   it("does not wire desktop scheduled rows for drag", () => {

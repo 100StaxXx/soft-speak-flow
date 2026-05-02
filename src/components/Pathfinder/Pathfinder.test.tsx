@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ACTIVE_CAMPAIGN_LIMIT_WARNING } from "@/features/epics/constants";
+import type { CampaignBuilderDraftSnapshot } from "@/utils/creationPopupPersistence";
 import { Pathfinder } from "./Pathfinder";
 
 const expectElementToIncludeClasses = (element: HTMLElement, classes: string) => {
@@ -25,9 +26,12 @@ const mocks = vi.hoisted(() => ({
   toggleMilestone: vi.fn(),
   updateMilestoneDate: vi.fn(),
   resetSchedule: vi.fn(),
+  hydrateSchedule: vi.fn(),
   setRituals: vi.fn(),
   resetClassification: vi.fn(),
   resetSuggestions: vi.fn(),
+  writeCampaignBuilderDraftSnapshot: vi.fn(),
+  clearCampaignBuilderDraftSnapshot: vi.fn(),
   activeEpics: [] as Array<{ id: string; status: string }>,
   aiAtEpicLimit: false,
   schedule: null as any,
@@ -37,6 +41,12 @@ vi.mock("@/hooks/useUserAIContext", () => ({
   useUserAIContext: () => ({
     preferences: { epicDuration: 30 },
     isAtEpicLimit: mocks.aiAtEpicLimit,
+  }),
+}));
+
+vi.mock("@/hooks/useAuth", () => ({
+  useAuth: () => ({
+    user: { id: "user-1" },
   }),
 }));
 
@@ -83,6 +93,7 @@ vi.mock("@/hooks/useJourneySchedule", () => ({
     toggleMilestone: (...args: unknown[]) => mocks.toggleMilestone(...args),
     updateMilestoneDate: (...args: unknown[]) => mocks.updateMilestoneDate(...args),
     reset: (...args: unknown[]) => mocks.resetSchedule(...args),
+    hydrateSchedule: (...args: unknown[]) => mocks.hydrateSchedule(...args),
     setRituals: (...args: unknown[]) => mocks.setRituals(...args),
     postcardCount: 0,
     maxPostcards: 3,
@@ -116,6 +127,11 @@ vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
     element: "ice",
     usesPortraitShell: true,
   }),
+}));
+
+vi.mock("@/utils/creationPopupPersistence", () => ({
+  writeCampaignBuilderDraftSnapshot: (...args: unknown[]) => mocks.writeCampaignBuilderDraftSnapshot(...args),
+  clearCampaignBuilderDraftSnapshot: (...args: unknown[]) => mocks.clearCampaignBuilderDraftSnapshot(...args),
 }));
 
 vi.mock("@/components/JourneyWizard/DeadlinePicker", () => ({
@@ -153,6 +169,7 @@ const clickPathfinderButton = async (name: RegExp | string) => {
 
 describe("Pathfinder", () => {
   afterEach(() => {
+    vi.useRealTimers();
     cleanup();
   });
 
@@ -209,10 +226,41 @@ describe("Pathfinder", () => {
     });
   });
 
+  it("debounces meaningful campaign builder draft writes while open", async () => {
+    mocks.schedule = null;
+
+    render(
+      <Pathfinder
+        open
+        userId="user-1"
+        onOpenChange={vi.fn()}
+        onCreateEpic={(...args) => mocks.onCreateEpic(...args)}
+        isCreating={false}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("What's your goal?"), {
+      target: { value: "Write a book proposal" },
+    });
+
+    expect(mocks.writeCampaignBuilderDraftSnapshot).not.toHaveBeenCalled();
+
+    await waitFor(() => {
+      expect(mocks.writeCampaignBuilderDraftSnapshot).toHaveBeenCalledWith(
+        "user-1",
+        expect.objectContaining({
+          step: "goal",
+          goalInput: "Write a book proposal",
+        }),
+      );
+    }, { timeout: 1000 });
+  });
+
   it("renders the themed shell chrome when open", () => {
     render(
       <Pathfinder
         open
+        userId="user-1"
         onOpenChange={vi.fn()}
         onCreateEpic={(...args) => mocks.onCreateEpic(...args)}
         isCreating={false}
@@ -230,12 +278,76 @@ describe("Pathfinder", () => {
     expect(screen.getByRole("button", { name: /Build My Plan/i })).toBeInTheDocument();
   });
 
+  it("hydrates a persisted campaign builder draft when reopened", async () => {
+    const selectedTemplate = {
+      id: "template-course",
+      name: "Template Course",
+      description: "Template default why",
+      theme_color: "mystic",
+      target_days: 45,
+      difficulty_tier: "intermediate" as const,
+      habits: [
+        {
+          title: "Template habit",
+          description: "Default habit",
+          frequency: "daily",
+          difficulty: "medium" as const,
+        },
+      ],
+      badge_icon: null,
+      badge_name: null,
+      popularity_count: 0,
+      is_featured: false,
+      created_at: "2026-01-01T00:00:00.000Z",
+    };
+    const resumeDraft: CampaignBuilderDraftSnapshot = {
+      version: 1,
+      step: "review",
+      goalInput: "Launch the course",
+      deadline: "2026-10-01",
+      timelineContext: "Outline is ready",
+      epicTitle: "Edited Course Launch",
+      epicWhy: "Ship the edited thing",
+      storyType: null,
+      themeColor: "heroic",
+      customHabits: [],
+      selectedTemplate,
+      schedule: mocks.schedule,
+      originalRituals: mocks.schedule.rituals,
+      localClarificationAnswers: { daily_time: "45 minutes" },
+      localEpicContext: "Course context",
+      showClarification: false,
+      clarificationQuestions: [],
+      updatedAt: "2026-05-01T12:00:00.000Z",
+    };
+
+    render(
+      <Pathfinder
+        open
+        userId="user-1"
+        onOpenChange={vi.fn()}
+        onCreateEpic={(...args) => mocks.onCreateEpic(...args)}
+        isCreating={false}
+        resumeDraft={resumeDraft}
+        resumeDraftKey="draft-1"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Your Why")).toHaveValue("Ship the edited thing");
+    });
+    expect(screen.getByLabelText("Campaign Name")).toHaveValue("Edited Course Launch");
+    expect(screen.queryByRole("button", { name: /Build My Plan/i })).not.toBeInTheDocument();
+    expect(mocks.hydrateSchedule).toHaveBeenCalledWith(resumeDraft.schedule);
+  });
+
   it("does not show the campaign-limit warning when only AI context says the user is at capacity", () => {
     mocks.aiAtEpicLimit = true;
 
     render(
       <Pathfinder
         open
+        userId="user-1"
         onOpenChange={vi.fn()}
         onCreateEpic={(...args) => mocks.onCreateEpic(...args)}
         isCreating={false}
@@ -254,6 +366,7 @@ describe("Pathfinder", () => {
     render(
       <Pathfinder
         open
+        userId="user-1"
         onOpenChange={vi.fn()}
         onCreateEpic={(...args) => mocks.onCreateEpic(...args)}
         isCreating={false}
@@ -293,6 +406,7 @@ describe("Pathfinder", () => {
     render(
       <Pathfinder
         open
+        userId="user-1"
         onOpenChange={vi.fn()}
         onCreateEpic={(...args) => mocks.onCreateEpic(...args)}
         isCreating={false}
@@ -327,6 +441,7 @@ describe("Pathfinder", () => {
     await waitFor(() => {
       expect(mocks.success).toHaveBeenCalled();
     });
+    expect(mocks.clearCampaignBuilderDraftSnapshot).toHaveBeenCalledWith("user-1");
   });
 
   it("submits integer milestone percents when the generated schedule has fractions", async () => {

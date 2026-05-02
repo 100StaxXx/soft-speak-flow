@@ -543,7 +543,6 @@
     "packageJson": {
       "dependencies": [
         "npm:@capacitor-community/apple-sign-in@^7.1.0",
-        "npm:@capacitor-community/contacts@^7.1.0",
         "npm:@capacitor/android@^7.4.4",
         "npm:@capacitor/app@7",
         "npm:@capacitor/camera@^7.0.3",

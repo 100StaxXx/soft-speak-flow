@@ -297,6 +297,10 @@ jobs:
             APNS_ENVIRONMENT
             OPENAI_API_KEY
             ELEVENLABS_API_KEY
+            GOOGLE_CALENDAR_CLIENT_ID
+            GOOGLE_CALENDAR_CLIENT_SECRET
+            OUTLOOK_CLIENT_ID
+            OUTLOOK_CLIENT_SECRET
           )
 
           missing=0

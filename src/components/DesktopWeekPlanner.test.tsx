@@ -167,10 +167,39 @@ describe("DesktopWeekPlanner", () => {
     expect(timedCard).toBeInTheDocument();
     expect(timedCard).toHaveAttribute("data-quest-card-shell", "true");
     expect(timedCard).toHaveClass("journeys-quest-card-shell");
+    expect(timedCard).not.toHaveClass("journeys-quest-card-shell--readable");
     expect(within(screen.getByTestId("desktop-week-anytime-2026-03-31")).getByText("Loose planning")).toBeInTheDocument();
     expect(screen.getByText("Wednesday review")).toBeInTheDocument();
     expect(within(timedCard).queryByText("8:00 AM")).not.toBeInTheDocument();
     expect(within(timedCard).queryByText("+20 XP")).not.toBeInTheDocument();
+  });
+
+  it("adds the readable shell class when readable quest cards are enabled", () => {
+    render(
+      <DesktopWeekPlanner
+        selectedDate={selectedDate}
+        tasks={[
+          baseTask({
+            id: "readable-task",
+            task_text: "Readable week quest",
+            task_date: "2026-03-31",
+            scheduled_time: "08:00",
+          }),
+        ]}
+        readableQuestCardsEnabled
+        onDateSelect={vi.fn()}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+      />,
+    );
+
+    const readableCard = screen.getByTestId("desktop-week-task-readable-task");
+    expect(readableCard).toHaveClass(
+      "journeys-quest-card-shell",
+      "journeys-quest-card-shell--readable",
+    );
+    expect(readableCard).not.toHaveClass("border-white/10");
+    expect(readableCard).not.toHaveClass("bg-white/[0.04]");
   });
 
   it("marks campaign rituals in the week scheduler task cards", () => {
@@ -202,6 +231,49 @@ describe("DesktopWeekPlanner", () => {
     );
     expect(within(ritualCard).getByText("Portfolio work")).toBeInTheDocument();
     expect(within(ritualCard).getByText("Campaign Ritual - Build Portfolio Website")).toBeInTheDocument();
+  });
+
+  it("keeps readable campaign rituals on the readable shell treatment when active", async () => {
+    render(
+      <DesktopWeekPlanner
+        selectedDate={selectedDate}
+        tasks={[
+          baseTask({
+            id: "readable-campaign-ritual",
+            task_text: "Portfolio launch ritual",
+            scheduled_time: "19:00",
+            estimated_duration: 60,
+            habit_source_id: "habit-portfolio",
+            epic_id: "epic-portfolio",
+            epic_title: "Build Portfolio Website",
+          }),
+        ]}
+        readableQuestCardsEnabled
+        onDateSelect={vi.fn()}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+      />,
+    );
+
+    const ritualCard = screen.getByTestId("desktop-week-task-readable-campaign-ritual");
+    expect(ritualCard).toHaveClass(
+      "campaign-ritual-card",
+      "journeys-quest-card-shell--readable",
+    );
+    expect(ritualCard).not.toHaveClass("border-primary/35");
+    expect(ritualCard).not.toHaveClass("bg-primary/[0.08]");
+    expect(ritualCard).not.toHaveClass("border-white/10");
+    expect(ritualCard).not.toHaveClass("bg-white/[0.04]");
+
+    fireEvent.click(screen.getByTestId("desktop-week-task-button-readable-campaign-ritual"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("desktop-quest-popover-readable-campaign-ritual")).toBeInTheDocument();
+    });
+
+    expect(ritualCard).toHaveClass("journeys-quest-card-shell--active");
+    expect(ritualCard).not.toHaveClass("border-primary/40");
+    expect(ritualCard).not.toHaveClass("bg-primary/[0.08]");
   });
 
   it("uses the mac fallback duration for timed task height when duration is missing", () => {

@@ -116,9 +116,9 @@ export const QUEST_FORM_STYLES = {
   mobileHeaderSummary:
     "mt-1 text-sm text-[#ffe9ba]/78",
   mobileHeaderToolbar:
-    "mt-3 flex items-center justify-between gap-2",
+    "mt-2 flex items-center justify-between gap-2",
   mobileDifficultyGroup:
-    "mt-4 inline-flex w-full items-stretch gap-2 rounded-[20px] border-[3px] border-[#4d2811] bg-white/35 p-2 shadow-[inset_0_3px_0_rgba(255,255,255,0.22)]",
+    "mt-3 inline-flex w-full items-stretch gap-1.5 rounded-[20px] border-[3px] border-[#4d2811] bg-white/35 p-1.5 shadow-[inset_0_3px_0_rgba(255,255,255,0.22)]",
   desktopPanelShell:
     "border-[4px] border-[#4d2811] bg-[radial-gradient(circle_at_top_left,rgba(255,247,199,0.24),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(254,151,54,0.18),transparent_28%),linear-gradient(180deg,#a23518_0%,#701d0d_62%,#4a1209_100%)] text-[#4f240c] shadow-[0_18px_0_#4d2811,0_34px_90px_-36px_rgba(38,12,5,0.62)]",
   desktopPanelHeader:

@@ -290,8 +290,12 @@ export function CalendarIntegrationsSettings() {
 
       const source = Capacitor.isNativePlatform() ? 'native' : 'web';
       const callbackBase = getRedirectUrlWithPath('/calendar/oauth/callback');
-      const redirectUri = `${callbackBase}?calendar_provider=${provider}&calendar_source=${source}`;
-      const url = await beginOAuthConnection.mutateAsync({ provider, redirectUri, syncMode: 'send_only' });
+      const url = await beginOAuthConnection.mutateAsync({
+        provider,
+        redirectUri: callbackBase,
+        syncMode: 'send_only',
+        source,
+      });
       window.location.href = url;
     } catch (err) {
       toast({

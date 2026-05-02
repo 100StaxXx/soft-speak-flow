@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback, useLayoutEffect } from "react";
-import { format, addDays, isSameDay } from "date-fns";
+import { format, addDays, isSameDay, parseISO } from "date-fns";
 import { motion, useReducedMotion } from "framer-motion";
 import { Compass } from "lucide-react";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
@@ -77,6 +77,14 @@ import type {
   CompanionPlannerStarterIntent,
   PlannerBriefingContext,
 } from "@/types/companionPlanner";
+import {
+  clearCampaignBuilderDraftSnapshot,
+  clearCreationPopupMarker,
+  readCampaignBuilderDraftSnapshot,
+  readCreationPopupMarker,
+  type CampaignBuilderDraftSnapshot,
+  writeCreationPopupMarker,
+} from "@/utils/creationPopupPersistence";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -324,11 +332,14 @@ const Journeys = () => {
   const [prefilledTime, setPrefilledTime] = useState<string | null>(null);
   const [questSheetPrefillDraft, setQuestSheetPrefillDraft] = useState<QuestComposerPrefillDraft | null>(null);
   const [questSheetPrefillKey, setQuestSheetPrefillKey] = useState<string | null>(null);
+  const [autoRestoreQuestDraftOnOpen, setAutoRestoreQuestDraftOnOpen] = useState(false);
 
   // Campaign creation state
   const [showPathfinder, setShowPathfinder] = useState(false);
   const [pathfinderInitialGoal, setPathfinderInitialGoal] = useState("");
   const [pathfinderSessionKey, setPathfinderSessionKey] = useState(0);
+  const [pathfinderResumeDraft, setPathfinderResumeDraft] = useState<CampaignBuilderDraftSnapshot | null>(null);
+  const [pathfinderResumeDraftKey, setPathfinderResumeDraftKey] = useState<string | null>(null);
   const [showCreatedAnimation, setShowCreatedAnimation] = useState(false);
   const [createdCampaignData, setCreatedCampaignData] = useState<CreatedCampaignData | null>(null);
   const [isInboxExpanded, setIsInboxExpanded] = useState(false);
@@ -337,10 +348,12 @@ const Journeys = () => {
   const pendingSelectedDateResetRef = useRef(false);
   const hasUserDateInteractionRef = useRef(false);
   const showAddSheetRef = useRef(showAddSheet);
+  const showPathfinderRef = useRef(showPathfinder);
   const scheduledTimeUpdateQueueRef = useRef<Map<string, Promise<void>>>(new Map());
   const inboxSectionRef = useRef<HTMLDivElement | null>(null);
   const hasInitializedInboxVisibilityRef = useRef(false);
   const tutorialOverlayCleanupSignatureRef = useRef<string | null>(null);
+  const hasConsumedCreationPopupResumeRef = useRef(false);
   const { isActive: tutorialActive, currentStep: tutorialStep, currentSubstep: tutorialSubstep } =
     usePostOnboardingMentorGuidance();
   const shouldAutoFillTutorialTime =
@@ -358,7 +371,7 @@ const Journeys = () => {
   const queryClient = useQueryClient();
   const { queueAction, shouldQueueWrites, retryNow } = useResilience();
   const { profile, loading: profileLoading } = useProfile();
-  
+
   // Streak freeze
   const { 
     needsStreakDecision, 
@@ -388,9 +401,22 @@ const Journeys = () => {
     setShowAddSheet(nextOpen);
   }, []);
 
+  const clearQuestCreationPopupState = useCallback(() => {
+    clearCreationPopupMarker(user?.id, "quest");
+    setAutoRestoreQuestDraftOnOpen(false);
+  }, [user?.id]);
+
+  const clearCampaignCreationPopupState = useCallback(() => {
+    clearCreationPopupMarker(user?.id, "campaign");
+    clearCampaignBuilderDraftSnapshot(user?.id);
+    setPathfinderResumeDraft(null);
+    setPathfinderResumeDraftKey(null);
+  }, [user?.id]);
+
   const handleAddQuestSheetOpenChange = useCallback((nextOpen: boolean) => {
     setAddQuestSheetOpen(nextOpen);
     if (!nextOpen) {
+      clearQuestCreationPopupState();
       setPrefilledTime(null);
       setQuestSheetPrefillDraft(null);
       setQuestSheetPrefillKey(null);
@@ -398,7 +424,7 @@ const Journeys = () => {
         finishPlannerQuestEdit({ saved: false });
       }
     }
-  }, [finishPlannerQuestEdit, plannerQuestEditSession?.editor, setAddQuestSheetOpen]);
+  }, [clearQuestCreationPopupState, finishPlannerQuestEdit, plannerQuestEditSession?.editor, setAddQuestSheetOpen]);
 
   const openAddQuestSheet = useCallback((options?: {
     date?: Date;
@@ -412,6 +438,7 @@ const Journeys = () => {
     setPrefilledTime(options?.time ?? options?.prefillDraft?.scheduledTime ?? null);
     setQuestSheetPrefillDraft(options?.prefillDraft ?? null);
     setQuestSheetPrefillKey(options?.prefillKey ?? null);
+    setAutoRestoreQuestDraftOnOpen(false);
     setAddQuestSheetOpen(true);
   }, [setAddQuestSheetOpen]);
 
@@ -428,6 +455,8 @@ const Journeys = () => {
       window.dispatchEvent(new CustomEvent("campaign-builder-opened"));
     }
     setPathfinderInitialGoal(initialGoal?.trim() ?? "");
+    setPathfinderResumeDraft(null);
+    setPathfinderResumeDraftKey(null);
     setPathfinderSessionKey((currentKey) => currentKey + 1);
     setShowPathfinder(true);
   }, []);
@@ -501,16 +530,85 @@ const Journeys = () => {
   const handlePathfinderOpenChange = useCallback((nextOpen: boolean) => {
     setShowPathfinder(nextOpen);
     if (!nextOpen) {
+      clearCampaignCreationPopupState();
       setPathfinderInitialGoal("");
     }
-  }, []);
+  }, [clearCampaignCreationPopupState]);
+
+  useEffect(() => {
+    if (!user?.id || !showAddSheet) return;
+
+    writeCreationPopupMarker(user.id, {
+      surface: "quest",
+      route: JOURNEYS_ROUTE,
+      selectedDate: format(selectedDate, "yyyy-MM-dd"),
+      updatedAt: new Date().toISOString(),
+    });
+  }, [selectedDate, showAddSheet, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || !showPathfinder) return;
+
+    writeCreationPopupMarker(user.id, {
+      surface: "campaign",
+      route: JOURNEYS_ROUTE,
+      selectedDate: null,
+      updatedAt: new Date().toISOString(),
+    });
+  }, [showPathfinder, user?.id]);
+
+  useEffect(() => {
+    if (hasConsumedCreationPopupResumeRef.current) return;
+    if (!isJourneysRouteActive) return;
+    if (!user?.id) return;
+    if (profileLoading) return;
+    if (showAddSheet || showPathfinder) return;
+
+    const marker = readCreationPopupMarker(user.id);
+    if (!marker || marker.route !== JOURNEYS_ROUTE) return;
+
+    hasConsumedCreationPopupResumeRef.current = true;
+
+    if (marker.surface === "quest") {
+      if (marker.selectedDate) {
+        const restored = parseISO(`${marker.selectedDate}T00:00:00`);
+        if (!Number.isNaN(restored.getTime())) {
+          setSelectedDate(restored);
+        }
+      }
+      setPrefilledTime(null);
+      setQuestSheetPrefillDraft(null);
+      setQuestSheetPrefillKey(null);
+      setAutoRestoreQuestDraftOnOpen(true);
+      setAddQuestSheetOpen(true);
+      return;
+    }
+
+    const draft = readCampaignBuilderDraftSnapshot(user.id);
+    setPathfinderInitialGoal(draft?.goalInput?.trim() ?? "");
+    setPathfinderResumeDraft(draft);
+    setPathfinderResumeDraftKey(`resume-${marker.updatedAt}`);
+    setPathfinderSessionKey((currentKey) => currentKey + 1);
+    setShowPathfinder(true);
+  }, [
+    isJourneysRouteActive,
+    profileLoading,
+    setAddQuestSheetOpen,
+    showAddSheet,
+    showPathfinder,
+    user?.id,
+  ]);
 
   useEffect(() => {
     showAddSheetRef.current = showAddSheet;
   }, [showAddSheet]);
 
+  useEffect(() => {
+    showPathfinderRef.current = showPathfinder;
+  }, [showPathfinder]);
+
   const resetSelectedDateToToday = useCallback((options?: { deferIfAddSheetOpen?: boolean }) => {
-    if (showAddSheetRef.current) {
+    if (showAddSheetRef.current || showPathfinderRef.current) {
       if (options?.deferIfAddSheetOpen) {
         pendingSelectedDateResetRef.current = true;
       }
@@ -559,9 +657,9 @@ const Journeys = () => {
   }, [isJourneysRouteActive, journeysLocationSignature, resetSelectedDateToToday]);
 
   useLayoutEffect(() => {
-    if (!isJourneysRouteActive || showAddSheet || !pendingSelectedDateResetRef.current) return;
+    if (!isJourneysRouteActive || showAddSheet || showPathfinder || !pendingSelectedDateResetRef.current) return;
     resetSelectedDateToToday();
-  }, [isJourneysRouteActive, resetSelectedDateToToday, showAddSheet]);
+  }, [isJourneysRouteActive, resetSelectedDateToToday, showAddSheet, showPathfinder]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -740,6 +838,7 @@ const Journeys = () => {
     closeInteractionModalRef.current();
 
     if (tutorialStep !== "create_quest") {
+      clearQuestCreationPopupState();
       setAddQuestSheetOpen(false);
       setPrefilledTime(null);
       setQuestSheetPrefillDraft(null);
@@ -753,12 +852,15 @@ const Journeys = () => {
       finishPlannerQuestEdit({ saved: false });
     }
 
+    clearCampaignCreationPopupState();
     setShowPathfinder(false);
     setPathfinderInitialGoal("");
     setShowCreatedAnimation(false);
     setCreatedCampaignData(null);
   }, [
     finishPlannerQuestEdit,
+    clearCampaignCreationPopupState,
+    clearQuestCreationPopupState,
     isTabActive,
     location.pathname,
     plannerQuestEditSession?.editor,
@@ -1011,6 +1113,7 @@ const Journeys = () => {
     }
 
     if (plannerQuestEditSession?.editor === "create") {
+      clearQuestCreationPopupState();
       setAddQuestSheetOpen(false);
     }
     if (plannerQuestEditSession?.editor === "update") {
@@ -1036,6 +1139,7 @@ const Journeys = () => {
         prefillKey: `${proposal.id}:${Date.now()}`,
       });
       setPrefilledTime(null);
+      setAutoRestoreQuestDraftOnOpen(false);
       setAddQuestSheetOpen(true);
       return promise;
     }
@@ -1070,7 +1174,14 @@ const Journeys = () => {
     });
     setEditingTask(nextDraft.task);
     return promise;
-  }, [dailyTasks, finishPlannerQuestEdit, inboxTasks, plannerQuestEditSession?.editor, setAddQuestSheetOpen]);
+  }, [
+    clearQuestCreationPopupState,
+    dailyTasks,
+    finishPlannerQuestEdit,
+    inboxTasks,
+    plannerQuestEditSession?.editor,
+    setAddQuestSheetOpen,
+  ]);
 
   // Deep link handling - open task from widget tap
   const { pendingTaskId, clearPendingTask } = useDeepLink();
@@ -1257,6 +1368,7 @@ const Journeys = () => {
     }
 
     setAddQuestSheetOpen(false);
+    clearQuestCreationPopupState();
 
     if (SEND_TO_CALENDAR_ENABLED && data.sendToCalendar && createdTask?.id) {
       const calendarSyncStartedAt = Date.now();
@@ -1273,7 +1385,15 @@ const Journeys = () => {
         inboxSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     }
-  }, [selectedDate, addTask, finishPlannerQuestEdit, handleSendTaskToCalendar, plannerQuestEditSession?.editor, setAddQuestSheetOpen]);
+  }, [
+    selectedDate,
+    addTask,
+    clearQuestCreationPopupState,
+    finishPlannerQuestEdit,
+    handleSendTaskToCalendar,
+    plannerQuestEditSession?.editor,
+    setAddQuestSheetOpen,
+  ]);
 
   const handleToggleTask = useCallback((taskId: string, completed: boolean, xpReward: number, taskData?: { scheduled_time?: string | null; difficulty?: string | null; category?: string | null; ai_generated?: boolean | null; task_text?: string | null }) => {
     if (completed) {
@@ -1631,6 +1751,7 @@ const Journeys = () => {
         }),
       );
       setPathfinderInitialGoal("");
+      clearCampaignCreationPopupState();
       setShowPathfinder(false);
       setCreatedCampaignData({
         title: data.title,
@@ -1639,8 +1760,9 @@ const Journeys = () => {
       setShowCreatedAnimation(true);
     } catch (error) {
       console.error('Failed to create campaign:', error);
+      throw error;
     }
-  }, [createEpic]);
+  }, [clearCampaignCreationPopupState, createEpic]);
 
   const handleAnimationComplete = useCallback(() => {
     setShowCreatedAnimation(false);
@@ -1738,6 +1860,7 @@ const Journeys = () => {
               <DesktopWeekPlanner
                 selectedDate={selectedDate}
                 tasks={weekCalendarTasks}
+                readableQuestCardsEnabled={profile?.readable_quest_cards_enabled ?? false}
                 currentStreak={currentStreak}
                 activeEpics={activeEpics}
                 isCampaignsLoading={epicsLoading}
@@ -1767,6 +1890,7 @@ const Journeys = () => {
               <TodaysAgenda
                 tasks={dailyTasks}
                 selectedDate={selectedDate}
+                readableQuestCardsEnabled={profile?.readable_quest_cards_enabled ?? false}
                 layoutMode={journeysLayoutMode}
                 hideDesktopRailAddButton={isMacHostedIOSApp}
                 isVisible={location.pathname === JOURNEYS_ROUTE}
@@ -1837,6 +1961,8 @@ const Journeys = () => {
           prefillKey={plannerQuestEditSession?.editor === "create"
             ? plannerQuestEditSession.prefillKey
             : questSheetPrefillKey}
+          autoRestoreDraftOnOpen={autoRestoreQuestDraftOnOpen}
+          persistenceRoute="/journeys"
           onCreateCampaign={() => openCampaignBuilder()}
         />
         
@@ -1875,6 +2001,7 @@ const Journeys = () => {
           onTimeSlotLongPress={(date, time) => {
             handleUserDateSelect(date);
             setPrefilledTime(time);
+            setAutoRestoreQuestDraftOnOpen(false);
             setAddQuestSheetOpen(true);
           }}
         />
@@ -1924,6 +2051,10 @@ const Journeys = () => {
           onCreateEpic={handleCreateCampaign}
           isCreating={isCreatingCampaign}
           initialGoal={pathfinderInitialGoal}
+          resumeDraft={pathfinderResumeDraft}
+          resumeDraftKey={pathfinderResumeDraftKey}
+          persistenceRoute="/journeys"
+          userId={user?.id}
           showTemplatesFirst={false}
         />
 

@@ -6,12 +6,101 @@ import type { CalendarProvider } from '@/hooks/useCalendarIntegrations';
 
 type OAuthProvider = Exclude<CalendarProvider, 'apple'>;
 type CallbackStatus = 'success' | 'error';
+type OAuthSource = 'web' | 'native';
+
+interface OAuthStateHint {
+  provider: OAuthProvider;
+  source: OAuthSource;
+}
 
 const isOAuthProvider = (value: string | null): value is OAuthProvider =>
   value === 'google' || value === 'outlook';
 
+const isOAuthSource = (value: unknown): value is OAuthSource =>
+  value === 'web' || value === 'native';
+
 const providerLabel = (provider: OAuthProvider): string =>
   provider === 'google' ? 'Google' : 'Outlook';
+
+const decodeBase64Url = (input: string): string => {
+  const normalized = input.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+  return window.atob(padded);
+};
+
+export const getCalendarOAuthStateHint = (state: string | null | undefined): OAuthStateHint | null => {
+  if (!state) return null;
+
+  const [rawPayload] = state.split('.');
+  if (!rawPayload) return null;
+
+  try {
+    const payload = JSON.parse(decodeBase64Url(rawPayload)) as Record<string, unknown>;
+    const provider = typeof payload.provider === 'string' && isOAuthProvider(payload.provider)
+      ? payload.provider
+      : null;
+
+    if (!provider) return null;
+
+    return {
+      provider,
+      source: isOAuthSource(payload.source) ? payload.source : 'web',
+    };
+  } catch {
+    return null;
+  }
+};
+
+const getLegacyRedirectUri = (args: {
+  provider: OAuthProvider;
+  source: OAuthSource;
+  origin: string;
+  pathname: string;
+}): string => `${args.origin}${args.pathname}?calendar_provider=${args.provider}&calendar_source=${args.source}`;
+
+export const getCalendarOAuthCallbackContext = (args: {
+  search: string;
+  origin: string;
+  pathname: string;
+}): {
+  provider: OAuthProvider | null;
+  source: OAuthSource;
+  code: string | null;
+  state: string | null;
+  error: string | null;
+  errorDescription: string | null;
+  redirectUri: string;
+} => {
+  const params = new URLSearchParams(args.search);
+  const legacyProvider = params.get('calendar_provider');
+  const legacySource = params.get('calendar_source');
+  const state = params.get('state');
+  const stateHint = getCalendarOAuthStateHint(state);
+  const provider = isOAuthProvider(legacyProvider)
+    ? legacyProvider
+    : stateHint?.provider ?? null;
+  const source = isOAuthSource(legacySource)
+    ? legacySource
+    : stateHint?.source ?? 'web';
+  const redirectUri = provider && isOAuthProvider(legacyProvider)
+    ? getLegacyRedirectUri({
+      provider,
+      source,
+      origin: args.origin,
+      pathname: args.pathname,
+    })
+    : `${args.origin}${args.pathname}`;
+
+  return {
+    provider,
+    source,
+    code: params.get('code'),
+    state,
+    error: params.get('error'),
+    errorDescription: params.get('error_description'),
+    redirectUri,
+  };
+};
 
 const buildProfileRedirect = (args: {
   provider: OAuthProvider;
@@ -64,13 +153,19 @@ export default function CalendarOAuthCallback() {
     let cancelled = false;
 
     const run = async () => {
-      const params = new URLSearchParams(window.location.search);
-      const provider = params.get('calendar_provider');
-      const source = params.get('calendar_source') === 'native' ? 'native' : 'web';
-      const error = params.get('error');
-      const errorDescription = params.get('error_description');
-      const code = params.get('code');
-      const state = params.get('state');
+      const {
+        provider,
+        source,
+        error,
+        errorDescription,
+        code,
+        state,
+        redirectUri,
+      } = getCalendarOAuthCallbackContext({
+        search: window.location.search,
+        origin: window.location.origin,
+        pathname: window.location.pathname,
+      });
 
       const finish = (payload: {
         provider: OAuthProvider;
@@ -93,11 +188,11 @@ export default function CalendarOAuthCallback() {
         window.location.replace(profileRedirect);
       };
 
-      if (!isOAuthProvider(provider)) {
+      if (!provider) {
         finish({
           provider: 'google',
           status: 'error',
-          message: 'Unsupported calendar provider.',
+          message: 'Missing or invalid calendar connection state. Please try connecting again.',
         });
         return;
       }
@@ -119,8 +214,6 @@ export default function CalendarOAuthCallback() {
         });
         return;
       }
-
-      const redirectUri = `${window.location.origin}${window.location.pathname}?calendar_provider=${provider}&calendar_source=${source}`;
 
       const { error: exchangeError } = await supabase.functions.invoke(`${provider}-calendar-auth`, {
         body: {

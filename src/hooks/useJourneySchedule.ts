@@ -267,6 +267,12 @@ export function useJourneySchedule() {
     });
   }, []);
 
+  const hydrateSchedule = useCallback((nextSchedule: JourneySchedule | null) => {
+    setSchedule(nextSchedule ? normalizeJourneySchedule(nextSchedule) : null);
+    setError(null);
+    setIsLoading(false);
+  }, []);
+
   const updateMilestoneDate = useCallback((milestoneId: string, newDate: string) => {
     setSchedule(prev => {
       if (!prev) return prev;
@@ -298,6 +304,7 @@ export function useJourneySchedule() {
     addRitual,
     removeRitual,
     setRituals,
+    hydrateSchedule,
     updateMilestoneDate,
     reset,
     postcardCount,

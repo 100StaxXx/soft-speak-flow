@@ -8,6 +8,8 @@ export const ENCOUNTER_PASSES_LEGACY_KEY = "encounter_passes";
 
 export const getEncounterPassesStorageKey = (userId: string) => `encounter_passes_${userId}`;
 export const getQuestDraftStorageKey = (userId: string) => `quest_draft_${userId}`;
+export const getCreationPopupMarkerStorageKey = (userId: string) => `creation_popup_marker_${userId}`;
+export const getCampaignBuilderDraftStorageKey = (userId: string) => `campaign_builder_draft_${userId}`;
 export const getMorningCheckInDraftStorageKey = (userId: string) => `morning_checkin_draft_${userId}`;
 
 export const getWeeklyRecapDismissedKey = (userId: string, weekStartDate: string) =>
@@ -35,6 +37,8 @@ export const clearUserAccountLocalState = (userId: string | null | undefined): v
   const encounterKey = getEncounterPassesStorageKey(userId);
   const guidedTutorialKey = getGuidedTutorialLocalProgressKey(userId);
   const questDraftKey = getQuestDraftStorageKey(userId);
+  const creationPopupMarkerKey = getCreationPopupMarkerStorageKey(userId);
+  const campaignBuilderDraftKey = getCampaignBuilderDraftStorageKey(userId);
   const morningCheckInDraftKey = getMorningCheckInDraftStorageKey(userId);
 
   for (const key of getLocalStorageKeys()) {
@@ -43,6 +47,8 @@ export const clearUserAccountLocalState = (userId: string | null | undefined): v
       || key === encounterKey
       || key === guidedTutorialKey
       || key === questDraftKey
+      || key === creationPopupMarkerKey
+      || key === campaignBuilderDraftKey
       || key === morningCheckInDraftKey
     ) {
       safeLocalStorage.removeItem(key);

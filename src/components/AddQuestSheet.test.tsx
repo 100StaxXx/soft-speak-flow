@@ -1603,6 +1603,48 @@ describe("AddQuestSheet", () => {
     expect(screen.getByPlaceholderText("Quest Title")).toHaveValue("Persistent quest");
   });
 
+  it("auto-restores a saved quest draft when opened from creation popup recovery", async () => {
+    mocks.safeLocalStorage.setItem(
+      getQuestDraftStorageKey("user-1"),
+      JSON.stringify({
+        text: "Recovered quest",
+        taskDate: "2026-01-15",
+        difficulty: "hard",
+        scheduledTime: "10:00",
+        estimatedDuration: 45,
+        recurrencePattern: null,
+        recurrenceDays: [],
+        recurrenceMonthDays: [],
+        recurrenceCustomPeriod: null,
+        reminderEnabled: false,
+        reminderMinutesBefore: 15,
+        moreInformation: "Still here after relaunch",
+        location: null,
+        sendToCalendar: false,
+        subtasks: ["First step"],
+        attachments: [],
+        creationSource: "manual",
+        selectedTemplate: null,
+        updatedAt: "2026-01-15T10:00:00.000Z",
+      }),
+    );
+
+    render(
+      <AddQuestSheet
+        open
+        autoRestoreDraftOnOpen
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("Quest Title")).toHaveValue("Recovered quest");
+    });
+    expect(screen.queryByText("Restore saved quest draft?")).not.toBeInTheDocument();
+  });
+
   it("discards a saved quest draft when requested", async () => {
     mocks.safeLocalStorage.setItem(
       getQuestDraftStorageKey("user-1"),

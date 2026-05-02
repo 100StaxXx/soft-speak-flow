@@ -1,6 +1,8 @@
 import type { HTMLAttributes, ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import type { ComponentProps } from "react";
+import type { Pathfinder } from "@/components/Pathfinder";
 
 type MockEpic = {
   id: string;
@@ -19,6 +21,14 @@ type MockEpic = {
 const mocks = vi.hoisted(() => ({
   activeEpics: [] as MockEpic[],
   completedEpics: [] as MockEpic[],
+  creationMarker: null as null | {
+    surface: "campaign";
+    route: "/campaigns";
+    selectedDate: null;
+    updatedAt: string;
+  },
+  campaignDraft: null as null | { updatedAt: string; goalInput: string },
+  lastPathfinderProps: null as null | ComponentProps<typeof Pathfinder>,
 }));
 
 const createEpic = ({
@@ -71,7 +81,10 @@ vi.mock("@/components/CampaignCard", () => ({
 }));
 
 vi.mock("@/components/Pathfinder", () => ({
-  Pathfinder: () => null,
+  Pathfinder: (props: ComponentProps<typeof Pathfinder>) => {
+    mocks.lastPathfinderProps = props;
+    return <div data-testid="pathfinder" data-open={String(props.open)} />;
+  },
 }));
 
 vi.mock("@/components/CampaignCreatedAnimation", () => ({
@@ -82,6 +95,20 @@ vi.mock("@/contexts/MainTabVisibilityContext", () => ({
   useMainTabVisibility: () => ({
     isTabActive: true,
   }),
+}));
+
+vi.mock("@/hooks/useAuth", () => ({
+  useAuth: () => ({
+    user: { id: "user-1" },
+  }),
+}));
+
+vi.mock("@/utils/creationPopupPersistence", () => ({
+  readCreationPopupMarker: () => mocks.creationMarker,
+  readCampaignBuilderDraftSnapshot: () => mocks.campaignDraft,
+  writeCreationPopupMarker: vi.fn(),
+  clearCreationPopupMarker: vi.fn(),
+  clearCampaignBuilderDraftSnapshot: vi.fn(),
 }));
 
 vi.mock("@/hooks/useEpics", () => ({
@@ -102,6 +129,9 @@ describe("Campaigns populated layout", () => {
   beforeEach(() => {
     mocks.activeEpics = [];
     mocks.completedEpics = [];
+    mocks.creationMarker = null;
+    mocks.campaignDraft = null;
+    mocks.lastPathfinderProps = null;
   });
 
   it("places the create button inside the existing campaigns section above the active campaign cards", () => {
@@ -135,5 +165,26 @@ describe("Campaigns populated layout", () => {
     expect(screen.queryByTestId("campaigns-stat-active")).not.toBeInTheDocument();
     expect(screen.queryByTestId("campaigns-stat-completed")).not.toBeInTheDocument();
     expect(screen.queryByTestId("campaigns-stat-completion")).not.toBeInTheDocument();
+  });
+
+  it("reopens Pathfinder with a stored campaign draft for the campaigns tab", async () => {
+    mocks.creationMarker = {
+      surface: "campaign",
+      route: "/campaigns",
+      selectedDate: null,
+      updatedAt: "2026-05-01T12:00:00.000Z",
+    };
+    mocks.campaignDraft = {
+      updatedAt: "2026-05-01T12:01:00.000Z",
+      goalInput: "Recovered campaign",
+    };
+
+    render(<Campaigns />);
+
+    await waitFor(() => {
+      expect(mocks.lastPathfinderProps?.open).toBe(true);
+    });
+    expect(mocks.lastPathfinderProps?.resumeDraft).toBe(mocks.campaignDraft);
+    expect(mocks.lastPathfinderProps?.resumeDraftKey).toBe("resume-2026-05-01T12:00:00.000Z");
   });
 });

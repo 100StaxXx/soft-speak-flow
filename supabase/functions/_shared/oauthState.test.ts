@@ -26,11 +26,50 @@ async function assertRejects(fn: () => Promise<unknown>, expectedMessage: string
   throw new Error("Expected promise to reject");
 }
 
+function encodeBase64Url(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
+async function createLegacyStateWithoutSource(args: {
+  provider: "google" | "outlook";
+  userId: string;
+  syncMode: "send_only" | "full_sync";
+  secret: string;
+}): Promise<string> {
+  const payload = {
+    v: 1,
+    provider: args.provider,
+    userId: args.userId,
+    syncMode: args.syncMode,
+    exp: Math.floor(Date.now() / 1000) + 600,
+    nonce: "legacy-nonce",
+  };
+  const payloadBytes = new TextEncoder().encode(JSON.stringify(payload));
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(args.secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, toArrayBuffer(payloadBytes)));
+  return `${encodeBase64Url(payloadBytes)}.${encodeBase64Url(signature)}`;
+}
+
 Deno.test("oauthState creates and verifies signed state payloads", async () => {
   const state = await createSignedOAuthState({
     provider: "google",
     userId: "user-1",
     syncMode: "full_sync",
+    source: "native",
     secret: "test-secret",
   });
 
@@ -43,7 +82,25 @@ Deno.test("oauthState creates and verifies signed state payloads", async () => {
   assertEquals(payload.provider, "google");
   assertEquals(payload.userId, "user-1");
   assertEquals(payload.syncMode, "full_sync");
+  assertEquals(payload.source, "native");
   assert(payload.exp > Math.floor(Date.now() / 1000));
+});
+
+Deno.test("oauthState defaults source to web for legacy payloads", async () => {
+  const state = await createLegacyStateWithoutSource({
+    provider: "google",
+    userId: "user-legacy",
+    syncMode: "send_only",
+    secret: "test-secret",
+  });
+
+  const payload = await verifySignedOAuthState({
+    state,
+    provider: "google",
+    secret: "test-secret",
+  });
+
+  assertEquals(payload.source, "web");
 });
 
 Deno.test("oauthState rejects tampered signatures", async () => {

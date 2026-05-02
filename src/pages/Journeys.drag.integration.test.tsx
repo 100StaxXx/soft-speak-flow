@@ -5,6 +5,10 @@ import { isSameDay } from "date-fns";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { JOURNEYS_RESET_TO_TODAY_EVENT } from "@/pages/journeysDateSync";
+import {
+  getCampaignBuilderDraftStorageKey,
+  getCreationPopupMarkerStorageKey,
+} from "@/utils/accountLocalState";
 
 vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
   useJourneysCompanionVisual: () => ({
@@ -94,9 +98,11 @@ const mocks = vi.hoisted(() => ({
   lastDatePillCenterRequestKey: null as number | null,
   lastAddQuestSheetProps: null as null | {
     autoFillTimeOnFirstTap?: boolean;
+    autoRestoreDraftOnOpen?: boolean;
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
     presentation?: string;
+    persistenceRoute?: string;
     prefillKey?: string | null;
     prefillDraft?: {
       text?: string;
@@ -163,6 +169,10 @@ const mocks = vi.hoisted(() => ({
   lastPathfinderProps: null as null | {
     open?: boolean;
     initialGoal?: string;
+    resumeDraft?: unknown;
+    resumeDraftKey?: string | null;
+    persistenceRoute?: string;
+    userId?: string | null;
     onOpenChange?: (open: boolean) => void;
   },
   tutorialGuidance: {
@@ -286,9 +296,11 @@ vi.mock("@/components/DatePillsScroller", () => ({
 vi.mock("@/components/AddQuestSheet", () => ({
   AddQuestSheet: (props: {
     autoFillTimeOnFirstTap?: boolean;
+    autoRestoreDraftOnOpen?: boolean;
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
     presentation?: string;
+    persistenceRoute?: string;
     prefillKey?: string | null;
     prefillDraft?: {
       text?: string;
@@ -411,7 +423,15 @@ vi.mock("@/components/EditRitualSheet", () => ({
 }));
 
 vi.mock("@/components/Pathfinder", () => ({
-  Pathfinder: (props: { open?: boolean; initialGoal?: string; onOpenChange?: (open: boolean) => void }) => {
+  Pathfinder: (props: {
+    open?: boolean;
+    initialGoal?: string;
+    resumeDraft?: unknown;
+    resumeDraftKey?: string | null;
+    persistenceRoute?: string;
+    userId?: string | null;
+    onOpenChange?: (open: boolean) => void;
+  }) => {
     mocks.lastPathfinderProps = props;
     return null;
   },
@@ -778,6 +798,95 @@ describe("Journeys row drag integration", () => {
       configurable: true,
       value: { height: 720 },
     });
+  });
+
+  it("reopens the add quest sheet from a persisted creation marker", async () => {
+    localStorage.setItem(
+      getCreationPopupMarkerStorageKey("user-1"),
+      JSON.stringify({
+        surface: "quest",
+        route: "/journeys",
+        selectedDate: "2026-01-15",
+        updatedAt: "2026-05-01T12:00:00.000Z",
+      }),
+    );
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(mocks.lastAddQuestSheetProps?.open).toBe(true);
+    });
+    expect(mocks.lastAddQuestSheetProps?.autoRestoreDraftOnOpen).toBe(true);
+    expect(mocks.lastAddQuestSheetProps?.persistenceRoute).toBe("/journeys");
+  });
+
+  it("reopens Pathfinder from a persisted journeys campaign marker", async () => {
+    localStorage.setItem(
+      getCreationPopupMarkerStorageKey("user-1"),
+      JSON.stringify({
+        surface: "campaign",
+        route: "/journeys",
+        selectedDate: null,
+        updatedAt: "2026-05-01T12:00:00.000Z",
+      }),
+    );
+    localStorage.setItem(
+      getCampaignBuilderDraftStorageKey("user-1"),
+      JSON.stringify({
+        version: 1,
+        step: "goal",
+        goalInput: "Recovered campaign",
+        deadline: null,
+        timelineContext: "",
+        epicTitle: "",
+        epicWhy: "",
+        storyType: null,
+        themeColor: "heroic",
+        customHabits: [],
+        selectedTemplate: null,
+        schedule: null,
+        originalRituals: [],
+        localClarificationAnswers: {},
+        localEpicContext: null,
+        showClarification: false,
+        clarificationQuestions: [],
+        updatedAt: "2026-05-01T12:01:00.000Z",
+      }),
+    );
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(mocks.lastPathfinderProps?.open).toBe(true);
+    });
+    expect((mocks.lastPathfinderProps?.resumeDraft as { goalInput?: string } | null)?.goalInput).toBe("Recovered campaign");
+    expect(mocks.lastPathfinderProps?.resumeDraftKey).toBe("resume-2026-05-01T12:00:00.000Z");
+    expect(mocks.lastPathfinderProps?.persistenceRoute).toBe("/journeys");
+    expect(mocks.lastPathfinderProps?.userId).toBe("user-1");
   });
 
   it("passes tutorial auto-fill as false outside the create quest time substep", async () => {

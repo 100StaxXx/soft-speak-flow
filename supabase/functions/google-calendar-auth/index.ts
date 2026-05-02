@@ -12,11 +12,13 @@ const GOOGLE_CALENDAR_LIST_URL = "https://www.googleapis.com/calendar/v3/users/m
 const GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo";
 
 const SCOPES = [
-  "https://www.googleapis.com/auth/calendar",
+  "https://www.googleapis.com/auth/calendar.events",
+  "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
   "https://www.googleapis.com/auth/userinfo.email",
 ].join(" ");
 
 type SyncMode = "send_only" | "full_sync";
+type OAuthSource = "web" | "native";
 
 type Action =
   | "getAuthUrl"
@@ -61,6 +63,10 @@ function normalizeSyncMode(mode: unknown): SyncMode {
 
 function isSyncMode(mode: unknown): mode is SyncMode {
   return mode === "send_only" || mode === "full_sync";
+}
+
+function normalizeOAuthSource(source: unknown): OAuthSource {
+  return source === "native" ? "native" : "web";
 }
 
 function getBearerToken(req: Request): string | null {
@@ -210,6 +216,7 @@ Deno.serve(async (req) => {
       const userId = await getAuthedUserId(supabase, req);
       const redirectUri = (body?.redirectUri || body?.redirect_uri) as string | undefined;
       const requestedSyncMode = normalizeSyncMode(body?.syncMode ?? body?.sync_mode);
+      const requestedSource = normalizeOAuthSource(body?.source ?? body?.calendar_source);
       if (!redirectUri) {
         return jsonResponse({ error: "redirectUri is required" }, 400);
       }
@@ -222,6 +229,7 @@ Deno.serve(async (req) => {
         provider: "google",
         userId,
         syncMode: requestedSyncMode,
+        source: requestedSource,
         secret: internalFunctionSecret,
       });
 
@@ -252,8 +260,9 @@ Deno.serve(async (req) => {
 
       let userId = await tryGetAuthedUserId(supabase, req);
       let requestedSyncMode: SyncMode = normalizeSyncMode(requestedSyncModeFromBody);
+      let requestedSource: OAuthSource = normalizeOAuthSource(body?.source ?? body?.calendar_source);
 
-      if (!userId) {
+      if (state) {
         if (!internalFunctionSecret) {
           return jsonResponse({ error: "OAuth state validation is not configured" }, 500);
         }
@@ -264,13 +273,19 @@ Deno.serve(async (req) => {
             provider: "google",
             secret: internalFunctionSecret,
           });
+          if (userId && verified.userId !== userId) {
+            return jsonResponse({ error: "OAuth state does not match the authenticated user" }, 401);
+          }
           userId = verified.userId;
           if (!requestedSyncModeFromBody) {
             requestedSyncMode = verified.syncMode;
           }
+          requestedSource = verified.source;
         } catch {
           return jsonResponse({ error: "Invalid or expired OAuth state" }, 401);
         }
+      } else if (!userId) {
+        return jsonResponse({ error: "Invalid or expired OAuth state" }, 401);
       }
 
       const tokenResponse = await fetch(GOOGLE_TOKEN_URL, {
@@ -330,7 +345,7 @@ Deno.serve(async (req) => {
             primary_calendar_name: primary.summary,
             sync_enabled: true,
             sync_mode: requestedSyncMode,
-            platform: "web",
+            platform: requestedSource === "native" ? "ios" : "web",
             updated_at: new Date().toISOString(),
           },
           { onConflict: "user_id,provider" },

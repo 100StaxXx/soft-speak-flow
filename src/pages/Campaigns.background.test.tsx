@@ -45,6 +45,12 @@ vi.mock("@/contexts/MainTabVisibilityContext", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useAuth", () => ({
+  useAuth: () => ({
+    user: { id: "user-1" },
+  }),
+}));
+
 vi.mock("@/hooks/useEpics", () => ({
   useEpics: () => ({
     activeEpics: [],

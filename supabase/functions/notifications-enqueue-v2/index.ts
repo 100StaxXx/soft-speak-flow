@@ -208,7 +208,6 @@ serve(async (req) => {
     const taskPageSize = parseIntEnv("NOTIFICATIONS_V2_TASK_SCAN_LIMIT", 400);
     const queueInsertBatchSize = parseIntEnv("NOTIFICATIONS_V2_QUEUE_INSERT_BATCH_SIZE", 500);
     const maxHabit = parseIntEnv("NOTIFICATIONS_V2_HABIT_SCAN_LIMIT", 200);
-    const maxContact = parseIntEnv("NOTIFICATIONS_V2_CONTACT_SCAN_LIMIT", 200);
     const maxNudge = parseIntEnv("NOTIFICATIONS_V2_NUDGE_SCAN_LIMIT", 200);
     // Acts as a page size for profile-scoped scans so later rows are not starved.
     const profilePageSize = parseIntEnv("NOTIFICATIONS_V2_PROFILE_SCAN_LIMIT", 300);
@@ -725,49 +724,7 @@ serve(async (req) => {
       }));
     }
 
-    // 5) Contact reminders
-    const { data: dueContacts, error: contactError } = await supabase
-      .from("contact_reminders")
-      .select(`
-        id,
-        user_id,
-        reason,
-        reminder_at,
-        contacts:contact_id (
-          id,
-          name
-        )
-      `)
-      .eq("sent", false)
-      .lte("reminder_at", nowIso)
-      .limit(maxContact);
-
-    if (contactError) throw contactError;
-
-    for (const reminder of dueContacts ?? []) {
-      const contactRaw = reminder.contacts as unknown;
-      const contact = contactRaw as { id: string; name: string } | null;
-      if (!contact) continue;
-
-      inserts.push(rowForQueue({
-        userId: reminder.user_id,
-        type: "contact_reminder",
-        sourceTable: "contact_reminders",
-        sourceId: reminder.id,
-        dedupeKey: `contact_reminder:${reminder.id}`,
-        scheduledFor: reminder.reminder_at ?? nowIso,
-        payload: {
-          reminder_id: reminder.id,
-          contact_id: contact.id,
-          contact_name: contact.name,
-          reason: reminder.reason,
-          type: "contact_reminder",
-          url: "/contacts",
-        },
-      }));
-    }
-
-    // 6) Mentor nudges
+    // 5) Mentor nudges
     const { data: pendingNudges, error: nudgeError } = await supabase
       .from("mentor_nudges")
       .select("id, user_id, message, nudge_type, context")
@@ -810,7 +767,7 @@ serve(async (req) => {
       }));
     }
 
-    // 7) Check-in reminders
+    // 6) Check-in reminders
     let checkinProfilesScanned = 0;
 
     await scanPaginatedRows<Pick<ProfileRow, "id" | "timezone" | "checkin_reminders_enabled">>({
@@ -929,7 +886,7 @@ serve(async (req) => {
           task_start_candidates: queuedTaskStarts,
           task_reminder_candidates: queuedTaskReminders,
           habits: habitCandidates?.length ?? 0,
-          contact_reminders: dueContacts?.length ?? 0,
+          contact_reminders: 0,
           mentor_nudges: nudges.length,
           checkin_profiles: checkinProfilesScanned,
         },

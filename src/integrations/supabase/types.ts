@@ -5839,6 +5839,7 @@ export type Database = {
           onboarding_step: string | null
           paypal_email: string | null
           preferences: Json | null
+          readable_quest_cards_enabled: boolean | null
           referral_code: string | null
           referral_count: number | null
           referred_by: string | null
@@ -5894,6 +5895,7 @@ export type Database = {
           onboarding_step?: string | null
           paypal_email?: string | null
           preferences?: Json | null
+          readable_quest_cards_enabled?: boolean | null
           referral_code?: string | null
           referral_count?: number | null
           referred_by?: string | null
@@ -5949,6 +5951,7 @@ export type Database = {
           onboarding_step?: string | null
           paypal_email?: string | null
           preferences?: Json | null
+          readable_quest_cards_enabled?: boolean | null
           referral_code?: string | null
           referral_count?: number | null
           referred_by?: string | null
