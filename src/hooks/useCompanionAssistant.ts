@@ -1636,6 +1636,9 @@ export function useCompanionAssistant({
     const isQuestCapturePrime =
       launchIntent.starterIntent === "quest_capture" &&
       launchMessage.trim() === "";
+    const isQuestCaptureGreeting =
+      launchIntent.starterIntent === "quest_capture" &&
+      launchMessage.trim().length > 0;
 
     void (async () => {
       threadMutationVersionRef.current += 1;
@@ -1654,6 +1657,22 @@ export function useCompanionAssistant({
               visibleAssistantOpening: true,
             });
           }
+          return;
+        }
+
+        if (isQuestCaptureGreeting && !useLegacyFallback) {
+          startTemplateThread({
+            greetingText: launchMessage,
+            visibleAssistantOpening: true,
+          });
+          setActiveFollowUp({
+            question: "What quest do you want to capture?",
+            reason:
+              "I need the quest before I can draft something worth putting on your calendar.",
+            expectedAnswerType: "free_text",
+            options: [],
+            blocksDrafting: true,
+          });
           return;
         }
 

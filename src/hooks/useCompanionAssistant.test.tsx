@@ -1343,6 +1343,82 @@ describe("useCompanionAssistant", () => {
     ).toBe(false);
   });
 
+  it("seeds activeFollowUp for quest_capture launchers that ship a personalized greeting", async () => {
+    const consumed = vi.fn();
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () =>
+        useCompanionAssistant({
+          surface: "journeys",
+          launchIntent: {
+            id: "launch-quest-greeting-1",
+            message: "Clean slate for today. What quest should we add?",
+            starterIntent: "quest_capture",
+            target: "planner",
+          },
+          onLaunchIntentConsumed: consumed,
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(consumed).toHaveBeenCalledWith("launch-quest-greeting-1");
+    });
+
+    expect(mocks.supabaseInvoke).not.toHaveBeenCalled();
+    expect(result.current.messages).toEqual([
+      expect.objectContaining({
+        role: "assistant",
+        content: "Clean slate for today. What quest should we add?",
+      }),
+    ]);
+    expect(result.current.activeFollowUp).toEqual({
+      question: "What quest do you want to capture?",
+      reason:
+        "I need the quest before I can draft something worth putting on your calendar.",
+      expectedAnswerType: "free_text",
+      options: [],
+      blocksDrafting: true,
+    });
+
+    mocks.supabaseInvoke.mockResolvedValueOnce({
+      data: {
+        reply: "Locked in. Gym at 6:00 AM.",
+        mode: "draft",
+        intent: "schedule_task",
+        confidence: 0.9,
+        threadState: {
+          threadId: "fresh-session",
+          sessionId: "fresh-session",
+          openaiConversationId: "conv_q",
+          lastOpenAIResponseId: "resp_q",
+          hasPendingAction: false,
+        },
+        followUp: null,
+      },
+      error: null,
+    });
+
+    await act(async () => {
+      await result.current.submitMessage("Gym at 6 am", "text", {
+        turnOrigin: "composer",
+      });
+    });
+
+    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+      "companion-agent",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          message: "Gym at 6 am",
+          activeFollowUp: expect.objectContaining({
+            question: "What quest do you want to capture?",
+            blocksDrafting: true,
+          }),
+        }),
+      }),
+    );
+  });
+
   it("opens free-talk launcher templates as companion-authored visible openers", async () => {
     const consumed = vi.fn();
     const { wrapper } = createWrapper();
