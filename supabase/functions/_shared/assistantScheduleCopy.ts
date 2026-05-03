@@ -74,6 +74,34 @@ export const getLocalMinutesFromDateTime = (
   return (hour * 60) + minute;
 };
 
+const getOffsetMinutesFromDateTime = (
+  value: string | null | undefined,
+): number => {
+  const match = value?.match(/([+-])(\d{2}):(\d{2})$/);
+  if (!match) return 0;
+
+  const sign = match[1] === "-" ? -1 : 1;
+  const hours = Number.parseInt(match[2] ?? "", 10);
+  const minutes = Number.parseInt(match[3] ?? "", 10);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return 0;
+
+  return sign * ((hours * 60) + minutes);
+};
+
+const getClockTimeInReferenceOffset = (
+  timestamp: string,
+  referenceDateTime: string | null | undefined,
+): string | null => {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const offsetMinutes = getOffsetMinutesFromDateTime(referenceDateTime);
+  const shifted = new Date(date.getTime() + (offsetMinutes * 60_000));
+  return `${String(shifted.getUTCHours()).padStart(2, "0")}:${
+    String(shifted.getUTCMinutes()).padStart(2, "0")
+  }`;
+};
+
 const compareDateKeys = (left: string, right: string) =>
   left.localeCompare(right);
 
@@ -177,15 +205,17 @@ export const buildAssistantEventScheduleLabel = (input: {
     return `${input.title} (all day)`;
   }
 
-  const startDate = new Date(input.start);
-  const endDate = new Date(input.end);
+  const startTime = getClockTimeInReferenceOffset(
+    input.start,
+    input.currentDateTime,
+  );
+  const endTime = getClockTimeInReferenceOffset(
+    input.end,
+    input.currentDateTime,
+  );
   const rangeLabel = formatAssistantTimeRange(
-    `${String(startDate.getHours()).padStart(2, "0")}:${
-      String(startDate.getMinutes()).padStart(2, "0")
-    }`,
-    `${String(endDate.getHours()).padStart(2, "0")}:${
-      String(endDate.getMinutes()).padStart(2, "0")
-    }`,
+    startTime ?? "",
+    endTime ?? "",
   ) ?? "scheduled";
 
   if (status === "past") return `${input.title} (was ${rangeLabel})`;

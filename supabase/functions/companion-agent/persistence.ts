@@ -326,6 +326,53 @@ export async function persistAgentTurn(params: {
   });
 }
 
+export async function mergeLatestAssistantAgentDecision(params: {
+  supabase: any;
+  userId: string;
+  sessionId: string;
+  surface: "companion" | "journeys";
+  assistantMode?: string | null;
+  assistantIntent?: string | null;
+  agentDecision: Record<string, unknown>;
+}) {
+  const { data: latestAssistant, error: selectError } = await params.supabase
+    .from("companion_chats")
+    .select("id, metadata")
+    .eq("session_id", params.sessionId)
+    .eq("user_id", params.userId)
+    .eq("surface", params.surface)
+    .eq("role", "assistant")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (selectError) throw selectError;
+  const latestAssistantRecord = asRecord(latestAssistant);
+  const latestAssistantId = latestAssistantRecord?.id;
+  if (typeof latestAssistantId !== "string") return false;
+
+  const metadata = asRecord(latestAssistantRecord?.metadata) ?? {};
+  const existingDecision = asRecord(metadata.agentDecision) ?? {};
+  const nextMetadata = {
+    ...metadata,
+    ...(params.assistantMode ? { mode: params.assistantMode } : {}),
+    ...(params.assistantIntent ? { intent: params.assistantIntent } : {}),
+    agentDecision: {
+      ...existingDecision,
+      ...params.agentDecision,
+    },
+  };
+
+  const { error: updateError } = await params.supabase
+    .from("companion_chats")
+    .update({ metadata: nextMetadata })
+    .eq("id", latestAssistantId)
+    .eq("user_id", params.userId);
+
+  if (updateError) throw updateError;
+  return true;
+}
+
 export async function persistActionReceipt(params: {
   supabase: any;
   userId: string;

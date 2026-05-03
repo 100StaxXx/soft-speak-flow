@@ -1,5 +1,12 @@
 import type { HTMLAttributes, ReactNode } from "react";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
 import type { CompanionAgentFollowUp } from "@/types/companionAgent";
@@ -184,15 +191,22 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
 }));
 
 vi.mock("@/components/ui/dialog", () => ({
-  Dialog: (
-    { open, children }: { open: boolean; children: ReactNode },
-  ) => (open ? <div>{children}</div> : null),
-  DialogContent: (
-    { children, className }: { children: ReactNode; className?: string },
-  ) => <div className={className}>{children}</div>,
-  DialogHeader: (
-    { children, className }: { children: ReactNode; className?: string },
-  ) => <div className={className}>{children}</div>,
+  Dialog: ({ open, children }: { open: boolean; children: ReactNode }) =>
+    open ? <div>{children}</div> : null,
+  DialogContent: ({
+    children,
+    className,
+  }: {
+    children: ReactNode;
+    className?: string;
+  }) => <div className={className}>{children}</div>,
+  DialogHeader: ({
+    children,
+    className,
+  }: {
+    children: ReactNode;
+    className?: string;
+  }) => <div className={className}>{children}</div>,
   DialogTitle: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   DialogDescription: ({ children }: { children: ReactNode }) => (
     <div>{children}</div>
@@ -216,11 +230,17 @@ vi.mock("@/components/ui/drawer", () => ({
     className,
     ...props
   }: HTMLAttributes<HTMLDivElement> & { children: ReactNode }) => (
-    <div className={className} {...props}>{children}</div>
+    <div className={className} {...props}>
+      {children}
+    </div>
   ),
-  DrawerHeader: (
-    { children, className }: { children: ReactNode; className?: string },
-  ) => <div className={className}>{children}</div>,
+  DrawerHeader: ({
+    children,
+    className,
+  }: {
+    children: ReactNode;
+    className?: string;
+  }) => <div className={className}>{children}</div>,
   DrawerTitle: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   DrawerDescription: ({ children }: { children: ReactNode }) => (
     <div>{children}</div>
@@ -260,8 +280,7 @@ const createBasePendingAction = () => ({
   actionType: "task_create" as const,
   proposalId: null,
   summary: 'Add "Focus block" for 2026-04-19 at 14:00.',
-  confirmationMessage:
-    'Want me to add "Focus block" for 2026-04-19 at 14:00?',
+  confirmationMessage: 'Want me to add "Focus block" for 2026-04-19 at 14:00?',
   normalizedPayload: {},
   affectedEntities: null,
   expiresAt: "2026-04-19T20:00:00.000Z",
@@ -446,19 +465,24 @@ describe("JourneysCompanionPlannerModal", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByTestId("structured-plan-day")).toBeInTheDocument();
-    expect(screen.getByText("Outline the launch checklist"))
-      .toBeInTheDocument();
+    expect(
+      screen.getByText("Outline the launch checklist"),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Saved" })).toBeInTheDocument();
-    expect(screen.getByText('Add "Focus block" for 2026-04-19 at 14:00.'))
-      .toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Confirm All (3)" }))
-      .toBeInTheDocument();
+    expect(
+      screen.getByText('Add "Focus block" for 2026-04-19 at 14:00.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Confirm All (3)" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Confirm" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
-    expect(screen.getByTestId("journeys-companion-planner-text-input"))
-      .toHaveAttribute("data-tour", "companion-plan-day-chat-input");
-    expect(screen.getByTestId("journeys-companion-planner-send-button"))
-      .toHaveAttribute("data-tour", "companion-plan-day-chat-send");
+    expect(
+      screen.getByTestId("journeys-companion-planner-text-input"),
+    ).toHaveAttribute("data-tour", "companion-plan-day-chat-input");
+    expect(
+      screen.getByTestId("journeys-companion-planner-send-button"),
+    ).toHaveAttribute("data-tour", "companion-plan-day-chat-send");
   });
 
   it("keeps text entry local until the user sends", () => {
@@ -622,8 +646,9 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(screen.queryByText(cardOriginReply)).toBeNull();
     expect(screen.getByText("Confirm")).toBeInTheDocument();
     expect(screen.getByText(receiptReply)).toBeInTheDocument();
-    expect(screen.getByTestId("structured-plan-day"))
-      .toHaveTextContent("Outline the launch checklist");
+    expect(screen.getByTestId("structured-plan-day")).toHaveTextContent(
+      "Outline the launch checklist",
+    );
 
     mocks.state.messages = previousMessages;
     mocks.state.pendingAction = previousPendingAction;
@@ -684,7 +709,9 @@ describe("JourneysCompanionPlannerModal", () => {
       "I can help you shape that into something concrete when you're ready.",
     );
 
-    fireEvent.click(screen.getByTestId("journeys-companion-planner-send-button"));
+    fireEvent.click(
+      screen.getByTestId("journeys-companion-planner-send-button"),
+    );
 
     expect(mocks.assistant.submitMessage).not.toHaveBeenCalled();
     expect(mocks.assistant.submitTypedMessage).toHaveBeenCalledTimes(1);
@@ -735,8 +762,9 @@ describe("JourneysCompanionPlannerModal", () => {
       />,
     );
 
-    expect(screen.getByText("I added more detail while you were reading above."))
-      .toBeInTheDocument();
+    expect(
+      screen.getByText("I added more detail while you were reading above."),
+    ).toBeInTheDocument();
     expect(scrollTo).not.toHaveBeenCalled();
     expect(viewport.scrollTop).toBe(120);
   });
@@ -812,7 +840,9 @@ describe("JourneysCompanionPlannerModal", () => {
     fireEvent.scroll(viewport);
     scrollTo.mockClear();
 
-    fireEvent.focus(screen.getByTestId("journeys-companion-planner-text-input"));
+    fireEvent.focus(
+      screen.getByTestId("journeys-companion-planner-text-input"),
+    );
 
     expect(scrollTo).not.toHaveBeenCalled();
     expect(viewport.scrollTop).toBe(120);
@@ -838,8 +868,9 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(onLaunchIntentConsumed).toHaveBeenCalledWith("launch-1");
 
     await waitFor(() => {
-      expect(screen.getByTestId("journeys-companion-thread-picker"))
-        .toBeInTheDocument();
+      expect(
+        screen.getByTestId("journeys-companion-thread-picker"),
+      ).toBeInTheDocument();
     });
 
     fireEvent.click(
@@ -862,8 +893,9 @@ describe("JourneysCompanionPlannerModal", () => {
       />,
     );
 
-    expect(mocks.drawerRootProps.find((props) => props.open === true))
-      .toMatchObject({ repositionInputs: false });
+    expect(
+      mocks.drawerRootProps.find((props) => props.open === true),
+    ).toMatchObject({ repositionInputs: false });
   });
 
   it("keeps the mobile planner drawer flush when no keyboard inset is present", () => {
@@ -875,8 +907,9 @@ describe("JourneysCompanionPlannerModal", () => {
       />,
     );
 
-    expect(screen.getByTestId("journeys-companion-planner-drawer-content"))
-      .toHaveStyle({ bottom: "0px" });
+    expect(
+      screen.getByTestId("journeys-companion-planner-drawer-content"),
+    ).toHaveStyle({ bottom: "0px" });
   });
 
   it.each([
@@ -910,10 +943,12 @@ describe("JourneysCompanionPlannerModal", () => {
         />,
       );
 
-      expect(screen.getByTestId("journeys-companion-planner-shell"))
-        .toHaveStyle({ height: `${expectedShellHeight}px` });
-      expect(screen.getByTestId("journeys-companion-planner-drawer-content"))
-        .toHaveClass("max-h-none");
+      expect(
+        screen.getByTestId("journeys-companion-planner-shell"),
+      ).toHaveStyle({ height: `${expectedShellHeight}px` });
+      expect(
+        screen.getByTestId("journeys-companion-planner-drawer-content"),
+      ).toHaveClass("max-h-none");
     },
   );
 
@@ -926,11 +961,10 @@ describe("JourneysCompanionPlannerModal", () => {
       />,
     );
 
-    expect(screen.getByTestId("journeys-companion-planner-footer"))
-      .toHaveClass(
-        "pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]",
-        "sm:pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))]",
-      );
+    expect(screen.getByTestId("journeys-companion-planner-footer")).toHaveClass(
+      "pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]",
+      "sm:pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))]",
+    );
   });
 
   it("sizes the mobile planner shell to the visible viewport when the keyboard opens", () => {
@@ -957,12 +991,15 @@ describe("JourneysCompanionPlannerModal", () => {
       />,
     );
 
-    expect(screen.getByTestId("journeys-companion-planner-shell"))
-      .toHaveStyle({ height: "454px" });
-    expect(screen.getByTestId("journeys-companion-planner-drawer-content"))
-      .toHaveStyle({ bottom: "352px" });
-    expect(mocks.drawerRootProps.find((props) => props.open === true))
-      .toMatchObject({ repositionInputs: false });
+    expect(screen.getByTestId("journeys-companion-planner-shell")).toHaveStyle({
+      height: "454px",
+    });
+    expect(
+      screen.getByTestId("journeys-companion-planner-drawer-content"),
+    ).toHaveStyle({ bottom: "352px" });
+    expect(
+      mocks.drawerRootProps.find((props) => props.open === true),
+    ).toMatchObject({ repositionInputs: false });
   });
 
   it("keeps the pinned transcript anchored when the drawer layout changes", async () => {
@@ -1003,8 +1040,9 @@ describe("JourneysCompanionPlannerModal", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId("journeys-companion-planner-shell"))
-        .toHaveStyle({ height: "454px" });
+      expect(
+        screen.getByTestId("journeys-companion-planner-shell"),
+      ).toHaveStyle({ height: "454px" });
     });
     expect(scrollTo).toHaveBeenCalledWith({
       top: 600,
@@ -1025,10 +1063,13 @@ describe("JourneysCompanionPlannerModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
-    expect(screen.getByRole("button", { name: "Confirm All (3)" }))
-      .toHaveAttribute("data-tour", "companion-plan-day-pending-confirm-all");
-    expect(screen.getByRole("button", { name: "Confirm" }))
-      .toHaveAttribute("data-tour", "companion-plan-day-pending-confirm");
+    expect(
+      screen.getByRole("button", { name: "Confirm All (3)" }),
+    ).toHaveAttribute("data-tour", "companion-plan-day-pending-confirm-all");
+    expect(screen.getByRole("button", { name: "Confirm" })).toHaveAttribute(
+      "data-tour",
+      "companion-plan-day-pending-confirm",
+    );
     expect(mocks.assistant.confirmAllPendingActions).toHaveBeenCalledTimes(1);
     expect(mocks.assistant.confirmPendingAction).toHaveBeenCalledTimes(1);
     expect(mocks.assistant.cancelPendingAction).toHaveBeenCalledTimes(1);
@@ -1053,12 +1094,16 @@ describe("JourneysCompanionPlannerModal", () => {
       />,
     );
 
-    expect(screen.getByTestId("journeys-companion-follow-up"))
-      .toHaveTextContent("Do you want today to lean progress or recovery?");
-    expect(screen.getByText("Your calendar has room for either shape."))
-      .toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Progress" }))
-      .toHaveAttribute("data-tour", "companion-plan-day-follow-up-option");
+    expect(
+      screen.getByTestId("journeys-companion-follow-up"),
+    ).toHaveTextContent("Do you want today to lean progress or recovery?");
+    expect(
+      screen.getByText("Your calendar has room for either shape."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Progress" })).toHaveAttribute(
+      "data-tour",
+      "companion-plan-day-follow-up-option",
+    );
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Progress" }));
@@ -1181,13 +1226,9 @@ describe("JourneysCompanionPlannerModal", () => {
     });
 
     expect(onQuestProposalEditHandoff).not.toHaveBeenCalled();
-    expect(mocks.assistant.submitMessage).toHaveBeenCalledWith(
-      "No",
-      "text",
-      {
-        turnOrigin: "follow_up_option",
-      },
-    );
+    expect(mocks.assistant.submitMessage).toHaveBeenCalledWith("No", "text", {
+      turnOrigin: "follow_up_option",
+    });
 
     mocks.state.pendingAction = previousPendingAction;
     mocks.state.activeFollowUp = null;
@@ -1230,10 +1271,12 @@ describe("JourneysCompanionPlannerModal", () => {
       />,
     );
 
-    expect(screen.getByTestId("journeys-companion-proposed-actions"))
-      .toHaveTextContent("Draft launch email");
-    expect(screen.getByText("It fits the cleanest open window."))
-      .toBeInTheDocument();
+    expect(
+      screen.getByTestId("journeys-companion-proposed-actions"),
+    ).toHaveTextContent("Draft launch email");
+    expect(
+      screen.getByText("It fits the cleanest open window."),
+    ).toBeInTheDocument();
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /Draft/i }));
@@ -1379,6 +1422,55 @@ describe("JourneysCompanionPlannerModal", () => {
     mocks.state.proposedActions = previousProposedActions;
   });
 
+  it("opens the campaign builder for campaign start proposed actions", async () => {
+    const previousPendingAction = mocks.state.pendingAction;
+    const previousStructuredResponse = mocks.state.structuredResponse;
+    const previousProposedActions = mocks.state.proposedActions;
+    const onOpenCampaignBuilder = vi.fn();
+    const proposedAction = {
+      type: "campaign_start",
+      title: "Launch the course",
+      summary: "Open the campaign builder with this goal.",
+      normalizedPayload: {
+        initialGoal: "Launch the course by the end of next month",
+      },
+    };
+    mocks.state.pendingAction = null;
+    mocks.state.structuredResponse = null;
+    mocks.state.proposedActions = [proposedAction];
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+        onOpenCampaignBuilder={onOpenCampaignBuilder}
+      />,
+    );
+
+    const proposedActionsPanel = screen.getByTestId(
+      "journeys-companion-proposed-actions",
+    );
+    expect(proposedActionsPanel).toHaveTextContent("Launch the course");
+
+    await act(async () => {
+      fireEvent.click(
+        within(proposedActionsPanel).getByRole("button", {
+          name: /Start Campaign/i,
+        }),
+      );
+    });
+
+    expect(onOpenCampaignBuilder).toHaveBeenCalledWith(
+      "Launch the course by the end of next month",
+    );
+    expect(mocks.assistant.submitMessage).not.toHaveBeenCalled();
+
+    mocks.state.pendingAction = previousPendingAction;
+    mocks.state.structuredResponse = previousStructuredResponse;
+    mocks.state.proposedActions = previousProposedActions;
+  });
+
   it("shows a visible error when a quest edit action is missing its task id", async () => {
     const previousPendingAction = mocks.state.pendingAction;
     const previousStructuredResponse = mocks.state.structuredResponse;
@@ -1427,9 +1519,9 @@ describe("JourneysCompanionPlannerModal", () => {
     const previousPendingAction = mocks.state.pendingAction;
     const previousStructuredResponse = mocks.state.structuredResponse;
     const previousProposedActions = mocks.state.proposedActions;
-    const onQuestProposalEditHandoff = vi.fn().mockReturnValue(
-      new Promise(() => undefined),
-    );
+    const onQuestProposalEditHandoff = vi
+      .fn()
+      .mockReturnValue(new Promise(() => undefined));
     const firstProposedAction = {
       type: "quest.create",
       title: "Draft launch email",
@@ -1458,8 +1550,7 @@ describe("JourneysCompanionPlannerModal", () => {
     fireEvent.click(draftButtons[0]!);
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /Drafting/i }))
-        .toBeDisabled();
+      expect(screen.getByRole("button", { name: /Drafting/i })).toBeDisabled();
     });
     fireEvent.click(draftButtons[1]!);
 
@@ -1499,8 +1590,9 @@ describe("JourneysCompanionPlannerModal", () => {
       />,
     );
 
-    expect(screen.getByTestId("journeys-companion-proposed-actions"))
-      .toHaveTextContent("Move dentist appointment");
+    expect(
+      screen.getByTestId("journeys-companion-proposed-actions"),
+    ).toHaveTextContent("Move dentist appointment");
     expect(screen.queryByRole("button", { name: /Draft/i })).toBeNull();
 
     await act(async () => {
@@ -1539,8 +1631,9 @@ describe("JourneysCompanionPlannerModal", () => {
 
     fireEvent.click(screen.getByTestId("structured-suggestion-confirm-plan-1"));
 
-    expect(screen.getByTestId("structured-suggestion-confirm-plan-1"))
-      .toHaveAttribute("data-tour", "companion-plan-day-suggestion-save");
+    expect(
+      screen.getByTestId("structured-suggestion-confirm-plan-1"),
+    ).toHaveAttribute("data-tour", "companion-plan-day-suggestion-save");
     expect(mocks.assistant.confirmSuggestedQuest).toHaveBeenCalledWith(
       "proposal-plan-1",
     );

@@ -2160,16 +2160,10 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const strictLockEnabled = milestoneUsesStrictLock(currentMilestone);
   const tutorialUnavailable = tutorialSuppressed || isCampaignBuilderTutorialPaused;
   const secondaryActionLabel =
-    !tutorialUnavailable && !isIntroDialogueActive
-      ? currentStepId === "first_plan_closeout"
-        ? "Complete tutorial"
-        : "Skip tutorial"
+    !tutorialUnavailable && !isIntroDialogueActive && currentStepId === "first_plan_closeout"
+      ? "Complete tutorial"
       : undefined;
-  const onSecondaryAction = secondaryActionLabel
-    ? currentStepId === "first_plan_closeout"
-      ? completeTutorial
-      : dismissTutorial
-    : undefined;
+  const onSecondaryAction = secondaryActionLabel ? completeTutorial : undefined;
   const isPreHatchCompanionStep = !tutorialUnavailable && currentStepId === "hatch_companion";
 
   return {

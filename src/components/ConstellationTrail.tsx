@@ -5,7 +5,7 @@ import { AlertCircle, HelpCircle, MapPin, Sparkles, Lock, Star, Zap } from "luci
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
-import { cosmicPathBackgrounds, getStaticBackgroundSrcSet } from "@/assets/backgrounds";
+import { getStaticBackgroundSrcSet, starPathPlaceholderBackgrounds } from "@/assets/backgrounds";
 import { useJourneyPathImage } from "@/hooks/useJourneyPathImage";
 import { usePreloadedImageUrl } from "@/hooks/usePreloadedImageUrl";
 import { getJourneyPathCardImageUrl } from "@/utils/journeyPathUrls";
@@ -993,8 +993,8 @@ export const ConstellationTrail = memo(function ConstellationTrail({
 
   const colors = getProgressColors(progress);
   const fallbackBackground = useMemo(() => {
-    const backgroundIndex = hashString(epicId || "fallback-cosmic-path") % cosmicPathBackgrounds.length;
-    return cosmicPathBackgrounds[backgroundIndex];
+    const backgroundIndex = hashString(epicId || "fallback-cosmic-path") % starPathPlaceholderBackgrounds.length;
+    return starPathPlaceholderBackgrounds[backgroundIndex];
   }, [epicId]);
   const optimizedPathImageUrl = useMemo(
     () => getJourneyPathCardImageUrl(pathImageUrl),

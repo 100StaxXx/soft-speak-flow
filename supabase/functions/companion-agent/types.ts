@@ -292,6 +292,20 @@ export const CompanionAgentRequestSchema = z.object({
   selectedProposedActionIntent: SelectedProposedActionIntentSchema.optional(),
 });
 
+export const CompanionDraftOpportunityRequestSchema =
+  CompanionAgentRequestSchema.extend({
+    assistantReply: z.string().min(1).max(4000),
+    assistantMode: ModeSchema,
+    assistantIntent: IntentSchema,
+    assistantConfidence: z.number().min(0).max(1).optional(),
+    assistantUnderstandingState: UnderstandingStateSchema.optional(),
+    assistantFollowUp: CompanionAgentFollowUpSchema.nullable().optional(),
+    assistantProposedActions: z.array(CompanionAgentProposedActionSchema).max(8)
+      .optional(),
+    assistantStructuredResponse: CompanionStructuredResponseSchema.nullable()
+      .optional(),
+  });
+
 export const CompanionAgentActionRequestSchema = z.object({
   sessionId: z.string().min(1).max(200),
   actionId: z.string().uuid().optional(),
@@ -314,6 +328,9 @@ export const SubmitCompanionResultSchema = z.object({
 });
 
 export type CompanionAgentRequest = z.infer<typeof CompanionAgentRequestSchema>;
+export type CompanionDraftOpportunityRequest = z.infer<
+  typeof CompanionDraftOpportunityRequestSchema
+>;
 export type CompanionAgentActionRequest = z.infer<
   typeof CompanionAgentActionRequestSchema
 >;

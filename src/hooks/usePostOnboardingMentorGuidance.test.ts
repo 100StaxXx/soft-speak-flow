@@ -554,7 +554,7 @@ describe("guided tutorial first-value loop", () => {
     ).toBe(false);
   });
 
-  it("can skip the in-progress first-value tutorial", async () => {
+  it("does not expose a skip action during the in-progress first-value tutorial", async () => {
     mocks.state.guidedTutorial = {
       ...createFreshTutorial(),
       milestonesCompleted: ["mentor_intro_hello"],
@@ -566,30 +566,18 @@ describe("guided tutorial first-value loop", () => {
 
     await waitFor(() => {
       expect(result.current.currentStep).toBe("new_goal");
-      expect(result.current.secondaryActionLabel).toBe("Skip tutorial");
+      expect(result.current.secondaryActionLabel).toBeUndefined();
+      expect(result.current.onSecondaryAction).toBeUndefined();
     });
 
-    await act(async () => {
-      result.current.onSecondaryAction?.();
-    });
-
-    await waitFor(() => {
-      expect(result.current.currentStep).toBeNull();
-      expect(result.current.isActive).toBe(false);
-    });
-
-    const latestPayload = mocks.state.profileUpdatePayloads.at(-1) as
-      | { onboarding_data?: { guided_tutorial?: { dismissed?: boolean } } }
-      | undefined;
-    expect(latestPayload?.onboarding_data?.guided_tutorial?.dismissed).toBe(
-      true,
-    );
+    expect(mocks.state.profileUpdatePayloads).toHaveLength(0);
   });
 
-  it("stops forcing pre-hatch companion display after skipping on the hatch step", async () => {
+  it("honors persisted dismissal without forcing the pre-hatch companion display", async () => {
     mocks.state.guidedTutorial = {
       ...createFreshTutorial(),
       completedSteps: ["new_goal"],
+      dismissed: true,
       xpAwardedSteps: ["new_goal"],
       milestonesCompleted: [
         "mentor_intro_hello",
@@ -604,15 +592,6 @@ describe("guided tutorial first-value loop", () => {
 
     const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
       wrapper: createWrapper("/companion"),
-    });
-
-    await waitFor(() => {
-      expect(result.current.currentStep).toBe("hatch_companion");
-      expect(result.current.isPreHatchCompanionStep).toBe(true);
-    });
-
-    await act(async () => {
-      result.current.onSecondaryAction?.();
     });
 
     await waitFor(() => {

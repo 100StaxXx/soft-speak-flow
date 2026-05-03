@@ -23,8 +23,8 @@ const mocks = vi.hoisted(() => ({
     isStrictLockActive: true,
     dialogueText: "Create your first campaign.",
     dialogueSupportText: "Pathfinder will turn a bigger goal into rituals and milestones.",
-    secondaryActionLabel: "Skip tutorial",
-    onSecondaryAction: vi.fn(),
+    secondaryActionLabel: undefined as string | undefined,
+    onSecondaryAction: undefined as (() => void) | undefined,
     dialogueActionLabel: undefined,
     onDialogueAction: undefined,
     speakerName: "Sage",
@@ -43,8 +43,8 @@ vi.mock("@/hooks/usePostOnboardingMentorGuidance", () => ({
 
 beforeEach(() => {
   mocks.guidance.isActive = true;
-  mocks.guidance.secondaryActionLabel = "Skip tutorial";
-  mocks.guidance.onSecondaryAction = mocks.onSecondaryAction;
+  mocks.guidance.secondaryActionLabel = undefined;
+  mocks.guidance.onSecondaryAction = undefined;
   mocks.guidance.dialogueActionLabel = undefined;
   mocks.guidance.onDialogueAction = undefined;
   mocks.onDialogueAction.mockClear();
@@ -75,7 +75,7 @@ const rect = ({
   }) as DOMRect;
 
 describe("MentorGuidanceCard", () => {
-  it("renders VN-style dialogue with a skip control once the tutorial is in progress", () => {
+  it("renders VN-style dialogue without a skip control once the tutorial is in progress", () => {
     render(<MentorGuidanceCard />);
 
     expect(screen.getByText("Sage portrait")).toBeInTheDocument();
@@ -83,7 +83,7 @@ describe("MentorGuidanceCard", () => {
     expect(screen.getByText("Step 1 of 2")).toBeInTheDocument();
     expect(screen.getByText("Create your first campaign.")).toBeInTheDocument();
     expect(screen.getByText("Pathfinder will turn a bigger goal into rituals and milestones.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Skip tutorial" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Skip tutorial" })).not.toBeInTheDocument();
   });
 
   it("uses a centered compact mobile width for the floating panel", () => {
@@ -188,21 +188,21 @@ describe("MentorGuidanceCard", () => {
     expect(mocks.onDialogueAction).toHaveBeenCalledTimes(1);
 
     mocks.guidance.isIntroDialogueActive = false;
-    mocks.guidance.secondaryActionLabel = "Skip tutorial";
-    mocks.guidance.onSecondaryAction = mocks.onSecondaryAction;
+    mocks.guidance.secondaryActionLabel = undefined;
+    mocks.guidance.onSecondaryAction = undefined;
     mocks.guidance.dialogueActionLabel = undefined;
     mocks.guidance.onDialogueAction = undefined;
     mocks.onDialogueAction.mockClear();
   });
 
-  it("renders skip action for in-progress tutorial milestones", () => {
-    mocks.guidance.secondaryActionLabel = "Skip tutorial";
+  it("does not render a fallback skip action when a secondary callback has no label", () => {
+    mocks.guidance.secondaryActionLabel = undefined;
     mocks.guidance.onSecondaryAction = mocks.onSecondaryAction;
 
     render(<MentorGuidanceCard />);
-    fireEvent.click(screen.getByRole("button", { name: "Skip tutorial" }));
 
-    expect(mocks.onSecondaryAction).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: "Skip tutorial" })).not.toBeInTheDocument();
+    expect(mocks.onSecondaryAction).not.toHaveBeenCalled();
 
     mocks.onSecondaryAction.mockClear();
   });
@@ -215,7 +215,7 @@ describe("MentorGuidanceCard", () => {
 
     expect(screen.getByRole("button", { name: "Complete tutorial" })).toBeInTheDocument();
 
-    mocks.guidance.secondaryActionLabel = "Skip tutorial";
+    mocks.guidance.secondaryActionLabel = undefined;
   });
 
   it("renders continue action for non-intro explainer milestones", () => {

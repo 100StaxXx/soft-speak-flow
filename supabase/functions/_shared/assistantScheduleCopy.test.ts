@@ -1,5 +1,6 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
+  buildAssistantEventScheduleLabel,
   buildAssistantTaskScheduleLabel,
   classifyTaskTemporalStatus,
   formatAssistantTime,
@@ -69,6 +70,20 @@ Deno.test("buildAssistantTaskScheduleLabel uses tense-aware schedule phrasing", 
       currentDateTime: "2026-04-19T10:28:00-07:00",
     }),
     "Room cleanup (at 6:40 pm)",
+  );
+});
+
+Deno.test("buildAssistantEventScheduleLabel formats event times in the caller offset", () => {
+  assertEquals(
+    buildAssistantEventScheduleLabel({
+      title: "Dinner",
+      start: "2026-04-19T02:00:00.000Z",
+      end: "2026-04-19T03:00:00.000Z",
+      isAllDay: false,
+      currentDate: "2026-04-18",
+      currentDateTime: "2026-04-18T18:30:00-07:00",
+    }),
+    "Dinner (7:00 pm-8:00 pm)",
   );
 });
 

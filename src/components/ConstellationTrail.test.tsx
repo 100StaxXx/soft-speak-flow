@@ -10,6 +10,7 @@ vi.mock("@/hooks/useJourneyPathImage", () => ({
 }));
 
 import { ConstellationTrail } from "./ConstellationTrail";
+import { starPathPlaceholderBackgrounds } from "@/assets/backgrounds";
 
 class MockPreloadImage {
   complete = false;
@@ -180,7 +181,11 @@ describe("ConstellationTrail", () => {
 
     render(<ConstellationTrail progress={42} targetDays={45} epicId="epic-9" />);
 
-    expect(screen.getByTestId("journey-path-fallback")).toBeInTheDocument();
+    const fallbackImage = screen.getByTestId("journey-path-fallback");
+    expect(fallbackImage).toBeInTheDocument();
+    expect(starPathPlaceholderBackgrounds.map((background) => background.src)).toContain(
+      fallbackImage.getAttribute("src"),
+    );
     expect(screen.getByTestId("journey-path-overlay")).toHaveAttribute("data-overlay-mode", "fallback");
     expect(screen.getByText("Updating")).toBeInTheDocument();
     expect(screen.queryByText(/mapping your path/i)).not.toBeInTheDocument();

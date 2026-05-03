@@ -159,7 +159,16 @@ vi.mock("./PostcardPreview", () => ({
 }));
 
 vi.mock("@/features/tasks/components/EpicClarificationFlow", () => ({
-  EpicClarificationFlow: () => null,
+  EpicClarificationFlow: ({ questions }: { questions: Array<{ id: string; question: string }> }) => (
+    <div data-testid="mock-epic-clarification-flow">
+      {questions.map((question) => (
+        <label key={question.id}>
+          {question.question}
+          <input aria-label={`Answer ${question.question}`} />
+        </label>
+      ))}
+    </div>
+  ),
 }));
 
 const clickPathfinderButton = async (name: RegExp | string) => {
@@ -276,6 +285,98 @@ describe("Pathfinder", () => {
     expect(screen.getByTestId("pathfinder-progress")).toBeInTheDocument();
     expect(screen.getByTestId("pathfinder-footer")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Build My Plan/i })).toBeInTheDocument();
+  });
+
+  it("auto-scrolls the goal panel when generated clarification questions appear", async () => {
+    mocks.classify.mockResolvedValueOnce({
+      type: "epic",
+      epicClarifyingQuestions: [
+        {
+          id: "experience_level",
+          question: "What is your current experience level?",
+          type: "text",
+          required: true,
+        },
+      ],
+    });
+
+    const scrollToSpy = vi.spyOn(HTMLElement.prototype, "scrollTo");
+    const createRect = (top: number, height: number): DOMRect => ({
+      x: 0,
+      y: top,
+      width: 400,
+      height,
+      top,
+      right: 400,
+      bottom: top + height,
+      left: 0,
+      toJSON: () => ({}),
+    }) as DOMRect;
+    const getBoundingClientRectSpy = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockImplementation(function getBoundingClientRect(this: HTMLElement) {
+        if (this.dataset.testid === "pathfinder-goal-scroll-container") {
+          return createRect(120, 520);
+        }
+        if (this.dataset.testid === "pathfinder-clarification-panel") {
+          return createRect(620, 240);
+        }
+        return createRect(0, 0);
+      });
+
+    try {
+      render(
+        <Pathfinder
+          open
+          userId="user-1"
+          onOpenChange={vi.fn()}
+          onCreateEpic={(...args) => mocks.onCreateEpic(...args)}
+          isCreating={false}
+        />,
+      );
+
+      const goalInput = screen.getByLabelText("What's your goal?");
+      fireEvent.change(goalInput, {
+        target: { value: "Pass the bar exam" },
+      });
+      expect(scrollToSpy.mock.calls.some(([options]) => (
+        typeof options === "object" && options?.behavior === "smooth"
+      ))).toBe(false);
+
+      fireEvent.click(screen.getByText("Pick Deadline"));
+      fireEvent.click(screen.getByRole("button", { name: "Build My Plan" }));
+
+      const scrollContainer = await screen.findByTestId("pathfinder-goal-scroll-container");
+      await screen.findByTestId("pathfinder-clarification-panel");
+
+      await waitFor(() => {
+        const didScrollToClarification = scrollToSpy.mock.calls.some(([options], index) => (
+          scrollToSpy.mock.contexts[index] === scrollContainer
+          && typeof options === "object"
+          && options?.top === 484
+          && options?.behavior === "smooth"
+        ));
+        expect(didScrollToClarification).toBe(true);
+      });
+
+      const smoothScrollCount = scrollToSpy.mock.calls.filter(([options]) => (
+        typeof options === "object" && options?.behavior === "smooth"
+      )).length;
+
+      fireEvent.change(goalInput, {
+        target: { value: "Pass the bar exam with essays" },
+      });
+      fireEvent.change(screen.getByLabelText("Answer What is your current experience level?"), {
+        target: { value: "Some experience" },
+      });
+
+      expect(scrollToSpy.mock.calls.filter(([options]) => (
+        typeof options === "object" && options?.behavior === "smooth"
+      ))).toHaveLength(smoothScrollCount);
+    } finally {
+      scrollToSpy.mockRestore();
+      getBoundingClientRectSpy.mockRestore();
+    }
   });
 
   it("hydrates a persisted campaign builder draft when reopened", async () => {

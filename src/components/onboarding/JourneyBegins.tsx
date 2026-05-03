@@ -17,14 +17,15 @@ const narrativeLines = [
   "...will shape both your destinies.",
 ];
 
-const LINE_DISPLAY_MS = 1300;
-const FINAL_LINE_HOLD_MS = 1000;
+const LINE_DISPLAY_MS = 3000;
+const FINAL_LINE_HOLD_MS = 3200;
 const FINAL_BUTTON_DELAY_MS = 900;
 
 export const JourneyBegins = ({ userName, companionAnimal, onComplete }: JourneyBeginsProps) => {
   const [currentLine, setCurrentLine] = useState(0);
   const [showFinalMessage, setShowFinalMessage] = useState(false);
   const [showButton, setShowButton] = useState(false);
+  const currentNarrativeLine = narrativeLines[currentLine];
 
   // Memoize particle positions to prevent them from jumping on re-render
   const particlePositions = useMemo(() => 
@@ -35,18 +36,22 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
     })), []);
 
   useEffect(() => {
-    if (currentLine < narrativeLines.length) {
+    if (showFinalMessage) {
+      return;
+    }
+
+    if (currentLine < narrativeLines.length - 1) {
       const timer = setTimeout(() => {
         setCurrentLine(prev => prev + 1);
       }, LINE_DISPLAY_MS);
       return () => clearTimeout(timer);
-    } else {
-      const finalTimer = setTimeout(() => {
-        setShowFinalMessage(true);
-      }, FINAL_LINE_HOLD_MS);
-      return () => clearTimeout(finalTimer);
     }
-  }, [currentLine]);
+
+    const finalTimer = setTimeout(() => {
+      setShowFinalMessage(true);
+    }, FINAL_LINE_HOLD_MS);
+    return () => clearTimeout(finalTimer);
+  }, [currentLine, showFinalMessage]);
 
   useEffect(() => {
     if (showFinalMessage) {
@@ -83,20 +88,18 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
         {/* Narrative lines */}
         <div className="min-h-[220px] flex flex-col items-center justify-center space-y-6">
           <AnimatePresence mode="wait">
-            {!showFinalMessage && narrativeLines.map((line, index) => (
-              index === currentLine - 1 && (
-                <motion.p
-                  key={index}
-                  initial={{ opacity: 0, y: 20, filter: "blur(4px)" }}
-                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                  exit={{ opacity: 0, y: -10, filter: "blur(2px)" }}
-                  transition={{ duration: 0.9 }}
-                  className="text-lg md:text-xl text-white/80 italic leading-relaxed"
-                >
-                  {line}
-                </motion.p>
-              )
-            ))}
+            {!showFinalMessage && currentNarrativeLine && (
+              <motion.p
+                key={currentLine}
+                initial={{ opacity: 0, y: 20, filter: "blur(4px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                exit={{ opacity: 0, y: -10, filter: "blur(2px)" }}
+                transition={{ duration: 0.9 }}
+                className="text-lg md:text-xl text-white/80 italic leading-relaxed"
+              >
+                {currentNarrativeLine}
+              </motion.p>
+            )}
           </AnimatePresence>
 
           {/* Final message */}

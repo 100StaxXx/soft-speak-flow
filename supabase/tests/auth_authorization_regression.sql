@@ -433,6 +433,51 @@ begin
     'pre-hatch XP should still persist earned XP'
   );
 
+  update public.user_companion
+  set
+    current_xp = 0,
+    current_stage = 0
+  where id = v_companion.id;
+
+  select *
+  into v_award
+  from public.award_xp_v2(
+    'guided_tutorial_step_complete',
+    10,
+    '{"guided_step":"new_goal","source":"guided_tutorial"}'::jsonb,
+    'stage0-guided-tutorial-handoff'
+  )
+  limit 1;
+
+  perform public.test_assert(
+    coalesce(v_award.xp_awarded, 0) = 10,
+    'guided tutorial handoff should award the full 10 XP hatch threshold'
+  );
+
+  perform public.test_assert(
+    coalesce(v_award.should_evolve, false),
+    'guided tutorial handoff XP should mark the egg ready to hatch'
+  );
+
+  perform public.test_assert(
+    coalesce(v_award.claimed_stage_after, -1) = 0,
+    'guided tutorial handoff XP must not claim stage 1'
+  );
+
+  perform public.test_assert(
+    coalesce(v_award.pending_evolution_count, -1) = 1,
+    'guided tutorial handoff XP should report one pending hatch'
+  );
+
+  perform public.test_assert(
+    (
+      select current_stage = 0 and current_xp = 10
+      from public.user_companion
+      where id = v_companion.id
+    ),
+    'guided tutorial handoff should persist hatch-ready XP while leaving the egg unclaimed'
+  );
+
   select *
   into v_preset_bound
   from public.apply_companion_preset_selection(

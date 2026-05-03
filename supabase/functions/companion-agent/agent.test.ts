@@ -9,6 +9,7 @@ import {
   isCompanionScheduleReadFastPathRequest,
   resolveCompanionAgentModel,
   runCompanionAgent,
+  runCompanionDraftOpportunity,
 } from "./agent.ts";
 
 type QueryResult = {
@@ -257,6 +258,70 @@ function createInstructionCaptureFetch(reply = "I’m here.") {
   return { guardedFetch, responseBodies };
 }
 
+function createInstructionAndDraftOpportunityFetch(params: {
+  reply: string;
+  decision: Record<string, unknown>;
+}) {
+  const responseBodies: Array<Record<string, unknown>> = [];
+  const draftOpportunityBodies: Array<Record<string, unknown>> = [];
+  const guardedFetch = (async (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ) => {
+    const url = String(input);
+    if (url.endsWith("/conversations")) {
+      return jsonResponse({ id: `conv_${responseBodies.length + 1}` });
+    }
+
+    if (url.endsWith("/responses")) {
+      const body = JSON.parse(String(init?.body ?? "{}")) as Record<
+        string,
+        unknown
+      >;
+      responseBodies.push(body);
+      return jsonResponse({
+        id: `resp_${responseBodies.length}`,
+        conversation: { id: `conv_${responseBodies.length}` },
+        output: [
+          {
+            type: "function_call",
+            call_id: "call_submit",
+            name: "submit_companion_result",
+            arguments: JSON.stringify({
+              reply: params.reply,
+              mode: "conversation",
+              intent: "unknown",
+              confidence: 0.9,
+              understanding_state: "enough_to_discuss",
+            }),
+          },
+        ],
+      });
+    }
+
+    if (url.endsWith("/chat/completions")) {
+      const body = JSON.parse(String(init?.body ?? "{}")) as Record<
+        string,
+        unknown
+      >;
+      draftOpportunityBodies.push(body);
+      return jsonResponse({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify(params.decision),
+            },
+          },
+        ],
+      });
+    }
+
+    throw new Error(`Unexpected fetch: ${url}`);
+  }) as typeof fetch;
+
+  return { guardedFetch, responseBodies, draftOpportunityBodies };
+}
+
 function createOutputTextCaptureFetch(outputText = "I’m here.") {
   const responseBodies: Array<Record<string, unknown>> = [];
   const guardedFetch = (async (
@@ -439,6 +504,158 @@ Deno.test("runCompanionAgent keeps composer conversation chat-only when model do
     ),
     false,
   );
+});
+
+Deno.test("runCompanionDraftOpportunity surfaces a concrete quest sidecar draft as a suggestion card", async () => {
+  const supabase = createMockSupabase();
+  const { guardedFetch, draftOpportunityBodies } =
+    createInstructionAndDraftOpportunityFetch({
+      reply: "That sounds like a clean thing to put on the board.",
+      decision: {
+        decision: "prepare_action",
+        action_type: "task_create",
+        title: "Review launch notes",
+        summary: "Add Review launch notes for tomorrow morning.",
+        reason: "The user gave a concrete quest and time.",
+        normalized_payload: {
+          title: "Review launch notes",
+          task_date: "2026-04-19",
+          scheduled_time: "09:00",
+          estimated_duration: 30,
+        },
+        confidence: 0.87,
+      },
+    });
+
+  const result = await runCompanionDraftOpportunity({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-draft-sidecar-task",
+      message: "Review launch notes tomorrow at 9",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      turnOrigin: "composer",
+      assistantReply: "That sounds like a clean thing to put on the board.",
+      assistantMode: "conversation",
+      assistantIntent: "unknown",
+      assistantConfidence: 0.9,
+      assistantUnderstandingState: "enough_to_discuss",
+    },
+  });
+
+  assertEquals(draftOpportunityBodies.length, 1);
+  assertEquals(result.understandingState, "ready_to_propose");
+  assertEquals(result.proposedActions[0]?.type, "task_create");
+  assertEquals(
+    result.proposedActions[0]?.normalizedPayload?.title,
+    "Review launch notes",
+  );
+  assertEquals(
+    supabase.inserts.some((entry) =>
+      entry.table === "companion_pending_actions"
+    ),
+    false,
+  );
+
+  assertEquals(result.draftOpportunity?.source, "draft_opportunity");
+});
+
+Deno.test("runCompanionDraftOpportunity surfaces sidecar campaign starts as builder suggestions", async () => {
+  const supabase = createMockSupabase();
+  const { guardedFetch, draftOpportunityBodies } =
+    createInstructionAndDraftOpportunityFetch({
+      reply: "That sounds bigger than a single quest.",
+      decision: {
+        decision: "open_campaign_builder",
+        action_type: "campaign_start",
+        title: "Launch the course",
+        summary: "Open the campaign builder with this goal.",
+        reason: "The user described a broad goal.",
+        normalized_payload: {
+          initialGoal: "Launch the course",
+        },
+        confidence: 0.82,
+      },
+    });
+
+  const result = await runCompanionDraftOpportunity({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-draft-sidecar-campaign-start",
+      message: "I want to launch my course by the end of next month",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      turnOrigin: "composer",
+      assistantReply: "That sounds bigger than a single quest.",
+      assistantMode: "conversation",
+      assistantIntent: "unknown",
+      assistantConfidence: 0.9,
+      assistantUnderstandingState: "enough_to_discuss",
+    },
+  });
+
+  assertEquals(draftOpportunityBodies.length, 1);
+  assertEquals(result.intent, "goal_setting");
+  assertEquals(result.understandingState, "ready_to_propose");
+  assertEquals(result.proposedActions[0]?.type, "campaign_start");
+  assertEquals(
+    result.proposedActions[0]?.normalizedPayload?.initialGoal,
+    "Launch the course",
+  );
+  assertEquals(
+    supabase.inserts.some((entry) =>
+      entry.table === "companion_pending_actions"
+    ),
+    false,
+  );
+});
+
+Deno.test("runCompanionDraftOpportunity ignores sidecar follow-up decisions", async () => {
+  const supabase = createMockSupabase();
+  const { guardedFetch, draftOpportunityBodies } =
+    createInstructionAndDraftOpportunityFetch({
+      reply: "We can shape that together.",
+      decision: {
+        decision: "ask_user",
+        action_type: "task_create",
+        question: "Should I draft a quest?",
+        options: ["Yes", "No"],
+        confidence: 0.77,
+      },
+    });
+
+  const result = await runCompanionDraftOpportunity({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-draft-sidecar-ask-user",
+      message: "Maybe I should call my parents",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      turnOrigin: "composer",
+      assistantReply: "We can shape that together.",
+      assistantMode: "conversation",
+      assistantIntent: "unknown",
+      assistantConfidence: 0.9,
+      assistantUnderstandingState: "enough_to_discuss",
+    },
+  });
+
+  assertEquals(draftOpportunityBodies.length, 1);
+  assertEquals(result.followUp, null);
+  assertEquals(result.proposedActions, []);
+  assertEquals(result.draftOpportunity, null);
 });
 
 Deno.test("runCompanionAgent uses bare starter follow-up when OpenAI is not configured", async () => {
@@ -1171,7 +1388,7 @@ Deno.test("runCompanionAgent keeps plan-day energy answers out of the generic ag
   assert(result.reply.length > 10);
 });
 
-Deno.test("runCompanionAgent routes typed text after Quest? through the AI companion before pending confirmation", async () => {
+Deno.test("runCompanionAgent keeps typed quest text conversational for the sidecar card flow", async () => {
   const launchSupabase = createMockSupabase();
   let launchFetchCalled = false;
 
@@ -1267,14 +1484,15 @@ Deno.test("runCompanionAgent routes typed text after Quest? through the AI compa
   });
 
   assertEquals(responseBodies.length, 1);
-  assertEquals(result.mode, "pending_confirmation");
-  assertEquals(result.pendingAction?.actionType, "task_create");
-  assertEquals(result.pendingAction?.normalizedPayload.title, "Pilates");
-  assert(
+  assertEquals(result.mode, "conversation");
+  assertEquals(result.understandingState, "enough_to_discuss");
+  assertEquals(result.pendingAction, undefined);
+  assertEquals(result.proposedActions, []);
+  assertEquals(
     supabase.inserts.some((entry) =>
       entry.table === "companion_pending_actions"
     ),
-    "typed quest text should become a confirmable pending action, not a direct write",
+    false,
   );
 });
 
@@ -1311,7 +1529,7 @@ Deno.test("runCompanionAgent does not create a composer draft from deterministic
   );
 });
 
-Deno.test("runCompanionAgent drafts Gym at 6 after Quest? when OpenAI returns no tool calls", async () => {
+Deno.test("runCompanionAgent keeps Quest? parser fallback conversational for the sidecar", async () => {
   const supabase = createMockSupabase();
   const { guardedFetch } = createRawMessageTextCaptureFetch("");
 
@@ -1331,21 +1549,19 @@ Deno.test("runCompanionAgent drafts Gym at 6 after Quest? when OpenAI returns no
     },
   });
 
-  assertEquals(result.mode, "pending_confirmation");
-  assertEquals(result.intent, "schedule_task");
-  assertEquals(result.pendingAction?.actionType, "task_create");
-  assertEquals(result.pendingAction?.normalizedPayload.title, "Gym");
-  assertEquals(result.pendingAction?.normalizedPayload.scheduled_time, "18:00");
-  assertEquals(result.pendingAction?.normalizedPayload.task_date, "2026-05-03");
-  assert(
+  assertEquals(result.mode, "conversation");
+  assertEquals(result.understandingState, "enough_to_discuss");
+  assertEquals(result.pendingAction, undefined);
+  assertEquals(result.proposedActions, []);
+  assertEquals(
     supabase.inserts.some((entry) =>
       entry.table === "companion_pending_actions"
     ),
-    "quest-capture parser fallback should become a confirmable pending action",
+    false,
   );
 });
 
-Deno.test("runCompanionAgent planner fallback drafts concrete quest-capture starter text", async () => {
+Deno.test("runCompanionAgent keeps concrete quest-capture fallback conversational", async () => {
   const supabase = createMockSupabase();
   let fetchCalled = false;
 
@@ -1369,26 +1585,14 @@ Deno.test("runCompanionAgent planner fallback drafts concrete quest-capture star
   });
 
   assertEquals(fetchCalled, true);
-  assertEquals(result.mode, "pending_confirmation");
-  assertEquals(result.pendingAction?.actionType, "task_create");
+  assertEquals(result.mode, "conversation");
+  assertEquals(result.pendingAction, undefined);
   assertEquals(result.reply.includes("Quest?"), false);
-  assertEquals(result.proposedActions[0]?.type, "task_create");
-  assertEquals(
-    result.pendingAction?.normalizedPayload.title,
-    "Pilates",
-  );
+  assertEquals(result.proposedActions, []);
   const pendingActionInsert = supabase.inserts.find((entry) =>
     entry.table === "companion_pending_actions"
   );
-  assert(pendingActionInsert, "expected planner fallback to persist action");
-  assertEquals(
-    (pendingActionInsert.value as Record<string, unknown>).metadata,
-    {
-      source: "companion-agent-planner-fallback",
-      visibleDateStart: "2026-04-18",
-      visibleDateEnd: "2026-04-24",
-    },
-  );
+  assertEquals(pendingActionInsert, undefined);
 });
 
 Deno.test("runCompanionAgent carries selected date on quest-capture follow-ups", async () => {
@@ -2289,9 +2493,9 @@ Deno.test({
       },
     });
 
-    assertEquals(result.mode, "schedule_read");
+    assertEquals(result.mode, "conversation");
     assertEquals(result.intent, "check_calendar");
-    assertEquals(result.understandingState, "ready_to_propose");
+    assertEquals(result.understandingState, "enough_to_discuss");
     assertEquals(result.pendingAction, undefined);
     assertEquals(result.threadState.hasPendingAction, false);
     assert(
@@ -2465,9 +2669,9 @@ Deno.test({
       },
     });
 
-    assertEquals(result.mode, "schedule_read");
+    assertEquals(result.mode, "conversation");
     assertEquals(result.intent, "schedule_task");
-    assertEquals(result.understandingState, "ready_to_propose");
+    assertEquals(result.understandingState, "enough_to_discuss");
     assertEquals(result.pendingAction, undefined);
     assertEquals(result.threadState.hasPendingAction, false);
     assert(

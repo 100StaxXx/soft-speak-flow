@@ -677,6 +677,92 @@ describe("useCompanionAssistant", () => {
     );
   });
 
+  it("requests draft opportunity cards after conversational Journeys replies", async () => {
+    mocks.supabaseInvoke.mockImplementation(async (functionName, options) => {
+      if (functionName === "companion-draft-opportunity") {
+        return {
+          data: {
+            intent: "schedule_task",
+            understandingState: "ready_to_propose",
+            proposedActions: [
+              {
+                type: "task_create",
+                title: "Review launch notes",
+                summary: "Add Review launch notes for tomorrow morning.",
+                normalizedPayload: {
+                  title: "Review launch notes",
+                },
+              },
+            ],
+            threadState: {
+              threadId: options?.body?.sessionId ?? "persisted-session",
+              sessionId: options?.body?.sessionId ?? "persisted-session",
+              hasPendingAction: false,
+            },
+          },
+          error: null,
+        };
+      }
+
+      return {
+        data: {
+          reply: "That sounds like a clean thing to put on the board.",
+          mode: "conversation",
+          intent: "unknown",
+          confidence: 0.9,
+          understandingState: "enough_to_discuss",
+          threadState: {
+            threadId: "persisted-session",
+            sessionId: "persisted-session",
+            openaiConversationId: "conv_123",
+            lastOpenAIResponseId: "resp_123",
+            hasPendingAction: false,
+          },
+        },
+        error: null,
+      };
+    });
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("persisted-session");
+    });
+
+    await act(async () => {
+      await result.current.submitMessage(
+        "Review launch notes tomorrow",
+        "text",
+      );
+    });
+
+    await waitFor(() => {
+      expect(result.current.proposedActions[0]?.type).toBe("task_create");
+    });
+    expect(result.current.messages.at(-1)?.content).toBe(
+      "That sounds like a clean thing to put on the board.",
+    );
+    const latestMessage = result.current.messages.at(-1);
+    expect(
+      latestMessage && "proposedActions" in latestMessage
+        ? latestMessage.proposedActions?.[0]?.title
+        : null,
+    ).toBe("Review launch notes");
+    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+      "companion-draft-opportunity",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          message: "Review launch notes tomorrow",
+          assistantReply: "That sounds like a clean thing to put on the board.",
+          assistantMode: "conversation",
+        }),
+      }),
+    );
+  });
+
   it("marks typed composer submissions with the composer turn origin", async () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(

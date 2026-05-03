@@ -60,6 +60,10 @@ export const cosmicPath2Background = createBackgroundAsset(cosmicPath2, cosmicPa
 export const signinBackground = createBackgroundAsset(cosmicSignin, cosmicSignin_2x);
 export const questsSeedBackground = createBackgroundAsset(wallpaperQuestsSeed, wallpaperQuestsSeed_2x);
 export const campaignsSeedBackground = createBackgroundAsset(wallpaperCampaignsSeed, wallpaperCampaignsSeed_2x);
+export const starPathPlaceholderBackgrounds = [
+  questsSeedBackground,
+  campaignsSeedBackground,
+];
 
 export const cinematicPageBackgrounds: Record<CinematicPageBackgroundKey, CinematicPageBackgroundPreset> = {
   guide: {

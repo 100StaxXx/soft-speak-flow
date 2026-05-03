@@ -206,6 +206,9 @@ const getRangeDates = (
   );
 };
 
+const addDaysToDateKey = (dateKey: string, days: number): string =>
+  format(addDays(parseISO(dateKey), days), "yyyy-MM-dd");
+
 const toTimeOfDay = (time: string | null | undefined): string | null => {
   const minutes = parseTimeToMinutes(time);
   if (minutes === null) return null;
@@ -269,6 +272,30 @@ const getLocalMinutesFromDateTime = (value: string): number | null => {
   return (hour * 60) + minute;
 };
 
+const getDateTimeOffset = (value: string): string => {
+  const match = value.match(/([+-]\d{2}:\d{2}|Z)$/);
+  return match?.[1] ?? "Z";
+};
+
+const buildOffsetDateTime = (
+  dateKey: string,
+  clockTime: string,
+  offset: string,
+): string => `${dateKey}T${clockTime}:00${offset}`;
+
+const buildOffsetDateWindow = (
+  currentDateTime: string,
+  dateKey: string,
+): { start: Date; end: Date } => {
+  const offset = getDateTimeOffset(currentDateTime);
+  return {
+    start: new Date(buildOffsetDateTime(dateKey, "00:00", offset)),
+    end: new Date(
+      buildOffsetDateTime(addDaysToDateKey(dateKey, 1), "00:00", offset),
+    ),
+  };
+};
+
 const normalizeScheduleReadMessage = (message: string): string => {
   const trimmed = message.trim();
   const normalized = trimmed.toLowerCase();
@@ -328,11 +355,14 @@ const buildTaskIntervals = (tasks: PlannerContextTask[]): TimelineInterval[] =>
 const buildCalendarIntervals = (
   date: string,
   events: PlannerContextCalendarEvent[],
+  currentDateTime: string,
   wakeMinutes: number,
   windDownMinutes: number,
 ): TimelineInterval[] => {
-  const dayStart = new Date(`${date}T00:00:00`);
-  const dayEnd = new Date(`${date}T23:59:59`);
+  const { start: dayStart, end: dayEnd } = buildOffsetDateWindow(
+    currentDateTime,
+    date,
+  );
 
   return events
     .map((event) => {
@@ -352,9 +382,12 @@ const buildCalendarIntervals = (
 
       const localStart = eventStart < dayStart ? dayStart : eventStart;
       const localEnd = eventEnd > dayEnd ? dayEnd : eventEnd;
-      const startMinutes = (localStart.getHours() * 60) +
-        localStart.getMinutes();
-      const endMinutes = (localEnd.getHours() * 60) + localEnd.getMinutes();
+      const startMinutes = Math.round(
+        (localStart.getTime() - dayStart.getTime()) / 60_000,
+      );
+      const endMinutes = Math.round(
+        (localEnd.getTime() - dayStart.getTime()) / 60_000,
+      );
       if (endMinutes <= startMinutes) return null;
 
       return {
@@ -372,6 +405,7 @@ const buildIntervalsForDate = (params: {
   date: string;
   tasks: PlannerContextTask[];
   calendarEvents: PlannerContextCalendarEvent[];
+  currentDateTime: string;
   wakeMinutes: number;
   windDownMinutes: number;
 }) =>
@@ -380,6 +414,7 @@ const buildIntervalsForDate = (params: {
     ...buildCalendarIntervals(
       params.date,
       params.calendarEvents,
+      params.currentDateTime,
       params.wakeMinutes,
       params.windDownMinutes,
     ),
@@ -479,6 +514,7 @@ const buildSuggestedSlots = (params: {
       date,
       tasks: params.tasksByDate.get(date) ?? [],
       calendarEvents: params.calendarEvents,
+      currentDateTime: params.currentDateTime,
       wakeMinutes,
       windDownMinutes,
     });
@@ -653,6 +689,7 @@ const buildScheduleInsights = (params: {
         task.completed !== true
       ),
       calendarEvents: params.calendarEvents,
+      currentDateTime: params.currentDateTime,
       wakeMinutes,
       windDownMinutes,
     });
@@ -675,6 +712,7 @@ const buildScheduleInsights = (params: {
       date,
       tasks: tasksByDate.get(date) ?? [],
       calendarEvents: params.calendarEvents,
+      currentDateTime: params.currentDateTime,
       wakeMinutes,
       windDownMinutes,
     })).map((conflict) => ({

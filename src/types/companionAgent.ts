@@ -160,6 +160,16 @@ export interface CompanionAgentResponse {
   threadState: CompanionAgentThreadState;
 }
 
+export interface CompanionDraftOpportunityResponse {
+  companionId?: string;
+  intent?: CompanionAgentIntent;
+  understandingState?: CompanionAgentUnderstandingState;
+  followUp?: null;
+  proposedActions?: CompanionAgentProposedAction[];
+  draftOpportunity?: Json | null;
+  threadState?: CompanionAgentThreadState;
+}
+
 export interface CompanionAgentActionRequest {
   sessionId: string;
   actionId?: string;

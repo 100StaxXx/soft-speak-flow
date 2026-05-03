@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { buildCompanionPlannerScheduleInsights } from "@/utils/companionPlannerSchedule";
-import type { PlannerContextCalendarEvent, PlannerContextTask } from "@/types/companionPlanner";
+import type {
+  PlannerContextCalendarEvent,
+  PlannerContextTask,
+} from "@/types/companionPlanner";
 
-const buildTask = (overrides: Partial<PlannerContextTask> = {}): PlannerContextTask => ({
+const buildTask = (
+  overrides: Partial<PlannerContextTask> = {},
+): PlannerContextTask => ({
   id: crypto.randomUUID(),
   title: "Task",
   taskDate: "2026-04-18",
@@ -53,9 +58,24 @@ describe("buildCompanionPlannerScheduleInsights", () => {
         peakProductivityTimes: ["09:00", "10:00"],
       },
       tasks: [
-        buildTask({ id: "task-a", title: "Inbox zero", scheduledTime: "09:00", estimatedDuration: 60 }),
-        buildTask({ id: "task-b", title: "Standup prep", scheduledTime: "09:30", estimatedDuration: 30 }),
-        buildTask({ id: "task-c", title: "Workout", scheduledTime: "12:00", estimatedDuration: 45 }),
+        buildTask({
+          id: "task-a",
+          title: "Inbox zero",
+          scheduledTime: "09:00",
+          estimatedDuration: 60,
+        }),
+        buildTask({
+          id: "task-b",
+          title: "Standup prep",
+          scheduledTime: "09:30",
+          estimatedDuration: 30,
+        }),
+        buildTask({
+          id: "task-c",
+          title: "Workout",
+          scheduledTime: "12:00",
+          estimatedDuration: 45,
+        }),
       ],
     });
 
@@ -81,10 +101,31 @@ describe("buildCompanionPlannerScheduleInsights", () => {
         windDownTime: "20:00",
       },
       tasks: [
-        buildTask({ id: "heavy-1", title: "Strategy block", estimatedDuration: 180, scheduledTime: "08:00" }),
-        buildTask({ id: "heavy-2", title: "Client work", estimatedDuration: 150, scheduledTime: "11:30" }),
-        buildTask({ id: "heavy-3", title: "Planning", estimatedDuration: 60, scheduledTime: "15:00" }),
-        buildTask({ id: "light-1", title: "Check-in", taskDate: "2026-04-20", estimatedDuration: 30, scheduledTime: "10:00" }),
+        buildTask({
+          id: "heavy-1",
+          title: "Strategy block",
+          estimatedDuration: 180,
+          scheduledTime: "08:00",
+        }),
+        buildTask({
+          id: "heavy-2",
+          title: "Client work",
+          estimatedDuration: 150,
+          scheduledTime: "11:30",
+        }),
+        buildTask({
+          id: "heavy-3",
+          title: "Planning",
+          estimatedDuration: 60,
+          scheduledTime: "15:00",
+        }),
+        buildTask({
+          id: "light-1",
+          title: "Check-in",
+          taskDate: "2026-04-20",
+          estimatedDuration: 30,
+          scheduledTime: "10:00",
+        }),
       ],
     });
 
@@ -94,7 +135,9 @@ describe("buildCompanionPlannerScheduleInsights", () => {
       toDate: "2026-04-19",
       taskId: "heavy-1",
     });
-    expect(insights.dayLoads.find((load) => load.date === "2026-04-19")?.status).toBe("open");
+    expect(
+      insights.dayLoads.find((load) => load.date === "2026-04-19")?.status,
+    ).toBe("open");
   });
 
   it("treats connected calendar events as occupied time when finding conflicts and openings", () => {
@@ -107,7 +150,12 @@ describe("buildCompanionPlannerScheduleInsights", () => {
         windDownTime: "21:00",
       },
       tasks: [
-        buildTask({ id: "task-a", title: "Workout", scheduledTime: "09:00", estimatedDuration: 60 }),
+        buildTask({
+          id: "task-a",
+          title: "Workout",
+          scheduledTime: "09:00",
+          estimatedDuration: 60,
+        }),
       ],
       calendarEvents: [
         buildCalendarEvent({
@@ -120,7 +168,40 @@ describe("buildCompanionPlannerScheduleInsights", () => {
     });
 
     expect(insights.dayLoads[0]?.totalMinutes).toBeGreaterThan(120);
-    expect(insights.suggestedSlots.some((slot) => slot.time === "16:00")).toBe(false);
+    expect(insights.suggestedSlots.some((slot) => slot.time === "16:00")).toBe(
+      false,
+    );
+  });
+
+  it("keeps late evening calendar events on the user's local date", () => {
+    const insights = buildCompanionPlannerScheduleInsights({
+      horizon: "day",
+      selectedDate: "2026-04-18",
+      currentDateTime: "2026-04-18T18:30:00-07:00",
+      plannerMemory: {
+        wakeTime: "08:00",
+        windDownTime: "22:00",
+      },
+      tasks: [],
+      calendarEvents: [
+        buildCalendarEvent({
+          id: "event-late",
+          title: "Dinner",
+          start: "2026-04-19T02:00:00.000Z",
+          end: "2026-04-19T03:00:00.000Z",
+        }),
+      ],
+    });
+
+    expect(insights.dayLoads[0]).toMatchObject({
+      date: "2026-04-18",
+      taskCount: 1,
+      totalMinutes: 60,
+      status: "balanced",
+    });
+    expect(insights.suggestedSlots.some((slot) => slot.time === "19:00")).toBe(
+      false,
+    );
   });
 
   it("never suggests past openings for the current day late at night", () => {
@@ -144,8 +225,14 @@ describe("buildCompanionPlannerScheduleInsights", () => {
       calendarEvents: [],
     });
 
-    expect(insights.suggestedSlots.some((slot) => slot.time === "08:00")).toBe(false);
-    expect(insights.suggestedSlots.some((slot) => slot.time === "09:00")).toBe(false);
-    expect(insights.suggestedSlots.every((slot) => slot.time >= "21:48")).toBe(true);
+    expect(insights.suggestedSlots.some((slot) => slot.time === "08:00")).toBe(
+      false,
+    );
+    expect(insights.suggestedSlots.some((slot) => slot.time === "09:00")).toBe(
+      false,
+    );
+    expect(insights.suggestedSlots.every((slot) => slot.time >= "21:48")).toBe(
+      true,
+    );
   });
 });

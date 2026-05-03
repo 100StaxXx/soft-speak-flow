@@ -39,6 +39,7 @@ import type {
   CompanionAgentSelectedProposedActionIntent,
   CompanionAgentTurnOrigin,
   CompanionAgentUnderstandingState,
+  CompanionDraftOpportunityResponse,
   PendingActionView,
 } from "@/types/companionAgent";
 import type {
@@ -136,6 +137,38 @@ const inferStarterIntentFromMessage = (
   message: string,
 ): CompanionPlannerLaunchIntent["starterIntent"] | undefined =>
   isUpcomingScheduleDigestMessage(message) ? "upcoming_start" : undefined;
+
+const parseDraftOpportunityActions = (
+  response: CompanionDraftOpportunityResponse,
+): CompanionAgentProposedAction[] =>
+  Array.isArray(response.proposedActions)
+    ? response.proposedActions.filter(
+        (action): action is CompanionAgentProposedAction =>
+          Boolean(action) &&
+          typeof action === "object" &&
+          !Array.isArray(action) &&
+          typeof (action as Record<string, unknown>).type === "string",
+      )
+    : [];
+
+const shouldRequestDraftOpportunitySidecar = (params: {
+  surface: CompanionAssistantSurface;
+  response: CompanionAgentResponse;
+  selectedProposedAction?: CompanionAgentProposedAction | null;
+}) => {
+  const { surface, response, selectedProposedAction } = params;
+  if (surface !== "journeys") return false;
+  if (selectedProposedAction) return false;
+  if (response.pendingAction) return false;
+  if (response.followUp) return false;
+  if ((response.proposedActions?.length ?? 0) > 0) return false;
+  if (response.structuredResponse) return false;
+  if (response.mode === "pending_confirmation") return false;
+  if (response.mode === "schedule_read") return false;
+  if (response.intent === "check_calendar") return false;
+  if (response.understandingState === "ready_to_draft") return false;
+  return true;
+};
 
 const generateMessageId = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -1198,6 +1231,98 @@ export function useCompanionAssistant({
     [speakAssistantReply, structuredResponse],
   );
 
+  const requestDraftOpportunitySidecar = useCallback(
+    async (params: {
+      message: string;
+      inputMode: CompanionChatInputMode;
+      currentDateTime: string;
+      turnOrigin?: CompanionAgentTurnOrigin;
+      starterIntent?: CompanionPlannerLaunchIntent["starterIntent"];
+      selectedDate?: string | null;
+      selectedProposedAction?: CompanionAgentProposedAction | null;
+      response: CompanionAgentResponse;
+    }) => {
+      if (
+        !shouldRequestDraftOpportunitySidecar({
+          surface,
+          response: params.response,
+          selectedProposedAction: params.selectedProposedAction,
+        })
+      ) {
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase.functions.invoke(
+          "companion-draft-opportunity",
+          {
+            body: {
+              surface,
+              sessionId: params.response.threadState.sessionId,
+              message: params.message,
+              inputMode: params.inputMode,
+              currentDateTime: params.currentDateTime,
+              turnOrigin: params.turnOrigin,
+              starterIntent: params.starterIntent,
+              selectedDate: params.selectedDate ?? undefined,
+              activeFollowUp,
+              activeProposedActions: proposedActions.slice(
+                0,
+                MAX_ACTIVE_PROPOSED_ACTIONS,
+              ),
+              assistantReply: params.response.reply,
+              assistantMode: params.response.mode,
+              assistantIntent: params.response.intent,
+              assistantConfidence: params.response.confidence,
+              assistantUnderstandingState:
+                params.response.understandingState ?? undefined,
+              assistantFollowUp: params.response.followUp ?? null,
+              assistantProposedActions: params.response.proposedActions ?? [],
+              assistantStructuredResponse:
+                params.response.structuredResponse ?? null,
+            },
+          },
+        );
+
+        if (error) throw error;
+        if (
+          activeSessionIdRef.current !== params.response.threadState.sessionId
+        ) {
+          return;
+        }
+
+        const sidecarResponse = data as CompanionDraftOpportunityResponse;
+        const sidecarActions = parseDraftOpportunityActions(sidecarResponse);
+        if (sidecarActions.length === 0) return;
+
+        const nextUnderstandingState =
+          sidecarResponse.understandingState ?? "ready_to_propose";
+        setMessages((previous) => {
+          const nextMessages = [...previous];
+          for (let index = nextMessages.length - 1; index >= 0; index -= 1) {
+            const candidate = nextMessages[index];
+            if (candidate?.role !== "assistant") continue;
+            nextMessages[index] = {
+              ...candidate,
+              followUp: null,
+              proposedActions: sidecarActions,
+              understandingState: nextUnderstandingState,
+            };
+            break;
+          }
+          return nextMessages;
+        });
+        setActiveFollowUp(null);
+        setUnderstandingState(nextUnderstandingState);
+        setProposedActions(sidecarActions);
+        void invalidateThreads();
+      } catch (error) {
+        console.warn("Draft opportunity sidecar failed:", error);
+      }
+    },
+    [activeFollowUp, invalidateThreads, proposedActions, surface],
+  );
+
   const submitMessage = useCallback(
     async (
       rawMessage: string,
@@ -1274,6 +1399,7 @@ export function useCompanionAssistant({
       try {
         lastStarterIntentRef.current = starterIntent ?? null;
         lastReplayablePlannerMessageRef.current = message;
+        const currentDateTime = formatCurrentDateTimeWithOffset(new Date());
         const { data, error } = await supabase.functions.invoke(
           "companion-agent",
           {
@@ -1282,7 +1408,7 @@ export function useCompanionAssistant({
               sessionId: activeSessionIdRef.current,
               message,
               inputMode,
-              currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
+              currentDateTime,
               turnOrigin: options?.turnOrigin,
               starterIntent,
               selectedDate: selectedDate ?? undefined,
@@ -1305,6 +1431,16 @@ export function useCompanionAssistant({
         const response = data as CompanionAgentResponse;
         applyActiveSessionId(response.threadState.sessionId);
         appendAssistantResponse(response);
+        void requestDraftOpportunitySidecar({
+          message,
+          inputMode,
+          currentDateTime,
+          turnOrigin: options?.turnOrigin,
+          starterIntent,
+          selectedDate,
+          selectedProposedAction: options?.selectedProposedAction ?? null,
+          response,
+        });
         const nextQuestCaptureSelectedDate =
           readFollowUpSelectedDate(response.followUp ?? null) ??
           (response.followUp && selectedDate ? selectedDate : null);
@@ -1424,6 +1560,7 @@ export function useCompanionAssistant({
       isSubmitting,
       legacyAssistant,
       messages,
+      requestDraftOpportunitySidecar,
       trackInteraction,
       pendingSuggestionProposalId,
       proposedActions,

@@ -5296,6 +5296,39 @@ Deno.test("upcoming_start returns the today-and-tomorrow digest immediately", ()
   );
 });
 
+Deno.test("upcoming_start keeps late calendar events on the local current day", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What do I have coming up?",
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T18:30:00-07:00",
+    plannerContext: {
+      calendarEvents: [
+        {
+          id: "event-late",
+          title: "Dinner",
+          start: "2026-04-19T02:00:00.000Z",
+          end: "2026-04-19T03:00:00.000Z",
+          isAllDay: false,
+          provider: "google",
+          readOnly: true,
+        },
+      ],
+      starterIntent: "upcoming_start",
+    },
+  }));
+
+  assertEquals(result.mode, "schedule_read");
+  assertStringIncludes(result.reply, "Today: Dinner (7:00 pm-8:00 pm).");
+  assertEquals(
+    result.structuredResponse?.comingUp?.remainingToday[0]?.title,
+    "Dinner",
+  );
+  assertEquals(
+    result.structuredResponse?.comingUp?.nextEvent?.title,
+    "Dinner",
+  );
+});
+
 Deno.test("upcoming_start drops standalone habit tasks whose habit is no longer active", () => {
   const result = buildPlannerResponse(baseInput({
     message: "What do I have coming up?",

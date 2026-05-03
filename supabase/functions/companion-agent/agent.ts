@@ -25,6 +25,7 @@ import {
   type CompanionAgentRequest,
   type CompanionAgentSelectedProposedActionIntent,
   type CompanionAgentUnderstandingState,
+  type CompanionDraftOpportunityRequest,
   type CompanionPendingActionType,
   type LoadedCompanionAgentContext,
   type PendingActionCandidate,
@@ -36,6 +37,7 @@ import {
   loadActivePendingAction,
   loadRecentMessages,
   loadThread,
+  mergeLatestAssistantAgentDecision,
   persistAgentTurn,
   replacePendingAction,
 } from "./persistence.ts";
@@ -173,6 +175,8 @@ const persistAgentTurnBestEffort = async (params: {
 };
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
+const OPENAI_CHAT_COMPLETIONS_URL =
+  "https://api.openai.com/v1/chat/completions";
 const OPENAI_CONVERSATIONS_URL = "https://api.openai.com/v1/conversations";
 export const DEFAULT_COMPANION_AGENT_MODEL = "gpt-5.5";
 
@@ -185,6 +189,7 @@ const MAX_CAMPAIGNS = 8;
 const MAX_CALENDAR_EVENTS = 16;
 const MAX_REFLECTIONS = 8;
 const AGENT_RESPONSE_TIMEOUT_MS = 5_000;
+const DRAFT_OPPORTUNITY_TIMEOUT_MS = 2_500;
 
 const getOptionalEnv = (name: string): string | null => {
   try {
@@ -608,6 +613,40 @@ const PrepareJournalEntrySchema = z.object({
     .nullable(),
 });
 
+const DraftOpportunityActionTypeSchema = z.enum([
+  "task_create",
+  "task_update",
+  "ritual_create",
+  "reminder_create",
+  "campaign_update",
+  "campaign_adjust",
+  "journal_entry",
+  "campaign_start",
+]);
+
+const DraftOpportunityDecisionSchema = z.object({
+  decision: z.enum([
+    "none",
+    "prepare_action",
+    "open_campaign_builder",
+  ]),
+  action_type: DraftOpportunityActionTypeSchema.optional().nullable(),
+  reason: z.string().min(1).max(1000).optional().nullable(),
+  title: z.string().min(1).max(200).optional().nullable(),
+  summary: z.string().min(1).max(1000).optional().nullable(),
+  normalized_payload: z.record(z.unknown()).optional().nullable(),
+  confidence: z.number().min(0).max(1).optional().nullable(),
+});
+
+type DraftOpportunityDecision = z.infer<typeof DraftOpportunityDecisionSchema>;
+type DraftOpportunityMetadata = {
+  source: "draft_opportunity";
+  decision: DraftOpportunityDecision["decision"];
+  actionType: DraftOpportunityDecision["action_type"];
+  confidence: number | null;
+  reason: string | null;
+};
+
 type GuardedFetch = typeof fetch;
 
 export interface UserCompanionRow {
@@ -658,6 +697,7 @@ interface AgentRunResult {
       typeof consultPlannerForAgent
     >["structuredResponse"];
     preparedActionId: string | null;
+    draftOpportunity?: DraftOpportunityMetadata | null;
   };
   openaiConversationId: string | null;
   lastOpenAIResponseId: string | null;
@@ -1375,6 +1415,9 @@ const buildAgentDecisionMetadata = (
   proposedActions: result.proposedActions,
   assumptions: result.assumptions,
   evidenceIds: result.evidenceIds,
+  ...(result.draftOpportunity
+    ? { draftOpportunity: result.draftOpportunity }
+    : {}),
   ...(providerDiagnostics ? { providerDiagnostics } : {}),
 });
 
@@ -1414,6 +1457,17 @@ const addDays = (dateOnly: string, days: number) => {
   return next.toISOString().slice(0, 10);
 };
 
+const getDateTimeOffset = (value: string): string => {
+  const match = value.match(/([+-]\d{2}:\d{2}|Z)$/);
+  return match?.[1] ?? "Z";
+};
+
+const buildOffsetDateTime = (
+  dateKey: string,
+  clockTime: string,
+  offset: string,
+): string => `${dateKey}T${clockTime}:00${offset}`;
+
 const buildDateRange = (request: CompanionAgentRequest) => {
   const baseDate = request.selectedDate ?? toDateOnly(request.currentDateTime);
   const start = request.visibleDateStart ?? baseDate;
@@ -1422,7 +1476,7 @@ const buildDateRange = (request: CompanionAgentRequest) => {
   return {
     start,
     end,
-    timezone: request.currentDateTime.slice(-6),
+    timezone: getDateTimeOffset(request.currentDateTime),
   };
 };
 
@@ -1794,8 +1848,14 @@ async function loadCompanionAgentContext(params: {
           "id, title, start_time, end_time, is_all_day, location, description, source",
         )
         .eq("user_id", params.userId)
-        .lt("start_time", `${addDays(range.end, 1)}T00:00:00`)
-        .gte("end_time", `${range.start}T00:00:00`)
+        .lt(
+          "start_time",
+          buildOffsetDateTime(addDays(range.end, 1), "00:00", range.timezone),
+        )
+        .gte(
+          "end_time",
+          buildOffsetDateTime(range.start, "00:00", range.timezone),
+        )
         .order("start_time", { ascending: true })
         .limit(MAX_CALENDAR_EVENTS),
     ),
@@ -2073,6 +2133,21 @@ function buildInstructions(params: {
   const companionName = resolveCompanionAgentDisplayName(params.companion);
   const currentMood = params.companion.current_mood?.trim() || "steady";
   const modeConfig = getCompanionModeConfig(params.context.companionMode);
+  const sidecarManagedTurn = isJourneysSidecarManagedTurn(params.request);
+  const writePolicyInstructions = sidecarManagedTurn
+    ? [
+      "For this Journeys turn, you are the user-facing chat only. Do not call prepare tools, do not return pending_confirmation, and do not return proposed_actions for drafts or campaigns.",
+      "If the user mentions a concrete quest, plan change, journal item, reminder, ritual, or broad campaign goal, answer naturally in chat. A separate backend sidecar will decide whether to show an opt-in Suggestions card.",
+      "Do not ask structured draft-consent follow-ups like 'Should I draft this?' or 'Would you like to start a campaign?' The sidecar handles card-or-nothing opportunities.",
+      "If a normal conversational question would help, ask it in your reply text with mode conversation and understanding_state enough_to_discuss.",
+      "Never say you drafted, prepared, saved, queued, or opened something from a sidecar-managed turn.",
+    ]
+    : [
+      "You must never execute writes. You may only use read tools and prepare tools.",
+      "If a write is appropriate and you understand enough, prepare exactly one normalized pending action and then call submit_companion_result with mode pending_confirmation and understanding_state ready_to_draft.",
+      "If detail is missing for a useful or safe write, ask one concise clarifying question with mode clarify and understanding_state needs_followup.",
+      "Do not say you drafted, prepared, saved, or queued something unless you actually used a prepare tool and returned pending_confirmation.",
+    ];
 
   return [
     `You are ${companionName}, Cosmiq's conversational companion.`,
@@ -2085,19 +2160,32 @@ function buildInstructions(params: {
     "Turn origin matters: launcher means an app template started the turn, composer means the user freely typed or dictated into chat, follow_up_option means the user clicked a follow-up chip, and proposed_action means the user chose a suggestion control.",
     "For composer turns, treat activeFollowUp as context only. The user may answer it, refine it, ignore it, ask something else, or pivot naturally like ChatGPT; do not force them back into the template form.",
     "Only treat latestUserMessageAnswersFollowUp as true when the context packet says it is true.",
-    "For planning launchers, keep the experience conversational and read-only until the user explicitly opts into drafting. This covers Plan my day, What should I do right now, Adjust my day, Make room, What matters, Prepare me for tomorrow, Advance my campaign, Relationship touch, and low-energy planning.",
-    "If a planning-launcher follow-up names a concrete task, ask the generic confirmation 'Would you like to form a quest?' with Yes and No options. Do not echo an inferred title, draft the quest, or carry hidden quest fields in that same turn.",
-    "If the active follow-up asks whether to form a quest and the user says no, keep the reply conversational and do not prepare a write. If they say yes, ask what the quest should be called before preparing anything.",
-    "If a planning launcher would require moving tasks, creating a campaign reset, or drafting any planner change, ask for explicit consent first, such as 'Would you like me to draft those schedule changes?' or 'Would you like me to draft a campaign adjustment?'",
-    "After the user answers the follow-up or explicitly asks you to draft, create, add, save, move, or schedule something specific, you may use consult_planner and prepare tools when helpful.",
-    "Your job is to choose whether to answer, ask a follow-up, show a plan, suggest quests, or prepare a confirmable action.",
-    "Follow-ups are normal and often appropriate. Ask because one more answer would materially improve the plan or avoid a wrong action, not because the prompt is short.",
-    "A good follow-up is specific and grounded in the provided schedule, tasks, campaigns, rituals, or current moment. Avoid generic questions that ask the user to repeat data the app already supplied.",
+    ...(sidecarManagedTurn
+      ? [
+        "For Journeys planning launchers, keep the visible experience conversational and read-only. Do not create structured draft-consent follow-ups or pending drafts.",
+        "If the user names a concrete task, plan change, or campaign goal, respond to it in chat. The sidecar owns quest and campaign suggestion cards.",
+      ]
+      : [
+        "For planning launchers, keep the experience conversational and read-only until the user explicitly opts into drafting. This covers Plan my day, What should I do right now, Adjust my day, Make room, What matters, Prepare me for tomorrow, Advance my campaign, Relationship touch, and low-energy planning.",
+        "If a planning-launcher follow-up names a concrete task, ask the generic confirmation 'Would you like to form a quest?' with Yes and No options. Do not echo an inferred title, draft the quest, or carry hidden quest fields in that same turn.",
+        "If the active follow-up asks whether to form a quest and the user says no, keep the reply conversational and do not prepare a write. If they say yes, ask what the quest should be called before preparing anything.",
+        "If a planning launcher would require moving tasks, creating a campaign reset, or drafting any planner change, ask for explicit consent first, such as 'Would you like me to draft those schedule changes?' or 'Would you like me to draft a campaign adjustment?'",
+        "After the user answers the follow-up or explicitly asks you to draft, create, add, save, move, or schedule something specific, you may use consult_planner and prepare tools when helpful.",
+      ]),
+    sidecarManagedTurn
+      ? "Your job is to answer the user in chat. Do not show plans as structured proposals, suggest quest cards, or prepare confirmable actions from this turn."
+      : "Your job is to choose whether to answer, ask a follow-up, show a plan, suggest quests, or prepare a confirmable action.",
+    sidecarManagedTurn
+      ? "If you need more information, ask conversationally in the reply text instead of returning a structured follow_up."
+      : "Follow-ups are normal and often appropriate. Ask because one more answer would materially improve the plan or avoid a wrong action, not because the prompt is short.",
+    sidecarManagedTurn
+      ? "Avoid generic questions that ask the user to repeat data the app already supplied."
+      : "A good follow-up is specific and grounded in the provided schedule, tasks, campaigns, rituals, or current moment. Avoid generic questions that ask the user to repeat data the app already supplied.",
     "Use understanding_state in submit_companion_result: needs_followup when you ask a question, enough_to_discuss when chatting or reflecting, ready_to_propose when showing a plan/suggestions, and ready_to_draft when you prepared a pending action.",
-    "When you ask a follow-up, include follow_up with the exact question, why it matters, the expected answer type, and short options when useful. Preserve the original intent across the follow-up loop.",
-    "You must never execute writes. You may only use read tools and prepare tools.",
-    "If a write is appropriate and you understand enough, prepare exactly one normalized pending action and then call submit_companion_result with mode pending_confirmation and understanding_state ready_to_draft.",
-    "If detail is missing for a useful or safe write, ask one concise clarifying question with mode clarify and understanding_state needs_followup.",
+    sidecarManagedTurn
+      ? "Do not include follow_up in submit_companion_result for this turn."
+      : "When you ask a follow-up, include follow_up with the exact question, why it matters, the expected answer type, and short options when useful. Preserve the original intent across the follow-up loop.",
+    ...writePolicyInstructions,
     "If latestUserMessageSelectedProposedAction is true and selectedProposedActionIntent is draft in the context packet, treat the user message as asking you to draft that selected proposal. Prepare a pending action if the proposal is valid enough, or ask one targeted follow-up if it is not.",
     "If latestUserMessageSelectedProposedAction is true and selectedProposedActionIntent is discuss, use the selected proposal as conversation context only. Explain tradeoffs, answer questions, or ask follow-ups, but do not prepare a write from that selection.",
     "If the user wants schedule or task state, use the read tools and summarize only what is actually present.",
@@ -2113,7 +2201,9 @@ function buildInstructions(params: {
     "External calendar events are read-only in v1. If the user wants to change a calendar event directly, explain the limitation and offer a task-based alternative when appropriate.",
     "If there is already an active pending action, be aware of it and avoid stacking multiple confirms in one reply.",
     "Include assumptions and evidence_ids when they help the app/debugger understand why you made the decision. Evidence IDs should reference actual task, ritual, campaign, reminder, or calendar IDs from context.",
-    "If you are ready to draft but do not use a prepare tool, include a supported proposed_actions item with enough normalizedPayload for the app to validate and create a pending confirmation.",
+    sidecarManagedTurn
+      ? "Do not include proposed_actions on this turn. The separate sidecar owns suggestion cards."
+      : "If you are ready to draft but do not use a prepare tool, include a supported proposed_actions item with enough normalizedPayload for the app to validate and create a pending confirmation.",
     "Always finish by calling submit_companion_result. Do not end with a plain assistant message.",
     `Surface: ${params.surface}.`,
     `Current local datetime from the app: ${params.currentDateTime}.`,
@@ -2147,6 +2237,12 @@ function getSelectedProposedActionIntent(
   return request.selectedProposedActionIntent ?? "draft";
 }
 
+function isJourneysSidecarManagedTurn(request: CompanionAgentRequest) {
+  return request.surface === "journeys" &&
+    !request.selectedProposalId &&
+    getSelectedProposedActionIntent(request) !== "draft";
+}
+
 function getDiscussionModeForIntent(
   intent: CompanionAgentIntent,
 ): CompanionAgentMode {
@@ -2172,6 +2268,24 @@ function normalizeUnpersistedDraftResult(result: AgentRunResult["result"]) {
     mode,
     followUp: result.followUp,
   });
+  result.preparedActionId = null;
+}
+
+function normalizeSidecarManagedResult(result: AgentRunResult["result"]) {
+  const hasActionState = result.mode === "pending_confirmation" ||
+    result.understandingState === "ready_to_draft" ||
+    Boolean(result.followUp) ||
+    Boolean(result.preparedActionId) ||
+    result.proposedActions.length > 0 ||
+    Boolean(result.structuredResponse);
+
+  if (!hasActionState) return;
+
+  result.mode = "conversation";
+  result.understandingState = "enough_to_discuss";
+  result.followUp = null;
+  result.proposedActions = [];
+  result.structuredResponse = null;
   result.preparedActionId = null;
 }
 
@@ -3557,6 +3671,498 @@ const buildPreparedCandidateFromProposedAction = (
   }
 };
 
+const clampDraftOpportunityConfidence = (
+  value: number | null | undefined,
+) =>
+  typeof value === "number" && Number.isFinite(value)
+    ? Math.max(0, Math.min(1, value))
+    : 0.72;
+
+const cleanDraftOpportunityText = (value: string | null | undefined) => {
+  const trimmed = value?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : null;
+};
+
+const buildDraftOpportunityMetadata = (
+  decision: DraftOpportunityDecision,
+): DraftOpportunityMetadata => ({
+  source: "draft_opportunity",
+  decision: decision.decision,
+  actionType: decision.action_type ??
+    (decision.decision === "open_campaign_builder" ? "campaign_start" : null),
+  confidence: typeof decision.confidence === "number"
+    ? clampDraftOpportunityConfidence(decision.confidence)
+    : null,
+  reason: cleanDraftOpportunityText(decision.reason),
+});
+
+const compactDraftOpportunityRecord = (
+  record: Record<string, unknown>,
+  keys: string[],
+) => {
+  const compacted: Record<string, unknown> = {};
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      compacted[key] = value.trim();
+      continue;
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+      compacted[key] = value;
+      continue;
+    }
+    if (typeof value === "boolean") {
+      compacted[key] = value;
+    }
+  }
+  return compacted;
+};
+
+const buildDraftOpportunityContext = (params: {
+  request: CompanionAgentRequest;
+  context: LoadedCompanionAgentContext;
+  agentResult: AgentRunResult;
+}) => ({
+  currentDateTime: params.context.currentDateTime,
+  timezone: params.context.timezone,
+  surface: params.request.surface,
+  latestUserMessage: params.request.message,
+  assistantReply: params.agentResult.result.reply,
+  assistantMode: params.agentResult.result.mode,
+  assistantIntent: params.agentResult.result.intent,
+  assistantUnderstandingState: params.agentResult.result.understandingState,
+  turnOrigin: params.request.turnOrigin ?? null,
+  launcherStarterIntent: params.request.starterIntent ?? null,
+  selectedDate: params.request.selectedDate ?? null,
+  activeFollowUp: params.request.activeFollowUp ?? null,
+  visibleDateRange: {
+    start: params.context.visibleDateStart,
+    end: params.context.visibleDateEnd,
+  },
+  recentMessages: params.context.messages.slice(-6).map((message) => ({
+    role: message.role,
+    content: message.content,
+    createdAt: message.created_at,
+  })),
+  tasks: params.context.tasks.slice(0, 10).map((task) =>
+    compactDraftOpportunityRecord(task, [
+      "id",
+      "task_text",
+      "task_date",
+      "scheduled_time",
+      "estimated_duration",
+      "priority",
+      "completed",
+      "epic_id",
+    ])
+  ),
+  rituals: params.context.rituals.slice(0, 6).map((ritual) =>
+    compactDraftOpportunityRecord(ritual, [
+      "id",
+      "title",
+      "frequency",
+      "preferred_time",
+      "estimated_minutes",
+      "category",
+    ])
+  ),
+  campaigns: params.context.campaigns.slice(0, 6).map((campaign) =>
+    compactDraftOpportunityRecord(campaign, [
+      "id",
+      "title",
+      "description",
+      "end_date",
+      "status",
+      "target_days",
+      "progress_percentage",
+    ])
+  ),
+  calendarEvents: params.context.calendarEvents.slice(0, 8).map((event) =>
+    compactDraftOpportunityRecord(event, [
+      "id",
+      "title",
+      "start_time",
+      "end_time",
+      "is_all_day",
+      "location",
+      "source",
+    ])
+  ),
+  capabilities: {
+    canSuggestDraftCards: [
+      "task_create",
+      "task_update",
+      "ritual_create",
+      "reminder_create",
+      "campaign_update",
+      "campaign_adjust",
+      "journal_entry",
+    ],
+    campaignStartOpensBuilderOnly: true,
+    writesRequireUserConfirmation: true,
+    cardOrNothingOnly: true,
+  },
+});
+
+const isDraftOpportunityEligible = (params: {
+  request: CompanionAgentRequest;
+  context: LoadedCompanionAgentContext;
+  agentResult: AgentRunResult;
+}) => {
+  const { request, context, agentResult } = params;
+  const result = agentResult.result;
+
+  if (request.surface !== "journeys") return false;
+  if (agentResult.draftDecisionSource !== "model") return false;
+  if (context.activePendingAction) return false;
+  if (request.selectedProposalId || request.selectedProposedAction) {
+    return false;
+  }
+  if (result.followUp || result.preparedActionId) return false;
+  if (result.proposedActions.length > 0 || result.structuredResponse) {
+    return false;
+  }
+  if (
+    result.mode === "pending_confirmation" ||
+    result.mode === "schedule_read" ||
+    result.intent === "check_calendar" ||
+    result.understandingState === "ready_to_draft"
+  ) {
+    return false;
+  }
+  if (isThinGenericAgentReply(result.reply)) return false;
+  if (result.reply.includes("?")) return false;
+
+  return true;
+};
+
+const parseDraftOpportunityContent = (content: string) => {
+  if (!content) return null;
+
+  try {
+    return DraftOpportunityDecisionSchema.parse(JSON.parse(content));
+  } catch (_error) {
+    const firstBrace = content.indexOf("{");
+    const lastBrace = content.lastIndexOf("}");
+    if (firstBrace < 0 || lastBrace <= firstBrace) return null;
+    try {
+      return DraftOpportunityDecisionSchema.parse(
+        JSON.parse(content.slice(firstBrace, lastBrace + 1)),
+      );
+    } catch {
+      return null;
+    }
+  }
+};
+
+const parseDraftOpportunityChatResponse = (body: unknown) => {
+  const response = asRecord(body);
+  const choices = Array.isArray(response?.choices) ? response.choices : [];
+  const firstChoice = asRecord(choices[0]);
+  const message = asRecord(firstChoice?.message);
+  const content = typeof message?.content === "string"
+    ? message.content.trim()
+    : "";
+  return parseDraftOpportunityContent(content);
+};
+
+const parseDraftOpportunityResponsesResponse = (body: unknown) =>
+  parseDraftOpportunityContent(
+    extractOpenAIResponseText(body as OpenAIResponseBody),
+  );
+
+const runDraftOpportunitySidecar = async (params: {
+  guardedFetch: GuardedFetch;
+  openAIApiKey?: string;
+  request: CompanionAgentRequest;
+  context: LoadedCompanionAgentContext;
+  agentResult: AgentRunResult;
+}): Promise<DraftOpportunityDecision | null> => {
+  if (!isDraftOpportunityEligible(params)) return null;
+
+  const openAIApiKey = params.openAIApiKey ?? getOptionalEnv("OPENAI_API_KEY");
+  if (!openAIApiKey) return null;
+
+  const model = resolveCompanionAgentModel();
+  const messages = [
+    {
+      role: "system",
+      content: [
+        "You are Cosmiq's backend draft-opportunity decider.",
+        "The user-facing assistant already replied. Decide whether the backend should show one draft suggestion card, show one campaign-start suggestion card, or do nothing.",
+        "Return JSON only. Never execute writes or pending confirmations.",
+        'Return shape: {"decision":"none|prepare_action|open_campaign_builder","action_type":null|string,"reason":null|string,"title":null|string,"summary":null|string,"normalized_payload":object|null,"confidence":number|null}.',
+        "Use decision none for casual chat, reflection, schedule reads, unsupported actions, vague intent, or when the assistant reply is already enough.",
+        "Use none when required details are missing. Do not ask a follow-up question; the user can keep chatting with the assistant.",
+        "Use prepare_action only when the latest turn contains enough concrete detail for exactly one supported draft suggestion card. The user will still click Draft before anything opens or saves.",
+        "Use open_campaign_builder when the user expresses a broad goal that should become a campaign. This only shows a user-choice card; the app opens the builder only if the user taps it. Do not invent a backend campaign-create action.",
+      ].join("\n"),
+    },
+    {
+      role: "user",
+      content: JSON.stringify(buildDraftOpportunityContext(params)),
+    },
+  ];
+
+  try {
+    const response = await withTimeout(
+      () =>
+        params.guardedFetch(OPENAI_CHAT_COMPLETIONS_URL, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${openAIApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            response_format: { type: "json_object" },
+            max_completion_tokens: 500,
+          }),
+        }),
+      {
+        timeoutMs: DRAFT_OPPORTUNITY_TIMEOUT_MS,
+        operation: "companion draft opportunity sidecar",
+        timeoutCode: "COMPANION_DRAFT_OPPORTUNITY_TIMEOUT",
+      },
+    );
+
+    if (response.ok) {
+      return parseDraftOpportunityChatResponse(await response.json());
+    }
+
+    if (response.status !== 400 && response.status !== 404) return null;
+
+    const fallbackResponse = await withTimeout(
+      () =>
+        params.guardedFetch(OPENAI_RESPONSES_URL, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${openAIApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            instructions: messages[0].content,
+            input: [messages[1]],
+            max_output_tokens: 500,
+            store: false,
+          }),
+        }),
+      {
+        timeoutMs: DRAFT_OPPORTUNITY_TIMEOUT_MS,
+        operation: "companion draft opportunity fallback",
+        timeoutCode: "COMPANION_DRAFT_OPPORTUNITY_TIMEOUT",
+      },
+    );
+    if (!fallbackResponse.ok) return null;
+    return parseDraftOpportunityResponsesResponse(
+      await fallbackResponse.json(),
+    );
+  } catch {
+    return null;
+  }
+};
+
+const buildDraftOpportunityProposedAction = (
+  decision: DraftOpportunityDecision,
+) => {
+  const payload = asRecord(decision.normalized_payload) ?? {};
+  const actionType = decision.action_type ??
+    (decision.decision === "open_campaign_builder" ? "campaign_start" : null);
+  if (!actionType) return null;
+
+  const payloadTitle = readFirstString(payload, [
+    "title",
+    "task_text",
+    "name",
+    "goal",
+    "initialGoal",
+    "initial_goal",
+  ]);
+  const title = cleanDraftOpportunityText(decision.title) ??
+    payloadTitle ??
+    actionType.replaceAll("_", " ");
+  const summary = cleanDraftOpportunityText(decision.summary) ??
+    cleanDraftOpportunityText(decision.reason) ??
+    `Prepare ${title}.`;
+
+  return {
+    type: actionType,
+    title,
+    summary,
+    reason: cleanDraftOpportunityText(decision.reason),
+    normalizedPayload: payload,
+    confidence: clampDraftOpportunityConfidence(decision.confidence),
+  } satisfies CompanionAgentProposedAction;
+};
+
+const applyDraftOpportunityDecision = (params: {
+  request: CompanionAgentRequest;
+  agentResult: AgentRunResult;
+  decision: DraftOpportunityDecision | null;
+}) => {
+  const { request, agentResult, decision } = params;
+  if (!decision || decision.decision === "none") return;
+
+  const metadata = buildDraftOpportunityMetadata(decision);
+
+  const proposedAction = buildDraftOpportunityProposedAction(decision);
+  if (!proposedAction) return;
+
+  if (decision.decision === "open_campaign_builder") {
+    const payload = asRecord(proposedAction.normalizedPayload) ?? {};
+    const initialGoal = readFirstString(payload, [
+      "initialGoal",
+      "initial_goal",
+      "goal",
+      "title",
+      "description",
+    ]) ?? proposedAction.title ?? request.message;
+    agentResult.result.mode = "conversation";
+    agentResult.result.intent = "goal_setting";
+    agentResult.result.understandingState = "ready_to_propose";
+    agentResult.result.followUp = null;
+    agentResult.result.preparedActionId = null;
+    agentResult.result.proposedActions = [{
+      ...proposedAction,
+      type: "campaign_start",
+      title: proposedAction.title ?? "Start a campaign?",
+      summary: proposedAction.summary ??
+        "Start a campaign from this goal.",
+      normalizedPayload: {
+        ...payload,
+        initialGoal,
+      },
+    }];
+    agentResult.result.draftOpportunity = metadata;
+    return;
+  }
+
+  if (decision.decision !== "prepare_action") return;
+  if (!normalizeProposedActionType(proposedAction.type)) return;
+
+  agentResult.result.mode = "conversation";
+  agentResult.result.intent = proposedAction.type === "task_create"
+    ? "schedule_task"
+    : proposedAction.type === "task_update" ||
+        proposedAction.type === "reminder_create"
+    ? "update_existing_plan"
+    : proposedAction.type === "journal_entry"
+    ? "journal"
+    : "goal_setting";
+  agentResult.result.understandingState = "ready_to_propose";
+  agentResult.result.followUp = null;
+  agentResult.result.proposedActions = [proposedAction];
+  agentResult.result.preparedActionId = null;
+  agentResult.result.draftOpportunity = metadata;
+};
+
+export async function runCompanionDraftOpportunity(params: {
+  guardedFetch: GuardedFetch;
+  supabase: any;
+  userId: string;
+  request: CompanionDraftOpportunityRequest;
+  openAIApiKey?: string;
+  requestId?: string | null;
+}) {
+  const companion = await wrapSubStage(
+    "context_load",
+    () => loadCompanionId(params.supabase, params.userId, params.requestId),
+  );
+  const context = await wrapSubStage(
+    "context_load",
+    () =>
+      loadCompanionAgentContext({
+        supabase: params.supabase,
+        userId: params.userId,
+        companionId: companion.id,
+        sessionId: params.request.sessionId,
+        request: params.request,
+        requestId: params.requestId,
+      }),
+  );
+
+  const agentResult: AgentRunResult = {
+    result: {
+      reply: params.request.assistantReply,
+      mode: params.request.assistantMode,
+      intent: params.request.assistantIntent,
+      confidence: params.request.assistantConfidence ?? 0.8,
+      understandingState: params.request.assistantUnderstandingState ??
+        deriveUnderstandingState({
+          mode: params.request.assistantMode,
+          followUp: params.request.assistantFollowUp ?? null,
+        }),
+      followUp: params.request.assistantFollowUp ?? null,
+      proposedActions: params.request.assistantProposedActions ?? [],
+      assumptions: [],
+      evidenceIds: [],
+      structuredResponse: params.request.assistantStructuredResponse ?? null,
+      preparedActionId: null,
+    },
+    openaiConversationId: context.thread?.openai_conversation_id ?? null,
+    lastOpenAIResponseId: context.thread?.last_openai_response_id ?? null,
+    draftDecisionSource: "model",
+    providerDiagnostics: null,
+  };
+
+  applyDraftOpportunityDecision({
+    request: params.request,
+    agentResult,
+    decision: await runDraftOpportunitySidecar({
+      guardedFetch: params.guardedFetch,
+      openAIApiKey: params.openAIApiKey,
+      request: params.request,
+      context,
+      agentResult,
+    }),
+  });
+
+  const sidecarAgentDecision = buildAgentDecisionMetadata(agentResult.result);
+  const hasSidecarCard = agentResult.result.proposedActions.length > 0;
+
+  if (hasSidecarCard) {
+    await persistAgentTurnBestEffort({
+      requestId: params.requestId,
+      persistConversation: async () => {
+        await mergeLatestAssistantAgentDecision({
+          supabase: params.supabase,
+          userId: params.userId,
+          sessionId: params.request.sessionId,
+          surface: params.request.surface,
+          assistantMode: agentResult.result.mode,
+          assistantIntent: agentResult.result.intent,
+          agentDecision: sidecarAgentDecision,
+        });
+      },
+    });
+  }
+
+  console.log("[companion-draft-opportunity] turn", {
+    sessionId: params.request.sessionId,
+    userId: params.userId,
+    decision: agentResult.result.draftOpportunity?.decision ?? "none",
+    proposedActionCount: agentResult.result.proposedActions.length,
+  });
+
+  return {
+    companionId: companion.id,
+    intent: agentResult.result.intent,
+    understandingState: agentResult.result.understandingState,
+    followUp: null,
+    proposedActions: agentResult.result.proposedActions,
+    draftOpportunity: agentResult.result.draftOpportunity ?? null,
+    threadState: {
+      threadId: params.request.sessionId,
+      sessionId: params.request.sessionId,
+      openaiConversationId: context.thread?.openai_conversation_id ?? null,
+      lastOpenAIResponseId: context.thread?.last_openai_response_id ?? null,
+      hasPendingAction: Boolean(context.activePendingAction),
+    },
+  };
+}
+
 export async function runCompanionAgent(params: RunAgentParams) {
   const companion = await wrapSubStage(
     "context_load",
@@ -4229,6 +4835,16 @@ export async function runCompanionAgent(params: RunAgentParams) {
     request: params.request,
     result: agentResult.result,
   });
+  if (
+    isJourneysSidecarManagedTurn(params.request) &&
+    (
+      agentResult.draftDecisionSource === "model" ||
+      agentResult.result.mode === "pending_confirmation" ||
+      agentResult.result.understandingState === "ready_to_draft"
+    )
+  ) {
+    normalizeSidecarManagedResult(agentResult.result);
+  }
 
   let persistedPendingAction: PendingActionRow | null =
     context.activePendingAction;
@@ -4245,12 +4861,14 @@ export async function runCompanionAgent(params: RunAgentParams) {
   const selectedProposedActionIsDiscussion =
     selectedProposedActionIntent === "discuss";
   const modelAuthoredDraftDecision =
-    agentResult.draftDecisionSource === "model";
+    agentResult.draftDecisionSource === "model" &&
+    !isJourneysSidecarManagedTurn(params.request);
   const deterministicQuestCaptureDraftDecision =
     agentResult.draftDecisionSource === "deterministic" &&
     params.request.starterIntent === "quest_capture" &&
     agentResult.result.understandingState === "ready_to_draft" &&
-    !agentResult.result.followUp;
+    !agentResult.result.followUp &&
+    !isJourneysSidecarManagedTurn(params.request);
 
   if (
     modelAuthoredDraftDecision &&

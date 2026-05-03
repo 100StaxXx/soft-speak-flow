@@ -595,20 +595,20 @@ export const MentorGuidanceCard = () => {
             {dialogueSupportText && !isCompact ? (
               <p className="mt-1 text-sm leading-relaxed text-white/80">{dialogueSupportText}</p>
             ) : null}
-            {!isCompact && (onSecondaryAction || onDialogueAction) ? (
+            {!isCompact && ((onSecondaryAction && secondaryActionLabel) || onDialogueAction) ? (
               <div className={cn("mt-3 flex flex-wrap gap-2", isCompact && "mt-2")}>
-                {onSecondaryAction ? (
+                {onSecondaryAction && secondaryActionLabel ? (
                   <Button
                     type="button"
                     variant="ghost"
-                    aria-label={secondaryActionLabel || "Skip tutorial"}
+                    aria-label={secondaryActionLabel}
                     onClick={onSecondaryAction}
                     className={cn(
                       "pointer-events-auto h-9 rounded-xl border border-white/25 bg-black/45 text-white hover:bg-black/60",
                       isCompact && "h-8 px-2 text-xs",
                     )}
                   >
-                    {secondaryActionLabel || "Skip tutorial"}
+                    {secondaryActionLabel}
                   </Button>
                 ) : null}
                 {onDialogueAction ? (

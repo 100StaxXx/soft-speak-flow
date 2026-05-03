@@ -271,9 +271,7 @@ describe("guided tutorial route restoration", () => {
         "Your rituals are on the calendar now.",
       );
       expect(screen.getByTestId("intro-action")).toHaveTextContent("Meet companion");
-      expect(screen.getByTestId("secondary-action")).toHaveTextContent(
-        "Skip tutorial",
-      );
+      expect(screen.getByTestId("secondary-action")).toHaveTextContent("");
     });
 
     fireEvent.click(screen.getByRole("button", { name: "intro-action" }));
@@ -306,23 +304,16 @@ describe("guided tutorial route restoration", () => {
     });
   });
 
-  it("stops restoring tutorial routes after the tutorial is skipped", async () => {
+  it("stops restoring tutorial routes after the tutorial was previously dismissed", async () => {
     mocks.guidedTutorial = {
       ...createFreshTutorial(),
+      dismissed: true,
       milestonesCompleted: ["mentor_intro_hello"],
     };
     renderWithProviders("/journeys");
 
     await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/campaigns");
-      expect(screen.getByTestId("secondary-action")).toHaveTextContent(
-        "Skip tutorial",
-      );
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "secondary" }));
-
-    await waitFor(() => {
+      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
       expect(screen.getByTestId("step")).toHaveTextContent("");
       expect(screen.getByTestId("secondary-action")).toHaveTextContent("");
     });

@@ -4271,11 +4271,13 @@ const buildTaskIntervalsForDate = (
 const buildCalendarIntervalsForDate = (
   events: PlannerContextCalendarEvent[],
   date: string,
+  currentDateTime: string,
   plannerMemory?: PlannerMemoryProfile | null,
 ): TimelineInterval[] => {
-  const dayStart = new Date(`${date}T00:00:00`);
-  const nextDay = addDaysToDateKey(date, 1);
-  const dayEnd = new Date(`${nextDay}T00:00:00`);
+  const { start: dayStart, end: dayEnd } = buildOffsetDateWindow(
+    currentDateTime,
+    date,
+  );
   const wakeMinutes = getWakeMinutes(plannerMemory);
   const windDownMinutes = getWindDownMinutes(plannerMemory);
 
@@ -4297,9 +4299,12 @@ const buildCalendarIntervalsForDate = (
 
       const localStart = start < dayStart ? dayStart : start;
       const localEnd = end > dayEnd ? dayEnd : end;
-      const startMinutes = (localStart.getHours() * 60) +
-        localStart.getMinutes();
-      const endMinutes = (localEnd.getHours() * 60) + localEnd.getMinutes();
+      const startMinutes = Math.round(
+        (localStart.getTime() - dayStart.getTime()) / 60_000,
+      );
+      const endMinutes = Math.round(
+        (localEnd.getTime() - dayStart.getTime()) / 60_000,
+      );
       if (endMinutes <= startMinutes) return null;
 
       return {
@@ -4322,6 +4327,7 @@ const buildIntervalsForDate = (
   ...buildCalendarIntervalsForDate(
     input.plannerContext.calendarEvents,
     date,
+    input.currentDateTime,
     input.plannerContext.plannerMemory,
   ),
 ].sort((left, right) => left.startMinutes - right.startMinutes));
@@ -4400,11 +4406,16 @@ const collectScheduleItemsForDate = (
 
   const events = input.plannerContext.calendarEvents
     .filter((event) => {
-      const start = new Date(event.start);
       const end = new Date(event.end);
-      const dayStart = new Date(`${date}T00:00:00`);
-      const dayEnd = new Date(`${addDaysToDateKey(date, 1)}T00:00:00`);
-      if (!(end > dayStart && start < dayEnd)) return false;
+      if (
+        !calendarEventOverlapsOffsetDate(
+          event,
+          date,
+          input.currentDateTime,
+        )
+      ) {
+        return false;
+      }
       if (!remainingOnly || date !== currentDateKey) return true;
       return end > now;
     })
@@ -4417,10 +4428,10 @@ const collectScheduleItemsForDate = (
         currentDate: input.currentDate,
         currentDateTime: input.currentDateTime,
       }),
-      sortMinutes: event.isAllDay ? -1 : parseTimeToMinutes(
-        `${new Date(event.start).getHours()}:${
-          String(new Date(event.start).getMinutes()).padStart(2, "0")
-        }`,
+      sortMinutes: getEventSortMinutesForDate(
+        input.currentDateTime,
+        event,
+        date,
       ),
     }));
 
@@ -4484,11 +4495,16 @@ const collectStructuredScheduleItemsForDate = (
 
   const events = input.plannerContext.calendarEvents
     .filter((event) => {
-      const start = new Date(event.start);
       const end = new Date(event.end);
-      const dayStart = new Date(`${date}T00:00:00`);
-      const dayEnd = new Date(`${addDaysToDateKey(date, 1)}T00:00:00`);
-      if (!(end > dayStart && start < dayEnd)) return false;
+      if (
+        !calendarEventOverlapsOffsetDate(
+          event,
+          date,
+          input.currentDateTime,
+        )
+      ) {
+        return false;
+      }
       if (!remainingOnly || date !== currentDateKey) return true;
       return end > now;
     })
@@ -4507,10 +4523,10 @@ const collectStructuredScheduleItemsForDate = (
       endsAt: event.end,
       isAllDay: event.isAllDay,
       source: "calendar" as const,
-      sortMinutes: event.isAllDay ? -1 : parseTimeToMinutes(
-        `${new Date(event.start).getHours()}:${
-          String(new Date(event.start).getMinutes()).padStart(2, "0")
-        }`,
+      sortMinutes: getEventSortMinutesForDate(
+        input.currentDateTime,
+        event,
+        date,
       ),
     }));
 
@@ -8258,6 +8274,53 @@ const buildOffsetDateTime = (
   offset: string,
 ): string => `${dateKey}T${clockTime}:00${offset}`;
 
+const buildOffsetDateWindow = (
+  currentDateTime: string,
+  dateKey: string,
+): { start: Date; end: Date } => {
+  const offset = getDateTimeOffset(currentDateTime);
+  return {
+    start: new Date(buildOffsetDateTime(dateKey, "00:00", offset)),
+    end: new Date(
+      buildOffsetDateTime(addDaysToDateKey(dateKey, 1), "00:00", offset),
+    ),
+  };
+};
+
+const getEventSortMinutesForDate = (
+  currentDateTime: string,
+  event: PlannerContextCalendarEvent,
+  dateKey: string,
+): number | null => {
+  if (event.isAllDay) return -1;
+
+  const { start: dayStart } = buildOffsetDateWindow(currentDateTime, dateKey);
+  const eventStart = new Date(event.start);
+  if (Number.isNaN(eventStart.getTime())) return null;
+
+  return Math.max(
+    0,
+    Math.round((eventStart.getTime() - dayStart.getTime()) / 60_000),
+  );
+};
+
+const calendarEventOverlapsOffsetDate = (
+  event: PlannerContextCalendarEvent,
+  dateKey: string,
+  currentDateTime: string,
+): boolean => {
+  const { start: dayStart, end: dayEnd } = buildOffsetDateWindow(
+    currentDateTime,
+    dateKey,
+  );
+  const start = new Date(event.start);
+  const end = new Date(event.end);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return false;
+  }
+  return end > dayStart && start < dayEnd;
+};
+
 const inferTimingLabelFromClock = (
   clockTime: string | null | undefined,
 ): PlannerTaskTimingLabel | undefined => {
@@ -8327,12 +8390,9 @@ type PlanDayCampaignFocus = NonNullable<
 const calendarEventOverlapsDate = (
   event: PlannerContextCalendarEvent,
   date: string,
+  currentDateTime: string,
 ): boolean => {
-  const dayStart = new Date(`${date}T00:00:00`);
-  const dayEnd = new Date(`${addDaysToDateKey(date, 1)}T00:00:00`);
-  const start = new Date(event.start);
-  const end = new Date(event.end);
-  return end > dayStart && start < dayEnd;
+  return calendarEventOverlapsOffsetDate(event, date, currentDateTime);
 };
 
 export const getActiveCampaignIdSet = (
@@ -8645,7 +8705,7 @@ export const getPlanDayLoadBreakdown = (
     !hasActiveCampaignLink(task, activeCampaignIds) && !task.habitSourceId
   );
   const calendarBlocks = input.plannerContext.calendarEvents.filter((event) =>
-    calendarEventOverlapsDate(event, targetDate)
+    calendarEventOverlapsDate(event, targetDate, input.currentDateTime)
   );
 
   return {
