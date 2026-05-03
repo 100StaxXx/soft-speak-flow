@@ -50,6 +50,10 @@ export interface CompanionCosmiqTitleCard {
   status: "ready" | "generating" | "unavailable";
   cached: boolean;
   promptVersion: number;
+  failureCode?: string | null;
+  failureMessage?: string | null;
+  retryable?: boolean;
+  lastAttemptAt?: string | null;
 }
 
 export interface CompanionCosmiqTitlePreviousState {

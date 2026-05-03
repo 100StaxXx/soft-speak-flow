@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   BarChart3,
@@ -39,7 +39,6 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { Skeleton } from "@/components/ui/skeleton";
 import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
 import {
@@ -50,6 +49,10 @@ import {
   useCompanionStatAnalysis,
 } from "@/hooks/useCompanionStatAnalysis";
 import { cn } from "@/lib/utils";
+import {
+  COMPANION_STAT_ANALYSIS_PRELUDE_CARDS,
+  type CompanionStatAnalysisPreludeCard,
+} from "@/shared/companionStatAnalysisPreludeCards";
 
 interface CompanionStatAnalysisSurfaceProps {
   open: boolean;
@@ -110,6 +113,10 @@ const ATTRIBUTE_ORDER: CompanionStatAttribute[] = [
 
 const STAT_MIN = 100;
 const STAT_MAX = 1000;
+const EMPTY_IMAGE_URLS: string[] = [];
+const TITLE_ART_SLIDE_INTERVAL_MS = 1_800;
+const TITLE_ART_SLIDES_BEFORE_REVEAL = 2;
+const TITLE_ART_REVEAL_SETTLE_MS = 900;
 
 const RANK_BY_BAND: Record<CompanionStatBand, string> = {
   Emerging: "C",
@@ -257,13 +264,343 @@ const mentorAccentStyle = (analysis: CompanionStatAnalysis): CSSProperties | und
   };
 };
 
-function LoadingState() {
+const getTitleCardImageUrls = (
+  card: CompanionStatAnalysis["cosmiqTitleCard"] | null | undefined,
+): string[] => {
+  const urls = [
+    ...(Array.isArray(card?.imageUrls) ? card.imageUrls : []),
+    card?.imageUrl ?? null,
+  ].filter((imageUrl): imageUrl is string => typeof imageUrl === "string" && imageUrl.length > 0);
+
+  return Array.from(new Set(urls));
+};
+
+const getTitleArtPreviewDwellMs = (imageCount: number): number => {
+  if (imageCount <= 1) return 0;
+  return (Math.min(TITLE_ART_SLIDES_BEFORE_REVEAL, imageCount - 1) * TITLE_ART_SLIDE_INTERVAL_MS)
+    + TITLE_ART_REVEAL_SETTLE_MS;
+};
+
+const getTitleArtDiagnosticMessage = ({
+  card,
+  isTitleArtFallback,
+  isRegeneratingTitleCard,
+}: {
+  card: CompanionStatAnalysis["cosmiqTitleCard"] | null | undefined;
+  isTitleArtFallback: boolean;
+  isRegeneratingTitleCard: boolean;
+}) => {
+  if (isRegeneratingTitleCard) return "Regenerating title art.";
+  if (card?.failureMessage) return card.failureMessage;
+  if (isTitleArtFallback) return "Title art could not load. Tap regenerate to try again.";
+  return null;
+};
+
+type TitleCardImageGateState = "idle" | "loading" | "loaded" | "failed";
+
+type LoadingStatePhase = "analysis" | "title-card";
+
+interface LoadingStateProps {
+  phase?: LoadingStatePhase;
+  imageUrl?: string | null;
+  imageUrls?: string[];
+  titleCardStatus?: NonNullable<CompanionStatAnalysis["cosmiqTitleCard"]>["status"];
+  imageState?: TitleCardImageGateState;
+  onVerifiedPreviewCountChange?: (verifiedCount: number) => void;
+  prefersReducedMotion: boolean;
+}
+
+function PreludeCardCarousel({
+  activeCard,
+  activeIndex,
+}: {
+  activeCard: CompanionStatAnalysisPreludeCard;
+  activeIndex: number;
+}) {
   return (
-    <Card className="min-h-[62vh] overflow-hidden border-primary/20 bg-[radial-gradient(circle_at_top,hsl(var(--primary)/0.20),transparent_34%),linear-gradient(180deg,hsl(var(--background)/0.92),hsl(var(--card)/0.98))]">
+    <div
+      data-card-id={activeCard.id}
+      data-testid="companion-stat-analysis-prelude-card"
+      className="mx-auto w-full max-w-md rounded-lg border border-white/15 bg-background/72 p-4 text-left shadow-2xl backdrop-blur-md"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <Badge className="bg-primary text-primary-foreground">Analyze My Stats</Badge>
+        <Badge variant="outline" className="border-white/25 bg-background/50 text-foreground">
+          {activeIndex + 1}/{COMPANION_STAT_ANALYSIS_PRELUDE_CARDS.length}
+        </Badge>
+      </div>
+      <div className="mt-5 space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Prelude Card</p>
+        <h3
+          data-testid="companion-stat-analysis-prelude-title"
+          className="text-2xl font-semibold leading-tight sm:text-3xl"
+        >
+          {activeCard.title}
+        </h3>
+        <p
+          data-testid="companion-stat-analysis-prelude-description"
+          className="text-sm leading-6 text-muted-foreground"
+        >
+          {activeCard.description}
+        </p>
+      </div>
+      <div
+        aria-label="Analyze My Stats prelude cards"
+        className="mt-5 flex gap-1.5"
+      >
+        {COMPANION_STAT_ANALYSIS_PRELUDE_CARDS.map((card, index) => (
+          <span
+            key={card.id}
+            className={cn(
+              "h-1.5 flex-1 rounded-full bg-primary/20 transition-colors",
+              index === activeIndex && "bg-primary",
+            )}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LoadingState({
+  phase = "analysis",
+  imageUrl,
+  imageUrls = EMPTY_IMAGE_URLS,
+  titleCardStatus = "generating",
+  imageState = "loading",
+  onVerifiedPreviewCountChange,
+  prefersReducedMotion,
+}: LoadingStateProps) {
+  const slideshowUrls = useMemo(() => {
+    const urls = [...imageUrls, imageUrl ?? null]
+      .filter((candidate): candidate is string => typeof candidate === "string" && candidate.length > 0);
+    return Array.from(new Set(urls));
+  }, [imageUrl, imageUrls]);
+  const slideshowKey = useMemo(() => slideshowUrls.join("|"), [slideshowUrls]);
+  const [activeSlideIndex, setActiveSlideIndex] = useState(0);
+  const [activePreludeCardIndex, setActivePreludeCardIndex] = useState(0);
+  const [loadedPreviewUrls, setLoadedPreviewUrls] = useState<Set<string>>(() => new Set());
+  const activeSafePreludeCardIndex =
+    activePreludeCardIndex % COMPANION_STAT_ANALYSIS_PRELUDE_CARDS.length;
+  const activePreludeCard =
+    COMPANION_STAT_ANALYSIS_PRELUDE_CARDS[activeSafePreludeCardIndex]
+    ?? COMPANION_STAT_ANALYSIS_PRELUDE_CARDS[0];
+  const verifiedSlideshowUrls = useMemo(
+    () =>
+      slideshowUrls.filter((slideUrl, index) =>
+        loadedPreviewUrls.has(slideUrl) || (index === 0 && imageState === "loaded")
+      ),
+    [imageState, loadedPreviewUrls, slideshowUrls],
+  );
+  const previewSlideshowUrls = verifiedSlideshowUrls.length > 0
+    ? verifiedSlideshowUrls
+    : slideshowUrls.slice(0, 1);
+  const previewSlideshowKey = useMemo(() => previewSlideshowUrls.join("|"), [previewSlideshowUrls]);
+  const verifiedPreviewCount = imageState === "loaded" ? verifiedSlideshowUrls.length : 0;
+  const markPreviewUrlLoaded = useCallback((slideUrl: string) => {
+    setLoadedPreviewUrls((current) => {
+      if (current.has(slideUrl)) return current;
+      const next = new Set(current);
+      next.add(slideUrl);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    setActiveSlideIndex(0);
+    setLoadedPreviewUrls(new Set());
+  }, [slideshowKey]);
+
+  useEffect(() => {
+    setActivePreludeCardIndex(0);
+  }, [phase]);
+
+  useEffect(() => {
+    onVerifiedPreviewCountChange?.(verifiedPreviewCount);
+  }, [onVerifiedPreviewCountChange, verifiedPreviewCount]);
+
+  useEffect(() => {
+    if (prefersReducedMotion || COMPANION_STAT_ANALYSIS_PRELUDE_CARDS.length <= 1) return;
+
+    const intervalId = window.setInterval(() => {
+      setActivePreludeCardIndex((current) => (current + 1) % COMPANION_STAT_ANALYSIS_PRELUDE_CARDS.length);
+    }, TITLE_ART_SLIDE_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [phase, prefersReducedMotion]);
+
+  useEffect(() => {
+    if (phase === "title-card" && imageState === "loaded" && slideshowUrls[0]) {
+      markPreviewUrlLoaded(slideshowUrls[0]);
+      setActiveSlideIndex(0);
+    }
+  }, [phase, imageState, markPreviewUrlLoaded, slideshowKey, slideshowUrls]);
+
+  useEffect(() => {
+    if (
+      phase !== "title-card"
+      || imageState !== "loaded"
+      || prefersReducedMotion
+      || previewSlideshowUrls.length <= 1
+    ) return;
+
+    const intervalId = window.setInterval(() => {
+      setActiveSlideIndex((current) => (current + 1) % previewSlideshowUrls.length);
+    }, TITLE_ART_SLIDE_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [phase, imageState, prefersReducedMotion, previewSlideshowKey, previewSlideshowUrls.length]);
+
+  if (phase === "title-card") {
+    const hasImagePreview = slideshowUrls.length > 0;
+    const loadingStatus = hasImagePreview
+      ? "Art preview received"
+      : titleCardStatus === "ready"
+        ? "Polishing title art"
+        : "Generating title art";
+    const loadingCopy = hasImagePreview
+      ? "Generated art is here. Polishing the reveal before it lands."
+      : "Preparing the personal title card reveal.";
+    const hasVerifiedPreview = previewSlideshowUrls.length > 0;
+    const hasSlideshow = previewSlideshowUrls.length > 1;
+    const activeSafeSlideIndex = hasVerifiedPreview
+      ? activeSlideIndex % previewSlideshowUrls.length
+      : 0;
+    const activeSlideUrl = previewSlideshowUrls[activeSafeSlideIndex] ?? null;
+    const previewBadgeLabel = imageState === "loaded" && hasVerifiedPreview
+      ? `Preview ${activeSafeSlideIndex + 1}/${previewSlideshowUrls.length}`
+      : imageState === "idle"
+        ? "Preparing preview"
+        : hasImagePreview
+          ? "Preview warming"
+          : "Render in progress";
+
+    return (
+      <Card
+        data-testid="companion-title-art-loading"
+        className="relative min-h-[min(72vh,760px)] overflow-hidden border-primary/25 bg-background"
+      >
+        {hasImagePreview ? (
+          <div className="absolute inset-0" data-testid="companion-title-art-loading-preview">
+            {slideshowUrls.map((slideUrl, index) => (
+              <img
+                key={slideUrl}
+                alt=""
+                aria-hidden="true"
+                className={cn(
+                  "absolute inset-0 h-full w-full scale-105 object-cover opacity-0 blur-md transition-opacity duration-700",
+                  slideUrl === activeSlideUrl && "opacity-55",
+                )}
+                onLoad={() => markPreviewUrlLoaded(slideUrl)}
+                src={slideUrl}
+              />
+            ))}
+          </div>
+        ) : (
+          <div
+            data-testid="companion-title-art-placeholder"
+            className="absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,hsl(var(--primary)/0.34),transparent_30%),radial-gradient(circle_at_18%_74%,hsl(var(--accent)/0.20),transparent_30%),linear-gradient(145deg,hsl(var(--background)),hsl(var(--card)),hsl(var(--background)))]"
+          />
+        )}
+
+        <motion.div
+          aria-hidden="true"
+          className="absolute inset-y-0 left-[-35%] w-1/2 rotate-12 bg-[linear-gradient(90deg,transparent,hsl(var(--primary)/0.24),transparent)] blur-xl"
+          animate={prefersReducedMotion ? undefined : { x: ["0%", "220%", "0%"], opacity: [0.12, 0.32, 0.12] }}
+          transition={prefersReducedMotion ? undefined : { duration: 5.8, ease: "easeInOut", repeat: Infinity }}
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,hsl(var(--background)/0.16),hsl(var(--background)/0.42)_44%,hsl(var(--background)/0.90))]" />
+
+        <CardContent className="relative z-10 flex min-h-[min(72vh,760px)] flex-col justify-between gap-6 p-4 text-center sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 text-left">
+            <div className="flex flex-wrap gap-2">
+              <Badge className="bg-primary text-primary-foreground">{loadingStatus}</Badge>
+              <Badge variant="outline" className="border-white/30 bg-background/55 text-foreground backdrop-blur">
+                {previewBadgeLabel}
+              </Badge>
+            </div>
+            <Badge variant="outline" className="border-white/30 bg-background/55 text-foreground backdrop-blur">
+              Preparing reveal
+            </Badge>
+          </div>
+
+          <div className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center gap-6">
+            <div className="relative flex h-36 w-36 items-center justify-center">
+              <motion.div
+                aria-hidden="true"
+                className="absolute inset-0 rounded-full border border-primary/30 bg-primary/10"
+                animate={prefersReducedMotion ? undefined : { rotate: 360 }}
+                transition={prefersReducedMotion ? undefined : { duration: 16, ease: "linear", repeat: Infinity }}
+              />
+              <motion.div
+                aria-hidden="true"
+                className="absolute inset-5 rounded-full border border-primary/25"
+                animate={prefersReducedMotion ? undefined : { rotate: -360 }}
+                transition={prefersReducedMotion ? undefined : { duration: 12, ease: "linear", repeat: Infinity }}
+              />
+              <div className="relative flex h-20 w-20 items-center justify-center rounded-full border border-white/15 bg-background/70 shadow-2xl backdrop-blur">
+                <Sparkles className={cn("h-9 w-9 text-primary", !prefersReducedMotion && "animate-pulse")} />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <PreludeCardCarousel
+                activeCard={activePreludeCard}
+                activeIndex={activeSafePreludeCardIndex}
+              />
+              <p className="mx-auto max-w-md text-sm leading-6 text-muted-foreground">{loadingCopy}</p>
+              {hasSlideshow ? (
+                <div
+                  aria-label="Generated title art preview slides"
+                  className="flex justify-center gap-1.5"
+                >
+                  {previewSlideshowUrls.map((slideUrl, index) => (
+                    <span
+                      key={slideUrl}
+                      className={cn(
+                        "h-1.5 w-5 rounded-full bg-primary/25 transition-colors",
+                        index === activeSafeSlideIndex && "bg-primary",
+                      )}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div
+                key={index}
+                className="rounded-lg border border-white/10 bg-background/60 px-3 py-2 text-left backdrop-blur"
+                aria-hidden="true"
+              >
+                <div className="h-2 w-16 rounded-full bg-primary/20" />
+                <div className="mt-3 flex items-end justify-between gap-2">
+                  <div className="h-5 w-10 rounded-full bg-white/10" />
+                  <div className="h-2 w-12 rounded-full bg-primary/15" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card
+      data-testid="companion-stat-analysis-loading"
+      className="min-h-[62vh] overflow-hidden border-primary/20 bg-[radial-gradient(circle_at_top,hsl(var(--primary)/0.20),transparent_34%),linear-gradient(180deg,hsl(var(--background)/0.92),hsl(var(--card)/0.98))]"
+    >
       <CardContent className="flex min-h-[62vh] flex-col items-center justify-center gap-6 p-6 text-center">
         <div className="relative flex h-28 w-28 items-center justify-center rounded-full border border-primary/25 bg-primary/10">
           <div className="absolute inset-2 rounded-full border border-primary/20" />
-          <Sparkles className="h-10 w-10 animate-pulse text-primary" />
+          <Sparkles className={cn("h-10 w-10 text-primary", !prefersReducedMotion && "animate-pulse")} />
         </div>
         <div className="space-y-2">
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-primary">Cosmiq reading</p>
@@ -272,17 +609,14 @@ function LoadingState() {
             Reading your stat shape, momentum, and next evolution path.
           </p>
         </div>
-        <div className="grid w-full max-w-md grid-cols-3 gap-2">
-          {Array.from({ length: 6 }).map((_, index) => (
-            <Skeleton key={index} className="h-12 rounded-lg bg-primary/10" />
-          ))}
-        </div>
+        <PreludeCardCarousel
+          activeCard={activePreludeCard}
+          activeIndex={activeSafePreludeCardIndex}
+        />
       </CardContent>
     </Card>
   );
 }
-
-type TitleCardImageGateState = "idle" | "loading" | "loaded" | "failed";
 
 const getTitleCardImageKey = (profileKey: string | null | undefined, imageUrl: string | null | undefined) =>
   profileKey && imageUrl ? `${profileKey}:${imageUrl}` : null;
@@ -296,7 +630,7 @@ function useTitleCardImageGate({
 }) {
   const card = analysis.cosmiqTitleCard;
   const profileKey = card?.profileKey ?? null;
-  const imageUrl = card?.imageUrl ?? null;
+  const imageUrl = getTitleCardImageUrls(card)[0] ?? null;
   const imageKey = getTitleCardImageKey(profileKey, imageUrl);
   const forcedRetryProfileKeysRef = useRef<Set<string>>(new Set());
   const [loadedImageKey, setLoadedImageKey] = useState<string | null>(null);
@@ -776,6 +1110,10 @@ function CosmiqTitleRevealCard({
   onFlip,
   isRefreshing,
   onRefresh,
+  isTitleArtFallback,
+  isRegeneratingTitleCard,
+  onRegenerateTitleCard,
+  prefersReducedMotion,
 }: {
   analysis: CompanionStatAnalysis;
   viewModel: ReturnType<typeof buildCompanionStatAnalysisViewModel>;
@@ -784,9 +1122,22 @@ function CosmiqTitleRevealCard({
   onFlip: () => void;
   isRefreshing: boolean;
   onRefresh: () => void;
+  isTitleArtFallback: boolean;
+  isRegeneratingTitleCard: boolean;
+  onRegenerateTitleCard: (analysis: CompanionStatAnalysis) => Promise<unknown>;
+  prefersReducedMotion: boolean;
 }) {
-  const imageUrl = analysis.cosmiqTitleCard?.imageUrl ?? null;
+  const imageUrl = isTitleArtFallback ? null : getTitleCardImageUrls(analysis.cosmiqTitleCard)[0] ?? null;
   const cardStatus = analysis.cosmiqTitleCard?.status ?? "unavailable";
+  const showTitleArtUnavailableBadge = isTitleArtFallback || cardStatus === "unavailable";
+  const titleArtDiagnosticMessage = getTitleArtDiagnosticMessage({
+    card: analysis.cosmiqTitleCard,
+    isTitleArtFallback,
+    isRegeneratingTitleCard,
+  });
+  const handleRegenerateTitleArt = () => {
+    void onRegenerateTitleCard(analysis).catch(() => undefined);
+  };
 
   if (isFlipped) {
     return (
@@ -815,20 +1166,40 @@ function CosmiqTitleRevealCard({
                   {analysis.analysisDate}
                 </Badge>
               </div>
+              {showTitleArtUnavailableBadge && titleArtDiagnosticMessage ? (
+                <p className="max-w-lg text-xs leading-5 text-muted-foreground">
+                  {titleArtDiagnosticMessage}
+                </p>
+              ) : null}
               <CardTitle className="text-2xl leading-tight sm:text-3xl">
                 {analysis.cosmiqTitle.title}
               </CardTitle>
             </div>
-            <Button
-              type="button"
-              variant="secondary"
-              size="icon"
-              aria-label="Show Cosmiq title card"
-              className="shrink-0 border border-white/20 bg-background/70 backdrop-blur hover:bg-background/85"
-              onClick={onFlip}
-            >
-              <RotateCcw className="h-4 w-4" />
-            </Button>
+            <div className="flex shrink-0 items-center gap-2">
+              {showTitleArtUnavailableBadge ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="icon"
+                  aria-label="Regenerate title art"
+                  className="border border-white/20 bg-background/70 backdrop-blur hover:bg-background/85"
+                  onClick={handleRegenerateTitleArt}
+                  disabled={isRegeneratingTitleCard}
+                >
+                  <RefreshCw className={cn("h-4 w-4", isRegeneratingTitleCard && "animate-spin")} />
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon"
+                aria-label="Show Cosmiq title card"
+                className="border border-white/20 bg-background/70 backdrop-blur hover:bg-background/85"
+                onClick={onFlip}
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
@@ -850,11 +1221,18 @@ function CosmiqTitleRevealCard({
       style={mentorAccentStyle(analysis)}
     >
       {imageUrl ? (
-        <img
-          alt={`${analysis.cosmiqTitle.title} archetype illustration`}
-          className="absolute inset-0 h-full w-full object-cover"
-          src={imageUrl}
-        />
+        <motion.div
+          className="absolute inset-0"
+          initial={prefersReducedMotion ? false : { opacity: 0, scale: 1.04, filter: "blur(14px)" }}
+          animate={prefersReducedMotion ? undefined : { opacity: 1, scale: 1, filter: "blur(0px)" }}
+          transition={prefersReducedMotion ? undefined : { duration: 0.5, ease: "easeOut" }}
+        >
+          <img
+            alt={`${analysis.cosmiqTitle.title} archetype illustration`}
+            className="h-full w-full object-cover"
+            src={imageUrl}
+          />
+        </motion.div>
       ) : (
         <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_top,hsl(var(--primary)/0.30),transparent_38%),linear-gradient(145deg,hsl(var(--background)),hsl(var(--accent)/0.18),hsl(var(--card)))]">
           <ImageIcon className="h-20 w-20 text-primary/45" aria-hidden="true" />
@@ -865,32 +1243,64 @@ function CosmiqTitleRevealCard({
 
       <div className="relative z-10 flex min-h-[min(72vh,760px)] flex-col justify-between p-4 sm:p-6">
         <div className="flex items-start justify-between gap-3">
-          <div className="flex flex-wrap gap-2">
-            <Badge className="bg-primary text-primary-foreground">
-              {formatRarityLabel(analysis.cosmiqTitle.rarity)}
-            </Badge>
-            <Badge variant="outline" className="border-white/30 bg-background/55 text-foreground backdrop-blur">
-              {STABILITY_LABELS[analysis.cosmiqTitle.titleStability]}
-            </Badge>
-            {cardStatus === "generating" ? (
-              <Badge variant="outline" className="border-white/30 bg-background/55 text-foreground backdrop-blur">
-                Art warming up
+          <div className="min-w-0 space-y-2">
+            <div className="flex flex-wrap gap-2">
+              <Badge className="bg-primary text-primary-foreground">
+                {formatRarityLabel(analysis.cosmiqTitle.rarity)}
               </Badge>
+              <Badge variant="outline" className="border-white/30 bg-background/55 text-foreground backdrop-blur">
+                {STABILITY_LABELS[analysis.cosmiqTitle.titleStability]}
+              </Badge>
+              {cardStatus === "generating" ? (
+                <Badge variant="outline" className="border-white/30 bg-background/55 text-foreground backdrop-blur">
+                  Art warming up
+                </Badge>
+              ) : null}
+              {showTitleArtUnavailableBadge ? (
+                <Badge variant="outline" className="border-white/30 bg-background/55 text-foreground backdrop-blur">
+                  Art unavailable
+                </Badge>
+              ) : null}
+            </div>
+            {showTitleArtUnavailableBadge && titleArtDiagnosticMessage ? (
+              <p className="max-w-md rounded-lg border border-white/10 bg-background/55 px-3 py-2 text-xs leading-5 text-muted-foreground backdrop-blur">
+                {titleArtDiagnosticMessage}
+              </p>
             ) : null}
           </div>
-          <Button
-            type="button"
-            variant="secondary"
-            size="icon"
-            aria-label={isFlipped ? "Show Cosmiq title card" : "Show stat analysis"}
-            className="shrink-0 border border-white/20 bg-background/70 backdrop-blur hover:bg-background/85"
-            onClick={onFlip}
-          >
-            {isFlipped ? <RotateCcw className="h-4 w-4" /> : <BarChart3 className="h-4 w-4" />}
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            {showTitleArtUnavailableBadge ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon"
+                aria-label="Regenerate title art"
+                className="border border-white/20 bg-background/70 backdrop-blur hover:bg-background/85"
+                onClick={handleRegenerateTitleArt}
+                disabled={isRegeneratingTitleCard}
+              >
+                <RefreshCw className={cn("h-4 w-4", isRegeneratingTitleCard && "animate-spin")} />
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              aria-label={isFlipped ? "Show Cosmiq title card" : "Show stat analysis"}
+              className="border border-white/20 bg-background/70 backdrop-blur hover:bg-background/85"
+              onClick={onFlip}
+            >
+              {isFlipped ? <RotateCcw className="h-4 w-4" /> : <BarChart3 className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
 
-        <div className="space-y-4 rounded-lg border border-white/15 bg-background/72 p-4 shadow-2xl backdrop-blur-md">
+        <motion.div
+          className="space-y-4 rounded-lg border border-white/15 bg-background/72 p-4 shadow-2xl backdrop-blur-md"
+          initial={prefersReducedMotion ? false : { opacity: 0, y: 12 }}
+          animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
+          transition={prefersReducedMotion ? undefined : { duration: 0.32, delay: 0.12, ease: "easeOut" }}
+        >
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Cosmiq Title</p>
             <h3 className="mt-2 text-3xl font-semibold leading-tight md:text-5xl">
@@ -913,7 +1323,7 @@ function CosmiqTitleRevealCard({
               </div>
             ))}
           </div>
-        </div>
+        </motion.div>
       </div>
     </Card>
   );
@@ -938,37 +1348,75 @@ function CompanionStatAnalysisView({
   const viewModel = useMemo(() => buildCompanionStatAnalysisViewModel(analysis), [analysis]);
   const [isFlipped, setIsFlipped] = useState(false);
   const {
-    failedImageKey,
     imageState,
     isLoaded: isTitleCardImageLoaded,
-    retry: retryTitleCardImage,
   } = useTitleCardImageGate({
     analysis,
     onRegenerateTitleCard,
   });
   const titleCardStatus = analysis.cosmiqTitleCard?.status ?? "generating";
+  const isTitleArtFallback = titleCardStatus === "unavailable" || imageState === "failed";
+  const titleCardImageUrls = useMemo(
+    () => getTitleCardImageUrls(analysis.cosmiqTitleCard),
+    [analysis.cosmiqTitleCard],
+  );
+  const primaryTitleCardImageUrl = titleCardImageUrls[0] ?? null;
+  const titleCardPreviewKey = titleCardImageUrls.join("|");
+  const titleCardPreviewDwellMs = prefersReducedMotion
+    ? 0
+    : getTitleArtPreviewDwellMs(titleCardImageUrls.length);
+  const [isTitleCardPreviewDwellComplete, setIsTitleCardPreviewDwellComplete] = useState(false);
+  const [verifiedTitleCardPreviewCount, setVerifiedTitleCardPreviewCount] = useState(0);
+  const handleVerifiedPreviewCountChange = useCallback((verifiedCount: number) => {
+    setVerifiedTitleCardPreviewCount(verifiedCount);
+  }, []);
 
-  if (titleCardStatus === "unavailable" || imageState === "failed") {
-    return (
-      <AnalysisUnavailableCard
-        message={
-          failedImageKey
-            ? "We couldn't load the generated title art. Try regenerating it."
-            : "Generated title art is unavailable right now. Try again in a moment."
-        }
-        isRefreshing={isRefreshing || isRegeneratingTitleCard}
-        onRetry={failedImageKey ? retryTitleCardImage : onRefresh}
-      />
-    );
-  }
+  // The verified count dependency intentionally restarts dwell when another preview image becomes slideshow-safe.
+  useEffect(() => {
+    if (titleCardPreviewDwellMs <= 0 || titleCardPreviewKey.length === 0) {
+      setIsTitleCardPreviewDwellComplete(true);
+      setVerifiedTitleCardPreviewCount(0);
+      return;
+    }
+
+    if (!isTitleCardImageLoaded) {
+      setIsTitleCardPreviewDwellComplete(false);
+      setVerifiedTitleCardPreviewCount(0);
+      return;
+    }
+
+    setIsTitleCardPreviewDwellComplete(false);
+    const timeoutId = window.setTimeout(() => {
+      setIsTitleCardPreviewDwellComplete(true);
+    }, titleCardPreviewDwellMs);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [isTitleCardImageLoaded, titleCardPreviewDwellMs, titleCardPreviewKey, verifiedTitleCardPreviewCount]);
+  const isTitleCardPreviewDwellSatisfied = titleCardPreviewDwellMs <= 0 || isTitleCardPreviewDwellComplete;
 
   if (
-    titleCardStatus !== "ready"
-    || !analysis.cosmiqTitleCard?.imageUrl
-    || !isTitleCardImageLoaded
-    || isRegeneratingTitleCard
+    !isTitleArtFallback
+    && (
+      titleCardStatus !== "ready"
+      || !primaryTitleCardImageUrl
+      || !isTitleCardImageLoaded
+      || !isTitleCardPreviewDwellSatisfied
+      || isRegeneratingTitleCard
+    )
   ) {
-    return <LoadingState />;
+    return (
+      <LoadingState
+        phase="title-card"
+        imageUrl={primaryTitleCardImageUrl}
+        imageUrls={titleCardImageUrls}
+        titleCardStatus={titleCardStatus}
+        imageState={imageState}
+        onVerifiedPreviewCountChange={handleVerifiedPreviewCountChange}
+        prefersReducedMotion={prefersReducedMotion}
+      />
+    );
   }
 
   return (
@@ -987,6 +1435,10 @@ function CompanionStatAnalysisView({
           onFlip={() => setIsFlipped((current) => !current)}
           isRefreshing={isRefreshing}
           onRefresh={onRefresh}
+          isTitleArtFallback={isTitleArtFallback}
+          isRegeneratingTitleCard={isRegeneratingTitleCard}
+          onRegenerateTitleCard={onRegenerateTitleCard}
+          prefersReducedMotion={prefersReducedMotion}
         />
       </motion.div>
     </motion.div>
@@ -1004,6 +1456,7 @@ function AnalysisContent() {
     refreshAnalysis,
     regenerateTitleCard,
   } = useCompanionStatAnalysis({ enabled: true });
+  const prefersReducedMotion = useReducedMotion();
   const [renderBoundaryKey, setRenderBoundaryKey] = useState(0);
 
   const handleRefresh = () => {
@@ -1019,7 +1472,7 @@ function AnalysisContent() {
   };
 
   if (isLoading && !analysis) {
-    return <LoadingState />;
+    return <LoadingState prefersReducedMotion={prefersReducedMotion} />;
   }
 
   if (!analysis) {

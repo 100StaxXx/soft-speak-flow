@@ -460,6 +460,24 @@ function validateCosmiqTitleCard(value: unknown, path: string): ValidationResult
     return failure(`${path}.imageUrl must be a non-empty string or null`);
   }
 
+  let imageUrls: string[] | undefined;
+  if (value.imageUrls !== undefined) {
+    if (!Array.isArray(value.imageUrls)) {
+      return failure(`${path}.imageUrls must be an array`);
+    }
+
+    const normalizedUrls: string[] = [];
+    for (const [index, imageUrl] of value.imageUrls.entries()) {
+      if (!isNonEmptyString(imageUrl)) {
+        return failure(`${path}.imageUrls[${index}] must be a non-empty string`);
+      }
+      if (!normalizedUrls.includes(imageUrl)) {
+        normalizedUrls.push(imageUrl);
+      }
+    }
+    imageUrls = normalizedUrls;
+  }
+
   if (!isString(value.status) || !COSMIQ_TITLE_CARD_STATUS_VALUES.has(value.status)) {
     return failure(`${path}.status must be ready, generating, or unavailable`);
   }
@@ -472,7 +490,26 @@ function validateCosmiqTitleCard(value: unknown, path: string): ValidationResult
     return failure(`${path}.promptVersion must be a number`);
   }
 
-  return success(value as unknown as CompanionCosmiqTitleCard);
+  if (!(value.failureCode === undefined || value.failureCode === null || isNonEmptyString(value.failureCode))) {
+    return failure(`${path}.failureCode must be a non-empty string or null`);
+  }
+
+  if (!(value.failureMessage === undefined || value.failureMessage === null || isNonEmptyString(value.failureMessage))) {
+    return failure(`${path}.failureMessage must be a non-empty string or null`);
+  }
+
+  if (!(value.retryable === undefined || typeof value.retryable === "boolean")) {
+    return failure(`${path}.retryable must be a boolean`);
+  }
+
+  if (!(value.lastAttemptAt === undefined || value.lastAttemptAt === null || isNonEmptyString(value.lastAttemptAt))) {
+    return failure(`${path}.lastAttemptAt must be a non-empty string or null`);
+  }
+
+  return success({
+    ...(value as unknown as CompanionCosmiqTitleCard),
+    ...(imageUrls ? { imageUrls } : {}),
+  });
 }
 
 function validateActivitySnapshot(

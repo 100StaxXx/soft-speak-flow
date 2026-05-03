@@ -1,5 +1,5 @@
 import type { HTMLAttributes, ReactNode } from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -11,12 +11,17 @@ const mocks = vi.hoisted(() => ({
 
 const originalImage = globalThis.Image;
 let imageLoadMode: "load" | "error" | "idle" = "load";
+let mockImageInstances: MockImage[] = [];
 
 class MockImage {
   complete = false;
   naturalWidth = 0;
   onload: (() => void) | null = null;
   onerror: (() => void) | null = null;
+
+  constructor() {
+    mockImageInstances.push(this);
+  }
 
   set src(_value: string) {
     if (imageLoadMode === "idle") return;
@@ -59,6 +64,7 @@ vi.mock("framer-motion", () => ({
       variants: _variants,
       initial: _initial,
       animate: _animate,
+      transition: _transition,
       ...props
     }: HTMLAttributes<HTMLDivElement> & Record<string, unknown>) => (
       <div
@@ -74,6 +80,7 @@ vi.mock("framer-motion", () => ({
       variants: _variants,
       initial: _initial,
       animate: _animate,
+      transition: _transition,
       ...props
     }: HTMLAttributes<HTMLDetailsElement> & Record<string, unknown>) => (
       <details
@@ -104,6 +111,7 @@ vi.mock("recharts", () => ({
 }));
 
 import { CompanionStatAnalysisSurface } from "./CompanionStatAnalysisSurface";
+import { COMPANION_STAT_ANALYSIS_PRELUDE_CARDS } from "@/shared/companionStatAnalysisPreludeCards";
 
 const analysis = {
   analysisDate: "2026-04-18",
@@ -174,6 +182,7 @@ const analysis = {
   cosmiqTitleCard: {
     profileKey: "v1::the-oathbound-pathfinder",
     imageUrl: "https://example.com/cosmiq-card.png",
+    imageUrls: ["https://example.com/cosmiq-card.png"],
     status: "ready",
     cached: true,
     promptVersion: 1,
@@ -268,6 +277,7 @@ describe("CompanionStatAnalysisSurface", () => {
   beforeEach(() => {
     mocks.prefersReducedMotion = true;
     imageLoadMode = "load";
+    mockImageInstances = [];
     globalThis.Image = MockImage as unknown as typeof Image;
     mocks.refreshAnalysisMock.mockClear();
     mocks.regenerateTitleCardMock.mockClear();
@@ -285,6 +295,7 @@ describe("CompanionStatAnalysisSurface", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     globalThis.Image = originalImage;
   });
 
@@ -300,6 +311,10 @@ describe("CompanionStatAnalysisSurface", () => {
     expect(screen.getByTestId("drawer-root")).toBeInTheDocument();
     expect(screen.getByTestId("companion-stats-analysis-drawer")).toBeInTheDocument();
     expect(screen.getByTestId("companion-cosmiq-title-card")).toBeInTheDocument();
+    expect(screen.getByAltText("The Oathbound Pathfinder archetype illustration")).toHaveAttribute(
+      "src",
+      "https://example.com/cosmiq-card.png",
+    );
     expect(screen.getByText("Cosmiq Title")).toBeInTheDocument();
     expect(screen.getByText("The Oathbound Pathfinder")).toBeInTheDocument();
     expect(screen.getByText("New Title Unlocked")).toBeInTheDocument();
@@ -376,6 +391,7 @@ describe("CompanionStatAnalysisSurface", () => {
 
   it("uses the animated reveal path when reduced motion is not preferred", () => {
     mocks.prefersReducedMotion = false;
+    vi.useFakeTimers();
 
     const { container } = render(
       <CompanionStatAnalysisSurface
@@ -384,6 +400,10 @@ describe("CompanionStatAnalysisSurface", () => {
         layoutMode="desktop"
       />,
     );
+
+    act(() => {
+      vi.advanceTimersByTime(4_500);
+    });
 
     expect(container.querySelector("[data-motion-initial='hidden']")).toBeInTheDocument();
     expect(container.querySelector("[data-motion-animate='visible']")).toBeInTheDocument();
@@ -420,13 +440,84 @@ describe("CompanionStatAnalysisSurface", () => {
     expect(screen.getByText("Rebalance Creativity")).toBeInTheDocument();
   });
 
+  it("uses generic prelude cards while the initial stat analysis loads", () => {
+    const firstPreludeCard = COMPANION_STAT_ANALYSIS_PRELUDE_CARDS[0];
+    mocks.useCompanionStatAnalysisMock.mockReturnValue({
+      analysis: null,
+      cached: false,
+      error: null,
+      isLoading: true,
+      isRefreshing: false,
+      isRegeneratingTitleCard: false,
+      refreshAnalysis: mocks.refreshAnalysisMock,
+      regenerateTitleCard: mocks.regenerateTitleCardMock,
+    });
+
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="desktop"
+      />,
+    );
+
+    const preludeCard = screen.getByTestId("companion-stat-analysis-prelude-card");
+    expect(preludeCard).toHaveAttribute("data-card-id", firstPreludeCard.id);
+    expect(screen.getByText(firstPreludeCard.title)).toBeInTheDocument();
+    expect(screen.getByText(firstPreludeCard.description)).toBeInTheDocument();
+    expect(screen.getByLabelText("Analyze My Stats prelude cards")).toBeInTheDocument();
+    expect(screen.queryByText("The Oathbound Pathfinder")).not.toBeInTheDocument();
+    expect(screen.queryByText("Discipline")).not.toBeInTheDocument();
+    expect(screen.queryByText("560")).not.toBeInTheDocument();
+  });
+
+  it("does not auto-rotate prelude cards when reduced motion is preferred", () => {
+    const firstPreludeCard = COMPANION_STAT_ANALYSIS_PRELUDE_CARDS[0];
+    mocks.prefersReducedMotion = true;
+    vi.useFakeTimers();
+    mocks.useCompanionStatAnalysisMock.mockReturnValue({
+      analysis: null,
+      cached: false,
+      error: null,
+      isLoading: true,
+      isRefreshing: false,
+      isRegeneratingTitleCard: false,
+      refreshAnalysis: mocks.refreshAnalysisMock,
+      regenerateTitleCard: mocks.regenerateTitleCardMock,
+    });
+
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="desktop"
+      />,
+    );
+
+    expect(screen.getByTestId("companion-stat-analysis-prelude-card")).toHaveAttribute(
+      "data-card-id",
+      firstPreludeCard.id,
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(7_200);
+    });
+
+    expect(screen.getByTestId("companion-stat-analysis-prelude-card")).toHaveAttribute(
+      "data-card-id",
+      firstPreludeCard.id,
+    );
+  });
+
   it("keeps the loading state while title-card art is still generating", () => {
+    const firstPreludeCard = COMPANION_STAT_ANALYSIS_PRELUDE_CARDS[0];
     mocks.useCompanionStatAnalysisMock.mockReturnValue({
       analysis: {
         ...analysis,
         cosmiqTitleCard: {
           ...analysis.cosmiqTitleCard,
           imageUrl: null,
+          imageUrls: [],
           status: "generating",
         },
       },
@@ -447,7 +538,19 @@ describe("CompanionStatAnalysisSurface", () => {
       />,
     );
 
-    expect(screen.getByText("Revealing your title")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-title-art-loading")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-title-art-placeholder")).toBeInTheDocument();
+    expect(screen.getByText("Generating title art")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-stat-analysis-prelude-card")).toHaveAttribute(
+      "data-card-id",
+      firstPreludeCard.id,
+    );
+    expect(screen.getByText(firstPreludeCard.title)).toBeInTheDocument();
+    expect(screen.getByText(firstPreludeCard.description)).toBeInTheDocument();
+    expect(screen.queryByText("The Oathbound Pathfinder")).not.toBeInTheDocument();
+    expect(screen.queryByText("Discipline")).not.toBeInTheDocument();
+    expect(screen.queryByText("Alignment")).not.toBeInTheDocument();
+    expect(screen.queryByText("560")).not.toBeInTheDocument();
     expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
   });
 
@@ -462,11 +565,172 @@ describe("CompanionStatAnalysisSurface", () => {
       />,
     );
 
-    expect(screen.getByText("Revealing your title")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-title-art-loading")).toBeInTheDocument();
+    expect(screen.getByText("Art preview received")).toBeInTheDocument();
+    const preview = screen.getByTestId("companion-title-art-loading-preview");
+    expect(preview.querySelector("img")?.getAttribute("src")).toBe("https://example.com/cosmiq-card.png");
+    expect(preview.querySelectorAll("img")).toHaveLength(1);
+    expect(screen.getByText("Preview warming")).toBeInTheDocument();
+    expect(screen.getByText(COMPANION_STAT_ANALYSIS_PRELUDE_CARDS[0].title)).toBeInTheDocument();
+    expect(screen.queryByText("The Oathbound Pathfinder")).not.toBeInTheDocument();
+    expect(screen.queryByText("Discipline")).not.toBeInTheDocument();
+    expect(screen.queryByText("560")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Generated title art preview slides")).not.toBeInTheDocument();
     expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
   });
 
-  it("forces one title-card regeneration when a ready image fails to load", async () => {
+  it("reveals a ready title card from imageUrls when legacy imageUrl is absent", async () => {
+    mocks.useCompanionStatAnalysisMock.mockReturnValue({
+      analysis: {
+        ...analysis,
+        cosmiqTitleCard: {
+          ...analysis.cosmiqTitleCard,
+          imageUrl: null,
+        },
+      },
+      cached: true,
+      error: null,
+      isLoading: false,
+      isRefreshing: false,
+      isRegeneratingTitleCard: false,
+      refreshAnalysis: mocks.refreshAnalysisMock,
+      regenerateTitleCard: mocks.regenerateTitleCardMock,
+    });
+
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="desktop"
+      />,
+    );
+
+    expect(await screen.findByTestId("companion-cosmiq-title-card")).toBeInTheDocument();
+    expect(screen.getByAltText("The Oathbound Pathfinder archetype illustration")).toHaveAttribute(
+      "src",
+      "https://example.com/cosmiq-card.png",
+    );
+    expect(screen.queryByTestId("companion-title-art-loading")).not.toBeInTheDocument();
+  });
+
+  it("reveals fast-path title art as soon as the primary image loads", async () => {
+    mocks.prefersReducedMotion = false;
+    imageLoadMode = "idle";
+
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="desktop"
+      />,
+    );
+
+    expect(screen.getByTestId("companion-title-art-loading")).toBeInTheDocument();
+    expect(screen.getByText("Preview warming")).toBeInTheDocument();
+
+    act(() => {
+      const preloadImage = mockImageInstances[0];
+      preloadImage.complete = true;
+      preloadImage.naturalWidth = 100;
+      preloadImage.onload?.();
+    });
+
+    expect(await screen.findByTestId("companion-cosmiq-title-card")).toBeInTheDocument();
+    expect(screen.queryByTestId("companion-title-art-loading")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Generated title art preview slides")).not.toBeInTheDocument();
+  });
+
+  it("still lets legacy multi-image title art preview dwell before reveal", () => {
+    mocks.prefersReducedMotion = false;
+    imageLoadMode = "idle";
+    vi.useFakeTimers();
+    mocks.useCompanionStatAnalysisMock.mockReturnValue({
+      analysis: {
+        ...analysis,
+        cosmiqTitleCard: {
+          ...analysis.cosmiqTitleCard,
+          imageUrls: [
+            "https://example.com/cosmiq-card.png",
+            "https://example.com/cosmiq-card-variant-2.png",
+            "https://example.com/cosmiq-card-variant-3.png",
+          ],
+        },
+      },
+      cached: true,
+      error: null,
+      isLoading: false,
+      isRefreshing: false,
+      isRegeneratingTitleCard: false,
+      refreshAnalysis: mocks.refreshAnalysisMock,
+      regenerateTitleCard: mocks.regenerateTitleCardMock,
+    });
+
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="desktop"
+      />,
+    );
+
+    expect(screen.getByTestId("companion-title-art-loading")).toBeInTheDocument();
+    expect(screen.getByText("Preview warming")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+
+    expect(screen.getByTestId("companion-title-art-loading")).toBeInTheDocument();
+    expect(screen.getByText("Preview warming")).toBeInTheDocument();
+    expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
+
+    act(() => {
+      const preloadImage = mockImageInstances[0];
+      preloadImage.complete = true;
+      preloadImage.naturalWidth = 100;
+      preloadImage.onload?.();
+    });
+
+    expect(screen.getByText("Preview 1/1")).toBeInTheDocument();
+    expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(1_800);
+    });
+
+    expect(screen.getByText("Preview 1/1")).toBeInTheDocument();
+    expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
+
+    const preview = screen.getByTestId("companion-title-art-loading-preview");
+    act(() => {
+      preview.querySelectorAll("img").forEach((previewImage) => {
+        fireEvent.load(previewImage);
+      });
+    });
+
+    expect(screen.getByText("Preview 1/3")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(1_800);
+    });
+
+    expect(screen.getByText("Preview 2/3")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(1_800);
+    });
+
+    expect(screen.getByText("Preview 3/3")).toBeInTheDocument();
+    expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(900);
+    });
+
+    expect(screen.getByTestId("companion-cosmiq-title-card")).toBeInTheDocument();
+  });
+
+  it("keeps the stat reading visible when ready title-card art fails to load", async () => {
     imageLoadMode = "error";
     mocks.regenerateTitleCardMock.mockRejectedValueOnce(new Error("image retry failed"));
 
@@ -481,8 +745,61 @@ describe("CompanionStatAnalysisSurface", () => {
     await waitFor(() => {
       expect(mocks.regenerateTitleCardMock).toHaveBeenCalledWith(analysis);
     });
-    expect(await screen.findByText("We couldn't load the generated title art. Try regenerating it.")).toBeInTheDocument();
-    expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("companion-cosmiq-title-card")).toBeInTheDocument();
+    expect(screen.getByText("Art unavailable")).toBeInTheDocument();
+    expect(screen.getByText("Title art could not load. Tap regenerate to try again.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Regenerate title art" })).toBeInTheDocument();
+    expect(screen.getByText("The Oathbound Pathfinder")).toBeInTheDocument();
+    expect(screen.queryByText("Stats analysis is unavailable right now.")).not.toBeInTheDocument();
+    expect(screen.queryByAltText("The Oathbound Pathfinder archetype illustration")).not.toBeInTheDocument();
+  });
+
+  it("keeps the stat reading visible when title-card generation is unavailable", () => {
+    mocks.useCompanionStatAnalysisMock.mockReturnValue({
+      analysis: {
+        ...analysis,
+        cosmiqTitleCard: {
+          ...analysis.cosmiqTitleCard,
+          imageUrl: null,
+          imageUrls: [],
+          status: "unavailable",
+          failureCode: "guardrail_blocked",
+          failureMessage: "Art generation is paused by the budget guardrail.",
+          retryable: false,
+          lastAttemptAt: "2026-04-18T18:35:00.000Z",
+        },
+      },
+      cached: true,
+      error: null,
+      isLoading: false,
+      isRefreshing: false,
+      isRegeneratingTitleCard: false,
+      refreshAnalysis: mocks.refreshAnalysisMock,
+      regenerateTitleCard: mocks.regenerateTitleCardMock,
+    });
+
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="mobile"
+      />,
+    );
+
+    expect(screen.getByTestId("companion-cosmiq-title-card")).toBeInTheDocument();
+    expect(screen.getByText("Art unavailable")).toBeInTheDocument();
+    expect(screen.getByText("Art generation is paused by the budget guardrail.")).toBeInTheDocument();
+    expect(screen.queryByText("Stats analysis is unavailable right now.")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Regenerate title art" }));
+    expect(mocks.regenerateTitleCardMock).toHaveBeenCalledWith(
+      expect.objectContaining({ analysisDate: "2026-04-18" }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Show stat analysis" }));
+
+    expect(screen.getByText("Current Build")).toBeInTheDocument();
+    expect(screen.getByText("Recommended Quest")).toBeInTheDocument();
   });
 
   it("shows the inline unavailable card when validated analysis is missing", () => {
