@@ -20,7 +20,13 @@ export interface MaybeEnqueueArgs {
 
 function isFeatureEnabled(): boolean {
   // Default OFF — operators must explicitly opt in once FAL_KEY is provisioned.
-  const raw = (Deno.env.get("COMPANION_KLING_ENABLED") ?? "").trim().toLowerCase();
+  // Reads COMPANION_ANIMATION_ENABLED (canonical) with COMPANION_KLING_ENABLED
+  // accepted as a legacy alias.
+  const raw = (
+    Deno.env.get("COMPANION_ANIMATION_ENABLED")
+    ?? Deno.env.get("COMPANION_KLING_ENABLED")
+    ?? ""
+  ).trim().toLowerCase();
   return raw === "1" || raw === "true" || raw === "yes" || raw === "on";
 }
 

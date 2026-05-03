@@ -41,8 +41,14 @@ interface AnimationJobRow {
 }
 
 function isFeatureEnabled(): boolean {
-  const raw = (Deno.env.get("COMPANION_KLING_ENABLED") ?? "").trim().toLowerCase();
   // Default OFF — operators must explicitly opt in once FAL_KEY is provisioned.
+  // Reads COMPANION_ANIMATION_ENABLED (canonical) with COMPANION_KLING_ENABLED
+  // accepted as a legacy alias.
+  const raw = (
+    Deno.env.get("COMPANION_ANIMATION_ENABLED")
+    ?? Deno.env.get("COMPANION_KLING_ENABLED")
+    ?? ""
+  ).trim().toLowerCase();
   return raw === "1" || raw === "true" || raw === "yes" || raw === "on";
 }
 
@@ -207,7 +213,7 @@ async function processJob(
   // Phase A: submit to fal.ai if we don't yet have a request id.
   if (!claimed.provider_request_id) {
     if (!isFeatureEnabled()) {
-      await markJobSkipped(supabase, claimed, "COMPANION_KLING_ENABLED is off");
+      await markJobSkipped(supabase, claimed, "COMPANION_ANIMATION_ENABLED is off");
       return;
     }
 
