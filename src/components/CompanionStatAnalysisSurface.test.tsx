@@ -111,6 +111,7 @@ vi.mock("recharts", () => ({
 }));
 
 import { CompanionStatAnalysisSurface } from "./CompanionStatAnalysisSurface";
+import { COMPANION_STAT_ANALYSIS_PRELUDE_CARDS } from "@/shared/companionStatAnalysisPreludeCards";
 
 const analysis = {
   analysisDate: "2026-04-18",
@@ -439,7 +440,77 @@ describe("CompanionStatAnalysisSurface", () => {
     expect(screen.getByText("Rebalance Creativity")).toBeInTheDocument();
   });
 
+  it("uses generic prelude cards while the initial stat analysis loads", () => {
+    const firstPreludeCard = COMPANION_STAT_ANALYSIS_PRELUDE_CARDS[0];
+    mocks.useCompanionStatAnalysisMock.mockReturnValue({
+      analysis: null,
+      cached: false,
+      error: null,
+      isLoading: true,
+      isRefreshing: false,
+      isRegeneratingTitleCard: false,
+      refreshAnalysis: mocks.refreshAnalysisMock,
+      regenerateTitleCard: mocks.regenerateTitleCardMock,
+    });
+
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="desktop"
+      />,
+    );
+
+    const preludeCard = screen.getByTestId("companion-stat-analysis-prelude-card");
+    expect(preludeCard).toHaveAttribute("data-card-id", firstPreludeCard.id);
+    expect(screen.getByText(firstPreludeCard.title)).toBeInTheDocument();
+    expect(screen.getByText(firstPreludeCard.description)).toBeInTheDocument();
+    expect(screen.getByLabelText("Analyze My Stats prelude cards")).toBeInTheDocument();
+    expect(screen.queryByText("The Oathbound Pathfinder")).not.toBeInTheDocument();
+    expect(screen.queryByText("Discipline")).not.toBeInTheDocument();
+    expect(screen.queryByText("560")).not.toBeInTheDocument();
+  });
+
+  it("does not auto-rotate prelude cards when reduced motion is preferred", () => {
+    const firstPreludeCard = COMPANION_STAT_ANALYSIS_PRELUDE_CARDS[0];
+    mocks.prefersReducedMotion = true;
+    vi.useFakeTimers();
+    mocks.useCompanionStatAnalysisMock.mockReturnValue({
+      analysis: null,
+      cached: false,
+      error: null,
+      isLoading: true,
+      isRefreshing: false,
+      isRegeneratingTitleCard: false,
+      refreshAnalysis: mocks.refreshAnalysisMock,
+      regenerateTitleCard: mocks.regenerateTitleCardMock,
+    });
+
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="desktop"
+      />,
+    );
+
+    expect(screen.getByTestId("companion-stat-analysis-prelude-card")).toHaveAttribute(
+      "data-card-id",
+      firstPreludeCard.id,
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(7_200);
+    });
+
+    expect(screen.getByTestId("companion-stat-analysis-prelude-card")).toHaveAttribute(
+      "data-card-id",
+      firstPreludeCard.id,
+    );
+  });
+
   it("keeps the loading state while title-card art is still generating", () => {
+    const firstPreludeCard = COMPANION_STAT_ANALYSIS_PRELUDE_CARDS[0];
     mocks.useCompanionStatAnalysisMock.mockReturnValue({
       analysis: {
         ...analysis,
@@ -470,9 +541,16 @@ describe("CompanionStatAnalysisSurface", () => {
     expect(screen.getByTestId("companion-title-art-loading")).toBeInTheDocument();
     expect(screen.getByTestId("companion-title-art-placeholder")).toBeInTheDocument();
     expect(screen.getByText("Generating title art")).toBeInTheDocument();
-    expect(screen.getByText("The Oathbound Pathfinder")).toBeInTheDocument();
-    expect(screen.getByText("Discipline")).toBeInTheDocument();
-    expect(screen.getByText("Alignment")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-stat-analysis-prelude-card")).toHaveAttribute(
+      "data-card-id",
+      firstPreludeCard.id,
+    );
+    expect(screen.getByText(firstPreludeCard.title)).toBeInTheDocument();
+    expect(screen.getByText(firstPreludeCard.description)).toBeInTheDocument();
+    expect(screen.queryByText("The Oathbound Pathfinder")).not.toBeInTheDocument();
+    expect(screen.queryByText("Discipline")).not.toBeInTheDocument();
+    expect(screen.queryByText("Alignment")).not.toBeInTheDocument();
+    expect(screen.queryByText("560")).not.toBeInTheDocument();
     expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
   });
 
@@ -493,6 +571,10 @@ describe("CompanionStatAnalysisSurface", () => {
     expect(preview.querySelector("img")?.getAttribute("src")).toBe("https://example.com/cosmiq-card.png");
     expect(preview.querySelectorAll("img")).toHaveLength(1);
     expect(screen.getByText("Preview warming")).toBeInTheDocument();
+    expect(screen.getByText(COMPANION_STAT_ANALYSIS_PRELUDE_CARDS[0].title)).toBeInTheDocument();
+    expect(screen.queryByText("The Oathbound Pathfinder")).not.toBeInTheDocument();
+    expect(screen.queryByText("Discipline")).not.toBeInTheDocument();
+    expect(screen.queryByText("560")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Generated title art preview slides")).not.toBeInTheDocument();
     expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
   });
@@ -665,6 +747,7 @@ describe("CompanionStatAnalysisSurface", () => {
     });
     expect(await screen.findByTestId("companion-cosmiq-title-card")).toBeInTheDocument();
     expect(screen.getByText("Art unavailable")).toBeInTheDocument();
+    expect(screen.getByText("Title art could not load. Tap regenerate to try again.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Regenerate title art" })).toBeInTheDocument();
     expect(screen.getByText("The Oathbound Pathfinder")).toBeInTheDocument();
     expect(screen.queryByText("Stats analysis is unavailable right now.")).not.toBeInTheDocument();
@@ -680,6 +763,10 @@ describe("CompanionStatAnalysisSurface", () => {
           imageUrl: null,
           imageUrls: [],
           status: "unavailable",
+          failureCode: "guardrail_blocked",
+          failureMessage: "Art generation is paused by the budget guardrail.",
+          retryable: false,
+          lastAttemptAt: "2026-04-18T18:35:00.000Z",
         },
       },
       cached: true,
@@ -701,6 +788,7 @@ describe("CompanionStatAnalysisSurface", () => {
 
     expect(screen.getByTestId("companion-cosmiq-title-card")).toBeInTheDocument();
     expect(screen.getByText("Art unavailable")).toBeInTheDocument();
+    expect(screen.getByText("Art generation is paused by the budget guardrail.")).toBeInTheDocument();
     expect(screen.queryByText("Stats analysis is unavailable right now.")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Regenerate title art" }));

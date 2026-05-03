@@ -39,7 +39,6 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { Skeleton } from "@/components/ui/skeleton";
 import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
 import {
@@ -50,6 +49,10 @@ import {
   useCompanionStatAnalysis,
 } from "@/hooks/useCompanionStatAnalysis";
 import { cn } from "@/lib/utils";
+import {
+  COMPANION_STAT_ANALYSIS_PRELUDE_CARDS,
+  type CompanionStatAnalysisPreludeCard,
+} from "@/shared/companionStatAnalysisPreludeCards";
 
 interface CompanionStatAnalysisSurfaceProps {
   open: boolean;
@@ -278,14 +281,27 @@ const getTitleArtPreviewDwellMs = (imageCount: number): number => {
     + TITLE_ART_REVEAL_SETTLE_MS;
 };
 
+const getTitleArtDiagnosticMessage = ({
+  card,
+  isTitleArtFallback,
+  isRegeneratingTitleCard,
+}: {
+  card: CompanionStatAnalysis["cosmiqTitleCard"] | null | undefined;
+  isTitleArtFallback: boolean;
+  isRegeneratingTitleCard: boolean;
+}) => {
+  if (isRegeneratingTitleCard) return "Regenerating title art.";
+  if (card?.failureMessage) return card.failureMessage;
+  if (isTitleArtFallback) return "Title art could not load. Tap regenerate to try again.";
+  return null;
+};
+
 type TitleCardImageGateState = "idle" | "loading" | "loaded" | "failed";
 
 type LoadingStatePhase = "analysis" | "title-card";
 
 interface LoadingStateProps {
   phase?: LoadingStatePhase;
-  analysis?: CompanionStatAnalysis;
-  viewModel?: ReturnType<typeof buildCompanionStatAnalysisViewModel>;
   imageUrl?: string | null;
   imageUrls?: string[];
   titleCardStatus?: NonNullable<CompanionStatAnalysis["cosmiqTitleCard"]>["status"];
@@ -294,10 +310,60 @@ interface LoadingStateProps {
   prefersReducedMotion: boolean;
 }
 
+function PreludeCardCarousel({
+  activeCard,
+  activeIndex,
+}: {
+  activeCard: CompanionStatAnalysisPreludeCard;
+  activeIndex: number;
+}) {
+  return (
+    <div
+      data-card-id={activeCard.id}
+      data-testid="companion-stat-analysis-prelude-card"
+      className="mx-auto w-full max-w-md rounded-lg border border-white/15 bg-background/72 p-4 text-left shadow-2xl backdrop-blur-md"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <Badge className="bg-primary text-primary-foreground">Analyze My Stats</Badge>
+        <Badge variant="outline" className="border-white/25 bg-background/50 text-foreground">
+          {activeIndex + 1}/{COMPANION_STAT_ANALYSIS_PRELUDE_CARDS.length}
+        </Badge>
+      </div>
+      <div className="mt-5 space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Prelude Card</p>
+        <h3
+          data-testid="companion-stat-analysis-prelude-title"
+          className="text-2xl font-semibold leading-tight sm:text-3xl"
+        >
+          {activeCard.title}
+        </h3>
+        <p
+          data-testid="companion-stat-analysis-prelude-description"
+          className="text-sm leading-6 text-muted-foreground"
+        >
+          {activeCard.description}
+        </p>
+      </div>
+      <div
+        aria-label="Analyze My Stats prelude cards"
+        className="mt-5 flex gap-1.5"
+      >
+        {COMPANION_STAT_ANALYSIS_PRELUDE_CARDS.map((card, index) => (
+          <span
+            key={card.id}
+            className={cn(
+              "h-1.5 flex-1 rounded-full bg-primary/20 transition-colors",
+              index === activeIndex && "bg-primary",
+            )}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function LoadingState({
   phase = "analysis",
-  analysis,
-  viewModel,
   imageUrl,
   imageUrls = EMPTY_IMAGE_URLS,
   titleCardStatus = "generating",
@@ -312,7 +378,13 @@ function LoadingState({
   }, [imageUrl, imageUrls]);
   const slideshowKey = useMemo(() => slideshowUrls.join("|"), [slideshowUrls]);
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
+  const [activePreludeCardIndex, setActivePreludeCardIndex] = useState(0);
   const [loadedPreviewUrls, setLoadedPreviewUrls] = useState<Set<string>>(() => new Set());
+  const activeSafePreludeCardIndex =
+    activePreludeCardIndex % COMPANION_STAT_ANALYSIS_PRELUDE_CARDS.length;
+  const activePreludeCard =
+    COMPANION_STAT_ANALYSIS_PRELUDE_CARDS[activeSafePreludeCardIndex]
+    ?? COMPANION_STAT_ANALYSIS_PRELUDE_CARDS[0];
   const verifiedSlideshowUrls = useMemo(
     () =>
       slideshowUrls.filter((slideUrl, index) =>
@@ -340,8 +412,24 @@ function LoadingState({
   }, [slideshowKey]);
 
   useEffect(() => {
+    setActivePreludeCardIndex(0);
+  }, [phase]);
+
+  useEffect(() => {
     onVerifiedPreviewCountChange?.(verifiedPreviewCount);
   }, [onVerifiedPreviewCountChange, verifiedPreviewCount]);
+
+  useEffect(() => {
+    if (prefersReducedMotion || COMPANION_STAT_ANALYSIS_PRELUDE_CARDS.length <= 1) return;
+
+    const intervalId = window.setInterval(() => {
+      setActivePreludeCardIndex((current) => (current + 1) % COMPANION_STAT_ANALYSIS_PRELUDE_CARDS.length);
+    }, TITLE_ART_SLIDE_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [phase, prefersReducedMotion]);
 
   useEffect(() => {
     if (phase === "title-card" && imageState === "loaded" && slideshowUrls[0]) {
@@ -367,10 +455,8 @@ function LoadingState({
     };
   }, [phase, imageState, prefersReducedMotion, previewSlideshowKey, previewSlideshowUrls.length]);
 
-  if (phase === "title-card" && analysis && viewModel) {
+  if (phase === "title-card") {
     const hasImagePreview = slideshowUrls.length > 0;
-    const dominantLabel = ATTRIBUTE_META[analysis.cosmiqTitle.dominantStat].label;
-    const secondaryLabel = ATTRIBUTE_META[analysis.cosmiqTitle.secondaryStat].label;
     const loadingStatus = hasImagePreview
       ? "Art preview received"
       : titleCardStatus === "ready"
@@ -378,9 +464,7 @@ function LoadingState({
         : "Generating title art";
     const loadingCopy = hasImagePreview
       ? "Generated art is here. Polishing the reveal before it lands."
-      : `Composing ${dominantLabel} and ${secondaryLabel} into your generated title card.`;
-    const topStats = viewModel.rankedStats.slice(0, 3);
-    const remainingStats = viewModel.statCards.filter((stat) => !topStats.includes(stat)).slice(0, 3);
+      : "Preparing the personal title card reveal.";
     const hasVerifiedPreview = previewSlideshowUrls.length > 0;
     const hasSlideshow = previewSlideshowUrls.length > 1;
     const activeSafeSlideIndex = hasVerifiedPreview
@@ -399,7 +483,6 @@ function LoadingState({
       <Card
         data-testid="companion-title-art-loading"
         className="relative min-h-[min(72vh,760px)] overflow-hidden border-primary/25 bg-background"
-        style={mentorAccentStyle(analysis)}
       >
         {hasImagePreview ? (
           <div className="absolute inset-0" data-testid="companion-title-art-loading-preview">
@@ -441,7 +524,7 @@ function LoadingState({
               </Badge>
             </div>
             <Badge variant="outline" className="border-white/30 bg-background/55 text-foreground backdrop-blur">
-              {analysis.mentor.name}
+              Preparing reveal
             </Badge>
           </div>
 
@@ -465,10 +548,10 @@ function LoadingState({
             </div>
 
             <div className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Cosmiq Title</p>
-              <h3 className="text-3xl font-semibold leading-tight sm:text-4xl">
-                {analysis.cosmiqTitle.title}
-              </h3>
+              <PreludeCardCarousel
+                activeCard={activePreludeCard}
+                activeIndex={activeSafePreludeCardIndex}
+              />
               <p className="mx-auto max-w-md text-sm leading-6 text-muted-foreground">{loadingCopy}</p>
               {hasSlideshow ? (
                 <div
@@ -490,15 +573,16 @@ function LoadingState({
           </div>
 
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {[...topStats, ...remainingStats].map((stat) => (
+            {Array.from({ length: 6 }).map((_, index) => (
               <div
-                key={stat.attribute}
+                key={index}
                 className="rounded-lg border border-white/10 bg-background/60 px-3 py-2 text-left backdrop-blur"
+                aria-hidden="true"
               >
-                <p className="text-[11px] font-medium text-muted-foreground">{stat.label}</p>
-                <div className="mt-1 flex items-end justify-between gap-2">
-                  <span className="text-lg font-semibold leading-none">{stat.score}</span>
-                  <span className="text-[10px] font-semibold uppercase text-primary">{stat.band}</span>
+                <div className="h-2 w-16 rounded-full bg-primary/20" />
+                <div className="mt-3 flex items-end justify-between gap-2">
+                  <div className="h-5 w-10 rounded-full bg-white/10" />
+                  <div className="h-2 w-12 rounded-full bg-primary/15" />
                 </div>
               </div>
             ))}
@@ -525,11 +609,10 @@ function LoadingState({
             Reading your stat shape, momentum, and next evolution path.
           </p>
         </div>
-        <div className="grid w-full max-w-md grid-cols-3 gap-2">
-          {Array.from({ length: 6 }).map((_, index) => (
-            <Skeleton key={index} className="h-12 rounded-lg bg-primary/10" />
-          ))}
-        </div>
+        <PreludeCardCarousel
+          activeCard={activePreludeCard}
+          activeIndex={activeSafePreludeCardIndex}
+        />
       </CardContent>
     </Card>
   );
@@ -1047,6 +1130,11 @@ function CosmiqTitleRevealCard({
   const imageUrl = isTitleArtFallback ? null : getTitleCardImageUrls(analysis.cosmiqTitleCard)[0] ?? null;
   const cardStatus = analysis.cosmiqTitleCard?.status ?? "unavailable";
   const showTitleArtUnavailableBadge = isTitleArtFallback || cardStatus === "unavailable";
+  const titleArtDiagnosticMessage = getTitleArtDiagnosticMessage({
+    card: analysis.cosmiqTitleCard,
+    isTitleArtFallback,
+    isRegeneratingTitleCard,
+  });
   const handleRegenerateTitleArt = () => {
     void onRegenerateTitleCard(analysis).catch(() => undefined);
   };
@@ -1078,6 +1166,11 @@ function CosmiqTitleRevealCard({
                   {analysis.analysisDate}
                 </Badge>
               </div>
+              {showTitleArtUnavailableBadge && titleArtDiagnosticMessage ? (
+                <p className="max-w-lg text-xs leading-5 text-muted-foreground">
+                  {titleArtDiagnosticMessage}
+                </p>
+              ) : null}
               <CardTitle className="text-2xl leading-tight sm:text-3xl">
                 {analysis.cosmiqTitle.title}
               </CardTitle>
@@ -1150,22 +1243,29 @@ function CosmiqTitleRevealCard({
 
       <div className="relative z-10 flex min-h-[min(72vh,760px)] flex-col justify-between p-4 sm:p-6">
         <div className="flex items-start justify-between gap-3">
-          <div className="flex flex-wrap gap-2">
-            <Badge className="bg-primary text-primary-foreground">
-              {formatRarityLabel(analysis.cosmiqTitle.rarity)}
-            </Badge>
-            <Badge variant="outline" className="border-white/30 bg-background/55 text-foreground backdrop-blur">
-              {STABILITY_LABELS[analysis.cosmiqTitle.titleStability]}
-            </Badge>
-            {cardStatus === "generating" ? (
-              <Badge variant="outline" className="border-white/30 bg-background/55 text-foreground backdrop-blur">
-                Art warming up
+          <div className="min-w-0 space-y-2">
+            <div className="flex flex-wrap gap-2">
+              <Badge className="bg-primary text-primary-foreground">
+                {formatRarityLabel(analysis.cosmiqTitle.rarity)}
               </Badge>
-            ) : null}
-            {showTitleArtUnavailableBadge ? (
               <Badge variant="outline" className="border-white/30 bg-background/55 text-foreground backdrop-blur">
-                Art unavailable
+                {STABILITY_LABELS[analysis.cosmiqTitle.titleStability]}
               </Badge>
+              {cardStatus === "generating" ? (
+                <Badge variant="outline" className="border-white/30 bg-background/55 text-foreground backdrop-blur">
+                  Art warming up
+                </Badge>
+              ) : null}
+              {showTitleArtUnavailableBadge ? (
+                <Badge variant="outline" className="border-white/30 bg-background/55 text-foreground backdrop-blur">
+                  Art unavailable
+                </Badge>
+              ) : null}
+            </div>
+            {showTitleArtUnavailableBadge && titleArtDiagnosticMessage ? (
+              <p className="max-w-md rounded-lg border border-white/10 bg-background/55 px-3 py-2 text-xs leading-5 text-muted-foreground backdrop-blur">
+                {titleArtDiagnosticMessage}
+              </p>
             ) : null}
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -1309,8 +1409,6 @@ function CompanionStatAnalysisView({
     return (
       <LoadingState
         phase="title-card"
-        analysis={analysis}
-        viewModel={viewModel}
         imageUrl={primaryTitleCardImageUrl}
         imageUrls={titleCardImageUrls}
         titleCardStatus={titleCardStatus}

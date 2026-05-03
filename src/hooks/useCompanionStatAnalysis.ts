@@ -62,6 +62,13 @@ const getMalformedAnalysisMessage = (error: string, refreshed: boolean) =>
 
 const TITLE_CARD_RETRY_DELAY_MS = 5_000;
 const TITLE_CARD_MAX_FAILED_ATTEMPTS = 3;
+const TITLE_CARD_MAX_RETRY_DELAY_MS = 30_000;
+
+const getTitleCardRetryDelayMs = (failedAttempts: number) =>
+  Math.min(
+    TITLE_CARD_MAX_RETRY_DELAY_MS,
+    TITLE_CARD_RETRY_DELAY_MS * Math.max(1, failedAttempts),
+  );
 
 const isCosmiqTitleCard = (value: unknown): value is NonNullable<CompanionStatAnalysis["cosmiqTitleCard"]> =>
   isRecord(value)
@@ -74,7 +81,11 @@ const isCosmiqTitleCard = (value: unknown): value is NonNullable<CompanionStatAn
   )
   && (value.status === "ready" || value.status === "generating" || value.status === "unavailable")
   && typeof value.cached === "boolean"
-  && typeof value.promptVersion === "number";
+  && typeof value.promptVersion === "number"
+  && (value.failureCode === undefined || value.failureCode === null || typeof value.failureCode === "string")
+  && (value.failureMessage === undefined || value.failureMessage === null || typeof value.failureMessage === "string")
+  && (value.retryable === undefined || typeof value.retryable === "boolean")
+  && (value.lastAttemptAt === undefined || value.lastAttemptAt === null || typeof value.lastAttemptAt === "string");
 
 const getCosmiqTitleCardProfileKey = (analysis: CompanionStatAnalysis) =>
   analysis.cosmiqTitleCard?.profileKey
@@ -108,9 +119,15 @@ export const useCompanionStatAnalysis = ({ enabled = true }: UseCompanionStatAna
   const markTitleCardUnavailable = useCallback(({
     analysisDate,
     expectedProfileKey,
+    failureCode = "client_fetch_failed",
+    failureMessage = "Title art request failed. Tap regenerate to try again.",
+    retryable = false,
   }: {
     analysisDate: string;
     expectedProfileKey: string;
+    failureCode?: string;
+    failureMessage?: string;
+    retryable?: boolean;
   }) => {
     queryClient.setQueryData<CompanionStatAnalysisResponse | undefined>(queryKey, (current) => {
       if (!current) return current;
@@ -128,6 +145,10 @@ export const useCompanionStatAnalysis = ({ enabled = true }: UseCompanionStatAna
             status: "unavailable",
             cached: false,
             promptVersion: COMPANION_COSMIQ_TITLE_CARD_PROMPT_VERSION,
+            failureCode,
+            failureMessage,
+            retryable,
+            lastAttemptAt: new Date().toISOString(),
           },
         },
       };
@@ -212,18 +233,38 @@ export const useCompanionStatAnalysis = ({ enabled = true }: UseCompanionStatAna
       };
     },
     onSuccess: ({ analysisDate, expectedProfileKey, card }) => {
-      titleCardFailureCountsRef.current.delete(`${analysisDate}:${expectedProfileKey}`);
+      const requestKey = `${analysisDate}:${expectedProfileKey}`;
+      let nextCard = card;
+      if (card.status === "ready") {
+        titleCardFailureCountsRef.current.delete(requestKey);
+      } else if (card.status === "unavailable" && card.retryable) {
+        const failedAttempts = (titleCardFailureCountsRef.current.get(requestKey) ?? 0) + 1;
+        titleCardFailureCountsRef.current.set(requestKey, failedAttempts);
+        if (failedAttempts >= TITLE_CARD_MAX_FAILED_ATTEMPTS) {
+          titleCardFailureCountsRef.current.delete(requestKey);
+          nextCard = {
+            ...card,
+            failureCode: "retry_limit_reached",
+            failureMessage: "Title art retries paused. Tap regenerate to try again.",
+            retryable: false,
+            lastAttemptAt: card.lastAttemptAt ?? new Date().toISOString(),
+          };
+        }
+      } else if (card.status === "unavailable") {
+        titleCardFailureCountsRef.current.delete(requestKey);
+      }
+
       queryClient.setQueryData<CompanionStatAnalysisResponse | undefined>(queryKey, (current) => {
         if (!current) return current;
         if (current.analysis.analysisDate !== analysisDate) return current;
         if (getCosmiqTitleCardProfileKey(current.analysis) !== expectedProfileKey) return current;
-        if (card.profileKey !== expectedProfileKey) return current;
+        if (nextCard.profileKey !== expectedProfileKey) return current;
 
         return {
           ...current,
           analysis: {
             ...current.analysis,
-            cosmiqTitleCard: card,
+            cosmiqTitleCard: nextCard,
           },
         };
       });
@@ -234,6 +275,15 @@ export const useCompanionStatAnalysis = ({ enabled = true }: UseCompanionStatAna
 
   const regenerateTitleCard = useCallback(async (analysis: CompanionStatAnalysis) => {
     const expectedProfileKey = getCosmiqTitleCardProfileKey(analysis);
+    const requestKey = `${analysis.analysisDate}:${expectedProfileKey}`;
+    titleCardFailureCountsRef.current.delete(requestKey);
+    lastTitleCardAttemptKeyRef.current = null;
+    if (titleCardRetryTimeoutRef.current) {
+      clearTimeout(titleCardRetryTimeoutRef.current);
+      titleCardRetryTimeoutRef.current = null;
+    }
+    titleCardRetryKeyRef.current = null;
+
     return await generateTitleCard({
       analysisDate: analysis.analysisDate,
       expectedProfileKey,
@@ -269,13 +319,19 @@ export const useCompanionStatAnalysis = ({ enabled = true }: UseCompanionStatAna
     }
 
     const titleCard = analysis.cosmiqTitleCard;
-    if (titleCard?.status === "ready" || titleCard?.status === "unavailable") {
+    if (titleCard?.status === "ready" || (titleCard?.status === "unavailable" && !titleCard.retryable)) {
       clearRetryTimer();
       return;
     }
 
     const expectedProfileKey = getCosmiqTitleCardProfileKey(analysis);
     const requestKey = `${analysis.analysisDate}:${expectedProfileKey}`;
+    const failedAttempts = titleCardFailureCountsRef.current.get(requestKey) ?? 0;
+    if (titleCard?.status === "unavailable" && failedAttempts >= TITLE_CARD_MAX_FAILED_ATTEMPTS) {
+      clearRetryTimer();
+      return;
+    }
+
     if (activeTitleCardRequestKeyRef.current === requestKey || isTitleCardGenerationPending) return;
 
     const requestTitleCard = () => {
@@ -296,6 +352,9 @@ export const useCompanionStatAnalysis = ({ enabled = true }: UseCompanionStatAna
             markTitleCardUnavailable({
               analysisDate: analysis.analysisDate,
               expectedProfileKey,
+              failureCode: "client_fetch_failed",
+              failureMessage: "Title art request failed. Tap regenerate to try again.",
+              retryable: false,
             });
           }
         })
@@ -325,7 +384,7 @@ export const useCompanionStatAnalysis = ({ enabled = true }: UseCompanionStatAna
       titleCardRetryTimeoutRef.current = null;
       titleCardRetryKeyRef.current = null;
       requestTitleCard();
-    }, TITLE_CARD_RETRY_DELAY_MS);
+    }, getTitleCardRetryDelayMs(failedAttempts));
   }, [
     enabled,
     generateTitleCard,

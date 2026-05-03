@@ -490,6 +490,22 @@ function validateCosmiqTitleCard(value: unknown, path: string): ValidationResult
     return failure(`${path}.promptVersion must be a number`);
   }
 
+  if (!(value.failureCode === undefined || value.failureCode === null || isNonEmptyString(value.failureCode))) {
+    return failure(`${path}.failureCode must be a non-empty string or null`);
+  }
+
+  if (!(value.failureMessage === undefined || value.failureMessage === null || isNonEmptyString(value.failureMessage))) {
+    return failure(`${path}.failureMessage must be a non-empty string or null`);
+  }
+
+  if (!(value.retryable === undefined || typeof value.retryable === "boolean")) {
+    return failure(`${path}.retryable must be a boolean`);
+  }
+
+  if (!(value.lastAttemptAt === undefined || value.lastAttemptAt === null || isNonEmptyString(value.lastAttemptAt))) {
+    return failure(`${path}.lastAttemptAt must be a non-empty string or null`);
+  }
+
   return success({
     ...(value as unknown as CompanionCosmiqTitleCard),
     ...(imageUrls ? { imageUrls } : {}),

@@ -161,7 +161,12 @@ function createJsonResponse(payload: unknown, status = 200): Response {
 
 function createMockSupabase(
   beginRows: unknown[],
-  options: { completeError?: { message: string } | null } = {},
+  options: {
+    beginError?: { message: string } | null;
+    completeError?: { message: string } | null;
+    uploadError?: { message: string } | null;
+    publicUrl?: string | null;
+  } = {},
 ) {
   const rpcCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
   const uploaded: Array<{ bucket: string; path: string; contentType: string | undefined }> = [];
@@ -201,6 +206,9 @@ function createMockSupabase(
     rpc(name: string, args: Record<string, unknown>) {
       rpcCalls.push({ name, args });
       if (name === "begin_cosmiq_title_card_generation") {
+        if (options.beginError) {
+          return Promise.resolve({ data: null, error: options.beginError });
+        }
         return Promise.resolve({ data: beginRows.shift() ?? [], error: null });
       }
       if (name === "complete_cosmiq_title_card_generation") {
@@ -211,14 +219,16 @@ function createMockSupabase(
     storage: {
       from(bucket: string) {
         return {
-          upload(path: string, _bytes: Uint8Array, options: { contentType?: string }) {
-            uploaded.push({ bucket, path, contentType: options.contentType });
-            return Promise.resolve({ error: null });
+          upload(path: string, _bytes: Uint8Array, uploadOptions: { contentType?: string }) {
+            uploaded.push({ bucket, path, contentType: uploadOptions.contentType });
+            return Promise.resolve({ error: options.uploadError ?? null });
           },
           getPublicUrl(path: string) {
             return {
               data: {
-                publicUrl: `https://cdn.example.com/${bucket}/${path}`,
+                publicUrl: options.publicUrl === undefined
+                  ? `https://cdn.example.com/${bucket}/${path}`
+                  : options.publicUrl,
               },
             };
           },
@@ -267,6 +277,57 @@ Deno.test("resolveCosmiqTitleCard returns cached ready images without regenerati
   assertEquals(card.imageUrls?.length, 2, "Expected cached slideshow URLs");
   assertEquals(fetchCalled, false, "Expected no image fetch on cache hit");
   assertEquals(supabase.uploaded.length, 0, "Expected no storage upload on cache hit");
+});
+
+Deno.test("resolveCosmiqTitleCard returns sanitized diagnostics when the generation RPC fails", async () => {
+  const supabase = createMockSupabase([], {
+    beginError: { message: "function begin_cosmiq_title_card_generation does not exist" },
+  });
+
+  const card = await resolveCosmiqTitleCard({
+    supabase,
+    userId: "user-1",
+    analysis: baseAnalysis,
+  });
+
+  assertEquals(card.status, "unavailable", "Expected RPC setup failure to be unavailable");
+  assertEquals(card.failureCode, "generation_rpc_failed", "Expected sanitized RPC failure code");
+  assertEquals(card.failureMessage, "Title art setup is out of sync. Update required.", "Expected sanitized RPC message");
+  assertEquals(card.retryable, false, "Expected RPC setup failure to be non-retryable");
+  assertEquals(supabase.uploaded.length, 0, "Expected no upload after RPC setup failure");
+});
+
+Deno.test("resolveCosmiqTitleCard records non-retryable diagnostics when the OpenAI key is missing", async () => {
+  const originalApiKey = Deno.env.get("OPENAI_API_KEY");
+  Deno.env.delete("OPENAI_API_KEY");
+
+  try {
+    const supabase = createMockSupabase([
+      [{
+        action: "started",
+        status: "generating",
+        image_url: null,
+        prompt_version: COSMIQ_TITLE_CARD_PROMPT_VERSION,
+      }],
+    ]);
+
+    const card = await resolveCosmiqTitleCard({
+      supabase,
+      userId: "user-1",
+      analysis: baseAnalysis,
+    });
+
+    const completeCall = supabase.rpcCalls.find((call) => call.name === "complete_cosmiq_title_card_generation");
+    assertEquals(card.status, "unavailable", "Expected missing API key to be unavailable");
+    assertEquals(card.failureCode, "missing_openai_key", "Expected missing-key diagnostic code");
+    assertEquals(card.failureMessage, "Image generation is not configured yet.", "Expected sanitized missing-key message");
+    assertEquals(card.retryable, false, "Expected missing-key diagnostic to be non-retryable");
+    assertEquals(completeCall?.args.p_failure_code, "missing_openai_key", "Expected missing-key code to be persisted");
+    assertEquals(completeCall?.args.p_retryable, false, "Expected missing-key retry flag to be persisted");
+    assertEquals(supabase.uploaded.length, 0, "Expected no upload without an API key");
+  } finally {
+    restoreEnv("OPENAI_API_KEY", originalApiKey);
+  }
 });
 
 Deno.test("resolveCosmiqTitleCard generates, uploads, and completes a first image", async () => {
@@ -331,6 +392,142 @@ Deno.test("resolveCosmiqTitleCard generates, uploads, and completes a first imag
     assert(requestPrompt.includes("female fantasy character"), "Expected female visual persona prompt guidance");
     assert(!requestPrompt.includes("Momentum:"), "Shared card prompt should not include momentum-only UI state");
   } finally {
+    restoreEnv("OPENAI_API_KEY", originalApiKey);
+  }
+});
+
+Deno.test("resolveCosmiqTitleCard records retryable diagnostics for upstream image failures", async () => {
+  const originalApiKey = Deno.env.get("OPENAI_API_KEY");
+  const originalWarn = console.warn;
+  Deno.env.set("OPENAI_API_KEY", "test-key");
+  console.warn = () => undefined;
+
+  try {
+    const supabase = createMockSupabase([
+      [{
+        action: "started",
+        status: "generating",
+        image_url: null,
+        prompt_version: COSMIQ_TITLE_CARD_PROMPT_VERSION,
+      }],
+    ]);
+
+    const card = await resolveCosmiqTitleCard({
+      supabase,
+      userId: "user-1",
+      analysis: baseAnalysis,
+      fetchImpl: (() => Promise.resolve(createJsonResponse({ error: "raw upstream detail" }, 503))) as typeof fetch,
+    });
+
+    const completeCall = supabase.rpcCalls.find((call) => call.name === "complete_cosmiq_title_card_generation");
+    assertEquals(card.status, "unavailable", "Expected upstream failure to be unavailable");
+    assertEquals(card.failureCode, "upstream_error", "Expected upstream diagnostic code");
+    assertEquals(card.failureMessage, "Image API failed. Retrying.", "Expected sanitized upstream message");
+    assertEquals(card.retryable, true, "Expected upstream failure to be retryable");
+    assertEquals(completeCall?.args.p_failure_code, "upstream_error", "Expected upstream code to be persisted");
+    assertEquals(completeCall?.args.p_error_message, "Image API failed. Retrying.", "Expected only sanitized message to be persisted");
+    assertEquals(completeCall?.args.p_retryable, true, "Expected retryable flag to be persisted");
+    assertEquals(supabase.uploaded.length, 0, "Expected no upload after upstream failure");
+  } finally {
+    console.warn = originalWarn;
+    restoreEnv("OPENAI_API_KEY", originalApiKey);
+  }
+});
+
+Deno.test("resolveCosmiqTitleCard records retryable diagnostics for storage upload failures", async () => {
+  const originalApiKey = Deno.env.get("OPENAI_API_KEY");
+  const originalWarn = console.warn;
+  Deno.env.set("OPENAI_API_KEY", "test-key");
+  console.warn = () => undefined;
+
+  try {
+    const supabase = createMockSupabase([
+      [{
+        action: "started",
+        status: "generating",
+        image_url: null,
+        prompt_version: COSMIQ_TITLE_CARD_PROMPT_VERSION,
+      }],
+    ], {
+      uploadError: { message: "raw storage detail" },
+    });
+    const generatedDataUrl = `data:image/png;base64,${btoa("image-bytes")}`;
+
+    const card = await resolveCosmiqTitleCard({
+      supabase,
+      userId: "user-1",
+      analysis: baseAnalysis,
+      fetchImpl: (() =>
+        Promise.resolve(createJsonResponse({
+          choices: [{
+            message: {
+              images: [{
+                image_url: { url: generatedDataUrl },
+              }],
+            },
+          }],
+        }))) as typeof fetch,
+    });
+
+    const completeCall = supabase.rpcCalls.find((call) => call.name === "complete_cosmiq_title_card_generation");
+    assertEquals(card.status, "unavailable", "Expected storage upload failure to be unavailable");
+    assertEquals(card.failureCode, "storage_upload_failed", "Expected storage diagnostic code");
+    assertEquals(card.failureMessage, "Title art storage upload failed. Retrying.", "Expected sanitized storage message");
+    assertEquals(card.retryable, true, "Expected storage failure to be retryable");
+    assertEquals(completeCall?.args.p_failure_code, "storage_upload_failed", "Expected storage code to be persisted");
+    assertEquals(completeCall?.args.p_error_message, "Title art storage upload failed. Retrying.", "Expected sanitized storage message to be persisted");
+    assertEquals(completeCall?.args.p_retryable, true, "Expected retryable flag to be persisted");
+    assertEquals(supabase.uploaded.length, 1, "Expected upload attempt before storage failure");
+  } finally {
+    console.warn = originalWarn;
+    restoreEnv("OPENAI_API_KEY", originalApiKey);
+  }
+});
+
+Deno.test("resolveCosmiqTitleCard records retryable diagnostics for missing public storage URLs", async () => {
+  const originalApiKey = Deno.env.get("OPENAI_API_KEY");
+  const originalWarn = console.warn;
+  Deno.env.set("OPENAI_API_KEY", "test-key");
+  console.warn = () => undefined;
+
+  try {
+    const supabase = createMockSupabase([
+      [{
+        action: "started",
+        status: "generating",
+        image_url: null,
+        prompt_version: COSMIQ_TITLE_CARD_PROMPT_VERSION,
+      }],
+    ], {
+      publicUrl: null,
+    });
+    const generatedDataUrl = `data:image/png;base64,${btoa("image-bytes")}`;
+
+    const card = await resolveCosmiqTitleCard({
+      supabase,
+      userId: "user-1",
+      analysis: baseAnalysis,
+      fetchImpl: (() =>
+        Promise.resolve(createJsonResponse({
+          choices: [{
+            message: {
+              images: [{
+                image_url: { url: generatedDataUrl },
+              }],
+            },
+          }],
+        }))) as typeof fetch,
+    });
+
+    const completeCall = supabase.rpcCalls.find((call) => call.name === "complete_cosmiq_title_card_generation");
+    assertEquals(card.status, "unavailable", "Expected public URL failure to be unavailable");
+    assertEquals(card.failureCode, "public_url_failed", "Expected public URL diagnostic code");
+    assertEquals(card.failureMessage, "Title art storage URL failed. Retrying.", "Expected sanitized public URL message");
+    assertEquals(card.retryable, true, "Expected public URL failure to be retryable");
+    assertEquals(completeCall?.args.p_failure_code, "public_url_failed", "Expected public URL code to be persisted");
+    assertEquals(completeCall?.args.p_retryable, true, "Expected retryable flag to be persisted");
+  } finally {
+    console.warn = originalWarn;
     restoreEnv("OPENAI_API_KEY", originalApiKey);
   }
 });
@@ -420,9 +617,14 @@ Deno.test("resolveCosmiqTitleCard falls back when primary image generation is bl
     const completeCall = supabase.rpcCalls.find((call) => call.name === "complete_cosmiq_title_card_generation");
     assertEquals(card.status, "unavailable", "Expected blocked primary generation to be unavailable");
     assertEquals(card.imageUrl, null, "Expected no image URL when blocked");
+    assertEquals(card.failureCode, "guardrail_blocked", "Expected guardrail diagnostic code");
+    assertEquals(card.failureMessage, "Art generation is paused by the budget guardrail.", "Expected sanitized guardrail message");
+    assertEquals(card.retryable, false, "Expected guardrail block to be non-retryable");
     assertEquals(supabase.uploaded.length, 0, "Expected no upload when primary generation is blocked");
     assertEquals(fetchCount, 1, "Expected one primary generation attempt");
     assertEquals(completeCall?.args.p_status, "unavailable", "Expected unavailable state to be persisted");
+    assertEquals(completeCall?.args.p_failure_code, "guardrail_blocked", "Expected guardrail code to be persisted");
+    assertEquals(completeCall?.args.p_retryable, false, "Expected guardrail retry flag to be persisted");
   } finally {
     console.warn = originalWarn;
     restoreEnv("OPENAI_API_KEY", originalApiKey);
@@ -581,8 +783,13 @@ Deno.test("resolveCosmiqTitleCard falls back to unavailable when guardrails bloc
     const completeCall = supabase.rpcCalls.find((call) => call.name === "complete_cosmiq_title_card_generation");
     assertEquals(card.status, "unavailable", "Expected guardrail fallback status");
     assertEquals(card.imageUrl, null, "Expected no image URL when blocked");
+    assertEquals(card.failureCode, "guardrail_blocked", "Expected guardrail diagnostic code");
+    assertEquals(card.failureMessage, "Art generation is paused by the budget guardrail.", "Expected sanitized guardrail message");
+    assertEquals(card.retryable, false, "Expected guardrail block to be non-retryable");
     assertEquals(fetchCalled, false, "Expected blocked generation to skip upstream fetch");
     assertEquals(completeCall?.args.p_status, "unavailable", "Expected unavailable completion state");
+    assertEquals(completeCall?.args.p_failure_code, "guardrail_blocked", "Expected guardrail code to be persisted");
+    assertEquals(completeCall?.args.p_retryable, false, "Expected guardrail retry flag to be persisted");
   } finally {
     console.warn = originalWarn;
     restoreEnv("OPENAI_API_KEY", originalApiKey);
