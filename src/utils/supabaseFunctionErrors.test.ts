@@ -245,6 +245,14 @@ describe("supabaseFunctionErrors", () => {
       upstreamError: "ElevenLabs API error: 402",
       backendMessage: "Failed to generate audio",
     };
+    const audioProviderRateLimitError: ParsedFunctionInvokeError = {
+      category: "rate_limit",
+      isOffline: false,
+      status: 429,
+      code: "AUDIO_PIPELINE_FAILED",
+      upstreamStatus: 429,
+      backendMessage: "Failed to prepare pep talk audio",
+    };
     const unknownParsed: ParsedFunctionInvokeError = {
       category: "unknown",
       isOffline: false,
@@ -291,6 +299,7 @@ describe("supabaseFunctionErrors", () => {
     expect(toUserFacingFunctionError(serverParsedWithMessage)).toBe("No themes configured for mentor: solace");
     expect(toUserFacingFunctionError(audioProviderAuthError)).toContain("provider authentication failed");
     expect(toUserFacingFunctionError(audioProviderCreditsError)).toContain("credits are exhausted");
+    expect(toUserFacingFunctionError(audioProviderRateLimitError)).toContain("Voice generation is being rate-limited");
     expect(toUserFacingFunctionError(rateLimitWithRetryHint)).toContain("30 seconds");
     expect(toUserFacingFunctionError(genericRateLimitWithRetryHint)).toContain("45 seconds");
     expect(toUserFacingFunctionError(pepTalkInProgress)).toContain("still being prepared");

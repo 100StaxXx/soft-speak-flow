@@ -1027,6 +1027,9 @@ function CosmiqTitleRevealCard({
   onFlip,
   isRefreshing,
   onRefresh,
+  isTitleArtFallback,
+  isRegeneratingTitleCard,
+  onRegenerateTitleCard,
   prefersReducedMotion,
 }: {
   analysis: CompanionStatAnalysis;
@@ -1036,10 +1039,17 @@ function CosmiqTitleRevealCard({
   onFlip: () => void;
   isRefreshing: boolean;
   onRefresh: () => void;
+  isTitleArtFallback: boolean;
+  isRegeneratingTitleCard: boolean;
+  onRegenerateTitleCard: (analysis: CompanionStatAnalysis) => Promise<unknown>;
   prefersReducedMotion: boolean;
 }) {
-  const imageUrl = getTitleCardImageUrls(analysis.cosmiqTitleCard)[0] ?? null;
+  const imageUrl = isTitleArtFallback ? null : getTitleCardImageUrls(analysis.cosmiqTitleCard)[0] ?? null;
   const cardStatus = analysis.cosmiqTitleCard?.status ?? "unavailable";
+  const showTitleArtUnavailableBadge = isTitleArtFallback || cardStatus === "unavailable";
+  const handleRegenerateTitleArt = () => {
+    void onRegenerateTitleCard(analysis).catch(() => undefined);
+  };
 
   if (isFlipped) {
     return (
@@ -1072,16 +1082,31 @@ function CosmiqTitleRevealCard({
                 {analysis.cosmiqTitle.title}
               </CardTitle>
             </div>
-            <Button
-              type="button"
-              variant="secondary"
-              size="icon"
-              aria-label="Show Cosmiq title card"
-              className="shrink-0 border border-white/20 bg-background/70 backdrop-blur hover:bg-background/85"
-              onClick={onFlip}
-            >
-              <RotateCcw className="h-4 w-4" />
-            </Button>
+            <div className="flex shrink-0 items-center gap-2">
+              {showTitleArtUnavailableBadge ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="icon"
+                  aria-label="Regenerate title art"
+                  className="border border-white/20 bg-background/70 backdrop-blur hover:bg-background/85"
+                  onClick={handleRegenerateTitleArt}
+                  disabled={isRegeneratingTitleCard}
+                >
+                  <RefreshCw className={cn("h-4 w-4", isRegeneratingTitleCard && "animate-spin")} />
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon"
+                aria-label="Show Cosmiq title card"
+                className="border border-white/20 bg-background/70 backdrop-blur hover:bg-background/85"
+                onClick={onFlip}
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
@@ -1137,17 +1162,37 @@ function CosmiqTitleRevealCard({
                 Art warming up
               </Badge>
             ) : null}
+            {showTitleArtUnavailableBadge ? (
+              <Badge variant="outline" className="border-white/30 bg-background/55 text-foreground backdrop-blur">
+                Art unavailable
+              </Badge>
+            ) : null}
           </div>
-          <Button
-            type="button"
-            variant="secondary"
-            size="icon"
-            aria-label={isFlipped ? "Show Cosmiq title card" : "Show stat analysis"}
-            className="shrink-0 border border-white/20 bg-background/70 backdrop-blur hover:bg-background/85"
-            onClick={onFlip}
-          >
-            {isFlipped ? <RotateCcw className="h-4 w-4" /> : <BarChart3 className="h-4 w-4" />}
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            {showTitleArtUnavailableBadge ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon"
+                aria-label="Regenerate title art"
+                className="border border-white/20 bg-background/70 backdrop-blur hover:bg-background/85"
+                onClick={handleRegenerateTitleArt}
+                disabled={isRegeneratingTitleCard}
+              >
+                <RefreshCw className={cn("h-4 w-4", isRegeneratingTitleCard && "animate-spin")} />
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              aria-label={isFlipped ? "Show Cosmiq title card" : "Show stat analysis"}
+              className="border border-white/20 bg-background/70 backdrop-blur hover:bg-background/85"
+              onClick={onFlip}
+            >
+              {isFlipped ? <RotateCcw className="h-4 w-4" /> : <BarChart3 className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
 
         <motion.div
@@ -1203,15 +1248,14 @@ function CompanionStatAnalysisView({
   const viewModel = useMemo(() => buildCompanionStatAnalysisViewModel(analysis), [analysis]);
   const [isFlipped, setIsFlipped] = useState(false);
   const {
-    failedImageKey,
     imageState,
     isLoaded: isTitleCardImageLoaded,
-    retry: retryTitleCardImage,
   } = useTitleCardImageGate({
     analysis,
     onRegenerateTitleCard,
   });
   const titleCardStatus = analysis.cosmiqTitleCard?.status ?? "generating";
+  const isTitleArtFallback = titleCardStatus === "unavailable" || imageState === "failed";
   const titleCardImageUrls = useMemo(
     () => getTitleCardImageUrls(analysis.cosmiqTitleCard),
     [analysis.cosmiqTitleCard],
@@ -1252,26 +1296,15 @@ function CompanionStatAnalysisView({
   }, [isTitleCardImageLoaded, titleCardPreviewDwellMs, titleCardPreviewKey, verifiedTitleCardPreviewCount]);
   const isTitleCardPreviewDwellSatisfied = titleCardPreviewDwellMs <= 0 || isTitleCardPreviewDwellComplete;
 
-  if (titleCardStatus === "unavailable" || imageState === "failed") {
-    return (
-      <AnalysisUnavailableCard
-        message={
-          failedImageKey
-            ? "We couldn't load the generated title art. Try regenerating it."
-            : "Generated title art is unavailable right now. Try again in a moment."
-        }
-        isRefreshing={isRefreshing || isRegeneratingTitleCard}
-        onRetry={failedImageKey ? retryTitleCardImage : onRefresh}
-      />
-    );
-  }
-
   if (
-    titleCardStatus !== "ready"
-    || !primaryTitleCardImageUrl
-    || !isTitleCardImageLoaded
-    || !isTitleCardPreviewDwellSatisfied
-    || isRegeneratingTitleCard
+    !isTitleArtFallback
+    && (
+      titleCardStatus !== "ready"
+      || !primaryTitleCardImageUrl
+      || !isTitleCardImageLoaded
+      || !isTitleCardPreviewDwellSatisfied
+      || isRegeneratingTitleCard
+    )
   ) {
     return (
       <LoadingState
@@ -1304,6 +1337,9 @@ function CompanionStatAnalysisView({
           onFlip={() => setIsFlipped((current) => !current)}
           isRefreshing={isRefreshing}
           onRefresh={onRefresh}
+          isTitleArtFallback={isTitleArtFallback}
+          isRegeneratingTitleCard={isRegeneratingTitleCard}
+          onRegenerateTitleCard={onRegenerateTitleCard}
           prefersReducedMotion={prefersReducedMotion}
         />
       </motion.div>

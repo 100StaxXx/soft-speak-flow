@@ -348,6 +348,11 @@ export function toUserFacingFunctionError(
     return `Your session has expired. Please sign in again and try to ${action}.`;
   }
 
+  const providerAudioError = mapProviderAudioError(parsed);
+  if (providerAudioError) {
+    return providerAudioError;
+  }
+
   if (parsed.category === "rate_limit") {
     return (
       (parsed.backendMessage && !isLikelyTechnicalMessage(parsed.backendMessage)
@@ -365,11 +370,6 @@ export function toUserFacingFunctionError(
     parsed.status === 408
   ) {
     return "Our servers are temporarily unavailable. Please try again in a moment.";
-  }
-
-  const providerAudioError = mapProviderAudioError(parsed);
-  if (providerAudioError) {
-    return providerAudioError;
   }
 
   if (typeof parsed.status === "number" && parsed.status >= 500) {

@@ -375,6 +375,37 @@ describe("TodaysPepTalk transcript expand behavior", () => {
     expect(screen.getByText("Execute Your Vision")).toBeInTheDocument();
   });
 
+  it("updates the daily query when the effective date changes while mounted", async () => {
+    mocks.state.effectiveDate = "2026-04-25";
+    mocks.state.todayPepTalk = makePepTalk({
+      id: "pep-talk-apr-25",
+      for_date: "2026-04-25",
+      title: "Last Week's Message",
+    });
+
+    renderComponent();
+
+    expect(await screen.findByText("Last Week's Message")).toBeInTheDocument();
+    expect(mocks.state.dailyPepTalkEqCalls).toContainEqual(["for_date", "2026-04-25"]);
+
+    mocks.state.dailyPepTalkEqCalls = [];
+    mocks.state.effectiveDate = "2026-05-02";
+    mocks.state.todayPepTalk = makePepTalk({
+      id: "pep-talk-may-02",
+      for_date: "2026-05-02",
+      title: "Fresh Today's Message",
+    });
+
+    act(() => {
+      window.dispatchEvent(new Event("focus"));
+    });
+
+    await waitFor(() => {
+      expect(mocks.state.dailyPepTalkEqCalls).toContainEqual(["for_date", "2026-05-02"]);
+    });
+    expect(await screen.findByText("Fresh Today's Message")).toBeInTheDocument();
+  });
+
   it("uses a transparent shell while loading", () => {
     renderComponent();
 
@@ -756,6 +787,36 @@ describe("TodaysPepTalk transcript expand behavior", () => {
 
     expect(screen.queryByText("Recording...")).not.toBeInTheDocument();
     expect(await screen.findByRole("button", { name: /refresh today's/i })).toBeEnabled();
+  });
+
+  it("uses a freshly available daily pep talk before invoking generation", async () => {
+    const oldFallback = makePepTalk({
+      id: "pep-talk-old-fallback",
+      for_date: "2026-04-25",
+      title: "Old Fallback Message",
+    });
+    const freshToday = makePepTalk({
+      id: "pep-talk-fresh-today",
+      for_date: "2026-05-02",
+      title: "Fresh Today's Message",
+    });
+
+    mocks.state.todayPepTalk = null;
+    mocks.state.fallbackPepTalk = oldFallback;
+
+    renderComponent();
+
+    expect(await screen.findByText("Old Fallback Message")).toBeInTheDocument();
+
+    mocks.state.todayPepTalk = freshToday;
+    fireEvent.click(await screen.findByRole("button", { name: /refresh today's/i }));
+
+    expect(await screen.findByText("Fresh Today's Message")).toBeInTheDocument();
+
+    const generationCalls = mocks.supabase.functions.invoke.mock.calls.filter(
+      ([functionName]) => functionName === "generate-single-daily-pep-talk",
+    );
+    expect(generationCalls).toHaveLength(0);
   });
 
   it("refetches when the mentor tab becomes active again", async () => {

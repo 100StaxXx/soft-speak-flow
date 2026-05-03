@@ -8,6 +8,7 @@ import {
   buildRetryTranscriptState,
   parseTranscriptSyncPayload,
   TRANSCRIPT_STATUS_PENDING,
+  TRANSCRIPT_STATUS_READY,
 } from "../_shared/transcriptRetryState.ts";
 import { requireUserAuth } from "../_shared/auth.ts";
 import {
@@ -69,6 +70,27 @@ function buildErrorResponse(
   return new Response(
     JSON.stringify(payload),
     { status: normalizeStatus(status), headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
+}
+
+function normalizePipelineFailureStatus(status: number): number {
+  if (status === 429) {
+    return 503;
+  }
+
+  return status;
+}
+
+function isPipelineRateLimit(status: number, upstreamError: string | null): boolean {
+  if (status === 429) {
+    return true;
+  }
+
+  const normalizedError = (upstreamError ?? "").toLowerCase();
+  return (
+    normalizedError.includes("429") ||
+    normalizedError.includes("rate limit") ||
+    normalizedError.includes("too many requests")
   );
 }
 
@@ -141,6 +163,111 @@ function isUniqueViolation(error: unknown): boolean {
   const code = typeof candidate.code === "string" ? candidate.code : "";
   const message = typeof candidate.message === "string" ? candidate.message.toLowerCase() : "";
   return code === "23505" || message.includes("duplicate key");
+}
+
+async function fetchExistingDailyPepTalk(
+  supabase: any,
+  mentorSlug: string,
+  forDate: string,
+): Promise<Record<string, unknown> | null> {
+  const { data, error } = await supabase
+    .from("daily_pep_talks")
+    .select("*")
+    .eq("mentor_slug", mentorSlug)
+    .eq("for_date", forDate)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Failed to fetch existing daily pep talk:", error);
+    return null;
+  }
+
+  return data && typeof data === "object" ? data as Record<string, unknown> : null;
+}
+
+async function reuseMostRecentDailyPepTalkForDate({
+  supabase,
+  mentorSlug,
+  forDate,
+}: {
+  supabase: any;
+  mentorSlug: string;
+  forDate: string;
+}): Promise<Record<string, unknown> | null> {
+  const { data: fallbackPepTalk, error: fallbackError } = await supabase
+    .from("daily_pep_talks")
+    .select("*")
+    .eq("mentor_slug", mentorSlug)
+    .lt("for_date", forDate)
+    .order("for_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (fallbackError) {
+    console.error("Failed to fetch fallback pep talk for rate-limit recovery:", fallbackError);
+    return null;
+  }
+
+  if (!fallbackPepTalk || typeof fallbackPepTalk !== "object") {
+    return null;
+  }
+
+  const fallback = fallbackPepTalk as Record<string, unknown>;
+  const audioUrl = typeof fallback.audio_url === "string" ? fallback.audio_url.trim() : "";
+  const script = typeof fallback.script === "string" ? fallback.script : "";
+  if (!audioUrl || !script) {
+    console.warn("Fallback pep talk is not reusable for rate-limit recovery", {
+      mentorSlug,
+      forDate,
+      fallbackDate: fallback.for_date,
+      hasAudioUrl: Boolean(audioUrl),
+      hasScript: Boolean(script),
+    });
+    return null;
+  }
+
+  const transcript = Array.isArray(fallback.transcript) ? fallback.transcript : [];
+  const nowIso = new Date().toISOString();
+  const { data: reusedPepTalk, error: insertError } = await supabase
+    .from("daily_pep_talks")
+    .insert({
+      mentor_slug: mentorSlug,
+      topic_category: typeof fallback.topic_category === "string" ? fallback.topic_category : "mindset",
+      emotional_triggers: Array.isArray(fallback.emotional_triggers) ? fallback.emotional_triggers : [],
+      intensity: typeof fallback.intensity === "string" ? fallback.intensity : "medium",
+      title: typeof fallback.title === "string" ? fallback.title : "Take Action Today",
+      summary: typeof fallback.summary === "string"
+        ? fallback.summary
+        : "A daily push to help you move forward with purpose and intention.",
+      script,
+      audio_url: audioUrl,
+      for_date: forDate,
+      transcript,
+      transcript_status: transcript.length > 0 ? TRANSCRIPT_STATUS_READY : TRANSCRIPT_STATUS_PENDING,
+      transcript_attempt_count: 0,
+      transcript_next_retry_at: transcript.length > 0 ? null : nowIso,
+      transcript_last_attempt_at: transcript.length > 0 ? nowIso : null,
+      transcript_last_error: null,
+      transcript_ready_at: transcript.length > 0 ? nowIso : null,
+    })
+    .select()
+    .single();
+
+  if (!insertError && reusedPepTalk && typeof reusedPepTalk === "object") {
+    console.warn("Reused latest available pep talk because live audio generation was rate-limited", {
+      mentorSlug,
+      forDate,
+      fallbackDate: fallback.for_date,
+    });
+    return reusedPepTalk as Record<string, unknown>;
+  }
+
+  if (isUniqueViolation(insertError)) {
+    return await fetchExistingDailyPepTalk(supabase, mentorSlug, forDate);
+  }
+
+  console.error("Failed to reuse fallback pep talk for rate-limit recovery:", insertError);
+  return null;
 }
 
 function getPepTalkPayloadAudioUrl(responsePayload: Record<string, unknown>): string | null {
@@ -337,16 +464,6 @@ serve(async (req) => {
     }
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     idempotencySupabase = supabase as unknown as PepTalkGenerationRpcClient;
-    const costGuardrails = createCostGuardrailSession({
-      supabase,
-      endpointKey: "generate-single-daily-pep-talk",
-      featureKey: "ai_pep_talks",
-      userId: auth.userId,
-    });
-    await costGuardrails.enforceAccess({
-      capabilities: ["text", "tts"],
-      providers: ["openai", "elevenlabs"],
-    });
 
     const { effectiveDate: todayDate, themeAnchorDate, timezone } = await resolveSingleDailyPepTalkDateContext({
       supabase: supabase as unknown as ProfileTimezoneSupabaseClient,
@@ -376,6 +493,17 @@ serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "generate-single-daily-pep-talk",
+      featureKey: "ai_pep_talks",
+      userId: auth.userId,
+    });
+    await costGuardrails.enforceAccess({
+      capabilities: ["text", "tts"],
+      providers: ["openai", "elevenlabs"],
+    });
 
     const { theme, usedFallbackTheme } = selectThemeForDate(resolvedMentorSlug, themeAnchorDate);
     if (usedFallbackTheme) {
@@ -493,9 +621,33 @@ serve(async (req) => {
       const upstreamRaw = await audioResponse.text();
       const upstreamError = parseUpstreamError(upstreamRaw);
       console.error('Error generating audio:', audioResponse.status, upstreamRaw);
+
+      if (isPipelineRateLimit(audioResponse.status, upstreamError)) {
+        const reusedPepTalk = await reuseMostRecentDailyPepTalkForDate({
+          supabase,
+          mentorSlug: resolvedMentorSlug,
+          forDate: todayDate,
+        });
+
+        if (reusedPepTalk) {
+          const responsePayload = {
+            pepTalk: reusedPepTalk,
+            status: "reused_fallback",
+            recoveryReason: "audio_rate_limited",
+          };
+          await completePepTalkGenerationRequestBestEffort({
+            supabase,
+            requestKey: idempotencyRequestKey,
+            status: "completed",
+            responsePayload,
+          });
+          return responseForPayload(responsePayload);
+        }
+      }
+
       return await failGeneration(
         buildErrorResponse(
-          audioResponse.status,
+          normalizePipelineFailureStatus(audioResponse.status),
           "Failed to prepare pep talk audio",
           {
             code: "AUDIO_PIPELINE_FAILED",

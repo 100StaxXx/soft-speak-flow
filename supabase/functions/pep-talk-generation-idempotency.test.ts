@@ -73,6 +73,23 @@ Deno.test("single daily pep talk generation uses idempotency and uniqueness conf
       source.includes("Completed replay audio URL was unavailable"),
     "Expected completed idempotency replay payloads to validate cached audio before reuse",
   );
+  assert(
+    source.indexOf("// Check if already generated for today") <
+      source.indexOf("createCostGuardrailSession({"),
+    "Expected existing daily pep talks to return before expensive guardrail checks",
+  );
+  assert(
+    source.includes("normalizePipelineFailureStatus") &&
+      source.includes("status === 429") &&
+      source.includes("AUDIO_PIPELINE_FAILED"),
+    "Expected upstream audio rate limits to be reported as pipeline failures instead of user request throttling",
+  );
+  assert(
+    source.includes("reuseMostRecentDailyPepTalkForDate") &&
+      source.includes("reused_fallback") &&
+      source.includes("audio_rate_limited"),
+    "Expected provider rate limits to reuse the latest working pep talk as today's daily row",
+  );
 });
 
 Deno.test("mentor audio retries ElevenLabs before falling back to OpenAI", async () => {
@@ -93,6 +110,10 @@ Deno.test("mentor audio retries ElevenLabs before falling back to OpenAI", async
     audioSource.includes("retrying primary voice") &&
       audioSource.includes("trying OpenAI TTS fallback as last resort"),
     "Expected logs to distinguish primary retry from last-resort fallback",
+  );
+  assert(
+    audioSource.includes("status === 429"),
+    "Expected ElevenLabs rate limits to retry and fall back through the same transient path",
   );
   assert(
     audioSource.includes("storagePath: filePath") &&

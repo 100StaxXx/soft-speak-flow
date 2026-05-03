@@ -194,6 +194,9 @@ export const TodaysPepTalk = memo(() => {
   const [, setHasAwardedXP] = useState(false);
   const [generationStage, setGenerationStage] = useState<"idle" | "script" | "audio" | "loading">("idle");
   const [isAudioReady, setIsAudioReady] = useState(false);
+  const [effectiveDate, setEffectiveDate] = useState(() =>
+    getEffectiveDailyDate(profile?.timezone ?? undefined),
+  );
   const audioRef = useRef<HTMLAudioElement>(null);
   const activeWordRef = useRef<HTMLSpanElement>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
@@ -209,10 +212,33 @@ export const TodaysPepTalk = memo(() => {
     () => typeof window !== "undefined" && Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios",
     [],
   );
-  const effectiveDate = useMemo(
-    () => getEffectiveDailyDate(profile?.timezone ?? undefined),
-    [profile?.timezone],
-  );
+  useEffect(() => {
+    const refreshEffectiveDate = () => {
+      const nextEffectiveDate = getEffectiveDailyDate(profile?.timezone ?? undefined);
+      setEffectiveDate((currentEffectiveDate) =>
+        currentEffectiveDate === nextEffectiveDate ? currentEffectiveDate : nextEffectiveDate,
+      );
+    };
+
+    refreshEffectiveDate();
+    const intervalId = window.setInterval(refreshEffectiveDate, 60_000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshEffectiveDate();
+      }
+    };
+
+    window.addEventListener("focus", refreshEffectiveDate);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshEffectiveDate);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [profile?.timezone]);
+
   const pepTalkQueryKey = useMemo(
     () => buildTodayPepTalkQueryKey(resolvedMentorId, effectiveDate),
     [resolvedMentorId, effectiveDate],
@@ -388,6 +414,16 @@ export const TodaysPepTalk = memo(() => {
   const generatePepTalkMutation = useMutation({
     retry: false,
     mutationFn: async (nextMentorSlug: string) => {
+      setGenerationStage("loading");
+      const refreshedPepTalk = await refetchPepTalk();
+      if (
+        refreshedPepTalk.data?.pepTalk &&
+        !refreshedPepTalk.data.isFallback &&
+        refreshedPepTalk.data.mentorSlug === nextMentorSlug
+      ) {
+        return refreshedPepTalk.data;
+      }
+
       setGenerationStage("script");
       let audioStageTimer: number | null = window.setTimeout(() => {
         setGenerationStage("audio");

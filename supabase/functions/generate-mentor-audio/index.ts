@@ -94,7 +94,7 @@ function isRetriableElevenLabsError(error: Error): boolean {
   if (!statusMatch) return false;
 
   const status = Number(statusMatch[1]);
-  return status === 408 || status >= 500;
+  return status === 408 || status === 429 || status >= 500;
 }
 
 async function fetchAudioWithTimeout({

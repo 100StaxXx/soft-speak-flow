@@ -648,7 +648,7 @@ describe("CompanionStatAnalysisSurface", () => {
     expect(screen.getByTestId("companion-cosmiq-title-card")).toBeInTheDocument();
   });
 
-  it("forces one title-card regeneration when a ready image fails to load", async () => {
+  it("keeps the stat reading visible when ready title-card art fails to load", async () => {
     imageLoadMode = "error";
     mocks.regenerateTitleCardMock.mockRejectedValueOnce(new Error("image retry failed"));
 
@@ -663,8 +663,55 @@ describe("CompanionStatAnalysisSurface", () => {
     await waitFor(() => {
       expect(mocks.regenerateTitleCardMock).toHaveBeenCalledWith(analysis);
     });
-    expect(await screen.findByText("We couldn't load the generated title art. Try regenerating it.")).toBeInTheDocument();
-    expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("companion-cosmiq-title-card")).toBeInTheDocument();
+    expect(screen.getByText("Art unavailable")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Regenerate title art" })).toBeInTheDocument();
+    expect(screen.getByText("The Oathbound Pathfinder")).toBeInTheDocument();
+    expect(screen.queryByText("Stats analysis is unavailable right now.")).not.toBeInTheDocument();
+    expect(screen.queryByAltText("The Oathbound Pathfinder archetype illustration")).not.toBeInTheDocument();
+  });
+
+  it("keeps the stat reading visible when title-card generation is unavailable", () => {
+    mocks.useCompanionStatAnalysisMock.mockReturnValue({
+      analysis: {
+        ...analysis,
+        cosmiqTitleCard: {
+          ...analysis.cosmiqTitleCard,
+          imageUrl: null,
+          imageUrls: [],
+          status: "unavailable",
+        },
+      },
+      cached: true,
+      error: null,
+      isLoading: false,
+      isRefreshing: false,
+      isRegeneratingTitleCard: false,
+      refreshAnalysis: mocks.refreshAnalysisMock,
+      regenerateTitleCard: mocks.regenerateTitleCardMock,
+    });
+
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="mobile"
+      />,
+    );
+
+    expect(screen.getByTestId("companion-cosmiq-title-card")).toBeInTheDocument();
+    expect(screen.getByText("Art unavailable")).toBeInTheDocument();
+    expect(screen.queryByText("Stats analysis is unavailable right now.")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Regenerate title art" }));
+    expect(mocks.regenerateTitleCardMock).toHaveBeenCalledWith(
+      expect.objectContaining({ analysisDate: "2026-04-18" }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Show stat analysis" }));
+
+    expect(screen.getByText("Current Build")).toBeInTheDocument();
+    expect(screen.getByText("Recommended Quest")).toBeInTheDocument();
   });
 
   it("shows the inline unavailable card when validated analysis is missing", () => {
