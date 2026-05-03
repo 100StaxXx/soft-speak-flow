@@ -25,7 +25,7 @@ describe("OnboardingEggSelection", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: /Choose Your Element/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Choose Your Companion/i })).toBeInTheDocument();
     expect(screen.getByTestId("onboarding-egg-chamber-underlay")).toHaveAttribute(
       "src",
       expect.stringContaining("choose-your-element-selection-screen-expanded.png"),

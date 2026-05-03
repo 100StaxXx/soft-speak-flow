@@ -35,7 +35,11 @@ const createJob = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-const createSupabaseHarness = () => {
+const createSupabaseHarness = ({
+  failEvolutionUpdates = false,
+}: {
+  failEvolutionUpdates?: boolean;
+} = {}) => {
   const updates: Array<
     {
       table: string;
@@ -58,6 +62,9 @@ const createSupabaseHarness = () => {
       update: (payload: Record<string, unknown>) => ({
         eq: async (column: string, value: unknown) => {
           updates.push({ table, payload, column, value });
+          if (table === "companion_evolutions" && failEvolutionUpdates) {
+            return { error: new Error("evolution write failed") };
+          }
           return { error: null };
         },
       }),
@@ -218,6 +225,209 @@ Deno.test("processClaimedCompanionAnimationJob downloads, uploads, ledgers, and 
   assertEquals(
     evolutionUpdate?.payload.animation_video_url,
     resultRecord.videoUrl,
+  );
+});
+
+Deno.test("processClaimedCompanionAnimationJob does not mark a job succeeded before the evolution row has the video URL", async () => {
+  const { supabase, updates } = createSupabaseHarness({
+    failEvolutionUpdates: true,
+  });
+  const { deps } = createDeps({
+    fetchFn: ((url: string | URL | Request) => {
+      const stringUrl = String(url);
+      if (stringUrl.endsWith("/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ status: "COMPLETED" })),
+        );
+      }
+      if (stringUrl.endsWith("/requests/fal-request-1")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({
+            status: "COMPLETED",
+            video: { url: "https://fal.example/video.mp4" },
+          })),
+        );
+      }
+      return Promise.resolve(
+        new Response(new Uint8Array([1, 2, 3]), {
+          headers: { "Content-Type": "video/mp4" },
+        }),
+      );
+    }) as typeof fetch,
+  });
+
+  await assertRejects(
+    () =>
+      module.processClaimedCompanionAnimationJob({
+        supabase: supabase as never,
+        job: createJob({ provider_task_id: "fal-request-1" }) as never,
+        deps,
+      }),
+    Error,
+    "evolution write failed",
+  );
+
+  assertEquals(
+    updates.some((update) =>
+      update.table === "companion_animation_jobs" &&
+      update.payload.status === "succeeded"
+    ),
+    false,
+  );
+});
+
+Deno.test("handleProcessCompanionAnimationJob repairs a succeeded evolution when the job terminal update fails", async () => {
+  const updates: Array<{ table: string; payload: Record<string, unknown> }> =
+    [];
+  const baseJob = createJob({
+    provider_task_id: "fal-request-1",
+    status: "queued",
+  });
+  let jobSelectCount = 0;
+  let succeededJobUpdateAttempts = 0;
+  let evolutionState: Record<string, unknown> = {
+    animation_status: "processing",
+    animation_video_url: null,
+    animation_storage_path: null,
+    animation_completed_at: null,
+  };
+
+  const createUpdateChain = (
+    table: string,
+    payload: Record<string, unknown>,
+  ) => {
+    const chain = {
+      error: null as Error | null,
+      eq: (_column: string, _value: unknown) => chain,
+      select: (_columns: string) => ({
+        maybeSingle: async () => ({
+          data: {
+            ...baseJob,
+            status: "processing",
+            started_at: "2026-05-02T12:00:30.000Z",
+            updated_at: "2026-05-02T12:00:30.000Z",
+          },
+          error: null,
+        }),
+      }),
+    };
+
+    updates.push({ table, payload });
+    if (table === "companion_evolutions") {
+      evolutionState = { ...evolutionState, ...payload };
+    }
+    if (
+      table === "companion_animation_jobs" && payload.status === "succeeded"
+    ) {
+      succeededJobUpdateAttempts += 1;
+      if (succeededJobUpdateAttempts === 1) {
+        chain.error = new Error("job terminal update failed");
+      }
+    }
+
+    return chain;
+  };
+
+  const supabase = {
+    from: (table: string) => ({
+      select: (_columns: string) => ({
+        eq: (_column: string, _value: unknown) => ({
+          maybeSingle: async () => {
+            if (table === "companion_animation_jobs") {
+              jobSelectCount += 1;
+              return {
+                data: {
+                  ...baseJob,
+                  status: jobSelectCount === 1 ? "queued" : "processing",
+                },
+                error: null,
+              };
+            }
+
+            if (table === "companion_evolutions") {
+              return { data: evolutionState, error: null };
+            }
+
+            return { data: null, error: null };
+          },
+        }),
+      }),
+      update: (payload: Record<string, unknown>) =>
+        createUpdateChain(table, payload),
+    }),
+    storage: {
+      from: (bucket: string) => ({
+        upload: async () => ({ error: null }),
+        getPublicUrl: (path: string) => ({
+          data: {
+            publicUrl:
+              `https://example.supabase.co/storage/v1/object/public/${bucket}/${path}`,
+          },
+        }),
+      }),
+    },
+  };
+
+  const { deps } = createDeps({
+    fetchFn: ((url: string | URL | Request) => {
+      const stringUrl = String(url);
+      if (stringUrl.endsWith("/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ status: "COMPLETED" })),
+        );
+      }
+      if (stringUrl.endsWith("/requests/fal-request-1")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({
+            status: "COMPLETED",
+            video: { url: "https://fal.example/video.mp4" },
+          })),
+        );
+      }
+      return Promise.resolve(
+        new Response(new Uint8Array([1, 2, 3]), {
+          headers: { "Content-Type": "video/mp4" },
+        }),
+      );
+    }) as typeof fetch,
+  });
+  const handlerDeps = {
+    ...deps,
+    createClient: (() => supabase) as never,
+    env: {
+      get: (name: string) => {
+        if (name === "SUPABASE_URL") return "https://example.supabase.co";
+        if (name === "SUPABASE_SERVICE_ROLE_KEY") return "service-role-key";
+        if (name === "SUPABASE_ANON_KEY") return "anon-key";
+        if (name === "INTERNAL_FUNCTION_SECRET") return "internal-secret";
+        return deps.env.get(name);
+      },
+    },
+  } as ProcessDeps;
+
+  const response = await module.handleProcessCompanionAnimationJob(
+    new Request("https://example.test/process", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-internal-key": "internal-secret",
+      },
+      body: JSON.stringify({ jobId: "job-1" }),
+    }),
+    handlerDeps,
+  );
+  const body = await response.json();
+
+  assertEquals(response.status, 200);
+  assertEquals(body.status, "succeeded");
+  assertEquals(body.repaired, true);
+  assertEquals(succeededJobUpdateAttempts, 2);
+  assertEquals(
+    updates.some((update) =>
+      update.table === "companion_evolutions" &&
+      update.payload.animation_status === "failed"
+    ),
+    false,
   );
 });
 

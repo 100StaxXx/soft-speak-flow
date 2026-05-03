@@ -1,5 +1,5 @@
 import { useState, useEffect, memo } from "react";
-import { Repeat, Loader2, Brain, Dumbbell, Flame, Trash2 } from "lucide-react";
+import { Repeat, Loader2, Brain, Dumbbell, Flame, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
   SheetFooter,
@@ -32,6 +33,8 @@ import { DurationPickerField, TimePickerField, getNextTimeForStep } from "@/comp
 import type { ParsedTask } from "@/features/tasks/hooks";
 import { inferCustomPeriod } from "@/utils/habitSchedule";
 import { useRitualUpdate } from "@/hooks/useRitualUpdate";
+import { plannerPathfinderTheme } from "@/components/companion/plannerPathfinderTheme";
+import { QUEST_FORM_STYLES } from "@/components/quest-shared";
 
 type HabitCategory = 'mind' | 'body' | 'soul';
 type Difficulty = 'easy' | 'medium' | 'hard';
@@ -74,10 +77,10 @@ interface EditRitualSheetProps {
   isDeleting?: boolean;
 }
 
-const categoryConfig: Record<HabitCategory, { icon: typeof Brain; label: string; color: string }> = {
-  mind: { icon: Brain, label: 'Mind', color: 'text-blue-500 border-blue-500/50 bg-blue-500/10' },
-  body: { icon: Dumbbell, label: 'Body', color: 'text-green-500 border-green-500/50 bg-green-500/10' },
-  soul: { icon: Flame, label: 'Soul', color: 'text-orange-500 border-orange-500/50 bg-orange-500/10' },
+const categoryConfig: Record<HabitCategory, { icon: typeof Brain; label: string }> = {
+  mind: { icon: Brain, label: 'Mind' },
+  body: { icon: Dumbbell, label: 'Body' },
+  soul: { icon: Flame, label: 'Soul' },
 };
 
 export const EditRitualSheet = memo(function EditRitualSheet({
@@ -131,11 +134,7 @@ export const EditRitualSheet = memo(function EditRitualSheet({
       );
       setReminderEnabled(ritual.reminder_enabled || false);
       setReminderMinutesBefore(ritual.reminder_minutes_before || 15);
-      // Auto-expand advanced if any advanced fields are set
-      setShowAdvanced(
-        !!ritual.recurrence_pattern || 
-        !!ritual.category
-      );
+      setShowAdvanced(!!ritual.reminder_enabled);
     }
   }, [ritual]);
 
@@ -229,107 +228,142 @@ export const EditRitualSheet = memo(function EditRitualSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="flex h-[85dvh] max-h-[85dvh] flex-col overflow-hidden rounded-t-xl">
-        <SheetHeader className="shrink-0 pb-2">
-          <SheetTitle className="flex items-center gap-2">
-            <Repeat className="h-5 w-5 text-accent" />
-            Edit Ritual
-          </SheetTitle>
-          <p className="text-xs text-muted-foreground">
-            Changes sync to all instances of this ritual
-          </p>
+      <SheetContent
+        side="bottom"
+        data-testid="edit-ritual-sheet-shell"
+        className={cn(
+          plannerPathfinderTheme.shell,
+          "fixed flex h-[88dvh] max-h-[88dvh] flex-col overflow-hidden rounded-t-[2.25rem] px-0 pb-0 pt-0",
+        )}
+      >
+        <div className={plannerPathfinderTheme.shellGloss} />
+        <div className={plannerPathfinderTheme.shellGlow} />
+
+        <SheetHeader className="relative z-10 shrink-0 px-4 pt-4 text-left sm:px-5 sm:pt-5">
+          <div className={plannerPathfinderTheme.headerBar}>
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#b04b12] shadow-[0_5px_0_rgba(77,40,17,0.45)]">
+              <Repeat className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1 text-left">
+              <SheetTitle className="text-xl text-white">
+                Edit Ritual
+              </SheetTitle>
+              <p className="text-sm text-white/[0.68]">
+                Changes sync to all instances of this ritual.
+              </p>
+              <SheetDescription className="sr-only">
+                Update this ritual details, schedule, and reminders.
+              </SheetDescription>
+            </div>
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              className={cn("h-10 w-10 shrink-0", plannerPathfinderTheme.headerIconButton)}
+              onClick={() => onOpenChange(false)}
+              aria-label="Close Edit Ritual"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </SheetHeader>
-        
-        <ScrollArea className="min-h-0 flex-1 pr-4">
-          <div className="space-y-6 py-4" data-vaul-no-drag>
-            {/* Natural Language Quick Edit */}
-            <NaturalLanguageEditor onApply={handleNaturalLanguageApply} />
 
-            {/* Title */}
-            <div className="space-y-2">
-              <Label htmlFor="title">Ritual Name</Label>
-              <Input
-                id="title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="What's your ritual?"
-              />
-            </div>
-            
-            {/* Description */}
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="What does this ritual involve? Add details about how to perform it, timing, or any tips..."
-                rows={3}
-              />
-              {!description && (
-                <p className="text-xs text-muted-foreground">
-                  Add details about what this ritual involves - this was drafted when you created your campaign
-                </p>
-              )}
-            </div>
+        <ScrollArea className="relative z-10 mx-4 mt-3 min-h-0 flex-1 rounded-[2rem] border-[4px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,248,225,0.9),rgba(255,216,128,0.82))] shadow-[0_12px_0_rgba(77,40,17,0.84)] sm:mx-5">
+          <div className="space-y-5 px-4 pb-10 pt-4 text-[#4f240c] sm:px-5" data-vaul-no-drag>
+            <NaturalLanguageEditor onApply={handleNaturalLanguageApply} visualStyle="quest-soft" />
 
-            {/* Difficulty */}
-            <div className="space-y-2">
-              <Label>Difficulty</Label>
+            <section className={cn(plannerPathfinderTheme.raisedPanel, "space-y-4 p-4")}>
+              <div className="space-y-2">
+                <Label htmlFor="ritual-title" className={QUEST_FORM_STYLES.label}>Ritual Name</Label>
+                <Input
+                  id="ritual-title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="What's your ritual?"
+                  className={plannerPathfinderTheme.textField}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="ritual-description" className={QUEST_FORM_STYLES.label}>Description</Label>
+                <Textarea
+                  id="ritual-description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="What does this ritual involve? Add details about how to perform it, timing, or any tips..."
+                  rows={3}
+                  className={cn(plannerPathfinderTheme.textField, "min-h-[108px]")}
+                />
+                {!description && (
+                  <p className={QUEST_FORM_STYLES.helperText}>
+                    Add details about what this ritual involves - this was drafted when you created your campaign.
+                  </p>
+                )}
+              </div>
+            </section>
+
+            <section className={cn(plannerPathfinderTheme.raisedPanel, "space-y-4 p-4")}>
               <HabitDifficultySelector
                 value={difficulty}
                 onChange={setDifficulty}
+                variant="quest-soft"
+                idPrefix={ritual?.habitId ? `edit-ritual-${ritual.habitId}` : "edit-ritual"}
               />
-            </div>
 
-            {/* Time and Duration */}
-            <div className="grid gap-4 sm:grid-cols-2">
-              <TimePickerField
-                value={preferredTime || null}
-                onChange={(time) => setPreferredTime(time ?? "")}
-                label="Scheduled Time"
-                placeholder="Time"
-                ariaLabel="Scheduled ritual time"
-                seedValueOnOpen={() => getNextTimeForStep(30)}
-              />
-              <DurationPickerField
-                value={estimatedMinutes}
-                onChange={setEstimatedMinutes}
-                label="Duration (min)"
-              />
-            </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <TimePickerField
+                  value={preferredTime || null}
+                  onChange={(time) => setPreferredTime(time ?? "")}
+                  label="Scheduled Time"
+                  placeholder="Time"
+                  ariaLabel="Scheduled ritual time"
+                  seedValueOnOpen={() => getNextTimeForStep(30)}
+                  variant="quest-soft"
+                  tone={difficulty}
+                />
+                <DurationPickerField
+                  value={estimatedMinutes}
+                  onChange={setEstimatedMinutes}
+                  label="Duration"
+                  variant="quest-soft"
+                  tone={difficulty}
+                />
+              </div>
+            </section>
             
-            {/* Frequency with day picker */}
-            <FrequencyPresets
-              frequency={frequency === '3x_week' ? 'custom' : frequency as 'daily' | '5x_week' | 'weekly' | 'monthly' | 'custom'}
-              customDays={recurrenceDays}
-              customMonthDays={recurrenceMonthDays}
-              customPeriod={customPeriod}
-              onFrequencyChange={({ frequency: newFreq, customDays, customMonthDays, customPeriod: nextCustomPeriod }) => {
-                setFrequency(newFreq);
-                setRecurrenceDays(customDays);
-                setRecurrenceMonthDays(customMonthDays);
-                setCustomPeriod(nextCustomPeriod);
-              }}
-            />
+            <section className={cn(plannerPathfinderTheme.mutedPanel, "space-y-3 p-4")}>
+              <FrequencyPresets
+                frequency={frequency === '3x_week' ? 'custom' : frequency as 'daily' | '5x_week' | 'weekly' | 'monthly' | 'custom'}
+                customDays={recurrenceDays}
+                customMonthDays={recurrenceMonthDays}
+                customPeriod={customPeriod}
+                variant="planner"
+                onFrequencyChange={({ frequency: newFreq, customDays, customMonthDays, customPeriod: nextCustomPeriod }) => {
+                  setFrequency(newFreq);
+                  setRecurrenceDays(customDays);
+                  setRecurrenceMonthDays(customMonthDays);
+                  setCustomPeriod(nextCustomPeriod);
+                }}
+              />
+            </section>
 
-            {/* Category */}
-            <div className="space-y-2">
-              <Label>Attribute Boost</Label>
-              <div className="flex gap-2">
+            <section className={cn(plannerPathfinderTheme.raisedPanel, "space-y-3 p-4")}>
+              <Label className={QUEST_FORM_STYLES.label}>Attribute Boost</Label>
+              <div className="grid grid-cols-3 gap-2">
                 {(Object.keys(categoryConfig) as HabitCategory[]).map((cat) => {
                   const config = categoryConfig[cat];
                   const Icon = config.icon;
+                  const isSelected = category === cat;
                   return (
                     <Button
                       key={cat}
                       type="button"
                       variant="outline"
-                      size="sm"
+                      aria-pressed={isSelected}
                       onClick={() => setCategory(cat)}
                       className={cn(
-                        "flex-1 gap-2",
-                        category === cat && config.color
+                        "min-h-[4.25rem] flex-col gap-1.5 px-2 text-sm",
+                        isSelected ? plannerPathfinderTheme.primaryButton : plannerPathfinderTheme.outlineButton,
                       )}
                     >
                       <Icon className="h-4 w-4" />
@@ -338,107 +372,102 @@ export const EditRitualSheet = memo(function EditRitualSheet({
                   );
                 })}
               </div>
-              <p className="text-xs text-muted-foreground">
-                Which companion attribute grows when you complete this ritual
+              <p className={QUEST_FORM_STYLES.helperText}>
+                Which companion attribute grows when you complete this ritual.
               </p>
-            </div>
+            </section>
 
-            {preferredTime && (
-              <AdvancedQuestOptions
-                scheduledTime={preferredTime || null}
-                estimatedDuration={estimatedMinutes}
-                recurrencePattern={recurrencePattern}
-                recurrenceDays={recurrenceDays}
-                recurrenceMonthDays={recurrenceMonthDays}
-                recurrenceCustomPeriod={null}
-                reminderEnabled={reminderEnabled}
-                reminderMinutesBefore={reminderMinutesBefore}
-                moreInformation={null}
-                onScheduledTimeChange={setPreferredTime}
-                onEstimatedDurationChange={setEstimatedMinutes}
-                onRecurrencePatternChange={setRecurrencePattern}
-                onRecurrenceDaysChange={setRecurrenceDays}
-                onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
-                onRecurrenceCustomPeriodChange={() => {}}
-                onReminderEnabledChange={setReminderEnabled}
-                onReminderMinutesBeforeChange={setReminderMinutesBefore}
-                onMoreInformationChange={() => {}}
-                location={null}
-                onLocationChange={() => {}}
-                hideScheduledTime
-                hideDuration
-                hideRecurrence
-                hideLocation
-                hideMoreInformation
-              />
-            )}
-
-            {/* Advanced Options Toggle */}
-            <div className="pt-2">
+            <section className={cn(plannerPathfinderTheme.mutedPanel, "space-y-3 p-4")}>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowAdvanced(!showAdvanced)}
-                className="w-full justify-between text-muted-foreground"
+                className={QUEST_FORM_STYLES.advancedTrigger}
               >
                 Advanced Options
                 <span className="text-xs">{showAdvanced ? "▲" : "▼"}</span>
               </Button>
               
               {showAdvanced && (
-                <div className="mt-4">
-                  <AdvancedQuestOptions
-                    scheduledTime={preferredTime || null}
-                    estimatedDuration={estimatedMinutes}
-                    recurrencePattern={recurrencePattern}
-                    recurrenceDays={recurrenceDays}
-                    recurrenceMonthDays={recurrenceMonthDays}
-                    recurrenceCustomPeriod={null}
-                    reminderEnabled={reminderEnabled}
-                    reminderMinutesBefore={reminderMinutesBefore}
-                    moreInformation={null}
-                    onScheduledTimeChange={setPreferredTime}
-                    onEstimatedDurationChange={setEstimatedMinutes}
-                    onRecurrencePatternChange={setRecurrencePattern}
-                    onRecurrenceDaysChange={setRecurrenceDays}
-                    onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
-                    onRecurrenceCustomPeriodChange={() => {}}
-                    onReminderEnabledChange={setReminderEnabled}
-                    onReminderMinutesBeforeChange={setReminderMinutesBefore}
-                    onMoreInformationChange={() => {}}
-                    location={null}
-                    onLocationChange={() => {}}
-                    hideReminder={true}
-                    hideRecurrence={true}
-                    hideLocation={true}
-                    hideMoreInformation={true}
-                  />
+                <div className="mt-3">
+                  {preferredTime ? (
+                    <AdvancedQuestOptions
+                      scheduledTime={preferredTime || null}
+                      estimatedDuration={estimatedMinutes}
+                      recurrencePattern={recurrencePattern}
+                      recurrenceDays={recurrenceDays}
+                      recurrenceMonthDays={recurrenceMonthDays}
+                      recurrenceCustomPeriod={null}
+                      reminderEnabled={reminderEnabled}
+                      reminderMinutesBefore={reminderMinutesBefore}
+                      moreInformation={null}
+                      onScheduledTimeChange={(time) => setPreferredTime(time ?? "")}
+                      onEstimatedDurationChange={setEstimatedMinutes}
+                      onRecurrencePatternChange={setRecurrencePattern}
+                      onRecurrenceDaysChange={setRecurrenceDays}
+                      onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
+                      onRecurrenceCustomPeriodChange={() => {}}
+                      onReminderEnabledChange={setReminderEnabled}
+                      onReminderMinutesBeforeChange={setReminderMinutesBefore}
+                      onMoreInformationChange={() => {}}
+                      location={null}
+                      onLocationChange={() => {}}
+                      taskDifficulty={difficulty}
+                      hideScheduledTime
+                      hideDuration
+                      hideRecurrence
+                      hideLocation
+                      hideMoreInformation
+                      visualStyle="quest-soft"
+                    />
+                  ) : (
+                    <p className={QUEST_FORM_STYLES.helperText}>
+                      Set a scheduled time to enable reminder options.
+                    </p>
+                  )}
                 </div>
               )}
-            </div>
+            </section>
 
-            {/* Delete button - separated from save actions */}
             {onDelete && (
-              <div className="pt-6 mt-4 border-t border-border/50">
-                <Button 
-                  variant="ghost" 
+              <section className="space-y-3 rounded-[1.5rem] border-[3px] border-[#8a2716] bg-[#ffd9bf] p-4 text-[#8a2716] shadow-[0_8px_0_rgba(154,71,24,0.18)]">
+                <div className="flex items-center gap-2">
+                  <Trash2 className="h-4 w-4" />
+                  <h3 className="text-sm font-semibold">Danger zone</h3>
+                </div>
+                <p className="text-sm text-[#8a2716]/80">
+                  Permanently delete this ritual and remove all future instances. Completed tasks stay in your history.
+                </p>
+                <Button
+                  variant="destructive"
                   onClick={() => setShowDeleteConfirm(true)}
                   disabled={isDeleting || saving}
-                  className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                  className="gap-2"
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
                   Delete Ritual
                 </Button>
-              </div>
+              </section>
             )}
           </div>
         </ScrollArea>
 
-        <SheetFooter className="flex shrink-0 gap-2 pb-safe pt-4">
-          <Button variant="outline" className="flex-1" onClick={() => onOpenChange(false)} disabled={saving}>
+        <SheetFooter className={cn(plannerPathfinderTheme.footerBar, "relative z-10 flex shrink-0 flex-col gap-3 px-4 pb-safe pt-4 sm:flex-row sm:px-5 sm:space-x-0")}>
+          <Button
+            type="button"
+            variant="outline"
+            className={cn("flex-1", plannerPathfinderTheme.outlineButton)}
+            onClick={() => onOpenChange(false)}
+            disabled={saving}
+          >
             Cancel
           </Button>
-          <Button className="flex-1" onClick={handleSave} disabled={saving || !title.trim()}>
+          <Button
+            type="button"
+            className={cn("flex-1 gap-2", plannerPathfinderTheme.primaryButton)}
+            onClick={handleSave}
+            disabled={saving || !title.trim()}
+          >
             {saving ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />

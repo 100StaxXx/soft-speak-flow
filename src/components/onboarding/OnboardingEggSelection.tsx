@@ -183,7 +183,7 @@ export const OnboardingEggSelection = ({
           data-selected-element={selectedElement ?? ""}
           data-testid="onboarding-egg-chamber"
         >
-          <h1 className="sr-only">Choose your element</h1>
+          <h1 className="sr-only">Choose your companion</h1>
 
           <img
             src={CHAMBER_BACKGROUND_EXPANDED_SRC}

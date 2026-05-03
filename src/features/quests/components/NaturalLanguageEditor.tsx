@@ -5,14 +5,17 @@ import { Input } from "@/components/ui/input";
 import { useNaturalLanguageParser, ParsedTask } from "@/features/tasks/hooks";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { cn } from "@/lib/utils";
+import { DIFFICULTY_COLORS, QUEST_FORM_STYLES } from "@/components/quest-shared";
 
 interface NaturalLanguageEditorProps {
   onApply: (parsed: ParsedTask) => void;
+  visualStyle?: "default" | "quest-soft";
 }
 
-export function NaturalLanguageEditor({ onApply }: NaturalLanguageEditorProps) {
+export function NaturalLanguageEditor({ onApply, visualStyle = "default" }: NaturalLanguageEditorProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const { input, setInput, parsed, reset } = useNaturalLanguageParser();
+  const isQuestSoft = visualStyle === "quest-soft";
 
   const { isRecording, toggleRecording, isSupported: isVoiceSupported } = useVoiceInput({
     onInterimResult: (transcript) => {
@@ -56,7 +59,11 @@ export function NaturalLanguageEditor({ onApply }: NaturalLanguageEditorProps) {
         variant="ghost"
         size="sm"
         onClick={() => setIsExpanded(true)}
-        className="w-full justify-start text-muted-foreground hover:text-foreground gap-2"
+        className={cn(
+          isQuestSoft
+            ? cn(QUEST_FORM_STYLES.advancedTrigger, "justify-start gap-2")
+            : "w-full justify-start gap-2 text-muted-foreground hover:text-foreground",
+        )}
       >
         <Sparkles className="h-4 w-4" />
         Quick edit with natural language...
@@ -65,10 +72,15 @@ export function NaturalLanguageEditor({ onApply }: NaturalLanguageEditorProps) {
   }
 
   return (
-    <div className="space-y-3 p-3 rounded-lg bg-muted/50 border border-border">
+    <div className={cn(
+      "space-y-3 p-3",
+      isQuestSoft
+        ? QUEST_FORM_STYLES.sectionCardSoft
+        : "rounded-lg bg-muted/50 border border-border",
+    )}>
       <div className="flex items-center gap-2">
-        <Sparkles className="h-4 w-4 text-primary" />
-        <span className="text-sm font-medium">Quick Edit</span>
+        <Sparkles className={cn("h-4 w-4", isQuestSoft ? "text-[#8d481c]" : "text-primary")} />
+        <span className={cn("text-sm font-medium", isQuestSoft && "text-[#5d2a0f]")}>Quick Edit</span>
       </div>
 
       <div className="flex gap-2">
@@ -76,14 +88,14 @@ export function NaturalLanguageEditor({ onApply }: NaturalLanguageEditorProps) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="e.g., 'at 3pm for 1 hour daily for body'"
-          className="flex-1 text-sm"
+          className={cn("flex-1 text-sm", isQuestSoft && QUEST_FORM_STYLES.desktopPanelInput)}
         />
         {isVoiceSupported && (
           <Button
             variant={isRecording ? "destructive" : "outline"}
             size="icon"
             onClick={toggleRecording}
-            className="shrink-0"
+            className={cn("shrink-0", isQuestSoft && QUEST_FORM_STYLES.iconSecondaryButton)}
           >
             {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
           </Button>
@@ -214,7 +226,7 @@ export function NaturalLanguageEditor({ onApply }: NaturalLanguageEditorProps) {
             reset();
             setIsExpanded(false);
           }}
-          className="flex-1"
+          className={cn("flex-1", isQuestSoft && QUEST_FORM_STYLES.secondaryButton)}
         >
           Cancel
         </Button>
@@ -222,7 +234,7 @@ export function NaturalLanguageEditor({ onApply }: NaturalLanguageEditorProps) {
           size="sm"
           onClick={handleApply}
           disabled={!hasParsedValues}
-          className="flex-1 gap-1"
+          className={cn("flex-1 gap-1", isQuestSoft && DIFFICULTY_COLORS.medium.primaryButton)}
         >
           <Check className="h-3 w-3" />
           Apply

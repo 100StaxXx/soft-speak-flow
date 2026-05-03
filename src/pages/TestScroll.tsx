@@ -1,6 +1,7 @@
 import { useState, type ComponentProps } from "react";
 
 import { AddQuestSheet, type AddQuestData } from "@/components/AddQuestSheet";
+import { EditRitualSheet, type RitualData } from "@/components/EditRitualSheet";
 import { Pathfinder } from "@/components/Pathfinder/Pathfinder";
 import { Button } from "@/components/ui/button";
 import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
@@ -13,6 +14,7 @@ type VisualOverlay =
   | "edit-quest-mobile"
   | "edit-quest-desktop"
   | "edit-campaign"
+  | "edit-ritual"
   | null;
 
 const VISUAL_TEST_DATE = new Date("2026-04-28T12:00:00");
@@ -36,6 +38,25 @@ const editQuestFixture: NonNullable<ComponentProps<typeof EditQuestDialog>["task
   image_url: null,
   attachments: [],
   location: "Library reading room",
+};
+
+const editRitualFixture: RitualData = {
+  habitId: "test-scroll-edit-ritual",
+  title: "Morning focus ritual",
+  description: "Open the day with one intentional planning block.",
+  difficulty: "medium",
+  frequency: "custom",
+  estimated_minutes: 25,
+  preferred_time: "08:30",
+  category: "mind",
+  custom_days: [1, 3, 5],
+  custom_month_days: [],
+  recurrence_pattern: null,
+  recurrence_days: null,
+  recurrence_month_days: null,
+  recurrence_custom_period: "week",
+  reminder_enabled: true,
+  reminder_minutes_before: 15,
 };
 
 const TestScroll = () => {
@@ -74,6 +95,11 @@ const TestScroll = () => {
     setActiveOverlay(null);
   };
 
+  const handleDeleteRitual = async (habitId: string) => {
+    console.log("Ritual deleted (mock):", habitId);
+    setActiveOverlay(null);
+  };
+
   const setOverlayOpen = (overlay: Exclude<VisualOverlay, null>) => (open: boolean) => {
     setActiveOverlay(open ? overlay : null);
   };
@@ -96,6 +122,9 @@ const TestScroll = () => {
             </Button>
             <Button onClick={() => setActiveOverlay("edit-campaign")} variant="outline" className="w-full">
               Open Edit Campaign Sheet
+            </Button>
+            <Button onClick={() => setActiveOverlay("edit-ritual")} variant="outline" className="w-full">
+              Open Edit Ritual Sheet
             </Button>
             <Button onClick={() => setActiveOverlay("add-quest-mobile")} variant="outline" className="w-full">
               Open Add Quest Mobile Sheet
@@ -168,6 +197,13 @@ const TestScroll = () => {
         <EditCampaignSheetPreview
           open={activeOverlay === "edit-campaign"}
           onOpenChange={setOverlayOpen("edit-campaign")}
+        />
+
+        <EditRitualSheet
+          ritual={editRitualFixture}
+          open={activeOverlay === "edit-ritual"}
+          onOpenChange={setOverlayOpen("edit-ritual")}
+          onDelete={handleDeleteRitual}
         />
       </div>
     </div>

@@ -435,8 +435,9 @@ jobs:
 
           if [ -s /tmp/skipped-new-functions.txt ]; then
             skipped_count="$(wc -l < /tmp/skipped-new-functions.txt | tr -d ' ')"
-            echo "::warning title=Skipped undeployed Edge Functions::Skipped ${skipped_count} allow-listed functions that do not exist in Supabase. Set allow_new_functions=true after pruning functions or upgrading the project quota to create them."
-            sed 's/^/Skipped function: /' /tmp/skipped-new-functions.txt
+            echo "::error title=Missing allow-listed Edge Functions::Refusing to leave ${skipped_count} allow-listed functions undeployed. Deploy with allow_new_functions=true only after confirming project quota/pruning."
+            sed 's/^/Missing allow-listed function: /' /tmp/skipped-new-functions.txt
+            exit 1
           fi
 
           if [ -s /tmp/deployed-outside-allow-list.txt ]; then

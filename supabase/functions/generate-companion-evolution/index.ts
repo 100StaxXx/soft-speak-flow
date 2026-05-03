@@ -3,14 +3,21 @@ installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { checkRateLimit, RATE_LIMITS, createRateLimitResponse } from "../_shared/rateLimiter.ts";
+import {
+  checkRateLimit,
+  createRateLimitResponse,
+  RATE_LIMITS,
+} from "../_shared/rateLimiter.ts";
 import { resolveCompanionImageSizeForUser } from "../_shared/companionImagePolicy.ts";
 import {
   buildCostGuardrailBlockedResponse,
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
-import { buildSpiritLockPromptBlock, resolveCompanionSpiritLockProfile } from "../_shared/companionSpiritLock.ts";
+import {
+  buildSpiritLockPromptBlock,
+  resolveCompanionSpiritLockProfile,
+} from "../_shared/companionSpiritLock.ts";
 import {
   buildBoundaryEvolutionEditPrompt,
   buildCompanionGenerationMetadata,
@@ -23,25 +30,27 @@ import {
   updateLineageMetadataAfterBoundaryEvolution,
   updateLineageMetadataAfterReveal,
 } from "../_shared/companionLineage.ts";
-import { generateCompanionImage, editCompanionImage } from "../_shared/openaiCompanionImageClient.ts";
+import {
+  editCompanionImage,
+  generateCompanionImage,
+} from "../_shared/openaiCompanionImageClient.ts";
 import { judgeCompanionImage } from "../_shared/companionImageJudge.ts";
+import { maybeEnqueueCompanionAnimationJob } from "../_shared/companionAnimationJobs.ts";
 import {
-  buildCompanionAnimationPrompt,
-  COMPANION_ANIMATION_PROVIDER,
-  resolveFalKlingModelFromEnv,
-} from "../_shared/falKlingVideoClient.ts";
-import {
-  COMPANION_PRESET_BUCKET,
   coerceCompanionElementId,
   coerceCompanionPresetId,
+  COMPANION_PRESET_BUCKET,
   resolveCompanionAssetPath,
 } from "../../../src/config/companionCatalog.ts";
 import { isPresetBackedCompanion } from "../../../src/lib/companionPredicates.ts";
 import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
 
+export { maybeEnqueueCompanionAnimationJob } from "../_shared/companionAnimationJobs.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-internal-key",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-internal-key",
 };
 
 const IMAGE_BUCKET = "evolution-cards";
@@ -64,12 +73,22 @@ const resolveServerErrorCode = (message: string) => {
   if (normalized.includes("max stage")) return "max_stage_reached";
   if (normalized.includes("already evolved")) return "already_evolved";
   if (normalized.includes("companion not found")) return "companion_not_found";
-  if (normalized.includes("image generation failed")) return "image_generation_failed";
+  if (normalized.includes("image generation failed")) {
+    return "image_generation_failed";
+  }
   if (normalized.includes("no image returned")) return "image_generation_empty";
-  if (normalized.includes("failed to upload image")) return "image_upload_failed";
-  if (normalized.includes("failed to save evolution record")) return "evolution_record_failed";
-  if (normalized.includes("failed to update companion")) return "companion_update_failed";
-  if (normalized.includes("evolution thresholds not available")) return "evolution_thresholds_unavailable";
+  if (normalized.includes("failed to upload image")) {
+    return "image_upload_failed";
+  }
+  if (normalized.includes("failed to save evolution record")) {
+    return "evolution_record_failed";
+  }
+  if (normalized.includes("failed to update companion")) {
+    return "companion_update_failed";
+  }
+  if (normalized.includes("evolution thresholds not available")) {
+    return "evolution_thresholds_unavailable";
+  }
   if (normalized.includes("openai_api_key")) return "openai_api_key_missing";
   return normalizeErrorCode(message);
 };
@@ -93,7 +112,8 @@ const uploadGeneratedImage = async ({
   generatedImageDataUrl: string;
 }): Promise<{ fileName: string; publicUrl: string }> => {
   const buffer = parseDataUrl(generatedImageDataUrl);
-  const fileName = `${userId}/evolutions/${companionId}_stage_${nextStage}_${Date.now()}.png`;
+  const fileName =
+    `${userId}/evolutions/${companionId}_stage_${nextStage}_${Date.now()}.png`;
 
   const { error: uploadError } = await supabase.storage
     .from(IMAGE_BUCKET)
@@ -103,14 +123,16 @@ const uploadGeneratedImage = async ({
     });
 
   if (uploadError) {
-    const uploadMessage =
-      typeof uploadError.message === "string" && uploadError.message.trim().length > 0
-        ? uploadError.message
-        : "unknown_storage_error";
+    const uploadMessage = typeof uploadError.message === "string" &&
+        uploadError.message.trim().length > 0
+      ? uploadError.message
+      : "unknown_storage_error";
     throw new Error(`Failed to upload image: ${uploadMessage}`);
   }
 
-  const { data: urlData } = supabase.storage.from(IMAGE_BUCKET).getPublicUrl(fileName);
+  const { data: urlData } = supabase.storage.from(IMAGE_BUCKET).getPublicUrl(
+    fileName,
+  );
   return { fileName, publicUrl: urlData.publicUrl };
 };
 
@@ -166,18 +188,18 @@ const judgeScoresPass = ({
   if (!scores) return true;
 
   if (
-    scores.overall < JUDGE_MINIMUMS.overall
-    || scores.continuity < JUDGE_MINIMUMS.continuity
-    || scores.anatomy < JUDGE_MINIMUMS.anatomy
+    scores.overall < JUDGE_MINIMUMS.overall ||
+    scores.continuity < JUDGE_MINIMUMS.continuity ||
+    scores.anatomy < JUDGE_MINIMUMS.anatomy
   ) {
     return false;
   }
 
   if (
-    mode === "evolution"
-    && typeof previousLevel === "number"
-    && typeof nextLevel === "number"
-    && scores.difference < getEvolutionDifferenceFloor(previousLevel, nextLevel)
+    mode === "evolution" &&
+    typeof previousLevel === "number" &&
+    typeof nextLevel === "number" &&
+    scores.difference < getEvolutionDifferenceFloor(previousLevel, nextLevel)
   ) {
     return false;
   }
@@ -185,14 +207,16 @@ const judgeScoresPass = ({
   return true;
 };
 
-const rankJudgeScores = (scores: Awaited<ReturnType<typeof judgeCompanionImage>>): number => {
+const rankJudgeScores = (
+  scores: Awaited<ReturnType<typeof judgeCompanionImage>>,
+): number => {
   if (!scores) return 0;
   return (
-    scores.overall * 4
-    + scores.continuity * 3
-    + scores.anatomy * 2
-    + scores.centering
-    + scores.difference
+    scores.overall * 4 +
+    scores.continuity * 3 +
+    scores.anatomy * 2 +
+    scores.centering +
+    scores.difference
   );
 };
 
@@ -201,275 +225,13 @@ const resolveJudgeFocalValue = (value: number | null | undefined): number =>
     ? Math.max(0, Math.min(1, value))
     : 0.5;
 
-const appendJudgeCritique = (prompt: string, notes: string | null | undefined): string => {
+const appendJudgeCritique = (
+  prompt: string,
+  notes: string | null | undefined,
+): string => {
   const critique = typeof notes === "string" ? notes.trim() : "";
   if (!critique) return prompt;
   return `${prompt}\n\nRetry critique:\n- ${critique}`;
-};
-
-const truthyEnvValue = (value: string | null | undefined): boolean => {
-  const normalized = value?.trim().toLowerCase() ?? "";
-  return normalized === "1" || normalized === "true" || normalized === "yes" ||
-    normalized === "on";
-};
-
-const hasPublicHttpUrl = (value: string | null | undefined): value is string => {
-  if (!value) return false;
-  try {
-    const parsed = new URL(value);
-    return parsed.protocol === "https:" || parsed.protocol === "http:";
-  } catch {
-    return false;
-  }
-};
-
-interface EnqueueCompanionAnimationJobParams {
-  supabase: any;
-  createCostGuardrailSession: typeof createCostGuardrailSession;
-  userId: string;
-  companionId: string;
-  evolutionId: string | null | undefined;
-  stage: number;
-  imageUrl: string | null | undefined;
-  element?: string | null;
-  env?: Pick<typeof Deno.env, "get">;
-  now?: () => Date;
-  info?: typeof console.info;
-  error?: typeof console.error;
-}
-
-const markCompanionAnimationSkipped = async ({
-  supabase,
-  evolutionId,
-  providerModel,
-  prompt,
-  nowIso,
-  code,
-  message,
-}: {
-  supabase: any;
-  evolutionId: string;
-  providerModel: string;
-  prompt: string;
-  nowIso: string;
-  code: string;
-  message: string;
-}) => {
-  await supabase
-    .from("companion_evolutions")
-    .update({
-      animation_provider: COMPANION_ANIMATION_PROVIDER,
-      animation_provider_model: providerModel,
-      animation_status: "skipped",
-      animation_prompt: prompt,
-      animation_error_code: code,
-      animation_error_message: message,
-      animation_requested_at: nowIso,
-      animation_completed_at: nowIso,
-    })
-    .eq("id", evolutionId);
-};
-
-export const maybeEnqueueCompanionAnimationJob = async ({
-  supabase,
-  createCostGuardrailSession: createCostGuardrailSessionFn,
-  userId,
-  companionId,
-  evolutionId,
-  stage,
-  imageUrl,
-  element,
-  env = Deno.env,
-  now = () => new Date(),
-  info = console.info,
-  error = console.error,
-}: EnqueueCompanionAnimationJobParams): Promise<{
-  status: "queued" | "skipped" | "failed";
-  reason?: string;
-  jobId?: string;
-}> => {
-  if (!truthyEnvValue(env.get("COMPANION_ANIMATION_ENABLED"))) {
-    return { status: "skipped", reason: "disabled" };
-  }
-
-  if (!evolutionId) {
-    return { status: "skipped", reason: "missing_evolution_id" };
-  }
-
-  const providerModel = resolveFalKlingModelFromEnv(env);
-  const prompt = buildCompanionAnimationPrompt({ element, stage });
-  const nowIso = now().toISOString();
-
-  const markSkipped = async (code: string, message: string) => {
-    try {
-      await markCompanionAnimationSkipped({
-        supabase,
-        evolutionId,
-        providerModel,
-        prompt,
-        nowIso,
-        code,
-        message,
-      });
-    } catch (skipError) {
-      error("[CompanionEvolution] Failed to record skipped companion animation", skipError);
-    }
-    return { status: "skipped" as const, reason: code };
-  };
-
-  if (!env.get("FAL_KEY")?.trim()) {
-    return await markSkipped("fal_key_missing", "FAL_KEY is not configured");
-  }
-
-  if (!hasPublicHttpUrl(imageUrl)) {
-    return await markSkipped(
-      "source_image_url_unavailable",
-      "Evolution image URL is not publicly accessible",
-    );
-  }
-
-  try {
-    const costGuardrails = createCostGuardrailSessionFn({
-      supabase,
-      endpointKey: "process-companion-animation-job",
-      featureKey: "ai_companion_animation",
-      userId,
-    });
-    await costGuardrails.enforceAccess({
-      capabilities: ["video"],
-      providers: [COMPANION_ANIMATION_PROVIDER],
-      metadata: {
-        model: providerModel,
-        stage,
-        phase: "enqueue",
-      },
-    });
-  } catch (guardrailError) {
-    if (isCostGuardrailBlockedError(guardrailError)) {
-      return await markSkipped(
-        "cost_guardrail_blocked",
-        "Companion animation generation is blocked by cost guardrails",
-      );
-    }
-    error(
-      "[CompanionEvolution] Failed to check companion animation cost guardrails",
-      guardrailError,
-    );
-    try {
-      await supabase
-        .from("companion_evolutions")
-        .update({
-          animation_provider: COMPANION_ANIMATION_PROVIDER,
-          animation_provider_model: providerModel,
-          animation_status: "failed",
-          animation_prompt: prompt,
-          animation_error_code: "animation_guardrail_check_failed",
-          animation_error_message: guardrailError instanceof Error
-            ? guardrailError.message.slice(0, 500)
-            : "Unknown error",
-          animation_requested_at: nowIso,
-          animation_completed_at: nowIso,
-        })
-        .eq("id", evolutionId);
-    } catch (updateError) {
-      error(
-        "[CompanionEvolution] Failed to record companion animation guardrail failure",
-        updateError,
-      );
-    }
-    return { status: "failed", reason: "animation_guardrail_check_failed" };
-  }
-
-  try {
-    const { data, error: upsertJobError } = await supabase
-      .from("companion_animation_jobs")
-      .upsert(
-        {
-          user_id: userId,
-          companion_id: companionId,
-          evolution_id: evolutionId,
-          stage,
-          source_image_url: imageUrl,
-          provider: COMPANION_ANIMATION_PROVIDER,
-          provider_model: providerModel,
-          status: "queued",
-          prompt,
-          error_code: null,
-          error_message: null,
-          next_retry_at: nowIso,
-          requested_at: nowIso,
-          updated_at: nowIso,
-        },
-        { onConflict: "evolution_id" },
-      )
-      .select("id")
-      .single();
-
-    if (upsertJobError) {
-      throw upsertJobError;
-    }
-
-    const { error: updateEvolutionError } = await supabase
-      .from("companion_evolutions")
-      .update({
-        animation_provider: COMPANION_ANIMATION_PROVIDER,
-        animation_provider_model: providerModel,
-        animation_provider_task_id: null,
-        animation_status: "queued",
-        animation_prompt: prompt,
-        animation_error_code: null,
-        animation_error_message: null,
-        animation_requested_at: nowIso,
-        animation_completed_at: null,
-      })
-      .eq("id", evolutionId);
-
-    if (updateEvolutionError) {
-      throw updateEvolutionError;
-    }
-
-    info("[CompanionEvolution] Enqueued companion animation job", {
-      companionId,
-      evolutionId,
-      jobId: data?.id,
-      stage,
-      providerModel,
-    });
-
-    return {
-      status: "queued",
-      jobId: typeof data?.id === "string" ? data.id : undefined,
-    };
-  } catch (enqueueError) {
-    error(
-      "[CompanionEvolution] Failed to enqueue companion animation job",
-      enqueueError,
-    );
-    try {
-      await supabase
-        .from("companion_evolutions")
-        .update({
-          animation_provider: COMPANION_ANIMATION_PROVIDER,
-          animation_provider_model: providerModel,
-          animation_status: "failed",
-          animation_prompt: prompt,
-          animation_error_code: "animation_enqueue_failed",
-          animation_error_message: enqueueError instanceof Error
-            ? enqueueError.message.slice(0, 500)
-            : "Unknown error",
-          animation_requested_at: nowIso,
-          animation_completed_at: nowIso,
-        })
-        .eq("id", evolutionId);
-    } catch (updateError) {
-      error(
-        "[CompanionEvolution] Failed to record companion animation enqueue failure",
-        updateError,
-      );
-    }
-
-    return { status: "failed", reason: "animation_enqueue_failed" };
-  }
 };
 
 export interface GenerateCompanionEvolutionDeps {
@@ -527,7 +289,8 @@ export const handleGenerateCompanionEvolution = async (
     registerUserStorageAsset: registerUserStorageAssetFn,
     uploadGeneratedImage: uploadGeneratedImageFn,
     upsertEvolutionRecord: upsertEvolutionRecordFn,
-    enqueueCompanionAnimationJob: enqueueCompanionAnimationJobFn = maybeEnqueueCompanionAnimationJob,
+    enqueueCompanionAnimationJob: enqueueCompanionAnimationJobFn =
+      maybeEnqueueCompanionAnimationJob,
     info: infoLog,
     error: errorLog,
   } = deps;
@@ -539,18 +302,26 @@ export const handleGenerateCompanionEvolution = async (
     const openAIApiKey = Deno.env.get("OPENAI_API_KEY");
     const internalSecret = Deno.env.get("INTERNAL_FUNCTION_SECRET");
     const providedInternalSecret = req.headers.get("x-internal-key");
-    const isInternalCall = Boolean(internalSecret) && providedInternalSecret === internalSecret;
+    const isInternalCall = Boolean(internalSecret) &&
+      providedInternalSecret === internalSecret;
     const authHeader = req.headers.get("Authorization");
     const requestBody = await req.json().catch(() => ({}));
-    const requestedUserId = typeof requestBody?.userId === "string" ? requestBody.userId : null;
+    const requestedUserId = typeof requestBody?.userId === "string"
+      ? requestBody.userId
+      : null;
 
     let resolvedUserId: string | null = null;
 
     if (isInternalCall) {
       if (!requestedUserId) {
         return new Response(
-          JSON.stringify({ error: "userId is required for internal evolution calls" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          JSON.stringify({
+            error: "userId is required for internal evolution calls",
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
         );
       }
       resolvedUserId = requestedUserId;
@@ -558,7 +329,10 @@ export const handleGenerateCompanionEvolution = async (
       if (!authHeader) {
         return new Response(
           JSON.stringify({ error: "Missing Authorization header" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
         );
       }
 
@@ -578,7 +352,10 @@ export const handleGenerateCompanionEvolution = async (
       if (authError || !user) {
         return new Response(
           JSON.stringify({ error: "Unauthorized" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
         );
       }
 
@@ -586,15 +363,23 @@ export const handleGenerateCompanionEvolution = async (
       if (resolvedUserId !== user.id) {
         return new Response(
           JSON.stringify({ error: "User mismatch" }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
         );
       }
     }
 
     if (!resolvedUserId) {
       return new Response(
-        JSON.stringify({ error: "Unable to resolve user for evolution request" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        JSON.stringify({
+          error: "Unable to resolve user for evolution request",
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
     }
 
@@ -641,7 +426,9 @@ export const handleGenerateCompanionEvolution = async (
       );
     }
 
-    const nextThresholdData = thresholds.find((threshold) => threshold.stage === currentStage + 1);
+    const nextThresholdData = thresholds.find((threshold) =>
+      threshold.stage === currentStage + 1
+    );
     if (!nextThresholdData) {
       throw new Error(`No threshold found for stage ${currentStage + 1}`);
     }
@@ -664,13 +451,14 @@ export const handleGenerateCompanionEvolution = async (
       evolutionRecord: Record<string, unknown> | null | undefined,
       imageUrl: string | null | undefined,
     ) => {
-      const existingAnimationStatus = typeof evolutionRecord?.animation_status === "string"
-        ? evolutionRecord.animation_status
-        : null;
+      const existingAnimationStatus =
+        typeof evolutionRecord?.animation_status === "string"
+          ? evolutionRecord.animation_status
+          : null;
       if (
-        existingAnimationStatus === "queued"
-        || existingAnimationStatus === "processing"
-        || existingAnimationStatus === "succeeded"
+        existingAnimationStatus === "queued" ||
+        existingAnimationStatus === "processing" ||
+        existingAnimationStatus === "succeeded"
       ) {
         return;
       }
@@ -680,10 +468,14 @@ export const handleGenerateCompanionEvolution = async (
         createCostGuardrailSession: createCostGuardrailSessionFn,
         userId: resolvedUserId,
         companionId: companion.id,
-        evolutionId: typeof evolutionRecord?.id === "string" ? evolutionRecord.id : null,
+        evolutionId: typeof evolutionRecord?.id === "string"
+          ? evolutionRecord.id
+          : null,
         stage: nextStage,
         imageUrl,
-        element: typeof companion.core_element === "string" ? companion.core_element : null,
+        element: typeof companion.core_element === "string"
+          ? companion.core_element
+          : null,
         info: infoLog,
         error: errorLog,
       });
@@ -701,7 +493,9 @@ export const handleGenerateCompanionEvolution = async (
         state: "normal",
         element: coerceCompanionElementId(companion.core_element),
       });
-      const newImageUrl = supabase.storage.from(COMPANION_PRESET_BUCKET).getPublicUrl(assetPath).data.publicUrl;
+      const newImageUrl =
+        supabase.storage.from(COMPANION_PRESET_BUCKET).getPublicUrl(assetPath)
+          .data.publicUrl;
       const evolutionRecord = await upsertEvolutionRecordFn({
         supabase,
         companionId: companion.id,
@@ -739,90 +533,101 @@ export const handleGenerateCompanionEvolution = async (
       );
     }
 
-    const visualIdentityProfile = synthesizeVisualIdentityProfile(companion.visual_identity_profile, {
-      spiritAnimal: companion.spirit_animal,
-      coreElement: companion.core_element,
-      favoriteColor: companion.favorite_color,
-      storyTone: companion.story_tone,
-    });
-    const imageLineageMetadata = coerceImageLineageMetadata(companion.image_lineage_metadata);
+    const visualIdentityProfile = synthesizeVisualIdentityProfile(
+      companion.visual_identity_profile,
+      {
+        spiritAnimal: companion.spirit_animal,
+        coreElement: companion.core_element,
+        favoriteColor: companion.favorite_color,
+        storyTone: companion.story_tone,
+      },
+    );
+    const imageLineageMetadata = coerceImageLineageMetadata(
+      companion.image_lineage_metadata,
+    );
 
     const hiddenStageOneAnchor = nextStage === 1
       ? getHiddenBoundaryAnchor(companion.image_lineage_metadata, 1)
       : null;
 
     if (nextStage === 1 && hiddenStageOneAnchor?.imageUrl) {
-        const lineageMetadataAfterReveal = updateLineageMetadataAfterReveal({
-          existing: companion.image_lineage_metadata,
-          revealedLevel: 1,
-          imageUrl: hiddenStageOneAnchor.imageUrl,
-          focalX: hiddenStageOneAnchor.focalX,
-          focalY: hiddenStageOneAnchor.focalY,
-        });
-        const generationMetadata = buildCompanionGenerationMetadata({
-          sourceType: "reveal",
-          boundaryLevel: 1,
-          portraitRegenerated: false,
-          reusedFromStage: 1,
-        });
+      const lineageMetadataAfterReveal = updateLineageMetadataAfterReveal({
+        existing: companion.image_lineage_metadata,
+        revealedLevel: 1,
+        imageUrl: hiddenStageOneAnchor.imageUrl,
+        focalX: hiddenStageOneAnchor.focalX,
+        focalY: hiddenStageOneAnchor.focalY,
+      });
+      const generationMetadata = buildCompanionGenerationMetadata({
+        sourceType: "reveal",
+        boundaryLevel: 1,
+        portraitRegenerated: false,
+        reusedFromStage: 1,
+      });
 
-        const evolutionRecord = await upsertEvolutionRecordFn({
-          supabase,
-          companionId: companion.id,
-          stage: nextStage,
-          imageUrl: hiddenStageOneAnchor.imageUrl,
-          xpAtEvolution: currentXP,
-          generationMetadata,
-        });
+      const evolutionRecord = await upsertEvolutionRecordFn({
+        supabase,
+        companionId: companion.id,
+        stage: nextStage,
+        imageUrl: hiddenStageOneAnchor.imageUrl,
+        xpAtEvolution: currentXP,
+        generationMetadata,
+      });
 
-        const { error: updateError } = await supabase
-          .from("user_companion")
-          .update({
-            current_stage: nextStage,
-            current_image_url: hiddenStageOneAnchor.imageUrl,
-            current_image_focal_x: hiddenStageOneAnchor.focalX,
-            current_image_focal_y: hiddenStageOneAnchor.focalY,
-            visual_identity_profile: visualIdentityProfile,
-            image_lineage_metadata: lineageMetadataAfterReveal,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", companion.id);
+      const { error: updateError } = await supabase
+        .from("user_companion")
+        .update({
+          current_stage: nextStage,
+          current_image_url: hiddenStageOneAnchor.imageUrl,
+          current_image_focal_x: hiddenStageOneAnchor.focalX,
+          current_image_focal_y: hiddenStageOneAnchor.focalY,
+          visual_identity_profile: visualIdentityProfile,
+          image_lineage_metadata: lineageMetadataAfterReveal,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", companion.id);
 
-        if (updateError) {
-          throw new Error("Failed to update companion");
-        }
+      if (updateError) {
+        throw new Error("Failed to update companion");
+      }
 
-        await enqueueAnimationForEvolution(evolutionRecord, hiddenStageOneAnchor.imageUrl);
+      await enqueueAnimationForEvolution(
+        evolutionRecord,
+        hiddenStageOneAnchor.imageUrl,
+      );
 
-        return new Response(
-          JSON.stringify({
-            evolved: true,
-            previous_stage: currentStage,
-            new_stage: nextStage,
-            image_url: hiddenStageOneAnchor.imageUrl,
-            xp_at_evolution: currentXP,
-            evolution_id: evolutionRecord.id,
-            portrait_regenerated: false,
-            visual_identity_profile: visualIdentityProfile,
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
+      return new Response(
+        JSON.stringify({
+          evolved: true,
+          previous_stage: currentStage,
+          new_stage: nextStage,
+          image_url: hiddenStageOneAnchor.imageUrl,
+          xp_at_evolution: currentXP,
+          evolution_id: evolutionRecord.id,
+          portrait_regenerated: false,
+          visual_identity_profile: visualIdentityProfile,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
-    const isLegacyStageOneBackfill = nextStage === 1 && !hiddenStageOneAnchor?.imageUrl;
+    const isLegacyStageOneBackfill = nextStage === 1 &&
+      !hiddenStageOneAnchor?.imageUrl;
     if (isLegacyStageOneBackfill) {
-      infoLog("[CompanionEvolution] Missing hidden stage-1 anchor for AI companion; generating legacy backfill stage 1", {
-        companionId: companion.id,
-        currentStage,
-        nextStage,
-      });
+      infoLog(
+        "[CompanionEvolution] Missing hidden stage-1 anchor for AI companion; generating legacy backfill stage 1",
+        {
+          companionId: companion.id,
+          currentStage,
+          nextStage,
+        },
+      );
     }
 
     if (!shouldGeneratePortraitForStage(nextStage)) {
-      const reusedImageUrl =
-        companion.current_image_url
-        ?? companion.initial_image_url
-        ?? "";
+      const reusedImageUrl = companion.current_image_url ??
+        companion.initial_image_url ??
+        "";
 
       if (!reusedImageUrl) {
         throw new Error("Companion is missing a portrait to reuse");
@@ -910,7 +715,9 @@ export const handleGenerateCompanionEvolution = async (
     }
 
     const imageSize = resolveCompanionImageSizeForUserFn(resolvedUserId);
-    const spiritLockProfile = resolveCompanionSpiritLockProfile(companion.spirit_animal);
+    const spiritLockProfile = resolveCompanionSpiritLockProfile(
+      companion.spirit_animal,
+    );
     const spiritLockPromptBlock = spiritLockProfile
       ? buildSpiritLockPromptBlock(spiritLockProfile, "image")
       : null;
@@ -928,7 +735,9 @@ export const handleGenerateCompanionEvolution = async (
       referenceImageUrl?: string | null;
       previousLevel?: number;
       nextLevel?: number;
-      render: (prompt: string) => Promise<{ imageDataUrl: string; revisedPrompt: string | null }>;
+      render: (
+        prompt: string,
+      ) => Promise<{ imageDataUrl: string; revisedPrompt: string | null }>;
     }) => {
       let promptForAttempt = basePrompt;
       let bestAttempt:
@@ -960,7 +769,10 @@ export const handleGenerateCompanionEvolution = async (
           retryCount: attempt,
         };
 
-        if (!bestAttempt || rankJudgeScores(scores) >= rankJudgeScores(bestAttempt.scores)) {
+        if (
+          !bestAttempt ||
+          rankJudgeScores(scores) >= rankJudgeScores(bestAttempt.scores)
+        ) {
           bestAttempt = attemptResult;
         }
 
@@ -979,7 +791,9 @@ export const handleGenerateCompanionEvolution = async (
     };
 
     if (nextStage === 1) {
-      const starterPromptBase = buildStage1BootstrapPrompt(visualIdentityProfile);
+      const starterPromptBase = buildStage1BootstrapPrompt(
+        visualIdentityProfile,
+      );
       const starterPrompt = spiritLockPromptBlock
         ? `${starterPromptBase}\n\nMechanical spirit-lock:\n${spiritLockPromptBlock}`
         : starterPromptBase;
@@ -1000,15 +814,21 @@ export const handleGenerateCompanionEvolution = async (
           }),
       });
 
-      const { fileName, publicUrl: newImageUrl } = await uploadGeneratedImageFn({
-        supabase,
-        userId: resolvedUserId,
-        companionId: companion.id,
-        nextStage,
-        generatedImageDataUrl: stageOneAttempt.imageDataUrl,
-      });
-      const stageOneFocalX = resolveJudgeFocalValue(stageOneAttempt.scores?.subjectCenterX);
-      const stageOneFocalY = resolveJudgeFocalValue(stageOneAttempt.scores?.subjectCenterY);
+      const { fileName, publicUrl: newImageUrl } = await uploadGeneratedImageFn(
+        {
+          supabase,
+          userId: resolvedUserId,
+          companionId: companion.id,
+          nextStage,
+          generatedImageDataUrl: stageOneAttempt.imageDataUrl,
+        },
+      );
+      const stageOneFocalX = resolveJudgeFocalValue(
+        stageOneAttempt.scores?.subjectCenterX,
+      );
+      const stageOneFocalY = resolveJudgeFocalValue(
+        stageOneAttempt.scores?.subjectCenterY,
+      );
 
       const lineageMetadataAfterReveal = updateLineageMetadataAfterReveal({
         existing: companion.image_lineage_metadata,
@@ -1044,7 +864,9 @@ export const handleGenerateCompanionEvolution = async (
         storagePath: fileName,
         sourceKind: "companion_evolution",
         sourceRecordTable: "companion_evolutions",
-        sourceRecordId: typeof evolutionRecord?.id === "string" ? evolutionRecord.id : undefined,
+        sourceRecordId: typeof evolutionRecord?.id === "string"
+          ? evolutionRecord.id
+          : undefined,
       });
 
       const { error: updateError } = await supabase
@@ -1087,7 +909,8 @@ export const handleGenerateCompanionEvolution = async (
       );
     }
 
-    const previousImageUrl = companion.current_image_url ?? companion.initial_image_url ?? null;
+    const previousImageUrl = companion.current_image_url ??
+      companion.initial_image_url ?? null;
     if (!previousImageUrl) {
       throw new Error("Companion is missing a portrait to evolve from");
     }
@@ -1130,16 +953,21 @@ export const handleGenerateCompanionEvolution = async (
       nextStage,
       generatedImageDataUrl: evolutionAttempt.imageDataUrl,
     });
-    const evolutionFocalX = resolveJudgeFocalValue(evolutionAttempt.scores?.subjectCenterX);
-    const evolutionFocalY = resolveJudgeFocalValue(evolutionAttempt.scores?.subjectCenterY);
+    const evolutionFocalX = resolveJudgeFocalValue(
+      evolutionAttempt.scores?.subjectCenterX,
+    );
+    const evolutionFocalY = resolveJudgeFocalValue(
+      evolutionAttempt.scores?.subjectCenterY,
+    );
 
-    const lineageMetadataAfterEvolution = updateLineageMetadataAfterBoundaryEvolution({
-      existing: companion.image_lineage_metadata,
-      boundaryLevel: nextStage,
-      imageUrl: newImageUrl,
-      focalX: evolutionFocalX,
-      focalY: evolutionFocalY,
-    });
+    const lineageMetadataAfterEvolution =
+      updateLineageMetadataAfterBoundaryEvolution({
+        existing: companion.image_lineage_metadata,
+        boundaryLevel: nextStage,
+        imageUrl: newImageUrl,
+        focalX: evolutionFocalX,
+        focalY: evolutionFocalY,
+      });
     const generationMetadata = buildCompanionGenerationMetadata({
       sourceType: "edit",
       boundaryLevel: nextStage,
@@ -1165,7 +993,9 @@ export const handleGenerateCompanionEvolution = async (
       storagePath: fileName,
       sourceKind: "companion_evolution",
       sourceRecordTable: "companion_evolutions",
-      sourceRecordId: typeof evolutionRecord?.id === "string" ? evolutionRecord.id : undefined,
+      sourceRecordId: typeof evolutionRecord?.id === "string"
+        ? evolutionRecord.id
+        : undefined,
     });
 
     const { error: updateError } = await supabase
@@ -1212,7 +1042,9 @@ export const handleGenerateCompanionEvolution = async (
     }
 
     errorLog("Error in generate-companion-evolution:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorMessage = error instanceof Error
+      ? error.message
+      : "Unknown error";
     const errorCode = resolveServerErrorCode(errorMessage);
     return new Response(
       JSON.stringify({
@@ -1225,7 +1057,9 @@ export const handleGenerateCompanionEvolution = async (
       },
     );
   } finally {
-    console.log(`[CompanionEvolutionTiming] total_ms=${Date.now() - requestStartedAt}`);
+    console.log(
+      `[CompanionEvolutionTiming] total_ms=${Date.now() - requestStartedAt}`,
+    );
   }
 };
 

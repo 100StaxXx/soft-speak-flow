@@ -74,6 +74,7 @@ const REDUCED_SEQUENCE_MS = {
 
 const EMERGENCY_EXIT_DELAY_MS = 15_000;
 const IMAGE_PRELOAD_TIMEOUT_MS = 2_000;
+const ANIMATION_VIDEO_PRELOAD_TIMEOUT_MS = 10_000;
 const HATCH_INTRO_MIN_MS = 800;
 const HATCH_FOREGROUND_STAGE_MAX_WIDTH_PX = 560;
 const HATCH_FOREGROUND_STAGE_MAX_HEIGHT_PX = 700;
@@ -390,26 +391,27 @@ const CompanionEvolutionContent = ({
   const [animationVideoFailed, setAnimationVideoFailed] = useState(false);
 
   const isFirstEvolution = newStage === 1;
+  const { profile, capabilities, signals } = useMotionProfile();
+  const { triggerEvent } = useCompanionMotionSafe();
+  const prefersReducedMotion = profile === "reduced" || signals.prefersReducedMotion;
   const hatchVideoUrl = useMemo(
     () => getCompanionHatchVideoUrl({ presetId, element }),
     [element, presetId],
   );
+  const hasPlayableAnimationVideoUrl = Boolean(animationVideoUrl) && !prefersReducedMotion;
   const useHatchVideo = shouldUseMappedPresetHatchVideo({
     isFirstEvolution,
     presetId,
     hatchVideoUrl,
-    disableHatchVideo,
+    disableHatchVideo: disableHatchVideo || hasPlayableAnimationVideoUrl,
   });
   const theme: EvoTheme = useMemo(
     () => getEvolutionTheme(element, isFirstEvolution),
     [element, isFirstEvolution],
   );
   const levelDisplay = useMemo(() => getProgressionLevelDisplay(newStage), [newStage]);
-  const { profile, capabilities, signals } = useMotionProfile();
-  const { triggerEvent } = useCompanionMotionSafe();
-  const prefersReducedMotion = profile === "reduced" || signals.prefersReducedMotion;
   const sequence = prefersReducedMotion ? REDUCED_SEQUENCE_MS : FULL_SEQUENCE_MS;
-  const shouldRenderAnimationVideo = Boolean(animationVideoUrl) && !useHatchVideo && !prefersReducedMotion;
+  const shouldRenderAnimationVideo = hasPlayableAnimationVideoUrl && !useHatchVideo;
   const shouldUseAnimationVideo = shouldRenderAnimationVideo && animationVideoReady && !animationVideoFailed;
   const showAnimationVideo = shouldUseAnimationVideo && (phase === "reveal" || phase === "settle");
   const convergenceParticleCount = Math.max(4, Math.min(12, Math.round(capabilities.maxParticles * 0.5)));
@@ -473,7 +475,10 @@ const CompanionEvolutionContent = ({
     : `Your companion reached ${levelDisplay}.`;
 
   const showHatchIntro = isFirstEvolution && !hatchIntroComplete;
-  const shouldStartCinematic = artReadiness.ready && (!isFirstEvolution || hatchIntroComplete);
+  const animationVideoReadyForCinematic =
+    !shouldRenderAnimationVideo || animationVideoReady || animationVideoFailed;
+  const shouldStartCinematic =
+    artReadiness.ready && animationVideoReadyForCinematic && (!isFirstEvolution || hatchIntroComplete);
   const firstHatchImageFit = isFirstEvolution ? "portrait" : "cover";
 
   useEffect(() => {
@@ -490,6 +495,35 @@ const CompanionEvolutionContent = ({
       videoElement.currentTime = 0;
     }
   }, [animationVideoUrl, isEvolving]);
+
+  useEffect(() => {
+    if (
+      !isEvolving ||
+      !shouldRenderAnimationVideo ||
+      !animationVideoUrl ||
+      animationVideoReady ||
+      animationVideoFailed
+    ) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      log.warn("Evolution animation video preload timed out, using still reveal", {
+        animationVideoUrl,
+      });
+      setAnimationVideoFailed(true);
+    }, ANIMATION_VIDEO_PRELOAD_TIMEOUT_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [
+    animationVideoFailed,
+    animationVideoReady,
+    animationVideoUrl,
+    isEvolving,
+    shouldRenderAnimationVideo,
+  ]);
 
   useEffect(() => {
     if (!isEvolving) {

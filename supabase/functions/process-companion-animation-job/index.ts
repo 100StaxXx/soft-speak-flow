@@ -254,6 +254,45 @@ const updateJob = async (
   }
 };
 
+const fetchSucceededEvolutionAnimation = async (
+  supabase: SupabaseServiceClient,
+  evolutionId: string,
+): Promise<
+  | {
+    videoUrl: string;
+    storagePath: string | null;
+    completedAt: string | null;
+  }
+  | null
+> => {
+  const { data, error } = await supabase
+    .from("companion_evolutions")
+    .select(
+      "animation_status, animation_video_url, animation_storage_path, animation_completed_at",
+    )
+    .eq("id", evolutionId)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  const videoUrl = typeof data?.animation_video_url === "string"
+    ? data.animation_video_url.trim()
+    : "";
+  if (data?.animation_status !== "succeeded" || !videoUrl) {
+    return null;
+  }
+
+  return {
+    videoUrl,
+    storagePath: typeof data.animation_storage_path === "string"
+      ? data.animation_storage_path
+      : null,
+    completedAt: typeof data.animation_completed_at === "string"
+      ? data.animation_completed_at
+      : null,
+  };
+};
+
 const uploadAnimationVideo = async ({
   supabase,
   job,
@@ -457,17 +496,6 @@ export const processClaimedCompanionAnimationJob = async ({
     sourceRecordId: job.evolution_id,
   });
 
-  await updateJob(supabase, job.id, {
-    status: "succeeded",
-    provider_status: normalizedStatus,
-    video_url: uploadedVideo.publicUrl,
-    storage_path: uploadedVideo.storagePath,
-    completed_at: toIso(now),
-    next_retry_at: null,
-    error_code: null,
-    error_message: null,
-    updated_at: toIso(now),
-  });
   await updateEvolutionAnimation(supabase, job.evolution_id, {
     animation_video_url: uploadedVideo.publicUrl,
     animation_storage_path: uploadedVideo.storagePath,
@@ -478,6 +506,17 @@ export const processClaimedCompanionAnimationJob = async ({
     animation_completed_at: toIso(now),
     animation_error_code: null,
     animation_error_message: null,
+  });
+  await updateJob(supabase, job.id, {
+    status: "succeeded",
+    provider_status: normalizedStatus,
+    video_url: uploadedVideo.publicUrl,
+    storage_path: uploadedVideo.storagePath,
+    completed_at: toIso(now),
+    next_retry_at: null,
+    error_code: null,
+    error_message: null,
+    updated_at: toIso(now),
   });
 
   return {
@@ -687,6 +726,77 @@ export const handleProcessCompanionAnimationJob = async (
           : true;
         const shouldRetry = retryable && retryCount <= MAX_RETRY_COUNT;
 
+        if (typeof currentJob.evolution_id === "string") {
+          let succeededEvolution: Awaited<
+            ReturnType<typeof fetchSucceededEvolutionAnimation>
+          > = null;
+          try {
+            succeededEvolution = await fetchSucceededEvolutionAnimation(
+              supabase,
+              currentJob.evolution_id,
+            );
+          } catch (repairLookupError) {
+            deps.warn(
+              "Failed to check succeeded companion animation before retry handling",
+              repairLookupError,
+            );
+          }
+
+          if (succeededEvolution) {
+            try {
+              await updateJob(supabase, requestedJobId, {
+                status: "succeeded",
+                video_url: succeededEvolution.videoUrl,
+                storage_path: succeededEvolution.storagePath,
+                completed_at: succeededEvolution.completedAt ?? toIso(now),
+                next_retry_at: null,
+                error_code: null,
+                error_message: null,
+                updated_at: toIso(now),
+              });
+
+              return new Response(
+                JSON.stringify({
+                  jobId: requestedJobId,
+                  status: "succeeded",
+                  videoUrl: succeededEvolution.videoUrl,
+                  repaired: true,
+                }),
+                {
+                  headers: {
+                    ...corsHeaders,
+                    "Content-Type": "application/json",
+                  },
+                },
+              );
+            } catch (repairError) {
+              deps.error(
+                "Failed to repair succeeded companion animation job",
+                repairError,
+              );
+
+              const repairMessage = repairError instanceof Error
+                ? repairError.message
+                : "Unknown error";
+              return new Response(
+                JSON.stringify({
+                  jobId: requestedJobId,
+                  status: "processing",
+                  error: repairMessage,
+                  code: "animation_success_repair_failed",
+                }),
+                {
+                  status: 500,
+                  headers: {
+                    ...corsHeaders,
+                    "Content-Type": "application/json",
+                  },
+                },
+              );
+            }
+          }
+        }
+
         if (shouldRetry) {
           const nextRetryAt = getNextRetryAt(now, retryCount);
           await updateJob(supabase, requestedJobId, {
@@ -713,14 +823,6 @@ export const handleProcessCompanionAnimationJob = async (
           );
         }
 
-        await updateJob(supabase, requestedJobId, {
-          status: "failed",
-          retry_count: retryCount,
-          error_code: errorCode,
-          error_message: message.slice(0, 500),
-          completed_at: toIso(now),
-          updated_at: toIso(now),
-        });
         if (typeof currentJob.evolution_id === "string") {
           await updateEvolutionAnimation(supabase, currentJob.evolution_id, {
             animation_status: "failed",
@@ -729,6 +831,14 @@ export const handleProcessCompanionAnimationJob = async (
             animation_completed_at: toIso(now),
           });
         }
+        await updateJob(supabase, requestedJobId, {
+          status: "failed",
+          retry_count: retryCount,
+          error_code: errorCode,
+          error_message: message.slice(0, 500),
+          completed_at: toIso(now),
+          updated_at: toIso(now),
+        });
 
         return new Response(
           JSON.stringify({

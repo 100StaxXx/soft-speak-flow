@@ -456,6 +456,14 @@ interface GeneratedCompanionImageResponse {
   idempotencyReplay?: boolean;
 }
 
+interface CompanionAnimationPrewarmResponse {
+  status?: "queued" | "processing" | "succeeded" | "skipped" | "failed";
+  jobId?: string | null;
+  evolutionId?: string;
+  videoUrl?: string;
+  reason?: string;
+}
+
 const AI_COMPANION_IMAGE_REQUEST_KEY_PREFIX = "soft-speak-flow:ai-companion-image-request:";
 
 const createClientRequestId = (): string => {
@@ -489,6 +497,56 @@ const clearAiCompanionImageRequestKey = (userId: string): void => {
     window.sessionStorage.removeItem(`${AI_COMPANION_IMAGE_REQUEST_KEY_PREFIX}${userId}`);
   } catch {
     // Best-effort cleanup only.
+  }
+};
+
+const kickOffCompanionAnimationJob = async (jobId: string) => {
+  try {
+    await supabase.functions.invoke("process-companion-animation-job", {
+      body: { jobId },
+    });
+  } catch (error) {
+    logger.warn("Companion animation worker kick-off failed", {
+      jobId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
+const requestCompanionAnimationPrewarm = async ({
+  companionId,
+  stage,
+}: {
+  companionId: string;
+  stage: number;
+}): Promise<CompanionAnimationPrewarmResponse | null> => {
+  try {
+    const { data, error } = await supabase.functions.invoke("prewarm-companion-animation", {
+      body: { companionId, stage },
+    });
+
+    if (error) {
+      logger.warn("Companion animation prewarm failed", {
+        companionId,
+        stage,
+        error: error.message ?? String(error),
+      });
+      return null;
+    }
+
+    const result = (data ?? null) as CompanionAnimationPrewarmResponse | null;
+    if (typeof result?.jobId === "string" && result.jobId.trim().length > 0) {
+      void kickOffCompanionAnimationJob(result.jobId);
+    }
+
+    return result;
+  } catch (error) {
+    logger.warn("Companion animation prewarm threw", {
+      companionId,
+      stage,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
   }
 };
 
@@ -1305,6 +1363,13 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
           });
         }
 
+        if (isNewCompanion && companionData.current_stage === 0) {
+          void requestCompanionAnimationPrewarm({
+            companionId: companionData.id,
+            stage: 1,
+          });
+        }
+
         if (Object.prototype.hasOwnProperty.call(data, "companionName")) {
           await persistCompanionCustomName(companionData.id, data.companionName);
         }
@@ -1344,6 +1409,10 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
               }
 
               clearAiCompanionImageRequestKey(user.id);
+              void requestCompanionAnimationPrewarm({
+                companionId: companionData.id,
+                stage: 1,
+              });
               queryClient.invalidateQueries({ queryKey: ["companion"] });
               logger.info("Deferred AI companion egg image applied", {
                 userId: user.id,
@@ -1512,6 +1581,11 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
 
       void generateStageOneArtifacts();
 
+      await requestCompanionAnimationPrewarm({
+        companionId: companionToUse.id,
+        stage: 1,
+      });
+
       return {
         ...hatchResult,
         previous_image_url: initialImageUrl,
@@ -1534,7 +1608,6 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         }),
       );
 
-      setIsEvolvingLoading(false);
       queryClient.invalidateQueries({ queryKey: ["companion"] });
       queryClient.invalidateQueries({ queryKey: ["companion-story"] });
       queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
@@ -1806,9 +1879,11 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
     },
     onSuccess: async (result) => {
       evolutionInProgress.current = false;
-      setIsEvolvingLoading(false);
 
-      if (!result) return;
+      if (!result) {
+        setIsEvolvingLoading(false);
+        return;
+      }
       if (typeof result.newStage === "number") {
         await checkCompanionAchievements(result.newStage);
       }
@@ -1816,6 +1891,14 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
       queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
       queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
       queryClient.invalidateQueries({ queryKey: ["current-evolution-card"] });
+
+      const shouldWaitForEvolutionPresentation =
+        typeof result.newStage === "number"
+        && companion
+        && result.newStage > companion.current_stage;
+      if (!shouldWaitForEvolutionPresentation) {
+        setIsEvolvingLoading(false);
+      }
     },
     onError: (error) => {
       evolutionInProgress.current = false;

@@ -13,18 +13,83 @@ import {
 } from "@/lib/companionEvolutionEvents";
 import { logger } from "@/utils/logger";
 import {
-  didTierChange,
   getProgressionLevelDisplay,
   getProgressionTierLabelForLevel,
 } from "@/config/progression";
 import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
 
 const EVOLUTION_RECORD_RETRY_DELAYS_MS = [0, 75, 150] as const;
+const EVOLUTION_ANIMATION_DISCOVERY_TIMEOUT_MS = 20_000;
+const EVOLUTION_ANIMATION_READY_TIMEOUT_MS = 180_000;
+const EVOLUTION_ANIMATION_POLL_INTERVAL_MS = 2_000;
+const EVOLUTION_ANIMATION_PROCESS_INTERVAL_MS = 5_000;
 const LOCAL_HATCH_DEDUPE_WINDOW_MS = 15000;
+
+type CompanionAnimationStatus =
+  | "queued"
+  | "processing"
+  | "succeeded"
+  | "failed"
+  | "skipped";
 
 type PersistedEvolutionMetadata = {
   id: string;
   animationVideoUrl: string | null;
+  animationStatus: CompanionAnimationStatus | null;
+};
+
+const sleep = (delayMs: number) => new Promise((resolve) => setTimeout(resolve, delayMs));
+
+const normalizeAnimationStatus = (value: unknown): CompanionAnimationStatus | null => {
+  if (
+    value === "queued" ||
+    value === "processing" ||
+    value === "succeeded" ||
+    value === "failed" ||
+    value === "skipped"
+  ) {
+    return value;
+  }
+
+  return null;
+};
+
+const fetchPersistedEvolutionMetadata = async ({
+  companionId,
+  stage,
+}: {
+  companionId: string;
+  stage: number;
+}): Promise<PersistedEvolutionMetadata | null> => {
+  const { data, error } = await supabase
+    .from("companion_evolutions")
+    .select("id, animation_video_url, animation_status")
+    .eq("companion_id", companionId)
+    .eq("stage", stage)
+    .maybeSingle();
+
+  if (error) {
+    logger.warn("Evolution listener: Failed to verify persisted evolution", {
+      companionId,
+      stage,
+      error: error.message,
+    });
+    return null;
+  }
+
+  if (!data?.id) return null;
+
+  const animationStatus = normalizeAnimationStatus(data.animation_status);
+  const animationVideoUrl =
+    animationStatus === "succeeded" && typeof data.animation_video_url === "string"
+      ? data.animation_video_url
+      : null;
+
+  return {
+    id: data.id,
+    animationStatus,
+    animationVideoUrl,
+  };
 };
 
 const waitForEvolutionPersistence = async ({
@@ -35,40 +100,95 @@ const waitForEvolutionPersistence = async ({
   stage: number;
 }): Promise<PersistedEvolutionMetadata | null> => {
   for (const delayMs of EVOLUTION_RECORD_RETRY_DELAYS_MS) {
-    if (delayMs > 0) {
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-    }
+    if (delayMs > 0) await sleep(delayMs);
 
-    const { data, error } = await supabase
-      .from("companion_evolutions")
-      .select("id, animation_video_url, animation_status")
-      .eq("companion_id", companionId)
-      .eq("stage", stage)
-      .maybeSingle();
-
-    if (error) {
-      logger.warn("Evolution listener: Failed to verify persisted evolution", {
-        companionId,
-        stage,
-        error: error.message,
-      });
-      return null;
-    }
-
-    if (data?.id) {
-      const animationVideoUrl =
-        data.animation_status === "succeeded" && typeof data.animation_video_url === "string"
-          ? data.animation_video_url
-          : null;
-
-      return {
-        id: data.id,
-        animationVideoUrl,
-      };
-    }
+    const metadata = await fetchPersistedEvolutionMetadata({ companionId, stage });
+    if (metadata) return metadata;
   }
 
   return null;
+};
+
+const fetchAnimationJobId = async (evolutionId: string): Promise<string | null> => {
+  const { data, error } = await supabase
+    .from("companion_animation_jobs")
+    .select("id")
+    .eq("evolution_id", evolutionId)
+    .maybeSingle();
+
+  if (error) {
+    logger.warn("Evolution listener: Failed to find companion animation job", {
+      evolutionId,
+      error: error.message,
+    });
+    return null;
+  }
+
+  return typeof data?.id === "string" ? data.id : null;
+};
+
+const processAnimationJobOnce = async (jobId: string) => {
+  const { error } = await supabase.functions.invoke("process-companion-animation-job", {
+    body: { jobId },
+  });
+
+  if (error) {
+    logger.warn("Evolution listener: Companion animation worker invoke failed", {
+      jobId,
+      error: error.message ?? String(error),
+    });
+  }
+};
+
+const waitForEvolutionAnimation = async ({
+  companionId,
+  stage,
+  initialMetadata,
+}: {
+  companionId: string;
+  stage: number;
+  initialMetadata: PersistedEvolutionMetadata;
+}): Promise<PersistedEvolutionMetadata> => {
+  let metadata = initialMetadata;
+  const startedAt = Date.now();
+  const discoveryDeadline = startedAt + EVOLUTION_ANIMATION_DISCOVERY_TIMEOUT_MS;
+  const readyDeadline = startedAt + EVOLUTION_ANIMATION_READY_TIMEOUT_MS;
+  let jobId: string | null = null;
+  let lastProcessAt = 0;
+
+  while (Date.now() < readyDeadline) {
+    if (metadata.animationVideoUrl) {
+      return metadata;
+    }
+
+    if (metadata.animationStatus === "failed" || metadata.animationStatus === "skipped") {
+      return metadata;
+    }
+
+    if (metadata.animationStatus === "queued" || metadata.animationStatus === "processing") {
+      if (!jobId) {
+        jobId = await fetchAnimationJobId(metadata.id);
+      }
+
+      if (jobId && Date.now() - lastProcessAt >= EVOLUTION_ANIMATION_PROCESS_INTERVAL_MS) {
+        lastProcessAt = Date.now();
+        await processAnimationJobOnce(jobId);
+      }
+    } else if (Date.now() > discoveryDeadline) {
+      return metadata;
+    }
+
+    await sleep(EVOLUTION_ANIMATION_POLL_INTERVAL_MS);
+    metadata = await fetchPersistedEvolutionMetadata({ companionId, stage }) ?? metadata;
+  }
+
+  logger.warn("Evolution listener: Timed out waiting for companion animation video", {
+    companionId,
+    stage,
+    evolutionId: metadata.id,
+    animationStatus: metadata.animationStatus,
+  });
+  return metadata;
 };
 
 export const GlobalEvolutionListener = () => {
@@ -91,6 +211,7 @@ export const GlobalEvolutionListener = () => {
     element?: string;
   } | null>(null);
   const activeEvolutionKeyRef = useRef<string | null>(null);
+  const pendingEvolutionKeysRef = useRef(new Set<string>());
   const recentLocalHatchKeysRef = useRef(new Map<string, number>());
 
   const buildEvolutionKey = useCallback((companionId: string, stage: number) => (
@@ -272,6 +393,90 @@ export const GlobalEvolutionListener = () => {
     triggerEvent,
   ]);
 
+  const beginEvolutionPresentationWhenReady = useCallback(async ({
+    companionId,
+    previousLevel,
+    level,
+    previousImageUrl,
+    imageUrl,
+    presetId,
+    element,
+    dispatchLoadingStart = false,
+    markAsLocalHatch = false,
+    missingEvolutionLog,
+  }: {
+    companionId: string;
+    previousLevel: number;
+    level: number;
+    previousImageUrl: string;
+    imageUrl: string;
+    presetId?: string;
+    element?: string;
+    dispatchLoadingStart?: boolean;
+    markAsLocalHatch?: boolean;
+    missingEvolutionLog?: Record<string, unknown>;
+  }) => {
+    const key = buildEvolutionKey(companionId, level);
+    if (activeEvolutionKeyRef.current === key || pendingEvolutionKeysRef.current.has(key)) {
+      return false;
+    }
+
+    pendingEvolutionKeysRef.current.add(key);
+    if (markAsLocalHatch) {
+      recentLocalHatchKeysRef.current.set(key, Date.now());
+    }
+
+    if (dispatchLoadingStart) {
+      window.dispatchEvent(new CustomEvent("evolution-loading-start"));
+    }
+    setIsEvolvingLoading(true);
+
+    let started = false;
+    try {
+      const persistedEvolution = await waitForEvolutionPersistence({
+        companionId,
+        stage: level,
+      });
+
+      if (!persistedEvolution) {
+        logger.warn("Evolution listener: Ignoring stage update without persisted evolution row", {
+          companionId,
+          previousLevel,
+          level,
+          ...missingEvolutionLog,
+        });
+        return false;
+      }
+
+      const readyEvolution = await waitForEvolutionAnimation({
+        companionId,
+        stage: level,
+        initialMetadata: persistedEvolution,
+      });
+
+      started = startEvolutionPresentation({
+        companionId,
+        previousLevel,
+        level,
+        previousImageUrl,
+        imageUrl,
+        animationVideoUrl: readyEvolution.animationVideoUrl,
+        presetId,
+        element,
+      });
+      return started;
+    } finally {
+      pendingEvolutionKeysRef.current.delete(key);
+      if (!started && activeEvolutionKeyRef.current !== key) {
+        setIsEvolvingLoading(false);
+      }
+    }
+  }, [
+    buildEvolutionKey,
+    setIsEvolvingLoading,
+    startEvolutionPresentation,
+  ]);
+
   useEffect(() => {
     if (!user) return;
 
@@ -322,7 +527,7 @@ export const GlobalEvolutionListener = () => {
             return;
           }
 
-          if (newLevel <= oldLevel || !didTierChange(oldLevel, newLevel)) {
+          if (newLevel <= oldLevel) {
             return;
           }
 
@@ -338,20 +543,6 @@ export const GlobalEvolutionListener = () => {
           const localHatchStartedAt = recentLocalHatchKeysRef.current.get(evolutionKey);
           if (localHatchStartedAt && Date.now() - localHatchStartedAt <= LOCAL_HATCH_DEDUPE_WINDOW_MS) {
             recentLocalHatchKeysRef.current.delete(evolutionKey);
-            return;
-          }
-
-          const persistedEvolution = await waitForEvolutionPersistence({
-            companionId,
-            stage: newLevel,
-          });
-
-          if (!persistedEvolution) {
-            logger.warn("Evolution listener: Ignoring stage update without persisted evolution row", {
-              companionId,
-              oldLevel,
-              newLevel,
-            });
             return;
           }
 
@@ -390,13 +581,12 @@ export const GlobalEvolutionListener = () => {
                 : null,
           }) ?? currentImageUrl;
 
-          await startEvolutionPresentation({
+          await beginEvolutionPresentationWhenReady({
             companionId,
             previousLevel: oldLevel,
             level: newLevel,
             previousImageUrl,
             imageUrl,
-            animationVideoUrl: persistedEvolution.animationVideoUrl,
             presetId: typeof newData.preset_id === "string"
               ? newData.preset_id
               : typeof oldData.preset_id === "string"
@@ -404,6 +594,10 @@ export const GlobalEvolutionListener = () => {
                 : undefined,
             element,
             dispatchLoadingStart: true,
+            missingEvolutionLog: {
+              oldLevel,
+              newLevel,
+            },
           });
         },
       )
@@ -423,8 +617,8 @@ export const GlobalEvolutionListener = () => {
   }, [
     buildEvolutionKey,
     pruneRecentLocalHatchKeys,
+    beginEvolutionPresentationWhenReady,
     queryClient,
-    startEvolutionPresentation,
     user,
     user?.id,
   ]);
@@ -438,15 +632,15 @@ export const GlobalEvolutionListener = () => {
         return;
       }
 
-      void startEvolutionPresentation({
+      void beginEvolutionPresentationWhenReady({
         companionId: detail.companionId,
         previousLevel: detail.previousStage,
         level: detail.newStage,
         previousImageUrl: detail.previousImageUrl,
         imageUrl: detail.newImageUrl,
-        animationVideoUrl: null,
         presetId: typeof detail.presetId === "string" ? detail.presetId : undefined,
         element: detail.element ?? undefined,
+        dispatchLoadingStart: true,
         markAsLocalHatch: true,
       });
     };
@@ -455,7 +649,7 @@ export const GlobalEvolutionListener = () => {
     return () => {
       window.removeEventListener(COMPANION_HATCH_STARTED_EVENT, handleHatchStarted as EventListener);
     };
-  }, [startEvolutionPresentation, user]);
+  }, [beginEvolutionPresentationWhenReady, user]);
 
   if (!isEvolving || !evolutionData) {
     return null;

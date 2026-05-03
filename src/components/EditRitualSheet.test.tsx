@@ -1,52 +1,49 @@
-import type { ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { HTMLAttributes, ReactNode } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { EditRitualSheet } from "./EditRitualSheet";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { EditRitualSheet, type RitualData } from "./EditRitualSheet";
 
 const mocks = vi.hoisted(() => ({
-  invalidateQueries: vi.fn(),
-  saveRitualMock: vi.fn(),
-}));
-
-vi.mock("@/hooks/useAuth", () => ({
-  useAuth: () => ({
-    user: { id: "user-1" },
-  }),
-}));
-
-vi.mock("@tanstack/react-query", () => ({
-  useQueryClient: () => ({
-    invalidateQueries: mocks.invalidateQueries,
-  }),
-}));
-
-vi.mock("@/integrations/supabase/client", () => ({
-  supabase: {
-    from: vi.fn(),
-  },
+  getSuggestedSlots: vi.fn(),
+  saveRitual: vi.fn(),
+  toastSuccess: vi.fn(),
+  toastError: vi.fn(),
 }));
 
 vi.mock("@/hooks/useRitualUpdate", () => ({
   useRitualUpdate: () => ({
-    saveRitual: mocks.saveRitualMock,
+    saveRitual: mocks.saveRitual,
   }),
 }));
 
-vi.mock("sonner", () => ({
+vi.mock("@/hooks/useSmartScheduling", () => ({
+  useSmartScheduling: () => ({
+    suggestedSlots: [],
+    getSuggestedSlots: mocks.getSuggestedSlots,
+    isLoading: false,
+  }),
+}));
+
+vi.mock("@/components/ui/sonner", () => ({
   toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-    warning: vi.fn(),
+    success: mocks.toastSuccess,
+    error: mocks.toastError,
   },
 }));
 
 vi.mock("@/features/quests/components/NaturalLanguageEditor", () => ({
-  NaturalLanguageEditor: () => <div>Quick Edit</div>,
+  NaturalLanguageEditor: ({ visualStyle }: { visualStyle?: string }) => (
+    <div data-testid="natural-language-editor" data-visual-style={visualStyle}>
+      Quick Edit
+    </div>
+  ),
 }));
 
 vi.mock("@/components/Pathfinder/FrequencyPresets", () => ({
   FrequencyPresets: ({
     onFrequencyChange,
+    variant,
   }: {
     onFrequencyChange: (selection: {
       frequency: string;
@@ -54,9 +51,11 @@ vi.mock("@/components/Pathfinder/FrequencyPresets", () => ({
       customMonthDays: number[];
       customPeriod: "week" | "month";
     }) => void;
+    variant?: string;
   }) => (
     <button
       type="button"
+      data-variant={variant}
       onClick={() =>
         onFrequencyChange({
           frequency: "5x_week",
@@ -71,22 +70,35 @@ vi.mock("@/components/Pathfinder/FrequencyPresets", () => ({
   ),
 }));
 
-vi.mock("@/components/HabitDifficultySelector", () => ({
-  HabitDifficultySelector: () => <div>Difficulty Selector</div>,
-}));
-
 vi.mock("@/components/ui/sheet", () => ({
-  Sheet: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  SheetContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  SheetHeader: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  SheetTitle: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  SheetFooter: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  Sheet: ({ open, children }: { open: boolean; children: ReactNode }) => (open ? <div>{children}</div> : null),
+  SheetContent: ({
+    children,
+    side: _side,
+    ...props
+  }: HTMLAttributes<HTMLDivElement> & { children: ReactNode; side?: string }) => <div {...props}>{children}</div>,
+  SheetDescription: ({ children, ...props }: HTMLAttributes<HTMLParagraphElement> & { children: ReactNode }) => (
+    <p {...props}>{children}</p>
+  ),
+  SheetHeader: ({ children, ...props }: HTMLAttributes<HTMLDivElement> & { children: ReactNode }) => (
+    <div {...props}>{children}</div>
+  ),
+  SheetTitle: ({ children, ...props }: HTMLAttributes<HTMLHeadingElement> & { children: ReactNode }) => (
+    <h2 {...props}>{children}</h2>
+  ),
+  SheetFooter: ({ children, ...props }: HTMLAttributes<HTMLDivElement> & { children: ReactNode }) => (
+    <div {...props}>{children}</div>
+  ),
 }));
 
 vi.mock("@/components/ui/alert-dialog", () => ({
-  AlertDialog: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  AlertDialogAction: ({ children }: { children: ReactNode }) => <button type="button">{children}</button>,
-  AlertDialogCancel: ({ children }: { children: ReactNode }) => <button type="button">{children}</button>,
+  AlertDialog: ({ open, children }: { open: boolean; children: ReactNode }) => (open ? <div>{children}</div> : null),
+  AlertDialogAction: ({ children, ...props }: HTMLAttributes<HTMLButtonElement> & { children: ReactNode }) => (
+    <button type="button" {...props}>{children}</button>
+  ),
+  AlertDialogCancel: ({ children, ...props }: HTMLAttributes<HTMLButtonElement> & { children: ReactNode }) => (
+    <button type="button" {...props}>{children}</button>
+  ),
   AlertDialogContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   AlertDialogDescription: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   AlertDialogFooter: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -95,24 +107,64 @@ vi.mock("@/components/ui/alert-dialog", () => ({
 }));
 
 vi.mock("@/components/ui/scroll-area", () => ({
-  ScrollArea: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  ScrollArea: ({ children, ...props }: HTMLAttributes<HTMLDivElement> & { children: ReactNode }) => (
+    <div {...props}>{children}</div>
+  ),
 }));
+
+const ritualFixture: RitualData = {
+  habitId: "ritual-1",
+  title: "Morning focus ritual",
+  description: "Open the day with one intentional planning block.",
+  difficulty: "medium",
+  frequency: "custom",
+  estimated_minutes: 25,
+  preferred_time: "08:30",
+  category: "mind",
+  custom_days: [1, 3, 5],
+  custom_month_days: [],
+  recurrence_pattern: null,
+  recurrence_days: null,
+  recurrence_month_days: null,
+  recurrence_custom_period: "week",
+  reminder_enabled: true,
+  reminder_minutes_before: 15,
+};
 
 describe("EditRitualSheet", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.saveRitualMock.mockResolvedValue({
+    mocks.saveRitual.mockResolvedValue({
       queued: false,
       createdCount: 4,
       updatedCount: 1,
       deletedCount: 0,
-      normalizedSchedule: {
-        frequency: "5x_week",
-        custom_days: [0, 1, 2, 3, 4],
-        custom_month_days: null,
-        customPeriod: "week",
-      },
     });
+  });
+
+  it("renders the warm planner shell with the core ritual fields and actions", () => {
+    render(
+      <EditRitualSheet
+        ritual={ritualFixture}
+        open
+        onOpenChange={vi.fn()}
+        onDelete={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    expect(screen.getByTestId("edit-ritual-sheet-shell").className).toContain("border-[#4d2811]");
+    expect(screen.getByText("Edit Ritual")).toBeInTheDocument();
+    expect(screen.getByText("Changes sync to all instances of this ritual.")).toBeInTheDocument();
+    expect(screen.getByTestId("natural-language-editor")).toHaveAttribute("data-visual-style", "quest-soft");
+    expect(screen.getByRole("button", { name: "Frequency Presets" })).toHaveAttribute("data-variant", "planner");
+    expect(screen.getByDisplayValue("Morning focus ritual")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Open the day with one intentional planning block.")).toBeInTheDocument();
+    expect(screen.getByText("Difficulty (affects XP reward)")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "8:30 AM" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "25 min" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save Changes" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Delete Ritual" })).toBeEnabled();
   });
 
   it("uses the shared time and duration controls", () => {
@@ -135,23 +187,23 @@ describe("EditRitualSheet", () => {
       />,
     );
 
-    const timeButtons = screen.getAllByRole("button", { name: "7:00 AM" });
-    expect(timeButtons[0]).toBeInTheDocument();
-    const durationButtons = screen.getAllByRole("button", { name: "45 min" });
-    expect(durationButtons[0]).toBeInTheDocument();
+    const timeButton = screen.getByRole("button", { name: "7:00 AM" });
+    expect(timeButton).toBeInTheDocument();
+    const durationButton = screen.getByRole("button", { name: "45 min" });
+    expect(durationButton).toBeInTheDocument();
 
-    fireEvent.click(timeButtons[0]);
+    fireEvent.click(timeButton);
     fireEvent.change(screen.getByLabelText("Scheduled ritual time"), {
       target: { value: "08:15" },
     });
     expect(screen.getByDisplayValue("08:15")).toBeInTheDocument();
 
-    fireEvent.click(durationButtons[0]);
-    fireEvent.click(screen.getAllByRole("button", { name: "1h" })[0]);
+    fireEvent.click(durationButton);
+    fireEvent.click(screen.getByRole("button", { name: "1h" }));
     expect(screen.getAllByRole("button", { name: "1h" })[0]).toBeInTheDocument();
   });
 
-  it("shows Early Reminder above Advanced Options without duplicating it", () => {
+  it("shows Early Reminder inside Advanced Options without duplicating it", () => {
     render(
       <EditRitualSheet
         ritual={{
@@ -170,15 +222,13 @@ describe("EditRitualSheet", () => {
       />,
     );
 
-    const reminderLabel = screen.getByText("Early Reminder");
     const advancedTrigger = screen.getByRole("button", { name: /Advanced Options/i });
-    const relation = advancedTrigger.compareDocumentPosition(reminderLabel);
-
-    expect(relation & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
     expect(screen.getAllByText("Early Reminder")).toHaveLength(1);
 
     fireEvent.click(advancedTrigger);
+    expect(screen.queryByText("Early Reminder")).not.toBeInTheDocument();
 
+    fireEvent.click(advancedTrigger);
     expect(screen.getAllByText("Early Reminder")).toHaveLength(1);
   });
 
@@ -209,7 +259,7 @@ describe("EditRitualSheet", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
 
     await waitFor(() => {
-      expect(mocks.saveRitualMock).toHaveBeenCalledWith(
+      expect(mocks.saveRitual).toHaveBeenCalledWith(
         expect.objectContaining({
           habitId: "habit-1",
           frequency: "5x_week",

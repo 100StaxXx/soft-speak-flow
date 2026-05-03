@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-03T06:37:06Z",
+  "generatedAt": "2026-05-03T08:32:56Z",
   "frontendInvoked": [
     "adjust-epic-plan",
     "analyze-user-patterns",
@@ -56,6 +56,8 @@
     "mentor-chat",
     "optimize-daily-plan",
     "outlook-todo-tasks",
+    "prewarm-companion-animation",
+    "process-companion-animation-job",
     "process-paypal-payout",
     "process-referral",
     "record-ai-interaction",
@@ -88,9 +90,12 @@
     "generate-full-mentor-audio",
     "generate-journey-path",
     "generate-lesson",
+    "generate-mentor-audio",
+    "generate-mentor-script",
     "generate-neglected-companion-image",
     "google-native-auth",
     "init-quest-attachment-upload",
+    "prewarm-companion-animation",
     "sync-daily-pep-talk-transcript",
     "transcribe-audio"
   ],
@@ -100,6 +105,7 @@
     "generate-tomorrow-pep-talks",
     "notifications-dispatch-v2",
     "notifications-enqueue-v2",
+    "process-companion-animation-job",
     "rotate-daily-wallpapers"
   ],
   "allowList": [
@@ -156,6 +162,7 @@
     "generate-journey-schedule",
     "generate-lesson",
     "generate-mentor-audio",
+    "generate-mentor-script",
     "generate-morning-briefing",
     "generate-neglected-companion-image",
     "generate-reflection-reply",
@@ -180,6 +187,7 @@
     "outlook-calendar-auth",
     "outlook-calendar-events",
     "outlook-todo-tasks",
+    "prewarm-companion-animation",
     "process-companion-animation-job",
     "process-companion-evolution-job",
     "process-paypal-payout",
@@ -192,6 +200,7 @@
     "retry-missing-pep-talk-transcripts",
     "rotate-daily-wallpapers",
     "schedule-daily-mentor-pushes",
+    "send-apns-notification",
     "send-shout-notification",
     "submit-support-report",
     "suggest-task-times",

@@ -141,6 +141,7 @@ const REDUCED_SEQUENCE_MS = {
   dismissBuffer: 120,
 } as const;
 const HATCH_INTRO_MIN_MS = 800;
+const ANIMATION_VIDEO_PRELOAD_TIMEOUT_MS = 10_000;
 
 const STROBE_BEAT_OFFSETS_MS = [
   0,
@@ -479,6 +480,35 @@ describe("CompanionEvolution", () => {
     expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
   });
 
+  it("falls back to the still reveal when the evolution animation video preload stalls", async () => {
+    const props = {
+      ...buildProps(),
+      animationVideoUrl: "https://example.com/stalled-evolution.mp4",
+    };
+
+    render(<CompanionEvolution {...props} />);
+    await prepareEvolution();
+
+    const dialog = screen.getByRole("alertdialog");
+    const video = screen.getByTestId("evolution-animation-video") as HTMLVideoElement;
+
+    await flushTimers(ANIMATION_VIDEO_PRELOAD_TIMEOUT_MS);
+    expect(video).toHaveAttribute("data-animation-failed", "true");
+
+    await flushTimers(
+      FULL_SEQUENCE_MS.hold +
+      FULL_SEQUENCE_MS.charge +
+      FULL_SEQUENCE_MS.conceal +
+      FULL_SEQUENCE_MS.strobe +
+      FULL_SEQUENCE_MS.apex,
+    );
+
+    expect(dialog).toHaveAttribute("data-phase", "reveal");
+    expect(video).toHaveStyle({ opacity: "0" });
+    expect(screen.getByTestId("evolution-reveal-art")).toBeInTheDocument();
+    expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
+  });
+
   it("falls back to the still reveal when evolution animation playback is rejected", async () => {
     Object.defineProperty(HTMLMediaElement.prototype, "play", {
       configurable: true,
@@ -605,7 +635,7 @@ describe("CompanionEvolution", () => {
     expect(mocks.hapticsLightMock).toHaveBeenCalled();
   });
 
-  it("keeps mapped first hatch videos ahead of optional evolution animation videos", async () => {
+  it("uses a prewarmed evolution animation ahead of mapped first hatch videos", async () => {
     render(
       <CompanionEvolution
         {...buildFirstHatchProps()}
@@ -615,8 +645,27 @@ describe("CompanionEvolution", () => {
     await prepareEvolution();
     await flushTimers(HATCH_INTRO_MIN_MS);
 
-    expect(screen.getByTestId("evolution-hatch-video")).toBeInTheDocument();
-    expect(screen.queryByTestId("evolution-animation-video")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("evolution-hatch-video")).not.toBeInTheDocument();
+
+    const dialog = screen.getByRole("alertdialog");
+    const video = screen.getByTestId("evolution-animation-video") as HTMLVideoElement;
+    expect(video).toHaveStyle({ opacity: "0" });
+
+    await act(async () => {
+      fireEvent.canPlay(video);
+    });
+
+    await flushTimers(
+      FULL_SEQUENCE_MS.hold +
+      FULL_SEQUENCE_MS.charge +
+      FULL_SEQUENCE_MS.conceal +
+      FULL_SEQUENCE_MS.strobe +
+      FULL_SEQUENCE_MS.apex,
+    );
+
+    expect(dialog).toHaveAttribute("data-phase", "reveal");
+    expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(1);
+    expect(video).toHaveStyle({ opacity: "1" });
   });
 
   it("mutes the hatch video when global audio is disabled", async () => {

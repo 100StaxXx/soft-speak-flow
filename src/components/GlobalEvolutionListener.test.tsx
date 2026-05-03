@@ -20,6 +20,8 @@ const mocks = vi.hoisted(() => {
     mentorLookup: null as null | (() => Promise<{ data: unknown; error: unknown }>),
   };
   const companionEvolutionLookupResponses: Array<{ data: unknown; error: unknown }> = [];
+  const animationJobLookupResponses: Array<{ data: unknown; error: unknown }> = [];
+  const functionsInvokeMock = vi.fn();
 
   return {
     invalidateQueriesMock,
@@ -33,8 +35,10 @@ const mocks = vi.hoisted(() => {
     loggerWarnMock,
     loggerErrorMock,
     companionEvolutionPropsMock,
+    functionsInvokeMock,
     state,
     companionEvolutionLookupResponses,
+    animationJobLookupResponses,
   };
 });
 
@@ -109,7 +113,7 @@ vi.mock("@/integrations/supabase/client", () => ({
       if (table === "companion_evolutions") {
         const maybeSingleMock = vi.fn(async () =>
           mocks.companionEvolutionLookupResponses.shift() ?? {
-            data: { id: "evo-1", animation_video_url: null, animation_status: null },
+            data: { id: "evo-1", animation_video_url: null, animation_status: "skipped" },
             error: null,
           });
 
@@ -119,6 +123,22 @@ vi.mock("@/integrations/supabase/client", () => ({
               eq: vi.fn(() => ({
                 maybeSingle: maybeSingleMock,
               })),
+            })),
+          })),
+        };
+      }
+
+      if (table === "companion_animation_jobs") {
+        const maybeSingleMock = vi.fn(async () =>
+          mocks.animationJobLookupResponses.shift() ?? {
+            data: { id: "job-1" },
+            error: null,
+          });
+
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: maybeSingleMock,
             })),
           })),
         };
@@ -166,6 +186,9 @@ vi.mock("@/integrations/supabase/client", () => ({
         })),
       };
     }),
+    functions: {
+      invoke: mocks.functionsInvokeMock,
+    },
   },
 }));
 
@@ -178,6 +201,8 @@ describe("GlobalEvolutionListener", () => {
     mocks.state.mentorId = null;
     mocks.state.mentorLookup = null;
     mocks.companionEvolutionLookupResponses.length = 0;
+    mocks.animationJobLookupResponses.length = 0;
+    mocks.functionsInvokeMock.mockResolvedValue({ data: { status: "processing" }, error: null });
 
     mocks.onMock.mockImplementation(
       (_event: string, _config: Record<string, unknown>, callback: (payload: Record<string, unknown>) => Promise<void>) => {
@@ -258,6 +283,39 @@ describe("GlobalEvolutionListener", () => {
     );
   });
 
+  it("shows same-tier stage advances so every generated evolution can reveal", async () => {
+    render(<GlobalEvolutionListener />);
+
+    await act(async () => {
+      await mocks.state.callback?.({
+        eventType: "UPDATE",
+        new: {
+          id: "companion-1",
+          current_stage: 2,
+          current_image_url: "https://example.com/stage-2.png",
+        },
+        old: {
+          id: "companion-1",
+          current_stage: 1,
+          current_image_url: "https://example.com/stage-1.png",
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("companion-evolution")).toBeInTheDocument();
+    });
+
+    expect(mocks.companionEvolutionPropsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        previousStage: 1,
+        newStage: 2,
+        previousImageUrl: "https://example.com/stage-1.png",
+        newImageUrl: "https://example.com/stage-2.png",
+      }),
+    );
+  });
+
   it("passes ready animation videos from the persisted evolution row into the modal", async () => {
     mocks.companionEvolutionLookupResponses.push({
       data: {
@@ -298,6 +356,71 @@ describe("GlobalEvolutionListener", () => {
         animationVideoUrl: "https://example.com/evolution.mp4",
       }),
     );
+  });
+
+  it("waits for queued animation jobs before opening the modal", async () => {
+    vi.useFakeTimers();
+    mocks.companionEvolutionLookupResponses.push(
+      {
+        data: {
+          id: "evo-1",
+          animation_video_url: null,
+          animation_status: "queued",
+        },
+        error: null,
+      },
+      {
+        data: {
+          id: "evo-1",
+          animation_video_url: "https://example.com/evolution.mp4",
+          animation_status: "succeeded",
+        },
+        error: null,
+      },
+    );
+    mocks.animationJobLookupResponses.push({
+      data: { id: "job-1" },
+      error: null,
+    });
+
+    try {
+      render(<GlobalEvolutionListener />);
+
+      const callbackPromise = mocks.state.callback?.({
+        eventType: "UPDATE",
+        new: {
+          id: "companion-1",
+          current_stage: 5,
+          current_image_url: "https://example.com/stage-5.png",
+        },
+        old: {
+          id: "companion-1",
+          current_stage: 4,
+          current_image_url: "https://example.com/stage-4.png",
+        },
+      }) ?? Promise.resolve();
+
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
+      expect(mocks.functionsInvokeMock).toHaveBeenCalledWith("process-companion-animation-job", {
+        body: { jobId: "job-1" },
+      });
+
+      await act(async () => {
+        vi.advanceTimersByTime(2000);
+        await callbackPromise;
+      });
+
+      expect(screen.getByTestId("companion-evolution")).toHaveAttribute(
+        "data-animation-video-url",
+        "https://example.com/evolution.mp4",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("starts the first hatch animation from a local hatch event", async () => {

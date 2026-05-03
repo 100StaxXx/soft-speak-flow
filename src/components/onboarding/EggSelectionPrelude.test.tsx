@@ -29,7 +29,7 @@ vi.mock("framer-motion", async () => {
 });
 
 describe("EggSelectionPrelude", () => {
-  it("reveals the updated element copy before continuing", async () => {
+  it("reveals the updated companion copy before continuing", async () => {
     vi.useFakeTimers();
     const onComplete = vi.fn();
 
@@ -63,11 +63,11 @@ describe("EggSelectionPrelude", () => {
       });
 
       expect(
-        screen.getByText("Somewhere ahead, an element is already listening for your arrival."),
+        screen.getByText("Somewhere ahead, your companion is waiting for your arrival."),
       ).toBeInTheDocument();
-      expect(screen.getByRole("heading", { name: "Choose The Element That Answers You" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Choose Your Companion" })).toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole("button", { name: "Choose My Element" }));
+      fireEvent.click(screen.getByRole("button", { name: "Choose My Companion" }));
 
       expect(onComplete).toHaveBeenCalledTimes(1);
     } finally {

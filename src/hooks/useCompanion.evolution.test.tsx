@@ -321,6 +321,8 @@ describe("useCompanion evolveCompanion", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["companion-stories-all"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["evolution-cards"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["current-evolution-card"] });
+    expect(mocks.setIsEvolvingLoadingMock).toHaveBeenCalledWith(true);
+    expect(mocks.setIsEvolvingLoadingMock).not.toHaveBeenCalledWith(false);
   });
 
   it("surfaces evolved:false payloads with a clear user message", async () => {
@@ -1011,12 +1013,12 @@ describe("useCompanion evolveCompanion", () => {
         p_eye_color: "",
         p_fur_color: "",
         p_preset_id: "wolf",
-        p_current_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
-        p_current_image_focal_x: 0.508798,
-        p_current_image_focal_y: 0.458008,
-        p_initial_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
-        p_initial_image_focal_x: 0.508798,
-        p_initial_image_focal_y: 0.458008,
+        p_current_image_url: "/companion-eggs/v2/egg__t0_egg__normal__fire.webp",
+        p_current_image_focal_x: 0.5,
+        p_current_image_focal_y: 0.5,
+        p_initial_image_url: "/companion-eggs/v2/egg__t0_egg__normal__fire.webp",
+        p_initial_image_focal_x: 0.5,
+        p_initial_image_focal_y: 0.5,
       }),
     );
   });
@@ -1123,7 +1125,7 @@ describe("useCompanion evolveCompanion", () => {
   });
 
   it("can defer AI egg image generation so onboarding creates the companion immediately", async () => {
-    const bundledIceEggUrl = "/companion-eggs/egg__t0_egg__normal__ice.png";
+    const bundledIceEggUrl = "/companion-eggs/v2/egg__t0_egg__normal__ice.webp";
     let resolveGeneratedImage: ((value: { data: unknown; error: unknown }) => void) | null = null;
     const generatedImagePromise = new Promise<{ data: unknown; error: unknown }>((resolve) => {
       resolveGeneratedImage = resolve;

@@ -81,6 +81,7 @@ jobs:
           check_unauthorized "companion-agent" '{"surface":"journeys","sessionId":"smoke-session","message":"Plan my day","inputMode":"text"}'
           check_unauthorized "companion-agent-action" '{"sessionId":"smoke-session","actionId":"smoke-action","action":"confirm"}'
           check_unauthorized "companion-planner-chat" '{}'
+          check_unauthorized "generate-cosmiq-title-card" '{}'
           check_unauthorized "generate-daily-plan" '{"energyLevel":"medium","dayType":"workday","focusArea":"progress"}'
           check_unauthorized "verify-admin-access" '{}'
           check_unauthorized "notifications-enqueue-v2" '{}'

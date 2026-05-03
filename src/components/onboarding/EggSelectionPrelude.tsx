@@ -17,7 +17,7 @@ interface EggSelectionPreludeProps {
 const PRELUDE_LINES = [
   "A second choice waits beyond the guide you have chosen...",
   "Not a question of allegiance, but of resonance.",
-  "Somewhere ahead, an element is already listening for your arrival.",
+  "Somewhere ahead, your companion is waiting for your arrival.",
 ] as const;
 
 const TONE_PRELUDE_COPY: Record<CompanionStoryTone, string> = {
@@ -133,7 +133,7 @@ export const EggSelectionPrelude = ({
                 </div>
 
                 <h1 className="text-3xl font-semibold text-white md:text-4xl">
-                  Choose The Element That Answers You
+                  Choose Your Companion
                 </h1>
 
                 <p className="text-base leading-7 text-white/[0.74] md:text-lg">
@@ -160,10 +160,10 @@ export const EggSelectionPrelude = ({
                 onClick={onComplete}
                 className="px-10 py-6 text-lg"
               >
-                Choose My Element
+                Choose My Companion
               </Button>
               <p className="text-sm text-white/[0.48]">
-                Species sleeps within. Element shapes the shell. Tone shapes the story ahead.
+                Species, color, and name come next. Tone shapes the story ahead.
               </p>
             </motion.div>
           ) : null}
