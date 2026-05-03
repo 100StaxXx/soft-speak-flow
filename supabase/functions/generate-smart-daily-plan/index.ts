@@ -57,6 +57,89 @@ interface RequestBody {
   };
 }
 
+interface DeletedPlannerMemoryMatch {
+  title: string | null;
+  entityId: string | null;
+}
+
+const fetchDeletedPlannerMemory = async (
+  supabaseClient: any,
+  userId: string,
+): Promise<DeletedPlannerMemoryMatch[]> => {
+  try {
+    const { data, error } = await supabaseClient
+      .from("deleted_planner_entities")
+      .select("entity_id, title")
+      .eq("user_id", userId)
+      .limit(300);
+    if (error) throw error;
+    return (data ?? [])
+      .map((row: any) => ({
+        entityId: typeof row.entity_id === "string" ? row.entity_id : null,
+        title: typeof row.title === "string" && row.title.trim()
+          ? row.title.trim()
+          : null,
+      }))
+      .filter((row: DeletedPlannerMemoryMatch) => row.entityId || row.title);
+  } catch (error) {
+    console.warn("[generate-smart-daily-plan] deleted planner memory unavailable", error);
+    return [];
+  }
+};
+
+const textMentionsDeletedPlannerMemory = (
+  value: unknown,
+  deletedMemory: DeletedPlannerMemoryMatch[],
+): boolean => {
+  if (typeof value !== "string") return false;
+  const normalized = value.toLowerCase();
+  return deletedMemory.some((entry) =>
+    (entry.entityId && normalized.includes(entry.entityId.toLowerCase())) ||
+    (entry.title &&
+      entry.title.length >= 3 &&
+      normalized.includes(entry.title.toLowerCase()))
+  );
+};
+
+const filterDeletedPlannerStrings = (
+  value: unknown,
+  deletedMemory: DeletedPlannerMemoryMatch[],
+): unknown =>
+  Array.isArray(value)
+    ? value.filter((entry) =>
+      !textMentionsDeletedPlannerMemory(entry, deletedMemory)
+    )
+    : value;
+
+const sanitizeAiLearningForDeletedPlannerMemory = (
+  aiLearning: any,
+  deletedMemory: DeletedPlannerMemoryMatch[],
+) => {
+  if (!aiLearning || deletedMemory.length === 0) return aiLearning;
+  const successfulPatterns = aiLearning.successful_patterns ?? {};
+  return {
+    ...aiLearning,
+    conversation_profile: {
+      ...(aiLearning.conversation_profile ?? {}),
+      goals: filterDeletedPlannerStrings(
+        aiLearning.conversation_profile?.goals,
+        deletedMemory,
+      ),
+    },
+    successful_patterns: {
+      ...successfulPatterns,
+      ai_accepted: filterDeletedPlannerStrings(
+        successfulPatterns.ai_accepted,
+        deletedMemory,
+      ),
+      recurring_tasks: filterDeletedPlannerStrings(
+        successfulPatterns.recurring_tasks,
+        deletedMemory,
+      ),
+    },
+  };
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -110,6 +193,7 @@ serve(async (req) => {
         .from("habits")
         .select("id, title, preferred_time, category, current_streak")
         .eq("user_id", user.id)
+        .eq("is_active", true)
         .in("id", protectedHabitIds);
       protectedHabits = data || [];
     }
@@ -121,6 +205,8 @@ serve(async (req) => {
         .from("epics")
         .select("id, title, description")
         .eq("user_id", user.id)
+        .eq("status", "active")
+        .is("completed_at", null)
         .in("id", prioritizedEpicIds);
 
       const accessibleEpicIds = (epics || []).map((epic) => epic.id);
@@ -146,6 +232,7 @@ serve(async (req) => {
       .select("id, task_text, scheduled_time, estimated_duration, priority")
       .eq("user_id", user.id)
       .eq("task_date", planDate)
+      .is("excluded_from_planner_at", null)
       .eq("completed", false);
 
     // Fetch user learning data
@@ -154,6 +241,14 @@ serve(async (req) => {
       .select("*")
       .eq("user_id", user.id)
       .single();
+    const deletedPlannerMemory = await fetchDeletedPlannerMemory(
+      supabaseClient,
+      user.id,
+    );
+    const sanitizedAiLearning = sanitizeAiLearningForDeletedPlannerMemory(
+      aiLearning,
+      deletedPlannerMemory,
+    );
 
     // Build the AI prompt
     const systemPrompt = buildSystemPrompt({
@@ -165,7 +260,7 @@ serve(async (req) => {
       existingTasks: existingTasks || [],
       hardCommitments,
       contactsNeedingAttention: contactsNeedingAttention || [],
-      aiLearning,
+      aiLearning: sanitizedAiLearning,
       adjustmentRequest,
       previousPlan,
     });

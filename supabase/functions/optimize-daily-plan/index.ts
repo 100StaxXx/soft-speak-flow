@@ -276,6 +276,7 @@ serve(async (req) => {
         .from('daily_tasks')
         .select('id, task_text, completed, scheduled_time, estimated_duration, difficulty, is_top_three, category')
         .eq('user_id', userId)
+        .is('excluded_from_planner_at', null)
         .eq('task_date', today),
       
       // Yesterday's tasks (for pattern analysis)
@@ -283,6 +284,7 @@ serve(async (req) => {
         .from('daily_tasks')
         .select('id, completed, difficulty')
         .eq('user_id', userId)
+        .is('excluded_from_planner_at', null)
         .eq('task_date', yesterday),
       
       // Active habits due today
@@ -297,13 +299,15 @@ serve(async (req) => {
         .from('epics')
         .select('id, title, progress_percentage, target_days, start_date')
         .eq('user_id', userId)
-        .eq('status', 'active'),
+        .eq('status', 'active')
+        .is('completed_at', null),
       
       // Recent 7-day task completion
       supabase
         .from('daily_tasks')
         .select('completed, task_date')
         .eq('user_id', userId)
+        .is('excluded_from_planner_at', null)
         .gte('task_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
       
       // AI learning profile with scheduling patterns + mentor chat signals

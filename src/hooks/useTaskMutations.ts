@@ -57,6 +57,10 @@ import {
   getPrimaryQuestReminderOffset,
   resolveQuestReminderOffsets,
 } from "@/utils/questReminders";
+import {
+  forgetDeletedPlannerEntities,
+  type DeletedPlannerEntity,
+} from "@/utils/deletedPlannerMemory";
 
 export {
   getTaskCompletionDisciplineAward,
@@ -1840,7 +1844,45 @@ export const useTaskMutations = (taskDate: string) => {
       if (!user?.id) throw new Error('User not authenticated');
       if (!taskId) throw new Error('Invalid task ID');
       const remoteTaskId = getRemoteTaskId(taskId);
-      const existingSubtasks = await getLocalSubtasksForAnyTaskId<Array<{ id: string }>[number]>(taskId);
+      const [existingSubtasks, localTask, remoteTask] = await Promise.all([
+        getLocalSubtasksForAnyTaskId<Array<{ id: string }>[number]>(taskId),
+        getPlannerRecord<DailyTask>("daily_tasks", taskId),
+        remoteTaskId !== taskId
+          ? getPlannerRecord<DailyTask>("daily_tasks", remoteTaskId)
+          : Promise.resolve(null),
+      ]);
+      const existingTask = localTask ?? remoteTask;
+      const deletedTaskEntities: DeletedPlannerEntity[] = [
+        {
+          entityType: "task",
+          entityId: taskId,
+          title: existingTask?.task_text ?? null,
+          metadata: {
+            remoteTaskId,
+            taskDate: existingTask?.task_date ?? null,
+            epicId: existingTask?.epic_id ?? null,
+            habitSourceId: existingTask?.habit_source_id ?? null,
+          },
+        },
+        ...(remoteTaskId !== taskId
+          ? [{
+            entityType: "task" as const,
+            entityId: remoteTaskId,
+            title: existingTask?.task_text ?? null,
+            metadata: {
+              localTaskId: taskId,
+              taskDate: existingTask?.task_date ?? null,
+              epicId: existingTask?.epic_id ?? null,
+              habitSourceId: existingTask?.habit_source_id ?? null,
+            },
+          }]
+          : []),
+      ];
+      await forgetDeletedPlannerEntities({
+        userId: user.id,
+        source: "task_delete",
+        entities: deletedTaskEntities,
+      });
       await removePlannerRecord("daily_tasks", taskId);
       if (remoteTaskId !== taskId) {
         await removePlannerRecord("daily_tasks", remoteTaskId);
@@ -1850,7 +1892,14 @@ export const useTaskMutations = (taskDate: string) => {
       }
       
       if (shouldQueueWrites) {
-        await queueTaskAction("DELETE_TASK", { taskId });
+        await queueTaskAction("DELETE_TASK", {
+          taskId,
+          remoteTaskId,
+          taskTitle: existingTask?.task_text ?? null,
+          taskDate: existingTask?.task_date ?? null,
+          epicId: existingTask?.epic_id ?? null,
+          habitSourceId: existingTask?.habit_source_id ?? null,
+        });
         return { queued: true };
       }
 
@@ -1876,7 +1925,10 @@ export const useTaskMutations = (taskDate: string) => {
     onError: (error: Error, taskId) => {
       if (isQueueableWriteError(error)) {
         reportApiFailure(error, { source: "task_delete_onError" });
-        void queueTaskAction("DELETE_TASK", { taskId });
+        void queueTaskAction("DELETE_TASK", {
+          taskId,
+          remoteTaskId: getRemoteTaskId(taskId),
+        });
         toast({
           title: "Quest deletion queued",
           description: "We'll sync this deletion when connection is restored.",

@@ -228,6 +228,81 @@ Deno.test("processClaimedCompanionAnimationJob downloads, uploads, ledgers, and 
   );
 });
 
+Deno.test("processClaimedCompanionAnimationJob falls back to the top-level Kling queue request path", async () => {
+  const { supabase, updates, uploads } = createSupabaseHarness();
+  const fetchCalls: string[] = [];
+  const { deps } = createDeps({
+    fetchFn: ((url: string | URL | Request) => {
+      const stringUrl = String(url);
+      fetchCalls.push(stringUrl);
+
+      if (
+        stringUrl.endsWith(
+          "/fal-ai/kling-video/v3/standard/image-to-video/requests/fal-request-1/status",
+        )
+      ) {
+        return Promise.resolve(
+          new Response("method not allowed", { status: 405 }),
+        );
+      }
+
+      if (
+        stringUrl.endsWith("/fal-ai/kling-video/requests/fal-request-1/status")
+      ) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ status: "COMPLETED" })),
+        );
+      }
+
+      if (
+        stringUrl.endsWith(
+          "/fal-ai/kling-video/v3/standard/image-to-video/requests/fal-request-1",
+        )
+      ) {
+        return Promise.resolve(
+          new Response("method not allowed", { status: 405 }),
+        );
+      }
+
+      if (stringUrl.endsWith("/fal-ai/kling-video/requests/fal-request-1")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({
+            status: "COMPLETED",
+            video: { url: "https://fal.example/video.mp4" },
+          })),
+        );
+      }
+
+      return Promise.resolve(
+        new Response(new Uint8Array([1, 2, 3]), {
+          headers: { "Content-Type": "video/mp4" },
+        }),
+      );
+    }) as typeof fetch,
+  });
+
+  const result = await module.processClaimedCompanionAnimationJob({
+    supabase: supabase as never,
+    job: createJob({ provider_task_id: "fal-request-1" }) as never,
+    deps,
+  });
+
+  const resultRecord = result as Record<string, unknown>;
+  assertEquals(resultRecord.status, "succeeded");
+  assertEquals(uploads[0]?.bucket, "companion-animation-videos");
+  assertEquals(
+    fetchCalls.includes(
+      "https://queue.fal.run/fal-ai/kling-video/requests/fal-request-1/status",
+    ),
+    true,
+  );
+  assertEquals(
+    updates.find((update) => update.table === "companion_evolutions")?.payload
+      .animation_status,
+    "succeeded",
+  );
+});
+
 Deno.test("processClaimedCompanionAnimationJob does not mark a job succeeded before the evolution row has the video URL", async () => {
   const { supabase, updates } = createSupabaseHarness({
     failEvolutionUpdates: true,

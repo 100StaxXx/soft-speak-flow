@@ -6,6 +6,11 @@ import type {
   PlannerPriorityScore,
 } from "./planner.ts";
 import type { SupabaseClientLike } from "../_shared/costGuardrails.ts";
+import {
+  isDeletedPlannerEntityReference,
+  loadDeletedPlannerEntities,
+  type DeletedPlannerEntity,
+} from "./deletedPlannerMemory.ts";
 
 type PlannerContext = PlannerBuildInput["plannerContext"];
 
@@ -20,6 +25,7 @@ interface EpicRow {
   end_date: string | null;
   progress_percentage: number | null;
   status: string | null;
+  completed_at?: string | null;
 }
 
 interface HabitRow {
@@ -49,6 +55,7 @@ interface DailyTaskRow {
   contact_id: string | null;
   habit_source_id: string | null;
   epic_id: string | null;
+  excluded_from_planner_at?: string | null;
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -161,13 +168,46 @@ const filterTasksWithDbRows = (
   activeEpicTitleById: ReadonlyMap<string, string>,
   activeHabitIds: ReadonlySet<string>,
   pendingLocalTaskIds: ReadonlySet<string>,
+  deletedEntities: DeletedPlannerEntity[] | null,
 ): PlannerContextTask[] =>
   tasks.reduce<PlannerContextTask[]>((scoped, task) => {
+    if (
+      isDeletedPlannerEntityReference({
+        entityType: "task",
+        entityId: task.id,
+      }, deletedEntities)
+    ) {
+      return scoped;
+    }
+
     const row = taskRowsById.get(task.id);
     if (!row) {
       if (pendingLocalTaskIds.has(task.id)) {
         scoped.push(task);
       }
+      return scoped;
+    }
+    if (row.excluded_from_planner_at) {
+      return scoped;
+    }
+    if (
+      isDeletedPlannerEntityReference({
+        entityType: "task",
+        entityId: row.id,
+      }, deletedEntities) ||
+      isDeletedPlannerEntityReference({
+        entityType: "campaign",
+        entityId: row.epic_id,
+      }, deletedEntities) ||
+      isDeletedPlannerEntityReference({
+        entityType: "ritual",
+        entityId: row.habit_source_id,
+      }, deletedEntities) ||
+      isDeletedPlannerEntityReference({
+        entityType: "habit",
+        entityId: row.habit_source_id,
+      }, deletedEntities)
+    ) {
       return scoped;
     }
     const hasInactiveEpic = Boolean(
@@ -198,8 +238,25 @@ const filterRitualsWithDbRows = (
   rituals: PlannerContextRitual[],
   activeEpicsById: ReadonlyMap<string, PlannerContextEpic>,
   activeHabitIds: ReadonlySet<string>,
+  deletedEntities: DeletedPlannerEntity[] | null,
 ): PlannerContextRitual[] =>
   rituals.reduce<PlannerContextRitual[]>((scoped, ritual) => {
+    if (
+      isDeletedPlannerEntityReference({
+        entityType: "ritual",
+        entityId: ritual.id,
+      }, deletedEntities) ||
+      isDeletedPlannerEntityReference({
+        entityType: "habit",
+        entityId: ritual.id,
+      }, deletedEntities) ||
+      isDeletedPlannerEntityReference({
+        entityType: "campaign",
+        entityId: ritual.epicId,
+      }, deletedEntities)
+    ) {
+      return scoped;
+    }
     const epic = activeEpicsById.get(ritual.epicId);
     if (!epic || !activeHabitIds.has(ritual.id)) return scoped;
     scoped.push({
@@ -514,8 +571,11 @@ export const validateAndPrunePlannerContext = async (
   supabase: SupabaseClientLike,
   userId: string,
   plannerContext: PlannerContext,
+  deletedEntities?: DeletedPlannerEntity[] | null,
 ): Promise<PlannerContext> => {
   try {
+    const deletedPlannerEntities = deletedEntities ??
+      await loadDeletedPlannerEntities(supabase, userId);
     const taskGroups = collectPlannerTaskGroups(plannerContext);
     const pendingLocalTaskIds = new Set(plannerContext.pendingLocalTaskIds ?? []);
     const pendingLocalEpicIds = new Set(plannerContext.pendingLocalEpicIds ?? []);
@@ -530,7 +590,7 @@ export const validateAndPrunePlannerContext = async (
     const taskRows = await runInQuery<DailyTaskRow>(
       supabase,
       "daily_tasks",
-      "id, task_text, task_date, category, difficulty, priority, flexibility, energy_type, must_calendar_block, deadline_at, completed, scheduled_time, completed_at, estimated_duration, actual_time_spent, notes, recurrence_pattern, recurrence_end_date, source, contact_id, habit_source_id, epic_id",
+      "id, task_text, task_date, category, difficulty, priority, flexibility, energy_type, must_calendar_block, deadline_at, completed, scheduled_time, completed_at, estimated_duration, actual_time_spent, notes, recurrence_pattern, recurrence_end_date, source, contact_id, habit_source_id, epic_id, excluded_from_planner_at",
       userId,
       referencedTaskIds,
     );
@@ -551,7 +611,7 @@ export const validateAndPrunePlannerContext = async (
       runInQuery<EpicRow>(
         supabase,
         "epics",
-        "id, title, end_date, progress_percentage, status",
+        "id, title, end_date, progress_percentage, status, completed_at",
         userId,
         referencedEpicIds,
       ),
@@ -566,7 +626,14 @@ export const validateAndPrunePlannerContext = async (
     ]);
 
     const remoteEpicIds = new Set(epicRows.map((row) => row.id));
-    const activeEpicRows = epicRows.filter((row) => row.status === "active");
+    const activeEpicRows = epicRows.filter((row) =>
+      row.status === "active" &&
+      !row.completed_at &&
+      !isDeletedPlannerEntityReference({
+        entityType: "campaign",
+        entityId: row.id,
+      }, deletedPlannerEntities)
+    );
     const preservedClientEpics = plannerContext.activeEpics.filter((epic) =>
       !remoteEpicIds.has(epic.id) &&
       pendingLocalEpicIds.has(epic.id)
@@ -599,6 +666,7 @@ export const validateAndPrunePlannerContext = async (
       activeEpicTitleById,
       activeHabitIds,
       pendingLocalTaskIds,
+      deletedPlannerEntities,
     );
     const inboxTasks = filterTasksWithDbRows(
       plannerContext.inboxTasks,
@@ -607,6 +675,7 @@ export const validateAndPrunePlannerContext = async (
       activeEpicTitleById,
       activeHabitIds,
       pendingLocalTaskIds,
+      deletedPlannerEntities,
     );
     const recentCompletedTasks = filterTasksWithDbRows(
       plannerContext.recentCompletedTasks ?? [],
@@ -615,11 +684,13 @@ export const validateAndPrunePlannerContext = async (
       activeEpicTitleById,
       activeHabitIds,
       pendingLocalTaskIds,
+      deletedPlannerEntities,
     );
     const rituals = filterRitualsWithDbRows(
       plannerContext.rituals,
       activeEpicsById,
       activeHabitIds,
+      deletedPlannerEntities,
     );
     const activeRitualIds = new Set(rituals.map((ritual) => ritual.id));
     const activeTaskIds = new Set([

@@ -430,4 +430,12 @@ export interface LoadedCompanionAgentContext {
   visibleDateEnd: string;
   currentDateTime: string;
   timezone: string;
+  loadWarnings?: CompanionAgentContextLoadWarning[];
+}
+
+export interface CompanionAgentContextLoadWarning {
+  source: string;
+  required: boolean;
+  message: string;
+  code: string | null;
 }

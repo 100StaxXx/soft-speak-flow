@@ -14,6 +14,7 @@ import {
   attachRitualActualDurationMinutes,
 } from "@/hooks/plannerActualDurations";
 import { sanitizePlannerContext } from "@/utils/companionPlannerRequest";
+import { loadDeletedPlannerEntities } from "@/utils/deletedPlannerMemory";
 import { buildCompanionPlannerScheduleInsights } from "@/utils/companionPlannerSchedule";
 import { formatCurrentDateTimeWithOffset } from "@/utils/currentDateTime";
 import { getOnboardingScheduleArchetypeProfile } from "@/shared/onboardingScheduleArchetype";
@@ -418,6 +419,16 @@ export function useCompanionPlanningContext({
     },
   });
 
+  const deletedPlannerEntitiesQuery = useQuery({
+    queryKey: ["deleted-planner-entities", user?.id],
+    enabled: !!user?.id,
+    staleTime: 30 * 1000,
+    queryFn: async () => {
+      if (!user?.id) return [];
+      return loadDeletedPlannerEntities(user.id);
+    },
+  });
+
   const recentCompletedTasksQuery = useQuery({
     queryKey: ["companion-planner-recent-completed-tasks", user?.id, todayIso],
     enabled: !!user?.id,
@@ -432,6 +443,7 @@ export function useCompanionPlanningContext({
           "id, task_text, task_date, scheduled_time, estimated_duration, actual_time_spent, notes, recurrence_pattern, recurrence_end_date, completed, completed_at, priority, source, epic_id, contact_id, habit_source_id",
         )
         .eq("user_id", user.id)
+        .is("excluded_from_planner_at", null)
         .eq("completed", true)
         .not("completed_at", "is", null)
         .gte("completed_at", `${startDate}T00:00:00.000Z`)
@@ -594,7 +606,7 @@ export function useCompanionPlanningContext({
       scheduleInsights,
       plannerMemory,
       aiSignals: enrichedContext,
-    }), [activeEpics, baseRituals, contextEventsQuery.events, contextTasks, enrichedContext, inboxTasks, plannerMemory, recentCompletedTasksQuery.data, ritualsQuery.data, scheduleInsights]);
+    }, deletedPlannerEntitiesQuery.data ?? []), [activeEpics, baseRituals, contextEventsQuery.events, contextTasks, deletedPlannerEntitiesQuery.data, enrichedContext, inboxTasks, plannerMemory, recentCompletedTasksQuery.data, ritualsQuery.data, scheduleInsights]);
 
   return {
     today,

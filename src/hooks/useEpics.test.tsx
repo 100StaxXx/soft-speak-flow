@@ -2078,6 +2078,7 @@ describe("useEpics", () => {
         epic_id: null,
         epic_title: null,
         habit_source_id: null,
+        excluded_from_planner_at: expect.any(String),
       }),
     ]);
     expect(localHabits).toHaveLength(0);
@@ -2088,11 +2089,31 @@ describe("useEpics", () => {
       actionKind: "EPIC_DELETE",
       entityType: "epic",
       entityId: "epic-1",
-      payload: {
+      payload: expect.objectContaining({
         epicId: "epic-1",
         epicTitle: "Campaign Alpha",
         epicCreatedAt: "2026-02-10T00:00:00.000Z",
-      },
+        deletedPlannerEntities: expect.arrayContaining([
+          expect.objectContaining({
+            entityType: "campaign",
+            entityId: "epic-1",
+            title: "Campaign Alpha",
+          }),
+          expect.objectContaining({
+            entityType: "ritual",
+            entityId: "habit-1",
+            title: "Morning focus",
+          }),
+          expect.objectContaining({
+            entityType: "task",
+            entityId: "task-open",
+          }),
+          expect.objectContaining({
+            entityType: "task",
+            entityId: "task-complete",
+          }),
+        ]),
+      }),
     });
     expect(mocks.withPlannerRemoteSyncLockMock).toHaveBeenCalledWith(
       "user-1",
@@ -2258,6 +2279,7 @@ describe("useEpics", () => {
         epic_id: null,
         epic_title: null,
         habit_source_id: null,
+        excluded_from_planner_at: expect.any(String),
       }),
     ]);
     expect(localHabits).toHaveLength(0);
@@ -2269,6 +2291,7 @@ describe("useEpics", () => {
         epic_id: null,
         epic_title: null,
         habit_source_id: null,
+        excluded_from_planner_at: expect.any(String),
       }),
     ]);
     expect(queryClient.getQueryData(calendarTaskCacheKey)).toEqual([
@@ -2277,16 +2300,31 @@ describe("useEpics", () => {
         epic_id: null,
         epic_title: null,
         habit_source_id: null,
+        excluded_from_planner_at: expect.any(String),
       }),
     ]);
     expect(mocks.queueActionMock).toHaveBeenCalledWith({
       actionKind: "EPIC_RITUAL_DELETE",
       entityType: "epic",
       entityId: "epic-1",
-      payload: {
+      payload: expect.objectContaining({
         epicId: "epic-1",
         habitId: "habit-hydration",
-      },
+        deletedPlannerEntities: expect.arrayContaining([
+          expect.objectContaining({
+            entityType: "ritual",
+            entityId: "habit-hydration",
+          }),
+          expect.objectContaining({
+            entityType: "task",
+            entityId: "task-hydration-open",
+          }),
+          expect.objectContaining({
+            entityType: "task",
+            entityId: "task-hydration-complete",
+          }),
+        ]),
+      }),
     });
     expect(mocks.dispatchPlannerSyncFinishedMock).toHaveBeenCalled();
   });

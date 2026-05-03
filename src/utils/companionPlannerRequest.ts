@@ -6,6 +6,12 @@ import type {
   CompanionPlannerSessionState,
   PlannerStatInterpretation,
 } from "@/types/companionPlanner";
+import {
+  isDeletedPlannerEntityReference,
+  sanitizeConversationHistoryForDeletedPlannerEntities,
+  sanitizeTextForDeletedPlannerEntities,
+  type DeletedPlannerEntity,
+} from "@/utils/deletedPlannerMemory";
 
 type PlannerContext = CompanionPlannerRequest["plannerContext"];
 type PlannerConversationHistory = CompanionPlannerRequest["conversationHistory"];
@@ -142,6 +148,8 @@ const isPlanningLauncherConsentKind = (
 
 const sanitizePlanningConsentState = (
   value: PlannerSessionState["planningConsent"],
+  deletedEntities?: DeletedPlannerEntity[] | null,
+  allowedTitles?: Iterable<string | null | undefined>,
 ): PlannerSessionState["planningConsent"] => {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
@@ -161,7 +169,11 @@ const sanitizePlanningConsentState = (
   return {
     kind,
     sourceStarterIntent,
-    sourceMessage: sourceMessage.slice(0, 4000),
+    sourceMessage: sanitizeTextForDeletedPlannerEntities(
+      sourceMessage.slice(0, 4000),
+      deletedEntities,
+      allowedTitles,
+    ),
     confirmed: value.confirmed === true ? true : undefined,
   };
 };
@@ -375,6 +387,60 @@ const scopePlannerRitualsToActiveCampaigns = (
     activeEpicIds.has(ritual.epicId) &&
     (!activeHabitIds || activeHabitIds.has(ritual.id))
   );
+
+const hasPlannerExclusionMarker = (entry: unknown): boolean => {
+  if (!entry || typeof entry !== "object") return false;
+  const record = entry as {
+    excludedFromPlannerAt?: unknown;
+    excluded_from_planner_at?: unknown;
+  };
+  return Boolean(record.excludedFromPlannerAt || record.excluded_from_planner_at);
+};
+
+const isDeletedPlannerTaskLikeEntry = (
+  task: PlannerContext["tasks"][number],
+  deletedEntities?: DeletedPlannerEntity[] | null,
+): boolean => {
+  if (hasPlannerExclusionMarker(task)) return true;
+  if (!deletedEntities || deletedEntities.length === 0) return false;
+
+  return isDeletedPlannerEntityReference({
+      entityType: "task",
+      entityId: task.id,
+    }, deletedEntities) ||
+    isDeletedPlannerEntityReference({
+      entityType: "campaign",
+      entityId: task.epicId,
+    }, deletedEntities) ||
+    isDeletedPlannerEntityReference({
+      entityType: "ritual",
+      entityId: task.habitSourceId,
+    }, deletedEntities) ||
+    isDeletedPlannerEntityReference({
+      entityType: "habit",
+      entityId: task.habitSourceId,
+    }, deletedEntities);
+};
+
+const isDeletedPlannerRitualEntry = (
+  ritual: PlannerContext["rituals"][number],
+  deletedEntities?: DeletedPlannerEntity[] | null,
+): boolean => {
+  if (!deletedEntities || deletedEntities.length === 0) return false;
+
+  return isDeletedPlannerEntityReference({
+      entityType: "ritual",
+      entityId: ritual.id,
+    }, deletedEntities) ||
+    isDeletedPlannerEntityReference({
+      entityType: "habit",
+      entityId: ritual.id,
+    }, deletedEntities) ||
+    isDeletedPlannerEntityReference({
+      entityType: "campaign",
+      entityId: ritual.epicId,
+    }, deletedEntities);
+};
 
 const scopePriorityScoresToActiveCampaigns = (
   priorityScores: NonNullable<PlannerContext["priorityScores"]>,
@@ -830,8 +896,11 @@ const sanitizeStatInterpretation = (
 
 export const sanitizePlannerConversationHistory = (
   conversationHistory: PlannerConversationHistory,
+  deletedEntities?: DeletedPlannerEntity[] | null,
+  allowedTitles?: Iterable<string | null | undefined>,
 ): PlannerConversationHistory =>
-  conversationHistory
+  sanitizeConversationHistoryForDeletedPlannerEntities(
+    conversationHistory
     .map((entry) => {
       const content = asNonEmptyString(entry.content);
       if (!content || !isPlannerConversationRole(entry.role)) {
@@ -846,7 +915,10 @@ export const sanitizePlannerConversationHistory = (
     .filter((entry): entry is PlannerConversationHistory[number] =>
       Boolean(entry)
     )
-    .slice(-24);
+    .slice(-24),
+    deletedEntities,
+    allowedTitles,
+  );
 
 const sanitizeSessionDraft = (
   draft: PlannerSessionState["draft"],
@@ -857,6 +929,8 @@ const sanitizeSessionDraft = (
 
 export const sanitizePlannerSessionState = (
   sessionState: PlannerSessionState,
+  deletedEntities?: DeletedPlannerEntity[] | null,
+  allowedTitles?: Iterable<string | null | undefined>,
 ): PlannerSessionState => {
   const normalizedLastClassification = typeof sessionState.lastClassification ===
         "string"
@@ -896,6 +970,8 @@ export const sanitizePlannerSessionState = (
       : undefined,
     planningConsent: sanitizePlanningConsentState(
       sessionState.planningConsent,
+      deletedEntities,
+      allowedTitles,
     ),
   };
 };
@@ -927,6 +1003,7 @@ export const sanitizePlannerParsedInput = (
 
 export const sanitizePlannerContext = (
   context: PlannerContext,
+  deletedEntities?: DeletedPlannerEntity[] | null,
 ): PlannerContext => {
   const starterIntent = isPlannerStarterIntent(context.starterIntent)
     ? context.starterIntent
@@ -945,6 +1022,12 @@ export const sanitizePlannerContext = (
     .map(sanitizeEpic)
     .filter((entry): entry is PlannerContext["activeEpics"][number] =>
       Boolean(entry)
+    )
+    .filter((entry) =>
+      !isDeletedPlannerEntityReference({
+        entityType: "campaign",
+        entityId: entry.id,
+      }, deletedEntities)
     );
   const activeEpicIds = new Set(activeEpics.map((epic) => epic.id));
   const activeHabitIdsList = asStringArray(context.activeHabitIds);
@@ -966,37 +1049,44 @@ export const sanitizePlannerContext = (
       .map(sanitizeRitual)
       .filter((entry): entry is PlannerContext["rituals"][number] =>
         Boolean(entry)
-      ),
+      )
+      .filter((entry) => !isDeletedPlannerRitualEntry(entry, deletedEntities)),
     activeEpicIds,
     activeHabitIds,
   );
   const activeRitualIds = new Set(rituals.map((ritual) => ritual.id));
   const tasks = scopePlannerTasksToActiveCampaigns(
     context.tasks
+      .filter((entry) => !hasPlannerExclusionMarker(entry))
       .map(sanitizeTaskLikeEntry)
       .filter((entry): entry is PlannerContext["tasks"][number] =>
         Boolean(entry)
-      ),
+      )
+      .filter((entry) => !isDeletedPlannerTaskLikeEntry(entry, deletedEntities)),
     activeEpicIds,
     activeRitualIds,
     activeHabitIds,
   );
   const inboxTasks = scopePlannerTasksToActiveCampaigns(
     context.inboxTasks
+      .filter((entry) => !hasPlannerExclusionMarker(entry))
       .map(sanitizeTaskLikeEntry)
       .filter((entry): entry is PlannerContext["inboxTasks"][number] =>
         Boolean(entry)
-      ),
+      )
+      .filter((entry) => !isDeletedPlannerTaskLikeEntry(entry, deletedEntities)),
     activeEpicIds,
     activeRitualIds,
     activeHabitIds,
   );
   const recentCompletedTasks = scopePlannerTasksToActiveCampaigns(
     (context.recentCompletedTasks ?? [])
+      .filter((entry) => !hasPlannerExclusionMarker(entry))
       .map(sanitizeTaskLikeEntry)
       .filter((entry): entry is NonNullable<
         PlannerContext["recentCompletedTasks"]
-      >[number] => Boolean(entry)),
+      >[number] => Boolean(entry))
+      .filter((entry) => !isDeletedPlannerTaskLikeEntry(entry, deletedEntities)),
     activeEpicIds,
     activeRitualIds,
     activeHabitIds,

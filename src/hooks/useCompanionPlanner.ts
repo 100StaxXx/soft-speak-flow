@@ -43,6 +43,10 @@ import {
   summarizePlannerRequestForDebug,
 } from "@/utils/companionPlannerRequest";
 import {
+  DELETED_PLANNER_MEMORY_EVENT,
+  loadDeletedPlannerEntities,
+} from "@/utils/deletedPlannerMemory";
+import {
   validateCompanionPlannerRequest,
 } from "@/utils/companionPlannerRequestValidation";
 import { buildCompanionPlannerScheduleInsights } from "@/utils/companionPlannerSchedule";
@@ -213,6 +217,19 @@ const writeStoredPreferences = (value: StoredPlannerPreferences) => {
 const mapTasksToContext = (tasks: PlannerContextTask[]) =>
   tasks.slice(0, MAX_CONTEXT_TASKS);
 
+const collectAllowedPlannerTitles = (
+  context: CompanionPlannerRequest["plannerContext"],
+): string[] =>
+  Array.from(
+    new Set([
+      ...context.activeEpics.map((epic) => epic.title),
+      ...context.rituals.map((ritual) => ritual.title),
+      ...context.tasks.map((task) => task.title),
+      ...context.inboxTasks.map((task) => task.title),
+      ...(context.recentCompletedTasks ?? []).map((task) => task.title),
+    ].filter((title): title is string => Boolean(title?.trim()))),
+  );
+
 const getPlannerSyncRange = (date: Date, horizon: PlannerHorizon) => {
   const start = new Date(date);
   start.setHours(0, 0, 0, 0);
@@ -328,9 +345,13 @@ const extractPlannerProfile = (
   return {
     preferredWorkBlocksRecord: preferredWorkBlocks,
     tonePack: asString(profile.tonePack) as PlannerTonePack | null | undefined,
-    scheduleArchetype: asString(profile.scheduleArchetype) as PlannerMemoryProfile["scheduleArchetype"],
+    scheduleArchetype: asString(
+      profile.scheduleArchetype,
+    ) as PlannerMemoryProfile["scheduleArchetype"],
     scheduleArchetypeLabel: asString(profile.scheduleArchetypeLabel),
-    scheduleArchetypePlanningHint: asString(profile.scheduleArchetypePlanningHint),
+    scheduleArchetypePlanningHint: asString(
+      profile.scheduleArchetypePlanningHint,
+    ),
     preferredTimeOfDay: asString(profile.preferredTimeOfDay),
     preferredTimeReason: asString(profile.preferredTimeReason),
     reminderMinutesBefore: asNumber(profile.reminderMinutesBefore),
@@ -649,9 +670,10 @@ const deriveStarterIntentFromMessage = (
     return "what_matters";
   }
   if (
-    /\b(prepare me for tomorrow|prep me for tomorrow|help me prepare for tomorrow|set me up for tomorrow|tomorrow prep)\b/.test(
-      normalizedMessage,
-    )
+    /\b(prepare me for tomorrow|prep me for tomorrow|help me prepare for tomorrow|set me up for tomorrow|tomorrow prep)\b/
+      .test(
+        normalizedMessage,
+      )
   ) {
     return "briefing_followup";
   }
@@ -697,8 +719,8 @@ const inferScheduledTimeFromProposal = (
     const firstHabit = habits[0];
     if (firstHabit && typeof firstHabit === "object" && firstHabit !== null) {
       const preferredTime =
-        (firstHabit as Record<string, unknown>).preferred_time
-        ?? (firstHabit as Record<string, unknown>).preferredTime;
+        (firstHabit as Record<string, unknown>).preferred_time ??
+          (firstHabit as Record<string, unknown>).preferredTime;
       return typeof preferredTime === "string" ? preferredTime : null;
     }
   }
@@ -858,27 +880,31 @@ const summarizeProposalGenerationTelemetry = (
   const optimizerSources = [
     ...new Set(
       optimizerTelemetry
-        .map((telemetry) => typeof telemetry.optimizerSource === "string"
-          ? telemetry.optimizerSource
-          : null)
+        .map((telemetry) =>
+          typeof telemetry.optimizerSource === "string"
+            ? telemetry.optimizerSource
+            : null
+        )
         .filter((source): source is string => Boolean(source)),
     ),
   ];
   const optimizerModes = [
     ...new Set(
       optimizerTelemetry
-        .map((telemetry) => typeof telemetry.optimizerMode === "string"
-          ? telemetry.optimizerMode
-          : null)
+        .map((telemetry) =>
+          typeof telemetry.optimizerMode === "string"
+            ? telemetry.optimizerMode
+            : null
+        )
         .filter((mode): mode is string => Boolean(mode)),
     ),
   ];
   const usedFallback = optimizerTelemetry.some((telemetry) =>
     telemetry.usedFallback === true
   );
-  const fallbackProposalCount = optimizerTelemetry.filter((telemetry) =>
-    telemetry.fallbackToInbox === true
-  ).length;
+  const fallbackProposalCount =
+    optimizerTelemetry.filter((telemetry) => telemetry.fallbackToInbox === true)
+      .length;
 
   return {
     optimizerProposalCount: optimizerTelemetry.length,
@@ -1297,7 +1323,9 @@ export function useCompanionPlanner({
   const todayTasksQuery = useTasksQuery(today, { enabled });
   const weekTasksQuery = useCalendarTasks(today, "week", { enabled });
   const monthTasksQuery = useCalendarTasks(today, "month", { enabled });
-  const activeEventsQuery = useExternalCalendarEvents(today, horizon, { enabled });
+  const activeEventsQuery = useExternalCalendarEvents(today, horizon, {
+    enabled,
+  });
   const contextEventsQuery = useExternalCalendarEvents(
     today,
     horizon === "month" ? "month" : "week",
@@ -1432,6 +1460,39 @@ export function useCompanionPlanner({
       };
     },
   });
+
+  const deletedPlannerEntitiesQuery = useQuery({
+    queryKey: ["deleted-planner-entities", user?.id],
+    enabled: enabled && !!user?.id,
+    staleTime: 30 * 1000,
+    queryFn: async () => {
+      if (!user?.id) return [];
+      return loadDeletedPlannerEntities(user.id);
+    },
+  });
+
+  useEffect(() => {
+    if (!user?.id || typeof window === "undefined") return;
+
+    const handleDeletedPlannerMemoryUpdate = (event: Event) => {
+      const detail = (event as CustomEvent<{ userId?: string }>).detail;
+      if (detail?.userId && detail.userId !== user.id) return;
+      queryClient.invalidateQueries({
+        queryKey: ["deleted-planner-entities", user.id],
+      });
+    };
+
+    window.addEventListener(
+      DELETED_PLANNER_MEMORY_EVENT,
+      handleDeletedPlannerMemoryUpdate,
+    );
+    return () => {
+      window.removeEventListener(
+        DELETED_PLANNER_MEMORY_EVENT,
+        handleDeletedPlannerMemoryUpdate,
+      );
+    };
+  }, [queryClient, user?.id]);
 
   const contactsAttentionQuery = useQuery({
     queryKey: [
@@ -1605,6 +1666,7 @@ export function useCompanionPlanner({
             "id, task_text, task_date, category, difficulty, priority, flexibility, energy_type, must_calendar_block, deadline_at, completed, scheduled_time, completed_at, actual_time_spent, contact_id, habit_source_id",
           )
           .eq("user_id", user.id)
+          .is("excluded_from_planner_at", null)
           .gte("task_date", tasksStartDate)
           .lte("task_date", todayIso),
       ]);
@@ -1633,6 +1695,7 @@ export function useCompanionPlanner({
           "id, task_text, task_date, category, difficulty, priority, flexibility, energy_type, must_calendar_block, deadline_at, completed, scheduled_time, completed_at, estimated_duration, actual_time_spent, notes, recurrence_pattern, recurrence_end_date, source, contact_id, habit_source_id, epic_id",
         )
         .eq("user_id", user.id)
+        .is("excluded_from_planner_at", null)
         .eq("completed", true)
         .not("completed_at", "is", null)
         .gte("completed_at", `${startDate}T00:00:00.000Z`)
@@ -1683,21 +1746,24 @@ export function useCompanionPlanner({
     };
   }, [queuedActionReceipts]);
   const activeHabitIdsList = useMemo(
-    () => [...new Set([
-      ...(habitsQuery.data ?? [])
-        .filter((habit) => habit.is_active !== false)
-        .map((habit) => habit.id),
-      ...pendingPlannerCreateIds.habitIds,
-    ])],
+    () => [
+      ...new Set([
+        ...(habitsQuery.data ?? [])
+          .filter((habit) => habit.is_active !== false)
+          .map((habit) => habit.id),
+        ...pendingPlannerCreateIds.habitIds,
+      ]),
+    ],
     [habitsQuery.data, pendingPlannerCreateIds.habitIds],
   );
   const activeHabitIds = useMemo(
     () => new Set(activeHabitIdsList),
     [activeHabitIdsList],
   );
-  const activeHabitIdScope = habitsQuery.data || pendingPlannerCreateIds.habitIds.length > 0
-    ? activeHabitIds
-    : null;
+  const activeHabitIdScope =
+    habitsQuery.data || pendingPlannerCreateIds.habitIds.length > 0
+      ? activeHabitIds
+      : null;
 
   const baseRituals = useMemo(
     () => {
@@ -1711,7 +1777,9 @@ export function useCompanionPlanner({
     () => new Set(baseRituals.map((ritual) => ritual.id)),
     [baseRituals],
   );
-  const durationHistoryStartIso = `${format(addDays(today, -59), "yyyy-MM-dd")}T00:00:00.000Z`;
+  const durationHistoryStartIso = `${
+    format(addDays(today, -59), "yyyy-MM-dd")
+  }T00:00:00.000Z`;
 
   const ritualsQuery = useQuery({
     queryKey: [
@@ -1748,43 +1816,52 @@ export function useCompanionPlanner({
   ), [horizon, monthTasksQuery.tasks, weekTasksQuery.tasks]);
 
   const activePlannerTasks = useMemo(
-    () => scopeTasksToActiveCampaigns(
-      activeTasks.map(serializeTaskContext),
-      activeEpicIds,
-      activeRitualIds,
-      activeHabitIdScope,
-    ),
+    () =>
+      scopeTasksToActiveCampaigns(
+        activeTasks.map(serializeTaskContext),
+        activeEpicIds,
+        activeRitualIds,
+        activeHabitIdScope,
+      ),
     [activeEpicIds, activeHabitIdScope, activeRitualIds, activeTasks],
   );
 
   const contextPlannerTasks = useMemo(
-    () => scopeTasksToActiveCampaigns(
-      contextTasks.map(serializeTaskContext),
-      activeEpicIds,
-      activeRitualIds,
-      activeHabitIdScope,
-    ),
+    () =>
+      scopeTasksToActiveCampaigns(
+        contextTasks.map(serializeTaskContext),
+        activeEpicIds,
+        activeRitualIds,
+        activeHabitIdScope,
+      ),
     [activeEpicIds, activeHabitIdScope, activeRitualIds, contextTasks],
   );
 
   const inboxPlannerTasks = useMemo(
-    () => scopeTasksToActiveCampaigns(
-      inboxTasks.map(serializeTaskContext),
-      activeEpicIds,
-      activeRitualIds,
-      activeHabitIdScope,
-    ),
+    () =>
+      scopeTasksToActiveCampaigns(
+        inboxTasks.map(serializeTaskContext),
+        activeEpicIds,
+        activeRitualIds,
+        activeHabitIdScope,
+      ),
     [activeEpicIds, activeHabitIdScope, activeRitualIds, inboxTasks],
   );
 
   const recentCompletedPlannerTasks = useMemo(
-    () => scopeTasksToActiveCampaigns(
-      (recentCompletedTasksQuery.data ?? []).map(serializeTaskContext),
+    () =>
+      scopeTasksToActiveCampaigns(
+        (recentCompletedTasksQuery.data ?? []).map(serializeTaskContext),
+        activeEpicIds,
+        activeRitualIds,
+        activeHabitIdScope,
+      ),
+    [
       activeEpicIds,
-      activeRitualIds,
       activeHabitIdScope,
-    ),
-    [activeEpicIds, activeHabitIdScope, activeRitualIds, recentCompletedTasksQuery.data],
+      activeRitualIds,
+      recentCompletedTasksQuery.data,
+    ],
   );
 
   const plannerMemory = useMemo<PlannerMemoryProfile>(() => {
@@ -1823,8 +1900,10 @@ export function useCompanionPlanner({
           timeReason: storedPreferences.preferredTimeReason ?? null,
         },
         {
-          timeOfDay: onboardingScheduleProfile?.defaultPreferredTimeOfDay ?? null,
-          timeReason: onboardingScheduleProfile?.defaultPreferredTimeReason ?? null,
+          timeOfDay: onboardingScheduleProfile?.defaultPreferredTimeOfDay ??
+            null,
+          timeReason: onboardingScheduleProfile?.defaultPreferredTimeReason ??
+            null,
         },
       ],
     });
@@ -1858,8 +1937,8 @@ export function useCompanionPlanner({
         onboardingScheduleProfile?.label ?? null,
       scheduleArchetypePlanningHint:
         remoteProfile.scheduleArchetypePlanningHint ??
-        onboardingScheduleProfile?.plannerHint ??
-        asString(onboardingData.scheduleArchetypePlanningHint),
+          onboardingScheduleProfile?.plannerHint ??
+          asString(onboardingData.scheduleArchetypePlanningHint),
       preferredTimeOfDay,
       preferredTimeReason,
       reminderMinutesBefore,
@@ -1919,8 +1998,15 @@ export function useCompanionPlanner({
         selectedDate: todayIso,
         currentDateTime: formatCurrentDateTimeWithOffset(today),
         plannerMemory,
-      }),
-    [activeEventsQuery.events, activePlannerTasks, horizon, plannerMemory, today, todayIso],
+      }, deletedPlannerEntitiesQuery.data ?? []),
+    [
+      activeEventsQuery.events,
+      activePlannerTasks,
+      horizon,
+      plannerMemory,
+      today,
+      todayIso,
+    ],
   );
 
   const careSignals = useMemo<PlannerCareState>(() => ({
@@ -2017,9 +2103,10 @@ export function useCompanionPlanner({
   );
 
   const effectiveWorkloadTolerance = useMemo(
-    () => plannerMemory.workloadTolerance ??
-      plannerAISignals?.suggestedWorkload ??
-      null,
+    () =>
+      plannerMemory.workloadTolerance ??
+        plannerAISignals?.suggestedWorkload ??
+        null,
     [
       plannerAISignals?.suggestedWorkload,
       plannerMemory.workloadTolerance,
@@ -2068,37 +2155,39 @@ export function useCompanionPlanner({
       reflectionSignalsQuery.data,
       scheduleInsights,
       todayIso,
+      deletedPlannerEntitiesQuery.data,
     ],
   );
 
   const plannerContext = useMemo<CompanionPlannerRequest["plannerContext"]>(
-    () => sanitizePlannerContext({
-      tasks: mapTasksToContext(contextPlannerTasks),
-      inboxTasks: mapTasksToContext(inboxPlannerTasks),
-      recentCompletedTasks: mapTasksToContext(recentCompletedPlannerTasks),
-      activeEpics: mapEpicsToContext(activeEpics, todayIso),
-      ...(habitsQuery.data ? { activeHabitIds: activeHabitIdsList } : {}),
-      ...(pendingPlannerCreateIds.taskIds.length > 0
-        ? { pendingLocalTaskIds: pendingPlannerCreateIds.taskIds }
-        : {}),
-      ...(pendingPlannerCreateIds.epicIds.length > 0
-        ? { pendingLocalEpicIds: pendingPlannerCreateIds.epicIds }
-        : {}),
-      ...(pendingPlannerCreateIds.habitIds.length > 0
-        ? { pendingLocalHabitIds: pendingPlannerCreateIds.habitIds }
-        : {}),
-      rituals: ritualsQuery.data ?? baseRituals,
-      calendarEvents: contextEventsQuery
-        .events as PlannerContextCalendarEvent[],
-      contactsNeedingAttention: contactsAttentionQuery.data ?? [],
-      reflectionSignals: reflectionSignalsQuery.data ?? [],
-      careSignals,
-      priorityScores,
-      scheduleInsights,
-      plannerMemory: effectivePlannerMemory,
-      statInterpretation,
-      aiSignals: plannerAISignals,
-    }),
+    () =>
+      sanitizePlannerContext({
+        tasks: mapTasksToContext(contextPlannerTasks),
+        inboxTasks: mapTasksToContext(inboxPlannerTasks),
+        recentCompletedTasks: mapTasksToContext(recentCompletedPlannerTasks),
+        activeEpics: mapEpicsToContext(activeEpics, todayIso),
+        ...(habitsQuery.data ? { activeHabitIds: activeHabitIdsList } : {}),
+        ...(pendingPlannerCreateIds.taskIds.length > 0
+          ? { pendingLocalTaskIds: pendingPlannerCreateIds.taskIds }
+          : {}),
+        ...(pendingPlannerCreateIds.epicIds.length > 0
+          ? { pendingLocalEpicIds: pendingPlannerCreateIds.epicIds }
+          : {}),
+        ...(pendingPlannerCreateIds.habitIds.length > 0
+          ? { pendingLocalHabitIds: pendingPlannerCreateIds.habitIds }
+          : {}),
+        rituals: ritualsQuery.data ?? baseRituals,
+        calendarEvents: contextEventsQuery
+          .events as PlannerContextCalendarEvent[],
+        contactsNeedingAttention: contactsAttentionQuery.data ?? [],
+        reflectionSignals: reflectionSignalsQuery.data ?? [],
+        careSignals,
+        priorityScores,
+        scheduleInsights,
+        plannerMemory: effectivePlannerMemory,
+        statInterpretation,
+        aiSignals: plannerAISignals,
+      }, deletedPlannerEntitiesQuery.data ?? []),
     [
       activeEpics,
       activeHabitIdsList,
@@ -2119,6 +2208,7 @@ export function useCompanionPlanner({
       reflectionSignalsQuery.data,
       scheduleInsights,
       todayIso,
+      deletedPlannerEntitiesQuery.data,
     ],
   );
 
@@ -2586,8 +2676,8 @@ export function useCompanionPlanner({
 
     const resolvedStarterIntent: CompanionPlannerContextStarterIntent =
       normalizeStarterIntentForPlanner(
-      options?.starterIntent,
-    ) ?? deriveStarterIntentFromMessage(message);
+        options?.starterIntent,
+      ) ?? deriveStarterIntentFromMessage(message);
     if (resolvedStarterIntent === "quest_capture" && !options?.skipUserEcho) {
       primeQuestCapture(message, { selectedDate });
       return;
@@ -2607,13 +2697,11 @@ export function useCompanionPlanner({
     const parsedInput = parseNaturalLanguage(
       message,
       selectedDate
-        ? { referenceDateTime: buildSelectedDateReferenceDateTime(selectedDate) }
+        ? {
+          referenceDateTime: buildSelectedDateReferenceDateTime(selectedDate),
+        }
         : undefined,
     );
-    const sanitizedConversationHistory = sanitizePlannerConversationHistory(
-      conversationHistory,
-    );
-    const sanitizedSessionState = sanitizePlannerSessionState(sessionState);
     const sanitizedParsedInput = sanitizePlannerParsedInput({
       text: parsedInput.text,
       scheduledTime: parsedInput.scheduledTime,
@@ -2636,7 +2724,9 @@ export function useCompanionPlanner({
         ...plannerMemory,
         workloadTolerance: effectiveWorkloadTolerance,
       };
-      const requestCurrentDateTime = formatCurrentDateTimeWithOffset(new Date());
+      const requestCurrentDateTime = formatCurrentDateTimeWithOffset(
+        new Date(),
+      );
       const outlookSyncPromise = withTimeout(
         () => syncOutlookPlanningContext(),
         {
@@ -2689,6 +2779,7 @@ export function useCompanionPlanner({
           )
           .map((ritual) => ritual.id),
       );
+      const deletedPlannerEntities = deletedPlannerEntitiesQuery.data ?? [];
       const syncedPlannerContext = sanitizePlannerContext(
         {
           ...mergedPlannerContext,
@@ -2711,6 +2802,7 @@ export function useCompanionPlanner({
             mergedActiveHabitIds,
           ),
         },
+        deletedPlannerEntities,
       );
       const requestActiveEpics = mapEpicsToContext(activeEpics, requestDate);
       const requestScheduleInsights = requestDate === todayIso
@@ -2758,7 +2850,20 @@ export function useCompanionPlanner({
         priorityScores: requestPriorityScores,
         scheduleInsights: requestScheduleInsights,
         plannerMemory: resolvedPlannerMemory,
-      });
+      }, deletedPlannerEntities);
+      const allowedPlannerTitles = collectAllowedPlannerTitles(
+        requestPlannerContext,
+      );
+      const sanitizedConversationHistory = sanitizePlannerConversationHistory(
+        conversationHistory,
+        deletedPlannerEntities,
+        allowedPlannerTitles,
+      );
+      const sanitizedSessionState = sanitizePlannerSessionState(
+        sessionState,
+        deletedPlannerEntities,
+        allowedPlannerTitles,
+      );
       requestBody = {
         message,
         currentDate: requestDate,
@@ -2771,9 +2876,7 @@ export function useCompanionPlanner({
         parsedInput: sanitizedParsedInput,
         classificationHint,
         plannerContext: requestPlannerContext,
-        activeDayPlan: dayPlan && dayPlan.status === "draft"
-          ? dayPlan
-          : null,
+        activeDayPlan: dayPlan && dayPlan.status === "draft" ? dayPlan : null,
       };
       const localValidation = validateCompanionPlannerRequest(requestBody);
       if (!localValidation.success) {
@@ -2838,8 +2941,7 @@ export function useCompanionPlanner({
       ];
       await persistPlannerThreadRows(persistedRows);
 
-      const isReadOnlyBriefing =
-        resolvedStarterIntent === "upcoming_start" ||
+      const isReadOnlyBriefing = resolvedStarterIntent === "upcoming_start" ||
         response.mode === "schedule_read" ||
         response.plannerContract?.mode === "schedule_read";
       if (!isReadOnlyBriefing) {
@@ -2883,30 +2985,31 @@ export function useCompanionPlanner({
               },
             );
           }));
-          await Promise.all(response.proposals
-            .filter((proposal) =>
-              asUnknownRecord(proposal.payload)?.scheduleValidationStatus ===
-                "warning"
-            )
-            .map((proposal) => {
-              const entityIds = extractPlannerEventEntityIds(proposal);
-              return recordPlannerEvent(
-                "schedule_validation_failed",
-                {
-                  ...basePlannerEventPayload,
-                  proposalKind: proposal.kind,
-                  proposalTitle: proposal.title,
-                  scheduleValidationIssues:
-                    asUnknownRecord(proposal.payload)
+          await Promise.all(
+            response.proposals
+              .filter((proposal) =>
+                asUnknownRecord(proposal.payload)?.scheduleValidationStatus ===
+                  "warning"
+              )
+              .map((proposal) => {
+                const entityIds = extractPlannerEventEntityIds(proposal);
+                return recordPlannerEvent(
+                  "schedule_validation_failed",
+                  {
+                    ...basePlannerEventPayload,
+                    proposalKind: proposal.kind,
+                    proposalTitle: proposal.title,
+                    scheduleValidationIssues: asUnknownRecord(proposal.payload)
                       ?.scheduleValidationIssues ?? [],
-                },
-                {
-                  proposalId: proposal.id,
-                  taskId: entityIds.taskId,
-                  epicId: entityIds.epicId,
-                },
-              );
-            }));
+                  },
+                  {
+                    proposalId: proposal.id,
+                    taskId: entityIds.taskId,
+                    epicId: entityIds.epicId,
+                  },
+                );
+              }),
+          );
         } else if (response.structuredResponse) {
           await recordPlannerEvent(
             "suggestion_generated",
@@ -2966,6 +3069,7 @@ export function useCompanionPlanner({
     contextTasks,
     conversationHistory,
     dayPlan,
+    deletedPlannerEntitiesQuery.data,
     enabled,
     effectivePlannerMemory,
     horizon,
@@ -3136,7 +3240,8 @@ export function useCompanionPlanner({
           const payload = proposal.payload as Parameters<typeof createEpic>[0];
           await createEpic(payload);
           const starterHabit = payload.habits?.[0];
-          const starterHabitTime = starterHabit?.preferred_time ?? starterHabit?.preferredTime;
+          const starterHabitTime = starterHabit?.preferred_time ??
+            starterHabit?.preferredTime;
           if (starterHabitTime) {
             await trackTaskCreation(
               starterHabitTime,
@@ -3582,11 +3687,14 @@ export function useCompanionPlanner({
         );
       }
 
-      const committedTaskIds = Array.isArray(commitResult.data?.committedTaskIds)
-        ? commitResult.data.committedTaskIds.filter((taskId): taskId is string =>
-          typeof taskId === "string" && taskId.trim().length > 0
-        )
-        : [];
+      const committedTaskIds =
+        Array.isArray(commitResult.data?.committedTaskIds)
+          ? commitResult.data.committedTaskIds.filter((
+            taskId,
+          ): taskId is string =>
+            typeof taskId === "string" && taskId.trim().length > 0
+          )
+          : [];
       const committedPlan: NonNullable<CompanionPlannerResponse["dayPlan"]> = {
         ...startingPlan,
         id: planId,
@@ -3623,7 +3731,9 @@ export function useCompanionPlanner({
           return committedPlan;
         }
         if (current.date !== startingPlan.date) return current;
-        if (current.blocks.length !== startingPlan.blocks.length) return current;
+        if (current.blocks.length !== startingPlan.blocks.length) {
+          return current;
+        }
         return committedPlan;
       });
       setProposals(committedProposals);
@@ -3785,7 +3895,9 @@ export function useCompanionPlanner({
         ? readPersistedQuestCaptureSelectedDate(latestPlannerSnapshot?.metadata)
         : null;
     const nextProposals = [
-      ...readPersistedPlannerProposals(latestPlannerSnapshot?.metadata.proposals),
+      ...readPersistedPlannerProposals(
+        latestPlannerSnapshot?.metadata.proposals,
+      ),
       ...readPersistedPlannerProposals(
         latestPlannerSnapshot?.metadata.suggestedReminders,
       ),

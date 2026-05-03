@@ -118,6 +118,9 @@ verify_jwt = false
 [functions.process-companion-animation-job]
 verify_jwt = false
 
+[functions.prewarm-companion-animation]
+verify_jwt = true
+
 [functions.generate-zodiac-images]
 verify_jwt = false
 
@@ -218,6 +221,9 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.generate-companion-stat-analysis]
+verify_jwt = true
+
+[functions.generate-cosmiq-title-card]
 verify_jwt = true
 
 [functions.send-apns-notification]

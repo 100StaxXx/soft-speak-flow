@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { CompanionPlannerRequest } from "@/types/companionPlanner";
 import {
   sanitizePlannerContext,
+  sanitizePlannerConversationHistory,
   sanitizePlannerParsedInput,
   sanitizePlannerSessionState,
   summarizePlannerRequestForDebug,
@@ -488,6 +489,110 @@ describe("sanitizePlannerContext", () => {
       }),
     ]);
     expect(JSON.stringify(sanitized)).not.toContain("Daily Hydration");
+  });
+
+  it("drops tombstoned planner entities and excluded task history", () => {
+    const context: CompanionPlannerRequest["plannerContext"] = {
+      tasks: [
+        {
+          id: "task-deleted",
+          title: "Call the vendor",
+          taskDate: "2026-05-03",
+          scheduledTime: null,
+          estimatedDuration: null,
+          recurrencePattern: null,
+          epicId: "epic-deleted",
+          epicTitle: "Launch Sprint",
+        },
+        {
+          id: "task-excluded",
+          title: "Completed old work",
+          taskDate: "2026-05-02",
+          scheduledTime: null,
+          estimatedDuration: null,
+          recurrencePattern: null,
+          completed: true,
+          excludedFromPlannerAt: "2026-05-03T00:00:00Z",
+        } as CompanionPlannerRequest["plannerContext"]["tasks"][number],
+        {
+          id: "task-live",
+          title: "Current launch review",
+          taskDate: "2026-05-03",
+          scheduledTime: null,
+          estimatedDuration: null,
+          recurrencePattern: null,
+          epicId: "epic-live",
+          epicTitle: "Launch Sprint",
+        },
+      ],
+      inboxTasks: [],
+      recentCompletedTasks: [],
+      activeEpics: [
+        {
+          id: "epic-deleted",
+          title: "Launch Sprint",
+          endDate: "2026-06-01",
+        },
+        {
+          id: "epic-live",
+          title: "Launch Sprint",
+          endDate: "2026-06-15",
+        },
+      ],
+      rituals: [],
+      calendarEvents: [],
+    };
+
+    const sanitized = sanitizePlannerContext(context, [
+      {
+        entityType: "campaign",
+        entityId: "epic-deleted",
+        title: "Launch Sprint",
+      },
+      {
+        entityType: "task",
+        entityId: "task-deleted",
+        title: "Call the vendor",
+      },
+    ]);
+
+    expect(sanitized.activeEpics.map((epic) => epic.id)).toEqual(["epic-live"]);
+    expect(sanitized.tasks.map((task) => task.id)).toEqual(["task-live"]);
+    expect(sanitized.tasks[0].epicTitle).toBe("Launch Sprint");
+  });
+});
+
+describe("sanitizePlannerConversationHistory", () => {
+  it("redacts tombstoned titles while preserving active same-title context", () => {
+    const history = sanitizePlannerConversationHistory(
+      [
+        {
+          role: "user",
+          content: "Please keep Launch Sprint but forget Call the vendor.",
+        },
+        {
+          role: "assistant",
+          content: "Call the vendor belonged to task-deleted.",
+        },
+      ],
+      [
+        {
+          entityType: "campaign",
+          entityId: "epic-deleted",
+          title: "Launch Sprint",
+        },
+        {
+          entityType: "task",
+          entityId: "task-deleted",
+          title: "Call the vendor",
+        },
+      ],
+      ["Launch Sprint"],
+    );
+
+    expect(history[0].content).toContain("Launch Sprint");
+    expect(history[0].content).not.toContain("Call the vendor");
+    expect(history[1].content).not.toContain("task-deleted");
   });
 });
 

@@ -109,6 +109,29 @@ Deno.test("consultPlannerForAgent drafts concrete quest-capture starter text imm
   assertEquals(result.actionHints[0]?.normalizedPayload?.title, "Pilates");
 });
 
+Deno.test("consultPlannerForAgent drafts Gym at 6 from quest capture", () => {
+  const result = consultPlannerForAgent({
+    message: "Gym at 6",
+    currentDateTime: "2026-05-03T21:08:00-07:00",
+    surface: "journeys",
+    horizon: "day",
+    starterIntent: "quest_capture",
+    context: buildContext({
+      visibleDateStart: "2026-05-03",
+      visibleDateEnd: "2026-05-09",
+      currentDateTime: "2026-05-03T21:08:00-07:00",
+    }),
+  });
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.actionHints[0]?.actionType, "task_create");
+  assertEquals(result.actionHints[0]?.normalizedPayload?.title, "Gym");
+  assertEquals(
+    result.actionHints[0]?.normalizedPayload?.scheduled_time,
+    "18:00",
+  );
+});
+
 Deno.test("consultPlannerForAgent preserves selected date for quest-capture replies", () => {
   const consultSelectedDatePlanner = (message: string) =>
     consultPlannerForAgent({

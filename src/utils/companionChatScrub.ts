@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { forgetDeletedPlannerEntities } from "@/utils/deletedPlannerMemory";
 
 export async function scrubCompanionChatsForDeletedEpic(
   userId: string,
@@ -8,31 +8,15 @@ export async function scrubCompanionChatsForDeletedEpic(
   const trimmedTitle = epicTitle?.trim();
   if (!trimmedTitle) return;
 
-  const escapedTitle = trimmedTitle.replace(/[\\%_]/g, (match) => `\\${match}`);
-
-  try {
-    let query = supabase
-      .from("companion_chats")
-      .delete()
-      .eq("user_id", userId)
-      .eq("role", "assistant")
-      .ilike("content", `%${escapedTitle}%`);
-
-    if (epicCreatedAt) {
-      query = query.gte("created_at", epicCreatedAt);
-    }
-
-    const { error } = await query;
-    if (error) {
-      console.warn(
-        "Failed to scrub companion_chats for deleted epic:",
-        error,
-      );
-    }
-  } catch (error) {
-    console.warn(
-      "Failed to scrub companion_chats for deleted epic:",
-      error,
-    );
-  }
+  await forgetDeletedPlannerEntities({
+    userId,
+    source: "legacy_epic_chat_scrub",
+    entities: [{
+      entityType: "campaign",
+      title: trimmedTitle,
+      metadata: {
+        createdAt: epicCreatedAt ?? null,
+      },
+    }],
+  });
 }

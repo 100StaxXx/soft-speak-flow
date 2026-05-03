@@ -17,6 +17,7 @@ import { withCompanionChatPersistenceCapability } from "../companion-chat/persis
 import {
   CampaignLifecycleStatusSchema,
   COMPANION_CAMPAIGN_LIFECYCLE_STATUSES,
+  type CompanionAgentContextLoadWarning,
   type CompanionAgentFollowUp,
   type CompanionAgentIntent,
   type CompanionAgentMode,
@@ -38,6 +39,10 @@ import {
   persistAgentTurn,
   replacePendingAction,
 } from "./persistence.ts";
+import {
+  buildErrorLog,
+  getCompanionAgentFailureReason,
+} from "./failureDiagnostics.ts";
 
 type AgentRunSubStage = "context_load" | "openai" | "persistence";
 
@@ -67,6 +72,103 @@ const wrapSubStage = async <T>(
   } catch (error) {
     if (error instanceof AgentRunSubStageError) throw error;
     throw new AgentRunSubStageError(subStage, error);
+  }
+};
+
+const readStringField = (
+  value: unknown,
+  field: string,
+): string | null => {
+  if (!value || typeof value !== "object") return null;
+  const candidate = (value as Record<string, unknown>)[field];
+  return typeof candidate === "string" && candidate.length > 0
+    ? candidate
+    : null;
+};
+
+const describeAgentError = (error: unknown): string => {
+  if (error instanceof Error && error.message.length > 0) {
+    return error.message;
+  }
+  if (typeof error === "string" && error.length > 0) return error;
+  return readStringField(error, "message") ??
+    readStringField(error, "error") ??
+    "Unknown companion agent failure";
+};
+
+const buildContextLoadWarning = (
+  source: string,
+  required: boolean,
+  error: unknown,
+): CompanionAgentContextLoadWarning => ({
+  source,
+  required,
+  message: describeAgentError(error),
+  code: readStringField(error, "code"),
+});
+
+const logCompanionAgentBestEffortFailure = (params: {
+  requestId?: string | null;
+  subStage: Extract<AgentRunSubStage, "context_load" | "persistence">;
+  source: string;
+  required?: boolean;
+  error: unknown;
+}) => {
+  const wrapped = new AgentRunSubStageError(params.subStage, params.error);
+  console.warn("[companion-agent] best-effort failure", {
+    ...buildErrorLog(params.error),
+    requestId: params.requestId ?? null,
+    stage: params.subStage,
+    failureReason: getCompanionAgentFailureReason(wrapped, "agent_run"),
+    source: params.source,
+    required: params.required ?? false,
+  });
+};
+
+const loadCompanionContextBestEffort = async <T>(params: {
+  requestId?: string | null;
+  source: string;
+  required: boolean;
+  fallback: T;
+  warnings: CompanionAgentContextLoadWarning[];
+  load: () => Promise<T>;
+}): Promise<T> => {
+  try {
+    return await params.load();
+  } catch (error) {
+    const warning = buildContextLoadWarning(
+      params.source,
+      params.required,
+      error,
+    );
+    params.warnings.push(warning);
+    logCompanionAgentBestEffortFailure({
+      requestId: params.requestId,
+      subStage: "context_load",
+      source: params.source,
+      required: params.required,
+      error,
+    });
+    return params.fallback;
+  }
+};
+
+const persistAgentTurnBestEffort = async (params: {
+  requestId?: string | null;
+  persistConversation: () => Promise<void>;
+}): Promise<boolean> => {
+  try {
+    return await withCompanionChatPersistenceCapability(
+      params.persistConversation,
+    );
+  } catch (error) {
+    logCompanionAgentBestEffortFailure({
+      requestId: params.requestId,
+      subStage: "persistence",
+      source: "companion_chat_persistence",
+      error,
+    });
+    return false;
   }
 };
 
@@ -102,6 +204,206 @@ export const resolveCompanionAgentModel = (
   env("OPENAI_COMPANION_AGENT_MODEL") ??
     env("OPENAI_TEXT_MODEL") ??
     DEFAULT_COMPANION_AGENT_MODEL;
+
+const OPENAI_PROVIDER_UNAVAILABLE_REPLY =
+  "I'm having trouble reaching my AI brain right now. Try again in a moment, and I'll pick this back up.";
+const OPENAI_EMPTY_OUTPUT_REPLY =
+  "I reached my AI path, but it came back blank. Try again in a moment and I'll pick this up.";
+
+type OpenAIProviderFailureReason =
+  | "missing_api_key"
+  | "model_access"
+  | "quota"
+  | "rate_limit"
+  | "timeout"
+  | "invalid_parameter"
+  | "auth"
+  | "network"
+  | "server"
+  | "empty_output"
+  | "unknown";
+
+type OpenAIProviderOperation = "api_key" | "conversation" | "response";
+
+interface OpenAIProviderDiagnostics {
+  provider: "openai";
+  operation: OpenAIProviderOperation;
+  reason: OpenAIProviderFailureReason;
+  model: string;
+  status: number | null;
+  requestId: string | null;
+  responseId: string | null;
+  message: string;
+}
+
+class OpenAIProviderError extends Error {
+  readonly diagnostics: OpenAIProviderDiagnostics;
+
+  constructor(message: string, diagnostics: OpenAIProviderDiagnostics) {
+    super(message);
+    this.name = "OpenAIProviderError";
+    this.diagnostics = diagnostics;
+  }
+}
+
+const sanitizeOpenAIDiagnosticMessage = (message: string): string => {
+  const withoutKeys = message.replace(/sk-[A-Za-z0-9_-]+/g, "sk-...");
+  return withoutKeys.length > 700
+    ? `${withoutKeys.slice(0, 700)}...`
+    : withoutKeys;
+};
+
+const classifyOpenAIProviderFailure = (
+  message: string,
+  status: number | null = null,
+): OpenAIProviderFailureReason => {
+  const normalized = message.toLowerCase();
+  if (normalized.includes("openai_api_key not configured")) {
+    return "missing_api_key";
+  }
+  if (
+    normalized.includes("model_not_found") ||
+    normalized.includes("does not have access to model") ||
+    normalized.includes("model access") ||
+    (status === 404 && normalized.includes("model"))
+  ) {
+    return "model_access";
+  }
+  if (
+    normalized.includes("insufficient_quota") ||
+    normalized.includes("exceeded your current quota") ||
+    normalized.includes("quota")
+  ) {
+    return "quota";
+  }
+  if (status === 429 || normalized.includes("rate limit")) {
+    return "rate_limit";
+  }
+  if (
+    status === 408 ||
+    normalized.includes("timeout") ||
+    normalized.includes("timed out")
+  ) {
+    return "timeout";
+  }
+  if (
+    status === 401 ||
+    status === 403 ||
+    normalized.includes("invalid api key") ||
+    normalized.includes("incorrect api key")
+  ) {
+    return "auth";
+  }
+  if (
+    normalized.includes("unknown parameter") ||
+    normalized.includes("unsupported parameter") ||
+    normalized.includes("invalid_request_error") ||
+    normalized.includes("invalid parameter") ||
+    normalized.includes("unrecognized request argument")
+  ) {
+    return "invalid_parameter";
+  }
+  if (
+    normalized.includes("failed to fetch") ||
+    normalized.includes("network") ||
+    normalized.includes("econnreset") ||
+    normalized.includes("connection") ||
+    normalized.includes("fetcherror")
+  ) {
+    return "network";
+  }
+  if (
+    (status !== null && status >= 500) ||
+    normalized.includes("service unavailable") ||
+    normalized.includes("temporarily unavailable") ||
+    normalized.includes("server error") ||
+    normalized.includes("internal server error") ||
+    normalized.includes("bad gateway") ||
+    normalized.includes("gateway timeout")
+  ) {
+    return "server";
+  }
+
+  return "unknown";
+};
+
+const readOpenAIRequestId = (response: Response): string | null =>
+  response.headers.get("x-request-id") ??
+    response.headers.get("openai-request-id") ??
+    response.headers.get("request-id");
+
+const buildOpenAIProviderError = (params: {
+  operation: OpenAIProviderOperation;
+  message: string;
+  model?: string;
+  status?: number | null;
+  requestId?: string | null;
+  responseId?: string | null;
+}): OpenAIProviderError => {
+  const status = params.status ?? null;
+  const message = sanitizeOpenAIDiagnosticMessage(params.message);
+  return new OpenAIProviderError(message, {
+    provider: "openai",
+    operation: params.operation,
+    reason: classifyOpenAIProviderFailure(message, status),
+    model: params.model ?? resolveCompanionAgentModel(),
+    status,
+    requestId: params.requestId ?? null,
+    responseId: params.responseId ?? null,
+    message,
+  });
+};
+
+const buildOpenAIEmptyOutputDiagnostics = (params: {
+  responseId: string | null;
+}): OpenAIProviderDiagnostics => ({
+  provider: "openai",
+  operation: "response",
+  reason: "empty_output",
+  model: resolveCompanionAgentModel(),
+  status: null,
+  requestId: null,
+  responseId: params.responseId,
+  message: "OpenAI response contained no usable assistant text.",
+});
+
+const getOpenAIProviderDiagnostics = (
+  error: unknown,
+): OpenAIProviderDiagnostics | null => {
+  if (error instanceof OpenAIProviderError) return error.diagnostics;
+
+  if (error instanceof TimeoutError || isOpenAIProviderFallbackError(error)) {
+    const message = sanitizeOpenAIDiagnosticMessage(getErrorMessage(error));
+    return {
+      provider: "openai",
+      operation: "response",
+      reason: classifyOpenAIProviderFailure(message),
+      model: resolveCompanionAgentModel(),
+      status: null,
+      requestId: null,
+      responseId: null,
+      message,
+    };
+  }
+
+  return null;
+};
+
+const loggableOpenAIProviderDiagnostics = (
+  diagnostics: OpenAIProviderDiagnostics | null | undefined,
+) =>
+  diagnostics
+    ? {
+      provider: diagnostics.provider,
+      operation: diagnostics.operation,
+      reason: diagnostics.reason,
+      model: diagnostics.model,
+      status: diagnostics.status,
+      requestId: diagnostics.requestId,
+      responseId: diagnostics.responseId,
+      message: diagnostics.message,
+    }
+    : null;
 
 const medianDuration = (durations: number[]): number | null => {
   if (durations.length === 0) return null;
@@ -325,6 +627,7 @@ interface RunAgentParams {
   userId: string;
   request: CompanionAgentRequest;
   openAIApiKey?: string;
+  requestId?: string | null;
 }
 
 interface ToolCall {
@@ -359,6 +662,49 @@ interface AgentRunResult {
   openaiConversationId: string | null;
   lastOpenAIResponseId: string | null;
   draftDecisionSource?: "model" | "deterministic";
+  providerDiagnostics?: OpenAIProviderDiagnostics | null;
+}
+
+const extractTextFromContentItem = (value: unknown): string => {
+  if (typeof value === "string") return value.trim();
+  const item = asRecord(value);
+  if (!item) return "";
+
+  const text = typeof item.text === "string"
+    ? item.text
+    : typeof item.output_text === "string"
+    ? item.output_text
+    : typeof item.content === "string"
+    ? item.content
+    : "";
+
+  return text.trim();
+};
+
+function extractOpenAIResponseText(response: OpenAIResponseBody): string {
+  const sdkOutputText = response.output_text?.trim();
+  if (sdkOutputText) return sdkOutputText;
+
+  const outputTextParts = (response.output ?? [])
+    .map((item) => asRecord(item))
+    .filter((item): item is Record<string, unknown> => item !== null)
+    .flatMap((item) => {
+      const directText = extractTextFromContentItem(item);
+      const content = Array.isArray(item.content)
+        ? item.content
+        : Array.isArray(item.output)
+        ? item.output
+        : [];
+
+      return [
+        item.type === "output_text" ? directText : "",
+        ...content.map(extractTextFromContentItem),
+      ];
+    })
+    .map((text) => text.trim())
+    .filter((text) => text.length > 0);
+
+  return outputTextParts.join("\n").trim();
 }
 
 const readSelectedProposalId = (
@@ -654,7 +1000,7 @@ const isFollowUpOptionTurn = (request: CompanionAgentRequest): boolean =>
   request.turnOrigin === "follow_up_option" ||
   request.turnOrigin === undefined;
 
-const isDeterministicScheduleReadRequest = (
+export const isCompanionScheduleReadFastPathRequest = (
   request: CompanionAgentRequest,
 ): boolean => {
   if (request.selectedProposalId || request.selectedProposedAction) {
@@ -665,6 +1011,26 @@ const isDeterministicScheduleReadRequest = (
     isUpcomingScheduleDigestMessage(request.message) ||
     isScheduleReadMessage(request.message);
 };
+
+const isDeterministicScheduleReadRequest =
+  isCompanionScheduleReadFastPathRequest;
+
+const looksLikePlannerActionMessage = (message: string): boolean => {
+  const normalized = normalizeBareStarterPrompt(message);
+  return /\b(add|block|calendar|catch up|create|deadline|delete|do next|finish|habit|make|move|plan|quest|remind|reschedule|ritual|schedule|task|today|tomorrow|week)\b/
+    .test(normalized);
+};
+
+const isFreeTalkProviderFallbackRequest = (
+  request: CompanionAgentRequest,
+): boolean =>
+  !request.starterIntent &&
+  !request.selectedProposalId &&
+  !request.selectedProposedAction &&
+  !request.activeFollowUp &&
+  (request.activeProposedActions?.length ?? 0) === 0 &&
+  !isDeterministicScheduleReadRequest(request) &&
+  !looksLikePlannerActionMessage(request.message);
 
 const getScheduleReadStarterIntent = (
   request: CompanionAgentRequest,
@@ -1000,12 +1366,16 @@ function buildActiveFollowUpClarifyAgentResult(params: {
   };
 }
 
-const buildAgentDecisionMetadata = (result: AgentRunResult["result"]) => ({
+const buildAgentDecisionMetadata = (
+  result: AgentRunResult["result"],
+  providerDiagnostics?: OpenAIProviderDiagnostics | null,
+) => ({
   understandingState: result.understandingState,
   followUp: result.followUp,
   proposedActions: result.proposedActions,
   assumptions: result.assumptions,
   evidenceIds: result.evidenceIds,
+  ...(providerDiagnostics ? { providerDiagnostics } : {}),
 });
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -1080,18 +1450,108 @@ const createPreparedAction = (
   ...input,
 });
 
-async function loadCompanionId(supabase: any, userId: string) {
-  const companion = await maybeSingle<UserCompanionRow>(
-    supabase
-      .from("user_companion")
-      .select(
+const isSchemaCompatibilityError = (error: unknown): boolean => {
+  const source = typeof error === "object" && error
+    ? JSON.stringify(error).toLowerCase()
+    : String(error).toLowerCase();
+
+  return source.includes("does not exist") ||
+    source.includes("undefined_table") ||
+    source.includes("undefined_column") ||
+    source.includes("schema cache") ||
+    source.includes("relation") ||
+    source.includes("column");
+};
+
+const normalizeCompanionRow = (
+  row: Record<string, unknown> | null,
+): UserCompanionRow | null => {
+  if (!row || typeof row.id !== "string" || row.id.length === 0) return null;
+
+  return {
+    id: row.id,
+    companion_name: typeof row.companion_name === "string"
+      ? row.companion_name
+      : null,
+    cached_creature_name: typeof row.cached_creature_name === "string"
+      ? row.cached_creature_name
+      : null,
+    preset_id: typeof row.preset_id === "string" ? row.preset_id : null,
+    spirit_animal: typeof row.spirit_animal === "string"
+      ? row.spirit_animal
+      : null,
+    core_element: typeof row.core_element === "string"
+      ? row.core_element
+      : null,
+    current_stage: typeof row.current_stage === "number"
+      ? row.current_stage
+      : null,
+    current_mood: typeof row.current_mood === "string"
+      ? row.current_mood
+      : null,
+  };
+};
+
+async function loadCompanionId(
+  supabase: any,
+  userId: string,
+  requestId?: string | null,
+) {
+  const loadWithSelect = async (selectColumns: string) =>
+    maybeSingle<Record<string, unknown>>(
+      supabase
+        .from("user_companion")
+        .select(selectColumns)
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    );
+
+  const companionSelects = [
+    {
+      source: "user_companion.identity_extended",
+      columns:
         "id, companion_name, cached_creature_name, preset_id, spirit_animal, core_element, current_stage, current_mood",
-      )
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-  );
+    },
+    {
+      source: "user_companion.identity_without_cached_name",
+      columns:
+        "id, companion_name, preset_id, spirit_animal, core_element, current_stage, current_mood",
+    },
+    {
+      source: "user_companion.identity_minimal",
+      columns: "id, companion_name, preset_id, spirit_animal, core_element",
+    },
+    {
+      source: "user_companion.identity_id_only",
+      columns: "id",
+    },
+  ];
+
+  let companion: UserCompanionRow | null = null;
+  let lastSchemaError: unknown = null;
+
+  for (const [index, select] of companionSelects.entries()) {
+    try {
+      companion = normalizeCompanionRow(await loadWithSelect(select.columns));
+      break;
+    } catch (error) {
+      if (!isSchemaCompatibilityError(error)) throw error;
+      lastSchemaError = error;
+      logCompanionAgentBestEffortFailure({
+        requestId,
+        subStage: "context_load",
+        source: select.source,
+        required: index === companionSelects.length - 1,
+        error,
+      });
+    }
+  }
+
+  if (!companion && lastSchemaError) {
+    throw lastSchemaError;
+  }
 
   if (!companion?.id) {
     throw new Error("Companion not found");
@@ -1142,10 +1602,52 @@ async function loadCompanionAgentContext(params: {
   companionId: string;
   sessionId: string;
   request: CompanionAgentRequest;
+  requestId?: string | null;
 }) {
   const range = buildDateRange(params.request);
+  const scheduleReadFastPath = isCompanionScheduleReadFastPathRequest(
+    params.request,
+  );
+  const loadWarnings: CompanionAgentContextLoadWarning[] = [];
+  const emptyRowsResult = () => ({ data: [], error: null });
+  const emptySingleResult = () => ({ data: null, error: null });
+  const queryBestEffort = (
+    source: string,
+    required: boolean,
+    fallback: { data: unknown; error: null },
+    query: PromiseLike<{ data?: unknown; error?: unknown }>,
+  ) =>
+    loadCompanionContextBestEffort({
+      requestId: params.requestId,
+      source,
+      required,
+      fallback,
+      warnings: loadWarnings,
+      load: async () => {
+        const result = await query;
+        if (result.error) throw result.error;
+        return { ...result, error: null };
+      },
+    });
 
-  const [
+  let thread: any;
+  let messages: any;
+  let activePendingAction: any;
+  let datedTasksResult: any;
+  let inboxTasksResult: any;
+  let recentCompletedTasksResult: any;
+  let ritualsResult: any;
+  let campaignsResult: any;
+  let calendarResult: any;
+  let aiLearning: any;
+  let plannerPreferences: any;
+  let profileResult: any;
+  let aiPreferences: any;
+  let companionMemories: any;
+  let reflections: any;
+  let dailyCheckIns: any;
+
+  [
     thread,
     messages,
     activePendingAction,
@@ -1163,140 +1665,231 @@ async function loadCompanionAgentContext(params: {
     reflections,
     dailyCheckIns,
   ] = await Promise.all([
-    loadThread(params.supabase, params.userId, params.sessionId),
-    loadRecentMessages(params.supabase, params.userId, params.sessionId, 20),
-    loadActivePendingAction(params.supabase, params.userId, params.sessionId),
-    params.supabase
-      .from("daily_tasks")
-      .select(
-        "id, task_text, task_date, category, scheduled_time, estimated_duration, actual_time_spent, completed, completed_at, epic_id, habit_source_id, priority, location, notes, reminder_enabled, reminder_minutes_before, recurrence_pattern, recurrence_end_date",
-      )
-      .eq("user_id", params.userId)
-      .gte("task_date", range.start)
-      .lte("task_date", range.end)
-      .order("task_date", { ascending: true })
-      .order("scheduled_time", { ascending: true, nullsFirst: false })
-      .limit(MAX_TASKS),
-    params.supabase
-      .from("daily_tasks")
-      .select(
-        "id, task_text, task_date, category, scheduled_time, estimated_duration, actual_time_spent, completed, completed_at, epic_id, habit_source_id, priority, location, notes, reminder_enabled, reminder_minutes_before, recurrence_pattern, recurrence_end_date",
-      )
-      .eq("user_id", params.userId)
-      .is("task_date", null)
-      .order("created_at", { ascending: false })
-      .limit(MAX_INBOX_TASKS),
-    params.supabase
-      .from("daily_tasks")
-      .select(
-        "id, task_text, task_date, category, scheduled_time, estimated_duration, actual_time_spent, completed, completed_at, epic_id, habit_source_id, priority, location, notes, reminder_enabled, reminder_minutes_before, recurrence_pattern, recurrence_end_date",
-      )
-      .eq("user_id", params.userId)
-      .eq("completed", true)
-      .not("completed_at", "is", null)
-      .gte(
-        "completed_at",
-        `${
-          addDays(toDateOnly(params.request.currentDateTime), -13)
-        }T00:00:00.000Z`,
-      )
-      .lte(
-        "completed_at",
-        `${toDateOnly(params.request.currentDateTime)}T23:59:59.999Z`,
-      )
-      .order("completed_at", { ascending: false })
-      .limit(MAX_RECENT_COMPLETED_TASKS),
-    params.supabase
-      .from("habits")
-      .select(
-        "id, title, frequency, preferred_time, estimated_minutes, description, category, reminder_enabled, reminder_minutes_before",
-      )
-      .eq("user_id", params.userId)
-      .eq("is_active", true)
-      .order("created_at", { ascending: false })
-      .limit(MAX_RITUALS),
-    params.supabase
-      .from("epics")
-      .select(
-        "id, title, description, start_date, end_date, status, target_days, progress_percentage",
-      )
-      .eq("user_id", params.userId)
-      .eq("status", "active")
-      .is("completed_at", null)
-      .order("updated_at", { ascending: false })
-      .limit(MAX_CAMPAIGNS),
-    params.supabase
-      .from("external_calendar_events")
-      .select(
-        "id, title, start_time, end_time, is_all_day, location, description, source",
-      )
-      .eq("user_id", params.userId)
-      .lt("start_time", `${addDays(range.end, 1)}T00:00:00`)
-      .gte("end_time", `${range.start}T00:00:00`)
-      .order("start_time", { ascending: true })
-      .limit(MAX_CALENDAR_EVENTS),
-    params.supabase
-      .from("user_ai_learning")
-      .select(
-        "conversation_profile, common_contexts, peak_productivity_times, preferred_epic_duration, preferred_habit_frequency, preferred_habit_difficulty, successful_patterns",
-      )
-      .eq("user_id", params.userId)
-      .maybeSingle(),
-    params.supabase
-      .from("daily_planning_preferences")
-      .select("preferred_work_blocks, wake_time, wind_down_time")
-      .eq("user_id", params.userId)
-      .maybeSingle(),
-    params.supabase
-      .from("profiles")
-      .select("onboarding_data")
-      .eq("id", params.userId)
-      .maybeSingle(),
-    loadUserAIPreferences(params.supabase, params.userId),
-    params.supabase
-      .from("companion_memories")
-      .select(
-        "id, memory_type, memory_date, memory_context, created_at, last_referenced_at",
-      )
-      .eq("user_id", params.userId)
-      .eq("companion_id", params.companionId)
-      .order("last_referenced_at", { ascending: false, nullsFirst: false })
-      .order("created_at", { ascending: false })
-      .limit(MAX_REFLECTIONS),
-    params.supabase
-      .from("user_reflections")
-      .select("id, mood, note, reflection_date, created_at")
-      .eq("user_id", params.userId)
-      .order("created_at", { ascending: false })
-      .limit(MAX_REFLECTIONS),
-    params.supabase
-      .from("daily_check_ins")
-      .select(
-        "id, check_in_type, mood, reflection, intention, completed_at, created_at",
-      )
-      .eq("user_id", params.userId)
-      .order("created_at", { ascending: false })
-      .limit(MAX_REFLECTIONS),
+    loadCompanionContextBestEffort({
+      requestId: params.requestId,
+      source: "companion_chat_threads",
+      required: false,
+      fallback: null,
+      warnings: loadWarnings,
+      load: () => loadThread(params.supabase, params.userId, params.sessionId),
+    }),
+    loadCompanionContextBestEffort({
+      requestId: params.requestId,
+      source: "companion_chats",
+      required: false,
+      fallback: [],
+      warnings: loadWarnings,
+      load: () =>
+        loadRecentMessages(
+          params.supabase,
+          params.userId,
+          params.sessionId,
+          20,
+        ),
+    }),
+    loadCompanionContextBestEffort({
+      requestId: params.requestId,
+      source: "companion_pending_actions",
+      required: false,
+      fallback: null,
+      warnings: loadWarnings,
+      load: () =>
+        loadActivePendingAction(
+          params.supabase,
+          params.userId,
+          params.sessionId,
+        ),
+    }),
+    queryBestEffort(
+      "daily_tasks.dated",
+      true,
+      emptyRowsResult(),
+      params.supabase
+        .from("daily_tasks")
+        .select(
+          "id, task_text, task_date, category, scheduled_time, estimated_duration, actual_time_spent, completed, completed_at, epic_id, habit_source_id, priority, location, notes, reminder_enabled, reminder_minutes_before, recurrence_pattern, recurrence_end_date",
+        )
+        .eq("user_id", params.userId)
+        .gte("task_date", range.start)
+        .lte("task_date", range.end)
+        .order("task_date", { ascending: true })
+        .order("scheduled_time", { ascending: true, nullsFirst: false })
+        .limit(MAX_TASKS),
+    ),
+    queryBestEffort(
+      "daily_tasks.inbox",
+      true,
+      emptyRowsResult(),
+      params.supabase
+        .from("daily_tasks")
+        .select(
+          "id, task_text, task_date, category, scheduled_time, estimated_duration, actual_time_spent, completed, completed_at, epic_id, habit_source_id, priority, location, notes, reminder_enabled, reminder_minutes_before, recurrence_pattern, recurrence_end_date",
+        )
+        .eq("user_id", params.userId)
+        .is("task_date", null)
+        .order("created_at", { ascending: false })
+        .limit(MAX_INBOX_TASKS),
+    ),
+    queryBestEffort(
+      "daily_tasks.recent_completed",
+      false,
+      emptyRowsResult(),
+      params.supabase
+        .from("daily_tasks")
+        .select(
+          "id, task_text, task_date, category, scheduled_time, estimated_duration, actual_time_spent, completed, completed_at, epic_id, habit_source_id, priority, location, notes, reminder_enabled, reminder_minutes_before, recurrence_pattern, recurrence_end_date",
+        )
+        .eq("user_id", params.userId)
+        .eq("completed", true)
+        .not("completed_at", "is", null)
+        .gte(
+          "completed_at",
+          `${
+            addDays(toDateOnly(params.request.currentDateTime), -13)
+          }T00:00:00.000Z`,
+        )
+        .lte(
+          "completed_at",
+          `${toDateOnly(params.request.currentDateTime)}T23:59:59.999Z`,
+        )
+        .order("completed_at", { ascending: false })
+        .limit(MAX_RECENT_COMPLETED_TASKS),
+    ),
+    queryBestEffort(
+      "habits",
+      true,
+      emptyRowsResult(),
+      params.supabase
+        .from("habits")
+        .select(
+          "id, title, frequency, preferred_time, estimated_minutes, description, category, reminder_enabled, reminder_minutes_before",
+        )
+        .eq("user_id", params.userId)
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(MAX_RITUALS),
+    ),
+    queryBestEffort(
+      "epics",
+      true,
+      emptyRowsResult(),
+      params.supabase
+        .from("epics")
+        .select(
+          "id, title, description, start_date, end_date, status, target_days, progress_percentage",
+        )
+        .eq("user_id", params.userId)
+        .eq("status", "active")
+        .is("completed_at", null)
+        .order("updated_at", { ascending: false })
+        .limit(MAX_CAMPAIGNS),
+    ),
+    queryBestEffort(
+      "external_calendar_events",
+      true,
+      emptyRowsResult(),
+      params.supabase
+        .from("external_calendar_events")
+        .select(
+          "id, title, start_time, end_time, is_all_day, location, description, source",
+        )
+        .eq("user_id", params.userId)
+        .lt("start_time", `${addDays(range.end, 1)}T00:00:00`)
+        .gte("end_time", `${range.start}T00:00:00`)
+        .order("start_time", { ascending: true })
+        .limit(MAX_CALENDAR_EVENTS),
+    ),
+    queryBestEffort(
+      "user_ai_learning",
+      false,
+      emptySingleResult(),
+      params.supabase
+        .from("user_ai_learning")
+        .select(
+          "conversation_profile, common_contexts, peak_productivity_times, preferred_epic_duration, preferred_habit_frequency, preferred_habit_difficulty, successful_patterns",
+        )
+        .eq("user_id", params.userId)
+        .maybeSingle(),
+    ),
+    queryBestEffort(
+      "daily_planning_preferences",
+      false,
+      emptySingleResult(),
+      params.supabase
+        .from("daily_planning_preferences")
+        .select("preferred_work_blocks, wake_time, wind_down_time")
+        .eq("user_id", params.userId)
+        .maybeSingle(),
+    ),
+    queryBestEffort(
+      "profiles",
+      false,
+      emptySingleResult(),
+      params.supabase
+        .from("profiles")
+        .select("onboarding_data")
+        .eq("id", params.userId)
+        .maybeSingle(),
+    ),
+    loadCompanionContextBestEffort({
+      requestId: params.requestId,
+      source: "user_ai_preferences",
+      required: false,
+      fallback: null,
+      warnings: loadWarnings,
+      load: () => loadUserAIPreferences(params.supabase, params.userId),
+    }),
+    queryBestEffort(
+      "companion_memories",
+      false,
+      emptyRowsResult(),
+      params.supabase
+        .from("companion_memories")
+        .select(
+          "id, memory_type, memory_date, memory_context, created_at, last_referenced_at",
+        )
+        .eq("user_id", params.userId)
+        .eq("companion_id", params.companionId)
+        .order("last_referenced_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
+        .limit(MAX_REFLECTIONS),
+    ),
+    queryBestEffort(
+      "user_reflections",
+      false,
+      emptyRowsResult(),
+      params.supabase
+        .from("user_reflections")
+        .select("id, mood, note, reflection_date, created_at")
+        .eq("user_id", params.userId)
+        .order("created_at", { ascending: false })
+        .limit(MAX_REFLECTIONS),
+    ),
+    queryBestEffort(
+      "daily_check_ins",
+      false,
+      emptyRowsResult(),
+      params.supabase
+        .from("daily_check_ins")
+        .select(
+          "id, check_in_type, mood, reflection, intention, completed_at, created_at",
+        )
+        .eq("user_id", params.userId)
+        .order("created_at", { ascending: false })
+        .limit(MAX_REFLECTIONS),
+    ),
   ]);
 
-  const check = (result: { error: any }) => {
-    if (result.error) throw result.error;
-  };
-
-  [
-    datedTasksResult,
-    inboxTasksResult,
-    recentCompletedTasksResult,
-    ritualsResult,
-    campaignsResult,
-    calendarResult,
-    aiLearning,
-    plannerPreferences,
-    profileResult,
-    companionMemories,
-    reflections,
-    dailyCheckIns,
-  ].forEach(check);
+  const requiredContextWarnings = loadWarnings.filter((warning) =>
+    warning.required
+  );
+  if (!scheduleReadFastPath && requiredContextWarnings.length > 0) {
+    throw new Error(
+      `Required companion planner context unavailable: ${
+        requiredContextWarnings.map((warning) => warning.source).join(", ")
+      }`,
+    );
+  }
 
   const datedTasks = (datedTasksResult.data ?? []) as Array<
     Record<string, unknown>
@@ -1304,18 +1897,50 @@ async function loadCompanionAgentContext(params: {
   const inboxTasks = (inboxTasksResult.data ?? []) as Array<
     Record<string, unknown>
   >;
-  const recentCompletedTasks = await attachActualDurationMinutes(
-    params.supabase,
-    params.userId,
-    (recentCompletedTasksResult.data ?? []) as Array<Record<string, unknown>>,
-  );
+  const recentCompletedTaskRows =
+    (recentCompletedTasksResult.data ?? []) as Array<
+      Record<string, unknown>
+    >;
+  const recentCompletedTasks = await loadCompanionContextBestEffort({
+    requestId: params.requestId,
+    source: "focus_sessions.recent_completed_duration",
+    required: false,
+    fallback: recentCompletedTaskRows.map((task) => ({
+      ...task,
+      actual_duration_minutes: null,
+    })),
+    warnings: loadWarnings,
+    load: () =>
+      attachActualDurationMinutes(
+        params.supabase,
+        params.userId,
+        recentCompletedTaskRows,
+      ),
+  });
   const tasks = [...datedTasks, ...inboxTasks];
-  const rituals = await attachRitualActualDurationMinutes(
-    params.supabase,
-    params.userId,
-    (ritualsResult.data ?? []) as Array<Record<string, unknown>>,
-    `${addDays(toDateOnly(params.request.currentDateTime), -59)}T00:00:00.000Z`,
-  );
+  const ritualRows = (ritualsResult.data ?? []) as Array<
+    Record<string, unknown>
+  >;
+  const ritualDurationStart = `${
+    addDays(toDateOnly(params.request.currentDateTime), -59)
+  }T00:00:00.000Z`;
+  const rituals = await loadCompanionContextBestEffort({
+    requestId: params.requestId,
+    source: "focus_sessions.ritual_duration",
+    required: false,
+    fallback: ritualRows.map((ritual) => ({
+      ...ritual,
+      actual_duration_minutes: null,
+    })),
+    warnings: loadWarnings,
+    load: () =>
+      attachRitualActualDurationMinutes(
+        params.supabase,
+        params.userId,
+        ritualRows,
+        ritualDurationStart,
+      ),
+  });
   const campaigns = (campaignsResult.data ?? []) as Array<
     Record<string, unknown>
   >;
@@ -1408,6 +2033,7 @@ async function loadCompanionAgentContext(params: {
     visibleDateEnd: range.end,
     currentDateTime: params.request.currentDateTime,
     timezone: range.timezone,
+    ...(loadWarnings.length > 0 ? { loadWarnings } : {}),
   };
 
   return context;
@@ -1692,7 +2318,12 @@ async function createOpenAIConversation(params: {
   openAIApiKey?: string;
 }) {
   const openAIApiKey = params.openAIApiKey ?? getOptionalEnv("OPENAI_API_KEY");
-  if (!openAIApiKey) throw new Error("OPENAI_API_KEY not configured");
+  if (!openAIApiKey) {
+    throw buildOpenAIProviderError({
+      operation: "api_key",
+      message: "OPENAI_API_KEY not configured",
+    });
+  }
 
   let response: Response;
   try {
@@ -1712,19 +2343,29 @@ async function createOpenAIConversation(params: {
       }),
     });
   } catch (error) {
-    throw new Error(
-      `OpenAI conversation create failed: ${getErrorMessage(error)}`,
-    );
+    throw buildOpenAIProviderError({
+      operation: "conversation",
+      message: `OpenAI conversation create failed: ${getErrorMessage(error)}`,
+    });
   }
 
   if (!response.ok) {
-    throw new Error(
-      `OpenAI conversation create failed: ${await response.text()}`,
-    );
+    throw buildOpenAIProviderError({
+      operation: "conversation",
+      message: `OpenAI conversation create failed: ${await response.text()}`,
+      status: response.status,
+      requestId: readOpenAIRequestId(response),
+    });
   }
 
   const body = await response.json() as { id?: string };
-  if (!body.id) throw new Error("OpenAI conversation id missing");
+  if (!body.id) {
+    throw buildOpenAIProviderError({
+      operation: "conversation",
+      message: "OpenAI conversation id missing",
+      requestId: readOpenAIRequestId(response),
+    });
+  }
   return body.id;
 }
 
@@ -1738,10 +2379,17 @@ async function createOpenAIResponse(params: {
   openAIApiKey?: string;
 }) {
   const openAIApiKey = params.openAIApiKey ?? getOptionalEnv("OPENAI_API_KEY");
-  if (!openAIApiKey) throw new Error("OPENAI_API_KEY not configured");
+  const model = resolveCompanionAgentModel();
+  if (!openAIApiKey) {
+    throw buildOpenAIProviderError({
+      operation: "api_key",
+      message: "OPENAI_API_KEY not configured",
+      model,
+    });
+  }
 
   const body: Record<string, unknown> = {
-    model: resolveCompanionAgentModel(),
+    model,
     instructions: params.instructions,
     input: params.input,
     tools: params.tools,
@@ -1768,12 +2416,22 @@ async function createOpenAIResponse(params: {
       body: JSON.stringify(body),
     });
   } catch (error) {
-    throw new Error(`OpenAI responses call failed: ${getErrorMessage(error)}`);
+    throw buildOpenAIProviderError({
+      operation: "response",
+      message: `OpenAI responses call failed: ${getErrorMessage(error)}`,
+      model,
+    });
   }
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`OpenAI responses call failed: ${errorText}`);
+    throw buildOpenAIProviderError({
+      operation: "response",
+      message: `OpenAI responses call failed: ${errorText}`,
+      model,
+      status: response.status,
+      requestId: readOpenAIRequestId(response),
+    });
   }
 
   return await response.json() as OpenAIResponseBody;
@@ -2392,10 +3050,14 @@ function isLinkageError(error: unknown) {
   const message = error instanceof Error
     ? error.message.toLowerCase()
     : String(error).toLowerCase();
-  return message.includes("previous_response_id") ||
-    message.includes("conversation") ||
-    message.includes("not found") ||
-    message.includes("invalid");
+  const hasPreviousResponseLinkage = message.includes("previous_response_id") ||
+    message.includes("previous response");
+  const hasConversationLinkage = message.includes("conversation") &&
+    (message.includes("not found") ||
+      message.includes("invalid") ||
+      message.includes("missing"));
+
+  return hasPreviousResponseLinkage || hasConversationLinkage;
 }
 
 function getErrorMessage(error: unknown) {
@@ -2403,6 +3065,8 @@ function getErrorMessage(error: unknown) {
 }
 
 function isOpenAIProviderFallbackError(error: unknown) {
+  if (error instanceof OpenAIProviderError) return true;
+
   const message = getErrorMessage(error).toLowerCase();
   const isOpenAIError = message.includes("openai_api_key not configured") ||
     message.includes("openai conversation create failed") ||
@@ -2456,6 +3120,109 @@ function mapPlannerFallbackIntent(
 
   const hintIntent = plannerResult.actionHints[0]?.intent;
   return hintIntent ?? "unknown";
+}
+
+const getRequiredScheduleReadContextWarnings = (
+  context: LoadedCompanionAgentContext,
+) => (context.loadWarnings ?? []).filter((warning) => warning.required);
+
+function buildScheduleReadContextUnavailableResult(params: {
+  request: CompanionAgentRequest;
+  context: LoadedCompanionAgentContext;
+  warnings: CompanionAgentContextLoadWarning[];
+}): AgentRunResult {
+  console.warn("[companion-agent] schedule read core context unavailable", {
+    sessionId: params.request.sessionId,
+    sources: params.warnings.map((warning) => warning.source),
+  });
+
+  return {
+    result: {
+      reply:
+        "I couldn’t load your planner right now, so I don’t want to guess at what’s coming up. Please try again in a moment.",
+      mode: "schedule_read" as CompanionAgentMode,
+      intent: "check_calendar" as CompanionAgentIntent,
+      confidence: 0.1,
+      understandingState:
+        "enough_to_discuss" as CompanionAgentUnderstandingState,
+      followUp: null,
+      proposedActions: [],
+      assumptions: [],
+      evidenceIds: [],
+      structuredResponse: null,
+      preparedActionId: null,
+    },
+    openaiConversationId: params.context.thread?.openai_conversation_id ?? null,
+    lastOpenAIResponseId: params.context.thread?.last_openai_response_id ??
+      null,
+    draftDecisionSource: "deterministic",
+  };
+}
+
+function buildDeterministicScheduleReadResult(params: {
+  request: CompanionAgentRequest;
+  context: LoadedCompanionAgentContext;
+}): AgentRunResult {
+  const plannerStarterIntent = getScheduleReadStarterIntent(params.request);
+  const plannerResult = consultPlannerForAgent({
+    message: params.request.message,
+    currentDateTime: params.context.currentDateTime,
+    selectedDate: params.request.selectedDate ?? null,
+    surface: params.request.surface,
+    horizon: "day",
+    starterIntent: plannerStarterIntent,
+    activeFollowUp: null,
+    context: params.context,
+  });
+  const mode = plannerResult.questions.length > 0
+    ? "clarify" as CompanionAgentMode
+    : plannerResult.mode === "proposal" ||
+        plannerResult.mode === "schedule_read"
+    ? "schedule_read" as CompanionAgentMode
+    : "conversation" as CompanionAgentMode;
+  const followUp = plannerResult.questions[0]
+    ? {
+      question: plannerResult.questions[0].prompt,
+      reason: plannerResult.questions[0].reason ?? null,
+      expectedAnswerType: plannerResult.questions[0].options?.length
+        ? "choice" as const
+        : "free_text" as const,
+      options: plannerResult.questions[0].options ?? [],
+      blocksDrafting: true,
+      metadata: {
+        ...(plannerResult.questions[0].metadata ?? {}),
+        questionId: plannerResult.questions[0].id,
+      },
+    }
+    : null;
+
+  return {
+    result: {
+      reply: plannerResult.reply,
+      mode,
+      intent: mapPlannerFallbackIntent(plannerResult),
+      confidence: 0.82,
+      understandingState: deriveUnderstandingState({ mode, followUp }),
+      followUp,
+      proposedActions: plannerResult.actionHints
+        .filter((hint) => hint.actionType && hint.normalizedPayload)
+        .map((hint) => ({
+          type: hint.actionType ?? "unknown",
+          summary: hint.summary,
+          reason: hint.unsupportedReason ?? null,
+          normalizedPayload: hint.normalizedPayload ?? {},
+          confidence: 0.55,
+        })),
+      assumptions: [],
+      evidenceIds: [],
+      structuredResponse: plannerResult.structuredResponse ?? null,
+      preparedActionId: null,
+    },
+    openaiConversationId: params.context.thread?.openai_conversation_id ?? null,
+    lastOpenAIResponseId: params.context.thread?.last_openai_response_id ??
+      null,
+    draftDecisionSource: "deterministic",
+  };
 }
 
 function buildPreparedCandidateFromPlannerHint(
@@ -2793,7 +3560,7 @@ const buildPreparedCandidateFromProposedAction = (
 export async function runCompanionAgent(params: RunAgentParams) {
   const companion = await wrapSubStage(
     "context_load",
-    () => loadCompanionId(params.supabase, params.userId),
+    () => loadCompanionId(params.supabase, params.userId, params.requestId),
   );
   const context = await wrapSubStage(
     "context_load",
@@ -2804,8 +3571,28 @@ export async function runCompanionAgent(params: RunAgentParams) {
         companionId: companion.id,
         sessionId: params.request.sessionId,
         request: params.request,
+        requestId: params.requestId,
       }),
   );
+
+  const scheduleReadFastPath = isCompanionScheduleReadFastPathRequest(
+    params.request,
+  );
+  const requiredScheduleReadWarnings = scheduleReadFastPath
+    ? getRequiredScheduleReadContextWarnings(context)
+    : [];
+  let agentResult: AgentRunResult | null = scheduleReadFastPath
+    ? requiredScheduleReadWarnings.length > 0
+      ? buildScheduleReadContextUnavailableResult({
+        request: params.request,
+        context,
+        warnings: requiredScheduleReadWarnings,
+      })
+      : buildDeterministicScheduleReadResult({
+        request: params.request,
+        context,
+      })
+    : null;
 
   const preparedActions = new Map<string, PendingActionCandidate>();
 
@@ -2859,35 +3646,34 @@ export async function runCompanionAgent(params: RunAgentParams) {
         evidenceIds: [],
       };
 
-      const persistenceReady = await wrapSubStage(
-        "persistence",
-        () =>
-          withCompanionChatPersistenceCapability(async () => {
-            const responsePendingAction = mapPendingActionForResponse(
-              persistedPendingAction,
-            );
-            await persistAgentTurn({
-              supabase: params.supabase,
-              userId: params.userId,
-              companionId: companion.id,
-              sessionId: params.request.sessionId,
-              surface: params.request.surface,
-              userMessage: null,
-              assistantReply:
-                "I pulled that suggestion into a confirmable action. Review it and confirm if it fits.",
-              inputMode: params.request.inputMode,
-              openaiConversationId: context.thread?.openai_conversation_id ??
-                null,
-              lastOpenAIResponseId: context.thread?.last_openai_response_id ??
-                null,
-              assistantMode: "pending_confirmation",
-              assistantIntent: candidate.intent,
-              agentDecision: selectedProposalDecision,
-              structuredResponse: plannerResult.structuredResponse ?? null,
-              pendingAction: responsePendingAction,
-            });
-          }),
-      );
+      const persistenceReady = await persistAgentTurnBestEffort({
+        requestId: params.requestId,
+        persistConversation: async () => {
+          const responsePendingAction = mapPendingActionForResponse(
+            persistedPendingAction,
+          );
+          await persistAgentTurn({
+            supabase: params.supabase,
+            userId: params.userId,
+            companionId: companion.id,
+            sessionId: params.request.sessionId,
+            surface: params.request.surface,
+            userMessage: null,
+            assistantReply:
+              "I pulled that suggestion into a confirmable action. Review it and confirm if it fits.",
+            inputMode: params.request.inputMode,
+            openaiConversationId: context.thread?.openai_conversation_id ??
+              null,
+            lastOpenAIResponseId: context.thread?.last_openai_response_id ??
+              null,
+            assistantMode: "pending_confirmation",
+            assistantIntent: candidate.intent,
+            agentDecision: selectedProposalDecision,
+            structuredResponse: plannerResult.structuredResponse ?? null,
+            pendingAction: responsePendingAction,
+          });
+        },
+      });
 
       console.log("[companion-agent] prepared planner suggestion", {
         sessionId: params.request.sessionId,
@@ -2922,407 +3708,522 @@ export async function runCompanionAgent(params: RunAgentParams) {
       };
     }
   }
-  const executeTool = buildToolExecutor({
-    context,
-    preparedActions,
-    requestMessage: params.request.message,
-    surface: params.request.surface,
-    request: params.request,
-  });
-  const tools = buildToolDefinitions();
-  const instructions = buildInstructions({
-    surface: params.request.surface,
-    currentDateTime: params.request.currentDateTime,
-    companion,
-    context,
-    request: params.request,
-  });
-
-  const runResponseLoop = async (transport: {
-    conversationId?: string | null;
-    previousResponseId?: string | null;
-    manualHistory: boolean;
-  }): Promise<AgentRunResult> => {
-    let response = await createOpenAIResponse({
-      guardedFetch: params.guardedFetch,
-      input: buildInitialInput({
-        context,
-        request: params.request,
-        manualHistory: transport.manualHistory,
-      }),
-      instructions,
-      conversationId: transport.conversationId,
-      previousResponseId: transport.previousResponseId,
-      tools,
-      openAIApiKey: params.openAIApiKey,
+  if (!agentResult) {
+    const executeTool = buildToolExecutor({
+      context,
+      preparedActions,
+      requestMessage: params.request.message,
+      surface: params.request.surface,
+      request: params.request,
+    });
+    const tools = buildToolDefinitions();
+    const instructions = buildInstructions({
+      surface: params.request.surface,
+      currentDateTime: params.request.currentDateTime,
+      companion,
+      context,
+      request: params.request,
     });
 
-    let currentConversationId = response.conversation?.id ??
-      transport.conversationId ?? null;
-    let currentPreviousResponseId = response.id;
-
-    for (let loop = 0; loop < MAX_TOOL_LOOPS; loop += 1) {
-      const functionCalls = getFunctionCalls(response);
-      if (functionCalls.length === 0) {
-        const outputReply = response.output_text?.trim() ?? "";
-        const activeFollowUp = params.request.activeFollowUp ??
-          getPersistedActiveFollowUp(context);
-        if (
-          (!outputReply || isThinGenericAgentReply(outputReply)) &&
-          isDeterministicScheduleReadRequest(params.request)
-        ) {
-          return buildPlannerFallbackResult("thin_schedule_read_output", {
-            starterIntent: getScheduleReadStarterIntent(params.request),
-            ignoreActiveFollowUp: true,
-            confidence: 0.82,
-            suppressWarning: true,
-          });
-        }
-        if (
-          isFollowUpOptionTurn(params.request) &&
-          activeFollowUp &&
-          (!outputReply || isThinGenericAgentReply(outputReply))
-        ) {
-          const planningStarterIntent = getPlanningStarterIntentFromFollowUp(
-            activeFollowUp,
-          );
-          return buildActiveFollowUpClarifyAgentResult({
-            followUp: activeFollowUp,
-            intent: isPlanningLauncherFollowUpQuestion(activeFollowUp)
-              ? mapPlanningStarterIntentToAgentIntent(planningStarterIntent)
-              : "unknown",
-            confidence: 0.25,
-            context,
-            openaiConversationId: currentConversationId,
-            lastOpenAIResponseId: currentPreviousResponseId,
-          });
-        }
-
-        return {
-          result: {
-            reply: outputReply && !isThinGenericAgentReply(outputReply)
-              ? outputReply
-              : "I need a little more to help. Tell me what you want to do next.",
-            mode: "conversation" as CompanionAgentMode,
-            intent: "unknown" as CompanionAgentIntent,
-            confidence: 0.25,
-            understandingState:
-              "enough_to_discuss" as CompanionAgentUnderstandingState,
-            followUp: null,
-            proposedActions: [],
-            assumptions: [],
-            evidenceIds: [],
-            structuredResponse: null,
-            preparedActionId: null,
-          },
-          openaiConversationId: currentConversationId,
-          lastOpenAIResponseId: currentPreviousResponseId,
-          draftDecisionSource: "model",
-        };
-      }
-
-      const finalCall = functionCalls.find((call) =>
-        call.name === "submit_companion_result"
-      );
-      if (finalCall) {
-        const payload = SubmitCompanionResultSchema.parse(
-          JSON.parse(finalCall.arguments || "{}"),
-        );
-        const payloadReply = payload.reply.trim();
-        const followUp = payload.follow_up ?? null;
-        const preparedActionId = payload.prepared_action_id ?? null;
-        const activeFollowUp = params.request.activeFollowUp ??
-          getPersistedActiveFollowUp(context);
-        const followUpToPreserve = activeFollowUp ?? followUp;
-        if (
-          isThinGenericAgentReply(payloadReply) &&
-          isDeterministicScheduleReadRequest(params.request)
-        ) {
-          return buildPlannerFallbackResult("thin_schedule_read_result", {
-            starterIntent: getScheduleReadStarterIntent(params.request),
-            ignoreActiveFollowUp: true,
-            confidence: 0.82,
-            suppressWarning: true,
-          });
-        }
-        if (
-          isFollowUpOptionTurn(params.request) &&
-          followUpToPreserve &&
-          isThinGenericAgentReply(payloadReply)
-        ) {
-          const planningStarterIntent = getPlanningStarterIntentFromFollowUp(
-            followUpToPreserve,
-          );
-          return buildActiveFollowUpClarifyAgentResult({
-            followUp: followUpToPreserve,
-            intent: payload.intent === "unknown" &&
-                isPlanningLauncherFollowUpQuestion(followUpToPreserve)
-              ? mapPlanningStarterIntentToAgentIntent(planningStarterIntent)
-              : payload.intent,
-            confidence: payload.confidence,
-            context,
-            openaiConversationId: currentConversationId,
-            lastOpenAIResponseId: currentPreviousResponseId,
-          });
-        }
-
-        const understandingState = payload.understanding_state ??
-          deriveUnderstandingState({
-            mode: payload.mode,
-            preparedActionId,
-            followUp,
-          });
-        return {
-          result: {
-            reply: payloadReply && !isThinGenericAgentReply(payloadReply)
-              ? payloadReply
-              : "I need a little more to help. Tell me what you want to do next.",
-            mode: payload.mode,
-            intent: payload.intent,
-            confidence: payload.confidence,
-            understandingState,
-            followUp,
-            proposedActions: payload.proposed_actions ?? [],
-            assumptions: payload.assumptions ?? [],
-            evidenceIds: payload.evidence_ids ?? [],
-            structuredResponse: payload.structured_response ?? null,
-            preparedActionId,
-          },
-          openaiConversationId: currentConversationId,
-          lastOpenAIResponseId: currentPreviousResponseId,
-          draftDecisionSource: "model",
-        };
-      }
-
-      const toolOutputs = [];
-      for (const functionCall of functionCalls) {
-        const output = await executeTool(functionCall);
-        toolOutputs.push(buildToolOutput(functionCall.call_id, output));
-      }
-
-      response = await createOpenAIResponse({
+    const runResponseLoop = async (transport: {
+      conversationId?: string | null;
+      previousResponseId?: string | null;
+      manualHistory: boolean;
+    }): Promise<AgentRunResult> => {
+      let response = await createOpenAIResponse({
         guardedFetch: params.guardedFetch,
-        input: toolOutputs,
+        input: buildInitialInput({
+          context,
+          request: params.request,
+          manualHistory: transport.manualHistory,
+        }),
         instructions,
-        conversationId: currentConversationId,
-        previousResponseId: currentConversationId
-          ? null
-          : currentPreviousResponseId,
+        conversationId: transport.conversationId,
+        previousResponseId: transport.previousResponseId,
         tools,
         openAIApiKey: params.openAIApiKey,
       });
 
-      currentConversationId = response.conversation?.id ??
-        currentConversationId;
-      currentPreviousResponseId = response.id;
+      let currentConversationId = response.conversation?.id ??
+        transport.conversationId ?? null;
+      let currentPreviousResponseId = response.id;
+
+      for (let loop = 0; loop < MAX_TOOL_LOOPS; loop += 1) {
+        const functionCalls = getFunctionCalls(response);
+        if (functionCalls.length === 0) {
+          const outputReply = extractOpenAIResponseText(response);
+          const activeFollowUp = params.request.activeFollowUp ??
+            getPersistedActiveFollowUp(context);
+          if (params.request.starterIntent === "quest_capture") {
+            return buildPlannerFallbackResult(
+              "quest_capture_no_action_output",
+              {
+                starterIntent: "quest_capture",
+                confidence: 0.72,
+                openaiConversationId: currentConversationId,
+                lastOpenAIResponseId: currentPreviousResponseId,
+                suppressWarning: Boolean(
+                  outputReply && !isThinGenericAgentReply(outputReply),
+                ),
+              },
+            );
+          }
+          if (
+            (!outputReply || isThinGenericAgentReply(outputReply)) &&
+            isDeterministicScheduleReadRequest(params.request)
+          ) {
+            return buildPlannerFallbackResult("thin_schedule_read_output", {
+              starterIntent: getScheduleReadStarterIntent(params.request),
+              ignoreActiveFollowUp: true,
+              confidence: 0.82,
+              suppressWarning: true,
+            });
+          }
+          if (
+            isFollowUpOptionTurn(params.request) &&
+            activeFollowUp &&
+            (!outputReply || isThinGenericAgentReply(outputReply))
+          ) {
+            const planningStarterIntent = getPlanningStarterIntentFromFollowUp(
+              activeFollowUp,
+            );
+            return buildActiveFollowUpClarifyAgentResult({
+              followUp: activeFollowUp,
+              intent: isPlanningLauncherFollowUpQuestion(activeFollowUp)
+                ? mapPlanningStarterIntentToAgentIntent(planningStarterIntent)
+                : "unknown",
+              confidence: 0.25,
+              context,
+              openaiConversationId: currentConversationId,
+              lastOpenAIResponseId: currentPreviousResponseId,
+            });
+          }
+
+          const usableOutputReply = outputReply &&
+              !isThinGenericAgentReply(outputReply)
+            ? outputReply
+            : null;
+          const providerDiagnostics = usableOutputReply
+            ? null
+            : buildOpenAIEmptyOutputDiagnostics({
+              responseId: currentPreviousResponseId,
+            });
+          if (providerDiagnostics) {
+            console.warn("[companion-agent] empty openai output", {
+              sessionId: params.request.sessionId,
+              providerDiagnostics: loggableOpenAIProviderDiagnostics(
+                providerDiagnostics,
+              ),
+            });
+          }
+
+          return {
+            result: {
+              reply: usableOutputReply ?? OPENAI_EMPTY_OUTPUT_REPLY,
+              mode: "conversation" as CompanionAgentMode,
+              intent: "unknown" as CompanionAgentIntent,
+              confidence: 0.25,
+              understandingState:
+                "enough_to_discuss" as CompanionAgentUnderstandingState,
+              followUp: null,
+              proposedActions: [],
+              assumptions: [],
+              evidenceIds: [],
+              structuredResponse: null,
+              preparedActionId: null,
+            },
+            openaiConversationId: currentConversationId,
+            lastOpenAIResponseId: currentPreviousResponseId,
+            draftDecisionSource: "model",
+            providerDiagnostics,
+          };
+        }
+
+        const finalCall = functionCalls.find((call) =>
+          call.name === "submit_companion_result"
+        );
+        if (finalCall) {
+          const payload = SubmitCompanionResultSchema.parse(
+            JSON.parse(finalCall.arguments || "{}"),
+          );
+          const payloadReply = payload.reply.trim();
+          const followUp = payload.follow_up ?? null;
+          const preparedActionId = payload.prepared_action_id ?? null;
+          const proposedActions = payload.proposed_actions ?? [];
+          const activeFollowUp = params.request.activeFollowUp ??
+            getPersistedActiveFollowUp(context);
+          const followUpToPreserve = activeFollowUp ?? followUp;
+          if (
+            params.request.starterIntent === "quest_capture" &&
+            !preparedActionId &&
+            !followUp &&
+            proposedActions.length === 0
+          ) {
+            return buildPlannerFallbackResult(
+              "quest_capture_no_action_result",
+              {
+                starterIntent: "quest_capture",
+                confidence: Math.max(payload.confidence, 0.72),
+                openaiConversationId: currentConversationId,
+                lastOpenAIResponseId: currentPreviousResponseId,
+                suppressWarning: !isThinGenericAgentReply(payloadReply),
+              },
+            );
+          }
+          if (
+            isThinGenericAgentReply(payloadReply) &&
+            isDeterministicScheduleReadRequest(params.request)
+          ) {
+            return buildPlannerFallbackResult("thin_schedule_read_result", {
+              starterIntent: getScheduleReadStarterIntent(params.request),
+              ignoreActiveFollowUp: true,
+              confidence: 0.82,
+              suppressWarning: true,
+            });
+          }
+          if (
+            isFollowUpOptionTurn(params.request) &&
+            followUpToPreserve &&
+            isThinGenericAgentReply(payloadReply)
+          ) {
+            const planningStarterIntent = getPlanningStarterIntentFromFollowUp(
+              followUpToPreserve,
+            );
+            return buildActiveFollowUpClarifyAgentResult({
+              followUp: followUpToPreserve,
+              intent: payload.intent === "unknown" &&
+                  isPlanningLauncherFollowUpQuestion(followUpToPreserve)
+                ? mapPlanningStarterIntentToAgentIntent(planningStarterIntent)
+                : payload.intent,
+              confidence: payload.confidence,
+              context,
+              openaiConversationId: currentConversationId,
+              lastOpenAIResponseId: currentPreviousResponseId,
+            });
+          }
+
+          const understandingState = payload.understanding_state ??
+            deriveUnderstandingState({
+              mode: payload.mode,
+              preparedActionId,
+              followUp,
+            });
+          const usablePayloadReply = payloadReply &&
+              !isThinGenericAgentReply(payloadReply)
+            ? payloadReply
+            : null;
+          const providerDiagnostics = usablePayloadReply
+            ? null
+            : buildOpenAIEmptyOutputDiagnostics({
+              responseId: currentPreviousResponseId,
+            });
+          if (providerDiagnostics) {
+            console.warn("[companion-agent] thin openai result reply", {
+              sessionId: params.request.sessionId,
+              providerDiagnostics: loggableOpenAIProviderDiagnostics(
+                providerDiagnostics,
+              ),
+            });
+          }
+          return {
+            result: {
+              reply: usablePayloadReply ?? OPENAI_EMPTY_OUTPUT_REPLY,
+              mode: payload.mode,
+              intent: payload.intent,
+              confidence: payload.confidence,
+              understandingState,
+              followUp,
+              proposedActions,
+              assumptions: payload.assumptions ?? [],
+              evidenceIds: payload.evidence_ids ?? [],
+              structuredResponse: payload.structured_response ?? null,
+              preparedActionId,
+            },
+            openaiConversationId: currentConversationId,
+            lastOpenAIResponseId: currentPreviousResponseId,
+            draftDecisionSource: "model",
+            providerDiagnostics,
+          };
+        }
+
+        const toolOutputs = [];
+        for (const functionCall of functionCalls) {
+          const output = await executeTool(functionCall);
+          toolOutputs.push(buildToolOutput(functionCall.call_id, output));
+        }
+
+        response = await createOpenAIResponse({
+          guardedFetch: params.guardedFetch,
+          input: toolOutputs,
+          instructions,
+          conversationId: currentConversationId,
+          previousResponseId: currentConversationId
+            ? null
+            : currentPreviousResponseId,
+          tools,
+          openAIApiKey: params.openAIApiKey,
+        });
+
+        currentConversationId = response.conversation?.id ??
+          currentConversationId;
+        currentPreviousResponseId = response.id;
+      }
+
+      throw new Error("Companion agent exceeded tool loop limit");
+    };
+
+    const runResponseLoopWithTimeout = (transport: {
+      conversationId?: string | null;
+      previousResponseId?: string | null;
+      manualHistory: boolean;
+    }): Promise<AgentRunResult> =>
+      withTimeout(
+        () => runResponseLoop(transport),
+        {
+          timeoutMs: AGENT_RESPONSE_TIMEOUT_MS,
+          operation: "companion agent response loop",
+          timeoutCode: "COMPANION_AGENT_TIMEOUT",
+        },
+      );
+
+    function buildPlannerFallbackResult(
+      reason: string,
+      options: {
+        starterIntent?: string | null;
+        forcePlanDayFollowUp?: boolean;
+        confidence?: number;
+        ignoreActiveFollowUp?: boolean;
+        suppressWarning?: boolean;
+        openaiConversationId?: string | null;
+        lastOpenAIResponseId?: string | null;
+        providerDiagnostics?: OpenAIProviderDiagnostics | null;
+      } = {},
+    ): AgentRunResult {
+      if (!options.suppressWarning) {
+        console.warn("[companion-agent] planner fallback", {
+          sessionId: params.request.sessionId,
+          reason,
+          providerDiagnostics: loggableOpenAIProviderDiagnostics(
+            options.providerDiagnostics,
+          ),
+        });
+      }
+
+      const plannerStarterIntent = options.starterIntent ??
+        params.request.starterIntent ??
+        null;
+      const plannerResult = consultPlannerForAgent({
+        message: params.request.message,
+        currentDateTime: context.currentDateTime,
+        selectedDate: params.request.selectedDate ?? null,
+        surface: params.request.surface,
+        horizon: "day",
+        starterIntent: plannerStarterIntent,
+        forcePlanDayFollowUp: options.forcePlanDayFollowUp,
+        activeFollowUp: !options.ignoreActiveFollowUp &&
+            isFollowUpOptionTurn(params.request)
+          ? params.request.activeFollowUp ?? getPersistedActiveFollowUp(context)
+          : null,
+        context,
+      });
+
+      const mode = plannerResult.questions.length > 0
+        ? "clarify" as CompanionAgentMode
+        : plannerStarterIntent === "quest_capture" &&
+            plannerResult.actionHints.some((hint) =>
+              hint.actionType === "task_create" && hint.normalizedPayload
+            )
+        ? "pending_confirmation" as CompanionAgentMode
+        : plannerResult.mode === "proposal"
+        ? "schedule_read" as CompanionAgentMode
+        : plannerResult.mode === "schedule_read"
+        ? "schedule_read" as CompanionAgentMode
+        : "conversation" as CompanionAgentMode;
+      const followUp = plannerResult.questions[0]
+        ? {
+          question: plannerResult.questions[0].prompt,
+          reason: plannerResult.questions[0].reason ?? null,
+          expectedAnswerType: plannerResult.questions[0].id ===
+                "plan_day_quest_consent" ||
+              plannerResult.questions[0].id === "planning_launcher_consent"
+            ? "confirmation" as const
+            : plannerResult.questions[0].options?.length
+            ? "choice" as const
+            : "free_text" as const,
+          options: plannerResult.questions[0].options ?? [],
+          blocksDrafting: true,
+          metadata: {
+            ...(plannerResult.questions[0].metadata ?? {}),
+            questionId: plannerResult.questions[0].id,
+            ...(plannerStarterIntent === "quest_capture" &&
+                params.request.selectedDate
+              ? {
+                selectedDate: params.request.selectedDate,
+                sourceStarterIntent: "quest_capture",
+              }
+              : {}),
+          },
+        }
+        : null;
+
+      return {
+        result: {
+          reply: plannerResult.reply,
+          mode,
+          intent: (
+              plannerStarterIntent === "plan_day" ||
+              options.forcePlanDayFollowUp === true
+            ) && plannerResult.questions.length > 0
+            ? "plan_day"
+            : mapPlannerFallbackIntent(plannerResult),
+          confidence: options.confidence ?? 0.55,
+          understandingState: mode === "pending_confirmation"
+            ? "ready_to_draft"
+            : deriveUnderstandingState({ mode, followUp }),
+          followUp,
+          proposedActions: plannerResult.actionHints
+            .filter((hint) => hint.actionType && hint.normalizedPayload)
+            .map((hint) => ({
+              type: hint.actionType ?? "unknown",
+              summary: hint.summary,
+              reason: hint.unsupportedReason ?? null,
+              normalizedPayload: hint.normalizedPayload ?? {},
+              confidence: 0.55,
+            })),
+          assumptions: [],
+          evidenceIds: [],
+          structuredResponse: plannerResult.structuredResponse ?? null,
+          preparedActionId: null,
+        },
+        openaiConversationId: options.openaiConversationId ??
+          context.thread?.openai_conversation_id ?? null,
+        lastOpenAIResponseId: options.lastOpenAIResponseId ??
+          context.thread?.last_openai_response_id ?? null,
+        draftDecisionSource: "deterministic",
+        providerDiagnostics: options.providerDiagnostics ?? null,
+      };
     }
 
-    throw new Error("Companion agent exceeded tool loop limit");
-  };
-
-  const runResponseLoopWithTimeout = (transport: {
-    conversationId?: string | null;
-    previousResponseId?: string | null;
-    manualHistory: boolean;
-  }): Promise<AgentRunResult> =>
-    withTimeout(
-      () => runResponseLoop(transport),
-      {
-        timeoutMs: AGENT_RESPONSE_TIMEOUT_MS,
-        operation: "companion agent response loop",
-        timeoutCode: "COMPANION_AGENT_TIMEOUT",
-      },
-    );
-
-  function buildPlannerFallbackResult(
-    reason: string,
-    options: {
-      starterIntent?: string | null;
-      forcePlanDayFollowUp?: boolean;
-      confidence?: number;
-      ignoreActiveFollowUp?: boolean;
-      suppressWarning?: boolean;
-    } = {},
-  ): AgentRunResult {
-    if (!options.suppressWarning) {
-      console.warn("[companion-agent] planner fallback", {
+    function buildProviderUnavailableResult(
+      providerDiagnostics: OpenAIProviderDiagnostics,
+    ): AgentRunResult {
+      console.warn("[companion-agent] openai provider fallback", {
         sessionId: params.request.sessionId,
-        reason,
+        providerDiagnostics: loggableOpenAIProviderDiagnostics(
+          providerDiagnostics,
+        ),
+      });
+
+      return {
+        result: {
+          reply: OPENAI_PROVIDER_UNAVAILABLE_REPLY,
+          mode: "conversation" as CompanionAgentMode,
+          intent: "unknown" as CompanionAgentIntent,
+          confidence: 0.1,
+          understandingState:
+            "enough_to_discuss" as CompanionAgentUnderstandingState,
+          followUp: null,
+          proposedActions: [],
+          assumptions: [],
+          evidenceIds: [],
+          structuredResponse: null,
+          preparedActionId: null,
+        },
+        openaiConversationId: context.thread?.openai_conversation_id ?? null,
+        lastOpenAIResponseId: context.thread?.last_openai_response_id ?? null,
+        draftDecisionSource: "deterministic",
+        providerDiagnostics,
+      };
+    }
+
+    function buildFallbackResultForOpenAIError(error: unknown): AgentRunResult {
+      const providerDiagnostics = getOpenAIProviderDiagnostics(error);
+      if (
+        providerDiagnostics && isFreeTalkProviderFallbackRequest(params.request)
+      ) {
+        return buildProviderUnavailableResult(providerDiagnostics);
+      }
+
+      return buildPlannerFallbackResult(getErrorMessage(error), {
+        providerDiagnostics,
       });
     }
 
-    const plannerStarterIntent = options.starterIntent ??
-      params.request.starterIntent ??
-      null;
-    const plannerResult = consultPlannerForAgent({
-      message: params.request.message,
-      currentDateTime: context.currentDateTime,
-      selectedDate: params.request.selectedDate ?? null,
-      surface: params.request.surface,
-      horizon: "day",
-      starterIntent: plannerStarterIntent,
-      forcePlanDayFollowUp: options.forcePlanDayFollowUp,
-      activeFollowUp: !options.ignoreActiveFollowUp &&
-          isFollowUpOptionTurn(params.request)
-        ? params.request.activeFollowUp ?? getPersistedActiveFollowUp(context)
-        : null,
+    const bareStarterResult = buildBareStarterAgentResult({
+      request: params.request,
       context,
     });
-
-    const mode = plannerResult.questions.length > 0
-      ? "clarify" as CompanionAgentMode
-      : plannerResult.mode === "proposal"
-      ? "schedule_read" as CompanionAgentMode
-      : plannerResult.mode === "schedule_read"
-      ? "schedule_read" as CompanionAgentMode
-      : "conversation" as CompanionAgentMode;
-    const followUp = plannerResult.questions[0]
-      ? {
-        question: plannerResult.questions[0].prompt,
-        reason: plannerResult.questions[0].reason ?? null,
-        expectedAnswerType: plannerResult.questions[0].id ===
-              "plan_day_quest_consent" ||
-            plannerResult.questions[0].id === "planning_launcher_consent"
-          ? "confirmation" as const
-          : plannerResult.questions[0].options?.length
-          ? "choice" as const
-          : "free_text" as const,
-        options: plannerResult.questions[0].options ?? [],
-        blocksDrafting: true,
-        metadata: {
-          ...(plannerResult.questions[0].metadata ?? {}),
-          questionId: plannerResult.questions[0].id,
-          ...(plannerStarterIntent === "quest_capture" &&
-              params.request.selectedDate
-            ? {
-              selectedDate: params.request.selectedDate,
-              sourceStarterIntent: "quest_capture",
-            }
-            : {}),
-        },
-      }
+    const planningFollowUpStarterIntent =
+      getPlanningStarterIntentFromActiveFollowUp(
+        params.request,
+        context,
+      );
+    const deterministicPlanningFollowUpResult = bareStarterResult
+      ? null
+      : isPlanningLauncherFollowUpAnswer(params.request, context)
+      ? buildPlannerFallbackResult("planning_launcher_follow_up_answer", {
+        starterIntent: planningFollowUpStarterIntent,
+        forcePlanDayFollowUp: planningFollowUpStarterIntent === "plan_day",
+        confidence: 0.78,
+      })
       : null;
 
-    return {
-      result: {
-        reply: plannerResult.reply,
-        mode,
-        intent: (
-            plannerStarterIntent === "plan_day" ||
-            options.forcePlanDayFollowUp === true
-          ) && plannerResult.questions.length > 0
-          ? "plan_day"
-          : mapPlannerFallbackIntent(plannerResult),
-        confidence: options.confidence ?? 0.55,
-        understandingState: deriveUnderstandingState({ mode, followUp }),
-        followUp,
-        proposedActions: plannerResult.actionHints
-          .filter((hint) => hint.actionType && hint.normalizedPayload)
-          .map((hint) => ({
-            type: hint.actionType ?? "unknown",
-            summary: hint.summary,
-            reason: hint.unsupportedReason ?? null,
-            normalizedPayload: hint.normalizedPayload ?? {},
-            confidence: 0.55,
-          })),
-        assumptions: [],
-        evidenceIds: [],
-        structuredResponse: plannerResult.structuredResponse ?? null,
-        preparedActionId: null,
-      },
-      openaiConversationId: context.thread?.openai_conversation_id ?? null,
-      lastOpenAIResponseId: context.thread?.last_openai_response_id ?? null,
-      draftDecisionSource: "deterministic",
-    };
+    agentResult = bareStarterResult ??
+      deterministicPlanningFollowUpResult ??
+      await wrapSubStage("openai", async () => {
+        try {
+          if (context.thread?.openai_conversation_id) {
+            return await runResponseLoopWithTimeout({
+              conversationId: context.thread.openai_conversation_id,
+              manualHistory: false,
+            });
+          }
+          if (context.thread?.last_openai_response_id) {
+            return await runResponseLoopWithTimeout({
+              previousResponseId: context.thread.last_openai_response_id,
+              manualHistory: false,
+            });
+          }
+          const conversationId = await createOpenAIConversation({
+            guardedFetch: params.guardedFetch,
+            userId: params.userId,
+            sessionId: params.request.sessionId,
+            surface: params.request.surface,
+            openAIApiKey: params.openAIApiKey,
+          });
+          return await runResponseLoopWithTimeout({
+            conversationId,
+            manualHistory: false,
+          });
+        } catch (error) {
+          if (isLinkageError(error)) {
+            console.warn("[companion-agent] linkage fallback", {
+              sessionId: params.request.sessionId,
+              message: error instanceof Error ? error.message : String(error),
+            });
+
+            try {
+              return await runResponseLoopWithTimeout({
+                manualHistory: true,
+              });
+            } catch (manualHistoryError) {
+              if (!isPlannerFallbackError(manualHistoryError)) {
+                throw manualHistoryError;
+              }
+              return buildFallbackResultForOpenAIError(manualHistoryError);
+            }
+          }
+          if (isPlannerFallbackError(error)) {
+            return buildFallbackResultForOpenAIError(error);
+          }
+          throw error;
+        }
+      });
   }
 
-  const bareStarterResult = buildBareStarterAgentResult({
-    request: params.request,
-    context,
-  });
-  const deterministicScheduleReadResult = !bareStarterResult &&
-      isDeterministicScheduleReadRequest(params.request)
-    ? buildPlannerFallbackResult("deterministic_schedule_read", {
-      starterIntent: getScheduleReadStarterIntent(params.request),
-      ignoreActiveFollowUp: true,
-      confidence: 0.82,
-      suppressWarning: true,
-    })
-    : null;
-  const planningFollowUpStarterIntent =
-    getPlanningStarterIntentFromActiveFollowUp(
-      params.request,
-      context,
-    );
-  const deterministicPlanningFollowUpResult = bareStarterResult ||
-      deterministicScheduleReadResult
-    ? null
-    : isPlanningLauncherFollowUpAnswer(params.request, context)
-    ? buildPlannerFallbackResult("planning_launcher_follow_up_answer", {
-      starterIntent: planningFollowUpStarterIntent,
-      forcePlanDayFollowUp: planningFollowUpStarterIntent === "plan_day",
-      confidence: 0.78,
-    })
-    : null;
-
-  const agentResult: AgentRunResult = bareStarterResult ??
-    deterministicScheduleReadResult ??
-    deterministicPlanningFollowUpResult ??
-    await wrapSubStage("openai", async () => {
-      try {
-        if (context.thread?.openai_conversation_id) {
-          return await runResponseLoopWithTimeout({
-            conversationId: context.thread.openai_conversation_id,
-            manualHistory: false,
-          });
-        }
-        if (context.thread?.last_openai_response_id) {
-          return await runResponseLoopWithTimeout({
-            previousResponseId: context.thread.last_openai_response_id,
-            manualHistory: false,
-          });
-        }
-        const conversationId = await createOpenAIConversation({
-          guardedFetch: params.guardedFetch,
-          userId: params.userId,
-          sessionId: params.request.sessionId,
-          surface: params.request.surface,
-          openAIApiKey: params.openAIApiKey,
-        });
-        return await runResponseLoopWithTimeout({
-          conversationId,
-          manualHistory: false,
-        });
-      } catch (error) {
-        if (isLinkageError(error)) {
-          console.warn("[companion-agent] linkage fallback", {
-            sessionId: params.request.sessionId,
-            message: error instanceof Error ? error.message : String(error),
-          });
-
-          try {
-            return await runResponseLoopWithTimeout({
-              manualHistory: true,
-            });
-          } catch (manualHistoryError) {
-            if (!isPlannerFallbackError(manualHistoryError)) {
-              throw manualHistoryError;
-            }
-            return buildPlannerFallbackResult(
-              manualHistoryError instanceof Error
-                ? manualHistoryError.message
-                : String(manualHistoryError),
-            );
-          }
-        }
-        if (isPlannerFallbackError(error)) {
-          return buildPlannerFallbackResult(
-            error instanceof Error ? error.message : String(error),
-          );
-        }
-        throw error;
-      }
-    });
+  if (!agentResult) {
+    throw new Error("Companion agent did not produce a result");
+  }
 
   normalizeBareStarterResult({
     request: params.request,
@@ -3336,6 +4237,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
     | "tool"
     | "proposed_action"
     | "selected_proposed_action"
+    | "planner_fallback"
     | null = null;
   const selectedProposedActionIntent = getSelectedProposedActionIntent(
     params.request,
@@ -3344,6 +4246,11 @@ export async function runCompanionAgent(params: RunAgentParams) {
     selectedProposedActionIntent === "discuss";
   const modelAuthoredDraftDecision =
     agentResult.draftDecisionSource === "model";
+  const deterministicQuestCaptureDraftDecision =
+    agentResult.draftDecisionSource === "deterministic" &&
+    params.request.starterIntent === "quest_capture" &&
+    agentResult.result.understandingState === "ready_to_draft" &&
+    !agentResult.result.followUp;
 
   if (
     modelAuthoredDraftDecision &&
@@ -3365,6 +4272,28 @@ export async function runCompanionAgent(params: RunAgentParams) {
     candidateToPersist = null;
     candidateSource = null;
     agentResult.result.preparedActionId = null;
+  }
+
+  if (
+    !persistedPendingAction &&
+    !candidateToPersist &&
+    deterministicQuestCaptureDraftDecision &&
+    !selectedProposedActionIsDiscussion
+  ) {
+    candidateToPersist = agentResult.result.proposedActions
+      .filter((proposedAction) =>
+        normalizeProposedActionType(proposedAction.type) === "task_create"
+      )
+      .map((proposedAction) =>
+        buildPreparedCandidateFromProposedAction(
+          proposedAction,
+          agentResult.result.intent,
+        )
+      )
+      .find((candidate): candidate is PendingActionCandidate =>
+        candidate !== null && candidate.actionType === "task_create"
+      ) ?? null;
+    candidateSource = candidateToPersist ? "planner_fallback" : null;
   }
 
   if (
@@ -3440,6 +4369,8 @@ export async function runCompanionAgent(params: RunAgentParams) {
               ? "companion-agent-selected-proposed-action"
               : candidateSource === "proposed_action"
               ? "companion-agent-proposed-action"
+              : candidateSource === "planner_fallback"
+              ? "companion-agent-planner-fallback"
               : "companion-agent",
             visibleDateStart: context.visibleDateStart,
             visibleDateEnd: context.visibleDateEnd,
@@ -3448,32 +4379,35 @@ export async function runCompanionAgent(params: RunAgentParams) {
     );
   }
 
-  const persistenceReady = await wrapSubStage(
-    "persistence",
-    () =>
-      withCompanionChatPersistenceCapability(async () => {
-        const responsePendingAction = persistedPendingAction
-          ? mapPendingActionForResponse(persistedPendingAction)
-          : null;
-        await persistAgentTurn({
-          supabase: params.supabase,
-          userId: params.userId,
-          companionId: companion.id,
-          sessionId: params.request.sessionId,
-          surface: params.request.surface,
-          userMessage: params.request.message,
-          assistantReply: agentResult.result.reply,
-          inputMode: params.request.inputMode,
-          openaiConversationId: agentResult.openaiConversationId,
-          lastOpenAIResponseId: agentResult.lastOpenAIResponseId,
-          assistantMode: agentResult.result.mode,
-          assistantIntent: agentResult.result.intent,
-          agentDecision: buildAgentDecisionMetadata(agentResult.result),
-          structuredResponse: agentResult.result.structuredResponse ?? null,
-          pendingAction: responsePendingAction,
-        });
-      }),
-  );
+  const persistConversation = async () => {
+    const responsePendingAction = persistedPendingAction
+      ? mapPendingActionForResponse(persistedPendingAction)
+      : null;
+    await persistAgentTurn({
+      supabase: params.supabase,
+      userId: params.userId,
+      companionId: companion.id,
+      sessionId: params.request.sessionId,
+      surface: params.request.surface,
+      userMessage: params.request.message,
+      assistantReply: agentResult.result.reply,
+      inputMode: params.request.inputMode,
+      openaiConversationId: agentResult.openaiConversationId,
+      lastOpenAIResponseId: agentResult.lastOpenAIResponseId,
+      assistantMode: agentResult.result.mode,
+      assistantIntent: agentResult.result.intent,
+      agentDecision: buildAgentDecisionMetadata(
+        agentResult.result,
+        agentResult.providerDiagnostics,
+      ),
+      structuredResponse: agentResult.result.structuredResponse ?? null,
+      pendingAction: responsePendingAction,
+    });
+  };
+  const persistenceReady = await persistAgentTurnBestEffort({
+    requestId: params.requestId,
+    persistConversation,
+  });
 
   console.log("[companion-agent] turn", {
     sessionId: params.request.sessionId,
@@ -3487,6 +4421,9 @@ export async function runCompanionAgent(params: RunAgentParams) {
     persistenceReady,
     openaiConversationId: agentResult.openaiConversationId,
     openaiResponseId: agentResult.lastOpenAIResponseId,
+    providerDiagnostics: loggableOpenAIProviderDiagnostics(
+      agentResult.providerDiagnostics,
+    ),
   });
 
   return {
@@ -3501,6 +4438,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
     assumptions: agentResult.result.assumptions,
     evidenceIds: agentResult.result.evidenceIds,
     structuredResponse: agentResult.result.structuredResponse ?? null,
+    providerDiagnostics: agentResult.providerDiagnostics ?? undefined,
     pendingAction: persistedPendingAction
       ? mapPendingActionForResponse(persistedPendingAction)
       : undefined,

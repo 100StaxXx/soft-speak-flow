@@ -38,6 +38,12 @@ import {
   UPCOMING_AI_TIMEOUT_MS,
 } from "./latencyBudget.ts";
 import { validateAndPrunePlannerContext } from "./plannerContextValidator.ts";
+import {
+  collectAllowedPlannerTitles,
+  loadDeletedPlannerEntities,
+  sanitizeConversationHistoryForDeletedPlannerEntities,
+  sanitizeSessionStateForDeletedPlannerEntities,
+} from "./deletedPlannerMemory.ts";
 
 const getClassificationHint = async (
   req: Request,
@@ -178,10 +184,18 @@ serve(async (req) => {
     const parsedPlannerContext = parsed.data
       .plannerContext as unknown as PlannerBuildInput["plannerContext"];
     const validatorClient = createCostGuardrailSupabaseClient();
+    const deletedPlannerEntities = await loadDeletedPlannerEntities(
+      validatorClient,
+      protectedRequest.auth.userId,
+    );
     const validatedPlannerContext = await validateAndPrunePlannerContext(
       validatorClient,
       protectedRequest.auth.userId,
       parsedPlannerContext,
+      deletedPlannerEntities,
+    );
+    const allowedPlannerTitles = collectAllowedPlannerTitles(
+      validatedPlannerContext,
     );
 
     const plannerInput = scopePlannerInputContext({
@@ -191,8 +205,16 @@ serve(async (req) => {
       timezone: parsed.data.timezone,
       horizon: parsed.data.horizon,
       tonePack: parsed.data.tonePack,
-      conversationHistory: parsed.data.conversationHistory,
-      sessionState: parsed.data.sessionState as PlannerSessionState,
+      conversationHistory: sanitizeConversationHistoryForDeletedPlannerEntities(
+        parsed.data.conversationHistory,
+        deletedPlannerEntities,
+        allowedPlannerTitles,
+      ),
+      sessionState: sanitizeSessionStateForDeletedPlannerEntities(
+        parsed.data.sessionState as PlannerSessionState,
+        deletedPlannerEntities,
+        allowedPlannerTitles,
+      ),
       parsedInput: (parsed.data.parsedInput as ParsedInputHint | undefined) ??
         null,
       classificationHint,

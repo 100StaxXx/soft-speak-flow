@@ -509,13 +509,13 @@ describe("useOfflineQueue", () => {
 
     expect(dailyTasksUpdateMock).toHaveBeenNthCalledWith(1, {
       epic_id: null,
-      epic_title: null,
       habit_source_id: null,
+      excluded_from_planner_at: expect.any(String),
     });
     expect(dailyTasksUpdateMock).toHaveBeenNthCalledWith(2, {
       epic_id: null,
-      epic_title: null,
       habit_source_id: null,
+      excluded_from_planner_at: expect.any(String),
     });
     expect(dailyTasksDeleteMock).toHaveBeenCalled();
     expect(habitsInMock).toHaveBeenCalledWith("id", ["habit-1"]);

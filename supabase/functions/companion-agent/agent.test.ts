@@ -6,6 +6,7 @@ import {
 import {
   buildToolDefinitions,
   DEFAULT_COMPANION_AGENT_MODEL,
+  isCompanionScheduleReadFastPathRequest,
   resolveCompanionAgentModel,
   runCompanionAgent,
 } from "./agent.ts";
@@ -30,6 +31,7 @@ type MockCompanionRow = {
 type MockSupabaseOptions = {
   companion?: Partial<MockCompanionRow>;
   messages?: unknown[];
+  tableErrors?: Record<string, unknown>;
 };
 
 const defaultCompanionRow: MockCompanionRow = {
@@ -48,8 +50,19 @@ function createQueryResult(
   operation: string,
   maybeSingle: boolean,
   value?: unknown,
+  selectedColumns?: string,
   options: MockSupabaseOptions = {},
 ): QueryResult {
+  const configuredError =
+    (selectedColumns
+      ? options.tableErrors?.[`${table}:${operation}:${selectedColumns}`]
+      : undefined) ??
+      options.tableErrors?.[`${table}:${operation}`] ??
+      options.tableErrors?.[table];
+  if (configuredError) {
+    return { data: null, error: configuredError };
+  }
+
   if (table === "user_companion" && maybeSingle) {
     return {
       data: {
@@ -110,9 +123,11 @@ function createMockSupabase(options: MockSupabaseOptions = {}) {
     let operation = "select";
     let maybeSingle = false;
     let value: unknown;
+    let selectedColumns: string | undefined;
 
     const builder = {
-      select: (_columns?: string, _options?: unknown) => {
+      select: (columns?: string, _options?: unknown) => {
+        selectedColumns = columns;
         if (operation !== "insert" && operation !== "update") {
           operation = "select";
         }
@@ -141,19 +156,40 @@ function createMockSupabase(options: MockSupabaseOptions = {}) {
       maybeSingle: () => {
         maybeSingle = true;
         return Promise.resolve(
-          createQueryResult(table, operation, maybeSingle, value, options),
+          createQueryResult(
+            table,
+            operation,
+            maybeSingle,
+            value,
+            selectedColumns,
+            options,
+          ),
         );
       },
       single: () =>
         Promise.resolve(
-          createQueryResult(table, operation, true, value, options),
+          createQueryResult(
+            table,
+            operation,
+            true,
+            value,
+            selectedColumns,
+            options,
+          ),
         ),
       then: (
         resolve: (value: QueryResult) => unknown,
         reject?: (reason: unknown) => unknown,
       ) =>
         Promise.resolve(
-          createQueryResult(table, operation, maybeSingle, value, options),
+          createQueryResult(
+            table,
+            operation,
+            maybeSingle,
+            value,
+            selectedColumns,
+            options,
+          ),
         )
           .then(
             resolve,
@@ -250,6 +286,93 @@ function createOutputTextCaptureFetch(outputText = "I’m here.") {
   }) as typeof fetch;
 
   return { guardedFetch, responseBodies };
+}
+
+function createRawMessageTextCaptureFetch(outputText = "I’m here.") {
+  const responseBodies: Array<Record<string, unknown>> = [];
+  const guardedFetch = (async (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ) => {
+    const url = String(input);
+    if (url.endsWith("/conversations")) {
+      return jsonResponse({ id: `conv_${responseBodies.length + 1}` });
+    }
+
+    if (url.endsWith("/responses")) {
+      const body = JSON.parse(String(init?.body ?? "{}")) as Record<
+        string,
+        unknown
+      >;
+      responseBodies.push(body);
+      return jsonResponse({
+        id: `resp_${responseBodies.length}`,
+        conversation: { id: `conv_${responseBodies.length}` },
+        output: [
+          {
+            type: "message",
+            role: "assistant",
+            content: [{ type: "output_text", text: outputText }],
+          },
+        ],
+      });
+    }
+
+    throw new Error(`Unexpected fetch: ${url}`);
+  }) as typeof fetch;
+
+  return { guardedFetch, responseBodies };
+}
+
+function createResponseFailureFetch(params: {
+  status: number;
+  body: unknown;
+  requestId?: string;
+}) {
+  const responseBodies: Array<Record<string, unknown>> = [];
+  const guardedFetch = (async (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ) => {
+    const url = String(input);
+    if (url.endsWith("/conversations")) {
+      return jsonResponse({ id: "conv_provider_failure" });
+    }
+
+    if (url.endsWith("/responses")) {
+      const body = JSON.parse(String(init?.body ?? "{}")) as Record<
+        string,
+        unknown
+      >;
+      responseBodies.push(body);
+      return new Response(JSON.stringify(params.body), {
+        status: params.status,
+        headers: {
+          "Content-Type": "application/json",
+          ...(params.requestId ? { "x-request-id": params.requestId } : {}),
+        },
+      });
+    }
+
+    throw new Error(`Unexpected fetch: ${url}`);
+  }) as typeof fetch;
+
+  return { guardedFetch, responseBodies };
+}
+
+function getLatestAssistantAgentDecision(
+  inserts: Array<{ table: string; value: unknown }>,
+) {
+  const chatInsert = inserts.find((entry) => entry.table === "companion_chats");
+  const rows = Array.isArray(chatInsert?.value) ? chatInsert.value : [];
+  const assistantRow = rows.find((row) =>
+    row && typeof row === "object" &&
+    (row as Record<string, unknown>).role === "assistant"
+  ) as Record<string, unknown> | undefined;
+  const metadata = assistantRow?.metadata as
+    | Record<string, unknown>
+    | undefined;
+  return metadata?.agentDecision as Record<string, unknown> | undefined;
 }
 
 Deno.test("companion agent tools explicitly opt out of strict Responses schemas", () => {
@@ -536,6 +659,329 @@ Deno.test("runCompanionAgent answers launcher upcoming schedule reads without Op
   assertEquals(result.followUp, null);
   assertEquals(result.proposedActions, []);
   assertEquals(result.pendingAction, undefined);
+});
+
+Deno.test("runCompanionAgent answers upcoming reads when optional companion identity columns are missing", async () => {
+  const supabase = createMockSupabase({
+    tableErrors: {
+      "user_companion:select:id, companion_name, cached_creature_name, preset_id, spirit_animal, core_element, current_stage, current_mood":
+        {
+          message: "column user_companion.cached_creature_name does not exist",
+          code: "42703",
+        },
+    },
+  });
+  let guardedFetchCalled = false;
+  const guardedFetch = (async (input: string | URL | Request) => {
+    guardedFetchCalled = true;
+    throw new Error(
+      `Upcoming launcher schedule reads should not call OpenAI: ${
+        String(input)
+      }`,
+    );
+  }) as typeof fetch;
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    requestId: "request-companion-identity-fallback",
+    request: {
+      surface: "journeys",
+      sessionId: "session-upcoming-companion-identity-fallback",
+      message: "What do I have coming up?",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T20:32:00-07:00",
+      turnOrigin: "launcher",
+      starterIntent: "upcoming_start",
+    },
+  });
+
+  assertEquals(guardedFetchCalled, false);
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.intent, "check_calendar");
+  assertEquals(
+    result.reply,
+    "Today: nothing scheduled.\nTomorrow: nothing scheduled.",
+  );
+});
+
+Deno.test("isCompanionScheduleReadFastPathRequest excludes proposal action turns", () => {
+  assertEquals(
+    isCompanionScheduleReadFastPathRequest({
+      surface: "journeys",
+      sessionId: "session-fast-path",
+      message: "What do I have coming up?",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T20:32:00-07:00",
+      starterIntent: "upcoming_start",
+    }),
+    true,
+  );
+  assertEquals(
+    isCompanionScheduleReadFastPathRequest({
+      surface: "journeys",
+      sessionId: "session-selected-action",
+      message: "What do I have coming up?",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T20:32:00-07:00",
+      starterIntent: "upcoming_start",
+      selectedProposedAction: {
+        type: "task_create",
+        title: "Draft launch email",
+        normalizedPayload: { title: "Draft launch email" },
+      },
+    }),
+    false,
+  );
+});
+
+Deno.test("runCompanionAgent answers upcoming reads when optional context fails", async () => {
+  const supabase = createMockSupabase({
+    tableErrors: {
+      "profiles:select": {
+        message: "profiles optional context unavailable",
+        code: "PGRST000",
+      },
+      "user_ai_preferences:select": {
+        message: "user_ai_preferences optional context unavailable",
+        code: "PGRST000",
+      },
+      "companion_memories:select": {
+        message: "companion_memories optional context unavailable",
+        code: "PGRST000",
+      },
+      "user_reflections:select": {
+        message: "user_reflections optional context unavailable",
+        code: "PGRST000",
+      },
+      "daily_check_ins:select": {
+        message: "daily_check_ins optional context unavailable",
+        code: "PGRST000",
+      },
+    },
+  });
+  let guardedFetchCalled = false;
+  const guardedFetch = (async (input: string | URL | Request) => {
+    guardedFetchCalled = true;
+    throw new Error(
+      `Optional context failures should not call OpenAI: ${String(input)}`,
+    );
+  }) as typeof fetch;
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-upcoming-optional-context-failure",
+      message: "What do I have coming up?",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T20:32:00-07:00",
+      turnOrigin: "launcher",
+      starterIntent: "upcoming_start",
+    },
+  });
+
+  assertEquals(guardedFetchCalled, false);
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.intent, "check_calendar");
+  assertEquals(
+    result.reply,
+    "Today: nothing scheduled.\nTomorrow: nothing scheduled.",
+  );
+  assertEquals(result.structuredResponse?.comingUp?.tomorrowSummary, "open");
+});
+
+Deno.test("runCompanionAgent returns upcoming digest when chat persistence fails", async () => {
+  const supabase = createMockSupabase({
+    tableErrors: {
+      "companion_chats:insert": {
+        message: "companion_chats insert failed",
+        code: "23514",
+      },
+    },
+  });
+  let guardedFetchCalled = false;
+  const guardedFetch = (async (input: string | URL | Request) => {
+    guardedFetchCalled = true;
+    throw new Error(
+      `Persistence failures should not call OpenAI: ${String(input)}`,
+    );
+  }) as typeof fetch;
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    requestId: "request-persistence-failure",
+    request: {
+      surface: "journeys",
+      sessionId: "session-upcoming-persistence-failure",
+      message: "What do I have coming up?",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T20:32:00-07:00",
+      turnOrigin: "launcher",
+      starterIntent: "upcoming_start",
+    },
+  });
+
+  assertEquals(guardedFetchCalled, false);
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.intent, "check_calendar");
+  assertEquals(
+    result.reply,
+    "Today: nothing scheduled.\nTomorrow: nothing scheduled.",
+  );
+});
+
+Deno.test("runCompanionAgent still reaches OpenAI when optional context fails", async () => {
+  const supabase = createMockSupabase({
+    tableErrors: {
+      "profiles:select": {
+        message: "profiles optional context unavailable",
+        code: "PGRST000",
+      },
+      "user_ai_preferences:select": {
+        message: "user_ai_preferences optional context unavailable",
+        code: "PGRST000",
+      },
+      "companion_memories:select": {
+        message: "companion_memories optional context unavailable",
+        code: "PGRST000",
+      },
+      "user_reflections:select": {
+        message: "user_reflections optional context unavailable",
+        code: "PGRST000",
+      },
+      "daily_check_ins:select": {
+        message: "daily_check_ins optional context unavailable",
+        code: "PGRST000",
+      },
+    },
+  });
+  const { guardedFetch, responseBodies } = createInstructionCaptureFetch(
+    "We can talk that through without turning it into a planner action yet.",
+  );
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    requestId: "request-optional-context-chat",
+    request: {
+      surface: "journeys",
+      sessionId: "session-optional-context-chat",
+      message: "Can you help me think through the weekend?",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T20:32:00-07:00",
+      turnOrigin: "composer",
+    },
+  });
+
+  assertEquals(responseBodies.length, 1);
+  assertEquals(result.mode, "conversation");
+  assertEquals(result.intent, "unknown");
+  assertEquals(
+    result.reply,
+    "We can talk that through without turning it into a planner action yet.",
+  );
+});
+
+Deno.test("runCompanionAgent returns AI replies when chat persistence fails", async () => {
+  const supabase = createMockSupabase({
+    tableErrors: {
+      "companion_chats:insert": {
+        message: "companion_chats insert failed",
+        code: "23514",
+      },
+    },
+  });
+  const { guardedFetch, responseBodies } = createInstructionCaptureFetch(
+    "Absolutely. Let's sort the pieces first.",
+  );
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    requestId: "request-ai-persistence-failure",
+    request: {
+      surface: "journeys",
+      sessionId: "session-ai-persistence-failure",
+      message: "I need help organizing my thoughts.",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T20:32:00-07:00",
+      turnOrigin: "composer",
+    },
+  });
+
+  assertEquals(responseBodies.length, 1);
+  assertEquals(result.mode, "conversation");
+  assertEquals(result.intent, "unknown");
+  assertEquals(result.reply, "Absolutely. Let's sort the pieces first.");
+});
+
+Deno.test("runCompanionAgent returns in-chat failure when core upcoming context fails", async () => {
+  const supabase = createMockSupabase({
+    tableErrors: {
+      "daily_tasks:select": {
+        message: "daily_tasks core context unavailable",
+        code: "PGRST000",
+      },
+      "habits:select": {
+        message: "habits core context unavailable",
+        code: "PGRST000",
+      },
+      "epics:select": {
+        message: "epics core context unavailable",
+        code: "PGRST000",
+      },
+      "external_calendar_events:select": {
+        message: "external_calendar_events core context unavailable",
+        code: "PGRST000",
+      },
+    },
+  });
+  let guardedFetchCalled = false;
+  const guardedFetch = (async (input: string | URL | Request) => {
+    guardedFetchCalled = true;
+    throw new Error(
+      `Core context failures should not call OpenAI: ${String(input)}`,
+    );
+  }) as typeof fetch;
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    requestId: "request-core-context-failure",
+    request: {
+      surface: "journeys",
+      sessionId: "session-upcoming-core-context-failure",
+      message: "What do I have coming up?",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T20:32:00-07:00",
+      turnOrigin: "launcher",
+      starterIntent: "upcoming_start",
+    },
+  });
+
+  assertEquals(guardedFetchCalled, false);
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.intent, "check_calendar");
+  assert(
+    result.reply.includes("couldn’t load your planner"),
+    "expected an in-chat load failure instead of a thrown error",
+  );
+  assertEquals(result.structuredResponse, null);
 });
 
 Deno.test("runCompanionAgent routes plan-day follow-up answers through the planner", async () => {
@@ -865,6 +1311,40 @@ Deno.test("runCompanionAgent does not create a composer draft from deterministic
   );
 });
 
+Deno.test("runCompanionAgent drafts Gym at 6 after Quest? when OpenAI returns no tool calls", async () => {
+  const supabase = createMockSupabase();
+  const { guardedFetch } = createRawMessageTextCaptureFetch("");
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-quest-gym-no-tools",
+      message: "Gym at 6",
+      inputMode: "text",
+      currentDateTime: "2026-05-03T21:08:00-07:00",
+      starterIntent: "quest_capture",
+      turnOrigin: "composer",
+    },
+  });
+
+  assertEquals(result.mode, "pending_confirmation");
+  assertEquals(result.intent, "schedule_task");
+  assertEquals(result.pendingAction?.actionType, "task_create");
+  assertEquals(result.pendingAction?.normalizedPayload.title, "Gym");
+  assertEquals(result.pendingAction?.normalizedPayload.scheduled_time, "18:00");
+  assertEquals(result.pendingAction?.normalizedPayload.task_date, "2026-05-03");
+  assert(
+    supabase.inserts.some((entry) =>
+      entry.table === "companion_pending_actions"
+    ),
+    "quest-capture parser fallback should become a confirmable pending action",
+  );
+});
+
 Deno.test("runCompanionAgent planner fallback drafts concrete quest-capture starter text", async () => {
   const supabase = createMockSupabase();
   let fetchCalled = false;
@@ -889,12 +1369,25 @@ Deno.test("runCompanionAgent planner fallback drafts concrete quest-capture star
   });
 
   assertEquals(fetchCalled, true);
+  assertEquals(result.mode, "pending_confirmation");
+  assertEquals(result.pendingAction?.actionType, "task_create");
   assertEquals(result.reply.includes("Quest?"), false);
   assertEquals(result.proposedActions[0]?.type, "task_create");
   assertEquals(
-    (result.proposedActions[0]?.normalizedPayload as Record<string, unknown>)
-      ?.title,
+    result.pendingAction?.normalizedPayload.title,
     "Pilates",
+  );
+  const pendingActionInsert = supabase.inserts.find((entry) =>
+    entry.table === "companion_pending_actions"
+  );
+  assert(pendingActionInsert, "expected planner fallback to persist action");
+  assertEquals(
+    (pendingActionInsert.value as Record<string, unknown>).metadata,
+    {
+      source: "companion-agent-planner-fallback",
+      visibleDateStart: "2026-04-18",
+      visibleDateEnd: "2026-04-24",
+    },
   );
 });
 
@@ -1076,6 +1569,205 @@ Deno.test("runCompanionAgent does not resurrect cleared persisted follow-ups", a
   assertEquals(result.mode, "conversation");
   assertEquals(result.followUp, null);
   assertEquals(result.reply, "All clear.");
+});
+
+Deno.test("runCompanionAgent reads raw Responses message text for free-talk replies", async () => {
+  const supabase = createMockSupabase({
+    messages: [
+      {
+        id: "msg-free-talk-opener",
+        role: "assistant",
+        content: "What's good, champ?",
+        created_at: "2026-05-03T16:12:00.000Z",
+        input_mode: null,
+        source: "agent",
+        surface: "journeys",
+        session_id: "session-free-talk-raw-output",
+        metadata: { agentDecision: { followUp: null } },
+      },
+    ],
+  });
+  const { guardedFetch } = createRawMessageTextCaptureFetch(
+    "Living pretty well. What are we getting into?",
+  );
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-free-talk-raw-output",
+      message: "Vibing how are you living?",
+      inputMode: "text",
+      currentDateTime: "2026-05-03T21:12:00-07:00",
+      turnOrigin: "composer",
+    },
+  });
+
+  assertEquals(result.mode, "conversation");
+  assertEquals(result.followUp, null);
+  assertEquals(
+    result.reply,
+    "Living pretty well. What are we getting into?",
+  );
+  assertEquals(result.pendingAction, undefined);
+});
+
+Deno.test("runCompanionAgent records provider diagnostics for model access failures", async () => {
+  const supabase = createMockSupabase({
+    messages: [
+      {
+        id: "msg-free-talk-opener",
+        role: "assistant",
+        content: "What's good, champ?",
+        created_at: "2026-05-03T16:12:00.000Z",
+        input_mode: null,
+        source: "agent",
+        surface: "journeys",
+        session_id: "session-provider-model-access",
+        metadata: { agentDecision: { followUp: null } },
+      },
+    ],
+  });
+  const { guardedFetch, responseBodies } = createResponseFailureFetch({
+    status: 404,
+    requestId: "req_model_missing",
+    body: {
+      error: {
+        message:
+          "The model `gpt-5.5` does not exist or you do not have access to it.",
+        type: "invalid_request_error",
+        code: "model_not_found",
+      },
+    },
+  });
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-provider-model-access",
+      message: "Chilling. How are you?",
+      inputMode: "text",
+      currentDateTime: "2026-05-03T21:12:00-07:00",
+      turnOrigin: "composer",
+    },
+  });
+
+  assertEquals(responseBodies[0].model, DEFAULT_COMPANION_AGENT_MODEL);
+  assertEquals(result.mode, "conversation");
+  assert(result.reply.includes("having trouble reaching my AI brain"));
+
+  const diagnostics = (result as Record<string, unknown>)
+    .providerDiagnostics as Record<string, unknown>;
+  assertEquals(diagnostics.reason, "model_access");
+  assertEquals(diagnostics.model, DEFAULT_COMPANION_AGENT_MODEL);
+  assertEquals(diagnostics.requestId, "req_model_missing");
+
+  const agentDecision = getLatestAssistantAgentDecision(supabase.inserts);
+  const metadataDiagnostics = agentDecision
+    ?.providerDiagnostics as Record<string, unknown>;
+  assertEquals(metadataDiagnostics.reason, "model_access");
+  assertEquals(metadataDiagnostics.requestId, "req_model_missing");
+});
+
+Deno.test("runCompanionAgent records provider diagnostics for invalid API keys", async () => {
+  const supabase = createMockSupabase({
+    messages: [
+      {
+        id: "msg-free-talk-opener",
+        role: "assistant",
+        content: "What's good, champ?",
+        created_at: "2026-05-03T16:12:00.000Z",
+        input_mode: null,
+        source: "agent",
+        surface: "journeys",
+        session_id: "session-provider-invalid-key",
+        metadata: { agentDecision: { followUp: null } },
+      },
+    ],
+  });
+  const { guardedFetch } = createResponseFailureFetch({
+    status: 401,
+    requestId: "req_invalid_key",
+    body: {
+      error: {
+        message: "Incorrect API key provided.",
+        type: "invalid_request_error",
+        code: "invalid_api_key",
+      },
+    },
+  });
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-provider-invalid-key",
+      message: "Chilling. How are you?",
+      inputMode: "text",
+      currentDateTime: "2026-05-03T21:12:00-07:00",
+      turnOrigin: "composer",
+    },
+  });
+
+  assertEquals(result.mode, "conversation");
+  assert(result.reply.includes("having trouble reaching my AI brain"));
+
+  const diagnostics = (result as Record<string, unknown>)
+    .providerDiagnostics as Record<string, unknown>;
+  assertEquals(diagnostics.reason, "auth");
+  assertEquals(diagnostics.status, 401);
+  assertEquals(diagnostics.requestId, "req_invalid_key");
+});
+
+Deno.test("runCompanionAgent records provider diagnostics for empty model output", async () => {
+  const supabase = createMockSupabase({
+    messages: [
+      {
+        id: "msg-free-talk-opener",
+        role: "assistant",
+        content: "What's good, champ?",
+        created_at: "2026-05-03T16:12:00.000Z",
+        input_mode: null,
+        source: "agent",
+        surface: "journeys",
+        session_id: "session-empty-model-output",
+        metadata: { agentDecision: { followUp: null } },
+      },
+    ],
+  });
+  const { guardedFetch } = createRawMessageTextCaptureFetch("");
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-empty-model-output",
+      message: "Chilling. How are you?",
+      inputMode: "text",
+      currentDateTime: "2026-05-03T21:12:00-07:00",
+      turnOrigin: "composer",
+    },
+  });
+
+  assertEquals(result.mode, "conversation");
+  assert(result.reply.includes("came back blank"));
+  const diagnostics = (result as Record<string, unknown>)
+    .providerDiagnostics as Record<string, unknown>;
+  assertEquals(diagnostics.reason, "empty_output");
+  assertEquals(diagnostics.responseId, "resp_1");
 });
 
 Deno.test("runCompanionAgent asks a follow-up for bare plan-day variants without OpenAI", async () => {

@@ -1,14 +1,20 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
-import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
+import {
+  createSafeErrorResponse,
+  requireProtectedRequest,
+} from "../_shared/abuseProtection.ts";
 import {
   createCostGuardrailSession,
   createCostGuardrailSupabaseClient,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
 import { CompanionAgentRequestSchema } from "./types.ts";
-import { runCompanionAgent } from "./agent.ts";
+import {
+  isCompanionScheduleReadFastPathRequest,
+  runCompanionAgent,
+} from "./agent.ts";
 import {
   buildErrorLog,
   type CompanionAgentFailureStage,
@@ -30,7 +36,8 @@ serve(async (req) => {
       profileKey: "companion_agent",
       endpointName: "companion-agent",
       allowServiceRole: false,
-      blockedMessage: "Too many companion requests right now. Try again in a moment.",
+      blockedMessage:
+        "Too many companion requests right now. Try again in a moment.",
     });
 
     if (protectedRequest instanceof Response) return protectedRequest;
@@ -44,32 +51,41 @@ serve(async (req) => {
       return createSafeErrorResponse(req, {
         status: 400,
         code: "INVALID_REQUEST",
-        error: parsed.error.flatten().formErrors[0] ?? "Invalid companion request",
+        error: parsed.error.flatten().formErrors[0] ??
+          "Invalid companion request",
         requestId,
         stage,
         failureReason: "invalid_request",
       });
     }
 
-    stage = "cost_guardrail";
-    const costGuardrails = createCostGuardrailSession({
-      supabase: createCostGuardrailSupabaseClient(),
-      endpointKey: "companion-agent",
-      featureKey: "ai_companion_agent",
-      userId: protectedRequest.auth.userId,
-      requestId,
-    });
-    await costGuardrails.enforceAccess({
-      capabilities: ["text"],
-      providers: ["openai"],
-    });
+    const scheduleReadFastPath = isCompanionScheduleReadFastPathRequest(
+      parsed.data,
+    );
+    let guardedFetch: typeof fetch = fetch;
+    if (!scheduleReadFastPath) {
+      stage = "cost_guardrail";
+      const costGuardrails = createCostGuardrailSession({
+        supabase: createCostGuardrailSupabaseClient(),
+        endpointKey: "companion-agent",
+        featureKey: "ai_companion_agent",
+        userId: protectedRequest.auth.userId,
+        requestId,
+      });
+      await costGuardrails.enforceAccess({
+        capabilities: ["text"],
+        providers: ["openai"],
+      });
+      guardedFetch = costGuardrails.wrapFetch(fetch);
+    }
 
     stage = "agent_run";
     const result = await runCompanionAgent({
-      guardedFetch: costGuardrails.wrapFetch(fetch),
+      guardedFetch,
       supabase: protectedRequest.supabase,
       userId: protectedRequest.auth.userId,
       request: parsed.data,
+      requestId,
     });
 
     return new Response(

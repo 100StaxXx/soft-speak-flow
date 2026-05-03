@@ -22,7 +22,12 @@ import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
 import { dispatchPlannerSyncFinished } from "@/utils/plannerSync";
 import { toRemoteEpicInsertPayload } from "@/utils/epicRemotePayload";
 import { normalizeCampaignMilestonePercentArray } from "@/utils/campaignMilestones";
-import { scrubCompanionChatsForDeletedEpic } from "@/utils/companionChatScrub";
+import {
+  forgetDeletedPlannerEntities,
+  normalizeDeletedPlannerEntities,
+  type DeletedPlannerEntity,
+} from "@/utils/deletedPlannerMemory";
+import { runDailyTaskCleanupUpdate } from "@/utils/supabaseDailyTaskCleanup";
 import {
   getPrimaryQuestReminderOffset,
   resolveQuestReminderOffsets,
@@ -93,6 +98,17 @@ function stripUnsupportedRecurrenceColumns(payload: Record<string, unknown>): Re
   delete nextPayload.recurrence_custom_period;
   return nextPayload;
 }
+
+const normalizeQueuedDeletedPlannerEntities = (
+  value: unknown,
+): DeletedPlannerEntity[] =>
+  Array.isArray(value)
+    ? normalizeDeletedPlannerEntities(
+      value.filter((entry): entry is Record<string, unknown> =>
+        Boolean(entry && typeof entry === "object" && !Array.isArray(entry))
+      ),
+    )
+    : [];
 
 async function executeQueuedAction(userId: string, action: QueuedAction): Promise<void> {
   switch (action.action_kind) {
@@ -255,12 +271,48 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
     }
 
     case "TASK_DELETE": {
-      const { taskId } = action.payload as { taskId: string };
+      const payload = action.payload as Record<string, unknown>;
+      const taskId = payload.taskId as string;
+      const remoteTaskId = (payload.remoteTaskId as string | undefined) ??
+        taskId;
+      const taskTitle = (payload.taskTitle as string | null | undefined) ??
+        null;
+
+      await forgetDeletedPlannerEntities({
+        userId,
+        source: "queued_task_delete",
+        entities: normalizeDeletedPlannerEntities([
+          {
+            entityType: "task",
+            entityId: taskId,
+            title: taskTitle,
+            metadata: {
+              remoteTaskId,
+              taskDate: payload.taskDate ?? null,
+              epicId: payload.epicId ?? null,
+              habitSourceId: payload.habitSourceId ?? null,
+            },
+          },
+          ...(remoteTaskId !== taskId
+            ? [{
+              entityType: "task" as const,
+              entityId: remoteTaskId,
+              title: taskTitle,
+              metadata: {
+                localTaskId: taskId,
+                taskDate: payload.taskDate ?? null,
+                epicId: payload.epicId ?? null,
+                habitSourceId: payload.habitSourceId ?? null,
+              },
+            }]
+            : []),
+        ]),
+      });
 
       const { error } = await supabase
         .from("daily_tasks")
         .delete()
-        .eq("id", taskId)
+        .eq("id", remoteTaskId)
         .eq("user_id", userId);
 
       if (error) throw error;
@@ -372,17 +424,17 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
         .eq("habit_id", habitId);
       if (linkLookupError) throw linkLookupError;
 
-      const { error: detachCompletedTasksError } = await supabase
-        .from("daily_tasks")
-        .update({
+      await runDailyTaskCleanupUpdate({
           epic_id: null,
-          epic_title: null,
           habit_source_id: null,
-        })
-        .eq("habit_source_id", habitId)
-        .eq("user_id", userId)
-        .or("completed.eq.true,completed_at.not.is.null");
-      if (detachCompletedTasksError) throw detachCompletedTasksError;
+        }, (update) =>
+          supabase
+            .from("daily_tasks")
+            .update(update)
+            .eq("habit_source_id", habitId)
+            .eq("user_id", userId)
+            .or("completed.eq.true,completed_at.not.is.null")
+        );
 
       const { error: deleteIncompleteTasksError } = await supabase
         .from("daily_tasks")
@@ -550,10 +602,28 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
     }
 
     case "EPIC_RITUAL_DELETE": {
-      const { epicId, habitId } = action.payload as {
+      const payload = action.payload as {
         epicId: string;
         habitId: string;
+        deletedPlannerEntities?: unknown;
       };
+      const { epicId, habitId } = payload;
+      const queuedDeletedPlannerEntities = normalizeQueuedDeletedPlannerEntities(
+        payload.deletedPlannerEntities,
+      );
+      await forgetDeletedPlannerEntities({
+        userId,
+        source: "queued_campaign_ritual_delete",
+        entities: queuedDeletedPlannerEntities.length > 0
+          ? queuedDeletedPlannerEntities
+          : [{
+            entityType: "ritual",
+            entityId: habitId,
+            title: null,
+            metadata: { campaignId: epicId },
+          }],
+      });
+      const excludedFromPlannerAt = new Date().toISOString();
 
       const { data: matchingLinks, error: linkLookupError } = await supabase
         .from("epic_habits")
@@ -573,17 +643,18 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
         throw new Error("Campaign ritual link not found");
       }
 
-      const { error: detachCompletedTasksError } = await supabase
-        .from("daily_tasks")
-        .update({
+      await runDailyTaskCleanupUpdate({
           epic_id: null,
-          epic_title: null,
           habit_source_id: null,
-        })
-        .eq("habit_source_id", habitId)
-        .eq("user_id", userId)
-        .or("completed.eq.true,completed_at.not.is.null");
-      if (detachCompletedTasksError) throw detachCompletedTasksError;
+          excluded_from_planner_at: excludedFromPlannerAt,
+        }, (update) =>
+          supabase
+            .from("daily_tasks")
+            .update(update)
+            .eq("habit_source_id", habitId)
+            .eq("user_id", userId)
+            .or("completed.eq.true,completed_at.not.is.null")
+        );
 
       const { error: deleteIncompleteTasksError } = await supabase
         .from("daily_tasks")
@@ -623,16 +694,16 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
         habitId: string;
       };
 
-      const { error: detachTasksError } = await supabase
-        .from("daily_tasks")
-        .update({
+      await runDailyTaskCleanupUpdate({
           epic_id: null,
-          epic_title: null,
-        })
-        .eq("user_id", userId)
-        .eq("epic_id", epicId)
-        .eq("habit_source_id", habitId);
-      if (detachTasksError) throw detachTasksError;
+        }, (update) =>
+          supabase
+            .from("daily_tasks")
+            .update(update)
+            .eq("user_id", userId)
+            .eq("epic_id", epicId)
+            .eq("habit_source_id", habitId)
+        );
 
       const { error } = await supabase
         .from("epic_habits")
@@ -645,11 +716,31 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
     }
 
     case "EPIC_DELETE": {
-      const { epicId, epicTitle, epicCreatedAt } = action.payload as {
+      const payload = action.payload as {
         epicId: string;
         epicTitle?: string | null;
         epicCreatedAt?: string | null;
+        deletedPlannerEntities?: unknown;
       };
+      const { epicId, epicTitle, epicCreatedAt } = payload;
+      const queuedDeletedPlannerEntities = normalizeQueuedDeletedPlannerEntities(
+        payload.deletedPlannerEntities,
+      );
+      await forgetDeletedPlannerEntities({
+        userId,
+        source: "queued_campaign_delete",
+        entities: queuedDeletedPlannerEntities.length > 0
+          ? queuedDeletedPlannerEntities
+          : [{
+            entityType: "campaign",
+            entityId: epicId,
+            title: epicTitle ?? null,
+            metadata: {
+              createdAt: epicCreatedAt ?? null,
+            },
+          }],
+      });
+      const excludedFromPlannerAt = new Date().toISOString();
 
       const { data: epicHabits, error: epicHabitsError } = await supabase
         .from("epic_habits")
@@ -660,30 +751,32 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
       const habitIds = epicHabits?.map((row) => row.habit_id) ?? [];
       const linkIds = epicHabits?.map((row) => row.id) ?? [];
 
-      const { error: detachCompletedEpicTasksError } = await supabase
-        .from("daily_tasks")
-        .update({
+      await runDailyTaskCleanupUpdate({
           epic_id: null,
-          epic_title: null,
           habit_source_id: null,
-        })
-        .eq("user_id", userId)
-        .eq("epic_id", epicId)
-        .or("completed.eq.true,completed_at.not.is.null");
-      if (detachCompletedEpicTasksError) throw detachCompletedEpicTasksError;
+          excluded_from_planner_at: excludedFromPlannerAt,
+        }, (update) =>
+          supabase
+            .from("daily_tasks")
+            .update(update)
+            .eq("user_id", userId)
+            .eq("epic_id", epicId)
+            .or("completed.eq.true,completed_at.not.is.null")
+        );
 
       if (habitIds.length > 0) {
-        const { error: detachCompletedHabitTasksError } = await supabase
-          .from("daily_tasks")
-          .update({
+        await runDailyTaskCleanupUpdate({
             epic_id: null,
-            epic_title: null,
             habit_source_id: null,
-          })
-          .eq("user_id", userId)
-          .in("habit_source_id", habitIds)
-          .or("completed.eq.true,completed_at.not.is.null");
-        if (detachCompletedHabitTasksError) throw detachCompletedHabitTasksError;
+            excluded_from_planner_at: excludedFromPlannerAt,
+          }, (update) =>
+            supabase
+              .from("daily_tasks")
+              .update(update)
+              .eq("user_id", userId)
+              .in("habit_source_id", habitIds)
+              .or("completed.eq.true,completed_at.not.is.null")
+          );
 
         const { error: deleteIncompleteTasksError } = await supabase
           .from("daily_tasks")
@@ -731,12 +824,6 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
         .eq("user_id", userId);
       if (epicError) throw epicError;
 
-      await scrubCompanionChatsForDeletedEpic(
-        userId,
-        epicTitle ?? null,
-        epicCreatedAt ?? null,
-      );
-
       return;
     }
 
@@ -766,17 +853,17 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
         const habitIds = epicHabits?.map((row) => row.habit_id) ?? [];
 
         if (habitIds.length > 0) {
-          const { error: detachCompletedHabitTasksError } = await supabase
-            .from("daily_tasks")
-            .update({
+          await runDailyTaskCleanupUpdate({
               epic_id: null,
-              epic_title: null,
               habit_source_id: null,
-            })
-            .in("habit_source_id", habitIds)
-            .eq("user_id", userId)
-            .or("completed.eq.true,completed_at.not.is.null");
-          if (detachCompletedHabitTasksError) throw detachCompletedHabitTasksError;
+            }, (update) =>
+              supabase
+                .from("daily_tasks")
+                .update(update)
+                .in("habit_source_id", habitIds)
+                .eq("user_id", userId)
+                .or("completed.eq.true,completed_at.not.is.null")
+            );
 
           const { error: habitsError } = await supabase
             .from("habits")
@@ -806,17 +893,17 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
           }
         }
 
-        const { error: detachCompletedEpicTasksError } = await supabase
-            .from("daily_tasks")
-            .update({
+        await runDailyTaskCleanupUpdate({
               epic_id: null,
-              epic_title: null,
               habit_source_id: null,
-            })
-            .eq("user_id", userId)
-            .eq("epic_id", epicId)
-            .or("completed.eq.true,completed_at.not.is.null");
-        if (detachCompletedEpicTasksError) throw detachCompletedEpicTasksError;
+            }, (update) =>
+              supabase
+                .from("daily_tasks")
+                .update(update)
+                .eq("user_id", userId)
+                .eq("epic_id", epicId)
+                .or("completed.eq.true,completed_at.not.is.null")
+            );
 
         const { error: milestonesError } = await supabase
           .from("epic_milestones")

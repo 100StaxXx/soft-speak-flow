@@ -2846,9 +2846,10 @@ export type Database = {
           created_at: string | null
           difficulty: string | null
           deadline_at: string | null
-          energy_type: string | null
-          epic_id: string | null
-          estimated_duration: number | null
+	          energy_type: string | null
+	          epic_id: string | null
+	          excluded_from_planner_at: string | null
+	          estimated_duration: number | null
           flexibility: string
           habit_source_id: string | null
           id: string
@@ -2896,9 +2897,10 @@ export type Database = {
           created_at?: string | null
           difficulty?: string | null
           deadline_at?: string | null
-          energy_type?: string | null
-          epic_id?: string | null
-          estimated_duration?: number | null
+	          energy_type?: string | null
+	          epic_id?: string | null
+	          excluded_from_planner_at?: string | null
+	          estimated_duration?: number | null
           flexibility?: string
           habit_source_id?: string | null
           id?: string
@@ -2946,9 +2948,10 @@ export type Database = {
           created_at?: string | null
           difficulty?: string | null
           deadline_at?: string | null
-          energy_type?: string | null
-          epic_id?: string | null
-          estimated_duration?: number | null
+	          energy_type?: string | null
+	          epic_id?: string | null
+	          excluded_from_planner_at?: string | null
+	          estimated_duration?: number | null
           flexibility?: string
           habit_source_id?: string | null
           id?: string
@@ -3019,9 +3022,45 @@ export type Database = {
             referencedRelation: "daily_tasks"
             referencedColumns: ["id"]
           },
-        ]
-      }
-      daily_wallpaper_assignments: {
+	        ]
+	      }
+	      deleted_planner_entities: {
+	        Row: {
+	          created_at: string
+	          deleted_at: string
+	          entity_id: string | null
+	          entity_type: string
+	          id: string
+	          metadata: Json
+	          source: string | null
+	          title: string | null
+	          user_id: string
+	        }
+	        Insert: {
+	          created_at?: string
+	          deleted_at?: string
+	          entity_id?: string | null
+	          entity_type: string
+	          id?: string
+	          metadata?: Json
+	          source?: string | null
+	          title?: string | null
+	          user_id: string
+	        }
+	        Update: {
+	          created_at?: string
+	          deleted_at?: string
+	          entity_id?: string | null
+	          entity_type?: string
+	          id?: string
+	          metadata?: Json
+	          source?: string | null
+	          title?: string | null
+	          user_id?: string
+	        }
+	        Relationships: []
+	      }
+	      daily_wallpaper_assignments: {
         Row: {
           assignment_source: string
           created_at: string

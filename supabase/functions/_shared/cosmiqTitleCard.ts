@@ -1,10 +1,9 @@
-import { installOpenAICompatibilityShim } from "./aiClient.ts";
 import {
   type CompanionStatAnalysis,
 } from "../../../src/shared/companionStatAnalysis.ts";
 import {
-  COMPANION_COSMIQ_TITLE_CARD_PROMPT_VERSION,
   buildCompanionCosmiqTitleCardProfileKey,
+  COMPANION_COSMIQ_TITLE_CARD_PROMPT_VERSION,
   type CompanionCosmiqTitleCard,
 } from "../../../src/shared/companionStatCosmiqTitles.ts";
 import {
@@ -13,12 +12,19 @@ import {
 } from "./costGuardrails.ts";
 import type { OnboardingVisualPersona } from "../../../src/shared/onboardingVisualPersona.ts";
 
-installOpenAICompatibilityShim();
+export const COSMIQ_TITLE_CARD_PROMPT_VERSION =
+  COMPANION_COSMIQ_TITLE_CARD_PROMPT_VERSION;
 
-export const COSMIQ_TITLE_CARD_PROMPT_VERSION = COMPANION_COSMIQ_TITLE_CARD_PROMPT_VERSION;
-
+const OPENAI_IMAGE_GENERATIONS_URL =
+  "https://api.openai.com/v1/images/generations";
+const COSMIQ_TITLE_CARD_IMAGE_MODEL = "gpt-image-2";
+const COSMIQ_TITLE_CARD_IMAGE_FALLBACK_MODELS = [
+  "chatgpt-image-latest",
+  "gpt-image-1.5",
+  "gpt-image-1",
+] as const;
 const COSMIQ_TITLE_CARD_BUCKET = "cosmiq-title-cards";
-const IMAGE_GENERATION_TIMEOUT_MS = 45_000;
+const IMAGE_GENERATION_TIMEOUT_MS = 120_000;
 const GENERATION_STALE_AFTER = "75 seconds";
 const COSMIQ_TITLE_CARD_IMAGE_SIZE = "1024x1536";
 const COSMIQ_TITLE_CARD_PRIMARY_DIRECTION =
@@ -80,9 +86,14 @@ const toCachedCardRow = (value: unknown): CachedCardRow | null =>
     ? value as CachedCardRow
     : null;
 
-const normalizeImageUrls = (value: unknown, fallbackImageUrl?: string | null): string[] => {
+const normalizeImageUrls = (
+  value: unknown,
+  fallbackImageUrl?: string | null,
+): string[] => {
   const urls = Array.isArray(value)
-    ? value.filter((imageUrl): imageUrl is string => typeof imageUrl === "string" && imageUrl.trim().length > 0)
+    ? value.filter((imageUrl): imageUrl is string =>
+      typeof imageUrl === "string" && imageUrl.trim().length > 0
+    )
     : [];
 
   if (fallbackImageUrl && fallbackImageUrl.trim().length > 0) {
@@ -94,21 +105,34 @@ const normalizeImageUrls = (value: unknown, fallbackImageUrl?: string | null): s
 
 const getFailureDiagnosticFromRow = (
   row: CachedCardRow | BeginGenerationRow | null | undefined,
-): Partial<Pick<CompanionCosmiqTitleCard, "failureCode" | "failureMessage" | "retryable" | "lastAttemptAt">> => {
+): Partial<
+  Pick<
+    CompanionCosmiqTitleCard,
+    "failureCode" | "failureMessage" | "retryable" | "lastAttemptAt"
+  >
+> => {
   if (!row) return {};
 
   return {
-    ...(typeof row.failure_code === "string" && row.failure_code.trim().length > 0
+    ...(typeof row.failure_code === "string" &&
+        row.failure_code.trim().length > 0
       ? { failureCode: row.failure_code }
       : {}),
-    ...(typeof row.failure_message === "string" && row.failure_message.trim().length > 0
+    ...(typeof row.failure_message === "string" &&
+        row.failure_message.trim().length > 0
       ? { failureMessage: row.failure_message }
       : {}),
     ...(typeof row.retryable === "boolean" ? { retryable: row.retryable } : {}),
-    ...(typeof row.last_attempt_at === "string" && row.last_attempt_at.trim().length > 0
+    ...(typeof row.last_attempt_at === "string" &&
+        row.last_attempt_at.trim().length > 0
       ? { lastAttemptAt: row.last_attempt_at }
       : {}),
   };
+};
+
+const shouldRetryUnavailableCacheRow = (row: CachedCardRow): boolean => {
+  if (row.retryable === true) return true;
+  return row.failure_code !== "guardrail_blocked";
 };
 
 const buildProfileKey = (
@@ -162,7 +186,9 @@ export async function getCosmiqTitleCardCacheState({
 
   const { data, error } = await supabase
     .from("companion_cosmiq_title_cards")
-    .select("image_url, image_urls, status, prompt_version, failure_code, failure_message, retryable, last_attempt_at")
+    .select(
+      "image_url, image_urls, status, prompt_version, failure_code, failure_message, retryable, last_attempt_at",
+    )
     .eq("profile_key", pending.profileKey)
     .maybeSingle();
 
@@ -190,6 +216,16 @@ export async function getCosmiqTitleCardCacheState({
   }
 
   if (row?.status === "unavailable") {
+    if (shouldRetryUnavailableCacheRow(row)) {
+      return {
+        ...pending,
+        imageUrls,
+        promptVersion,
+        ...getFailureDiagnosticFromRow(row),
+        retryable: true,
+      };
+    }
+
     return {
       profileKey: pending.profileKey,
       imageUrl: null,
@@ -209,16 +245,69 @@ export async function getCosmiqTitleCardCacheState({
   };
 }
 
-const parseDataImage = (imageData: string): { bytes: Uint8Array; contentType: string; extension: string } | null => {
+const getImageExtension = (contentType: string): string => {
+  if (contentType.includes("jpeg") || contentType.includes("jpg")) return "jpg";
+  if (contentType.includes("webp")) return "webp";
+  return "png";
+};
+
+const parseDataImage = (
+  imageData: string,
+): { bytes: Uint8Array; contentType: string; extension: string } | null => {
   const match = imageData.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/);
   if (!match) return null;
 
   const [, imageFormat, base64Data] = match;
-  const extension = imageFormat === "jpeg" ? "jpg" : imageFormat;
+  const contentType = `image/${imageFormat}`;
+  return parseBase64Image(base64Data, contentType);
+};
+
+const parseBase64Image = (
+  imageData: string,
+  contentType = "image/png",
+): { bytes: Uint8Array; contentType: string; extension: string } | null => {
+  try {
+    return {
+      bytes: Uint8Array.from(atob(imageData), (char) => char.charCodeAt(0)),
+      contentType,
+      extension: getImageExtension(contentType),
+    };
+  } catch {
+    return null;
+  }
+};
+
+const getTitleCardImageModels = (): string[] => {
+  const configuredModel = Deno.env.get("COSMIQ_TITLE_CARD_IMAGE_MODEL")?.trim();
+  return Array.from(
+    new Set([
+      configuredModel || COSMIQ_TITLE_CARD_IMAGE_MODEL,
+      COSMIQ_TITLE_CARD_IMAGE_MODEL,
+      ...COSMIQ_TITLE_CARD_IMAGE_FALLBACK_MODELS,
+    ].filter((model) => model.length > 0)),
+  );
+};
+
+const downloadGeneratedImage = async (
+  imageUrl: string,
+  fetchImpl: typeof fetch,
+): Promise<{ bytes: Uint8Array; contentType: string; extension: string }> => {
+  const response = await fetchWithTimeout(
+    imageUrl,
+    { method: "GET" },
+    IMAGE_GENERATION_TIMEOUT_MS,
+    fetchImpl,
+  );
+
+  if (!response.ok) {
+    throw new Error(`Generated image download failed: ${response.status}`);
+  }
+
+  const contentType = response.headers.get("content-type") ?? "image/png";
   return {
-    bytes: Uint8Array.from(atob(base64Data), (char) => char.charCodeAt(0)),
-    contentType: `image/${imageFormat}`,
-    extension,
+    bytes: new Uint8Array(await response.arrayBuffer()),
+    contentType,
+    extension: getImageExtension(contentType),
   };
 };
 
@@ -292,7 +381,9 @@ class CosmiqTitleCardGenerationError extends Error {
   }
 }
 
-const sanitizeFailureDiagnostic = (error: unknown): CosmiqTitleCardFailureDiagnostic => {
+const sanitizeFailureDiagnostic = (
+  error: unknown,
+): CosmiqTitleCardFailureDiagnostic => {
   if (error instanceof CosmiqTitleCardGenerationError) {
     return error.diagnostic;
   }
@@ -317,6 +408,31 @@ const sanitizeFailureDiagnostic = (error: unknown): CosmiqTitleCardFailureDiagno
   }
 
   if (message.startsWith("AI image generation failed:")) {
+    if (message.includes(": 401 ")) {
+      return {
+        failureCode: "openai_auth_failed",
+        failureMessage: "OpenAI image authentication failed.",
+        retryable: false,
+      };
+    }
+
+    if (message.includes(": 403 ")) {
+      return {
+        failureCode: "openai_image_model_forbidden",
+        failureMessage:
+          "OpenAI rejected the configured image model. Check GPT Image access for this API key.",
+        retryable: false,
+      };
+    }
+
+    if (message.includes(": 429 ")) {
+      return {
+        failureCode: "upstream_rate_limited",
+        failureMessage: "Image API rate-limited title art. Retrying.",
+        retryable: true,
+      };
+    }
+
     return {
       failureCode: "upstream_error",
       failureMessage: "Image API failed. Retrying.",
@@ -324,7 +440,11 @@ const sanitizeFailureDiagnostic = (error: unknown): CosmiqTitleCardFailureDiagno
     };
   }
 
-  if (message === "No image generated" || message === "Generated image was not returned as a data URL") {
+  if (
+    message === "No image generated" ||
+    message === "Generated image was not returned as base64 data" ||
+    message.startsWith("Generated image download failed:")
+  ) {
     return {
       failureCode: "invalid_image_payload",
       failureMessage: "Image API returned an unusable image. Retrying.",
@@ -371,15 +491,18 @@ async function completeGenerationBestEffort({
   diagnostic?: CosmiqTitleCardFailureDiagnostic | null;
 }) {
   try {
-    const { error } = await supabase.rpc("complete_cosmiq_title_card_generation", {
-      p_profile_key: profileKey,
-      p_status: status,
-      p_image_url: imageUrl ?? null,
-      p_image_urls: imageUrls ?? null,
-      p_error_message: diagnostic?.failureMessage ?? null,
-      p_failure_code: diagnostic?.failureCode ?? null,
-      p_retryable: diagnostic?.retryable ?? false,
-    });
+    const { error } = await supabase.rpc(
+      "complete_cosmiq_title_card_generation",
+      {
+        p_profile_key: profileKey,
+        p_status: status,
+        p_image_url: imageUrl ?? null,
+        p_image_urls: imageUrls ?? null,
+        p_error_message: diagnostic?.failureMessage ?? null,
+        p_failure_code: diagnostic?.failureCode ?? null,
+        p_retryable: diagnostic?.retryable ?? false,
+      },
+    );
 
     if (error) {
       console.warn("[CosmiqTitleCard] Failed completing generation state", {
@@ -410,42 +533,69 @@ async function generateCosmiqTitleCardImage({
   guardedFetch: typeof fetch;
   variantDirection: string;
 }) {
-  const response = await fetchWithTimeout(
-    "https://api.openai.com/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${openAiApiKey}`,
-        "Content-Type": "application/json",
+  let lastImageError: Error | null = null;
+  const prompt = buildPrompt(analysis, visualPersona, variantDirection);
+
+  for (const model of getTitleCardImageModels()) {
+    const response = await fetchWithTimeout(
+      OPENAI_IMAGE_GENERATIONS_URL,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${openAiApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          prompt,
+          size: COSMIQ_TITLE_CARD_IMAGE_SIZE,
+          quality: "high",
+          n: 1,
+        }),
       },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image-preview",
-        messages: [{ role: "user", content: buildPrompt(analysis, visualPersona, variantDirection) }],
-        modalities: ["image", "text"],
-        image_size: COSMIQ_TITLE_CARD_IMAGE_SIZE,
-      }),
-    },
-    IMAGE_GENERATION_TIMEOUT_MS,
-    guardedFetch,
-  );
+      IMAGE_GENERATION_TIMEOUT_MS,
+      guardedFetch,
+    );
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`AI image generation failed: ${response.status} ${errorText}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      lastImageError = new Error(
+        `AI image generation failed: ${model}: ${response.status} ${errorText}`,
+      );
+      console.warn("[CosmiqTitleCard] Image model failed", {
+        model,
+        status: response.status,
+      });
+      continue;
+    }
+
+    const data = await response.json();
+    const firstImage = Array.isArray(data.data) ? data.data[0] : null;
+    const base64Image = typeof firstImage?.b64_json === "string"
+      ? firstImage.b64_json.trim()
+      : "";
+    const imageUrl = typeof firstImage?.url === "string"
+      ? firstImage.url.trim()
+      : "";
+
+    if (!base64Image && !imageUrl) {
+      throw new Error("No image generated");
+    }
+
+    if (base64Image) {
+      const parsedImage = base64Image.startsWith("data:image/")
+        ? parseDataImage(base64Image)
+        : parseBase64Image(base64Image);
+      if (!parsedImage) {
+        throw new Error("Generated image was not returned as base64 data");
+      }
+      return parsedImage;
+    }
+
+    return await downloadGeneratedImage(imageUrl, guardedFetch);
   }
 
-  const data = await response.json();
-  const imageData = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-  if (typeof imageData !== "string" || imageData.trim().length === 0) {
-    throw new Error("No image generated");
-  }
-
-  const parsedImage = parseDataImage(imageData);
-  if (!parsedImage) {
-    throw new Error("Generated image was not returned as a data URL");
-  }
-
-  return parsedImage;
+  throw lastImageError ?? new Error("No image generated");
 }
 
 export async function resolveCosmiqTitleCard({
@@ -458,26 +608,30 @@ export async function resolveCosmiqTitleCard({
 }: ResolveCosmiqTitleCardParams): Promise<CompanionCosmiqTitleCard> {
   const pending = buildPendingCosmiqTitleCard(analysis, visualPersona);
   const { profileKey } = pending;
-  const unavailable = (diagnostic?: CosmiqTitleCardFailureDiagnostic) => buildUnavailableCard(profileKey, diagnostic);
+  const unavailable = (diagnostic?: CosmiqTitleCardFailureDiagnostic) =>
+    buildUnavailableCard(profileKey, diagnostic);
 
-  const { data: beginData, error: beginError } = await supabase.rpc("begin_cosmiq_title_card_generation", {
-    p_profile_key: profileKey,
-    p_prompt_version: COSMIQ_TITLE_CARD_PROMPT_VERSION,
-    p_visual_persona: visualPersona,
-    p_title: analysis.cosmiqTitle.title,
-    p_rarity: analysis.cosmiqTitle.rarity,
-    p_momentum: analysis.cosmiqTitle.momentum,
-    p_dominant_stat: analysis.cosmiqTitle.dominantStat,
-    p_secondary_stat: analysis.cosmiqTitle.secondaryStat,
-    p_rebalance_stat: analysis.cosmiqTitle.rebalanceStat,
-    p_fusion: analysis.cosmiqTitle.fusion,
-    p_band_signature: analysis.statBreakdowns
-      .map((breakdown) => `${breakdown.attribute}:${breakdown.band}`)
-      .sort()
-      .join("|"),
-    p_force_refresh: forceRefresh,
-    p_stale_after: GENERATION_STALE_AFTER,
-  });
+  const { data: beginData, error: beginError } = await supabase.rpc(
+    "begin_cosmiq_title_card_generation",
+    {
+      p_profile_key: profileKey,
+      p_prompt_version: COSMIQ_TITLE_CARD_PROMPT_VERSION,
+      p_visual_persona: visualPersona,
+      p_title: analysis.cosmiqTitle.title,
+      p_rarity: analysis.cosmiqTitle.rarity,
+      p_momentum: analysis.cosmiqTitle.momentum,
+      p_dominant_stat: analysis.cosmiqTitle.dominantStat,
+      p_secondary_stat: analysis.cosmiqTitle.secondaryStat,
+      p_rebalance_stat: analysis.cosmiqTitle.rebalanceStat,
+      p_fusion: analysis.cosmiqTitle.fusion,
+      p_band_signature: analysis.statBreakdowns
+        .map((breakdown) => `${breakdown.attribute}:${breakdown.band}`)
+        .sort()
+        .join("|"),
+      p_force_refresh: forceRefresh,
+      p_stale_after: GENERATION_STALE_AFTER,
+    },
+  );
 
   if (beginError) {
     const diagnostic = {
@@ -562,8 +716,11 @@ export async function resolveCosmiqTitleCard({
       variantDirection: COSMIQ_TITLE_CARD_PRIMARY_DIRECTION,
     });
 
-    const storageKey = forceRefresh ? `${profileKey}__${crypto.randomUUID()}` : profileKey;
-    const storagePath = `${COSMIQ_TITLE_CARD_PROMPT_VERSION}/${storageKey}.${parsedImage.extension}`;
+    const storageKey = forceRefresh
+      ? `${profileKey}__${crypto.randomUUID()}`
+      : profileKey;
+    const storagePath =
+      `${COSMIQ_TITLE_CARD_PROMPT_VERSION}/${storageKey}.${parsedImage.extension}`;
     const { error: uploadError } = await supabase.storage
       .from(COSMIQ_TITLE_CARD_BUCKET)
       .upload(storagePath, parsedImage.bytes, {
@@ -572,7 +729,9 @@ export async function resolveCosmiqTitleCard({
       });
 
     if (uploadError) {
-      throw new Error(`Cosmiq title card upload failed: ${uploadError.message}`);
+      throw new Error(
+        `Cosmiq title card upload failed: ${uploadError.message}`,
+      );
     }
 
     const { data: publicUrlData } = supabase.storage
@@ -618,11 +777,14 @@ export async function resolveCosmiqTitleCard({
     });
 
     if (isCostGuardrailBlockedError(error)) {
-      console.warn("[CosmiqTitleCard] Cost guardrail blocked image generation", {
-        profileKey,
-        scopeType: error.scopeType,
-        scopeKey: error.scopeKey,
-      });
+      console.warn(
+        "[CosmiqTitleCard] Cost guardrail blocked image generation",
+        {
+          profileKey,
+          scopeType: error.scopeType,
+          scopeKey: error.scopeKey,
+        },
+      );
     } else {
       console.warn("[CosmiqTitleCard] Image generation failed", {
         profileKey,

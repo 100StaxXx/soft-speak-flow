@@ -196,10 +196,12 @@ const emitPlanDayActionSavedEvent = () => {
 const mapLoadedMessage = (
   message: Awaited<ReturnType<typeof loadCompanionChatThreadMessages>>[number],
 ): CompanionAssistantMessage => {
-  const metadata = message.metadata && typeof message.metadata === "object" &&
-      !Array.isArray(message.metadata)
-    ? message.metadata as Record<string, unknown>
-    : null;
+  const metadata =
+    message.metadata &&
+    typeof message.metadata === "object" &&
+    !Array.isArray(message.metadata)
+      ? (message.metadata as Record<string, unknown>)
+      : null;
 
   const parsePendingAction = (
     value: unknown,
@@ -225,13 +227,15 @@ const mapLoadedMessage = (
       status: pendingAction.status as PendingActionView["status"],
       intent: pendingAction.intent as PendingActionView["intent"],
       actionType: pendingAction.actionType as PendingActionView["actionType"],
-      proposalId: typeof pendingAction.proposalId === "string"
-        ? pendingAction.proposalId
-        : null,
+      proposalId:
+        typeof pendingAction.proposalId === "string"
+          ? pendingAction.proposalId
+          : null,
       summary: pendingAction.summary,
-      confirmationMessage: typeof pendingAction.confirmationMessage === "string"
-        ? pendingAction.confirmationMessage
-        : null,
+      confirmationMessage:
+        typeof pendingAction.confirmationMessage === "string"
+          ? pendingAction.confirmationMessage
+          : null,
       normalizedPayload: isJsonValue(pendingAction.normalizedPayload)
         ? pendingAction.normalizedPayload
         : {},
@@ -260,9 +264,8 @@ const mapLoadedMessage = (
     return {
       actionId: receipt.actionId,
       status: receipt.status as ActionReceiptView["status"],
-      proposalId: typeof receipt.proposalId === "string"
-        ? receipt.proposalId
-        : null,
+      proposalId:
+        typeof receipt.proposalId === "string" ? receipt.proposalId : null,
       message: receipt.message,
       summary: typeof receipt.summary === "string" ? receipt.summary : null,
       createdAt: receipt.createdAt,
@@ -277,10 +280,10 @@ const mapLoadedMessage = (
 
   const parseUnderstandingState = (value: unknown) =>
     value === "needs_followup" ||
-      value === "enough_to_discuss" ||
-      value === "ready_to_propose" ||
-      value === "ready_to_draft"
-      ? value as CompanionAgentUnderstandingState
+    value === "enough_to_discuss" ||
+    value === "ready_to_propose" ||
+    value === "ready_to_draft"
+      ? (value as CompanionAgentUnderstandingState)
       : undefined;
 
   const parseFollowUp = (value: unknown): CompanionAgentFollowUp | null => {
@@ -290,31 +293,34 @@ const mapLoadedMessage = (
     const followUp = value as Record<string, unknown>;
     if (typeof followUp.question !== "string") return null;
 
-    const expectedAnswerType = followUp.expectedAnswerType === "choice" ||
-        followUp.expectedAnswerType === "time" ||
-        followUp.expectedAnswerType === "priority" ||
-        followUp.expectedAnswerType === "confirmation" ||
-        followUp.expectedAnswerType === "free_text"
-      ? followUp.expectedAnswerType
-      : "free_text";
+    const expectedAnswerType =
+      followUp.expectedAnswerType === "choice" ||
+      followUp.expectedAnswerType === "time" ||
+      followUp.expectedAnswerType === "priority" ||
+      followUp.expectedAnswerType === "confirmation" ||
+      followUp.expectedAnswerType === "free_text"
+        ? followUp.expectedAnswerType
+        : "free_text";
 
     return {
       question: followUp.question,
       reason: typeof followUp.reason === "string" ? followUp.reason : null,
       expectedAnswerType,
       options: Array.isArray(followUp.options)
-        ? followUp.options.filter((option): option is string =>
-          typeof option === "string"
-        )
+        ? followUp.options.filter(
+            (option): option is string => typeof option === "string",
+          )
         : undefined,
-      blocksDrafting: typeof followUp.blocksDrafting === "boolean"
-        ? followUp.blocksDrafting
-        : true,
-      metadata: isJsonValue(followUp.metadata) &&
-          typeof followUp.metadata === "object" &&
-          !Array.isArray(followUp.metadata)
-        ? followUp.metadata as Record<string, Json>
-        : undefined,
+      blocksDrafting:
+        typeof followUp.blocksDrafting === "boolean"
+          ? followUp.blocksDrafting
+          : true,
+      metadata:
+        isJsonValue(followUp.metadata) &&
+        typeof followUp.metadata === "object" &&
+        !Array.isArray(followUp.metadata)
+          ? (followUp.metadata as Record<string, Json>)
+          : undefined,
     };
   };
 
@@ -322,10 +328,13 @@ const mapLoadedMessage = (
     value: unknown,
   ): CompanionAgentProposedAction[] =>
     Array.isArray(value)
-      ? value.filter((entry): entry is CompanionAgentProposedAction =>
-        Boolean(entry) && typeof entry === "object" && !Array.isArray(entry) &&
-        typeof (entry as Record<string, unknown>).type === "string"
-      )
+      ? value.filter(
+          (entry): entry is CompanionAgentProposedAction =>
+            Boolean(entry) &&
+            typeof entry === "object" &&
+            !Array.isArray(entry) &&
+            typeof (entry as Record<string, unknown>).type === "string",
+        )
       : [];
 
   const parseStringArray = (value: unknown): string[] =>
@@ -334,16 +343,18 @@ const mapLoadedMessage = (
       : [];
 
   const agentDecision =
-    metadata && typeof metadata.agentDecision === "object" &&
-      metadata.agentDecision !== null && !Array.isArray(metadata.agentDecision)
-      ? metadata.agentDecision as Record<string, unknown>
+    metadata &&
+    typeof metadata.agentDecision === "object" &&
+    metadata.agentDecision !== null &&
+    !Array.isArray(metadata.agentDecision)
+      ? (metadata.agentDecision as Record<string, unknown>)
       : null;
 
-  const structuredResponse = metadata && "structuredResponse" in metadata
-    ? (metadata
-      .structuredResponse as CompanionAgentResponse["structuredResponse"] ??
-      null)
-    : undefined;
+  const structuredResponse =
+    metadata && "structuredResponse" in metadata
+      ? ((metadata.structuredResponse as CompanionAgentResponse["structuredResponse"]) ??
+        null)
+      : undefined;
 
   return {
     id: message.id,
@@ -394,8 +405,9 @@ const isPlanDayStarterMessage = (value: string): boolean =>
 const hasRecentPlanDayStarter = (messages: CompanionAssistantMessage[]) =>
   messages
     .slice(-6)
-    .some((message) =>
-      message.role === "user" && isPlanDayStarterMessage(message.content)
+    .some(
+      (message) =>
+        message.role === "user" && isPlanDayStarterMessage(message.content),
     );
 
 const collectStructuredResponseSectionKeys = (
@@ -457,7 +469,8 @@ const deriveStructuredResponseFromMessages = (
 
   for (const message of messages) {
     if (
-      message.role !== "assistant" || message.structuredResponse === undefined
+      message.role !== "assistant" ||
+      message.structuredResponse === undefined
     ) {
       continue;
     }
@@ -483,7 +496,8 @@ const deriveLatestAgentDecisionFromMessages = (
 
   for (const message of messages) {
     if (message.role !== "assistant") continue;
-    const hasDecision = message.understandingState !== undefined ||
+    const hasDecision =
+      message.understandingState !== undefined ||
       message.followUp !== undefined ||
       message.proposedActions !== undefined;
     if (!hasDecision) continue;
@@ -535,8 +549,8 @@ const getCompanionAgentErrorSource = (parsed: ParsedFunctionInvokeError) =>
     parsed.responsePayload?.stage,
     parsed.responsePayload?.failureReason,
   ]
-    .filter((value): value is string =>
-      typeof value === "string" && value.length > 0
+    .filter(
+      (value): value is string => typeof value === "string" && value.length > 0,
     )
     .join(" ")
     .toLowerCase();
@@ -556,12 +570,14 @@ const isMissingCompanionAgentFunctionError = (
   const code = getParsedFunctionCode(parsed)?.toLowerCase() ?? "";
   const source = getCompanionAgentErrorSource(parsed);
 
-  return code.includes("function_not_found") ||
+  return (
+    code.includes("function_not_found") ||
     source.includes("function not found") ||
     source.includes("no route matched") ||
     source.includes("could not find function") ||
     source.includes("could not find the function") ||
-    (parsed.status === 404 && !parsed.backendMessage);
+    (parsed.status === 404 && !parsed.backendMessage)
+  );
 };
 
 const isCompanionAgentSetupError = (parsed: ParsedFunctionInvokeError) => {
@@ -571,8 +587,8 @@ const isCompanionAgentSetupError = (parsed: ParsedFunctionInvokeError) => {
     parsed.failureReason,
     parsed.responsePayload?.failureReason,
   ]
-    .filter((value): value is string =>
-      typeof value === "string" && value.length > 0
+    .filter(
+      (value): value is string => typeof value === "string" && value.length > 0,
     )
     .join(" ")
     .toLowerCase();
@@ -616,9 +632,7 @@ const isCompanionAgentSetupError = (parsed: ParsedFunctionInvokeError) => {
   ].some((token) => source.includes(token));
 };
 
-const toUserFacingCompanionAgentError = (
-  parsed: ParsedFunctionInvokeError,
-) => {
+const toUserFacingCompanionAgentError = (parsed: ParsedFunctionInvokeError) => {
   const code = getParsedFunctionCode(parsed)?.toUpperCase();
 
   if (code === "COST_GUARDRAIL_BLOCKED") {
@@ -636,10 +650,31 @@ const toUserFacingCompanionAgentError = (
   return toUserFacingFunctionError(parsed, { action: "send your message" });
 };
 
-const shouldFallbackToLegacyAgent = (parsed: ParsedFunctionInvokeError) => {
+const isProtectedCompanionAgentFailure = (
+  parsed: ParsedFunctionInvokeError,
+) => {
+  const code = getParsedFunctionCode(parsed)?.toLowerCase() ?? "";
+  return (
+    parsed.status === 401 ||
+    parsed.status === 403 ||
+    parsed.status === 429 ||
+    code === "unauthorized" ||
+    code === "forbidden" ||
+    code === "rate_limited" ||
+    code === "cooldown_active" ||
+    code === "abuse_check_failed" ||
+    code === "cost_guardrail_blocked"
+  );
+};
+
+const shouldFallbackToLegacyAgent = (
+  parsed: ParsedFunctionInvokeError,
+  options?: { allowReadOnlyScheduleFallback?: boolean },
+) => {
   const source = getCompanionAgentErrorSource(parsed);
 
-  const hasSchemaSignal = source.includes("does not exist") ||
+  const hasSchemaSignal =
+    source.includes("does not exist") ||
     source.includes("undefined_table") ||
     source.includes("undefined_column") ||
     source.includes("undefined_function") ||
@@ -647,14 +682,34 @@ const shouldFallbackToLegacyAgent = (parsed: ParsedFunctionInvokeError) => {
     source.includes("relation") ||
     source.includes("column");
 
-  return isMissingCompanionAgentFunctionError(parsed) ||
-    (hasSchemaSignal && (
-      source.includes("companion_pending_actions") ||
-      source.includes("openai_conversation_id") ||
-      source.includes("last_openai_response_id") ||
-      source.includes("companion_mode") ||
-      source.includes("companion_mode_adaptation_enabled")
-    ));
+  const missingOrKnownSchemaFallback =
+    isMissingCompanionAgentFunctionError(parsed) ||
+    (hasSchemaSignal &&
+      (source.includes("companion_pending_actions") ||
+        source.includes("openai_conversation_id") ||
+        source.includes("last_openai_response_id") ||
+        source.includes("companion_mode") ||
+        source.includes("companion_mode_adaptation_enabled")));
+
+  if (missingOrKnownSchemaFallback) return true;
+
+  if (
+    options?.allowReadOnlyScheduleFallback &&
+    !isProtectedCompanionAgentFailure(parsed)
+  ) {
+    const code = getParsedFunctionCode(parsed)?.toLowerCase() ?? "";
+    return (
+      code === "companion_agent_failed" ||
+      code === "companion_agent_setup_failed" ||
+      isCompanionAgentSetupError(parsed) ||
+      parsed.category === "network" ||
+      (typeof parsed.status === "number" &&
+        parsed.status >= 500 &&
+        parsed.status < 600)
+    );
+  }
+
+  return false;
 };
 
 export function useCompanionAssistant({
@@ -671,9 +726,8 @@ export function useCompanionAssistant({
   const { autoplayVoice, muteSpokenReplies } = useCompanionVoiceSettings();
   const queryClient = useQueryClient();
   const agentSurfaceEnabled = isCompanionAgentSurfaceEnabled(surface);
-  const [useLegacyFallback, setUseLegacyFallback] = useState(
-    !agentSurfaceEnabled,
-  );
+  const [useLegacyFallback, setUseLegacyFallback] =
+    useState(!agentSurfaceEnabled);
   const unifiedAgentActive = !useLegacyFallback;
 
   const legacyAssistant = useLegacyCompanionAssistantAdapter({
@@ -685,7 +739,7 @@ export function useCompanionAssistant({
   });
 
   const [activeSessionId, setActiveSessionId] = useState(() =>
-    generateCompanionThreadSessionId()
+    generateCompanionThreadSessionId(),
   );
   const activeSessionIdRef = useRef(activeSessionId);
   const applyActiveSessionId = useCallback((nextSessionId: string) => {
@@ -693,15 +747,12 @@ export function useCompanionAssistant({
     setActiveSessionId(nextSessionId);
   }, []);
   const [messages, setMessages] = useState<CompanionAssistantMessage[]>([]);
-  const [structuredResponse, setStructuredResponse] = useState<
-    CompanionAgentResponse["structuredResponse"]
-  >(null);
-  const [activeFollowUp, setActiveFollowUp] = useState<
-    CompanionAgentFollowUp | null
-  >(null);
-  const [understandingState, setUnderstandingState] = useState<
-    CompanionAgentUnderstandingState | null
-  >(null);
+  const [structuredResponse, setStructuredResponse] =
+    useState<CompanionAgentResponse["structuredResponse"]>(null);
+  const [activeFollowUp, setActiveFollowUp] =
+    useState<CompanionAgentFollowUp | null>(null);
+  const [understandingState, setUnderstandingState] =
+    useState<CompanionAgentUnderstandingState | null>(null);
   const [proposedActions, setProposedActions] = useState<
     CompanionAgentProposedAction[]
   >([]);
@@ -720,9 +771,8 @@ export function useCompanionAssistant({
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [speechProvider, setSpeechProvider] = useState<CompanionSpeechProvider>(
-    "none",
-  );
+  const [speechProvider, setSpeechProvider] =
+    useState<CompanionSpeechProvider>("none");
 
   const localThreadCreatedAtRef = useRef(new Date().toISOString());
   const scopeKeyRef = useRef<string | null>(null);
@@ -744,17 +794,18 @@ export function useCompanionAssistant({
   const scopeKey = `${surface}:${user?.id ?? "anon"}:${
     companion?.id ?? "none"
   }`;
-  const baseGreeting = surface === "journeys"
-    ? getCompanionPlannerOpener({ userId: user?.id ?? null })
-    : greeting;
+  const baseGreeting =
+    surface === "journeys"
+      ? getCompanionPlannerOpener({ userId: user?.id ?? null })
+      : greeting;
   const todayLabel = getTodayLabel();
   const placeholder = pendingAction
     ? "Reply here or confirm the pending action."
     : activeFollowUp
-    ? "Answer Cosmiq's follow-up."
-    : surface === "journeys"
-    ? "Talk to Cosmiq"
-    : "Talk to Cosmiq naturally.";
+      ? "Answer Cosmiq's follow-up."
+      : surface === "journeys"
+        ? "Talk to Cosmiq"
+        : "Talk to Cosmiq naturally.";
 
   const threadsQuery = useQuery({
     queryKey: getCompanionChatThreadsQueryKey(user?.id, companion?.id, surface),
@@ -786,48 +837,51 @@ export function useCompanionAssistant({
     },
   });
 
-  const openFreshThread = useCallback((options?: {
-    sessionId?: string;
-    greetingText?: string;
-    markBootstrapped?: boolean;
-    visibleAssistantOpening?: boolean;
-  }) => {
-    threadMutationVersionRef.current += 1;
-    const nextSessionId = options?.sessionId ??
-      generateCompanionThreadSessionId();
-    const greetingText = options?.greetingText?.trim();
-    localThreadCreatedAtRef.current = new Date().toISOString();
-    applyActiveSessionId(nextSessionId);
-    setDraftInput("");
-    setInterimText("");
-    setStructuredResponse(null);
-    setActiveFollowUp(null);
-    setUnderstandingState(null);
-    setProposedActions([]);
-    setPendingAction(null);
-    setSavedSuggestionProposalIds([]);
-    setPendingSuggestionProposalId(null);
-    lastStarterIntentRef.current = null;
-    lastReplayablePlannerMessageRef.current = null;
-    pendingStarterIntentRef.current = null;
-    pendingQuestCaptureSelectedDateRef.current = null;
-    setMessages(
-      greetingText
-        ? [
-          createMessage("assistant", greetingText, {
-            ...(options?.visibleAssistantOpening ? {} : { isSeed: true }),
-            source: "agent",
-          }),
-        ]
-        : [],
-    );
+  const openFreshThread = useCallback(
+    (options?: {
+      sessionId?: string;
+      greetingText?: string;
+      markBootstrapped?: boolean;
+      visibleAssistantOpening?: boolean;
+    }) => {
+      threadMutationVersionRef.current += 1;
+      const nextSessionId =
+        options?.sessionId ?? generateCompanionThreadSessionId();
+      const greetingText = options?.greetingText?.trim();
+      localThreadCreatedAtRef.current = new Date().toISOString();
+      applyActiveSessionId(nextSessionId);
+      setDraftInput("");
+      setInterimText("");
+      setStructuredResponse(null);
+      setActiveFollowUp(null);
+      setUnderstandingState(null);
+      setProposedActions([]);
+      setPendingAction(null);
+      setSavedSuggestionProposalIds([]);
+      setPendingSuggestionProposalId(null);
+      lastStarterIntentRef.current = null;
+      lastReplayablePlannerMessageRef.current = null;
+      pendingStarterIntentRef.current = null;
+      pendingQuestCaptureSelectedDateRef.current = null;
+      setMessages(
+        greetingText
+          ? [
+              createMessage("assistant", greetingText, {
+                ...(options?.visibleAssistantOpening ? {} : { isSeed: true }),
+                source: "agent",
+              }),
+            ]
+          : [],
+      );
 
-    if (options?.markBootstrapped) {
-      bootstrappedScopeRef.current = scopeKey;
-    }
+      if (options?.markBootstrapped) {
+        bootstrappedScopeRef.current = scopeKey;
+      }
 
-    return nextSessionId;
-  }, [applyActiveSessionId, scopeKey]);
+      return nextSessionId;
+    },
+    [applyActiveSessionId, scopeKey],
+  );
 
   useEffect(() => {
     if (!activeSessionIdRef.current) return;
@@ -851,68 +905,71 @@ export function useCompanionAssistant({
     understandingState,
   ]);
 
-  const loadThreadState = useCallback(async (
-    sessionId: string,
-    options?: {
-      expectedMutationVersion?: number;
-    },
-  ) => {
-    const [threadMessages, loadedPendingAction] = await Promise.all([
-      loadCompanionChatThreadMessages(sessionId, surface),
-      loadCompanionPendingAction(sessionId),
-    ]);
+  const loadThreadState = useCallback(
+    async (
+      sessionId: string,
+      options?: {
+        expectedMutationVersion?: number;
+      },
+    ) => {
+      const [threadMessages, loadedPendingAction] = await Promise.all([
+        loadCompanionChatThreadMessages(sessionId, surface),
+        loadCompanionPendingAction(sessionId),
+      ]);
 
-    if (
-      options?.expectedMutationVersion !== undefined &&
-      threadMutationVersionRef.current !== options.expectedMutationVersion
-    ) {
-      return false;
-    }
-
-    const cachedThreadUiState = threadUiStateCacheRef.current.get(sessionId) ??
-      null;
-    const mappedThreadMessages = cachedThreadUiState?.messages ??
-      threadMessages.map(mapLoadedMessage);
-    const restoredStructuredResponse =
-      cachedThreadUiState?.structuredResponse ??
-        deriveStructuredResponseFromMessages(mappedThreadMessages);
-    const restoredDecision = cachedThreadUiState
-      ? {
-        activeFollowUp: cachedThreadUiState.activeFollowUp,
-        understandingState: cachedThreadUiState.understandingState,
-        proposedActions: cachedThreadUiState.proposedActions,
+      if (
+        options?.expectedMutationVersion !== undefined &&
+        threadMutationVersionRef.current !== options.expectedMutationVersion
+      ) {
+        return false;
       }
-      : deriveLatestAgentDecisionFromMessages(mappedThreadMessages);
-    const restoredSavedProposalIds =
-      cachedThreadUiState?.savedSuggestionProposalIds ??
+
+      const cachedThreadUiState =
+        threadUiStateCacheRef.current.get(sessionId) ?? null;
+      const mappedThreadMessages =
+        cachedThreadUiState?.messages ?? threadMessages.map(mapLoadedMessage);
+      const restoredStructuredResponse =
+        cachedThreadUiState?.structuredResponse ??
+        deriveStructuredResponseFromMessages(mappedThreadMessages);
+      const restoredDecision = cachedThreadUiState
+        ? {
+            activeFollowUp: cachedThreadUiState.activeFollowUp,
+            understandingState: cachedThreadUiState.understandingState,
+            proposedActions: cachedThreadUiState.proposedActions,
+          }
+        : deriveLatestAgentDecisionFromMessages(mappedThreadMessages);
+      const restoredSavedProposalIds =
+        cachedThreadUiState?.savedSuggestionProposalIds ??
         collectSavedProposalIdsFromMessages(mappedThreadMessages);
 
-    localThreadCreatedAtRef.current = threadMessages[0]?.createdAt ??
-      new Date().toISOString();
-    applyActiveSessionId(sessionId);
-    setMessages(mappedThreadMessages);
-    setStructuredResponse(restoredStructuredResponse);
-    setActiveFollowUp(restoredDecision.activeFollowUp);
-    setUnderstandingState(restoredDecision.understandingState);
-    setProposedActions(restoredDecision.proposedActions);
-    setPendingAction(loadedPendingAction);
-    setSavedSuggestionProposalIds(
-      pruneProposalIdsToStructuredResponse(
-        restoredSavedProposalIds,
-        restoredStructuredResponse,
-      ),
-    );
-    setPendingSuggestionProposalId(loadedPendingAction?.proposalId ?? null);
-    setDraftInput("");
-    setInterimText("");
-    lastStarterIntentRef.current = cachedThreadUiState?.lastStarterIntent ??
-      null;
-    lastReplayablePlannerMessageRef.current =
-      cachedThreadUiState?.lastReplayablePlannerMessage ?? null;
-    pendingStarterIntentRef.current = null;
-    pendingQuestCaptureSelectedDateRef.current = null;
-    return true;
-  }, [applyActiveSessionId, surface]);
+      localThreadCreatedAtRef.current =
+        threadMessages[0]?.createdAt ?? new Date().toISOString();
+      applyActiveSessionId(sessionId);
+      setMessages(mappedThreadMessages);
+      setStructuredResponse(restoredStructuredResponse);
+      setActiveFollowUp(restoredDecision.activeFollowUp);
+      setUnderstandingState(restoredDecision.understandingState);
+      setProposedActions(restoredDecision.proposedActions);
+      setPendingAction(loadedPendingAction);
+      setSavedSuggestionProposalIds(
+        pruneProposalIdsToStructuredResponse(
+          restoredSavedProposalIds,
+          restoredStructuredResponse,
+        ),
+      );
+      setPendingSuggestionProposalId(loadedPendingAction?.proposalId ?? null);
+      setDraftInput("");
+      setInterimText("");
+      lastStarterIntentRef.current =
+        cachedThreadUiState?.lastStarterIntent ?? null;
+      lastReplayablePlannerMessageRef.current =
+        cachedThreadUiState?.lastReplayablePlannerMessage ?? null;
+      pendingStarterIntentRef.current = null;
+      pendingQuestCaptureSelectedDateRef.current = null;
+      return true;
+    },
+    [applyActiveSessionId, surface],
+  );
 
   useEffect(() => {
     if (scopeKeyRef.current === scopeKey) return;
@@ -940,8 +997,8 @@ export function useCompanionAssistant({
       return;
     }
 
-    const activePersistedThread = threadsQuery.data.threads.find((thread) =>
-      thread.archivedAt === null
+    const activePersistedThread = threadsQuery.data.threads.find(
+      (thread) => thread.archivedAt === null,
     );
 
     if (!activePersistedThread) {
@@ -967,7 +1024,8 @@ export function useCompanionAssistant({
       .catch((error) => {
         console.error("Failed to hydrate companion thread:", error);
         if (
-          cancelled || threadMutationVersionRef.current !== hydrationVersion
+          cancelled ||
+          threadMutationVersionRef.current !== hydrationVersion
         ) {
           return;
         }
@@ -999,8 +1057,9 @@ export function useCompanionAssistant({
 
   const persistedActiveThread = useMemo(
     () =>
-      threadsQuery.data?.threads.find((thread) =>
-        thread.sessionId === activeSessionId && thread.archivedAt === null
+      threadsQuery.data?.threads.find(
+        (thread) =>
+          thread.sessionId === activeSessionId && thread.archivedAt === null,
       ) ?? null,
     [activeSessionId, threadsQuery.data],
   );
@@ -1012,8 +1071,8 @@ export function useCompanionAssistant({
 
   const localActiveThread = useMemo<CompanionChatThreadSummary>(() => {
     const realMessages = messages.filter((message) => !message.isSeed);
-    const firstUserMessage = realMessages.find((message) =>
-      message.role === "user"
+    const firstUserMessage = realMessages.find(
+      (message) => message.role === "user",
     );
     const latestMessage = realMessages[realMessages.length - 1];
 
@@ -1026,8 +1085,8 @@ export function useCompanionAssistant({
       ),
       previewText: buildCompanionThreadPreview(latestMessage?.content ?? ""),
       createdAt: realMessages[0]?.createdAt ?? localThreadCreatedAtRef.current,
-      lastMessageAt: latestMessage?.createdAt ??
-        localThreadCreatedAtRef.current,
+      lastMessageAt:
+        latestMessage?.createdAt ?? localThreadCreatedAtRef.current,
       archivedAt: null,
       messageCount: realMessages.length,
     };
@@ -1036,49 +1095,53 @@ export function useCompanionAssistant({
   const activeThread = persistedActiveThread ?? localActiveThread;
   const historyThreads = useMemo(
     () =>
-      (threadsQuery.data?.threads ?? []).filter((thread) =>
-        thread.sessionId !== persistedActiveThread?.sessionId &&
-        thread.messageCount >= 2
+      (threadsQuery.data?.threads ?? []).filter(
+        (thread) =>
+          thread.sessionId !== persistedActiveThread?.sessionId &&
+          thread.messageCount >= 2,
       ),
     [persistedActiveThread?.sessionId, threadsQuery.data],
   );
   const hasPersistedActiveThread = Boolean(persistedActiveThread);
 
-  const speakAssistantReply = useCallback(async (
-    text: string,
-    sessionId: string,
-  ) => {
-    if (!conversationEnabled || !companion?.id) return;
-    if (!autoplayVoice || muteSpokenReplies) return;
-    const trimmedText = text.trim();
-    if (!trimmedText) return;
+  const speakAssistantReply = useCallback(
+    async (text: string, sessionId: string) => {
+      if (!conversationEnabled || !companion?.id) return;
+      if (!autoplayVoice || muteSpokenReplies) return;
+      const trimmedText = text.trim();
+      if (!trimmedText) return;
 
-    setIsSpeaking(true);
-    try {
-      const provider = await speakCompanionReply({
-        text: trimmedText,
-        companionId: companion.id,
-        voiceStyle,
-        sessionId,
-      });
-      setSpeechProvider(provider);
-    } catch (error) {
-      console.error("Failed to speak companion reply:", error);
-      setSpeechProvider("none");
-    } finally {
-      setIsSpeaking(false);
-    }
-  }, [
-    autoplayVoice,
-    companion?.id,
-    conversationEnabled,
-    muteSpokenReplies,
-    voiceStyle,
-  ]);
+      setIsSpeaking(true);
+      try {
+        const provider = await speakCompanionReply({
+          text: trimmedText,
+          companionId: companion.id,
+          voiceStyle,
+          sessionId,
+        });
+        setSpeechProvider(provider);
+      } catch (error) {
+        console.error("Failed to speak companion reply:", error);
+        setSpeechProvider("none");
+      } finally {
+        setIsSpeaking(false);
+      }
+    },
+    [
+      autoplayVoice,
+      companion?.id,
+      conversationEnabled,
+      muteSpokenReplies,
+      voiceStyle,
+    ],
+  );
 
-  useEffect(() => () => {
-    stopCompanionSpeech();
-  }, []);
+  useEffect(
+    () => () => {
+      stopCompanionSpeech();
+    },
+    [],
+  );
 
   const invalidateThreads = useCallback(() => {
     return queryClient.invalidateQueries({
@@ -1090,228 +1153,98 @@ export function useCompanionAssistant({
     });
   }, [companion?.id, queryClient, surface, user?.id]);
 
-  const appendAssistantResponse = useCallback((
-    response: CompanionAgentResponse,
-    options?: {
-      pendingProposalId?: string | null;
+  const appendAssistantResponse = useCallback(
+    (
+      response: CompanionAgentResponse,
+      options?: {
+        pendingProposalId?: string | null;
+      },
+    ) => {
+      const nextStructuredResponse =
+        response.structuredResponse === undefined
+          ? (structuredResponse ?? null)
+          : (response.structuredResponse ?? null);
+      setMessages((previous) => [
+        ...previous,
+        createMessage("assistant", stripMarkdown(response.reply), {
+          source: "agent",
+          understandingState: response.understandingState,
+          followUp: response.followUp ?? null,
+          proposedActions: response.proposedActions ?? [],
+          assumptions: response.assumptions ?? [],
+          evidenceIds: response.evidenceIds ?? [],
+          structuredResponse: nextStructuredResponse,
+          pendingAction: response.pendingAction,
+          receipt: response.receipt,
+        }),
+      ]);
+      setStructuredResponse(nextStructuredResponse);
+      setActiveFollowUp(response.followUp ?? null);
+      setUnderstandingState(response.understandingState ?? null);
+      setProposedActions(response.proposedActions ?? []);
+      setPendingAction(response.pendingAction ?? null);
+      setSavedSuggestionProposalIds((previous) =>
+        pruneProposalIdsToStructuredResponse(previous, nextStructuredResponse),
+      );
+      setPendingSuggestionProposalId(
+        response.pendingAction
+          ? (response.pendingAction.proposalId ??
+              options?.pendingProposalId ??
+              null)
+          : null,
+      );
+      void speakAssistantReply(response.reply, response.threadState.sessionId);
     },
-  ) => {
-    const nextStructuredResponse = response.structuredResponse === undefined
-      ? structuredResponse ?? null
-      : response.structuredResponse ?? null;
-    setMessages((previous) => [
-      ...previous,
-      createMessage("assistant", stripMarkdown(response.reply), {
-        source: "agent",
-        understandingState: response.understandingState,
-        followUp: response.followUp ?? null,
-        proposedActions: response.proposedActions ?? [],
-        assumptions: response.assumptions ?? [],
-        evidenceIds: response.evidenceIds ?? [],
-        structuredResponse: nextStructuredResponse,
-        pendingAction: response.pendingAction,
-        receipt: response.receipt,
-      }),
-    ]);
-    setStructuredResponse(nextStructuredResponse);
-    setActiveFollowUp(response.followUp ?? null);
-    setUnderstandingState(response.understandingState ?? null);
-    setProposedActions(response.proposedActions ?? []);
-    setPendingAction(response.pendingAction ?? null);
-    setSavedSuggestionProposalIds((previous) =>
-      pruneProposalIdsToStructuredResponse(previous, nextStructuredResponse)
-    );
-    setPendingSuggestionProposalId(
-      response.pendingAction
-        ? response.pendingAction.proposalId ?? options?.pendingProposalId ??
-          null
-        : null,
-    );
-    void speakAssistantReply(response.reply, response.threadState.sessionId);
-  }, [speakAssistantReply, structuredResponse]);
+    [speakAssistantReply, structuredResponse],
+  );
 
-  const submitMessage = useCallback(async (
-    rawMessage: string,
-    inputMode: CompanionChatInputMode = "text",
-    options?: CompanionAgentSubmitOptions,
-  ) => {
-    const message = rawMessage.trim();
-    if (!message || isSubmitting || isResolvingAction) return false;
-    const pendingStarterIntent = pendingStarterIntentRef.current;
-    const activeFollowUpSelectedDate = readFollowUpSelectedDate(activeFollowUp);
-    const selectedDate = normalizeSelectedDateKey(options?.selectedDate) ??
-      (pendingStarterIntent === "quest_capture"
-        ? pendingQuestCaptureSelectedDateRef.current
-        : null) ??
-      activeFollowUpSelectedDate ??
-      (activeFollowUp ? pendingQuestCaptureSelectedDateRef.current : null);
-    const starterIntent = options?.starterIntent ?? pendingStarterIntent ??
-      inferStarterIntentFromMessage(message);
-    const shouldConsumePendingStarterIntent = pendingStarterIntent !== null;
-    const shouldEmitPlanDayAiAnswered =
-      !starterIntent &&
-      Boolean(activeFollowUp) &&
-      (
-        lastStarterIntentRef.current === "plan_day" ||
-        hasRecentPlanDayStarter(messages)
-      );
+  const submitMessage = useCallback(
+    async (
+      rawMessage: string,
+      inputMode: CompanionChatInputMode = "text",
+      options?: CompanionAgentSubmitOptions,
+    ) => {
+      const message = rawMessage.trim();
+      if (!message || isSubmitting || isResolvingAction) return false;
+      const pendingStarterIntent = pendingStarterIntentRef.current;
+      const activeFollowUpSelectedDate =
+        readFollowUpSelectedDate(activeFollowUp);
+      const selectedDate =
+        normalizeSelectedDateKey(options?.selectedDate) ??
+        (pendingStarterIntent === "quest_capture"
+          ? pendingQuestCaptureSelectedDateRef.current
+          : null) ??
+        activeFollowUpSelectedDate ??
+        (activeFollowUp ? pendingQuestCaptureSelectedDateRef.current : null);
+      const starterIntent =
+        options?.starterIntent ??
+        pendingStarterIntent ??
+        inferStarterIntentFromMessage(message);
+      const shouldConsumePendingStarterIntent = pendingStarterIntent !== null;
+      const shouldEmitPlanDayAiAnswered =
+        !starterIntent &&
+        Boolean(activeFollowUp) &&
+        (lastStarterIntentRef.current === "plan_day" ||
+          hasRecentPlanDayStarter(messages));
 
-    if (useLegacyFallback) {
-      const legacyStarterIntent =
-        pendingStarterIntent === "quest_capture" && !options?.starterIntent
-          ? undefined
-          : starterIntent;
-      const legacySubmitOptions =
-        legacyStarterIntent === undefined && !options && !selectedDate
-        ? undefined
-        : {
-          ...options,
-          starterIntent: legacyStarterIntent,
-          ...(selectedDate ? { selectedDate } : {}),
-        };
-      await legacyAssistant.submitMessage(message, inputMode, legacySubmitOptions);
-      if (
-        shouldConsumePendingStarterIntent &&
-        pendingStarterIntentRef.current === pendingStarterIntent
-      ) {
-        pendingStarterIntentRef.current = null;
-        pendingQuestCaptureSelectedDateRef.current = null;
-      }
-      return true;
-    }
-
-    if (!user?.id || !companion?.id) {
-      toast.error("Your companion is still loading. Try again in a moment.");
-      return false;
-    }
-
-    setIsSubmitting(true);
-    setDraftInput("");
-    setInterimText("");
-
-    const optimisticUserMessage = createMessage("user", message, {
-      inputMode,
-      source: "agent",
-    });
-    setMessages((previous) => [...previous, optimisticUserMessage]);
-    const nextUnifiedMessages = [...messages, optimisticUserMessage];
-
-    try {
-      lastStarterIntentRef.current = starterIntent ?? null;
-      lastReplayablePlannerMessageRef.current = message;
-      const { data, error } = await supabase.functions.invoke(
-        "companion-agent",
-        {
-          body: {
-            surface,
-            sessionId: activeSessionIdRef.current,
-            message,
-            inputMode,
-            currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
-            turnOrigin: options?.turnOrigin,
-            starterIntent,
-            selectedDate: selectedDate ?? undefined,
-            activeFollowUp,
-            activeProposedActions: proposedActions.slice(
-              0,
-              MAX_ACTIVE_PROPOSED_ACTIONS,
-            ),
-            selectedProposedAction: options?.selectedProposedAction ??
-              undefined,
-            selectedProposedActionIntent: options?.selectedProposedAction
-              ? options.selectedProposedActionIntent ?? "draft"
-              : undefined,
-          },
-        },
-      );
-
-      if (error) throw error;
-
-      const response = data as CompanionAgentResponse;
-      applyActiveSessionId(response.threadState.sessionId);
-      appendAssistantResponse(response);
-      const nextQuestCaptureSelectedDate =
-        readFollowUpSelectedDate(response.followUp ?? null) ??
-          (response.followUp && selectedDate ? selectedDate : null);
-      await trackInteraction({
-        interactionType: "companion_agent",
-        inputText: message,
-        detectedIntent: response.intent,
-        aiResponse: {
-          mode: response.mode,
-          structuredSections: collectStructuredResponseSectionKeys(
-            response.structuredResponse ?? null,
-          ),
-          hasPendingAction: Boolean(response.pendingAction),
-          pendingActionType: response.pendingAction?.actionType ?? null,
-          hasReceipt: Boolean(response.receipt),
-          understandingState: response.understandingState ?? null,
-          hasFollowUp: Boolean(response.followUp),
-          proposedActionCount: response.proposedActions?.length ?? 0,
-        },
-        userAction: "accepted",
-        modifications: {
-          surface,
-          turnOrigin: options?.turnOrigin ?? null,
-          starterIntent: starterIntent ?? null,
-          selectedProposedActionType: options?.selectedProposedAction?.type ??
-            null,
-          selectedProposedActionIntent: options?.selectedProposedAction
-            ? options.selectedProposedActionIntent ?? "draft"
-            : null,
-          proposalId: response.pendingAction?.proposalId ?? null,
-        },
-      });
-      if (shouldEmitPlanDayAiAnswered) {
-        emitPlanDayAiAnsweredEvent();
-      }
-      if (
-        shouldConsumePendingStarterIntent &&
-        pendingStarterIntentRef.current === pendingStarterIntent
-      ) {
-        pendingStarterIntentRef.current = null;
-      }
-      pendingQuestCaptureSelectedDateRef.current =
-        nextQuestCaptureSelectedDate ?? null;
-      void invalidateThreads();
-      return true;
-    } catch (error) {
-      const parsed = await parseFunctionInvokeError(error);
-      const shouldFallback = shouldFallbackToLegacyAgent(parsed);
-      console.error("Failed to submit companion agent message:", {
-        status: parsed.status ?? null,
-        code: getParsedFunctionCode(parsed) ?? null,
-        requestId: parsed.requestId ?? null,
-        stage: parsed.stage ?? parsed.responsePayload?.stage ?? null,
-        failureReason: parsed.failureReason ??
-          parsed.responsePayload?.failureReason ?? null,
-        category: parsed.category ?? "unknown",
-        surface,
-        sessionId: activeSessionIdRef.current,
-        fallbackToLegacy: shouldFallback,
-      });
-
-      if (shouldFallback) {
-        legacyAssistant.hydrateFromUnifiedState?.({
-          sessionId: activeSessionIdRef.current,
-          messages: nextUnifiedMessages,
-          savedSuggestionProposalIds,
-          pendingSuggestionProposalId,
-        });
-        setUseLegacyFallback(true);
+      if (useLegacyFallback) {
         const legacyStarterIntent =
           pendingStarterIntent === "quest_capture" && !options?.starterIntent
             ? undefined
             : starterIntent;
         const legacySubmitOptions =
           legacyStarterIntent === undefined && !options && !selectedDate
-          ? undefined
-          : {
-            ...options,
-            starterIntent: legacyStarterIntent,
-            ...(selectedDate ? { selectedDate } : {}),
-          };
-        await legacyAssistant.submitMessage(message, inputMode, legacySubmitOptions);
+            ? undefined
+            : {
+                ...options,
+                starterIntent: legacyStarterIntent,
+                ...(selectedDate ? { selectedDate } : {}),
+              };
+        await legacyAssistant.submitMessage(
+          message,
+          inputMode,
+          legacySubmitOptions,
+        );
         if (
           shouldConsumePendingStarterIntent &&
           pendingStarterIntentRef.current === pendingStarterIntent
@@ -1322,31 +1255,184 @@ export function useCompanionAssistant({
         return true;
       }
 
-      toast.error(
-        toUserFacingCompanionAgentError(parsed),
-      );
-      return false;
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [
-    applyActiveSessionId,
-    appendAssistantResponse,
-    activeFollowUp,
-    companion?.id,
-    invalidateThreads,
-    isResolvingAction,
-    isSubmitting,
-    legacyAssistant,
-    messages,
-    trackInteraction,
-    pendingSuggestionProposalId,
-    proposedActions,
-    savedSuggestionProposalIds,
-    surface,
-    useLegacyFallback,
-    user?.id,
-  ]);
+      if (!user?.id || !companion?.id) {
+        toast.error("Your companion is still loading. Try again in a moment.");
+        return false;
+      }
+
+      setIsSubmitting(true);
+      setDraftInput("");
+      setInterimText("");
+
+      const optimisticUserMessage = createMessage("user", message, {
+        inputMode,
+        source: "agent",
+      });
+      setMessages((previous) => [...previous, optimisticUserMessage]);
+      const nextUnifiedMessages = [...messages, optimisticUserMessage];
+
+      try {
+        lastStarterIntentRef.current = starterIntent ?? null;
+        lastReplayablePlannerMessageRef.current = message;
+        const { data, error } = await supabase.functions.invoke(
+          "companion-agent",
+          {
+            body: {
+              surface,
+              sessionId: activeSessionIdRef.current,
+              message,
+              inputMode,
+              currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
+              turnOrigin: options?.turnOrigin,
+              starterIntent,
+              selectedDate: selectedDate ?? undefined,
+              activeFollowUp,
+              activeProposedActions: proposedActions.slice(
+                0,
+                MAX_ACTIVE_PROPOSED_ACTIONS,
+              ),
+              selectedProposedAction:
+                options?.selectedProposedAction ?? undefined,
+              selectedProposedActionIntent: options?.selectedProposedAction
+                ? (options.selectedProposedActionIntent ?? "draft")
+                : undefined,
+            },
+          },
+        );
+
+        if (error) throw error;
+
+        const response = data as CompanionAgentResponse;
+        applyActiveSessionId(response.threadState.sessionId);
+        appendAssistantResponse(response);
+        const nextQuestCaptureSelectedDate =
+          readFollowUpSelectedDate(response.followUp ?? null) ??
+          (response.followUp && selectedDate ? selectedDate : null);
+        await trackInteraction({
+          interactionType: "companion_agent",
+          inputText: message,
+          detectedIntent: response.intent,
+          aiResponse: {
+            mode: response.mode,
+            structuredSections: collectStructuredResponseSectionKeys(
+              response.structuredResponse ?? null,
+            ),
+            hasPendingAction: Boolean(response.pendingAction),
+            pendingActionType: response.pendingAction?.actionType ?? null,
+            hasReceipt: Boolean(response.receipt),
+            understandingState: response.understandingState ?? null,
+            hasFollowUp: Boolean(response.followUp),
+            proposedActionCount: response.proposedActions?.length ?? 0,
+          },
+          userAction: "accepted",
+          modifications: {
+            surface,
+            turnOrigin: options?.turnOrigin ?? null,
+            starterIntent: starterIntent ?? null,
+            selectedProposedActionType:
+              options?.selectedProposedAction?.type ?? null,
+            selectedProposedActionIntent: options?.selectedProposedAction
+              ? (options.selectedProposedActionIntent ?? "draft")
+              : null,
+            proposalId: response.pendingAction?.proposalId ?? null,
+          },
+        });
+        if (shouldEmitPlanDayAiAnswered) {
+          emitPlanDayAiAnsweredEvent();
+        }
+        if (
+          shouldConsumePendingStarterIntent &&
+          pendingStarterIntentRef.current === pendingStarterIntent
+        ) {
+          pendingStarterIntentRef.current = null;
+        }
+        pendingQuestCaptureSelectedDateRef.current =
+          nextQuestCaptureSelectedDate ?? null;
+        void invalidateThreads();
+        return true;
+      } catch (error) {
+        const parsed = await parseFunctionInvokeError(error);
+        const allowReadOnlyScheduleFallback =
+          starterIntent === "upcoming_start" &&
+          !options?.selectedProposedAction;
+        const shouldFallback = shouldFallbackToLegacyAgent(parsed, {
+          allowReadOnlyScheduleFallback,
+        });
+        console.error("Failed to submit companion agent message:", {
+          status: parsed.status ?? null,
+          code: getParsedFunctionCode(parsed) ?? null,
+          requestId: parsed.requestId ?? null,
+          stage: parsed.stage ?? parsed.responsePayload?.stage ?? null,
+          failureReason:
+            parsed.failureReason ??
+            parsed.responsePayload?.failureReason ??
+            null,
+          category: parsed.category ?? "unknown",
+          surface,
+          sessionId: activeSessionIdRef.current,
+          fallbackToLegacy: shouldFallback,
+        });
+
+        if (shouldFallback) {
+          legacyAssistant.hydrateFromUnifiedState?.({
+            sessionId: activeSessionIdRef.current,
+            messages: nextUnifiedMessages,
+            savedSuggestionProposalIds,
+            pendingSuggestionProposalId,
+          });
+          setUseLegacyFallback(true);
+          const legacyStarterIntent =
+            pendingStarterIntent === "quest_capture" && !options?.starterIntent
+              ? undefined
+              : starterIntent;
+          const legacySubmitOptions =
+            legacyStarterIntent === undefined && !options && !selectedDate
+              ? undefined
+              : {
+                  ...options,
+                  starterIntent: legacyStarterIntent,
+                  ...(selectedDate ? { selectedDate } : {}),
+                };
+          await legacyAssistant.submitMessage(
+            message,
+            inputMode,
+            legacySubmitOptions,
+          );
+          if (
+            shouldConsumePendingStarterIntent &&
+            pendingStarterIntentRef.current === pendingStarterIntent
+          ) {
+            pendingStarterIntentRef.current = null;
+            pendingQuestCaptureSelectedDateRef.current = null;
+          }
+          return true;
+        }
+
+        toast.error(toUserFacingCompanionAgentError(parsed));
+        return false;
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [
+      applyActiveSessionId,
+      appendAssistantResponse,
+      activeFollowUp,
+      companion?.id,
+      invalidateThreads,
+      isResolvingAction,
+      isSubmitting,
+      legacyAssistant,
+      messages,
+      trackInteraction,
+      pendingSuggestionProposalId,
+      proposedActions,
+      savedSuggestionProposalIds,
+      surface,
+      useLegacyFallback,
+      user?.id,
+    ],
+  );
 
   const resolvePendingAction = useCallback(
     async (mode: "confirm" | "cancel") => {
@@ -1377,11 +1463,12 @@ export function useCompanionAssistant({
         if (error) throw error;
 
         const response = data as CompanionAgentResponse;
-        const nextStructuredResponse = response.structuredResponse === undefined
-          ? structuredResponse ?? null
-          : response.structuredResponse ?? null;
-        const resolvedProposalId = pendingAction?.proposalId ??
-          pendingSuggestionProposalId;
+        const nextStructuredResponse =
+          response.structuredResponse === undefined
+            ? (structuredResponse ?? null)
+            : (response.structuredResponse ?? null);
+        const resolvedProposalId =
+          pendingAction?.proposalId ?? pendingSuggestionProposalId;
         setPendingAction(null);
         setMessages((previous) => [
           ...previous,
@@ -1404,11 +1491,12 @@ export function useCompanionAssistant({
         setUnderstandingState(response.understandingState ?? null);
         setProposedActions(response.proposedActions ?? []);
         setSavedSuggestionProposalIds((previous) => {
-          const nextProposalIds = mode === "confirm" &&
-              response.receipt?.status === "executed" &&
-              resolvedProposalId
-            ? [...new Set([...previous, resolvedProposalId])]
-            : previous;
+          const nextProposalIds =
+            mode === "confirm" &&
+            response.receipt?.status === "executed" &&
+            resolvedProposalId
+              ? [...new Set([...previous, resolvedProposalId])]
+              : previous;
 
           return pruneProposalIdsToStructuredResponse(
             nextProposalIds,
@@ -1468,118 +1556,123 @@ export function useCompanionAssistant({
     ],
   );
 
-  const confirmSuggestedQuest = useCallback(async (proposalId: string) => {
-    if (useLegacyFallback) {
-      await legacyAssistant.confirmSuggestedQuest(proposalId);
-      return;
-    }
+  const confirmSuggestedQuest = useCallback(
+    async (proposalId: string) => {
+      if (useLegacyFallback) {
+        await legacyAssistant.confirmSuggestedQuest(proposalId);
+        return;
+      }
 
-    if (!proposalId || pendingAction || isSubmitting || isResolvingAction) {
-      return;
-    }
+      if (!proposalId || pendingAction || isSubmitting || isResolvingAction) {
+        return;
+      }
 
-    const latestUserMessage = lastReplayablePlannerMessageRef.current?.trim() ||
-      [...messages]
-        .reverse()
-        .find((message) =>
-          message.role === "user" &&
-          !message.isSeed &&
-          !isSyntheticResolutionMessage(message.content)
-        )
-        ?.content
-        ?.trim() ||
-      (structuredResponse?.planDay
-        ? "Plan my day"
-        : structuredResponse?.weeklyPlan
-        ? "Plan my week"
-        : structuredResponse?.priorityOverview
-        ? structuredResponse.priorityOverview.title.toLowerCase().includes(
-            "make room",
+      const latestUserMessage =
+        lastReplayablePlannerMessageRef.current?.trim() ||
+        [...messages]
+          .reverse()
+          .find(
+            (message) =>
+              message.role === "user" &&
+              !message.isSeed &&
+              !isSyntheticResolutionMessage(message.content),
           )
-          ? "Make room"
-          : "What matters most?"
-        : structuredResponse?.reflectionBridge
-        ? "Prepare me for tomorrow"
-        : structuredResponse?.campaignMomentum
-        ? "Advance my campaign"
-        : structuredResponse?.comingUp
-        ? "What do I have coming up?"
-        : null);
+          ?.content?.trim() ||
+        (structuredResponse?.planDay
+          ? "Plan my day"
+          : structuredResponse?.weeklyPlan
+            ? "Plan my week"
+            : structuredResponse?.priorityOverview
+              ? structuredResponse.priorityOverview.title
+                  .toLowerCase()
+                  .includes("make room")
+                ? "Make room"
+                : "What matters most?"
+              : structuredResponse?.reflectionBridge
+                ? "Prepare me for tomorrow"
+                : structuredResponse?.campaignMomentum
+                  ? "Advance my campaign"
+                  : structuredResponse?.comingUp
+                    ? "What do I have coming up?"
+                    : null);
 
-    if (!latestUserMessage) {
-      toast.error(
-        "I couldn't recover that planner suggestion. Try asking again.",
-      );
-      return;
-    }
+      if (!latestUserMessage) {
+        toast.error(
+          "I couldn't recover that planner suggestion. Try asking again.",
+        );
+        return;
+      }
 
-    setIsSubmitting(true);
-    try {
-      const starterIntent = lastStarterIntentRef.current ??
-        inferStarterIntentFromStructuredResponse(structuredResponse) ??
-        undefined;
-      lastReplayablePlannerMessageRef.current = latestUserMessage;
-      const { data, error } = await supabase.functions.invoke(
-        "companion-agent",
-        {
-          body: {
-            surface,
-            sessionId: activeSessionIdRef.current,
-            message: latestUserMessage,
-            inputMode: "text",
-            currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
-            turnOrigin: "proposed_action",
-            starterIntent,
-            selectedProposalId: proposalId,
+      setIsSubmitting(true);
+      try {
+        const starterIntent =
+          lastStarterIntentRef.current ??
+          inferStarterIntentFromStructuredResponse(structuredResponse) ??
+          undefined;
+        lastReplayablePlannerMessageRef.current = latestUserMessage;
+        const { data, error } = await supabase.functions.invoke(
+          "companion-agent",
+          {
+            body: {
+              surface,
+              sessionId: activeSessionIdRef.current,
+              message: latestUserMessage,
+              inputMode: "text",
+              currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
+              turnOrigin: "proposed_action",
+              starterIntent,
+              selectedProposalId: proposalId,
+            },
           },
-        },
-      );
+        );
 
-      if (error) throw error;
+        if (error) throw error;
 
-      const response = data as CompanionAgentResponse;
-      applyActiveSessionId(response.threadState.sessionId);
-      appendAssistantResponse(response, {
-        pendingProposalId: proposalId,
-      });
-      await trackInteraction({
-        interactionType: "companion_agent_suggestion_prepare",
-        inputText: latestUserMessage,
-        detectedIntent: response.intent,
-        aiResponse: {
-          mode: response.mode,
-          actionType: response.pendingAction?.actionType ?? null,
-          proposalId: response.pendingAction?.proposalId ?? proposalId,
-        },
-        userAction: "accepted",
-        modifications: {
-          proposalId,
-          turnOrigin: "proposed_action",
-          starterIntent: starterIntent ?? null,
-          surface,
-        },
-      });
-      void invalidateThreads();
-    } catch (error) {
-      console.error("Failed to prepare planner suggestion:", error);
-      toast.error("I couldn't prepare that suggestion right now.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [
-    appendAssistantResponse,
-    applyActiveSessionId,
-    invalidateThreads,
-    isResolvingAction,
-    isSubmitting,
-    legacyAssistant,
-    messages,
-    pendingAction,
-    structuredResponse,
-    surface,
-    trackInteraction,
-    useLegacyFallback,
-  ]);
+        const response = data as CompanionAgentResponse;
+        applyActiveSessionId(response.threadState.sessionId);
+        appendAssistantResponse(response, {
+          pendingProposalId: proposalId,
+        });
+        await trackInteraction({
+          interactionType: "companion_agent_suggestion_prepare",
+          inputText: latestUserMessage,
+          detectedIntent: response.intent,
+          aiResponse: {
+            mode: response.mode,
+            actionType: response.pendingAction?.actionType ?? null,
+            proposalId: response.pendingAction?.proposalId ?? proposalId,
+          },
+          userAction: "accepted",
+          modifications: {
+            proposalId,
+            turnOrigin: "proposed_action",
+            starterIntent: starterIntent ?? null,
+            surface,
+          },
+        });
+        void invalidateThreads();
+      } catch (error) {
+        console.error("Failed to prepare planner suggestion:", error);
+        toast.error("I couldn't prepare that suggestion right now.");
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [
+      appendAssistantResponse,
+      applyActiveSessionId,
+      invalidateThreads,
+      isResolvingAction,
+      isSubmitting,
+      legacyAssistant,
+      messages,
+      pendingAction,
+      structuredResponse,
+      surface,
+      trackInteraction,
+      useLegacyFallback,
+    ],
+  );
 
   const archiveCurrentThread = useCallback(async () => {
     if (!persistedActiveThread) {
@@ -1600,23 +1693,22 @@ export function useCompanionAssistant({
 
   const startNewChat = useCallback(
     async (options?: CompanionTemplateThreadOptions) => {
-      const threadToArchive = persistedActiveThread ??
-        threadsQuery.data?.threads.find((thread) =>
-          thread.archivedAt === null
+      const threadToArchive =
+        persistedActiveThread ??
+        threadsQuery.data?.threads.find(
+          (thread) => thread.archivedAt === null,
         ) ??
         null;
 
       if (threadToArchive) {
-        await setCompanionChatThreadArchived(
-          threadToArchive.sessionId,
-          true,
-        );
+        await setCompanionChatThreadArchived(threadToArchive.sessionId, true);
         await invalidateThreads();
       }
 
-      const greetingText = options?.greetingText === null
-        ? undefined
-        : options?.greetingText ?? baseGreeting;
+      const greetingText =
+        options?.greetingText === null
+          ? undefined
+          : (options?.greetingText ?? baseGreeting);
 
       return openFreshThread({
         greetingText,
@@ -1635,14 +1727,14 @@ export function useCompanionAssistant({
 
   const startTemplateThread = useCallback(
     (options?: CompanionTemplateThreadOptions) => {
-      const threadToArchive = persistedActiveThread ??
-        threadsQuery.data?.threads.find((thread) =>
-          thread.archivedAt === null
+      const threadToArchive =
+        persistedActiveThread ??
+        threadsQuery.data?.threads.find(
+          (thread) => thread.archivedAt === null,
         ) ??
         null;
-      const greetingText = options?.greetingText === null
-        ? undefined
-        : options?.greetingText;
+      const greetingText =
+        options?.greetingText === null ? undefined : options?.greetingText;
       const nextSessionId = openFreshThread({
         greetingText,
         markBootstrapped: true,
@@ -1651,14 +1743,13 @@ export function useCompanionAssistant({
 
       void (async () => {
         try {
-          const resolvedThreadToArchive = threadToArchive ??
-            (
-              companion?.id
-                ? (await listCompanionChatThreads(companion.id, surface)).find(
+          const resolvedThreadToArchive =
+            threadToArchive ??
+            (companion?.id
+              ? ((await listCompanionChatThreads(companion.id, surface)).find(
                   (thread) => thread.archivedAt === null,
-                ) ?? null
-                : null
-            );
+                ) ?? null)
+              : null);
 
           if (!resolvedThreadToArchive) return;
           if (resolvedThreadToArchive.sessionId === nextSessionId) return;
@@ -1688,13 +1779,16 @@ export function useCompanionAssistant({
     ],
   );
 
-  const resumeThread = useCallback(async (sessionId: string) => {
-    const hydrationVersion = threadMutationVersionRef.current + 1;
-    threadMutationVersionRef.current = hydrationVersion;
-    await loadThreadState(sessionId, {
-      expectedMutationVersion: hydrationVersion,
-    });
-  }, [loadThreadState]);
+  const resumeThread = useCallback(
+    async (sessionId: string) => {
+      const hydrationVersion = threadMutationVersionRef.current + 1;
+      threadMutationVersionRef.current = hydrationVersion;
+      await loadThreadState(sessionId, {
+        expectedMutationVersion: hydrationVersion,
+      });
+    },
+    [loadThreadState],
+  );
 
   useEffect(() => {
     if (!launchIntent?.id) return;
@@ -1743,8 +1837,8 @@ export function useCompanionAssistant({
         }
 
         if (isQuestCaptureStarter) {
-          const greetingText = launchMessage.trim() ||
-            COMPANION_PLANNER_QUEST_CAPTURE_OPENING;
+          const greetingText =
+            launchMessage.trim() || COMPANION_PLANNER_QUEST_CAPTURE_OPENING;
           if (useLegacyFallback) {
             legacyAssistant.startQuestCaptureThread?.(greetingText, {
               selectedDate: launchIntent.selectedDate ?? null,
@@ -1843,8 +1937,8 @@ export function useCompanionAssistant({
   const archiveDisabledReason = pendingAction
     ? "Resolve or cancel the pending action first."
     : hasPersistedActiveThread
-    ? null
-    : "This chat isn't saved yet.";
+      ? null
+      : "This chat isn't saved yet.";
   const threadHistoryEmptyStateMessage = threadsQuery.data?.setupUnavailable
     ? COMPANION_CHAT_THREAD_HISTORY_DISABLED_REASON
     : COMPANION_CHAT_THREAD_HISTORY_EMPTY_STATE;
@@ -1858,18 +1952,17 @@ export function useCompanionAssistant({
       dayPlan: legacyAssistant.dayPlan ?? null,
       committingDayPlan: legacyAssistant.committingDayPlan ?? false,
       committedDayPlanId: legacyAssistant.committedDayPlanId ?? null,
-      commitDayPlan: legacyAssistant.commitDayPlan ??
-        (async () => undefined),
+      commitDayPlan: legacyAssistant.commitDayPlan ?? (async () => undefined),
       activeFollowUp: null,
       understandingState: null,
       proposedActions: [],
       pendingAction: legacyAssistant.pendingAction,
-      savedSuggestionProposalIds: legacyAssistant.savedSuggestionProposalIds ??
-        [],
+      savedSuggestionProposalIds:
+        legacyAssistant.savedSuggestionProposalIds ?? [],
       pendingSuggestionProposalId:
         legacyAssistant.pendingSuggestionProposalId ??
-          legacyAssistant.pendingAction?.proposalId ??
-          null,
+        legacyAssistant.pendingAction?.proposalId ??
+        null,
       pendingActionCount: legacyAssistant.pendingActionCount,
       readyPendingActionCount: legacyAssistant.readyPendingActionCount,
       draftInput,
@@ -1908,9 +2001,8 @@ export function useCompanionAssistant({
       canArchiveThread: legacyAssistant.canArchiveThread,
       archiveDisabledReason: legacyAssistant.archiveDisabledReason,
       startNewChat: legacyAssistant.startNewChat,
-      startTemplateThread: (
-        options?: CompanionTemplateThreadOptions,
-      ) => legacyAssistant.startTemplateThread?.(options),
+      startTemplateThread: (options?: CompanionTemplateThreadOptions) =>
+        legacyAssistant.startTemplateThread?.(options),
       canStartNewChat: legacyAssistant.canStartNewChat,
       newChatDisabledReason: legacyAssistant.newChatDisabledReason,
     };

@@ -144,8 +144,8 @@ serve(async (req) => {
       habitsRes,
       aiLearningRes,
     ] = await Promise.all([
-      supabase.from('daily_tasks').select('*').eq('user_id', user.id).eq('task_date', today),
-      supabase.from('epics').select('*, epic_milestones(*)').eq('user_id', user.id).eq('status', 'active'),
+      supabase.from('daily_tasks').select('*').eq('user_id', user.id).eq('task_date', today).is('excluded_from_planner_at', null),
+      supabase.from('epics').select('*, epic_milestones(*)').eq('user_id', user.id).eq('status', 'active').is('completed_at', null),
       supabase.from('habits').select('*').eq('user_id', user.id).eq('is_active', true),
       supabase.from('user_ai_learning').select('*').eq('user_id', user.id).single(),
     ]);

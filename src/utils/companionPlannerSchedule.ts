@@ -11,6 +11,10 @@ import type {
   PlannerScheduleConflict,
   PlannerScheduleInsights,
 } from "@/types/companionPlanner";
+import {
+  type DeletedPlannerEntity,
+  isDeletedPlannerEntityReference,
+} from "@/utils/deletedPlannerMemory";
 
 const DEFAULT_DURATION_MINUTES = 30;
 const DEFAULT_WAKE_TIME = "08:00";
@@ -41,9 +45,47 @@ type PreferredWindow = {
   sourceCount: number;
 };
 
-const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+const hasPlannerExclusionMarker = (entry: unknown): boolean => {
+  if (!entry || typeof entry !== "object") return false;
+  const record = entry as {
+    excludedFromPlannerAt?: unknown;
+    excluded_from_planner_at?: unknown;
+  };
+  return Boolean(
+    record.excludedFromPlannerAt || record.excluded_from_planner_at,
+  );
+};
 
-const parseTimeToMinutes = (value: string | null | undefined): number | null => {
+const isDeletedScheduleTask = (
+  task: PlannerContextTask,
+  deletedEntities?: DeletedPlannerEntity[] | null,
+): boolean =>
+  hasPlannerExclusionMarker(task) ||
+  isDeletedPlannerEntityReference({
+    entityType: "task",
+    entityId: task.id,
+    title: task.title,
+  }, deletedEntities) ||
+  isDeletedPlannerEntityReference({
+    entityType: "campaign",
+    entityId: task.epicId,
+    title: task.epicTitle,
+  }, deletedEntities) ||
+  isDeletedPlannerEntityReference({
+    entityType: "ritual",
+    entityId: task.habitSourceId,
+  }, deletedEntities) ||
+  isDeletedPlannerEntityReference({
+    entityType: "habit",
+    entityId: task.habitSourceId,
+  }, deletedEntities);
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
+
+const parseTimeToMinutes = (
+  value: string | null | undefined,
+): number | null => {
   if (!value) return null;
   const match = value.match(/^(\d{1,2}):(\d{2})/);
   if (!match) return null;
@@ -67,11 +109,17 @@ const getTaskDuration = (task: PlannerContextTask): number =>
     ? Number(task.estimatedDuration)
     : DEFAULT_DURATION_MINUTES;
 
-const getRangeDates = (selectedDate: string, horizon: PlannerHorizon): string[] => {
+const getRangeDates = (
+  selectedDate: string,
+  horizon: PlannerHorizon,
+): string[] => {
   const start = parseISO(selectedDate);
   const totalDays = horizon === "day" ? 1 : horizon === "week" ? 7 : 30;
 
-  return Array.from({ length: totalDays }, (_, index) => format(addDays(start, index), "yyyy-MM-dd"));
+  return Array.from(
+    { length: totalDays },
+    (_, index) => format(addDays(start, index), "yyyy-MM-dd"),
+  );
 };
 
 const toTimeOfDay = (time: string | null | undefined): string | null => {
@@ -85,7 +133,9 @@ const toTimeOfDay = (time: string | null | undefined): string | null => {
   return "night";
 };
 
-const getPreferredWindows = (plannerMemory?: PlannerMemoryProfile | null): PreferredWindow[] => {
+const getPreferredWindows = (
+  plannerMemory?: PlannerMemoryProfile | null,
+): PreferredWindow[] => {
   const windows = plannerMemory?.preferredWindows?.map((window) => ({
     timeOfDay: window.timeOfDay,
     time: window.time ?? null,
@@ -110,7 +160,8 @@ const getWakeMinutes = (plannerMemory?: PlannerMemoryProfile | null) =>
   parseTimeToMinutes(plannerMemory?.wakeTime ?? DEFAULT_WAKE_TIME) ?? 8 * 60;
 
 const getWindDownMinutes = (plannerMemory?: PlannerMemoryProfile | null) =>
-  parseTimeToMinutes(plannerMemory?.windDownTime ?? DEFAULT_WIND_DOWN_TIME) ?? 21 * 60;
+  parseTimeToMinutes(plannerMemory?.windDownTime ?? DEFAULT_WIND_DOWN_TIME) ??
+    21 * 60;
 
 const getDayBounds = (date: string) => {
   const start = parseISO(`${date}T00:00:00`);
@@ -136,7 +187,9 @@ const getLocalMinutesFromDateTime = (value: string): number | null => {
 
 const buildTaskIntervals = (tasks: PlannerContextTask[]): TimelineInterval[] =>
   tasks
-    .filter((task) => task.completed !== true && task.taskDate && task.scheduledTime)
+    .filter((task) =>
+      task.completed !== true && task.taskDate && task.scheduledTime
+    )
     .map((task) => {
       const startMinutes = parseTimeToMinutes(task.scheduledTime);
       if (startMinutes === null) return null;
@@ -179,7 +232,8 @@ const buildCalendarIntervals = (
 
       const localStart = eventStart < dayStart ? dayStart : eventStart;
       const localEnd = eventEnd > dayEnd ? dayEnd : eventEnd;
-      const startMinutes = (localStart.getHours() * 60) + localStart.getMinutes();
+      const startMinutes = (localStart.getHours() * 60) +
+        localStart.getMinutes();
       const endMinutes = (localEnd.getHours() * 60) + localEnd.getMinutes();
 
       if (endMinutes <= startMinutes) return null;
@@ -207,12 +261,21 @@ const buildIntervalsForDate = ({
   calendarEvents: PlannerContextCalendarEvent[];
   wakeMinutes: number;
   windDownMinutes: number;
-}) => [
-  ...buildTaskIntervals(tasks),
-  ...buildCalendarIntervals(date, calendarEvents, wakeMinutes, windDownMinutes),
-].sort((left, right) => left.startMinutes - right.startMinutes);
+}) =>
+  [
+    ...buildTaskIntervals(tasks),
+    ...buildCalendarIntervals(
+      date,
+      calendarEvents,
+      wakeMinutes,
+      windDownMinutes,
+    ),
+  ].sort((left, right) => left.startMinutes - right.startMinutes);
 
-const getDayLoadStatus = (totalMinutes: number, taskCount: number): PlannerDayLoad["status"] => {
+const getDayLoadStatus = (
+  totalMinutes: number,
+  taskCount: number,
+): PlannerDayLoad["status"] => {
   if (taskCount === 0 || totalMinutes === 0) return "open";
   if (totalMinutes > 300 || taskCount >= 6) return "overloaded";
   if (totalMinutes > 180 || taskCount >= 4) return "busy";
@@ -236,9 +299,15 @@ const scoreSlot = ({
 }): { score: number; reason: string } => {
   const slotTime = formatMinutesAsTime(slotStart);
   const slotTimeOfDay = toTimeOfDay(slotTime);
-  const exactMatch = preferredWindows.find((window) => window.time === slotTime);
-  const windowMatch = preferredWindows.find((window) => window.timeOfDay === slotTimeOfDay);
-  const peakMatch = peakHours.some((hour) => Math.abs((hour * 60) - slotStart) <= 60);
+  const exactMatch = preferredWindows.find((window) =>
+    window.time === slotTime
+  );
+  const windowMatch = preferredWindows.find((window) =>
+    window.timeOfDay === slotTimeOfDay
+  );
+  const peakMatch = peakHours.some((hour) =>
+    Math.abs((hour * 60) - slotStart) <= 60
+  );
 
   let score = 50;
   let reason = "Open time in your schedule.";
@@ -271,7 +340,8 @@ const scoreSlot = ({
     score += 12;
     reason = "Near one of your stronger focus hours.";
   } else if (load.status === "open") {
-    reason = "This day is light, so it has room without crowding anything else.";
+    reason =
+      "This day is light, so it has room without crowding anything else.";
   } else if (load.status === "balanced") {
     reason = "This window keeps the day balanced without creating a pileup.";
   }
@@ -301,7 +371,11 @@ const buildSuggestedSlots = ({
 }): PlannerOpenSlot[] => {
   const preferredWindows = getPreferredWindows(plannerMemory);
   const peakHours = (plannerMemory?.peakProductivityTimes ?? [])
-    .map((value) => value.includes(":") ? parseTimeToMinutes(value) : parseTimeToMinutes(`${value.padStart(2, "0")}:00`))
+    .map((value) =>
+      value.includes(":")
+        ? parseTimeToMinutes(value)
+        : parseTimeToMinutes(`${value.padStart(2, "0")}:00`)
+    )
     .filter((minutes): minutes is number => minutes !== null)
     .map((minutes) => Math.floor(minutes / 60));
   const fallbackPeakHours = (plannerMemory?.preferredWindows ?? [])
@@ -352,7 +426,10 @@ const buildSuggestedSlots = ({
         );
 
       const chosenStart = preferredStart ?? slotStart;
-      const chosenEnd = Math.min(slotEnd, chosenStart + Math.max(minimumSlotMinutes, Math.min(duration, 90)));
+      const chosenEnd = Math.min(
+        slotEnd,
+        chosenStart + Math.max(minimumSlotMinutes, Math.min(duration, 90)),
+      );
       const { score, reason } = scoreSlot({
         slotStart: chosenStart,
         selectedDate,
@@ -400,8 +477,12 @@ const buildMoveSuggestions = ({
   dayLoads: PlannerDayLoad[];
   suggestedSlots: PlannerOpenSlot[];
 }): PlannerMoveSuggestion[] => {
-  const openTargets = dayLoads.filter((load) => load.status === "open" || load.status === "balanced");
-  const overloadedLoads = dayLoads.filter((load) => load.status === "overloaded");
+  const openTargets = dayLoads.filter((load) =>
+    load.status === "open" || load.status === "balanced"
+  );
+  const overloadedLoads = dayLoads.filter((load) =>
+    load.status === "overloaded"
+  );
   const suggestions: PlannerMoveSuggestion[] = [];
 
   overloadedLoads.forEach((load) => {
@@ -411,10 +492,14 @@ const buildMoveSuggestions = ({
       .sort((left, right) => getTaskDuration(right) - getTaskDuration(left));
 
     const moveTask = tasks[0];
-    const targetDay = openTargets.find((candidate) => candidate.date !== load.date);
+    const targetDay = openTargets.find((candidate) =>
+      candidate.date !== load.date
+    );
     if (!moveTask || !targetDay) return;
 
-    const targetSlot = suggestedSlots.find((slot) => slot.date === targetDay.date);
+    const targetSlot = suggestedSlots.find((slot) =>
+      slot.date === targetDay.date
+    );
     suggestions.push({
       fromDate: load.date,
       toDate: targetDay.date,
@@ -430,7 +515,9 @@ const buildMoveSuggestions = ({
   return suggestions.slice(0, Math.min(rangeDates.length, 3));
 };
 
-const buildConflicts = (intervals: TimelineInterval[]): PlannerScheduleConflict[] => {
+const buildConflicts = (
+  intervals: TimelineInterval[],
+): PlannerScheduleConflict[] => {
   if (intervals.length < 2) return [];
 
   const conflicts: PlannerScheduleConflict[] = [];
@@ -441,7 +528,8 @@ const buildConflicts = (intervals: TimelineInterval[]): PlannerScheduleConflict[
       const next = intervals[j];
       if (next.startMinutes >= current.endMinutes) break;
 
-      const overlapMinutes = Math.min(current.endMinutes, next.endMinutes) - next.startMinutes;
+      const overlapMinutes = Math.min(current.endMinutes, next.endMinutes) -
+        next.startMinutes;
       if (overlapMinutes <= 0) continue;
 
       conflicts.push({
@@ -458,20 +546,26 @@ const buildConflicts = (intervals: TimelineInterval[]): PlannerScheduleConflict[
   return conflicts;
 };
 
-export const buildCompanionPlannerScheduleInsights = ({
-  tasks,
-  calendarEvents = [],
-  horizon,
-  selectedDate,
-  currentDateTime,
-  plannerMemory,
-}: BuildScheduleInsightsInput): PlannerScheduleInsights => {
+export const buildCompanionPlannerScheduleInsights = (
+  {
+    tasks,
+    calendarEvents = [],
+    horizon,
+    selectedDate,
+    currentDateTime,
+    plannerMemory,
+  }: BuildScheduleInsightsInput,
+  deletedEntities?: DeletedPlannerEntity[] | null,
+): PlannerScheduleInsights => {
   const rangeDates = getRangeDates(selectedDate, horizon);
+  const visibleTasks = tasks.filter((task) =>
+    !isDeletedScheduleTask(task, deletedEntities)
+  );
   const tasksByDate = new Map<string, PlannerContextTask[]>();
   const wakeMinutes = getWakeMinutes(plannerMemory);
   const windDownMinutes = getWindDownMinutes(plannerMemory);
 
-  tasks.forEach((task) => {
+  visibleTasks.forEach((task) => {
     if (!task.taskDate || !rangeDates.includes(task.taskDate)) return;
 
     if (!tasksByDate.has(task.taskDate)) {
@@ -482,7 +576,9 @@ export const buildCompanionPlannerScheduleInsights = ({
   });
 
   const dayLoads = rangeDates.map((date) => {
-    const dateTasks = (tasksByDate.get(date) ?? []).filter((task) => task.completed !== true);
+    const dateTasks = (tasksByDate.get(date) ?? []).filter((task) =>
+      task.completed !== true
+    );
     const intervals = buildIntervalsForDate({
       date,
       tasks: dateTasks,
@@ -490,7 +586,11 @@ export const buildCompanionPlannerScheduleInsights = ({
       wakeMinutes,
       windDownMinutes,
     });
-    const totalMinutes = intervals.reduce((sum, interval) => sum + Math.max(0, interval.endMinutes - interval.startMinutes), 0);
+    const totalMinutes = intervals.reduce(
+      (sum, interval) =>
+        sum + Math.max(0, interval.endMinutes - interval.startMinutes),
+      0,
+    );
 
     return {
       date,
@@ -512,7 +612,7 @@ export const buildCompanionPlannerScheduleInsights = ({
     ).map((conflict) => ({
       ...conflict,
       date,
-    })),
+    }))
   );
 
   const suggestedSlots = buildSuggestedSlots({
@@ -536,8 +636,11 @@ export const buildCompanionPlannerScheduleInsights = ({
     horizon,
     selectedDate,
     dayLoads,
-    overloadedDates: dayLoads.filter((load) => load.status === "overloaded").map((load) => load.date),
-    emptyDates: dayLoads.filter((load) => load.status === "open").map((load) => load.date),
+    overloadedDates: dayLoads.filter((load) => load.status === "overloaded")
+      .map((load) => load.date),
+    emptyDates: dayLoads.filter((load) => load.status === "open").map((load) =>
+      load.date
+    ),
     conflicts,
     suggestedSlots,
     moveSuggestions,

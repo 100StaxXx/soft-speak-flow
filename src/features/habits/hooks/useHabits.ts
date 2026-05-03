@@ -36,6 +36,7 @@ import {
   syncLocalHabitsFromRemote,
   withPlannerRemoteSyncLock,
 } from "@/utils/plannerSync";
+import { runDailyTaskCleanupUpdate } from "@/utils/supabaseDailyTaskCleanup";
 import type { Habit, HabitCompletion, HabitDifficulty, HabitCategory } from "../types";
 
 const getToday = () => format(new Date(), "yyyy-MM-dd");
@@ -145,17 +146,17 @@ async function applyRemoteHabitDelete(userId: string, habitId: string) {
     .eq("habit_id", habitId);
   if (linkLookupError) throw linkLookupError;
 
-  const { error: detachCompletedTasksError } = await supabase
-    .from("daily_tasks")
-    .update({
+  await runDailyTaskCleanupUpdate({
       epic_id: null,
-      epic_title: null,
       habit_source_id: null,
-    })
-    .eq("habit_source_id", habitId)
-    .eq("user_id", userId)
-    .or("completed.eq.true,completed_at.not.is.null");
-  if (detachCompletedTasksError) throw detachCompletedTasksError;
+    }, (update) =>
+      supabase
+        .from("daily_tasks")
+        .update(update)
+        .eq("habit_source_id", habitId)
+        .eq("user_id", userId)
+        .or("completed.eq.true,completed_at.not.is.null")
+    );
 
   const { error: deleteIncompleteTasksError } = await supabase
     .from("daily_tasks")

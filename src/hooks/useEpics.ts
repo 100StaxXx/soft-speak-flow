@@ -29,7 +29,11 @@ import {
 import { resolveEpicEndDate } from "@/utils/epicDates";
 import { isQueueableWriteError } from "@/utils/networkErrors";
 import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
-import { scrubCompanionChatsForDeletedEpic } from "@/utils/companionChatScrub";
+import {
+  forgetDeletedPlannerEntities,
+  normalizeDeletedPlannerEntities,
+  type DeletedPlannerEntity,
+} from "@/utils/deletedPlannerMemory";
 import {
   createOfflinePlannerId,
   getAllLocalTasksForUser,
@@ -46,6 +50,7 @@ import {
 } from "@/utils/plannerLocalStore";
 import { toRemoteEpicInsertPayload } from "@/utils/epicRemotePayload";
 import { getQueuedActions, type QueuedAction } from "@/utils/offlineStorage";
+import { runDailyTaskCleanupUpdate } from "@/utils/supabaseDailyTaskCleanup";
 import {
   isValidCampaignMilestonePercent,
   normalizeCampaignMilestonePercentArray,
@@ -396,18 +401,64 @@ type LocalTaskEpicTitleRow = {
 type LocalTaskCampaignCleanupRow = {
   id: string;
   user_id: string;
+  task_text?: string | null;
   habit_source_id: string | null;
   epic_id: string | null;
   epic_title?: string | null;
   task_date: string | null;
   completed: boolean | null;
   completed_at?: string | null;
+  excluded_from_planner_at?: string | null;
+};
+
+const buildDeletedPlannerEntitiesForCampaign = ({
+  epic,
+  habits,
+  tasks,
+}: {
+  epic: LocalEpicRow;
+  habits: LocalHabitRow[];
+  tasks: LocalTaskCampaignCleanupRow[];
+}): DeletedPlannerEntity[] => {
+  const campaignEntity: DeletedPlannerEntity = {
+    entityType: "campaign",
+    entityId: epic.id,
+    title: epic.title,
+    metadata: {
+      createdAt: epic.created_at ?? null,
+    },
+  };
+
+  const ritualEntities = habits.map((habit): DeletedPlannerEntity => ({
+    entityType: "ritual",
+    entityId: habit.id,
+    title: habit.title,
+    metadata: {
+      campaignId: epic.id,
+      campaignTitle: epic.title,
+    },
+  }));
+
+  const taskEntities = tasks.map((task): DeletedPlannerEntity => ({
+    entityType: "task",
+    entityId: task.id,
+    title: task.task_text ?? null,
+    metadata: {
+      campaignId: epic.id,
+      campaignTitle: epic.title,
+      habitSourceId: task.habit_source_id ?? null,
+      taskDate: task.task_date ?? null,
+    },
+  }));
+
+  return [campaignEntity, ...ritualEntities, ...taskEntities];
 };
 
 function scrubCampaignRitualTaskRows<T>(rows: T | undefined, habitId: string): T | undefined {
   if (!Array.isArray(rows)) return rows;
 
   let changed = false;
+  const excludedFromPlannerAt = new Date().toISOString();
   const nextRows = (rows as DailyTask[]).reduce<DailyTask[]>((next, task) => {
     if (task.habit_source_id !== habitId) {
       next.push(task);
@@ -421,6 +472,8 @@ function scrubCampaignRitualTaskRows<T>(rows: T | undefined, habitId: string): T
         epic_id: null,
         epic_title: null,
         habit_source_id: null,
+        excluded_from_planner_at: task.excluded_from_planner_at ??
+          excludedFromPlannerAt,
       });
     }
     return next;
@@ -987,11 +1040,13 @@ async function rollbackRemoteCampaignRitualPayload(userId: string, payload: Loca
 async function applyLocalCampaignRitualDelete(
   userId: string,
   { epicId, habitId }: DeleteCampaignRitualInput,
+  epic: LocalEpicRow,
 ) {
-  const [epicHabits, localTasks, habitCompletions] = await Promise.all([
+  const [epicHabits, localTasks, habitCompletions, habits] = await Promise.all([
     getLocalEpicHabits<LocalEpicHabitRow>([epicId]),
     getAllLocalTasksForUser<LocalTaskCampaignCleanupRow>(userId),
     getLocalHabitCompletions<Array<{ id: string; habit_id: string | null; user_id: string; date: string }>[number]>(userId),
+    getLocalHabits<LocalHabitRow>(userId),
   ]);
 
   const linkIdsToDelete = epicHabits
@@ -1002,6 +1057,31 @@ async function applyLocalCampaignRitualDelete(
   }
 
   const linkedTasks = localTasks.filter((task) => task.habit_source_id === habitId);
+  const habit = habits.find((candidate) => candidate.id === habitId);
+  const deletedPlannerEntities = normalizeDeletedPlannerEntities([
+    {
+      entityType: "ritual",
+      entityId: habitId,
+      title: habit?.title ?? null,
+      metadata: {
+        campaignId: epicId,
+        campaignTitle: epic.title,
+      },
+    },
+    ...linkedTasks.map((task) => ({
+      entityType: "task" as const,
+      entityId: task.id,
+      title: task.task_text ?? null,
+      metadata: {
+        campaignId: epicId,
+        campaignTitle: epic.title,
+        habitSourceId: habitId,
+        ritualTitle: habit?.title ?? null,
+        taskDate: task.task_date ?? null,
+      },
+    })),
+  ]);
+  const excludedFromPlannerAt = new Date().toISOString();
   const tasksToDelete = linkedTasks
     .filter((task) => task.completed !== true && !task.completed_at)
     .map((task) => task.id);
@@ -1013,6 +1093,8 @@ async function applyLocalCampaignRitualDelete(
       epic_id: null,
       epic_title: null,
       habit_source_id: null,
+      excluded_from_planner_at: task.excluded_from_planner_at ??
+        excludedFromPlannerAt,
     }));
   const completionsToDelete = habitCompletions
     .filter((completion) => completion.habit_id === habitId)
@@ -1032,12 +1114,14 @@ async function applyLocalCampaignRitualDelete(
   }
 
   await removePlannerRecord("habits", habitId);
+  return { deletedPlannerEntities };
 }
 
 async function applyRemoteCampaignRitualDelete(
   userId: string,
   { epicId, habitId }: DeleteCampaignRitualInput,
 ) {
+  const excludedFromPlannerAt = new Date().toISOString();
   const { data: matchingLinks, error: linkLookupError } = await supabase
     .from("epic_habits")
     .select("id")
@@ -1056,17 +1140,18 @@ async function applyRemoteCampaignRitualDelete(
     throw new Error("Campaign ritual link not found");
   }
 
-  const { error: detachCompletedTasksError } = await supabase
-    .from("daily_tasks")
-    .update({
+  await runDailyTaskCleanupUpdate({
       epic_id: null,
-      epic_title: null,
       habit_source_id: null,
-    })
-    .eq("habit_source_id", habitId)
-    .eq("user_id", userId)
-    .or("completed.eq.true,completed_at.not.is.null");
-  if (detachCompletedTasksError) throw detachCompletedTasksError;
+      excluded_from_planner_at: excludedFromPlannerAt,
+    }, (update) =>
+      supabase
+        .from("daily_tasks")
+        .update(update)
+        .eq("habit_source_id", habitId)
+        .eq("user_id", userId)
+        .or("completed.eq.true,completed_at.not.is.null")
+    );
 
   const { error: deleteIncompleteTasksError } = await supabase
     .from("daily_tasks")
@@ -1130,16 +1215,16 @@ async function applyRemoteCampaignHabitUnlink(
   userId: string,
   { epicId, habitId }: DeleteCampaignRitualInput,
 ) {
-  const { error: detachTasksError } = await supabase
-    .from("daily_tasks")
-    .update({
+  await runDailyTaskCleanupUpdate({
       epic_id: null,
-      epic_title: null,
-    })
-    .eq("user_id", userId)
-    .eq("epic_id", epicId)
-    .eq("habit_source_id", habitId);
-  if (detachTasksError) throw detachTasksError;
+    }, (update) =>
+      supabase
+        .from("daily_tasks")
+        .update(update)
+        .eq("user_id", userId)
+        .eq("epic_id", epicId)
+        .eq("habit_source_id", habitId)
+    );
 
   const { error } = await supabase
     .from("epic_habits")
@@ -1512,20 +1597,29 @@ async function applyLocalEpicDelete(userId: string, epicId: string) {
 
   const habitIds = epicHabits.map((link) => link.habit_id);
   const habitIdSet = new Set(habitIds);
+  const linkedCampaignTasks = localTasks
+    .filter((task) =>
+      task.epic_id === epicId ||
+      (task.habit_source_id ? habitIdSet.has(task.habit_source_id) : false)
+    );
+  const linkedCampaignHabits = habits
+    .filter((habit) => habitIdSet.has(habit.id));
+  const deletedPlannerEntities = buildDeletedPlannerEntitiesForCampaign({
+    epic,
+    habits: linkedCampaignHabits,
+    tasks: linkedCampaignTasks,
+  });
+  const excludedFromPlannerAt = new Date().toISOString();
 
-  const tasksToDelete = localTasks
+  const tasksToDelete = linkedCampaignTasks
     .filter((task) => {
-      const linkedToCampaign = task.epic_id === epicId || (task.habit_source_id ? habitIdSet.has(task.habit_source_id) : false);
-      if (!linkedToCampaign) return false;
       if (task.completed === true || task.completed_at) return false;
       return true;
     })
     .map((task) => task.id);
 
-  const tasksToDetach = localTasks
+  const tasksToDetach = linkedCampaignTasks
     .filter((task) => {
-      const linkedToCampaign = task.epic_id === epicId || (task.habit_source_id ? habitIdSet.has(task.habit_source_id) : false);
-      if (!linkedToCampaign) return false;
       return !tasksToDelete.includes(task.id);
     })
     .map((task) => ({
@@ -1533,11 +1627,11 @@ async function applyLocalEpicDelete(userId: string, epicId: string) {
       epic_id: null,
       epic_title: null,
       habit_source_id: null,
+      excluded_from_planner_at: task.excluded_from_planner_at ??
+        excludedFromPlannerAt,
     }));
 
-  const habitsToDelete = habits
-    .filter((habit) => habitIdSet.has(habit.id))
-    .map((habit) => habit.id);
+  const habitsToDelete = linkedCampaignHabits.map((habit) => habit.id);
 
   const completionsToDelete = habitCompletions
     .filter((completion) => completion.habit_id && habitIdSet.has(completion.habit_id))
@@ -1577,6 +1671,7 @@ async function applyLocalEpicDelete(userId: string, epicId: string) {
   return {
     epic,
     habitIds,
+    deletedPlannerEntities,
   };
 }
 
@@ -1605,17 +1700,17 @@ async function applyRemoteEpicStatusChange(userId: string, epicId: string, statu
 
   const habitIds = epicHabits?.map((row) => row.habit_id) ?? [];
   if (habitIds.length > 0) {
-    const { error: detachCompletedHabitTasksError } = await supabase
-      .from("daily_tasks")
-      .update({
+    await runDailyTaskCleanupUpdate({
         epic_id: null,
-        epic_title: null,
         habit_source_id: null,
-      })
-      .in("habit_source_id", habitIds)
-      .eq("user_id", userId)
-      .or("completed.eq.true,completed_at.not.is.null");
-    if (detachCompletedHabitTasksError) throw detachCompletedHabitTasksError;
+      }, (update) =>
+        supabase
+          .from("daily_tasks")
+          .update(update)
+          .in("habit_source_id", habitIds)
+          .eq("user_id", userId)
+          .or("completed.eq.true,completed_at.not.is.null")
+      );
 
     const { error: habitsError } = await supabase
       .from("habits")
@@ -1645,17 +1740,17 @@ async function applyRemoteEpicStatusChange(userId: string, epicId: string, statu
     }
   }
 
-  const { error: detachCompletedEpicTasksError } = await supabase
-    .from("daily_tasks")
-    .update({
+  await runDailyTaskCleanupUpdate({
       epic_id: null,
-      epic_title: null,
       habit_source_id: null,
-    })
-    .eq("user_id", userId)
-    .eq("epic_id", epicId)
-    .or("completed.eq.true,completed_at.not.is.null");
-  if (detachCompletedEpicTasksError) throw detachCompletedEpicTasksError;
+    }, (update) =>
+      supabase
+        .from("daily_tasks")
+        .update(update)
+        .eq("user_id", userId)
+        .eq("epic_id", epicId)
+        .or("completed.eq.true,completed_at.not.is.null")
+    );
 
   const { error: milestonesError } = await supabase
     .from("epic_milestones")
@@ -1683,6 +1778,7 @@ async function applyRemoteEpicUpdate(
 }
 
 async function applyRemoteEpicDelete(userId: string, epicId: string) {
+  const excludedFromPlannerAt = new Date().toISOString();
   const { data: epicHabits, error: epicHabitsError } = await supabase
     .from("epic_habits")
     .select("id, habit_id")
@@ -1693,17 +1789,18 @@ async function applyRemoteEpicDelete(userId: string, epicId: string) {
   const linkIds = epicHabits?.map((row) => row.id) ?? [];
 
   if (habitIds.length > 0) {
-    const { error: detachCompletedHabitTasksError } = await supabase
-      .from("daily_tasks")
-      .update({
+    await runDailyTaskCleanupUpdate({
         epic_id: null,
-        epic_title: null,
         habit_source_id: null,
-      })
-      .in("habit_source_id", habitIds)
-      .eq("user_id", userId)
-      .or("completed.eq.true,completed_at.not.is.null");
-    if (detachCompletedHabitTasksError) throw detachCompletedHabitTasksError;
+        excluded_from_planner_at: excludedFromPlannerAt,
+      }, (update) =>
+        supabase
+          .from("daily_tasks")
+          .update(update)
+          .in("habit_source_id", habitIds)
+          .eq("user_id", userId)
+          .or("completed.eq.true,completed_at.not.is.null")
+      );
 
     const { error: deleteFutureTasksError } = await supabase
       .from("daily_tasks")
@@ -1722,17 +1819,18 @@ async function applyRemoteEpicDelete(userId: string, epicId: string) {
     if (deleteHabitsError) throw deleteHabitsError;
   }
 
-  const { error: detachCompletedTasksError } = await supabase
-    .from("daily_tasks")
-    .update({
+  await runDailyTaskCleanupUpdate({
       epic_id: null,
-      epic_title: null,
       habit_source_id: null,
-    })
-    .eq("user_id", userId)
-    .eq("epic_id", epicId)
-    .or("completed.eq.true,completed_at.not.is.null");
-  if (detachCompletedTasksError) throw detachCompletedTasksError;
+      excluded_from_planner_at: excludedFromPlannerAt,
+    }, (update) =>
+      supabase
+        .from("daily_tasks")
+        .update(update)
+        .eq("user_id", userId)
+        .eq("epic_id", epicId)
+        .or("completed.eq.true,completed_at.not.is.null")
+    );
 
   const { error: milestonesError } = await supabase
     .from("epic_milestones")
@@ -2488,7 +2586,12 @@ export const useEpics = (options: EpicsOptions = {}) => {
           throw new Error("Only active campaigns can be deleted");
         }
 
-        await applyLocalEpicDelete(user.id, epicId);
+        const localDelete = await applyLocalEpicDelete(user.id, epicId);
+        await forgetDeletedPlannerEntities({
+          userId: user.id,
+          source: "campaign_delete",
+          entities: localDelete.deletedPlannerEntities,
+        });
         await refreshEpicsQueryFromLocalStore(queryClient, user.id);
 
         const epicCreatedAt = typeof epic.created_at === "string"
@@ -2504,6 +2607,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
               epicId,
               epicTitle: epic.title,
               epicCreatedAt,
+              deletedPlannerEntities: localDelete.deletedPlannerEntities,
             },
           });
           return { epic, queued: true };
@@ -2520,17 +2624,12 @@ export const useEpics = (options: EpicsOptions = {}) => {
               epicId,
               epicTitle: epic.title,
               epicCreatedAt,
+              deletedPlannerEntities: localDelete.deletedPlannerEntities,
             },
           });
           void retryNow();
           return { epic, queued: true };
         }
-
-        await scrubCompanionChatsForDeletedEpic(
-          user.id,
-          epic.title,
-          epicCreatedAt,
-        );
 
         return { epic, queued: false };
       });
@@ -2575,7 +2674,16 @@ export const useEpics = (options: EpicsOptions = {}) => {
           throw new Error("Only active campaign rituals can be deleted");
         }
 
-        await applyLocalCampaignRitualDelete(user.id, input);
+        const localDelete = await applyLocalCampaignRitualDelete(
+          user.id,
+          input,
+          epic,
+        );
+        await forgetDeletedPlannerEntities({
+          userId: user.id,
+          source: "campaign_ritual_delete",
+          entities: localDelete.deletedPlannerEntities,
+        });
         await refreshEpicsQueryFromLocalStore(queryClient, user.id);
         scrubCampaignRitualTaskCaches(queryClient, input.habitId);
 
@@ -2584,7 +2692,10 @@ export const useEpics = (options: EpicsOptions = {}) => {
             actionKind: "EPIC_RITUAL_DELETE",
             entityType: "epic",
             entityId: input.epicId,
-            payload: input,
+            payload: {
+              ...input,
+              deletedPlannerEntities: localDelete.deletedPlannerEntities,
+            },
           });
           return { queued: true };
         }
@@ -2596,7 +2707,10 @@ export const useEpics = (options: EpicsOptions = {}) => {
             actionKind: "EPIC_RITUAL_DELETE",
             entityType: "epic",
             entityId: input.epicId,
-            payload: input,
+            payload: {
+              ...input,
+              deletedPlannerEntities: localDelete.deletedPlannerEntities,
+            },
           });
           void retryNow();
           return { queued: true };

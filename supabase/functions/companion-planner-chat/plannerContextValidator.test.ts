@@ -74,6 +74,7 @@ const taskRow = (overrides: Partial<MockRow> = {}): MockRow => ({
   habit_source_id: null,
   epic_id: null,
   epic_title: null,
+  excluded_from_planner_at: null,
   ...overrides,
 });
 
@@ -82,25 +83,35 @@ const createMockSupabase = (
     epics?: MockRow[];
     daily_tasks?: MockRow[];
     habits?: MockRow[];
+    deleted_planner_entities?: MockRow[];
   },
   failTable?: keyof typeof tables,
 ): ValidatorSupabase => ({
   from: (tableName: keyof typeof tables) => {
     const filters: Record<string, unknown> = {};
+    const filterRows = () => (tables[tableName] ?? []).filter((row) =>
+      Object.entries(filters).every(([key, value]) => row[key] === value)
+    );
     const builder = {
       select: () => builder,
       eq: (column: string, value: unknown) => {
         filters[column] = value;
         return builder;
       },
+      order: () => builder,
+      limit: async (count: number) => {
+        if (tableName === failTable) {
+          return { data: null, error: new Error(`failed ${tableName}`) };
+        }
+        return { data: filterRows().slice(0, count), error: null };
+      },
       in: async (column: string, values: string[]) => {
         if (tableName === failTable) {
           return { data: null, error: new Error(`failed ${tableName}`) };
         }
 
-        const rows = (tables[tableName] ?? []).filter((row) =>
-          values.includes(String(row[column])) &&
-          Object.entries(filters).every(([key, value]) => row[key] === value)
+        const rows = filterRows().filter((row) =>
+          values.includes(String(row[column]))
         );
 
         return { data: rows, error: null };
@@ -143,6 +154,96 @@ Deno.test("validateAndPrunePlannerContext drops client-only deleted campaign con
   assertEquals(result.tasks, []);
   assertEquals(result.rituals, []);
   assertEquals(result.activeHabitIds, []);
+});
+
+Deno.test("validateAndPrunePlannerContext strips tombstoned ids and excluded completed history", async () => {
+  const context = baseContext({
+    activeEpics: [{
+      id: EPIC_DELETED_ID,
+      title: "Launch Sprint",
+      endDate: "2026-06-01",
+    }, {
+      id: EPIC_LIVE_ID,
+      title: "Launch Sprint",
+      endDate: "2026-06-15",
+    }],
+    tasks: [
+      baseTask({
+        id: TASK_DELETED_ID,
+        title: "Call vendor",
+        epicId: EPIC_DELETED_ID,
+        epicTitle: "Launch Sprint",
+      }),
+      baseTask({
+        id: TASK_COMPLETED_STALE_ID,
+        title: "Old completed proof",
+        completed: true,
+        completedAt: "2026-05-01T12:00:00Z",
+      }),
+      baseTask({
+        id: TASK_LIVE_ID,
+        title: "Current launch review",
+        epicId: EPIC_LIVE_ID,
+        epicTitle: "Launch Sprint",
+      }),
+    ],
+  });
+
+  const result = await validateAndPrunePlannerContext(
+    createMockSupabase({
+      deleted_planner_entities: [
+        {
+          id: "del-campaign",
+          user_id: "user-1",
+          entity_type: "campaign",
+          entity_id: EPIC_DELETED_ID,
+          title: "Launch Sprint",
+        },
+        {
+          id: "del-task",
+          user_id: "user-1",
+          entity_type: "task",
+          entity_id: TASK_DELETED_ID,
+          title: "Call vendor",
+        },
+      ],
+      epics: [{
+        id: EPIC_LIVE_ID,
+        user_id: "user-1",
+        title: "Launch Sprint",
+        end_date: "2026-06-15",
+        progress_percentage: 25,
+        status: "active",
+        completed_at: null,
+      }],
+      daily_tasks: [
+        taskRow({
+          id: TASK_DELETED_ID,
+          task_text: "Call vendor",
+          epic_id: EPIC_DELETED_ID,
+        }),
+        taskRow({
+          id: TASK_COMPLETED_STALE_ID,
+          task_text: "Old completed proof",
+          completed: true,
+          completed_at: "2026-05-01T12:00:00Z",
+          excluded_from_planner_at: "2026-05-02T00:00:00Z",
+        }),
+        taskRow({
+          id: TASK_LIVE_ID,
+          task_text: "Current launch review",
+          epic_id: EPIC_LIVE_ID,
+        }),
+      ],
+      habits: [],
+    }),
+    "user-1",
+    context,
+  );
+
+  assertEquals(result.activeEpics.map((epic) => epic.id), [EPIC_LIVE_ID]);
+  assertEquals(result.tasks.map((task) => task.id), [TASK_LIVE_ID]);
+  assertEquals(result.tasks[0].epicTitle, "Launch Sprint");
 });
 
 Deno.test("validateAndPrunePlannerContext drops non-UUID local rows unless they are explicitly pending", async () => {

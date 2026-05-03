@@ -71,6 +71,42 @@ const normalizeModel = (model: string | null | undefined): string => {
 const falQueueUrl = (model: string) =>
   `${FAL_QUEUE_BASE_URL}/${normalizeModel(model)}`;
 
+const uniqueStrings = (values: string[]): string[] => {
+  const seen = new Set<string>();
+  return values.filter((value) => {
+    if (seen.has(value)) return false;
+    seen.add(value);
+    return true;
+  });
+};
+
+const falQueueRequestModelCandidates = (model: string): string[] => {
+  const normalized = normalizeModel(model);
+  const candidates = [normalized];
+  const parts = normalized.split("/").filter(Boolean);
+
+  if (parts[0] === "fal-ai" && parts[1] === "kling-video" && parts.length > 2) {
+    candidates.push(parts.slice(0, 2).join("/"));
+  }
+
+  return uniqueStrings(candidates);
+};
+
+const falQueueRequestUrls = (
+  model: string,
+  requestId: string,
+  suffix = "",
+): string[] =>
+  falQueueRequestModelCandidates(model).map((candidate) =>
+    `${FAL_QUEUE_BASE_URL}/${candidate}/requests/${
+      encodeURIComponent(requestId)
+    }${suffix}`
+  );
+
+const shouldTryNextQueueUrl = (error: unknown): boolean =>
+  error instanceof FalKlingVideoError &&
+  (error.status === 404 || error.status === 405);
+
 const parseJsonResponse = async (
   response: Response,
 ): Promise<Record<string, unknown>> => {
@@ -205,22 +241,31 @@ export const getFalKlingQueueStatus = async ({
   model: string;
   requestId: string;
 }): Promise<FalQueueStatusResult> => {
-  const response = await fetchFn(
-    `${falQueueUrl(model)}/requests/${encodeURIComponent(requestId)}/status`,
-    {
+  let lastError: unknown;
+  for (const url of falQueueRequestUrls(model, requestId, "/status")) {
+    const response = await fetchFn(url, {
       method: "GET",
       headers: {
         Authorization: `Key ${apiKey}`,
       },
-    },
-  );
-  const payload = await parseJsonResponse(response);
-  const status = firstString([payload.status]) ?? "UNKNOWN";
+    });
+    try {
+      const payload = await parseJsonResponse(response);
+      const status = firstString([payload.status]) ?? "UNKNOWN";
 
-  return {
-    status,
-    responseUrl: asString(payload.response_url),
-  };
+      return {
+        status,
+        responseUrl: asString(payload.response_url),
+      };
+    } catch (error) {
+      if (!shouldTryNextQueueUrl(error)) {
+        throw error;
+      }
+      lastError = error;
+    }
+  }
+
+  throw lastError;
 };
 
 const extractVideoUrlFromPayload = (
@@ -261,31 +306,40 @@ export const getFalKlingQueueResult = async ({
   model: string;
   requestId: string;
 }): Promise<FalQueueResult> => {
-  const response = await fetchFn(
-    `${falQueueUrl(model)}/requests/${encodeURIComponent(requestId)}`,
-    {
+  let lastError: unknown;
+  for (const url of falQueueRequestUrls(model, requestId)) {
+    const response = await fetchFn(url, {
       method: "GET",
       headers: {
         Authorization: `Key ${apiKey}`,
       },
-    },
-  );
-  const payload = await parseJsonResponse(response);
-  const videoUrl = extractVideoUrlFromPayload(payload);
-
-  if (!videoUrl) {
-    throw new FalKlingVideoError("fal result did not include a video URL", {
-      status: response.status,
-      code: "fal_missing_video_url",
-      retryable: false,
     });
+    try {
+      const payload = await parseJsonResponse(response);
+      const videoUrl = extractVideoUrlFromPayload(payload);
+
+      if (!videoUrl) {
+        throw new FalKlingVideoError("fal result did not include a video URL", {
+          status: response.status,
+          code: "fal_missing_video_url",
+          retryable: false,
+        });
+      }
+
+      return {
+        status: asString(payload.status),
+        videoUrl,
+        raw: payload,
+      };
+    } catch (error) {
+      if (!shouldTryNextQueueUrl(error)) {
+        throw error;
+      }
+      lastError = error;
+    }
   }
 
-  return {
-    status: asString(payload.status),
-    videoUrl,
-    raw: payload,
-  };
+  throw lastError;
 };
 
 export const downloadFalVideo = async ({
