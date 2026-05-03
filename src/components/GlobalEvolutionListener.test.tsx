@@ -103,6 +103,7 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     channel: mocks.channelMock,
     removeChannel: mocks.removeChannelMock,
+    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
     from: vi.fn((table: string) => {
       if (table === "companion_evolutions") {
         const maybeSingleMock = vi.fn(async () =>
@@ -111,13 +112,39 @@ vi.mock("@/integrations/supabase/client", () => ({
             error: null,
           });
 
+        // The load-time animation-video replay check is the only consumer
+        // that joins user_companion!inner. Route it to a no-op default so it
+        // doesn't drain the queue meant for waitForEvolutionPersistence.
+        const replayMaybeSingleMock = vi.fn(async () => ({ data: null, error: null }));
+
+        const buildPassthroughBuilder = (terminalMaybeSingle: typeof maybeSingleMock) => {
+          const builder: Record<string, unknown> = {};
+          const passthrough = () => builder;
+          builder.select = passthrough;
+          builder.eq = passthrough;
+          builder.lt = passthrough;
+          builder.gte = passthrough;
+          builder.not = passthrough;
+          builder.is = passthrough;
+          builder.order = passthrough;
+          builder.limit = passthrough;
+          builder.maybeSingle = terminalMaybeSingle;
+          builder.update = vi.fn(() => ({
+            eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }));
+          return builder;
+        };
+
         return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                maybeSingle: maybeSingleMock,
-              })),
-            })),
+          select: vi.fn((columns?: string) => {
+            const isReplayQuery = typeof columns === "string"
+              && columns.includes("user_companion!inner");
+            return buildPassthroughBuilder(
+              isReplayQuery ? replayMaybeSingleMock : maybeSingleMock,
+            );
+          }),
+          update: vi.fn(() => ({
+            eq: vi.fn().mockResolvedValue({ data: null, error: null }),
           })),
         };
       }
@@ -178,8 +205,14 @@ describe("GlobalEvolutionListener", () => {
     mocks.companionEvolutionLookupResponses.length = 0;
 
     mocks.onMock.mockImplementation(
-      (_event: string, _config: Record<string, unknown>, callback: (payload: Record<string, unknown>) => Promise<void>) => {
-        mocks.state.callback = callback;
+      (_event: string, config: Record<string, unknown>, callback: (payload: Record<string, unknown>) => Promise<void>) => {
+        // Route callbacks per table so the new always-on companion_evolutions
+        // subscription doesn't clobber the user_companion handler that the
+        // existing tests fire payloads into via state.callback.
+        const table = typeof config?.table === "string" ? config.table : "";
+        if (table === "user_companion") {
+          mocks.state.callback = callback;
+        }
         return {
           subscribe: mocks.subscribeMock,
         };

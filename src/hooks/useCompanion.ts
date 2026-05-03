@@ -82,6 +82,11 @@ export interface Companion {
   neglected_image_url?: string | null;
   neglected_image_focal_x?: number | null;
   neglected_image_focal_y?: number | null;
+  launcher_image_url?: string | null;
+  launcher_image_focal_x?: number | null;
+  launcher_image_focal_y?: number | null;
+  launcher_image_source_url?: string | null;
+  launcher_image_generated_at?: string | null;
   image_regenerations_used?: number;
   visual_identity_profile?: Record<string, unknown> | null;
   image_lineage_metadata?: Record<string, unknown> | null;
@@ -1522,6 +1527,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         newImageUrl: hatchResult.current_image_url,
         presetId: hatchResult.preset_id ?? null,
         element: hatchResult.core_element ?? null,
+        evolutionId: hatchResult.evolution_id ?? null,
       };
 
       window.dispatchEvent(

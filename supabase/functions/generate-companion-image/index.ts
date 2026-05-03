@@ -1696,6 +1696,18 @@ NOT photorealistic; avoid extreme/chibi cartoon exaggeration.
 Painterly digital art with rich saturated colors, soft but defined edges.
 Slightly brighter exposure with lifted midtones and clearer highlights for readability.`;
     }
+
+    // Centering enforcement appended to every prompt branch. The page image
+    // is the source for the launcher icon AND for Kling image-to-video, so
+    // off-frame subjects break both downstream flows.
+    fullPrompt = `${fullPrompt}
+
+━━━ COMPOSITION & CENTERING (MANDATORY) ━━━
+- Subject must be perfectly centered in the frame
+- Subject occupies the centered ~60% of the canvas; leave at least 10% padding on every edge
+- Ears, wings, tail, and feet are fully inside the frame; never crop against any edge
+- Square 1:1 framing; no letterboxing
+- Background fills the full frame as supporting context, never as the focal subject`;
     promptBuildDurationMs = Date.now() - promptBuildStartedAt;
     console.log(`[CompanionImageTiming] prompt_build_ms=${promptBuildDurationMs}`);
 
