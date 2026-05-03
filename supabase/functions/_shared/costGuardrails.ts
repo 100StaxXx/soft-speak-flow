@@ -10,7 +10,7 @@ export type CostCapability =
   | "transcription"
   | "video";
 
-export type CostProvider = "openai" | "elevenlabs" | "unknown";
+export type CostProvider = "openai" | "elevenlabs" | "fal" | "unknown";
 export type CostScopeType = "provider" | "feature" | "endpoint";
 export type CostEventStatus = "success" | "error" | "blocked";
 export type CostAlertType = "threshold" | "anomaly";
@@ -414,6 +414,11 @@ function resolveCapabilityFromElevenLabsRequest(
   return null;
 }
 
+function resolveFalModelFromPathname(pathname: string): string | null {
+  const normalizedPathname = pathname.replace(/^\/+|\/+$/g, "");
+  return normalizedPathname.length > 0 ? normalizedPathname : null;
+}
+
 async function resolveProviderRequestContext(
   input: string | URL,
   init?: RequestInit,
@@ -448,6 +453,18 @@ async function resolveProviderRequestContext(
       model: typeof requestBody?.model_id === "string"
         ? requestBody.model_id
         : null,
+      requestBody,
+    };
+  }
+
+  if (hostname === "queue.fal.run" && (init?.method ?? "GET").toUpperCase() === "POST") {
+    const model = resolveFalModelFromPathname(url.pathname);
+    if (!model) return null;
+    return {
+      provider: "fal",
+      capability: "video",
+      url: url.toString(),
+      model,
       requestBody,
     };
   }
@@ -583,6 +600,18 @@ function estimateElevenLabsCost(
   return 0;
 }
 
+function estimateFalCost(
+  capability: CostCapability,
+  requestBody: JsonObject | null,
+): number {
+  if (capability !== "video") return 0;
+  const durationSeconds = parseNumber(
+    requestBody?.duration_seconds ?? requestBody?.duration,
+    5,
+  );
+  return roundUsd(Math.max(1, durationSeconds) * 0.1);
+}
+
 function estimateProviderRequestCost(
   providerContext: ProviderRequestContext,
   metrics: ProviderResponseMetrics,
@@ -604,6 +633,13 @@ function estimateProviderRequestCost(
       providerContext.capability,
       providerContext.requestBody,
       metrics,
+    );
+  }
+
+  if (providerContext.provider === "fal") {
+    return estimateFalCost(
+      providerContext.capability,
+      providerContext.requestBody,
     );
   }
 

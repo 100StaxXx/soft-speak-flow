@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { Swords, Skull } from "lucide-react";
 import { Adversary, AdversaryTier } from "@/types/astralEncounters";
 import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
-import { isCompanionPresetImageSource } from "@/lib/companionImageFocal";
+import { isCompanionSceneImageSource } from "@/lib/companionImageFocal";
 
 interface BattleSceneHeaderProps {
   companionImageUrl?: string;
@@ -69,7 +69,7 @@ export const BattleSceneHeader = ({
             {/* Portrait container - larger size */}
             <div className="relative w-24 h-24 rounded-2xl overflow-hidden border-2 border-primary/50 bg-gradient-to-br from-primary/20 to-accent/20 shadow-lg shadow-primary/20">
               {companionImageUrl ? (
-                isCompanionPresetImageSource(companionImageUrl) ? (
+                isCompanionSceneImageSource(companionImageUrl) ? (
                   <CompanionPortraitShell
                     src={companionImageUrl}
                     className="h-full w-full rounded-2xl"

@@ -409,6 +409,125 @@ describe("CompanionEvolution", () => {
     expect(mocks.hapticsMediumMock).not.toHaveBeenCalled();
   });
 
+  it("plays a ready evolution animation video after the flash reveal", async () => {
+    const props = {
+      ...buildProps(),
+      animationVideoUrl: "https://example.com/evolution.mp4",
+    };
+
+    render(<CompanionEvolution {...props} />);
+    await prepareEvolution();
+
+    const dialog = screen.getByRole("alertdialog");
+    const video = screen.getByTestId("evolution-animation-video") as HTMLVideoElement;
+
+    expect(video).toHaveAttribute("src", props.animationVideoUrl);
+    expect(video.muted).toBe(true);
+    expect(video.playsInline).toBe(true);
+    expect(video).toHaveAttribute("data-animation-ready", "false");
+    expect(video).toHaveStyle({ opacity: "0" });
+
+    await act(async () => {
+      fireEvent.canPlay(video);
+    });
+
+    expect(video).toHaveAttribute("data-animation-ready", "true");
+    expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
+
+    await flushTimers(
+      FULL_SEQUENCE_MS.hold +
+      FULL_SEQUENCE_MS.charge +
+      FULL_SEQUENCE_MS.conceal +
+      FULL_SEQUENCE_MS.strobe +
+      FULL_SEQUENCE_MS.apex,
+    );
+
+    expect(dialog).toHaveAttribute("data-phase", "reveal");
+    expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(1);
+    expect(video).toHaveStyle({ opacity: "1" });
+    expect(screen.getByTestId("evolution-reveal-art")).toBeInTheDocument();
+  });
+
+  it("falls back to the still reveal when the evolution animation video fails to preload", async () => {
+    const props = {
+      ...buildProps(),
+      animationVideoUrl: "https://example.com/broken-evolution.mp4",
+    };
+
+    render(<CompanionEvolution {...props} />);
+    await prepareEvolution();
+
+    const dialog = screen.getByRole("alertdialog");
+    const video = screen.getByTestId("evolution-animation-video") as HTMLVideoElement;
+
+    await act(async () => {
+      fireEvent.error(video);
+    });
+
+    await flushTimers(
+      FULL_SEQUENCE_MS.hold +
+      FULL_SEQUENCE_MS.charge +
+      FULL_SEQUENCE_MS.conceal +
+      FULL_SEQUENCE_MS.strobe +
+      FULL_SEQUENCE_MS.apex,
+    );
+
+    expect(dialog).toHaveAttribute("data-phase", "reveal");
+    expect(video).toHaveAttribute("data-animation-failed", "true");
+    expect(video).toHaveStyle({ opacity: "0" });
+    expect(screen.getByTestId("evolution-reveal-art")).toBeInTheDocument();
+    expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the still reveal when evolution animation playback is rejected", async () => {
+    Object.defineProperty(HTMLMediaElement.prototype, "play", {
+      configurable: true,
+      value: vi.fn().mockRejectedValue(new Error("autoplay rejected")),
+      writable: true,
+    });
+
+    const props = {
+      ...buildProps(),
+      animationVideoUrl: "https://example.com/evolution.mp4",
+    };
+
+    render(<CompanionEvolution {...props} />);
+    await prepareEvolution();
+
+    const video = screen.getByTestId("evolution-animation-video") as HTMLVideoElement;
+
+    await act(async () => {
+      fireEvent.canPlay(video);
+    });
+
+    await flushTimers(
+      FULL_SEQUENCE_MS.hold +
+      FULL_SEQUENCE_MS.charge +
+      FULL_SEQUENCE_MS.conceal +
+      FULL_SEQUENCE_MS.strobe +
+      FULL_SEQUENCE_MS.apex,
+    );
+    await flushTimers();
+
+    expect(video).toHaveAttribute("data-animation-failed", "true");
+    expect(screen.getByTestId("evolution-reveal-art")).toBeInTheDocument();
+  });
+
+  it("does not render the evolution animation video in reduced motion", async () => {
+    mocks.profile = "reduced";
+    mocks.prefersReducedMotion = true;
+
+    render(
+      <CompanionEvolution
+        {...buildProps()}
+        animationVideoUrl="https://example.com/evolution.mp4"
+      />,
+    );
+    await prepareEvolution();
+
+    expect(screen.queryByTestId("evolution-animation-video")).not.toBeInTheDocument();
+  });
+
   it("shows a short hatchery intro before the first hatch cinematic begins", async () => {
     render(<CompanionEvolution {...buildFirstHatchProps()} />);
     await prepareEvolution();
@@ -484,6 +603,20 @@ describe("CompanionEvolution", () => {
 
     expect(props.onComplete).toHaveBeenCalledTimes(1);
     expect(mocks.hapticsLightMock).toHaveBeenCalled();
+  });
+
+  it("keeps mapped first hatch videos ahead of optional evolution animation videos", async () => {
+    render(
+      <CompanionEvolution
+        {...buildFirstHatchProps()}
+        animationVideoUrl="https://example.com/evolution.mp4"
+      />,
+    );
+    await prepareEvolution();
+    await flushTimers(HATCH_INTRO_MIN_MS);
+
+    expect(screen.getByTestId("evolution-hatch-video")).toBeInTheDocument();
+    expect(screen.queryByTestId("evolution-animation-video")).not.toBeInTheDocument();
   });
 
   it("mutes the hatch video when global audio is disabled", async () => {

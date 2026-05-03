@@ -451,9 +451,6 @@ const Journeys = () => {
   }, [finishPlannerQuestEdit, plannerQuestEditSession?.editor]);
 
   const openCampaignBuilder = useCallback((initialGoal?: string | null) => {
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("campaign-builder-opened"));
-    }
     setPathfinderInitialGoal(initialGoal?.trim() ?? "");
     setPathfinderResumeDraft(null);
     setPathfinderResumeDraftKey(null);
@@ -1742,14 +1739,6 @@ const Journeys = () => {
   const handleCreateCampaign = useCallback(async (data: Parameters<typeof createEpic>[0]) => {
     try {
       await createEpic(data);
-      window.dispatchEvent(
-        new CustomEvent("pathfinder-campaign-created", {
-          detail: {
-            title: data.title,
-            habitCount: data.habits.length,
-          },
-        }),
-      );
       setPathfinderInitialGoal("");
       clearCampaignCreationPopupState();
       setShowPathfinder(false);

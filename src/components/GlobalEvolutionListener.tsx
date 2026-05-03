@@ -22,13 +22,18 @@ import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
 const EVOLUTION_RECORD_RETRY_DELAYS_MS = [0, 75, 150] as const;
 const LOCAL_HATCH_DEDUPE_WINDOW_MS = 15000;
 
+type PersistedEvolutionMetadata = {
+  id: string;
+  animationVideoUrl: string | null;
+};
+
 const waitForEvolutionPersistence = async ({
   companionId,
   stage,
 }: {
   companionId: string;
   stage: number;
-}) => {
+}): Promise<PersistedEvolutionMetadata | null> => {
   for (const delayMs of EVOLUTION_RECORD_RETRY_DELAYS_MS) {
     if (delayMs > 0) {
       await new Promise((resolve) => setTimeout(resolve, delayMs));
@@ -36,7 +41,7 @@ const waitForEvolutionPersistence = async ({
 
     const { data, error } = await supabase
       .from("companion_evolutions")
-      .select("id")
+      .select("id, animation_video_url, animation_status")
       .eq("companion_id", companionId)
       .eq("stage", stage)
       .maybeSingle();
@@ -47,15 +52,23 @@ const waitForEvolutionPersistence = async ({
         stage,
         error: error.message,
       });
-      return false;
+      return null;
     }
 
     if (data?.id) {
-      return true;
+      const animationVideoUrl =
+        data.animation_status === "succeeded" && typeof data.animation_video_url === "string"
+          ? data.animation_video_url
+          : null;
+
+      return {
+        id: data.id,
+        animationVideoUrl,
+      };
     }
   }
 
-  return false;
+  return null;
 };
 
 export const GlobalEvolutionListener = () => {
@@ -72,6 +85,7 @@ export const GlobalEvolutionListener = () => {
     level: number;
     previousImageUrl: string;
     imageUrl: string;
+    animationVideoUrl?: string | null;
     presetId?: string;
     mentorSlug?: string;
     element?: string;
@@ -147,6 +161,7 @@ export const GlobalEvolutionListener = () => {
     level,
     previousImageUrl,
     imageUrl,
+    animationVideoUrl = null,
     presetId,
     element,
     dispatchLoadingStart = false,
@@ -157,6 +172,7 @@ export const GlobalEvolutionListener = () => {
     level: number;
     previousImageUrl: string;
     imageUrl: string;
+    animationVideoUrl?: string | null;
     presetId?: string;
     element?: string;
     dispatchLoadingStart?: boolean;
@@ -181,6 +197,7 @@ export const GlobalEvolutionListener = () => {
         level,
         previousImageUrl,
         imageUrl,
+        animationVideoUrl,
         presetId,
         element,
       });
@@ -324,12 +341,12 @@ export const GlobalEvolutionListener = () => {
             return;
           }
 
-          const hasPersistedEvolution = await waitForEvolutionPersistence({
+          const persistedEvolution = await waitForEvolutionPersistence({
             companionId,
             stage: newLevel,
           });
 
-          if (!hasPersistedEvolution) {
+          if (!persistedEvolution) {
             logger.warn("Evolution listener: Ignoring stage update without persisted evolution row", {
               companionId,
               oldLevel,
@@ -379,6 +396,7 @@ export const GlobalEvolutionListener = () => {
             level: newLevel,
             previousImageUrl,
             imageUrl,
+            animationVideoUrl: persistedEvolution.animationVideoUrl,
             presetId: typeof newData.preset_id === "string"
               ? newData.preset_id
               : typeof oldData.preset_id === "string"
@@ -426,6 +444,7 @@ export const GlobalEvolutionListener = () => {
         level: detail.newStage,
         previousImageUrl: detail.previousImageUrl,
         imageUrl: detail.newImageUrl,
+        animationVideoUrl: null,
         presetId: typeof detail.presetId === "string" ? detail.presetId : undefined,
         element: detail.element ?? undefined,
         markAsLocalHatch: true,
@@ -449,6 +468,7 @@ export const GlobalEvolutionListener = () => {
       newStage={evolutionData.level}
       previousImageUrl={evolutionData.previousImageUrl}
       newImageUrl={evolutionData.imageUrl}
+      animationVideoUrl={evolutionData.animationVideoUrl ?? null}
       presetId={evolutionData.presetId}
       element={evolutionData.element}
       onComplete={() => {

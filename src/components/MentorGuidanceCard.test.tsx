@@ -13,16 +13,16 @@ const mocks = vi.hoisted(() => ({
   guidance: {
     isActive: true,
     isIntroDialogueActive: false,
-    currentStep: "plan_my_day",
+    currentStep: "new_goal",
     currentSubstep: null,
-    stepRoute: "/journeys",
-    mentorInstructionLines: ["Tap 'Plan day.'"],
-    progressText: "Step 2 of 3",
-    activeTargetSelectors: ['[data-tour="companion-launcher-option-plan-day"]'],
-    activeTargetSelector: '[data-tour="companion-launcher-option-plan-day"]',
+    stepRoute: "/campaigns",
+    mentorInstructionLines: ["Create your first campaign."],
+    progressText: "Step 1 of 2",
+    activeTargetSelectors: ['[data-tour="campaign-builder-launcher"]'],
+    activeTargetSelector: '[data-tour="campaign-builder-launcher"]',
     isStrictLockActive: true,
-    dialogueText: "Tap 'Plan day.'",
-    dialogueSupportText: "It'll give you something simple to follow.",
+    dialogueText: "Create your first campaign.",
+    dialogueSupportText: "Pathfinder will turn a bigger goal into rituals and milestones.",
     secondaryActionLabel: "Skip tutorial",
     onSecondaryAction: vi.fn(),
     dialogueActionLabel: undefined,
@@ -80,9 +80,9 @@ describe("MentorGuidanceCard", () => {
 
     expect(screen.getByText("Sage portrait")).toBeInTheDocument();
     expect(screen.getByText("Sage")).toBeInTheDocument();
-    expect(screen.getByText("Step 2 of 3")).toBeInTheDocument();
-    expect(screen.getByText("Tap 'Plan day.'")).toBeInTheDocument();
-    expect(screen.getByText("It'll give you something simple to follow.")).toBeInTheDocument();
+    expect(screen.getByText("Step 1 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Create your first campaign.")).toBeInTheDocument();
+    expect(screen.getByText("Pathfinder will turn a bigger goal into rituals and milestones.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Skip tutorial" })).toBeInTheDocument();
   });
 
@@ -95,8 +95,8 @@ describe("MentorGuidanceCard", () => {
 
   it("places the panel against the visible duplicate target", async () => {
     document.body.innerHTML = `
-      <button data-tour="companion-launcher-option-plan-day" data-kind="hidden" style="display:none">hidden</button>
-      <button data-tour="companion-launcher-option-plan-day" data-kind="visible">visible</button>
+      <button data-tour="campaign-builder-launcher" data-kind="hidden" style="display:none">hidden</button>
+      <button data-tour="campaign-builder-launcher" data-kind="visible">visible</button>
     `;
     Object.defineProperty(window, "innerHeight", {
       configurable: true,
@@ -129,7 +129,7 @@ describe("MentorGuidanceCard", () => {
 
   it("constrains the compact dock to the measured nonblocking height", async () => {
     document.body.innerHTML = `
-      <button data-tour="companion-launcher-option-plan-day">plan</button>
+      <button data-tour="campaign-builder-launcher">campaign</button>
       <div data-tutorial-avoid="true">right rail</div>
     `;
     Object.defineProperty(window, "innerHeight", {
@@ -145,7 +145,7 @@ describe("MentorGuidanceCard", () => {
       if (element.dataset.tutorial === "mentor-dialogue-panel" || element.dataset.testid === "mentor-guidance-card-panel") {
         return rect({ top: 620, left: 0, width: 390, height: 224 });
       }
-      if (element.dataset.tour === "companion-launcher-option-plan-day") {
+      if (element.dataset.tour === "campaign-builder-launcher") {
         return rect({ top: 700, left: 24, width: 180, height: 48 });
       }
       if (element.dataset.tutorialAvoid === "true") {

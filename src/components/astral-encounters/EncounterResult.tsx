@@ -6,7 +6,7 @@ import { useEffect, useMemo } from 'react';
 import confetti from 'canvas-confetti';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { CompanionImage, CompanionPortraitShell } from '@/components/CompanionImage';
-import { isCompanionPresetImageSource } from '@/lib/companionImageFocal';
+import { isCompanionSceneImageSource } from '@/lib/companionImageFocal';
 
 interface EncounterResultProps {
   adversary: Adversary;
@@ -272,7 +272,7 @@ export const EncounterResultScreen = ({
           
           {/* Companion image */}
           <div className={`relative w-28 h-28 rounded-full overflow-hidden border-2 ${isSuccess ? 'border-primary/50 shadow-lg shadow-primary/30' : 'border-slate-500/40 shadow-lg shadow-purple-900/30'}`}>
-            {isCompanionPresetImageSource(companionImageUrl) ? (
+            {isCompanionSceneImageSource(companionImageUrl) ? (
               <CompanionPortraitShell
                 src={companionImageUrl}
                 className="h-full w-full rounded-full"

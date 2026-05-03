@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
 import { Progress } from "@/components/ui/progress";
-import { isCompanionPresetImageSource } from "@/lib/companionImageFocal";
+import { isCompanionSceneImageSource } from "@/lib/companionImageFocal";
 import type { CompletionCompanionTone } from "@/types/completionFeedback";
  
  interface CompanionTalkPopupProps {
@@ -28,7 +28,7 @@ import type { CompletionCompanionTone } from "@/types/completionFeedback";
   companionImageFocalY?: number | null;
 }
 
-const usesPortraitAvatar = (imageUrl?: string | null) => isCompanionPresetImageSource(imageUrl);
+const usesPortraitAvatar = (imageUrl?: string | null) => isCompanionSceneImageSource(imageUrl);
 
 // Keep the popup bottom and the toast stacking vars in lockstep so fixed layers do not drift.
 const COMPLETION_FEEDBACK_POPUP_BOTTOM_OFFSET_TERMS = "64px + env(safe-area-inset-bottom, 0px) + 12px";

@@ -56,6 +56,7 @@ const LEGACY_USER_STORAGE_PREFIX_TARGETS = [
   { bucket: "mentors-avatars", prefix: (userId: string) => userId },
   { bucket: "journey-paths", prefix: (userId: string) => userId },
   { bucket: "companion-images", prefix: (userId: string) => userId },
+  { bucket: "companion-animation-videos", prefix: (userId: string) => userId },
   {
     bucket: "evolution-cards",
     prefix: (userId: string) => `postcards/${userId}`,

@@ -444,6 +444,59 @@ describe("Pathfinder", () => {
     expect(mocks.clearCampaignBuilderDraftSnapshot).toHaveBeenCalledWith("user-1");
   });
 
+  it("dispatches a builder closed event when Pathfinder is dismissed", () => {
+    const onClosed = vi.fn();
+    window.addEventListener("campaign-builder-closed", onClosed);
+
+    render(
+      <Pathfinder
+        open
+        userId="user-1"
+        onOpenChange={vi.fn()}
+        onCreateEpic={(...args) => mocks.onCreateEpic(...args)}
+        isCreating={false}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText("Close Pathfinder"));
+
+    expect(onClosed).toHaveBeenCalledTimes(1);
+    window.removeEventListener("campaign-builder-closed", onClosed);
+  });
+
+  it("dispatches a builder opened event when Pathfinder opens", async () => {
+    const onOpened = vi.fn();
+    window.addEventListener("campaign-builder-opened", onOpened);
+
+    const props = {
+      userId: "user-1",
+      onOpenChange: vi.fn(),
+      onCreateEpic: (...args: Parameters<typeof mocks.onCreateEpic>) => mocks.onCreateEpic(...args),
+      isCreating: false,
+    };
+
+    const { rerender } = render(
+      <Pathfinder
+        {...props}
+        open={false}
+      />,
+    );
+
+    expect(onOpened).not.toHaveBeenCalled();
+
+    rerender(
+      <Pathfinder
+        {...props}
+        open
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onOpened).toHaveBeenCalledTimes(1);
+    });
+    window.removeEventListener("campaign-builder-opened", onOpened);
+  });
+
   it("submits integer milestone percents when the generated schedule has fractions", async () => {
     mocks.schedule = {
       feasibilityAssessment: null,
@@ -523,6 +576,9 @@ describe("Pathfinder", () => {
       executionModel: "sequential",
     };
 
+    const onCampaignCreated = vi.fn();
+    window.addEventListener("pathfinder-campaign-created", onCampaignCreated);
+
     render(
       <Pathfinder
         open
@@ -563,5 +619,16 @@ describe("Pathfinder", () => {
       preferred_time: "07:15",
       estimated_minutes: 45,
     }));
+
+    expect(onCampaignCreated).toHaveBeenCalledTimes(1);
+    const event = onCampaignCreated.mock.calls[0]?.[0] as CustomEvent<{
+      title: string;
+      habitCount: number;
+    }>;
+    expect(event.detail).toEqual({
+      title: "Run a marathon in 90 days",
+      habitCount: payload.habits?.length,
+    });
+    window.removeEventListener("pathfinder-campaign-created", onCampaignCreated);
   });
 });

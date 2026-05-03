@@ -23,7 +23,7 @@ import {
   isPresetEggCompanion,
 } from "@/lib/companionPredicates";
 
-const UNIVERSAL_EGG_ASSET_DIR = "companion-eggs";
+const UNIVERSAL_EGG_ASSET_DIR = "companion-eggs/v2";
 const COMPANION_PRESET_PUBLIC_PATH_SEGMENT = `/storage/v1/object/public/${COMPANION_PRESET_BUCKET}/`;
 
 interface CompanionAssetSource {
@@ -42,7 +42,7 @@ export const resolveUniversalEggAssetPath = ({
   element: string;
 }): string => {
   const normalizedElement = coerceCompanionElementId(element);
-  return `${UNIVERSAL_EGG_ASSET_DIR}/egg__t0_egg__normal__${normalizedElement}.png`;
+  return `${UNIVERSAL_EGG_ASSET_DIR}/egg__t0_egg__normal__${normalizedElement}.webp`;
 };
 
 export const getUniversalEggAssetUrl = (element: string): string =>

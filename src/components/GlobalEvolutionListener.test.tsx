@@ -78,6 +78,7 @@ vi.mock("@/components/CompanionEvolution", () => ({
     newStage: number;
     previousImageUrl: string;
     newImageUrl: string;
+    animationVideoUrl?: string | null;
   }) => {
     mocks.companionEvolutionPropsMock(props);
     return props.isEvolving ? (
@@ -87,6 +88,7 @@ vi.mock("@/components/CompanionEvolution", () => ({
         data-new-stage={props.newStage}
         data-previous-image-url={props.previousImageUrl}
         data-new-image-url={props.newImageUrl}
+        data-animation-video-url={props.animationVideoUrl ?? ""}
       />
     ) : null;
   },
@@ -107,7 +109,7 @@ vi.mock("@/integrations/supabase/client", () => ({
       if (table === "companion_evolutions") {
         const maybeSingleMock = vi.fn(async () =>
           mocks.companionEvolutionLookupResponses.shift() ?? {
-            data: { id: "evo-1" },
+            data: { id: "evo-1", animation_video_url: null, animation_status: null },
             error: null,
           });
 
@@ -251,6 +253,49 @@ describe("GlobalEvolutionListener", () => {
         newStage: 5,
         previousImageUrl: "https://example.com/stage-4.png",
         newImageUrl: "https://example.com/stage-5.png",
+        animationVideoUrl: null,
+      }),
+    );
+  });
+
+  it("passes ready animation videos from the persisted evolution row into the modal", async () => {
+    mocks.companionEvolutionLookupResponses.push({
+      data: {
+        id: "evo-1",
+        animation_video_url: "https://example.com/evolution.mp4",
+        animation_status: "succeeded",
+      },
+      error: null,
+    });
+
+    render(<GlobalEvolutionListener />);
+
+    await act(async () => {
+      await mocks.state.callback?.({
+        eventType: "UPDATE",
+        new: {
+          id: "companion-1",
+          current_stage: 5,
+          current_image_url: "https://example.com/stage-5.png",
+        },
+        old: {
+          id: "companion-1",
+          current_stage: 4,
+          current_image_url: "https://example.com/stage-4.png",
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("companion-evolution")).toHaveAttribute(
+        "data-animation-video-url",
+        "https://example.com/evolution.mp4",
+      );
+    });
+
+    expect(mocks.companionEvolutionPropsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        animationVideoUrl: "https://example.com/evolution.mp4",
       }),
     );
   });

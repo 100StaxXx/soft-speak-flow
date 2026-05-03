@@ -268,6 +268,9 @@ vi.mock("@/lib/companionName", () => ({
 }));
 
 vi.mock("@/lib/companionAssetResolver", () => ({
+  getUniversalEggAssetUrl: vi.fn().mockImplementation((element: string) => (
+    `/companion-eggs/v2/egg__t0_egg__normal__${String(element ?? "fire").toLowerCase()}.webp`
+  )),
   resolveCompanionExpressiveAssetUrl: vi.fn().mockImplementation((companion: {
     current_stage?: number | null;
     core_element?: string | null;
@@ -282,7 +285,7 @@ vi.mock("@/lib/companionAssetResolver", () => ({
     current_image_url?: string | null;
   }) => (
     (companion.current_stage ?? 0) <= 0
-      ? `/companion-eggs/egg__t0_egg__normal__${String(companion.core_element ?? "fire").toLowerCase()}.png`
+      ? `/companion-eggs/v2/egg__t0_egg__normal__${String(companion.core_element ?? "fire").toLowerCase()}.webp`
       : (companion.current_image_url ?? "/companion.png")
   )),
 }));
@@ -361,6 +364,29 @@ describe("CompanionDisplay overlay stack", () => {
     expect(
       screen.getByText("Your companion has fallen into a deep sleep"),
     ).toBeInTheDocument();
+  });
+
+  it("renders the current companion page image instead of launcher-only FAB art", async () => {
+    mocks.isDormant = false;
+    mocks.isRegenerating = false;
+    mocks.companion = {
+      ...mocks.companion,
+      preset_id: null,
+      current_image_url: "https://assets.example.com/scene-backed-companion.png",
+      launcher_image_url: "https://assets.example.com/launcher-cutout-source.png",
+      launcher_image_source_url: "https://assets.example.com/scene-backed-companion.png",
+      launcher_image_focal_x: 0.5,
+      launcher_image_focal_y: 0.5,
+    };
+    vi.mocked(resolveCompanionExpressiveAssetUrl).mockReturnValueOnce(null);
+
+    render(<CompanionDisplay />);
+
+    await screen.findByText("Nova");
+
+    const image = screen.getByAltText(/companion at level 8/i);
+    expect(image).toHaveAttribute("src", "https://assets.example.com/scene-backed-companion.png");
+    expect(image).not.toHaveAttribute("src", "https://assets.example.com/launcher-cutout-source.png");
   });
 
   it("renders the stats analysis trigger directly below the stat grid", async () => {
@@ -532,7 +558,7 @@ describe("CompanionDisplay overlay stack", () => {
     const image = screen.getByAltText(/egg companion at level 0/i);
     expect(image).toHaveAttribute(
       "src",
-      expect.stringContaining("/companion-eggs/egg__t0_egg__normal__fire.png"),
+      expect.stringContaining("/companion-eggs/v2/egg__t0_egg__normal__fire.webp"),
     );
   });
 

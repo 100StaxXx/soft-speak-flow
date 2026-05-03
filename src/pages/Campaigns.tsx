@@ -60,9 +60,6 @@ const Campaigns = () => {
   const hasReachedLimit = hasReachedActiveCampaignLimit(activeEpics.length);
 
   const openCampaignBuilder = useCallback(() => {
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("campaign-builder-opened"));
-    }
     setPathfinderResumeDraft(null);
     setPathfinderResumeDraftKey(null);
     setShowPathfinder(true);

@@ -9,7 +9,7 @@ import {
 
 const createFreshTutorial = () => ({
   version: 2,
-  flowVersion: 9,
+  flowVersion: 10,
   eligible: true,
   dismissed: false,
   completed: false,
@@ -18,8 +18,9 @@ const createFreshTutorial = () => ({
   milestonesCompleted: [] as string[],
 });
 
-const createPlanStepTutorial = () => ({
+const createLegacyPlanStepTutorial = () => ({
   ...createFreshTutorial(),
+  flowVersion: 9,
   completedSteps: ["new_goal"],
   xpAwardedSteps: ["new_goal"],
   milestonesCompleted: ["mentor_intro_hello", "start_new_goal", "complete_pathfinder_campaign"],
@@ -28,15 +29,13 @@ const createPlanStepTutorial = () => ({
 const createCompletedTutorial = () => ({
   ...createFreshTutorial(),
   completed: true,
-  completedSteps: ["new_goal", "plan_my_day", "hatch_companion"],
-  xpAwardedSteps: ["new_goal", "plan_my_day"],
+  completedSteps: ["new_goal", "hatch_companion"],
+  xpAwardedSteps: ["new_goal"],
   milestonesCompleted: [
     "mentor_intro_hello",
     "start_new_goal",
     "complete_pathfinder_campaign",
-    "start_plan_my_day",
-    "answer_plan_day_ai",
-    "save_plan_day_action",
+    "campaign_calendar_handoff",
     "tap_hatch_companion",
     "complete_companion_hatch",
   ],
@@ -126,6 +125,7 @@ const RouteProbe = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const {
+    isActive,
     isIntroDialogueActive,
     dialogueActionLabel,
     onDialogueAction,
@@ -133,13 +133,16 @@ const RouteProbe = () => {
     secondaryActionLabel,
     onSecondaryAction,
     activeTargetSelector,
+    dialogueText,
   } = usePostOnboardingMentorGuidance();
 
   return (
     <div>
       <div data-testid="path">{location.pathname}</div>
+      <div data-testid="active">{String(isActive)}</div>
       <div data-testid="step">{currentStep ?? ""}</div>
       <div data-testid="intro-active">{String(isIntroDialogueActive)}</div>
+      <div data-testid="dialogue">{dialogueText}</div>
       <div data-testid="intro-action">{dialogueActionLabel || ""}</div>
       <div data-testid="secondary-action">{secondaryActionLabel || ""}</div>
       <div data-testid="target">{activeTargetSelector || ""}</div>
@@ -154,6 +157,9 @@ const RouteProbe = () => {
       </button>
       <button type="button" onClick={() => navigate("/journeys")}>
         go-journeys
+      </button>
+      <button type="button" onClick={() => navigate("/campaigns")}>
+        go-campaigns
       </button>
     </div>
   );
@@ -171,7 +177,7 @@ describe("guided tutorial route restoration", () => {
         : createRect({ width: 0, height: 0 });
     });
     document
-      .querySelectorAll('[data-tour="companion-launcher-option-plan-day"], [data-tour="companion-plan-day-follow-up-option"], [data-tour="companion-plan-day-suggestion-save"], [data-tour="companion-plan-day-pending-confirm"], [data-tour="companion-plan-day-pending-confirm-all"], [data-tour="companion-launcher-option-goal"], [data-tour="pathfinder-primary-action"], [data-tour="evolve-companion-button"], [data-tour="pathfinder-campaign-builder"]')
+      .querySelectorAll('[data-tour="campaign-builder-launcher"], [data-tour="companion-launcher-option-plan-day"], [data-tour="companion-plan-day-follow-up-option"], [data-tour="companion-plan-day-suggestion-save"], [data-tour="companion-plan-day-pending-confirm"], [data-tour="companion-plan-day-pending-confirm-all"], [data-tour="companion-launcher-option-goal"], [data-tour="pathfinder-primary-action"], [data-tour="evolve-companion-button"], [data-tour="pathfinder-campaign-builder"]')
       .forEach((element) => element.remove());
   });
 
@@ -179,7 +185,7 @@ describe("guided tutorial route restoration", () => {
     vi.restoreAllMocks();
   });
 
-  const renderWithProviders = (initialPath = "/journeys") => {
+  const renderWithProviders = (initialPath = "/campaigns") => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: {
@@ -201,11 +207,11 @@ describe("guided tutorial route restoration", () => {
     );
   };
 
-  it("restores a fresh tutorial to the journeys route", async () => {
+  it("restores a fresh tutorial to the campaigns route", async () => {
     renderWithProviders("/companion");
 
     await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
+      expect(screen.getByTestId("path")).toHaveTextContent("/campaigns");
       expect(screen.getByTestId("step")).toHaveTextContent("new_goal");
       expect(screen.getByTestId("intro-action")).toHaveTextContent(
         "Start Tutorial",
@@ -215,22 +221,19 @@ describe("guided tutorial route restoration", () => {
     fireEvent.click(screen.getByRole("button", { name: "back" }));
 
     await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
+      expect(screen.getByTestId("path")).toHaveTextContent("/campaigns");
     });
   });
 
-  it("advances from intro to Pathfinder save, then Plan My Day on journeys", async () => {
-    const newGoalTarget = document.createElement("button");
-    newGoalTarget.setAttribute("data-tour", "companion-launcher-option-goal");
-    document.body.appendChild(newGoalTarget);
-    const pathfinderTarget = document.createElement("button");
-    pathfinderTarget.setAttribute("data-tour", "pathfinder-primary-action");
-    document.body.appendChild(pathfinderTarget);
-    const planTarget = document.createElement("button");
-    planTarget.setAttribute("data-tour", "companion-launcher-option-plan-day");
-    document.body.appendChild(planTarget);
+  it("steps aside in Pathfinder, then routes from ritual handoff to companion hatch", async () => {
+    const campaignTarget = document.createElement("button");
+    campaignTarget.setAttribute("data-tour", "campaign-builder-launcher");
+    document.body.appendChild(campaignTarget);
+    const hatchTarget = document.createElement("button");
+    hatchTarget.setAttribute("data-tour", "evolve-companion-button");
+    document.body.appendChild(hatchTarget);
 
-    renderWithProviders("/journeys");
+    renderWithProviders("/campaigns");
 
     await waitFor(() => {
       expect(screen.getByTestId("intro-action")).toHaveTextContent(
@@ -244,18 +247,17 @@ describe("guided tutorial route restoration", () => {
       expect(screen.getByTestId("step")).toHaveTextContent("new_goal");
       expect(screen.getByTestId("intro-action")).toHaveTextContent("");
       expect(screen.getByTestId("target")).toHaveTextContent(
-        '[data-tour="companion-launcher-option-goal"]',
+        '[data-tour="campaign-builder-launcher"]',
       );
     });
 
     await act(async () => {
-      window.dispatchEvent(new CustomEvent("companion-new-goal-started"));
+      window.dispatchEvent(new CustomEvent("campaign-builder-opened"));
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId("target")).toHaveTextContent(
-        '[data-tour="pathfinder-primary-action"]',
-      );
+      expect(screen.getByTestId("active")).toHaveTextContent("false");
+      expect(screen.getByTestId("step")).toHaveTextContent("");
     });
 
     await act(async () => {
@@ -263,73 +265,41 @@ describe("guided tutorial route restoration", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
-      expect(screen.getByTestId("step")).toHaveTextContent("plan_my_day");
-      expect(screen.getByTestId("intro-action")).toHaveTextContent("");
+      expect(screen.getByTestId("path")).toHaveTextContent("/campaigns");
+      expect(screen.getByTestId("step")).toHaveTextContent("new_goal");
+      expect(screen.getByTestId("dialogue")).toHaveTextContent(
+        "Your rituals are on the calendar now.",
+      );
+      expect(screen.getByTestId("intro-action")).toHaveTextContent("Meet companion");
       expect(screen.getByTestId("secondary-action")).toHaveTextContent(
         "Skip tutorial",
       );
     });
-  });
 
-  it("targets Plan My Day through Save quest, then hands off to companion hatch", async () => {
-    mocks.guidedTutorial = createPlanStepTutorial();
-    const planTarget = document.createElement("button");
-    planTarget.setAttribute("data-tour", "companion-launcher-option-plan-day");
-    document.body.appendChild(planTarget);
-    const answerTarget = document.createElement("button");
-    answerTarget.setAttribute("data-tour", "companion-plan-day-follow-up-option");
-    document.body.appendChild(answerTarget);
-    const saveTarget = document.createElement("button");
-    saveTarget.setAttribute("data-tour", "companion-plan-day-suggestion-save");
-    document.body.appendChild(saveTarget);
-    const hatchTarget = document.createElement("button");
-    hatchTarget.setAttribute("data-tour", "evolve-companion-button");
-    document.body.appendChild(hatchTarget);
-
-    renderWithProviders("/companion");
-
-    await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
-      expect(screen.getByTestId("step")).toHaveTextContent("plan_my_day");
-      expect(screen.getByTestId("target")).toHaveTextContent(
-        '[data-tour="companion-launcher-option-plan-day"]',
-      );
-    });
-
-    await act(async () => {
-      window.dispatchEvent(new CustomEvent("companion-plan-my-day-started"));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("step")).toHaveTextContent("plan_my_day");
-      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
-      expect(screen.getByTestId("target")).toHaveTextContent(
-        '[data-tour="companion-plan-day-follow-up-option"]',
-      );
-    });
-
-    await act(async () => {
-      window.dispatchEvent(new CustomEvent("companion-plan-my-day-ai-answered"));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("step")).toHaveTextContent("plan_my_day");
-      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
-      expect(screen.getByTestId("target")).toHaveTextContent(
-        '[data-tour="companion-plan-day-suggestion-save"]',
-      );
-    });
-
-    await act(async () => {
-      window.dispatchEvent(new CustomEvent("companion-plan-my-day-action-saved"));
-    });
+    fireEvent.click(screen.getByRole("button", { name: "intro-action" }));
 
     await waitFor(() => {
       expect(screen.getByTestId("step")).toHaveTextContent(
         "hatch_companion",
       );
       expect(screen.getByTestId("path")).toHaveTextContent("/companion");
+      expect(screen.getByTestId("target")).toHaveTextContent(
+        '[data-tour="evolve-companion-button"]',
+      );
+    });
+  });
+
+  it("moves legacy Plan My Day users directly to companion hatch", async () => {
+    mocks.guidedTutorial = createLegacyPlanStepTutorial();
+    const hatchTarget = document.createElement("button");
+    hatchTarget.setAttribute("data-tour", "evolve-companion-button");
+    document.body.appendChild(hatchTarget);
+
+    renderWithProviders("/campaigns");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("path")).toHaveTextContent("/companion");
+      expect(screen.getByTestId("step")).toHaveTextContent("hatch_companion");
       expect(screen.getByTestId("target")).toHaveTextContent(
         '[data-tour="evolve-companion-button"]',
       );
@@ -344,7 +314,7 @@ describe("guided tutorial route restoration", () => {
     renderWithProviders("/journeys");
 
     await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
+      expect(screen.getByTestId("path")).toHaveTextContent("/campaigns");
       expect(screen.getByTestId("secondary-action")).toHaveTextContent(
         "Skip tutorial",
       );
@@ -357,10 +327,10 @@ describe("guided tutorial route restoration", () => {
       expect(screen.getByTestId("secondary-action")).toHaveTextContent("");
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "go-journeys" }));
+    fireEvent.click(screen.getByRole("button", { name: "go-campaigns" }));
 
     await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
+      expect(screen.getByTestId("path")).toHaveTextContent("/campaigns");
     });
   });
 

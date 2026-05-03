@@ -18,6 +18,7 @@ Deno.env.set("INTERNAL_FUNCTION_SECRET", "internal-secret");
 Deno.env.set("OPENAI_API_KEY", "openai-key");
 
 const module = await import("./index.ts");
+const costGuardrailsModule = await import("../_shared/costGuardrails.ts");
 type GenerateCompanionEvolutionDeps = NonNullable<
   Parameters<typeof module.handleGenerateCompanionEvolution>[1]
 >;
@@ -383,4 +384,163 @@ Deno.test("boundary evolutions retry after low judge scores and edit from the pr
   const generationMetadata = upsertCall.generationMetadata as Record<string, unknown>;
   assertEquals(generationMetadata.sourceType, "edit", "Expected boundary evolution to persist edit provenance");
   assertEquals(generationMetadata.retryCount, 1, "Expected boundary evolution retry count to reflect one retry");
+});
+
+const createAnimationEnqueueHarness = () => {
+  const updates: Array<{ table: string; payload: Record<string, unknown>; column: string; value: unknown }> = [];
+  const upserts: Array<{ table: string; payload: Record<string, unknown>; options: Record<string, unknown> }> = [];
+  const guardrailAccessCalls: Array<Record<string, unknown>> = [];
+
+  const supabase = {
+    from: (table: string) => ({
+      update: (payload: Record<string, unknown>) => ({
+        eq: async (column: string, value: unknown) => {
+          updates.push({ table, payload, column, value });
+          return { error: null };
+        },
+      }),
+      upsert: (payload: Record<string, unknown>, options: Record<string, unknown>) => {
+        upserts.push({ table, payload, options });
+        return {
+          select: () => ({
+            single: async () => ({ data: { id: "animation-job-1" }, error: null }),
+          }),
+        };
+      },
+    }),
+  };
+
+  const createCostGuardrailSession = () => ({
+    enforceAccess: async (args: Record<string, unknown>) => {
+      guardrailAccessCalls.push(args);
+    },
+  });
+
+  return {
+    supabase,
+    updates,
+    upserts,
+    guardrailAccessCalls,
+    createCostGuardrailSession,
+  };
+};
+
+Deno.test("maybeEnqueueCompanionAnimationJob skips without touching storage when animation is disabled", async () => {
+  const harness = createAnimationEnqueueHarness();
+
+  const result = await module.maybeEnqueueCompanionAnimationJob({
+    supabase: harness.supabase,
+    createCostGuardrailSession: harness.createCostGuardrailSession as never,
+    userId: USER_ID,
+    companionId: "companion-1",
+    evolutionId: "evo-1",
+    stage: 5,
+    imageUrl: "https://example.com/stage-5.png",
+    env: { get: () => undefined },
+  });
+
+  assertEquals(result.status, "skipped", "Expected disabled animation to skip");
+  assertEquals(result.reason, "disabled", "Expected disabled skip reason");
+  assertEquals(harness.upserts.length, 0, "Expected no animation job upsert when disabled");
+  assertEquals(harness.updates.length, 0, "Expected no evolution metadata update when disabled");
+});
+
+Deno.test("maybeEnqueueCompanionAnimationJob records a skipped status when FAL_KEY is missing", async () => {
+  const harness = createAnimationEnqueueHarness();
+
+  const result = await module.maybeEnqueueCompanionAnimationJob({
+    supabase: harness.supabase,
+    createCostGuardrailSession: harness.createCostGuardrailSession as never,
+    userId: USER_ID,
+    companionId: "companion-1",
+    evolutionId: "evo-1",
+    stage: 5,
+    imageUrl: "https://example.com/stage-5.png",
+    env: {
+      get: (name: string) => name === "COMPANION_ANIMATION_ENABLED" ? "true" : undefined,
+    },
+    now: () => new Date("2026-05-02T12:00:00.000Z"),
+  });
+
+  assertEquals(result.status, "skipped", "Expected missing FAL_KEY to skip");
+  assertEquals(result.reason, "fal_key_missing", "Expected missing key skip reason");
+  assertEquals(harness.upserts.length, 0, "Expected no animation job upsert without credentials");
+  assertEquals(harness.updates[0]?.payload.animation_status, "skipped", "Expected evolution row to record skipped animation");
+  assertEquals(harness.updates[0]?.payload.animation_error_code, "fal_key_missing", "Expected missing key metadata");
+});
+
+Deno.test("maybeEnqueueCompanionAnimationJob enqueues only when enabled, credentialed, public, and allowed", async () => {
+  const harness = createAnimationEnqueueHarness();
+
+  const result = await module.maybeEnqueueCompanionAnimationJob({
+    supabase: harness.supabase,
+    createCostGuardrailSession: harness.createCostGuardrailSession as never,
+    userId: USER_ID,
+    companionId: "companion-1",
+    evolutionId: "evo-1",
+    stage: 5,
+    imageUrl: "https://example.com/stage-5.png",
+    element: "water",
+    env: {
+      get: (name: string) => {
+        if (name === "COMPANION_ANIMATION_ENABLED") return "true";
+        if (name === "FAL_KEY") return "fal-key";
+        if (name === "FAL_KLING_MODEL") return "fal-ai/kling-video/v3/standard/image-to-video";
+        return undefined;
+      },
+    },
+    now: () => new Date("2026-05-02T12:00:00.000Z"),
+  });
+
+  assertEquals(result.status, "queued", "Expected animation job to be queued");
+  assertEquals(result.jobId, "animation-job-1", "Expected queued job id");
+  assertEquals(
+    JSON.stringify(harness.guardrailAccessCalls[0]?.capabilities),
+    JSON.stringify(["video"]),
+    "Expected video cost guardrail access check",
+  );
+  assertEquals(
+    JSON.stringify(harness.guardrailAccessCalls[0]?.providers),
+    JSON.stringify(["fal"]),
+    "Expected fal provider guardrail access check",
+  );
+  assertEquals(harness.upserts[0]?.table, "companion_animation_jobs", "Expected companion animation job upsert");
+  assertEquals(harness.upserts[0]?.payload.source_image_url, "https://example.com/stage-5.png", "Expected public source image");
+  assertEquals(harness.upserts[0]?.payload.provider, "fal", "Expected fal provider");
+  assertEquals(harness.updates[0]?.payload.animation_status, "queued", "Expected evolution metadata to be queued");
+});
+
+Deno.test("maybeEnqueueCompanionAnimationJob records skipped when video cost guardrails block", async () => {
+  const harness = createAnimationEnqueueHarness();
+  const createCostGuardrailSession = () => ({
+    enforceAccess: async () => {
+      throw new costGuardrailsModule.CostGuardrailBlockedError("blocked", {
+        scopeType: "feature",
+        scopeKey: "ai_companion_animation",
+      });
+    },
+  });
+
+  const result = await module.maybeEnqueueCompanionAnimationJob({
+    supabase: harness.supabase,
+    createCostGuardrailSession: createCostGuardrailSession as never,
+    userId: USER_ID,
+    companionId: "companion-1",
+    evolutionId: "evo-1",
+    stage: 5,
+    imageUrl: "https://example.com/stage-5.png",
+    env: {
+      get: (name: string) => {
+        if (name === "COMPANION_ANIMATION_ENABLED") return "true";
+        if (name === "FAL_KEY") return "fal-key";
+        return undefined;
+      },
+    },
+  });
+
+  assertEquals(result.status, "skipped", "Expected blocked animation to skip");
+  assertEquals(result.reason, "cost_guardrail_blocked", "Expected blocked skip reason");
+  assertEquals(harness.upserts.length, 0, "Expected no job when cost guardrails block");
+  assertEquals(harness.updates[0]?.payload.animation_status, "skipped", "Expected skipped evolution metadata");
+  assertEquals(harness.updates[0]?.payload.animation_error_code, "cost_guardrail_blocked", "Expected cost guardrail metadata");
 });

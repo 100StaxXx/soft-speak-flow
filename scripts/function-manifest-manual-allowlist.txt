@@ -7,6 +7,7 @@ google-calendar-events
 optimize-weekly-plan
 outlook-calendar-auth
 outlook-calendar-events
+process-companion-animation-job
 process-companion-evolution-job
 retry-missing-pep-talk-transcripts
 schedule-daily-mentor-pushes

@@ -29,6 +29,7 @@ export type GuidedMilestoneId =
   | "mentor_intro_hello"
   | "start_new_goal"
   | "complete_pathfinder_campaign"
+  | "campaign_calendar_handoff"
   | "stay_on_quests" // legacy
   | "quests_campaigns_intro"
   | "meet_companion_intro"
@@ -71,6 +72,8 @@ export interface GuidedTutorialProgress {
   evolutionInFlight?: boolean;
   evolutionStartedAt?: string;
   evolutionCompletedAt?: string;
+  hatchReadyTopUpAwardedAt?: string;
+  hatchReadyTopUpAmount?: number;
   introEnabled?: boolean;
   introSeen?: boolean;
   introSeenAt?: string;

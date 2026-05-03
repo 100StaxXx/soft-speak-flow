@@ -260,6 +260,23 @@ export function Pathfinder({
   });
 
   useEffect(() => {
+    if (!open || typeof window === "undefined") return;
+
+    let cancelled = false;
+    const dispatchOpened = () => {
+      if (cancelled) return;
+      window.dispatchEvent(new CustomEvent("campaign-builder-opened"));
+    };
+
+    // Defer so ancestor tutorial listeners finish registering during the same commit.
+    window.queueMicrotask(dispatchOpened);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  useEffect(() => {
     if (!open || !resumeDraft || !resumeDraftKey) return;
     if (lastAppliedResumeDraftKeyRef.current === resumeDraftKey) return;
 
@@ -667,8 +684,10 @@ export function Pathfinder({
     });
 
     try {
+      const createdTitle = epicTitle || goalInput;
+
       await Promise.resolve(onCreateEpic({
-        title: epicTitle || goalInput,
+        title: createdTitle,
         description: epicWhy || undefined,
         target_days: targetDays,
         habits,
@@ -678,6 +697,17 @@ export function Pathfinder({
         story_type_slug: storyType || undefined,
         theme_color: themeColor,
       }));
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("pathfinder-campaign-created", {
+            detail: {
+              title: createdTitle,
+              habitCount: habits.length,
+            },
+          }),
+        );
+      }
 
       clearCampaignBuilderDraftSnapshot(userId);
       success();
@@ -713,6 +743,9 @@ export function Pathfinder({
     resetSchedule();
     resetClassification();
     clearCampaignBuilderDraftSnapshot(userId);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("campaign-builder-closed"));
+    }
     onOpenChange(false);
   }, [onOpenChange, resetSuggestions, resetSchedule, resetClassification, initialGoal, userId]);
 

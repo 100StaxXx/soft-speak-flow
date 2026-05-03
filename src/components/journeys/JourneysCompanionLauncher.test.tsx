@@ -4,15 +4,27 @@ import { JourneysCompanionLauncher } from "./JourneysCompanionLauncher";
 
 const mocks = vi.hoisted(() => ({
   useJourneysCompanionVisual: vi.fn(),
+  useCompanionImageBackgroundCutout: vi.fn(() => ({
+    cutoutSrc: null,
+    status: "idle",
+  })),
 }));
 
 vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
   useJourneysCompanionVisual: mocks.useJourneysCompanionVisual,
 }));
 
+vi.mock("@/hooks/useCompanionImageBackgroundCutout", () => ({
+  useCompanionImageBackgroundCutout: mocks.useCompanionImageBackgroundCutout,
+}));
+
 describe("JourneysCompanionLauncher", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.useCompanionImageBackgroundCutout.mockReturnValue({
+      cutoutSrc: null,
+      status: "idle",
+    });
     mocks.useJourneysCompanionVisual.mockReturnValue({
       companionLabel: "Nova",
       imageUrl: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__fire.png",
@@ -62,5 +74,41 @@ describe("JourneysCompanionLauncher", () => {
     );
 
     expect(screen.getByRole("img", { name: "Nova" })).toHaveAttribute("data-companion-image-fit", "contain");
+  });
+
+  it("can suppress image fallback and render a neutral placeholder", () => {
+    render(
+      <JourneysCompanionLauncher
+        variant="floating"
+        floatingSize="hero"
+        imageUrlOverride={null}
+        allowImageFallback={false}
+        data-testid="launcher"
+      />,
+    );
+
+    expect(screen.getByTestId("journeys-companion-launcher-placeholder")).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Nova" })).not.toBeInTheDocument();
+  });
+
+  it("shows a placeholder instead of original art when a required hero cutout fails", () => {
+    mocks.useCompanionImageBackgroundCutout.mockReturnValue({
+      cutoutSrc: null,
+      status: "failed",
+    });
+
+    render(
+      <JourneysCompanionLauncher
+        variant="floating"
+        floatingSize="hero"
+        imageUrlOverride="https://example.com/launcher-with-light-bg.png"
+        usesPortraitShellOverride={false}
+        requireHeroCutout
+        data-testid="launcher"
+      />,
+    );
+
+    expect(screen.getByTestId("journeys-companion-launcher-placeholder")).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Nova" })).not.toBeInTheDocument();
   });
 });

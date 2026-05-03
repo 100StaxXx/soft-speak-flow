@@ -32,6 +32,24 @@ vi.mock("@/utils/storage", () => ({
 
 const mocks = vi.hoisted(() => ({
   onOpenCompanionPlanner: vi.fn(),
+  launcherImageCalls: [] as Array<Record<string, unknown>>,
+  visual: {
+    companionId: "companion-1",
+    companionLabel: "Nova",
+    presetId: "dragon",
+    imageUrl: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__fire.png",
+    focalX: null,
+    focalY: null,
+    element: "fire",
+    usesPortraitShell: true,
+    isGeneratedCompanion: false,
+    currentSceneImageUrl: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__fire.png",
+    launcherAwayImageUrl: "/companion-launcher-away/dragon/dragon__launcher-away__fire.png",
+    launcherAwayFocalX: null,
+    launcherAwayFocalY: null,
+    launcherAwayUsesPortraitShell: true,
+    needsLauncherImage: false,
+  } as Record<string, unknown>,
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
@@ -41,19 +59,17 @@ vi.mock("@/hooks/useAuth", () => ({
 }));
 
 vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
-  useJourneysCompanionVisual: () => ({
-    companionLabel: "Nova",
-    presetId: "dragon",
-    imageUrl: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__fire.png",
-    focalX: null,
-    focalY: null,
-    element: "fire",
-    usesPortraitShell: true,
-    launcherAwayImageUrl: "/companion-launcher-away/dragon/dragon__launcher-away__fire.png",
-    launcherAwayFocalX: null,
-    launcherAwayFocalY: null,
-    launcherAwayUsesPortraitShell: true,
-  }),
+  useJourneysCompanionVisual: () => mocks.visual,
+}));
+
+vi.mock("@/hooks/useCompanionLauncherImage", () => ({
+  useCompanionLauncherImage: (options: Record<string, unknown>) => {
+    mocks.launcherImageCalls.push(options);
+    return {
+      isGenerating: false,
+      error: null,
+    };
+  },
 }));
 
 const setViewport = ({ width, height }: { width: number; height: number }) => {
@@ -94,6 +110,24 @@ describe("DraggableFAB", () => {
   beforeEach(() => {
     storage.safeLocalStorage.clear();
     vi.clearAllMocks();
+    mocks.launcherImageCalls = [];
+    mocks.visual = {
+      companionId: "companion-1",
+      companionLabel: "Nova",
+      presetId: "dragon",
+      imageUrl: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__fire.png",
+      focalX: null,
+      focalY: null,
+      element: "fire",
+      usesPortraitShell: true,
+      isGeneratedCompanion: false,
+      currentSceneImageUrl: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__fire.png",
+      launcherAwayImageUrl: "/companion-launcher-away/dragon/dragon__launcher-away__fire.png",
+      launcherAwayFocalX: null,
+      launcherAwayFocalY: null,
+      launcherAwayUsesPortraitShell: true,
+      needsLauncherImage: false,
+    };
     vi.useRealTimers();
     setViewport({ width: 400, height: 800 });
     setSafeAreaVars({ top: 0, right: 0, bottom: 0, left: 0 });
@@ -119,6 +153,36 @@ describe("DraggableFAB", () => {
     expect(screen.getByTestId("journeys-companion-launcher-popup")).toBeInTheDocument();
     expect(launcher).toHaveAttribute("data-face-direction", "front");
     expect(mocks.onOpenCompanionPlanner).not.toHaveBeenCalled();
+  });
+
+  it("requests AI launcher art without falling back to the scenic companion image", () => {
+    mocks.visual = {
+      companionId: "companion-ai",
+      companionLabel: "Nova",
+      presetId: null,
+      imageUrl: "https://assets.example.com/scenic-companion.png",
+      focalX: 0.4,
+      focalY: 0.58,
+      element: "fire",
+      usesPortraitShell: false,
+      isGeneratedCompanion: true,
+      currentSceneImageUrl: "https://assets.example.com/scenic-companion.png",
+      launcherAwayImageUrl: null,
+      launcherAwayFocalX: null,
+      launcherAwayFocalY: null,
+      launcherAwayUsesPortraitShell: false,
+      needsLauncherImage: true,
+    };
+
+    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
+
+    expect(mocks.launcherImageCalls).toContainEqual({
+      companionId: "companion-ai",
+      sourceImageUrl: "https://assets.example.com/scenic-companion.png",
+      enabled: true,
+    });
+    expect(screen.getByTestId("journeys-companion-launcher-placeholder")).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Nova" })).not.toBeInTheDocument();
   });
 
   it("suppresses popup open after a completed long-press drag interaction", async () => {

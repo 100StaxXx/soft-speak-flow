@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { JourneysCompanionLauncher } from "@/components/journeys/JourneysCompanionLauncher";
 import { JourneysCompanionLauncherPopup } from "@/components/journeys/JourneysCompanionLauncherPopup";
 import { useDraggableFAB } from "@/hooks/useDraggableFAB";
+import { useCompanionLauncherImage } from "@/hooks/useCompanionLauncherImage";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
 import { cn } from "@/lib/utils";
 import {
@@ -42,12 +43,21 @@ export const DraggableFAB = ({ onOpenCompanionPlanner, onTap }: DraggableFABProp
   const suppressTapRef = useRef(false);
   const suppressTapResetRef = useRef<number | null>(null);
   const {
+    companionId,
     companionLabel,
+    isGeneratedCompanion,
+    currentSceneImageUrl,
     launcherAwayImageUrl,
     launcherAwayFocalX,
     launcherAwayFocalY,
     launcherAwayUsesPortraitShell,
+    needsLauncherImage,
   } = useJourneysCompanionVisual();
+  useCompanionLauncherImage({
+    companionId,
+    sourceImageUrl: currentSceneImageUrl,
+    enabled: needsLauncherImage,
+  });
   const handleDragCompleted = useCallback(() => {
     suppressTapRef.current = true;
     if (suppressTapResetRef.current !== null) {
@@ -227,10 +237,12 @@ export const DraggableFAB = ({ onOpenCompanionPlanner, onTap }: DraggableFABProp
         variant="floating"
         floatingSize="hero"
         faceDirection={isMenuOpen ? "front" : "away"}
-        imageUrlOverride={isMenuOpen ? null : launcherAwayImageUrl}
-        imageFocalXOverride={isMenuOpen ? null : launcherAwayFocalX}
-        imageFocalYOverride={isMenuOpen ? null : launcherAwayFocalY}
-        usesPortraitShellOverride={isMenuOpen ? undefined : launcherAwayUsesPortraitShell}
+        imageUrlOverride={isGeneratedCompanion ? launcherAwayImageUrl : isMenuOpen ? null : launcherAwayImageUrl}
+        imageFocalXOverride={isGeneratedCompanion ? launcherAwayFocalX : isMenuOpen ? null : launcherAwayFocalX}
+        imageFocalYOverride={isGeneratedCompanion ? launcherAwayFocalY : isMenuOpen ? null : launcherAwayFocalY}
+        usesPortraitShellOverride={isGeneratedCompanion ? launcherAwayUsesPortraitShell : isMenuOpen ? undefined : launcherAwayUsesPortraitShell}
+        allowImageFallback={!isGeneratedCompanion}
+        requireHeroCutout={isGeneratedCompanion}
         aria-label="Open companion quick actions"
         data-tour="add-quest-fab"
         data-planner-tour="companion-quick-actions"

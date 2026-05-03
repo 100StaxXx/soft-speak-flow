@@ -28,6 +28,7 @@ Critical:
 - `generate-full-mentor-audio`
 - `generate-companion-image`
 - `generate-companion-evolution`
+- `process-companion-animation-job`
 - `process-companion-evolution-job`
 
 High:

@@ -30,11 +30,13 @@ Deno.test("ledger migration provisions the asset table, trigger, bucket, and bac
 Deno.test("user-owned media writers register uploaded assets in the ledger", async () => {
   const files = [
     "./generate-companion-image/index.ts",
+    "./generate-companion-launcher-image/index.ts",
     "./generate-companion-evolution/index.ts",
     "./generate-cosmic-postcard/index.ts",
     "./generate-journey-path/index.ts",
     "./generate-dormant-companion-image/index.ts",
     "./generate-memorial-image/index.ts",
+    "./process-companion-animation-job/index.ts",
   ];
 
   for (const file of files) {

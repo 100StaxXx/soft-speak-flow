@@ -57,6 +57,10 @@ export interface Companion {
   current_image_url: string | null;
   current_image_focal_x?: number | null;
   current_image_focal_y?: number | null;
+  launcher_image_url?: string | null;
+  launcher_image_focal_x?: number | null;
+  launcher_image_focal_y?: number | null;
+  launcher_image_source_url?: string | null;
   initial_image_url?: string | null;
   initial_image_focal_x?: number | null;
   initial_image_focal_y?: number | null;

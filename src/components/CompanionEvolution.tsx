@@ -22,6 +22,7 @@ interface CompanionEvolutionProps {
   newStage: number;
   previousImageUrl: string;
   newImageUrl: string;
+  animationVideoUrl?: string | null;
   presetId?: string;
   element?: string;
   onComplete: () => void;
@@ -360,6 +361,7 @@ const CompanionEvolutionContent = ({
   newStage,
   previousImageUrl,
   newImageUrl,
+  animationVideoUrl,
   presetId,
   element,
   onComplete,
@@ -380,9 +382,12 @@ const CompanionEvolutionContent = ({
   const dismissHandledRef = useRef(false);
   const hatchVideoRef = useRef<HTMLVideoElement | null>(null);
   const hatchVideoBackdropRef = useRef<HTMLVideoElement | null>(null);
+  const animationVideoRef = useRef<HTMLVideoElement | null>(null);
   const [isHatchVideoMuted, setIsHatchVideoMuted] = useState(() => globalAudio.getMuted());
   const [disableHatchVideo, setDisableHatchVideo] = useState(false);
   const [hatchIntroComplete, setHatchIntroComplete] = useState(false);
+  const [animationVideoReady, setAnimationVideoReady] = useState(false);
+  const [animationVideoFailed, setAnimationVideoFailed] = useState(false);
 
   const isFirstEvolution = newStage === 1;
   const hatchVideoUrl = useMemo(
@@ -404,6 +409,9 @@ const CompanionEvolutionContent = ({
   const { triggerEvent } = useCompanionMotionSafe();
   const prefersReducedMotion = profile === "reduced" || signals.prefersReducedMotion;
   const sequence = prefersReducedMotion ? REDUCED_SEQUENCE_MS : FULL_SEQUENCE_MS;
+  const shouldRenderAnimationVideo = Boolean(animationVideoUrl) && !useHatchVideo && !prefersReducedMotion;
+  const shouldUseAnimationVideo = shouldRenderAnimationVideo && animationVideoReady && !animationVideoFailed;
+  const showAnimationVideo = shouldUseAnimationVideo && (phase === "reveal" || phase === "settle");
   const convergenceParticleCount = Math.max(4, Math.min(12, Math.round(capabilities.maxParticles * 0.5)));
   const confettiParticleCount = profile === "enhanced"
     ? theme.confettiParticleCount
@@ -473,6 +481,17 @@ const CompanionEvolutionContent = ({
   }, [element, isEvolving, newImageUrl, presetId, previousImageUrl]);
 
   useEffect(() => {
+    setAnimationVideoReady(false);
+    setAnimationVideoFailed(false);
+
+    const videoElement = animationVideoRef.current;
+    if (videoElement) {
+      videoElement.pause();
+      videoElement.currentTime = 0;
+    }
+  }, [animationVideoUrl, isEvolving]);
+
+  useEffect(() => {
     if (!isEvolving) {
       setHatchIntroComplete(false);
       return;
@@ -509,6 +528,23 @@ const CompanionEvolutionContent = ({
     if (!hatchVideoBackdropRef.current) return;
     hatchVideoBackdropRef.current.muted = true;
   }, [useHatchVideo]);
+
+  useEffect(() => {
+    const videoElement = animationVideoRef.current;
+    if (!showAnimationVideo || !videoElement) return;
+
+    videoElement.muted = true;
+    videoElement.playsInline = true;
+    videoElement.currentTime = 0;
+
+    void videoElement.play().catch((error) => {
+      log.warn("Evolution animation video playback failed, using still reveal", {
+        animationVideoUrl,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      setAnimationVideoFailed(true);
+    });
+  }, [animationVideoUrl, showAnimationVideo]);
 
   useEffect(() => {
     if (!isEvolving) {
@@ -594,6 +630,7 @@ const CompanionEvolutionContent = ({
       newStage,
       previousImageUrl,
       newImageUrl,
+      animationVideoUrl ?? "none",
       presetId ?? "none",
       useHatchVideo ? "video" : "legacy",
       prefersReducedMotion ? "reduced" : "full",
@@ -787,6 +824,7 @@ const CompanionEvolutionContent = ({
     isEvolving,
     isFirstEvolution,
     newImageUrl,
+    animationVideoUrl,
     newStage,
     presetId,
     prefersReducedMotion,
@@ -1336,6 +1374,38 @@ const CompanionEvolutionContent = ({
                   >
                     Evolution complete
                   </div>
+                )}
+
+                {shouldRenderAnimationVideo && animationVideoUrl && (
+                  <video
+                    ref={animationVideoRef}
+                    src={animationVideoUrl}
+                    className="absolute inset-0 z-[4] h-full w-full rounded-[2rem] object-contain shadow-2xl transition-opacity duration-500"
+                    muted
+                    playsInline
+                    preload="auto"
+                    poster={revealDisplayImageUrl ?? undefined}
+                    data-testid="evolution-animation-video"
+                    data-animation-ready={animationVideoReady ? "true" : "false"}
+                    data-animation-failed={animationVideoFailed ? "true" : "false"}
+                    onCanPlay={() => setAnimationVideoReady(true)}
+                    onLoadedData={() => setAnimationVideoReady(true)}
+                    onError={() => {
+                      log.warn("Evolution animation video failed to preload, using still reveal", {
+                        animationVideoUrl,
+                      });
+                      setAnimationVideoFailed(true);
+                    }}
+                    style={{
+                      opacity: showAnimationVideo ? 1 : 0,
+                      pointerEvents: "none",
+                      border: `3px solid hsl(${theme.glowA} / ${phase === "reveal" || phase === "settle" ? 0.62 : 0.24})`,
+                      boxShadow:
+                        phase === "reveal" || phase === "settle"
+                          ? `0 0 54px ${theme.revealBurstColor}, inset 0 0 26px hsl(${theme.glowB} / 0.18)`
+                          : "none",
+                    }}
+                  />
                 )}
 
                 {(phase === "reveal" || phase === "settle") && (

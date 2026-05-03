@@ -82,6 +82,18 @@ export const getCompanionPresetImageAssetKey = (src?: string | null): string | n
 export const isCompanionPresetImageSource = (src?: string | null): boolean =>
   getCompanionPresetImageAssetKey(src) !== null;
 
+export const getCompanionEggImageAssetKey = (src?: string | null): string | null => {
+  const assetKey = getBundledCompanionImageAssetKey(src);
+  if (!assetKey?.startsWith("companion-eggs/")) return null;
+  return assetKey;
+};
+
+export const isCompanionEggImageSource = (src?: string | null): boolean =>
+  getCompanionEggImageAssetKey(src) !== null;
+
+export const isCompanionSceneImageSource = (src?: string | null): boolean =>
+  isCompanionPresetImageSource(src) || isCompanionEggImageSource(src);
+
 export const getBundledCompanionImageFocalEntry = (
   src?: string | null,
 ): BundledCompanionImageFocalManifestEntry | null => {

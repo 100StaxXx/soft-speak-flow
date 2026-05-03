@@ -1361,6 +1361,17 @@ export type Database = {
       }
       companion_evolutions: {
         Row: {
+          animation_completed_at: string | null
+          animation_error_code: string | null
+          animation_error_message: string | null
+          animation_prompt: string | null
+          animation_provider: string | null
+          animation_provider_model: string | null
+          animation_provider_task_id: string | null
+          animation_requested_at: string | null
+          animation_status: string | null
+          animation_storage_path: string | null
+          animation_video_url: string | null
           companion_id: string
           evolved_at: string
           generation_metadata: Json | null
@@ -1370,6 +1381,17 @@ export type Database = {
           xp_at_evolution: number
         }
         Insert: {
+          animation_completed_at?: string | null
+          animation_error_code?: string | null
+          animation_error_message?: string | null
+          animation_prompt?: string | null
+          animation_provider?: string | null
+          animation_provider_model?: string | null
+          animation_provider_task_id?: string | null
+          animation_requested_at?: string | null
+          animation_status?: string | null
+          animation_storage_path?: string | null
+          animation_video_url?: string | null
           companion_id: string
           evolved_at?: string
           generation_metadata?: Json | null
@@ -1379,6 +1401,17 @@ export type Database = {
           xp_at_evolution: number
         }
         Update: {
+          animation_completed_at?: string | null
+          animation_error_code?: string | null
+          animation_error_message?: string | null
+          animation_prompt?: string | null
+          animation_provider?: string | null
+          animation_provider_model?: string | null
+          animation_provider_task_id?: string | null
+          animation_requested_at?: string | null
+          animation_status?: string | null
+          animation_storage_path?: string | null
+          animation_video_url?: string | null
           companion_id?: string
           evolved_at?: string
           generation_metadata?: Json | null
@@ -1393,6 +1426,106 @@ export type Database = {
             columns: ["companion_id"]
             isOneToOne: false
             referencedRelation: "user_companion"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      companion_animation_jobs: {
+        Row: {
+          companion_id: string
+          completed_at: string | null
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          evolution_id: string
+          id: string
+          next_retry_at: string | null
+          prompt: string
+          provider: string
+          provider_model: string
+          provider_status: string | null
+          provider_task_id: string | null
+          requested_at: string
+          retry_count: number
+          source_image_url: string
+          stage: number
+          started_at: string | null
+          status: string
+          storage_path: string | null
+          updated_at: string
+          user_id: string
+          video_url: string | null
+        }
+        Insert: {
+          companion_id: string
+          completed_at?: string | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          evolution_id: string
+          id?: string
+          next_retry_at?: string | null
+          prompt: string
+          provider?: string
+          provider_model: string
+          provider_status?: string | null
+          provider_task_id?: string | null
+          requested_at?: string
+          retry_count?: number
+          source_image_url: string
+          stage: number
+          started_at?: string | null
+          status?: string
+          storage_path?: string | null
+          updated_at?: string
+          user_id: string
+          video_url?: string | null
+        }
+        Update: {
+          companion_id?: string
+          completed_at?: string | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          evolution_id?: string
+          id?: string
+          next_retry_at?: string | null
+          prompt?: string
+          provider?: string
+          provider_model?: string
+          provider_status?: string | null
+          provider_task_id?: string | null
+          requested_at?: string
+          retry_count?: number
+          source_image_url?: string
+          stage?: number
+          started_at?: string | null
+          status?: string
+          storage_path?: string | null
+          updated_at?: string
+          user_id?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companion_animation_jobs_companion_id_fkey"
+            columns: ["companion_id"]
+            isOneToOne: false
+            referencedRelation: "user_companion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "companion_animation_jobs_evolution_id_fkey"
+            columns: ["evolution_id"]
+            isOneToOne: true
+            referencedRelation: "companion_evolutions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "companion_animation_jobs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -7576,6 +7709,10 @@ export type Database = {
           last_maintenance_summary: string | null
           last_mood_update: string | null
           last_weekly_maintenance_date: string | null
+          launcher_image_focal_x: number | null
+          launcher_image_focal_y: number | null
+          launcher_image_source_url: string | null
+          launcher_image_url: string | null
           legacy_traits: Json | null
           mind: number | null
           neglected_image_focal_x: number | null
@@ -7656,6 +7793,10 @@ export type Database = {
           last_maintenance_summary?: string | null
           last_mood_update?: string | null
           last_weekly_maintenance_date?: string | null
+          launcher_image_focal_x?: number | null
+          launcher_image_focal_y?: number | null
+          launcher_image_source_url?: string | null
+          launcher_image_url?: string | null
           legacy_traits?: Json | null
           mind?: number | null
           neglected_image_focal_x?: number | null
@@ -7736,6 +7877,10 @@ export type Database = {
           last_maintenance_summary?: string | null
           last_mood_update?: string | null
           last_weekly_maintenance_date?: string | null
+          launcher_image_focal_x?: number | null
+          launcher_image_focal_y?: number | null
+          launcher_image_source_url?: string | null
+          launcher_image_url?: string | null
           legacy_traits?: Json | null
           mind?: number | null
           neglected_image_focal_x?: number | null

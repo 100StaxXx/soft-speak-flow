@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { getStageName } from "@/config/companionStages";
 import { formatDisplayLabel } from "@/lib/utils";
 import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
-import { isCompanionPresetImageSource } from "@/lib/companionImageFocal";
+import { isCompanionSceneImageSource } from "@/lib/companionImageFocal";
 
 interface BattleVSScreenProps {
   companionImageUrl?: string;
@@ -172,7 +172,7 @@ export const BattleVSScreen = ({
               {/* Image frame */}
               <div className="relative w-full h-full rounded-2xl overflow-hidden border-2 border-primary/40 shadow-[0_0_30px_hsl(var(--primary)/0.3)]">
                 {companionImageUrl ? (
-                  isCompanionPresetImageSource(companionImageUrl) ? (
+                  isCompanionSceneImageSource(companionImageUrl) ? (
                     <CompanionPortraitShell
                       src={companionImageUrl}
                       className="h-full w-full rounded-2xl"

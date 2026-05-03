@@ -45,7 +45,10 @@ import {
   resolveCompanionVisualAssetUrl,
 } from "@/lib/companionAssetResolver";
 import { getCompanionEggLabel } from "@/config/companionCatalog";
-import { isCompanionPresetImageSource } from "@/lib/companionImageFocal";
+import {
+  isCompanionEggImageSource,
+  isCompanionPresetImageSource,
+} from "@/lib/companionImageFocal";
 import {
   hasCompanionStoredVisual,
   isAiGeneratedCompanion,
@@ -424,6 +427,13 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
 
   const effectiveImageUrl = displayImageUrl || COMPANION_PLACEHOLDER;
   const usesPresetPortraitShell = isCompanionPresetImageSource(effectiveImageUrl);
+  const usesEggPortraitShell = isCompanionEggImageSource(effectiveImageUrl);
+  const usesScenePortraitShell = effectiveImageUrl !== COMPANION_PLACEHOLDER;
+  const portraitImageFit = usesPresetPortraitShell || usesEggPortraitShell ? "portrait" : "cover";
+  const portraitSceneContentClassName = cn(
+    "flex items-center justify-center",
+    usesEggPortraitShell && "p-2.5 sm:p-3",
+  );
   const effectiveImageFocal = useMemo(() => {
     if (!displayCompanion) return { x: null, y: null };
 
@@ -789,10 +799,11 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
                         </div>
                       </div>
                     )}
-                    {usesPresetPortraitShell ? (
+                    {usesScenePortraitShell ? (
                       <CompanionPortraitShell
                         src={effectiveImageUrl}
                         element={displayCompanion.core_element}
+                        contentClassName={portraitSceneContentClassName}
                         className={cn(
                           "h-full w-full rounded-2xl ring-4 shadow-2xl transition-all duration-500 group-hover:scale-105",
                           imageLoaded ? "opacity-100" : "opacity-0 absolute inset-0",
@@ -805,7 +816,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
                           key={imageKey}
                           src={effectiveImageUrl}
                           alt={`${visualStageLabel} companion at level ${displayCompanion.current_stage}`}
-                          fit="portrait"
+                          fit={portraitImageFit}
                           element={displayCompanion.core_element}
                           focalX={effectiveImageFocal.x}
                           focalY={effectiveImageFocal.y}

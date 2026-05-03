@@ -9,7 +9,7 @@ import { useXPRewards } from "@/hooks/useXPRewards";
 import { useLivingCompanionSafe } from "@/hooks/useLivingCompanion";
 import { useAchievements } from "@/hooks/useAchievements";
 import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
-import { isCompanionPresetImageSource } from "@/lib/companionImageFocal";
+import { isCompanionSceneImageSource } from "@/lib/companionImageFocal";
 
 interface WelcomeBackModalProps {
   isOpen: boolean;
@@ -25,9 +25,9 @@ export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => 
   const [showReunion, setShowReunion] = useState(false);
   const [hasAwarded, setHasAwarded] = useState(false);
   const sadImageUrl = health.neglectedImageUrl || companion?.current_image_url || "";
-  const usesSadPortraitShell = isCompanionPresetImageSource(sadImageUrl);
+  const usesSadPortraitShell = isCompanionSceneImageSource(sadImageUrl);
   const happyImageUrl = companion?.current_image_url || "";
-  const usesHappyPortraitShell = isCompanionPresetImageSource(happyImageUrl);
+  const usesHappyPortraitShell = isCompanionSceneImageSource(happyImageUrl);
 
   // Calculate stats lost during absence
   const statsLost = Math.min(health.daysInactive * 5, 50); // -5 per day, max 50

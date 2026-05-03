@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const createFreshTutorial = () => ({
   version: 2,
-  flowVersion: 9,
+  flowVersion: 10,
   eligible: true,
   dismissed: false,
   completed: false,
@@ -20,7 +20,7 @@ const mocks = vi.hoisted(() => ({
     profileLoading: false,
     guidedTutorial: {
       version: 2,
-      flowVersion: 9,
+      flowVersion: 10,
       eligible: true,
       dismissed: false,
       completed: false,
@@ -37,7 +37,7 @@ const mocks = vi.hoisted(() => ({
     },
     companionData: null as { current_stage: number } | null,
     companionDataUpdatedAt: 0,
-    awardCustomXP: vi.fn().mockResolvedValue({ xpAwarded: 5 }),
+    awardCustomXP: vi.fn().mockImplementation(async (amount: number) => ({ xpAwarded: amount })),
     personality: null as
       | {
           name: string;
@@ -219,7 +219,7 @@ describe("guided tutorial helpers", () => {
 
   it("returns the per-mentor step text for the active flow", () => {
     expect(getMentorInstructionLines("new_goal", null, "sage")[0]).toBe(
-      "Tap 'New goal.'",
+      "Create your first campaign.",
     );
     expect(getMentorInstructionLines("plan_my_day", null, "sage")[0]).toBe(
       "Tap 'Plan day.'",
@@ -229,7 +229,7 @@ describe("guided tutorial helpers", () => {
     );
 
     expect(getMentorInstructionLines("new_goal", null, "rival")[0]).toBe(
-      "Tap 'New goal.'",
+      "Create your first campaign.",
     );
 
     // Unknown mentor falls back to sage
@@ -238,10 +238,11 @@ describe("guided tutorial helpers", () => {
     );
   });
 
-  it("strict-locks the actionable Plan day target in the new loop", () => {
+  it("strict-locks only the direct action targets in the new loop", () => {
     expect(milestoneUsesStrictLock("mentor_intro_hello")).toBe(false);
     expect(milestoneUsesStrictLock("start_new_goal")).toBe(true);
-    expect(milestoneUsesStrictLock("complete_pathfinder_campaign")).toBe(true);
+    expect(milestoneUsesStrictLock("complete_pathfinder_campaign")).toBe(false);
+    expect(milestoneUsesStrictLock("campaign_calendar_handoff")).toBe(false);
     expect(milestoneUsesStrictLock("start_plan_my_day")).toBe(true);
     expect(milestoneUsesStrictLock("answer_plan_day_ai")).toBe(false);
     expect(milestoneUsesStrictLock("save_plan_day_action")).toBe(true);
@@ -253,21 +254,21 @@ describe("guided tutorial helpers", () => {
     expect(
       shouldRestoreTutorialRoute({
         pathname: "/companion",
-        stepRoute: "/journeys",
+        stepRoute: "/campaigns",
         tutorialReady: true,
         tutorialComplete: false,
-        currentStepId: "plan_my_day",
+        currentStepId: "new_goal",
         evolutionInFlight: false,
       }),
     ).toBe(true);
 
     expect(
       shouldRestoreTutorialRoute({
-        pathname: "/journeys",
-        stepRoute: "/journeys",
+        pathname: "/campaigns",
+        stepRoute: "/campaigns",
         tutorialReady: true,
         tutorialComplete: false,
-        currentStepId: "plan_my_day",
+        currentStepId: "new_goal",
         evolutionInFlight: false,
       }),
     ).toBe(false);
@@ -301,7 +302,7 @@ describe("guided tutorial first-value loop", () => {
     mocks.state.companionData = null;
     mocks.state.companionDataUpdatedAt = 0;
     mocks.state.awardCustomXP.mockClear();
-    mocks.state.awardCustomXP.mockResolvedValue({ xpAwarded: 5 });
+    mocks.state.awardCustomXP.mockImplementation(async (amount: number) => ({ xpAwarded: amount }));
     mocks.state.personality = null;
     storageMocks.reset();
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
@@ -318,14 +319,14 @@ describe("guided tutorial first-value loop", () => {
       .querySelectorAll('[data-tour="companion-launcher-option-plan-day"], [data-tour="companion-plan-day-follow-up-option"], [data-tour="companion-plan-day-suggestion-save"], [data-tour="companion-plan-day-pending-confirm"], [data-tour="companion-plan-day-pending-confirm-all"]')
       .forEach((element) => element.remove());
     document
-      .querySelectorAll('[data-tour="companion-launcher-option-goal"], [data-tour="pathfinder-primary-action"], [data-tour="evolve-companion-button"]')
+      .querySelectorAll('[data-tour="campaign-builder-launcher"], [data-tour="companion-launcher-option-goal"], [data-tour="pathfinder-primary-action"], [data-tour="evolve-companion-button"]')
       .forEach((element) => element.remove());
     document
       .querySelectorAll('[data-planner-tour="companion-quick-actions"]')
       .forEach((element) => element.remove());
   });
 
-  const createWrapper = (path = "/journeys") =>
+  const createWrapper = (path = "/campaigns") =>
     ({ children }: { children: ReactNode }) =>
       React.createElement(
         MemoryRouter,
@@ -333,10 +334,10 @@ describe("guided tutorial first-value loop", () => {
         React.createElement(PostOnboardingMentorGuidanceProvider, null, children),
       );
 
-  it("starts with mentor intro, then points at New goal", async () => {
-    const newGoalTarget = document.createElement("button");
-    newGoalTarget.setAttribute("data-tour", "companion-launcher-option-goal");
-    document.body.appendChild(newGoalTarget);
+  it("starts with mentor intro, then points at the campaign builder", async () => {
+    const campaignTarget = document.createElement("button");
+    campaignTarget.setAttribute("data-tour", "campaign-builder-launcher");
+    document.body.appendChild(campaignTarget);
 
     const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
       wrapper: createWrapper(),
@@ -356,9 +357,9 @@ describe("guided tutorial first-value loop", () => {
       expect(result.current.isIntroDialogueActive).toBe(false);
       expect(result.current.currentStep).toBe("new_goal");
       expect(result.current.dialogueActionLabel).toBeUndefined();
-      expect(result.current.dialogueText).toBe("Tap 'New goal.'");
+      expect(result.current.dialogueText).toBe("Create your first campaign.");
       expect(result.current.activeTargetSelector).toBe(
-        '[data-tour="companion-launcher-option-goal"]',
+        '[data-tour="campaign-builder-launcher"]',
       );
     });
   });
@@ -385,63 +386,22 @@ describe("guided tutorial first-value loop", () => {
       expect(result.current.dialogueSupportText).toBe("Then choose New goal.");
     });
 
-    const newGoalTarget = document.createElement("button");
-    newGoalTarget.setAttribute("data-tour", "companion-launcher-option-goal");
-    document.body.appendChild(newGoalTarget);
+    const campaignTarget = document.createElement("button");
+    campaignTarget.setAttribute("data-tour", "campaign-builder-launcher");
+    document.body.appendChild(campaignTarget);
 
     await waitFor(() => {
       expect(result.current.activeTargetSelector).toBe(
-        '[data-tour="companion-launcher-option-goal"]',
+        '[data-tour="campaign-builder-launcher"]',
       );
-      expect(result.current.dialogueText).toBe("Tap 'New goal.'");
+      expect(result.current.dialogueText).toBe("Create your first campaign.");
     });
   });
 
-  it("names the closed companion launcher as the egg before Plan day is visible", async () => {
-    mocks.state.guidedTutorial = {
-      ...createFreshTutorial(),
-      completedSteps: ["new_goal"],
-      xpAwardedSteps: ["new_goal"],
-      milestonesCompleted: [
-        "mentor_intro_hello",
-        "start_new_goal",
-        "complete_pathfinder_campaign",
-      ],
-    };
-    const quickActionsTarget = document.createElement("button");
-    quickActionsTarget.setAttribute("data-planner-tour", "companion-quick-actions");
-    document.body.appendChild(quickActionsTarget);
-
-    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
-      wrapper: createWrapper(),
-    });
-
-    await waitFor(() => {
-      expect(result.current.currentStep).toBe("plan_my_day");
-      expect(result.current.activeTargetSelector).toBe(
-        '[data-planner-tour="companion-quick-actions"]',
-      );
-      expect(result.current.dialogueText).toBe("Click your companion's egg.");
-      expect(result.current.dialogueSupportText).toBe("Then choose Plan day.");
-    });
-  });
-
-  it("advances from Pathfinder campaign save through Plan day to hatch completion", async () => {
-    const newGoalTarget = document.createElement("button");
-    newGoalTarget.setAttribute("data-tour", "companion-launcher-option-goal");
-    document.body.appendChild(newGoalTarget);
-    const pathfinderTarget = document.createElement("button");
-    pathfinderTarget.setAttribute("data-tour", "pathfinder-primary-action");
-    document.body.appendChild(pathfinderTarget);
-    const planTarget = document.createElement("button");
-    planTarget.setAttribute("data-tour", "companion-launcher-option-plan-day");
-    document.body.appendChild(planTarget);
-    const answerTarget = document.createElement("button");
-    answerTarget.setAttribute("data-tour", "companion-plan-day-follow-up-option");
-    document.body.appendChild(answerTarget);
-    const saveTarget = document.createElement("button");
-    saveTarget.setAttribute("data-tour", "companion-plan-day-suggestion-save");
-    document.body.appendChild(saveTarget);
+  it("steps aside during Pathfinder, returns for ritual handoff, then hands off to hatch", async () => {
+    const campaignTarget = document.createElement("button");
+    campaignTarget.setAttribute("data-tour", "campaign-builder-launcher");
+    document.body.appendChild(campaignTarget);
     const hatchTarget = document.createElement("button");
     hatchTarget.setAttribute("data-tour", "evolve-companion-button");
     document.body.appendChild(hatchTarget);
@@ -456,98 +416,59 @@ describe("guided tutorial first-value loop", () => {
 
     await waitFor(() => {
       expect(result.current.currentStep).toBe("new_goal");
-      expect(result.current.dialogueText).toBe("Tap 'New goal.'");
+      expect(result.current.dialogueText).toBe("Create your first campaign.");
     });
 
     await act(async () => {
-      window.dispatchEvent(new CustomEvent("companion-new-goal-started"));
+      window.dispatchEvent(new CustomEvent("campaign-builder-opened"));
     });
 
     await waitFor(() => {
-      expect(result.current.currentStep).toBe("new_goal");
-      expect(result.current.dialogueText).toBe("Save the campaign.");
-      expect(result.current.activeTargetSelector).toBe(
-        '[data-tour="pathfinder-primary-action"]',
-      );
+      expect(result.current.isActive).toBe(false);
+      expect(result.current.currentStep).toBeNull();
+      expect(result.current.activeTargetSelectors).toEqual([]);
     });
 
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("campaign-builder-closed"));
+    });
+
+    await waitFor(() => {
+      expect(result.current.isActive).toBe(true);
+      expect(result.current.currentStep).toBe("new_goal");
+      expect(result.current.dialogueText).toBe("Create your first campaign.");
+      expect(result.current.activeTargetSelector).toBe('[data-tour="campaign-builder-launcher"]');
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("campaign-builder-opened"));
+    });
     await act(async () => {
       window.dispatchEvent(new CustomEvent("pathfinder-campaign-created"));
     });
 
     await waitFor(() => {
-      expect(result.current.currentStep).toBe("plan_my_day");
-      expect(result.current.activeTargetSelectors).toEqual([
-        '[data-tour="companion-launcher-option-plan-day"]',
-        '[data-planner-tour="companion-quick-actions"]',
-      ]);
-      expect(result.current.activeTargetSelector).toBe(
-        '[data-tour="companion-launcher-option-plan-day"]',
-      );
-      expect(mocks.state.awardCustomXP).toHaveBeenCalledWith(
-        5,
-        "guided_tutorial_step_complete",
-        undefined,
-        expect.objectContaining({
-          guided_step: "new_goal",
-          source: "guided_tutorial",
-        }),
-      );
+      expect(result.current.isActive).toBe(true);
+      expect(result.current.currentStep).toBe("new_goal");
+      expect(result.current.dialogueText).toBe("Your rituals are on the calendar now.");
+      expect(result.current.dialogueActionLabel).toBe("Meet companion");
+      expect(result.current.activeTargetSelectors).toEqual([]);
     });
 
     await act(async () => {
-      window.dispatchEvent(new CustomEvent("companion-plan-my-day-started"));
-    });
-
-    await waitFor(() => {
-      expect(result.current.currentStep).toBe("plan_my_day");
-      expect(result.current.dialogueText).toBe("Tell it what you need.");
-      expect(result.current.activeTargetSelectors).toEqual([
-        '[data-tour="companion-plan-day-follow-up-option"]',
-        '[data-tour="companion-plan-day-chat-input"]',
-        '[data-tour="companion-plan-day-chat-send"]',
-      ]);
-      expect(result.current.activeTargetSelector).toBe(
-        '[data-tour="companion-plan-day-follow-up-option"]',
-      );
-      expect(mocks.state.awardCustomXP).not.toHaveBeenCalledWith(
-        5,
-        "guided_tutorial_step_complete",
-        undefined,
-        expect.objectContaining({ guided_step: "plan_my_day" }),
-      );
-    });
-
-    await act(async () => {
-      window.dispatchEvent(new CustomEvent("companion-plan-my-day-ai-answered"));
-    });
-
-    await waitFor(() => {
-      expect(result.current.currentStep).toBe("plan_my_day");
-      expect(result.current.dialogueText).toBe("Save one quest.");
-      expect(result.current.activeTargetSelectors).toEqual([
-        '[data-tour="companion-plan-day-pending-confirm"]',
-        '[data-tour="companion-plan-day-pending-confirm-all"]',
-        '[data-tour="companion-plan-day-suggestion-save"]',
-      ]);
-      expect(result.current.activeTargetSelector).toBe(
-        '[data-tour="companion-plan-day-suggestion-save"]',
-      );
-    });
-
-    await act(async () => {
-      window.dispatchEvent(new CustomEvent("companion-plan-my-day-action-saved"));
+      result.current.onDialogueAction?.();
+      await Promise.resolve();
     });
 
     await waitFor(() => {
       expect(result.current.currentStep).toBe("hatch_companion");
       expect(result.current.stepRoute).toBe("/companion");
       expect(mocks.state.awardCustomXP).toHaveBeenCalledWith(
-        5,
+        10,
         "guided_tutorial_step_complete",
         undefined,
         expect.objectContaining({
-          guided_step: "plan_my_day",
+          guided_step: "new_goal",
           source: "guided_tutorial",
         }),
       );
@@ -582,11 +503,9 @@ describe("guided tutorial first-value loop", () => {
     });
   });
 
-  it("does not complete or route from Plan day until tutorial XP is actually awarded", async () => {
+  it("does not hand off to hatch until campaign tutorial XP is awarded", async () => {
     mocks.state.guidedTutorial = {
       ...createFreshTutorial(),
-      completedSteps: ["new_goal"],
-      xpAwardedSteps: ["new_goal"],
       milestonesCompleted: [
         "mentor_intro_hello",
         "start_new_goal",
@@ -594,38 +513,33 @@ describe("guided tutorial first-value loop", () => {
       ],
     };
     mocks.state.awardCustomXP.mockResolvedValue(undefined);
-    const planTarget = document.createElement("button");
-    planTarget.setAttribute("data-tour", "companion-launcher-option-plan-day");
-    document.body.appendChild(planTarget);
-    const saveTarget = document.createElement("button");
-    saveTarget.setAttribute("data-tour", "companion-plan-day-suggestion-save");
-    document.body.appendChild(saveTarget);
 
     const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
       wrapper: createWrapper(),
     });
 
     await waitFor(() => {
-      expect(result.current.currentStep).toBe("plan_my_day");
+      expect(result.current.currentStep).toBe("new_goal");
+      expect(result.current.dialogueActionLabel).toBe("Meet companion");
     });
 
     await act(async () => {
-      window.dispatchEvent(new CustomEvent("companion-plan-my-day-action-saved"));
+      result.current.onDialogueAction?.();
       await Promise.resolve();
     });
 
     await waitFor(() => {
       expect(mocks.state.awardCustomXP).toHaveBeenCalledWith(
-        5,
+        10,
         "guided_tutorial_step_complete",
         undefined,
         expect.objectContaining({
-          guided_step: "plan_my_day",
+          guided_step: "new_goal",
           source: "guided_tutorial",
         }),
       );
     });
-    expect(result.current.currentStep).toBe("plan_my_day");
+    expect(result.current.currentStep).toBe("new_goal");
     expect(mocks.state.queryClient.fetchQuery).not.toHaveBeenCalled();
     expect(
       mocks.state.profileUpdatePayloads.some((payload) => {
@@ -633,8 +547,8 @@ describe("guided tutorial first-value loop", () => {
           payload.onboarding_data as { guided_tutorial?: { completedSteps?: string[]; xpAwardedSteps?: string[] } } | undefined
         )?.guided_tutorial;
         return (
-          guidedTutorial?.completedSteps?.includes("plan_my_day") ||
-          guidedTutorial?.xpAwardedSteps?.includes("plan_my_day")
+          guidedTutorial?.completedSteps?.includes("new_goal") ||
+          guidedTutorial?.xpAwardedSteps?.includes("new_goal")
         );
       }),
     ).toBe(false);
@@ -675,15 +589,13 @@ describe("guided tutorial first-value loop", () => {
   it("stops forcing pre-hatch companion display after skipping on the hatch step", async () => {
     mocks.state.guidedTutorial = {
       ...createFreshTutorial(),
-      completedSteps: ["new_goal", "plan_my_day"],
-      xpAwardedSteps: ["new_goal", "plan_my_day"],
+      completedSteps: ["new_goal"],
+      xpAwardedSteps: ["new_goal"],
       milestonesCompleted: [
         "mentor_intro_hello",
         "start_new_goal",
         "complete_pathfinder_campaign",
-        "start_plan_my_day",
-        "answer_plan_day_ai",
-        "save_plan_day_action",
+        "campaign_calendar_handoff",
       ],
     };
     const hatchTarget = document.createElement("button");
@@ -708,6 +620,52 @@ describe("guided tutorial first-value loop", () => {
       expect(result.current.isActive).toBe(false);
       expect(result.current.isPreHatchCompanionStep).toBe(false);
     });
+  });
+
+  it("moves old Plan day progress to hatch and tops up old 5 XP campaign users", async () => {
+    mocks.state.guidedTutorial = {
+      ...createFreshTutorial(),
+      flowVersion: 9,
+      completedSteps: ["new_goal", "plan_my_day"],
+      xpAwardedSteps: ["new_goal"],
+      milestonesCompleted: [
+        "mentor_intro_hello",
+        "start_new_goal",
+        "complete_pathfinder_campaign",
+        "start_plan_my_day",
+        "answer_plan_day_ai",
+        "save_plan_day_action",
+      ],
+    };
+    mocks.state.queryClient.fetchQuery.mockResolvedValue({ current_stage: 0, current_xp: 5 });
+    const hatchTarget = document.createElement("button");
+    hatchTarget.setAttribute("data-tour", "evolve-companion-button");
+    document.body.appendChild(hatchTarget);
+
+    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/companion"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("hatch_companion");
+    });
+
+    await waitFor(() => {
+      expect(mocks.state.awardCustomXP).toHaveBeenCalledWith(
+        5,
+        "guided_tutorial_hatch_ready_top_up",
+        undefined,
+        expect.objectContaining({
+          guided_step: "hatch_companion",
+          source: "guided_tutorial",
+        }),
+      );
+    });
+
+    const latestPayload = mocks.state.profileUpdatePayloads.at(-1) as
+      | { onboarding_data?: { guided_tutorial?: { hatchReadyTopUpAmount?: number } } }
+      | undefined;
+    expect(latestPayload?.onboarding_data?.guided_tutorial?.hatchReadyTopUpAmount).toBe(5);
   });
 
   it("keeps completed old tutorial state completed after migration", async () => {

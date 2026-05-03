@@ -16,6 +16,8 @@ interface JourneysCompanionLauncherProps extends ButtonHTMLAttributes<HTMLButton
   imageFocalXOverride?: number | null;
   imageFocalYOverride?: number | null;
   usesPortraitShellOverride?: boolean;
+  allowImageFallback?: boolean;
+  requireHeroCutout?: boolean;
   floatingSize?: "default" | "hero";
   faceDirection?: JourneysCompanionLauncherFaceDirection;
 }
@@ -29,6 +31,8 @@ export function JourneysCompanionLauncher({
   imageFocalXOverride,
   imageFocalYOverride,
   usesPortraitShellOverride,
+  allowImageFallback = true,
+  requireHeroCutout = false,
   floatingSize = "default",
   faceDirection = "front",
   className,
@@ -44,22 +48,30 @@ export function JourneysCompanionLauncher({
     usesPortraitShell,
   } = useJourneysCompanionVisual();
 
-  const resolvedImageUrl = imageUrlOverride ?? imageUrl;
-  const resolvedFocalX = imageFocalXOverride ?? focalX;
-  const resolvedFocalY = imageFocalYOverride ?? focalY;
+  const resolvedImageUrl = imageUrlOverride === undefined
+    ? imageUrl
+    : imageUrlOverride ?? (allowImageFallback ? imageUrl : null);
+  const resolvedFocalX = imageFocalXOverride === undefined ? focalX : imageFocalXOverride;
+  const resolvedFocalY = imageFocalYOverride === undefined ? focalY : imageFocalYOverride;
   const resolvedUsesPortraitShell = usesPortraitShellOverride ?? usesPortraitShell;
   const resolvedText = text ?? `Chat with ${companionLabel}`;
   const isFloatingHero = variant === "floating" && floatingSize === "hero";
-  const shouldCutOutHeroBackground = isFloatingHero && !resolvedUsesPortraitShell;
+  const shouldCutOutHeroBackground = isFloatingHero && Boolean(resolvedImageUrl) && !resolvedUsesPortraitShell;
   const {
     cutoutSrc: heroCutoutSrc,
     status: heroCutoutStatus,
   } = useCompanionImageBackgroundCutout(resolvedImageUrl, {
     enabled: shouldCutOutHeroBackground,
   });
-  const resolvedHeroImageUrl = heroCutoutSrc ?? resolvedImageUrl;
+  const resolvedHeroImageUrl = heroCutoutSrc ?? (
+    requireHeroCutout && shouldCutOutHeroBackground ? null : resolvedImageUrl
+  );
   const isWaitingForHeroCutout = shouldCutOutHeroBackground
     && (heroCutoutStatus === "idle" || heroCutoutStatus === "processing");
+  const shouldShowHeroPlaceholder = isFloatingHero && (
+    !resolvedHeroImageUrl
+    || (requireHeroCutout && shouldCutOutHeroBackground && heroCutoutStatus !== "ready")
+  );
   const portraitClassName = variant === "floating"
     ? isFloatingHero
       ? "h-[7.75rem] w-[7.75rem]"
@@ -67,27 +79,44 @@ export function JourneysCompanionLauncher({
     : compact
       ? "h-9 w-9"
       : "h-10 w-10";
+  const portraitPlaceholder = (
+    <span
+      aria-hidden="true"
+      data-testid="journeys-companion-launcher-placeholder"
+      className={cn(
+        "flex shrink-0 items-center justify-center rounded-full border border-white/15 bg-[radial-gradient(circle_at_40%_28%,rgba(255,255,255,0.22),rgba(255,255,255,0.08)_42%,rgba(15,23,42,0.84))]",
+        portraitClassName,
+      )}
+      data-companion-background-cutout={shouldCutOutHeroBackground ? heroCutoutStatus : undefined}
+    >
+      <span className="h-1/2 w-1/2 rounded-full bg-white/12 shadow-[inset_0_0_24px_rgba(255,255,255,0.14)]" />
+    </span>
+  );
 
   const portrait = isFloatingHero ? (
     <div
       className={cn("relative shrink-0", portraitClassName)}
       style={{ filter: "drop-shadow(0 10px 24px rgba(0, 0, 0, 0.24))" }}
     >
-      <CompanionImage
-        src={resolvedHeroImageUrl}
-        alt={companionLabel}
-        fit={resolvedUsesPortraitShell ? "portrait" : "contain"}
-        element={element}
-        focalX={resolvedFocalX}
-        focalY={resolvedFocalY}
-        className={cn(
-          "pointer-events-none select-none transition-opacity duration-150",
-          isWaitingForHeroCutout && "opacity-0",
-        )}
-        draggable={false}
-        data-companion-background-cutout={shouldCutOutHeroBackground ? heroCutoutStatus : undefined}
-      />
+      {shouldShowHeroPlaceholder ? portraitPlaceholder : (
+        <CompanionImage
+          src={resolvedHeroImageUrl}
+          alt={companionLabel}
+          fit={resolvedUsesPortraitShell ? "portrait" : "contain"}
+          element={element}
+          focalX={resolvedFocalX}
+          focalY={resolvedFocalY}
+          className={cn(
+            "pointer-events-none select-none transition-opacity duration-150",
+            isWaitingForHeroCutout && "opacity-0",
+          )}
+          draggable={false}
+          data-companion-background-cutout={shouldCutOutHeroBackground ? heroCutoutStatus : undefined}
+        />
+      )}
     </div>
+  ) : !resolvedImageUrl ? (
+    portraitPlaceholder
   ) : resolvedUsesPortraitShell ? (
     <CompanionPortraitShell
       src={resolvedImageUrl}

@@ -16,6 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { fetchCompanion, getCompanionQueryKey, type Companion } from "@/hooks/useCompanion";
+import { getProgressionThreshold, HATCH_READY_LEVEL } from "@/config/progression";
 import { COMPANION_HATCH_STARTED_EVENT } from "@/lib/companionEvolutionEvents";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { resolveActiveMentorSlug, type ActiveMentorSlug } from "@/lib/mentorRoster";
@@ -37,8 +38,8 @@ import type {
 
 const TARGET_RESOLVE_POLL_MS = 250;
 const TARGET_MISSING_FALLBACK_MS = 1400;
+const CAMPAIGN_BUILDER_LAUNCHER_SELECTOR = '[data-tour="campaign-builder-launcher"]';
 const NEW_GOAL_SELECTOR = '[data-tour="companion-launcher-option-goal"]';
-const PATHFINDER_PRIMARY_ACTION_SELECTOR = '[data-tour="pathfinder-primary-action"]';
 const PLAN_MY_DAY_SELECTOR = '[data-tour="companion-launcher-option-plan-day"]';
 const COMPANION_QUICK_ACTIONS_SELECTOR = '[data-planner-tour="companion-quick-actions"]';
 const PLAN_DAY_AI_FOLLOW_UP_OPTION_SELECTOR = '[data-tour="companion-plan-day-follow-up-option"]';
@@ -49,10 +50,10 @@ const PLAN_DAY_PENDING_CONFIRM_SELECTOR = '[data-tour="companion-plan-day-pendin
 const PLAN_DAY_PENDING_CONFIRM_ALL_SELECTOR = '[data-tour="companion-plan-day-pending-confirm-all"]';
 const EVOLVE_AUTOSCROLL_SELECTOR = '[data-tour="evolve-companion-button"]';
 const EVOLVE_AUTOSCROLL_VIEWPORT_MARGIN_PX = 72;
+const HATCH_READY_XP = getProgressionThreshold(HATCH_READY_LEVEL) ?? 10;
 
 const STEP_XP_REWARDS: Partial<Record<GuidedTutorialStepId, number>> = {
-  new_goal: 5,
-  plan_my_day: 5,
+  new_goal: HATCH_READY_XP,
 };
 
 interface GuidedStep {
@@ -63,11 +64,7 @@ interface GuidedStep {
 const GUIDED_STEPS: GuidedStep[] = [
   {
     id: "new_goal",
-    route: "/journeys",
-  },
-  {
-    id: "plan_my_day",
-    route: "/journeys",
+    route: "/campaigns",
   },
   {
     id: "hatch_companion",
@@ -93,6 +90,7 @@ const LEGACY_GUIDED_STEP_ID_SET = new Set<GuidedTutorialStepId>([
   "quests_campaigns_intro",
   "create_quest",
   "meet_companion",
+  "plan_my_day",
   "first_plan_closeout",
   "morning_checkin",
   "companion_tab_intro",
@@ -123,6 +121,7 @@ const MILESTONE_ID_SET = new Set<GuidedMilestoneId>([
   "mentor_intro_hello",
   "start_new_goal",
   "complete_pathfinder_campaign",
+  "campaign_calendar_handoff",
   "meet_companion_intro",
   "start_plan_my_day",
   "answer_plan_day_ai",
@@ -171,11 +170,16 @@ const getTargetSelectorsForMilestone = (milestoneId: GuidedMilestoneId): string[
     case "mentor_intro_hello":
     case "meet_companion_intro":
     case "first_plan_closeout_message":
+    case "campaign_calendar_handoff":
       return [];
     case "start_new_goal":
-      return [NEW_GOAL_SELECTOR, COMPANION_QUICK_ACTIONS_SELECTOR];
+      return [
+        CAMPAIGN_BUILDER_LAUNCHER_SELECTOR,
+        NEW_GOAL_SELECTOR,
+        COMPANION_QUICK_ACTIONS_SELECTOR,
+      ];
     case "complete_pathfinder_campaign":
-      return [PATHFINDER_PRIMARY_ACTION_SELECTOR, '[data-testid="pathfinder-footer"]'];
+      return [];
     case "start_plan_my_day":
       return [PLAN_MY_DAY_SELECTOR, COMPANION_QUICK_ACTIONS_SELECTOR];
     case "answer_plan_day_ai":
@@ -239,6 +243,7 @@ type TutorialDialogueKey =
   | "mentor_intro_hello"
   | "start_new_goal"
   | "complete_pathfinder_campaign"
+  | "campaign_calendar_handoff"
   | "meet_companion_intro"
   | "start_plan_my_day"
   | "answer_plan_day_ai"
@@ -250,8 +255,9 @@ type TutorialDialogueKey =
 const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, MentorDialogueLine>> = {
   sage: {
     mentor_intro_hello: { text: "Hey, I'm Sage. I'll walk you through this." },
-    start_new_goal: { text: "Tap 'New goal.'", support: "Pathfinder will turn it into a campaign." },
-    complete_pathfinder_campaign: { text: "Save the campaign.", support: "That locks in your first path." },
+    start_new_goal: { text: "Create your first campaign.", support: "Pathfinder will turn a bigger goal into rituals and milestones." },
+    complete_pathfinder_campaign: { text: "Build your campaign.", support: "I'll meet you when it's saved." },
+    campaign_calendar_handoff: { text: "Your rituals are on the calendar now.", support: "They'll show up where your days are planned. Let's hatch your Companion." },
     meet_companion_intro: { text: "This is your Companion.", support: "Use it when you need help planning your day." },
     start_plan_my_day: { text: "Tap 'Plan day.'", support: "It'll give you something simple to follow." },
     answer_plan_day_ai: { text: "Tell it what you need.", support: "Focus, catch up, or take it slow." },
@@ -262,8 +268,9 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
   },
   lyra: {
     mentor_intro_hello: { text: "Hey, I'm Lyra. I'll help you get started." },
-    start_new_goal: { text: "Tap 'New goal.'", support: "Pathfinder will shape the first path." },
-    complete_pathfinder_campaign: { text: "Save the campaign.", support: "Then we'll plan today around it." },
+    start_new_goal: { text: "Create your first campaign.", support: "Pathfinder will shape it into rituals and milestones." },
+    complete_pathfinder_campaign: { text: "Build your campaign.", support: "I'll meet you when it's saved." },
+    campaign_calendar_handoff: { text: "Your rituals are on the calendar now.", support: "They'll keep your path visible. Let's meet your Companion." },
     meet_companion_intro: { text: "This is your Companion.", support: "It helps you find clarity." },
     start_plan_my_day: { text: "Tap 'Plan day.'", support: "It'll shape your day for you." },
     answer_plan_day_ai: { text: "Tell it what you need.", support: "Go with what feels true." },
@@ -274,8 +281,9 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
   },
   icon: {
     mentor_intro_hello: { text: "I'm Icon. Let's get this set up right." },
-    start_new_goal: { text: "Tap 'New goal.'", support: "Pathfinder will build your first campaign." },
-    complete_pathfinder_campaign: { text: "Save the campaign.", support: "Good structure starts there." },
+    start_new_goal: { text: "Create your first campaign.", support: "Pathfinder will turn the goal into rituals and milestones." },
+    complete_pathfinder_campaign: { text: "Build your campaign.", support: "I'll meet you when it's saved." },
+    campaign_calendar_handoff: { text: "Your rituals are on the calendar now.", support: "Structure is in place. Time to hatch your Companion." },
     meet_companion_intro: { text: "This is your Companion.", support: "It helps you stay aligned." },
     start_plan_my_day: { text: "Tap 'Plan day.'", support: "You'll get a clear direction for today." },
     answer_plan_day_ai: { text: "Tell it what you need.", support: "Keep it honest." },
@@ -286,8 +294,9 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
   },
   charles: {
     mentor_intro_hello: { text: "Charles. This won't take long." },
-    start_new_goal: { text: "Tap 'New goal.'", support: "Pathfinder will do the organizing." },
-    complete_pathfinder_campaign: { text: "Save the campaign.", support: "No ceremony. Just lock it in." },
+    start_new_goal: { text: "Create your first campaign.", support: "Pathfinder will do the organizing." },
+    complete_pathfinder_campaign: { text: "Build your campaign.", support: "I'll be back when it's saved." },
+    campaign_calendar_handoff: { text: "Your rituals are on the calendar now.", support: "The system has a pulse. Go hatch your Companion." },
     meet_companion_intro: { text: "This is your Companion.", support: "Use it when you don't feel like thinking." },
     start_plan_my_day: { text: "Tap 'Plan day.'", support: "It handles the obvious next step." },
     answer_plan_day_ai: { text: "Tell it what you need.", support: "Try being honest for once." },
@@ -298,8 +307,9 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
   },
   princess: {
     mentor_intro_hello: { text: "Hi, I'm Princess. Let's ease into this." },
-    start_new_goal: { text: "Tap 'New goal.'", support: "Pathfinder will make it feel manageable." },
-    complete_pathfinder_campaign: { text: "Save the campaign.", support: "A tiny brave beginning." },
+    start_new_goal: { text: "Create your first campaign.", support: "Pathfinder will make it feel manageable." },
+    complete_pathfinder_campaign: { text: "Build your campaign.", support: "I'll meet you when it's saved." },
+    campaign_calendar_handoff: { text: "Your rituals are on the calendar now.", support: "A gentle path is waiting. Let's hatch your Companion." },
     meet_companion_intro: { text: "This is your Companion.", support: "It's here to help you, not overwhelm you." },
     start_plan_my_day: { text: "Tap 'Plan day.'", support: "It'll gently guide your day." },
     answer_plan_day_ai: { text: "Tell it what you need.", support: "Whatever feels right today." },
@@ -310,8 +320,9 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
   },
   operator: {
     mentor_intro_hello: { text: "Operator. Let's set your system." },
-    start_new_goal: { text: "Tap 'New goal.'", support: "Pathfinder creates the campaign." },
-    complete_pathfinder_campaign: { text: "Save the campaign.", support: "Primary objective recorded." },
+    start_new_goal: { text: "Create your first campaign.", support: "Pathfinder creates rituals and milestones." },
+    complete_pathfinder_campaign: { text: "Build your campaign.", support: "I'll resume once it's saved." },
+    campaign_calendar_handoff: { text: "Your rituals are on the calendar now.", support: "Operating rhythm installed. Proceed to Companion hatch." },
     meet_companion_intro: { text: "This is your Companion.", support: "Use it to plan and adjust your day." },
     start_plan_my_day: { text: "Tap 'Plan day.'", support: "This builds today's structure." },
     answer_plan_day_ai: { text: "Tell it what you need.", support: "Be direct." },
@@ -322,8 +333,9 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
   },
   rival: {
     mentor_intro_hello: { text: "I'm Rival. Let's see what you do with this." },
-    start_new_goal: { text: "Tap 'New goal.'", support: "Pathfinder will show whether you mean it." },
-    complete_pathfinder_campaign: { text: "Save the campaign.", support: "Commit to the path." },
+    start_new_goal: { text: "Create your first campaign.", support: "Pathfinder will show whether you mean it." },
+    complete_pathfinder_campaign: { text: "Build your campaign.", support: "I'll meet you when it's saved." },
+    campaign_calendar_handoff: { text: "Your rituals are on the calendar now.", support: "You made the path. Go hatch your Companion." },
     meet_companion_intro: { text: "This is your Companion.", support: "Use it if you're serious." },
     start_plan_my_day: { text: "Tap 'Plan day.'", support: "Get something real on the board." },
     answer_plan_day_ai: { text: "Tell it what you need.", support: "No excuses." },
@@ -338,6 +350,7 @@ const TUTORIAL_DIALOGUE_KEYS = new Set<string>([
   "mentor_intro_hello",
   "start_new_goal",
   "complete_pathfinder_campaign",
+  "campaign_calendar_handoff",
   "meet_companion_intro",
   "start_plan_my_day",
   "answer_plan_day_ai",
@@ -393,6 +406,8 @@ interface MigratedGuidedProgress {
   evolutionInFlight: boolean;
   evolutionStartedAt?: string;
   evolutionCompletedAt?: string;
+  hatchReadyTopUpAwardedAt?: string;
+  hatchReadyTopUpAmount?: number;
   needsMigration: boolean;
 }
 
@@ -478,6 +493,8 @@ const migrateGuidedTutorialProgress = ({
   evolutionInFlight,
   evolutionStartedAt,
   evolutionCompletedAt,
+  hatchReadyTopUpAwardedAt,
+  hatchReadyTopUpAmount,
 }: {
   completedSteps: GuidedTutorialStepId[];
   awardedSteps: GuidedTutorialStepId[];
@@ -489,10 +506,13 @@ const migrateGuidedTutorialProgress = ({
   evolutionInFlight: boolean;
   evolutionStartedAt?: string;
   evolutionCompletedAt?: string;
+  hatchReadyTopUpAwardedAt?: string;
+  hatchReadyTopUpAmount?: number;
 }): MigratedGuidedProgress => {
   const rawCompletedSet = new Set(completedSteps);
   const rawAwardedSet = new Set(awardedSteps);
   const rawMilestoneSet = new Set(milestonesCompleted);
+  const isCurrentFlowVersion = flowVersion === GUIDED_TUTORIAL_FLOW_VERSION;
 
   const migratedCompletedSet = new Set<GuidedTutorialStepId>(
     completedSteps.filter((stepId) => ACTIVE_GUIDED_STEP_ID_SET.has(stepId))
@@ -508,7 +528,7 @@ const migrateGuidedTutorialProgress = ({
     rawCompletedSet.has("evolve_companion") ||
     rawCompletedSet.has("post_evolution_companion_intro") ||
     rawCompletedSet.has("mentor_closeout") ||
-    rawMilestoneSet.has("complete_pathfinder_campaign") ||
+    (!isCurrentFlowVersion && rawMilestoneSet.has("complete_pathfinder_campaign")) ||
     rawMilestoneSet.has("companion_tab_intro") ||
     rawMilestoneSet.has("post_evolution_companion_intro");
   const shouldMarkHatchComplete =
@@ -534,6 +554,7 @@ const migrateGuidedTutorialProgress = ({
     "mentor_intro_hello",
     "start_new_goal",
     "complete_pathfinder_campaign",
+    "campaign_calendar_handoff",
     "start_plan_my_day",
     "answer_plan_day_ai",
     "save_plan_day_action",
@@ -553,6 +574,7 @@ const migrateGuidedTutorialProgress = ({
   if (migratedCompletedSet.has("new_goal")) {
     migratedMilestoneSet.add("start_new_goal");
     migratedMilestoneSet.add("complete_pathfinder_campaign");
+    migratedMilestoneSet.add("campaign_calendar_handoff");
   }
   if (migratedCompletedSet.has("plan_my_day")) {
     migratedMilestoneSet.add("start_plan_my_day");
@@ -566,6 +588,7 @@ const migrateGuidedTutorialProgress = ({
   if (isLegacyTutorialComplete) {
     migratedMilestoneSet.add("start_new_goal");
     migratedMilestoneSet.add("complete_pathfinder_campaign");
+    migratedMilestoneSet.add("campaign_calendar_handoff");
     migratedMilestoneSet.add("start_plan_my_day");
     migratedMilestoneSet.add("answer_plan_day_ai");
     migratedMilestoneSet.add("save_plan_day_action");
@@ -597,6 +620,8 @@ const migrateGuidedTutorialProgress = ({
     evolutionInFlight,
     evolutionStartedAt,
     evolutionCompletedAt,
+    hatchReadyTopUpAwardedAt,
+    hatchReadyTopUpAmount,
     needsMigration,
   };
 };
@@ -769,6 +794,8 @@ const getTargetAwareMilestoneDialogue = (
 export const milestoneUsesStrictLock = (milestoneId: GuidedMilestoneId | null): boolean => {
   if (!milestoneId) return false;
   if (milestoneId === "mentor_intro_hello") return false;
+  if (milestoneId === "complete_pathfinder_campaign") return false;
+  if (milestoneId === "campaign_calendar_handoff") return false;
   if (milestoneId === "meet_companion_intro") return false;
   if (milestoneId === "answer_plan_day_ai") return false;
   if (milestoneId === "first_plan_closeout_message") return false;
@@ -802,14 +829,20 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const migrationPersistSignatureRef = useRef<string | null>(null);
   const evolveCompanionBaselineUpdatedAtRef = useRef<number | null>(null);
   const evolutionStartRecordedRef = useRef(false);
+  const hatchReadyTopUpInFlightRef = useRef(false);
 
   const [sessionCompleted, setSessionCompleted] = useState<GuidedTutorialStepId[]>([]);
   const [sessionAwarded, setSessionAwarded] = useState<GuidedTutorialStepId[]>([]);
   const [sessionCreateQuestCompleted, setSessionCreateQuestCompleted] = useState<CreateQuestSubstepId[]>([]);
   const [sessionMilestonesCompleted, setSessionMilestonesCompleted] = useState<GuidedMilestoneId[]>([]);
   const [sessionEvolutionInFlight, setSessionEvolutionInFlight] = useState<boolean | null>(null);
+  const [sessionHatchReadyTopUp, setSessionHatchReadyTopUp] = useState<{
+    awardedAt: string;
+    amount: number;
+  } | null>(null);
   const [sessionDismissed, setSessionDismissed] = useState<boolean | null>(null);
   const [activeTargetSelector, setActiveTargetSelector] = useState<string | null>(null);
+  const [campaignBuilderOpen, setCampaignBuilderOpen] = useState(false);
 
   const onboardingData = (profile?.onboarding_data as Record<string, unknown> | null) ?? null;
   const walkthroughCompleted = onboardingData?.walkthrough_completed === true;
@@ -828,14 +861,17 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     setSessionCreateQuestCompleted([]);
     setSessionMilestonesCompleted([]);
     setSessionEvolutionInFlight(null);
+    setSessionHatchReadyTopUp(null);
     setSessionDismissed(null);
     setActiveTargetSelector(null);
+    setCampaignBuilderOpen(false);
     completionPersistRef.current = false;
     stepPersistThrottleRef.current.clear();
     missingTargetSinceRef.current = null;
     migrationPersistSignatureRef.current = null;
     evolveCompanionBaselineUpdatedAtRef.current = null;
     evolutionStartRecordedRef.current = false;
+    hatchReadyTopUpInFlightRef.current = false;
   }, [user?.id]);
 
   const persistedCompletedBeforeMigration = useMemo(() => {
@@ -855,6 +891,28 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     const local = getSafeMilestoneArray(localProgress?.milestonesCompleted);
     return Array.from(new Set([...remote, ...local]));
   }, [localProgress?.milestonesCompleted, remoteProgress?.milestonesCompleted]);
+
+  const persistedHatchReadyTopUpAwardedAt = useMemo(() => {
+    if (typeof remoteProgress?.hatchReadyTopUpAwardedAt === "string") {
+      return remoteProgress.hatchReadyTopUpAwardedAt;
+    }
+    if (typeof localProgress?.hatchReadyTopUpAwardedAt === "string") {
+      return localProgress.hatchReadyTopUpAwardedAt;
+    }
+    return undefined;
+  }, [localProgress?.hatchReadyTopUpAwardedAt, remoteProgress?.hatchReadyTopUpAwardedAt]);
+
+  const persistedHatchReadyTopUpAmount = useMemo(() => {
+    const remoteAmount = remoteProgress?.hatchReadyTopUpAmount;
+    if (typeof remoteAmount === "number" && Number.isFinite(remoteAmount)) {
+      return remoteAmount;
+    }
+    const localAmount = localProgress?.hatchReadyTopUpAmount;
+    if (typeof localAmount === "number" && Number.isFinite(localAmount)) {
+      return localAmount;
+    }
+    return undefined;
+  }, [localProgress?.hatchReadyTopUpAmount, remoteProgress?.hatchReadyTopUpAmount]);
 
   const remoteCreateQuestProgress = useMemo(
     () => sanitizeCreateQuestProgress((remoteProgress?.substeps as GuidedSubstepProgress | undefined)?.create_quest),
@@ -906,6 +964,8 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
             : typeof localProgress?.evolutionCompletedAt === "string"
               ? localProgress.evolutionCompletedAt
               : undefined,
+        hatchReadyTopUpAwardedAt: persistedHatchReadyTopUpAwardedAt,
+        hatchReadyTopUpAmount: persistedHatchReadyTopUpAmount,
       }),
     [
       localProgress?.completed,
@@ -914,6 +974,8 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       localProgress?.evolutionInFlight,
       localProgress?.evolutionStartedAt,
       localProgress?.flowVersion,
+      persistedHatchReadyTopUpAmount,
+      persistedHatchReadyTopUpAwardedAt,
       mergedCreateQuestProgress,
       persistedAwardedBeforeMigration,
       persistedCompletedBeforeMigration,
@@ -930,6 +992,8 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const persistedCompleted = migratedProgress.completedSteps;
   const persistedAwarded = migratedProgress.xpAwardedSteps;
   const persistedMilestones = migratedProgress.milestonesCompleted;
+  const hatchReadyTopUpAwardedAt =
+    sessionHatchReadyTopUp?.awardedAt ?? migratedProgress.hatchReadyTopUpAwardedAt;
 
   const createQuestProgress = useMemo(() => {
     const completed = toCreateQuestSubstepOrder([
@@ -982,6 +1046,11 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const tutorialDismissed = sessionDismissed ?? persistedDismissed;
   const tutorialComplete = tutorialReady && (tutorialMarkedComplete || !currentStep);
   const tutorialSuppressed = tutorialComplete || tutorialDismissed;
+  const isCampaignBuilderTutorialPaused =
+    currentStepId === "new_goal" &&
+    campaignBuilderOpen &&
+    milestoneSet.has("start_new_goal") &&
+    !milestoneSet.has("complete_pathfinder_campaign");
   const hasPendingIntroDialogue = Boolean(currentStep) && !milestoneSet.has("mentor_intro_hello");
   const hasRecordedEvolutionStart =
     milestoneSet.has("tap_hatch_companion") ||
@@ -993,7 +1062,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     pathname: location.pathname,
     stepRoute,
     tutorialReady,
-    tutorialComplete: tutorialSuppressed,
+    tutorialComplete: tutorialSuppressed || isCampaignBuilderTutorialPaused,
     currentStepId,
     evolutionInFlight,
   });
@@ -1071,6 +1140,8 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       evolutionInFlight: migratedProgress.evolutionInFlight,
       evolutionStartedAt: migratedProgress.evolutionStartedAt,
       evolutionCompletedAt: migratedProgress.evolutionCompletedAt,
+      hatchReadyTopUpAwardedAt: migratedProgress.hatchReadyTopUpAwardedAt,
+      hatchReadyTopUpAmount: migratedProgress.hatchReadyTopUpAmount,
     };
 
     const signature = JSON.stringify(migrationPayload);
@@ -1172,6 +1243,71 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     }
   }, [companionQueryKey, queryClient, user?.id]);
 
+  const awardHatchReadyTopUpIfNeeded = useCallback(async () => {
+    if (!user?.id || hatchReadyTopUpAwardedAt) return;
+    if (hatchReadyTopUpInFlightRef.current) return;
+
+    hatchReadyTopUpInFlightRef.current = true;
+    let companion: Companion | null = null;
+    try {
+      companion = await queryClient.fetchQuery({
+        queryKey: companionQueryKey,
+        queryFn: () => fetchCompanion(user.id),
+      });
+    } catch (error) {
+      console.warn("Failed to refresh companion before guided tutorial hatch top-up:", error);
+      companion =
+        queryClient.getQueryData<Companion | null>(companionQueryKey) ??
+        cachedCompanion ??
+        null;
+    }
+
+    const currentXp = companion?.current_xp ?? cachedCompanion?.current_xp;
+    if (typeof currentXp !== "number" || !Number.isFinite(currentXp)) {
+      hatchReadyTopUpInFlightRef.current = false;
+      return;
+    }
+
+    const topUpAmount = Math.max(0, HATCH_READY_XP - currentXp);
+    if (topUpAmount <= 0) {
+      hatchReadyTopUpInFlightRef.current = false;
+      return;
+    }
+
+    try {
+      const awardResult = await awardCustomXP(topUpAmount, "guided_tutorial_hatch_ready_top_up", undefined, {
+        guided_step: "hatch_companion",
+        source: "guided_tutorial",
+      });
+
+      if (!awardResult || awardResult.xpAwarded <= 0) {
+        hatchReadyTopUpInFlightRef.current = false;
+        return;
+      }
+
+      const awardedAt = new Date().toISOString();
+      const amount = awardResult.xpAwarded;
+      setSessionHatchReadyTopUp({ awardedAt, amount });
+      void persistProgress({
+        hatchReadyTopUpAwardedAt: awardedAt,
+        hatchReadyTopUpAmount: amount,
+      });
+      await refreshCompanionForTutorialHandoff();
+    } catch (error) {
+      console.error("Failed to award guided tutorial hatch top-up XP:", error);
+      hatchReadyTopUpInFlightRef.current = false;
+    }
+  }, [
+    awardCustomXP,
+    cachedCompanion,
+    companionQueryKey,
+    hatchReadyTopUpAwardedAt,
+    persistProgress,
+    queryClient,
+    refreshCompanionForTutorialHandoff,
+    user?.id,
+  ]);
+
   const markStepComplete = useCallback(
     async (
       stepId: GuidedTutorialStepId,
@@ -1251,10 +1387,6 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     if (!tutorialReady || tutorialSuppressed || hasPendingIntroDialogue || !currentStep) return;
 
     if (currentStep.id === "new_goal") {
-      if (location.pathname !== "/journeys") return;
-      if (milestoneSet.has("complete_pathfinder_campaign")) {
-        void markStepComplete("new_goal");
-      }
       return;
     }
 
@@ -1383,13 +1515,28 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   ]);
 
   useEffect(() => {
+    if (!tutorialReady || tutorialSuppressed) return;
+    if (currentStepId !== "hatch_companion") return;
+    if (evolutionInFlight || hatchReadyTopUpAwardedAt) return;
+
+    void awardHatchReadyTopUpIfNeeded();
+  }, [
+    awardHatchReadyTopUpIfNeeded,
+    currentStepId,
+    evolutionInFlight,
+    hatchReadyTopUpAwardedAt,
+    tutorialReady,
+    tutorialSuppressed,
+  ]);
+
+  useEffect(() => {
     if (!currentStep || !tutorialReady || tutorialSuppressed || hasPendingIntroDialogue) return;
 
     const listeners: Array<{ eventName: string; handler: (event: Event) => void }> = [];
 
     if (currentStep.id === "new_goal") {
       const markNewGoalStarted = () => {
-        if (location.pathname !== "/journeys") return;
+        if (location.pathname !== "/campaigns" && location.pathname !== "/journeys") return;
         markMilestoneComplete("start_new_goal");
       };
 
@@ -1400,20 +1547,28 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
 
       listeners.push({
         eventName: "campaign-builder-opened",
-        handler: markNewGoalStarted,
+        handler: () => {
+          setCampaignBuilderOpen(true);
+          markNewGoalStarted();
+        },
+      });
+
+      listeners.push({
+        eventName: "campaign-builder-closed",
+        handler: () => {
+          setCampaignBuilderOpen(false);
+        },
       });
 
       listeners.push({
         eventName: "pathfinder-campaign-created",
         handler: () => {
-          if (location.pathname !== "/journeys") return;
-          void (async () => {
-            if (!milestoneSet.has("start_new_goal")) {
-              markMilestoneComplete("start_new_goal");
-            }
-            markMilestoneComplete("complete_pathfinder_campaign");
-            await markStepComplete("new_goal");
-          })();
+          if (location.pathname !== "/campaigns" && location.pathname !== "/journeys") return;
+          setCampaignBuilderOpen(false);
+          if (!milestoneSet.has("start_new_goal")) {
+            markMilestoneComplete("start_new_goal");
+          }
+          markMilestoneComplete("complete_pathfinder_campaign");
         },
       });
     }
@@ -1594,9 +1749,13 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     if (!milestoneSet.has("mentor_intro_hello")) return "mentor_intro_hello";
 
     if (currentStep.id === "new_goal") {
-      return milestoneSet.has("start_new_goal")
-        ? "complete_pathfinder_campaign"
-        : "start_new_goal";
+      if (!milestoneSet.has("start_new_goal")) {
+        return "start_new_goal";
+      }
+      if (!milestoneSet.has("complete_pathfinder_campaign")) {
+        return campaignBuilderOpen ? "complete_pathfinder_campaign" : "start_new_goal";
+      }
+      return "campaign_calendar_handoff";
     }
 
     if (currentStep.id === "plan_my_day") {
@@ -1650,11 +1809,12 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     }
 
     return null;
-  }, [createQuestProgress.current, currentStep, evolutionInFlight, milestoneSet]);
+  }, [campaignBuilderOpen, createQuestProgress.current, currentStep, evolutionInFlight, milestoneSet]);
 
   const isIntroDialogueActive = currentMilestone === "mentor_intro_hello";
   const supportsDialogueAction =
     currentMilestone === "mentor_intro_hello" ||
+    currentMilestone === "campaign_calendar_handoff" ||
     currentMilestone === "meet_companion_intro" ||
     currentMilestone === "first_plan_closeout_message" ||
     currentMilestone === "quests_campaigns_intro" ||
@@ -1663,14 +1823,34 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const dialogueActionLabel = supportsDialogueAction
     ? currentMilestone === "mentor_intro_hello"
       ? "Start Tutorial"
+      : currentMilestone === "campaign_calendar_handoff"
+      ? "Meet companion"
       : currentMilestone === "first_plan_closeout_message"
       ? "Finish"
       : "Continue"
     : undefined;
   const onDialogueAction = useCallback(() => {
     if (!currentMilestone || !supportsDialogueAction) return;
+    if (currentMilestone === "campaign_calendar_handoff") {
+      markMilestoneComplete("campaign_calendar_handoff");
+      void (async () => {
+        const completed = await markStepComplete("new_goal", {
+          beforeComplete: refreshCompanionForTutorialHandoff,
+        });
+        if (!completed) return;
+        navigate("/companion", { replace: true });
+      })();
+      return;
+    }
     markMilestoneComplete(currentMilestone);
-  }, [currentMilestone, markMilestoneComplete, supportsDialogueAction]);
+  }, [
+    currentMilestone,
+    markMilestoneComplete,
+    markStepComplete,
+    navigate,
+    refreshCompanionForTutorialHandoff,
+    supportsDialogueAction,
+  ]);
 
   const dismissTutorial = useCallback(() => {
     if (!tutorialReady || tutorialMarkedComplete || tutorialDismissed) return;
@@ -1767,7 +1947,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   ]);
 
   useEffect(() => {
-    if (tutorialSuppressed || !currentMilestone) {
+    if (tutorialSuppressed || isCampaignBuilderTutorialPaused || !currentMilestone) {
       currentMilestoneStartedAtRef.current = null;
       lastTargetResolutionSignatureRef.current = null;
       return;
@@ -1781,12 +1961,20 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       milestoneId: currentMilestone,
       route: location.pathname,
     });
-  }, [currentMilestone, currentStep?.id, location.pathname, tutorialSuppressed, user?.id]);
+  }, [
+    currentMilestone,
+    currentStep?.id,
+    isCampaignBuilderTutorialPaused,
+    location.pathname,
+    tutorialSuppressed,
+    user?.id,
+  ]);
 
   useEffect(() => {
     if (
       !tutorialReady ||
       tutorialSuppressed ||
+      isCampaignBuilderTutorialPaused ||
       !currentMilestone ||
       isIntroDialogueActive ||
       shouldRestoreRoute ||
@@ -1841,6 +2029,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     currentMilestone,
     currentStep?.id,
     isIntroDialogueActive,
+    isCampaignBuilderTutorialPaused,
     location.pathname,
     shouldRestoreRoute,
     tutorialSuppressed,
@@ -1851,6 +2040,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const isActive =
     tutorialReady &&
     !tutorialSuppressed &&
+    !isCampaignBuilderTutorialPaused &&
     !shouldRestoreRoute &&
     !pathIsHidden(location.pathname) &&
     Boolean(currentStep);
@@ -1968,8 +2158,9 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     ? "I'm waiting for this area to load. Stay on this screen and it'll highlight as soon as it's ready."
     : dialogue.support;
   const strictLockEnabled = milestoneUsesStrictLock(currentMilestone);
+  const tutorialUnavailable = tutorialSuppressed || isCampaignBuilderTutorialPaused;
   const secondaryActionLabel =
-    !tutorialSuppressed && !isIntroDialogueActive
+    !tutorialUnavailable && !isIntroDialogueActive
       ? currentStepId === "first_plan_closeout"
         ? "Complete tutorial"
         : "Skip tutorial"
@@ -1979,31 +2170,31 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       ? completeTutorial
       : dismissTutorial
     : undefined;
-  const isPreHatchCompanionStep = !tutorialSuppressed && currentStepId === "hatch_companion";
+  const isPreHatchCompanionStep = !tutorialUnavailable && currentStepId === "hatch_companion";
 
   return {
     isIntroDialogueActive,
     isActive,
-    currentStep: tutorialSuppressed ? null : currentStepId,
+    currentStep: tutorialUnavailable ? null : currentStepId,
     isPreHatchCompanionStep,
-    currentSubstep: tutorialSuppressed ? null : currentSubstep,
-    stepRoute: tutorialSuppressed ? null : stepRoute,
-    mentorInstructionLines: tutorialSuppressed ? [] : mentorInstructionLines,
-    progressText: tutorialSuppressed ? "" : progressText,
-    activeTargetSelectors: tutorialSuppressed ? [] : activeTargetSelectors,
-    activeTargetSelector: tutorialSuppressed ? null : activeTargetSelector,
+    currentSubstep: tutorialUnavailable ? null : currentSubstep,
+    stepRoute: tutorialUnavailable ? null : stepRoute,
+    mentorInstructionLines: tutorialUnavailable ? [] : mentorInstructionLines,
+    progressText: tutorialUnavailable ? "" : progressText,
+    activeTargetSelectors: tutorialUnavailable ? [] : activeTargetSelectors,
+    activeTargetSelector: tutorialUnavailable ? null : activeTargetSelector,
     isStrictLockActive: Boolean(isActive && activeTargetSelector && strictLockEnabled),
-    dialogueText: tutorialSuppressed ? "" : dialogue.text,
-    dialogueSupportText: tutorialSuppressed ? undefined : dialogueSupportText,
+    dialogueText: tutorialUnavailable ? "" : dialogue.text,
+    dialogueSupportText: tutorialUnavailable ? undefined : dialogueSupportText,
     speakerName: personality?.name ?? "Your guide",
     speakerPrimaryColor: personality?.primary_color ?? "#f59e0b",
     speakerSlug: personality?.slug,
     speakerAvatarUrl: personality?.avatar_url,
     secondaryActionLabel,
     onSecondaryAction,
-    dialogueActionLabel: tutorialSuppressed ? undefined : dialogueActionLabel,
+    dialogueActionLabel: tutorialUnavailable ? undefined : dialogueActionLabel,
     onDialogueAction:
-      tutorialSuppressed ? undefined : (supportsDialogueAction ? onDialogueAction : undefined),
+      tutorialUnavailable ? undefined : (supportsDialogueAction ? onDialogueAction : undefined),
   };
 };
 

@@ -89,7 +89,7 @@ async function buildManifest() {
     if (!fs.existsSync(target.dirPath)) continue;
 
     const files = walk(target.dirPath)
-      .filter((filePath) => filePath.endsWith(".png"))
+      .filter((filePath) => filePath.endsWith(".png") || filePath.endsWith(".webp"))
       .sort((left, right) => left.localeCompare(right));
 
     for (const filePath of files) {

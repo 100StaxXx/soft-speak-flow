@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Sparkles, Heart, Sun, Star } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { CompanionImage, CompanionPortraitShell } from '@/components/CompanionImage';
-import { isCompanionPresetImageSource } from '@/lib/companionImageFocal';
+import { isCompanionSceneImageSource } from '@/lib/companionImageFocal';
 
 interface WakeUpCelebrationProps {
   isOpen: boolean;
@@ -28,7 +28,7 @@ const WAKE_UP_MESSAGES = [
   "My heart feels warm again. Thank you for believing in me.",
 ];
 
-const usesPortraitShell = (imageUrl?: string | null) => isCompanionPresetImageSource(imageUrl);
+const usesPortraitShell = (imageUrl?: string | null) => isCompanionSceneImageSource(imageUrl);
 
 const BOND_MILESTONE_MESSAGES: Record<number, string> = {
   1: "A bond has been renewed.",

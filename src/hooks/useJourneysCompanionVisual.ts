@@ -3,16 +3,20 @@ import { resolveCompanionVisualAssetUrl } from "@/lib/companionAssetResolver";
 import { deriveCompanionDisplayState } from "@/lib/companionDisplayState";
 import {
   getBundledCompanionImageAssetKey,
-  isCompanionPresetImageSource,
+  isCompanionSceneImageSource,
 } from "@/lib/companionImageFocal";
 import { resolveJourneysCompanionLauncherAwayAssetUrl } from "@/lib/journeysCompanionLauncherArt";
 import { getStoredCompanionCustomName } from "@/lib/companionName";
+import { isAiGeneratedCompanion } from "@/lib/companionPredicates";
 import { formatDisplayLabel } from "@/lib/utils";
 import { useCompanion } from "./useCompanion";
 import { useCompanionCareSignals } from "./useCompanionCareSignals";
 import { useCompanionHealth } from "./useCompanionHealth";
 
 const COMPANION_PLACEHOLDER = "/placeholder-companion.svg";
+
+const isRemoteImageUrl = (value?: string | null): value is string =>
+  typeof value === "string" && /^https?:\/\//i.test(value.trim());
 
 export const useJourneysCompanionVisual = () => {
   const {
@@ -123,27 +127,55 @@ export const useJourneysCompanionVisual = () => {
 
   const presetId = displayCompanion?.preset_id ?? companion?.preset_id ?? null;
   const element = displayCompanion?.core_element ?? companion?.core_element ?? null;
-  const launcherAwayImageUrl = useMemo(() => resolveJourneysCompanionLauncherAwayAssetUrl({
-    presetId,
-    element,
-    fallbackUrl: imageUrl,
-  }), [element, imageUrl, presetId]);
+  const currentSceneImageUrl = companion?.current_image_url ?? null;
+  const isGeneratedCompanion = isAiGeneratedCompanion(companion);
+  const hasFreshLauncherImage = Boolean(
+    isGeneratedCompanion
+    && companion?.launcher_image_url
+    && companion.launcher_image_source_url === currentSceneImageUrl,
+  );
+  const launcherAwayImageUrl = useMemo(() => {
+    const bundledLauncherUrl = resolveJourneysCompanionLauncherAwayAssetUrl({
+      presetId,
+      element,
+      fallbackUrl: null,
+    });
+
+    if (bundledLauncherUrl) {
+      return bundledLauncherUrl;
+    }
+
+    if (hasFreshLauncherImage) {
+      return companion?.launcher_image_url ?? null;
+    }
+
+    return null;
+  }, [companion?.launcher_image_url, element, hasFreshLauncherImage, presetId]);
   const launcherAwayUsesPortraitShell = useMemo(
     () => getBundledCompanionImageAssetKey(launcherAwayImageUrl) !== null,
     [launcherAwayImageUrl],
   );
+  const needsLauncherImage = Boolean(
+    isGeneratedCompanion
+    && isRemoteImageUrl(currentSceneImageUrl)
+    && !hasFreshLauncherImage,
+  );
 
   return {
+    companionId: companion?.id ?? null,
     companionLabel,
     presetId,
     imageUrl,
     focalX: focalPoint.x,
     focalY: focalPoint.y,
     element,
-    usesPortraitShell: isCompanionPresetImageSource(imageUrl),
+    usesPortraitShell: isCompanionSceneImageSource(imageUrl),
+    isGeneratedCompanion,
+    currentSceneImageUrl,
     launcherAwayImageUrl,
-    launcherAwayFocalX: null,
-    launcherAwayFocalY: null,
+    launcherAwayFocalX: hasFreshLauncherImage ? companion?.launcher_image_focal_x ?? 0.5 : null,
+    launcherAwayFocalY: hasFreshLauncherImage ? companion?.launcher_image_focal_y ?? 0.5 : null,
     launcherAwayUsesPortraitShell,
+    needsLauncherImage,
   };
 };

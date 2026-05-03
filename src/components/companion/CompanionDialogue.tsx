@@ -20,7 +20,7 @@ import type { CompanionShimmerType } from "@/config/companionDialoguePacks";
 import { isNearEvolution } from "@/lib/companionEvolutionSignals";
 import {
   getBundledCompanionImageFocalPoint,
-  isCompanionPresetImageSource,
+  isCompanionSceneImageSource,
 } from "@/lib/companionImageFocal";
 import {
   resolveCompanionExpressiveAssetUrl,
@@ -210,7 +210,7 @@ export const CompanionDialogue = memo(({
     : health.isNeglected
       ? health.neglectedImageFocalY ?? companion?.neglected_image_focal_y ?? companion?.current_image_focal_y ?? null
       : bundledCompanionImageFocal?.y ?? companion?.current_image_focal_y ?? null;
-  const usesPortraitAvatar = isCompanionPresetImageSource(companionImageUrl);
+  const usesPortraitAvatar = isCompanionSceneImageSource(companionImageUrl);
   const customCompanionName = normalizeCompanionName(companion?.companion_name);
   const cachedCompanionName =
     !customCompanionName && companion && companion.current_stage > 0
