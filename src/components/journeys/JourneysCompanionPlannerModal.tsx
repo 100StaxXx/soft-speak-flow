@@ -33,6 +33,7 @@ import { PermissionRequestDialog } from "@/components/PermissionRequestDialog";
 import { plannerPathfinderTheme } from "@/components/companion/plannerPathfinderTheme";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/sonner";
 import {
   Dialog,
   DialogContent,
@@ -105,6 +106,170 @@ const formatProposedActionType = (type: string) =>
 const normalizeProposedActionType = (type: string) =>
   type.trim().toLowerCase().replace(/[.\s-]+/g, "_");
 
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+
+const stripUndefinedValues = (value: Record<string, unknown>) =>
+  Object.fromEntries(
+    Object.entries(value).filter(([, entry]) => entry !== undefined),
+  );
+
+const getProposedActionPayloadSource = (
+  action: CompanionAgentProposedAction,
+) => ({
+  ...action,
+  ...(asRecord(action.normalizedPayload) ?? {}),
+});
+
+const readFirstString = (
+  source: Record<string, unknown>,
+  keys: string[],
+): string | undefined => {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return undefined;
+};
+
+const readFirstNullableString = (
+  source: Record<string, unknown>,
+  keys: string[],
+): string | null | undefined => {
+  for (const key of keys) {
+    if (!(key in source)) continue;
+    const value = source[key];
+    if (value === null) return null;
+    if (typeof value === "string") return value.trim() || undefined;
+  }
+  return undefined;
+};
+
+const readFirstNumber = (
+  source: Record<string, unknown>,
+  keys: string[],
+): number | undefined => {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      const durationMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s*(?:m|min|minutes)?$/i);
+      const parsed = durationMatch ? Number(durationMatch[1]) : Number(trimmed);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return undefined;
+};
+
+const readFirstNullableNumber = (
+  source: Record<string, unknown>,
+  keys: string[],
+): number | null | undefined => {
+  for (const key of keys) {
+    if (!(key in source)) continue;
+    const value = source[key];
+    if (value === null) return null;
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+      const parsed = readFirstNumber(source, [key]);
+      if (parsed !== undefined) return parsed;
+    }
+  }
+  return undefined;
+};
+
+const readFirstBoolean = (
+  source: Record<string, unknown>,
+  keys: string[],
+): boolean | undefined => {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === "true") return true;
+      if (normalized === "false") return false;
+    }
+  }
+  return undefined;
+};
+
+const readStringList = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((entry) => {
+      if (typeof entry === "string") return entry.trim();
+      const record = asRecord(entry);
+      if (!record) return "";
+      return readFirstString(record, ["title", "task_text", "name", "text"]) ??
+        "";
+    })
+    .filter((entry) => entry.length > 0);
+};
+
+const readFirstStringList = (
+  source: Record<string, unknown>,
+  keys: string[],
+): string[] => {
+  for (const key of keys) {
+    const entries = readStringList(source[key]);
+    if (entries.length > 0) return entries;
+  }
+  return [];
+};
+
+const normalizeProposedQuestTitle = (value: string) => {
+  let next = value.trim().replace(/^["'“”]+|["'“”]+$/g, "").trim();
+
+  for (let index = 0; index < 4; index += 1) {
+    const unwrapped = next
+      .replace(/^create\s+(?:a\s+)?(?:quest|task)\s+for\s+["'“”]?(.+?)["'“”]?$/i, "$1")
+      .trim()
+      .replace(/^["'“”]+|["'“”]+$/g, "")
+      .trim();
+    if (unwrapped === next) break;
+    next = unwrapped;
+  }
+
+  return next;
+};
+
+const getProposedActionPayloadTitle = (
+  action: CompanionAgentProposedAction,
+) => {
+  const actionType = normalizeProposedActionType(action.type);
+  if (
+    ![
+      "quest_create",
+      "task_create",
+      "quest_update",
+      "task_update",
+      "quest_move",
+      "task_move",
+      "reminder_create",
+    ].includes(actionType)
+  ) {
+    return null;
+  }
+
+  const title = readFirstString(asRecord(action.normalizedPayload) ?? {}, [
+    "title",
+    "task_text",
+    "name",
+    "text",
+  ]);
+  return title ? normalizeProposedQuestTitle(title) : null;
+};
+
+const isCreateQuestProposedActionType = (actionType: string) =>
+  actionType === "quest_create" || actionType === "task_create";
+
 const isDraftableProposedAction = (action: CompanionAgentProposedAction) =>
   [
     "quest_create",
@@ -124,9 +289,19 @@ const isDraftableProposedAction = (action: CompanionAgentProposedAction) =>
     "reflection_create",
   ].includes(normalizeProposedActionType(action.type));
 
-const getProposedActionTitle = (action: CompanionAgentProposedAction) =>
-  action.title?.trim() || action.summary?.trim() ||
-  formatProposedActionType(action.type);
+const getProposedActionTitle = (action: CompanionAgentProposedAction) => {
+  const actionType = normalizeProposedActionType(action.type);
+  const payloadTitle = getProposedActionPayloadTitle(action);
+  const actionTitle = action.title
+    ? normalizeProposedQuestTitle(action.title)
+    : null;
+
+  return (
+    isCreateQuestProposedActionType(actionType)
+      ? payloadTitle || actionTitle
+      : actionTitle || payloadTitle
+  ) || action.summary?.trim() || formatProposedActionType(action.type);
+};
 
 const getProposedActionSummary = (action: CompanionAgentProposedAction) => {
   const title = getProposedActionTitle(action);
@@ -260,6 +435,299 @@ const buildQuestConsentCreateProposal = (sourceText: string) => {
     : ({ creationSource: "nlp" } satisfies QuestComposerPrefillDraft);
 
   return buildCreateQuestProposalFromDraft(prefillDraft);
+};
+
+type ProposedActionQuestProposalResult =
+  | { status: "ready"; proposal: CompanionPlannerProposal }
+  | { status: "invalid"; message: string }
+  | { status: "unsupported" };
+
+const createProposedActionProposalId = (
+  actionType: string,
+  action: CompanionAgentProposedAction,
+) =>
+  `proposed-${actionType}-${getProposedActionKey(action)}-${Date.now()}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 120);
+
+const getProposedActionSubtasks = (source: Record<string, unknown>) => {
+  const directSubtasks = readFirstStringList(source, [
+    "subtasks",
+    "subtaskTitles",
+    "subtask_titles",
+  ]);
+  if (directSubtasks.length > 0) return directSubtasks;
+
+  const subtaskPlan = asRecord(source.subtaskPlan) ??
+    asRecord(source.subtask_plan);
+  return readFirstStringList(subtaskPlan ?? {}, ["titles", "subtasks"]);
+};
+
+const buildCreateQuestProposalFromProposedAction = (
+  action: CompanionAgentProposedAction,
+  actionType: string,
+): ProposedActionQuestProposalResult => {
+  const source = getProposedActionPayloadSource(action);
+  const title = getProposedActionTitle(action);
+  const taskText = title.trim();
+
+  if (!taskText) {
+    return {
+      status: "invalid",
+      message: "Couldn't open that quest draft right now.",
+    };
+  }
+
+  return {
+    status: "ready",
+    proposal: {
+      id: createProposedActionProposalId(actionType, action),
+      kind: "create_quest",
+      title: taskText,
+      summary: action.summary?.trim() ||
+        `Review "${taskText}" before saving.`,
+      reasoning: action.reason?.trim() || null,
+      payload: {
+        taskText,
+        taskDate: readFirstNullableString(source, [
+          "taskDate",
+          "task_date",
+          "date",
+        ]) ?? null,
+        difficulty: readFirstString(source, ["difficulty"]) ?? "medium",
+        scheduledTime: readFirstNullableString(source, [
+          "scheduledTime",
+          "scheduled_time",
+          "startTime",
+          "time",
+        ]) ?? null,
+        estimatedDuration: readFirstNumber(source, [
+          "estimatedDuration",
+          "estimated_duration",
+          "durationMinutes",
+          "duration_minutes",
+          "duration",
+        ]) ?? 30,
+        recurrencePattern: readFirstNullableString(source, [
+          "recurrencePattern",
+          "recurrence_pattern",
+        ]) ?? null,
+        recurrenceDays: source.recurrenceDays ?? source.recurrence_days ?? [],
+        recurrenceMonthDays:
+          source.recurrenceMonthDays ?? source.recurrence_month_days ?? [],
+        recurrenceCustomPeriod: readFirstNullableString(source, [
+          "recurrenceCustomPeriod",
+          "recurrence_custom_period",
+        ]) ?? null,
+        reminderEnabled: readFirstBoolean(source, [
+          "reminderEnabled",
+          "reminder_enabled",
+        ]) ?? false,
+        reminderMinutesBefore: readFirstNumber(source, [
+          "reminderMinutesBefore",
+          "reminder_minutes_before",
+        ]) ?? 15,
+        notes: readFirstNullableString(source, [
+          "notes",
+          "note",
+          "description",
+        ]) ?? null,
+        location: readFirstNullableString(source, ["location"]) ?? null,
+        subtasks: getProposedActionSubtasks(source),
+      },
+      status: "pending",
+      readyToConfirm: true,
+    },
+  };
+};
+
+const buildUpdateQuestProposalFromProposedAction = (
+  action: CompanionAgentProposedAction,
+  actionType: string,
+): ProposedActionQuestProposalResult => {
+  const payloadSource = asRecord(action.normalizedPayload) ?? {};
+  const source = getProposedActionPayloadSource(action);
+  const taskId = readFirstString(source, ["taskId", "task_id", "id"]);
+
+  if (!taskId) {
+    return {
+      status: "invalid",
+      message: "Couldn't find the quest tied to that edit.",
+    };
+  }
+
+  const updates = stripUndefinedValues({
+    task_text: readFirstNullableString(payloadSource, [
+      "task_text",
+      "title",
+      "name",
+      "text",
+    ]) ?? readFirstNullableString(source, [
+      "task_text",
+      "name",
+      "text",
+    ]),
+    task_date: readFirstNullableString(source, [
+      "task_date",
+      "taskDate",
+      "date",
+    ]),
+    difficulty: readFirstNullableString(source, ["difficulty"]),
+    scheduled_time: readFirstNullableString(source, [
+      "scheduled_time",
+      "scheduledTime",
+      "startTime",
+      "time",
+    ]),
+    estimated_duration: readFirstNullableNumber(source, [
+      "estimated_duration",
+      "estimatedDuration",
+      "durationMinutes",
+      "duration_minutes",
+      "duration",
+    ]),
+    recurrence_pattern: readFirstNullableString(source, [
+      "recurrence_pattern",
+      "recurrencePattern",
+    ]),
+    recurrence_days: source.recurrence_days ?? source.recurrenceDays,
+    recurrence_month_days:
+      source.recurrence_month_days ?? source.recurrenceMonthDays,
+    recurrence_custom_period: readFirstNullableString(source, [
+      "recurrence_custom_period",
+      "recurrenceCustomPeriod",
+    ]),
+    reminder_enabled: readFirstBoolean(source, [
+      "reminder_enabled",
+      "reminderEnabled",
+    ]),
+    reminder_minutes_before: readFirstNullableNumber(source, [
+      "reminder_minutes_before",
+      "reminderMinutesBefore",
+    ]),
+    category: readFirstNullableString(source, ["category"]),
+    notes: readFirstNullableString(source, ["notes", "note", "description"]),
+    image_url: readFirstNullableString(source, ["image_url", "imageUrl"]),
+    location: readFirstNullableString(source, ["location"]),
+  });
+  const subtaskTitles = getProposedActionSubtasks(source);
+  const rawSubtaskPlan = asRecord(source.subtaskPlan) ??
+    asRecord(source.subtask_plan);
+  const rawMode = readFirstString(rawSubtaskPlan ?? source, [
+    "mode",
+    "subtaskPlanMode",
+    "subtask_plan_mode",
+  ]);
+  const subtaskPlanMode = rawMode === "replace" ? "replace" : "append";
+
+  return {
+    status: "ready",
+    proposal: {
+      id: createProposedActionProposalId(actionType, action),
+      kind: "update_quest",
+      title: getProposedActionTitle(action),
+      summary: action.summary?.trim() || "Review this quest edit.",
+      reasoning: action.reason?.trim() || null,
+      payload: stripUndefinedValues({
+        taskId,
+        updates,
+        subtaskPlan: subtaskTitles.length > 0
+          ? {
+            mode: subtaskPlanMode,
+            titles: subtaskTitles,
+          }
+          : undefined,
+      }),
+      status: "pending",
+      readyToConfirm: true,
+    },
+  };
+};
+
+const isQuestReminderTargetType = (value: string | undefined) => {
+  if (!value) return false;
+  return ["quest", "task", "daily_task", "daily-task"].includes(
+    value.trim().toLowerCase(),
+  );
+};
+
+const buildReminderQuestProposalFromProposedAction = (
+  action: CompanionAgentProposedAction,
+  actionType: string,
+): ProposedActionQuestProposalResult => {
+  const source = getProposedActionPayloadSource(action);
+  const targetType = readFirstString(source, ["targetType", "target_type"]);
+  const taskId = readFirstString(source, [
+    "taskId",
+    "task_id",
+    "targetId",
+    "target_id",
+    "id",
+  ]);
+
+  if (targetType && !isQuestReminderTargetType(targetType)) {
+    return { status: "unsupported" };
+  }
+
+  if (!taskId) {
+    return {
+      status: "invalid",
+      message: "Couldn't find the quest tied to that reminder.",
+    };
+  }
+
+  return {
+    status: "ready",
+    proposal: {
+      id: createProposedActionProposalId(actionType, action),
+      kind: "suggest_reminder",
+      title: getProposedActionTitle(action),
+      summary: action.summary?.trim() || "Review this quest reminder.",
+      reasoning: action.reason?.trim() || null,
+      payload: {
+        taskId,
+        updates: stripUndefinedValues({
+          reminder_enabled: readFirstBoolean(source, [
+            "reminder_enabled",
+            "reminderEnabled",
+          ]) ?? true,
+          reminder_minutes_before: readFirstNullableNumber(source, [
+            "reminder_minutes_before",
+            "reminderMinutesBefore",
+          ]) ?? 15,
+        }),
+      },
+      status: "pending",
+      readyToConfirm: true,
+    },
+  };
+};
+
+const buildQuestProposalFromProposedAction = (
+  action: CompanionAgentProposedAction,
+): ProposedActionQuestProposalResult => {
+  const actionType = normalizeProposedActionType(action.type);
+
+  if (actionType === "quest_create" || actionType === "task_create") {
+    return buildCreateQuestProposalFromProposedAction(action, actionType);
+  }
+
+  if (
+    actionType === "quest_update" ||
+    actionType === "task_update" ||
+    actionType === "quest_move" ||
+    actionType === "task_move"
+  ) {
+    return buildUpdateQuestProposalFromProposedAction(action, actionType);
+  }
+
+  if (actionType === "reminder_create") {
+    return buildReminderQuestProposalFromProposedAction(action, actionType);
+  }
+
+  return { status: "unsupported" };
 };
 
 const hasRichStructuredResponse = (
@@ -775,7 +1243,26 @@ const JourneysCompanionOverlayBody = memo(({
   ) => {
     if (localActionPending) return;
 
-    setPendingProposedActionKey(getProposedActionKey(action));
+    const actionKey = getProposedActionKey(action);
+    const localQuestProposal = onQuestProposalEditHandoff
+      ? buildQuestProposalFromProposedAction(action)
+      : ({ status: "unsupported" } satisfies ProposedActionQuestProposalResult);
+
+    if (localQuestProposal.status === "invalid") {
+      toast.error(localQuestProposal.message);
+      return;
+    }
+
+    setPendingProposedActionKey(actionKey);
+    if (localQuestProposal.status === "ready") {
+      void onQuestProposalEditHandoff?.(localQuestProposal.proposal).finally(
+        () => {
+          setPendingProposedActionKey(null);
+        },
+      );
+      return;
+    }
+
     void assistant
       .submitMessage(
         `Draft this: ${getProposedActionTitle(action)}`,
@@ -789,7 +1276,7 @@ const JourneysCompanionOverlayBody = memo(({
       .finally(() => {
         setPendingProposedActionKey(null);
       });
-  }, [assistant, localActionPending]);
+  }, [assistant, localActionPending, onQuestProposalEditHandoff]);
 
   const handleProposedActionDiscuss = useCallback((
     action: CompanionAgentProposedAction,

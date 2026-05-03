@@ -31,6 +31,7 @@
     "companions:expressive:manifest": "node --import tsx scripts/generate-companion-expressive-manifest.ts",
     "companions:expressive:sheets": "node --import tsx scripts/render-companion-expressive-contact-sheets.ts",
     "companions:portraits:refresh": "node scripts/refresh-companion-portrait-assets.mjs",
+    "cosmiq:preload-cards": "node --import tsx scripts/generate-cosmiq-title-preload-cards.ts",
     "companions:hatchlings:import": "node --import tsx scripts/import-companion-hatchling-assets.ts",
     "companions:hatchlings:pipeline": "npm run companions:hatchlings:import",
     "companions:initiate:import": "node --import tsx scripts/import-companion-initiate-assets.ts",

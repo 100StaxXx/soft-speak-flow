@@ -299,7 +299,7 @@ describe("CompanionStatAnalysisSurface", () => {
     globalThis.Image = originalImage;
   });
 
-  it("uses a drawer on mobile and renders the RPG stat reading shell", () => {
+  it("uses a drawer on mobile and renders the minimal title-card front", () => {
     render(
       <CompanionStatAnalysisSurface
         open={true}
@@ -315,10 +315,12 @@ describe("CompanionStatAnalysisSurface", () => {
       "src",
       "https://example.com/cosmiq-card.png",
     );
-    expect(screen.getByText("Cosmiq Title")).toBeInTheDocument();
     expect(screen.getByText("The Oathbound Pathfinder")).toBeInTheDocument();
-    expect(screen.getByText("New Title Unlocked")).toBeInTheDocument();
     expect(screen.getByText("Strengthen Creativity to evolve toward The Soulforged Creator.")).toBeInTheDocument();
+    expect(screen.queryByText("New Title Unlocked")).not.toBeInTheDocument();
+    expect(screen.queryByText("Vitality")).not.toBeInTheDocument();
+    expect(screen.queryByText("560")).not.toBeInTheDocument();
+    expect(screen.queryByText("Strong")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Show stat analysis" }));
 
@@ -539,14 +541,16 @@ describe("CompanionStatAnalysisSurface", () => {
     );
 
     expect(screen.getByTestId("companion-title-art-loading")).toBeInTheDocument();
-    expect(screen.getByTestId("companion-title-art-placeholder")).toBeInTheDocument();
-    expect(screen.getByText("Generating title art")).toBeInTheDocument();
     expect(screen.getByTestId("companion-stat-analysis-prelude-card")).toHaveAttribute(
       "data-card-id",
       firstPreludeCard.id,
     );
     expect(screen.getByText(firstPreludeCard.title)).toBeInTheDocument();
     expect(screen.getByText(firstPreludeCard.description)).toBeInTheDocument();
+    expect(screen.getByAltText(`${firstPreludeCard.title} preload archetype illustration`)).toHaveAttribute(
+      "src",
+      expect.stringContaining(firstPreludeCard.imageStoragePath),
+    );
     expect(screen.queryByText("The Oathbound Pathfinder")).not.toBeInTheDocument();
     expect(screen.queryByText("Discipline")).not.toBeInTheDocument();
     expect(screen.queryByText("Alignment")).not.toBeInTheDocument();
@@ -566,12 +570,14 @@ describe("CompanionStatAnalysisSurface", () => {
     );
 
     expect(screen.getByTestId("companion-title-art-loading")).toBeInTheDocument();
-    expect(screen.getByText("Art preview received")).toBeInTheDocument();
     const preview = screen.getByTestId("companion-title-art-loading-preview");
     expect(preview.querySelector("img")?.getAttribute("src")).toBe("https://example.com/cosmiq-card.png");
     expect(preview.querySelectorAll("img")).toHaveLength(1);
-    expect(screen.getByText("Preview warming")).toBeInTheDocument();
     expect(screen.getByText(COMPANION_STAT_ANALYSIS_PRELUDE_CARDS[0].title)).toBeInTheDocument();
+    expect(screen.getByAltText("The Wandering Seeker preload archetype illustration")).toHaveAttribute(
+      "src",
+      expect.stringContaining("preload-template-cards/v1/the-wandering-seeker.png"),
+    );
     expect(screen.queryByText("The Oathbound Pathfinder")).not.toBeInTheDocument();
     expect(screen.queryByText("Discipline")).not.toBeInTheDocument();
     expect(screen.queryByText("560")).not.toBeInTheDocument();
@@ -626,7 +632,7 @@ describe("CompanionStatAnalysisSurface", () => {
     );
 
     expect(screen.getByTestId("companion-title-art-loading")).toBeInTheDocument();
-    expect(screen.getByText("Preview warming")).toBeInTheDocument();
+    expect(screen.getByText(COMPANION_STAT_ANALYSIS_PRELUDE_CARDS[0].title)).toBeInTheDocument();
 
     act(() => {
       const preloadImage = mockImageInstances[0];
@@ -674,14 +680,14 @@ describe("CompanionStatAnalysisSurface", () => {
     );
 
     expect(screen.getByTestId("companion-title-art-loading")).toBeInTheDocument();
-    expect(screen.getByText("Preview warming")).toBeInTheDocument();
+    expect(screen.getByText(COMPANION_STAT_ANALYSIS_PRELUDE_CARDS[0].title)).toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(10_000);
     });
 
     expect(screen.getByTestId("companion-title-art-loading")).toBeInTheDocument();
-    expect(screen.getByText("Preview warming")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-stat-analysis-prelude-card")).toBeInTheDocument();
     expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
 
     act(() => {
@@ -691,14 +697,12 @@ describe("CompanionStatAnalysisSurface", () => {
       preloadImage.onload?.();
     });
 
-    expect(screen.getByText("Preview 1/1")).toBeInTheDocument();
     expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(1_800);
     });
 
-    expect(screen.getByText("Preview 1/1")).toBeInTheDocument();
     expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
 
     const preview = screen.getByTestId("companion-title-art-loading-preview");
@@ -708,19 +712,10 @@ describe("CompanionStatAnalysisSurface", () => {
       });
     });
 
-    expect(screen.getByText("Preview 1/3")).toBeInTheDocument();
-
     act(() => {
-      vi.advanceTimersByTime(1_800);
+      vi.advanceTimersByTime(3_600);
     });
 
-    expect(screen.getByText("Preview 2/3")).toBeInTheDocument();
-
-    act(() => {
-      vi.advanceTimersByTime(1_800);
-    });
-
-    expect(screen.getByText("Preview 3/3")).toBeInTheDocument();
     expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
 
     act(() => {
@@ -746,12 +741,17 @@ describe("CompanionStatAnalysisSurface", () => {
       expect(mocks.regenerateTitleCardMock).toHaveBeenCalledWith(analysis);
     });
     expect(await screen.findByTestId("companion-cosmiq-title-card")).toBeInTheDocument();
-    expect(screen.getByText("Art unavailable")).toBeInTheDocument();
-    expect(screen.getByText("Title art could not load. Tap regenerate to try again.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Regenerate title art" })).toBeInTheDocument();
+    expect(screen.getByTestId("companion-title-art-placeholder")).toBeInTheDocument();
     expect(screen.getByText("The Oathbound Pathfinder")).toBeInTheDocument();
+    expect(screen.getByText("Strengthen Creativity to evolve toward The Soulforged Creator.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Regenerate title art" })).not.toBeInTheDocument();
     expect(screen.queryByText("Stats analysis is unavailable right now.")).not.toBeInTheDocument();
     expect(screen.queryByAltText("The Oathbound Pathfinder archetype illustration")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show stat analysis" }));
+
+    expect(screen.getByText("Title art could not load. Tap regenerate to try again.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Regenerate title art" })).toBeInTheDocument();
   });
 
   it("keeps the stat reading visible when title-card generation is unavailable", () => {
@@ -787,16 +787,18 @@ describe("CompanionStatAnalysisSurface", () => {
     );
 
     expect(screen.getByTestId("companion-cosmiq-title-card")).toBeInTheDocument();
-    expect(screen.getByText("Art unavailable")).toBeInTheDocument();
-    expect(screen.getByText("Art generation is paused by the budget guardrail.")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-title-art-placeholder")).toBeInTheDocument();
+    expect(screen.queryByText("Art unavailable")).not.toBeInTheDocument();
+    expect(screen.queryByText("Art generation is paused by the budget guardrail.")).not.toBeInTheDocument();
     expect(screen.queryByText("Stats analysis is unavailable right now.")).not.toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("button", { name: "Show stat analysis" }));
+
+    expect(screen.getByText("Art generation is paused by the budget guardrail.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Regenerate title art" }));
     expect(mocks.regenerateTitleCardMock).toHaveBeenCalledWith(
       expect.objectContaining({ analysisDate: "2026-04-18" }),
     );
-
-    fireEvent.click(screen.getByRole("button", { name: "Show stat analysis" }));
 
     expect(screen.getByText("Current Build")).toBeInTheDocument();
     expect(screen.getByText("Recommended Quest")).toBeInTheDocument();
