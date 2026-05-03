@@ -150,18 +150,6 @@ const MILESTONE_ID_SET = new Set<GuidedMilestoneId>([
 const isGuidedMilestoneId = (value: unknown): value is GuidedMilestoneId =>
   typeof value === "string" && MILESTONE_ID_SET.has(value as GuidedMilestoneId);
 
-export const MILESTONES_ALLOWING_TEMPORARY_HIDE = new Set<GuidedMilestoneId>([
-  "complete_companion_evolution",
-  "start_new_goal",
-  "complete_pathfinder_campaign",
-  "start_plan_my_day",
-  "answer_plan_day_ai",
-  "save_plan_day_action",
-  "tap_hatch_companion",
-  "complete_companion_hatch",
-  "first_plan_closeout_message",
-]);
-
 const getSafeMilestoneArray = (value: unknown): GuidedMilestoneId[] => {
   if (!Array.isArray(value)) return [];
   return value.filter(isGuidedMilestoneId);
@@ -685,7 +673,6 @@ export interface PostOnboardingMentorGuidanceState {
   activeTargetSelectors: string[];
   activeTargetSelector: string | null;
   isStrictLockActive: boolean;
-  canTemporarilyHide: boolean;
   dialogueText: string;
   dialogueSupportText?: string;
   speakerName: string;
@@ -710,7 +697,6 @@ const DEFAULT_GUIDANCE_STATE: PostOnboardingMentorGuidanceState = {
   activeTargetSelectors: [],
   activeTargetSelector: null,
   isStrictLockActive: false,
-  canTemporarilyHide: false,
   dialogueText: "",
   dialogueSupportText: undefined,
   speakerName: "Your guide",
@@ -754,6 +740,30 @@ const getMilestoneDialogue = (
     return getDialogueForMentor(mentorSlug, milestoneId);
   }
   return FALLBACK_DIALOGUE;
+};
+
+const getTargetAwareMilestoneDialogue = (
+  milestoneId: GuidedMilestoneId,
+  mentorSlug: string | undefined,
+  activeTargetSelector: string | null,
+): MentorDialogueLine => {
+  if (activeTargetSelector === COMPANION_QUICK_ACTIONS_SELECTOR) {
+    if (milestoneId === "start_new_goal") {
+      return {
+        text: "Click your companion's egg.",
+        support: "Then choose New goal.",
+      };
+    }
+
+    if (milestoneId === "start_plan_my_day") {
+      return {
+        text: "Click your companion's egg.",
+        support: "Then choose Plan day.",
+      };
+    }
+  }
+
+  return getMilestoneDialogue(milestoneId, mentorSlug);
 };
 
 export const milestoneUsesStrictLock = (milestoneId: GuidedMilestoneId | null): boolean => {
@@ -1917,7 +1927,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       : "";
 
   const dialogue: MentorDialogueLine = currentMilestone
-    ? getMilestoneDialogue(currentMilestone, personality?.slug)
+    ? getTargetAwareMilestoneDialogue(currentMilestone, personality?.slug, activeTargetSelector)
     : { text: "" };
   const mentorInstructionLines = dialogue.support ? [dialogue.text, dialogue.support] : [dialogue.text];
 
@@ -1983,8 +1993,6 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     activeTargetSelectors: tutorialSuppressed ? [] : activeTargetSelectors,
     activeTargetSelector: tutorialSuppressed ? null : activeTargetSelector,
     isStrictLockActive: Boolean(isActive && activeTargetSelector && strictLockEnabled),
-    canTemporarilyHide: !tutorialSuppressed &&
-      MILESTONES_ALLOWING_TEMPORARY_HIDE.has(currentMilestone as GuidedMilestoneId),
     dialogueText: tutorialSuppressed ? "" : dialogue.text,
     dialogueSupportText: tutorialSuppressed ? undefined : dialogueSupportText,
     speakerName: personality?.name ?? "Your guide",

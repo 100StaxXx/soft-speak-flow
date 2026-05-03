@@ -159,7 +159,6 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 import {
   CREATE_QUEST_SUBSTEP_ORDER,
-  MILESTONES_ALLOWING_TEMPORARY_HIDE,
   PostOnboardingMentorGuidanceProvider,
   getMentorInstructionLines,
   milestoneUsesStrictLock,
@@ -250,20 +249,6 @@ describe("guided tutorial helpers", () => {
     expect(milestoneUsesStrictLock("complete_companion_hatch")).toBe(false);
   });
 
-  it("allows temporarily hiding the panel on planner milestones that occlude transcript content", () => {
-    expect(
-      MILESTONES_ALLOWING_TEMPORARY_HIDE.has("complete_companion_evolution"),
-    ).toBe(true);
-    expect(MILESTONES_ALLOWING_TEMPORARY_HIDE.has("start_new_goal")).toBe(true);
-    expect(MILESTONES_ALLOWING_TEMPORARY_HIDE.has("complete_pathfinder_campaign")).toBe(true);
-    expect(MILESTONES_ALLOWING_TEMPORARY_HIDE.has("start_plan_my_day")).toBe(true);
-    expect(MILESTONES_ALLOWING_TEMPORARY_HIDE.has("answer_plan_day_ai")).toBe(true);
-    expect(MILESTONES_ALLOWING_TEMPORARY_HIDE.has("tap_hatch_companion")).toBe(true);
-    expect(MILESTONES_ALLOWING_TEMPORARY_HIDE.has("complete_companion_hatch")).toBe(true);
-    expect(MILESTONES_ALLOWING_TEMPORARY_HIDE.has("mentor_intro_hello")).toBe(false);
-    expect(MILESTONES_ALLOWING_TEMPORARY_HIDE.has("meet_companion_intro")).toBe(false);
-  });
-
   it("restores current tutorial work to the active feature route", () => {
     expect(
       shouldRestoreTutorialRoute({
@@ -335,6 +320,9 @@ describe("guided tutorial first-value loop", () => {
     document
       .querySelectorAll('[data-tour="companion-launcher-option-goal"], [data-tour="pathfinder-primary-action"], [data-tour="evolve-companion-button"]')
       .forEach((element) => element.remove());
+    document
+      .querySelectorAll('[data-planner-tour="companion-quick-actions"]')
+      .forEach((element) => element.remove());
   });
 
   const createWrapper = (path = "/journeys") =>
@@ -372,6 +360,69 @@ describe("guided tutorial first-value loop", () => {
       expect(result.current.activeTargetSelector).toBe(
         '[data-tour="companion-launcher-option-goal"]',
       );
+    });
+  });
+
+  it("names the closed companion launcher as the egg before New goal is visible", async () => {
+    const quickActionsTarget = document.createElement("button");
+    quickActionsTarget.setAttribute("data-planner-tour", "companion-quick-actions");
+    document.body.appendChild(quickActionsTarget);
+
+    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.onDialogueAction?.();
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("new_goal");
+      expect(result.current.activeTargetSelector).toBe(
+        '[data-planner-tour="companion-quick-actions"]',
+      );
+      expect(result.current.dialogueText).toBe("Click your companion's egg.");
+      expect(result.current.dialogueSupportText).toBe("Then choose New goal.");
+    });
+
+    const newGoalTarget = document.createElement("button");
+    newGoalTarget.setAttribute("data-tour", "companion-launcher-option-goal");
+    document.body.appendChild(newGoalTarget);
+
+    await waitFor(() => {
+      expect(result.current.activeTargetSelector).toBe(
+        '[data-tour="companion-launcher-option-goal"]',
+      );
+      expect(result.current.dialogueText).toBe("Tap 'New goal.'");
+    });
+  });
+
+  it("names the closed companion launcher as the egg before Plan day is visible", async () => {
+    mocks.state.guidedTutorial = {
+      ...createFreshTutorial(),
+      completedSteps: ["new_goal"],
+      xpAwardedSteps: ["new_goal"],
+      milestonesCompleted: [
+        "mentor_intro_hello",
+        "start_new_goal",
+        "complete_pathfinder_campaign",
+      ],
+    };
+    const quickActionsTarget = document.createElement("button");
+    quickActionsTarget.setAttribute("data-planner-tour", "companion-quick-actions");
+    document.body.appendChild(quickActionsTarget);
+
+    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("plan_my_day");
+      expect(result.current.activeTargetSelector).toBe(
+        '[data-planner-tour="companion-quick-actions"]',
+      );
+      expect(result.current.dialogueText).toBe("Click your companion's egg.");
+      expect(result.current.dialogueSupportText).toBe("Then choose Plan day.");
     });
   });
 

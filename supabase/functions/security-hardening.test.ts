@@ -156,7 +156,7 @@ const EXPECTED_MENTOR_VOICE_IDS = [
   ["charles", "charles", "jRAAK67SEFE9m7ci5DhD"],
   ["princess", "princess", "uIZsnBL0YK1S5j69bAih"],
   ["operator", "operator", "pNInz6obpgDQGcFmaJgB"],
-  ["rival", "rival", "ch0vU2DwfJVmFG2iZy89"],
+  ["rival", "rival", "KLZOWyG48RjZkAAjuM89"],
   ["reign", "reign", "GTQ4ImqrRljZAa9VJX6B"],
 ] as const;
 
@@ -167,7 +167,7 @@ const EXPECTED_ALIAS_VOICE_IDS = [
   ["elizabeth", "charles", "jRAAK67SEFE9m7ci5DhD"],
   ["sienna", "princess", "uIZsnBL0YK1S5j69bAih"],
   ["stryker", "operator", "pNInz6obpgDQGcFmaJgB"],
-  ["eli", "rival", "ch0vU2DwfJVmFG2iZy89"],
+  ["eli", "rival", "KLZOWyG48RjZkAAjuM89"],
 ] as const;
 
 Deno.test("retry-failed-payouts rejects unauthenticated callers", async () => {

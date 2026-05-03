@@ -402,7 +402,6 @@ export const MentorGuidanceCard = () => {
     isActive,
     activeTargetSelector,
     activeTargetSelectors,
-    canTemporarilyHide,
     progressText,
     dialogueText,
     dialogueSupportText,
@@ -422,7 +421,6 @@ export const MentorGuidanceCard = () => {
     anchor: "bottom",
     bottomPx: PANEL_BASE_BOTTOM_PX,
   });
-  const [isTemporarilyHidden, setIsTemporarilyHidden] = useState(false);
 
   const updatePlacement = useCallback(() => {
     if (!isActive) return;
@@ -502,14 +500,7 @@ export const MentorGuidanceCard = () => {
     };
   }, [isActive, updatePlacement]);
 
-  useEffect(() => {
-    if (canTemporarilyHide) return;
-    setIsTemporarilyHidden(false);
-  }, [canTemporarilyHide]);
-
-  const isPanelVisible = Boolean(
-    isActive && dialogueText && !(canTemporarilyHide && isTemporarilyHidden)
-  );
+  const isPanelVisible = Boolean(isActive && dialogueText);
 
   useEffect(() => {
     if (!isPanelVisible) {
@@ -552,7 +543,7 @@ export const MentorGuidanceCard = () => {
   );
   const isCompact = placement.anchor === "floating" && placement.compact;
 
-  if (!isActive || !dialogueText || (canTemporarilyHide && isTemporarilyHidden)) {
+  if (!isActive || !dialogueText) {
     return null;
   }
 
@@ -604,22 +595,8 @@ export const MentorGuidanceCard = () => {
             {dialogueSupportText && !isCompact ? (
               <p className="mt-1 text-sm leading-relaxed text-white/80">{dialogueSupportText}</p>
             ) : null}
-            {!isCompact && (canTemporarilyHide || onSecondaryAction || onDialogueAction) ? (
+            {!isCompact && (onSecondaryAction || onDialogueAction) ? (
               <div className={cn("mt-3 flex flex-wrap gap-2", isCompact && "mt-2")}>
-                {canTemporarilyHide ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    aria-label="Hide tutorial"
-                    onClick={() => setIsTemporarilyHidden(true)}
-                    className={cn(
-                      "pointer-events-auto h-9 rounded-xl border border-white/25 bg-black/45 text-white hover:bg-black/60",
-                      isCompact && "h-8 px-2 text-xs",
-                    )}
-                  >
-                    Hide tutorial
-                  </Button>
-                ) : null}
                 {onSecondaryAction ? (
                   <Button
                     type="button"

@@ -61,7 +61,7 @@ export const ELEVENLABS_MENTOR_VOICES: Record<
     use_speaker_boost: true,
   },
   rival: {
-    voiceId: "ch0vU2DwfJVmFG2iZy89",
+    voiceId: "KLZOWyG48RjZkAAjuM89",
     stability: 0.68,
     similarity_boost: 0.88,
     style_exaggeration: 0.84,

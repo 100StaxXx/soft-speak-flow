@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   MentorGuidanceCard,
   resolveMentorGuidanceBottomInsetPx,
@@ -21,7 +21,6 @@ const mocks = vi.hoisted(() => ({
     activeTargetSelectors: ['[data-tour="companion-launcher-option-plan-day"]'],
     activeTargetSelector: '[data-tour="companion-launcher-option-plan-day"]',
     isStrictLockActive: true,
-    canTemporarilyHide: false,
     dialogueText: "Tap 'Plan day.'",
     dialogueSupportText: "It'll give you something simple to follow.",
     secondaryActionLabel: "Skip tutorial",
@@ -41,6 +40,16 @@ vi.mock("@/components/MentorAvatar", () => ({
 vi.mock("@/hooks/usePostOnboardingMentorGuidance", () => ({
   usePostOnboardingMentorGuidance: () => mocks.guidance,
 }));
+
+beforeEach(() => {
+  mocks.guidance.isActive = true;
+  mocks.guidance.secondaryActionLabel = "Skip tutorial";
+  mocks.guidance.onSecondaryAction = mocks.onSecondaryAction;
+  mocks.guidance.dialogueActionLabel = undefined;
+  mocks.guidance.onDialogueAction = undefined;
+  mocks.onDialogueAction.mockClear();
+  mocks.onSecondaryAction.mockClear();
+});
 
 const rect = ({
   top,
@@ -224,42 +233,10 @@ describe("MentorGuidanceCard", () => {
     mocks.onDialogueAction.mockClear();
   });
 
-  it("renders hide tutorial control only when temporary hiding is allowed", () => {
-    const { rerender } = render(<MentorGuidanceCard />);
+  it("does not render a hide tutorial control", () => {
+    render(<MentorGuidanceCard />);
 
     expect(screen.queryByRole("button", { name: "Hide tutorial" })).not.toBeInTheDocument();
-
-    mocks.guidance.canTemporarilyHide = true;
-    rerender(<MentorGuidanceCard />);
-
-    expect(screen.getByRole("button", { name: "Hide tutorial" })).toBeInTheDocument();
-
-    mocks.guidance.canTemporarilyHide = false;
-  });
-
-  it("hides the panel after tapping hide tutorial", () => {
-    mocks.guidance.canTemporarilyHide = true;
-
-    render(<MentorGuidanceCard />);
-    fireEvent.click(screen.getByRole("button", { name: "Hide tutorial" }));
-
-    expect(screen.queryByText("Sage portrait")).not.toBeInTheDocument();
-
-    mocks.guidance.canTemporarilyHide = false;
-  });
-
-  it("restores the panel after temporary hiding is no longer allowed", () => {
-    mocks.guidance.canTemporarilyHide = true;
-    const { rerender } = render(<MentorGuidanceCard />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Hide tutorial" }));
-    expect(screen.queryByText("Sage portrait")).not.toBeInTheDocument();
-
-    mocks.guidance.canTemporarilyHide = false;
-    rerender(<MentorGuidanceCard />);
-
-    expect(screen.getByText("Sage portrait")).toBeInTheDocument();
-    expect(screen.getByText("Tap 'Plan day.'")).toBeInTheDocument();
   });
 });
 
@@ -506,7 +483,6 @@ describe("resolveMentorGuidanceBottomInsetPx", () => {
 describe("MentorGuidanceCard CSS var", () => {
   afterEach(() => {
     document.documentElement.style.removeProperty("--mentor-guidance-bottom-inset");
-    mocks.guidance.canTemporarilyHide = false;
     mocks.guidance.isActive = true;
   });
 
@@ -563,37 +539,6 @@ describe("MentorGuidanceCard CSS var", () => {
     rectSpy.mockRestore();
   });
 
-  it("resets the bottom inset variable when the panel is temporarily hidden", async () => {
-    mocks.guidance.canTemporarilyHide = true;
-    Object.defineProperty(window, "innerHeight", {
-      configurable: true,
-      value: 844,
-    });
-    const rectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
-      const element = this as HTMLElement;
-      if (element.dataset.tutorial === "mentor-dialogue-panel" || element.dataset.testid === "mentor-guidance-card-panel") {
-        return rect({ top: 620, left: 0, width: 390, height: 224 });
-      }
-      return rect({ top: 0, left: 0, width: 0, height: 0 });
-    });
-
-    render(<MentorGuidanceCard />);
-    await waitFor(() => {
-      expect(
-        document.documentElement.style.getPropertyValue("--mentor-guidance-bottom-inset")
-      ).toBe("224px");
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Hide tutorial" }));
-
-    await waitFor(() => {
-      expect(
-        document.documentElement.style.getPropertyValue("--mentor-guidance-bottom-inset")
-      ).toBe("0px");
-    });
-
-    rectSpy.mockRestore();
-  });
 });
 
 describe("resolveMentorGuidanceMinTopPx", () => {

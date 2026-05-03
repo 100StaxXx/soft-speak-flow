@@ -6,27 +6,40 @@ function assert(condition: boolean, message: string): void {
 
 Deno.test("pep talk generation migration provisions global idempotency and daily uniqueness", async () => {
   const migration = await Deno.readTextFile(
-    new URL("../migrations/20260425183000_add_pep_talk_generation_idempotency.sql", import.meta.url),
+    new URL(
+      "../migrations/20260425183000_add_pep_talk_generation_idempotency.sql",
+      import.meta.url,
+    ),
   );
 
   assert(
-    migration.includes("CREATE TABLE IF NOT EXISTS public.pep_talk_generation_requests"),
+    migration.includes(
+      "CREATE TABLE IF NOT EXISTS public.pep_talk_generation_requests",
+    ),
     "Expected migration to create pep_talk_generation_requests",
   );
   assert(
-    migration.includes("CREATE UNIQUE INDEX IF NOT EXISTS pep_talk_generation_requests_key_idx") &&
+    migration.includes(
+      "CREATE UNIQUE INDEX IF NOT EXISTS pep_talk_generation_requests_key_idx",
+    ) &&
       migration.includes("ON public.pep_talk_generation_requests(request_key)"),
     "Expected generation idempotency to be global by request_key",
   );
   assert(
-    migration.includes("CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_pep_talks_mentor_date_unique") &&
+    migration.includes(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_pep_talks_mentor_date_unique",
+    ) &&
       migration.includes("ON public.daily_pep_talks(mentor_slug, for_date)"),
     "Expected daily_pep_talks to enforce one row per mentor/date",
   );
   assert(
     migration.includes("UPDATE public.user_daily_pushes") &&
-      migration.includes("DROP INDEX IF EXISTS public.idx_user_daily_pushes_user_pep_unique") &&
-      migration.includes("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_daily_pushes_user_pep_unique") &&
+      migration.includes(
+        "DROP INDEX IF EXISTS public.idx_user_daily_pushes_user_pep_unique",
+      ) &&
+      migration.includes(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_user_daily_pushes_user_pep_unique",
+      ) &&
       migration.includes("DELETE FROM public.daily_pep_talks"),
     "Expected migration to re-point and de-dupe push rows before removing duplicate daily pep talks",
   );
@@ -119,5 +132,11 @@ Deno.test("mentor audio retries ElevenLabs before falling back to OpenAI", async
     audioSource.includes("storagePath: filePath") &&
       fullAudioSource.includes("audioStoragePath"),
     "Expected audio storage path to flow through the pipeline for replay diagnostics",
+  );
+  assert(
+    fullAudioSource.includes("shouldUseFallbackScript") &&
+      fullAudioSource.includes("buildFallbackMentorScript") &&
+      fullAudioSource.includes("scriptFallback"),
+    "Expected script-provider throttling to use a local fallback script and continue to audio generation",
   );
 });

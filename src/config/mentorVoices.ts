@@ -104,7 +104,7 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
     mentorSlug: "rival",
     mentorName: "The Rival",
     voiceName: "The Rival",
-    voiceId: "ch0vU2DwfJVmFG2iZy89",
+    voiceId: "KLZOWyG48RjZkAAjuM89",
     defaultIntensity: "high",
     categories: ["competition", "performance", "intensity"],
     voiceSettings: {
