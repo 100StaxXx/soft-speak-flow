@@ -140,11 +140,33 @@ describe("useAccessStatus", () => {
     expect(result.current.gateReason).toBe("none");
   });
 
-  it("shows pre-trial signup gate after tutorial completion even if legacy trial dates exist", () => {
+  it("grants trial access after tutorial completion when entitlement is active", () => {
     mocks.accessState = {
       has_access: true,
       access_source: "trial",
-      trial_ends_at: "2026-03-01T00:00:00.000Z",
+      trial_ends_at: "2026-05-11T00:00:00.000Z",
+      subscribed: false,
+    };
+    mocks.profile = createProfile({
+      onboarding_data: {
+        guided_tutorial: { completed: true },
+      },
+    });
+
+    const { result } = renderHook(() => useAccessStatus());
+
+    expect(result.current.hasAccess).toBe(true);
+    expect(result.current.accessSource).toBe("trial");
+    expect(result.current.isInTrial).toBe(true);
+    expect(result.current.trialDaysRemaining).toBeGreaterThan(0);
+    expect(result.current.gateReason).toBe("none");
+  });
+
+  it("shows trial_expired gate (not pre_trial_signup) when expired trial follows tutorial completion", () => {
+    mocks.accessState = {
+      has_access: false,
+      access_source: "none",
+      trial_ends_at: "2026-01-08T00:00:00.000Z",
       subscribed: false,
     };
     mocks.profile = createProfile({
@@ -156,7 +178,8 @@ describe("useAccessStatus", () => {
     const { result } = renderHook(() => useAccessStatus());
 
     expect(result.current.hasAccess).toBe(false);
-    expect(result.current.gateReason).toBe("pre_trial_signup");
+    expect(result.current.trialExpired).toBe(true);
+    expect(result.current.gateReason).toBe("trial_expired");
   });
 
   it("shows pre-trial signup gate from local guided tutorial completion before profile refresh", () => {
