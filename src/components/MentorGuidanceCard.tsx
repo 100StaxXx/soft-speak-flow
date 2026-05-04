@@ -405,6 +405,7 @@ export const MentorGuidanceCard = () => {
     activeTargetSelector,
     activeTargetSelectors,
     canTemporarilyHide,
+    shouldAutoHideCard,
     progressText,
     dialogueText,
     dialogueSupportText,
@@ -540,7 +541,7 @@ export const MentorGuidanceCard = () => {
   }, [canTemporarilyHide]);
 
   const isPanelVisible = Boolean(
-    isActive && dialogueText && !(canTemporarilyHide && isTemporarilyHidden)
+    isActive && dialogueText && !(canTemporarilyHide && isTemporarilyHidden) && !shouldAutoHideCard
   );
 
   useEffect(() => {
@@ -584,7 +585,7 @@ export const MentorGuidanceCard = () => {
   );
   const isCompact = placement.anchor === "floating" && placement.compact;
 
-  if (!isActive || !dialogueText || (canTemporarilyHide && isTemporarilyHidden)) {
+  if (!isActive || !dialogueText || (canTemporarilyHide && isTemporarilyHidden) || shouldAutoHideCard) {
     return null;
   }
 

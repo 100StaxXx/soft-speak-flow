@@ -162,6 +162,12 @@ export const MILESTONES_ALLOWING_TEMPORARY_HIDE = new Set<GuidedMilestoneId>([
   "first_plan_closeout_message",
 ]);
 
+// Milestones whose card should not render at all — the user is in a passive
+// wait and the system auto-progresses, so the card adds no value.
+export const MILESTONES_AUTO_HIDDEN = new Set<GuidedMilestoneId>([
+  "complete_companion_hatch",
+]);
+
 const getSafeMilestoneArray = (value: unknown): GuidedMilestoneId[] => {
   if (!Array.isArray(value)) return [];
   return value.filter(isGuidedMilestoneId);
@@ -686,6 +692,7 @@ export interface PostOnboardingMentorGuidanceState {
   activeTargetSelector: string | null;
   isStrictLockActive: boolean;
   canTemporarilyHide: boolean;
+  shouldAutoHideCard: boolean;
   dialogueText: string;
   dialogueSupportText?: string;
   speakerName: string;
@@ -711,6 +718,7 @@ const DEFAULT_GUIDANCE_STATE: PostOnboardingMentorGuidanceState = {
   activeTargetSelector: null,
   isStrictLockActive: false,
   canTemporarilyHide: false,
+  shouldAutoHideCard: false,
   dialogueText: "",
   dialogueSupportText: undefined,
   speakerName: "Your guide",
@@ -1984,6 +1992,8 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     isStrictLockActive: Boolean(isActive && activeTargetSelector && strictLockEnabled),
     canTemporarilyHide: !tutorialSuppressed &&
       MILESTONES_ALLOWING_TEMPORARY_HIDE.has(currentMilestone as GuidedMilestoneId),
+    shouldAutoHideCard: !tutorialSuppressed &&
+      MILESTONES_AUTO_HIDDEN.has(currentMilestone as GuidedMilestoneId),
     dialogueText: tutorialSuppressed ? "" : dialogue.text,
     dialogueSupportText: tutorialSuppressed ? undefined : dialogueSupportText,
     speakerName: personality?.name ?? "Your guide",
