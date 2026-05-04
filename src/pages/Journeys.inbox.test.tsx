@@ -284,6 +284,12 @@ vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
     launcherAwayFocalX: null,
     launcherAwayFocalY: null,
     launcherAwayUsesPortraitShell: false,
+    launcherImageUrl: "/placeholder-companion.svg",
+    launcherImageFocalX: 0.5,
+    launcherImageFocalY: 0.5,
+    launcherImageFresh: false,
+    launcherImageStatus: "ready",
+    retryLauncherImage: vi.fn(),
   }),
 }));
 

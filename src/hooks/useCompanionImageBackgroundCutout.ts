@@ -19,6 +19,11 @@ type CachedCompanionImageCutoutResult = {
 
 const MAX_CUTOUT_EDGE_PX = 512;
 const MIN_REMOVED_PIXEL_RATIO = 0.02;
+// Hard ceiling to keep the FAB from staying invisible (opacity-0) forever
+// when an image neither loads nor fires `onerror` — most often caused by a
+// cross-origin response without proper CORS headers under
+// `crossOrigin="anonymous"`.
+const CUTOUT_LOAD_TIMEOUT_MS = 4000;
 const cutoutCache = new Map<string, CachedCompanionImageCutoutResult>();
 
 const isCutoutCandidateSrc = (src?: string | null) => {
@@ -76,7 +81,22 @@ export const useCompanionImageBackgroundCutout = (
       image.crossOrigin = "anonymous";
     }
 
+    const failOnce = (reason: "load-error" | "timeout" | "context-missing" | "decode-error") => {
+      if (cancelled) return;
+      cutoutCache.set(normalizedSrc, { cutoutSrc: null, status: "failed" });
+      setResult({ cutoutSrc: null, status: "failed" });
+      if (reason === "timeout") {
+        // Detach handlers so a late onload/onerror cannot resurrect the
+        // hook into a stale state for a different src.
+        image.onload = null;
+        image.onerror = null;
+      }
+    };
+
+    const loadTimeout = window.setTimeout(() => failOnce("timeout"), CUTOUT_LOAD_TIMEOUT_MS);
+
     image.onload = () => {
+      window.clearTimeout(loadTimeout);
       if (cancelled) return;
 
       try {
@@ -84,8 +104,7 @@ export const useCompanionImageBackgroundCutout = (
         const context = canvas.getContext("2d", { willReadFrequently: true });
 
         if (!context) {
-          cutoutCache.set(normalizedSrc, { cutoutSrc: null, status: "failed" });
-          setResult({ cutoutSrc: null, status: "failed" });
+          failOnce("context-missing");
           return;
         }
 
@@ -107,21 +126,20 @@ export const useCompanionImageBackgroundCutout = (
         cutoutCache.set(normalizedSrc, { cutoutSrc, status: "ready" });
         setResult({ cutoutSrc, status: "ready" });
       } catch {
-        cutoutCache.set(normalizedSrc, { cutoutSrc: null, status: "failed" });
-        setResult({ cutoutSrc: null, status: "failed" });
+        failOnce("decode-error");
       }
     };
 
     image.onerror = () => {
-      if (cancelled) return;
-      cutoutCache.set(normalizedSrc, { cutoutSrc: null, status: "failed" });
-      setResult({ cutoutSrc: null, status: "failed" });
+      window.clearTimeout(loadTimeout);
+      failOnce("load-error");
     };
 
     image.src = normalizedSrc;
 
     return () => {
       cancelled = true;
+      window.clearTimeout(loadTimeout);
       image.onload = null;
       image.onerror = null;
     };

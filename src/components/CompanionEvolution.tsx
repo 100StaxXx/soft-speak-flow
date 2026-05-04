@@ -52,6 +52,7 @@ interface MappedHatchVideoPolicyInput {
 
 interface SilhouetteStrobePolicyInput {
   hasDualArt: boolean;
+  hasFirstHatchSingleArt: boolean;
   prefersReducedMotion: boolean;
   useHatchVideo: boolean;
 }
@@ -79,7 +80,13 @@ const REDUCED_SEQUENCE_MS = {
 } as const;
 
 const EMERGENCY_EXIT_DELAY_MS = 15_000;
+// Cold Supabase storage URLs (especially the freshly-uploaded hatchling
+// portrait) routinely take 2-3s to first-byte, so a tight 2s timeout was
+// causing the hatch animation to start with both images marked "error" and
+// fall through to a no-art quick-exit. Five seconds for first hatch keeps
+// the UX deterministic; subsequent evolutions keep the snappier 2s.
 const IMAGE_PRELOAD_TIMEOUT_MS = 2_000;
+const FIRST_HATCH_IMAGE_PRELOAD_TIMEOUT_MS = 5_000;
 const HATCH_INTRO_MIN_MS = 800;
 const HATCH_FOREGROUND_STAGE_MAX_WIDTH_PX = 560;
 const HATCH_FOREGROUND_STAGE_MAX_HEIGHT_PX = 700;
@@ -115,10 +122,11 @@ const shouldUseMappedPresetHatchVideo = ({
 
 const shouldUseSilhouetteStrobe = ({
   hasDualArt,
+  hasFirstHatchSingleArt,
   prefersReducedMotion,
   useHatchVideo,
 }: SilhouetteStrobePolicyInput): boolean => (
-  hasDualArt
+  (hasDualArt || hasFirstHatchSingleArt)
   && !prefersReducedMotion
   && !useHatchVideo
 );
@@ -450,8 +458,19 @@ const CompanionEvolutionContent = ({
       && previousDisplayImageUrl !== revealDisplayImageUrl
       && artReadiness.next === "loaded",
   );
+  // First-hatch path: even if the previous (egg) image fails to preload, we
+  // still want a full cinematic so the user sees a visible reveal. Strobe
+  // the new image alone using a darken-to-silhouette filter on the
+  // "previous" beats.
+  const hasFirstHatchSingleArt = Boolean(
+    isFirstEvolution
+      && !hasDualArt
+      && artReadiness.next === "loaded"
+      && newImageUrl,
+  );
   const silhouetteStrobeEnabled = shouldUseSilhouetteStrobe({
     hasDualArt,
+    hasFirstHatchSingleArt,
     prefersReducedMotion,
     useHatchVideo,
   });
@@ -649,6 +668,9 @@ const CompanionEvolutionContent = ({
     preload(previousImageUrl, "previous");
     preload(newImageUrl, "next");
 
+    const preloadTimeoutMs = isFirstEvolution
+      ? FIRST_HATCH_IMAGE_PRELOAD_TIMEOUT_MS
+      : IMAGE_PRELOAD_TIMEOUT_MS;
     const timeoutId = window.setTimeout(() => {
       if (!active) return;
 
@@ -659,13 +681,13 @@ const CompanionEvolutionContent = ({
       }));
       previousSettled = true;
       nextSettled = true;
-    }, IMAGE_PRELOAD_TIMEOUT_MS);
+    }, preloadTimeoutMs);
 
     return () => {
       active = false;
       window.clearTimeout(timeoutId);
     };
-  }, [isEvolving, newImageUrl, previousImageUrl]);
+  }, [isEvolving, isFirstEvolution, newImageUrl, previousImageUrl]);
 
   useEffect(() => {
     if (!isEvolving || !shouldStartCinematic) return;
@@ -1363,23 +1385,37 @@ const CompanionEvolutionContent = ({
                                 : "brightness(0) saturate(0) contrast(1.7) blur(10px)",
                       }
                       : {
-                        opacity: 1,
+                        opacity: silhouetteStrobeEnabled && phase === "strobe"
+                          ? strobeTarget === "previous"
+                            ? 0.94
+                            : 0.78
+                          : 1,
                         scale: phase === "hold"
                           ? 1
                           : phase === "charge"
                             ? 1.03
                             : phase === "conceal"
                               ? 1.08
-                              : phase === "reveal"
-                                ? 1.05
-                                : 1,
+                              : phase === "strobe"
+                                ? 1.1 + strobeProgress * 0.02
+                                : phase === "apex"
+                                  ? 1.14
+                                  : phase === "reveal"
+                                    ? 1.05
+                                    : 1,
                         filter: phase === "conceal"
                           ? "brightness(0) saturate(0) contrast(1.45) blur(5px)"
-                          : phase === "reveal"
-                            ? "brightness(1.14) saturate(1.1) contrast(1.04) blur(0px)"
-                            : phase === "charge"
-                              ? "brightness(1.08) saturate(1.05) contrast(1.02) blur(0px)"
-                              : "brightness(1) saturate(1) contrast(1) blur(0px)",
+                          : phase === "strobe" && silhouetteStrobeEnabled
+                            ? strobeTarget === "previous"
+                              ? "brightness(0) saturate(0) contrast(1.7) blur(6px)"
+                              : "brightness(1.06) saturate(1.04) contrast(1.12) blur(0px)"
+                            : phase === "apex"
+                              ? "brightness(0) saturate(0) contrast(1.9) blur(8px)"
+                              : phase === "reveal"
+                                ? "brightness(1.14) saturate(1.1) contrast(1.04) blur(0px)"
+                                : phase === "charge"
+                                  ? "brightness(1.08) saturate(1.05) contrast(1.02) blur(0px)"
+                                  : "brightness(1) saturate(1) contrast(1) blur(0px)",
                       }}
                     transition={{
                       duration:
