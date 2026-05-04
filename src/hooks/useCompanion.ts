@@ -1599,11 +1599,12 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
     },
     onError: (error) => {
       console.error('XP award failed:', error);
-      const message =
-        error instanceof Error && error.message
-          ? error.message
-          : "Failed to award XP. Please try again.";
-      toast.error(message);
+      const rawMessage = (error as { message?: unknown } | null)?.message;
+      toast.error(
+        typeof rawMessage === "string" && rawMessage.length > 0
+          ? rawMessage
+          : "Failed to award XP. Please try again.",
+      );
     },
   });
 
