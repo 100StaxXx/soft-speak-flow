@@ -228,6 +228,12 @@ describe("guided tutorial helpers", () => {
     expect(getMentorInstructionLines("hatch_companion", null, "sage")[0]).toBe(
       "Tap 'Hatch.'",
     );
+    expect(getMentorInstructionLines("mentor_closeout", null, "sage")[0]).toBe(
+      "Your Companion is here.",
+    );
+    expect(getMentorInstructionLines("mentor_closeout", null, "rival")[0]).toBe(
+      "It hatched.",
+    );
 
     expect(getMentorInstructionLines("new_goal", null, "rival")[0]).toBe(
       "Tap 'New goal.'",
@@ -526,6 +532,17 @@ describe("guided tutorial first-value loop", () => {
 
     await waitFor(() => {
       expect(mocks.state.queryClient.refetchQueries).toHaveBeenCalled();
+      expect(result.current.currentStep).toBe("mentor_closeout");
+      expect(result.current.dialogueText).toBe("Your Companion is here.");
+      expect(result.current.dialogueActionLabel).toBe("Finish");
+      expect(result.current.isPreHatchCompanionStep).toBe(false);
+    });
+
+    await act(async () => {
+      result.current.onDialogueAction?.();
+    });
+
+    await waitFor(() => {
       expect(result.current.isActive).toBe(false);
       expect(result.current.currentStep).toBeNull();
     });
