@@ -71,7 +71,7 @@ interface VisualIdentitySeed {
   storyTone?: string | null;
 }
 
-export const COMPANION_IMAGE_PROMPT_VERSION = "companion_lineage_v3";
+export const COMPANION_IMAGE_PROMPT_VERSION = "companion_lineage_v4";
 const DEFAULT_IMAGE_LINEAGE_PROVIDER = "openai";
 const DEFAULT_IMAGE_LINEAGE_PIPELINE = "stage1_first_bootstrap_v1";
 
@@ -355,13 +355,81 @@ const getEvolutionDeltaBudget = (previousLevel: number, nextLevel: number): stri
   }
 };
 
+const buildEnvironment = (coreElement: string): string[] => {
+  const key = (coreElement || "").trim().toLowerCase();
+  const map: Record<string, string[]> = {
+    fire: [
+      "ember-strewn canyon at dusk with drifting sparks and glowing magma veins in the rock",
+      "warm orange-and-crimson rim light from off-frame embers",
+      "background heat-haze blurred so the subject reads as the clear hero",
+    ],
+    nature: [
+      "lush misty old-growth forest with shafts of green-gold light filtering through the canopy",
+      "soft moss, drifting pollen motes, and out-of-focus ferns framing the subject",
+      "verdant atmospheric depth that frames but never crowds the creature",
+    ],
+    light: [
+      "sunlit cathedral of clouds with radiant god-rays and pale gold mist",
+      "luminous warm key light wrapping the subject",
+      "bright airy background blurred to keep all attention on the hero",
+    ],
+    water: [
+      "glowing turquoise lagoon with bioluminescent coral and gentle caustic light patterns",
+      "soft cyan rim light and drifting bubbles in the background bokeh",
+      "underwater-feeling atmosphere that stays calm and recessed behind the subject",
+    ],
+    earth: [
+      "weathered stone canyon with crystal outcrops and warm ochre dust in the air",
+      "amber rim light bouncing off distant cliffs",
+      "grounded earthy depth held in soft focus behind the subject",
+    ],
+    air: [
+      "high windswept sky-cliffs above a sea of clouds with drifting feathers and pale blue light",
+      "cool wind-streaked atmosphere with bright sky bokeh",
+      "open airy background that emphasizes elevation without distracting",
+    ],
+    lightning: [
+      "stormy violet sky with distant forking lightning and charged static mist",
+      "electric blue-white rim light edging the subject",
+      "dramatic storm atmosphere kept low-contrast in the background so the creature pops",
+    ],
+    shadow: [
+      "moonlit obsidian grotto with deep indigo shadows and faint violet fog",
+      "cool moon-blue rim light separating the subject from the dark",
+      "mysterious low-key background that frames the silhouette without swallowing it",
+    ],
+    cosmic: [
+      "deep starfield with soft nebula clouds in magenta, teal, and indigo",
+      "starlight rim catching the subject's edges",
+      "vast cosmic backdrop kept dreamy and out-of-focus behind the hero",
+    ],
+  };
+  const aliases: Record<string, string> = {
+    void: "shadow",
+    dark: "shadow",
+    spirit: "shadow",
+    thunder: "lightning",
+    storm: "lightning",
+    tempest: "lightning",
+    frost: "water",
+    ice: "water",
+    energy: "cosmic",
+  };
+  return map[key] ?? map[aliases[key] ?? ""] ?? [
+    "soft painterly habitat in the subject's signature color family, kept atmospheric",
+    "gentle rim light separating the subject from the background",
+    "background blurred and recessed so the creature is unmistakably the hero",
+  ];
+};
+
 const buildArtDirection = (): string[] => [
-  "single companion as the subject",
-  "silhouette-first composition",
-  "high readability at thumbnail size",
-  "minimal background clutter",
-  "no text, logos, or extra characters",
-  "lighting should support form readability rather than drown the subject",
+  "single companion as the subject and clear hero of the frame",
+  "subject perfectly centered horizontally and vertically within the square canvas, with roughly equal negative space on the left, right, top, and bottom; no horizontal or vertical drift, no off-axis composition",
+  "frame the full creature so head, limbs, and tail/wings are all inside the canvas with a small margin — never cropped at an edge",
+  "silhouette-first composition with high readability at thumbnail size",
+  "atmospheric background that supports the subject without competing for attention — soft depth-of-field, no sharp foreground props, no other characters",
+  "no text, logos, watermarks, UI, or extra characters",
+  "lighting should rim and shape the subject so it pops cleanly off the background",
 ];
 
 const buildContinuityChecklist = (profile: VisualIdentityProfile): string[] => [
@@ -634,6 +702,12 @@ export const buildAiEggPrompt = (profile: VisualIdentityProfile): string => {
     "- No visible full creature body or hatchling face",
     "- The shell should imply power sleeping inside",
     "",
+    "Environment & Background:",
+    "- subtle element-themed atmosphere only: a soft, heavily-blurred hint of the lineage's habitat",
+    ...buildEnvironment(profile.coreElement)
+      .slice(0, 1)
+      .map((item) => `- ${item} — kept very out-of-focus and low-contrast so the egg remains the unmistakable hero`),
+    "",
     "Art Direction:",
     ...buildArtDirection().map((item) => `- ${item}`),
     "",
@@ -670,6 +744,9 @@ export const buildStage1BootstrapPrompt = (profile: VisualIdentityProfile): stri
     "- Show one major signature feature clearly, but at starter intensity",
     "- Strong silhouette and facial read matter more than ornament density",
     "",
+    "Environment & Background:",
+    ...buildEnvironment(profile.coreElement).map((item) => `- ${item}`),
+    "",
     "Art Direction:",
     ...buildArtDirection().map((item) => `- ${item}`),
     "",
@@ -698,7 +775,13 @@ export const buildEggFromStage1Prompt = (profile: VisualIdentityProfile): string
     "- No visible full creature body",
     "- No visible face, paws, wings, or full silhouette emerging from the shell",
     "- The egg must feel like it contains the referenced hatchling specifically",
-    "- Strong mystery, premium readability, minimal background clutter",
+    "- Strong mystery and premium readability; background must stay subtle and never compete with the egg",
+    "",
+    "Environment & Background:",
+    "- subtle element-themed atmosphere only: a soft, heavily-blurred hint of the lineage's habitat",
+    ...buildEnvironment(profile.coreElement)
+      .slice(0, 1)
+      .map((item) => `- ${item} — kept very out-of-focus and low-contrast so the egg remains the unmistakable hero`),
     "",
     "Continuity Checklist:",
     ...buildContinuityChecklist(profile).map((item) => `- ${item}`),
@@ -754,6 +837,9 @@ export const buildAiEvolutionPrompt = ({
     "",
     "Evolution Delta Budget:",
     ...getEvolutionDeltaBudget(previousLevel, nextLevel).map((item) => `- ${item}`),
+    "",
+    "Environment & Background:",
+    ...buildEnvironment(profile.coreElement).map((item) => `- ${item}`),
     "",
     "Art Direction:",
     ...buildArtDirection().map((item) => `- ${item}`),
