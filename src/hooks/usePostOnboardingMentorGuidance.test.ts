@@ -534,9 +534,23 @@ describe("guided tutorial first-value loop", () => {
       expect(result.current.shouldAutoHideCard).toBe(true);
     });
 
+    // Regression guard: companion data refetching with stage > 0 must NOT
+    // advance the step while the visual hatch animation is still playing.
+    // The step only releases when companion-evolved fires (i.e., user
+    // dismisses the evolved-companion image).
     await act(async () => {
       mocks.state.companionData = { current_stage: 1 };
       mocks.state.companionDataUpdatedAt = 2;
+      rerender();
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("hatch_companion");
+      expect(result.current.dialogueText).toBe("Let the hatch finish.");
+      expect(result.current.shouldAutoHideCard).toBe(true);
+    });
+
+    await act(async () => {
       window.dispatchEvent(new CustomEvent("companion-evolved"));
       rerender();
     });
