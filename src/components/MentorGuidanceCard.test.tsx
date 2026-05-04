@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
     activeTargetSelector: '[data-tour="companion-launcher-option-plan-day"]',
     isStrictLockActive: true,
     canTemporarilyHide: false,
+    shouldAutoHideCard: false,
     dialogueText: "Tap 'Plan day.'",
     dialogueSupportText: "It'll give you something simple to follow.",
     secondaryActionLabel: "Skip tutorial",
@@ -169,6 +170,14 @@ describe("MentorGuidanceCard", () => {
     render(<MentorGuidanceCard />);
     expect(screen.queryByText("Sage")).not.toBeInTheDocument();
     mocks.guidance.isActive = true;
+  });
+
+  it("does not render when the active milestone opts into auto-hiding", () => {
+    mocks.guidance.shouldAutoHideCard = true;
+    render(<MentorGuidanceCard />);
+    expect(screen.queryByText("Sage portrait")).not.toBeInTheDocument();
+    expect(screen.queryByText("Tap 'Plan day.'")).not.toBeInTheDocument();
+    mocks.guidance.shouldAutoHideCard = false;
   });
 
   it("renders intro action button and triggers callback", () => {

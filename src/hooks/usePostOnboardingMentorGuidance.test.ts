@@ -160,6 +160,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 import {
   CREATE_QUEST_SUBSTEP_ORDER,
   MILESTONES_ALLOWING_TEMPORARY_HIDE,
+  MILESTONES_AUTO_HIDDEN,
   PostOnboardingMentorGuidanceProvider,
   getMentorInstructionLines,
   milestoneUsesStrictLock,
@@ -262,6 +263,15 @@ describe("guided tutorial helpers", () => {
     expect(MILESTONES_ALLOWING_TEMPORARY_HIDE.has("complete_companion_hatch")).toBe(true);
     expect(MILESTONES_ALLOWING_TEMPORARY_HIDE.has("mentor_intro_hello")).toBe(false);
     expect(MILESTONES_ALLOWING_TEMPORARY_HIDE.has("meet_companion_intro")).toBe(false);
+  });
+
+  it("auto-hides the card on milestones where the user is in a passive wait", () => {
+    // The hatch wait is purely waiting on auto-progression; the card adds noise.
+    expect(MILESTONES_AUTO_HIDDEN.has("complete_companion_hatch")).toBe(true);
+    // The pre-hatch tap is still actionable, so it must keep showing the card.
+    expect(MILESTONES_AUTO_HIDDEN.has("tap_hatch_companion")).toBe(false);
+    expect(MILESTONES_AUTO_HIDDEN.has("start_new_goal")).toBe(false);
+    expect(MILESTONES_AUTO_HIDDEN.has("mentor_intro_hello")).toBe(false);
   });
 
   it("restores current tutorial work to the active feature route", () => {
@@ -515,6 +525,7 @@ describe("guided tutorial first-value loop", () => {
     await waitFor(() => {
       expect(result.current.currentStep).toBe("hatch_companion");
       expect(result.current.dialogueText).toBe("Let the hatch finish.");
+      expect(result.current.shouldAutoHideCard).toBe(true);
     });
 
     await act(async () => {
