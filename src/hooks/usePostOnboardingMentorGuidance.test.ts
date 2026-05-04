@@ -253,7 +253,7 @@ describe("guided tutorial helpers", () => {
     expect(milestoneUsesStrictLock("start_plan_my_day")).toBe(true);
     expect(milestoneUsesStrictLock("answer_plan_day_ai")).toBe(false);
     expect(milestoneUsesStrictLock("save_plan_day_action")).toBe(true);
-    expect(milestoneUsesStrictLock("tap_hatch_companion")).toBe(true);
+    expect(milestoneUsesStrictLock("tap_hatch_companion")).toBe(false);
     expect(milestoneUsesStrictLock("complete_companion_hatch")).toBe(false);
   });
 
