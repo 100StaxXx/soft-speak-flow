@@ -1083,14 +1083,20 @@ export async function handleGenerateCompanionStatAnalysis(
       suggestedAction: mentorCopy.suggestedAction,
     };
 
-    analysis = await attachCosmiqTitleCardCacheState({
-      deps,
-      supabase,
-      analysis,
-      userId,
-      analysisDate,
-      visualPersona,
-    });
+    const preservedTitleCard = (existingAnalysis as CachedAnalysisRow | null)
+      ?.payload?.cosmiqTitleCard;
+    if (preservedTitleCard?.status === "ready" && preservedTitleCard.imageUrl) {
+      analysis = { ...analysis, cosmiqTitleCard: preservedTitleCard };
+    } else {
+      analysis = await attachCosmiqTitleCardCacheState({
+        deps,
+        supabase,
+        analysis,
+        userId,
+        analysisDate,
+        visualPersona,
+      });
+    }
 
     const analysisValidation = validateCompanionStatAnalysis(analysis);
     if (!analysisValidation.ok) {

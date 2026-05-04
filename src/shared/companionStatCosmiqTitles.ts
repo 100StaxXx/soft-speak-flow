@@ -47,9 +47,14 @@ export interface CompanionCosmiqTitle {
 export interface CompanionCosmiqTitleCard {
   profileKey: string;
   imageUrl: string | null;
+  imageUrls?: string[];
   status: "ready" | "generating" | "unavailable";
   cached: boolean;
   promptVersion: number;
+  failureCode?: string | null;
+  failureMessage?: string | null;
+  retryable?: boolean;
+  lastAttemptAt?: string | null;
 }
 
 export interface CompanionCosmiqTitlePreviousState {
