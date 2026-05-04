@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { resolveCompanionVisualAssetUrl } from "@/lib/companionAssetResolver";
 import { deriveCompanionDisplayState } from "@/lib/companionDisplayState";
 import {
@@ -8,10 +8,13 @@ import {
 import { resolveJourneysCompanionLauncherAwayAssetUrl } from "@/lib/journeysCompanionLauncherArt";
 import { getStoredCompanionCustomName } from "@/lib/companionName";
 import { formatDisplayLabel } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
 import { useCompanion } from "./useCompanion";
 import { useCompanionCareSignals } from "./useCompanionCareSignals";
 import { useCompanionHealth } from "./useCompanionHealth";
+import {
+  useCompanionLauncherImage,
+  type CompanionLauncherImageStatus,
+} from "./useCompanionLauncherImage";
 
 const COMPANION_PLACEHOLDER = "/placeholder-companion.svg";
 
@@ -135,43 +138,27 @@ export const useJourneysCompanionVisual = () => {
   );
 
   // Two-image pipeline: prefer the dedicated white-bg launcher icon for
-  // small/icon surfaces, but fall back to the scenic page image until the
-  // lazy backfill completes (existing companions pre-dating the migration).
-  const launcherImageFresh = Boolean(
-    companion?.launcher_image_url
-      && (
-        !companion?.launcher_image_source_url
-        || companion?.launcher_image_source_url === companion?.current_image_url
-      ),
-  );
+  // small/icon surfaces. The hook tracks the Gemini call so consumers can
+  // render a deterministic pending/error state instead of falling back to
+  // the scenic page image (which never reads as a clean icon).
+  const {
+    launcherImageUrl: trackedLauncherImageUrl,
+    launcherImageFocalX: trackedLauncherFocalX,
+    launcherImageFocalY: trackedLauncherFocalY,
+    isFresh: launcherImageFresh,
+    status: launcherImageStatus,
+    retry: retryLauncherImage,
+  } = useCompanionLauncherImage(companion);
+
   const launcherImageUrl = launcherImageFresh
-    ? (companion?.launcher_image_url ?? imageUrl)
+    ? trackedLauncherImageUrl ?? imageUrl
     : imageUrl;
   const launcherImageFocalX = launcherImageFresh
-    ? (companion?.launcher_image_focal_x ?? 0.5)
+    ? trackedLauncherFocalX
     : focalPoint.x;
   const launcherImageFocalY = launcherImageFresh
-    ? (companion?.launcher_image_focal_y ?? 0.5)
+    ? trackedLauncherFocalY
     : focalPoint.y;
-
-  // Lazy backfill: kick a single fire-and-forget request when the companion
-  // has a current portrait but no launcher icon (or a stale one). Result is
-  // dropped — the realtime subscription on user_companion will deliver the
-  // new launcher_image_url on the next render.
-  const launcherBackfillRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!companion?.id) return;
-    if (!companion.current_image_url) return;
-    if (launcherImageFresh) return;
-    const key = `${companion.id}:${companion.current_image_url}`;
-    if (launcherBackfillRef.current === key) return;
-    launcherBackfillRef.current = key;
-    void supabase.functions
-      .invoke("generate-companion-launcher-image", {
-        body: { companionId: companion.id },
-      })
-      .catch(() => undefined);
-  }, [companion?.id, companion?.current_image_url, launcherImageFresh]);
 
   return {
     companionLabel,
@@ -189,5 +176,9 @@ export const useJourneysCompanionVisual = () => {
     launcherImageFocalX,
     launcherImageFocalY,
     launcherImageFresh,
+    launcherImageStatus,
+    retryLauncherImage,
   };
 };
+
+export type JourneysCompanionLauncherImageStatus = CompanionLauncherImageStatus;

@@ -24,6 +24,12 @@ describe("JourneysCompanionLauncher", () => {
       launcherAwayFocalX: null,
       launcherAwayFocalY: null,
       launcherAwayUsesPortraitShell: false,
+      launcherImageUrl: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__fire.png",
+      launcherImageFocalX: 0.5,
+      launcherImageFocalY: 0.5,
+      launcherImageFresh: false,
+      launcherImageStatus: "ready",
+      retryLauncherImage: vi.fn(),
     });
   });
 
