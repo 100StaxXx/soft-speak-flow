@@ -284,7 +284,6 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
         hasCompanion: Boolean(companion),
         hasPresetCompanion: Boolean(companion?.preset_id),
         companionStage: companion?.current_stage ?? null,
-        hasCompanionImages: Boolean(companion?.current_image_url || companion?.initial_image_url),
       }),
     [profile, companion],
   );
@@ -308,7 +307,6 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
       hasCompanion: Boolean(companion),
       hasPresetCompanion: Boolean(companion?.preset_id),
       companionStage: companion?.current_stage ?? null,
-      hasCompanionImages: Boolean(companion?.current_image_url || companion?.initial_image_url),
     });
     if (!patch) return;
 

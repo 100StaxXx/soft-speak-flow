@@ -48,7 +48,7 @@ const fetchAuthRedirectProfile = (userId: string) =>
 const fetchAuthRedirectCompanion = (userId: string) =>
   supabase
     .from("user_companion")
-    .select("id, preset_id, current_stage, current_image_url, initial_image_url")
+    .select("id, preset_id, current_stage")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -75,7 +75,6 @@ const readAuthRedirectContext = async (
   hasCompanion: boolean;
   hasPresetCompanion: boolean;
   companionStage: number | null;
-  hasCompanionImages: boolean;
 }> => {
   const [profileResult, companionResult] = await Promise.allSettled([
     withTimeout(
@@ -95,7 +94,6 @@ const readAuthRedirectContext = async (
   let hasCompanion = false;
   let hasPresetCompanion = false;
   let companionStage: number | null = null;
-  let hasCompanionImages = false;
 
   if (profileResult.status === "fulfilled") {
     profile = (profileResult.value.data ?? null) as AuthRedirectProfile | null;
@@ -117,9 +115,6 @@ const readAuthRedirectContext = async (
       companionStage = typeof companionResult.value.data?.current_stage === "number"
         ? companionResult.value.data.current_stage
         : null;
-      hasCompanionImages = Boolean(
-        companionResult.value.data?.current_image_url || companionResult.value.data?.initial_image_url,
-      );
     }
   } else {
     logger.warn("[authRedirect] Companion lookup timed out, continuing without companion signal", {
@@ -127,7 +122,7 @@ const readAuthRedirectContext = async (
     });
   }
 
-  return { profile, profileError, hasCompanion, hasPresetCompanion, companionStage, hasCompanionImages };
+  return { profile, profileError, hasCompanion, hasPresetCompanion, companionStage };
 };
 
 const getDeviceTimezone = (): string =>
@@ -179,14 +174,12 @@ const scheduleEstablishedProfileSelfHeal = (
   hasCompanion: boolean,
   hasPresetCompanion: boolean,
   companionStage: number | null,
-  hasCompanionImages: boolean,
 ) => {
   const patch = buildEstablishedProfileSelfHealPatch({
     profile,
     hasCompanion,
     hasPresetCompanion,
     companionStage,
-    hasCompanionImages,
   });
   if (!patch) return;
 
@@ -217,7 +210,6 @@ const resolvePathFromContext = (
     hasCompanion: boolean;
     hasPresetCompanion: boolean;
     companionStage: number | null;
-    hasCompanionImages: boolean;
   },
   options: AuthRedirectOptions = {},
 ): string | null => {
@@ -227,7 +219,6 @@ const resolvePathFromContext = (
     hasCompanion,
     hasPresetCompanion,
     companionStage,
-    hasCompanionImages,
   } = context;
 
   if (profileError) {
@@ -252,7 +243,6 @@ const resolvePathFromContext = (
     hasCompanion,
     hasPresetCompanion,
     companionStage,
-    hasCompanionImages,
   });
 
   logger.debug("[authRedirect] Profile fetched", {
@@ -263,12 +253,10 @@ const resolvePathFromContext = (
     hasCompanion,
     hasPresetCompanion,
     companionStage,
-    hasCompanionImages,
     hasMentor: !!profile.selected_mentor_id,
     onboardingMentorId: onboardingMentorId?.substring(0, 8),
     resolvedMentorId: resolvedMentorId?.substring(0, 8),
     gateReason: gate.reason,
-    needsCompanionMigration: gate.needsCompanionMigration,
     timezoneChanged: profile.timezone !== userTimezone,
   });
 
@@ -313,7 +301,6 @@ const resolvePathFromContext = (
       hasCompanion,
       hasPresetCompanion,
       companionStage,
-      hasCompanionImages,
     );
     logger.debug("[getAuthRedirectPath] Established account, redirecting to /tasks", {
       reason: gate.reason,
