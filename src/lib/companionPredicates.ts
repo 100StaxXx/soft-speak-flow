@@ -44,15 +44,3 @@ export const hasValidCompanionStage = (
   const stage = companion.current_stage;
   return typeof stage === "number" && Number.isInteger(stage) && stage >= 0 && stage <= PROGRESSION_LEVEL_CAP;
 };
-
-export const isStructurallyInvalidCompanion = (
-  companion: CompanionPredicateShape | null | undefined,
-): boolean => {
-  if (!companion) return false;
-
-  if (!hasValidCompanionStage(companion)) {
-    return true;
-  }
-
-  return !hasCompanionStoredVisual(companion) && !isPresetBackedCompanion(companion);
-};

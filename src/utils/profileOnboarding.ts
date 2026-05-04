@@ -1,5 +1,4 @@
 import { getResolvedMentorId } from "./mentor";
-import { hasValidCompanionStage } from "@/lib/companionPredicates";
 
 type OnboardingAwareProfile = {
   selected_mentor_id?: string | null;
@@ -35,7 +34,6 @@ const ONBOARDING_RESUME_STEP_SET = new Set<string>(ONBOARDING_RESUME_STEPS);
 export interface OnboardingGateState {
   isEstablished: boolean;
   needsOnboarding: boolean;
-  needsCompanionMigration: boolean;
   needsProgressionReset: boolean;
   reason: EstablishedAccountReason | null;
   resumeStep: OnboardingResumeStep | null;
@@ -102,23 +100,16 @@ export const getOnboardingGateState = ({
   hasCompanion = false,
   hasPresetCompanion = false,
   companionStage = null,
-  hasCompanionImages = false,
 }: {
   profile: OnboardingAwareProfile;
   hasCompanion?: boolean;
   hasPresetCompanion?: boolean;
   companionStage?: number | null;
-  hasCompanionImages?: boolean;
 }): OnboardingGateState => {
   const walkthroughCompleted = hasWalkthroughCompleted(profile?.onboarding_data);
   const hasResolvedGuidedTutorial = hasResolvedGuidedTutorialProgress(profile?.onboarding_data);
   const needsProgressionReset = hasProgressionResetPending(profile?.onboarding_data);
   const hasStageZeroEggCompanion = hasCompanion && companionStage === 0;
-  const hasInvalidCompanionStage = hasCompanion && !hasValidCompanionStage({ current_stage: companionStage });
-  const needsCompanionMigration = hasCompanion && (
-    hasInvalidCompanionStage
-    || (!hasPresetCompanion && !hasCompanionImages)
-  );
   const onboardingStep = normalizeOnboardingStep(profile?.onboarding_step);
   const isCompletionStep = onboardingStep === "complete";
   const inProgressResumeStep = onboardingStep && ONBOARDING_RESUME_STEP_SET.has(onboardingStep)
@@ -136,8 +127,6 @@ export const getOnboardingGateState = ({
   let resumeStep: OnboardingResumeStep | null = null;
 
   if (needsProgressionReset) {
-    reason = null;
-  } else if (needsCompanionMigration) {
     reason = null;
   } else if (needsJourneyBeginsRecovery) {
     resumeStep = "journey-begins";
@@ -158,7 +147,6 @@ export const getOnboardingGateState = ({
   return {
     isEstablished: reason !== null,
     needsOnboarding: reason === null,
-    needsCompanionMigration,
     needsProgressionReset,
     reason,
     resumeStep,
@@ -167,7 +155,6 @@ export const getOnboardingGateState = ({
     companionStage,
     shouldSelfHeal:
       !needsProgressionReset
-      && !needsCompanionMigration
       && (reason === "companion_exists" || reason === "onboarding_step_complete"),
   };
 };
@@ -178,14 +165,12 @@ export const isReturningProfile = (
     hasCompanion?: boolean;
     hasPresetCompanion?: boolean;
     companionStage?: number | null;
-    hasCompanionImages?: boolean;
   } = {},
 ): boolean => getOnboardingGateState({
   profile,
   hasCompanion: options.hasCompanion,
   hasPresetCompanion: options.hasPresetCompanion,
   companionStage: options.companionStage,
-  hasCompanionImages: options.hasCompanionImages,
 }).isEstablished;
 
 export const buildEstablishedProfileSelfHealPatch = ({
@@ -193,20 +178,17 @@ export const buildEstablishedProfileSelfHealPatch = ({
   hasCompanion = false,
   hasPresetCompanion = false,
   companionStage = null,
-  hasCompanionImages = false,
 }: {
   profile: OnboardingAwareProfile;
   hasCompanion?: boolean;
   hasPresetCompanion?: boolean;
   companionStage?: number | null;
-  hasCompanionImages?: boolean;
 }): { onboarding_completed: true; onboarding_data: Record<string, unknown> } | null => {
   const gate = getOnboardingGateState({
     profile,
     hasCompanion,
     hasPresetCompanion,
     companionStage,
-    hasCompanionImages,
   });
   if (!gate.shouldSelfHeal) return null;
 

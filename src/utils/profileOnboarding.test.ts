@@ -18,7 +18,6 @@ describe("getOnboardingGateState", () => {
         hasCompanion: true,
         hasPresetCompanion: true,
         companionStage: 1,
-        hasCompanionImages: true,
       }),
     ).toMatchObject({
       isEstablished: true,
@@ -39,14 +38,12 @@ describe("getOnboardingGateState", () => {
         hasCompanion: true,
         hasPresetCompanion: true,
         companionStage: 0,
-        hasCompanionImages: true,
       }),
     ).toMatchObject({
       isEstablished: false,
       needsOnboarding: true,
       reason: null,
       resumeStep: "journey-begins",
-      needsCompanionMigration: false,
       shouldSelfHeal: false,
     });
   });
@@ -62,14 +59,12 @@ describe("getOnboardingGateState", () => {
         hasCompanion: true,
         hasPresetCompanion: false,
         companionStage: 0,
-        hasCompanionImages: true,
       }),
     ).toMatchObject({
       isEstablished: false,
       needsOnboarding: true,
       reason: null,
       resumeStep: "journey-begins",
-      needsCompanionMigration: false,
       shouldSelfHeal: false,
     });
   });
@@ -90,13 +85,11 @@ describe("getOnboardingGateState", () => {
         hasCompanion: true,
         hasPresetCompanion: false,
         companionStage: 0,
-        hasCompanionImages: true,
       }),
     ).toMatchObject({
       isEstablished: false,
       needsOnboarding: true,
       resumeStep: null,
-      needsCompanionMigration: false,
     });
   });
 
@@ -117,13 +110,11 @@ describe("getOnboardingGateState", () => {
         hasCompanion: true,
         hasPresetCompanion: false,
         companionStage: 0,
-        hasCompanionImages: true,
       }),
     ).toMatchObject({
       isEstablished: false,
       needsOnboarding: true,
       resumeStep: null,
-      needsCompanionMigration: false,
     });
   });
 
@@ -146,13 +137,11 @@ describe("getOnboardingGateState", () => {
         hasCompanion: true,
         hasPresetCompanion: false,
         companionStage: 0,
-        hasCompanionImages: true,
       }),
     ).toMatchObject({
       isEstablished: false,
       needsOnboarding: true,
       resumeStep: null,
-      needsCompanionMigration: false,
     });
   });
 
@@ -189,14 +178,12 @@ describe("getOnboardingGateState", () => {
         hasCompanion: true,
         hasPresetCompanion: true,
         companionStage: 1,
-        hasCompanionImages: true,
       }),
     ).toMatchObject({
       isEstablished: false,
       needsOnboarding: true,
       reason: null,
       resumeStep: "journey-begins",
-      needsCompanionMigration: false,
       shouldSelfHeal: false,
     });
   });
@@ -213,7 +200,6 @@ describe("getOnboardingGateState", () => {
         hasCompanion: true,
         hasPresetCompanion: false,
         companionStage: 0,
-        hasCompanionImages: true,
       }),
     ).toMatchObject({
       isEstablished: true,
@@ -235,18 +221,16 @@ describe("getOnboardingGateState", () => {
         hasCompanion: true,
         hasPresetCompanion: false,
         companionStage: 2,
-        hasCompanionImages: true,
       }),
     ).toMatchObject({
       isEstablished: true,
       needsOnboarding: false,
       reason: "companion_exists",
-      needsCompanionMigration: false,
       shouldSelfHeal: true,
     });
   });
 
-  it("keeps structurally broken post-stage-0 AI companions in migration", () => {
+  it("treats AI companions with missing image URLs as established", () => {
     expect(
       getOnboardingGateState({
         profile: {
@@ -259,11 +243,10 @@ describe("getOnboardingGateState", () => {
         companionStage: 2,
       }),
     ).toMatchObject({
-      isEstablished: false,
-      needsOnboarding: true,
-      reason: null,
-      needsCompanionMigration: true,
-      shouldSelfHeal: false,
+      isEstablished: true,
+      needsOnboarding: false,
+      reason: "companion_exists",
+      shouldSelfHeal: true,
     });
   });
 
@@ -278,13 +261,11 @@ describe("getOnboardingGateState", () => {
         hasCompanion: true,
         hasPresetCompanion: true,
         companionStage: 5,
-        hasCompanionImages: false,
       }),
     ).toMatchObject({
       isEstablished: true,
       needsOnboarding: false,
       reason: "companion_exists",
-      needsCompanionMigration: false,
       shouldSelfHeal: true,
     });
   });
@@ -429,7 +410,7 @@ describe("isReturningProfile", () => {
           selected_mentor_id: "mentor-1",
           onboarding_data: {},
         },
-        { hasCompanion: true, hasPresetCompanion: true, companionStage: 1, hasCompanionImages: true },
+        { hasCompanion: true, hasPresetCompanion: true, companionStage: 1 },
       ),
     ).toBe(true);
   });
@@ -442,7 +423,7 @@ describe("isReturningProfile", () => {
           selected_mentor_id: "mentor-1",
           onboarding_data: {},
         },
-        { hasCompanion: true, hasPresetCompanion: false, companionStage: 0, hasCompanionImages: true },
+        { hasCompanion: true, hasPresetCompanion: false, companionStage: 0 },
       ),
     ).toBe(false);
   });
@@ -456,7 +437,7 @@ describe("isReturningProfile", () => {
           selected_mentor_id: "mentor-1",
           onboarding_data: {},
         },
-        { hasCompanion: true, hasPresetCompanion: true, companionStage: 1, hasCompanionImages: true },
+        { hasCompanion: true, hasPresetCompanion: true, companionStage: 1 },
       ),
     ).toBe(false);
   });
@@ -479,7 +460,6 @@ describe("buildEstablishedProfileSelfHealPatch", () => {
         hasCompanion: true,
         hasPresetCompanion: true,
         companionStage: 1,
-        hasCompanionImages: true,
       }),
     ).toEqual({
       onboarding_completed: true,
@@ -519,7 +499,6 @@ describe("buildEstablishedProfileSelfHealPatch", () => {
         hasCompanion: true,
         hasPresetCompanion: false,
         companionStage: 0,
-        hasCompanionImages: true,
       }),
     ).toBeNull();
   });
@@ -535,7 +514,6 @@ describe("buildEstablishedProfileSelfHealPatch", () => {
         hasCompanion: true,
         hasPresetCompanion: true,
         companionStage: 1,
-        hasCompanionImages: true,
       }),
     ).toBeNull();
   });

@@ -1,7 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { toast } from "@/components/ui/sonner";
 
 const mocks = vi.hoisted(() => {
   const profilesUpdateEqMock = vi.fn(() => Promise.resolve({ error: null }));
@@ -21,8 +20,6 @@ const mocks = vi.hoisted(() => {
     storyOnboardingProps: null as Record<string, unknown> | null,
     queryClient: { invalidateQueries: vi.fn(), refetchQueries: vi.fn() },
     signOut: vi.fn(() => Promise.resolve()),
-    deleteCurrentAccount: vi.fn((_options?: unknown) => Promise.resolve({ warnings: [] })),
-    isAccountDeletionAuthError: vi.fn((_error?: unknown) => false),
     status: "authenticated" as "loading" | "recovering" | "authenticated" | "unauthenticated",
     user: { id: "user-1" } as { id: string } | null,
     profile: {
@@ -46,7 +43,6 @@ const mocks = vi.hoisted(() => {
     profilesUpdateEqMock,
     profilesUpdateMock,
     fromMock,
-    loggerError: vi.fn(),
   };
 });
 
@@ -90,41 +86,6 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
-vi.mock("@/services/accountDeletion", () => ({
-  deleteCurrentAccount: (options: unknown) => mocks.deleteCurrentAccount(options),
-  isAccountDeletionAuthError: (error: unknown) => mocks.isAccountDeletionAuthError(error),
-  getAccountDeletionErrorMetadata: (error: unknown) => {
-    if (!error || typeof error !== "object") return {};
-    const candidate = error as Record<string, unknown>;
-    return {
-      ...(typeof candidate.code === "string" ? { code: candidate.code } : {}),
-      ...(typeof candidate.status === "number" ? { status: candidate.status } : {}),
-      ...(typeof candidate.requestId === "string" ? { requestId: candidate.requestId } : {}),
-      ...(typeof candidate.stage === "string" ? { stage: candidate.stage } : {}),
-    };
-  },
-  getAccountDeletionFailureMessage: (error: unknown) => {
-    const stage =
-      error && typeof error === "object" && typeof (error as { stage?: unknown }).stage === "string"
-        ? (error as { stage: string }).stage
-        : undefined;
-    if (stage === "storage_cleanup") {
-      return "We couldn't finish deleting your uploaded files, so your account wasn't removed. Please try again.";
-    }
-    return error instanceof Error ? error.message : "Failed to delete account. Please try again.";
-  },
-}));
-
-vi.mock("@/utils/logger", () => ({
-  logger: {
-    error: mocks.loggerError,
-  },
-}));
-
-vi.mock("@/components/PageLoader", () => ({
-  PageLoader: ({ message }: { message: string }) => <div>{message}</div>,
-}));
-
 vi.mock("@/components/onboarding", () => ({
   StoryOnboarding: (props: Record<string, unknown>) => {
     mocks.storyOnboardingProps = props;
@@ -147,8 +108,6 @@ describe("Onboarding route guard", () => {
     mocks.status = "authenticated";
     mocks.storyOnboardingProps = null;
     mocks.signOut.mockResolvedValue(undefined);
-    mocks.deleteCurrentAccount.mockResolvedValue({ warnings: [] });
-    mocks.isAccountDeletionAuthError.mockReturnValue(false);
     mocks.user = { id: "user-1" };
     mocks.profile = {
       onboarding_completed: false,
@@ -158,7 +117,6 @@ describe("Onboarding route guard", () => {
     mocks.profileLoading = false;
     mocks.companion = null;
     mocks.companionLoading = false;
-    mocks.loggerError.mockReset();
   });
 
   it("redirects companion-backed established accounts away from onboarding", async () => {
@@ -518,74 +476,21 @@ describe("Onboarding route guard", () => {
     });
   });
 
-  it("requires explicit confirmation before resetting legacy companion accounts", async () => {
+  it("treats AI companions with missing image URLs as established and never offers to reset the account", async () => {
+    mocks.profile = {
+      onboarding_completed: true,
+      selected_mentor_id: "mentor-1",
+      onboarding_data: { walkthrough_completed: true },
+    };
     mocks.companion = { id: "companion-legacy", preset_id: null, current_stage: 2 };
 
     renderOnboarding();
 
-    expect(screen.getByText("Your old companion setup needs a reset")).toBeInTheDocument();
-    expect(mocks.deleteCurrentAccount).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole("button", { name: "Reset my account" }));
+    expect(screen.queryByText("Your old companion setup needs a reset")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reset my account" })).not.toBeInTheDocument();
 
     await waitFor(() => {
-      expect(mocks.deleteCurrentAccount).toHaveBeenCalledWith({
-        queryClient: mocks.queryClient,
-        userId: "user-1",
-        signOut: mocks.signOut,
-      });
+      expect(mocks.navigate).toHaveBeenCalledWith("/journeys", { replace: true });
     });
-
-    await waitFor(() => {
-      expect(mocks.navigate).toHaveBeenCalledWith("/auth", {
-        replace: true,
-        state: {
-          message: "Your previous account was removed so you can restart onboarding with the new companion system.",
-        },
-      });
-    });
-
-    expect(screen.queryByText("StoryOnboarding")).not.toBeInTheDocument();
-  });
-
-  it("logs and surfaces a stage-aware failure after confirmed legacy account deletion fails", async () => {
-    mocks.companion = { id: "companion-legacy", preset_id: null, current_stage: 2 };
-    mocks.deleteCurrentAccount.mockRejectedValueOnce(
-      Object.assign(new Error("Account deletion is temporarily unavailable. Please try again later."), {
-        code: "ACCOUNT_DELETION_STORAGE_CLEANUP_FAILED",
-        status: 500,
-        requestId: "req-delete-onboarding-1",
-        stage: "storage_cleanup",
-      }),
-    );
-
-    const toastErrorSpy = vi.spyOn(toast, "error").mockImplementation(() => "");
-
-    renderOnboarding();
-
-    fireEvent.click(screen.getByRole("button", { name: "Reset my account" }));
-
-    await waitFor(() => {
-      expect(mocks.loggerError).toHaveBeenCalledWith("[Account Deletion] Legacy onboarding reset failed", {
-        surface: "onboarding_legacy_reset",
-        userId: "user-1",
-        code: "ACCOUNT_DELETION_STORAGE_CLEANUP_FAILED",
-        status: 500,
-        requestId: "req-delete-onboarding-1",
-        stage: "storage_cleanup",
-        message: "Account deletion is temporarily unavailable. Please try again later.",
-      });
-    });
-    expect(toastErrorSpy).toHaveBeenCalledWith(
-      "We couldn't finish deleting your uploaded files, so your account wasn't removed. Please try again.",
-    );
-    expect(mocks.navigate).not.toHaveBeenCalledWith("/auth", {
-      replace: true,
-      state: {
-        message: "Your previous account was removed so you can restart onboarding with the new companion system.",
-      },
-    });
-
-    toastErrorSpy.mockRestore();
   });
 });
