@@ -316,7 +316,12 @@ describe("CompanionStatAnalysisSurface", () => {
       "https://example.com/cosmiq-card.png",
     );
     expect(screen.getByText("The Oathbound Pathfinder")).toBeInTheDocument();
-    expect(screen.getByText("Strengthen Creativity to evolve toward The Soulforged Creator.")).toBeInTheDocument();
+    expect(
+      screen.getByText("A vow-driven traveler whose discipline lights the route forward."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Strengthen Creativity to evolve toward The Soulforged Creator."),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText("New Title Unlocked")).not.toBeInTheDocument();
     expect(screen.queryByText("Vitality")).not.toBeInTheDocument();
     expect(screen.queryByText("560")).not.toBeInTheDocument();
@@ -551,6 +556,8 @@ describe("CompanionStatAnalysisSurface", () => {
       "src",
       expect.stringContaining(firstPreludeCard.imageStoragePath),
     );
+    const loadingCaption = screen.getByTestId("companion-title-art-loading-caption");
+    expect(loadingCaption).toHaveTextContent("Generating your title art");
     expect(screen.queryByText("The Oathbound Pathfinder")).not.toBeInTheDocument();
     expect(screen.queryByText("Discipline")).not.toBeInTheDocument();
     expect(screen.queryByText("Alignment")).not.toBeInTheDocument();
@@ -700,7 +707,7 @@ describe("CompanionStatAnalysisSurface", () => {
     expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
 
     act(() => {
-      vi.advanceTimersByTime(1_800);
+      vi.advanceTimersByTime(4_000);
     });
 
     expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
@@ -713,7 +720,7 @@ describe("CompanionStatAnalysisSurface", () => {
     });
 
     act(() => {
-      vi.advanceTimersByTime(3_600);
+      vi.advanceTimersByTime(8_000);
     });
 
     expect(screen.queryByTestId("companion-cosmiq-title-card")).not.toBeInTheDocument();
@@ -743,7 +750,12 @@ describe("CompanionStatAnalysisSurface", () => {
     expect(await screen.findByTestId("companion-cosmiq-title-card")).toBeInTheDocument();
     expect(screen.getByTestId("companion-title-art-placeholder")).toBeInTheDocument();
     expect(screen.getByText("The Oathbound Pathfinder")).toBeInTheDocument();
-    expect(screen.getByText("Strengthen Creativity to evolve toward The Soulforged Creator.")).toBeInTheDocument();
+    expect(
+      screen.getByText("A vow-driven traveler whose discipline lights the route forward."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Strengthen Creativity to evolve toward The Soulforged Creator."),
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Regenerate title art" })).not.toBeInTheDocument();
     expect(screen.queryByText("Stats analysis is unavailable right now.")).not.toBeInTheDocument();
     expect(screen.queryByAltText("The Oathbound Pathfinder archetype illustration")).not.toBeInTheDocument();

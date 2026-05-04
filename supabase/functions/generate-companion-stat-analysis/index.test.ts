@@ -419,6 +419,116 @@ Deno.test("generate-companion-stat-analysis force refresh regenerates and overwr
   );
 });
 
+Deno.test("generate-companion-stat-analysis preserves a ready title card on force refresh (one-per-day quota)", async () => {
+  const readyCard = {
+    profileKey: "v1-original-profile-key",
+    imageUrl: "https://cdn.example.com/today.png",
+    status: "ready" as const,
+    cached: true,
+    promptVersion: 1,
+  };
+  const cachedReadyAnalysis = {
+    ...baseAnalysis,
+    cosmiqTitleCard: readyCard,
+  };
+  const supabase = createMockSupabase({
+    companion_stat_analyses: [{ data: { payload: cachedReadyAnalysis }, error: null }],
+    ...createFreshAnalysisResponseMap(),
+  });
+  let titleCardLookupCount = 0;
+
+  const response = await module.handleGenerateCompanionStatAnalysis(
+    new Request("http://localhost", { method: "POST", body: JSON.stringify({ forceRefresh: true }) }),
+    {
+      authenticate: async () => ({ userId: "user-1", isServiceRole: false }),
+      createSupabaseClient: () => supabase,
+      fetchImpl: fetch,
+      now: () => new Date("2026-04-18T18:30:00.000Z"),
+      getCosmiqTitleCardCacheState: async () => {
+        titleCardLookupCount += 1;
+        return {
+          profileKey: "v1-different-profile-key",
+          imageUrl: "https://cdn.example.com/should-not-appear.png",
+          status: "ready" as const,
+          cached: true,
+          promptVersion: 1,
+        };
+      },
+    },
+  );
+
+  assertEquals(response.status, 200, "Force refresh should succeed");
+
+  const payload = await response.json();
+  assertEquals(payload.cached, false, "Force refresh should not be flagged as cached");
+  assertEquals(
+    payload.analysis.cosmiqTitleCard.imageUrl,
+    "https://cdn.example.com/today.png",
+    "Force refresh should reuse today's existing ready image",
+  );
+  assertEquals(
+    payload.analysis.cosmiqTitleCard.profileKey,
+    "v1-original-profile-key",
+    "Force refresh should preserve the original profile key tied to today's image",
+  );
+  assertEquals(
+    titleCardLookupCount,
+    0,
+    "Force refresh should skip title-card cache lookup when today already has a ready image",
+  );
+});
+
+Deno.test("generate-companion-stat-analysis falls through to title-card lookup when prior card was not ready", async () => {
+  const cachedGeneratingAnalysis = {
+    ...baseAnalysis,
+    cosmiqTitleCard: {
+      profileKey: "v1-the-oathbound-pathfinder",
+      imageUrl: null,
+      status: "generating" as const,
+      cached: false,
+      promptVersion: 1,
+    },
+  };
+  const supabase = createMockSupabase({
+    companion_stat_analyses: [{ data: { payload: cachedGeneratingAnalysis }, error: null }],
+    ...createFreshAnalysisResponseMap(),
+  });
+  let titleCardLookupCount = 0;
+
+  const response = await module.handleGenerateCompanionStatAnalysis(
+    new Request("http://localhost", { method: "POST", body: JSON.stringify({ forceRefresh: true }) }),
+    {
+      authenticate: async () => ({ userId: "user-1", isServiceRole: false }),
+      createSupabaseClient: () => supabase,
+      fetchImpl: fetch,
+      now: () => new Date("2026-04-18T18:30:00.000Z"),
+      getCosmiqTitleCardCacheState: async () => {
+        titleCardLookupCount += 1;
+        return {
+          profileKey: "v1-fresh-profile-key",
+          imageUrl: null,
+          status: "generating" as const,
+          cached: false,
+          promptVersion: 1,
+        };
+      },
+    },
+  );
+
+  assertEquals(response.status, 200, "Force refresh should succeed when prior card was not ready");
+  const payload = await response.json();
+  assertEquals(
+    titleCardLookupCount,
+    1,
+    "Title-card cache lookup should run when prior card was not ready",
+  );
+  assertEquals(
+    payload.analysis.cosmiqTitleCard.profileKey,
+    "v1-fresh-profile-key",
+    "Force refresh should pick up the fresh profile key from cache lookup",
+  );
+});
+
 Deno.test("generate-companion-stat-analysis attaches title-card cache state without blocking on image generation", async () => {
   const supabase = createMockSupabase({
     companion_stat_analyses: [{ data: null, error: null }, { data: null, error: null }],

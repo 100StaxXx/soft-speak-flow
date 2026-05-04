@@ -7,6 +7,7 @@ import {
   Flame,
   HeartPulse,
   ImageIcon,
+  Loader2,
   Palette,
   RefreshCw,
   RotateCcw,
@@ -53,6 +54,7 @@ import {
   buildCompanionStatAnalysisPreludeCardImageUrl,
   COMPANION_STAT_ANALYSIS_PRELUDE_CARDS,
 } from "@/shared/companionStatAnalysisPreludeCards";
+import { getCompanionCosmiqTitleFlavorDescription } from "@/shared/companionCosmiqTitleDescriptions";
 
 interface CompanionStatAnalysisSurfaceProps {
   open: boolean;
@@ -114,7 +116,7 @@ const ATTRIBUTE_ORDER: CompanionStatAttribute[] = [
 const STAT_MIN = 100;
 const STAT_MAX = 1000;
 const EMPTY_IMAGE_URLS: string[] = [];
-const TITLE_ART_SLIDE_INTERVAL_MS = 1_800;
+const TITLE_ART_SLIDE_INTERVAL_MS = 4_000;
 const TITLE_ART_SLIDES_BEFORE_REVEAL = 2;
 const TITLE_ART_REVEAL_SETTLE_MS = 900;
 
@@ -517,6 +519,15 @@ function LoadingState({
         title={activePreludeCard.title}
       />
       <PreludeSlideProgress activeIndex={activeSafePreludeCardIndex} />
+      {phase === "title-card" ? (
+        <div
+          data-testid="companion-title-art-loading-caption"
+          className="flex items-center justify-center gap-2 pt-1 text-xs text-muted-foreground"
+        >
+          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+          <span>Generating your title art…</span>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1112,7 +1123,7 @@ function CosmiqTitleRevealCard({
 
   return (
     <CosmiqTitleFrontCard
-      description={analysis.cosmiqTitle.rebalancePath}
+      description={getCompanionCosmiqTitleFlavorDescription(analysis.cosmiqTitle)}
       imageAlt={`${analysis.cosmiqTitle.title} archetype illustration`}
       imageUrl={imageUrl}
       onFlip={onFlip}
