@@ -73,6 +73,10 @@ const GUIDED_STEPS: GuidedStep[] = [
     id: "hatch_companion",
     route: "/companion",
   },
+  {
+    id: "mentor_closeout",
+    route: "/companion",
+  },
 ];
 
 export const CREATE_QUEST_SUBSTEP_ORDER: CreateQuestSubstepId[] = [
@@ -98,7 +102,6 @@ const LEGACY_GUIDED_STEP_ID_SET = new Set<GuidedTutorialStepId>([
   "companion_tab_intro",
   "evolve_companion",
   "post_evolution_companion_intro",
-  "mentor_closeout",
 ]);
 const GUIDED_STEP_ID_SET = new Set<GuidedTutorialStepId>([
   ...GUIDED_STEPS.map((step) => step.id),
@@ -160,6 +163,7 @@ export const MILESTONES_ALLOWING_TEMPORARY_HIDE = new Set<GuidedMilestoneId>([
   "tap_hatch_companion",
   "complete_companion_hatch",
   "first_plan_closeout_message",
+  "mentor_closeout_message",
 ]);
 
 // Milestones whose card should not render at all — the user is in a passive
@@ -263,7 +267,8 @@ type TutorialDialogueKey =
   | "save_plan_day_action"
   | "tap_hatch_companion"
   | "complete_companion_hatch"
-  | "first_plan_closeout_message";
+  | "first_plan_closeout_message"
+  | "mentor_closeout_message";
 
 const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, MentorDialogueLine>> = {
   sage: {
@@ -277,6 +282,7 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
     tap_hatch_companion: { text: "Tap 'Hatch.'", support: "Your Companion is ready." },
     complete_companion_hatch: { text: "Let the hatch finish.", support: "I'll wrap up once it confirms." },
     first_plan_closeout_message: { text: "That's it.", support: "Take it one day at a time." },
+    mentor_closeout_message: { text: "Your Companion is here.", support: "That's the tutorial — take it one day at a time." },
   },
   lyra: {
     mentor_intro_hello: { text: "Hey, I'm Lyra. I'll help you get started." },
@@ -289,6 +295,7 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
     tap_hatch_companion: { text: "Tap 'Hatch.'", support: "Your Companion is ready to meet you." },
     complete_companion_hatch: { text: "Let the hatch finish.", support: "Almost there." },
     first_plan_closeout_message: { text: "You're set.", support: "Follow the signal." },
+    mentor_closeout_message: { text: "There they are.", support: "You're set. Follow the signal." },
   },
   icon: {
     mentor_intro_hello: { text: "I'm Icon. Let's get this set up right." },
@@ -301,6 +308,7 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
     tap_hatch_companion: { text: "Tap 'Hatch.'", support: "You've earned the reveal." },
     complete_companion_hatch: { text: "Let the hatch finish.", support: "Hold the moment." },
     first_plan_closeout_message: { text: "You're set.", support: "Follow through." },
+    mentor_closeout_message: { text: "Companion online.", support: "You're set. Follow through." },
   },
   charles: {
     mentor_intro_hello: { text: "Charles. This won't take long." },
@@ -313,6 +321,7 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
     tap_hatch_companion: { text: "Tap 'Hatch.'", support: "You did enough. Shocking." },
     complete_companion_hatch: { text: "Let the hatch finish.", support: "Don't tap everything at once." },
     first_plan_closeout_message: { text: "Done.", support: "Now go do it." },
+    mentor_closeout_message: { text: "It hatched.", support: "Done. Now go do it." },
   },
   princess: {
     mentor_intro_hello: { text: "Hi, I'm Princess. Let's ease into this." },
@@ -325,6 +334,7 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
     tap_hatch_companion: { text: "Tap 'Hatch.'", support: "Your Companion is ready now." },
     complete_companion_hatch: { text: "Let the hatch finish.", support: "Almost done." },
     first_plan_closeout_message: { text: "You're doing great.", support: "Just keep going." },
+    mentor_closeout_message: { text: "Look at them!", support: "You're doing great — just keep going." },
   },
   operator: {
     mentor_intro_hello: { text: "Operator. Let's set your system." },
@@ -337,6 +347,7 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
     tap_hatch_companion: { text: "Tap 'Hatch.'", support: "Companion activation is ready." },
     complete_companion_hatch: { text: "Let the hatch finish.", support: "Awaiting confirmation." },
     first_plan_closeout_message: { text: "System ready.", support: "Execute." },
+    mentor_closeout_message: { text: "Companion hatched.", support: "System ready. Execute." },
   },
   rival: {
     mentor_intro_hello: { text: "I'm Rival. Let's see what you do with this." },
@@ -349,6 +360,7 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
     tap_hatch_companion: { text: "Tap 'Hatch.'", support: "You've earned one decent reveal." },
     complete_companion_hatch: { text: "Let the hatch finish.", support: "Finish what you started." },
     first_plan_closeout_message: { text: "That's all you need.", support: "Don't waste it." },
+    mentor_closeout_message: { text: "It hatched.", support: "That's all you need. Don't waste it." },
   },
 };
 
@@ -363,6 +375,7 @@ const TUTORIAL_DIALOGUE_KEYS = new Set<string>([
   "tap_hatch_companion",
   "complete_companion_hatch",
   "first_plan_closeout_message",
+  "mentor_closeout_message",
 ]);
 
 const isTutorialDialogueKey = (value: string): value is TutorialDialogueKey =>
@@ -557,6 +570,7 @@ const migrateGuidedTutorialProgress = ({
     "save_plan_day_action",
     "tap_hatch_companion",
     "complete_companion_hatch",
+    "mentor_closeout_message",
   ]);
   const migratedMilestoneSet = new Set<GuidedMilestoneId>(
     milestonesCompleted.filter((milestoneId) => currentFlowMilestones.has(milestoneId)),
@@ -581,6 +595,9 @@ const migrateGuidedTutorialProgress = ({
     migratedMilestoneSet.add("tap_hatch_companion");
     migratedMilestoneSet.add("complete_companion_hatch");
   }
+  if (migratedCompletedSet.has("mentor_closeout")) {
+    migratedMilestoneSet.add("mentor_closeout_message");
+  }
   if (isLegacyTutorialComplete) {
     migratedMilestoneSet.add("start_new_goal");
     migratedMilestoneSet.add("complete_pathfinder_campaign");
@@ -589,6 +606,7 @@ const migrateGuidedTutorialProgress = ({
     migratedMilestoneSet.add("save_plan_day_action");
     migratedMilestoneSet.add("tap_hatch_companion");
     migratedMilestoneSet.add("complete_companion_hatch");
+    migratedMilestoneSet.add("mentor_closeout_message");
   }
 
   const migratedAwardedSet = new Set<GuidedTutorialStepId>(
@@ -743,6 +761,7 @@ const STEP_TO_DIALOGUE_KEY: Partial<Record<GuidedTutorialStepId, TutorialDialogu
   plan_my_day: "start_plan_my_day",
   hatch_companion: "tap_hatch_companion",
   first_plan_closeout: "first_plan_closeout_message",
+  mentor_closeout: "mentor_closeout_message",
 };
 
 export const getMentorInstructionLines = (
@@ -1356,6 +1375,14 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       return;
     }
 
+    if (currentStep.id === "mentor_closeout") {
+      if (location.pathname !== "/companion") return;
+      if (milestoneSet.has("mentor_closeout_message")) {
+        void markStepComplete("mentor_closeout");
+      }
+      return;
+    }
+
     if (currentStep.id === "post_evolution_companion_intro") {
       if (location.pathname !== "/companion") return;
       if (milestoneSet.has("post_evolution_companion_intro")) {
@@ -1645,6 +1672,10 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
         : "tap_hatch_companion";
     }
 
+    if (currentStep.id === "mentor_closeout") {
+      return "mentor_closeout_message";
+    }
+
     if (currentStep.id === "post_evolution_companion_intro") {
       return "post_evolution_companion_intro";
     }
@@ -1657,13 +1688,15 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     currentMilestone === "mentor_intro_hello" ||
     currentMilestone === "meet_companion_intro" ||
     currentMilestone === "first_plan_closeout_message" ||
+    currentMilestone === "mentor_closeout_message" ||
     currentMilestone === "quests_campaigns_intro" ||
     currentMilestone === "companion_tab_intro" ||
     currentMilestone === "post_evolution_companion_intro";
   const dialogueActionLabel = supportsDialogueAction
     ? currentMilestone === "mentor_intro_hello"
       ? "Start Tutorial"
-      : currentMilestone === "first_plan_closeout_message"
+      : currentMilestone === "first_plan_closeout_message" ||
+        currentMilestone === "mentor_closeout_message"
       ? "Finish"
       : "Continue"
     : undefined;
@@ -1707,19 +1740,28 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       !tutorialReady ||
       tutorialMarkedComplete ||
       tutorialDismissed ||
-      currentStepId !== "first_plan_closeout"
+      (currentStepId !== "first_plan_closeout" && currentStepId !== "mentor_closeout")
     ) {
       return;
     }
 
-    if (
-      currentMilestone === "first_plan_closeout_message" &&
-      !milestoneSet.has("first_plan_closeout_message")
-    ) {
-      markMilestoneComplete("first_plan_closeout_message");
+    if (currentStepId === "first_plan_closeout") {
+      if (
+        currentMilestone === "first_plan_closeout_message" &&
+        !milestoneSet.has("first_plan_closeout_message")
+      ) {
+        markMilestoneComplete("first_plan_closeout_message");
+      }
+      void markStepComplete("first_plan_closeout");
+      return;
     }
 
-    void markStepComplete("first_plan_closeout");
+    if (currentStepId === "mentor_closeout") {
+      if (!milestoneSet.has("mentor_closeout_message")) {
+        markMilestoneComplete("mentor_closeout_message");
+      }
+      void markStepComplete("mentor_closeout");
+    }
   }, [
     currentMilestone,
     currentStepId,
@@ -1968,14 +2010,16 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     ? "I'm waiting for this area to load. Stay on this screen and it'll highlight as soon as it's ready."
     : dialogue.support;
   const strictLockEnabled = milestoneUsesStrictLock(currentMilestone);
+  const isCloseoutStep =
+    currentStepId === "first_plan_closeout" || currentStepId === "mentor_closeout";
   const secondaryActionLabel =
     !tutorialSuppressed && !isIntroDialogueActive
-      ? currentStepId === "first_plan_closeout"
+      ? isCloseoutStep
         ? "Complete tutorial"
         : "Skip tutorial"
       : undefined;
   const onSecondaryAction = secondaryActionLabel
-    ? currentStepId === "first_plan_closeout"
+    ? isCloseoutStep
       ? completeTutorial
       : dismissTutorial
     : undefined;
