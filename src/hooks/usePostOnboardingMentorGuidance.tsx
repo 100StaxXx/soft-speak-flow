@@ -694,6 +694,7 @@ export interface PostOnboardingMentorGuidanceState {
   speakerAvatarUrl?: string;
   secondaryActionLabel?: string;
   onSecondaryAction?: () => void;
+  dismissTutorial?: () => void;
   dialogueActionLabel?: string;
   onDialogueAction?: () => void;
 }
@@ -719,6 +720,7 @@ const DEFAULT_GUIDANCE_STATE: PostOnboardingMentorGuidanceState = {
   speakerAvatarUrl: undefined,
   secondaryActionLabel: undefined,
   onSecondaryAction: undefined,
+  dismissTutorial: undefined,
   dialogueActionLabel: undefined,
   onDialogueAction: undefined,
 };
@@ -1992,6 +1994,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     speakerAvatarUrl: personality?.avatar_url,
     secondaryActionLabel,
     onSecondaryAction,
+    dismissTutorial: tutorialSuppressed ? undefined : dismissTutorial,
     dialogueActionLabel: tutorialSuppressed ? undefined : dialogueActionLabel,
     onDialogueAction:
       tutorialSuppressed ? undefined : (supportsDialogueAction ? onDialogueAction : undefined),

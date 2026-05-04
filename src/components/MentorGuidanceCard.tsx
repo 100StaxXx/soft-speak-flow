@@ -414,6 +414,7 @@ export const MentorGuidanceCard = () => {
     speakerAvatarUrl,
     secondaryActionLabel,
     onSecondaryAction,
+    dismissTutorial,
     dialogueActionLabel,
     onDialogueAction,
   } = usePostOnboardingMentorGuidance();
@@ -437,7 +438,7 @@ export const MentorGuidanceCard = () => {
   }, []);
 
   const canRevealSkipX =
-    secondaryActionLabel === "Skip tutorial" && Boolean(onSecondaryAction);
+    isActive && Boolean(dismissTutorial) && secondaryActionLabel !== "Complete tutorial";
 
   const revealSkipX = useCallback(() => {
     if (!canRevealSkipX) return;
@@ -606,11 +607,13 @@ export const MentorGuidanceCard = () => {
       <div
         ref={panelRef}
         data-testid="mentor-guidance-card-panel"
+        onClick={canRevealSkipX ? revealSkipX : undefined}
         className={cn(
-          "pointer-events-none relative rounded-2xl border border-white/20 bg-black/65 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-md",
+          "pointer-events-auto relative rounded-2xl border border-white/20 bg-black/65 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-md",
           isCompact
             ? "h-full w-full overflow-hidden rounded-xl"
             : "mx-auto w-full max-w-[22rem] sm:max-w-4xl",
+          canRevealSkipX && "cursor-pointer",
         )}
       >
         {canRevealSkipX ? (
@@ -624,7 +627,7 @@ export const MentorGuidanceCard = () => {
                   event.stopPropagation();
                   clearHideSkipTimeout();
                   setShowSkipX(false);
-                  onSecondaryAction?.();
+                  dismissTutorial?.();
                 }}
                 initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.85 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -644,9 +647,7 @@ export const MentorGuidanceCard = () => {
           className={cn(
             "flex gap-3",
             isCompact ? "h-full items-center p-3" : "items-end p-3 sm:p-4",
-            canRevealSkipX && "pointer-events-auto cursor-pointer",
           )}
-          onClick={canRevealSkipX ? revealSkipX : undefined}
         >
           <div className={cn("shrink-0", isCompact && "hidden")}>
             <MentorAvatar
