@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { X } from "lucide-react";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { MentorAvatar } from "@/components/MentorAvatar";
 import { Button } from "@/components/ui/button";
@@ -423,6 +425,36 @@ export const MentorGuidanceCard = () => {
     bottomPx: PANEL_BASE_BOTTOM_PX,
   });
   const [isTemporarilyHidden, setIsTemporarilyHidden] = useState(false);
+  const [showSkipX, setShowSkipX] = useState(false);
+  const hideSkipTimeoutRef = useRef<number | null>(null);
+  const prefersReducedMotion = useReducedMotion();
+
+  const clearHideSkipTimeout = useCallback(() => {
+    if (hideSkipTimeoutRef.current !== null) {
+      window.clearTimeout(hideSkipTimeoutRef.current);
+      hideSkipTimeoutRef.current = null;
+    }
+  }, []);
+
+  const canRevealSkipX =
+    secondaryActionLabel === "Skip tutorial" && Boolean(onSecondaryAction);
+
+  const revealSkipX = useCallback(() => {
+    if (!canRevealSkipX) return;
+    setShowSkipX(true);
+    clearHideSkipTimeout();
+    hideSkipTimeoutRef.current = window.setTimeout(() => {
+      setShowSkipX(false);
+      hideSkipTimeoutRef.current = null;
+    }, 3000);
+  }, [canRevealSkipX, clearHideSkipTimeout]);
+
+  useEffect(() => {
+    setShowSkipX(false);
+    clearHideSkipTimeout();
+  }, [dialogueText, isActive, clearHideSkipTimeout]);
+
+  useEffect(() => () => clearHideSkipTimeout(), [clearHideSkipTimeout]);
 
   const updatePlacement = useCallback(() => {
     if (!isActive) return;
@@ -575,13 +607,47 @@ export const MentorGuidanceCard = () => {
         ref={panelRef}
         data-testid="mentor-guidance-card-panel"
         className={cn(
-          "pointer-events-none rounded-2xl border border-white/20 bg-black/65 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-md",
+          "pointer-events-none relative rounded-2xl border border-white/20 bg-black/65 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-md",
           isCompact
             ? "h-full w-full overflow-hidden rounded-xl"
             : "mx-auto w-full max-w-[22rem] sm:max-w-4xl",
         )}
       >
-        <div className={cn("flex gap-3", isCompact ? "h-full items-center p-3" : "items-end p-3 sm:p-4")}>
+        {canRevealSkipX ? (
+          <AnimatePresence>
+            {showSkipX ? (
+              <motion.button
+                key="skip-x"
+                type="button"
+                aria-label="Skip tutorial"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  clearHideSkipTimeout();
+                  setShowSkipX(false);
+                  onSecondaryAction?.();
+                }}
+                initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.85 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.85 }}
+                transition={{ duration: 0.15 }}
+                className={cn(
+                  "pointer-events-auto absolute z-10 rounded-full text-red-400/90 transition-colors hover:bg-white/10 hover:text-red-300",
+                  isCompact ? "right-1.5 top-1.5 p-1" : "right-2 top-2 p-1.5",
+                )}
+              >
+                <X className={isCompact ? "h-3.5 w-3.5" : "h-4 w-4"} />
+              </motion.button>
+            ) : null}
+          </AnimatePresence>
+        ) : null}
+        <div
+          className={cn(
+            "flex gap-3",
+            isCompact ? "h-full items-center p-3" : "items-end p-3 sm:p-4",
+            canRevealSkipX && "pointer-events-auto cursor-pointer",
+          )}
+          onClick={canRevealSkipX ? revealSkipX : undefined}
+        >
           <div className={cn("shrink-0", isCompact && "hidden")}>
             <MentorAvatar
               mentorSlug={(speakerSlug || "").toLowerCase()}
@@ -604,7 +670,7 @@ export const MentorGuidanceCard = () => {
             {dialogueSupportText && !isCompact ? (
               <p className="mt-1 text-sm leading-relaxed text-white/80">{dialogueSupportText}</p>
             ) : null}
-            {!isCompact && (canTemporarilyHide || onSecondaryAction || onDialogueAction) ? (
+            {!isCompact && (canTemporarilyHide || (onSecondaryAction && secondaryActionLabel === "Complete tutorial") || onDialogueAction) ? (
               <div className={cn("mt-3 flex flex-wrap gap-2", isCompact && "mt-2")}>
                 {canTemporarilyHide ? (
                   <Button
@@ -620,18 +686,18 @@ export const MentorGuidanceCard = () => {
                     Hide tutorial
                   </Button>
                 ) : null}
-                {onSecondaryAction ? (
+                {onSecondaryAction && secondaryActionLabel === "Complete tutorial" ? (
                   <Button
                     type="button"
                     variant="ghost"
-                    aria-label={secondaryActionLabel || "Skip tutorial"}
+                    aria-label={secondaryActionLabel}
                     onClick={onSecondaryAction}
                     className={cn(
                       "pointer-events-auto h-9 rounded-xl border border-white/25 bg-black/45 text-white hover:bg-black/60",
                       isCompact && "h-8 px-2 text-xs",
                     )}
                   >
-                    {secondaryActionLabel || "Skip tutorial"}
+                    {secondaryActionLabel}
                   </Button>
                 ) : null}
                 {onDialogueAction ? (

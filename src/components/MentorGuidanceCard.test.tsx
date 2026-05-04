@@ -74,6 +74,9 @@ describe("MentorGuidanceCard", () => {
     expect(screen.getByText("Step 2 of 3")).toBeInTheDocument();
     expect(screen.getByText("Tap 'Plan day.'")).toBeInTheDocument();
     expect(screen.getByText("It'll give you something simple to follow.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Skip tutorial" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Tap 'Plan day.'"));
     expect(screen.getByRole("button", { name: "Skip tutorial" })).toBeInTheDocument();
   });
 
@@ -191,6 +194,7 @@ describe("MentorGuidanceCard", () => {
     mocks.guidance.onSecondaryAction = mocks.onSecondaryAction;
 
     render(<MentorGuidanceCard />);
+    fireEvent.click(screen.getByText("Tap 'Plan day.'"));
     fireEvent.click(screen.getByRole("button", { name: "Skip tutorial" }));
 
     expect(mocks.onSecondaryAction).toHaveBeenCalledTimes(1);
