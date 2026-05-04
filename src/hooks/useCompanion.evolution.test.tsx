@@ -580,7 +580,11 @@ describe("useCompanion evolveCompanion", () => {
     expect(result.current.companion?.current_stage).toBe(1);
     expect(result.current.companion?.current_image_url).toBe("https://example.com/stage-1.png");
     expect(result.current.nextEvolutionXP).toBe(30);
-    expect(result.current.canEvolve).toBe(true);
+    // Stage 1 → 2 is intra-tier (both hatchling), so the EVOLVE button stays
+    // hidden and the listener auto-progresses; hasPendingLevels still reflects
+    // the pending XP.
+    expect(result.current.canEvolve).toBe(false);
+    expect(result.current.hasPendingLevels).toBe(true);
     expect(mocks.loggerWarnMock).toHaveBeenCalledWith(
       "Applied local companion claim fallback",
       expect.objectContaining({
@@ -907,7 +911,29 @@ describe("useCompanion evolveCompanion", () => {
 
     expect(result.current.nextEvolutionXP).toBe(60);
     expect(result.current.progressToNext).toBe(100);
+    // Stage 2 → 3 is intra-tier (both hatchling), so the EVOLVE button is gated
+    // off; hasPendingLevels confirms there are still pending levels to claim.
+    expect(result.current.canEvolve).toBe(false);
+    expect(result.current.hasPendingLevels).toBe(true);
+  });
+
+  it("opens the EVOLVE button when the next stage crosses a tier boundary", async () => {
+    mocks.userCompanionResponses.length = 0;
+    mocks.userCompanionResponses.push({
+      data: {
+        ...companionFixture,
+        current_stage: 4,
+        current_xp: 100,
+      },
+      error: null,
+    });
+
+    const { result } = await renderUseCompanion();
+
+    // Stage 4 → 5 crosses hatchling → initiate (image changes), so the EVOLVE
+    // button must appear.
     expect(result.current.canEvolve).toBe(true);
+    expect(result.current.hasPendingLevels).toBe(true);
   });
 
   it("keeps stage 0 eggs hatch-ready without auto-advancing them", async () => {

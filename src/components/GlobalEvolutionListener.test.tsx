@@ -14,10 +14,16 @@ const mocks = vi.hoisted(() => {
   const loggerWarnMock = vi.fn();
   const loggerErrorMock = vi.fn();
   const companionEvolutionPropsMock = vi.fn();
+  const triggerManualEvolutionMock = vi.fn().mockResolvedValue(undefined);
+  const toastCustomMock = vi.fn();
+  const confettiMock = vi.fn();
+  const hapticsImpactMock = vi.fn().mockResolvedValue(undefined);
   const state = {
     callback: null as null | ((payload: Record<string, unknown>) => Promise<void>),
     mentorId: null as string | null,
     mentorLookup: null as null | (() => Promise<{ data: unknown; error: unknown }>),
+    companion: null as null | { id: string; current_stage: number; current_xp: number },
+    isEvolutionBusy: false,
   };
   const companionEvolutionLookupResponses: Array<{ data: unknown; error: unknown }> = [];
 
@@ -33,6 +39,10 @@ const mocks = vi.hoisted(() => {
     loggerWarnMock,
     loggerErrorMock,
     companionEvolutionPropsMock,
+    triggerManualEvolutionMock,
+    toastCustomMock,
+    confettiMock,
+    hapticsImpactMock,
     state,
     companionEvolutionLookupResponses,
   };
@@ -96,6 +106,35 @@ vi.mock("@/utils/logger", () => ({
   logger: {
     warn: mocks.loggerWarnMock,
     error: mocks.loggerErrorMock,
+  },
+}));
+
+vi.mock("@/hooks/useCompanion", () => ({
+  useCompanion: () => ({
+    companion: mocks.state.companion,
+    triggerManualEvolution: mocks.triggerManualEvolutionMock,
+    isEvolutionBusy: mocks.state.isEvolutionBusy,
+  }),
+}));
+
+vi.mock("@/components/ui/sonner", () => ({
+  toast: {
+    custom: mocks.toastCustomMock,
+  },
+}));
+
+vi.mock("canvas-confetti", () => ({
+  default: mocks.confettiMock,
+}));
+
+vi.mock("@capacitor/haptics", () => ({
+  Haptics: {
+    impact: mocks.hapticsImpactMock,
+  },
+  ImpactStyle: {
+    Light: "LIGHT",
+    Medium: "MEDIUM",
+    Heavy: "HEAVY",
   },
 }));
 
@@ -202,6 +241,8 @@ describe("GlobalEvolutionListener", () => {
     mocks.state.callback = null;
     mocks.state.mentorId = null;
     mocks.state.mentorLookup = null;
+    mocks.state.companion = null;
+    mocks.state.isEvolutionBusy = false;
     mocks.companionEvolutionLookupResponses.length = 0;
 
     mocks.onMock.mockImplementation(
@@ -401,6 +442,98 @@ describe("GlobalEvolutionListener", () => {
         newImageUrl: "https://example.com/hatchling.png",
       }),
     );
+  });
+
+  it("fires the level-up toast and skips the modal for intra-tier graduations", async () => {
+    render(<GlobalEvolutionListener />);
+
+    await act(async () => {
+      await mocks.state.callback?.({
+        eventType: "UPDATE",
+        new: {
+          id: "companion-1",
+          current_stage: 6,
+          current_image_url: "https://example.com/stage-6.png",
+        },
+        old: {
+          id: "companion-1",
+          current_stage: 5,
+          current_image_url: "https://example.com/stage-5.png",
+        },
+      });
+    });
+
+    // Stage 5 → 6 stays inside the initiate tier (5–12), so the dramatic modal
+    // must NOT appear; the celebratory level-up toast does.
+    expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
+    expect(mocks.toastCustomMock).toHaveBeenCalledTimes(1);
+    expect(mocks.confettiMock).toHaveBeenCalledTimes(1);
+    expect(mocks.hapticsImpactMock).toHaveBeenCalledTimes(1);
+    expect(mocks.setEvolutionInProgressMock).not.toHaveBeenCalledWith(true);
+  });
+
+  it("auto-progresses the companion when a graduation is intra-tier", async () => {
+    mocks.state.companion = {
+      id: "companion-1",
+      current_stage: 5,
+      current_xp: 240, // earnedLevel = 6, intra-tier (initiate 5–12)
+    };
+
+    render(<GlobalEvolutionListener />);
+
+    await waitFor(() => {
+      expect(mocks.triggerManualEvolutionMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("does not auto-progress while an evolution is busy", async () => {
+    mocks.state.companion = {
+      id: "companion-1",
+      current_stage: 5,
+      current_xp: 240,
+    };
+    mocks.state.isEvolutionBusy = true;
+
+    render(<GlobalEvolutionListener />);
+
+    // Give the effect a chance to run.
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mocks.triggerManualEvolutionMock).not.toHaveBeenCalled();
+  });
+
+  it("does not auto-progress when the next stage is a tier boundary", async () => {
+    mocks.state.companion = {
+      id: "companion-1",
+      current_stage: 4,
+      current_xp: 100, // earnedLevel = 5, next stage 5 = tier boundary
+    };
+
+    render(<GlobalEvolutionListener />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mocks.triggerManualEvolutionMock).not.toHaveBeenCalled();
+  });
+
+  it("does not auto-progress eggs (current_stage 0)", async () => {
+    mocks.state.companion = {
+      id: "companion-1",
+      current_stage: 0,
+      current_xp: 14, // earnedLevel = 1
+    };
+
+    render(<GlobalEvolutionListener />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mocks.triggerManualEvolutionMock).not.toHaveBeenCalled();
   });
 
   it("ignores raw stage jumps when no persisted evolution row exists", async () => {
