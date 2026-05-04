@@ -34,6 +34,7 @@ import {
   toUserFacingFunctionError,
 } from "@/utils/supabaseFunctionErrors";
 import {
+  didTierChange,
   getProgressionThreshold,
   resolveProgressionLevelFromXp,
 } from "@/config/progression";
@@ -1588,7 +1589,14 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
     onSuccess: ({ shouldEvolve, claimedStage, earnedLevel, earnedLevelBefore, pendingEvolutionCount }) => {
       queryClient.invalidateQueries({ queryKey: ["companion"] });
 
-      if (shouldEvolve && earnedLevel > earnedLevelBefore) {
+      // Only announce "Ready to evolve" when the next advancement actually crosses
+      // a tier (image changes) — intra-tier level-ups are auto-progressed and get
+      // their own celebratory toast from GlobalEvolutionListener.
+      if (
+        shouldEvolve
+        && earnedLevel > earnedLevelBefore
+        && didTierChange(claimedStage, claimedStage + 1)
+      ) {
         const nextClaimedLevel = claimedStage + 1;
         const extraReadyCopy = pendingEvolutionCount > 1
           ? ` ${pendingEvolutionCount} evolutions are ready.`
@@ -1868,6 +1876,15 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
 
   const canEvolve = useMemo(() => {
     if (!companion) return false;
+    if (earnedLevel <= companion.current_stage) return false;
+    // Imminent-boundary check: only show EVOLVE when the very next advancement
+    // crosses a tier (image changes). Intra-tier graduations are auto-progressed
+    // by GlobalEvolutionListener and celebrated with a toast.
+    return didTierChange(companion.current_stage, companion.current_stage + 1);
+  }, [companion, earnedLevel]);
+
+  const hasPendingLevels = useMemo(() => {
+    if (!companion) return false;
     return earnedLevel > companion.current_stage;
   }, [companion, earnedLevel]);
 
@@ -1967,6 +1984,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
     progressToNext,
     isEvolvingLoading,
     canEvolve,
+    hasPendingLevels,
     requiresHatchSelection,
     isEvolutionBusy,
     triggerManualEvolution,

@@ -1,8 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import confetti from "canvas-confetti";
+import { Haptics, ImpactStyle } from "@capacitor/haptics";
+import { Sparkles } from "lucide-react";
 import { CompanionEvolution } from "@/components/CompanionEvolution";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/sonner";
 import { useAuth } from "@/hooks/useAuth";
+import { useCompanion } from "@/hooks/useCompanion";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { useCelebration } from "@/contexts/CelebrationContext";
 import { useMentorConnection } from "@/contexts/MentorConnectionContext";
@@ -13,14 +18,52 @@ import {
 } from "@/lib/companionEvolutionEvents";
 import { logger } from "@/utils/logger";
 import {
+  PROGRESSION_LEVEL_CAP,
   didTierChange,
   getProgressionLevelDisplay,
+  getProgressionLevelLabel,
   getProgressionTierLabelForLevel,
+  resolveProgressionLevelFromXp,
 } from "@/config/progression";
 import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
 
 const EVOLUTION_RECORD_RETRY_DELAYS_MS = [0, 75, 150] as const;
 const LOCAL_HATCH_DEDUPE_WINDOW_MS = 15000;
+
+const LEVEL_UP_CONFETTI_COLORS = ["#F59E0B", "#FCD34D", "#FBBF24", "#FDE68A", "#FFD700"];
+
+const fireLevelUpToast = (newLevel: number) => {
+  const levelLabel = getProgressionLevelLabel(newLevel);
+  const tierLabel = getProgressionTierLabelForLevel(newLevel);
+
+  toast.custom(
+    () => (
+      <div className="flex items-center gap-3 rounded-xl border border-amber-400/40 bg-gradient-to-br from-amber-500/25 via-orange-500/15 to-yellow-500/25 px-4 py-3 shadow-lg backdrop-blur-md">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-amber-50 shadow-inner">
+          <Sparkles className="h-5 w-5" />
+        </div>
+        <div className="flex flex-col">
+          <span className="text-sm font-bold tracking-wide text-amber-100">Level Up!</span>
+          <span className="text-xs text-amber-200/85">{levelLabel} • {tierLabel}</span>
+        </div>
+      </div>
+    ),
+    { duration: 2000 },
+  );
+
+  // Light haptic — distinct from the heavy modal evolution feel.
+  Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
+
+  // Brief confetti burst — small count so it feels celebratory but not dramatic.
+  confetti({
+    particleCount: 28,
+    spread: 60,
+    startVelocity: 28,
+    origin: { y: 0.7 },
+    colors: LEVEL_UP_CONFETTI_COLORS,
+    ticks: 80,
+  });
+};
 
 const waitForEvolutionPersistence = async ({
   companionId,
@@ -68,6 +111,12 @@ export const GlobalEvolutionListener = () => {
   const { setIsEvolvingLoading, onEvolutionComplete } = useEvolution();
   const { setEvolutionInProgress } = useCelebration();
   const { triggerEvent } = useCompanionMotionSafe();
+  const { companion, triggerManualEvolution, isEvolutionBusy } = useCompanion();
+  const earnedLevel = useMemo(
+    () => (companion ? resolveProgressionLevelFromXp(companion.current_xp) : 0),
+    [companion],
+  );
+  const lastAutoProgressedStageRef = useRef<number | null>(null);
   const [isEvolving, setIsEvolving] = useState(false);
   const [evolutionData, setEvolutionData] = useState<{
     companionId: string;
@@ -316,7 +365,19 @@ export const GlobalEvolutionListener = () => {
             return;
           }
 
-          if (newLevel <= oldLevel || !didTierChange(oldLevel, newLevel)) {
+          if (newLevel <= oldLevel) {
+            return;
+          }
+
+          if (!didTierChange(oldLevel, newLevel)) {
+            // Intra-tier graduation: companion image is unchanged, so skip the
+            // dramatic modal entirely and fire a celebratory toast instead.
+            fireLevelUpToast(newLevel);
+            triggerEvent({
+              type: "xp_gain",
+              intensity: "medium",
+              stage: newLevel,
+            });
             return;
           }
 
@@ -651,6 +712,23 @@ export const GlobalEvolutionListener = () => {
       window.removeEventListener(COMPANION_HATCH_STARTED_EVENT, handleHatchStarted as EventListener);
     };
   }, [startEvolutionPresentation, user]);
+
+  // Auto-progress intra-tier graduations. The flashy EVOLVE button is reserved
+  // for tier-boundary transitions where the companion's image actually changes.
+  // For intra-tier level-ups (image identical), we silently advance the stage
+  // and let the realtime listener fire its celebratory toast.
+  useEffect(() => {
+    if (!companion) return;
+    if (companion.current_stage <= 0) return;                           // hatching uses the HATCH button
+    if (companion.current_stage >= PROGRESSION_LEVEL_CAP) return;        // already at level cap
+    if (isEvolutionBusy || isEvolving) return;                           // serialize with active modal
+    if (earnedLevel <= companion.current_stage) return;                  // nothing pending
+    if (didTierChange(companion.current_stage, companion.current_stage + 1)) return; // hand off to button
+    if (lastAutoProgressedStageRef.current === companion.current_stage) return;       // dedupe re-fires
+
+    lastAutoProgressedStageRef.current = companion.current_stage;
+    void triggerManualEvolution();
+  }, [companion, earnedLevel, isEvolutionBusy, isEvolving, triggerManualEvolution]);
 
   if (!isEvolving || !evolutionData) {
     return null;

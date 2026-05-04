@@ -1,5 +1,5 @@
 import { toast as sonnerToast } from "@/components/ui/sonner";
-import { resolveProgressionLevelFromXp } from "@/config/progression";
+import { didTierChange, resolveProgressionLevelFromXp } from "@/config/progression";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -134,7 +134,14 @@ export const showMissionRewardFeedback = (
     : Math.max(earnedLevelAfter - claimedStage, 0);
   const shouldEvolve = Boolean(result.should_evolve ?? pendingEvolutionCount > 0);
 
-  if (shouldEvolve && earnedLevelAfter > earnedLevelBefore) {
+  // Only announce "Ready to evolve" when the next advancement actually crosses
+  // a tier (image changes). Intra-tier graduations are auto-progressed and get
+  // their own celebratory toast from GlobalEvolutionListener.
+  if (
+    shouldEvolve
+    && earnedLevelAfter > earnedLevelBefore
+    && didTierChange(claimedStage, claimedStage + 1)
+  ) {
     const nextClaimedLevel = claimedStage + 1;
     const extraReadyCopy = pendingEvolutionCount > 1
       ? ` ${pendingEvolutionCount} evolutions are ready.`
