@@ -1394,9 +1394,8 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       });
 
       listeners.push({
-        eventName: "pathfinder-campaign-created",
+        eventName: "campaign-created",
         handler: () => {
-          if (location.pathname !== "/journeys") return;
           void (async () => {
             if (!milestoneSet.has("start_new_goal")) {
               markMilestoneComplete("start_new_goal");

@@ -421,7 +421,7 @@ describe("guided tutorial first-value loop", () => {
     });
 
     await act(async () => {
-      window.dispatchEvent(new CustomEvent("pathfinder-campaign-created"));
+      window.dispatchEvent(new CustomEvent("campaign-created"));
     });
 
     await waitFor(() => {
