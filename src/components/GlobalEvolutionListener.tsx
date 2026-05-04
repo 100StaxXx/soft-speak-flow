@@ -36,7 +36,7 @@ const waitForEvolutionPersistence = async ({
 
     const { data, error } = await supabase
       .from("companion_evolutions")
-      .select("id")
+      .select("id, animation_video_url")
       .eq("companion_id", companionId)
       .eq("stage", stage)
       .maybeSingle();
@@ -47,15 +47,18 @@ const waitForEvolutionPersistence = async ({
         stage,
         error: error.message,
       });
-      return false;
+      return null;
     }
 
     if (data?.id) {
-      return true;
+      return {
+        evolutionId: data.id,
+        animationVideoUrl: typeof data.animation_video_url === "string" ? data.animation_video_url : null,
+      };
     }
   }
 
-  return false;
+  return null;
 };
 
 export const GlobalEvolutionListener = () => {
@@ -75,6 +78,8 @@ export const GlobalEvolutionListener = () => {
     presetId?: string;
     mentorSlug?: string;
     element?: string;
+    evolutionId?: string;
+    animationVideoUrl?: string | null;
   } | null>(null);
   const activeEvolutionKeyRef = useRef<string | null>(null);
   const recentLocalHatchKeysRef = useRef(new Map<string, number>());
@@ -149,6 +154,8 @@ export const GlobalEvolutionListener = () => {
     imageUrl,
     presetId,
     element,
+    evolutionId,
+    animationVideoUrl,
     dispatchLoadingStart = false,
     markAsLocalHatch = false,
   }: {
@@ -159,6 +166,8 @@ export const GlobalEvolutionListener = () => {
     imageUrl: string;
     presetId?: string;
     element?: string;
+    evolutionId?: string;
+    animationVideoUrl?: string | null;
     dispatchLoadingStart?: boolean;
     markAsLocalHatch?: boolean;
   }) => {
@@ -183,6 +192,8 @@ export const GlobalEvolutionListener = () => {
         imageUrl,
         presetId,
         element,
+        evolutionId,
+        animationVideoUrl: animationVideoUrl ?? null,
       });
       triggerEvent({
         type: "evolution_start",
@@ -324,12 +335,12 @@ export const GlobalEvolutionListener = () => {
             return;
           }
 
-          const hasPersistedEvolution = await waitForEvolutionPersistence({
+          const persistence = await waitForEvolutionPersistence({
             companionId,
             stage: newLevel,
           });
 
-          if (!hasPersistedEvolution) {
+          if (!persistence) {
             logger.warn("Evolution listener: Ignoring stage update without persisted evolution row", {
               companionId,
               oldLevel,
@@ -385,6 +396,8 @@ export const GlobalEvolutionListener = () => {
                 ? oldData.preset_id
                 : undefined,
             element,
+            evolutionId: persistence.evolutionId,
+            animationVideoUrl: persistence.animationVideoUrl,
             dispatchLoadingStart: true,
           });
         },
@@ -411,6 +424,203 @@ export const GlobalEvolutionListener = () => {
     user?.id,
   ]);
 
+  // Hot-swap the Kling MP4 once the cron drainer flips animation_video_url
+  // on the active evolution row mid-presentation. CompanionEvolution renders
+  // the video over the still during reveal/settle; if the URL arrives after
+  // the still has appeared, the video fades in cleanly.
+  useEffect(() => {
+    const evolutionId = evolutionData?.evolutionId;
+    if (!evolutionId || evolutionData?.animationVideoUrl) {
+      return;
+    }
+
+    const channel = supabase
+      .channel(`companion-evolution-row-${evolutionId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "companion_evolutions",
+          filter: `id=eq.${evolutionId}`,
+        },
+        (payload) => {
+          const next = payload.new as Record<string, unknown> | null;
+          const nextUrl = next && typeof next.animation_video_url === "string"
+            ? next.animation_video_url
+            : null;
+          if (!nextUrl) return;
+          setEvolutionData((current) => {
+            if (!current || current.evolutionId !== evolutionId) return current;
+            if (current.animationVideoUrl) return current;
+            return { ...current, animationVideoUrl: nextUrl };
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [evolutionData?.evolutionId, evolutionData?.animationVideoUrl]);
+
+  // Re-present an evolution from scratch with the Kling video. Used both by
+  // the always-on realtime subscription (mid-session arrivals) and the
+  // load-time check below (user closed the app between hatch and Kling).
+  const presentEvolutionWithVideo = useCallback(async ({
+    evolutionId,
+    companionId,
+    stage,
+    imageUrl,
+    animationVideoUrl,
+  }: {
+    evolutionId: string;
+    companionId: string;
+    stage: number;
+    imageUrl: string;
+    animationVideoUrl: string;
+  }) => {
+    if (activeEvolutionKeyRef.current === buildEvolutionKey(companionId, stage)) {
+      // Already on screen — the hot-swap subscription handles this case.
+      return;
+    }
+
+    // Fetch the companion identity and previous-stage portrait in parallel.
+    // Halves the time-to-present for the re-present path.
+    const [companionResult, previousResult] = await Promise.all([
+      supabase
+        .from("user_companion")
+        .select("preset_id, core_element, current_image_url, initial_image_url")
+        .eq("id", companionId)
+        .maybeSingle(),
+      supabase
+        .from("companion_evolutions")
+        .select("image_url")
+        .eq("companion_id", companionId)
+        .lt("stage", stage)
+        .order("stage", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    const companionRow = companionResult.data;
+    const previousEvolution = previousResult.data;
+    if (!companionRow) return;
+
+    const previousImageUrl =
+      (previousEvolution && typeof previousEvolution.image_url === "string"
+        ? previousEvolution.image_url
+        : null)
+      ?? (typeof companionRow.initial_image_url === "string" ? companionRow.initial_image_url : null)
+      ?? (typeof companionRow.current_image_url === "string" ? companionRow.current_image_url : null)
+      ?? "";
+
+    // Allow re-trigger by clearing the dedupe key for this evolution.
+    activeEvolutionKeyRef.current = null;
+
+    void startEvolutionPresentation({
+      companionId,
+      previousLevel: Math.max(0, stage - 1),
+      level: stage,
+      previousImageUrl,
+      imageUrl,
+      presetId: typeof companionRow.preset_id === "string" ? companionRow.preset_id : undefined,
+      element: typeof companionRow.core_element === "string" ? companionRow.core_element : undefined,
+      evolutionId,
+      animationVideoUrl,
+    });
+  }, [buildEvolutionKey, startEvolutionPresentation]);
+
+  // Always-on realtime subscription on the user's evolution rows. Fires when
+  // the cron drainer flips animation_video_url from null to a string AFTER
+  // the user has dismissed the live evolution screen — re-presents with the
+  // video, mirroring the existing "bring the user back when ready" pattern
+  // used by triggerManualEvolution + hatchAnimationSnapshot.
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`companion-evolution-video-ready-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "companion_evolutions",
+        },
+        (payload) => {
+          const next = payload.new as Record<string, unknown> | null;
+          const old = payload.old as Record<string, unknown> | null;
+          if (!next || !old) return;
+
+          const newUrl = typeof next.animation_video_url === "string" ? next.animation_video_url : null;
+          const oldUrl = typeof old.animation_video_url === "string" ? old.animation_video_url : null;
+          if (!newUrl || oldUrl) return;
+          if (next.animation_seen_at) return;
+
+          const evolutionId = typeof next.id === "string" ? next.id : null;
+          const companionId = typeof next.companion_id === "string" ? next.companion_id : null;
+          const stage = typeof next.stage === "number" ? next.stage : null;
+          const imageUrl = typeof next.image_url === "string" ? next.image_url : null;
+          if (!evolutionId || !companionId || stage === null || !imageUrl) return;
+
+          void presentEvolutionWithVideo({
+            evolutionId,
+            companionId,
+            stage,
+            imageUrl,
+            animationVideoUrl: newUrl,
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, presentEvolutionWithVideo]);
+
+  // Load-time replay: when the app boots, look for the user's most recent
+  // evolution that has a Kling video AND hasn't been shown to them yet, and
+  // re-present it. Covers the case where the user closed the app between the
+  // hatch (still played) and Kling completion (~30-90s later). Keyed by user
+  // id so account switches re-fire the check rather than silently skipping.
+  const replayCheckedForUserRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!user?.id) return;
+    if (replayCheckedForUserRef.current === user.id) return;
+    replayCheckedForUserRef.current = user.id;
+
+    void (async () => {
+      const recencyCutoffIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: row } = await supabase
+        .from("companion_evolutions")
+        .select("id, companion_id, stage, image_url, animation_video_url, evolved_at, user_companion!inner(user_id)")
+        .eq("user_companion.user_id", user.id)
+        .not("animation_video_url", "is", null)
+        .is("animation_seen_at", null)
+        .gte("evolved_at", recencyCutoffIso)
+        .order("evolved_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!row) return;
+      const evolutionId = typeof row.id === "string" ? row.id : null;
+      const companionId = typeof row.companion_id === "string" ? row.companion_id : null;
+      const stage = typeof row.stage === "number" ? row.stage : null;
+      const imageUrl = typeof row.image_url === "string" ? row.image_url : null;
+      const animationVideoUrl = typeof row.animation_video_url === "string" ? row.animation_video_url : null;
+      if (!evolutionId || !companionId || stage === null || !imageUrl || !animationVideoUrl) return;
+
+      await presentEvolutionWithVideo({
+        evolutionId,
+        companionId,
+        stage,
+        imageUrl,
+        animationVideoUrl,
+      });
+    })();
+  }, [user?.id, presentEvolutionWithVideo]);
+
   useEffect(() => {
     if (!user) return;
 
@@ -428,6 +638,10 @@ export const GlobalEvolutionListener = () => {
         imageUrl: detail.newImageUrl,
         presetId: typeof detail.presetId === "string" ? detail.presetId : undefined,
         element: detail.element ?? undefined,
+        evolutionId: typeof detail.evolutionId === "string" ? detail.evolutionId : undefined,
+        // animationVideoUrl starts null — the companion_evolutions UPDATE
+        // subscription in this component hot-swaps it once Kling finishes.
+        animationVideoUrl: null,
         markAsLocalHatch: true,
       });
     };
@@ -451,7 +665,18 @@ export const GlobalEvolutionListener = () => {
       newImageUrl={evolutionData.imageUrl}
       presetId={evolutionData.presetId}
       element={evolutionData.element}
+      animationVideoUrl={evolutionData.animationVideoUrl ?? null}
       onComplete={() => {
+        // Only mark animation as seen when the user actually had the Kling
+        // video URL on this presentation. If they dismissed BEFORE Kling
+        // landed (animationVideoUrl still null), leave animation_seen_at
+        // NULL so the always-on / load-time replay can bring them back to
+        // see the video once it's ready.
+        if (evolutionData.evolutionId && evolutionData.animationVideoUrl) {
+          void supabase.rpc("mark_companion_animation_seen", {
+            p_evolution_id: evolutionData.evolutionId,
+          });
+        }
         setIsEvolving(false);
         setEvolutionData(null);
         activeEvolutionKeyRef.current = null;

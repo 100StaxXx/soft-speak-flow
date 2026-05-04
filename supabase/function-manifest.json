@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-30T18:01:14Z",
+  "generatedAt": "2026-05-04T01:05:38Z",
   "frontendInvoked": [
     "adjust-epic-plan",
     "analyze-user-patterns",
@@ -26,12 +26,14 @@
     "generate-check-in-response",
     "generate-companion-evolution",
     "generate-companion-image",
+    "generate-companion-launcher-image",
     "generate-companion-stat-analysis",
     "generate-companion-story",
     "generate-companion-tts",
     "generate-completion-feedback",
     "generate-cosmic-postcard",
     "generate-cosmic-postcard-test",
+    "generate-cosmiq-title-card",
     "generate-daily-missions",
     "generate-daily-plan",
     "generate-epic-narrative-seed",
@@ -100,6 +102,7 @@
     "generate-tomorrow-pep-talks",
     "notifications-dispatch-v2",
     "notifications-enqueue-v2",
+    "process-companion-animation-job",
     "rotate-daily-wallpapers"
   ],
   "allowList": [
@@ -135,6 +138,7 @@
     "generate-check-in-response",
     "generate-companion-evolution",
     "generate-companion-image",
+    "generate-companion-launcher-image",
     "generate-companion-stat-analysis",
     "generate-companion-story",
     "generate-companion-tts",
@@ -180,6 +184,7 @@
     "outlook-calendar-auth",
     "outlook-calendar-events",
     "outlook-todo-tasks",
+    "process-companion-animation-job",
     "process-companion-evolution-job",
     "process-paypal-payout",
     "process-referral",

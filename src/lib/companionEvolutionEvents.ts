@@ -8,6 +8,13 @@ export interface CompanionHatchStartedDetail {
   newImageUrl: string;
   presetId?: string | null;
   element: string | null;
+  /**
+   * Stage-1 evolution row id returned by hatch_companion_with_preset. Carries
+   * through to GlobalEvolutionListener so the realtime subscription on
+   * companion_evolutions.animation_video_url can hot-swap the Kling MP4 in
+   * once the cron drainer finishes generating it.
+   */
+  evolutionId?: string | null;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -30,5 +37,10 @@ export const isCompanionHatchStartedDetail = (
       || typeof value.presetId === "undefined"
     )
     && (typeof value.element === "string" || value.element === null)
+    && (
+      typeof value.evolutionId === "string"
+      || value.evolutionId === null
+      || typeof value.evolutionId === "undefined"
+    )
   );
 };

@@ -33,6 +33,7 @@ import {
 } from "../../../src/config/companionCatalog.ts";
 import { isPresetBackedCompanion } from "../../../src/lib/companionPredicates.ts";
 import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
+import { maybeEnqueueCompanionAnimationJob } from "../_shared/companionAnimationJobs.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -214,6 +215,7 @@ export interface GenerateCompanionEvolutionDeps {
   registerUserStorageAsset: typeof registerUserStorageAsset;
   uploadGeneratedImage: typeof uploadGeneratedImage;
   upsertEvolutionRecord: typeof upsertEvolutionRecord;
+  maybeEnqueueCompanionAnimationJob: typeof maybeEnqueueCompanionAnimationJob;
   info: typeof console.info;
   error: typeof console.error;
 }
@@ -230,6 +232,7 @@ const defaultGenerateCompanionEvolutionDeps: GenerateCompanionEvolutionDeps = {
   registerUserStorageAsset,
   uploadGeneratedImage,
   upsertEvolutionRecord,
+  maybeEnqueueCompanionAnimationJob,
   info: console.info,
   error: console.error,
 };
@@ -255,6 +258,7 @@ export const handleGenerateCompanionEvolution = async (
     registerUserStorageAsset: registerUserStorageAssetFn,
     uploadGeneratedImage: uploadGeneratedImageFn,
     upsertEvolutionRecord: upsertEvolutionRecordFn,
+    maybeEnqueueCompanionAnimationJob: enqueueCompanionAnimationJobFn,
     info: infoLog,
     error: errorLog,
   } = deps;
@@ -422,6 +426,18 @@ export const handleGenerateCompanionEvolution = async (
         throw new Error("Failed to update companion");
       }
 
+      await enqueueCompanionAnimationJobFn({
+        supabase,
+        companionId: companion.id,
+        evolutionId: typeof evolutionRecord?.id === "string" ? evolutionRecord.id : null,
+        userId: resolvedUserId,
+        sourceImageUrl: newImageUrl,
+        portraitRegenerated: true,
+        stage: nextStage,
+        info: infoLog,
+        warn: errorLog,
+      });
+
       return new Response(
         JSON.stringify({
           evolved: true,
@@ -488,6 +504,18 @@ export const handleGenerateCompanionEvolution = async (
         if (updateError) {
           throw new Error("Failed to update companion");
         }
+
+        await enqueueCompanionAnimationJobFn({
+          supabase,
+          companionId: companion.id,
+          evolutionId: typeof evolutionRecord?.id === "string" ? evolutionRecord.id : null,
+          userId: resolvedUserId,
+          sourceImageUrl: hiddenStageOneAnchor.imageUrl,
+          portraitRegenerated: false,
+          stage: nextStage,
+          info: infoLog,
+          warn: errorLog,
+        });
 
         return new Response(
           JSON.stringify({
@@ -763,6 +791,18 @@ export const handleGenerateCompanionEvolution = async (
         throw new Error("Failed to update companion");
       }
 
+      await enqueueCompanionAnimationJobFn({
+        supabase,
+        companionId: companion.id,
+        evolutionId: typeof evolutionRecord?.id === "string" ? evolutionRecord.id : null,
+        userId: resolvedUserId,
+        sourceImageUrl: newImageUrl,
+        portraitRegenerated: true,
+        stage: nextStage,
+        info: infoLog,
+        warn: errorLog,
+      });
+
       return new Response(
         JSON.stringify({
           evolved: true,
@@ -881,6 +921,18 @@ export const handleGenerateCompanionEvolution = async (
     if (updateError) {
       throw new Error("Failed to update companion");
     }
+
+    await enqueueCompanionAnimationJobFn({
+      supabase,
+      companionId: companion.id,
+      evolutionId: typeof evolutionRecord?.id === "string" ? evolutionRecord.id : null,
+      userId: resolvedUserId,
+      sourceImageUrl: newImageUrl,
+      portraitRegenerated: true,
+      stage: nextStage,
+      info: infoLog,
+      warn: errorLog,
+    });
 
     return new Response(
       JSON.stringify({

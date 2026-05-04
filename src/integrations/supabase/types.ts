@@ -1361,6 +1361,14 @@ export type Database = {
       }
       companion_evolutions: {
         Row: {
+          animation_completed_at: string | null
+          animation_error: string | null
+          animation_provider: string | null
+          animation_provider_request_id: string | null
+          animation_seen_at: string | null
+          animation_status: string | null
+          animation_storage_path: string | null
+          animation_video_url: string | null
           companion_id: string
           evolved_at: string
           generation_metadata: Json | null
@@ -1370,6 +1378,14 @@ export type Database = {
           xp_at_evolution: number
         }
         Insert: {
+          animation_completed_at?: string | null
+          animation_error?: string | null
+          animation_provider?: string | null
+          animation_provider_request_id?: string | null
+          animation_seen_at?: string | null
+          animation_status?: string | null
+          animation_storage_path?: string | null
+          animation_video_url?: string | null
           companion_id: string
           evolved_at?: string
           generation_metadata?: Json | null
@@ -1379,6 +1395,14 @@ export type Database = {
           xp_at_evolution: number
         }
         Update: {
+          animation_completed_at?: string | null
+          animation_error?: string | null
+          animation_provider?: string | null
+          animation_provider_request_id?: string | null
+          animation_seen_at?: string | null
+          animation_status?: string | null
+          animation_storage_path?: string | null
+          animation_video_url?: string | null
           companion_id?: string
           evolved_at?: string
           generation_metadata?: Json | null
@@ -7573,6 +7597,11 @@ export type Database = {
           last_maintenance_summary: string | null
           last_mood_update: string | null
           last_weekly_maintenance_date: string | null
+          launcher_image_focal_x: number | null
+          launcher_image_focal_y: number | null
+          launcher_image_generated_at: string | null
+          launcher_image_source_url: string | null
+          launcher_image_url: string | null
           legacy_traits: Json | null
           mind: number | null
           neglected_image_focal_x: number | null
@@ -7653,6 +7682,11 @@ export type Database = {
           last_maintenance_summary?: string | null
           last_mood_update?: string | null
           last_weekly_maintenance_date?: string | null
+          launcher_image_focal_x?: number | null
+          launcher_image_focal_y?: number | null
+          launcher_image_generated_at?: string | null
+          launcher_image_source_url?: string | null
+          launcher_image_url?: string | null
           legacy_traits?: Json | null
           mind?: number | null
           neglected_image_focal_x?: number | null
@@ -7733,6 +7767,11 @@ export type Database = {
           last_maintenance_summary?: string | null
           last_mood_update?: string | null
           last_weekly_maintenance_date?: string | null
+          launcher_image_focal_x?: number | null
+          launcher_image_focal_y?: number | null
+          launcher_image_generated_at?: string | null
+          launcher_image_source_url?: string | null
+          launcher_image_url?: string | null
           legacy_traits?: Json | null
           mind?: number | null
           neglected_image_focal_x?: number | null
@@ -8883,6 +8922,10 @@ export type Database = {
       mark_companion_active: {
         Args: never
         Returns: string
+      }
+      mark_companion_animation_seen: {
+        Args: { p_evolution_id: string }
+        Returns: undefined
       }
       mark_weekly_recap_viewed: {
         Args: { p_recap_id: string }

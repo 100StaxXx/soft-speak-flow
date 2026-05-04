@@ -42,15 +42,29 @@ export function JourneysCompanionLauncher({
     focalY,
     element,
     usesPortraitShell,
+    launcherImageUrl,
+    launcherImageFocalX,
+    launcherImageFocalY,
+    launcherImageFresh,
   } = useJourneysCompanionVisual();
 
-  const resolvedImageUrl = imageUrlOverride ?? imageUrl;
-  const resolvedFocalX = imageFocalXOverride ?? focalX;
-  const resolvedFocalY = imageFocalYOverride ?? focalY;
+  const isFloatingHero = variant === "floating" && floatingSize === "hero";
+  // All launcher surfaces (small floating, hero floating, inline) prefer the
+  // dedicated white-bg launcher icon when one is available. The hero variant
+  // still uses the client-side background-cutout pipeline as a fallback for
+  // companions whose launcher icon hasn't been generated yet.
+  const useLauncherIcon = launcherImageFresh;
+  const sourceImageUrl = useLauncherIcon ? launcherImageUrl : imageUrl;
+  const sourceFocalX = useLauncherIcon ? launcherImageFocalX : focalX;
+  const sourceFocalY = useLauncherIcon ? launcherImageFocalY : focalY;
+  const resolvedImageUrl = imageUrlOverride ?? sourceImageUrl;
+  const resolvedFocalX = imageFocalXOverride ?? sourceFocalX;
+  const resolvedFocalY = imageFocalYOverride ?? sourceFocalY;
   const resolvedUsesPortraitShell = usesPortraitShellOverride ?? usesPortraitShell;
   const resolvedText = text ?? `Chat with ${companionLabel}`;
-  const isFloatingHero = variant === "floating" && floatingSize === "hero";
-  const shouldCutOutHeroBackground = isFloatingHero && !resolvedUsesPortraitShell;
+  // Skip the expensive client-side cutout when we already have a clean
+  // white-bg launcher icon — it has no scenic background to remove.
+  const shouldCutOutHeroBackground = isFloatingHero && !resolvedUsesPortraitShell && !useLauncherIcon;
   const {
     cutoutSrc: heroCutoutSrc,
     status: heroCutoutStatus,

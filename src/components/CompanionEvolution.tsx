@@ -24,6 +24,13 @@ interface CompanionEvolutionProps {
   newImageUrl: string;
   presetId?: string;
   element?: string;
+  /**
+   * Optional Kling-rendered MP4 of the new portrait. When provided and the user
+   * has not opted out of motion, the video plays during the `reveal`/`settle`
+   * phases in place of the still `newImageUrl`. Falls back to the still image
+   * if the video fails to load or is not yet ready by the start of `reveal`.
+   */
+  animationVideoUrl?: string | null;
   onComplete: () => void;
 }
 
@@ -362,6 +369,7 @@ const CompanionEvolutionContent = ({
   newImageUrl,
   presetId,
   element,
+  animationVideoUrl,
   onComplete,
 }: CompanionEvolutionProps) => {
   const [phase, setPhase] = useState<EvolutionPhase>("hold");
@@ -380,8 +388,11 @@ const CompanionEvolutionContent = ({
   const dismissHandledRef = useRef(false);
   const hatchVideoRef = useRef<HTMLVideoElement | null>(null);
   const hatchVideoBackdropRef = useRef<HTMLVideoElement | null>(null);
+  const animationVideoRef = useRef<HTMLVideoElement | null>(null);
   const [isHatchVideoMuted, setIsHatchVideoMuted] = useState(() => globalAudio.getMuted());
   const [disableHatchVideo, setDisableHatchVideo] = useState(false);
+  const [animationVideoReady, setAnimationVideoReady] = useState(false);
+  const [disableAnimationVideo, setDisableAnimationVideo] = useState(false);
   const [hatchIntroComplete, setHatchIntroComplete] = useState(false);
 
   const isFirstEvolution = newStage === 1;
@@ -403,6 +414,11 @@ const CompanionEvolutionContent = ({
   const { profile, capabilities, signals } = useMotionProfile();
   const { triggerEvent } = useCompanionMotionSafe();
   const prefersReducedMotion = profile === "reduced" || signals.prefersReducedMotion;
+  const animationVideoEligible =
+    Boolean(animationVideoUrl)
+    && !disableAnimationVideo
+    && !useHatchVideo
+    && !prefersReducedMotion;
   const sequence = prefersReducedMotion ? REDUCED_SEQUENCE_MS : FULL_SEQUENCE_MS;
   const convergenceParticleCount = Math.max(4, Math.min(12, Math.round(capabilities.maxParticles * 0.5)));
   const confettiParticleCount = profile === "enhanced"
@@ -471,6 +487,71 @@ const CompanionEvolutionContent = ({
   useEffect(() => {
     setDisableHatchVideo(false);
   }, [element, isEvolving, newImageUrl, presetId, previousImageUrl]);
+
+  useEffect(() => {
+    setAnimationVideoReady(false);
+    setDisableAnimationVideo(false);
+  }, [animationVideoUrl, isEvolving]);
+
+  // Pre-buffer the Kling MP4 once concealing starts so playback can begin the
+  // moment we land in `reveal`. preload="auto" already does most of this; the
+  // explicit load() forces it on browsers that defer until interaction.
+  useEffect(() => {
+    if (!animationVideoEligible) return;
+    if (phase !== "conceal") return;
+    const node = animationVideoRef.current;
+    if (!node) return;
+    try {
+      node.load();
+    } catch {
+      // Best-effort prefetch; ignore environments that throw.
+    }
+  }, [animationVideoEligible, phase]);
+
+  // If we entered the reveal window without metadata loaded, fall back to the
+  // still image rather than show a blank frame.
+  useEffect(() => {
+    if (!animationVideoEligible) return;
+    if (phase !== "reveal") return;
+    if (animationVideoReady) return;
+    const timer = window.setTimeout(() => {
+      setDisableAnimationVideo(true);
+    }, 600);
+    return () => window.clearTimeout(timer);
+  }, [animationVideoEligible, animationVideoReady, phase]);
+
+  // Explicitly play the Kling MP4 when reveal starts. The `autoPlay` attribute
+  // only fires on initial mount; toggling it via JSX after the element exists
+  // does NOT retroactively trigger playback. Mirrors the hatch-video pattern
+  // above with a muted-retry fallback for autoplay-policy denials.
+  useEffect(() => {
+    if (!animationVideoEligible) return;
+    if (phase !== "reveal" && phase !== "settle") return;
+    const node = animationVideoRef.current;
+    if (!node) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        node.muted = true;
+        node.currentTime = 0;
+        await node.play();
+      } catch (error) {
+        if (cancelled) return;
+        log.warn("Kling animation video play failed; falling back to still", {
+          message: error instanceof Error ? error.message : String(error),
+        });
+        setDisableAnimationVideo(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      try {
+        node.pause();
+      } catch {
+        // Element may already be torn down — safe to ignore.
+      }
+    };
+  }, [animationVideoEligible, phase, animationVideoUrl]);
 
   useEffect(() => {
     if (!isEvolving) {
@@ -1328,6 +1409,29 @@ const CompanionEvolutionContent = ({
                       containerAspectRatio={580 / 470}
                       className="rounded-[2rem] shadow-2xl"
                     />
+                    {animationVideoEligible && animationVideoUrl ? (
+                      <video
+                        ref={animationVideoRef}
+                        src={animationVideoUrl}
+                        poster={revealDisplayImageUrl}
+                        muted
+                        playsInline
+                        preload="auto"
+                        data-testid="evolution-animation-video"
+                        data-animation-ready={animationVideoReady ? "true" : "false"}
+                        className="absolute inset-0 h-full w-full rounded-[2rem] object-cover transition-opacity duration-500"
+                        style={{
+                          opacity:
+                            (phase === "reveal" || phase === "settle") && animationVideoReady
+                              ? 1
+                              : 0,
+                          pointerEvents: "none",
+                        }}
+                        onLoadedMetadata={() => setAnimationVideoReady(true)}
+                        onCanPlay={() => setAnimationVideoReady(true)}
+                        onError={() => setDisableAnimationVideo(true)}
+                      />
+                    ) : null}
                   </motion.div>
                 ) : (
                   <div
