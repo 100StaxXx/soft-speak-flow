@@ -1351,17 +1351,23 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     }
 
     if (currentStep.id === "hatch_companion") {
+      // Block transitioning to mentor_closeout while the visual hatch
+      // animation is still playing in THIS session. The companion-evolved
+      // listener flips sessionEvolutionInFlight to false when the animation
+      // ends, which is what releases this gate. We deliberately use the
+      // session-only signal: cold reopens have sessionEvolutionInFlight=null,
+      // so a stale persisted evolutionInFlight=true does NOT block recovery.
+      const visualAnimationActive = sessionEvolutionInFlight === true;
+
       const hasConfirmedHatch =
         Boolean(cachedCompanion) &&
         cachedCompanion.current_stage > 0 &&
+        !visualAnimationActive &&
         (hasRecordedEvolutionStart ||
           milestoneSet.has("tap_hatch_companion") ||
           companionDataUpdatedAt > (evolveCompanionBaselineUpdatedAtRef.current ?? 0));
 
       if (hasConfirmedHatch) {
-        if (evolutionInFlight) {
-          setSessionEvolutionInFlight(false);
-        }
         void persistProgress({
           evolutionInFlight: false,
           evolutionCompletedAt:
@@ -1404,6 +1410,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     persistProgress,
     milestoneSet,
     evolutionInFlight,
+    sessionEvolutionInFlight,
     hasPendingIntroDialogue,
     migratedProgress.evolutionCompletedAt,
     tutorialSuppressed,
