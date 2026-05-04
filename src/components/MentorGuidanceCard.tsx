@@ -414,6 +414,7 @@ export const MentorGuidanceCard = () => {
     speakerAvatarUrl,
     secondaryActionLabel,
     onSecondaryAction,
+    dismissTutorial,
     dialogueActionLabel,
     onDialogueAction,
   } = usePostOnboardingMentorGuidance();
@@ -437,7 +438,7 @@ export const MentorGuidanceCard = () => {
   }, []);
 
   const canRevealSkipX =
-    secondaryActionLabel === "Skip tutorial" && Boolean(onSecondaryAction);
+    isActive && Boolean(dismissTutorial) && secondaryActionLabel !== "Complete tutorial";
 
   const revealSkipX = useCallback(() => {
     if (!canRevealSkipX) return;
@@ -624,7 +625,7 @@ export const MentorGuidanceCard = () => {
                   event.stopPropagation();
                   clearHideSkipTimeout();
                   setShowSkipX(false);
-                  onSecondaryAction?.();
+                  dismissTutorial?.();
                 }}
                 initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.85 }}
                 animate={{ opacity: 1, scale: 1 }}
