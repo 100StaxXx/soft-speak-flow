@@ -113,9 +113,9 @@ CREATE POLICY "Users read own animation videos"
 DO $$
 BEGIN
   BEGIN
-    PERFORM cron.unschedule('process-companion-animation-jobs')
+    PERFORM cron.unschedule('process-companion-animation-job')
     FROM cron.job
-    WHERE cron.job.jobname = 'process-companion-animation-jobs';
+    WHERE cron.job.jobname = 'process-companion-animation-job';
   EXCEPTION
     WHEN undefined_table OR undefined_function THEN
       NULL;
@@ -125,14 +125,14 @@ BEGIN
 END $$;
 
 SELECT cron.schedule(
-  'process-companion-animation-jobs',
+  'process-companion-animation-job',
   '* * * * *',
   $$SELECT public.invoke_edge_function_with_internal_secret(
     'process-companion-animation-job',
     '{"batchSize":4}'::jsonb
   );$$
 )
-WHERE NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'process-companion-animation-jobs');
+WHERE NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'process-companion-animation-job');
 
 -- 6. Aurelith repair RPC ----------------------------------------------------
 -- Idempotent: clears the visual fields so subsequent generate-companion-image
