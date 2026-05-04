@@ -559,6 +559,106 @@ describe("guided tutorial first-value loop", () => {
     });
   });
 
+  it("holds on hatch_companion while the visual hatch animation is still playing", async () => {
+    // The hatch RPC resolves and refetches companion data with stage=1 long
+    // before the ~12s visual animation finishes. The mentor must stay hidden
+    // until companion-evolved fires; otherwise the closeout dialogue overlays
+    // the HATCHING gradient mid-animation.
+    mocks.state.guidedTutorial = {
+      ...createFreshTutorial(),
+      completedSteps: ["new_goal", "plan_my_day"],
+      xpAwardedSteps: ["new_goal", "plan_my_day"],
+      milestonesCompleted: [
+        "mentor_intro_hello",
+        "start_new_goal",
+        "complete_pathfinder_campaign",
+        "start_plan_my_day",
+        "answer_plan_day_ai",
+        "save_plan_day_action",
+      ],
+    };
+    const hatchTarget = document.createElement("button");
+    hatchTarget.setAttribute("data-tour", "evolve-companion-button");
+    document.body.appendChild(hatchTarget);
+
+    const { result, rerender } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/companion"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("hatch_companion");
+    });
+
+    // User taps Hatch — the visual animation begins, sessionEvolutionInFlight=true.
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("companion-hatch-started"));
+    });
+
+    await waitFor(() => {
+      expect(result.current.dialogueText).toBe("Let the hatch finish.");
+      expect(result.current.shouldAutoHideCard).toBe(true);
+    });
+
+    // Companion data refetches with stage=1 mid-animation. The step must NOT
+    // advance — visualAnimationActive is still true.
+    await act(async () => {
+      mocks.state.companionData = { current_stage: 1 };
+      mocks.state.companionDataUpdatedAt = 2;
+      rerender();
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("hatch_companion");
+      expect(result.current.shouldAutoHideCard).toBe(true);
+    });
+
+    // Visual animation completes — companion-evolved releases the gate.
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("companion-evolved"));
+      rerender();
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("mentor_closeout");
+    });
+  });
+
+  it("recovers from a stale persisted evolutionInFlight on cold reopen", async () => {
+    // If the user closes the app mid-animation, persistedEvolutionInFlight
+    // stays true but no companion-evolved event will fire next session.
+    // sessionEvolutionInFlight starts at null, so visualAnimationActive is
+    // false and the step is allowed to advance once data confirms the hatch.
+    mocks.state.guidedTutorial = {
+      ...createFreshTutorial(),
+      completedSteps: ["new_goal", "plan_my_day"],
+      xpAwardedSteps: ["new_goal", "plan_my_day"],
+      milestonesCompleted: [
+        "mentor_intro_hello",
+        "start_new_goal",
+        "complete_pathfinder_campaign",
+        "start_plan_my_day",
+        "answer_plan_day_ai",
+        "save_plan_day_action",
+        "tap_hatch_companion",
+      ],
+      evolutionInFlight: true,
+      evolutionStartedAt: "2026-05-04T00:00:00.000Z",
+    };
+    mocks.state.companionData = { current_stage: 1 };
+    mocks.state.companionDataUpdatedAt = 100;
+    const hatchTarget = document.createElement("button");
+    hatchTarget.setAttribute("data-tour", "evolve-companion-button");
+    document.body.appendChild(hatchTarget);
+
+    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/companion"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("mentor_closeout");
+    });
+  });
+
   it("does not complete or route from Plan day until tutorial XP is actually awarded", async () => {
     mocks.state.guidedTutorial = {
       ...createFreshTutorial(),
