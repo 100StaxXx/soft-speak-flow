@@ -765,6 +765,7 @@ export const milestoneUsesStrictLock = (milestoneId: GuidedMilestoneId | null): 
   if (milestoneId === "answer_plan_day_ai") return false;
   if (milestoneId === "first_plan_closeout_message") return false;
   if (milestoneId === "complete_companion_hatch") return false;
+  if (milestoneId === "tap_hatch_companion") return false;
   if (milestoneId === "quests_campaigns_intro") return false;
   if (milestoneId === "confirm_companion_progress") return false;
   if (milestoneId === "submit_morning_checkin") return false;
