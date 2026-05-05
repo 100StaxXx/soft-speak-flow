@@ -578,8 +578,8 @@ Deno.test("resolveCosmiqTitleCard generates, uploads, and completes a first imag
         );
         assertEquals(
           requestBody.model,
-          "gpt-image-2",
-          "Expected GPT Image 2 model",
+          "gpt-image-1-mini",
+          "Expected GPT Image 1 mini model",
         );
         assertEquals(
           requestBody.size,
@@ -588,8 +588,8 @@ Deno.test("resolveCosmiqTitleCard generates, uploads, and completes a first imag
         );
         assertEquals(
           requestBody.quality,
-          "high",
-          "Expected high quality title art",
+          "medium",
+          "Expected medium quality title art",
         );
         assertEquals(
           requestBody.n,
@@ -664,7 +664,7 @@ Deno.test("resolveCosmiqTitleCard generates, uploads, and completes a first imag
     );
     assertEquals(
       requestModel,
-      "gpt-image-2",
+      "gpt-image-1-mini",
       "Expected no Gemini model fallback",
     );
     assert(
@@ -755,7 +755,7 @@ Deno.test("resolveCosmiqTitleCard records retryable diagnostics for upstream ima
   }
 });
 
-Deno.test("resolveCosmiqTitleCard falls back when GPT Image 2 is forbidden", async () => {
+Deno.test("resolveCosmiqTitleCard falls back when GPT Image 1 mini is forbidden", async () => {
   const originalApiKey = Deno.env.get("OPENAI_API_KEY");
   const originalWarn = console.warn;
   Deno.env.set("OPENAI_API_KEY", "test-key");
@@ -792,11 +792,11 @@ Deno.test("resolveCosmiqTitleCard falls back when GPT Image 2 is forbidden", asy
           "Expected fallback to stay on Image API, not chat completions",
         );
 
-        if (requestBody.model === "gpt-image-2") {
+        if (requestBody.model === "gpt-image-1-mini") {
           return Promise.resolve(
             createJsonResponse({
               error: {
-                message: "Project does not have access to gpt-image-2",
+                message: "Project does not have access to gpt-image-1-mini",
               },
             }, 403),
           );
@@ -809,13 +809,13 @@ Deno.test("resolveCosmiqTitleCard falls back when GPT Image 2 is forbidden", asy
     assertEquals(card.status, "ready", "Expected fallback image to be ready");
     assertEquals(
       requestedModels[0],
-      "gpt-image-2",
-      "Expected GPT Image 2 to remain the first attempted model",
+      "gpt-image-1-mini",
+      "Expected GPT Image 1 mini to remain the first attempted model",
     );
     assertEquals(
       requestedModels[1],
-      "chatgpt-image-latest",
-      "Expected ChatGPT image fallback after GPT Image 2 access failure",
+      "gpt-image-1",
+      "Expected gpt-image-1 fallback after GPT Image 1 mini access failure",
     );
     assertEquals(
       supabase.uploaded.length,

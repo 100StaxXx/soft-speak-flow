@@ -91,8 +91,8 @@ Deno.test("generateCompanionImage downloads direct image URLs with guardedFetch"
           unknown
         >;
         assert(
-          body.model === "gpt-image-2",
-          `Expected gpt-image-2 default model, got ${String(body.model)}`,
+          body.model === "gpt-image-1-mini",
+          `Expected gpt-image-1-mini default model, got ${String(body.model)}`,
         );
         assert(
           body.size === "1536x1024",
@@ -290,10 +290,10 @@ Deno.test("generateCompanionImage falls back to the next image model after a pri
       >;
       requestedModels.push(String(body.model ?? ""));
 
-      if (body.model === "gpt-image-2") {
+      if (body.model === "gpt-image-1-mini") {
         return createJsonResponse({
           error: {
-            message: "Project does not have access to gpt-image-2",
+            message: "Project does not have access to gpt-image-1-mini",
           },
         }, 403);
       }
@@ -321,7 +321,7 @@ Deno.test("generateCompanionImage falls back to the next image model after a pri
       `Expected 2 model attempts, got ${requestedModels.length}`,
     );
     assert(
-      requestedModels[0] === "gpt-image-2",
+      requestedModels[0] === "gpt-image-1-mini",
       `Expected primary model first, got ${requestedModels[0]}`,
     );
     assert(
@@ -401,7 +401,7 @@ Deno.test("generateCompanionImage does not try another model for permanent input
 
     assert(caught instanceof Error, "Expected permanent 400 to be thrown");
     assert(
-      requestedModels.every((model) => model === "gpt-image-2"),
+      requestedModels.every((model) => model === "gpt-image-1-mini"),
       `Expected no fallback model attempts, got ${requestedModels.join(", ")}`,
     );
   } finally {
@@ -417,7 +417,7 @@ Deno.test("generateCompanionImage does not try another model for permanent input
   }
 });
 
-Deno.test("editCompanionImage sends multipart image uploads without input_fidelity for gpt-image-2", async () => {
+Deno.test("editCompanionImage sends multipart image uploads without input_fidelity for gpt-image-1-mini", async () => {
   const originalCompanionImageModel = Deno.env.get(
     "OPENAI_COMPANION_IMAGE_MODEL",
   );
@@ -457,8 +457,10 @@ Deno.test("editCompanionImage sends multipart image uploads without input_fideli
           "Expected edit body to be FormData",
         );
         assert(
-          formData.get("model") === "gpt-image-2",
-          `Expected gpt-image-2 model, got ${String(formData.get("model"))}`,
+          formData.get("model") === "gpt-image-1-mini",
+          `Expected gpt-image-1-mini model, got ${
+            String(formData.get("model"))
+          }`,
         );
         assert(
           formData.get("prompt") === "evolve the companion",
@@ -484,7 +486,7 @@ Deno.test("editCompanionImage sends multipart image uploads without input_fideli
         );
         assert(
           formData.get("input_fidelity") === null,
-          `Did not expect input_fidelity for gpt-image-2, got ${
+          `Did not expect input_fidelity for gpt-image-1-mini, got ${
             String(formData.get("input_fidelity"))
           }`,
         );
@@ -592,10 +594,10 @@ Deno.test("editCompanionImage falls back to the next image model after a primary
         const model = String(formData.get("model") ?? "");
         requestedModels.push(model);
 
-        if (model === "gpt-image-2") {
+        if (model === "gpt-image-1-mini") {
           return createJsonResponse({
             error: {
-              message: "Project does not have access to gpt-image-2",
+              message: "Project does not have access to gpt-image-1-mini",
             },
           }, 403);
         }
@@ -627,7 +629,7 @@ Deno.test("editCompanionImage falls back to the next image model after a primary
       `Expected 2 edit model attempts, got ${requestedModels.length}`,
     );
     assert(
-      requestedModels[0] === "gpt-image-2",
+      requestedModels[0] === "gpt-image-1-mini",
       `Expected primary edit model first, got ${requestedModels[0]}`,
     );
     assert(
@@ -717,7 +719,7 @@ Deno.test("editCompanionImage does not try another model for permanent input 400
 
     assert(caught instanceof Error, "Expected permanent edit 400 to be thrown");
     assert(
-      requestedModels.every((model) => model === "gpt-image-2"),
+      requestedModels.every((model) => model === "gpt-image-1-mini"),
       `Expected no fallback edit model attempts, got ${
         requestedModels.join(", ")
       }`,
@@ -1121,7 +1123,7 @@ Deno.test("editCompanionImage falls back to square size and then drops quality a
     );
     assert(
       seenRequests[0]?.inputFidelity === null,
-      `Did not expect first edit attempt input_fidelity for gpt-image-2, got ${
+      `Did not expect first edit attempt input_fidelity for gpt-image-1-mini, got ${
         String(seenRequests[0]?.inputFidelity)
       }`,
     );
@@ -1151,7 +1153,7 @@ Deno.test("editCompanionImage falls back to square size and then drops quality a
     );
     assert(
       seenRequests[2]?.inputFidelity === null,
-      `Did not expect third edit attempt input_fidelity for gpt-image-2, got ${
+      `Did not expect third edit attempt input_fidelity for gpt-image-1-mini, got ${
         String(seenRequests[2]?.inputFidelity)
       }`,
     );

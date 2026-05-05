@@ -17,7 +17,6 @@ import {
 import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
 import { normalizeAchievementType } from "@/lib/achievementTypes";
 import { isSupabaseMissingRelationError } from "@/utils/supabaseSchemaErrors";
-import { getProgressionThreshold, HATCH_READY_LEVEL } from "@/config/progression";
 
 type FilterCategory = 'all' | BadgeCategory;
 type ReplayStatus = "queued" | "processing" | "succeeded";
@@ -32,9 +31,20 @@ interface EvolutionReplay {
   animation_completed_at: string | null;
 }
 
+interface AnimationJobReplaySource {
+  id: string;
+  evolution_id: string | null;
+  stage: number;
+  source_image_url: string | null;
+  status: ReplayStatus | string | null;
+  video_url: string | null;
+  completed_at: string | null;
+  requested_at: string | null;
+  updated_at: string | null;
+}
+
 const EVOLUTION_REPLAYS_QUERY_KEY = "companion-evolution-replays";
 const COMPANION_REPLAY_SOURCE_QUERY_KEY = "companion-replay-source";
-const HATCH_READY_XP = getProgressionThreshold(HATCH_READY_LEVEL) ?? 10;
 
 const badgePreviewModules = import.meta.glob("/src/assets/badges/*.webp", {
   eager: true,
@@ -48,6 +58,27 @@ const badgePreviewLocalUrls = Object.fromEntries(
     return [badgeId, moduleUrl];
   }),
 ) as Record<string, string>;
+
+const normalizeReplayStatus = (value: unknown): ReplayStatus | null => {
+  if (value === "queued" || value === "processing" || value === "succeeded") {
+    return value;
+  }
+
+  return null;
+};
+
+const hasVisibleReplayState = (replay: EvolutionReplay) => (
+  replay.animation_status === "queued"
+  || replay.animation_status === "processing"
+  || (replay.animation_status === "succeeded" && Boolean(replay.animation_video_url))
+);
+
+const getReplaySortTime = (replay: EvolutionReplay) => {
+  const value = replay.animation_completed_at ?? replay.evolved_at;
+  if (!value) return 0;
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+};
 
 interface BadgesCollectionPanelProps {
   layoutMode?: CompanionLayoutMode;
@@ -111,7 +142,7 @@ export const BadgesCollectionPanel = ({ layoutMode = "mobile" }: BadgesCollectio
 
       const { data, error } = await supabase
         .from("user_companion")
-        .select("id, current_stage, current_xp")
+        .select("id")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -121,42 +152,115 @@ export const BadgesCollectionPanel = ({ layoutMode = "mobile" }: BadgesCollectio
       return typeof data?.id === "string"
         ? {
           companionId: data.id,
-          currentStage: typeof data.current_stage === "number" ? data.current_stage : 0,
-          currentXp: typeof data.current_xp === "number" ? data.current_xp : 0,
         }
         : null;
     },
   });
   const companionId = replaySource?.companionId ?? null;
-  const replayCurrentStage = replaySource?.currentStage ?? 0;
-  const replayMaxStage =
-    replayCurrentStage === 0 && (replaySource?.currentXp ?? 0) >= HATCH_READY_XP
-      ? HATCH_READY_LEVEL
-      : replayCurrentStage;
 
   const { data: evolutionReplays = [], isLoading: isLoadingEvolutionReplays } = useQuery({
-    queryKey: [EVOLUTION_REPLAYS_QUERY_KEY, companionId, replayMaxStage],
-    enabled: !!companionId,
+    queryKey: [EVOLUTION_REPLAYS_QUERY_KEY, companionId, user?.id],
+    enabled: !!companionId && !!user?.id,
     staleTime: 30 * 1000,
+    refetchInterval: (query) => {
+      const replays = query.state.data as EvolutionReplay[] | undefined;
+      return replays?.some((replay) => replay.animation_status === "queued" || replay.animation_status === "processing")
+        ? 5_000
+        : false;
+    },
     queryFn: async () => {
-      if (!companionId) return [];
+      if (!companionId || !user?.id) return [];
 
       const { data, error } = await supabase
         .from("companion_evolutions")
         .select("id, stage, image_url, evolved_at, animation_status, animation_video_url, animation_completed_at")
         .eq("companion_id", companionId)
-        .lte("stage", replayMaxStage)
         .in("animation_status", ["queued", "processing", "succeeded"])
         .order("evolved_at", { ascending: false })
         .limit(12);
 
       if (error) throw error;
 
-      return (data ?? []).filter((row) => (
-        row.animation_status === "queued"
-        || row.animation_status === "processing"
-        || (row.animation_status === "succeeded" && Boolean(row.animation_video_url))
-      )) as EvolutionReplay[];
+      const { data: jobData, error: jobError } = await supabase
+        .from("companion_animation_jobs")
+        .select("id, evolution_id, stage, source_image_url, status, video_url, completed_at, requested_at, updated_at")
+        .eq("user_id", user.id)
+        .eq("companion_id", companionId)
+        .in("status", ["queued", "processing", "succeeded"])
+        .order("requested_at", { ascending: false })
+        .limit(12);
+
+      if (jobError && !isSupabaseMissingRelationError(jobError, "companion_animation_jobs")) {
+        throw jobError;
+      }
+
+      const replaysByEvolutionId = new Map<string, EvolutionReplay>();
+      const replaysById = new Map<string, EvolutionReplay>();
+
+      ((data ?? []) as EvolutionReplay[]).forEach((row) => {
+        const status = normalizeReplayStatus(row.animation_status);
+        if (!status) return;
+
+        const replay: EvolutionReplay = {
+          ...row,
+          animation_status: status,
+          animation_video_url: status === "succeeded" ? row.animation_video_url : null,
+        };
+        if (!hasVisibleReplayState(replay)) return;
+
+        replaysById.set(replay.id, replay);
+        replaysByEvolutionId.set(replay.id, replay);
+      });
+
+      if (!jobError) {
+        ((jobData ?? []) as AnimationJobReplaySource[]).forEach((job) => {
+          const status = normalizeReplayStatus(job.status);
+          if (!status) return;
+
+          const videoUrl = status === "succeeded" && job.video_url
+            ? job.video_url
+            : null;
+          const existing = job.evolution_id
+            ? replaysByEvolutionId.get(job.evolution_id)
+            : null;
+
+          if (existing) {
+            const merged: EvolutionReplay = {
+              ...existing,
+              image_url: existing.image_url ?? job.source_image_url ?? null,
+              evolved_at: existing.evolved_at ?? job.requested_at ?? job.updated_at ?? null,
+              animation_status: videoUrl ? "succeeded" : existing.animation_status,
+              animation_video_url: existing.animation_video_url ?? videoUrl,
+              animation_completed_at: existing.animation_completed_at ?? job.completed_at ?? null,
+            };
+            if (!hasVisibleReplayState(merged)) return;
+
+            replaysById.set(merged.id, merged);
+            replaysByEvolutionId.set(merged.id, merged);
+            return;
+          }
+
+          const replay: EvolutionReplay = {
+            id: job.evolution_id ?? `job:${job.id}`,
+            stage: job.stage,
+            image_url: job.source_image_url ?? null,
+            evolved_at: job.requested_at ?? job.updated_at ?? null,
+            animation_status: status,
+            animation_video_url: videoUrl,
+            animation_completed_at: job.completed_at ?? null,
+          };
+          if (!hasVisibleReplayState(replay)) return;
+
+          replaysById.set(replay.id, replay);
+          if (job.evolution_id) {
+            replaysByEvolutionId.set(job.evolution_id, replay);
+          }
+        });
+      }
+
+      return Array.from(replaysById.values())
+        .sort((left, right) => getReplaySortTime(right) - getReplaySortTime(left))
+        .slice(0, 12);
     },
   });
 
@@ -180,8 +284,25 @@ export const BadgesCollectionPanel = ({ layoutMode = "mobile" }: BadgesCollectio
       )
       .subscribe();
 
+    const jobsChannel = supabase
+      .channel(`companion-animation-jobs-${companionId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "companion_animation_jobs",
+          filter: `companion_id=eq.${companionId}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: [EVOLUTION_REPLAYS_QUERY_KEY, companionId] });
+        },
+      )
+      .subscribe();
+
     return () => {
       void supabase.removeChannel(channel);
+      void supabase.removeChannel(jobsChannel);
     };
   }, [companionId, queryClient, user?.id]);
 

@@ -6,9 +6,9 @@ const DEFAULT_FAST_IMAGE_SIZE: SupportedImageSize = "1024x1024";
 const DEFAULT_FAST_PATH_PERCENT = 0;
 const DEFAULT_STAGE0_FAST_RETRIES = 1;
 const DEFAULT_NON_STAGE0_FAST_RETRIES = 1;
-const DEFAULT_STANDARD_STAGE0_RETRIES = 1;
-const DEFAULT_STANDARD_NON_STAGE0_RETRIES = 1;
-const DEFAULT_EVOLUTION_RENDER_ATTEMPTS = 2;
+const DEFAULT_STANDARD_STAGE0_RETRIES = 0;
+const DEFAULT_STANDARD_NON_STAGE0_RETRIES = 0;
+const DEFAULT_EVOLUTION_RENDER_ATTEMPTS = 1;
 
 const MAX_PERCENT = 100;
 export type CompanionImageQuality = "medium" | "high";
@@ -136,6 +136,6 @@ export function getCompanionHiddenImageQuality(): CompanionImageQuality {
 export function getCompanionFinalImageQuality(): CompanionImageQuality {
   return resolveImageQuality(
     getEnv("COMPANION_IMAGE_FINAL_QUALITY"),
-    "high",
+    "medium",
   );
 }

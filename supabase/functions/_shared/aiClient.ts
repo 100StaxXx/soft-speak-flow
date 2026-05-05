@@ -1,17 +1,26 @@
-const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
-const OPENAI_IMAGE_GENERATIONS_URL = "https://api.openai.com/v1/images/generations";
+const OPENAI_CHAT_COMPLETIONS_URL =
+  "https://api.openai.com/v1/chat/completions";
+const OPENAI_IMAGE_GENERATIONS_URL =
+  "https://api.openai.com/v1/images/generations";
 
 const DEFAULT_IMAGE_SIZE = "1536x1024";
-export const ALLOWED_IMAGE_SIZES = ["1024x1024", "1536x1024", "1024x1536"] as const;
+export const ALLOWED_IMAGE_SIZES = [
+  "1024x1024",
+  "1536x1024",
+  "1024x1536",
+] as const;
 export type SupportedImageSize = (typeof ALLOWED_IMAGE_SIZES)[number];
 
 function getEnv(name: string): string | undefined {
-  const maybeDeno = (globalThis as { Deno?: { env?: { get?: (key: string) => string | undefined } } }).Deno;
+  const maybeDeno = (globalThis as {
+    Deno?: { env?: { get?: (key: string) => string | undefined } };
+  }).Deno;
   return maybeDeno?.env?.get?.(name);
 }
 
 const DEFAULT_TEXT_MODEL = getEnv("OPENAI_TEXT_MODEL") ?? "gpt-4o-mini";
-const DEFAULT_IMAGE_MODEL = getEnv("OPENAI_IMAGE_MODEL") ?? "gpt-image-1";
+const DEFAULT_IMAGE_MODEL = getEnv("OPENAI_COMPAT_IMAGE_MODEL") ??
+  "gpt-image-1-mini";
 
 let shimInstalled = false;
 
@@ -131,9 +140,10 @@ function extractReferenceImageUrls(messages: unknown): string[] {
 
 function shouldGenerateImage(body: Record<string, unknown>): boolean {
   const modalities = body.modalities;
-  const hasImageModality =
-    Array.isArray(modalities) &&
-    modalities.some((modality) => typeof modality === "string" && modality.toLowerCase() === "image");
+  const hasImageModality = Array.isArray(modalities) &&
+    modalities.some((modality) =>
+      typeof modality === "string" && modality.toLowerCase() === "image"
+    );
 
   if (hasImageModality) {
     return true;
@@ -148,8 +158,14 @@ function shouldGenerateImage(body: Record<string, unknown>): boolean {
   return model.includes("image");
 }
 
-export function resolveImageSize(candidate: unknown, fallback: SupportedImageSize): SupportedImageSize;
-export function resolveImageSize(candidate: unknown, fallback: null): SupportedImageSize | null;
+export function resolveImageSize(
+  candidate: unknown,
+  fallback: SupportedImageSize,
+): SupportedImageSize;
+export function resolveImageSize(
+  candidate: unknown,
+  fallback: null,
+): SupportedImageSize | null;
 export function resolveImageSize(
   candidate: unknown,
   fallback: SupportedImageSize | null = DEFAULT_IMAGE_SIZE,
@@ -172,12 +188,13 @@ async function handleImageRequest(
   const referenceUrls = extractReferenceImageUrls(body.messages);
   const preferredSize = resolveImageSize(body.image_size, DEFAULT_IMAGE_SIZE);
 
-  const referenceHint =
-    referenceUrls.length > 0
-      ? `\n\nReference image URLs (preserve key subject identity and traits):\n${referenceUrls
-          .map((url) => `- ${url}`)
-          .join("\n")}`
-      : "";
+  const referenceHint = referenceUrls.length > 0
+    ? `\n\nReference image URLs (preserve key subject identity and traits):\n${
+      referenceUrls
+        .map((url) => `- ${url}`)
+        .join("\n")
+    }`
+    : "";
 
   const requestImage = (size: SupportedImageSize) =>
     originalFetch(OPENAI_IMAGE_GENERATIONS_URL, {
@@ -191,7 +208,9 @@ async function handleImageRequest(
     });
 
   let response = await requestImage(preferredSize);
-  if (!response.ok && response.status === 400 && preferredSize !== "1024x1024") {
+  if (
+    !response.ok && response.status === 400 && preferredSize !== "1024x1024"
+  ) {
     // Some provider/model combinations reject non-square sizes.
     response = await requestImage("1024x1024");
   }
@@ -242,7 +261,9 @@ async function handleImageRequest(
   });
 }
 
-function normalizeChatBody(body: Record<string, unknown>): Record<string, unknown> {
+function normalizeChatBody(
+  body: Record<string, unknown>,
+): Record<string, unknown> {
   const normalized: Record<string, unknown> = {
     ...body,
     model: mapModel(body.model, false),
@@ -260,13 +281,15 @@ export function installOpenAICompatibilityShim(): void {
   shimInstalled = true;
   const originalFetch = globalThis.fetch.bind(globalThis);
 
-  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const url =
-      typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.toString()
-          : input.url;
+  globalThis.fetch = async (
+    input: RequestInfo | URL,
+    init?: RequestInit,
+  ): Promise<Response> => {
+    const url = typeof input === "string"
+      ? input
+      : input instanceof URL
+      ? input.toString()
+      : input.url;
 
     if (url !== OPENAI_CHAT_COMPLETIONS_URL) {
       return originalFetch(input, init);

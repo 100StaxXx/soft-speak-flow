@@ -175,7 +175,11 @@ vi.mock("@/integrations/supabase/client", () => ({
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
-              maybeSingle: maybeSingleMock,
+              order: vi.fn(() => ({
+                limit: vi.fn(() => ({
+                  maybeSingle: maybeSingleMock,
+                })),
+              })),
             })),
           })),
         };
@@ -601,6 +605,54 @@ describe("GlobalEvolutionListener", () => {
     );
   });
 
+  it("uses the succeeded animation job when the evolution row has not caught up", async () => {
+    mocks.companionEvolutionLookupResponses.push({
+      data: {
+        id: "evo-1",
+        animation_video_url: null,
+        animation_status: "queued",
+        animation_presented_at: null,
+      },
+      error: null,
+    });
+    mocks.animationJobLookupResponses.push({
+      data: {
+        status: "succeeded",
+        video_url: "https://example.com/job-evolution.mp4",
+        completed_at: "2026-05-03T12:03:00.000Z",
+      },
+      error: null,
+    });
+
+    renderListener();
+
+    await act(async () => {
+      await mocks.state.callback?.({
+        eventType: "UPDATE",
+        new: {
+          id: "companion-1",
+          current_stage: 5,
+          current_image_url: "https://example.com/stage-5.png",
+        },
+        old: {
+          id: "companion-1",
+          current_stage: 4,
+          current_image_url: "https://example.com/stage-4.png",
+        },
+      });
+    });
+
+    expect(screen.getByTestId("evolution-animation-preloader")).toHaveAttribute(
+      "src",
+      "https://example.com/job-evolution.mp4",
+    );
+    await openPlayablePendingAnimation();
+    expect(screen.getByTestId("companion-evolution")).toHaveAttribute(
+      "data-animation-video-url",
+      "https://example.com/job-evolution.mp4",
+    );
+  });
+
   it("waits for queued animation jobs before opening the modal", async () => {
     vi.useFakeTimers();
     mocks.companionEvolutionLookupResponses.push(
@@ -939,50 +991,73 @@ describe("GlobalEvolutionListener", () => {
     );
   });
 
-  it("makes the first hatch revealable without waiting for generated animation", async () => {
-    mocks.companionEvolutionLookupResponses.push({
-      data: {
-        id: "evo-1",
-        animation_video_url: null,
-        animation_status: "processing",
-        animation_presented_at: null,
-      },
-      error: null,
-    });
-
-    renderListener();
-
-    await act(async () => {
-      window.dispatchEvent(new CustomEvent(COMPANION_HATCH_STARTED_EVENT, {
-        detail: {
-          companionId: "companion-1",
-          previousStage: 0,
-          newStage: 1,
-          previousImageUrl: "https://example.com/egg.png",
-          newImageUrl: "https://example.com/hatchling.png",
-          presetId: "fox",
-          element: "fire",
+  it("keeps the first hatch reveal preparing until the generated animation is complete", async () => {
+    vi.useFakeTimers();
+    mocks.companionEvolutionLookupResponses.push(
+      {
+        data: {
+          id: "evo-1",
+          animation_video_url: null,
+          animation_status: "processing",
+          animation_presented_at: null,
         },
-      }));
-    });
+        error: null,
+      },
+      {
+        data: {
+          id: "evo-1",
+          animation_video_url: "https://example.com/hatch-kling.mp4",
+          animation_status: "succeeded",
+          animation_presented_at: null,
+        },
+        error: null,
+      },
+    );
 
-    await waitFor(() => {
+    try {
+      renderListener();
+
+      await act(async () => {
+        window.dispatchEvent(new CustomEvent(COMPANION_HATCH_STARTED_EVENT, {
+          detail: {
+            companionId: "companion-1",
+            previousStage: 0,
+            newStage: 1,
+            previousImageUrl: "https://example.com/egg.png",
+            newImageUrl: "https://example.com/hatchling.png",
+            presetId: "fox",
+            element: "fire",
+          },
+        }));
+        await flushMicrotasks();
+      });
+
       expect(mocks.state.pendingEvolutionReveal).toEqual(
         expect.objectContaining({
-          status: "ready",
+          status: "preparing",
           animationVideoUrl: null,
         }),
       );
-    });
-    expect(screen.queryByTestId("evolution-animation-preloader")).not.toBeInTheDocument();
-    expect(mocks.functionsInvokeMock).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("evolution-animation-preloader")).not.toBeInTheDocument();
 
-    await requestReadyEvolutionReveal();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2_000);
+        await flushMicrotasks();
+      });
 
-    expect(screen.getByTestId("companion-evolution")).toHaveAttribute(
-      "data-animation-video-url",
-      "",
-    );
+      expect(screen.getByTestId("evolution-animation-preloader")).toHaveAttribute(
+        "src",
+        "https://example.com/hatch-kling.mp4",
+      );
+      await openPlayablePendingAnimation();
+
+      expect(screen.getByTestId("companion-evolution")).toHaveAttribute(
+        "data-animation-video-url",
+        "https://example.com/hatch-kling.mp4",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("opens the hatch overlay without waiting for mentor lookup", async () => {

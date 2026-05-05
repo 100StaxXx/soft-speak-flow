@@ -6,13 +6,11 @@ const mocks = vi.hoisted(() => ({
   user: { id: "user-1" },
   achievements: [] as Array<{ achievement_type: string; earned_at: string }>,
   achievementsError: null as null | { code?: string; message?: string; details?: string | null; hint?: string | null },
-  companion: { id: "companion-1", current_stage: 6, current_xp: 240 } as {
+  companion: { id: "companion-1" } as {
     id: string;
-    current_stage: number;
-    current_xp?: number;
   } | null,
   evolutions: [] as Array<Record<string, unknown>>,
-  evolutionStageUpperBound: null as number | null,
+  animationJobs: [] as Array<Record<string, unknown>>,
   realtimeCallback: null as null | (() => void),
   channel: vi.fn(),
   removeChannel: vi.fn(),
@@ -51,21 +49,27 @@ vi.mock("@/integrations/supabase/client", () => ({
         return {
           select: () => ({
             eq: () => ({
-              lte: (_column: string, stageUpperBound: number) => {
-                mocks.evolutionStageUpperBound = stageUpperBound;
-                return {
-                  in: () => ({
-                    order: () => ({
-                      limit: async () => ({
-                        data: mocks.evolutions.filter((row) => (
-                          typeof row.stage !== "number" || row.stage <= stageUpperBound
-                        )),
-                        error: null,
-                      }),
-                    }),
+              in: () => ({
+                order: () => ({
+                  limit: async () => ({ data: mocks.evolutions, error: null }),
+                }),
+              }),
+            }),
+          }),
+        };
+      }
+
+      if (table === "companion_animation_jobs") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                in: () => ({
+                  order: () => ({
+                    limit: async () => ({ data: mocks.animationJobs, error: null }),
                   }),
-                };
-              },
+                }),
+              }),
             }),
           }),
         };
@@ -100,6 +104,18 @@ const pendingReplay = {
   animation_completed_at: null,
 };
 
+const succeededJobReplay = {
+  id: "job-1",
+  evolution_id: "evolution-1",
+  stage: 1,
+  source_image_url: "https://example.com/stage-1.png",
+  status: "succeeded",
+  video_url: "https://example.com/stage-1.mp4",
+  completed_at: "2026-05-03T12:03:00.000Z",
+  requested_at: "2026-05-03T12:00:00.000Z",
+  updated_at: "2026-05-03T12:03:00.000Z",
+};
+
 const renderPanel = () => {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -118,9 +134,9 @@ describe("BadgesCollectionPanel evolution replays", () => {
   beforeEach(() => {
     mocks.achievements = [];
     mocks.achievementsError = null;
-    mocks.companion = { id: "companion-1", current_stage: 6, current_xp: 240 };
+    mocks.companion = { id: "companion-1" };
     mocks.evolutions = [succeededReplay];
-    mocks.evolutionStageUpperBound = null;
+    mocks.animationJobs = [];
     mocks.realtimeCallback = null;
     mocks.removeChannel.mockReset();
     mocks.channel.mockReset();
@@ -176,8 +192,8 @@ describe("BadgesCollectionPanel evolution replays", () => {
     expect(screen.queryByTestId("evolution-replay-video")).not.toBeInTheDocument();
   });
 
-  it("shows a hatch-ready stage-one prewarm before the egg is claimed", async () => {
-    mocks.companion = { id: "companion-1", current_stage: 0, current_xp: 10 };
+  it("shows a stage-one prewarm before the egg is claimed", async () => {
+    mocks.companion = { id: "companion-1" };
     mocks.evolutions = [
       {
         ...succeededReplay,
@@ -189,26 +205,20 @@ describe("BadgesCollectionPanel evolution replays", () => {
     renderPanel();
 
     expect(await screen.findByRole("button", { name: /replay stage 1 evolution/i })).toBeInTheDocument();
-    expect(mocks.evolutionStageUpperBound).toBe(1);
   });
 
-  it("keeps stage-one prewarms hidden until the egg is hatch-ready", async () => {
-    mocks.companion = { id: "companion-1", current_stage: 0, current_xp: 9 };
-    mocks.evolutions = [
-      {
-        ...succeededReplay,
-        id: "evolution-1",
-        stage: 1,
-      },
-    ];
+  it("shows succeeded animation jobs when the evolution row has not caught up", async () => {
+    mocks.companion = { id: "companion-1" };
+    mocks.evolutions = [];
+    mocks.animationJobs = [succeededJobReplay];
 
     renderPanel();
 
-    await screen.findByText("Your Badges");
-    await waitFor(() => {
-      expect(screen.queryByRole("button", { name: /replay stage 1 evolution/i })).not.toBeInTheDocument();
-    });
-    expect(mocks.evolutionStageUpperBound).toBe(0);
+    fireEvent.click(await screen.findByRole("button", { name: /replay stage 1 evolution/i }));
+    expect(await screen.findByTestId("evolution-replay-video")).toHaveAttribute(
+      "src",
+      "https://example.com/stage-1.mp4",
+    );
   });
 
   it("does not show an empty replay section when no evolution videos exist", async () => {

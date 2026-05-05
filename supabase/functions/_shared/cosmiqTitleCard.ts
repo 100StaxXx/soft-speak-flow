@@ -17,16 +17,15 @@ export const COSMIQ_TITLE_CARD_PROMPT_VERSION =
 
 const OPENAI_IMAGE_GENERATIONS_URL =
   "https://api.openai.com/v1/images/generations";
-const COSMIQ_TITLE_CARD_IMAGE_MODEL = "gpt-image-2";
+const COSMIQ_TITLE_CARD_IMAGE_MODEL = "gpt-image-1-mini";
 const COSMIQ_TITLE_CARD_IMAGE_FALLBACK_MODELS = [
-  "chatgpt-image-latest",
-  "gpt-image-1.5",
   "gpt-image-1",
 ] as const;
 const COSMIQ_TITLE_CARD_BUCKET = "cosmiq-title-cards";
 const IMAGE_GENERATION_TIMEOUT_MS = 120_000;
 const GENERATION_STALE_AFTER = "75 seconds";
 const COSMIQ_TITLE_CARD_IMAGE_SIZE = "1024x1536";
+const COSMIQ_TITLE_CARD_IMAGE_QUALITY = "medium";
 const COSMIQ_TITLE_CARD_PRIMARY_DIRECTION =
   "Fast primary render: luminous heroic portrait, clear silhouette, balanced cosmic aura.";
 
@@ -279,13 +278,31 @@ const parseBase64Image = (
 
 const getTitleCardImageModels = (): string[] => {
   const configuredModel = Deno.env.get("COSMIQ_TITLE_CARD_IMAGE_MODEL")?.trim();
+  const configuredFallbackModels =
+    Deno.env.get("COSMIQ_TITLE_CARD_IMAGE_FALLBACK_MODELS")
+      ?.split(",")
+      .map((model) => model.trim())
+      .filter((model) => model.length > 0) ?? [];
   return Array.from(
     new Set([
       configuredModel || COSMIQ_TITLE_CARD_IMAGE_MODEL,
       COSMIQ_TITLE_CARD_IMAGE_MODEL,
-      ...COSMIQ_TITLE_CARD_IMAGE_FALLBACK_MODELS,
+      ...(
+        configuredFallbackModels.length > 0
+          ? configuredFallbackModels
+          : COSMIQ_TITLE_CARD_IMAGE_FALLBACK_MODELS
+      ),
     ].filter((model) => model.length > 0)),
   );
+};
+
+const getTitleCardImageQuality = (): "medium" | "high" => {
+  const configuredQuality = Deno.env.get("COSMIQ_TITLE_CARD_IMAGE_QUALITY")
+    ?.trim()
+    .toLowerCase();
+  return configuredQuality === "high"
+    ? "high"
+    : COSMIQ_TITLE_CARD_IMAGE_QUALITY;
 };
 
 const downloadGeneratedImage = async (
@@ -549,7 +566,7 @@ async function generateCosmiqTitleCardImage({
           model,
           prompt,
           size: COSMIQ_TITLE_CARD_IMAGE_SIZE,
-          quality: "high",
+          quality: getTitleCardImageQuality(),
           n: 1,
         }),
       },

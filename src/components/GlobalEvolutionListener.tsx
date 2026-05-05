@@ -19,6 +19,7 @@ import {
   isCompanionHatchStartedDetail,
 } from "@/lib/companionEvolutionEvents";
 import { logger } from "@/utils/logger";
+import { isSupabaseMissingRelationError } from "@/utils/supabaseSchemaErrors";
 import {
   getProgressionLevelDisplay,
   getProgressionTierLabelForLevel,
@@ -86,8 +87,6 @@ type EvolutionPresentationRequest = Omit<EvolutionPresentationData, "evolutionId
 const sleep = (delayMs: number) => new Promise((resolve) => setTimeout(resolve, delayMs));
 const PRESENTED_EVOLUTION_STORAGE_PREFIX = "companion-evolution-presented";
 const locallyPresentedEvolutionKeys = new Set<string>();
-const isFirstHatchPresentation = (previousLevel: number, level: number) =>
-  previousLevel === 0 && level === 1;
 
 export const clearLocalEvolutionPresentationGuardsForTest = () => {
   locallyPresentedEvolutionKeys.clear();
@@ -132,23 +131,45 @@ const fetchPersistedEvolutionMetadata = async ({
 
   if (!data?.id) return null;
 
+  const { data: jobData, error: jobError } = await supabase
+    .from("companion_animation_jobs")
+    .select("status, video_url, completed_at, updated_at")
+    .eq("evolution_id", data.id)
+    .order("requested_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (jobError && !isSupabaseMissingRelationError(jobError, "companion_animation_jobs")) {
+    logger.warn("Evolution listener: Failed to verify animation job", {
+      companionId,
+      stage,
+      evolutionId: data.id,
+      error: jobError.message,
+    });
+  }
+
   const animationStatus = normalizeAnimationStatus(data.animation_status);
+  const jobAnimationStatus = normalizeAnimationStatus(jobData?.status);
   const animationVideoUrl =
     animationStatus === "succeeded" && typeof data.animation_video_url === "string"
       ? data.animation_video_url
+      : jobAnimationStatus === "succeeded" && typeof jobData?.video_url === "string"
+        ? jobData.video_url
       : null;
 
   return {
     id: data.id,
     imageUrl: typeof data.image_url === "string" ? data.image_url : null,
     evolvedAt: typeof data.evolved_at === "string" ? data.evolved_at : null,
-    animationStatus,
+    animationStatus: animationVideoUrl ? "succeeded" : animationStatus ?? jobAnimationStatus,
     animationVideoUrl,
     animationRequestedAt: typeof data.animation_requested_at === "string"
       ? data.animation_requested_at
       : null,
     animationCompletedAt: typeof data.animation_completed_at === "string"
       ? data.animation_completed_at
+      : typeof jobData?.completed_at === "string"
+        ? jobData.completed_at
       : null,
     animationPresentedAt: typeof data.animation_presented_at === "string"
       ? data.animation_presented_at
@@ -641,7 +662,7 @@ export const GlobalEvolutionListener = () => {
       return false;
     }
 
-    if (!animationVideoUrl && !isFirstHatchPresentation(previousLevel, level)) {
+    if (!animationVideoUrl) {
       logger.warn("Evolution listener: Refusing to open reveal without animation video", {
         companionId,
         level,
@@ -881,21 +902,6 @@ export const GlobalEvolutionListener = () => {
         level,
         evolvedAt: persistedEvolution.evolvedAt,
       });
-
-      if (isFirstHatchPresentation(previousLevel, level) && !persistedEvolution.animationVideoUrl) {
-        markPendingRevealReady({
-          evolutionId: persistedEvolution.id,
-          companionId,
-          previousLevel,
-          level,
-          previousImageUrl,
-          imageUrl,
-          animationVideoUrl: null,
-          presetId,
-          element,
-        });
-        return true;
-      }
 
       const readyEvolution = await waitForEvolutionAnimation({
         companionId,
@@ -1344,7 +1350,7 @@ export const GlobalEvolutionListener = () => {
 
       if (
         !pending.evolutionId ||
-        (!pending.animationVideoUrl && !isFirstHatchPresentation(pending.previousStage, pending.newStage))
+        !pending.animationVideoUrl
       ) {
         logger.warn("Evolution listener: Reveal requested before animation was playable", {
           companionId: pending.companionId,

@@ -1,10 +1,8 @@
 const OPENAI_IMAGE_GENERATIONS_URL =
   "https://api.openai.com/v1/images/generations";
 const OPENAI_IMAGE_EDITS_URL = "https://api.openai.com/v1/images/edits";
-const DEFAULT_COMPANION_IMAGE_MODEL = "gpt-image-2";
+const DEFAULT_COMPANION_IMAGE_MODEL = "gpt-image-1-mini";
 const DEFAULT_COMPANION_IMAGE_FALLBACK_MODELS = [
-  "chatgpt-image-latest",
-  "gpt-image-1.5",
   "gpt-image-1",
 ] as const;
 // Provider fallback can change aspect ratio; callers persist the returned size and render without stretching.
@@ -57,31 +55,10 @@ const getReferenceImageRetryBackoffMs = (): number => {
     : DEFAULT_REFERENCE_IMAGE_RETRY_BACKOFF_MS;
 };
 
-const isProductionRuntime = (): boolean => {
-  const environment = (
-    Deno.env.get("APP_ENV") ??
-      Deno.env.get("NODE_ENV") ??
-      Deno.env.get("ENVIRONMENT") ??
-      ""
-  ).trim().toLowerCase();
-  return environment === "production" || environment === "prod" ||
-    Boolean(Deno.env.get("DENO_DEPLOYMENT_ID"));
-};
-
 export const resolveCompanionImageModel = (): string => {
   const companionModel = Deno.env.get("OPENAI_COMPANION_IMAGE_MODEL");
-  const defaultImageModel = Deno.env.get("OPENAI_IMAGE_MODEL");
-  const resolved = companionModel ?? defaultImageModel ??
-    DEFAULT_COMPANION_IMAGE_MODEL;
-  const source = companionModel
-    ? "OPENAI_COMPANION_IMAGE_MODEL"
-    : defaultImageModel
-    ? "OPENAI_IMAGE_MODEL"
-    : "fallback";
-
-  if (!companionModel && !defaultImageModel && isProductionRuntime()) {
-    throw new Error("Companion image model is not configured in production");
-  }
+  const resolved = companionModel ?? DEFAULT_COMPANION_IMAGE_MODEL;
+  const source = companionModel ? "OPENAI_COMPANION_IMAGE_MODEL" : "fallback";
 
   if (!resolvedModelLogged) {
     resolvedModelLogged = true;

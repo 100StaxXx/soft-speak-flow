@@ -9,7 +9,10 @@ function assert(condition: unknown, message: string): asserts condition {
   }
 }
 
-function restoreEnv(name: "OPENAI_COMPANION_IMAGE_MODEL" | "OPENAI_IMAGE_MODEL", value: string | undefined) {
+function restoreEnv(
+  name: "OPENAI_COMPANION_IMAGE_MODEL" | "OPENAI_IMAGE_MODEL",
+  value: string | undefined,
+) {
   if (typeof value === "string") {
     Deno.env.set(name, value);
   } else {
@@ -18,7 +21,9 @@ function restoreEnv(name: "OPENAI_COMPANION_IMAGE_MODEL" | "OPENAI_IMAGE_MODEL",
 }
 
 Deno.test("companion lineage metadata uses the same default image model as the OpenAI client", () => {
-  const originalCompanionImageModel = Deno.env.get("OPENAI_COMPANION_IMAGE_MODEL");
+  const originalCompanionImageModel = Deno.env.get(
+    "OPENAI_COMPANION_IMAGE_MODEL",
+  );
   const originalImageModel = Deno.env.get("OPENAI_IMAGE_MODEL");
 
   try {
@@ -35,20 +40,31 @@ Deno.test("companion lineage metadata uses the same default image model as the O
       portraitRegenerated: true,
     });
 
-    assert(lineageMetadata.model === "gpt-image-2", `Expected lineage metadata default model to be gpt-image-2, got ${lineageMetadata.model}`);
-    assert(generationMetadata.model === "gpt-image-2", `Expected generation metadata default model to be gpt-image-2, got ${generationMetadata.model}`);
+    assert(
+      lineageMetadata.model === "gpt-image-1-mini",
+      `Expected lineage metadata default model to be gpt-image-1-mini, got ${lineageMetadata.model}`,
+    );
+    assert(
+      generationMetadata.model === "gpt-image-1-mini",
+      `Expected generation metadata default model to be gpt-image-1-mini, got ${generationMetadata.model}`,
+    );
   } finally {
-    restoreEnv("OPENAI_COMPANION_IMAGE_MODEL", originalCompanionImageModel ?? undefined);
+    restoreEnv(
+      "OPENAI_COMPANION_IMAGE_MODEL",
+      originalCompanionImageModel ?? undefined,
+    );
     restoreEnv("OPENAI_IMAGE_MODEL", originalImageModel ?? undefined);
   }
 });
 
 Deno.test("companion lineage metadata follows OPENAI_COMPANION_IMAGE_MODEL overrides", () => {
-  const originalCompanionImageModel = Deno.env.get("OPENAI_COMPANION_IMAGE_MODEL");
+  const originalCompanionImageModel = Deno.env.get(
+    "OPENAI_COMPANION_IMAGE_MODEL",
+  );
   const originalImageModel = Deno.env.get("OPENAI_IMAGE_MODEL");
 
   try {
-    Deno.env.set("OPENAI_COMPANION_IMAGE_MODEL", "gpt-image-2");
+    Deno.env.set("OPENAI_COMPANION_IMAGE_MODEL", "gpt-image-1-mini");
     Deno.env.set("OPENAI_IMAGE_MODEL", "gpt-image-1.5");
 
     const lineageMetadata = buildInitialImageLineageMetadata({
@@ -61,10 +77,19 @@ Deno.test("companion lineage metadata follows OPENAI_COMPANION_IMAGE_MODEL overr
       portraitRegenerated: true,
     });
 
-    assert(lineageMetadata.model === "gpt-image-2", `Expected lineage metadata model override to be gpt-image-2, got ${lineageMetadata.model}`);
-    assert(generationMetadata.model === "gpt-image-2", `Expected generation metadata model override to be gpt-image-2, got ${generationMetadata.model}`);
+    assert(
+      lineageMetadata.model === "gpt-image-1-mini",
+      `Expected lineage metadata model override to be gpt-image-1-mini, got ${lineageMetadata.model}`,
+    );
+    assert(
+      generationMetadata.model === "gpt-image-1-mini",
+      `Expected generation metadata model override to be gpt-image-1-mini, got ${generationMetadata.model}`,
+    );
   } finally {
-    restoreEnv("OPENAI_COMPANION_IMAGE_MODEL", originalCompanionImageModel ?? undefined);
+    restoreEnv(
+      "OPENAI_COMPANION_IMAGE_MODEL",
+      originalCompanionImageModel ?? undefined,
+    );
     restoreEnv("OPENAI_IMAGE_MODEL", originalImageModel ?? undefined);
   }
 });

@@ -25,3 +25,20 @@ Deno.test("companion evolutions realtime migration guards publication membership
     "Expected realtime publication migration to be duplicate-safe",
   );
 });
+
+Deno.test("companion animation jobs realtime migration guards publication membership", async () => {
+  const source = await Deno.readTextFile(
+    new URL(
+      "../../migrations/20260505150000_add_companion_animation_jobs_realtime.sql",
+      import.meta.url,
+    ),
+  );
+
+  assert(
+    source.includes("pg_publication_tables") &&
+      source.includes("companion_animation_jobs") &&
+      source.includes("ALTER PUBLICATION supabase_realtime ADD TABLE public.companion_animation_jobs") &&
+      source.includes("duplicate_object"),
+    "Expected companion animation jobs to be added to realtime publication idempotently",
+  );
+});

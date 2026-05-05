@@ -479,7 +479,7 @@ function resolveOpenAIModel(
   const raw = typeof rawModel === "string" ? rawModel.trim() : "";
   if (!raw) {
     if (capability === "image") {
-      return getEnv("OPENAI_IMAGE_MODEL") ?? "gpt-image-1";
+      return getEnv("OPENAI_COMPAT_IMAGE_MODEL") ?? "gpt-image-1-mini";
     }
     return getEnv("OPENAI_TEXT_MODEL") ?? "gpt-4o-mini";
   }
@@ -487,7 +487,7 @@ function resolveOpenAIModel(
   const lower = raw.toLowerCase();
   if (capability === "image") {
     if (lower.startsWith("google/") || lower.startsWith("gemini")) {
-      return getEnv("OPENAI_IMAGE_MODEL") ?? "gpt-image-1";
+      return getEnv("OPENAI_COMPAT_IMAGE_MODEL") ?? "gpt-image-1-mini";
     }
     return raw;
   }
