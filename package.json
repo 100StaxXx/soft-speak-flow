@@ -55,7 +55,7 @@
     "test:migrations:habit-index:static": "deno test --allow-read=supabase/migrations supabase/tests/migrations/daily-task-habit-conflict-index.test.ts",
     "test:migrations:habit-index:db": "supabase test db supabase/tests/migrations/01_daily_task_habit_conflict_index.sql",
     "test:migrations:habit-index": "npm run test:migrations:habit-index:static && npm run test:migrations:habit-index:db",
-    "test:security:db": "supabase test db supabase/tests/security/01_rls_and_storage.sql supabase/tests/security/02_entitlements_and_rpc.sql supabase/tests/security/04_companion_claim_validation.sql",
+    "test:security:db": "./scripts/run-security-db-tests.sh",
     "test:security:functions": "./scripts/run-security-function-tests.sh",
     "test:security": "npm run test:security:db && npm run test:security:functions"
   },
