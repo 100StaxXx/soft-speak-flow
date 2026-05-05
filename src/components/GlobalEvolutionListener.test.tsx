@@ -329,7 +329,12 @@ describe("GlobalEvolutionListener", () => {
     );
   });
 
-  it("starts the first hatch animation from a local hatch event", async () => {
+  it("defers the hatch reveal on companion-hatch-started until the Kling video is ready", async () => {
+    // The first hatch (stage 0→1) must NOT pop a still-only overlay. Tapping
+    // Hatch should hide the tutorial card (handled separately by the mentor
+    // guidance hook) and let the user navigate freely; the overlay only
+    // mounts once the cron drainer flips animation_video_url and the
+    // always-on companion_evolutions subscription re-presents with the video.
     render(<GlobalEvolutionListener />);
 
     await act(async () => {
@@ -345,25 +350,16 @@ describe("GlobalEvolutionListener", () => {
       }));
     });
 
-    await waitFor(() => {
-      expect(screen.getByTestId("companion-evolution")).toBeInTheDocument();
-    });
-
-    expect(mocks.setEvolutionInProgressMock).toHaveBeenCalledTimes(1);
-    expect(mocks.companionEvolutionPropsMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        previousStage: 0,
-        newStage: 1,
-        previousImageUrl: "https://example.com/egg.png",
-        newImageUrl: "https://example.com/hatchling.png",
-      }),
-    );
+    expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
+    expect(mocks.setEvolutionInProgressMock).not.toHaveBeenCalledWith(true);
   });
 
-  it("opens the hatch overlay without waiting for mentor lookup", async () => {
-    mocks.state.mentorId = "mentor-1";
-    mocks.state.mentorLookup = () => new Promise(() => {});
-
+  it("dedupes the realtime 0→1 update after a local hatch start (no overlay)", async () => {
+    // The hatch RPC bumps current_stage 0→1 in the DB, which fires a
+    // user_companion realtime UPDATE. With the local hatch dedupe key seeded
+    // by handleHatchStarted, that UPDATE must early-return — and even if it
+    // races ahead of the dedupe key, the explicit hatch-defer guard inside
+    // the realtime handler should still suppress the still-only overlay.
     render(<GlobalEvolutionListener />);
 
     await act(async () => {
@@ -377,40 +373,6 @@ describe("GlobalEvolutionListener", () => {
           element: "fire",
         },
       }));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("companion-evolution")).toBeInTheDocument();
-    });
-
-    expect(mocks.companionEvolutionPropsMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        previousStage: 0,
-        newStage: 1,
-        previousImageUrl: "https://example.com/egg.png",
-        newImageUrl: "https://example.com/hatchling.png",
-      }),
-    );
-  });
-
-  it("dedupes the realtime 0 to 1 update after a local hatch start", async () => {
-    render(<GlobalEvolutionListener />);
-
-    await act(async () => {
-      window.dispatchEvent(new CustomEvent(COMPANION_HATCH_STARTED_EVENT, {
-        detail: {
-          companionId: "companion-1",
-          previousStage: 0,
-          newStage: 1,
-          previousImageUrl: "https://example.com/egg.png",
-          newImageUrl: "https://example.com/hatchling.png",
-          element: "fire",
-        },
-      }));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("companion-evolution")).toBeInTheDocument();
     });
 
     await act(async () => {
@@ -433,15 +395,40 @@ describe("GlobalEvolutionListener", () => {
       });
     });
 
-    expect(mocks.setEvolutionInProgressMock).toHaveBeenCalledTimes(1);
-    expect(mocks.companionEvolutionPropsMock).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        previousStage: 0,
-        newStage: 1,
-        previousImageUrl: "https://example.com/egg.png",
-        newImageUrl: "https://example.com/hatchling.png",
-      }),
-    );
+    expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
+    expect(mocks.setEvolutionInProgressMock).not.toHaveBeenCalledWith(true);
+  });
+
+  it("defers a 0→1 realtime update with no animation_video_url even if hatch event hasn't fired", async () => {
+    // Race protection: if the realtime UPDATE arrives before
+    // handleHatchStarted runs (so the local-hatch dedupe key isn't seeded
+    // yet), the explicit hatch-defer guard inside the realtime handler must
+    // still suppress the still-only overlay. The always-on subscription will
+    // bring the user back when Kling is ready.
+    render(<GlobalEvolutionListener />);
+
+    await act(async () => {
+      await mocks.state.callback?.({
+        eventType: "UPDATE",
+        new: {
+          id: "companion-1",
+          current_stage: 1,
+          current_image_url: "https://example.com/hatchling.png",
+          core_element: "fire",
+          preset_id: "dragon",
+        },
+        old: {
+          id: "companion-1",
+          current_stage: 0,
+          current_image_url: "https://example.com/egg.png",
+          core_element: "fire",
+          preset_id: "dragon",
+        },
+      });
+    });
+
+    expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
+    expect(mocks.setEvolutionInProgressMock).not.toHaveBeenCalledWith(true);
   });
 
   it("fires the level-up toast and skips the modal for intra-tier graduations", async () => {

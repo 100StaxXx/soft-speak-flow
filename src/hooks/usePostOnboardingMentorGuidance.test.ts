@@ -659,6 +659,49 @@ describe("guided tutorial first-value loop", () => {
     });
   });
 
+  it("surfaces tap_hatch_companion when evolutionInFlight is stale but the egg never hatched", async () => {
+    // Defense-in-depth for the cold-reopen edge case where the persisted
+    // evolutionInFlight=true was orphaned (e.g., the hatch RPC failed after
+    // tap_hatch_companion was recorded, or a transient bug bumped the flag
+    // without an actual hatch). Without the milestone-selector guard, the
+    // step would resolve to the auto-hidden complete_companion_hatch and
+    // the user would see no actionable card despite the companion still
+    // being a stage-0 egg.
+    mocks.state.guidedTutorial = {
+      ...createFreshTutorial(),
+      completedSteps: ["new_goal", "plan_my_day"],
+      xpAwardedSteps: ["new_goal", "plan_my_day"],
+      milestonesCompleted: [
+        "mentor_intro_hello",
+        "start_new_goal",
+        "complete_pathfinder_campaign",
+        "start_plan_my_day",
+        "answer_plan_day_ai",
+        "save_plan_day_action",
+        "tap_hatch_companion",
+      ],
+      evolutionInFlight: true,
+      evolutionStartedAt: "2026-05-04T00:00:00.000Z",
+    };
+    mocks.state.companionData = { current_stage: 0 };
+    mocks.state.companionDataUpdatedAt = 100;
+    const hatchTarget = document.createElement("button");
+    hatchTarget.setAttribute("data-tour", "evolve-companion-button");
+    document.body.appendChild(hatchTarget);
+
+    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/companion"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("hatch_companion");
+      // The card must be visible (NOT auto-hidden) so the user can re-tap
+      // Hatch and recover from the stale state.
+      expect(result.current.shouldAutoHideCard).toBe(false);
+      expect(result.current.dialogueText).toBe("Tap 'Hatch.'");
+    });
+  });
+
   it("does not complete or route from Plan day until tutorial XP is actually awarded", async () => {
     mocks.state.guidedTutorial = {
       ...createFreshTutorial(),

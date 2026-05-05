@@ -410,6 +410,18 @@ export const GlobalEvolutionListener = () => {
             return;
           }
 
+          // For the initial hatch (0→1), defer the reveal until the Kling
+          // animation has rendered. The always-on companion_evolutions
+          // subscription above re-presents the full reveal once
+          // animation_video_url is populated by the cron drainer. This
+          // guards against the race where this realtime UPDATE arrives
+          // before handleHatchStarted runs and seeds the local-hatch
+          // dedupe key — the user shouldn't see a still-only fallback for
+          // their first hatch.
+          if (oldLevel === 0 && newLevel === 1 && !persistence.animationVideoUrl) {
+            return;
+          }
+
           const currentImageUrl = typeof newData.current_image_url === "string" ? newData.current_image_url : "";
           const element = typeof newData.core_element === "string" ? newData.core_element : undefined;
           const imageUrl = resolveCompanionVisualAssetUrl({
@@ -691,27 +703,28 @@ export const GlobalEvolutionListener = () => {
         return;
       }
 
-      void startEvolutionPresentation({
-        companionId: detail.companionId,
-        previousLevel: detail.previousStage,
-        level: detail.newStage,
-        previousImageUrl: detail.previousImageUrl,
-        imageUrl: detail.newImageUrl,
-        presetId: typeof detail.presetId === "string" ? detail.presetId : undefined,
-        element: detail.element ?? undefined,
-        evolutionId: typeof detail.evolutionId === "string" ? detail.evolutionId : undefined,
-        // animationVideoUrl starts null — the companion_evolutions UPDATE
-        // subscription in this component hot-swaps it once Kling finishes.
-        animationVideoUrl: null,
-        markAsLocalHatch: true,
-      });
+      // Defer the reveal until the Kling video URL is ready. Marking this
+      // hatch as a "recent local hatch" suppresses the user_companion
+      // realtime UPDATE handler from showing the still-only fallback when
+      // current_stage flips 0→1 in the database. Once the cron drainer
+      // populates animation_video_url on companion_evolutions, the always-on
+      // companion_evolutions subscription above re-presents the full reveal
+      // with the Kling video.
+      //
+      // Net effect: tapping Hatch hides the mentor tutorial card (the
+      // complete_companion_hatch milestone is in MILESTONES_AUTO_HIDDEN),
+      // the user can navigate freely, and CompanionEvolution mounts later
+      // with the full animation in hand.
+      const key = buildEvolutionKey(detail.companionId, detail.newStage);
+      pruneRecentLocalHatchKeys();
+      recentLocalHatchKeysRef.current.set(key, Date.now());
     };
 
     window.addEventListener(COMPANION_HATCH_STARTED_EVENT, handleHatchStarted as EventListener);
     return () => {
       window.removeEventListener(COMPANION_HATCH_STARTED_EVENT, handleHatchStarted as EventListener);
     };
-  }, [startEvolutionPresentation, user]);
+  }, [buildEvolutionKey, pruneRecentLocalHatchKeys, user]);
 
   // Auto-progress intra-tier graduations. The flashy EVOLVE button is reserved
   // for tier-boundary transitions where the companion's image actually changes.
