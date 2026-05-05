@@ -1674,6 +1674,22 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     }
 
     if (currentStep.id === "hatch_companion") {
+      // Defense-in-depth: if the companion is still actually an egg
+      // (current_stage === 0) AND no live session evolution is in flight,
+      // surface "tap_hatch_companion" regardless of the persisted
+      // evolutionInFlight flag. This covers the cold-reopen edge case
+      // where evolutionInFlight stayed true (e.g., user closed the app
+      // mid-RPC) but the hatch never actually completed — without this
+      // guard the milestone would resolve to the auto-hidden
+      // complete_companion_hatch and the user would see no card.
+      const companionStillEgg =
+        Boolean(cachedCompanion) &&
+        cachedCompanion.current_stage === 0 &&
+        sessionEvolutionInFlight !== true;
+      if (companionStillEgg) {
+        return "tap_hatch_companion";
+      }
+
       return evolutionInFlight || milestoneSet.has("tap_hatch_companion")
         ? "complete_companion_hatch"
         : "tap_hatch_companion";
@@ -1688,7 +1704,14 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     }
 
     return null;
-  }, [createQuestProgress.current, currentStep, evolutionInFlight, milestoneSet]);
+  }, [
+    cachedCompanion,
+    createQuestProgress.current,
+    currentStep,
+    evolutionInFlight,
+    milestoneSet,
+    sessionEvolutionInFlight,
+  ]);
 
   const isIntroDialogueActive = currentMilestone === "mentor_intro_hello";
   const supportsDialogueAction =
