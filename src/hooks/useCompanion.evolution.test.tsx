@@ -478,6 +478,78 @@ describe("useCompanion evolveCompanion", () => {
     );
   });
 
+  it("retries campaign creation XP with the legacy hatch-ready event when the RPC allowlist is stale", async () => {
+    mocks.rpcMock
+      .mockResolvedValueOnce({
+        data: null,
+        error: {
+          code: "P0001",
+          message: "Unsupported event_type: campaign_create",
+          details: null,
+          hint: null,
+        },
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            xp_awarded: 10,
+            xp_before: 0,
+            xp_after: 10,
+            should_evolve: true,
+            next_threshold: 10,
+            cap_applied: false,
+            level_before: 0,
+            level_after: 1,
+            tier_before: "Egg",
+            tier_after: "Hatchling",
+            earned_level_after: 1,
+            earned_tier_after: "Hatchling",
+            claimed_stage_after: 0,
+            pending_evolution_count: 1,
+          },
+        ],
+        error: null,
+      });
+
+    const { result } = await renderUseCompanion();
+
+    await act(async () => {
+      await expect(
+        result.current.awardXP.mutateAsync({
+          eventType: "campaign_create",
+          xpAmount: 10,
+          metadata: { epic_id: "epic-1" },
+          idempotencyKey: "campaign_create:epic-1",
+        }),
+      ).resolves.toEqual(expect.objectContaining({ xpAwarded: 10 }));
+    });
+
+    expect(mocks.rpcMock).toHaveBeenNthCalledWith(1, "award_xp_v2", {
+      p_event_type: "campaign_create",
+      p_xp_amount: 10,
+      p_event_metadata: { epic_id: "epic-1" },
+      p_idempotency_key: "campaign_create:epic-1",
+    });
+    expect(mocks.rpcMock).toHaveBeenNthCalledWith(2, "award_xp_v2", {
+      p_event_type: "guided_tutorial_hatch_ready_top_up",
+      p_xp_amount: 10,
+      p_event_metadata: {
+        epic_id: "epic-1",
+        original_event_type: "campaign_create",
+        compatibility_fallback: true,
+      },
+      p_idempotency_key: "campaign_create:epic-1",
+    });
+    expect(mocks.loggerInfoMock).toHaveBeenCalledWith(
+      "award_xp_v2 campaign_create unsupported; retrying with legacy hatch XP event",
+      expect.objectContaining({
+        eventType: "campaign_create",
+        fallbackEventType: "guided_tutorial_hatch_ready_top_up",
+      }),
+    );
+    expect(mocks.toastErrorMock).not.toHaveBeenCalled();
+  });
+
   it("treats newly earned levels as manual evolution readiness instead of auto-claiming them", async () => {
     mocks.rpcMock.mockResolvedValueOnce({
       data: [

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { isSupabaseMissingRelationError } from "@/utils/supabaseSchemaErrors";
 
 interface AchievementPepTalk {
   id: string;
@@ -27,6 +28,9 @@ export const useAchievementPepTalks = () => {
         .not("metadata->>pepTalkMessage", "is", null)
         .order("earned_at", { ascending: false });
 
+      if (isSupabaseMissingRelationError(error, "achievements")) {
+        return [];
+      }
       if (error) throw error;
 
       return data.map((achievement) => {

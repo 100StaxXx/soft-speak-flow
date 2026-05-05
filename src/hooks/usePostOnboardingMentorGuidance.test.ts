@@ -167,6 +167,7 @@ import {
   shouldRestoreTutorialRoute,
   usePostOnboardingMentorGuidance,
 } from "./usePostOnboardingMentorGuidance";
+import { CAMPAIGN_CREATED_ANIMATION_COMPLETE_EVENT } from "@/utils/tutorialEvents";
 
 describe("guided tutorial helpers", () => {
   it("keeps current and legacy step ids safe for migration", () => {
@@ -445,6 +446,17 @@ describe("guided tutorial first-value loop", () => {
     });
     await act(async () => {
       window.dispatchEvent(new CustomEvent("pathfinder-campaign-created"));
+    });
+
+    await waitFor(() => {
+      expect(result.current.isActive).toBe(false);
+      expect(result.current.currentStep).toBeNull();
+      expect(result.current.dialogueText).toBe("");
+      expect(result.current.activeTargetSelectors).toEqual([]);
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(CAMPAIGN_CREATED_ANIMATION_COMPLETE_EVENT));
     });
 
     await waitFor(() => {

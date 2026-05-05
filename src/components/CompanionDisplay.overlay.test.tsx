@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
     current_xp: 180,
     current_stage: 8,
     current_image_url: "/companion-presets/phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__fire.png",
+    current_image_focal_x: null as number | null,
+    current_image_focal_y: null as number | null,
     initial_image_url: null as string | null,
     preset_id: "phoenix",
     spirit_animal: "phoenix",
@@ -335,6 +337,8 @@ describe("CompanionDisplay overlay stack", () => {
       current_xp: 180,
       current_stage: 8,
       current_image_url: "/companion-presets/phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__fire.png",
+      current_image_focal_x: null,
+      current_image_focal_y: null,
       initial_image_url: null,
       preset_id: "phoenix",
       spirit_animal: "phoenix",
@@ -400,6 +404,8 @@ describe("CompanionDisplay overlay stack", () => {
       ...mocks.companion,
       preset_id: null,
       current_image_url: "https://assets.example.com/scene-backed-companion.png",
+      current_image_focal_x: 0.32,
+      current_image_focal_y: 0.68,
       launcher_image_url: "https://assets.example.com/launcher-cutout-source.png",
       launcher_image_source_url: "https://assets.example.com/scene-backed-companion.png",
       launcher_image_focal_x: 0.5,
@@ -414,6 +420,8 @@ describe("CompanionDisplay overlay stack", () => {
     const image = screen.getByAltText(/companion at level 8/i);
     expect(image).toHaveAttribute("src", "https://assets.example.com/scene-backed-companion.png");
     expect(image).not.toHaveAttribute("src", "https://assets.example.com/launcher-cutout-source.png");
+    expect(image).toHaveStyle({ objectPosition: "32% 68%" });
+    expect(image.style.transform).toBe("");
   });
 
   it("renders the stats analysis trigger directly below the stat grid", async () => {

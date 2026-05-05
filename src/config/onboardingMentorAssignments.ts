@@ -314,6 +314,18 @@ const getMentorScore = (
     score += 2;
   }
 
+  if (
+    mentorSlug === "operator"
+    && toneOptionId === "direct_demanding"
+    && (
+      focusOptionId === "discipline_performance"
+      || progressOptionId === "principles_logic"
+      || progressOptionId === "pressure_standards"
+    )
+  ) {
+    score += 4;
+  }
+
   if (mentorSlug === "operator" && toneOptionId === "gentle_compassionate") {
     score -= 1;
   }
@@ -373,15 +385,6 @@ const getMentorScore = (
 
   if (mentorSlug === "icon" && progressOptionId === "emotional_reassurance") {
     score -= 1;
-  }
-
-  if (
-    mentorSlug === "charles"
-    && focusOptionId === "discipline_performance"
-    && toneOptionId === "direct_demanding"
-    && progressOptionId === "pressure_standards"
-  ) {
-    score += 12;
   }
 
   return score;

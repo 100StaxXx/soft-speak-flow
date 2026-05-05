@@ -665,6 +665,8 @@ type CreateCompanionRpcResult = {
 
 const AWARD_XP_UNAVAILABLE_MESSAGE = "XP service is temporarily unavailable. Please try again shortly.";
 const CREATE_COMPANION_SIGNATURE_FALLBACK_MESSAGE = "Companion setup is still syncing. Please try again in a moment.";
+const CAMPAIGN_CREATE_EVENT_TYPE = "campaign_create";
+const LEGACY_CAMPAIGN_CREATE_XP_EVENT_TYPE = "guided_tutorial_hatch_ready_top_up";
 
 const getCreateCompanionArgsWithoutFocalPoints = ({
   p_current_image_focal_x: _ignoredCurrentImageFocalX,
@@ -729,6 +731,23 @@ const isAwardXpFunctionMissingError = (error: SupabaseRpcError | null | undefine
       || normalizedSource.includes("undefined function")
       || normalizedSource.includes("function not found")
     )
+  );
+};
+
+const isUnsupportedAwardXpEventTypeError = (
+  error: SupabaseRpcError | null | undefined,
+  eventType: string,
+) => {
+  if (!error) return false;
+
+  const normalizedEventType = eventType.trim().toLowerCase();
+  const normalizedCode = normalizeEvolutionErrorCode(error.code);
+  const normalizedSource = getNormalizedRpcErrorSource(error);
+
+  return (
+    normalizedCode === "p0001" &&
+    normalizedSource.includes("unsupported event_type") &&
+    normalizedSource.includes(normalizedEventType)
   );
 };
 
@@ -1729,12 +1748,38 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
     );
 
-    const { data, error } = await supabase.rpc("award_xp_v2", {
-      p_event_type: eventType,
+    let awardedEventType = eventType;
+    let awardMetadata: Record<string, string | number | boolean> = sanitizedMetadata;
+    let { data, error } = await supabase.rpc("award_xp_v2", {
+      p_event_type: awardedEventType,
       p_xp_amount: xpAmount,
-      p_event_metadata: sanitizedMetadata,
+      p_event_metadata: awardMetadata,
       p_idempotency_key: requestIdempotencyKey,
     });
+
+    if (
+      awardedEventType === CAMPAIGN_CREATE_EVENT_TYPE &&
+      isUnsupportedAwardXpEventTypeError(error, CAMPAIGN_CREATE_EVENT_TYPE)
+    ) {
+      awardedEventType = LEGACY_CAMPAIGN_CREATE_XP_EVENT_TYPE;
+      awardMetadata = {
+        ...sanitizedMetadata,
+        original_event_type: CAMPAIGN_CREATE_EVENT_TYPE,
+        compatibility_fallback: true,
+      };
+      logger.info("award_xp_v2 campaign_create unsupported; retrying with legacy hatch XP event", {
+        userId: currentUser.id,
+        eventType,
+        fallbackEventType: awardedEventType,
+        idempotencyKey: requestIdempotencyKey,
+      });
+      ({ data, error } = await supabase.rpc("award_xp_v2", {
+        p_event_type: awardedEventType,
+        p_xp_amount: xpAmount,
+        p_event_metadata: awardMetadata,
+        p_idempotency_key: requestIdempotencyKey,
+      }));
+    }
 
     if (error) {
       if (isAwardXpFunctionMissingError(error)) {
@@ -1779,6 +1824,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
 
     logger.log("[XP Award Debug]", {
       eventType,
+      awardedEventType,
       requestedXP: xpAmount,
       awardedXP: awardResult.xp_awarded,
       capApplied: awardResult.cap_applied,

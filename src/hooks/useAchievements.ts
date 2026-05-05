@@ -9,6 +9,7 @@ import {
   getAchievementTypeVariants,
   normalizeAchievementType,
 } from "@/lib/achievementTypes";
+import { isSupabaseMissingRelationError } from "@/utils/supabaseSchemaErrors";
 
 import { useAuth } from "./useAuth";
 
@@ -31,9 +32,11 @@ export const useAchievements = () => {
 
   // Track achievements already handled this session to prevent duplicate toasts and writes.
   const notifiedAchievements = useRef<Set<string>>(new Set());
+  const achievementsTableUnavailable = useRef(false);
 
   const awardAchievement = useCallback(async (achievement: AchievementData) => {
     if (!user) return;
+    if (achievementsTableUnavailable.current) return;
 
     const canonicalType = normalizeAchievementType(achievement.type);
     if (!canonicalType) return;
@@ -50,7 +53,13 @@ export const useAchievements = () => {
           .or("achievement_type.eq.story_chapter,achievement_type.like.story_chapter_%")
           .limit(1);
 
-        if (error) throw error;
+        if (error) {
+          if (isSupabaseMissingRelationError(error, "achievements")) {
+            achievementsTableUnavailable.current = true;
+            return;
+          }
+          throw error;
+        }
         existingAchievements = data;
       } else {
         const { data, error } = await supabase
@@ -60,7 +69,13 @@ export const useAchievements = () => {
           .in("achievement_type", getAchievementTypeVariants(canonicalType))
           .limit(1);
 
-        if (error) throw error;
+        if (error) {
+          if (isSupabaseMissingRelationError(error, "achievements")) {
+            achievementsTableUnavailable.current = true;
+            return;
+          }
+          throw error;
+        }
         existingAchievements = data;
       }
 
@@ -86,7 +101,13 @@ export const useAchievements = () => {
         .select("id")
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        if (isSupabaseMissingRelationError(error, "achievements")) {
+          achievementsTableUnavailable.current = true;
+          return;
+        }
+        throw error;
+      }
 
       notifiedAchievements.current.add(canonicalType);
 

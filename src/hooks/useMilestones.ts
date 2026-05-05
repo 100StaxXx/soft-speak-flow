@@ -388,7 +388,10 @@ export const useMilestones = (epicId?: string) => {
 
       const { error } = await supabase
         .from('epic_milestones')
-        .insert(milestonesToInsert);
+        .upsert(milestonesToInsert, {
+          onConflict: 'epic_id,milestone_percent',
+          ignoreDuplicates: true,
+        });
 
       if (error) throw error;
       

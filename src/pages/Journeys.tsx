@@ -42,6 +42,7 @@ import { useEpics } from "@/hooks/useEpics";
 import { useInboxTasks } from "@/hooks/useInboxTasks";
 import { useDeepLink } from "@/contexts/DeepLinkContext";
 import { logger } from "@/utils/logger";
+import { CAMPAIGN_CREATED_ANIMATION_COMPLETE_EVENT } from "@/utils/tutorialEvents";
 
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
 import { Pathfinder } from "@/components/Pathfinder";
@@ -1756,6 +1757,7 @@ const Journeys = () => {
   const handleAnimationComplete = useCallback(() => {
     setShowCreatedAnimation(false);
     setCreatedCampaignData(null);
+    window.dispatchEvent(new CustomEvent(CAMPAIGN_CREATED_ANIMATION_COMPLETE_EVENT));
   }, []);
 
   return (

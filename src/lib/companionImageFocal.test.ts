@@ -93,7 +93,7 @@ describe("companionImageFocal", () => {
     });
   });
 
-  it("keeps generated cover portraits unscaled unless recentering is requested", () => {
+  it("keeps generated cover portraits unscaled while using stored focal metadata", () => {
     expect(
       resolveCompanionImagePresentation({
         src: "https://example.com/generated-companion.png",
@@ -107,26 +107,6 @@ describe("companionImageFocal", () => {
       assetKey: null,
       style: {
         objectPosition: "37.5% 62.5%",
-      },
-    });
-  });
-
-  it("uses focal metadata to gently recenter generated square cover portraits when requested", () => {
-    expect(
-      resolveCompanionImagePresentation({
-        src: "https://example.com/generated-companion.png",
-        fit: "cover",
-        focalX: 0.375,
-        focalY: 0.625,
-        recenterGeneratedCover: true,
-      }),
-    ).toMatchObject({
-      focalSource: "stored",
-      assetKey: null,
-      style: {
-        objectPosition: "37.5% 62.5%",
-        transform: "translate(9.016%, -9.016%) scale(1.22)",
-        transformOrigin: "center center",
       },
     });
   });

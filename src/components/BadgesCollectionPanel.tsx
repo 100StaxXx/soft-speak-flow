@@ -16,6 +16,7 @@ import {
 } from "./ui/dialog";
 import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
 import { normalizeAchievementType } from "@/lib/achievementTypes";
+import { isSupabaseMissingRelationError } from "@/utils/supabaseSchemaErrors";
 
 type FilterCategory = 'all' | BadgeCategory;
 type ReplayStatus = "queued" | "processing" | "succeeded";
@@ -67,6 +68,9 @@ export const BadgesCollectionPanel = ({ layoutMode = "mobile" }: BadgesCollectio
         .from("achievements")
         .select("achievement_type, earned_at")
         .eq("user_id", user.id);
+      if (isSupabaseMissingRelationError(error, "achievements")) {
+        return [];
+      }
       if (error) throw error;
       return data || [];
     },

@@ -27,6 +27,7 @@ import {
 } from "@/utils/guidedTutorial";
 import { safeLocalStorage } from "@/utils/storage";
 import { resolveTutorialTargetFromSelectors } from "@/utils/tutorialTargets";
+import { CAMPAIGN_CREATED_ANIMATION_COMPLETE_EVENT } from "@/utils/tutorialEvents";
 import { trackOnboardingTutorialEvent } from "@/utils/onboardingTutorialTelemetry";
 import type {
   CreateQuestSubstepId,
@@ -864,6 +865,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const [sessionDismissed, setSessionDismissed] = useState<boolean | null>(null);
   const [activeTargetSelector, setActiveTargetSelector] = useState<string | null>(null);
   const [campaignBuilderOpen, setCampaignBuilderOpen] = useState(false);
+  const [campaignCreationAnimationPending, setCampaignCreationAnimationPending] = useState(false);
 
   const onboardingData = (profile?.onboarding_data as Record<string, unknown> | null) ?? null;
   const walkthroughCompleted = onboardingData?.walkthrough_completed === true;
@@ -887,6 +889,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     setSessionDismissed(null);
     setActiveTargetSelector(null);
     setCampaignBuilderOpen(false);
+    setCampaignCreationAnimationPending(false);
     completionPersistRef.current = false;
     stepPersistThrottleRef.current.clear();
     missingTargetSinceRef.current = null;
@@ -1092,7 +1095,11 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     pathname: location.pathname,
     stepRoute,
     tutorialReady,
-    tutorialComplete: tutorialSuppressed || isCampaignBuilderTutorialPaused || isHatchRevealPending,
+    tutorialComplete:
+      tutorialSuppressed ||
+      isCampaignBuilderTutorialPaused ||
+      campaignCreationAnimationPending ||
+      isHatchRevealPending,
     currentStepId,
     evolutionInFlight: evolutionInFlight || isHatchRevealPending,
   });
@@ -1578,6 +1585,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
         eventName: "campaign-builder-opened",
         handler: () => {
           setCampaignBuilderOpen(true);
+          setCampaignCreationAnimationPending(false);
           markNewGoalStarted();
         },
       });
@@ -1594,10 +1602,18 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
         handler: () => {
           if (location.pathname !== "/campaigns" && location.pathname !== "/journeys") return;
           setCampaignBuilderOpen(false);
+          setCampaignCreationAnimationPending(true);
           if (!milestoneSet.has("start_new_goal")) {
             markMilestoneComplete("start_new_goal");
           }
           markMilestoneComplete("complete_pathfinder_campaign");
+        },
+      });
+
+      listeners.push({
+        eventName: CAMPAIGN_CREATED_ANIMATION_COMPLETE_EVENT,
+        handler: () => {
+          setCampaignCreationAnimationPending(false);
         },
       });
     }
@@ -1991,7 +2007,13 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   ]);
 
   useEffect(() => {
-    if (tutorialSuppressed || isCampaignBuilderTutorialPaused || isHatchRevealPending || !currentMilestone) {
+    if (
+      tutorialSuppressed ||
+      isCampaignBuilderTutorialPaused ||
+      campaignCreationAnimationPending ||
+      isHatchRevealPending ||
+      !currentMilestone
+    ) {
       currentMilestoneStartedAtRef.current = null;
       lastTargetResolutionSignatureRef.current = null;
       return;
@@ -2008,6 +2030,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   }, [
     currentMilestone,
     currentStep?.id,
+    campaignCreationAnimationPending,
     isCampaignBuilderTutorialPaused,
     isHatchRevealPending,
     location.pathname,
@@ -2020,6 +2043,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       !tutorialReady ||
       tutorialSuppressed ||
       isCampaignBuilderTutorialPaused ||
+      campaignCreationAnimationPending ||
       isHatchRevealPending ||
       !currentMilestone ||
       isIntroDialogueActive ||
@@ -2075,6 +2099,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     currentMilestone,
     currentStep?.id,
     isIntroDialogueActive,
+    campaignCreationAnimationPending,
     isCampaignBuilderTutorialPaused,
     isHatchRevealPending,
     location.pathname,
@@ -2088,6 +2113,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     tutorialReady &&
     !tutorialSuppressed &&
     !isCampaignBuilderTutorialPaused &&
+    !campaignCreationAnimationPending &&
     !isHatchRevealPending &&
     !shouldRestoreRoute &&
     !pathIsHidden(location.pathname) &&
@@ -2206,7 +2232,11 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     ? "I'm waiting for this area to load. Stay on this screen and it'll highlight as soon as it's ready."
     : dialogue.support;
   const strictLockEnabled = milestoneUsesStrictLock(currentMilestone);
-  const tutorialUnavailable = tutorialSuppressed || isCampaignBuilderTutorialPaused || isHatchRevealPending;
+  const tutorialUnavailable =
+    tutorialSuppressed ||
+    isCampaignBuilderTutorialPaused ||
+    campaignCreationAnimationPending ||
+    isHatchRevealPending;
   const secondaryActionLabel =
     !tutorialUnavailable && !isIntroDialogueActive && currentStepId === "first_plan_closeout"
       ? "Complete tutorial"

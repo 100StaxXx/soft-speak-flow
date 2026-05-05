@@ -6,6 +6,7 @@ import {
   PostOnboardingMentorGuidanceProvider,
   usePostOnboardingMentorGuidance,
 } from "./usePostOnboardingMentorGuidance";
+import { CAMPAIGN_CREATED_ANIMATION_COMPLETE_EVENT } from "@/utils/tutorialEvents";
 
 const createFreshTutorial = () => ({
   version: 2,
@@ -225,7 +226,7 @@ describe("guided tutorial route restoration", () => {
     });
   });
 
-  it("steps aside in Pathfinder, then routes from ritual handoff to companion hatch", async () => {
+  it("steps aside in Pathfinder, waits for the animation, then routes from ritual handoff to companion hatch", async () => {
     const campaignTarget = document.createElement("button");
     campaignTarget.setAttribute("data-tour", "campaign-builder-launcher");
     document.body.appendChild(campaignTarget);
@@ -266,6 +267,17 @@ describe("guided tutorial route restoration", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("path")).toHaveTextContent("/campaigns");
+      expect(screen.getByTestId("active")).toHaveTextContent("false");
+      expect(screen.getByTestId("step")).toHaveTextContent("");
+      expect(screen.getByTestId("dialogue")).toHaveTextContent("");
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(CAMPAIGN_CREATED_ANIMATION_COMPLETE_EVENT));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("path")).toHaveTextContent("/campaigns");
       expect(screen.getByTestId("step")).toHaveTextContent("new_goal");
       expect(screen.getByTestId("dialogue")).toHaveTextContent(
         "Your rituals are on the calendar now.",
@@ -282,6 +294,61 @@ describe("guided tutorial route restoration", () => {
       );
       expect(screen.getByTestId("path")).toHaveTextContent("/companion");
       expect(screen.getByTestId("target")).toHaveTextContent("");
+    });
+  });
+
+  it("waits on the journeys page until the campaign animation completes before restoring campaigns", async () => {
+    const campaignTarget = document.createElement("button");
+    campaignTarget.setAttribute("data-tour", "campaign-builder-launcher");
+    document.body.appendChild(campaignTarget);
+
+    renderWithProviders("/campaigns");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("intro-action")).toHaveTextContent(
+        "Start Tutorial",
+      );
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "intro-action" }));
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("campaign-builder-opened"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("active")).toHaveTextContent("false");
+      expect(screen.getByTestId("step")).toHaveTextContent("");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "go-journeys" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("pathfinder-campaign-created"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
+      expect(screen.getByTestId("active")).toHaveTextContent("false");
+      expect(screen.getByTestId("step")).toHaveTextContent("");
+      expect(screen.getByTestId("dialogue")).toHaveTextContent("");
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(CAMPAIGN_CREATED_ANIMATION_COMPLETE_EVENT));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("path")).toHaveTextContent("/campaigns");
+      expect(screen.getByTestId("step")).toHaveTextContent("new_goal");
+      expect(screen.getByTestId("dialogue")).toHaveTextContent(
+        "Your rituals are on the calendar now.",
+      );
+      expect(screen.getByTestId("intro-action")).toHaveTextContent("Meet companion");
     });
   });
 
@@ -319,6 +386,17 @@ describe("guided tutorial route restoration", () => {
     await waitFor(() => {
       expect(screen.getByTestId("path")).toHaveTextContent("/campaigns");
     });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(CAMPAIGN_CREATED_ANIMATION_COMPLETE_EVENT));
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "go-journeys" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
+      expect(screen.getByTestId("step")).toHaveTextContent("");
+    });
   });
 
   it("does not restore routes after the tutorial is already complete", async () => {
@@ -329,6 +407,17 @@ describe("guided tutorial route restoration", () => {
       expect(screen.getByTestId("path")).toHaveTextContent("/companion");
       expect(screen.getByTestId("step")).toHaveTextContent("");
       expect(screen.getByTestId("secondary-action")).toHaveTextContent("");
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(CAMPAIGN_CREATED_ANIMATION_COMPLETE_EVENT));
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "go-journeys" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
+      expect(screen.getByTestId("step")).toHaveTextContent("");
     });
   });
 });

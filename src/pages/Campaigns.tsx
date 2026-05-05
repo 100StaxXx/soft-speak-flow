@@ -23,6 +23,7 @@ import {
   type CampaignBuilderDraftSnapshot,
   writeCreationPopupMarker,
 } from "@/utils/creationPopupPersistence";
+import { CAMPAIGN_CREATED_ANIMATION_COMPLETE_EVENT } from "@/utils/tutorialEvents";
 
 interface CreatedCampaignData {
   title: string;
@@ -119,6 +120,7 @@ const Campaigns = () => {
   const handleAnimationComplete = useCallback(() => {
     setShowCreatedAnimation(false);
     setCreatedCampaignData(null);
+    window.dispatchEvent(new CustomEvent(CAMPAIGN_CREATED_ANIMATION_COMPLETE_EVENT));
   }, []);
 
   return (

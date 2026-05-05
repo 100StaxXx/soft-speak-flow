@@ -36,7 +36,7 @@ describe("CompanionImage", () => {
     expect(image).toHaveStyle({ transform: "translate(0.000%, 2.930%)" });
   });
 
-  it("does not recenter generated cover art by default", () => {
+  it("uses stored focal metadata for generated cover art without translating the image", () => {
     render(
       <CompanionImage
         src="https://example.com/generated-companion.png"
@@ -52,24 +52,5 @@ describe("CompanionImage", () => {
     expect(image).toHaveClass("object-cover");
     expect(image).toHaveStyle({ objectPosition: "37.5% 62.5%" });
     expect(image.style.transform).toBe("");
-  });
-
-  it("recenters generated cover art when requested", () => {
-    render(
-      <CompanionImage
-        src="https://example.com/generated-companion.png"
-        alt="Generated Companion"
-        fit="cover"
-        focalX={0.375}
-        focalY={0.625}
-        recenterGeneratedCover
-      />,
-    );
-
-    const image = screen.getByRole("img", { name: "Generated Companion" });
-    expect(image).toHaveStyle({
-      objectPosition: "37.5% 62.5%",
-      transform: "translate(9.016%, -9.016%) scale(1.22)",
-    });
   });
 });

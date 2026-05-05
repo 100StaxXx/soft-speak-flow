@@ -62,32 +62,64 @@ describe("ONBOARDING_MENTOR_ASSIGNMENTS", () => {
     }
   });
 
-  it("keeps Operator and Icon popular in a balanced distribution while keeping Charles rare", () => {
-    const counts = Object.values(ONBOARDING_MENTOR_ASSIGNMENTS).reduce(
+  it("keeps Operator prominent while excluding Charles from automatic matches", () => {
+    const counts = ACTIVE_ONBOARDING_MENTOR_SLUGS.reduce(
       (acc, slug) => {
-        acc[slug] = (acc[slug] ?? 0) + 1;
+        acc[slug] = 0;
         return acc;
       },
       {} as Record<(typeof ACTIVE_ONBOARDING_MENTOR_SLUGS)[number], number>,
     );
 
+    Object.values(ONBOARDING_MENTOR_ASSIGNMENTS).forEach((slug) => {
+      counts[slug] += 1;
+    });
+
     expect(counts).toEqual({
       lyra: 24,
-      icon: 37,
+      icon: 36,
       princess: 35,
-      sage: 49,
-      operator: 34,
-      rival: 11,
-      charles: 2,
+      sage: 47,
+      operator: 44,
+      rival: 6,
+      charles: 0,
     });
     expect(
       Object.entries(ONBOARDING_MENTOR_ASSIGNMENTS)
         .filter(([, slug]) => slug === "charles")
         .map(([key]) => key),
-    ).toEqual([
-      "masculine_presence|discipline_performance|direct_demanding|pressure_standards",
-      "either_works|discipline_performance|direct_demanding|pressure_standards",
-    ]);
+    ).toEqual([]);
+  });
+
+  it("routes system-oriented direct masculine answers to The Operator", () => {
+    expect(
+      ONBOARDING_MENTOR_ASSIGNMENTS[
+        "masculine_presence|discipline_performance|direct_demanding|pressure_standards"
+      ],
+    ).toBe("operator");
+    expect(
+      ONBOARDING_MENTOR_ASSIGNMENTS[
+        "masculine_presence|discipline_performance|direct_demanding|belief_support"
+      ],
+    ).toBe("operator");
+    expect(
+      ONBOARDING_MENTOR_ASSIGNMENTS[
+        "masculine_presence|emotions_healing|direct_demanding|principles_logic"
+      ],
+    ).toBe("operator");
+    expect(
+      ONBOARDING_MENTOR_ASSIGNMENTS[
+        "masculine_presence|confidence_self_belief|direct_demanding|pressure_standards"
+      ],
+    ).toBe("operator");
+  });
+
+  it("keeps softer non-system direct masculine answers available to calmer mentors", () => {
+    expect(
+      ONBOARDING_MENTOR_ASSIGNMENTS[
+        "masculine_presence|emotions_healing|direct_demanding|emotional_reassurance"
+      ],
+    ).toBe("sage");
   });
 
   it("routes core answer archetypes to the matching mentor personality", () => {
@@ -115,7 +147,7 @@ describe("ONBOARDING_MENTOR_ASSIGNMENTS", () => {
       ONBOARDING_MENTOR_ASSIGNMENTS[
         "masculine_presence|discipline_performance|direct_demanding|belief_support"
       ],
-    ).toBe("rival");
+    ).toBe("operator");
     expect(
       ONBOARDING_MENTOR_ASSIGNMENTS[
         "either_works|confidence_self_belief|encouraging_supportive|belief_support"
