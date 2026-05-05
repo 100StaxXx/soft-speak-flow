@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Sparkles, LogIn, Star, Zap, Heart } from "lucide-react";
+import { Sparkles, LogIn, Star, Zap, Heart, UserPlus } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { getAuthRedirectPath } from "@/utils/authRedirect";
 import { motion, useReducedMotion } from "framer-motion";
@@ -105,12 +105,21 @@ const Welcome = () => {
           initial={prefersReducedMotion ? false : { y: 8, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: prefersReducedMotion ? 0 : 0.12, duration: prefersReducedMotion ? 0 : 0.24 }}
-          className="w-full px-4 md:max-w-sm"
+          className="w-full space-y-3 px-4 md:max-w-sm"
         >
           <Button
             size="lg"
-            onClick={() => navigate("/auth")}
+            onClick={() => navigate("/auth?mode=signup")}
             className="w-full h-14 text-lg font-semibold gap-2 shadow-lg shadow-primary/25"
+          >
+            <UserPlus className="h-5 w-5" />
+            Create Account
+          </Button>
+          <Button
+            size="lg"
+            variant="outline"
+            onClick={() => navigate("/auth")}
+            className="w-full h-14 border-white/15 bg-card/80 text-lg font-semibold text-foreground shadow-lg shadow-background/20 hover:bg-card"
           >
             <LogIn className="h-5 w-5" />
             Sign In

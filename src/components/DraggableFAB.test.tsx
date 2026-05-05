@@ -155,7 +155,7 @@ describe("DraggableFAB", () => {
     expect(mocks.onOpenCompanionPlanner).not.toHaveBeenCalled();
   });
 
-  it("requests AI launcher art without falling back to the scenic companion image", () => {
+  it("requests AI launcher art while showing the current companion image", () => {
     mocks.visual = {
       companionId: "companion-ai",
       companionLabel: "Nova",
@@ -167,10 +167,10 @@ describe("DraggableFAB", () => {
       usesPortraitShell: false,
       isGeneratedCompanion: true,
       currentSceneImageUrl: "https://assets.example.com/scenic-companion.png",
-      launcherAwayImageUrl: null,
-      launcherAwayFocalX: null,
-      launcherAwayFocalY: null,
-      launcherAwayUsesPortraitShell: false,
+      launcherAwayImageUrl: "https://assets.example.com/scenic-companion.png",
+      launcherAwayFocalX: 0.4,
+      launcherAwayFocalY: 0.58,
+      launcherAwayUsesPortraitShell: true,
       needsLauncherImage: true,
     };
 
@@ -181,8 +181,11 @@ describe("DraggableFAB", () => {
       sourceImageUrl: "https://assets.example.com/scenic-companion.png",
       enabled: true,
     });
-    expect(screen.getByTestId("journeys-companion-launcher-placeholder")).toBeInTheDocument();
-    expect(screen.queryByRole("img", { name: "Nova" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("journeys-companion-launcher-placeholder")).not.toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Nova" })).toHaveAttribute(
+      "src",
+      "https://assets.example.com/scenic-companion.png",
+    );
   });
 
   it("suppresses popup open after a completed long-press drag interaction", async () => {

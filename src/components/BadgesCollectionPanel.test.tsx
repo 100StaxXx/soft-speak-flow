@@ -6,8 +6,13 @@ const mocks = vi.hoisted(() => ({
   user: { id: "user-1" },
   achievements: [] as Array<{ achievement_type: string; earned_at: string }>,
   achievementsError: null as null | { code?: string; message?: string; details?: string | null; hint?: string | null },
-  companion: { id: "companion-1", current_stage: 6 } as { id: string; current_stage: number } | null,
+  companion: { id: "companion-1", current_stage: 6, current_xp: 240 } as {
+    id: string;
+    current_stage: number;
+    current_xp?: number;
+  } | null,
   evolutions: [] as Array<Record<string, unknown>>,
+  evolutionStageUpperBound: null as number | null,
   realtimeCallback: null as null | (() => void),
   channel: vi.fn(),
   removeChannel: vi.fn(),
@@ -46,13 +51,21 @@ vi.mock("@/integrations/supabase/client", () => ({
         return {
           select: () => ({
             eq: () => ({
-              lte: () => ({
-                in: () => ({
-                  order: () => ({
-                    limit: async () => ({ data: mocks.evolutions, error: null }),
+              lte: (_column: string, stageUpperBound: number) => {
+                mocks.evolutionStageUpperBound = stageUpperBound;
+                return {
+                  in: () => ({
+                    order: () => ({
+                      limit: async () => ({
+                        data: mocks.evolutions.filter((row) => (
+                          typeof row.stage !== "number" || row.stage <= stageUpperBound
+                        )),
+                        error: null,
+                      }),
+                    }),
                   }),
-                }),
-              }),
+                };
+              },
             }),
           }),
         };
@@ -105,8 +118,9 @@ describe("BadgesCollectionPanel evolution replays", () => {
   beforeEach(() => {
     mocks.achievements = [];
     mocks.achievementsError = null;
-    mocks.companion = { id: "companion-1", current_stage: 6 };
+    mocks.companion = { id: "companion-1", current_stage: 6, current_xp: 240 };
     mocks.evolutions = [succeededReplay];
+    mocks.evolutionStageUpperBound = null;
     mocks.realtimeCallback = null;
     mocks.removeChannel.mockReset();
     mocks.channel.mockReset();
@@ -160,6 +174,41 @@ describe("BadgesCollectionPanel evolution replays", () => {
 
     fireEvent.click(generatingCard);
     expect(screen.queryByTestId("evolution-replay-video")).not.toBeInTheDocument();
+  });
+
+  it("shows a hatch-ready stage-one prewarm before the egg is claimed", async () => {
+    mocks.companion = { id: "companion-1", current_stage: 0, current_xp: 10 };
+    mocks.evolutions = [
+      {
+        ...succeededReplay,
+        id: "evolution-1",
+        stage: 1,
+      },
+    ];
+
+    renderPanel();
+
+    expect(await screen.findByRole("button", { name: /replay stage 1 evolution/i })).toBeInTheDocument();
+    expect(mocks.evolutionStageUpperBound).toBe(1);
+  });
+
+  it("keeps stage-one prewarms hidden until the egg is hatch-ready", async () => {
+    mocks.companion = { id: "companion-1", current_stage: 0, current_xp: 9 };
+    mocks.evolutions = [
+      {
+        ...succeededReplay,
+        id: "evolution-1",
+        stage: 1,
+      },
+    ];
+
+    renderPanel();
+
+    await screen.findByText("Your Badges");
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /replay stage 1 evolution/i })).not.toBeInTheDocument();
+    });
+    expect(mocks.evolutionStageUpperBound).toBe(0);
   });
 
   it("does not show an empty replay section when no evolution videos exist", async () => {

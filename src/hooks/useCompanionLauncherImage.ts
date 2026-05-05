@@ -54,6 +54,15 @@ const getDecoratedParsedError = (error: unknown): ParsedFunctionInvokeError | un
   return (error as { parsedFunctionError?: ParsedFunctionInvokeError }).parsedFunctionError;
 };
 
+const isPermanentUpstreamFailure = (parsedError: ParsedFunctionInvokeError | undefined): boolean => {
+  const upstreamStatus = parsedError?.upstreamStatus;
+  return typeof upstreamStatus === "number" &&
+    upstreamStatus >= 400 &&
+    upstreamStatus < 500 &&
+    upstreamStatus !== 408 &&
+    upstreamStatus !== 429;
+};
+
 export const useCompanionLauncherImage = ({
   companionId,
   sourceImageUrl,
@@ -93,6 +102,7 @@ export const useCompanionLauncherImage = ({
       const retryable = getDecoratedParsedError(error)?.responsePayload?.retryable;
       if (retryable === false) return false;
       if (retryable === true) return true;
+      if (isPermanentUpstreamFailure(getDecoratedParsedError(error))) return false;
       return isRetriableFunctionInvokeError(error);
     },
     retryDelay: 0,

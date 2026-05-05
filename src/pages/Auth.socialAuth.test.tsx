@@ -212,6 +212,15 @@ describe("Auth social auth intent guard", () => {
     expect(screen.queryByRole("button", { name: /sign up with google/i })).not.toBeInTheDocument();
   });
 
+  it("opens signup mode when requested by the auth query string", async () => {
+    renderAuth("/auth?mode=signup");
+    await flushMicrotasks();
+
+    expect(screen.getByLabelText(/confirm password/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^get started$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /already have an account\? sign in/i })).toBeInTheDocument();
+  });
+
   it("sends sign_in intent for Apple in login mode and blocks account-not-found logins", async () => {
     mocks.isNativePlatform = true;
     mocks.platform = "ios";

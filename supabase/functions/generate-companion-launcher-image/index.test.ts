@@ -468,6 +468,41 @@ Deno.test("generate-companion-launcher-image returns non-retryable structured er
   assertEquals(supabase.uploadLog.length, 0, "Expected no upload");
 });
 
+Deno.test("generate-companion-launcher-image classifies raw AI API 400 errors as permanent edit failures", async () => {
+  const supabase = createMockSupabase({ companion: baseCompanion() });
+
+  const response = await handleGenerateCompanionLauncherImage(
+    new Request("https://example.com", {
+      method: "POST",
+      body: JSON.stringify({ companionId: "companion-1" }),
+    }),
+    {
+      authenticate: async () => ({ userId: "user-1", isInternal: false }),
+      createSupabaseClient: () => supabase,
+      createCostGuardrailSessionFn: createNoopCostGuardrailSession,
+      editCompanionImageFn: async () => {
+        throw new Error("AI API error: 400");
+      },
+      now: () => 123,
+    },
+  );
+
+  const body = await response.json();
+  assertEquals(
+    response.status,
+    424,
+    "Expected raw AI API 400 to be mapped to a permanent upstream failure",
+  );
+  assertEquals(
+    body.code,
+    "COMPANION_LAUNCHER_OPENAI_EDIT_FAILED",
+    "Expected structured OpenAI edit code",
+  );
+  assertEquals(body.upstreamStatus, 400, "Expected upstream OpenAI status");
+  assertEquals(body.retryable, false, "Expected raw upstream 400 not to retry");
+  assertEquals(supabase.uploadLog.length, 0, "Expected no upload");
+});
+
 Deno.test("generate-companion-launcher-image returns retryable structured error when OpenAI edit returns a transient 5xx", async () => {
   const supabase = createMockSupabase({ companion: baseCompanion() });
 

@@ -115,6 +115,16 @@ function hasNetworkPattern(text?: string): boolean {
   return NETWORK_ERROR_PATTERNS.some((pattern) => normalized.includes(pattern));
 }
 
+function inferUpstreamStatusFromMessage(message?: string): number | undefined {
+  if (!message) return undefined;
+  const match =
+    message.match(/\b(?:OpenAI|AI)\s+API\s+error:\s*([45]\d{2})\b/i) ??
+    message.match(/\bOpenAI image request failed\s*\(([45]\d{2})\):/i);
+  if (!match) return undefined;
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 function classifyFunctionInvokeError(details: {
   name?: string;
   message?: string;
@@ -223,7 +233,11 @@ export async function parseFunctionInvokeError(
   const failureReason = responsePayload?.failureReason;
   const backendMessage = responsePayload?.message ?? responsePayload?.error;
   const retryAfterSeconds = responsePayload?.retryAfterSeconds;
-  const upstreamStatus = responsePayload?.upstreamStatus;
+  const upstreamStatus =
+    responsePayload?.upstreamStatus ??
+    inferUpstreamStatusFromMessage(responsePayload?.upstreamError) ??
+    inferUpstreamStatusFromMessage(backendMessage) ??
+    inferUpstreamStatusFromMessage(message);
   const upstreamError = responsePayload?.upstreamError;
   const category = classifyFunctionInvokeError({
     name,
@@ -284,7 +298,9 @@ function isLikelyTechnicalMessage(message: string): boolean {
     normalized.includes("failed to prepare pep talk audio") ||
     normalized.includes("failed to generate audio") ||
     normalized.includes("failed to generate script") ||
+    normalized.includes("ai api error") ||
     normalized.includes("ai gateway error") ||
+    normalized.includes("openai image request failed") ||
     normalized.includes("rate limit exceeded") ||
     normalized.includes("too many requests")
   );

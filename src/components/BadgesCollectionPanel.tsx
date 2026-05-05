@@ -17,6 +17,7 @@ import {
 import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
 import { normalizeAchievementType } from "@/lib/achievementTypes";
 import { isSupabaseMissingRelationError } from "@/utils/supabaseSchemaErrors";
+import { getProgressionThreshold, HATCH_READY_LEVEL } from "@/config/progression";
 
 type FilterCategory = 'all' | BadgeCategory;
 type ReplayStatus = "queued" | "processing" | "succeeded";
@@ -33,6 +34,7 @@ interface EvolutionReplay {
 
 const EVOLUTION_REPLAYS_QUERY_KEY = "companion-evolution-replays";
 const COMPANION_REPLAY_SOURCE_QUERY_KEY = "companion-replay-source";
+const HATCH_READY_XP = getProgressionThreshold(HATCH_READY_LEVEL) ?? 10;
 
 const badgePreviewModules = import.meta.glob("/src/assets/badges/*.webp", {
   eager: true,
@@ -103,13 +105,13 @@ export const BadgesCollectionPanel = ({ layoutMode = "mobile" }: BadgesCollectio
   const { data: replaySource } = useQuery({
     queryKey: [COMPANION_REPLAY_SOURCE_QUERY_KEY, user?.id],
     enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
     queryFn: async () => {
       if (!user?.id) return null;
 
       const { data, error } = await supabase
         .from("user_companion")
-        .select("id, current_stage")
+        .select("id, current_stage, current_xp")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -120,15 +122,20 @@ export const BadgesCollectionPanel = ({ layoutMode = "mobile" }: BadgesCollectio
         ? {
           companionId: data.id,
           currentStage: typeof data.current_stage === "number" ? data.current_stage : 0,
+          currentXp: typeof data.current_xp === "number" ? data.current_xp : 0,
         }
         : null;
     },
   });
   const companionId = replaySource?.companionId ?? null;
   const replayCurrentStage = replaySource?.currentStage ?? 0;
+  const replayMaxStage =
+    replayCurrentStage === 0 && (replaySource?.currentXp ?? 0) >= HATCH_READY_XP
+      ? HATCH_READY_LEVEL
+      : replayCurrentStage;
 
   const { data: evolutionReplays = [], isLoading: isLoadingEvolutionReplays } = useQuery({
-    queryKey: [EVOLUTION_REPLAYS_QUERY_KEY, companionId, replayCurrentStage],
+    queryKey: [EVOLUTION_REPLAYS_QUERY_KEY, companionId, replayMaxStage],
     enabled: !!companionId,
     staleTime: 30 * 1000,
     queryFn: async () => {
@@ -138,7 +145,7 @@ export const BadgesCollectionPanel = ({ layoutMode = "mobile" }: BadgesCollectio
         .from("companion_evolutions")
         .select("id, stage, image_url, evolved_at, animation_status, animation_video_url, animation_completed_at")
         .eq("companion_id", companionId)
-        .lte("stage", replayCurrentStage)
+        .lte("stage", replayMaxStage)
         .in("animation_status", ["queued", "processing", "succeeded"])
         .order("evolved_at", { ascending: false })
         .limit(12);
@@ -167,6 +174,7 @@ export const BadgesCollectionPanel = ({ layoutMode = "mobile" }: BadgesCollectio
           filter: `companion_id=eq.${companionId}`,
         },
         () => {
+          queryClient.invalidateQueries({ queryKey: [COMPANION_REPLAY_SOURCE_QUERY_KEY, user?.id] });
           queryClient.invalidateQueries({ queryKey: [EVOLUTION_REPLAYS_QUERY_KEY, companionId] });
         },
       )
@@ -175,7 +183,7 @@ export const BadgesCollectionPanel = ({ layoutMode = "mobile" }: BadgesCollectio
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [companionId, queryClient]);
+  }, [companionId, queryClient, user?.id]);
 
   const filterCategories: FilterCategory[] = [
     'all',

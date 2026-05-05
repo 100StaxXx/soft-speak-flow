@@ -1242,26 +1242,55 @@ serve(async (req) => {
 
       let eggAttempt: Awaited<ReturnType<typeof runJudgedRender>>;
       let eggUpload: { filePath: string; publicUrl: string };
+      let eggSourceType: "stage1_reference_edit" | "standalone_generation" = "stage1_reference_edit";
+      let eggReferenceEditFailure: string | null = null;
       try {
-        eggAttempt = await runJudgedRender({
-          mode: "egg",
-          basePrompt: eggPrompt,
-          referenceImageUrl: stageOneAttempt.imageDataUrl,
-          render: async (prompt) =>
-            await editCompanionImage({
-              guardedFetch,
-              openAIApiKey: OPENAI_API_KEY,
-              prompt,
-              size: imageSize,
-              quality: finalImageQuality,
-              userId: user.id,
-              referenceImages: [
-                {
-                  imageUrl: hiddenStageOne.publicUrl,
-                },
-              ],
-            }),
-        });
+        try {
+          eggAttempt = await runJudgedRender({
+            mode: "egg",
+            basePrompt: eggPrompt,
+            referenceImageUrl: stageOneAttempt.imageDataUrl,
+            render: async (prompt) =>
+              await editCompanionImage({
+                guardedFetch,
+                openAIApiKey: OPENAI_API_KEY,
+                prompt,
+                size: imageSize,
+                quality: finalImageQuality,
+                userId: user.id,
+                referenceImages: [
+                  {
+                    imageUrl: hiddenStageOne.publicUrl,
+                  },
+                ],
+              }),
+          });
+        } catch (eggEditError) {
+          eggSourceType = "standalone_generation";
+          eggReferenceEditFailure = eggEditError instanceof Error
+            ? eggEditError.message.slice(0, 500)
+            : String(eggEditError).slice(0, 500);
+          console.warn("[CompanionImage] Stage-0 egg reference edit failed; falling back to standalone egg generation", {
+            userId: user.id,
+            stage: 0,
+            error: eggReferenceEditFailure,
+          });
+
+          eggAttempt = await runJudgedRender({
+            mode: "egg",
+            basePrompt: eggPrompt,
+            referenceImageUrl: stageOneAttempt.imageDataUrl,
+            render: async (prompt) =>
+              await generateCompanionImage({
+                guardedFetch,
+                openAIApiKey: OPENAI_API_KEY,
+                prompt,
+                size: imageSize,
+                quality: finalImageQuality,
+                userId: user.id,
+              }),
+          });
+        }
 
         const eggUploadStartedAt = Date.now();
         eggUpload = await uploadGeneratedDataUrl({
@@ -1330,6 +1359,8 @@ serve(async (req) => {
             scores: stageOneAttempt.scores,
           },
           egg: {
+            sourceType: eggSourceType,
+            referenceEditFailure: eggReferenceEditFailure,
             retryCount: eggAttempt.retryCount,
             passedJudge: eggAttempt.passed,
             judgeUnavailable: eggAttempt.judgeUnavailable,

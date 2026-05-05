@@ -99,12 +99,15 @@ describe("useJourneysCompanionVisual", () => {
     expect(result.current.needsLauncherImage).toBe(false);
   });
 
-  it("requests lazy generation when AI launcher art is missing", () => {
+  it("shows the current companion art while lazy AI launcher art is missing", () => {
     mocks.companion = baseCompanion();
 
     const { result } = renderHook(() => useJourneysCompanionVisual());
 
-    expect(result.current.launcherAwayImageUrl).toBeNull();
+    expect(result.current.launcherAwayImageUrl).toBe("https://assets.example.com/scene.png");
+    expect(result.current.launcherAwayFocalX).toBe(0.44);
+    expect(result.current.launcherAwayFocalY).toBe(0.58);
+    expect(result.current.launcherAwayUsesPortraitShell).toBe(true);
     expect(result.current.needsLauncherImage).toBe(true);
     expect(result.current.currentSceneImageUrl).toBe("https://assets.example.com/scene.png");
   });
@@ -118,7 +121,8 @@ describe("useJourneysCompanionVisual", () => {
 
     const { result } = renderHook(() => useJourneysCompanionVisual());
 
-    expect(result.current.launcherAwayImageUrl).toBeNull();
+    expect(result.current.launcherAwayImageUrl).toBe("https://assets.example.com/new-scene.png");
+    expect(result.current.launcherAwayUsesPortraitShell).toBe(true);
     expect(result.current.needsLauncherImage).toBe(true);
   });
 

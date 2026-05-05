@@ -164,8 +164,10 @@ const getOpenAIImageRequestStatus = (
   }
 
   const match = message.match(/OpenAI image request failed\s*\((\d{3})\):/i);
-  if (!match) return null;
-  const status = Number.parseInt(match[1], 10);
+  const genericMatch = match ??
+    message.match(/\b(?:OpenAI|AI)\s+API\s+error:\s*(\d{3})\b/i);
+  if (!genericMatch) return null;
+  const status = Number.parseInt(genericMatch[1], 10);
   return Number.isFinite(status) ? status : null;
 };
 

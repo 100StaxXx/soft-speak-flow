@@ -134,6 +134,9 @@ export const useJourneysCompanionVisual = () => {
     && companion?.launcher_image_url
     && companion.launcher_image_source_url === currentSceneImageUrl,
   );
+  const generatedFallbackLauncherImageUrl = isGeneratedCompanion
+    ? currentSceneImageUrl ?? imageUrl ?? null
+    : null;
   const launcherAwayImageUrl = useMemo(() => {
     const bundledLauncherUrl = resolveJourneysCompanionLauncherAwayAssetUrl({
       presetId,
@@ -149,11 +152,20 @@ export const useJourneysCompanionVisual = () => {
       return companion?.launcher_image_url ?? null;
     }
 
-    return null;
-  }, [companion?.launcher_image_url, element, hasFreshLauncherImage, presetId]);
+    return generatedFallbackLauncherImageUrl;
+  }, [
+    companion?.launcher_image_url,
+    element,
+    generatedFallbackLauncherImageUrl,
+    hasFreshLauncherImage,
+    presetId,
+  ]);
   const launcherAwayUsesPortraitShell = useMemo(
-    () => getBundledCompanionImageAssetKey(launcherAwayImageUrl) !== null,
-    [launcherAwayImageUrl],
+    () => (
+      getBundledCompanionImageAssetKey(launcherAwayImageUrl) !== null ||
+      (isGeneratedCompanion && !hasFreshLauncherImage && Boolean(launcherAwayImageUrl))
+    ),
+    [hasFreshLauncherImage, isGeneratedCompanion, launcherAwayImageUrl],
   );
   const needsLauncherImage = Boolean(
     isGeneratedCompanion
@@ -173,8 +185,16 @@ export const useJourneysCompanionVisual = () => {
     isGeneratedCompanion,
     currentSceneImageUrl,
     launcherAwayImageUrl,
-    launcherAwayFocalX: hasFreshLauncherImage ? companion?.launcher_image_focal_x ?? 0.5 : null,
-    launcherAwayFocalY: hasFreshLauncherImage ? companion?.launcher_image_focal_y ?? 0.5 : null,
+    launcherAwayFocalX: hasFreshLauncherImage
+      ? companion?.launcher_image_focal_x ?? 0.5
+      : launcherAwayImageUrl && launcherAwayImageUrl === generatedFallbackLauncherImageUrl
+        ? focalPoint.x ?? 0.5
+        : null,
+    launcherAwayFocalY: hasFreshLauncherImage
+      ? companion?.launcher_image_focal_y ?? 0.5
+      : launcherAwayImageUrl && launcherAwayImageUrl === generatedFallbackLauncherImageUrl
+        ? focalPoint.y ?? 0.5
+        : null,
     launcherAwayUsesPortraitShell,
     needsLauncherImage,
   };

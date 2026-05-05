@@ -271,6 +271,45 @@ describe("useCompanionLauncherImage", () => {
     });
   });
 
+  it("does not retry legacy 500 responses that wrap a permanent AI API 400", async () => {
+    const legacyError = createFunctionError({
+      status: 500,
+      payload: {
+        message: "AI API error: 400",
+      },
+    });
+    mocks.invoke.mockResolvedValue({
+      data: null,
+      error: legacyError,
+    });
+
+    renderHook(
+      () =>
+        useCompanionLauncherImage({
+          companionId: "companion-1",
+          sourceImageUrl: "https://assets.example.com/source-a.png",
+          enabled: true,
+        }),
+      { wrapper: createHarness().wrapper },
+    );
+
+    await waitFor(() => {
+      expect(mocks.invoke).toHaveBeenCalledTimes(1);
+      expect(mocks.loggerWarn).toHaveBeenCalledWith(
+        "Companion launcher image generation failed",
+        expect.objectContaining({
+          companionId: "companion-1",
+          sourceImageUrl: "https://assets.example.com/source-a.png",
+          status: 500,
+          reason: "AI API error: 400",
+          category: "http",
+          requestId: "request-1",
+          upstreamStatus: 400,
+        }),
+      );
+    });
+  });
+
   it("does not immediately request the same failed source again on rerender", async () => {
     const { wrapper } = createHarness();
     const { rerender } = renderHook(

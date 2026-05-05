@@ -301,7 +301,10 @@ const readFunctionErrorContext = async (error: unknown) => {
 
 
 const Auth = () => {
-  const [isLogin, setIsLogin] = useState(true);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const requestedAuthMode = new URLSearchParams(location.search).get("mode");
+  const [isLogin, setIsLogin] = useState(() => requestedAuthMode !== "signup");
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -309,8 +312,6 @@ const Auth = () => {
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'apple' | null>(null);
-  const navigate = useNavigate();
-  const location = useLocation();
   const { toast } = useToast();
   const pendingPostAuthNavigationContextRef = useRef<
     (PostAuthNavigationContext & { userId: string }) | null
@@ -572,6 +573,14 @@ const Auth = () => {
       hasRedirected.current = false;
     }
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (requestedAuthMode === "signup") {
+      setInlineError(null);
+      setIsForgotPassword(false);
+      setIsLogin(false);
+    }
+  }, [requestedAuthMode]);
 
   useEffect(() => {
     if (initializationComplete.current) return;

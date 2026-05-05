@@ -38,3 +38,26 @@ Deno.test("companion evolution reveal tracking stores presentation state and own
     "Expected companion evolution memories to be idempotent by evolution id",
   );
 });
+
+Deno.test("companion evolution reveal tracking keeps prewarmed reveals unpresented", async () => {
+  const source = await Deno.readTextFile(
+    new URL(
+      "../../migrations/20260505143000_clear_unpresented_prewarm_reveals.sql",
+      import.meta.url,
+    ),
+  );
+
+  assert(
+    source.includes("SET animation_presented_at = NULL") &&
+      source.includes("COALESCE(uc.current_stage, 0) < ce.stage"),
+    "Expected unclaimed future animation rows to remain revealable",
+  );
+
+  assert(
+    source.includes("animationPrewarmSource") &&
+      source.includes("future_stage_reveal") &&
+      source.includes("ce.animation_presented_at = ce.animation_completed_at") &&
+      source.includes("ce.animation_presented_at = ce.evolved_at"),
+    "Expected the repair to clear only automatic backfill timestamps for prewarmed reveals",
+  );
+});

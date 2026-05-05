@@ -167,6 +167,29 @@ describe("supabaseFunctionErrors", () => {
     expect(toUserFacingFunctionError(parsed)).toContain("provider authentication failed");
   });
 
+  it("infers upstream provider status from legacy AI API error messages", async () => {
+    const response = new Response(
+      JSON.stringify({
+        message: "AI API error: 400",
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+
+    const parsed = await parseFunctionInvokeError({
+      name: "FunctionsHttpError",
+      message: "Edge Function returned a non-2xx status code",
+      context: response,
+    });
+
+    expect(parsed.status).toBe(500);
+    expect(parsed.backendMessage).toBe("AI API error: 400");
+    expect(parsed.upstreamStatus).toBe(400);
+    expect(toUserFacingFunctionError(parsed)).toContain("temporarily unavailable");
+  });
+
   it("marks 5xx and timeout statuses as retriable", () => {
     const fiveHundredResponse = new Response("{}", { status: 503 });
     const timeoutResponse = new Response("{}", { status: 408 });
