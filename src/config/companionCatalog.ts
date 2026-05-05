@@ -397,6 +397,24 @@ export const COMPANION_STORY_TONES: readonly CompanionStoryToneDefinition[] = [
   },
 ] as const;
 
+export const FAVORITE_COLORS = [
+  { label: "Solar Gold", value: "#f5b942", gradient: "from-amber-300 via-yellow-400 to-orange-400" },
+  { label: "Rose Ember", value: "#ff6b7f", gradient: "from-rose-400 via-pink-500 to-red-500" },
+  { label: "Sky Current", value: "#52b7ff", gradient: "from-sky-300 via-cyan-400 to-blue-500" },
+  { label: "Verdant Glow", value: "#58d68d", gradient: "from-emerald-300 via-green-400 to-lime-500" },
+  { label: "Amethyst Mist", value: "#9b6bff", gradient: "from-violet-400 via-purple-500 to-fuchsia-500" },
+  { label: "Moon Silver", value: "#d6dee8", gradient: "from-slate-200 via-zinc-200 to-slate-400" },
+  { label: "Crimson Flare", value: "#ef4444", gradient: "from-red-400 via-red-500 to-orange-500" },
+  { label: "Ocean Teal", value: "#14b8a6", gradient: "from-teal-300 via-teal-400 to-cyan-500" },
+] as const;
+
+export const getCompanionFavoriteColorLabel = (hex: string | null | undefined): string => {
+  const normalized = (hex ?? "").trim().toLowerCase();
+  if (!normalized) return "their chosen color";
+  const match = FAVORITE_COLORS.find((color) => color.value.toLowerCase() === normalized);
+  return match?.label ?? "their chosen color";
+};
+
 export const COMPANION_ART_TIER_RANGES: ReadonlyArray<{
   id: CompanionArtTier;
   label: string;

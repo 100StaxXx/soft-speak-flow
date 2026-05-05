@@ -3,41 +3,27 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CompanionImage } from "@/components/CompanionImage";
 import {
   COMPANION_ELEMENTS,
   COMPANION_ONBOARDING_SILHOUETTE_SOURCES,
   COMPANION_PRESETS,
   COMPANION_STORY_TONES,
+  FAVORITE_COLORS,
+  getCompanionEggLabel,
   type CompanionElementId,
   type CompanionStoryTone,
 } from "@/config/companionCatalog";
+import {
+  COMPANION_FUTURE_STATE_LABEL,
+  isPilotCompanionElement,
+} from "@/config/companionPilotAvailability";
+import { getUniversalEggAssetUrl } from "@/lib/companionAssetResolver";
 import {
   COMPANION_CUSTOM_NAME_MAX_LENGTH,
   normalizeCompanionCustomName,
 } from "@/lib/companionName";
 import { cn } from "@/lib/utils";
-
-const FAVORITE_COLORS = [
-  { label: "Solar Gold", value: "#f5b942", gradient: "from-amber-300 via-yellow-400 to-orange-400" },
-  { label: "Rose Ember", value: "#ff6b7f", gradient: "from-rose-400 via-pink-500 to-red-500" },
-  { label: "Sky Current", value: "#52b7ff", gradient: "from-sky-300 via-cyan-400 to-blue-500" },
-  { label: "Verdant Glow", value: "#58d68d", gradient: "from-emerald-300 via-green-400 to-lime-500" },
-  { label: "Amethyst Mist", value: "#9b6bff", gradient: "from-violet-400 via-purple-500 to-fuchsia-500" },
-  { label: "Moon Silver", value: "#d6dee8", gradient: "from-slate-200 via-zinc-200 to-slate-400" },
-  { label: "Crimson Flare", value: "#ef4444", gradient: "from-red-400 via-red-500 to-orange-500" },
-  { label: "Ocean Teal", value: "#14b8a6", gradient: "from-teal-300 via-teal-400 to-cyan-500" },
-] as const;
-
-const COLOR_ELEMENT_DEFAULTS: Record<string, CompanionElementId> = {
-  "#f5b942": "light",
-  "#ff6b7f": "fire",
-  "#52b7ff": "ice",
-  "#58d68d": "nature",
-  "#9b6bff": "void",
-  "#d6dee8": "light",
-  "#ef4444": "fire",
-  "#14b8a6": "nature",
-};
 
 export interface AICompanionCreationData {
   favoriteColor: string;
@@ -87,7 +73,7 @@ export const AICompanionCreator = ({
   initialCompanionName = null,
   onBack,
   title = "Shape Your Companion Lineage",
-  description = "Choose the color and species that will define your egg's hidden destiny.",
+  description = "Choose the color, element, and species that will define your egg's hidden destiny.",
 }: AICompanionCreatorProps) => {
   const isCompact = layout === "compact";
   const [favoriteColor, setFavoriteColor] = useState<string>(
@@ -98,16 +84,15 @@ export const AICompanionCreator = ({
   );
   const [selectedStoryTone, setSelectedStoryTone] = useState<CompanionStoryTone>(storyTone);
   const [customCompanionName, setCustomCompanionName] = useState(initialCompanionName ?? "");
-  const coreElement = COLOR_ELEMENT_DEFAULTS[favoriteColor] ?? initialElement ?? "fire";
+  const [coreElement, setCoreElement] = useState<CompanionElementId>(() => {
+    const candidate = initialElement ?? "fire";
+    return isPilotCompanionElement(candidate) ? candidate : "fire";
+  });
 
   const normalizedCustomName = normalizeCompanionCustomName(customCompanionName);
   const selectedTone = useMemo(
     () => COMPANION_STORY_TONES.find((tone) => tone.value === selectedStoryTone) ?? COMPANION_STORY_TONES[0],
     [selectedStoryTone],
-  );
-  const selectedElement = useMemo(
-    () => COMPANION_ELEMENTS.find((element) => element.id === coreElement) ?? COMPANION_ELEMENTS[0],
-    [coreElement],
   );
   const selectedColorMeta = useMemo(
     () => FAVORITE_COLORS.find((color) => color.value === favoriteColor) ?? FAVORITE_COLORS[0],
@@ -176,9 +161,82 @@ export const AICompanionCreator = ({
                     <div>
                       <p className="text-sm font-semibold text-white">{selectedColorMeta.label}</p>
                       <p className="text-xs leading-5 text-white/55">
-                        This color also hints the egg toward {selectedElement.label.toLowerCase()} energy.
+                        Color anchors your companion's palette.
                       </p>
                     </div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="space-y-3">
+                <div className="space-y-1">
+                  <Label id="egg-element-picker-label" className="text-lg font-semibold text-white">
+                    Egg Element
+                  </Label>
+                  <p className="text-sm text-white/60">
+                    Pick the egg whose elemental energy your companion will hatch with.
+                  </p>
+                </div>
+                <div
+                  role="group"
+                  aria-labelledby="egg-element-picker-label"
+                  className="rounded-[24px] border border-white/10 bg-white/5 p-4"
+                >
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {COMPANION_ELEMENTS.map((element) => {
+                      const isSupported = isPilotCompanionElement(element.id);
+                      const isSelected = isSupported && element.id === coreElement;
+                      const eggLabel = getCompanionEggLabel(element.id);
+
+                      return (
+                        <button
+                          key={element.id}
+                          type="button"
+                          onClick={() => {
+                            if (!isSupported) return;
+                            setCoreElement(element.id);
+                          }}
+                          disabled={!isSupported}
+                          aria-pressed={isSelected}
+                          aria-label={`Select ${eggLabel}`}
+                          data-selected={isSelected ? "true" : "false"}
+                          data-supported={isSupported ? "true" : "false"}
+                          className={cn(
+                            "group flex flex-col overflow-hidden rounded-2xl border text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed",
+                            isSelected
+                              ? "border-primary/60 bg-primary/12 shadow-[0_18px_36px_rgba(168,85,247,0.18)]"
+                              : isSupported
+                                ? "border-white/10 bg-black/25 hover:border-white/25 hover:bg-black/35"
+                                : "border-white/8 bg-black/20 opacity-65 saturate-50",
+                          )}
+                        >
+                          <div className="relative flex h-28 w-full items-center justify-center bg-gradient-to-br from-slate-950/70 via-slate-900/60 to-slate-950/85">
+                            <CompanionImage
+                              src={getUniversalEggAssetUrl(element.id)}
+                              alt={eggLabel}
+                              fit="contain"
+                              className="h-full w-full p-2"
+                              loading="lazy"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between gap-2 px-3 py-2">
+                            <span className="text-sm font-semibold text-white">{eggLabel}</span>
+                            <span
+                              className={cn(
+                                "rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em]",
+                                isSelected
+                                  ? "border-primary/60 bg-primary/20 text-primary-foreground"
+                                  : isSupported
+                                    ? "border-white/15 bg-black/30 text-white/65"
+                                    : "border-white/10 bg-black/30 text-white/55",
+                              )}
+                            >
+                              {isSelected ? "Selected" : isSupported ? "Choose" : COMPANION_FUTURE_STATE_LABEL}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </section>

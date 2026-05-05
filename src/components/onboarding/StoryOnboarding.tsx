@@ -34,6 +34,7 @@ import {
 import {
   getCompanionEggLabel,
   getCompanionElementAnchorColor,
+  getCompanionFavoriteColorLabel,
   getCompanionPreset,
   COMPANION_STORY_TONES,
   type CompanionStoryTone,
@@ -990,6 +991,7 @@ export const StoryOnboarding = ({
     let onboardingFinalized = false;
     const enterJourneyImmediately = options.enterJourneyImmediately === true;
     const eggDisplayName = getCompanionEggLabel(preferences.coreElement);
+    const colorLabel = getCompanionFavoriteColorLabel(preferences.favoriteColor);
     const selectionDisplayName = getCompanionSelectionDisplayName(preferences);
 
     setPendingCompanionSetup(preferences);
@@ -1032,12 +1034,13 @@ export const StoryOnboarding = ({
       const memoryContext = {
         title: "Our First Meeting",
         description: preferences.presetId
-          ? `The day we found your ${eggDisplayName.toLowerCase()}, already carrying the spirit of ${preferences.spiritAnimal}.`
-          : `The day we found your ${eggDisplayName.toLowerCase()}, humming with possibility.`,
+          ? `The day we found your ${colorLabel.toLowerCase()} ${eggDisplayName.toLowerCase()}, already carrying the spirit of ${preferences.spiritAnimal}.`
+          : `The day we found your ${colorLabel.toLowerCase()} ${eggDisplayName.toLowerCase()}, humming with possibility.`,
         emotion: "wonder",
         details: {
           spiritAnimal: preferences.spiritAnimal,
           coreElement: preferences.coreElement,
+          favoriteColor: preferences.favoriteColor,
         },
       };
 
@@ -1737,8 +1740,8 @@ export const StoryOnboarding = ({
                 title={isResetMode ? "Shape Your New Companion Egg" : "Shape Your Companion Egg"}
                 description={
                   isResetMode
-                    ? "Pick the color and species for the new AI-generated egg that will carry your fresh start."
-                    : "Choose the color and species that will define your AI-generated companion egg."
+                    ? "Pick the color, element, and species for the new AI-generated egg that will carry your fresh start."
+                    : "Choose the color, element, and species that will define your AI-generated companion egg."
                 }
                 onBack={handleCompanionBack}
               />
