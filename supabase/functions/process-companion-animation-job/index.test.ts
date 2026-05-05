@@ -29,10 +29,70 @@ const createJob = (overrides: Record<string, unknown> = {}) => ({
   prompt: "Animate the companion",
   retry_count: 0,
   next_retry_at: null,
+  video_url: null,
+  storage_path: null,
+  completed_at: null,
   requested_at: "2026-05-02T12:00:00.000Z",
   started_at: "2026-05-02T12:00:01.000Z",
   updated_at: "2026-05-02T12:00:01.000Z",
   ...overrides,
+});
+
+Deno.test("handleProcessCompanionAnimationJob returns a playable URL for terminal succeeded jobs", async () => {
+  const terminalJob = createJob({
+    status: "succeeded",
+    provider_task_id: "fal-request-1",
+    video_url: "https://example.com/animation.mp4",
+  });
+  const supabase = {
+    from: (table: string) => {
+      if (table !== "companion_animation_jobs") {
+        throw new Error(`Unexpected table: ${table}`);
+      }
+      return {
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({ data: terminalJob, error: null }),
+          }),
+        }),
+      };
+    },
+  };
+  const { deps } = createDeps({
+    fetchFn: (() => {
+      throw new Error("terminal jobs should not call the provider");
+    }) as typeof fetch,
+  });
+  const handlerDeps = {
+    ...deps,
+    createClient: (() => supabase) as never,
+    env: {
+      get: (name: string) => {
+        if (name === "SUPABASE_URL") return "https://example.supabase.co";
+        if (name === "SUPABASE_SERVICE_ROLE_KEY") return "service-role-key";
+        if (name === "SUPABASE_ANON_KEY") return "anon-key";
+        if (name === "INTERNAL_FUNCTION_SECRET") return "internal-secret";
+        return deps.env.get(name);
+      },
+    },
+  } as ProcessDeps;
+
+  const response = await module.handleProcessCompanionAnimationJob(
+    new Request("https://example.test/process", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-internal-key": "internal-secret",
+      },
+      body: JSON.stringify({ jobId: "job-1" }),
+    }),
+    handlerDeps,
+  );
+  const body = await response.json();
+
+  assertEquals(response.status, 200);
+  assertEquals(body.status, "succeeded");
+  assertEquals(body.videoUrl, "https://example.com/animation.mp4");
 });
 
 const createSupabaseHarness = ({

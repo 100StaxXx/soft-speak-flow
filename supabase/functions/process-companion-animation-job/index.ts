@@ -45,6 +45,9 @@ interface CompanionAnimationJob {
   prompt: string;
   retry_count: number;
   next_retry_at: string | null;
+  video_url: string | null;
+  storage_path: string | null;
+  completed_at: string | null;
   requested_at: string;
   started_at: string | null;
   updated_at: string;
@@ -111,6 +114,9 @@ const getJobSelectColumns = () =>
     "prompt",
     "retry_count",
     "next_retry_at",
+    "video_url",
+    "storage_path",
+    "completed_at",
     "requested_at",
     "started_at",
     "updated_at",
@@ -319,6 +325,40 @@ const getJobHoldResponse = (
     providerStatus: job.provider_status,
     nextRetryAt: job.next_retry_at,
   };
+};
+
+const getTerminalJobResponse = async (
+  supabase: SupabaseServiceClient,
+  job: CompanionAnimationJob,
+) => {
+  const responseBody: Record<string, unknown> = {
+    jobId: job.id,
+    status: job.status,
+    providerTaskId: job.provider_task_id,
+  };
+
+  if (job.status !== "succeeded") {
+    return responseBody;
+  }
+
+  const jobVideoUrl = typeof job.video_url === "string"
+    ? job.video_url.trim()
+    : "";
+  if (jobVideoUrl) {
+    responseBody.videoUrl = jobVideoUrl;
+    return responseBody;
+  }
+
+  const succeededEvolution = await fetchSucceededEvolutionAnimation(
+    supabase,
+    job.evolution_id,
+  );
+  if (succeededEvolution?.videoUrl) {
+    responseBody.videoUrl = succeededEvolution.videoUrl;
+    responseBody.repaired = true;
+  }
+
+  return responseBody;
 };
 
 const uploadAnimationVideo = async ({
@@ -691,11 +731,7 @@ export const handleProcessCompanionAnimationJob = async (
 
     if (job.status === "succeeded" || job.status === "failed") {
       return new Response(
-        JSON.stringify({
-          jobId: job.id,
-          status: job.status,
-          providerTaskId: job.provider_task_id,
-        }),
+        JSON.stringify(await getTerminalJobResponse(supabase, job)),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
