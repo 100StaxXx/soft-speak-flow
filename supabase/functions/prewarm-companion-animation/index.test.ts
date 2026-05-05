@@ -33,6 +33,7 @@ const createHarness = ({
   const upserts: Array<{ table: string; payload: Record<string, unknown> }> =
     [];
   const enqueueCalls: Array<Record<string, unknown>> = [];
+  const workerCalls: string[] = [];
 
   const supabase = {
     from: (table: string) => {
@@ -67,8 +68,11 @@ const createHarness = ({
                 single: async () => ({
                   data: {
                     id: "evo-1",
-                    animation_status: null,
-                    animation_video_url: null,
+                    animation_status: existingEvolution?.animation_status ??
+                      null,
+                    animation_video_url:
+                      existingEvolution?.animation_video_url ??
+                        null,
                   },
                   error: null,
                 }),
@@ -108,10 +112,14 @@ const createHarness = ({
       enqueueCalls.push(params as unknown as Record<string, unknown>);
       return { status: "queued", jobId: "job-1" };
     },
+    invokeAnimationWorker: async (jobId) => {
+      workerCalls.push(jobId);
+      return { ok: false, reason: "test_worker_disabled" };
+    },
     now: () => new Date("2026-05-03T12:00:00.000Z"),
   };
 
-  return { deps, upserts, enqueueCalls };
+  return { deps, upserts, enqueueCalls, workerCalls };
 };
 
 Deno.test("prewarm-companion-animation enqueues a preset stage-one hatch animation", async () => {
@@ -146,6 +154,7 @@ Deno.test("prewarm-companion-animation enqueues a preset stage-one hatch animati
   );
   assertEquals(harness.enqueueCalls[0].evolutionId, "evo-1");
   assertEquals(harness.enqueueCalls[0].stage, 1);
+  assertEquals(harness.workerCalls[0], "job-1");
 });
 
 Deno.test("prewarm-companion-animation uses hidden AI stage-one lineage art", async () => {
@@ -249,6 +258,38 @@ Deno.test("prewarm-companion-animation requeues an existing claimed later-stage 
     harness.enqueueCalls[0].imageUrl,
     "https://example.com/stage-3.png",
   );
+});
+
+Deno.test("prewarm-companion-animation kicks an existing queued animation worker", async () => {
+  const harness = createHarness({
+    companion: {
+      id: "companion-1",
+      user_id: "user-1",
+      preset_id: null,
+      core_element: "water",
+      current_stage: 3,
+      current_xp: 100,
+      image_lineage_metadata: null,
+    },
+    existingEvolution: {
+      id: "evo-2",
+      image_url: "https://example.com/stage-3.png",
+      animation_status: "queued",
+      animation_video_url: null,
+    },
+  });
+
+  const response = await module.handlePrewarmCompanionAnimation(
+    createRequest({ companionId: "companion-1", stage: 3 }),
+    harness.deps,
+  );
+  const body = await response.json();
+
+  assertEquals(response.status, 200);
+  assertEquals(body.status, "queued");
+  assertEquals(body.jobId, "job-1");
+  assertEquals(harness.enqueueCalls.length, 0);
+  assertEquals(harness.workerCalls[0], "job-1");
 });
 
 Deno.test("prewarm-companion-animation skips eggs that are not hatch-ready", async () => {

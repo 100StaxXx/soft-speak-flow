@@ -7,6 +7,7 @@ import {
 } from "../_shared/auth.ts";
 import { maybeEnqueueCompanionAnimationJob } from "../_shared/companionAnimationJobs.ts";
 import { createCostGuardrailSession } from "../_shared/costGuardrails.ts";
+import { invokeInternalFunction } from "../_shared/internalFunctionAuth.ts";
 import { getHiddenBoundaryAnchor } from "../_shared/companionLineage.ts";
 import {
   coerceCompanionElementId,
@@ -40,7 +41,27 @@ interface PrewarmCompanionAnimationDeps {
   createSupabaseClient: () => any;
   createCostGuardrailSessionFn: typeof createCostGuardrailSession;
   enqueueAnimationJob: typeof maybeEnqueueCompanionAnimationJob;
+  invokeAnimationWorker?: (
+    jobId: string,
+  ) => Promise<AnimationWorkerKickoffResult>;
   now: () => Date;
+}
+
+type AnimationWorkerStatus =
+  | "queued"
+  | "processing"
+  | "succeeded"
+  | "failed"
+  | "skipped"
+  | "idle";
+
+interface AnimationWorkerKickoffResult {
+  ok: boolean;
+  status?: AnimationWorkerStatus | null;
+  jobId?: string;
+  videoUrl?: string;
+  reason?: string;
+  statusCode?: number;
 }
 
 const defaultDeps: PrewarmCompanionAnimationDeps = {
@@ -58,6 +79,121 @@ const defaultDeps: PrewarmCompanionAnimationDeps = {
   createCostGuardrailSessionFn: createCostGuardrailSession,
   enqueueAnimationJob: maybeEnqueueCompanionAnimationJob,
   now: () => new Date(),
+};
+
+const normalizeWorkerStatus = (
+  value: unknown,
+): AnimationWorkerStatus | null => {
+  if (typeof value !== "string") return null;
+  if (
+    value === "queued" ||
+    value === "processing" ||
+    value === "succeeded" ||
+    value === "failed" ||
+    value === "skipped" ||
+    value === "idle"
+  ) {
+    return value;
+  }
+  return null;
+};
+
+const readWorkerPayload = async (
+  response: Response,
+): Promise<Record<string, unknown>> => {
+  try {
+    const payload = await response.json();
+    return payload && typeof payload === "object" && !Array.isArray(payload)
+      ? payload as Record<string, unknown>
+      : {};
+  } catch {
+    return {};
+  }
+};
+
+const invokeAnimationWorkerBestEffort = async (
+  jobId: string,
+): Promise<AnimationWorkerKickoffResult> => {
+  if (Deno.env.get("SUPABASE_FUNCTIONS_TEST") === "1") {
+    return { ok: false, reason: "test_mode" };
+  }
+
+  try {
+    const response = await invokeInternalFunction(
+      "process-companion-animation-job",
+      {
+        jobId,
+      },
+    );
+    const payload = await readWorkerPayload(response);
+    const result: AnimationWorkerKickoffResult = {
+      ok: response.ok,
+      status: normalizeWorkerStatus(payload.status),
+      jobId: typeof payload.jobId === "string" ? payload.jobId : jobId,
+      videoUrl: typeof payload.videoUrl === "string"
+        ? payload.videoUrl
+        : undefined,
+      reason: typeof payload.reason === "string"
+        ? payload.reason
+        : typeof payload.error === "string"
+        ? payload.error
+        : undefined,
+      statusCode: response.status,
+    };
+
+    if (!response.ok) {
+      console.warn("[CompanionAnimationPrewarm] Worker kickoff failed", {
+        jobId,
+        status: response.status,
+        reason: result.reason,
+      });
+    }
+
+    return result;
+  } catch (error) {
+    console.warn("[CompanionAnimationPrewarm] Worker kickoff threw", {
+      jobId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { ok: false, reason: "worker_kickoff_failed" };
+  }
+};
+
+const attachWorkerKickoffResult = async (
+  deps: PrewarmCompanionAnimationDeps,
+  responseBody: Record<string, unknown>,
+  jobId: string | null | undefined,
+): Promise<Record<string, unknown>> => {
+  if (!jobId) return responseBody;
+
+  const invokeWorker = deps.invokeAnimationWorker ??
+    invokeAnimationWorkerBestEffort;
+  const workerResult = await invokeWorker(jobId);
+  const nextBody: Record<string, unknown> = {
+    ...responseBody,
+    workerKickoffStatus: workerResult.ok ? "invoked" : "unavailable",
+  };
+
+  if (workerResult.status) {
+    nextBody.workerStatus = workerResult.status;
+    if (workerResult.ok && workerResult.status !== "idle") {
+      nextBody.status = workerResult.status;
+    }
+  }
+  if (workerResult.jobId) {
+    nextBody.jobId = workerResult.jobId;
+  }
+  if (workerResult.videoUrl) {
+    nextBody.videoUrl = workerResult.videoUrl;
+  }
+  if (workerResult.reason) {
+    nextBody.workerKickoffReason = workerResult.reason;
+  }
+  if (typeof workerResult.statusCode === "number" && !workerResult.ok) {
+    nextBody.workerKickoffStatusCode = workerResult.statusCode;
+  }
+
+  return nextBody;
 };
 
 const jsonResponse = (body: Record<string, unknown>, status = 200) =>
@@ -190,7 +326,8 @@ export const handlePrewarmCompanionAnimation = async (
     const existingEvolutionId = typeof existingEvolution.data?.id === "string"
       ? existingEvolution.data.id
       : null;
-    const canCreatePreHatchEvolution = stage === 1 && currentStage === 0 && isHatchReady;
+    const canCreatePreHatchEvolution = stage === 1 && currentStage === 0 &&
+      isHatchReady;
     const canReuseClaimedEvolution = currentStage >= stage &&
       Boolean(existingEvolutionId);
     if (!canCreatePreHatchEvolution && !canReuseClaimedEvolution) {
@@ -259,12 +396,15 @@ export const handlePrewarmCompanionAnimation = async (
       evolution.animation_status === "queued" ||
       evolution.animation_status === "processing"
     ) {
-      return jsonResponse({
-        status: evolution.animation_status,
-        evolutionId,
-        jobId: await fetchExistingAnimationJobId(supabase, evolutionId),
-        stage,
-      });
+      const jobId = await fetchExistingAnimationJobId(supabase, evolutionId);
+      return jsonResponse(
+        await attachWorkerKickoffResult(deps, {
+          status: evolution.animation_status,
+          evolutionId,
+          jobId,
+          stage,
+        }, jobId),
+      );
     }
 
     if (
@@ -291,11 +431,18 @@ export const handlePrewarmCompanionAnimation = async (
       element: companionRecord.core_element,
     });
 
-    return jsonResponse({
+    const responseBody = {
       ...enqueueResult,
       evolutionId,
       stage,
-    });
+    };
+    return jsonResponse(
+      await attachWorkerKickoffResult(
+        deps,
+        responseBody,
+        enqueueResult.jobId,
+      ),
+    );
   } catch (error) {
     console.error("[CompanionAnimationPrewarm] Failed", error);
     const message = error instanceof Error ? error.message : "Unknown error";

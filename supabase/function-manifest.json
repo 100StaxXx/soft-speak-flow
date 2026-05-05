@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-03T21:16:48Z",
+  "generatedAt": "2026-05-05T16:39:56Z",
   "frontendInvoked": [
     "adjust-epic-plan",
     "analyze-user-patterns",
@@ -58,7 +58,6 @@
     "optimize-daily-plan",
     "outlook-todo-tasks",
     "prewarm-companion-animation",
-    "process-companion-animation-job",
     "process-paypal-payout",
     "process-referral",
     "record-ai-interaction",
@@ -86,17 +85,16 @@
     "generate-companion-evolution",
     "generate-companion-image",
     "generate-completion-feedback",
-    "generate-dormant-companion-image",
     "generate-epic-suggestions",
     "generate-full-mentor-audio",
     "generate-journey-path",
     "generate-lesson",
     "generate-mentor-audio",
     "generate-mentor-script",
-    "generate-neglected-companion-image",
     "google-native-auth",
     "init-quest-attachment-upload",
     "prewarm-companion-animation",
+    "process-companion-animation-job",
     "sync-daily-pep-talk-transcript",
     "transcribe-audio"
   ],

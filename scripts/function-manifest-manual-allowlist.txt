@@ -2,6 +2,8 @@
 ai-orchestrator
 generate-weekly-plan
 generate-cosmiq-title-card
+generate-dormant-companion-image
+generate-neglected-companion-image
 google-calendar-auth
 google-calendar-events
 optimize-weekly-plan

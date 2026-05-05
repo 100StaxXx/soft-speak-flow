@@ -19,7 +19,6 @@ import {
   isCompanionHatchStartedDetail,
 } from "@/lib/companionEvolutionEvents";
 import { logger } from "@/utils/logger";
-import { parseFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
 import {
   getProgressionLevelDisplay,
   getProgressionTierLabelForLevel,
@@ -220,49 +219,6 @@ const waitForEvolutionPersistence = async ({
   return null;
 };
 
-const fetchAnimationJobId = async (evolutionId: string): Promise<string | null> => {
-  const { data, error } = await supabase
-    .from("companion_animation_jobs")
-    .select("id")
-    .eq("evolution_id", evolutionId)
-    .maybeSingle();
-
-  if (error) {
-    logger.warn("Evolution listener: Failed to find companion animation job", {
-      evolutionId,
-      error: error.message,
-    });
-    return null;
-  }
-
-  return typeof data?.id === "string" ? data.id : null;
-};
-
-const processAnimationJobOnce = async (jobId: string) => {
-  const { error } = await supabase.functions.invoke(
-    "process-companion-animation-job",
-    {
-      body: { jobId },
-    },
-  );
-
-  if (error) {
-    const parsedError = await parseFunctionInvokeError(error);
-    logger.warn("Evolution listener: Companion animation worker invoke failed", {
-      jobId,
-      status: parsedError.status,
-      code: parsedError.code,
-      reason: parsedError.failureReason ?? parsedError.backendMessage ??
-        parsedError.message,
-      category: parsedError.category,
-      requestId: parsedError.requestId,
-      upstreamStatus: parsedError.upstreamStatus,
-      upstreamError: parsedError.upstreamError,
-      error: error.message ?? String(error),
-    });
-  }
-};
-
 const requestAnimationJobRetry = async ({
   companionId,
   stage,
@@ -298,10 +254,6 @@ const requestAnimationJobRetry = async ({
   const jobId = typeof result.jobId === "string" ? result.jobId : undefined;
   const videoUrl = typeof result.videoUrl === "string" ? result.videoUrl : undefined;
 
-  if (jobId) {
-    await processAnimationJobOnce(jobId);
-  }
-
   return {
     status: status ?? "unavailable",
     jobId,
@@ -327,7 +279,7 @@ const waitForEvolutionAnimation = async ({
     startedAt + STALE_TERMINAL_ANIMATION_DISCOVERY_TIMEOUT_MS;
   const readyDeadline = startedAt + EVOLUTION_ANIMATION_READY_TIMEOUT_MS;
   let jobId: string | null = null;
-  let lastProcessAt = 0;
+  let lastWorkerKickAt = 0;
   const retryAttemptKeys = new Set<string>();
 
   while (Date.now() < readyDeadline) {
@@ -395,14 +347,29 @@ const waitForEvolutionAnimation = async ({
         && Date.now() <= activeDiscoveryDeadline
       );
 
-    if (shouldDiscoverAnimationJob) {
-      if (!jobId) {
-        jobId = await fetchAnimationJobId(metadata.id);
+    if (
+      shouldDiscoverAnimationJob &&
+      (metadata.animationStatus === "queued" || metadata.animationStatus === "processing") &&
+      Date.now() - lastWorkerKickAt >= EVOLUTION_ANIMATION_PROCESS_INTERVAL_MS
+    ) {
+      lastWorkerKickAt = Date.now();
+      const processingResult = await requestAnimationJobRetry({
+        companionId,
+        stage,
+        reason: `status_${metadata.animationStatus}`,
+        force: false,
+      });
+
+      if (processingResult.videoUrl) {
+        return {
+          ...metadata,
+          animationStatus: "succeeded",
+          animationVideoUrl: processingResult.videoUrl,
+        };
       }
 
-      if (jobId && Date.now() - lastProcessAt >= EVOLUTION_ANIMATION_PROCESS_INTERVAL_MS) {
-        lastProcessAt = Date.now();
-        await processAnimationJobOnce(jobId);
+      if (processingResult.status === "queued" || processingResult.status === "processing") {
+        jobId = processingResult.jobId ?? jobId;
       }
     }
 

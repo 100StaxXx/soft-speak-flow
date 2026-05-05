@@ -648,8 +648,13 @@ describe("GlobalEvolutionListener", () => {
         await Promise.resolve();
       });
       expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
-      expect(mocks.functionsInvokeMock).toHaveBeenCalledWith("process-companion-animation-job", {
-        body: { jobId: "job-1" },
+      expect(mocks.functionsInvokeMock).toHaveBeenCalledWith("prewarm-companion-animation", {
+        body: {
+          companionId: "companion-1",
+          stage: 5,
+          force: false,
+          reason: "status_queued",
+        },
       });
       await act(async () => {
         await flushMicrotasks();
@@ -738,9 +743,7 @@ describe("GlobalEvolutionListener", () => {
       });
 
       expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
-      expect(mocks.functionsInvokeMock).toHaveBeenCalledWith("process-companion-animation-job", {
-        body: { jobId: "job-1" },
-      });
+      expect(mocks.functionsInvokeMock).not.toHaveBeenCalled();
       await act(async () => {
         await flushMicrotasks();
       });
@@ -750,6 +753,14 @@ describe("GlobalEvolutionListener", () => {
         await flushMicrotasks();
       });
       expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
+      expect(mocks.functionsInvokeMock).toHaveBeenCalledWith("prewarm-companion-animation", {
+        body: {
+          companionId: "companion-1",
+          stage: 5,
+          force: false,
+          reason: "status_queued",
+        },
+      });
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(2000);

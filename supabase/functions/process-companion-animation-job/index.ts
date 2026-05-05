@@ -293,6 +293,34 @@ const fetchSucceededEvolutionAnimation = async (
   };
 };
 
+const getJobHoldResponse = (
+  job: CompanionAnimationJob,
+  now: Date,
+):
+  | {
+    jobId: string;
+    status: "queued" | "processing";
+    providerTaskId: string | null;
+    providerStatus: string | null;
+    nextRetryAt: string;
+  }
+  | null => {
+  if (job.status !== "queued" || !job.next_retry_at) return null;
+
+  const nextRetryAtMs = new Date(job.next_retry_at).getTime();
+  if (!Number.isFinite(nextRetryAtMs) || nextRetryAtMs <= now.getTime()) {
+    return null;
+  }
+
+  return {
+    jobId: job.id,
+    status: job.provider_task_id ? "processing" : "queued",
+    providerTaskId: job.provider_task_id,
+    providerStatus: job.provider_status,
+    nextRetryAt: job.next_retry_at,
+  };
+};
+
 const uploadAnimationVideo = async ({
   supabase,
   job,
@@ -672,7 +700,16 @@ export const handleProcessCompanionAnimationJob = async (
       );
     }
 
-    const claimedJob = await claimJob(supabase, job, deps.now());
+    const now = deps.now();
+    const holdResponse = getJobHoldResponse(job, now);
+    if (holdResponse) {
+      return new Response(
+        JSON.stringify(holdResponse),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const claimedJob = await claimJob(supabase, job, now);
     if (!claimedJob) {
       return new Response(
         JSON.stringify({
