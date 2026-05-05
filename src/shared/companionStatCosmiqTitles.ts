@@ -5,8 +5,8 @@ import {
   type CompanionStatAttribute,
   type CompanionStatNeed,
   type CompanionStatProfileSummary,
-} from "./companionStatSignals";
-import type { OnboardingVisualPersona } from "./onboardingVisualPersona";
+} from "./companionStatSignals.ts";
+import type { OnboardingVisualPersona } from "./onboardingVisualPersona.ts";
 
 export type CompanionCosmiqTitleRarity =
   | "common"
