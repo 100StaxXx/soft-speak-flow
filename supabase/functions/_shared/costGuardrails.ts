@@ -55,6 +55,10 @@ interface ProviderResponseMetrics {
   inputTokens: number | null;
   outputTokens: number | null;
   totalTokens: number | null;
+  inputTextTokens: number | null;
+  inputImageTokens: number | null;
+  outputTextTokens: number | null;
+  outputImageTokens: number | null;
   audioSeconds: number | null;
   imageCount: number | null;
 }
@@ -156,10 +160,9 @@ export function getOpenAITextTokenRatesPerThousand(model: string | null): {
   outputRate: number;
 } {
   const modelName = (model ?? "").toLowerCase();
-  // OpenAI model docs publish GPT-5.5 text prices per 1M tokens;
+  // OpenAI model docs publish GPT-5.x text prices per 1M tokens;
   // guardrails store the same rates converted to per-1K tokens.
-  // Sources: https://developers.openai.com/api/docs/models/gpt-5.5
-  // and https://developers.openai.com/api/docs/models/gpt-5.5-pro.
+  // Sources: https://developers.openai.com/api/docs/models.
   if (modelName.includes("gpt-5.5-pro")) {
     return { inputRate: 0.03, outputRate: 0.18 };
   }
@@ -168,12 +171,132 @@ export function getOpenAITextTokenRatesPerThousand(model: string | null): {
     return { inputRate: 0.005, outputRate: 0.03 };
   }
 
+  if (modelName.includes("gpt-5.4-pro")) {
+    return { inputRate: 0.03, outputRate: 0.18 };
+  }
+
+  if (modelName.includes("gpt-5.4-mini")) {
+    return { inputRate: 0.00075, outputRate: 0.0045 };
+  }
+
+  if (modelName.includes("gpt-5.4-nano")) {
+    return { inputRate: 0.0002, outputRate: 0.00125 };
+  }
+
+  if (modelName.includes("gpt-5.4")) {
+    return { inputRate: 0.0025, outputRate: 0.015 };
+  }
+
+  if (modelName.includes("gpt-5.2")) {
+    return { inputRate: 0.00175, outputRate: 0.014 };
+  }
+
+  if (modelName.includes("gpt-5.1")) {
+    return { inputRate: 0.00125, outputRate: 0.01 };
+  }
+
   const isLargeModel = modelName.includes("gpt-5") ||
     modelName.includes("gpt-4o");
   return {
     inputRate: isLargeModel ? 0.005 : 0.001,
     outputRate: isLargeModel ? 0.015 : 0.002,
   };
+}
+
+export function getOpenAIImageTokenRatesPerThousand(model: string | null): {
+  textInputRate: number;
+  imageInputRate: number;
+  textOutputRate: number;
+  imageOutputRate: number;
+} {
+  const modelName = (model ?? "").toLowerCase();
+
+  if (modelName.includes("gpt-image-1-mini")) {
+    return {
+      textInputRate: 0.002,
+      imageInputRate: 0.0025,
+      textOutputRate: 0,
+      imageOutputRate: 0.008,
+    };
+  }
+
+  if (
+    modelName.includes("gpt-image-1.5") ||
+    modelName.includes("chatgpt-image-latest")
+  ) {
+    return {
+      textInputRate: 0.005,
+      imageInputRate: 0.008,
+      textOutputRate: 0.01,
+      imageOutputRate: 0.032,
+    };
+  }
+
+  if (modelName.includes("gpt-image-1")) {
+    return {
+      textInputRate: 0.005,
+      imageInputRate: 0.01,
+      textOutputRate: 0,
+      imageOutputRate: 0.04,
+    };
+  }
+
+  return {
+    textInputRate: 0.005,
+    imageInputRate: 0.008,
+    textOutputRate: 0,
+    imageOutputRate: 0.03,
+  };
+}
+
+export function getOpenAIImageFallbackCostUsd(
+  model: string | null,
+  size: string | null,
+  quality: string | null,
+): number {
+  const modelName = (model ?? "").toLowerCase();
+  const normalizedSize = size === "1024x1536" || size === "1536x1024"
+    ? "large"
+    : "square";
+  const normalizedQuality = quality === "low" || quality === "medium" ||
+      quality === "high"
+    ? quality
+    : "medium";
+
+  if (modelName.includes("gpt-image-1-mini")) {
+    const costs = {
+      low: { square: 0.005, large: 0.006 },
+      medium: { square: 0.011, large: 0.015 },
+      high: { square: 0.036, large: 0.052 },
+    } as const;
+    return costs[normalizedQuality][normalizedSize];
+  }
+
+  if (
+    modelName.includes("gpt-image-1.5") ||
+    modelName.includes("chatgpt-image-latest")
+  ) {
+    const costs = {
+      low: { square: 0.009, large: 0.013 },
+      medium: { square: 0.034, large: 0.05 },
+      high: { square: 0.133, large: 0.2 },
+    } as const;
+    return costs[normalizedQuality][normalizedSize];
+  }
+
+  if (
+    modelName.includes("gpt-image-1") &&
+    !modelName.includes("gpt-image-1-mini")
+  ) {
+    const costs = {
+      low: { square: 0.011, large: 0.016 },
+      medium: { square: 0.042, large: 0.063 },
+      high: { square: 0.167, large: 0.25 },
+    } as const;
+    return costs[normalizedQuality][normalizedSize];
+  }
+
+  return normalizedSize === "large" ? 0.08 : 0.05;
 }
 
 export function getCurrentCostPeriodStart(now = new Date()): string {
@@ -376,6 +499,20 @@ function resolveOpenAIModel(
   return raw;
 }
 
+function getStringField(source: JsonObject | null, key: string): string | null {
+  const value = source?.[key];
+  return typeof value === "string" ? value : null;
+}
+
+function hasOpenAIImageInput(requestBody: JsonObject | null): boolean {
+  return Boolean(
+    requestBody?.image ||
+      requestBody?.["image[]"] ||
+      requestBody?.images ||
+      requestBody?.mask,
+  );
+}
+
 function resolveCapabilityFromOpenAIRequest(
   pathname: string,
   body: JsonObject | null,
@@ -457,7 +594,10 @@ async function resolveProviderRequestContext(
     };
   }
 
-  if (hostname === "queue.fal.run" && (init?.method ?? "GET").toUpperCase() === "POST") {
+  if (
+    hostname === "queue.fal.run" &&
+    (init?.method ?? "GET").toUpperCase() === "POST"
+  ) {
     const model = resolveFalModelFromPathname(url.pathname);
     if (!model) return null;
     return {
@@ -480,6 +620,10 @@ async function extractResponseMetrics(
     inputTokens: null,
     outputTokens: null,
     totalTokens: null,
+    inputTextTokens: null,
+    inputImageTokens: null,
+    outputTextTokens: null,
+    outputImageTokens: null,
     audioSeconds: null,
     imageCount: null,
   };
@@ -506,6 +650,18 @@ async function extractResponseMetrics(
       usage?.completion_tokens ?? usage?.output_tokens,
     );
     metrics.totalTokens = toInt(usage?.total_tokens);
+    const inputDetails = usage?.input_tokens_details &&
+        typeof usage.input_tokens_details === "object"
+      ? usage.input_tokens_details as JsonObject
+      : null;
+    const outputDetails = usage?.output_tokens_details &&
+        typeof usage.output_tokens_details === "object"
+      ? usage.output_tokens_details as JsonObject
+      : null;
+    metrics.inputTextTokens = toInt(inputDetails?.text_tokens);
+    metrics.inputImageTokens = toInt(inputDetails?.image_tokens);
+    metrics.outputTextTokens = toInt(outputDetails?.text_tokens);
+    metrics.outputImageTokens = toInt(outputDetails?.image_tokens);
     metrics.audioSeconds = parseNumber(payload.duration, 0) || null;
 
     const dataImages = Array.isArray(payload.data) ? payload.data.length : 0;
@@ -543,12 +699,32 @@ function estimateOpenAICost(
   }
 
   if (capability === "image") {
-    const size = typeof requestBody?.image_size === "string"
-      ? requestBody.image_size
-      : "1024x1024";
+    const inputTokens = metrics.inputTokens ?? 0;
+    const outputTokens = metrics.outputTokens ?? 0;
+    if (inputTokens > 0 || outputTokens > 0) {
+      const rates = getOpenAIImageTokenRatesPerThousand(model);
+      const hasImageInput = hasOpenAIImageInput(requestBody);
+      const inputTextTokens = metrics.inputTextTokens ??
+        (hasImageInput ? 0 : inputTokens);
+      const inputImageTokens = metrics.inputImageTokens ??
+        (hasImageInput ? inputTokens : 0);
+      const outputTextTokens = metrics.outputTextTokens ?? 0;
+      const outputImageTokens = metrics.outputImageTokens ?? outputTokens;
+      return roundUsd(
+        (inputTextTokens / 1000) * rates.textInputRate +
+          (inputImageTokens / 1000) * rates.imageInputRate +
+          (outputTextTokens / 1000) * rates.textOutputRate +
+          (outputImageTokens / 1000) * rates.imageOutputRate,
+      );
+    }
+
+    const size = getStringField(requestBody, "size") ??
+      getStringField(requestBody, "image_size") ??
+      "1024x1024";
+    const quality = getStringField(requestBody, "quality");
     const imageCount = metrics.imageCount ??
       (parseNumber(requestBody?.n, 0) || 1);
-    const unitCost = size === "1536x1024" ? 0.08 : 0.05;
+    const unitCost = getOpenAIImageFallbackCostUsd(model, size, quality);
     return roundUsd(imageCount * unitCost);
   }
 

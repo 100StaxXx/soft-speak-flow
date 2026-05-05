@@ -1,18 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { CompanionEvolution } from "@/components/CompanionEvolution";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useEvolution } from "@/contexts/EvolutionContext";
+import {
+  useEvolution,
+  type PendingEvolutionReveal,
+} from "@/contexts/EvolutionContext";
 import { useCelebration } from "@/contexts/CelebrationContext";
 import { useMentorConnection } from "@/contexts/MentorConnectionContext";
 import { toast } from "@/components/ui/sonner";
 import { resolveCompanionVisualAssetUrl } from "@/lib/companionAssetResolver";
 import {
+  COMPANION_EVOLUTION_REVEAL_REQUESTED_EVENT,
   COMPANION_HATCH_STARTED_EVENT,
+  isCompanionEvolutionRevealRequestedDetail,
   isCompanionHatchStartedDetail,
 } from "@/lib/companionEvolutionEvents";
 import { logger } from "@/utils/logger";
+import { parseFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
 import {
   getProgressionLevelDisplay,
   getProgressionTierLabelForLevel,
@@ -38,10 +45,13 @@ type CompanionAnimationStatus =
 
 type PersistedEvolutionMetadata = {
   id: string;
+  imageUrl: string | null;
+  evolvedAt: string | null;
   animationVideoUrl: string | null;
   animationStatus: CompanionAnimationStatus | null;
   animationRequestedAt: string | null;
   animationCompletedAt: string | null;
+  animationPresentedAt: string | null;
 };
 
 type AnimationRetryResult = {
@@ -52,6 +62,7 @@ type AnimationRetryResult = {
 };
 
 type EvolutionPresentationData = {
+  evolutionId: string;
   companionId: string;
   previousLevel: number;
   level: number;
@@ -63,13 +74,19 @@ type EvolutionPresentationData = {
   element?: string;
 };
 
-type EvolutionPresentationRequest = Omit<EvolutionPresentationData, "animationVideoUrl" | "mentorSlug"> & {
+type EvolutionPresentationRequest = Omit<EvolutionPresentationData, "evolutionId" | "animationVideoUrl" | "mentorSlug"> & {
   dispatchLoadingStart?: boolean;
   markAsLocalHatch?: boolean;
   missingEvolutionLog?: Record<string, unknown>;
 };
 
 const sleep = (delayMs: number) => new Promise((resolve) => setTimeout(resolve, delayMs));
+const PRESENTED_EVOLUTION_STORAGE_PREFIX = "companion-evolution-presented";
+const locallyPresentedEvolutionKeys = new Set<string>();
+
+export const clearLocalEvolutionPresentationGuardsForTest = () => {
+  locallyPresentedEvolutionKeys.clear();
+};
 
 const normalizeAnimationStatus = (value: unknown): CompanionAnimationStatus | null => {
   if (
@@ -94,7 +111,7 @@ const fetchPersistedEvolutionMetadata = async ({
 }): Promise<PersistedEvolutionMetadata | null> => {
   const { data, error } = await supabase
     .from("companion_evolutions")
-    .select("id, animation_video_url, animation_status, animation_requested_at, animation_completed_at")
+    .select("id, image_url, evolved_at, animation_video_url, animation_status, animation_requested_at, animation_completed_at, animation_presented_at")
     .eq("companion_id", companionId)
     .eq("stage", stage)
     .maybeSingle();
@@ -118,6 +135,8 @@ const fetchPersistedEvolutionMetadata = async ({
 
   return {
     id: data.id,
+    imageUrl: typeof data.image_url === "string" ? data.image_url : null,
+    evolvedAt: typeof data.evolved_at === "string" ? data.evolved_at : null,
     animationStatus,
     animationVideoUrl,
     animationRequestedAt: typeof data.animation_requested_at === "string"
@@ -126,6 +145,9 @@ const fetchPersistedEvolutionMetadata = async ({
     animationCompletedAt: typeof data.animation_completed_at === "string"
       ? data.animation_completed_at
       : null,
+    animationPresentedAt: typeof data.animation_presented_at === "string"
+      ? data.animation_presented_at
+      : null,
   };
 };
 
@@ -133,6 +155,52 @@ const isTimestampAtOrAfter = (value: string | null, referenceMs: number): boolea
   if (!value) return false;
   const valueMs = new Date(value).getTime();
   return Number.isFinite(valueMs) && valueMs >= referenceMs;
+};
+
+const toDateOnly = (value: string | null | undefined): string => {
+  if (value) {
+    const parsedMs = new Date(value).getTime();
+    if (Number.isFinite(parsedMs)) {
+      return new Date(parsedMs).toISOString().split("T")[0];
+    }
+  }
+
+  return new Date().toISOString().split("T")[0];
+};
+
+const isUniqueViolation = (error: unknown): boolean => (
+  typeof error === "object"
+  && error !== null
+  && "code" in error
+  && (error as { code?: unknown }).code === "23505"
+);
+
+const getPresentedEvolutionStorageKey = (userId: string, evolutionId: string): string =>
+  `${PRESENTED_EVOLUTION_STORAGE_PREFIX}:${userId}:${evolutionId}`;
+
+const markEvolutionPresentedLocally = (userId: string, evolutionId: string) => {
+  const storageKey = getPresentedEvolutionStorageKey(userId, evolutionId);
+  locallyPresentedEvolutionKeys.add(storageKey);
+
+  try {
+    window.localStorage.setItem(
+      storageKey,
+      new Date().toISOString(),
+    );
+  } catch {
+    // localStorage can be unavailable in privacy modes; the RPC remains authoritative.
+  }
+};
+
+const wasEvolutionPresentedLocally = (userId: string, evolutionId: string): boolean => {
+  const storageKey = getPresentedEvolutionStorageKey(userId, evolutionId);
+  if (locallyPresentedEvolutionKeys.has(storageKey)) return true;
+
+  try {
+    return Boolean(window.localStorage.getItem(storageKey));
+  } catch {
+    return false;
+  }
 };
 
 const waitForEvolutionPersistence = async ({
@@ -171,13 +239,25 @@ const fetchAnimationJobId = async (evolutionId: string): Promise<string | null> 
 };
 
 const processAnimationJobOnce = async (jobId: string) => {
-  const { error } = await supabase.functions.invoke("process-companion-animation-job", {
-    body: { jobId },
-  });
+  const { error } = await supabase.functions.invoke(
+    "process-companion-animation-job",
+    {
+      body: { jobId },
+    },
+  );
 
   if (error) {
+    const parsedError = await parseFunctionInvokeError(error);
     logger.warn("Evolution listener: Companion animation worker invoke failed", {
       jobId,
+      status: parsedError.status,
+      code: parsedError.code,
+      reason: parsedError.failureReason ?? parsedError.backendMessage ??
+        parsedError.message,
+      category: parsedError.category,
+      requestId: parsedError.requestId,
+      upstreamStatus: parsedError.upstreamStatus,
+      upstreamError: parsedError.upstreamError,
       error: error.message ?? String(error),
     });
   }
@@ -411,11 +491,33 @@ const waitForEvolutionAnimation = async ({
   return null;
 };
 
+const markEvolutionAnimationPresented = async (evolutionId: string) => {
+  const { error } = await supabase.rpc("mark_companion_evolution_animation_presented", {
+    p_evolution_id: evolutionId,
+  });
+
+  if (error) {
+    logger.warn("Evolution listener: Failed to mark evolution animation as presented", {
+      evolutionId,
+      error: error.message,
+    });
+    return false;
+  }
+
+  return true;
+};
+
 export const GlobalEvolutionListener = () => {
   const { user } = useAuth();
   const { mentorId: resolvedMentorId } = useMentorConnection();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { setIsEvolvingLoading, onEvolutionComplete } = useEvolution();
+  const {
+    setIsEvolvingLoading,
+    pendingEvolutionReveal,
+    setPendingEvolutionReveal,
+    onEvolutionComplete,
+  } = useEvolution();
   const { setEvolutionInProgress } = useCelebration();
   const { triggerEvent } = useCompanionMotionSafe();
   const [isEvolving, setIsEvolving] = useState(false);
@@ -423,10 +525,12 @@ export const GlobalEvolutionListener = () => {
   const [pendingEvolutionData, setPendingEvolutionData] = useState<EvolutionPresentationData | null>(null);
   const activeEvolutionKeyRef = useRef<string | null>(null);
   const pendingEvolutionKeysRef = useRef(new Set<string>());
+  const pendingEvolutionRevealRef = useRef<PendingEvolutionReveal | null>(pendingEvolutionReveal);
   const pendingPreloadKeyRef = useRef<string | null>(null);
   const presentationRetryTimersRef = useRef(new Map<string, number>());
   const presentationRetryNotifiedKeysRef = useRef(new Set<string>());
   const recentLocalHatchKeysRef = useRef(new Map<string, number>());
+  const recordedEvolutionMemoryIdsRef = useRef(new Set<string>());
 
   const buildEvolutionKey = useCallback((companionId: string, stage: number) => (
     `${companionId}:${stage}`
@@ -439,6 +543,23 @@ export const GlobalEvolutionListener = () => {
       presentationRetryTimersRef.current.delete(key);
     }
   }, []);
+
+  const setPendingRevealState = useCallback((
+    next:
+      | PendingEvolutionReveal
+      | null
+      | ((current: PendingEvolutionReveal | null) => PendingEvolutionReveal | null),
+  ) => {
+    const resolved = typeof next === "function"
+      ? next(pendingEvolutionRevealRef.current)
+      : next;
+    pendingEvolutionRevealRef.current = resolved;
+    setPendingEvolutionReveal(resolved);
+  }, [setPendingEvolutionReveal]);
+
+  useEffect(() => {
+    pendingEvolutionRevealRef.current = pendingEvolutionReveal;
+  }, [pendingEvolutionReveal]);
 
   const pruneRecentLocalHatchKeys = useCallback(() => {
     const now = Date.now();
@@ -469,24 +590,30 @@ export const GlobalEvolutionListener = () => {
   }, [resolvedMentorId]);
 
   const recordEvolutionMemory = useCallback(({
+    evolutionId,
     companionId,
     previousLevel,
     level,
+    evolvedAt,
   }: {
+    evolutionId: string;
     companionId: string;
     previousLevel: number;
     level: number;
+    evolvedAt: string | null;
   }) => {
     if (!user?.id) return;
+    if (recordedEvolutionMemoryIdsRef.current.has(evolutionId)) return;
 
-    const today = new Date().toISOString().split("T")[0];
+    recordedEvolutionMemoryIdsRef.current.add(evolutionId);
+    const memoryDate = toDateOnly(evolvedAt);
     const isFirstEvolution = level === 1;
     const tierLabel = getProgressionTierLabelForLevel(level);
     supabase.from("companion_memories").insert({
       user_id: user.id,
       companion_id: companionId,
       memory_type: isFirstEvolution ? "first_evolution" : "evolution",
-      memory_date: today,
+      memory_date: memoryDate,
       memory_context: {
         title: isFirstEvolution ? "First Hatch" : `Reached ${getProgressionLevelDisplay(level)}`,
         description: isFirstEvolution
@@ -494,18 +621,24 @@ export const GlobalEvolutionListener = () => {
           : `Your companion crossed into the ${tierLabel} tier.`,
         emotion: isFirstEvolution ? "pride" : "joy",
         details: {
+          evolutionId,
           level,
           previousLevel,
           tier: tierLabel,
+          evolvedAt,
         },
       },
       referenced_count: 0,
     }).then(({ error }) => {
-      if (error) logger.error("Failed to create evolution memory:", error);
+      if (!error || isUniqueViolation(error)) return;
+
+      recordedEvolutionMemoryIdsRef.current.delete(evolutionId);
+      logger.error("Failed to create evolution memory:", error);
     });
   }, [user?.id]);
 
   const startEvolutionPresentation = useCallback(({
+    evolutionId,
     companionId,
     previousLevel,
     level,
@@ -517,6 +650,7 @@ export const GlobalEvolutionListener = () => {
     dispatchLoadingStart = false,
     markAsLocalHatch = false,
   }: {
+    evolutionId: string;
     companionId: string;
     previousLevel: number;
     level: number;
@@ -550,6 +684,7 @@ export const GlobalEvolutionListener = () => {
 
     try {
       setEvolutionData({
+        evolutionId,
         companionId,
         previousLevel,
         level,
@@ -571,12 +706,6 @@ export const GlobalEvolutionListener = () => {
       if (dispatchLoadingStart) {
         window.dispatchEvent(new CustomEvent("evolution-loading-start"));
       }
-
-      recordEvolutionMemory({
-        companionId,
-        previousLevel,
-        level,
-      });
 
       void resolveMentorSlug()
         .then((mentorSlug) => {
@@ -624,7 +753,6 @@ export const GlobalEvolutionListener = () => {
     }
   }, [
     buildEvolutionKey,
-    recordEvolutionMemory,
     resolveMentorSlug,
     setEvolutionInProgress,
     triggerEvent,
@@ -657,6 +785,17 @@ export const GlobalEvolutionListener = () => {
       window.dispatchEvent(new CustomEvent("evolution-loading-start"));
     }
     setIsEvolvingLoading(true);
+    setPendingRevealState({
+      status: "preparing",
+      companionId,
+      previousStage: previousLevel,
+      newStage: level,
+      previousImageUrl,
+      newImageUrl: imageUrl,
+      animationVideoUrl: null,
+      presetId: presetId ?? null,
+      element: element ?? null,
+    });
 
     let queuedForPreload = false;
     let scheduledRetry = false;
@@ -714,6 +853,32 @@ export const GlobalEvolutionListener = () => {
         return false;
       }
 
+      if (persistedEvolution.animationPresentedAt) {
+        setPendingRevealState((current) => (
+          current?.companionId === companionId && current.newStage === level
+            ? null
+            : current
+        ));
+        return false;
+      }
+
+      if (user?.id && wasEvolutionPresentedLocally(user.id, persistedEvolution.id)) {
+        setPendingRevealState((current) => (
+          current?.companionId === companionId && current.newStage === level
+            ? null
+            : current
+        ));
+        return false;
+      }
+
+      recordEvolutionMemory({
+        evolutionId: persistedEvolution.id,
+        companionId,
+        previousLevel,
+        level,
+        evolvedAt: persistedEvolution.evolvedAt,
+      });
+
       const readyEvolution = await waitForEvolutionAnimation({
         companionId,
         stage: level,
@@ -728,6 +893,7 @@ export const GlobalEvolutionListener = () => {
       presentationRetryNotifiedKeysRef.current.delete(key);
       pendingPreloadKeyRef.current = key;
       setPendingEvolutionData({
+        evolutionId: persistedEvolution.id,
         companionId,
         previousLevel,
         level,
@@ -750,7 +916,10 @@ export const GlobalEvolutionListener = () => {
   }, [
     buildEvolutionKey,
     clearPresentationRetryTimer,
+    recordEvolutionMemory,
+    setPendingRevealState,
     setIsEvolvingLoading,
+    user?.id,
   ]);
 
   const handlePendingAnimationReady = useCallback(() => {
@@ -762,17 +931,32 @@ export const GlobalEvolutionListener = () => {
     pendingPreloadKeyRef.current = null;
     setPendingEvolutionData(null);
     pendingEvolutionKeysRef.current.delete(key);
-
-    const started = startEvolutionPresentation(pending);
-    if (!started) {
-      setIsEvolvingLoading(false);
-      activeEvolutionKeyRef.current = null;
-    }
+    presentationRetryNotifiedKeysRef.current.delete(key);
+    setIsEvolvingLoading(false);
+    setPendingRevealState({
+      status: "ready",
+      companionId: pending.companionId,
+      evolutionId: pending.evolutionId,
+      previousStage: pending.previousLevel,
+      newStage: pending.level,
+      previousImageUrl: pending.previousImageUrl,
+      newImageUrl: pending.imageUrl,
+      animationVideoUrl: pending.animationVideoUrl,
+      presetId: pending.presetId ?? null,
+      element: pending.element ?? null,
+    });
+    toast.info("Your companion's evolution is ready.", {
+      action: {
+        label: "Reveal",
+        onClick: () => navigate("/companion"),
+      },
+    });
   }, [
     buildEvolutionKey,
+    navigate,
     pendingEvolutionData,
+    setPendingRevealState,
     setIsEvolvingLoading,
-    startEvolutionPresentation,
   ]);
 
   const retryPendingAnimationPreload = useCallback((reason: string) => {
@@ -792,6 +976,19 @@ export const GlobalEvolutionListener = () => {
     pendingPreloadKeyRef.current = null;
     setPendingEvolutionData(null);
     pendingEvolutionKeysRef.current.delete(key);
+    setIsEvolvingLoading(true);
+    setPendingRevealState({
+      status: "preparing",
+      companionId: pending.companionId,
+      evolutionId: pending.evolutionId,
+      previousStage: pending.previousLevel,
+      newStage: pending.level,
+      previousImageUrl: pending.previousImageUrl,
+      newImageUrl: pending.imageUrl,
+      animationVideoUrl: null,
+      presetId: pending.presetId ?? null,
+      element: pending.element ?? null,
+    });
 
     void requestAnimationJobRetry({
       companionId: pending.companionId,
@@ -814,6 +1011,8 @@ export const GlobalEvolutionListener = () => {
     beginEvolutionPresentationWhenReady,
     buildEvolutionKey,
     pendingEvolutionData,
+    setIsEvolvingLoading,
+    setPendingRevealState,
   ]);
 
   useEffect(() => {
@@ -975,6 +1174,131 @@ export const GlobalEvolutionListener = () => {
   ]);
 
   useEffect(() => {
+    if (!user?.id) return;
+
+    let cancelled = false;
+
+    const hydratePendingEvolutionReveal = async () => {
+      const { data: companion, error } = await supabase
+        .from("user_companion")
+        .select("id, current_stage, current_image_url, initial_image_url, preset_id, core_element, dormant_image_url, neglected_image_url")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (error) {
+        logger.warn("Evolution listener: Failed to hydrate pending reveal companion", {
+          userId: user.id,
+          error: error.message,
+        });
+        return;
+      }
+
+      const companionRecord = companion as Record<string, unknown> | null;
+      const companionId = typeof companionRecord?.id === "string" ? companionRecord.id : null;
+      const currentStage = typeof companionRecord?.current_stage === "number"
+        ? companionRecord.current_stage
+        : null;
+
+      if (!companionId || currentStage === null || currentStage <= 0) {
+        return;
+      }
+
+      const currentPending = pendingEvolutionRevealRef.current;
+      if (currentPending?.companionId === companionId && currentPending.newStage === currentStage) {
+        return;
+      }
+
+      const currentEvolution = await fetchPersistedEvolutionMetadata({
+        companionId,
+        stage: currentStage,
+      });
+
+      if (
+        cancelled ||
+        !currentEvolution ||
+        currentEvolution.animationPresentedAt
+      ) {
+        return;
+      }
+
+      const previousStage = Math.max(0, currentStage - 1);
+      let previousImageUrl: string | null =
+        typeof companionRecord?.initial_image_url === "string"
+          ? companionRecord.initial_image_url
+          : null;
+
+      if (previousStage > 0) {
+        const { data: previousEvolution } = await supabase
+          .from("companion_evolutions")
+          .select("image_url")
+          .eq("companion_id", companionId)
+          .eq("stage", previousStage)
+          .maybeSingle();
+
+        if (typeof previousEvolution?.image_url === "string") {
+          previousImageUrl = previousEvolution.image_url;
+        }
+      }
+
+      const element = typeof companionRecord?.core_element === "string"
+        ? companionRecord.core_element
+        : undefined;
+      const currentImageUrl = typeof companionRecord?.current_image_url === "string"
+        ? companionRecord.current_image_url
+        : "";
+      const resolvedCurrentImageUrl = currentEvolution.imageUrl
+        ?? resolveCompanionVisualAssetUrl({
+          preset_id: typeof companionRecord?.preset_id === "string" ? companionRecord.preset_id : null,
+          current_stage: currentStage,
+          core_element: element ?? null,
+          current_image_url: currentImageUrl,
+          dormant_image_url: typeof companionRecord?.dormant_image_url === "string"
+            ? companionRecord.dormant_image_url
+            : null,
+          neglected_image_url: typeof companionRecord?.neglected_image_url === "string"
+            ? companionRecord.neglected_image_url
+            : null,
+        })
+        ?? currentImageUrl;
+      const resolvedPreviousImageUrl = previousImageUrl
+        ?? resolveCompanionVisualAssetUrl({
+          preset_id: typeof companionRecord?.preset_id === "string" ? companionRecord.preset_id : null,
+          current_stage: previousStage,
+          core_element: element ?? null,
+          current_image_url: previousImageUrl ?? currentImageUrl,
+          dormant_image_url: null,
+          neglected_image_url: null,
+        })
+        ?? currentImageUrl;
+
+      if (cancelled || !resolvedCurrentImageUrl || !resolvedPreviousImageUrl) {
+        return;
+      }
+
+      void beginEvolutionPresentationWhenReady({
+        companionId,
+        previousLevel: previousStage,
+        level: currentStage,
+        previousImageUrl: resolvedPreviousImageUrl,
+        imageUrl: resolvedCurrentImageUrl,
+        presetId: typeof companionRecord?.preset_id === "string"
+          ? companionRecord.preset_id
+          : undefined,
+        element,
+        dispatchLoadingStart: false,
+      });
+    };
+
+    void hydratePendingEvolutionReveal();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [beginEvolutionPresentationWhenReady, user?.id]);
+
+  useEffect(() => {
     if (!user) return;
 
     const handleHatchStarted = (event: Event) => {
@@ -1001,6 +1325,62 @@ export const GlobalEvolutionListener = () => {
       window.removeEventListener(COMPANION_HATCH_STARTED_EVENT, handleHatchStarted as EventListener);
     };
   }, [beginEvolutionPresentationWhenReady, user]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const handleRevealRequested = (event: Event) => {
+      const detail = (event as CustomEvent<unknown>).detail;
+      if (!isCompanionEvolutionRevealRequestedDetail(detail)) {
+        return;
+      }
+
+      const pending = pendingEvolutionRevealRef.current;
+      if (
+        !pending ||
+        pending.status !== "ready" ||
+        pending.companionId !== detail.companionId ||
+        pending.newStage !== detail.stage
+      ) {
+        return;
+      }
+
+      if (!pending.evolutionId || !pending.animationVideoUrl) {
+        logger.warn("Evolution listener: Reveal requested before animation was playable", {
+          companionId: pending.companionId,
+          stage: pending.newStage,
+        });
+        return;
+      }
+
+      const started = startEvolutionPresentation({
+        evolutionId: pending.evolutionId,
+        companionId: pending.companionId,
+        previousLevel: pending.previousStage,
+        level: pending.newStage,
+        previousImageUrl: pending.previousImageUrl,
+        imageUrl: pending.newImageUrl,
+        animationVideoUrl: pending.animationVideoUrl,
+        presetId: pending.presetId ?? undefined,
+        element: pending.element ?? undefined,
+      });
+
+      if (started) {
+        setIsEvolvingLoading(false);
+      }
+    };
+
+    window.addEventListener(
+      COMPANION_EVOLUTION_REVEAL_REQUESTED_EVENT,
+      handleRevealRequested as EventListener,
+    );
+    return () => {
+      window.removeEventListener(
+        COMPANION_EVOLUTION_REVEAL_REQUESTED_EVENT,
+        handleRevealRequested as EventListener,
+      );
+    };
+  }, [setIsEvolvingLoading, startEvolutionPresentation, user]);
 
   return (
     <>
@@ -1043,8 +1423,20 @@ export const GlobalEvolutionListener = () => {
             setEvolutionData(null);
             activeEvolutionKeyRef.current = null;
             pendingEvolutionKeysRef.current.delete(key);
-            setIsEvolvingLoading(false);
+            setIsEvolvingLoading(true);
             setEvolutionInProgress(false);
+            setPendingRevealState({
+              status: "preparing",
+              evolutionId: evolutionData.evolutionId,
+              companionId: evolutionData.companionId,
+              previousStage: evolutionData.previousLevel,
+              newStage: evolutionData.level,
+              previousImageUrl: evolutionData.previousImageUrl,
+              newImageUrl: evolutionData.imageUrl,
+              animationVideoUrl: null,
+              presetId: evolutionData.presetId ?? null,
+              element: evolutionData.element ?? null,
+            });
             toast.info("Your companion animation needs another pass. We'll try again.");
             void requestAnimationJobRetry({
               companionId: evolutionData.companionId,
@@ -1065,11 +1457,27 @@ export const GlobalEvolutionListener = () => {
             });
           }}
           onComplete={() => {
+            const completedEvolutionId = evolutionData.evolutionId;
+            const completedKey = buildEvolutionKey(evolutionData.companionId, evolutionData.level);
+            if (user?.id) {
+              markEvolutionPresentedLocally(user.id, completedEvolutionId);
+            }
             setIsEvolving(false);
             setEvolutionData(null);
             activeEvolutionKeyRef.current = null;
             setIsEvolvingLoading(false);
             setEvolutionInProgress(false);
+            pendingEvolutionKeysRef.current.delete(completedKey);
+            setPendingRevealState((current) => (
+              current?.companionId === evolutionData.companionId && current.newStage === evolutionData.level
+                ? null
+                : current
+            ));
+            void markEvolutionAnimationPresented(completedEvolutionId).then((marked) => {
+              if (marked) {
+                queryClient.invalidateQueries({ queryKey: ["companion-evolution-replays"] });
+              }
+            });
 
             if (onEvolutionComplete) {
               onEvolutionComplete();

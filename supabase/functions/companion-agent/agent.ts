@@ -178,7 +178,7 @@ const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const OPENAI_CHAT_COMPLETIONS_URL =
   "https://api.openai.com/v1/chat/completions";
 const OPENAI_CONVERSATIONS_URL = "https://api.openai.com/v1/conversations";
-export const DEFAULT_COMPANION_AGENT_MODEL = "gpt-5.5";
+export const DEFAULT_COMPANION_AGENT_MODEL = "gpt-5.4-mini";
 
 const MAX_TOOL_LOOPS = 6;
 const MAX_TASKS = 18;
@@ -209,6 +209,25 @@ export const resolveCompanionAgentModel = (
   env("OPENAI_COMPANION_AGENT_MODEL") ??
     env("OPENAI_TEXT_MODEL") ??
     DEFAULT_COMPANION_AGENT_MODEL;
+
+const normalizeCompanionAgentModelName = (model: string) =>
+  model.trim().toLowerCase();
+
+const isReasoningCompanionAgentModel = (model: string) =>
+  /^(gpt-5|o[1-9])/.test(normalizeCompanionAgentModelName(model));
+
+const supportsNoReasoningEffort = (model: string) =>
+  /^gpt-5\.(?:[12]|4(?:-(?:mini|nano))?|5)(?:-\d{4}-\d{2}-\d{2})?$/.test(
+    normalizeCompanionAgentModelName(model),
+  );
+
+const buildResponsesReasoningConfig = (model: string) =>
+  supportsNoReasoningEffort(model)
+    ? { reasoning: { effort: "none" as const } }
+    : {};
+
+const buildChatReasoningConfig = (model: string) =>
+  supportsNoReasoningEffort(model) ? { reasoning_effort: "none" as const } : {};
 
 const OPENAI_PROVIDER_UNAVAILABLE_REPLY =
   "I'm having trouble reaching my AI brain right now. Try again in a moment, and I'll pick this back up.";
@@ -2511,6 +2530,7 @@ async function createOpenAIResponse(params: {
     max_tool_calls: 20,
     parallel_tool_calls: true,
     store: true,
+    ...buildResponsesReasoningConfig(model),
   };
 
   if (params.conversationId) {
@@ -3886,7 +3906,7 @@ const runDraftOpportunitySidecar = async (params: {
   const model = resolveCompanionAgentModel();
   const messages = [
     {
-      role: "system",
+      role: "system" as const,
       content: [
         "You are Cosmiq's backend draft-opportunity decider.",
         "The user-facing assistant already replied. Decide whether the backend should show one draft suggestion card, show one campaign-start suggestion card, or do nothing.",
@@ -3899,10 +3919,17 @@ const runDraftOpportunitySidecar = async (params: {
       ].join("\n"),
     },
     {
-      role: "user",
+      role: "user" as const,
       content: JSON.stringify(buildDraftOpportunityContext(params)),
     },
   ];
+  const chatMessages = isReasoningCompanionAgentModel(model)
+    ? messages.map((message) =>
+      message.role === "system"
+        ? { ...message, role: "developer" as const }
+        : message
+    )
+    : messages;
 
   try {
     const response = await withTimeout(
@@ -3915,9 +3942,10 @@ const runDraftOpportunitySidecar = async (params: {
           },
           body: JSON.stringify({
             model,
-            messages,
+            messages: chatMessages,
             response_format: { type: "json_object" },
             max_completion_tokens: 500,
+            ...buildChatReasoningConfig(model),
           }),
         }),
       {
@@ -3947,6 +3975,7 @@ const runDraftOpportunitySidecar = async (params: {
             input: [messages[1]],
             max_output_tokens: 500,
             store: false,
+            ...buildResponsesReasoningConfig(model),
           }),
         }),
       {

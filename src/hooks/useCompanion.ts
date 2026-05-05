@@ -502,13 +502,42 @@ const clearAiCompanionImageRequestKey = (userId: string): void => {
 
 const kickOffCompanionAnimationJob = async (jobId: string) => {
   try {
-    await supabase.functions.invoke("process-companion-animation-job", {
-      body: { jobId },
-    });
+    const { error } = await supabase.functions.invoke(
+      "process-companion-animation-job",
+      {
+        body: { jobId },
+      },
+    );
+
+    if (error) {
+      const parsedError = await parseFunctionInvokeError(error);
+      logger.warn("Companion animation worker kick-off failed", {
+        jobId,
+        status: parsedError.status,
+        code: parsedError.code,
+        reason: parsedError.failureReason ?? parsedError.backendMessage ??
+          parsedError.message,
+        category: parsedError.category,
+        requestId: parsedError.requestId,
+        upstreamStatus: parsedError.upstreamStatus,
+        upstreamError: parsedError.upstreamError,
+        error: error.message ?? String(error),
+      });
+    }
   } catch (error) {
-    logger.warn("Companion animation worker kick-off failed", {
-      jobId,
-      error: error instanceof Error ? error.message : String(error),
+    void parseFunctionInvokeError(error).then((parsedError) => {
+      logger.warn("Companion animation worker kick-off failed", {
+        jobId,
+        status: parsedError.status,
+        code: parsedError.code,
+        reason: parsedError.failureReason ?? parsedError.backendMessage ??
+          parsedError.message,
+        category: parsedError.category,
+        requestId: parsedError.requestId,
+        upstreamStatus: parsedError.upstreamStatus,
+        upstreamError: parsedError.upstreamError,
+        error: error instanceof Error ? error.message : String(error),
+      });
     });
   }
 };

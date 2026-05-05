@@ -121,6 +121,16 @@ export const EPIC_XP_REWARDS = {
 } as const;
 
 /**
+ * Campaign XP Rewards
+ *
+ * Creating a first campaign should be enough to make the egg hatch-ready.
+ */
+export const CAMPAIGN_XP_REWARDS = {
+  /** Creating a campaign */
+  CREATE: 10,
+} as const;
+
+/**
  * Calendar Power-Up XP Bonuses
  * 
  * Bonus XP for strategic scheduling behaviors.

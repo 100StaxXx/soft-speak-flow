@@ -1,11 +1,11 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { COMPANION_PICKER_PRESETS } from "@/config/companionCatalog";
+import { COMPANION_PRESETS } from "@/config/companionCatalog";
 import { CompanionPersonalization } from "./CompanionPersonalization";
 
 const getVisibleSpeciesOrder = () => {
-  const speciesNames = COMPANION_PICKER_PRESETS.map((preset) => preset.displayName);
+  const speciesNames = COMPANION_PRESETS.map((preset) => preset.displayName);
 
   return screen
     .getAllByRole("button")
@@ -24,30 +24,47 @@ describe("CompanionPersonalization", () => {
       />,
     );
 
-    const eggImages = screen.getAllByRole("img", { name: "Ember Egg" });
-    expect(eggImages.some((image) =>
+    const eggImage = screen.getAllByRole("img", { name: "Ember Egg" }).find((image) =>
       image.getAttribute("data-companion-image-fit") === "contain"
       && image.getAttribute("data-companion-image-focal-source") === "manifest"
-      && image.getAttribute("style")?.includes("scale(1.08)")
-    )).toBe(true);
+      && image.getAttribute("data-companion-image-asset-key") === "companion-eggs/v2/egg__t0_egg__normal__fire.webp"
+    );
+
+    expect(eggImage).toBeDefined();
+    expect(eggImage!).toHaveStyle({ transform: "translate(0.000%, 0.000%)" });
   });
 
-  it("dims unsupported egg elements during onboarding mode", () => {
+  it("allows every egg element during onboarding mode without status labels", () => {
+    const onComplete = vi.fn();
+
     render(
       <CompanionPersonalization
-        onComplete={vi.fn()}
+        onComplete={onComplete}
         mode="onboarding"
         layout="compact"
       />,
     );
 
     const stormButton = screen.getByRole("button", { name: /Storm Egg/i });
-    expect(stormButton).toBeDisabled();
-    expect(stormButton).toHaveAttribute("data-supported", "false");
-    expect(screen.getAllByText("Coming Soon").length).toBeGreaterThan(0);
+    expect(stormButton).toBeEnabled();
+    expect(stormButton).toHaveAttribute("data-supported", "true");
+    expect(screen.queryByText("Selected")).not.toBeInTheDocument();
+    expect(screen.queryByText("Coming Soon")).not.toBeInTheDocument();
+
+    fireEvent.click(stormButton);
+    fireEvent.click(screen.getByRole("button", { name: "Begin Your Journey" }));
+
+    expect(onComplete).toHaveBeenCalledWith({
+      presetId: null,
+      favoriteColor: "#38BDF8",
+      spiritAnimal: "Egg",
+      coreElement: "storm",
+      storyTone: "epic_adventure",
+      companionName: null,
+    });
   });
 
-  it("dims unsupported presets during hatch mode and keeps supported presets selectable", () => {
+  it("allows all active species during hatch mode without status labels", () => {
     render(
       <CompanionPersonalization
         onComplete={vi.fn()}
@@ -56,24 +73,24 @@ describe("CompanionPersonalization", () => {
       />,
     );
 
-    expect(getVisibleSpeciesOrder().slice(0, 3)).toEqual(["Leviathan", "Phoenix", "Kitsune"]);
-    for (const removedSpecies of ["Wolf", "Owl", "Lion", "Griffin", "Sphinx"]) {
-      expect(screen.queryByText(removedSpecies)).not.toBeInTheDocument();
-    }
-
     const dragonButton = screen.getByText("Dragon").closest("button");
     expect(dragonButton).not.toBeNull();
-    expect(dragonButton).toBeDisabled();
-    expect(dragonButton).toHaveAttribute("data-supported", "false");
+    expect(dragonButton).toBeEnabled();
+    expect(dragonButton).toHaveAttribute("data-supported", "true");
+
+    const griffinButton = screen.getByText("Griffin").closest("button");
+    expect(griffinButton).not.toBeNull();
+    expect(griffinButton).toBeEnabled();
 
     const phoenixButton = screen.getByText("Phoenix").closest("button");
     expect(phoenixButton).not.toBeNull();
     expect(phoenixButton).toBeEnabled();
     fireEvent.click(phoenixButton);
-    expect(screen.getAllByText("Selected").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Selected")).not.toBeInTheDocument();
+    expect(screen.queryByText("Coming Soon")).not.toBeInTheDocument();
   });
 
-  it("renders the curated species roster in hatch mode", () => {
+  it("renders the active species roster in hatch mode", () => {
     render(
       <CompanionPersonalization
         onComplete={vi.fn()}
@@ -82,16 +99,7 @@ describe("CompanionPersonalization", () => {
       />,
     );
 
-    expect(getVisibleSpeciesOrder()).toEqual([
-      "Leviathan",
-      "Phoenix",
-      "Kitsune",
-      "Dragon",
-      "Pegasus",
-      "Mechanical Dragon",
-      "Tanuki",
-      "Buttercat",
-    ]);
+    expect(getVisibleSpeciesOrder()).toEqual(COMPANION_PRESETS.map((preset) => preset.displayName));
   });
 
   it("lets reset mode lock a species while keeping the stage 0 egg flow", () => {

@@ -146,6 +146,8 @@ vi.mock("@/contexts/EvolutionContext", () => ({
   useEvolution: () => ({
     isEvolvingLoading: mocks.isEvolvingLoading,
     setIsEvolvingLoading: vi.fn(),
+    pendingEvolutionReveal: null,
+    setPendingEvolutionReveal: vi.fn(),
     onEvolutionComplete: null,
     setOnEvolutionComplete: vi.fn(),
   }),

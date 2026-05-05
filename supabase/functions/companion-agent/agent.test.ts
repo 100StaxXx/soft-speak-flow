@@ -475,7 +475,7 @@ Deno.test("resolveCompanionAgentModel uses default and env precedence", () => {
 
 Deno.test("runCompanionAgent keeps composer conversation chat-only when model does not draft", async () => {
   const supabase = createMockSupabase();
-  const { guardedFetch } = createInstructionCaptureFetch(
+  const { guardedFetch, responseBodies } = createInstructionCaptureFetch(
     "Yeah, talk to me. What are you trying to untangle?",
   );
 
@@ -494,6 +494,7 @@ Deno.test("runCompanionAgent keeps composer conversation chat-only when model do
     },
   });
 
+  assertEquals(responseBodies[0]?.reasoning, { effort: "none" });
   assertEquals(result.mode, "conversation");
   assertEquals(result.understandingState, "enough_to_discuss");
   assertEquals(result.pendingAction, undefined);
@@ -548,6 +549,11 @@ Deno.test("runCompanionDraftOpportunity surfaces a concrete quest sidecar draft 
   });
 
   assertEquals(draftOpportunityBodies.length, 1);
+  assertEquals(draftOpportunityBodies[0]?.reasoning_effort, "none");
+  assertEquals(
+    (draftOpportunityBodies[0]?.messages as Array<{ role?: string }>)[0]?.role,
+    "developer",
+  );
   assertEquals(result.understandingState, "ready_to_propose");
   assertEquals(result.proposedActions[0]?.type, "task_create");
   assertEquals(
@@ -1508,6 +1514,7 @@ Deno.test("runCompanionAgent does not create a composer draft from deterministic
     guardedFetch,
     supabase: supabase.client,
     userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "",
     request: {
       surface: "journeys",
       sessionId: "session-composer-fallback-no-draft",
@@ -1841,7 +1848,7 @@ Deno.test("runCompanionAgent records provider diagnostics for model access failu
     body: {
       error: {
         message:
-          "The model `gpt-5.5` does not exist or you do not have access to it.",
+          `The model \`${DEFAULT_COMPANION_AGENT_MODEL}\` does not exist or you do not have access to it.`,
         type: "invalid_request_error",
         code: "model_not_found",
       },
@@ -1864,6 +1871,7 @@ Deno.test("runCompanionAgent records provider diagnostics for model access failu
   });
 
   assertEquals(responseBodies[0].model, DEFAULT_COMPANION_AGENT_MODEL);
+  assertEquals(responseBodies[0].reasoning, { effort: "none" });
   assertEquals(result.mode, "conversation");
   assert(result.reply.includes("having trouble reaching my AI brain"));
 

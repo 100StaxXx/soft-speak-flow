@@ -37,7 +37,7 @@ import {
 } from "../../../src/shared/companionPlannerReadyProposal.ts";
 
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
-export const DEFAULT_COMPANION_PLANNER_MODEL = "gpt-5.5";
+export const DEFAULT_COMPANION_PLANNER_MODEL = "gpt-5.4-mini";
 
 const getOptionalEnv = (name: string): string | null => {
   try {
@@ -55,6 +55,74 @@ export const resolveCompanionPlannerModel = (
   env: (name: string) => string | null | undefined = getOptionalEnv,
 ): string =>
   env("OPENAI_COMPANION_PLANNER_MODEL") ?? DEFAULT_COMPANION_PLANNER_MODEL;
+
+type PlannerChatMessage = {
+  role: "system" | "developer" | "user" | "assistant" | "tool";
+  content: string | null;
+  tool_calls?: Array<{
+    id: string;
+    type: "function";
+    function: { name: string; arguments: string };
+  }>;
+  tool_call_id?: string;
+};
+
+const normalizePlannerChatModelName = (model: string) =>
+  model.trim().toLowerCase();
+
+const isReasoningPlannerChatModel = (model: string) =>
+  /^(gpt-5|o[1-9])/.test(normalizePlannerChatModelName(model));
+
+const supportsNoReasoningEffort = (model: string) =>
+  /^gpt-5\.(?:[12]|4(?:-(?:mini|nano))?|5)(?:-\d{4}-\d{2}-\d{2})?$/.test(
+    normalizePlannerChatModelName(model),
+  );
+
+function buildPlannerChatCompletionBody(params: {
+  model: string;
+  messages: PlannerChatMessage[];
+  temperature: number;
+  maxTokens: number;
+  responseFormat?: Record<string, unknown>;
+  tools?: readonly unknown[];
+  toolChoice?: unknown;
+  parallelToolCalls?: boolean;
+}): Record<string, unknown> {
+  const usesReasoningParams = isReasoningPlannerChatModel(params.model);
+  const messages = usesReasoningParams
+    ? params.messages.map((message) =>
+      message.role === "system"
+        ? { ...message, role: "developer" as const }
+        : message
+    )
+    : params.messages;
+
+  return {
+    model: params.model,
+    ...(usesReasoningParams
+      ? {
+        ...(supportsNoReasoningEffort(params.model)
+          ? { reasoning_effort: "none" as const }
+          : {}),
+        max_completion_tokens: params.maxTokens,
+      }
+      : {
+        temperature: params.temperature,
+        max_tokens: params.maxTokens,
+      }),
+    ...(params.responseFormat
+      ? { response_format: params.responseFormat }
+      : {}),
+    ...(params.tools ? { tools: params.tools } : {}),
+    ...(params.toolChoice !== undefined
+      ? { tool_choice: params.toolChoice }
+      : {}),
+    ...(params.parallelToolCalls !== undefined
+      ? { parallel_tool_calls: params.parallelToolCalls }
+      : {}),
+    messages,
+  };
+}
 
 type PlannerLLMReply = {
   reply: string;
@@ -603,16 +671,16 @@ export async function buildUpcomingAIResponse(params: {
         Authorization: `Bearer ${openAIApiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
+      body: JSON.stringify(buildPlannerChatCompletionBody({
         model,
         temperature: 0.5,
-        max_tokens: 300,
-        response_format: { type: "json_object" },
+        maxTokens: 300,
+        responseFormat: { type: "json_object" },
         messages: [
           { role: "system", content: buildUpcomingSystemPrompt() },
           { role: "user", content: buildUpcomingUserPrompt(params.input) },
         ],
-      }),
+      })),
     });
 
     if (!response.ok) {
@@ -745,16 +813,7 @@ const shouldUsePlanDayToolLoop = (
   baseResult: PlannerBuildResult,
 ): boolean => isPlanDayRefinementTurn(input, baseResult);
 
-type PlanDayToolMessage = {
-  role: "system" | "user" | "assistant" | "tool";
-  content: string | null;
-  tool_calls?: Array<{
-    id: string;
-    type: "function";
-    function: { name: string; arguments: string };
-  }>;
-  tool_call_id?: string;
-};
+type PlanDayToolMessage = PlannerChatMessage;
 
 async function runPlanDayToolLoop(params: {
   guardedFetch: typeof fetch;
@@ -793,15 +852,15 @@ async function runPlanDayToolLoop(params: {
         Authorization: `Bearer ${params.openAIApiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
+      body: JSON.stringify(buildPlannerChatCompletionBody({
         model: params.model,
         temperature: 0.5,
-        max_tokens: 600,
-        parallel_tool_calls: true,
+        maxTokens: 600,
+        parallelToolCalls: true,
         tools: PLAN_DAY_TOOL_DEFINITIONS,
-        tool_choice: state.clarification ? "none" : "auto",
+        toolChoice: state.clarification ? "none" : "auto",
         messages,
-      }),
+      })),
     });
 
     if (!response.ok) {
@@ -1039,11 +1098,11 @@ export async function buildOrchestratedPlannerResponse(params: {
         Authorization: `Bearer ${openAIApiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
+      body: JSON.stringify(buildPlannerChatCompletionBody({
         model,
         temperature: 0.8,
-        max_tokens: 260,
-        response_format: { type: "json_object" },
+        maxTokens: 260,
+        responseFormat: { type: "json_object" },
         messages: [
           {
             role: "system",
@@ -1058,7 +1117,7 @@ export async function buildOrchestratedPlannerResponse(params: {
             content: buildUserPrompt(params.input, params.baseResult),
           },
         ],
-      }),
+      })),
     });
 
     if (!response.ok) {

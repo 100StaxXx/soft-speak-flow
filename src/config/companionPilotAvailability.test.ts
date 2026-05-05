@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { COMPANION_ELEMENTS, COMPANION_PRESETS } from "./companionCatalog";
 import {
   COMPANION_FUTURE_STATE_LABEL,
   PILOT_COMPANION_ELEMENT_IDS,
@@ -11,17 +12,17 @@ import {
 } from "./companionPilotAvailability";
 
 describe("companionPilotAvailability", () => {
-  it("locks the launch pilot matrix", () => {
-    expect(PILOT_COMPANION_PRESET_IDS).toEqual(["fox", "phoenix", "leviathan"]);
-    expect(PILOT_COMPANION_ELEMENT_IDS).toEqual(["fire", "ice", "nature"]);
+  it("supports all active companion presets and elements", () => {
+    expect(PILOT_COMPANION_PRESET_IDS).toEqual(COMPANION_PRESETS.map((preset) => preset.id));
+    expect(PILOT_COMPANION_ELEMENT_IDS).toEqual(COMPANION_ELEMENTS.map((element) => element.id));
     expect(COMPANION_FUTURE_STATE_LABEL).toBe("Coming Soon");
   });
 
   it("recognizes supported presets and elements", () => {
     expect(isPilotCompanionPreset("fox")).toBe(true);
-    expect(isPilotCompanionPreset("dragon")).toBe(false);
+    expect(isPilotCompanionPreset("dragon")).toBe(true);
     expect(isPilotCompanionElement("nature")).toBe(true);
-    expect(isPilotCompanionElement("storm")).toBe(false);
+    expect(isPilotCompanionElement("storm")).toBe(true);
   });
 
   it("returns stable supported defaults", () => {

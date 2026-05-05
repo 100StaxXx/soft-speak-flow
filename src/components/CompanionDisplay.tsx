@@ -54,6 +54,10 @@ import {
   isAiGeneratedCompanion,
   isPresetEggCompanion,
 } from "@/lib/companionPredicates";
+import {
+  COMPANION_EVOLUTION_REVEAL_REQUESTED_EVENT,
+  type CompanionEvolutionRevealRequestedDetail,
+} from "@/lib/companionEvolutionEvents";
 import { useMotionProfile } from "@/hooks/useMotionProfile";
 import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
 import {
@@ -154,7 +158,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
   const { regenerate, isRegenerating, maxRegenerations, generationPhase, retryCount, resetProgress } = useCompanionRegenerate();
   const { equippedRewards } = useEpicRewards();
   const { isPreHatchCompanionStep } = usePostOnboardingMentorGuidance();
-  useEvolution();
+  const { pendingEvolutionReveal } = useEvolution();
   
   // Wake-up celebration detection
   const {
@@ -207,11 +211,22 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
   const previousImageUrl = useRef<string | null>(null);
   const regenerationsUsed = companion?.image_regenerations_used ?? 0;
   const regenerationsRemaining = Math.max(0, maxRegenerations - regenerationsUsed);
+  const matchingPendingEvolutionReveal = useMemo(
+    () => (
+      companion &&
+      pendingEvolutionReveal?.companionId === companion.id &&
+      pendingEvolutionReveal.newStage === companion.current_stage
+        ? pendingEvolutionReveal
+        : null
+    ),
+    [companion, pendingEvolutionReveal],
+  );
   const {
     displayCompanion,
     displayNextEvolutionXP,
     displayProgressToNext,
     displayCanEvolve,
+    isPendingRevealDisplay,
   } = useMemo(
     () =>
       deriveCompanionDisplayState({
@@ -220,8 +235,16 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
         progressToNext,
         canEvolve,
         forcePreHatchDisplay: isPreHatchCompanionStep,
+        pendingEvolutionReveal: matchingPendingEvolutionReveal,
       }),
-    [canEvolve, companion, isPreHatchCompanionStep, nextEvolutionXP, progressToNext],
+    [
+      canEvolve,
+      companion,
+      isPreHatchCompanionStep,
+      matchingPendingEvolutionReveal,
+      nextEvolutionXP,
+      progressToNext,
+    ],
   );
   const displayRequiresHatchSelection = Boolean(
     displayCompanion
@@ -515,6 +538,16 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
     const fetchCreatureName = async () => {
       if (!displayCompanion) return;
 
+      if (isPendingRevealDisplay) {
+        setCreatureName(
+          getStoredCompanionCustomName(displayCompanion)
+          ?? (displayCompanion.current_stage === 0
+            ? getCompanionEggLabel(displayCompanion.core_element)
+            : "Companion"),
+        );
+        return;
+      }
+
       if (displayCompanion.current_stage === 0) {
         setCreatureName(
           getStoredCompanionCustomName(displayCompanion)
@@ -545,6 +578,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
     displayCompanion?.cached_creature_name,
     displayCompanion?.spirit_animal,
     displayCompanion?.core_element,
+    isPendingRevealDisplay,
   ]);
 
   if (isLoading) return <CompanionSkeleton />;
@@ -586,8 +620,29 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
   const displayedCreatureName = creatureName
     || customDisplayName
     || (isStageZeroEgg ? getCompanionEggLabel(displayCompanion.core_element) : "Companion");
+  const isPendingRevealReady = matchingPendingEvolutionReveal?.status === "ready";
+  const isPendingRevealPreparing = isPendingRevealDisplay && !isPendingRevealReady;
 
   const handleEvolvePress = () => {
+    if (matchingPendingEvolutionReveal?.status === "ready") {
+      window.dispatchEvent(
+        new CustomEvent<CompanionEvolutionRevealRequestedDetail>(
+          COMPANION_EVOLUTION_REVEAL_REQUESTED_EVENT,
+          {
+            detail: {
+              companionId: matchingPendingEvolutionReveal.companionId,
+              stage: matchingPendingEvolutionReveal.newStage,
+            },
+          },
+        ),
+      );
+      return;
+    }
+
+    if (isPendingRevealDisplay) {
+      return;
+    }
+
     if (displayRequiresHatchSelection) {
       setHatchDialogOpen(true);
       return;
@@ -1000,9 +1055,10 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
               {displayCanEvolve && (
                 <EvolveButton
                   onEvolve={handleEvolvePress}
-                  isEvolving={isEvolutionBusy}
-                  actionLabel={isStageZeroEgg ? "HATCH" : "EVOLVE"}
-                  loadingLabel={isStageZeroEgg ? "HATCHING..." : "EVOLVING..."}
+                  isEvolving={isEvolutionBusy || isPendingRevealPreparing}
+                  actionLabel={isPendingRevealReady ? "REVEAL" : isStageZeroEgg ? "HATCH" : "EVOLVE"}
+                  loadingLabel={isPendingRevealDisplay ? "PREPARING..." : isStageZeroEgg ? "HATCHING..." : "EVOLVING..."}
+                  durationLabel={isPendingRevealDisplay ? "Preparing the reveal" : undefined}
                 />
               )}
             </AnimatePresence>

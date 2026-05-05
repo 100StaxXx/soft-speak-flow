@@ -518,6 +518,7 @@ export const useXPRewards = () => {
     eventType: string,
     displayReason?: string,
     metadata?: XPEventMetadata,
+    idempotencyKey?: string,
   ) => {
     // Guard: Don't attempt XP award if companion not loaded or mutation in progress
     if (!companion) {
@@ -534,7 +535,7 @@ export const useXPRewards = () => {
     }
 
     try {
-      return await awardXPEventAsync(eventType, effectiveAmount, metadata);
+      return await awardXPEventAsync(eventType, effectiveAmount, metadata, idempotencyKey);
     } catch (error) {
       logger.error('Error awarding custom XP:', error);
       throw error;

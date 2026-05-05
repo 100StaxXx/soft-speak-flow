@@ -8,7 +8,11 @@ import {
   createRateLimitResponse,
   RATE_LIMITS,
 } from "../_shared/rateLimiter.ts";
-import { resolveCompanionImageSizeForUser } from "../_shared/companionImagePolicy.ts";
+import {
+  getCompanionEvolutionRenderAttempts,
+  getCompanionFinalImageQuality,
+  resolveCompanionImageSizeForUser,
+} from "../_shared/companionImagePolicy.ts";
 import {
   buildCostGuardrailBlockedResponse,
   createCostGuardrailSession,
@@ -721,7 +725,8 @@ export const handleGenerateCompanionEvolution = async (
     const spiritLockPromptBlock = spiritLockProfile
       ? buildSpiritLockPromptBlock(spiritLockProfile, "image")
       : null;
-    const renderAttempts = 3;
+    const renderAttempts = getCompanionEvolutionRenderAttempts();
+    const finalImageQuality = getCompanionFinalImageQuality();
     const runJudgedRender = async ({
       mode,
       basePrompt,
@@ -809,7 +814,7 @@ export const handleGenerateCompanionEvolution = async (
             openAIApiKey,
             prompt,
             size: imageSize,
-            quality: "high",
+            quality: finalImageQuality,
             userId: resolvedUserId,
           }),
       });
@@ -936,7 +941,7 @@ export const handleGenerateCompanionEvolution = async (
           openAIApiKey,
           prompt,
           size: imageSize,
-          quality: "high",
+          quality: finalImageQuality,
           userId: resolvedUserId,
           referenceImages: [
             {

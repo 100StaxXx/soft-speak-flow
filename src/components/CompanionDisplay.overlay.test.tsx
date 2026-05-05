@@ -18,6 +18,10 @@ const mocks = vi.hoisted(() => ({
     image_regenerations_used: 1,
     story_tone: "epic_adventure",
     cached_creature_name: "Nova",
+    launcher_image_url: null as string | null,
+    launcher_image_source_url: null as string | null,
+    launcher_image_focal_x: null as number | null,
+    launcher_image_focal_y: null as number | null,
   },
   activeEvent: {
     id: "wake-1",
@@ -42,6 +46,18 @@ const mocks = vi.hoisted(() => ({
   guidedStep: null as string | null,
   isPreHatchCompanionStep: false,
   isEvolvingLoading: false,
+  pendingEvolutionReveal: null as null | {
+    status: "preparing" | "ready";
+    companionId: string;
+    evolutionId?: string | null;
+    previousStage: number;
+    newStage: number;
+    previousImageUrl: string;
+    newImageUrl: string;
+    animationVideoUrl?: string | null;
+    presetId?: string | null;
+    element?: string | null;
+  },
   expressionState: {
     mood: "calm" as "calm" | "happy" | "excited",
     variant: 2,
@@ -138,6 +154,8 @@ vi.mock("@/contexts/EvolutionContext", () => ({
   useEvolution: () => ({
     isEvolvingLoading: mocks.isEvolvingLoading,
     setIsEvolvingLoading: vi.fn(),
+    pendingEvolutionReveal: mocks.pendingEvolutionReveal,
+    setPendingEvolutionReveal: vi.fn(),
     onEvolutionComplete: null,
     setOnEvolutionComplete: vi.fn(),
   }),
@@ -221,14 +239,16 @@ vi.mock("@/components/companion/EvolveButton", () => ({
   EvolveButton: ({
     onEvolve,
     actionLabel = "EVOLVE",
+    loadingLabel = "EVOLVING...",
     isEvolving,
   }: {
     onEvolve: () => void;
     actionLabel?: string;
+    loadingLabel?: string;
     isEvolving: boolean;
   }) => (
     <button type="button" onClick={onEvolve} disabled={isEvolving}>
-      {actionLabel}
+      {isEvolving ? loadingLabel : actionLabel}
     </button>
   ),
 }));
@@ -292,6 +312,8 @@ vi.mock("@/lib/companionAssetResolver", () => ({
 
 import { CompanionDisplay } from "./CompanionDisplay";
 import { resolveCompanionExpressiveAssetUrl } from "@/lib/companionAssetResolver";
+import { COMPANION_EVOLUTION_REVEAL_REQUESTED_EVENT } from "@/lib/companionEvolutionEvents";
+import { resolveCompanionName } from "@/lib/companionName";
 
 describe("CompanionDisplay overlay stack", () => {
   beforeEach(() => {
@@ -307,6 +329,7 @@ describe("CompanionDisplay overlay stack", () => {
     mocks.guidedStep = null;
     mocks.isPreHatchCompanionStep = false;
     mocks.isEvolvingLoading = false;
+    mocks.pendingEvolutionReveal = null;
     mocks.companion = {
       id: "companion-1",
       current_xp: 180,
@@ -323,6 +346,10 @@ describe("CompanionDisplay overlay stack", () => {
       image_regenerations_used: 1,
       story_tone: "epic_adventure",
       cached_creature_name: "Nova",
+      launcher_image_url: null,
+      launcher_image_source_url: null,
+      launcher_image_focal_x: null,
+      launcher_image_focal_y: null,
     };
     mocks.expressionState = {
       mood: "calm",
@@ -606,6 +633,79 @@ describe("CompanionDisplay overlay stack", () => {
     const image = screen.getByAltText(/hatchling companion at level 1/i);
     expect(image).toBeInTheDocument();
     expect(image).toHaveAttribute("data-companion-image-fit", "portrait");
+  });
+
+  it("holds the previous companion look while a claimed evolution reveal is preparing", async () => {
+    mocks.isRegenerating = false;
+    mocks.isDormant = false;
+    mocks.companion = {
+      ...mocks.companion,
+      current_stage: 5,
+      current_xp: 260,
+      current_image_url: "https://example.com/stage-5.png",
+      cached_creature_name: "Astra",
+    };
+    mocks.pendingEvolutionReveal = {
+      status: "preparing",
+      companionId: "companion-1",
+      evolutionId: "evo-5",
+      previousStage: 4,
+      newStage: 5,
+      previousImageUrl: "https://example.com/stage-4.png",
+      newImageUrl: "https://example.com/stage-5.png",
+      animationVideoUrl: null,
+      presetId: "phoenix",
+      element: "fire",
+    };
+    vi.mocked(resolveCompanionExpressiveAssetUrl).mockReturnValueOnce(null);
+
+    render(<CompanionDisplay />);
+
+    expect(await screen.findByTestId("companion-level-chip")).toHaveTextContent("Level 4");
+    const image = screen.getByAltText(/companion at level 4/i);
+    expect(image).toHaveAttribute("src", "https://example.com/stage-4.png");
+    expect(screen.getByRole("button", { name: "PREPARING..." })).toBeDisabled();
+    expect(resolveCompanionName).not.toHaveBeenCalled();
+  });
+
+  it("dispatches a reveal request when the held evolution is ready", async () => {
+    mocks.isRegenerating = false;
+    mocks.isDormant = false;
+    mocks.companion = {
+      ...mocks.companion,
+      current_stage: 5,
+      current_xp: 260,
+      current_image_url: "https://example.com/stage-5.png",
+    };
+    mocks.pendingEvolutionReveal = {
+      status: "ready",
+      companionId: "companion-1",
+      evolutionId: "evo-5",
+      previousStage: 4,
+      newStage: 5,
+      previousImageUrl: "https://example.com/stage-4.png",
+      newImageUrl: "https://example.com/stage-5.png",
+      animationVideoUrl: "https://example.com/evolution.mp4",
+      presetId: "phoenix",
+      element: "fire",
+    };
+    vi.mocked(resolveCompanionExpressiveAssetUrl).mockReturnValueOnce(null);
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+
+    render(<CompanionDisplay />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "REVEAL" }));
+
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: COMPANION_EVOLUTION_REVEAL_REQUESTED_EVENT,
+        detail: {
+          companionId: "companion-1",
+          stage: 5,
+        },
+      }),
+    );
+    dispatchSpy.mockRestore();
   });
 
   it("shows max-level progression and final visual stage consistently", async () => {

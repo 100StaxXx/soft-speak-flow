@@ -101,6 +101,14 @@ Narrower shutdowns:
 - Transcription only: `COST_KILL_SWITCH_TRANSCRIPTION=true`
 - Single endpoint: add the function name to `COST_KILL_SWITCH_ENDPOINTS`
 
+## Cost-conscious defaults
+
+- Keep `OPENAI_COMPANION_CHAT_MODEL`, `OPENAI_COMPANION_AGENT_MODEL`, and `OPENAI_COMPANION_PLANNER_MODEL` on `gpt-5.4-mini` for normal traffic.
+- Use `OPENAI_COMPANION_MEMORY_MODEL=gpt-4.1-mini` and `OPENAI_COMPANION_JUDGE_MODEL=gpt-4.1-mini` for background extraction and image QA.
+- Leave `COMPANION_DECAY_IMAGE_AUTOGENERATION=false` unless you intentionally want the daily decay job to generate dormant/neglected custom art for inactive users.
+- Standard image generation defaults to one retry. Raise `COMPANION_IMAGE_STAGE0_MAX_RETRIES`, `COMPANION_IMAGE_NON_STAGE0_MAX_RETRIES`, or `COMPANION_EVOLUTION_RENDER_ATTEMPTS` only for premium experiments or short QA windows.
+- Keep hidden lineage art at `COMPANION_IMAGE_HIDDEN_QUALITY=medium`; reserve `COMPANION_IMAGE_FINAL_QUALITY=high` for the visible portrait/reveal.
+
 ## No-redeploy shutdown
 
 Disable a feature instantly in Postgres:

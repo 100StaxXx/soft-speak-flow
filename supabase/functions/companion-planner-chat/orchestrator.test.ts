@@ -134,6 +134,14 @@ Deno.test("planner orchestration request body uses the resolved default model", 
   });
 
   assertEquals(requestBodies[0]?.model, DEFAULT_COMPANION_PLANNER_MODEL);
+  assertEquals(requestBodies[0]?.reasoning_effort, "none");
+  assertEquals(requestBodies[0]?.max_completion_tokens, 260);
+  assertEquals("temperature" in requestBodies[0], false);
+  assertEquals("max_tokens" in requestBodies[0], false);
+  assertEquals(
+    (requestBodies[0]?.messages as Array<{ role?: string }>)[0]?.role,
+    "developer",
+  );
 });
 
 Deno.test("normalizes 24-hour times in model-authored planner replies", async () => {

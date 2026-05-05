@@ -52,9 +52,9 @@ const EVOLVE_AUTOSCROLL_SELECTOR = '[data-tour="evolve-companion-button"]';
 const EVOLVE_AUTOSCROLL_VIEWPORT_MARGIN_PX = 72;
 const HATCH_READY_XP = getProgressionThreshold(HATCH_READY_LEVEL) ?? 10;
 
-const STEP_XP_REWARDS: Partial<Record<GuidedTutorialStepId, number>> = {
-  new_goal: HATCH_READY_XP,
-};
+// Campaign creation itself awards hatch-ready XP. The hatch step top-up below
+// remains as a fallback for legacy or interrupted tutorial states.
+const STEP_XP_REWARDS: Partial<Record<GuidedTutorialStepId, number>> = {};
 
 interface GuidedStep {
   id: GuidedTutorialStepId;

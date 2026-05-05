@@ -10,10 +10,7 @@ import {
   type CompanionPresetId,
   type CompanionStoryTone,
 } from "@/config/companionCatalog";
-import {
-  COMPANION_FUTURE_STATE_LABEL,
-  isPilotCompanionElement,
-} from "@/config/companionPilotAvailability";
+import { isPilotCompanionElement } from "@/config/companionPilotAvailability";
 import {
   COMPANION_CUSTOM_NAME_MAX_LENGTH,
   normalizeCompanionCustomName,
@@ -246,9 +243,7 @@ export const OnboardingEggSelection = ({
                   data-element={element.id}
                   data-testid={`egg-slot-${element.id}`}
                   style={slotStyle}
-                  aria-label={isSupported
-                    ? `Select ${element.productLabel} element`
-                    : `${element.productLabel} element, ${COMPANION_FUTURE_STATE_LABEL}`}
+                  aria-label={`Select ${element.productLabel} element`}
                   aria-pressed={isSelected}
                   aria-disabled={!isSupported || isLoading}
                   disabled={isLoading || !isSupported}
@@ -259,11 +254,6 @@ export const OnboardingEggSelection = ({
                 >
                   <span className="onboarding-egg-slot__pedestal-flare" aria-hidden="true" />
                   <span className="onboarding-egg-slot__egg-aura" aria-hidden="true" />
-                  {!isSupported ? (
-                    <span className="onboarding-egg-slot__future-badge" aria-hidden="true">
-                      {COMPANION_FUTURE_STATE_LABEL}
-                    </span>
-                  ) : null}
                   <span
                     className={cn(
                       "onboarding-egg-slot__float",

@@ -1,5 +1,12 @@
-const OPENAI_IMAGE_GENERATIONS_URL = "https://api.openai.com/v1/images/generations";
+const OPENAI_IMAGE_GENERATIONS_URL =
+  "https://api.openai.com/v1/images/generations";
 const OPENAI_IMAGE_EDITS_URL = "https://api.openai.com/v1/images/edits";
+const DEFAULT_COMPANION_IMAGE_MODEL = "gpt-image-2";
+const DEFAULT_COMPANION_IMAGE_FALLBACK_MODELS = [
+  "chatgpt-image-latest",
+  "gpt-image-1.5",
+  "gpt-image-1",
+] as const;
 // Provider fallback can change aspect ratio; callers persist the returned size and render without stretching.
 const FALLBACK_IMAGE_SIZE = "1024x1024";
 const REFERENCE_IMAGE_MAX_DOWNLOAD_ATTEMPTS = 2;
@@ -11,17 +18,20 @@ export interface CompanionImageGenerationResult {
   imageDataUrl: string;
   revisedPrompt: string | null;
   size: string;
+  model?: string;
 }
 
 export class OpenAIImageRequestError extends Error {
   status: number;
   responseText: string;
+  model: string | null;
 
-  constructor(status: number, responseText: string) {
+  constructor(status: number, responseText: string, model?: string | null) {
     super(`OpenAI image request failed (${status}): ${responseText}`);
     this.name = "OpenAIImageRequestError";
     this.status = status;
     this.responseText = responseText;
+    this.model = model ?? null;
   }
 }
 
@@ -42,23 +52,27 @@ const getReferenceImageRetryBackoffMs = (): number => {
   const raw = Deno.env.get("COMPANION_IMAGE_REFERENCE_RETRY_BACKOFF_MS");
   if (!raw) return DEFAULT_REFERENCE_IMAGE_RETRY_BACKOFF_MS;
   const parsed = Number.parseInt(raw, 10);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_REFERENCE_IMAGE_RETRY_BACKOFF_MS;
+  return Number.isFinite(parsed) && parsed >= 0
+    ? parsed
+    : DEFAULT_REFERENCE_IMAGE_RETRY_BACKOFF_MS;
 };
 
 const isProductionRuntime = (): boolean => {
   const environment = (
-    Deno.env.get("APP_ENV")
-    ?? Deno.env.get("NODE_ENV")
-    ?? Deno.env.get("ENVIRONMENT")
-    ?? ""
+    Deno.env.get("APP_ENV") ??
+      Deno.env.get("NODE_ENV") ??
+      Deno.env.get("ENVIRONMENT") ??
+      ""
   ).trim().toLowerCase();
-  return environment === "production" || environment === "prod" || Boolean(Deno.env.get("DENO_DEPLOYMENT_ID"));
+  return environment === "production" || environment === "prod" ||
+    Boolean(Deno.env.get("DENO_DEPLOYMENT_ID"));
 };
 
 export const resolveCompanionImageModel = (): string => {
   const companionModel = Deno.env.get("OPENAI_COMPANION_IMAGE_MODEL");
   const defaultImageModel = Deno.env.get("OPENAI_IMAGE_MODEL");
-  const resolved = companionModel ?? defaultImageModel ?? "gpt-image-2";
+  const resolved = companionModel ?? defaultImageModel ??
+    DEFAULT_COMPANION_IMAGE_MODEL;
   const source = companionModel
     ? "OPENAI_COMPANION_IMAGE_MODEL"
     : defaultImageModel
@@ -77,6 +91,23 @@ export const resolveCompanionImageModel = (): string => {
   return resolved;
 };
 
+const parseModelList = (raw: string | undefined): string[] =>
+  (raw ?? "")
+    .split(",")
+    .map((model) => model.trim())
+    .filter((model) => model.length > 0);
+
+const resolveCompanionImageModels = (): string[] => {
+  const configuredFallbackModels = parseModelList(
+    Deno.env.get("OPENAI_COMPANION_IMAGE_FALLBACK_MODELS"),
+  );
+  const fallbackModels = configuredFallbackModels.length > 0
+    ? configuredFallbackModels
+    : [...DEFAULT_COMPANION_IMAGE_FALLBACK_MODELS];
+
+  return Array.from(new Set([resolveCompanionImageModel(), ...fallbackModels]));
+};
+
 const buildHeaders = (openAIApiKey: string) => ({
   Authorization: `Bearer ${openAIApiKey}`,
   "Content-Type": "application/json",
@@ -89,10 +120,10 @@ const buildMultipartHeaders = (openAIApiKey: string) => ({
 const supportsInputFidelityOverride = (model: string): boolean => {
   const normalizedModel = model.toLowerCase();
   return !(
-    normalizedModel === "gpt-image-2"
-    || normalizedModel.startsWith("gpt-image-2-")
-    || normalizedModel === "gpt-image-1-mini"
-    || normalizedModel.startsWith("gpt-image-1-mini-")
+    normalizedModel === "gpt-image-2" ||
+    normalizedModel.startsWith("gpt-image-2-") ||
+    normalizedModel === "gpt-image-1-mini" ||
+    normalizedModel.startsWith("gpt-image-1-mini-")
   );
 };
 
@@ -101,7 +132,10 @@ const buildBaseRequestBody = ({
   size,
   quality,
   userId,
-}: Omit<BaseImageRequestArgs, "guardedFetch" | "openAIApiKey">): Record<string, unknown> => {
+}: Omit<BaseImageRequestArgs, "guardedFetch" | "openAIApiKey">): Record<
+  string,
+  unknown
+> => {
   const body: Record<string, unknown> = {
     model: resolveCompanionImageModel(),
     prompt,
@@ -123,9 +157,15 @@ const normalizeToDataUrl = async (
   guardedFetch: typeof fetch,
   payload: Record<string, unknown>,
 ): Promise<{ imageDataUrl: string; revisedPrompt: string | null }> => {
-  const firstResult = Array.isArray(payload.data) ? payload.data[0] as Record<string, unknown> | undefined : undefined;
-  const revisedPrompt = typeof firstResult?.revised_prompt === "string" ? firstResult.revised_prompt : null;
-  const base64Image = typeof firstResult?.b64_json === "string" ? firstResult.b64_json : null;
+  const firstResult = Array.isArray(payload.data)
+    ? payload.data[0] as Record<string, unknown> | undefined
+    : undefined;
+  const revisedPrompt = typeof firstResult?.revised_prompt === "string"
+    ? firstResult.revised_prompt
+    : null;
+  const base64Image = typeof firstResult?.b64_json === "string"
+    ? firstResult.b64_json
+    : null;
   if (base64Image) {
     return {
       imageDataUrl: `data:image/png;base64,${base64Image}`,
@@ -133,14 +173,18 @@ const normalizeToDataUrl = async (
     };
   }
 
-  const directUrl = typeof firstResult?.url === "string" ? firstResult.url : null;
+  const directUrl = typeof firstResult?.url === "string"
+    ? firstResult.url
+    : null;
   if (!directUrl) {
     throw new Error("OpenAI image response did not include an image payload");
   }
 
   const imageResponse = await guardedFetch(directUrl);
   if (!imageResponse.ok) {
-    throw new Error(`Failed to download generated image: ${imageResponse.status}`);
+    throw new Error(
+      `Failed to download generated image: ${imageResponse.status}`,
+    );
   }
 
   const buffer = new Uint8Array(await imageResponse.arrayBuffer());
@@ -158,13 +202,72 @@ const normalizeToDataUrl = async (
 const parseImageApiResponse = async (
   guardedFetch: typeof fetch,
   response: Response,
+  model?: string | null,
 ): Promise<{ imageDataUrl: string; revisedPrompt: string | null }> => {
   if (!response.ok) {
-    throw new OpenAIImageRequestError(response.status, await response.text());
+    throw new OpenAIImageRequestError(
+      response.status,
+      await response.text(),
+      model,
+    );
   }
 
   const payload = await response.json() as Record<string, unknown>;
   return await normalizeToDataUrl(guardedFetch, payload);
+};
+
+const MODEL_FALLBACK_ERROR_PATTERNS = [
+  "model",
+  "not supported",
+  "unsupported",
+  "not found",
+  "does not exist",
+  "not available",
+  "not enabled",
+  "do not have access",
+  "does not have access",
+  "permission",
+  "organization verification",
+  "must be verified",
+  "verify your organization",
+  "unknown parameter",
+  "invalid parameter",
+  "unrecognized request argument",
+] as const;
+
+const isModelFallbackError = (error: OpenAIImageRequestError): boolean => {
+  if (error.status === 403 || error.status === 404) return true;
+  if (error.status !== 400) return false;
+
+  const normalizedError = error.responseText.toLowerCase();
+  return MODEL_FALLBACK_ERROR_PATTERNS.some((pattern) =>
+    normalizedError.includes(pattern)
+  );
+};
+
+const shouldTryNextImageModel = (error: unknown): boolean =>
+  error instanceof OpenAIImageRequestError && isModelFallbackError(error);
+
+const logImageModelFailure = (
+  context: "generation" | "edit",
+  model: string,
+  error: unknown,
+) => {
+  if (error instanceof OpenAIImageRequestError) {
+    console.warn("[CompanionImage] Image model failed", {
+      context,
+      model,
+      status: error.status,
+      error: error.responseText.slice(0, 500),
+    });
+    return;
+  }
+
+  console.warn("[CompanionImage] Image model failed", {
+    context,
+    model,
+    error: error instanceof Error ? error.message : String(error),
+  });
 };
 
 const performImageRequest = async ({
@@ -180,7 +283,9 @@ const performImageRequest = async ({
   body: Record<string, unknown>;
   fallbackToSquare?: boolean;
 }): Promise<CompanionImageGenerationResult> => {
-  const requestedSize = typeof body.size === "string" ? body.size : FALLBACK_IMAGE_SIZE;
+  const requestedSize = typeof body.size === "string"
+    ? body.size
+    : FALLBACK_IMAGE_SIZE;
 
   const requestImage = async (requestBody: Record<string, unknown>) =>
     await guardedFetch(endpoint, {
@@ -191,7 +296,10 @@ const performImageRequest = async ({
 
   let effectiveBody = { ...body };
   let response = await requestImage(effectiveBody);
-  if (!response.ok && response.status === 400 && fallbackToSquare && requestedSize !== FALLBACK_IMAGE_SIZE) {
+  if (
+    !response.ok && response.status === 400 && fallbackToSquare &&
+    requestedSize !== FALLBACK_IMAGE_SIZE
+  ) {
     effectiveBody = {
       ...effectiveBody,
       size: FALLBACK_IMAGE_SIZE,
@@ -205,14 +313,24 @@ const performImageRequest = async ({
     response = await requestImage(effectiveBody);
   }
 
-  const result = await parseImageApiResponse(guardedFetch, response);
+  const model = typeof effectiveBody.model === "string"
+    ? effectiveBody.model
+    : "";
+  const result = await parseImageApiResponse(guardedFetch, response, model);
   return {
     ...result,
-    size: typeof effectiveBody.size === "string" ? effectiveBody.size : FALLBACK_IMAGE_SIZE,
+    model,
+    size: typeof effectiveBody.size === "string"
+      ? effectiveBody.size
+      : FALLBACK_IMAGE_SIZE,
   };
 };
 
-const inferFilenameFromUrl = (imageUrl: string, index: number, contentType: string): string => {
+const inferFilenameFromUrl = (
+  imageUrl: string,
+  index: number,
+  contentType: string,
+): string => {
   try {
     const url = new URL(imageUrl);
     const pathname = url.pathname.split("/").filter(Boolean).pop();
@@ -244,17 +362,28 @@ const downloadReferenceImageFile = async ({
   let lastStatus: number | null = null;
   let lastError: unknown = null;
 
-  for (let attempt = 1; attempt <= REFERENCE_IMAGE_MAX_DOWNLOAD_ATTEMPTS; attempt += 1) {
+  for (
+    let attempt = 1;
+    attempt <= REFERENCE_IMAGE_MAX_DOWNLOAD_ATTEMPTS;
+    attempt += 1
+  ) {
     try {
       const response = await guardedFetch(imageUrl);
       lastStatus = response.status;
       if (!response.ok) {
-        const retryableStatus = response.status === 408 || response.status >= 500;
-        if (retryableStatus && attempt < REFERENCE_IMAGE_MAX_DOWNLOAD_ATTEMPTS) {
-          await new Promise((resolve) => setTimeout(resolve, getReferenceImageRetryBackoffMs()));
+        const retryableStatus = response.status === 408 ||
+          response.status >= 500;
+        if (
+          retryableStatus && attempt < REFERENCE_IMAGE_MAX_DOWNLOAD_ATTEMPTS
+        ) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, getReferenceImageRetryBackoffMs())
+          );
           continue;
         }
-        throw new Error(`Failed to download reference image: ${response.status}`);
+        throw new Error(
+          `Failed to download reference image: ${response.status}`,
+        );
       }
 
       const buffer = await response.arrayBuffer();
@@ -266,20 +395,27 @@ const downloadReferenceImageFile = async ({
       );
     } catch (error) {
       lastError = error;
-      if (error instanceof Error && error.message.startsWith("Failed to download reference image:")) {
+      if (
+        error instanceof Error &&
+        error.message.startsWith("Failed to download reference image:")
+      ) {
         throw error;
       }
       if (attempt >= REFERENCE_IMAGE_MAX_DOWNLOAD_ATTEMPTS) {
         break;
       }
-      await new Promise((resolve) => setTimeout(resolve, getReferenceImageRetryBackoffMs()));
+      await new Promise((resolve) =>
+        setTimeout(resolve, getReferenceImageRetryBackoffMs())
+      );
     }
   }
 
   if (lastError instanceof Error) {
     throw lastError;
   }
-  throw new Error(`Failed to download reference image: ${lastStatus ?? "unknown_status"}`);
+  throw new Error(
+    `Failed to download reference image: ${lastStatus ?? "unknown_status"}`,
+  );
 };
 
 const buildEditFormData = ({
@@ -340,15 +476,14 @@ const performMultipartEditRequest = async ({
   userId?: string | null;
   referenceImages: Array<{ imageUrl: string }>;
 }): Promise<CompanionImageGenerationResult> => {
-  const model = resolveCompanionImageModel();
-  let includeInputFidelity = supportsInputFidelityOverride(model);
   const referenceFiles = await Promise.all(
     referenceImages.map((referenceImage, index) =>
       downloadReferenceImageFile({
         guardedFetch,
         imageUrl: referenceImage.imageUrl,
         index,
-      })),
+      })
+    ),
   );
 
   const requestImage = async (formData: FormData) =>
@@ -358,56 +493,91 @@ const performMultipartEditRequest = async ({
       body: formData,
     });
 
-  let effectiveSize = size;
-  let includeQuality = quality;
+  const requestWithModel = async (model: string) => {
+    let effectiveSize = size;
+    let includeQuality = quality;
+    let includeInputFidelity = supportsInputFidelityOverride(model);
 
-  const requestCurrentImageEdit = async () =>
-    await requestImage(
-      buildEditFormData({
-        model,
-        prompt,
-        size: effectiveSize,
-        quality: includeQuality,
-        userId,
-        referenceFiles,
-        includeInputFidelity,
-      }),
+    const requestCurrentImageEdit = async () =>
+      await requestImage(
+        buildEditFormData({
+          model,
+          prompt,
+          size: effectiveSize,
+          quality: includeQuality,
+          userId,
+          referenceFiles,
+          includeInputFidelity,
+        }),
+      );
+
+    const retryWithoutInputFidelityIfRejected = async (
+      currentResponse: Response,
+    ): Promise<Response> => {
+      if (
+        !currentResponse.ok && currentResponse.status === 400 &&
+        includeInputFidelity
+      ) {
+        const errorText = await currentResponse.clone().text().catch(() => "");
+        const normalizedErrorText = errorText.toLowerCase();
+        if (
+          normalizedErrorText.includes("input_fidelity") ||
+          normalizedErrorText.includes("input fidelity") ||
+          normalizedErrorText.includes("inputfidelity")
+        ) {
+          includeInputFidelity = false;
+          return await requestCurrentImageEdit();
+        }
+      }
+
+      return currentResponse;
+    };
+
+    let response = await retryWithoutInputFidelityIfRejected(
+      await requestCurrentImageEdit(),
     );
 
-  const retryWithoutInputFidelityIfRejected = async (currentResponse: Response): Promise<Response> => {
-    if (!currentResponse.ok && currentResponse.status === 400 && includeInputFidelity) {
-      const errorText = await currentResponse.clone().text().catch(() => "");
-      const normalizedErrorText = errorText.toLowerCase();
-      if (
-        normalizedErrorText.includes("input_fidelity")
-        || normalizedErrorText.includes("input fidelity")
-        || normalizedErrorText.includes("inputfidelity")
-      ) {
-        includeInputFidelity = false;
-        return await requestCurrentImageEdit();
-      }
+    if (
+      !response.ok && response.status === 400 &&
+      effectiveSize !== FALLBACK_IMAGE_SIZE
+    ) {
+      effectiveSize = FALLBACK_IMAGE_SIZE;
+      response = await retryWithoutInputFidelityIfRejected(
+        await requestCurrentImageEdit(),
+      );
     }
 
-    return currentResponse;
+    if (!response.ok && response.status === 400 && includeQuality) {
+      includeQuality = undefined;
+      response = await retryWithoutInputFidelityIfRejected(
+        await requestCurrentImageEdit(),
+      );
+    }
+
+    const result = await parseImageApiResponse(guardedFetch, response, model);
+    return {
+      ...result,
+      model,
+      size: effectiveSize,
+    };
   };
 
-  let response = await retryWithoutInputFidelityIfRejected(await requestCurrentImageEdit());
-
-  if (!response.ok && response.status === 400 && effectiveSize !== FALLBACK_IMAGE_SIZE) {
-    effectiveSize = FALLBACK_IMAGE_SIZE;
-    response = await retryWithoutInputFidelityIfRejected(await requestCurrentImageEdit());
+  let lastError: unknown;
+  const models = resolveCompanionImageModels();
+  for (const [index, model] of models.entries()) {
+    try {
+      return await requestWithModel(model);
+    } catch (error) {
+      if (index < models.length - 1 && shouldTryNextImageModel(error)) {
+        lastError = error;
+        logImageModelFailure("edit", model, error);
+        continue;
+      }
+      throw error;
+    }
   }
 
-  if (!response.ok && response.status === 400 && includeQuality) {
-    includeQuality = undefined;
-    response = await retryWithoutInputFidelityIfRejected(await requestCurrentImageEdit());
-  }
-
-  const result = await parseImageApiResponse(guardedFetch, response);
-  return {
-    ...result,
-    size: effectiveSize,
-  };
+  throw lastError ?? new Error("No companion image model was available");
 };
 
 export const generateCompanionImage = async ({
@@ -418,17 +588,39 @@ export const generateCompanionImage = async ({
   quality = "high",
   userId,
 }: BaseImageRequestArgs): Promise<CompanionImageGenerationResult> =>
-  await performImageRequest({
-    guardedFetch,
-    openAIApiKey,
-    endpoint: OPENAI_IMAGE_GENERATIONS_URL,
-    body: buildBaseRequestBody({
+  await (async () => {
+    let lastError: unknown;
+    const models = resolveCompanionImageModels();
+    const baseBody = buildBaseRequestBody({
       prompt,
       size,
       quality,
       userId,
-    }),
-  });
+    });
+
+    for (const [index, model] of models.entries()) {
+      try {
+        return await performImageRequest({
+          guardedFetch,
+          openAIApiKey,
+          endpoint: OPENAI_IMAGE_GENERATIONS_URL,
+          body: {
+            ...baseBody,
+            model,
+          },
+        });
+      } catch (error) {
+        if (index < models.length - 1 && shouldTryNextImageModel(error)) {
+          lastError = error;
+          logImageModelFailure("generation", model, error);
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    throw lastError ?? new Error("No companion image model was available");
+  })();
 
 export const editCompanionImage = async ({
   guardedFetch,
@@ -440,7 +632,9 @@ export const editCompanionImage = async ({
   referenceImages,
 }: EditCompanionImageArgs): Promise<CompanionImageGenerationResult> => {
   if (!Array.isArray(referenceImages) || referenceImages.length === 0) {
-    throw new Error("Companion image edits require at least one reference image");
+    throw new Error(
+      "Companion image edits require at least one reference image",
+    );
   }
 
   return await performMultipartEditRequest({

@@ -1,18 +1,19 @@
-import type { CompanionElementId, CompanionPresetId } from "./companionCatalog";
+import {
+  COMPANION_ELEMENTS,
+  COMPANION_PRESETS,
+  type CompanionElementId,
+  type CompanionPresetId,
+} from "./companionCatalog";
 
 export const COMPANION_FUTURE_STATE_LABEL = "Coming Soon" as const;
 
-export const PILOT_COMPANION_PRESET_IDS = [
-  "fox",
-  "phoenix",
-  "leviathan",
-] as const satisfies readonly CompanionPresetId[];
+export const PILOT_COMPANION_PRESET_IDS = COMPANION_PRESETS.map(
+  (preset) => preset.id,
+) as readonly CompanionPresetId[];
 
-export const PILOT_COMPANION_ELEMENT_IDS = [
-  "fire",
-  "ice",
-  "nature",
-] as const satisfies readonly CompanionElementId[];
+export const PILOT_COMPANION_ELEMENT_IDS = COMPANION_ELEMENTS.map(
+  (element) => element.id,
+) as readonly CompanionElementId[];
 
 export const isPilotCompanionPreset = (
   presetId: CompanionPresetId | string | null | undefined,
@@ -28,8 +29,6 @@ export const isPilotCompanionElement = (
   && (PILOT_COMPANION_ELEMENT_IDS as readonly string[]).includes(elementId)
 );
 
-export const getDefaultPilotCompanionPresetId = (): CompanionPresetId =>
-  PILOT_COMPANION_PRESET_IDS[0];
+export const getDefaultPilotCompanionPresetId = (): CompanionPresetId => "fox";
 
-export const getDefaultPilotCompanionElementId = (): CompanionElementId =>
-  PILOT_COMPANION_ELEMENT_IDS[0];
+export const getDefaultPilotCompanionElementId = (): CompanionElementId => "fire";

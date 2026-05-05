@@ -31,6 +31,7 @@ const mocks = vi.hoisted(() => {
   let shouldQueueWrites = false;
   const warmEpicsQueryFromRemoteMock = vi.fn();
   const withPlannerRemoteSyncLockMock = vi.fn(async (_userId: string, operation: () => Promise<unknown>) => operation());
+  const awardCustomXPMock = vi.fn();
   const toastSuccessMock = vi.fn();
   const toastErrorMock = vi.fn();
   const toastMock = vi.fn();
@@ -68,6 +69,7 @@ const mocks = vi.hoisted(() => {
     },
     warmEpicsQueryFromRemoteMock,
     withPlannerRemoteSyncLockMock,
+    awardCustomXPMock,
     toastSuccessMock,
     toastErrorMock,
     toastMock,
@@ -82,7 +84,7 @@ vi.mock("./useAuth", () => ({
 
 vi.mock("@/hooks/useXPRewards", () => ({
   useXPRewards: () => ({
-    awardCustomXP: vi.fn(),
+    awardCustomXP: (...args: unknown[]) => mocks.awardCustomXPMock(...args),
   }),
 }));
 
@@ -233,6 +235,7 @@ describe("useEpics", () => {
     mocks.rpcMock.mockResolvedValue({ data: 0, error: null });
     mocks.warmEpicsQueryFromRemoteMock.mockResolvedValue([]);
     mocks.withPlannerRemoteSyncLockMock.mockImplementation(async (_userId: string, operation: () => Promise<unknown>) => operation());
+    mocks.awardCustomXPMock.mockResolvedValue({ xpAwarded: 10 });
     mocks.toastSuccessMock.mockReset();
     mocks.toastErrorMock.mockReset();
     mocks.toastMock.mockReset();
@@ -757,6 +760,56 @@ describe("useEpics", () => {
     });
   });
 
+  it("awards hatch-ready XP after a successful remote campaign create", async () => {
+    const tableWithInsert = () => ({
+      insert: vi.fn().mockResolvedValue({ error: null }),
+      upsert: vi.fn().mockResolvedValue({ error: null }),
+      select: mocks.selectMock,
+    });
+
+    mocks.fromMock.mockImplementation((table: string) => {
+      if (["habits", "epics", "epic_habits", "journey_phases", "epic_milestones"].includes(table)) {
+        return tableWithInsert();
+      }
+
+      return createDefaultSupabaseTableMock();
+    });
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.createEpic({
+        title: "Hatch Launch Sequence",
+        target_days: 14,
+        habits: [
+          {
+            title: "Morning focus",
+            difficulty: "easy",
+            frequency: "daily",
+            custom_days: [1, 2, 3, 4, 5],
+          },
+        ],
+      });
+    });
+
+    expect(mocks.awardCustomXPMock).toHaveBeenCalledWith(
+      10,
+      "campaign_create",
+      "Campaign Created!",
+      expect.objectContaining({
+        campaign_title: "Hatch Launch Sequence",
+        epic_id: expect.any(String),
+      }),
+      expect.stringMatching(/^campaign_create:/),
+    );
+  });
+
   it("spawns campaign ritual tasks with time and duration during campaign creation", async () => {
     let localEpics: Array<Record<string, unknown>> = [];
     let localHabits: Array<Record<string, unknown>> = [];
@@ -1158,6 +1211,7 @@ describe("useEpics", () => {
     });
 
     expect(mocks.queueActionMock).toHaveBeenCalled();
+    expect(mocks.awardCustomXPMock).not.toHaveBeenCalled();
     expect(mocks.queueTaskActionMock).toHaveBeenCalledWith(
       "CREATE_TASK",
       expect.objectContaining({

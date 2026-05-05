@@ -12,6 +12,9 @@ import {
 } from "../_shared/costGuardrails.ts";
 import {
   getCompanionFastRetryLimits,
+  getCompanionFinalImageQuality,
+  getCompanionHiddenImageQuality,
+  getCompanionStandardRetryLimits,
   isCompanionFastPathEligible,
   resolveCompanionImageSizeForUser,
 } from "../_shared/companionImagePolicy.ts";
@@ -382,8 +385,6 @@ function getElementOverlay(element: string): string {
   return `\n━━━ ELEMENTAL OVERLAY: ${element.toUpperCase()} ━━━\nEffect: ${effect}\nNOTE: Element adds ambient effects AROUND creature, does NOT change body/fur color!`;
 }
 
-const DEFAULT_INTERNAL_RETRIES = 2;
-const STAGE_ZERO_INTERNAL_RETRIES = 2;
 const MAX_ALLOWED_RETRIES = 3;
 const GENERATION_FETCH_TIMEOUT_MS = 75_000;
 const AUXILIARY_FETCH_TIMEOUT_MS = 25_000;
@@ -1067,8 +1068,11 @@ serve(async (req) => {
       storyTone,
     });
     const fastRetryLimits = getCompanionFastRetryLimits();
+    const standardRetryLimits = getCompanionStandardRetryLimits();
+    const hiddenImageQuality = getCompanionHiddenImageQuality();
+    const finalImageQuality = getCompanionFinalImageQuality();
     console.log(
-      `[CompanionImagePolicy] user=${user.id} flow=${normalizedFlowType} fast_path=${fastPathEligible} image_size=${imageSize} stage0_fast_retries=${fastRetryLimits.stage0} non_stage0_fast_retries=${fastRetryLimits.nonStage0}`,
+      `[CompanionImagePolicy] user=${user.id} flow=${normalizedFlowType} fast_path=${fastPathEligible} image_size=${imageSize} stage0_fast_retries=${fastRetryLimits.stage0} non_stage0_fast_retries=${fastRetryLimits.nonStage0} stage0_retries=${standardRetryLimits.stage0} non_stage0_retries=${standardRetryLimits.nonStage0} hidden_quality=${hiddenImageQuality} final_quality=${finalImageQuality}`,
     );
 
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
@@ -1163,7 +1167,8 @@ serve(async (req) => {
         1,
         Math.min(
           MAX_ALLOWED_RETRIES + 1,
-          (fastPathEligible ? fastRetryLimits.stage0 : STAGE_ZERO_INTERNAL_RETRIES) + 1,
+          (fastPathEligible ? fastRetryLimits.stage0 : standardRetryLimits.stage0) +
+            1,
         ),
       );
 
@@ -1220,7 +1225,7 @@ serve(async (req) => {
             openAIApiKey: OPENAI_API_KEY,
             prompt,
             size: imageSize,
-            quality: "high",
+            quality: hiddenImageQuality,
             userId: user.id,
           }),
       });
@@ -1248,7 +1253,7 @@ serve(async (req) => {
               openAIApiKey: OPENAI_API_KEY,
               prompt,
               size: imageSize,
-              quality: "high",
+              quality: finalImageQuality,
               userId: user.id,
               referenceImages: [
                 {
@@ -1706,7 +1711,9 @@ Slightly brighter exposure with lifted midtones and clearer highlights for reada
     const stageNumber = Number(stage);
     const adaptiveRetryDefault = fastPathEligible
       ? (stageNumber === 0 ? fastRetryLimits.stage0 : fastRetryLimits.nonStage0)
-      : (stageNumber === 0 ? STAGE_ZERO_INTERNAL_RETRIES : DEFAULT_INTERNAL_RETRIES);
+      : (stageNumber === 0
+        ? standardRetryLimits.stage0
+        : standardRetryLimits.nonStage0);
     const requestedRetries =
       typeof maxInternalRetries === "number" && Number.isFinite(maxInternalRetries)
         ? Math.max(0, Math.min(MAX_ALLOWED_RETRIES, Math.floor(maxInternalRetries)))

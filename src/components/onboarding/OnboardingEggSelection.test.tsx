@@ -114,7 +114,7 @@ describe("OnboardingEggSelection", () => {
     expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   });
 
-  it("renders unsupported elements as awaiting awakening and blocks selection", () => {
+  it("allows every element and renders no future-state labels", () => {
     const onComplete = vi.fn();
 
     render(
@@ -127,18 +127,20 @@ describe("OnboardingEggSelection", () => {
     );
 
     const stormSlot = screen.getByTestId("egg-slot-storm");
-    expect(stormSlot).toBeDisabled();
-    expect(stormSlot).toHaveAttribute("data-supported", "false");
-    expect(screen.getAllByText("Coming Soon").length).toBeGreaterThan(0);
+    expect(stormSlot).toBeEnabled();
+    expect(stormSlot).toHaveAttribute("data-supported", "true");
+    expect(screen.getByTestId("egg-slot-void")).toBeEnabled();
+    expect(screen.getByTestId("egg-slot-light")).toBeEnabled();
+    expect(screen.queryByText("Coming Soon")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Select Nature element" }));
+    fireEvent.click(screen.getByRole("button", { name: "Select Storm element" }));
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(onComplete).toHaveBeenCalledWith({
       presetId: "fox",
-      favoriteColor: "#34D399",
+      favoriteColor: "#38BDF8",
       spiritAnimal: "Kitsune",
-      coreElement: "nature",
+      coreElement: "storm",
       storyTone: "epic_adventure",
       companionName: null,
     });

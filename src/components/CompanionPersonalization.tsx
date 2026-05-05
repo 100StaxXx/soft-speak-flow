@@ -7,7 +7,7 @@ import { CompanionCreationLoader } from "./CompanionCreationLoader";
 import { CompanionImage, CompanionPortraitShell } from "./CompanionImage";
 import {
   COMPANION_ELEMENTS,
-  COMPANION_PICKER_PRESETS,
+  COMPANION_PRESETS,
   COMPANION_STORY_TONES,
   getCompanionElementAnchorColor,
   getCompanionEggLabel,
@@ -16,7 +16,6 @@ import {
   type CompanionStoryTone,
 } from "@/config/companionCatalog";
 import {
-  COMPANION_FUTURE_STATE_LABEL,
   getDefaultPilotCompanionElementId,
   getDefaultPilotCompanionPresetId,
   isPilotCompanionElement,
@@ -86,7 +85,7 @@ export const CompanionPersonalization = ({
   const normalizedCustomCompanionName = normalizeCompanionCustomName(customCompanionName);
 
   const selectedPreset = useMemo(
-    () => COMPANION_PICKER_PRESETS.find((preset) => preset.id === selectedPresetId) ?? COMPANION_PICKER_PRESETS[0],
+    () => COMPANION_PRESETS.find((preset) => preset.id === selectedPresetId) ?? COMPANION_PRESETS[0],
     [selectedPresetId],
   );
   const selectedElementMeta = useMemo(
@@ -131,7 +130,7 @@ export const CompanionPersonalization = ({
       : "Save Companion Form";
   const renderPresetCarousel = () => (
     <div className="flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory">
-      {COMPANION_PICKER_PRESETS.map((preset) => {
+      {COMPANION_PRESETS.map((preset) => {
         const previewUrl = getPresetPreviewUrl(preset.id, selectedElement);
         const previewKey = `${preset.id}:${selectedElement}`;
         const isSupported = isPilotCompanionPreset(preset.id);
@@ -147,6 +146,7 @@ export const CompanionPersonalization = ({
             }}
             disabled={!isSupported}
             aria-disabled={!isSupported}
+            aria-pressed={isSelected}
             className={[
               "snap-center shrink-0 w-[250px] rounded-3xl border text-left transition-all duration-300 overflow-hidden disabled:cursor-not-allowed",
               isSelected
@@ -206,16 +206,6 @@ export const CompanionPersonalization = ({
                       {preset.role}
                     </div>
                   </div>
-                  {isSelected && (
-                    <span className="rounded-full border border-primary/60 bg-primary/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary-foreground">
-                      Selected
-                    </span>
-                  )}
-                  {!isSelected && !isSupported && (
-                    <span className="rounded-full border border-white/10 bg-black/35 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
-                      {COMPANION_FUTURE_STATE_LABEL}
-                    </span>
-                  )}
                 </div>
               </div>
             </div>
@@ -268,7 +258,7 @@ export const CompanionPersonalization = ({
 
             {isEggSelectionMode ? (
               <>
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="grid grid-cols-2 gap-4">
                   {COMPANION_ELEMENTS.map((element) => {
                     const isSupported = isPilotCompanionElement(element.id);
                     const isSelected = isSupported && element.id === selectedElement;
@@ -282,6 +272,7 @@ export const CompanionPersonalization = ({
                         }}
                         disabled={!isSupported}
                         aria-disabled={!isSupported}
+                        aria-pressed={isSelected}
                         className={[
                           "rounded-3xl border text-left transition-all duration-300 overflow-hidden disabled:cursor-not-allowed",
                           isSelected
@@ -310,16 +301,6 @@ export const CompanionPersonalization = ({
                                   Stage 0 • Egg
                                 </div>
                               </div>
-                              {isSelected && (
-                                <span className="rounded-full border border-primary/60 bg-primary/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary-foreground">
-                                  Selected
-                                </span>
-                              )}
-                              {!isSelected && !isSupported && (
-                                <span className="rounded-full border border-white/10 bg-black/35 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
-                                  {COMPANION_FUTURE_STATE_LABEL}
-                                </span>
-                              )}
                             </div>
                           </div>
                         </div>
@@ -469,6 +450,7 @@ export const CompanionPersonalization = ({
                         }}
                         disabled={!isSupported}
                         aria-disabled={!isSupported}
+                        aria-pressed={isSelected}
                         className={[
                           "rounded-2xl border-2 p-4 text-left transition-all duration-200 disabled:cursor-not-allowed",
                           isSelected
@@ -487,11 +469,6 @@ export const CompanionPersonalization = ({
                             />
                             <div className="font-semibold text-foreground">{element.label}</div>
                           </div>
-                          {!isSelected && !isSupported ? (
-                            <span className="rounded-full border border-white/10 bg-black/25 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/70">
-                              {COMPANION_FUTURE_STATE_LABEL}
-                            </span>
-                          ) : null}
                         </div>
                         <p className="mt-2 text-xs text-muted-foreground">{element.summary}</p>
                       </button>

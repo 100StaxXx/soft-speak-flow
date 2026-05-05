@@ -1,5 +1,6 @@
 import {
   ASTRAL_ENCOUNTER_DAILY_XP_CAP,
+  CAMPAIGN_XP_REWARDS,
   HABIT_XP_REWARDS,
   SYSTEM_XP_REWARDS,
   DAILY_XP_CAP,
@@ -23,6 +24,10 @@ describe("xpRewards rebalance constants", () => {
 
   it("limits astral encounter XP to about three full runs per day", () => {
     expect(ASTRAL_ENCOUNTER_DAILY_XP_CAP).toBe(150);
+  });
+
+  it("makes campaign creation enough to hatch the egg", () => {
+    expect(CAMPAIGN_XP_REWARDS.CREATE).toBe(10);
   });
 });
 

@@ -1368,6 +1368,7 @@ export type Database = {
           animation_provider: string | null
           animation_provider_model: string | null
           animation_provider_task_id: string | null
+          animation_presented_at: string | null
           animation_requested_at: string | null
           animation_status: string | null
           animation_storage_path: string | null
@@ -1388,6 +1389,7 @@ export type Database = {
           animation_provider?: string | null
           animation_provider_model?: string | null
           animation_provider_task_id?: string | null
+          animation_presented_at?: string | null
           animation_requested_at?: string | null
           animation_status?: string | null
           animation_storage_path?: string | null
@@ -1408,6 +1410,7 @@ export type Database = {
           animation_provider?: string | null
           animation_provider_model?: string | null
           animation_provider_task_id?: string | null
+          animation_presented_at?: string | null
           animation_requested_at?: string | null
           animation_status?: string | null
           animation_storage_path?: string | null
@@ -9070,6 +9073,13 @@ export type Database = {
       mark_companion_active: {
         Args: never
         Returns: string
+      }
+      mark_companion_evolution_animation_presented: {
+        Args: { p_evolution_id: string }
+        Returns: {
+          animation_presented_at: string
+          id: string
+        }[]
       }
       mark_weekly_recap_viewed: {
         Args: { p_recap_id: string }

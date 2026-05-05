@@ -466,7 +466,7 @@ describe("guided tutorial first-value loop", () => {
       expect(result.current.dialogueText).toBe("Tap 'Hatch.'");
       expect(result.current.activeTargetSelectors).toEqual([]);
       expect(result.current.activeTargetSelector).toBeNull();
-      expect(mocks.state.awardCustomXP).toHaveBeenCalledWith(
+      expect(mocks.state.awardCustomXP).not.toHaveBeenCalledWith(
         10,
         "guided_tutorial_step_complete",
         undefined,
@@ -602,7 +602,7 @@ describe("guided tutorial first-value loop", () => {
     });
   });
 
-  it("does not hand off to hatch until campaign tutorial XP is awarded", async () => {
+  it("hands off to hatch without duplicating campaign creation XP", async () => {
     mocks.state.guidedTutorial = {
       ...createFreshTutorial(),
       milestonesCompleted: [
@@ -611,8 +611,6 @@ describe("guided tutorial first-value loop", () => {
         "complete_pathfinder_campaign",
       ],
     };
-    mocks.state.awardCustomXP.mockResolvedValue(undefined);
-
     const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
       wrapper: createWrapper(),
     });
@@ -628,29 +626,29 @@ describe("guided tutorial first-value loop", () => {
     });
 
     await waitFor(() => {
-      expect(mocks.state.awardCustomXP).toHaveBeenCalledWith(
-        10,
-        "guided_tutorial_step_complete",
-        undefined,
-        expect.objectContaining({
-          guided_step: "new_goal",
-          source: "guided_tutorial",
-        }),
-      );
+      expect(result.current.currentStep).toBe("hatch_companion");
     });
-    expect(result.current.currentStep).toBe("new_goal");
-    expect(mocks.state.queryClient.fetchQuery).not.toHaveBeenCalled();
+    expect(mocks.state.awardCustomXP).not.toHaveBeenCalledWith(
+      10,
+      "guided_tutorial_step_complete",
+      undefined,
+      expect.objectContaining({
+        guided_step: "new_goal",
+        source: "guided_tutorial",
+      }),
+    );
+    expect(mocks.state.queryClient.fetchQuery).toHaveBeenCalled();
     expect(
       mocks.state.profileUpdatePayloads.some((payload) => {
         const guidedTutorial = (
           payload.onboarding_data as { guided_tutorial?: { completedSteps?: string[]; xpAwardedSteps?: string[] } } | undefined
         )?.guided_tutorial;
         return (
-          guidedTutorial?.completedSteps?.includes("new_goal") ||
-          guidedTutorial?.xpAwardedSteps?.includes("new_goal")
+          guidedTutorial?.completedSteps?.includes("new_goal") &&
+          !guidedTutorial?.xpAwardedSteps?.includes("new_goal")
         );
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("does not expose a skip action during the in-progress first-value tutorial", async () => {

@@ -2,7 +2,9 @@ export type CompanionChatSurface = "companion" | "journeys";
 type CompanionChatMessageRole = "assistant" | "developer" | "system" | "user";
 type EnvGetter = (name: string) => string | null | undefined;
 
-export const DEFAULT_COMPANION_CHAT_MODEL = "gpt-5.5";
+export const DEFAULT_COMPANION_CHAT_MODEL = "gpt-5.4-mini";
+export const MAX_COMPANION_CHAT_HISTORY_MESSAGES = 8;
+export const MAX_COMPANION_CHAT_HISTORY_MESSAGE_CHARS = 1200;
 
 export const resolveCompanionChatModel = (env: EnvGetter): string =>
   env("OPENAI_COMPANION_CHAT_MODEL") ?? DEFAULT_COMPANION_CHAT_MODEL;
@@ -22,7 +24,29 @@ const isReasoningChatModel = (model: string) =>
   /^(gpt-5|o[1-9])/.test(normalizeChatModelName(model));
 
 const supportsNoReasoningEffort = (model: string) =>
-  /^gpt-5\.5(?:-\d{4}-\d{2}-\d{2})?$/.test(normalizeChatModelName(model));
+  /^gpt-5\.(?:[12]|4(?:-(?:mini|nano))?|5)(?:-\d{4}-\d{2}-\d{2})?$/.test(
+    normalizeChatModelName(model),
+  );
+
+const trimHistoryContent = (content: string): string => {
+  if (content.length <= MAX_COMPANION_CHAT_HISTORY_MESSAGE_CHARS) {
+    return content;
+  }
+
+  return `[Earlier text omitted]\n${
+    content.slice(-MAX_COMPANION_CHAT_HISTORY_MESSAGE_CHARS)
+  }`;
+};
+
+const getBoundedConversationHistory = (
+  history: Array<{ role: "assistant" | "user"; content: string }>,
+) =>
+  history
+    .slice(-MAX_COMPANION_CHAT_HISTORY_MESSAGES)
+    .map((entry) => ({
+      role: entry.role,
+      content: trimHistoryContent(entry.content),
+    }));
 
 export function buildCompanionChatCompletionBody(params: {
   model: string;
@@ -51,10 +75,7 @@ export function buildCompanionChatCompletionBody(params: {
       }),
     messages: [
       { role: instructionRole, content: params.systemPrompt },
-      ...params.conversationHistory.map((entry) => ({
-        role: entry.role,
-        content: entry.content,
-      })),
+      ...getBoundedConversationHistory(params.conversationHistory),
       { role: "user" as const, content: params.message },
     ],
   };

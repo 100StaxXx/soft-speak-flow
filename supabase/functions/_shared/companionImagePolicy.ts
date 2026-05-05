@@ -1,7 +1,4 @@
-import {
-  resolveImageSize,
-  type SupportedImageSize,
-} from "./aiClient.ts";
+import { resolveImageSize, type SupportedImageSize } from "./aiClient.ts";
 
 export const DEFAULT_COMPANION_IMAGE_SIZE: SupportedImageSize = "1536x1024";
 const DEFAULT_FAST_IMAGE_SIZE: SupportedImageSize = "1024x1024";
@@ -9,8 +6,12 @@ const DEFAULT_FAST_IMAGE_SIZE: SupportedImageSize = "1024x1024";
 const DEFAULT_FAST_PATH_PERCENT = 0;
 const DEFAULT_STAGE0_FAST_RETRIES = 1;
 const DEFAULT_NON_STAGE0_FAST_RETRIES = 1;
+const DEFAULT_STANDARD_STAGE0_RETRIES = 1;
+const DEFAULT_STANDARD_NON_STAGE0_RETRIES = 1;
+const DEFAULT_EVOLUTION_RENDER_ATTEMPTS = 2;
 
 const MAX_PERCENT = 100;
+export type CompanionImageQuality = "medium" | "high";
 
 function getEnv(name: string): string | undefined {
   try {
@@ -81,6 +82,60 @@ export function getCompanionFastRetryLimits(): {
 
   return {
     stage0: clamp(toFiniteInt(stage0Raw, DEFAULT_STAGE0_FAST_RETRIES), 0, 3),
-    nonStage0: clamp(toFiniteInt(nonStage0Raw, DEFAULT_NON_STAGE0_FAST_RETRIES), 0, 3),
+    nonStage0: clamp(
+      toFiniteInt(nonStage0Raw, DEFAULT_NON_STAGE0_FAST_RETRIES),
+      0,
+      3,
+    ),
   };
+}
+
+export function getCompanionStandardRetryLimits(): {
+  stage0: number;
+  nonStage0: number;
+} {
+  const stage0Raw = getEnv("COMPANION_IMAGE_STAGE0_MAX_RETRIES");
+  const nonStage0Raw = getEnv("COMPANION_IMAGE_NON_STAGE0_MAX_RETRIES");
+
+  return {
+    stage0: clamp(
+      toFiniteInt(stage0Raw, DEFAULT_STANDARD_STAGE0_RETRIES),
+      0,
+      3,
+    ),
+    nonStage0: clamp(
+      toFiniteInt(nonStage0Raw, DEFAULT_STANDARD_NON_STAGE0_RETRIES),
+      0,
+      3,
+    ),
+  };
+}
+
+export function getCompanionEvolutionRenderAttempts(): number {
+  const raw = getEnv("COMPANION_EVOLUTION_RENDER_ATTEMPTS");
+  return clamp(toFiniteInt(raw, DEFAULT_EVOLUTION_RENDER_ATTEMPTS), 1, 3);
+}
+
+function resolveImageQuality(
+  raw: string | undefined,
+  fallback: CompanionImageQuality,
+): CompanionImageQuality {
+  const normalized = (raw ?? "").trim().toLowerCase();
+  return normalized === "high" || normalized === "medium"
+    ? normalized
+    : fallback;
+}
+
+export function getCompanionHiddenImageQuality(): CompanionImageQuality {
+  return resolveImageQuality(
+    getEnv("COMPANION_IMAGE_HIDDEN_QUALITY"),
+    "medium",
+  );
+}
+
+export function getCompanionFinalImageQuality(): CompanionImageQuality {
+  return resolveImageQuality(
+    getEnv("COMPANION_IMAGE_FINAL_QUALITY"),
+    "high",
+  );
 }

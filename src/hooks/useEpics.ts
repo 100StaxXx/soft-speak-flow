@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "@/components/ui/sonner";
 import { useXPRewards } from "@/hooks/useXPRewards";
+import { CAMPAIGN_XP_REWARDS } from "@/config/xpRewards";
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
 import { useAchievements } from "@/hooks/useAchievements";
 import { format } from "date-fns";
@@ -2266,6 +2267,23 @@ export const useEpics = (options: EpicsOptions = {}) => {
       queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
       queryClient.invalidateQueries({ queryKey: DAILY_PLAN_OPTIMIZATION_QUERY_KEY });
+
+      if (!queued && isNewCreate) {
+        try {
+          await awardCustomXP(
+            CAMPAIGN_XP_REWARDS.CREATE,
+            "campaign_create",
+            "Campaign Created!",
+            {
+              epic_id: epic.id,
+              campaign_title: epic.title,
+            },
+            `campaign_create:${epic.id}`,
+          );
+        } catch (error) {
+          console.error("Failed to award campaign creation XP:", error);
+        }
+      }
 
       if (!queued && isNewCreate && user?.id) {
         const { count } = await supabase

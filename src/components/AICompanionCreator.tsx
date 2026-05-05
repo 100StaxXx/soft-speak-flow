@@ -14,10 +14,7 @@ import {
   type CompanionElementId,
   type CompanionStoryTone,
 } from "@/config/companionCatalog";
-import {
-  COMPANION_FUTURE_STATE_LABEL,
-  isPilotCompanionElement,
-} from "@/config/companionPilotAvailability";
+import { isPilotCompanionElement } from "@/config/companionPilotAvailability";
 import { getUniversalEggAssetUrl } from "@/lib/companionAssetResolver";
 import {
   COMPANION_CUSTOM_NAME_MAX_LENGTH,
@@ -182,7 +179,7 @@ export const AICompanionCreator = ({
                   aria-labelledby="egg-element-picker-label"
                   className="rounded-[24px] border border-white/10 bg-white/5 p-4"
                 >
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid grid-cols-2 gap-3">
                     {COMPANION_ELEMENTS.map((element) => {
                       const isSupported = isPilotCompanionElement(element.id);
                       const isSelected = isSupported && element.id === coreElement;
@@ -219,20 +216,8 @@ export const AICompanionCreator = ({
                               loading="lazy"
                             />
                           </div>
-                          <div className="flex items-center justify-between gap-2 px-3 py-2">
+                          <div className="px-3 py-2">
                             <span className="text-sm font-semibold text-white">{eggLabel}</span>
-                            <span
-                              className={cn(
-                                "rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em]",
-                                isSelected
-                                  ? "border-primary/60 bg-primary/20 text-primary-foreground"
-                                  : isSupported
-                                    ? "border-white/15 bg-black/30 text-white/65"
-                                    : "border-white/10 bg-black/30 text-white/55",
-                              )}
-                            >
-                              {isSelected ? "Selected" : isSupported ? "Choose" : COMPANION_FUTURE_STATE_LABEL}
-                            </span>
                           </div>
                         </button>
                       );
@@ -274,7 +259,7 @@ export const AICompanionCreator = ({
                         )}
                         data-selected={isSelected ? "true" : "false"}
                       >
-                        <div className="grid grid-cols-[minmax(0,1fr)_auto_48px] items-center gap-x-3 gap-y-1.5 sm:grid-cols-[minmax(0,1fr)_auto_56px]">
+                        <div className="grid grid-cols-[minmax(0,1fr)_48px] items-center gap-x-3 gap-y-1.5 sm:grid-cols-[minmax(0,1fr)_56px]">
                           <div className="min-w-0 self-start">
                             <div className="text-base font-semibold leading-tight text-white">
                               {preset.displayName}
@@ -283,17 +268,6 @@ export const AICompanionCreator = ({
                               {preset.role}
                             </p>
                           </div>
-
-                          <span
-                            className={cn(
-                              "self-start rounded-full border px-2.5 py-0.5 text-center text-[10px] font-semibold uppercase leading-4 tracking-[0.18em] text-white/78 sm:min-w-[96px]",
-                              isSelected
-                                ? "border-white/18 bg-white/12"
-                                : "border-white/10 bg-black/20",
-                            )}
-                          >
-                            {isSelected ? "Selected" : "Awaiting"}
-                          </span>
 
                           <div className="row-span-2 flex h-12 w-12 items-center justify-center justify-self-end self-center sm:h-14 sm:w-14">
                             {silhouetteSrc ? (
@@ -314,7 +288,7 @@ export const AICompanionCreator = ({
                             )}
                           </div>
 
-                          <p className="col-span-2 line-clamp-2 text-xs leading-[18px] text-white/72">
+                          <p className="line-clamp-2 text-xs leading-[18px] text-white/72">
                             {preset.revealCopy}
                           </p>
                         </div>

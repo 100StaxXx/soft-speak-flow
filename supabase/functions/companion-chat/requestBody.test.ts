@@ -2,6 +2,8 @@ import { assertEquals } from "https://deno.land/std@0.168.0/testing/asserts.ts";
 import {
   buildCompanionChatCompletionBody,
   DEFAULT_COMPANION_CHAT_MODEL,
+  MAX_COMPANION_CHAT_HISTORY_MESSAGE_CHARS,
+  MAX_COMPANION_CHAT_HISTORY_MESSAGES,
   resolveCompanionChatModel,
 } from "./requestBody.ts";
 
@@ -18,7 +20,7 @@ Deno.test("resolveCompanionChatModel uses the default unless an override is set"
   );
 });
 
-Deno.test("buildCompanionChatCompletionBody uses GPT-5.5 no-reasoning shape for the default model", () => {
+Deno.test("buildCompanionChatCompletionBody uses compact reasoning shape for the default model", () => {
   const body = buildCompanionChatCompletionBody({
     model: DEFAULT_COMPANION_CHAT_MODEL,
     systemPrompt: "Stay warm and concise.",
@@ -41,6 +43,35 @@ Deno.test("buildCompanionChatCompletionBody uses GPT-5.5 no-reasoning shape for 
     { role: "assistant", content: "I'm here." },
     { role: "user", content: "Can you help me think?" },
   ]);
+});
+
+Deno.test("buildCompanionChatCompletionBody caps chat history before sending it upstream", () => {
+  const longContent = "x".repeat(MAX_COMPANION_CHAT_HISTORY_MESSAGE_CHARS + 20);
+  const body = buildCompanionChatCompletionBody({
+    model: DEFAULT_COMPANION_CHAT_MODEL,
+    systemPrompt: "Stay warm and concise.",
+    conversationHistory: Array.from(
+      { length: MAX_COMPANION_CHAT_HISTORY_MESSAGES + 2 },
+      (_, index) => ({
+        role: index % 2 === 0 ? "user" as const : "assistant" as const,
+        content: index === MAX_COMPANION_CHAT_HISTORY_MESSAGES + 1
+          ? longContent
+          : `message-${index}`,
+      }),
+    ),
+    message: "latest",
+    surface: "companion",
+  });
+
+  assertEquals(body.messages.length, MAX_COMPANION_CHAT_HISTORY_MESSAGES + 2);
+  assertEquals(body.messages[1].content, "message-2");
+  const boundedLongContent = body.messages.at(-2)?.content ?? "";
+  assertEquals(
+    boundedLongContent.length,
+    "[Earlier text omitted]\n".length +
+      MAX_COMPANION_CHAT_HISTORY_MESSAGE_CHARS,
+  );
+  assertEquals(body.messages.at(-1), { role: "user", content: "latest" });
 });
 
 Deno.test("buildCompanionChatCompletionBody supports explicit GPT-5.5 no-reasoning shape", () => {
@@ -71,6 +102,34 @@ Deno.test("buildCompanionChatCompletionBody allows documented GPT-5.5 snapshots 
   assertEquals(body.reasoning_effort, "none");
   assertEquals(body.max_completion_tokens, 260);
   assertEquals(body.messages[0].role, "developer");
+});
+
+Deno.test("buildCompanionChatCompletionBody allows documented GPT-5.x variants to use no reasoning", () => {
+  for (
+    const model of [
+      "gpt-5.1",
+      "gpt-5.1-2025-11-13",
+      "gpt-5.2",
+      "gpt-5.2-2025-12-11",
+      "gpt-5.4",
+      "gpt-5.4-2026-03-05",
+      "gpt-5.4-mini",
+      "gpt-5.4-mini-2026-03-17",
+      "gpt-5.4-nano",
+    ]
+  ) {
+    const body = buildCompanionChatCompletionBody({
+      model,
+      systemPrompt: "Stay warm and concise.",
+      conversationHistory: [],
+      message: "Hello.",
+      surface: "companion",
+    });
+
+    assertEquals(body.reasoning_effort, "none", model);
+    assertEquals(body.max_completion_tokens, 260, model);
+    assertEquals(body.messages[0].role, "developer", model);
+  }
 });
 
 Deno.test("buildCompanionChatCompletionBody omits no-reasoning for unsupported reasoning models and keeps legacy params for non-reasoning models", () => {
