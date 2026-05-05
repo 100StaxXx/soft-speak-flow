@@ -1,5 +1,13 @@
 CREATE SCHEMA IF NOT EXISTS test_security;
 
+-- The tests `SET LOCAL ROLE 'authenticated'` (etc.) before calling test_security.*
+-- helpers, so every role that the suite switches into needs USAGE on the schema
+-- and EXECUTE on its functions; otherwise pgtap dies with `permission denied
+-- for schema test_security`.
+GRANT USAGE ON SCHEMA test_security TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA test_security
+  GRANT EXECUTE ON FUNCTIONS TO anon, authenticated, service_role;
+
 CREATE OR REPLACE FUNCTION test_security.set_auth(
   p_role TEXT,
   p_user_id UUID DEFAULT NULL
@@ -464,3 +472,6 @@ EXCEPTION
     NULL;
 END;
 $$;
+
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA test_security
+  TO anon, authenticated, service_role;
