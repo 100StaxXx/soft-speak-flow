@@ -82,11 +82,13 @@ const OverviewTab = memo(({
   nextEvolutionXP,
   progressToNext,
   layoutMode,
+  isActive,
 }: {
   companion: CompanionData | null;
   nextEvolutionXP: number;
   progressToNext: number;
   layoutMode: CompanionLayoutMode;
+  isActive: boolean;
 }) => {
   const isDesktop = layoutMode === "desktop";
 
@@ -119,7 +121,7 @@ const OverviewTab = memo(({
       <MemoryWhisper chance={0.2} className="px-2" />
 
       <ParallaxCard offset={30}>
-        <CompanionDisplay />
+        <CompanionDisplay isVisible={isActive} />
       </ParallaxCard>
       <ParallaxCard offset={22}>
         <div data-tour="companion-progress-area">
@@ -438,6 +440,7 @@ const Companion = () => {
                 nextEvolutionXP={displayNextEvolutionXP}
                 progressToNext={displayProgressToNext}
                 layoutMode={layoutMode}
+                isActive={activeTab === "overview"}
               />
             )}
           </TabsContent>

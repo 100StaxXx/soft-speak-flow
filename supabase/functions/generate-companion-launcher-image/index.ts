@@ -155,7 +155,10 @@ const getReferenceDownloadStatus = (message: string): number | null => {
   return Number.isFinite(status) ? status : null;
 };
 
-const getOpenAIImageRequestStatus = (error: unknown, message: string): number | null => {
+const getOpenAIImageRequestStatus = (
+  error: unknown,
+  message: string,
+): number | null => {
   if (error instanceof OpenAIImageRequestError) {
     return error.status;
   }
@@ -181,6 +184,7 @@ const launcherErrorResponse = ({
   retryable,
   upstreamStatus,
   upstreamError,
+  requestId,
 }: {
   status: number;
   message: string;
@@ -190,6 +194,7 @@ const launcherErrorResponse = ({
   retryable?: boolean;
   upstreamStatus?: number | null;
   upstreamError?: string | null;
+  requestId?: string;
 }): Response =>
   jsonResponse({
     error: message,
@@ -197,9 +202,12 @@ const launcherErrorResponse = ({
     code,
     stage,
     failureReason,
+    requestId: requestId ?? crypto.randomUUID(),
     retryable: retryable ?? false,
     ...(typeof upstreamStatus === "number" ? { upstreamStatus } : {}),
-    ...(upstreamError ? { upstreamError: truncateDiagnostic(upstreamError) } : {}),
+    ...(upstreamError
+      ? { upstreamError: truncateDiagnostic(upstreamError) }
+      : {}),
   }, { status });
 
 export async function handleGenerateCompanionLauncherImage(
@@ -316,7 +324,8 @@ export async function handleGenerateCompanionLauncherImage(
     if (!isUsableReferenceUrl(referenceImageUrl)) {
       return launcherErrorResponse({
         status: 400,
-        message: "Companion current image is not available for launcher generation",
+        message:
+          "Companion current image is not available for launcher generation",
         code: "COMPANION_LAUNCHER_REFERENCE_UNAVAILABLE",
         stage: "validate_reference",
         failureReason: "missing_reference_image",
@@ -383,7 +392,8 @@ export async function handleGenerateCompanionLauncherImage(
             code: "COMPANION_LAUNCHER_REFERENCE_DOWNLOAD_FAILED",
             stage: "download_reference",
             failureReason: "reference_download_failed",
-            retryable: !referenceStatus || referenceStatus >= 500 || referenceStatus === 408,
+            retryable: !referenceStatus || referenceStatus >= 500 ||
+              referenceStatus === 408,
             upstreamStatus: referenceStatus,
             upstreamError: errorMessage,
           });
@@ -418,7 +428,15 @@ export async function handleGenerateCompanionLauncherImage(
 
     if (uploadError) {
       console.error("[CompanionLauncherImage] Upload failed:", uploadError);
-      throw uploadError;
+      throw launcherErrorResponse({
+        status: 502,
+        message: "Companion launcher image upload failed",
+        code: "COMPANION_LAUNCHER_UPLOAD_FAILED",
+        stage: "upload_image",
+        failureReason: "storage_upload_failed",
+        retryable: true,
+        upstreamError: uploadError.message ?? String(uploadError),
+      });
     }
 
     const { data: publicUrlData } = supabase.storage
@@ -448,7 +466,15 @@ export async function handleGenerateCompanionLauncherImage(
         "[CompanionLauncherImage] Failed to save launcher image:",
         updateError,
       );
-      throw updateError;
+      throw launcherErrorResponse({
+        status: 500,
+        message: "Companion launcher image could not be saved",
+        code: "COMPANION_LAUNCHER_UPDATE_FAILED",
+        stage: "save_companion",
+        failureReason: "companion_update_failed",
+        retryable: true,
+        upstreamError: updateError.message ?? String(updateError),
+      });
     }
 
     if (!updatedCompanion) {
@@ -469,15 +495,31 @@ export async function handleGenerateCompanionLauncherImage(
       });
     }
 
-    await registerUserStorageAsset({
-      supabase,
-      userId: companion.user_id,
-      bucketId: COMPANION_IMAGE_BUCKET,
-      storagePath: filePath,
-      sourceKind: "companion_launcher_image",
-      sourceRecordTable: "user_companion",
-      sourceRecordId: companion.id,
-    });
+    try {
+      await registerUserStorageAsset({
+        supabase,
+        userId: companion.user_id,
+        bucketId: COMPANION_IMAGE_BUCKET,
+        storagePath: filePath,
+        sourceKind: "companion_launcher_image",
+        sourceRecordTable: "user_companion",
+        sourceRecordId: companion.id,
+      });
+    } catch (ledgerError) {
+      console.error(
+        "[CompanionLauncherImage] Failed to register launcher asset:",
+        ledgerError,
+      );
+      throw launcherErrorResponse({
+        status: 500,
+        message: "Companion launcher image asset could not be registered",
+        code: "COMPANION_LAUNCHER_LEDGER_FAILED",
+        stage: "register_asset",
+        failureReason: "storage_ledger_failed",
+        retryable: true,
+        upstreamError: getErrorMessage(ledgerError),
+      });
+    }
 
     return jsonResponse({
       success: true,

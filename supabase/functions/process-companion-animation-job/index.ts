@@ -698,6 +698,7 @@ export const handleProcessCompanionAnimationJob = async (
     requestedJobId = typeof requestBody?.jobId === "string"
       ? requestBody.jobId
       : undefined;
+    const isExplicitJobRequest = Boolean(requestedJobId);
 
     const supabase = deps.createClient(supabaseUrl, serviceRoleKey);
     const callerUserId = authContext.mode === "user"
@@ -737,7 +738,11 @@ export const handleProcessCompanionAnimationJob = async (
     }
 
     const now = deps.now();
-    const holdResponse = getJobHoldResponse(job, now);
+    const shouldBypassQueuedHold = isExplicitJobRequest &&
+      job.status === "queued" && !job.provider_task_id;
+    const holdResponse = shouldBypassQueuedHold
+      ? null
+      : getJobHoldResponse(job, now);
     if (holdResponse) {
       return new Response(
         JSON.stringify(holdResponse),

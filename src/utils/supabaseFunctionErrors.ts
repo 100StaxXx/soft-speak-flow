@@ -22,6 +22,7 @@ export interface ParsedFunctionInvokeError {
     stage?: string;
     failureReason?: string;
     status?: string;
+    retryable?: boolean;
     retryAfterSeconds?: number;
     upstreamStatus?: number;
     upstreamError?: string;
@@ -52,6 +53,10 @@ function asString(value: unknown): string | undefined {
 
 function asNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function asBoolean(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
 }
 
 function getOfflineState(): boolean {
@@ -171,6 +176,7 @@ export async function parseFunctionInvokeError(
         const payloadStage = asString(payloadRecord.stage);
         const payloadFailureReason = asString(payloadRecord.failureReason);
         const payloadStatus = asString(payloadRecord.status);
+        const payloadRetryable = asBoolean(payloadRecord.retryable);
         const payloadRetryAfterSeconds =
           asNumber(payloadRecord.retry_after_seconds) ?? asNumber(payloadRecord.retryAfterSeconds);
         const payloadUpstreamStatus =
@@ -186,6 +192,7 @@ export async function parseFunctionInvokeError(
           payloadStage ||
           payloadFailureReason ||
           payloadStatus ||
+          typeof payloadRetryable === "boolean" ||
           payloadRetryAfterSeconds ||
           payloadUpstreamStatus ||
           payloadUpstreamError
@@ -198,6 +205,7 @@ export async function parseFunctionInvokeError(
             stage: payloadStage,
             failureReason: payloadFailureReason,
             status: payloadStatus,
+            retryable: payloadRetryable,
             retryAfterSeconds: payloadRetryAfterSeconds,
             upstreamStatus: payloadUpstreamStatus,
             upstreamError: payloadUpstreamError,

@@ -228,6 +228,49 @@ describe("useCompanionLauncherImage", () => {
     });
   });
 
+  it("does not retry non-retryable structured 500 launcher failures", async () => {
+    const configError = createFunctionError({
+      status: 500,
+      payload: {
+        code: "COMPANION_LAUNCHER_CONFIG_ERROR",
+        failureReason: "openai_config_missing",
+        stage: "configure_openai",
+        message: "Companion launcher image generation is not configured",
+        retryable: false,
+      },
+    });
+    mocks.invoke.mockResolvedValue({
+      data: null,
+      error: configError,
+    });
+
+    renderHook(
+      () =>
+        useCompanionLauncherImage({
+          companionId: "companion-1",
+          sourceImageUrl: "https://assets.example.com/source-a.png",
+          enabled: true,
+        }),
+      { wrapper: createHarness().wrapper },
+    );
+
+    await waitFor(() => {
+      expect(mocks.invoke).toHaveBeenCalledTimes(1);
+      expect(mocks.loggerWarn).toHaveBeenCalledWith(
+        "Companion launcher image generation failed",
+        expect.objectContaining({
+          companionId: "companion-1",
+          sourceImageUrl: "https://assets.example.com/source-a.png",
+          status: 500,
+          code: "COMPANION_LAUNCHER_CONFIG_ERROR",
+          reason: "openai_config_missing",
+          category: "http",
+          requestId: "request-1",
+        }),
+      );
+    });
+  });
+
   it("does not immediately request the same failed source again on rerender", async () => {
     const { wrapper } = createHarness();
     const { rerender } = renderHook(

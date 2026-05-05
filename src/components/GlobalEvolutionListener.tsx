@@ -67,10 +67,14 @@ type EvolutionPresentationData = {
   level: number;
   previousImageUrl: string;
   imageUrl: string;
-  animationVideoUrl: string;
+  animationVideoUrl: string | null;
   presetId?: string;
   mentorSlug?: string;
   element?: string;
+};
+
+type PendingEvolutionPreloadData = EvolutionPresentationData & {
+  animationVideoUrl: string;
 };
 
 type EvolutionPresentationRequest = Omit<EvolutionPresentationData, "evolutionId" | "animationVideoUrl" | "mentorSlug"> & {
@@ -82,6 +86,8 @@ type EvolutionPresentationRequest = Omit<EvolutionPresentationData, "evolutionId
 const sleep = (delayMs: number) => new Promise((resolve) => setTimeout(resolve, delayMs));
 const PRESENTED_EVOLUTION_STORAGE_PREFIX = "companion-evolution-presented";
 const locallyPresentedEvolutionKeys = new Set<string>();
+const isFirstHatchPresentation = (previousLevel: number, level: number) =>
+  previousLevel === 0 && level === 1;
 
 export const clearLocalEvolutionPresentationGuardsForTest = () => {
   locallyPresentedEvolutionKeys.clear();
@@ -489,7 +495,7 @@ export const GlobalEvolutionListener = () => {
   const { triggerEvent } = useCompanionMotionSafe();
   const [isEvolving, setIsEvolving] = useState(false);
   const [evolutionData, setEvolutionData] = useState<EvolutionPresentationData | null>(null);
-  const [pendingEvolutionData, setPendingEvolutionData] = useState<EvolutionPresentationData | null>(null);
+  const [pendingEvolutionData, setPendingEvolutionData] = useState<PendingEvolutionPreloadData | null>(null);
   const activeEvolutionKeyRef = useRef<string | null>(null);
   const pendingEvolutionKeysRef = useRef(new Set<string>());
   const pendingEvolutionRevealRef = useRef<PendingEvolutionReveal | null>(pendingEvolutionReveal);
@@ -623,7 +629,7 @@ export const GlobalEvolutionListener = () => {
     level: number;
     previousImageUrl: string;
     imageUrl: string;
-    animationVideoUrl: string;
+    animationVideoUrl?: string | null;
     presetId?: string;
     element?: string;
     dispatchLoadingStart?: boolean;
@@ -635,7 +641,7 @@ export const GlobalEvolutionListener = () => {
       return false;
     }
 
-    if (!animationVideoUrl) {
+    if (!animationVideoUrl && !isFirstHatchPresentation(previousLevel, level)) {
       logger.warn("Evolution listener: Refusing to open reveal without animation video", {
         companionId,
         level,
@@ -657,7 +663,7 @@ export const GlobalEvolutionListener = () => {
         level,
         previousImageUrl,
         imageUrl,
-        animationVideoUrl,
+        animationVideoUrl: animationVideoUrl ?? null,
         presetId,
         element,
       });
@@ -723,6 +729,36 @@ export const GlobalEvolutionListener = () => {
     resolveMentorSlug,
     setEvolutionInProgress,
     triggerEvent,
+  ]);
+
+  const markPendingRevealReady = useCallback((pending: EvolutionPresentationData) => {
+    const key = buildEvolutionKey(pending.companionId, pending.level);
+    pendingEvolutionKeysRef.current.delete(key);
+    presentationRetryNotifiedKeysRef.current.delete(key);
+    setIsEvolvingLoading(false);
+    setPendingRevealState({
+      status: "ready",
+      companionId: pending.companionId,
+      evolutionId: pending.evolutionId,
+      previousStage: pending.previousLevel,
+      newStage: pending.level,
+      previousImageUrl: pending.previousImageUrl,
+      newImageUrl: pending.imageUrl,
+      animationVideoUrl: pending.animationVideoUrl,
+      presetId: pending.presetId ?? null,
+      element: pending.element ?? null,
+    });
+    toast.info("Your companion's evolution is ready.", {
+      action: {
+        label: "Reveal",
+        onClick: () => navigate("/companion"),
+      },
+    });
+  }, [
+    buildEvolutionKey,
+    navigate,
+    setIsEvolvingLoading,
+    setPendingRevealState,
   ]);
 
   const beginEvolutionPresentationWhenReady = useCallback(async ({
@@ -846,6 +882,21 @@ export const GlobalEvolutionListener = () => {
         evolvedAt: persistedEvolution.evolvedAt,
       });
 
+      if (isFirstHatchPresentation(previousLevel, level) && !persistedEvolution.animationVideoUrl) {
+        markPendingRevealReady({
+          evolutionId: persistedEvolution.id,
+          companionId,
+          previousLevel,
+          level,
+          previousImageUrl,
+          imageUrl,
+          animationVideoUrl: null,
+          presetId,
+          element,
+        });
+        return true;
+      }
+
       const readyEvolution = await waitForEvolutionAnimation({
         companionId,
         stage: level,
@@ -883,6 +934,7 @@ export const GlobalEvolutionListener = () => {
   }, [
     buildEvolutionKey,
     clearPresentationRetryTimer,
+    markPendingRevealReady,
     recordEvolutionMemory,
     setPendingRevealState,
     setIsEvolvingLoading,
@@ -897,33 +949,11 @@ export const GlobalEvolutionListener = () => {
     if (pendingPreloadKeyRef.current !== key) return;
     pendingPreloadKeyRef.current = null;
     setPendingEvolutionData(null);
-    pendingEvolutionKeysRef.current.delete(key);
-    presentationRetryNotifiedKeysRef.current.delete(key);
-    setIsEvolvingLoading(false);
-    setPendingRevealState({
-      status: "ready",
-      companionId: pending.companionId,
-      evolutionId: pending.evolutionId,
-      previousStage: pending.previousLevel,
-      newStage: pending.level,
-      previousImageUrl: pending.previousImageUrl,
-      newImageUrl: pending.imageUrl,
-      animationVideoUrl: pending.animationVideoUrl,
-      presetId: pending.presetId ?? null,
-      element: pending.element ?? null,
-    });
-    toast.info("Your companion's evolution is ready.", {
-      action: {
-        label: "Reveal",
-        onClick: () => navigate("/companion"),
-      },
-    });
+    markPendingRevealReady(pending);
   }, [
     buildEvolutionKey,
-    navigate,
+    markPendingRevealReady,
     pendingEvolutionData,
-    setPendingRevealState,
-    setIsEvolvingLoading,
   ]);
 
   const retryPendingAnimationPreload = useCallback((reason: string) => {
@@ -1312,7 +1342,10 @@ export const GlobalEvolutionListener = () => {
         return;
       }
 
-      if (!pending.evolutionId || !pending.animationVideoUrl) {
+      if (
+        !pending.evolutionId ||
+        (!pending.animationVideoUrl && !isFirstHatchPresentation(pending.previousStage, pending.newStage))
+      ) {
         logger.warn("Evolution listener: Reveal requested before animation was playable", {
           companionId: pending.companionId,
           stage: pending.newStage,
@@ -1327,7 +1360,7 @@ export const GlobalEvolutionListener = () => {
         level: pending.newStage,
         previousImageUrl: pending.previousImageUrl,
         imageUrl: pending.newImageUrl,
-        animationVideoUrl: pending.animationVideoUrl,
+        animationVideoUrl: pending.animationVideoUrl ?? null,
         presetId: pending.presetId ?? undefined,
         element: pending.element ?? undefined,
       });

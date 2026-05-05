@@ -151,10 +151,19 @@ const resolveCoverObjectPosition = ({
   return `50% ${yPosition}%`;
 };
 
-const resolveContainTransform = (focalPoint: CompanionImageFocalPoint): string => {
+const resolveContainStyle = (focalPoint: CompanionImageFocalPoint): CSSProperties => {
   const translateX = (0.5 - focalPoint.x) * 100;
   const translateY = (0.5 - focalPoint.y) * 100;
-  return `translate(${translateX.toFixed(3)}%, ${translateY.toFixed(3)}%)`;
+  const style: CSSProperties = {
+    objectPosition: "center center",
+  };
+
+  if (Math.abs(translateX) > 0.001 || Math.abs(translateY) > 0.001) {
+    style.transform = `translate(${translateX.toFixed(3)}%, ${translateY.toFixed(3)}%)`;
+    style.transformOrigin = "center center";
+  }
+
+  return style;
 };
 
 export const resolveCompanionImagePresentation = ({
@@ -182,10 +191,7 @@ export const resolveCompanionImagePresentation = ({
       focalPoint,
       focalSource,
       assetKey,
-      style: {
-        transform: resolveContainTransform(focalPoint),
-        transformOrigin: "center center",
-      },
+      style: resolveContainStyle(focalPoint),
     };
   }
 

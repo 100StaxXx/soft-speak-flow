@@ -61,6 +61,7 @@ interface AnimationWorkerKickoffResult {
   jobId?: string;
   videoUrl?: string;
   reason?: string;
+  code?: string;
   statusCode?: number;
 }
 
@@ -138,6 +139,7 @@ const invokeAnimationWorkerBestEffort = async (
         : typeof payload.error === "string"
         ? payload.error
         : undefined,
+      code: typeof payload.code === "string" ? payload.code : undefined,
       statusCode: response.status,
     };
 
@@ -151,19 +153,106 @@ const invokeAnimationWorkerBestEffort = async (
 
     return result;
   } catch (error) {
+    const reason = error instanceof Error
+      ? error.message
+      : "worker_kickoff_failed";
     console.warn("[CompanionAnimationPrewarm] Worker kickoff threw", {
       jobId,
-      error: error instanceof Error ? error.message : String(error),
+      error: reason,
     });
-    return { ok: false, reason: "worker_kickoff_failed" };
+    return { ok: false, reason };
   }
+};
+
+const normalizeWorkerKickoffFailureCode = (
+  workerResult: AnimationWorkerKickoffResult,
+): string => {
+  const reason = (workerResult.reason ?? "").toLowerCase();
+  if (workerResult.statusCode === 401 || workerResult.statusCode === 403) {
+    return "animation_worker_auth_failed";
+  }
+  if (
+    reason.includes("internal_function_secret") ||
+    reason.includes("internal function auth requires") ||
+    reason.includes("server_configuration_error") ||
+    reason.includes("supabase_url") ||
+    reason.includes("supabase_anon_key") ||
+    reason.includes("supabase_publishable_key")
+  ) {
+    return "animation_worker_config_error";
+  }
+  return "animation_worker_kickoff_failed";
+};
+
+const isTerminalWorkerKickoffFailure = (
+  workerResult: AnimationWorkerKickoffResult,
+): boolean => {
+  if (workerResult.ok) return false;
+  const code = normalizeWorkerKickoffFailureCode(workerResult);
+  return code === "animation_worker_config_error" ||
+    code === "animation_worker_auth_failed";
+};
+
+const markWorkerKickoffFailed = async ({
+  supabase,
+  evolutionId,
+  jobId,
+  workerResult,
+  now,
+}: {
+  supabase: any;
+  evolutionId: string;
+  jobId: string;
+  workerResult: AnimationWorkerKickoffResult;
+  now: Date;
+}): Promise<{ code: string; message: string }> => {
+  const code = normalizeWorkerKickoffFailureCode(workerResult);
+  const message = (workerResult.reason || code).slice(0, 500);
+  const nowIso = now.toISOString();
+
+  const { error: evolutionError } = await supabase
+    .from("companion_evolutions")
+    .update({
+      animation_status: "failed",
+      animation_error_code: code,
+      animation_error_message: message,
+      animation_completed_at: nowIso,
+    })
+    .eq("id", evolutionId);
+
+  if (evolutionError) {
+    throw evolutionError;
+  }
+
+  const { error: jobError } = await supabase
+    .from("companion_animation_jobs")
+    .update({
+      status: "failed",
+      error_code: code,
+      error_message: message,
+      completed_at: nowIso,
+      next_retry_at: null,
+      updated_at: nowIso,
+    })
+    .eq("id", jobId);
+
+  if (jobError) {
+    throw jobError;
+  }
+
+  return { code, message };
 };
 
 const attachWorkerKickoffResult = async (
   deps: PrewarmCompanionAnimationDeps,
   responseBody: Record<string, unknown>,
-  jobId: string | null | undefined,
+  params: {
+    supabase: any;
+    evolutionId: string;
+    jobId: string | null | undefined;
+  },
 ): Promise<Record<string, unknown>> => {
+  const { supabase, evolutionId, jobId } = params;
   if (!jobId) return responseBody;
 
   const invokeWorker = deps.invokeAnimationWorker ??
@@ -189,8 +278,45 @@ const attachWorkerKickoffResult = async (
   if (workerResult.reason) {
     nextBody.workerKickoffReason = workerResult.reason;
   }
+  if (workerResult.code) {
+    nextBody.code = workerResult.code;
+  }
   if (typeof workerResult.statusCode === "number" && !workerResult.ok) {
     nextBody.workerKickoffStatusCode = workerResult.statusCode;
+  }
+  if (workerResult.status === "failed") {
+    nextBody.status = "failed";
+    nextBody.reason = workerResult.code ?? workerResult.reason ??
+      "animation_worker_failed";
+    if (workerResult.reason) {
+      nextBody.error = workerResult.reason;
+    }
+  }
+
+  if (isTerminalWorkerKickoffFailure(workerResult)) {
+    try {
+      const failure = await markWorkerKickoffFailed({
+        supabase,
+        evolutionId,
+        jobId,
+        workerResult,
+        now: deps.now(),
+      });
+      nextBody.status = "failed";
+      nextBody.code = failure.code;
+      nextBody.reason = failure.code;
+      nextBody.error = failure.message;
+      nextBody.workerKickoffStatus = "failed";
+    } catch (error) {
+      console.warn(
+        "[CompanionAnimationPrewarm] Failed to record worker kickoff failure",
+        {
+          evolutionId,
+          jobId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      );
+    }
   }
 
   return nextBody;
@@ -403,7 +529,7 @@ export const handlePrewarmCompanionAnimation = async (
           evolutionId,
           jobId,
           stage,
-        }, jobId),
+        }, { supabase, evolutionId, jobId }),
       );
     }
 
@@ -440,7 +566,7 @@ export const handlePrewarmCompanionAnimation = async (
       await attachWorkerKickoffResult(
         deps,
         responseBody,
-        enqueueResult.jobId,
+        { supabase, evolutionId, jobId: enqueueResult.jobId },
       ),
     );
   } catch (error) {

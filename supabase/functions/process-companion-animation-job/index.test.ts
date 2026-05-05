@@ -236,6 +236,110 @@ Deno.test("processClaimedCompanionAnimationJob submits a new fal queue request",
   );
 });
 
+Deno.test("handleProcessCompanionAnimationJob submits explicit queued jobs without waiting for next_retry_at", async () => {
+  const queuedJob = createJob({
+    status: "queued",
+    provider_task_id: null,
+    provider_status: null,
+    next_retry_at: "2099-01-01T00:00:00.000Z",
+    started_at: null,
+  });
+  const updates: Array<{ table: string; payload: Record<string, unknown> }> =
+    [];
+  const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
+
+  const supabase = {
+    from: (table: string) => {
+      if (table === "companion_animation_jobs") {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: queuedJob, error: null }),
+            }),
+          }),
+          update: (payload: Record<string, unknown>) => {
+            updates.push({ table, payload });
+            const chain = {
+              eq: () => chain,
+              select: () => ({
+                maybeSingle: async () => ({
+                  data: {
+                    ...queuedJob,
+                    ...payload,
+                    status: "processing",
+                  },
+                  error: null,
+                }),
+              }),
+            };
+            return chain;
+          },
+        };
+      }
+
+      if (table === "companion_evolutions") {
+        return {
+          update: (payload: Record<string, unknown>) => ({
+            eq: async () => {
+              updates.push({ table, payload });
+              return { error: null };
+            },
+          }),
+        };
+      }
+
+      throw new Error(`Unexpected table: ${table}`);
+    },
+  };
+  const { deps } = createDeps({
+    fetchFn: ((url: string | URL | Request, init?: RequestInit) => {
+      fetchCalls.push({ url: String(url), init });
+      return Promise.resolve(
+        new Response(JSON.stringify({ request_id: "fal-request-1" })),
+      );
+    }) as typeof fetch,
+  });
+  const handlerDeps = {
+    ...deps,
+    createClient: (() => supabase) as never,
+    env: {
+      get: (name: string) => {
+        if (name === "SUPABASE_URL") return "https://example.supabase.co";
+        if (name === "SUPABASE_SERVICE_ROLE_KEY") return "service-role-key";
+        if (name === "SUPABASE_ANON_KEY") return "anon-key";
+        if (name === "INTERNAL_FUNCTION_SECRET") return "internal-secret";
+        return deps.env.get(name);
+      },
+    },
+  } as ProcessDeps;
+
+  const response = await module.handleProcessCompanionAnimationJob(
+    new Request("https://example.test/process", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-internal-key": "internal-secret",
+      },
+      body: JSON.stringify({ jobId: "job-1" }),
+    }),
+    handlerDeps,
+  );
+  const body = await response.json();
+
+  assertEquals(response.status, 200);
+  assertEquals(body.status, "processing");
+  assertEquals(body.providerTaskId, "fal-request-1");
+  assertEquals(fetchCalls[0]?.url.includes("queue.fal.run"), true);
+  assertEquals(
+    updates.find((update) =>
+      update.table === "companion_animation_jobs" &&
+      update.payload.provider_task_id === "fal-request-1"
+    )
+      ?.payload.provider_task_id,
+    "fal-request-1",
+  );
+});
+
 Deno.test("processClaimedCompanionAnimationJob downloads, uploads, ledgers, and records a completed video", async () => {
   const { supabase, updates, uploads } = createSupabaseHarness();
   const { deps, ledgerCalls } = createDeps({

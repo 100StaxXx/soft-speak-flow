@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   isRetriableFunctionInvokeError,
   parseFunctionInvokeError,
+  type ParsedFunctionInvokeError,
 } from "@/utils/supabaseFunctionErrors";
 import { logger } from "@/utils/logger";
 import { useAuth } from "./useAuth";
@@ -34,6 +35,25 @@ interface GenerateCompanionLauncherImageRequest {
 const getRequestKey = (companionId: string, sourceImageUrl: string) =>
   `${companionId}:${sourceImageUrl}`;
 
+type LauncherFunctionError = Error & {
+  parsedFunctionError?: ParsedFunctionInvokeError;
+};
+
+const decorateFunctionError = async (error: unknown): Promise<LauncherFunctionError> => {
+  const parsedFunctionError = await parseFunctionInvokeError(error);
+  const decoratedError: LauncherFunctionError =
+    error instanceof Error
+      ? error
+      : new Error(parsedFunctionError.message ?? String(error));
+  decoratedError.parsedFunctionError = parsedFunctionError;
+  return decoratedError;
+};
+
+const getDecoratedParsedError = (error: unknown): ParsedFunctionInvokeError | undefined => {
+  if (!error || typeof error !== "object") return undefined;
+  return (error as { parsedFunctionError?: ParsedFunctionInvokeError }).parsedFunctionError;
+};
+
 export const useCompanionLauncherImage = ({
   companionId,
   sourceImageUrl,
@@ -63,13 +83,18 @@ export const useCompanionLauncherImage = ({
       );
 
       if (error) {
-        throw error;
+        throw await decorateFunctionError(error);
       }
 
       return data ?? {};
     },
-    retry: (failureCount, error) =>
-      failureCount < 1 && isRetriableFunctionInvokeError(error),
+    retry: (failureCount, error) => {
+      if (failureCount >= 1) return false;
+      const retryable = getDecoratedParsedError(error)?.responsePayload?.retryable;
+      if (retryable === false) return false;
+      if (retryable === true) return true;
+      return isRetriableFunctionInvokeError(error);
+    },
     retryDelay: 0,
     onSuccess: (data, variables) => {
       if (!user?.id) return;
@@ -100,7 +125,10 @@ export const useCompanionLauncherImage = ({
       void queryClient.invalidateQueries({ queryKey: getCompanionQueryKey(user.id) });
     },
     onError: (error, variables) => {
-      void parseFunctionInvokeError(error).then((parsedError) => {
+      const parsedErrorPromise = getDecoratedParsedError(error)
+        ? Promise.resolve(getDecoratedParsedError(error)!)
+        : parseFunctionInvokeError(error);
+      void parsedErrorPromise.then((parsedError) => {
         logger.warn("Companion launcher image generation failed", {
           companionId: variables.companionId,
           sourceImageUrl: variables.sourceImageUrl,

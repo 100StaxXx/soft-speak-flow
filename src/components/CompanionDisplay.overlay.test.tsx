@@ -465,6 +465,25 @@ describe("CompanionDisplay overlay stack", () => {
     expect(shell).toHaveClass("animate-companion-idle-drift");
   });
 
+  it("remounts the companion art when a hidden overview tab becomes visible again", async () => {
+    mocks.isRegenerating = false;
+    mocks.isDormant = false;
+
+    const { rerender } = render(<CompanionDisplay isVisible />);
+
+    await screen.findByText("Nova");
+    const initialImage = screen.getByAltText(/companion at level 8/i);
+
+    fireEvent.load(initialImage);
+
+    rerender(<CompanionDisplay isVisible={false} />);
+    rerender(<CompanionDisplay isVisible />);
+
+    await waitFor(() => {
+      expect(screen.getByAltText(/companion at level 8/i)).not.toBe(initialImage);
+    });
+  });
+
   it("uses expressive portraits when available and exposes the active expression metadata", async () => {
     mocks.isRegenerating = false;
     mocks.isDormant = false;

@@ -939,6 +939,52 @@ describe("GlobalEvolutionListener", () => {
     );
   });
 
+  it("makes the first hatch revealable without waiting for generated animation", async () => {
+    mocks.companionEvolutionLookupResponses.push({
+      data: {
+        id: "evo-1",
+        animation_video_url: null,
+        animation_status: "processing",
+        animation_presented_at: null,
+      },
+      error: null,
+    });
+
+    renderListener();
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(COMPANION_HATCH_STARTED_EVENT, {
+        detail: {
+          companionId: "companion-1",
+          previousStage: 0,
+          newStage: 1,
+          previousImageUrl: "https://example.com/egg.png",
+          newImageUrl: "https://example.com/hatchling.png",
+          presetId: "fox",
+          element: "fire",
+        },
+      }));
+    });
+
+    await waitFor(() => {
+      expect(mocks.state.pendingEvolutionReveal).toEqual(
+        expect.objectContaining({
+          status: "ready",
+          animationVideoUrl: null,
+        }),
+      );
+    });
+    expect(screen.queryByTestId("evolution-animation-preloader")).not.toBeInTheDocument();
+    expect(mocks.functionsInvokeMock).not.toHaveBeenCalled();
+
+    await requestReadyEvolutionReveal();
+
+    expect(screen.getByTestId("companion-evolution")).toHaveAttribute(
+      "data-animation-video-url",
+      "",
+    );
+  });
+
   it("opens the hatch overlay without waiting for mentor lookup", async () => {
     mocks.state.mentorId = "mentor-1";
     mocks.state.mentorLookup = () => new Promise(() => {});

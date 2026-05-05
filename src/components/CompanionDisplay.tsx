@@ -86,6 +86,7 @@ import {
 
 interface CompanionDisplayProps {
   layoutMode?: CompanionLayoutMode;
+  isVisible?: boolean;
 }
 
 const LONG_PRESS_DURATION_MS = 800;
@@ -142,7 +143,10 @@ const getColorName = (hexColor: string): string => {
   }
 };
 
-export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDisplayProps) => {
+export const CompanionDisplay = memo(({
+  layoutMode = "mobile",
+  isVisible = true,
+}: CompanionDisplayProps) => {
   const {
     companion,
     nextEvolutionXP,
@@ -209,6 +213,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const touchStartPoint = useRef<{ x: number; y: number } | null>(null);
   const previousImageUrl = useRef<string | null>(null);
+  const wasVisible = useRef(isVisible);
   const regenerationsUsed = companion?.image_regenerations_used ?? 0;
   const regenerationsRemaining = Math.max(0, maxRegenerations - regenerationsUsed);
   const matchingPendingEvolutionReveal = useMemo(
@@ -503,6 +508,17 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
     setImageLoaded(false);
     setImageError(false);
   }, [effectiveImageUrl]);
+
+  useEffect(() => {
+    const becameVisible = isVisible && !wasVisible.current;
+    wasVisible.current = isVisible;
+
+    if (!becameVisible) return;
+
+    setImageLoaded(false);
+    setImageError(false);
+    setImageKey((prev) => prev + 1);
+  }, [isVisible]);
 
   useEffect(() => {
     setFallbackToDefaultPortrait(false);

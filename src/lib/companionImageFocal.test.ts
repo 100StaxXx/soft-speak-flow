@@ -43,6 +43,28 @@ describe("companionImageFocal", () => {
     });
   });
 
+  it("keeps centered square egg art in the center without a no-op transform", () => {
+    expect(
+      resolveCompanionImagePresentation({
+        src: "/companion-eggs/v2/egg__t0_egg__normal__storm.webp",
+        fit: "portrait",
+      }),
+    ).toMatchObject({
+      focalSource: "manifest",
+      assetKey: "companion-eggs/v2/egg__t0_egg__normal__storm.webp",
+      style: {
+        objectPosition: "center center",
+      },
+    });
+
+    expect(
+      resolveCompanionImagePresentation({
+        src: "/companion-eggs/v2/egg__t0_egg__normal__storm.webp",
+        fit: "portrait",
+      }).style.transform,
+    ).toBeUndefined();
+  });
+
   it("detects preset portrait assets and resolves portrait framing from bundled metadata", () => {
     expect(
       isCompanionPresetImageSource("/companion-presets/buttercat/t1_youth/normal/buttercat__t1_youth__normal__fire.png"),
