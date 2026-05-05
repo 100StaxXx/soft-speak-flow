@@ -614,6 +614,7 @@ describe("CompanionDisplay overlay stack", () => {
       "src",
       expect.stringContaining("/companion-eggs/v2/egg__t0_egg__normal__fire.webp"),
     );
+    expect(image).toHaveAttribute("data-companion-image-fit", "cover");
   });
 
   it("keeps the evolve tutorial step visually pre-hatch until hatch actually starts", async () => {

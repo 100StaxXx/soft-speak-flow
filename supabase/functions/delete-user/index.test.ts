@@ -822,7 +822,7 @@ Deno.test("delete-user retries transient storage removal failures and succeeds",
   );
 });
 
-Deno.test("delete-user returns storage_api failureReason when storage cleanup retries are exhausted", async () => {
+Deno.test("delete-user returns degraded success when storage cleanup retries are exhausted", async () => {
   const harness = createHandleDeleteUserHarness({
     registeredStorageAssets: [
       {
@@ -854,19 +854,20 @@ Deno.test("delete-user returns storage_api failureReason when storage cleanup re
 
   assertEquals(
     response.status,
-    500,
-    "Expected exhausted storage retries to remain fatal",
+    200,
+    "Expected exhausted storage retries to return degraded success",
   );
-  assertEquals(body.success, false, "Expected error response body");
-  assertEquals(
-    body.code,
-    "ACCOUNT_DELETION_STORAGE_CLEANUP_FAILED",
-    "Expected storage cleanup failure code",
+  assertEquals(body.success, true, "Expected success response body");
+  assert(
+    Array.isArray(body.warnings) && body.warnings.length > 0,
+    "Expected storage cleanup warnings in response",
   );
-  assertEquals(
-    body.failureReason,
-    "storage_api",
-    "Expected storage_api failureReason",
+  assert(
+    body.warnings.some((warning: { code: string; message: string }) =>
+      warning.code === "STORAGE_CLEANUP_INCOMPLETE" &&
+      warning.message.includes("Storage API cleanup failed")
+    ),
+    "Expected storage API cleanup warning",
   );
   assertArrayEquals(
     harness.sleepCalls,
@@ -875,8 +876,13 @@ Deno.test("delete-user returns storage_api failureReason when storage cleanup re
   );
   assertEquals(
     harness.getRpcCallCount(),
-    0,
-    "Expected relational cleanup not to run after fatal storage failure",
+    1,
+    "Expected relational cleanup to still run after degraded storage failure",
+  );
+  assertEquals(
+    harness.getAuthDeleteCallCount(),
+    1,
+    "Expected auth deletion to still run after degraded storage failure",
   );
 });
 

@@ -351,6 +351,24 @@ const classifyStorageCleanupFailureReason = (
   return "unknown";
 };
 
+const shouldContinueAfterStorageCleanupFailure = (error: unknown): boolean => {
+  const failureReason = classifyStorageCleanupFailureReason(error);
+  return failureReason === "storage_api" || failureReason === "timeout";
+};
+
+const buildStorageCleanupFailureWarning = (error: unknown): string => {
+  const failureReason = classifyStorageCleanupFailureReason(error);
+  const innermostError = getInnermostError(error);
+  const status = getErrorStatus(innermostError) ?? getErrorStatus(error);
+  const statusText = typeof status === "number" ? ` (status ${status})` : "";
+
+  if (failureReason === "timeout") {
+    return "Storage cleanup timed out before account deletion finished. Database cleanup fallback continued.";
+  }
+
+  return `Storage API cleanup failed${statusText}; account deletion continued with database cleanup fallback.`;
+};
+
 const describeError = (error: unknown): Record<string, unknown> => {
   const seen = new Set<unknown>();
 
@@ -1370,18 +1388,32 @@ export const handleDeleteUser = async (
         waitForRetry,
       );
     } catch (error) {
-      console.error("[delete-user] storage cleanup failed", {
-        requestId,
-        userId: user.id,
-        stage: "storage_cleanup",
-        ...describeError(error),
-      });
-      throw createStageFailureError(
-        "storage_cleanup",
-        ACCOUNT_DELETION_ERROR_CODES.STORAGE_CLEANUP_FAILED,
-        error,
-        classifyStorageCleanupFailureReason(error),
-      );
+      if (shouldContinueAfterStorageCleanupFailure(error)) {
+        console.warn(
+          "[delete-user] storage cleanup failed — continuing with database cleanup fallback",
+          {
+            requestId,
+            userId: user.id,
+            stage: "storage_cleanup",
+            failureReason: classifyStorageCleanupFailureReason(error),
+            ...describeError(error),
+          },
+        );
+        storageWarnings.push(buildStorageCleanupFailureWarning(error));
+      } else {
+        console.error("[delete-user] storage cleanup failed", {
+          requestId,
+          userId: user.id,
+          stage: "storage_cleanup",
+          ...describeError(error),
+        });
+        throw createStageFailureError(
+          "storage_cleanup",
+          ACCOUNT_DELETION_ERROR_CODES.STORAGE_CLEANUP_FAILED,
+          error,
+          classifyStorageCleanupFailureReason(error),
+        );
+      }
     }
 
     try {

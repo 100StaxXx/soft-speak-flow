@@ -46,6 +46,7 @@ import {
 } from "@/lib/companionAssetResolver";
 import { getCompanionEggLabel } from "@/config/companionCatalog";
 import {
+  getCompanionEggImageAssetKey,
   isCompanionEggImageSource,
   isCompanionPresetImageSource,
 } from "@/lib/companionImageFocal";
@@ -456,11 +457,15 @@ export const CompanionDisplay = memo(({
   const effectiveImageUrl = displayImageUrl || COMPANION_PLACEHOLDER;
   const usesPresetPortraitShell = isCompanionPresetImageSource(effectiveImageUrl);
   const usesEggPortraitShell = isCompanionEggImageSource(effectiveImageUrl);
+  const usesSceneEggPortraitShell =
+    getCompanionEggImageAssetKey(effectiveImageUrl)?.startsWith("companion-eggs/v2/") ?? false;
   const usesScenePortraitShell = effectiveImageUrl !== COMPANION_PLACEHOLDER;
-  const portraitImageFit = usesPresetPortraitShell || usesEggPortraitShell ? "portrait" : "cover";
+  const portraitImageFit = usesPresetPortraitShell || (usesEggPortraitShell && !usesSceneEggPortraitShell)
+    ? "portrait"
+    : "cover";
   const portraitSceneContentClassName = cn(
     "flex items-center justify-center",
-    usesEggPortraitShell && "p-2.5 sm:p-3",
+    usesEggPortraitShell && !usesSceneEggPortraitShell && "p-2.5 sm:p-3",
   );
   const effectiveImageFocal = useMemo(() => {
     if (!displayCompanion) return { x: null, y: null };

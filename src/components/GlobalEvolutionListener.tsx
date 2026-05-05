@@ -915,8 +915,7 @@ export const GlobalEvolutionListener = () => {
       }
 
       presentationRetryNotifiedKeysRef.current.delete(key);
-      pendingPreloadKeyRef.current = key;
-      setPendingEvolutionData({
+      const readyPendingEvolution = {
         evolutionId: persistedEvolution.id,
         companionId,
         previousLevel,
@@ -926,7 +925,10 @@ export const GlobalEvolutionListener = () => {
         animationVideoUrl: readyEvolution.animationVideoUrl,
         presetId,
         element,
-      });
+      };
+      pendingPreloadKeyRef.current = key;
+      setPendingEvolutionData(readyPendingEvolution);
+      markPendingRevealReady(readyPendingEvolution);
       queuedForPreload = true;
       return true;
     } finally {
@@ -955,6 +957,15 @@ export const GlobalEvolutionListener = () => {
     if (pendingPreloadKeyRef.current !== key) return;
     pendingPreloadKeyRef.current = null;
     setPendingEvolutionData(null);
+    const currentReveal = pendingEvolutionRevealRef.current;
+    if (
+      currentReveal?.status === "ready" &&
+      currentReveal.companionId === pending.companionId &&
+      currentReveal.newStage === pending.level &&
+      currentReveal.animationVideoUrl === pending.animationVideoUrl
+    ) {
+      return;
+    }
     markPendingRevealReady(pending);
   }, [
     buildEvolutionKey,
@@ -968,6 +979,24 @@ export const GlobalEvolutionListener = () => {
 
     const key = buildEvolutionKey(pending.companionId, pending.level);
     if (pendingPreloadKeyRef.current !== key) return;
+    const currentReveal = pendingEvolutionRevealRef.current;
+    if (
+      currentReveal?.status === "ready" &&
+      currentReveal.companionId === pending.companionId &&
+      currentReveal.newStage === pending.level &&
+      currentReveal.animationVideoUrl === pending.animationVideoUrl
+    ) {
+      logger.warn("Evolution listener: Animation video preload did not complete before reveal became ready", {
+        companionId: pending.companionId,
+        level: pending.level,
+        animationVideoUrl: pending.animationVideoUrl,
+        reason,
+      });
+      pendingPreloadKeyRef.current = null;
+      setPendingEvolutionData(null);
+      return;
+    }
+
     logger.warn("Evolution listener: Animation video could not be preloaded", {
       companionId: pending.companionId,
       level: pending.level,
@@ -1208,10 +1237,13 @@ export const GlobalEvolutionListener = () => {
         return;
       }
 
-      const currentPending = pendingEvolutionRevealRef.current;
-      if (currentPending?.companionId === companionId && currentPending.newStage === currentStage) {
-        return;
-      }
+	      const currentPending = pendingEvolutionRevealRef.current;
+	      const currentPendingMatches =
+	        currentPending?.companionId === companionId &&
+	        currentPending.newStage === currentStage;
+	      if (currentPendingMatches && currentPending.status === "ready") {
+	        return;
+	      }
 
       const currentEvolution = await fetchPersistedEvolutionMetadata({
         companionId,
@@ -1276,12 +1308,27 @@ export const GlobalEvolutionListener = () => {
         })
         ?? currentImageUrl;
 
-      if (cancelled || !resolvedCurrentImageUrl || !resolvedPreviousImageUrl) {
-        return;
-      }
+	      if (cancelled || !resolvedCurrentImageUrl || !resolvedPreviousImageUrl) {
+	        return;
+	      }
 
-      void beginEvolutionPresentationWhenReady({
-        companionId,
+	      if (currentPendingMatches && currentEvolution.animationVideoUrl) {
+	        markPendingRevealReady({
+	          evolutionId: currentEvolution.id,
+	          companionId,
+	          previousLevel: currentPending.previousStage,
+	          level: currentStage,
+	          previousImageUrl: currentPending.previousImageUrl,
+	          imageUrl: currentPending.newImageUrl,
+	          animationVideoUrl: currentEvolution.animationVideoUrl,
+	          presetId: currentPending.presetId ?? undefined,
+	          element: currentPending.element ?? undefined,
+	        });
+	        return;
+	      }
+
+	      void beginEvolutionPresentationWhenReady({
+	        companionId,
         previousLevel: previousStage,
         level: currentStage,
         previousImageUrl: resolvedPreviousImageUrl,
@@ -1299,7 +1346,7 @@ export const GlobalEvolutionListener = () => {
     return () => {
       cancelled = true;
     };
-  }, [beginEvolutionPresentationWhenReady, user?.id]);
+	  }, [beginEvolutionPresentationWhenReady, markPendingRevealReady, user?.id]);
 
   useEffect(() => {
     if (!user) return;
