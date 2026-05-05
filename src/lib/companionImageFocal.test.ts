@@ -93,6 +93,44 @@ describe("companionImageFocal", () => {
     });
   });
 
+  it("keeps generated cover portraits unscaled unless recentering is requested", () => {
+    expect(
+      resolveCompanionImagePresentation({
+        src: "https://example.com/generated-companion.png",
+        fit: "cover",
+        focalX: 0.375,
+        focalY: 0.625,
+      }),
+    ).toEqual({
+      focalPoint: { x: 0.375, y: 0.625 },
+      focalSource: "stored",
+      assetKey: null,
+      style: {
+        objectPosition: "37.5% 62.5%",
+      },
+    });
+  });
+
+  it("uses focal metadata to gently recenter generated square cover portraits when requested", () => {
+    expect(
+      resolveCompanionImagePresentation({
+        src: "https://example.com/generated-companion.png",
+        fit: "cover",
+        focalX: 0.375,
+        focalY: 0.625,
+        recenterGeneratedCover: true,
+      }),
+    ).toMatchObject({
+      focalSource: "stored",
+      assetKey: null,
+      style: {
+        objectPosition: "37.5% 62.5%",
+        transform: "translate(9.016%, -9.016%) scale(1.22)",
+        transformOrigin: "center center",
+      },
+    });
+  });
+
   it("falls back cleanly for non-bundled images without stored focal metadata", () => {
     expect(
       resolveCompanionImagePresentation({

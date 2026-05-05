@@ -43,8 +43,8 @@ vi.mock("@/hooks/useAccessState", () => ({
   useAccessState: () => accessState,
 }));
 
-vi.mock("@/components/TrialExpiredPaywall", () => ({
-  TrialExpiredPaywall: ({ variant }: { variant?: "pre_trial_signup" | "trial_expired" }) => (
+vi.mock("@/components/Paywall", () => ({
+  Paywall: ({ variant }: { variant?: "pre_trial_signup" | "trial_expired" }) => (
     <div>{`Paywall:${variant ?? "pre_trial_signup"}`}</div>
   ),
 }));

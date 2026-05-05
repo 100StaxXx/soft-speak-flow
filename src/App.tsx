@@ -165,12 +165,16 @@ const EvolutionAwareContent = memo(() => {
 EvolutionAwareContent.displayName = 'EvolutionAwareContent';
 
 const MentorTutorialLayer = memo(() => {
-  const { isActive, activeTargetSelector, isStrictLockActive } = usePostOnboardingMentorGuidance();
+  const { isActive, activeTargetSelector, activeTargetSelectors = [], isStrictLockActive } =
+    usePostOnboardingMentorGuidance();
+  const hasResolvedSpotlightTarget = Boolean(
+    isActive && activeTargetSelector && activeTargetSelectors.length > 0,
+  );
 
   return (
     <>
       <MentorSpotlightGuard
-        active={isActive}
+        active={hasResolvedSpotlightTarget}
         mode={isStrictLockActive ? "spotlight" : "outline"}
         targetSelector={activeTargetSelector}
       />

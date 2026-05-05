@@ -13,6 +13,18 @@ export interface CompanionImageGenerationResult {
   size: string;
 }
 
+export class OpenAIImageRequestError extends Error {
+  status: number;
+  responseText: string;
+
+  constructor(status: number, responseText: string) {
+    super(`OpenAI image request failed (${status}): ${responseText}`);
+    this.name = "OpenAIImageRequestError";
+    this.status = status;
+    this.responseText = responseText;
+  }
+}
+
 interface BaseImageRequestArgs {
   guardedFetch: typeof fetch;
   openAIApiKey: string;
@@ -148,7 +160,7 @@ const parseImageApiResponse = async (
   response: Response,
 ): Promise<{ imageDataUrl: string; revisedPrompt: string | null }> => {
   if (!response.ok) {
-    throw new Error(`OpenAI image request failed: ${await response.text()}`);
+    throw new OpenAIImageRequestError(response.status, await response.text());
   }
 
   const payload = await response.json() as Record<string, unknown>;

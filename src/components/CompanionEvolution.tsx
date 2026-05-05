@@ -25,6 +25,7 @@ interface CompanionEvolutionProps {
   animationVideoUrl?: string | null;
   presetId?: string;
   element?: string;
+  onAnimationError?: () => void;
   onComplete: () => void;
 }
 
@@ -74,8 +75,6 @@ const REDUCED_SEQUENCE_MS = {
 
 const EMERGENCY_EXIT_DELAY_MS = 15_000;
 const IMAGE_PRELOAD_TIMEOUT_MS = 2_000;
-const ANIMATION_VIDEO_PRELOAD_TIMEOUT_MS = 10_000;
-const HATCH_INTRO_MIN_MS = 800;
 const HATCH_FOREGROUND_STAGE_MAX_WIDTH_PX = 560;
 const HATCH_FOREGROUND_STAGE_MAX_HEIGHT_PX = 700;
 const STROBE_BEAT_OFFSETS_MS = [
@@ -119,52 +118,6 @@ const shouldUseSilhouetteStrobe = ({
 );
 
 const log = logger.scope("CompanionEvolution");
-
-const HatchIntroSplash = () => (
-  <div
-    className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden bg-black"
-    data-testid="evolution-hatch-intro"
-    style={{
-      paddingTop: "env(safe-area-inset-top)",
-      paddingBottom: "env(safe-area-inset-bottom)",
-      paddingLeft: "env(safe-area-inset-left)",
-      paddingRight: "env(safe-area-inset-right)",
-      background:
-        "radial-gradient(circle at center, rgba(58, 44, 6, 0.68) 0%, rgba(0, 0, 0, 0.94) 58%, black 100%)",
-    }}
-  >
-    <motion.div
-      className="absolute inset-[-15%] pointer-events-none"
-      animate={{ opacity: [0.32, 0.58, 0.32], scale: [0.96, 1.04, 0.96] }}
-      transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-      style={{
-        background:
-          "radial-gradient(circle at 50% 40%, rgba(255, 196, 94, 0.28) 0%, rgba(255, 214, 143, 0.12) 28%, transparent 64%)",
-      }}
-    />
-
-    <div className="relative z-10 flex max-w-md flex-col items-center gap-5 px-6 text-center">
-      <motion.div
-        className="h-28 w-28 rounded-full border border-amber-200/30"
-        animate={{ scale: [0.94, 1.04, 0.94], opacity: [0.46, 0.86, 0.46] }}
-        transition={{ duration: 1.9, repeat: Infinity, ease: "easeInOut" }}
-        style={{
-          background:
-            "radial-gradient(circle at 50% 35%, rgba(255, 229, 169, 0.72) 0%, rgba(245, 158, 11, 0.22) 48%, rgba(0, 0, 0, 0) 75%)",
-          boxShadow: "0 0 48px rgba(251, 191, 36, 0.18)",
-        }}
-      />
-      <div className="space-y-3">
-        <h2 className="text-3xl font-black uppercase tracking-[0.18em] text-amber-300 sm:text-4xl">
-          Opening the hatchery...
-        </h2>
-        <p className="text-base font-medium text-white/82 sm:text-lg">
-          Your companion is getting ready to emerge.
-        </p>
-      </div>
-    </div>
-  </div>
-);
 
 const ConvergenceParticles = ({
   phase,
@@ -365,6 +318,7 @@ const CompanionEvolutionContent = ({
   animationVideoUrl,
   presetId,
   element,
+  onAnimationError,
   onComplete,
 }: CompanionEvolutionProps) => {
   const [phase, setPhase] = useState<EvolutionPhase>("hold");
@@ -386,9 +340,9 @@ const CompanionEvolutionContent = ({
   const animationVideoRef = useRef<HTMLVideoElement | null>(null);
   const [isHatchVideoMuted, setIsHatchVideoMuted] = useState(() => globalAudio.getMuted());
   const [disableHatchVideo, setDisableHatchVideo] = useState(false);
-  const [hatchIntroComplete, setHatchIntroComplete] = useState(false);
-  const [animationVideoReady, setAnimationVideoReady] = useState(false);
+  const [animationVideoReady, setAnimationVideoReady] = useState(Boolean(animationVideoUrl));
   const [animationVideoFailed, setAnimationVideoFailed] = useState(false);
+  const [animationVideoEnded, setAnimationVideoEnded] = useState(false);
 
   const isFirstEvolution = newStage === 1;
   const { profile, capabilities, signals } = useMotionProfile();
@@ -398,7 +352,7 @@ const CompanionEvolutionContent = ({
     () => getCompanionHatchVideoUrl({ presetId, element }),
     [element, presetId],
   );
-  const hasPlayableAnimationVideoUrl = Boolean(animationVideoUrl) && !prefersReducedMotion;
+  const hasPlayableAnimationVideoUrl = Boolean(animationVideoUrl);
   const useHatchVideo = shouldUseMappedPresetHatchVideo({
     isFirstEvolution,
     presetId,
@@ -413,7 +367,12 @@ const CompanionEvolutionContent = ({
   const sequence = prefersReducedMotion ? REDUCED_SEQUENCE_MS : FULL_SEQUENCE_MS;
   const shouldRenderAnimationVideo = hasPlayableAnimationVideoUrl && !useHatchVideo;
   const shouldUseAnimationVideo = shouldRenderAnimationVideo && animationVideoReady && !animationVideoFailed;
-  const showAnimationVideo = shouldUseAnimationVideo && (phase === "reveal" || phase === "settle");
+  const isAnimationRevealPhase = phase === "reveal" || phase === "settle";
+  const showAnimationVideo = shouldUseAnimationVideo && !animationVideoEnded && isAnimationRevealPhase;
+  const holdStillRevealForAnimation =
+    shouldUseAnimationVideo && !animationVideoEnded && isAnimationRevealPhase;
+  const canDismissNow = canDismiss && !holdStillRevealForAnimation;
+  const canShowEmergencyExit = showEmergencyExit && (!shouldUseAnimationVideo || animationVideoEnded);
   const convergenceParticleCount = Math.max(4, Math.min(12, Math.round(capabilities.maxParticles * 0.5)));
   const confettiParticleCount = profile === "enhanced"
     ? theme.confettiParticleCount
@@ -474,11 +433,10 @@ const CompanionEvolutionContent = ({
     ? "Your companion has emerged."
     : `Your companion reached ${levelDisplay}.`;
 
-  const showHatchIntro = isFirstEvolution && !hatchIntroComplete;
   const animationVideoReadyForCinematic =
-    !shouldRenderAnimationVideo || animationVideoReady || animationVideoFailed;
+    !shouldRenderAnimationVideo || animationVideoReady;
   const shouldStartCinematic =
-    artReadiness.ready && animationVideoReadyForCinematic && (!isFirstEvolution || hatchIntroComplete);
+    artReadiness.ready && animationVideoReadyForCinematic && !animationVideoFailed;
   const firstHatchImageFit = isFirstEvolution ? "portrait" : "cover";
 
   useEffect(() => {
@@ -486,8 +444,9 @@ const CompanionEvolutionContent = ({
   }, [element, isEvolving, newImageUrl, presetId, previousImageUrl]);
 
   useEffect(() => {
-    setAnimationVideoReady(false);
+    setAnimationVideoReady(Boolean(animationVideoUrl));
     setAnimationVideoFailed(false);
+    setAnimationVideoEnded(false);
 
     const videoElement = animationVideoRef.current;
     if (videoElement) {
@@ -495,57 +454,6 @@ const CompanionEvolutionContent = ({
       videoElement.currentTime = 0;
     }
   }, [animationVideoUrl, isEvolving]);
-
-  useEffect(() => {
-    if (
-      !isEvolving ||
-      !shouldRenderAnimationVideo ||
-      !animationVideoUrl ||
-      animationVideoReady ||
-      animationVideoFailed
-    ) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      log.warn("Evolution animation video preload timed out, using still reveal", {
-        animationVideoUrl,
-      });
-      setAnimationVideoFailed(true);
-    }, ANIMATION_VIDEO_PRELOAD_TIMEOUT_MS);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [
-    animationVideoFailed,
-    animationVideoReady,
-    animationVideoUrl,
-    isEvolving,
-    shouldRenderAnimationVideo,
-  ]);
-
-  useEffect(() => {
-    if (!isEvolving) {
-      setHatchIntroComplete(false);
-      return;
-    }
-
-    if (!isFirstEvolution) {
-      setHatchIntroComplete(true);
-      return;
-    }
-
-    setHatchIntroComplete(false);
-
-    const timeoutId = window.setTimeout(() => {
-      setHatchIntroComplete(true);
-    }, HATCH_INTRO_MIN_MS);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [isEvolving, isFirstEvolution, previousImageUrl, newImageUrl, presetId, element]);
 
   useEffect(() => {
     return globalAudio.subscribe((muted) => {
@@ -572,13 +480,14 @@ const CompanionEvolutionContent = ({
     videoElement.currentTime = 0;
 
     void videoElement.play().catch((error) => {
-      log.warn("Evolution animation video playback failed, using still reveal", {
+      log.warn("Evolution animation video playback failed", {
         animationVideoUrl,
         error: error instanceof Error ? error.message : String(error),
       });
       setAnimationVideoFailed(true);
+      onAnimationError?.();
     });
-  }, [animationVideoUrl, showAnimationVideo]);
+  }, [animationVideoUrl, onAnimationError, showAnimationVideo]);
 
   useEffect(() => {
     if (!isEvolving) {
@@ -898,7 +807,7 @@ const CompanionEvolutionContent = ({
   }, [onComplete]);
 
   const handleDismiss = (event: React.MouseEvent) => {
-    if (!canDismiss) {
+    if (!canDismissNow) {
       event.preventDefault();
       event.stopPropagation();
       return;
@@ -914,28 +823,12 @@ const CompanionEvolutionContent = ({
 
   if (!isEvolving) return null;
 
-  if (showHatchIntro) {
-    return <HatchIntroSplash />;
+  if (!artReadiness.ready) {
+    return null;
   }
 
-  if (!artReadiness.ready) {
-    return (
-      <div
-        className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90"
-        style={{
-          paddingTop: "env(safe-area-inset-top)",
-          paddingBottom: "env(safe-area-inset-bottom)",
-        }}
-      >
-        <motion.div
-          animate={{ scale: [1, 1.08, 1], opacity: [0.55, 1, 0.55] }}
-          transition={{ duration: 1.2, repeat: Infinity }}
-          className="text-primary text-xl font-medium"
-        >
-          Preparing evolution...
-        </motion.div>
-      </div>
-    );
+  if (shouldRenderAnimationVideo && animationVideoFailed) {
+    return null;
   }
 
   return (
@@ -950,14 +843,14 @@ const CompanionEvolutionContent = ({
           role="alertdialog"
           aria-labelledby="evolution-title"
           aria-describedby="evolution-description"
-          className={`fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden gpu-layer ${canDismiss ? "cursor-pointer" : ""}`}
+          className={`fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden gpu-layer ${canDismissNow ? "cursor-pointer" : ""}`}
           onClick={handleDismiss}
-          onTouchStart={(event) => !canDismiss && event.preventDefault()}
+          onTouchStart={(event) => !canDismissNow && event.preventDefault()}
           data-phase={phase}
           data-reduced-motion={prefersReducedMotion ? "true" : "false"}
           style={{
             pointerEvents: "auto",
-            touchAction: canDismiss ? "auto" : "none",
+            touchAction: canDismissNow ? "auto" : "none",
             background: phase === "apex"
               ? "radial-gradient(circle at center, rgba(0, 0, 0, 0.98) 0%, rgba(0, 0, 0, 1) 62%, black 100%)"
               : isFirstEvolution
@@ -1317,12 +1210,15 @@ const CompanionEvolutionContent = ({
                   <motion.div
                     key={`reveal-art-${revealDisplayImageUrl}`}
                     data-testid="evolution-reveal-art"
+                    data-hold-for-animation={holdStillRevealForAnimation ? "true" : "false"}
                     className="absolute inset-0"
                     initial={false}
                     animate={hasDualArt
                       ? {
                         opacity: phase === "reveal" || phase === "settle"
-                          ? 1
+                          ? holdStillRevealForAnimation
+                            ? 0
+                            : 1
                           : phase === "apex"
                             ? 0.28
                             : phase === "strobe"
@@ -1354,7 +1250,7 @@ const CompanionEvolutionContent = ({
                                 : "brightness(0) saturate(0) contrast(1.7) blur(10px)",
                       }
                       : {
-                        opacity: 1,
+                        opacity: holdStillRevealForAnimation ? 0 : 1,
                         scale: phase === "hold"
                           ? 1
                           : phase === "charge"
@@ -1422,13 +1318,16 @@ const CompanionEvolutionContent = ({
                     data-testid="evolution-animation-video"
                     data-animation-ready={animationVideoReady ? "true" : "false"}
                     data-animation-failed={animationVideoFailed ? "true" : "false"}
+                    data-animation-ended={animationVideoEnded ? "true" : "false"}
                     onCanPlay={() => setAnimationVideoReady(true)}
                     onLoadedData={() => setAnimationVideoReady(true)}
+                    onEnded={() => setAnimationVideoEnded(true)}
                     onError={() => {
-                      log.warn("Evolution animation video failed to preload, using still reveal", {
+                      log.warn("Evolution animation video failed during reveal", {
                         animationVideoUrl,
                       });
                       setAnimationVideoFailed(true);
+                      onAnimationError?.();
                     }}
                     style={{
                       opacity: showAnimationVideo ? 1 : 0,
@@ -1507,7 +1406,7 @@ const CompanionEvolutionContent = ({
             </AnimatePresence>
 
             <AnimatePresence>
-              {canDismiss && !showEmergencyExit && (
+              {canDismissNow && !canShowEmergencyExit && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -1526,7 +1425,7 @@ const CompanionEvolutionContent = ({
               )}
             </AnimatePresence>
 
-            {showEmergencyExit && (
+            {canShowEmergencyExit && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}

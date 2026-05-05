@@ -18,6 +18,7 @@ type CommonCompanionImageProps = {
   focalX?: number | null;
   focalY?: number | null;
   containerAspectRatio?: number;
+  recenterGeneratedCover?: boolean;
   className?: string;
   style?: CSSProperties;
 };
@@ -137,6 +138,7 @@ export const CompanionImage = forwardRef<HTMLImageElement, CompanionImageProps>(
       focalX,
       focalY,
       containerAspectRatio = 1,
+      recenterGeneratedCover = false,
       className,
       style,
       ...rest
@@ -149,6 +151,7 @@ export const CompanionImage = forwardRef<HTMLImageElement, CompanionImageProps>(
       focalX,
       focalY,
       containerAspectRatio,
+      recenterGeneratedCover,
     });
 
     const mergedStyle = {

@@ -1,6 +1,10 @@
 import { useEffect, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  isRetriableFunctionInvokeError,
+  parseFunctionInvokeError,
+} from "@/utils/supabaseFunctionErrors";
 import { logger } from "@/utils/logger";
 import { useAuth } from "./useAuth";
 import { getCompanionQueryKey, type Companion } from "./useCompanion";
@@ -22,6 +26,11 @@ interface GenerateCompanionLauncherImageResponse {
   reason?: string;
 }
 
+interface GenerateCompanionLauncherImageRequest {
+  companionId: string;
+  sourceImageUrl: string;
+}
+
 const getRequestKey = (companionId: string, sourceImageUrl: string) =>
   `${companionId}:${sourceImageUrl}`;
 
@@ -35,15 +44,21 @@ export const useCompanionLauncherImage = ({
   const requestedKeyRef = useRef<string | null>(null);
 
   const mutation = useMutation({
-    mutationFn: async (): Promise<GenerateCompanionLauncherImageResponse> => {
-      if (!companionId) {
+    mutationFn: async ({
+      companionId: requestCompanionId,
+      sourceImageUrl: requestSourceImageUrl,
+    }: GenerateCompanionLauncherImageRequest): Promise<GenerateCompanionLauncherImageResponse> => {
+      if (!requestCompanionId) {
         throw new Error("Missing companion id");
       }
 
       const { data, error } = await supabase.functions.invoke<GenerateCompanionLauncherImageResponse>(
         "generate-companion-launcher-image",
         {
-          body: { companionId },
+          body: {
+            companionId: requestCompanionId,
+            sourceImageUrl: requestSourceImageUrl,
+          },
         },
       );
 
@@ -53,21 +68,24 @@ export const useCompanionLauncherImage = ({
 
       return data ?? {};
     },
-    onSuccess: (data) => {
-      if (!user?.id || !companionId) return;
+    retry: (failureCount, error) =>
+      failureCount < 1 && isRetriableFunctionInvokeError(error),
+    retryDelay: 0,
+    onSuccess: (data, variables) => {
+      if (!user?.id) return;
 
       const imageUrl = typeof data.imageUrl === "string" && data.imageUrl.trim().length > 0
         ? data.imageUrl.trim()
         : null;
       const sourceUrl = typeof data.sourceImageUrl === "string" && data.sourceImageUrl.trim().length > 0
         ? data.sourceImageUrl.trim()
-        : sourceImageUrl ?? null;
+        : variables.sourceImageUrl;
 
       if (imageUrl && sourceUrl) {
         queryClient.setQueryData<Companion | null>(
           getCompanionQueryKey(user.id),
           (existing) => {
-            if (!existing || existing.id !== companionId) return existing ?? null;
+            if (!existing || existing.id !== variables.companionId) return existing ?? null;
             return {
               ...existing,
               launcher_image_url: imageUrl,
@@ -81,10 +99,20 @@ export const useCompanionLauncherImage = ({
 
       void queryClient.invalidateQueries({ queryKey: getCompanionQueryKey(user.id) });
     },
-    onError: (error) => {
-      logger.warn("Companion launcher image generation failed", {
-        companionId,
-        error: error instanceof Error ? error.message : String(error),
+    onError: (error, variables) => {
+      void parseFunctionInvokeError(error).then((parsedError) => {
+        logger.warn("Companion launcher image generation failed", {
+          companionId: variables.companionId,
+          sourceImageUrl: variables.sourceImageUrl,
+          status: parsedError.status,
+          code: parsedError.code,
+          reason: parsedError.failureReason ?? parsedError.backendMessage ?? parsedError.message,
+          category: parsedError.category,
+          requestId: parsedError.requestId,
+          upstreamStatus: parsedError.upstreamStatus,
+          upstreamError: parsedError.upstreamError,
+          error: error instanceof Error ? error.message : String(error),
+        });
       });
     },
   });
@@ -103,7 +131,10 @@ export const useCompanionLauncherImage = ({
     }
 
     requestedKeyRef.current = requestKey;
-    mutation.mutate();
+    mutation.mutate({
+      companionId: trimmedCompanionId,
+      sourceImageUrl: trimmedSourceImageUrl,
+    });
   }, [companionId, enabled, mutation, sourceImageUrl]);
 
   return {

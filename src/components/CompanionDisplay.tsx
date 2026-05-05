@@ -820,6 +820,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
                           element={displayCompanion.core_element}
                           focalX={effectiveImageFocal.x}
                           focalY={effectiveImageFocal.y}
+                          recenterGeneratedCover={portraitImageFit === "cover"}
                           className="relative h-full w-full rounded-2xl"
                           style={{ ...skinStyles, ...careStyles, ...equippedCosmeticStyles }}
                           onLoad={() => {

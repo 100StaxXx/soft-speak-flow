@@ -142,12 +142,13 @@ export const handlePrewarmCompanionAnimation = async (
       ? body.companionId.trim()
       : "";
     const stage = parseStage(body?.stage);
+    const force = body?.force === true;
 
     if (!companionId) {
       return errorResponse(400, "companionId is required", corsHeaders);
     }
 
-    if (stage !== 1) {
+    if (stage < 1) {
       return errorResponse(400, "stage is not prewarmable", corsHeaders);
     }
 
@@ -189,13 +190,13 @@ export const handlePrewarmCompanionAnimation = async (
     const existingEvolutionId = typeof existingEvolution.data?.id === "string"
       ? existingEvolution.data.id
       : null;
-    const canCreatePreHatchEvolution = currentStage === 0 && isHatchReady;
+    const canCreatePreHatchEvolution = stage === 1 && currentStage === 0 && isHatchReady;
     const canReuseClaimedEvolution = currentStage >= stage &&
       Boolean(existingEvolutionId);
     if (!canCreatePreHatchEvolution && !canReuseClaimedEvolution) {
       return jsonResponse({
         status: "skipped",
-        reason: currentStage === 0
+        reason: stage === 1 && currentStage === 0
           ? "hatch_not_ready"
           : "evolution_record_unavailable",
         stage,
@@ -267,6 +268,7 @@ export const handlePrewarmCompanionAnimation = async (
     }
 
     if (
+      !force &&
       evolution.animation_status === "succeeded" &&
       evolution.animation_video_url
     ) {

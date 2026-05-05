@@ -15,6 +15,7 @@ export interface CompanionImagePresentationOptions {
   focalX?: number | null;
   focalY?: number | null;
   containerAspectRatio?: number;
+  recenterGeneratedCover?: boolean;
 }
 
 export interface CompanionImagePresentation {
@@ -37,6 +38,10 @@ const DEFAULT_PRESENTATION: CompanionImagePresentation = {
 };
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
+const COVER_FOCAL_CENTERING_SCALE = 1.22;
+const COVER_FOCAL_CENTERING_EPSILON_PERCENT = 0.5;
+const COVER_FOCAL_CENTERING_MAX_TRANSLATE_PERCENT =
+  ((COVER_FOCAL_CENTERING_SCALE - 1) / (2 * COVER_FOCAL_CENTERING_SCALE)) * 100;
 
 export const normalizeCompanionImageFocalValue = (value: unknown): number | null => {
   if (typeof value !== "number" || !Number.isFinite(value)) return null;
@@ -157,12 +162,44 @@ const resolveContainTransform = (focalPoint: CompanionImageFocalPoint): string =
   return `translate(${translateX.toFixed(3)}%, ${translateY.toFixed(3)}%)`;
 };
 
+const clampSigned = (value: number, limit: number): number =>
+  Math.max(-limit, Math.min(limit, value));
+
+const resolveGeneratedCoverTransform = (
+  focalPoint: CompanionImageFocalPoint,
+): CSSProperties | null => {
+  const desiredTranslateX = (0.5 - focalPoint.x) * 100;
+  const desiredTranslateY = (0.5 - focalPoint.y) * 100;
+
+  if (
+    Math.abs(desiredTranslateX) < COVER_FOCAL_CENTERING_EPSILON_PERCENT
+    && Math.abs(desiredTranslateY) < COVER_FOCAL_CENTERING_EPSILON_PERCENT
+  ) {
+    return null;
+  }
+
+  const translateX = clampSigned(
+    desiredTranslateX,
+    COVER_FOCAL_CENTERING_MAX_TRANSLATE_PERCENT,
+  );
+  const translateY = clampSigned(
+    desiredTranslateY,
+    COVER_FOCAL_CENTERING_MAX_TRANSLATE_PERCENT,
+  );
+
+  return {
+    transform: `translate(${translateX.toFixed(3)}%, ${translateY.toFixed(3)}%) scale(${COVER_FOCAL_CENTERING_SCALE})`,
+    transformOrigin: "center center",
+  };
+};
+
 export const resolveCompanionImagePresentation = ({
   src,
   fit = "cover",
   focalX,
   focalY,
   containerAspectRatio = 1,
+  recenterGeneratedCover = false,
 }: CompanionImagePresentationOptions): CompanionImagePresentation => {
   const storedFocalPoint = getStoredFocalPoint(focalX, focalY);
   const manifestEntry = getBundledCompanionImageFocalEntry(src);
@@ -199,6 +236,9 @@ export const resolveCompanionImagePresentation = ({
         entry: manifestEntry,
         containerAspectRatio,
       }),
+      ...(recenterGeneratedCover && !manifestEntry
+        ? resolveGeneratedCoverTransform(focalPoint) ?? {}
+        : {}),
     },
   };
 };

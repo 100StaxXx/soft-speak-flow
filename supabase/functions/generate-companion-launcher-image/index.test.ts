@@ -230,6 +230,252 @@ Deno.test("generate-companion-launcher-image returns a fresh cached launcher", a
   );
 });
 
+Deno.test("generate-companion-launcher-image skips stale requested source without generating", async () => {
+  const supabase = createMockSupabase({
+    companion: baseCompanion({
+      current_image_url: "https://assets.example.com/current-scene.png",
+    }),
+  });
+  let editCalls = 0;
+
+  const response = await handleGenerateCompanionLauncherImage(
+    new Request("https://example.com", {
+      method: "POST",
+      body: JSON.stringify({
+        companionId: "companion-1",
+        sourceImageUrl: "https://assets.example.com/old-scene.png",
+      }),
+    }),
+    {
+      authenticate: async () => ({ userId: "user-1", isInternal: false }),
+      createSupabaseClient: () => supabase,
+      createCostGuardrailSessionFn: createNoopCostGuardrailSession,
+      editCompanionImageFn: async () => {
+        editCalls += 1;
+        throw new Error("should not generate for a stale source request");
+      },
+      now: () => 123,
+    },
+  );
+
+  const body = await response.json();
+  assertEquals(response.status, 200, "Expected stale source skip to succeed");
+  assertEquals(body.skipped, true, "Expected stale source skip");
+  assertEquals(body.stale, true, "Expected stale flag");
+  assertEquals(
+    body.reason,
+    "source_image_changed",
+    "Expected stale source reason",
+  );
+  assertEquals(
+    body.sourceImageUrl,
+    "https://assets.example.com/current-scene.png",
+    "Expected current source image in response",
+  );
+  assertEquals(
+    body.requestedSourceImageUrl,
+    "https://assets.example.com/old-scene.png",
+    "Expected requested source image diagnostic",
+  );
+  assertEquals(editCalls, 0, "Expected no image edit for stale request");
+  assertEquals(supabase.uploadLog.length, 0, "Expected no upload");
+});
+
+Deno.test("generate-companion-launcher-image returns structured error when reference image is unavailable", async () => {
+  const supabase = createMockSupabase({
+    companion: baseCompanion({
+      current_image_url: null,
+    }),
+  });
+
+  const response = await handleGenerateCompanionLauncherImage(
+    new Request("https://example.com", {
+      method: "POST",
+      body: JSON.stringify({ companionId: "companion-1" }),
+    }),
+    {
+      authenticate: async () => ({ userId: "user-1", isInternal: false }),
+      createSupabaseClient: () => supabase,
+      createCostGuardrailSessionFn: createNoopCostGuardrailSession,
+      editCompanionImageFn: async () => {
+        throw new Error("should not generate without a reference image");
+      },
+      now: () => 123,
+    },
+  );
+
+  const body = await response.json();
+  assertEquals(response.status, 400, "Expected invalid reference status");
+  assertEquals(
+    body.code,
+    "COMPANION_LAUNCHER_REFERENCE_UNAVAILABLE",
+    "Expected structured reference error code",
+  );
+  assertEquals(
+    body.stage,
+    "validate_reference",
+    "Expected structured reference error stage",
+  );
+  assertEquals(
+    body.failureReason,
+    "missing_reference_image",
+    "Expected structured reference failure reason",
+  );
+  assertEquals(supabase.uploadLog.length, 0, "Expected no upload");
+});
+
+Deno.test("generate-companion-launcher-image returns structured error when OpenAI config is missing", async () => {
+  const originalOpenAiKey = Deno.env.get("OPENAI_API_KEY");
+  Deno.env.delete("OPENAI_API_KEY");
+  const supabase = createMockSupabase({ companion: baseCompanion() });
+
+  try {
+    const response = await handleGenerateCompanionLauncherImage(
+      new Request("https://example.com", {
+        method: "POST",
+        body: JSON.stringify({ companionId: "companion-1" }),
+      }),
+      {
+        authenticate: async () => ({ userId: "user-1", isInternal: false }),
+        createSupabaseClient: () => supabase,
+        createCostGuardrailSessionFn: createNoopCostGuardrailSession,
+        editCompanionImageFn: async () => {
+          throw new Error("should not generate without OpenAI config");
+        },
+        now: () => 123,
+      },
+    );
+
+    const body = await response.json();
+    assertEquals(response.status, 500, "Expected missing config status");
+    assertEquals(
+      body.code,
+      "COMPANION_LAUNCHER_CONFIG_ERROR",
+      "Expected structured config error code",
+    );
+    assertEquals(body.stage, "configure_openai", "Expected config error stage");
+    assertEquals(
+      body.failureReason,
+      "openai_config_missing",
+      "Expected structured config failure reason",
+    );
+    assertEquals(supabase.uploadLog.length, 0, "Expected no upload");
+  } finally {
+    if (originalOpenAiKey) {
+      Deno.env.set("OPENAI_API_KEY", originalOpenAiKey);
+    }
+  }
+});
+
+Deno.test("generate-companion-launcher-image returns structured error when reference download fails", async () => {
+  const supabase = createMockSupabase({ companion: baseCompanion() });
+
+  const response = await handleGenerateCompanionLauncherImage(
+    new Request("https://example.com", {
+      method: "POST",
+      body: JSON.stringify({ companionId: "companion-1" }),
+    }),
+    {
+      authenticate: async () => ({ userId: "user-1", isInternal: false }),
+      createSupabaseClient: () => supabase,
+      createCostGuardrailSessionFn: createNoopCostGuardrailSession,
+      editCompanionImageFn: async () => {
+        throw new Error("Failed to download reference image: 503");
+      },
+      now: () => 123,
+    },
+  );
+
+  const body = await response.json();
+  assertEquals(response.status, 502, "Expected reference download failure status");
+  assertEquals(
+    body.code,
+    "COMPANION_LAUNCHER_REFERENCE_DOWNLOAD_FAILED",
+    "Expected structured reference download code",
+  );
+  assertEquals(
+    body.stage,
+    "download_reference",
+    "Expected structured reference download stage",
+  );
+  assertEquals(
+    body.failureReason,
+    "reference_download_failed",
+    "Expected structured reference download reason",
+  );
+  assertEquals(body.retryable, true, "Expected transient reference failure to be retryable");
+  assertEquals(body.upstreamStatus, 503, "Expected upstream reference status");
+  assertEquals(supabase.uploadLog.length, 0, "Expected no upload");
+});
+
+Deno.test("generate-companion-launcher-image returns non-retryable structured error when OpenAI edit returns a permanent 4xx", async () => {
+  const supabase = createMockSupabase({ companion: baseCompanion() });
+
+  const response = await handleGenerateCompanionLauncherImage(
+    new Request("https://example.com", {
+      method: "POST",
+      body: JSON.stringify({ companionId: "companion-1" }),
+    }),
+    {
+      authenticate: async () => ({ userId: "user-1", isInternal: false }),
+      createSupabaseClient: () => supabase,
+      createCostGuardrailSessionFn: createNoopCostGuardrailSession,
+      editCompanionImageFn: async () => {
+        throw new Error('OpenAI image request failed (400): {"error":"invalid image input"}');
+      },
+      now: () => 123,
+    },
+  );
+
+  const body = await response.json();
+  assertEquals(response.status, 424, "Expected permanent OpenAI edit failure status");
+  assertEquals(
+    body.code,
+    "COMPANION_LAUNCHER_OPENAI_EDIT_FAILED",
+    "Expected structured OpenAI edit code",
+  );
+  assertEquals(body.stage, "edit_image", "Expected OpenAI edit stage");
+  assertEquals(
+    body.failureReason,
+    "openai_edit_failed",
+    "Expected structured OpenAI edit reason",
+  );
+  assertEquals(body.retryable, false, "Expected permanent OpenAI edit failure to be non-retryable");
+  assertEquals(body.upstreamStatus, 400, "Expected upstream OpenAI status");
+  assertEquals(supabase.uploadLog.length, 0, "Expected no upload");
+});
+
+Deno.test("generate-companion-launcher-image returns retryable structured error when OpenAI edit returns a transient 5xx", async () => {
+  const supabase = createMockSupabase({ companion: baseCompanion() });
+
+  const response = await handleGenerateCompanionLauncherImage(
+    new Request("https://example.com", {
+      method: "POST",
+      body: JSON.stringify({ companionId: "companion-1" }),
+    }),
+    {
+      authenticate: async () => ({ userId: "user-1", isInternal: false }),
+      createSupabaseClient: () => supabase,
+      createCostGuardrailSessionFn: createNoopCostGuardrailSession,
+      editCompanionImageFn: async () => {
+        throw new Error('OpenAI image request failed (503): {"error":"temporarily unavailable"}');
+      },
+      now: () => 123,
+    },
+  );
+
+  const body = await response.json();
+  assertEquals(response.status, 502, "Expected transient OpenAI edit failure status");
+  assertEquals(
+    body.code,
+    "COMPANION_LAUNCHER_OPENAI_EDIT_FAILED",
+    "Expected structured OpenAI edit code",
+  );
+  assertEquals(body.retryable, true, "Expected transient OpenAI edit failure retry hint");
+  assertEquals(body.upstreamStatus, 503, "Expected upstream OpenAI status");
+  assertEquals(supabase.uploadLog.length, 0, "Expected no upload");
+});
+
 Deno.test("generate-companion-launcher-image regenerates stale launcher art and updates source fields", async () => {
   const supabase = createMockSupabase({
     companion: baseCompanion({

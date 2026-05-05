@@ -246,7 +246,7 @@ describe("guided tutorial helpers", () => {
     expect(milestoneUsesStrictLock("start_plan_my_day")).toBe(true);
     expect(milestoneUsesStrictLock("answer_plan_day_ai")).toBe(false);
     expect(milestoneUsesStrictLock("save_plan_day_action")).toBe(true);
-    expect(milestoneUsesStrictLock("tap_hatch_companion")).toBe(true);
+    expect(milestoneUsesStrictLock("tap_hatch_companion")).toBe(false);
     expect(milestoneUsesStrictLock("complete_companion_hatch")).toBe(false);
   });
 
@@ -463,6 +463,9 @@ describe("guided tutorial first-value loop", () => {
     await waitFor(() => {
       expect(result.current.currentStep).toBe("hatch_companion");
       expect(result.current.stepRoute).toBe("/companion");
+      expect(result.current.dialogueText).toBe("Tap 'Hatch.'");
+      expect(result.current.activeTargetSelectors).toEqual([]);
+      expect(result.current.activeTargetSelector).toBeNull();
       expect(mocks.state.awardCustomXP).toHaveBeenCalledWith(
         10,
         "guided_tutorial_step_complete",
@@ -485,8 +488,9 @@ describe("guided tutorial first-value loop", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.currentStep).toBe("hatch_companion");
-      expect(result.current.dialogueText).toBe("Let the hatch finish.");
+      expect(result.current.isActive).toBe(false);
+      expect(result.current.currentStep).toBeNull();
+      expect(result.current.dialogueText).toBe("");
     });
 
     await act(async () => {
@@ -498,6 +502,101 @@ describe("guided tutorial first-value loop", () => {
 
     await waitFor(() => {
       expect(mocks.state.queryClient.refetchQueries).toHaveBeenCalled();
+      expect(result.current.isActive).toBe(true);
+      expect(result.current.currentStep).toBe("mentor_closeout");
+      expect(result.current.dialogueText).toBe("Your Companion is here.");
+      expect(result.current.dialogueSupportText).toBe("Finish setup to continue.");
+      expect(result.current.dialogueActionLabel).toBe("Finish");
+    });
+
+    await act(async () => {
+      result.current.onDialogueAction?.();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isActive).toBe(false);
+      expect(result.current.currentStep).toBeNull();
+    });
+  });
+
+  it("hides the hatch card after tapping Hatch, waits through image updates, then shows mentor closeout after reveal dismissal", async () => {
+    mocks.state.guidedTutorial = {
+      ...createFreshTutorial(),
+      completedSteps: ["new_goal"],
+      xpAwardedSteps: ["new_goal"],
+      milestonesCompleted: [
+        "mentor_intro_hello",
+        "start_new_goal",
+        "complete_pathfinder_campaign",
+        "campaign_calendar_handoff",
+        "tap_hatch_companion",
+      ],
+      evolutionInFlight: true,
+      evolutionStartedAt: "2026-05-01T12:00:00.000Z",
+    };
+    mocks.state.companionData = { current_stage: 0 };
+    mocks.state.companionDataUpdatedAt = 1;
+
+    const { result, rerender } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/companion"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isActive).toBe(false);
+      expect(result.current.currentStep).toBeNull();
+      expect(result.current.dialogueText).toBe("");
+    });
+
+    await act(async () => {
+      mocks.state.companionData = { current_stage: 1 };
+      mocks.state.companionDataUpdatedAt = 2;
+      rerender();
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBeNull();
+      expect(result.current.dialogueText).toBe("");
+      expect(result.current.isActive).toBe(false);
+    });
+
+    expect(
+      mocks.state.profileUpdatePayloads.some((payload) => {
+        const guidedTutorial = (
+          payload.onboarding_data as { guided_tutorial?: { completedSteps?: string[] } } | undefined
+        )?.guided_tutorial;
+        return guidedTutorial?.completedSteps?.includes("hatch_companion");
+      }),
+    ).toBe(false);
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("companion-evolved"));
+      rerender();
+    });
+
+    await waitFor(() => {
+      expect(mocks.state.queryClient.refetchQueries).toHaveBeenCalled();
+      expect(result.current.isActive).toBe(true);
+      expect(result.current.currentStep).toBe("mentor_closeout");
+      expect(result.current.dialogueText).toBe("Your Companion is here.");
+      expect(result.current.dialogueActionLabel).toBe("Finish");
+    });
+
+    expect(
+      mocks.state.profileUpdatePayloads.some((payload) => {
+        const guidedTutorial = (
+          payload.onboarding_data as { guided_tutorial?: { completed?: boolean } } | undefined
+        )?.guided_tutorial;
+        return guidedTutorial?.completed === true;
+      }),
+    ).toBe(false);
+
+    await act(async () => {
+      result.current.onDialogueAction?.();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
       expect(result.current.isActive).toBe(false);
       expect(result.current.currentStep).toBeNull();
     });

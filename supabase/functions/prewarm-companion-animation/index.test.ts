@@ -185,7 +185,7 @@ Deno.test("prewarm-companion-animation uses hidden AI stage-one lineage art", as
   );
 });
 
-Deno.test("prewarm-companion-animation rejects arbitrary future stages", async () => {
+Deno.test("prewarm-companion-animation skips arbitrary future stages", async () => {
   const harness = createHarness({
     companion: {
       id: "companion-1",
@@ -204,10 +204,51 @@ Deno.test("prewarm-companion-animation rejects arbitrary future stages", async (
   );
   const body = await response.json();
 
-  assertEquals(response.status, 400);
-  assertEquals(body.error, "stage is not prewarmable");
+  assertEquals(response.status, 200);
+  assertEquals(body.status, "skipped");
+  assertEquals(body.reason, "evolution_record_unavailable");
   assertEquals(harness.upserts.length, 0);
   assertEquals(harness.enqueueCalls.length, 0);
+});
+
+Deno.test("prewarm-companion-animation requeues an existing claimed later-stage evolution", async () => {
+  const harness = createHarness({
+    companion: {
+      id: "companion-1",
+      user_id: "user-1",
+      preset_id: null,
+      core_element: "water",
+      current_stage: 3,
+      current_xp: 100,
+      image_lineage_metadata: null,
+    },
+    existingEvolution: {
+      id: "evo-2",
+      image_url: "https://example.com/stage-3.png",
+      animation_status: "failed",
+      animation_video_url: null,
+    },
+  });
+
+  const response = await module.handlePrewarmCompanionAnimation(
+    createRequest({ companionId: "companion-1", stage: 3, force: true }),
+    harness.deps,
+  );
+  const body = await response.json();
+
+  assertEquals(response.status, 200);
+  assertEquals(body.status, "queued");
+  assertEquals(harness.upserts[0].payload.stage, 3);
+  assertEquals(
+    harness.upserts[0].payload.image_url,
+    "https://example.com/stage-3.png",
+  );
+  assertEquals(harness.enqueueCalls[0].evolutionId, "evo-1");
+  assertEquals(harness.enqueueCalls[0].stage, 3);
+  assertEquals(
+    harness.enqueueCalls[0].imageUrl,
+    "https://example.com/stage-3.png",
+  );
 });
 
 Deno.test("prewarm-companion-animation skips eggs that are not hatch-ready", async () => {

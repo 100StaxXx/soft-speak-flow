@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { useCelebration } from "@/contexts/CelebrationContext";
 import { useMentorConnection } from "@/contexts/MentorConnectionContext";
+import { toast } from "@/components/ui/sonner";
 import { resolveCompanionVisualAssetUrl } from "@/lib/companionAssetResolver";
 import {
   COMPANION_HATCH_STARTED_EVENT,
@@ -20,9 +21,12 @@ import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
 
 const EVOLUTION_RECORD_RETRY_DELAYS_MS = [0, 75, 150] as const;
 const EVOLUTION_ANIMATION_DISCOVERY_TIMEOUT_MS = 20_000;
+const STALE_TERMINAL_ANIMATION_DISCOVERY_TIMEOUT_MS = 5_000;
 const EVOLUTION_ANIMATION_READY_TIMEOUT_MS = 180_000;
 const EVOLUTION_ANIMATION_POLL_INTERVAL_MS = 2_000;
 const EVOLUTION_ANIMATION_PROCESS_INTERVAL_MS = 5_000;
+const EVOLUTION_ANIMATION_PRELOAD_TIMEOUT_MS = 30_000;
+const EVOLUTION_PRESENTATION_RETRY_DELAY_MS = 5_000;
 const LOCAL_HATCH_DEDUPE_WINDOW_MS = 15000;
 
 type CompanionAnimationStatus =
@@ -36,6 +40,33 @@ type PersistedEvolutionMetadata = {
   id: string;
   animationVideoUrl: string | null;
   animationStatus: CompanionAnimationStatus | null;
+  animationRequestedAt: string | null;
+  animationCompletedAt: string | null;
+};
+
+type AnimationRetryResult = {
+  status: CompanionAnimationStatus | "unavailable" | null;
+  jobId?: string;
+  videoUrl?: string;
+  reason?: string;
+};
+
+type EvolutionPresentationData = {
+  companionId: string;
+  previousLevel: number;
+  level: number;
+  previousImageUrl: string;
+  imageUrl: string;
+  animationVideoUrl: string;
+  presetId?: string;
+  mentorSlug?: string;
+  element?: string;
+};
+
+type EvolutionPresentationRequest = Omit<EvolutionPresentationData, "animationVideoUrl" | "mentorSlug"> & {
+  dispatchLoadingStart?: boolean;
+  markAsLocalHatch?: boolean;
+  missingEvolutionLog?: Record<string, unknown>;
 };
 
 const sleep = (delayMs: number) => new Promise((resolve) => setTimeout(resolve, delayMs));
@@ -63,7 +94,7 @@ const fetchPersistedEvolutionMetadata = async ({
 }): Promise<PersistedEvolutionMetadata | null> => {
   const { data, error } = await supabase
     .from("companion_evolutions")
-    .select("id, animation_video_url, animation_status")
+    .select("id, animation_video_url, animation_status, animation_requested_at, animation_completed_at")
     .eq("companion_id", companionId)
     .eq("stage", stage)
     .maybeSingle();
@@ -89,7 +120,19 @@ const fetchPersistedEvolutionMetadata = async ({
     id: data.id,
     animationStatus,
     animationVideoUrl,
+    animationRequestedAt: typeof data.animation_requested_at === "string"
+      ? data.animation_requested_at
+      : null,
+    animationCompletedAt: typeof data.animation_completed_at === "string"
+      ? data.animation_completed_at
+      : null,
   };
+};
+
+const isTimestampAtOrAfter = (value: string | null, referenceMs: number): boolean => {
+  if (!value) return false;
+  const valueMs = new Date(value).getTime();
+  return Number.isFinite(valueMs) && valueMs >= referenceMs;
 };
 
 const waitForEvolutionPersistence = async ({
@@ -140,6 +183,53 @@ const processAnimationJobOnce = async (jobId: string) => {
   }
 };
 
+const requestAnimationJobRetry = async ({
+  companionId,
+  stage,
+  reason,
+  force = true,
+}: {
+  companionId: string;
+  stage: number;
+  reason: string;
+  force?: boolean;
+}): Promise<AnimationRetryResult> => {
+  const { data, error } = await supabase.functions.invoke("prewarm-companion-animation", {
+    body: { companionId, stage, force, reason },
+  });
+
+  if (error) {
+    logger.warn("Evolution listener: Companion animation retry request failed", {
+      companionId,
+      stage,
+      reason,
+      error: error.message ?? String(error),
+    });
+    return { status: "unavailable", reason: error.message ?? String(error) };
+  }
+
+  const result = (data ?? {}) as {
+    status?: unknown;
+    jobId?: unknown;
+    videoUrl?: unknown;
+    reason?: unknown;
+  };
+  const status = normalizeAnimationStatus(result.status);
+  const jobId = typeof result.jobId === "string" ? result.jobId : undefined;
+  const videoUrl = typeof result.videoUrl === "string" ? result.videoUrl : undefined;
+
+  if (jobId) {
+    await processAnimationJobOnce(jobId);
+  }
+
+  return {
+    status: status ?? "unavailable",
+    jobId,
+    videoUrl,
+    reason: typeof result.reason === "string" ? result.reason : undefined,
+  };
+};
+
 const waitForEvolutionAnimation = async ({
   companionId,
   stage,
@@ -148,24 +238,84 @@ const waitForEvolutionAnimation = async ({
   companionId: string;
   stage: number;
   initialMetadata: PersistedEvolutionMetadata;
-}): Promise<PersistedEvolutionMetadata> => {
+}): Promise<PersistedEvolutionMetadata | null> => {
   let metadata = initialMetadata;
   const startedAt = Date.now();
+  const currentAttemptCutoffMs = startedAt - 5_000;
   const discoveryDeadline = startedAt + EVOLUTION_ANIMATION_DISCOVERY_TIMEOUT_MS;
+  const staleTerminalDiscoveryDeadline =
+    startedAt + STALE_TERMINAL_ANIMATION_DISCOVERY_TIMEOUT_MS;
   const readyDeadline = startedAt + EVOLUTION_ANIMATION_READY_TIMEOUT_MS;
   let jobId: string | null = null;
   let lastProcessAt = 0;
+  const retryAttemptKeys = new Set<string>();
 
   while (Date.now() < readyDeadline) {
     if (metadata.animationVideoUrl) {
       return metadata;
     }
 
-    if (metadata.animationStatus === "failed" || metadata.animationStatus === "skipped") {
-      return metadata;
+    const hasTerminalAnimationStatus =
+      metadata.animationStatus === "failed" || metadata.animationStatus === "skipped";
+    const terminalStatusHasTimestamp =
+      Boolean(metadata.animationRequestedAt || metadata.animationCompletedAt);
+    const terminalStatusIsCurrentAttempt =
+      !terminalStatusHasTimestamp ||
+      isTimestampAtOrAfter(metadata.animationRequestedAt, currentAttemptCutoffMs) ||
+      isTimestampAtOrAfter(metadata.animationCompletedAt, currentAttemptCutoffMs);
+    const activeDiscoveryDeadline = hasTerminalAnimationStatus
+      ? staleTerminalDiscoveryDeadline
+      : discoveryDeadline;
+
+    if (hasTerminalAnimationStatus && terminalStatusIsCurrentAttempt) {
+      const retryKey = [
+        metadata.animationStatus,
+        metadata.animationRequestedAt ?? "requested-unknown",
+        metadata.animationCompletedAt ?? "completed-unknown",
+      ].join("|");
+
+      if (!retryAttemptKeys.has(retryKey)) {
+        retryAttemptKeys.add(retryKey);
+        const retryResult = await requestAnimationJobRetry({
+          companionId,
+          stage,
+          reason: `terminal_${metadata.animationStatus}`,
+        });
+
+        if (retryResult.videoUrl) {
+          return {
+            ...metadata,
+            animationStatus: "succeeded",
+            animationVideoUrl: retryResult.videoUrl,
+          };
+        }
+
+        if (retryResult.status === "queued" || retryResult.status === "processing") {
+          jobId = retryResult.jobId ?? jobId;
+          await sleep(EVOLUTION_ANIMATION_POLL_INTERVAL_MS);
+          metadata = await fetchPersistedEvolutionMetadata({ companionId, stage }) ?? metadata;
+          continue;
+        }
+      }
+
+      logger.warn("Evolution listener: Companion animation ended without a playable video", {
+        companionId,
+        stage,
+        evolutionId: metadata.id,
+        animationStatus: metadata.animationStatus,
+      });
+      return null;
     }
 
-    if (metadata.animationStatus === "queued" || metadata.animationStatus === "processing") {
+    const shouldDiscoverAnimationJob =
+      metadata.animationStatus === "queued" ||
+      metadata.animationStatus === "processing" ||
+      (
+        hasTerminalAnimationStatus
+        && Date.now() <= activeDiscoveryDeadline
+      );
+
+    if (shouldDiscoverAnimationJob) {
       if (!jobId) {
         jobId = await fetchAnimationJobId(metadata.id);
       }
@@ -174,8 +324,78 @@ const waitForEvolutionAnimation = async ({
         lastProcessAt = Date.now();
         await processAnimationJobOnce(jobId);
       }
-    } else if (Date.now() > discoveryDeadline) {
-      return metadata;
+    }
+
+    if (
+      hasTerminalAnimationStatus
+      && Date.now() > activeDiscoveryDeadline
+    ) {
+      const retryKey = [
+        "stale",
+        metadata.animationStatus,
+        metadata.animationRequestedAt ?? "requested-unknown",
+        metadata.animationCompletedAt ?? "completed-unknown",
+      ].join("|");
+
+      if (!retryAttemptKeys.has(retryKey)) {
+        retryAttemptKeys.add(retryKey);
+        const retryResult = await requestAnimationJobRetry({
+          companionId,
+          stage,
+          reason: `stale_${metadata.animationStatus}`,
+        });
+
+        if (retryResult.videoUrl) {
+          return {
+            ...metadata,
+            animationStatus: "succeeded",
+            animationVideoUrl: retryResult.videoUrl,
+          };
+        }
+
+        if (retryResult.status === "queued" || retryResult.status === "processing") {
+          jobId = retryResult.jobId ?? jobId;
+          await sleep(EVOLUTION_ANIMATION_POLL_INTERVAL_MS);
+          metadata = await fetchPersistedEvolutionMetadata({ companionId, stage }) ?? metadata;
+          continue;
+        }
+      }
+
+      return null;
+    }
+
+    if (
+      !jobId
+      && metadata.animationStatus !== "queued"
+      && metadata.animationStatus !== "processing"
+      && Date.now() > discoveryDeadline
+    ) {
+      const retryKey = `missing_job:${metadata.animationStatus ?? "none"}`;
+      if (!retryAttemptKeys.has(retryKey)) {
+        retryAttemptKeys.add(retryKey);
+        const retryResult = await requestAnimationJobRetry({
+          companionId,
+          stage,
+          reason: "missing_animation_job",
+        });
+
+        if (retryResult.videoUrl) {
+          return {
+            ...metadata,
+            animationStatus: "succeeded",
+            animationVideoUrl: retryResult.videoUrl,
+          };
+        }
+
+        if (retryResult.status === "queued" || retryResult.status === "processing") {
+          jobId = retryResult.jobId ?? jobId;
+          await sleep(EVOLUTION_ANIMATION_POLL_INTERVAL_MS);
+          metadata = await fetchPersistedEvolutionMetadata({ companionId, stage }) ?? metadata;
+          continue;
+        }
+      }
+
+      return null;
     }
 
     await sleep(EVOLUTION_ANIMATION_POLL_INTERVAL_MS);
@@ -188,7 +408,7 @@ const waitForEvolutionAnimation = async ({
     evolutionId: metadata.id,
     animationStatus: metadata.animationStatus,
   });
-  return metadata;
+  return null;
 };
 
 export const GlobalEvolutionListener = () => {
@@ -199,24 +419,26 @@ export const GlobalEvolutionListener = () => {
   const { setEvolutionInProgress } = useCelebration();
   const { triggerEvent } = useCompanionMotionSafe();
   const [isEvolving, setIsEvolving] = useState(false);
-  const [evolutionData, setEvolutionData] = useState<{
-    companionId: string;
-    previousLevel: number;
-    level: number;
-    previousImageUrl: string;
-    imageUrl: string;
-    animationVideoUrl?: string | null;
-    presetId?: string;
-    mentorSlug?: string;
-    element?: string;
-  } | null>(null);
+  const [evolutionData, setEvolutionData] = useState<EvolutionPresentationData | null>(null);
+  const [pendingEvolutionData, setPendingEvolutionData] = useState<EvolutionPresentationData | null>(null);
   const activeEvolutionKeyRef = useRef<string | null>(null);
   const pendingEvolutionKeysRef = useRef(new Set<string>());
+  const pendingPreloadKeyRef = useRef<string | null>(null);
+  const presentationRetryTimersRef = useRef(new Map<string, number>());
+  const presentationRetryNotifiedKeysRef = useRef(new Set<string>());
   const recentLocalHatchKeysRef = useRef(new Map<string, number>());
 
   const buildEvolutionKey = useCallback((companionId: string, stage: number) => (
     `${companionId}:${stage}`
   ), []);
+
+  const clearPresentationRetryTimer = useCallback((key: string) => {
+    const timerId = presentationRetryTimersRef.current.get(key);
+    if (timerId) {
+      window.clearTimeout(timerId);
+      presentationRetryTimersRef.current.delete(key);
+    }
+  }, []);
 
   const pruneRecentLocalHatchKeys = useCallback(() => {
     const now = Date.now();
@@ -225,6 +447,13 @@ export const GlobalEvolutionListener = () => {
         recentLocalHatchKeysRef.current.delete(key);
       }
     });
+  }, []);
+
+  useEffect(() => () => {
+    presentationRetryTimersRef.current.forEach((timerId) => {
+      window.clearTimeout(timerId);
+    });
+    presentationRetryTimersRef.current.clear();
   }, []);
 
   const resolveMentorSlug = useCallback(async () => {
@@ -282,7 +511,7 @@ export const GlobalEvolutionListener = () => {
     level,
     previousImageUrl,
     imageUrl,
-    animationVideoUrl = null,
+    animationVideoUrl,
     presetId,
     element,
     dispatchLoadingStart = false,
@@ -293,7 +522,7 @@ export const GlobalEvolutionListener = () => {
     level: number;
     previousImageUrl: string;
     imageUrl: string;
-    animationVideoUrl?: string | null;
+    animationVideoUrl: string;
     presetId?: string;
     element?: string;
     dispatchLoadingStart?: boolean;
@@ -302,6 +531,14 @@ export const GlobalEvolutionListener = () => {
     const key = buildEvolutionKey(companionId, level);
 
     if (activeEvolutionKeyRef.current === key) {
+      return false;
+    }
+
+    if (!animationVideoUrl) {
+      logger.warn("Evolution listener: Refusing to open reveal without animation video", {
+        companionId,
+        level,
+      });
       return false;
     }
 
@@ -404,23 +641,13 @@ export const GlobalEvolutionListener = () => {
     dispatchLoadingStart = false,
     markAsLocalHatch = false,
     missingEvolutionLog,
-  }: {
-    companionId: string;
-    previousLevel: number;
-    level: number;
-    previousImageUrl: string;
-    imageUrl: string;
-    presetId?: string;
-    element?: string;
-    dispatchLoadingStart?: boolean;
-    markAsLocalHatch?: boolean;
-    missingEvolutionLog?: Record<string, unknown>;
-  }) => {
+  }: EvolutionPresentationRequest) => {
     const key = buildEvolutionKey(companionId, level);
     if (activeEvolutionKeyRef.current === key || pendingEvolutionKeysRef.current.has(key)) {
       return false;
     }
 
+    clearPresentationRetryTimer(key);
     pendingEvolutionKeysRef.current.add(key);
     if (markAsLocalHatch) {
       recentLocalHatchKeysRef.current.set(key, Date.now());
@@ -431,7 +658,45 @@ export const GlobalEvolutionListener = () => {
     }
     setIsEvolvingLoading(true);
 
-    let started = false;
+    let queuedForPreload = false;
+    let scheduledRetry = false;
+    const schedulePresentationRetry = (reason: string) => {
+      if (presentationRetryTimersRef.current.has(key)) {
+        scheduledRetry = true;
+        return;
+      }
+
+      scheduledRetry = true;
+      if (!presentationRetryNotifiedKeysRef.current.has(key)) {
+        presentationRetryNotifiedKeysRef.current.add(key);
+        toast.info("Your companion animation is still preparing. We'll keep trying in the background.");
+      }
+
+      const retryRequest: EvolutionPresentationRequest = {
+        companionId,
+        previousLevel,
+        level,
+        previousImageUrl,
+        imageUrl,
+        presetId,
+        element,
+        dispatchLoadingStart: false,
+        markAsLocalHatch: false,
+        missingEvolutionLog: {
+          ...(missingEvolutionLog ?? {}),
+          retryReason: reason,
+        },
+      };
+
+      const timerId = window.setTimeout(() => {
+        presentationRetryTimersRef.current.delete(key);
+        pendingEvolutionKeysRef.current.delete(key);
+        void beginEvolutionPresentationWhenReady(retryRequest);
+      }, EVOLUTION_PRESENTATION_RETRY_DELAY_MS);
+
+      presentationRetryTimersRef.current.set(key, timerId);
+    };
+
     try {
       const persistedEvolution = await waitForEvolutionPersistence({
         companionId,
@@ -445,6 +710,7 @@ export const GlobalEvolutionListener = () => {
           level,
           ...missingEvolutionLog,
         });
+        schedulePresentationRetry("missing_persisted_evolution");
         return false;
       }
 
@@ -454,7 +720,14 @@ export const GlobalEvolutionListener = () => {
         initialMetadata: persistedEvolution,
       });
 
-      started = startEvolutionPresentation({
+      if (!readyEvolution?.animationVideoUrl) {
+        schedulePresentationRetry("animation_not_ready");
+        return false;
+      }
+
+      presentationRetryNotifiedKeysRef.current.delete(key);
+      pendingPreloadKeyRef.current = key;
+      setPendingEvolutionData({
         companionId,
         previousLevel,
         level,
@@ -464,18 +737,96 @@ export const GlobalEvolutionListener = () => {
         presetId,
         element,
       });
-      return started;
+      queuedForPreload = true;
+      return true;
     } finally {
-      pendingEvolutionKeysRef.current.delete(key);
-      if (!started && activeEvolutionKeyRef.current !== key) {
+      if (!queuedForPreload) {
+        pendingEvolutionKeysRef.current.delete(key);
+      }
+      if (!queuedForPreload && !scheduledRetry && activeEvolutionKeyRef.current !== key) {
         setIsEvolvingLoading(false);
       }
     }
   }, [
     buildEvolutionKey,
+    clearPresentationRetryTimer,
+    setIsEvolvingLoading,
+  ]);
+
+  const handlePendingAnimationReady = useCallback(() => {
+    const pending = pendingEvolutionData;
+    if (!pending) return;
+
+    const key = buildEvolutionKey(pending.companionId, pending.level);
+    if (pendingPreloadKeyRef.current !== key) return;
+    pendingPreloadKeyRef.current = null;
+    setPendingEvolutionData(null);
+    pendingEvolutionKeysRef.current.delete(key);
+
+    const started = startEvolutionPresentation(pending);
+    if (!started) {
+      setIsEvolvingLoading(false);
+      activeEvolutionKeyRef.current = null;
+    }
+  }, [
+    buildEvolutionKey,
+    pendingEvolutionData,
     setIsEvolvingLoading,
     startEvolutionPresentation,
   ]);
+
+  const retryPendingAnimationPreload = useCallback((reason: string) => {
+    const pending = pendingEvolutionData;
+    if (!pending) return;
+
+    const key = buildEvolutionKey(pending.companionId, pending.level);
+    if (pendingPreloadKeyRef.current !== key) return;
+    logger.warn("Evolution listener: Animation video could not be preloaded", {
+      companionId: pending.companionId,
+      level: pending.level,
+      animationVideoUrl: pending.animationVideoUrl,
+      reason,
+    });
+    toast.info("Your companion animation needs another pass. We'll try again.");
+
+    pendingPreloadKeyRef.current = null;
+    setPendingEvolutionData(null);
+    pendingEvolutionKeysRef.current.delete(key);
+
+    void requestAnimationJobRetry({
+      companionId: pending.companionId,
+      stage: pending.level,
+      reason: `preload_${reason}`,
+      force: true,
+    }).then(() => {
+      void beginEvolutionPresentationWhenReady({
+        companionId: pending.companionId,
+        previousLevel: pending.previousLevel,
+        level: pending.level,
+        previousImageUrl: pending.previousImageUrl,
+        imageUrl: pending.imageUrl,
+        presetId: pending.presetId,
+        element: pending.element,
+        dispatchLoadingStart: false,
+      });
+    });
+  }, [
+    beginEvolutionPresentationWhenReady,
+    buildEvolutionKey,
+    pendingEvolutionData,
+  ]);
+
+  useEffect(() => {
+    if (!pendingEvolutionData) return;
+
+    const timeoutId = window.setTimeout(() => {
+      retryPendingAnimationPreload("timeout");
+    }, EVOLUTION_ANIMATION_PRELOAD_TIMEOUT_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [pendingEvolutionData, retryPendingAnimationPreload]);
 
   useEffect(() => {
     if (!user) return;
@@ -651,31 +1002,81 @@ export const GlobalEvolutionListener = () => {
     };
   }, [beginEvolutionPresentationWhenReady, user]);
 
-  if (!isEvolving || !evolutionData) {
-    return null;
-  }
-
   return (
-    <CompanionEvolution
-      isEvolving={isEvolving}
-      previousStage={evolutionData.previousLevel}
-      newStage={evolutionData.level}
-      previousImageUrl={evolutionData.previousImageUrl}
-      newImageUrl={evolutionData.imageUrl}
-      animationVideoUrl={evolutionData.animationVideoUrl ?? null}
-      presetId={evolutionData.presetId}
-      element={evolutionData.element}
-      onComplete={() => {
-        setIsEvolving(false);
-        setEvolutionData(null);
-        activeEvolutionKeyRef.current = null;
-        setIsEvolvingLoading(false);
-        setEvolutionInProgress(false);
+    <>
+      {pendingEvolutionData && (
+        <video
+          aria-hidden="true"
+          data-testid="evolution-animation-preloader"
+          muted
+          playsInline
+          preload="auto"
+          src={pendingEvolutionData.animationVideoUrl}
+          onCanPlay={handlePendingAnimationReady}
+          onCanPlayThrough={handlePendingAnimationReady}
+          onError={() => retryPendingAnimationPreload("error")}
+          style={{
+            position: "fixed",
+            width: 1,
+            height: 1,
+            opacity: 0,
+            pointerEvents: "none",
+            left: -1,
+            top: -1,
+          }}
+        />
+      )}
 
-        if (onEvolutionComplete) {
-          onEvolutionComplete();
-        }
-      }}
-    />
+      {isEvolving && evolutionData && (
+        <CompanionEvolution
+          isEvolving={isEvolving}
+          previousStage={evolutionData.previousLevel}
+          newStage={evolutionData.level}
+          previousImageUrl={evolutionData.previousImageUrl}
+          newImageUrl={evolutionData.imageUrl}
+          animationVideoUrl={evolutionData.animationVideoUrl}
+          presetId={evolutionData.presetId}
+          element={evolutionData.element}
+          onAnimationError={() => {
+            const key = buildEvolutionKey(evolutionData.companionId, evolutionData.level);
+            setIsEvolving(false);
+            setEvolutionData(null);
+            activeEvolutionKeyRef.current = null;
+            pendingEvolutionKeysRef.current.delete(key);
+            setIsEvolvingLoading(false);
+            setEvolutionInProgress(false);
+            toast.info("Your companion animation needs another pass. We'll try again.");
+            void requestAnimationJobRetry({
+              companionId: evolutionData.companionId,
+              stage: evolutionData.level,
+              reason: "playback_error",
+              force: true,
+            }).then(() => {
+              void beginEvolutionPresentationWhenReady({
+                companionId: evolutionData.companionId,
+                previousLevel: evolutionData.previousLevel,
+                level: evolutionData.level,
+                previousImageUrl: evolutionData.previousImageUrl,
+                imageUrl: evolutionData.imageUrl,
+                presetId: evolutionData.presetId,
+                element: evolutionData.element,
+                dispatchLoadingStart: false,
+              });
+            });
+          }}
+          onComplete={() => {
+            setIsEvolving(false);
+            setEvolutionData(null);
+            activeEvolutionKeyRef.current = null;
+            setIsEvolvingLoading(false);
+            setEvolutionInProgress(false);
+
+            if (onEvolutionComplete) {
+              onEvolutionComplete();
+            }
+          }}
+        />
+      )}
+    </>
   );
 };

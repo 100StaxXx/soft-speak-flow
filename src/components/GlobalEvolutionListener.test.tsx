@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { COMPANION_HATCH_STARTED_EVENT } from "@/lib/companionEvolutionEvents";
 
@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => {
   const loggerWarnMock = vi.fn();
   const loggerErrorMock = vi.fn();
   const companionEvolutionPropsMock = vi.fn();
+  const toastInfoMock = vi.fn();
   const state = {
     callback: null as null | ((payload: Record<string, unknown>) => Promise<void>),
     mentorId: null as string | null,
@@ -35,6 +36,7 @@ const mocks = vi.hoisted(() => {
     loggerWarnMock,
     loggerErrorMock,
     companionEvolutionPropsMock,
+    toastInfoMock,
     functionsInvokeMock,
     state,
     companionEvolutionLookupResponses,
@@ -98,6 +100,12 @@ vi.mock("@/components/CompanionEvolution", () => ({
   },
 }));
 
+vi.mock("@/components/ui/sonner", () => ({
+  toast: {
+    info: mocks.toastInfoMock,
+  },
+}));
+
 vi.mock("@/utils/logger", () => ({
   logger: {
     warn: mocks.loggerWarnMock,
@@ -113,7 +121,11 @@ vi.mock("@/integrations/supabase/client", () => ({
       if (table === "companion_evolutions") {
         const maybeSingleMock = vi.fn(async () =>
           mocks.companionEvolutionLookupResponses.shift() ?? {
-            data: { id: "evo-1", animation_video_url: null, animation_status: "skipped" },
+            data: {
+              id: "evo-1",
+              animation_video_url: "https://example.com/evolution.mp4",
+              animation_status: "succeeded",
+            },
             error: null,
           });
 
@@ -194,6 +206,21 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 import { GlobalEvolutionListener } from "./GlobalEvolutionListener";
 
+const openPlayablePendingAnimation = async () => {
+  const preloader = await screen.findByTestId("evolution-animation-preloader");
+  await act(async () => {
+    fireEvent.canPlay(preloader);
+  });
+  await waitFor(() => {
+    expect(screen.getByTestId("companion-evolution")).toBeInTheDocument();
+  });
+};
+
+const flushMicrotasks = async () => {
+  await Promise.resolve();
+  await Promise.resolve();
+};
+
 describe("GlobalEvolutionListener", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -202,7 +229,7 @@ describe("GlobalEvolutionListener", () => {
     mocks.state.mentorLookup = null;
     mocks.companionEvolutionLookupResponses.length = 0;
     mocks.animationJobLookupResponses.length = 0;
-    mocks.functionsInvokeMock.mockResolvedValue({ data: { status: "processing" }, error: null });
+    mocks.functionsInvokeMock.mockResolvedValue({ data: { status: "processing", jobId: "job-1" }, error: null });
 
     mocks.onMock.mockImplementation(
       (_event: string, _config: Record<string, unknown>, callback: (payload: Record<string, unknown>) => Promise<void>) => {
@@ -267,9 +294,8 @@ describe("GlobalEvolutionListener", () => {
       });
     });
 
-    await waitFor(() => {
-      expect(screen.getByTestId("companion-evolution")).toBeInTheDocument();
-    });
+    expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
+    await openPlayablePendingAnimation();
 
     expect(mocks.setEvolutionInProgressMock).toHaveBeenCalledWith(true);
     expect(mocks.companionEvolutionPropsMock).toHaveBeenCalledWith(
@@ -278,7 +304,7 @@ describe("GlobalEvolutionListener", () => {
         newStage: 5,
         previousImageUrl: "https://example.com/stage-4.png",
         newImageUrl: "https://example.com/stage-5.png",
-        animationVideoUrl: null,
+        animationVideoUrl: "https://example.com/evolution.mp4",
       }),
     );
   });
@@ -302,9 +328,8 @@ describe("GlobalEvolutionListener", () => {
       });
     });
 
-    await waitFor(() => {
-      expect(screen.getByTestId("companion-evolution")).toBeInTheDocument();
-    });
+    expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
+    await openPlayablePendingAnimation();
 
     expect(mocks.companionEvolutionPropsMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -344,12 +369,16 @@ describe("GlobalEvolutionListener", () => {
       });
     });
 
-    await waitFor(() => {
-      expect(screen.getByTestId("companion-evolution")).toHaveAttribute(
-        "data-animation-video-url",
-        "https://example.com/evolution.mp4",
-      );
-    });
+    expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
+    expect(screen.getByTestId("evolution-animation-preloader")).toHaveAttribute(
+      "src",
+      "https://example.com/evolution.mp4",
+    );
+    await openPlayablePendingAnimation();
+    expect(screen.getByTestId("companion-evolution")).toHaveAttribute(
+      "data-animation-video-url",
+      "https://example.com/evolution.mp4",
+    );
 
     expect(mocks.companionEvolutionPropsMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -414,9 +443,242 @@ describe("GlobalEvolutionListener", () => {
         await callbackPromise;
       });
 
+      expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
+      const preloader = screen.getByTestId("evolution-animation-preloader");
+      await act(async () => {
+        fireEvent.canPlay(preloader);
+      });
+
       expect(screen.getByTestId("companion-evolution")).toHaveAttribute(
         "data-animation-video-url",
         "https://example.com/evolution.mp4",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("waits through stale skipped animation metadata while a new Kling job is queued", async () => {
+    vi.useFakeTimers();
+    const staleTimestamp = new Date(Date.now() - 60_000).toISOString();
+    mocks.companionEvolutionLookupResponses.push(
+      {
+        data: {
+          id: "evo-1",
+          animation_video_url: null,
+          animation_status: "skipped",
+          animation_requested_at: staleTimestamp,
+          animation_completed_at: staleTimestamp,
+        },
+        error: null,
+      },
+      {
+        data: {
+          id: "evo-1",
+          animation_video_url: null,
+          animation_status: "queued",
+          animation_requested_at: new Date(Date.now()).toISOString(),
+          animation_completed_at: null,
+        },
+        error: null,
+      },
+      {
+        data: {
+          id: "evo-1",
+          animation_video_url: "https://example.com/evolution.mp4",
+          animation_status: "succeeded",
+          animation_requested_at: new Date(Date.now()).toISOString(),
+          animation_completed_at: new Date(Date.now() + 1_000).toISOString(),
+        },
+        error: null,
+      },
+    );
+    mocks.animationJobLookupResponses.push({
+      data: { id: "job-1" },
+      error: null,
+    });
+
+    try {
+      render(<GlobalEvolutionListener />);
+
+      const callbackPromise = mocks.state.callback?.({
+        eventType: "UPDATE",
+        new: {
+          id: "companion-1",
+          current_stage: 5,
+          current_image_url: "https://example.com/stage-5.png",
+        },
+        old: {
+          id: "companion-1",
+          current_stage: 4,
+          current_image_url: "https://example.com/stage-4.png",
+        },
+      }) ?? Promise.resolve();
+
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
+      expect(mocks.functionsInvokeMock).toHaveBeenCalledWith("process-companion-animation-job", {
+        body: { jobId: "job-1" },
+      });
+
+      await act(async () => {
+        vi.advanceTimersByTime(2000);
+        await Promise.resolve();
+      });
+      expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
+
+      await act(async () => {
+        vi.advanceTimersByTime(2000);
+        await callbackPromise;
+      });
+
+      expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
+      const preloader = screen.getByTestId("evolution-animation-preloader");
+      await act(async () => {
+        fireEvent.canPlay(preloader);
+      });
+
+      expect(screen.getByTestId("companion-evolution")).toHaveAttribute(
+        "data-animation-video-url",
+        "https://example.com/evolution.mp4",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps retrying when the evolution row is late, then opens after the MP4 preloads", async () => {
+    vi.useFakeTimers();
+    mocks.companionEvolutionLookupResponses.push(
+      { data: null, error: null },
+      { data: null, error: null },
+      { data: null, error: null },
+      {
+        data: {
+          id: "evo-1",
+          animation_video_url: "https://example.com/evolution.mp4",
+          animation_status: "succeeded",
+        },
+        error: null,
+      },
+    );
+
+    try {
+      render(<GlobalEvolutionListener />);
+
+      const callbackPromise = mocks.state.callback?.({
+        eventType: "UPDATE",
+        new: {
+          id: "companion-1",
+          current_stage: 5,
+          current_image_url: "https://example.com/stage-5.png",
+        },
+        old: {
+          id: "companion-1",
+          current_stage: 4,
+          current_image_url: "https://example.com/stage-4.png",
+        },
+      }) ?? Promise.resolve();
+
+      await act(async () => {
+        await flushMicrotasks();
+        await vi.advanceTimersByTimeAsync(225);
+      });
+      await callbackPromise;
+
+      expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("evolution-animation-preloader")).not.toBeInTheDocument();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+        await flushMicrotasks();
+      });
+
+      const preloader = screen.getByTestId("evolution-animation-preloader");
+      expect(preloader).toHaveAttribute("src", "https://example.com/evolution.mp4");
+
+      await act(async () => {
+        fireEvent.canPlay(preloader);
+      });
+
+      expect(screen.getByTestId("companion-evolution")).toHaveAttribute(
+        "data-animation-video-url",
+        "https://example.com/evolution.mp4",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps retrying after a failed animation retry cannot immediately queue", async () => {
+    vi.useFakeTimers();
+    mocks.functionsInvokeMock.mockResolvedValueOnce({
+      data: { status: "skipped", reason: "fal_key_missing" },
+      error: null,
+    });
+    mocks.companionEvolutionLookupResponses.push(
+      {
+        data: {
+          id: "evo-1",
+          animation_video_url: null,
+          animation_status: "failed",
+        },
+        error: null,
+      },
+      {
+        data: {
+          id: "evo-1",
+          animation_video_url: "https://example.com/recovered-evolution.mp4",
+          animation_status: "succeeded",
+        },
+        error: null,
+      },
+    );
+
+    try {
+      render(<GlobalEvolutionListener />);
+
+      const callbackPromise = mocks.state.callback?.({
+        eventType: "UPDATE",
+        new: {
+          id: "companion-1",
+          current_stage: 5,
+          current_image_url: "https://example.com/stage-5.png",
+        },
+        old: {
+          id: "companion-1",
+          current_stage: 4,
+          current_image_url: "https://example.com/stage-4.png",
+        },
+      }) ?? Promise.resolve();
+
+      await act(async () => {
+        await flushMicrotasks();
+        await callbackPromise;
+      });
+
+      expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("evolution-animation-preloader")).not.toBeInTheDocument();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+        await flushMicrotasks();
+      });
+
+      const preloader = screen.getByTestId("evolution-animation-preloader");
+      expect(preloader).toHaveAttribute("src", "https://example.com/recovered-evolution.mp4");
+
+      await act(async () => {
+        fireEvent.canPlay(preloader);
+      });
+
+      expect(screen.getByTestId("companion-evolution")).toHaveAttribute(
+        "data-animation-video-url",
+        "https://example.com/recovered-evolution.mp4",
       );
     } finally {
       vi.useRealTimers();
@@ -439,9 +701,7 @@ describe("GlobalEvolutionListener", () => {
       }));
     });
 
-    await waitFor(() => {
-      expect(screen.getByTestId("companion-evolution")).toBeInTheDocument();
-    });
+    await openPlayablePendingAnimation();
 
     expect(mocks.setEvolutionInProgressMock).toHaveBeenCalledTimes(1);
     expect(mocks.companionEvolutionPropsMock).toHaveBeenCalledWith(
@@ -473,9 +733,7 @@ describe("GlobalEvolutionListener", () => {
       }));
     });
 
-    await waitFor(() => {
-      expect(screen.getByTestId("companion-evolution")).toBeInTheDocument();
-    });
+    await openPlayablePendingAnimation();
 
     expect(mocks.companionEvolutionPropsMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -503,9 +761,7 @@ describe("GlobalEvolutionListener", () => {
       }));
     });
 
-    await waitFor(() => {
-      expect(screen.getByTestId("companion-evolution")).toBeInTheDocument();
-    });
+    await openPlayablePendingAnimation();
 
     await act(async () => {
       await mocks.state.callback?.({

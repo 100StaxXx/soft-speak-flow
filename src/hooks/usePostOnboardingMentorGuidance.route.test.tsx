@@ -281,9 +281,7 @@ describe("guided tutorial route restoration", () => {
         "hatch_companion",
       );
       expect(screen.getByTestId("path")).toHaveTextContent("/companion");
-      expect(screen.getByTestId("target")).toHaveTextContent(
-        '[data-tour="evolve-companion-button"]',
-      );
+      expect(screen.getByTestId("target")).toHaveTextContent("");
     });
   });
 
@@ -298,9 +296,7 @@ describe("guided tutorial route restoration", () => {
     await waitFor(() => {
       expect(screen.getByTestId("path")).toHaveTextContent("/companion");
       expect(screen.getByTestId("step")).toHaveTextContent("hatch_companion");
-      expect(screen.getByTestId("target")).toHaveTextContent(
-        '[data-tour="evolve-companion-button"]',
-      );
+      expect(screen.getByTestId("target")).toHaveTextContent("");
     });
   });
 

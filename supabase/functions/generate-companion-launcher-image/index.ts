@@ -13,7 +13,10 @@ import {
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
-import { editCompanionImage } from "../_shared/openaiCompanionImageClient.ts";
+import {
+  editCompanionImage,
+  OpenAIImageRequestError,
+} from "../_shared/openaiCompanionImageClient.ts";
 import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
 
 const corsHeaders = {
@@ -139,6 +142,66 @@ const jsonResponse = (
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
+const truncateDiagnostic = (value: string, maxLength = 800): string =>
+  value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
+
+const getErrorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
+const getReferenceDownloadStatus = (message: string): number | null => {
+  const match = message.match(/Failed to download reference image:\s*(\d{3})/i);
+  if (!match) return null;
+  const status = Number.parseInt(match[1], 10);
+  return Number.isFinite(status) ? status : null;
+};
+
+const getOpenAIImageRequestStatus = (error: unknown, message: string): number | null => {
+  if (error instanceof OpenAIImageRequestError) {
+    return error.status;
+  }
+
+  const match = message.match(/OpenAI image request failed\s*\((\d{3})\):/i);
+  if (!match) return null;
+  const status = Number.parseInt(match[1], 10);
+  return Number.isFinite(status) ? status : null;
+};
+
+const isRetryableUpstreamStatus = (status: number | null): boolean =>
+  status === null || status === 408 || status === 429 || status >= 500;
+
+const getLauncherStatusForUpstreamFailure = (status: number | null): number =>
+  isRetryableUpstreamStatus(status) ? 502 : 424;
+
+const launcherErrorResponse = ({
+  status,
+  message,
+  code,
+  stage,
+  failureReason,
+  retryable,
+  upstreamStatus,
+  upstreamError,
+}: {
+  status: number;
+  message: string;
+  code: string;
+  stage: string;
+  failureReason: string;
+  retryable?: boolean;
+  upstreamStatus?: number | null;
+  upstreamError?: string | null;
+}): Response =>
+  jsonResponse({
+    error: message,
+    message,
+    code,
+    stage,
+    failureReason,
+    retryable: retryable ?? false,
+    ...(typeof upstreamStatus === "number" ? { upstreamStatus } : {}),
+    ...(upstreamError ? { upstreamError: truncateDiagnostic(upstreamError) } : {}),
+  }, { status });
+
 export async function handleGenerateCompanionLauncherImage(
   req: Request,
   deps: GenerateCompanionLauncherImageDeps = defaultDeps,
@@ -163,9 +226,18 @@ export async function handleGenerateCompanionLauncherImage(
     const companionId = typeof body?.companionId === "string"
       ? body.companionId.trim()
       : "";
+    const requestedSourceImageUrl = typeof body?.sourceImageUrl === "string"
+      ? body.sourceImageUrl.trim()
+      : "";
 
     if (!companionId) {
-      return errorResponse(400, "Missing companionId", corsHeaders);
+      return launcherErrorResponse({
+        status: 400,
+        message: "Missing companionId",
+        code: "COMPANION_LAUNCHER_MISSING_COMPANION_ID",
+        stage: "validate_request",
+        failureReason: "missing_companion_id",
+      });
     }
 
     const supabase = deps.createSupabaseClient();
@@ -188,7 +260,29 @@ export async function handleGenerateCompanionLauncherImage(
 
     const companion = data as CompanionRow | null;
     if (!companion) {
-      return errorResponse(404, "Companion not found", corsHeaders);
+      return launcherErrorResponse({
+        status: 404,
+        message: "Companion not found",
+        code: "COMPANION_LAUNCHER_COMPANION_NOT_FOUND",
+        stage: "load_companion",
+        failureReason: "companion_not_found",
+      });
+    }
+
+    if (
+      requestedSourceImageUrl.length > 0 &&
+      requestedSourceImageUrl !== (companion.current_image_url ?? "")
+    ) {
+      return jsonResponse({
+        success: true,
+        cached: false,
+        skipped: true,
+        stale: true,
+        reason: "source_image_changed",
+        imageUrl: null,
+        sourceImageUrl: companion.current_image_url,
+        requestedSourceImageUrl,
+      });
     }
 
     if (
@@ -218,17 +312,26 @@ export async function handleGenerateCompanionLauncherImage(
       });
     }
 
-    if (!isUsableReferenceUrl(companion.current_image_url)) {
-      return errorResponse(
-        400,
-        "Companion current image is not available for launcher generation",
-        corsHeaders,
-      );
+    const referenceImageUrl = companion.current_image_url;
+    if (!isUsableReferenceUrl(referenceImageUrl)) {
+      return launcherErrorResponse({
+        status: 400,
+        message: "Companion current image is not available for launcher generation",
+        code: "COMPANION_LAUNCHER_REFERENCE_UNAVAILABLE",
+        stage: "validate_reference",
+        failureReason: "missing_reference_image",
+      });
     }
 
     const openAIApiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openAIApiKey) {
-      throw new Error("OPENAI_API_KEY not configured");
+      return launcherErrorResponse({
+        status: 500,
+        message: "Companion launcher image generation is not configured",
+        code: "COMPANION_LAUNCHER_CONFIG_ERROR",
+        stage: "configure_openai",
+        failureReason: "openai_config_missing",
+      });
     }
 
     const costGuardrails = deps.createCostGuardrailSessionFn({
@@ -243,15 +346,61 @@ export async function handleGenerateCompanionLauncherImage(
       providers: ["openai"],
     });
 
-    const generatedImage = await deps.editCompanionImageFn({
-      guardedFetch,
-      openAIApiKey,
-      prompt: buildLauncherPrompt(companion),
-      size: LAUNCHER_IMAGE_SIZE,
-      quality: "high",
-      userId: companion.user_id,
-      referenceImages: [{ imageUrl: companion.current_image_url }],
-    });
+    const generatedImage = await (async () => {
+      try {
+        return await deps.editCompanionImageFn({
+          guardedFetch,
+          openAIApiKey,
+          prompt: buildLauncherPrompt(companion),
+          size: LAUNCHER_IMAGE_SIZE,
+          quality: "high",
+          userId: companion.user_id,
+          referenceImages: [{ imageUrl: referenceImageUrl }],
+        });
+      } catch (error) {
+        const errorMessage = getErrorMessage(error);
+        const referenceStatus = getReferenceDownloadStatus(errorMessage);
+        const openAIStatus = getOpenAIImageRequestStatus(error, errorMessage);
+
+        if (
+          errorMessage.includes("Companion image model is not configured") ||
+          errorMessage.includes("OPENAI_API_KEY")
+        ) {
+          throw launcherErrorResponse({
+            status: 500,
+            message: "Companion launcher image generation is not configured",
+            code: "COMPANION_LAUNCHER_CONFIG_ERROR",
+            stage: "configure_openai",
+            failureReason: "openai_config_invalid",
+            upstreamError: errorMessage,
+          });
+        }
+
+        if (errorMessage.startsWith("Failed to download reference image:")) {
+          throw launcherErrorResponse({
+            status: referenceStatus && referenceStatus < 500 ? 424 : 502,
+            message: "Companion reference image could not be downloaded",
+            code: "COMPANION_LAUNCHER_REFERENCE_DOWNLOAD_FAILED",
+            stage: "download_reference",
+            failureReason: "reference_download_failed",
+            retryable: !referenceStatus || referenceStatus >= 500 || referenceStatus === 408,
+            upstreamStatus: referenceStatus,
+            upstreamError: errorMessage,
+          });
+        }
+
+        throw launcherErrorResponse({
+          status: getLauncherStatusForUpstreamFailure(openAIStatus),
+          message: "Companion launcher image edit failed",
+          code: "COMPANION_LAUNCHER_OPENAI_EDIT_FAILED",
+          stage: "edit_image",
+          failureReason: "openai_edit_failed",
+          retryable: isRetryableUpstreamStatus(openAIStatus),
+          upstreamStatus: openAIStatus,
+          upstreamError: errorMessage,
+        });
+      }
+    })();
 
     const imageBuffer = parseDataUrl(generatedImage.imageDataUrl);
     const stage = typeof companion.current_stage === "number"
@@ -281,7 +430,7 @@ export async function handleGenerateCompanionLauncherImage(
       launcher_image_url: imageUrl,
       launcher_image_focal_x: 0.5,
       launcher_image_focal_y: 0.5,
-      launcher_image_source_url: companion.current_image_url,
+      launcher_image_source_url: referenceImageUrl,
       updated_at: new Date().toISOString(),
     };
 
@@ -290,7 +439,7 @@ export async function handleGenerateCompanionLauncherImage(
       .update(updatePayload)
       .eq("id", companion.id)
       .eq("user_id", companion.user_id)
-      .eq("current_image_url", companion.current_image_url)
+      .eq("current_image_url", referenceImageUrl)
       .select("id")
       .maybeSingle();
 
@@ -316,7 +465,7 @@ export async function handleGenerateCompanionLauncherImage(
         stale: true,
         reason: "source_image_changed",
         imageUrl: null,
-        sourceImageUrl: companion.current_image_url,
+        sourceImageUrl: referenceImageUrl,
       });
     }
 
@@ -336,20 +485,28 @@ export async function handleGenerateCompanionLauncherImage(
       imageUrl,
       imageFocalX: 0.5,
       imageFocalY: 0.5,
-      sourceImageUrl: companion.current_image_url,
+      sourceImageUrl: referenceImageUrl,
       imageSize: generatedImage.size,
       revisedPrompt: generatedImage.revisedPrompt,
     });
   } catch (error) {
+    if (error instanceof Response) {
+      return error;
+    }
+
     if (isCostGuardrailBlockedError(error)) {
       return buildCostGuardrailBlockedResponse(error, corsHeaders);
     }
 
     console.error("[CompanionLauncherImage] Error:", error);
-    return jsonResponse(
-      { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 },
-    );
+    return launcherErrorResponse({
+      status: 500,
+      message: "Companion launcher image generation failed",
+      code: "COMPANION_LAUNCHER_GENERATION_FAILED",
+      stage: "unknown",
+      failureReason: "unexpected_error",
+      upstreamError: getErrorMessage(error),
+    });
   } finally {
     console.log(
       `[CompanionLauncherImageTiming] total_ms=${
