@@ -686,6 +686,20 @@ def optimize_schedule(request: OptimizerRequest) -> OptimizerResponse:
                     score_candidate(request, task, date_key, day_index, start, duration, free)
                 )
 
+        if not task_candidates:
+            posthog_client.capture(
+                distinct_id="planner_optimizer_service",
+                event="task_no_slot_candidates",
+                properties={
+                    "scheduling_mode": request.scheduling_mode,
+                    "task_duration_min": task.duration_min,
+                    "has_timing_preference": task.timing_preference is not None,
+                    "has_energy_type": task.energy_type is not None,
+                    "planning_window_days": date_diff(
+                        request.planning_window.start_date, request.planning_window.end_date
+                    ) + 1,
+                },
+            )
         task_assignments: list[tuple[cp_model.IntVar, SlotCandidate]] = []
         for index, candidate in enumerate(task_candidates):
             is_selected = model.NewBoolVar(f"{task.id}_candidate_{index}")
