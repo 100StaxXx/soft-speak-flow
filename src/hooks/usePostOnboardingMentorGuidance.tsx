@@ -244,6 +244,15 @@ interface MentorDialogueLine {
   support?: string;
 }
 
+export interface TutorialCompletionOverlayState {
+  title: string;
+  body: string;
+  highlights: string[];
+  mentorLine: string;
+  ctaLabel: string;
+  onComplete: () => void;
+}
+
 type TutorialDialogueKey =
   | "mentor_intro_hello"
   | "start_new_goal"
@@ -378,6 +387,19 @@ const isTutorialDialogueKey = (value: string): value is TutorialDialogueKey =>
   TUTORIAL_DIALOGUE_KEYS.has(value);
 
 const FALLBACK_DIALOGUE: MentorDialogueLine = { text: "Let's keep going." };
+const TUTORIAL_COMPLETION_TITLE = "You're ready.";
+const TUTORIAL_COMPLETION_BODY =
+  "Your Companion is awake, your first path is set, and today has somewhere to go.";
+const TUTORIAL_COMPLETION_HIGHLIGHTS = [
+  "Path created",
+  "Companion hatched",
+  "Next step ready",
+];
+const TUTORIAL_COMPLETION_CTA_LABEL = "Start my journey";
+const TUTORIAL_COMPLETION_MENTOR_LINE = "I'll be here when you need the next step.";
+
+const getTutorialCompletionMentorLine = (mentorName: string | undefined): string =>
+  mentorName ? `${mentorName}: ${TUTORIAL_COMPLETION_MENTOR_LINE}` : TUTORIAL_COMPLETION_MENTOR_LINE;
 
 const getDialogueForMentor = (
   mentorSlug: string | undefined,
@@ -727,6 +749,7 @@ export interface PostOnboardingMentorGuidanceState {
   onSecondaryAction?: () => void;
   dialogueActionLabel?: string;
   onDialogueAction?: () => void;
+  completionOverlay?: TutorialCompletionOverlayState;
 }
 
 const DEFAULT_GUIDANCE_STATE: PostOnboardingMentorGuidanceState = {
@@ -751,6 +774,7 @@ const DEFAULT_GUIDANCE_STATE: PostOnboardingMentorGuidanceState = {
   onSecondaryAction: undefined,
   dialogueActionLabel: undefined,
   onDialogueAction: undefined,
+  completionOverlay: undefined,
 };
 
 const PostOnboardingMentorGuidanceContext = createContext<PostOnboardingMentorGuidanceState>(
@@ -1869,7 +1893,6 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     currentMilestone === "campaign_calendar_handoff" ||
     currentMilestone === "meet_companion_intro" ||
     currentMilestone === "first_plan_closeout_message" ||
-    currentMilestone === "mentor_closeout_message" ||
     currentMilestone === "quests_campaigns_intro" ||
     currentMilestone === "companion_tab_intro" ||
     currentMilestone === "post_evolution_companion_intro";
@@ -1879,8 +1902,6 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       : currentMilestone === "campaign_calendar_handoff"
       ? "Meet companion"
       : currentMilestone === "first_plan_closeout_message"
-      ? "Finish"
-      : currentMilestone === "mentor_closeout_message"
       ? "Finish"
       : "Continue"
     : undefined;
@@ -1895,11 +1916,6 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
         if (!completed) return;
         navigate("/companion", { replace: true });
       })();
-      return;
-    }
-    if (currentMilestone === "mentor_closeout_message") {
-      markMilestoneComplete("mentor_closeout_message");
-      void markStepComplete("mentor_closeout");
       return;
     }
     markMilestoneComplete(currentMilestone);
@@ -1952,23 +1968,60 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       return;
     }
 
-    if (
-      currentMilestone === "mentor_closeout_message" &&
-      !milestoneSet.has("mentor_closeout_message")
-    ) {
-      markMilestoneComplete("mentor_closeout_message");
+    if (stepPersistThrottleRef.current.has("mentor_closeout")) {
+      return;
     }
 
-    void markStepComplete("mentor_closeout");
+    stepPersistThrottleRef.current.add("mentor_closeout");
+    window.setTimeout(() => {
+      stepPersistThrottleRef.current.delete("mentor_closeout");
+    }, 1000);
+
+    const completedAt = new Date().toISOString();
+    const nextCompletedSet = new Set<GuidedTutorialStepId>([
+      ...completedSet,
+      "mentor_closeout",
+    ]);
+    const nextMilestoneSet = new Set<GuidedMilestoneId>(milestoneSet);
+
+    if (currentMilestone === "mentor_closeout_message") {
+      if (!nextMilestoneSet.has("mentor_closeout_message")) {
+        emitTutorialEvent("tutorial_step_transition", {
+          userId: user?.id,
+          milestoneId: "mentor_closeout_message",
+          route: location.pathname,
+        });
+      }
+      nextMilestoneSet.add("mentor_closeout_message");
+    }
+
+    setSessionMilestonesCompleted((prev) =>
+      prev.includes("mentor_closeout_message") ? prev : [...prev, "mentor_closeout_message"]
+    );
+    setSessionCompleted((prev) =>
+      prev.includes("mentor_closeout") ? prev : [...prev, "mentor_closeout"]
+    );
+    completionPersistRef.current = true;
+
+    void persistProgress({
+      milestonesCompleted: Array.from(nextMilestoneSet),
+      completedSteps: toActiveStepOrder(nextCompletedSet),
+      xpAwardedSteps: toActiveStepOrder(awardedSet),
+      completed: true,
+      completedAt,
+    });
   }, [
+    awardedSet,
+    completedSet,
     currentMilestone,
     currentStepId,
-    markMilestoneComplete,
-    markStepComplete,
+    location.pathname,
     milestoneSet,
+    persistProgress,
     tutorialDismissed,
     tutorialMarkedComplete,
     tutorialReady,
+    user?.id,
   ]);
 
   const activeTargetSelectors = useMemo(
@@ -2237,11 +2290,23 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     isCampaignBuilderTutorialPaused ||
     campaignCreationAnimationPending ||
     isHatchRevealPending;
-  const secondaryActionLabel =
-    !tutorialUnavailable && !isIntroDialogueActive && currentStepId === "first_plan_closeout"
-      ? "Complete tutorial"
-      : undefined;
-  const onSecondaryAction = secondaryActionLabel ? completeTutorial : undefined;
+  const isCompletionOverlayActive =
+    isActive &&
+    !tutorialUnavailable &&
+    currentStepId === "mentor_closeout" &&
+    currentMilestone === "mentor_closeout_message";
+  const completionOverlay: TutorialCompletionOverlayState | undefined = isCompletionOverlayActive
+    ? {
+        title: TUTORIAL_COMPLETION_TITLE,
+        body: TUTORIAL_COMPLETION_BODY,
+        highlights: TUTORIAL_COMPLETION_HIGHLIGHTS,
+        mentorLine: getTutorialCompletionMentorLine(personality?.name),
+        ctaLabel: TUTORIAL_COMPLETION_CTA_LABEL,
+        onComplete: completeTutorial,
+      }
+    : undefined;
+  const secondaryActionLabel = undefined;
+  const onSecondaryAction = undefined;
   const isPreHatchCompanionStep = !tutorialUnavailable && currentStepId === "hatch_companion";
 
   return {
@@ -2267,6 +2332,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     dialogueActionLabel: tutorialUnavailable ? undefined : dialogueActionLabel,
     onDialogueAction:
       tutorialUnavailable ? undefined : (supportsDialogueAction ? onDialogueAction : undefined),
+    completionOverlay,
   };
 };
 

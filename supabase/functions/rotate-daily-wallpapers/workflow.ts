@@ -37,6 +37,7 @@ export interface RotateDailyWallpapersOptions {
   pageKeys: WallpaperPageKey[];
   candidateCount: number;
   force: boolean;
+  costEndpointKey?: string;
 }
 
 export interface RotateDailyWallpapersRequestBody {
@@ -182,6 +183,7 @@ const rotatePageWallpaperInternal = async (
   force: boolean,
   batchLabel: string,
   controls: RotatePageWallpaperControls,
+  costEndpointKey?: string,
   deps: RotationDeps = defaultDeps,
 ): Promise<RotatePageWallpaperExecutionResult> => {
   const existingAssignment = await deps.getExistingAssignment(supabase, pageKey, dateKey);
@@ -311,6 +313,7 @@ const rotatePageWallpaperInternal = async (
         promptText: recipe.prompt,
         variantKey: recipe.key,
         batchLabel,
+        endpointKey: costEndpointKey,
       });
 
       generatedCandidates.push(
@@ -416,6 +419,7 @@ export const rotatePageWallpaper = async (
     force,
     batchLabel,
     { allowGeneration: true },
+    undefined,
     deps,
   );
 
@@ -442,6 +446,7 @@ export const rotateWallpaperAssignments = async (
         options.force,
         batchLabel,
         { allowGeneration: remainingGenerationSlots > 0 },
+        options.costEndpointKey,
         deps,
       );
       outcomes.push(outcome);

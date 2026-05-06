@@ -27,6 +27,7 @@ const corsHeaders = {
 
 const COMPANION_IMAGE_BUCKET = "mentors-avatars";
 const LAUNCHER_IMAGE_SIZE = "1024x1024";
+const LAUNCHER_IMAGE_FILE_KIND = "launcher_transparent";
 
 interface CompanionRow {
   id: string;
@@ -72,6 +73,12 @@ const isUsableReferenceUrl = (
   value: string | null | undefined,
 ): value is string =>
   typeof value === "string" && /^https?:\/\//i.test(value.trim());
+
+const isTransparentLauncherImageUrl = (
+  value: string | null | undefined,
+): value is string =>
+  typeof value === "string" &&
+  value.includes(`_${LAUNCHER_IMAGE_FILE_KIND}_stage`);
 
 const parseDataUrl = (dataUrl: string): Uint8Array => {
   const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, "");
@@ -126,11 +133,11 @@ Preserve the exact companion identity:
 Change only the presentation:
 - Show only the companion, full body, centered, with ears/wings/tail fully inside the frame
 - Use a clean readable silhouette with 12-18% padding on all sides
-- Put the companion on a flat removable light background: solid off-white or very pale warm gray
+- Use a transparent background so only the companion remains visible
 - No scenic environment, no forest, room, starscape, frame, card, UI, props, text, watermark, border, or decorative backdrop
-- No cast shadow that touches the frame edge; keep the background easy to remove
+- No cast shadow, contact shadow, backdrop glow, or floor plane
 
-Output a polished square PNG-style render for a mobile floating action button.`;
+Output a polished square transparent PNG-style render for a mobile floating action button.`;
 };
 
 const jsonResponse = (
@@ -310,7 +317,8 @@ export async function handleGenerateCompanionLauncherImage(
     if (
       companion.launcher_image_url &&
       companion.current_image_url &&
-      companion.launcher_image_source_url === companion.current_image_url
+      companion.launcher_image_source_url === companion.current_image_url &&
+      isTransparentLauncherImageUrl(companion.launcher_image_url)
     ) {
       return jsonResponse({
         success: true,
@@ -365,6 +373,8 @@ export async function handleGenerateCompanionLauncherImage(
           prompt: buildLauncherPrompt(companion),
           size: LAUNCHER_IMAGE_SIZE,
           quality: "high",
+          background: "transparent",
+          outputFormat: "png",
           userId: companion.user_id,
           referenceImages: [{ imageUrl: referenceImageUrl }],
         });
@@ -419,7 +429,7 @@ export async function handleGenerateCompanionLauncherImage(
       ? companion.current_stage
       : 0;
     const filePath =
-      `${companion.user_id}/companion_${companion.user_id}_launcher_stage${stage}_${deps.now()}.png`;
+      `${companion.user_id}/companion_${companion.user_id}_${LAUNCHER_IMAGE_FILE_KIND}_stage${stage}_${deps.now()}.png`;
 
     const { error: uploadError } = await supabase.storage
       .from(COMPANION_IMAGE_BUCKET)

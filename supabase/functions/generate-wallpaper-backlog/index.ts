@@ -46,6 +46,7 @@ serve(async (req) => {
     daysAhead: body.daysAhead ?? (body.batchPreset ? 1 : undefined),
     force: body.force ?? true,
   });
+  options.costEndpointKey = "generate-wallpaper-backlog";
   const { batchLabel, outcomes } = await rotateWallpaperAssignments(supabase, options);
 
   return jsonResponse(200, {

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   badgesMountCount: 0,
+  momentsMountCount: 0,
   postcardsMountCount: 0,
   lootMountCount: 0,
 }));
@@ -102,6 +103,26 @@ vi.mock("@/components/BadgesCollectionPanel", async () => {
   };
 });
 
+vi.mock("@/components/companion/EvolutionMomentsPanel", async () => {
+  const React = await import("react");
+  return {
+    EvolutionMomentsPanel: () => {
+      const [count, setCount] = React.useState(0);
+
+      React.useEffect(() => {
+        mocks.momentsMountCount += 1;
+      }, []);
+
+      return (
+        <div>
+          <div data-testid="moments-count">Moments count {count}</div>
+          <button onClick={() => setCount((previous) => previous + 1)}>Moments increment</button>
+        </div>
+      );
+    },
+  };
+});
+
 vi.mock("@/components/companion/CompanionPostcards", async () => {
   const React = await import("react");
   return {
@@ -147,6 +168,7 @@ import { CollectionTab } from "@/components/companion/CollectionTab";
 describe("CollectionTab mount persistence", () => {
   beforeEach(() => {
     mocks.badgesMountCount = 0;
+    mocks.momentsMountCount = 0;
     mocks.postcardsMountCount = 0;
     mocks.lootMountCount = 0;
   });
@@ -155,12 +177,19 @@ describe("CollectionTab mount persistence", () => {
     vi.useRealTimers();
   });
 
-  it("keeps badges/postcards/loot panels mounted after first visit", async () => {
+  it("keeps badges/moments/postcards/loot panels mounted after first visit", async () => {
     render(<CollectionTab />);
 
     expect(mocks.badgesMountCount).toBe(1);
+    expect(mocks.momentsMountCount).toBe(0);
     expect(mocks.postcardsMountCount).toBe(0);
     expect(mocks.lootMountCount).toBe(0);
+
+    fireEvent.click(screen.getByRole("tab", { name: /moments/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId("moments-count")).toBeInTheDocument();
+    });
+    expect(mocks.momentsMountCount).toBe(1);
 
     fireEvent.click(screen.getByRole("tab", { name: /postcards/i }));
     await waitFor(() => {
@@ -175,10 +204,12 @@ describe("CollectionTab mount persistence", () => {
     expect(mocks.lootMountCount).toBe(1);
 
     fireEvent.click(screen.getByRole("tab", { name: /badges/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /moments/i }));
     fireEvent.click(screen.getByRole("tab", { name: /postcards/i }));
     fireEvent.click(screen.getByRole("tab", { name: /loot/i }));
 
     expect(mocks.badgesMountCount).toBe(1);
+    expect(mocks.momentsMountCount).toBe(1);
     expect(mocks.postcardsMountCount).toBe(1);
     expect(mocks.lootMountCount).toBe(1);
   });
@@ -201,7 +232,7 @@ describe("CollectionTab mount persistence", () => {
     expect(mocks.postcardsMountCount).toBe(1);
   });
 
-  it("prewarms postcards and loot panels on idle after collection tab mounts", async () => {
+  it("prewarms moments, postcards, and loot panels on idle after collection tab mounts", async () => {
     const originalRequestIdle = (window as Window & { requestIdleCallback?: unknown }).requestIdleCallback;
     const originalCancelIdle = (window as Window & { cancelIdleCallback?: unknown }).cancelIdleCallback;
     (window as Window & { requestIdleCallback?: unknown }).requestIdleCallback = undefined;
@@ -210,10 +241,12 @@ describe("CollectionTab mount persistence", () => {
     try {
       render(<CollectionTab />);
 
+      expect(mocks.momentsMountCount).toBe(0);
       expect(mocks.postcardsMountCount).toBe(0);
       expect(mocks.lootMountCount).toBe(0);
 
       await waitFor(() => {
+        expect(mocks.momentsMountCount).toBe(1);
         expect(mocks.postcardsMountCount).toBe(1);
         expect(mocks.lootMountCount).toBe(1);
       }, { timeout: 1500 });

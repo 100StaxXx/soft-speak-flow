@@ -15,6 +15,7 @@ const COMPACT_PANEL_HEIGHT_PX = 104;
 const BOTTOM_INSET_CSS_VAR = "--mentor-guidance-bottom-inset";
 const BOTTOM_INSET_MAX_VIEWPORT_RATIO = 0.4;
 const BOTTOM_INSET_UPDATE_THRESHOLD_PX = 1;
+const COMPANION_HEADER_SELECTOR = '[data-tour="companion-header"]';
 
 type PanelPlacement =
   | { anchor: "bottom"; bottomPx: number }
@@ -211,6 +212,22 @@ const collectAvoidRects = (selectors: string[]): RectLike[] => {
     .filter((rect): rect is RectLike => Boolean(rect));
 };
 
+const resolvePinnedTopPx = ({
+  minTopPx,
+  viewportTopPx,
+  headerSelector = COMPANION_HEADER_SELECTOR,
+}: {
+  minTopPx: number;
+  viewportTopPx: number;
+  headerSelector?: string;
+}): number => {
+  const headerRect = queryElementsForSelector(headerSelector)
+    .map(rectFromElement)
+    .find((rect): rect is RectLike => Boolean(rect));
+  const belowHeaderPx = headerRect ? headerRect.bottom + PANEL_GAP_PX : 0;
+  return Math.max(viewportTopPx + minTopPx, belowHeaderPx);
+};
+
 export const resolveMentorGuidanceMinTopPx = ({
   safeAreaInsetTopPx,
   topMarginPx = PANEL_TOP_MARGIN_PX,
@@ -403,6 +420,7 @@ export const MentorGuidanceCard = () => {
     activeTargetSelector,
     activeTargetSelectors,
     progressText,
+    currentStep,
     dialogueText,
     dialogueSupportText,
     speakerName,
@@ -413,6 +431,7 @@ export const MentorGuidanceCard = () => {
     onSecondaryAction,
     dialogueActionLabel,
     onDialogueAction,
+    completionOverlay,
   } = usePostOnboardingMentorGuidance();
 
   const wrapperRef = useRef<HTMLElement | null>(null);
@@ -434,7 +453,6 @@ export const MentorGuidanceCard = () => {
       ? resolveTutorialTarget(activeTargetSelector)?.element ?? null
       : null;
     const targetRect = targetElement ? rectFromElement(targetElement) : null;
-    const avoidRects = collectAvoidRects(activeTargetSelectors);
     const safeAreaInsetTopPx = readSafeAreaInsetTopPx();
     const minTopPx = resolveMentorGuidanceMinTopPx({ safeAreaInsetTopPx });
     const visualViewport = window.visualViewport;
@@ -442,17 +460,23 @@ export const MentorGuidanceCard = () => {
     const viewportWidth = visualViewport?.width ?? window.innerWidth;
     const viewportTopPx = visualViewport?.offsetTop ?? 0;
     const viewportLeftPx = visualViewport?.offsetLeft ?? 0;
+    const isHatchCompanionStep = currentStep === "hatch_companion";
 
-    const next = resolveMentorGuidancePlacement({
-      panelRect,
-      targetRect,
-      avoidRects,
-      viewportHeight,
-      viewportWidth,
-      viewportTopPx,
-      viewportLeftPx,
-      minTopPx,
-    });
+    const next = isHatchCompanionStep
+      ? normalizePlacement({
+          anchor: "top",
+          topPx: resolvePinnedTopPx({ minTopPx, viewportTopPx }),
+        })
+      : resolveMentorGuidancePlacement({
+          panelRect,
+          targetRect,
+          avoidRects: collectAvoidRects(activeTargetSelectors),
+          viewportHeight,
+          viewportWidth,
+          viewportTopPx,
+          viewportLeftPx,
+          minTopPx,
+        });
 
     writeBottomInsetVar(
       resolveMentorGuidanceBottomInsetPx({
@@ -463,7 +487,7 @@ export const MentorGuidanceCard = () => {
     );
 
     setPlacement((prev) => (arePlacementsEqual(prev, next) ? prev : next));
-  }, [activeTargetSelector, activeTargetSelectors, isActive]);
+  }, [activeTargetSelector, activeTargetSelectors, currentStep, isActive]);
 
   useEffect(() => {
     if (!isActive) {
@@ -473,12 +497,17 @@ export const MentorGuidanceCard = () => {
 
     const raf = window.requestAnimationFrame(updatePlacement);
     const handleRelayout = () => updatePlacement();
+    const isHatchCompanionStep = currentStep === "hatch_companion";
 
     window.addEventListener("resize", handleRelayout);
-    window.addEventListener("scroll", handleRelayout, true);
+    if (!isHatchCompanionStep) {
+      window.addEventListener("scroll", handleRelayout, true);
+    }
     window.addEventListener("orientationchange", handleRelayout);
     window.visualViewport?.addEventListener("resize", handleRelayout);
-    window.visualViewport?.addEventListener("scroll", handleRelayout);
+    if (!isHatchCompanionStep) {
+      window.visualViewport?.addEventListener("scroll", handleRelayout);
+    }
 
     const observer = typeof ResizeObserver !== "undefined"
       ? new ResizeObserver(() => updatePlacement())
@@ -492,13 +521,17 @@ export const MentorGuidanceCard = () => {
     return () => {
       window.cancelAnimationFrame(raf);
       window.removeEventListener("resize", handleRelayout);
-      window.removeEventListener("scroll", handleRelayout, true);
+      if (!isHatchCompanionStep) {
+        window.removeEventListener("scroll", handleRelayout, true);
+      }
       window.removeEventListener("orientationchange", handleRelayout);
       window.visualViewport?.removeEventListener("resize", handleRelayout);
-      window.visualViewport?.removeEventListener("scroll", handleRelayout);
+      if (!isHatchCompanionStep) {
+        window.visualViewport?.removeEventListener("scroll", handleRelayout);
+      }
       observer?.disconnect();
     };
-  }, [isActive, updatePlacement]);
+  }, [currentStep, isActive, updatePlacement]);
 
   const isPanelVisible = Boolean(isActive && dialogueText);
 
@@ -543,7 +576,7 @@ export const MentorGuidanceCard = () => {
   );
   const isCompact = placement.anchor === "floating" && placement.compact;
 
-  if (!isActive || !dialogueText) {
+  if (!isActive || !dialogueText || completionOverlay) {
     return null;
   }
 

@@ -122,6 +122,27 @@ SELECT is(
   'highest valid claimed stage includes legitimate evolution rows at the threshold'
 );
 
+INSERT INTO public.companion_evolutions (
+  companion_id,
+  stage,
+  image_url,
+  xp_at_evolution,
+  evolved_at
+)
+VALUES (
+  '22000000-0000-0000-0000-000000000001',
+  5,
+  'https://example.com/security-user-a-stage5.png',
+  100,
+  NOW()
+);
+
+SELECT is(
+  public.get_highest_valid_claimed_companion_stage('22000000-0000-0000-0000-000000000001'::uuid),
+  5,
+  'highest valid claimed stage tolerates legacy gaps and visual-boundary rows'
+);
+
 SELECT is(
   (SELECT repaired
    FROM public.repair_auto_advanced_companion_state('22000000-0000-0000-0000-000000000001'::uuid)
@@ -218,7 +239,7 @@ SELECT is(
 SELECT is(
   public.get_highest_valid_claimed_companion_stage('22000000-0000-0000-0000-000000000001'::uuid),
   5,
-  'legacy preset-backed companion repair backfills a contiguous valid claimed history'
+  'legacy preset-backed companion repair backfills valid visual-boundary claim history'
 );
 
 SELECT is(
@@ -226,8 +247,17 @@ SELECT is(
    FROM public.companion_evolutions
    WHERE companion_id = '22000000-0000-0000-0000-000000000001'
      AND stage BETWEEN 1 AND 5),
-  5::bigint,
-  'legacy preset-backed repair inserts each missing positive-stage evolution row up to the restored level'
+  2::bigint,
+  'legacy preset-backed repair inserts only missing visual-boundary evolution rows up to the restored level'
+);
+
+SELECT is(
+  (SELECT count(*)
+   FROM public.companion_evolutions
+   WHERE companion_id = '22000000-0000-0000-0000-000000000001'
+     AND stage IN (2, 3, 4)),
+  0::bigint,
+  'legacy preset-backed repair does not create intermediate evolution rows'
 );
 
 SELECT is(

@@ -56,7 +56,10 @@ export function JourneysCompanionLauncher({
   const resolvedUsesPortraitShell = usesPortraitShellOverride ?? usesPortraitShell;
   const resolvedText = text ?? `Chat with ${companionLabel}`;
   const isFloatingHero = variant === "floating" && floatingSize === "hero";
-  const shouldCutOutHeroBackground = isFloatingHero && Boolean(resolvedImageUrl) && !resolvedUsesPortraitShell;
+  const shouldCutOutHeroBackground = isFloatingHero
+    && requireHeroCutout
+    && Boolean(resolvedImageUrl)
+    && !resolvedUsesPortraitShell;
   const {
     cutoutSrc: heroCutoutSrc,
     status: heroCutoutStatus,

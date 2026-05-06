@@ -1,16 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Skeleton } from "./ui/skeleton";
-import { Award, Clock3, Lock, Play, Sparkles } from "lucide-react";
+import { Award, Lock } from "lucide-react";
 import { BADGE_CATALOG, BadgeCategory, CATEGORY_LABELS, TIER_COLORS, BadgeDefinition } from "@/data/badgeCatalog";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
@@ -19,32 +18,6 @@ import { normalizeAchievementType } from "@/lib/achievementTypes";
 import { isSupabaseMissingRelationError } from "@/utils/supabaseSchemaErrors";
 
 type FilterCategory = 'all' | BadgeCategory;
-type ReplayStatus = "queued" | "processing" | "succeeded";
-
-interface EvolutionReplay {
-  id: string;
-  stage: number;
-  image_url: string | null;
-  evolved_at: string | null;
-  animation_status: ReplayStatus | null;
-  animation_video_url: string | null;
-  animation_completed_at: string | null;
-}
-
-interface AnimationJobReplaySource {
-  id: string;
-  evolution_id: string | null;
-  stage: number;
-  source_image_url: string | null;
-  status: ReplayStatus | string | null;
-  video_url: string | null;
-  completed_at: string | null;
-  requested_at: string | null;
-  updated_at: string | null;
-}
-
-const EVOLUTION_REPLAYS_QUERY_KEY = "companion-evolution-replays";
-const COMPANION_REPLAY_SOURCE_QUERY_KEY = "companion-replay-source";
 
 const badgePreviewModules = import.meta.glob("/src/assets/badges/*.webp", {
   eager: true,
@@ -59,38 +32,15 @@ const badgePreviewLocalUrls = Object.fromEntries(
   }),
 ) as Record<string, string>;
 
-const normalizeReplayStatus = (value: unknown): ReplayStatus | null => {
-  if (value === "queued" || value === "processing" || value === "succeeded") {
-    return value;
-  }
-
-  return null;
-};
-
-const hasVisibleReplayState = (replay: EvolutionReplay) => (
-  replay.animation_status === "queued"
-  || replay.animation_status === "processing"
-  || (replay.animation_status === "succeeded" && Boolean(replay.animation_video_url))
-);
-
-const getReplaySortTime = (replay: EvolutionReplay) => {
-  const value = replay.animation_completed_at ?? replay.evolved_at;
-  if (!value) return 0;
-  const timestamp = new Date(value).getTime();
-  return Number.isFinite(timestamp) ? timestamp : 0;
-};
-
 interface BadgesCollectionPanelProps {
   layoutMode?: CompanionLayoutMode;
 }
 
 export const BadgesCollectionPanel = ({ layoutMode = "mobile" }: BadgesCollectionPanelProps) => {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('all');
   const [selectedBadge, setSelectedBadge] = useState<{ badge: BadgeDefinition; earned: boolean } | null>(null);
   const isDesktop = layoutMode === "desktop";
-  const showEvolutionReplays = activeFilter === "all" || activeFilter === "companion";
 
   const { data: earnedAchievements, isLoading } = useQuery({
     queryKey: ["achievements", user?.id],
@@ -132,179 +82,6 @@ export const BadgesCollectionPanel = ({ layoutMode = "mobile" }: BadgesCollectio
 
   const totalEarned = BADGE_CATALOG.filter(b => earnedTypes.has(b.achievementType)).length;
   const totalAvailable = BADGE_CATALOG.length;
-
-  const { data: replaySource } = useQuery({
-    queryKey: [COMPANION_REPLAY_SOURCE_QUERY_KEY, user?.id],
-    enabled: !!user?.id,
-    staleTime: 30 * 1000,
-    queryFn: async () => {
-      if (!user?.id) return null;
-
-      const { data, error } = await supabase
-        .from("user_companion")
-        .select("id")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) throw error;
-      return typeof data?.id === "string"
-        ? {
-          companionId: data.id,
-        }
-        : null;
-    },
-  });
-  const companionId = replaySource?.companionId ?? null;
-
-  const { data: evolutionReplays = [], isLoading: isLoadingEvolutionReplays } = useQuery({
-    queryKey: [EVOLUTION_REPLAYS_QUERY_KEY, companionId, user?.id],
-    enabled: !!companionId && !!user?.id,
-    staleTime: 30 * 1000,
-    refetchInterval: (query) => {
-      const replays = query.state.data as EvolutionReplay[] | undefined;
-      return replays?.some((replay) => replay.animation_status === "queued" || replay.animation_status === "processing")
-        ? 5_000
-        : false;
-    },
-    queryFn: async () => {
-      if (!companionId || !user?.id) return [];
-
-      const { data, error } = await supabase
-        .from("companion_evolutions")
-        .select("id, stage, image_url, evolved_at, animation_status, animation_video_url, animation_completed_at")
-        .eq("companion_id", companionId)
-        .in("animation_status", ["queued", "processing", "succeeded"])
-        .order("evolved_at", { ascending: false })
-        .limit(12);
-
-      if (error) throw error;
-
-      const { data: jobData, error: jobError } = await supabase
-        .from("companion_animation_jobs")
-        .select("id, evolution_id, stage, source_image_url, status, video_url, completed_at, requested_at, updated_at")
-        .eq("user_id", user.id)
-        .eq("companion_id", companionId)
-        .in("status", ["queued", "processing", "succeeded"])
-        .order("requested_at", { ascending: false })
-        .limit(12);
-
-      if (jobError && !isSupabaseMissingRelationError(jobError, "companion_animation_jobs")) {
-        throw jobError;
-      }
-
-      const replaysByEvolutionId = new Map<string, EvolutionReplay>();
-      const replaysById = new Map<string, EvolutionReplay>();
-
-      ((data ?? []) as EvolutionReplay[]).forEach((row) => {
-        const status = normalizeReplayStatus(row.animation_status);
-        if (!status) return;
-
-        const replay: EvolutionReplay = {
-          ...row,
-          animation_status: status,
-          animation_video_url: status === "succeeded" ? row.animation_video_url : null,
-        };
-        if (!hasVisibleReplayState(replay)) return;
-
-        replaysById.set(replay.id, replay);
-        replaysByEvolutionId.set(replay.id, replay);
-      });
-
-      if (!jobError) {
-        ((jobData ?? []) as AnimationJobReplaySource[]).forEach((job) => {
-          const status = normalizeReplayStatus(job.status);
-          if (!status) return;
-
-          const videoUrl = status === "succeeded" && job.video_url
-            ? job.video_url
-            : null;
-          const existing = job.evolution_id
-            ? replaysByEvolutionId.get(job.evolution_id)
-            : null;
-
-          if (existing) {
-            const merged: EvolutionReplay = {
-              ...existing,
-              image_url: existing.image_url ?? job.source_image_url ?? null,
-              evolved_at: existing.evolved_at ?? job.requested_at ?? job.updated_at ?? null,
-              animation_status: videoUrl ? "succeeded" : existing.animation_status,
-              animation_video_url: existing.animation_video_url ?? videoUrl,
-              animation_completed_at: existing.animation_completed_at ?? job.completed_at ?? null,
-            };
-            if (!hasVisibleReplayState(merged)) return;
-
-            replaysById.set(merged.id, merged);
-            replaysByEvolutionId.set(merged.id, merged);
-            return;
-          }
-
-          const replay: EvolutionReplay = {
-            id: job.evolution_id ?? `job:${job.id}`,
-            stage: job.stage,
-            image_url: job.source_image_url ?? null,
-            evolved_at: job.requested_at ?? job.updated_at ?? null,
-            animation_status: status,
-            animation_video_url: videoUrl,
-            animation_completed_at: job.completed_at ?? null,
-          };
-          if (!hasVisibleReplayState(replay)) return;
-
-          replaysById.set(replay.id, replay);
-          if (job.evolution_id) {
-            replaysByEvolutionId.set(job.evolution_id, replay);
-          }
-        });
-      }
-
-      return Array.from(replaysById.values())
-        .sort((left, right) => getReplaySortTime(right) - getReplaySortTime(left))
-        .slice(0, 12);
-    },
-  });
-
-  useEffect(() => {
-    if (!companionId) return;
-
-    const channel = supabase
-      .channel(`companion-evolution-replays-${companionId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "companion_evolutions",
-          filter: `companion_id=eq.${companionId}`,
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: [COMPANION_REPLAY_SOURCE_QUERY_KEY, user?.id] });
-          queryClient.invalidateQueries({ queryKey: [EVOLUTION_REPLAYS_QUERY_KEY, companionId] });
-        },
-      )
-      .subscribe();
-
-    const jobsChannel = supabase
-      .channel(`companion-animation-jobs-${companionId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "companion_animation_jobs",
-          filter: `companion_id=eq.${companionId}`,
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: [EVOLUTION_REPLAYS_QUERY_KEY, companionId] });
-        },
-      )
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-      void supabase.removeChannel(jobsChannel);
-    };
-  }, [companionId, queryClient, user?.id]);
 
   const filterCategories: FilterCategory[] = [
     'all',
@@ -357,14 +134,6 @@ export const BadgesCollectionPanel = ({ layoutMode = "mobile" }: BadgesCollectio
           </button>
         ))}
       </div>
-
-      {showEvolutionReplays && (
-        <EvolutionReplayStrip
-          isDesktop={isDesktop}
-          isLoading={isLoadingEvolutionReplays}
-          replays={evolutionReplays}
-        />
-      )}
 
       {/* Earned Badges */}
       {earnedBadges.length > 0 && (
@@ -439,174 +208,6 @@ export const BadgesCollectionPanel = ({ layoutMode = "mobile" }: BadgesCollectio
       </Dialog>
     </div>
   );
-};
-
-const EvolutionReplayStrip = ({
-  isDesktop,
-  isLoading,
-  replays,
-}: {
-  isDesktop: boolean;
-  isLoading: boolean;
-  replays: EvolutionReplay[];
-}) => {
-  const [selectedReplay, setSelectedReplay] = useState<EvolutionReplay | null>(null);
-  const [videoFailed, setVideoFailed] = useState(false);
-
-  useEffect(() => {
-    setVideoFailed(false);
-  }, [selectedReplay?.id]);
-
-  if (isLoading && replays.length === 0) {
-    return (
-      <section aria-label="Evolution replays" className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-primary" />
-          <h4 className="text-sm font-semibold text-muted-foreground">Evolution Replays</h4>
-        </div>
-        <div className={`grid gap-3 ${isDesktop ? "grid-cols-4" : "grid-cols-2 sm:grid-cols-3"}`}>
-          {[0, 1, 2].map((index) => (
-            <Skeleton key={index} className="aspect-[4/3] rounded-lg" />
-          ))}
-        </div>
-      </section>
-    );
-  }
-
-  if (replays.length === 0) {
-    return null;
-  }
-
-  return (
-    <section aria-label="Evolution replays" className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-primary" />
-          <h4 className="text-sm font-semibold text-muted-foreground">Evolution Replays</h4>
-        </div>
-        <span className="text-xs font-medium text-muted-foreground">{replays.length}</span>
-      </div>
-
-      <div className={`grid gap-3 ${isDesktop ? "grid-cols-4 xl:grid-cols-5" : "grid-cols-2 sm:grid-cols-3"}`}>
-        {replays.map((replay) => (
-          <EvolutionReplayCard
-            key={replay.id}
-            replay={replay}
-            onSelect={setSelectedReplay}
-          />
-        ))}
-      </div>
-
-      <Dialog
-        open={!!selectedReplay}
-        onOpenChange={(open) => {
-          if (!open) setSelectedReplay(null);
-        }}
-      >
-        <DialogContent className="max-w-xl rounded-xl p-4">
-          <DialogHeader>
-            <DialogTitle>Stage {selectedReplay?.stage} Replay</DialogTitle>
-            <DialogDescription>
-              {selectedReplay?.animation_completed_at
-                ? formatReplayDate(selectedReplay.animation_completed_at)
-                : selectedReplay?.evolved_at
-                  ? formatReplayDate(selectedReplay.evolved_at)
-                  : "Evolution moment"}
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedReplay && (
-            <div className="overflow-hidden rounded-xl border border-border/70 bg-black">
-              {selectedReplay.animation_video_url && !videoFailed ? (
-                <video
-                  src={selectedReplay.animation_video_url}
-                  className="max-h-[70vh] w-full bg-black object-contain"
-                  controls
-                  autoPlay
-                  muted
-                  playsInline
-                  poster={selectedReplay.image_url ?? undefined}
-                  data-testid="evolution-replay-video"
-                  onError={() => setVideoFailed(true)}
-                />
-              ) : selectedReplay.image_url ? (
-                <img
-                  src={selectedReplay.image_url}
-                  alt={`Evolution still after stage ${selectedReplay.stage}`}
-                  className="max-h-[70vh] w-full bg-black object-contain"
-                  loading="lazy"
-                  decoding="async"
-                  data-testid="evolution-replay-fallback-image"
-                />
-              ) : (
-                <div className="flex aspect-[4/3] items-center justify-center text-sm text-muted-foreground">
-                  Replay unavailable
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </section>
-  );
-};
-
-const EvolutionReplayCard = ({
-  replay,
-  onSelect,
-}: {
-  replay: EvolutionReplay;
-  onSelect: (replay: EvolutionReplay) => void;
-}) => {
-  const canPlay = replay.animation_status === "succeeded" && Boolean(replay.animation_video_url);
-
-  return (
-    <button
-      type="button"
-      disabled={!canPlay}
-      onClick={() => onSelect(replay)}
-      className={`group relative overflow-hidden rounded-lg border text-left transition-all active:scale-95 ${
-        canPlay
-          ? "border-primary/30 bg-card hover:border-primary/60"
-          : "cursor-not-allowed border-border/60 bg-secondary/30 opacity-75"
-      }`}
-      aria-label={canPlay ? `Replay stage ${replay.stage} evolution` : `Stage ${replay.stage} evolution generating`}
-    >
-      <div className="relative aspect-[4/3] overflow-hidden bg-secondary/40">
-        {replay.image_url ? (
-          <img
-            src={replay.image_url}
-            alt=""
-            className="h-full w-full object-cover"
-            loading="lazy"
-            decoding="async"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <Sparkles className="h-7 w-7 text-muted-foreground/60" />
-          </div>
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/76 via-black/10 to-transparent" />
-        <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-semibold text-white">
-          Stage {replay.stage}
-        </span>
-        <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-[11px] font-semibold text-white">
-          {canPlay ? <Play className="h-3 w-3 fill-current" /> : <Clock3 className="h-3 w-3" />}
-          {canPlay ? "Replay" : "Generating"}
-        </span>
-      </div>
-    </button>
-  );
-};
-
-const formatReplayDate = (value: string) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Evolution moment";
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(date);
 };
 
 interface BadgeCardProps {

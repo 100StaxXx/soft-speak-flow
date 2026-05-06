@@ -1,18 +1,20 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Award, Gift, MapPin } from "lucide-react";
+import { Award, Gift, MapPin, Sparkles } from "lucide-react";
 import { BadgesCollectionPanel } from "@/components/BadgesCollectionPanel";
+import { EvolutionMomentsPanel } from "@/components/companion/EvolutionMomentsPanel";
 import { CompanionPostcards } from "@/components/companion/CompanionPostcards";
 import { RewardInventory } from "@/components/RewardInventory";
 import { cn } from "@/lib/utils";
 import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
 
-type CollectionSection = "badges" | "postcards" | "loot";
+type CollectionSection = "badges" | "moments" | "postcards" | "loot";
 
-const COLLECTION_SECTIONS: CollectionSection[] = ["badges", "postcards", "loot"];
+const COLLECTION_SECTIONS: CollectionSection[] = ["badges", "moments", "postcards", "loot"];
 
 const INITIAL_MOUNTED_SECTIONS: Record<CollectionSection, boolean> = {
   badges: true,
+  moments: false,
   postcards: false,
   loot: false,
 };
@@ -61,11 +63,11 @@ export const CollectionTab = memo(({ layoutMode = "mobile" }: CollectionTabProps
 
     if (idleWindow.requestIdleCallback) {
       idleHandle = idleWindow.requestIdleCallback(() => {
-        setMountedSections({ badges: true, postcards: true, loot: true });
+        setMountedSections({ badges: true, moments: true, postcards: true, loot: true });
       }, { timeout: 1200 });
     } else {
       timeoutId = window.setTimeout(() => {
-        setMountedSections({ badges: true, postcards: true, loot: true });
+        setMountedSections({ badges: true, moments: true, postcards: true, loot: true });
       }, 400);
     }
 
@@ -84,13 +86,17 @@ export const CollectionTab = memo(({ layoutMode = "mobile" }: CollectionTabProps
       <Tabs value={activeSection} onValueChange={handleSectionChange}>
         <TabsList
           className={cn(
-            "grid grid-cols-3 h-10",
-            isDesktop ? "inline-grid w-auto min-w-[420px]" : "w-full",
+            "grid grid-cols-4 h-10",
+            isDesktop ? "inline-grid w-auto min-w-[520px]" : "w-full",
           )}
         >
           <TabsTrigger value="badges" className="flex items-center gap-2">
             <Award className="h-4 w-4" />
             <span className={cn(isDesktop ? "inline" : "hidden sm:inline")}>Badges</span>
+          </TabsTrigger>
+          <TabsTrigger value="moments" className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4" />
+            <span className={cn(isDesktop ? "inline" : "hidden sm:inline")}>Moments</span>
           </TabsTrigger>
           <TabsTrigger value="postcards" className="flex items-center gap-2">
             <MapPin className="h-4 w-4" />
@@ -104,6 +110,10 @@ export const CollectionTab = memo(({ layoutMode = "mobile" }: CollectionTabProps
 
         <TabsContent value="badges" forceMount className="mt-4 data-[state=inactive]:hidden">
           {mountedSections.badges && <BadgesCollectionPanel layoutMode={layoutMode} />}
+        </TabsContent>
+
+        <TabsContent value="moments" forceMount className="mt-4 data-[state=inactive]:hidden">
+          {mountedSections.moments && <EvolutionMomentsPanel layoutMode={layoutMode} />}
         </TabsContent>
 
         <TabsContent value="postcards" forceMount className="mt-4 data-[state=inactive]:hidden">

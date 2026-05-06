@@ -479,6 +479,18 @@ Deno.test("editCompanionImage sends multipart image uploads without input_fideli
           }`,
         );
         assert(
+          formData.get("background") === "transparent",
+          `Expected transparent background in multipart body, got ${
+            String(formData.get("background"))
+          }`,
+        );
+        assert(
+          formData.get("output_format") === "png",
+          `Expected PNG output format in multipart body, got ${
+            String(formData.get("output_format"))
+          }`,
+        );
+        assert(
           formData.get("user") === "user-1",
           `Expected user tag in multipart body, got ${
             String(formData.get("user"))
@@ -536,6 +548,8 @@ Deno.test("editCompanionImage sends multipart image uploads without input_fideli
       prompt: "evolve the companion",
       size: "1536x1024",
       quality: "high",
+      background: "transparent",
+      outputFormat: "png",
       userId: "user-1",
       referenceImages: [
         { imageUrl: "https://example.com/reference-a.png" },

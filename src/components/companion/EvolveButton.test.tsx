@@ -32,7 +32,7 @@ describe("EvolveButton", () => {
 
     fireEvent.click(button);
     expect(onEvolve).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText("About 1 minute")).not.toBeInTheDocument();
+    expect(screen.queryByText("This can take a few minutes")).not.toBeInTheDocument();
     expect(
       screen.queryByText("You can leave this screen and come back when it is ready."),
     ).not.toBeInTheDocument();
@@ -45,7 +45,7 @@ describe("EvolveButton", () => {
     const button = screen.getByRole("button");
     expect(button).toBeDisabled();
     expect(screen.getByText("EVOLVING...")).toBeInTheDocument();
-    expect(screen.getByText("About 1 minute")).toBeInTheDocument();
+    expect(screen.getByText("This can take a few minutes")).toBeInTheDocument();
     expect(
       screen.getByText("You can leave this screen and come back when it is ready."),
     ).toBeInTheDocument();
@@ -55,7 +55,7 @@ describe("EvolveButton", () => {
     });
 
     expect(
-      screen.getByText("Taking longer than usual, can take up to ~2 minutes"),
+      screen.getByText("Still working. Reveal videos can take several minutes."),
     ).toBeInTheDocument();
   });
 
@@ -69,7 +69,7 @@ describe("EvolveButton", () => {
 
     fireEvent.click(button);
     expect(onEvolve).not.toHaveBeenCalled();
-    expect(screen.getByText("About 1 minute")).toBeInTheDocument();
+    expect(screen.getByText("This can take a few minutes")).toBeInTheDocument();
     expect(
       screen.getByText("You can leave this screen and come back when it is ready."),
     ).toBeInTheDocument();

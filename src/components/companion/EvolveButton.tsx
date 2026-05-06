@@ -17,7 +17,7 @@ export const EvolveButton = memo(({
   isEvolving,
   actionLabel = "EVOLVE",
   loadingLabel = "EVOLVING...",
-  durationLabel = "About 1 minute",
+  durationLabel = "This can take a few minutes",
 }: EvolveButtonProps) => {
   const { isEvolvingLoading } = useEvolution();
   const isProcessing = isEvolving || isEvolvingLoading;
@@ -162,7 +162,7 @@ export const EvolveButton = memo(({
         <div className="mt-2 space-y-1 text-center">
           <p className="text-sm text-muted-foreground">
             {showLongRunningMessage
-              ? "Taking longer than usual, can take up to ~2 minutes"
+              ? "Still working. Reveal videos can take several minutes."
               : durationLabel}
           </p>
           <p className="text-xs text-muted-foreground/80">

@@ -4,6 +4,11 @@ installOpenAICompatibilityShim();
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -71,6 +76,23 @@ serve(async (req) => {
     if (!OPENAI_API_KEY) {
       throw new Error('OPENAI_API_KEY is not configured');
     }
+
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "adjust-epic-plan",
+      featureKey: "ai_planner_text",
+      userId: auth.userId,
+      requestId,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["text"],
+      providers: ["openai"],
+      metadata: {
+        adjustment_type: adjustmentType,
+        has_custom_request: Boolean(customRequest),
+      },
+    });
 
     // Fetch the epic with its habits
     const epicQuery = supabase
@@ -213,7 +235,7 @@ Return a JSON object with this structure:
 
     console.log('Generating adjustment suggestions for epic:', epicId, 'type:', adjustmentType);
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await guardedFetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
@@ -281,6 +303,9 @@ Return a JSON object with this structure:
     );
 
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error('Error generating adjustment suggestions:', error);
     return createSafeErrorResponse(req, {
       status: 500,

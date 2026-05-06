@@ -51,6 +51,7 @@ export const DraggableFAB = ({ onOpenCompanionPlanner, onTap }: DraggableFABProp
     launcherAwayFocalX,
     launcherAwayFocalY,
     launcherAwayUsesPortraitShell,
+    launcherAwayHasTransparentBackground,
     needsLauncherImage,
   } = useJourneysCompanionVisual();
   useCompanionLauncherImage({
@@ -242,7 +243,7 @@ export const DraggableFAB = ({ onOpenCompanionPlanner, onTap }: DraggableFABProp
         imageFocalYOverride={isGeneratedCompanion ? launcherAwayFocalY : isMenuOpen ? null : launcherAwayFocalY}
         usesPortraitShellOverride={isGeneratedCompanion ? launcherAwayUsesPortraitShell : isMenuOpen ? undefined : launcherAwayUsesPortraitShell}
         allowImageFallback={!isGeneratedCompanion}
-        requireHeroCutout={isGeneratedCompanion}
+        requireHeroCutout={isGeneratedCompanion && !launcherAwayHasTransparentBackground}
         aria-label="Open companion quick actions"
         data-tour="add-quest-fab"
         data-planner-tour="companion-quick-actions"

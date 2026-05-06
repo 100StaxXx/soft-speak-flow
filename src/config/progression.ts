@@ -63,6 +63,10 @@ export const PROGRESSION_VISUAL_STAGES = PROGRESSION_TIER_BANDS.map((band, stage
   levelEnd: band.levelEnd,
 })) satisfies ReadonlyArray<ProgressionVisualStage>;
 
+export const PROGRESSION_VISUAL_BOUNDARY_LEVELS = PROGRESSION_VISUAL_STAGES
+  .map((visualStage) => visualStage.levelStart)
+  .filter((level) => level > 0);
+
 export const PROGRESSION_XP_THRESHOLDS = {
   0: 0,
   1: 10,
@@ -235,6 +239,43 @@ export const getNextTierBoundary = (level: number): number | null => {
 export const getNextVisualStageBoundaryLevel = (level: number): number | null => {
   const safeLevel = clampProgressionLevel(level);
   return PROGRESSION_VISUAL_STAGES.find((visualStage) => visualStage.levelStart > safeLevel)?.levelStart ?? null;
+};
+
+export const getCurrentVisualStageBoundaryLevel = (level: number): number => {
+  const safeLevel = clampProgressionLevel(level);
+  const currentVisualStage = [...PROGRESSION_VISUAL_STAGES]
+    .reverse()
+    .find((visualStage) => safeLevel >= visualStage.levelStart);
+
+  return currentVisualStage?.levelStart ?? 0;
+};
+
+export const getNextUnclaimedVisualStageBoundaryLevel = (
+  claimedLevel: number,
+  earnedLevel: number,
+): number | null => {
+  const safeClaimedLevel = clampProgressionLevel(claimedLevel);
+  const safeEarnedLevel = clampProgressionLevel(earnedLevel);
+
+  return PROGRESSION_VISUAL_STAGES.find(
+    (visualStage) =>
+      visualStage.levelStart > safeClaimedLevel &&
+      visualStage.levelStart <= safeEarnedLevel,
+  )?.levelStart ?? null;
+};
+
+export const getPendingVisualStageBoundaryCount = (
+  claimedLevel: number,
+  earnedLevel: number,
+): number => {
+  const safeClaimedLevel = clampProgressionLevel(claimedLevel);
+  const safeEarnedLevel = clampProgressionLevel(earnedLevel);
+
+  return PROGRESSION_VISUAL_STAGES.filter(
+    (visualStage) =>
+      visualStage.levelStart > safeClaimedLevel &&
+      visualStage.levelStart <= safeEarnedLevel,
+  ).length;
 };
 
 export const isTierBoundaryLevel = (level: number): boolean => {

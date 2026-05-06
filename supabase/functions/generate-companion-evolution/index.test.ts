@@ -25,6 +25,25 @@ type GenerateCompanionEvolutionDeps = NonNullable<
 
 const USER_ID = "user-1";
 
+const withEnvValue = async <T>(
+  name: string,
+  value: string,
+  run: () => Promise<T>,
+): Promise<T> => {
+  const previousValue = Deno.env.get(name);
+  Deno.env.set(name, value);
+
+  try {
+    return await run();
+  } finally {
+    if (typeof previousValue === "string") {
+      Deno.env.set(name, previousValue);
+    } else {
+      Deno.env.delete(name);
+    }
+  }
+};
+
 type CompanionRecord = {
   id: string;
   user_id: string;
@@ -311,38 +330,39 @@ Deno.test("legacy stage-1 backfill generates a fresh starter and marks provenanc
   );
 });
 
-Deno.test("non-boundary evolutions reuse the current portrait without provider calls", async () => {
+Deno.test("intermediate earned levels skip directly to the next visual boundary", async () => {
   const companion = createCompanion({
-    current_stage: 2,
-    current_xp: 60,
-    current_image_url: "https://example.com/stage-2.png",
+    current_stage: 1,
+    current_xp: 100,
+    current_image_url: "https://example.com/stage-1.png",
     initial_image_url: "https://example.com/stage-0.png",
   });
   const harness = createDeps({
     companion,
     thresholds: [
-      { stage: 3, xp_required: 30 },
-      { stage: 4, xp_required: 60 },
+      { stage: 2, xp_required: 30 },
+      { stage: 3, xp_required: 60 },
+      { stage: 4, xp_required: 80 },
+      { stage: 5, xp_required: 100 },
+      { stage: 6, xp_required: 240 },
     ],
   });
 
   const response = await module.handleGenerateCompanionEvolution(createInternalRequest(), harness.deps);
   const payload = await response.json();
 
-  assertEquals(response.status, 200, "Expected non-boundary reuse response to succeed");
-  assertEquals(payload.portrait_regenerated, false, "Expected non-boundary stage to reuse the current portrait");
-  assertEquals(payload.image_url, "https://example.com/stage-2.png", "Expected non-boundary stage to keep the current image");
-  assertEquals(harness.generateCalls.length, 0, "Expected reuse path to avoid bootstrap generation");
-  assertEquals(harness.editCalls.length, 0, "Expected reuse path to avoid edit generation");
-  assertEquals(harness.judgeCalls.length, 0, "Expected reuse path to avoid judge calls");
+  assertEquals(response.status, 200, "Expected visual-boundary evolution response to succeed");
+  assertEquals(payload.previous_stage, 1, "Expected previous stage to remain the claimed visual boundary");
+  assertEquals(payload.new_stage, 5, "Expected manual evolution to target Level 5, not Level 2");
+  assertEquals(payload.portrait_regenerated, true, "Expected Level 5 boundary to render a new portrait");
+  assertEquals(harness.generateCalls.length, 0, "Expected boundary evolution to avoid bootstrap generation");
+  assertEquals(harness.editCalls.length, 1, "Expected boundary evolution to edit from the previous portrait");
+  assertEquals(harness.judgeCalls.length, 1, "Expected boundary evolution to judge the boundary render");
 
   const upsertCall = harness.upsertCalls[0];
-  assert(upsertCall, "Expected reuse path to upsert an evolution record");
-  assertEquals(
-    (upsertCall.generationMetadata as Record<string, unknown>).sourceType,
-    "reuse",
-    "Expected reuse path to persist reuse provenance",
-  );
+  assert(upsertCall, "Expected boundary evolution to upsert an evolution record");
+  assertEquals(upsertCall.stage, 5, "Expected evolution record to claim the next visual boundary");
+  assertEquals(harness.updatedCompanions[0]?.current_stage, 5, "Expected companion row to claim Level 5");
 });
 
 Deno.test("boundary evolutions retry after low judge scores and edit from the previous portrait", async () => {
@@ -361,7 +381,11 @@ Deno.test("boundary evolutions retry after low judge scores and edit from the pr
     judgeScores: [createFailingScores(), createPassingScores(7)],
   });
 
-  const response = await module.handleGenerateCompanionEvolution(createInternalRequest(), harness.deps);
+  const response = await withEnvValue(
+    "COMPANION_EVOLUTION_RENDER_ATTEMPTS",
+    "2",
+    () => module.handleGenerateCompanionEvolution(createInternalRequest(), harness.deps),
+  );
   const payload = await response.json();
 
   assertEquals(response.status, 200, "Expected boundary evolution response to succeed");

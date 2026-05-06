@@ -6,6 +6,11 @@ import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abu
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
 import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
+import {
   JOURNEY_PATH_LANDSCAPE_IMAGE_SIZE,
   JOURNEY_PATH_RENDER_VERSION,
   needsJourneyPathLandscapeRefresh,
@@ -181,6 +186,22 @@ export async function handleGenerateJourneyPath(
     }
 
     const userId = auth.userId;
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "generate-journey-path",
+      featureKey: "ai_journey_images",
+      userId,
+      requestId,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["image"],
+      providers: ["openai"],
+      metadata: {
+        epic_id: epicId,
+        milestone_index: milestoneIndex,
+      },
+    });
 
     const { data: existingPath } = await supabase
       .from("epic_journey_paths")
@@ -335,7 +356,7 @@ Keep the main path readable across the lower-middle band with open breathing roo
 No text, no UI, no readable symbols, no characters visible.
 Ultra high resolution.`;
 
-    const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+    const aiResponse = await guardedFetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${openAIApiKey}`,
@@ -443,6 +464,9 @@ Ultra high resolution.`;
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error("[generate-journey-path] Error:", error);
     return createSafeErrorResponse(req, {
       status: 500,

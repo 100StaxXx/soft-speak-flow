@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   MentorGuidanceCard,
@@ -30,6 +30,16 @@ const mocks = vi.hoisted(() => ({
     speakerName: "Sage",
     speakerSlug: "sage",
     speakerAvatarUrl: "",
+    completionOverlay: undefined as
+      | {
+          title: string;
+          body: string;
+          highlights: string[];
+          mentorLine: string;
+          ctaLabel: string;
+          onComplete: () => void;
+        }
+      | undefined,
   },
 }));
 
@@ -43,10 +53,17 @@ vi.mock("@/hooks/usePostOnboardingMentorGuidance", () => ({
 
 beforeEach(() => {
   mocks.guidance.isActive = true;
+  mocks.guidance.currentStep = "new_goal";
+  mocks.guidance.progressText = "Step 1 of 2";
+  mocks.guidance.activeTargetSelectors = ['[data-tour="campaign-builder-launcher"]'];
+  mocks.guidance.activeTargetSelector = '[data-tour="campaign-builder-launcher"]';
+  mocks.guidance.dialogueText = "Create your first campaign.";
+  mocks.guidance.dialogueSupportText = "Pathfinder will turn a bigger goal into rituals and milestones.";
   mocks.guidance.secondaryActionLabel = undefined;
   mocks.guidance.onSecondaryAction = undefined;
   mocks.guidance.dialogueActionLabel = undefined;
   mocks.guidance.onDialogueAction = undefined;
+  mocks.guidance.completionOverlay = undefined;
   mocks.onDialogueAction.mockClear();
   mocks.onSecondaryAction.mockClear();
 });
@@ -207,15 +224,32 @@ describe("MentorGuidanceCard", () => {
     mocks.onSecondaryAction.mockClear();
   });
 
-  it("renders a complete tutorial action on the final closeout step", () => {
-    mocks.guidance.secondaryActionLabel = "Complete tutorial";
-    mocks.guidance.onSecondaryAction = mocks.onSecondaryAction;
+  it("does not render the stale complete tutorial action on first-plan closeout", () => {
+    mocks.guidance.currentStep = "first_plan_closeout";
+    mocks.guidance.progressText = "Step 3 of 3";
+    mocks.guidance.dialogueText = "That's it.";
+    mocks.guidance.dialogueSupportText = "Take it one day at a time.";
 
     render(<MentorGuidanceCard />);
 
-    expect(screen.getByRole("button", { name: "Complete tutorial" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Complete tutorial" })).not.toBeInTheDocument();
+    expect(mocks.onSecondaryAction).not.toHaveBeenCalled();
+  });
 
-    mocks.guidance.secondaryActionLabel = undefined;
+  it("hides the guidance card while the completion overlay is active", () => {
+    mocks.guidance.completionOverlay = {
+      title: "You're ready.",
+      body: "Your Companion is awake, your first path is set, and today has somewhere to go.",
+      highlights: ["Path created", "Companion hatched", "Next step ready"],
+      mentorLine: "I'll be here when you need the next step.",
+      ctaLabel: "Start my journey",
+      onComplete: mocks.onSecondaryAction,
+    };
+
+    render(<MentorGuidanceCard />);
+
+    expect(screen.queryByText("Sage portrait")).not.toBeInTheDocument();
+    expect(screen.queryByText("Create your first campaign.")).not.toBeInTheDocument();
   });
 
   it("renders continue action for non-intro explainer milestones", () => {
@@ -237,6 +271,100 @@ describe("MentorGuidanceCard", () => {
     render(<MentorGuidanceCard />);
 
     expect(screen.queryByRole("button", { name: "Hide tutorial" })).not.toBeInTheDocument();
+  });
+
+  it("pins the hatch step below the companion header instead of floating around avoid rectangles", async () => {
+    mocks.guidance.currentStep = "hatch_companion";
+    mocks.guidance.progressText = "Step 2 of 3";
+    mocks.guidance.activeTargetSelectors = [];
+    mocks.guidance.activeTargetSelector = null;
+    mocks.guidance.dialogueText = "Tap 'Hatch.'";
+    mocks.guidance.dialogueSupportText = "Your Companion is ready.";
+    document.body.innerHTML = `
+      <header data-tour="companion-header">Companion</header>
+      <div data-tutorial-avoid="true">moving hatch area</div>
+    `;
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      value: 844,
+    });
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+    const rectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
+      const element = this as HTMLElement;
+      if (element.dataset.tutorial === "mentor-dialogue-panel" || element.dataset.testid === "mentor-guidance-card-panel") {
+        return rect({ top: 620, left: 0, width: 390, height: 224 });
+      }
+      if (element.dataset.tour === "companion-header") {
+        return rect({ top: 0, left: 0, width: 390, height: 88 });
+      }
+      if (element.dataset.tutorialAvoid === "true") {
+        return rect({ top: 180, left: 12, width: 366, height: 520 });
+      }
+      return rect({ top: 0, left: 0, width: 0, height: 0 });
+    });
+
+    const { container } = render(<MentorGuidanceCard />);
+
+    const wrapper = container.querySelector('[data-tutorial="mentor-dialogue-panel"]');
+    await waitFor(() => {
+      expect(wrapper).toHaveAttribute("data-placement", "top");
+      expect(wrapper).toHaveStyle({ top: "100px" });
+      expect(wrapper).not.toHaveAttribute("data-compact");
+    });
+
+    rectSpy.mockRestore();
+  });
+
+  it("keeps the hatch step pinned when avoid rectangles move during scroll", async () => {
+    mocks.guidance.currentStep = "hatch_companion";
+    mocks.guidance.progressText = "Step 2 of 3";
+    mocks.guidance.activeTargetSelectors = [];
+    mocks.guidance.activeTargetSelector = null;
+    mocks.guidance.dialogueText = "Tap 'Hatch.'";
+    mocks.guidance.dialogueSupportText = "Your Companion is ready.";
+    let avoidTop = 180;
+    document.body.innerHTML = `
+      <header data-tour="companion-header">Companion</header>
+      <div data-tutorial-avoid="true">moving hatch area</div>
+    `;
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      value: 844,
+    });
+    const rectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
+      const element = this as HTMLElement;
+      if (element.dataset.tutorial === "mentor-dialogue-panel" || element.dataset.testid === "mentor-guidance-card-panel") {
+        return rect({ top: 620, left: 0, width: 390, height: 224 });
+      }
+      if (element.dataset.tour === "companion-header") {
+        return rect({ top: 0, left: 0, width: 390, height: 88 });
+      }
+      if (element.dataset.tutorialAvoid === "true") {
+        return rect({ top: avoidTop, left: 12, width: 366, height: 520 });
+      }
+      return rect({ top: 0, left: 0, width: 0, height: 0 });
+    });
+
+    const { container } = render(<MentorGuidanceCard />);
+
+    const wrapper = container.querySelector('[data-tutorial="mentor-dialogue-panel"]');
+    await waitFor(() => {
+      expect(wrapper).toHaveStyle({ top: "100px" });
+    });
+
+    avoidTop = 420;
+    await act(async () => {
+      window.dispatchEvent(new Event("scroll"));
+      await Promise.resolve();
+    });
+
+    expect(wrapper).toHaveAttribute("data-placement", "top");
+    expect(wrapper).toHaveStyle({ top: "100px" });
+
+    rectSpy.mockRestore();
   });
 });
 
@@ -535,6 +663,39 @@ describe("MentorGuidanceCard CSS var", () => {
     expect(
       document.documentElement.style.getPropertyValue("--mentor-guidance-bottom-inset")
     ).toBe("0px");
+
+    rectSpy.mockRestore();
+  });
+
+  it("clears the bottom inset variable for pinned hatch guidance", async () => {
+    mocks.guidance.currentStep = "hatch_companion";
+    mocks.guidance.activeTargetSelectors = [];
+    mocks.guidance.activeTargetSelector = null;
+    mocks.guidance.dialogueText = "Tap 'Hatch.'";
+    document.documentElement.style.setProperty("--mentor-guidance-bottom-inset", "224px");
+    document.body.innerHTML = `<header data-tour="companion-header">Companion</header>`;
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      value: 844,
+    });
+    const rectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
+      const element = this as HTMLElement;
+      if (element.dataset.tutorial === "mentor-dialogue-panel" || element.dataset.testid === "mentor-guidance-card-panel") {
+        return rect({ top: 620, left: 0, width: 390, height: 224 });
+      }
+      if (element.dataset.tour === "companion-header") {
+        return rect({ top: 0, left: 0, width: 390, height: 88 });
+      }
+      return rect({ top: 0, left: 0, width: 0, height: 0 });
+    });
+
+    render(<MentorGuidanceCard />);
+
+    await waitFor(() => {
+      expect(
+        document.documentElement.style.getPropertyValue("--mentor-guidance-bottom-inset")
+      ).toBe("0px");
+    });
 
     rectSpy.mockRestore();
   });

@@ -79,10 +79,14 @@ import {
 } from "@/config/companionCatalog";
 import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
 import {
+  getNextProgressionLevelXp,
+  getNextUnclaimedVisualStageBoundaryLevel,
   getNextVisualStageBoundaryLevel,
+  getProgressPercentToNextLevel,
   getProgressionLevelLabel,
   getVisualStageDisplay,
   getVisualStageLabelForLevel,
+  resolveProgressionLevelFromXp,
 } from "@/config/progression";
 
 interface CompanionDisplayProps {
@@ -232,6 +236,7 @@ export const CompanionDisplay = memo(({
     displayNextEvolutionXP,
     displayProgressToNext,
     displayCanEvolve,
+    isPreHatchDisplay,
     isPendingRevealDisplay,
   } = useMemo(
     () =>
@@ -607,13 +612,36 @@ export const CompanionDisplay = memo(({
 
   const visualStageLabel = getVisualStageLabelForLevel(displayCompanion.current_stage);
   const visualStageDisplay = getVisualStageDisplay(displayCompanion.current_stage);
-  const currentLevelLabel = getProgressionLevelLabel(displayCompanion.current_stage);
+  const earnedLevel = isPreHatchDisplay
+    ? displayCompanion.current_stage
+    : resolveProgressionLevelFromXp(displayCompanion.current_xp);
+  const evolutionReadinessLevel = isPreHatchDisplay
+    ? resolveProgressionLevelFromXp(displayCompanion.current_xp)
+    : earnedLevel;
+  const currentLevelLabel = getProgressionLevelLabel(earnedLevel);
   const colorName = getColorName(displayCompanion.favorite_color);
-  const safeNextEvolutionXP = displayNextEvolutionXP ?? displayCompanion.current_xp;
-  const isMaxStage = displayCompanion.current_stage >= MAX_COMPANION_STAGE;
+  const nextProgressLevel = Math.min(earnedLevel + 1, MAX_COMPANION_STAGE);
+  const nextLevelLabel = getProgressionLevelLabel(nextProgressLevel);
+  const safeNextEvolutionXP =
+    displayNextEvolutionXP
+    ?? getNextProgressionLevelXp(earnedLevel)
+    ?? displayCompanion.current_xp;
+  const levelProgressToNext = getProgressPercentToNextLevel(earnedLevel, displayCompanion.current_xp);
+  const displayedProgressValue = displayCanEvolve ? 100 : levelProgressToNext;
+  const isMaxStage = earnedLevel >= MAX_COMPANION_STAGE;
   const isStageZeroEgg = displayCompanion.current_stage === 0;
-  const nextClaimedLevel = Math.min(displayCompanion.current_stage + 1, MAX_COMPANION_STAGE);
-  const nextLevelLabel = getProgressionLevelLabel(nextClaimedLevel);
+  const readyVisualBoundaryLevel = getNextUnclaimedVisualStageBoundaryLevel(
+    displayCompanion.current_stage,
+    evolutionReadinessLevel,
+  );
+  const readyVisualStageDisplay = readyVisualBoundaryLevel === null
+    ? null
+    : getVisualStageDisplay(readyVisualBoundaryLevel);
+  const readyEvolutionCopy = readyVisualBoundaryLevel === null
+    ? null
+    : readyVisualBoundaryLevel === 1
+      ? "Ready to hatch"
+      : `New form ready: ${readyVisualStageDisplay}`;
   const nextVisualStageBoundaryLevel = getNextVisualStageBoundaryLevel(displayCompanion.current_stage);
   const nextVisualStageLabel = nextVisualStageBoundaryLevel === null
     ? null
@@ -754,9 +782,9 @@ export const CompanionDisplay = memo(({
               </div>
               <p className="text-sm text-muted-foreground font-medium">
                 {isMaxStage
-                  ? "Maximum stage reached"
-                  : displayCanEvolve
-                    ? `Ready to evolve to ${nextLevelLabel}`
+                  ? "Maximum level reached"
+                  : displayCanEvolve && readyEvolutionCopy
+                    ? readyEvolutionCopy
                     : nextVisualStageBoundaryLevel === null || !nextVisualStageLabel
                       ? `Final stage • ${visualStageLabel}`
                       : `Next stage at Level ${nextVisualStageBoundaryLevel} • ${nextVisualStageLabel}`}
@@ -891,7 +919,7 @@ export const CompanionDisplay = memo(({
                         <CompanionImage
                           key={imageKey}
                           src={effectiveImageUrl}
-                          alt={`${visualStageLabel} companion at level ${displayCompanion.current_stage}`}
+                          alt={`${visualStageLabel} companion at level ${earnedLevel}`}
                           fit={portraitImageFit}
                           element={displayCompanion.core_element}
                           focalX={effectiveImageFocal.x}
@@ -920,7 +948,7 @@ export const CompanionDisplay = memo(({
                       <CompanionImage
                         key={imageKey}
                         src={effectiveImageUrl}
-                        alt={`${visualStageLabel} companion at level ${displayCompanion.current_stage}`}
+                        alt={`${visualStageLabel} companion at level ${earnedLevel}`}
                         fit="cover"
                         element={displayCompanion.core_element}
                         focalX={effectiveImageFocal.x}
@@ -1006,17 +1034,17 @@ export const CompanionDisplay = memo(({
               <p className="text-sm font-medium text-muted-foreground mb-2" id="xp-progress-label">
                 {isMaxStage
                   ? `${currentLevelLabel} maxed`
-                  : displayCanEvolve
-                    ? `Ready to evolve to ${nextLevelLabel}`
+                  : displayCanEvolve && readyEvolutionCopy
+                    ? readyEvolutionCopy
                     : `${displayCompanion.current_xp} / ${safeNextEvolutionXP} XP to ${nextLevelLabel}`}
               </p>
               <Progress 
-                value={displayProgressToNext} 
+                value={displayedProgressValue}
                 className="h-3 rounded-full shadow-inner" 
                 aria-labelledby="xp-progress-label"
-                aria-valuenow={Math.min(displayCompanion.current_xp, safeNextEvolutionXP)}
+                aria-valuenow={displayedProgressValue}
                 aria-valuemin={0}
-                aria-valuemax={safeNextEvolutionXP}
+                aria-valuemax={100}
               />
             </div>
             
@@ -1078,7 +1106,7 @@ export const CompanionDisplay = memo(({
                   isEvolving={isEvolutionBusy || isPendingRevealPreparing}
                   actionLabel={isPendingRevealReady ? "REVEAL" : isStageZeroEgg ? "HATCH" : "EVOLVE"}
                   loadingLabel={isPendingRevealDisplay ? "PREPARING..." : isStageZeroEgg ? "HATCHING..." : "EVOLVING..."}
-                  durationLabel={isPendingRevealDisplay ? "Preparing the reveal" : undefined}
+                  durationLabel={isPendingRevealDisplay ? "Rendering the reveal video. This can take a few minutes." : undefined}
                 />
               )}
             </AnimatePresence>

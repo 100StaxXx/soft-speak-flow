@@ -5,6 +5,18 @@ import type { Companion } from "./useCompanion";
 
 const mocks = vi.hoisted(() => ({
   companion: null as Companion | null,
+  pendingEvolutionReveal: null as {
+    status: "preparing" | "ready";
+    companionId: string;
+    evolutionId?: string | null;
+    previousStage: number;
+    newStage: number;
+    previousImageUrl: string;
+    newImageUrl: string;
+    animationVideoUrl?: string | null;
+    presetId?: string | null;
+    element?: string | null;
+  } | null,
   health: {
     imageUrl: null as string | null,
     imageFocalX: null as number | null,
@@ -19,6 +31,12 @@ const mocks = vi.hoisted(() => ({
       isDormant: false,
     },
   },
+}));
+
+vi.mock("@/contexts/EvolutionContext", () => ({
+  useEvolution: () => ({
+    pendingEvolutionReveal: mocks.pendingEvolutionReveal,
+  }),
 }));
 
 vi.mock("./useCompanion", () => ({
@@ -66,6 +84,7 @@ const baseCompanion = (overrides: Partial<Companion> = {}): Companion => ({
 describe("useJourneysCompanionVisual", () => {
   beforeEach(() => {
     mocks.companion = null;
+    mocks.pendingEvolutionReveal = null;
     mocks.health = {
       imageUrl: null,
       imageFocalX: null,
@@ -84,7 +103,8 @@ describe("useJourneysCompanionVisual", () => {
 
   it("uses fresh AI launcher art for the Journeys FAB", () => {
     mocks.companion = baseCompanion({
-      launcher_image_url: "https://assets.example.com/launcher.png",
+      launcher_image_url:
+        "https://assets.example.com/user-1/companion_user-1_launcher_transparent_stage3.png",
       launcher_image_focal_x: 0.51,
       launcher_image_focal_y: 0.47,
       launcher_image_source_url: "https://assets.example.com/scene.png",
@@ -93,10 +113,28 @@ describe("useJourneysCompanionVisual", () => {
     const { result } = renderHook(() => useJourneysCompanionVisual());
 
     expect(result.current.isGeneratedCompanion).toBe(true);
-    expect(result.current.launcherAwayImageUrl).toBe("https://assets.example.com/launcher.png");
+    expect(result.current.launcherAwayImageUrl).toBe(
+      "https://assets.example.com/user-1/companion_user-1_launcher_transparent_stage3.png",
+    );
     expect(result.current.launcherAwayFocalX).toBe(0.51);
     expect(result.current.launcherAwayFocalY).toBe(0.47);
+    expect(result.current.launcherAwayHasTransparentBackground).toBe(true);
     expect(result.current.needsLauncherImage).toBe(false);
+  });
+
+  it("regenerates legacy AI launcher art that was saved before transparent cutouts", () => {
+    mocks.companion = baseCompanion({
+      launcher_image_url: "https://assets.example.com/launcher.png",
+      launcher_image_focal_x: 0.51,
+      launcher_image_focal_y: 0.47,
+      launcher_image_source_url: "https://assets.example.com/scene.png",
+    });
+
+    const { result } = renderHook(() => useJourneysCompanionVisual());
+
+    expect(result.current.launcherAwayImageUrl).toBe("https://assets.example.com/scene.png");
+    expect(result.current.launcherAwayHasTransparentBackground).toBe(false);
+    expect(result.current.needsLauncherImage).toBe(true);
   });
 
   it("shows the current companion art while lazy AI launcher art is missing", () => {
@@ -108,8 +146,67 @@ describe("useJourneysCompanionVisual", () => {
     expect(result.current.launcherAwayFocalX).toBe(0.44);
     expect(result.current.launcherAwayFocalY).toBe(0.58);
     expect(result.current.launcherAwayUsesPortraitShell).toBe(true);
+    expect(result.current.launcherAwayHasTransparentBackground).toBe(false);
     expect(result.current.needsLauncherImage).toBe(true);
     expect(result.current.currentSceneImageUrl).toBe("https://assets.example.com/scene.png");
+  });
+
+  it("keeps the previous FAB launcher art while an evolution reveal is pending", () => {
+    mocks.companion = baseCompanion({
+      current_stage: 4,
+      current_image_url: "https://assets.example.com/stage-4-scene.png",
+      current_image_focal_x: 0.61,
+      current_image_focal_y: 0.42,
+      launcher_image_url:
+        "https://assets.example.com/user-1/companion_user-1_launcher_transparent_stage3.png",
+      launcher_image_focal_x: 0.45,
+      launcher_image_focal_y: 0.55,
+      launcher_image_source_url: "https://assets.example.com/stage-3-scene.png",
+    });
+    mocks.pendingEvolutionReveal = {
+      status: "ready",
+      companionId: "companion-1",
+      evolutionId: "evolution-4",
+      previousStage: 3,
+      newStage: 4,
+      previousImageUrl: "https://assets.example.com/stage-3-scene.png",
+      newImageUrl: "https://assets.example.com/stage-4-scene.png",
+      animationVideoUrl: "https://assets.example.com/reveal-stage-4.mp4",
+      presetId: null,
+      element: "fire",
+    };
+
+    const { result } = renderHook(() => useJourneysCompanionVisual());
+
+    expect(result.current.currentSceneImageUrl).toBe("https://assets.example.com/stage-3-scene.png");
+    expect(result.current.launcherAwayImageUrl).toBe(
+      "https://assets.example.com/user-1/companion_user-1_launcher_transparent_stage3.png",
+    );
+    expect(result.current.launcherAwayFocalX).toBe(0.45);
+    expect(result.current.launcherAwayFocalY).toBe(0.55);
+    expect(result.current.launcherAwayHasTransparentBackground).toBe(true);
+    expect(result.current.needsLauncherImage).toBe(false);
+  });
+
+  it("switches the FAB source to the new stage after the reveal state clears", () => {
+    mocks.companion = baseCompanion({
+      current_stage: 4,
+      current_image_url: "https://assets.example.com/stage-4-scene.png",
+      current_image_focal_x: 0.61,
+      current_image_focal_y: 0.42,
+      launcher_image_url:
+        "https://assets.example.com/user-1/companion_user-1_launcher_transparent_stage3.png",
+      launcher_image_source_url: "https://assets.example.com/stage-3-scene.png",
+    });
+
+    const { result } = renderHook(() => useJourneysCompanionVisual());
+
+    expect(result.current.currentSceneImageUrl).toBe("https://assets.example.com/stage-4-scene.png");
+    expect(result.current.launcherAwayImageUrl).toBe("https://assets.example.com/stage-4-scene.png");
+    expect(result.current.launcherAwayFocalX).toBe(0.61);
+    expect(result.current.launcherAwayFocalY).toBe(0.42);
+    expect(result.current.launcherAwayHasTransparentBackground).toBe(false);
+    expect(result.current.needsLauncherImage).toBe(true);
   });
 
   it("ignores stale launcher art when the current scene image changes", () => {

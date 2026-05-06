@@ -193,7 +193,8 @@ Deno.test("generate-companion-launcher-image rejects anonymous access", async ()
 Deno.test("generate-companion-launcher-image returns a fresh cached launcher", async () => {
   const supabase = createMockSupabase({
     companion: baseCompanion({
-      launcher_image_url: "https://assets.example.com/cached-launcher.png",
+      launcher_image_url:
+        "https://assets.example.com/user-1/companion_user-1_launcher_transparent_stage3_cached.png",
       launcher_image_focal_x: 0.44,
       launcher_image_focal_y: 0.56,
       launcher_image_source_url: "https://assets.example.com/current-scene.png",
@@ -225,13 +226,62 @@ Deno.test("generate-companion-launcher-image returns a fresh cached launcher", a
   assertEquals(body.cached, true, "Expected cached flag");
   assertEquals(
     body.imageUrl,
-    "https://assets.example.com/cached-launcher.png",
+    "https://assets.example.com/user-1/companion_user-1_launcher_transparent_stage3_cached.png",
     "Expected cached launcher URL",
   );
   assertEquals(
     supabase.uploadLog.length,
     0,
     "Expected no upload for fresh cached launcher",
+  );
+});
+
+Deno.test("generate-companion-launcher-image regenerates legacy non-transparent launcher art", async () => {
+  const supabase = createMockSupabase({
+    companion: baseCompanion({
+      launcher_image_url: "https://assets.example.com/legacy-launcher.png",
+      launcher_image_focal_x: 0.44,
+      launcher_image_focal_y: 0.56,
+      launcher_image_source_url: "https://assets.example.com/current-scene.png",
+    }),
+  });
+  const editCalls: Array<Record<string, unknown>> = [];
+
+  const response = await handleGenerateCompanionLauncherImage(
+    new Request("https://example.com", {
+      method: "POST",
+      body: JSON.stringify({ companionId: "companion-1" }),
+    }),
+    {
+      authenticate: async () => ({ userId: "user-1", isInternal: false }),
+      createSupabaseClient: () => supabase,
+      createCostGuardrailSessionFn: createNoopCostGuardrailSession,
+      editCompanionImageFn: async (args: any) => {
+        editCalls.push(args);
+        return {
+          imageDataUrl: transparentPngDataUrl,
+          revisedPrompt: null,
+          size: "1024x1024",
+        };
+      },
+      now: () => 234,
+    },
+  );
+
+  const body = await response.json();
+  assertEquals(response.status, 200, "Expected legacy launcher regeneration");
+  assertEquals(body.cached, false, "Expected generated response");
+  assertEquals(editCalls.length, 1, "Expected one image edit call");
+  assertEquals(
+    editCalls[0].background,
+    "transparent",
+    "Expected regenerated launcher to request transparency",
+  );
+  assert(
+    String(supabase.uploadLog[0].path).includes(
+      "user-1/companion_user-1_launcher_transparent_stage3_234.png",
+    ),
+    "Expected regenerated launcher to use transparent launcher file kind",
   );
 });
 
@@ -683,10 +733,28 @@ Deno.test("generate-companion-launcher-image regenerates stale launcher art and 
     "Expected uploaded public URL",
   );
   assertEquals(editCalls.length, 1, "Expected one image edit call");
+  assertEquals(
+    editCalls[0].background,
+    "transparent",
+    "Expected launcher edit to request a transparent background",
+  );
+  assertEquals(
+    editCalls[0].outputFormat,
+    "png",
+    "Expected launcher edit to request alpha-capable PNG output",
+  );
+  assert(
+    String(editCalls[0].prompt).includes("transparent background"),
+    "Expected launcher prompt to ask for transparent background",
+  );
+  assert(
+    !String(editCalls[0].prompt).includes("flat removable light background"),
+    "Expected launcher prompt not to request a saved removable backdrop",
+  );
   assertEquals(supabase.uploadLog.length, 1, "Expected generated image upload");
   assert(
     String(supabase.uploadLog[0].path).includes(
-      "user-1/companion_user-1_launcher_stage3_456.png",
+      "user-1/companion_user-1_launcher_transparent_stage3_456.png",
     ),
     "Expected upload path to follow companion image storage convention",
   );

@@ -550,7 +550,7 @@ describe("useCompanion evolveCompanion", () => {
     expect(mocks.toastErrorMock).not.toHaveBeenCalled();
   });
 
-  it("treats newly earned levels as manual evolution readiness instead of auto-claiming them", async () => {
+  it("treats hatch-level XP as manual hatch readiness instead of auto-claiming it", async () => {
     mocks.rpcMock.mockResolvedValueOnce({
       data: [
         {
@@ -583,10 +583,95 @@ describe("useCompanion evolveCompanion", () => {
     });
 
     expect(mocks.toastSuccessMock).toHaveBeenCalledWith(
-      "Ready to evolve to Stage 1.",
+      "Your companion is ready to hatch.",
       expect.objectContaining({ duration: MAX_TOAST_DURATION_MS }),
     );
     expect(mocks.checkCompanionAchievementsMock).not.toHaveBeenCalled();
+  });
+
+  it("celebrates intermediate levels without marking them evolvable", async () => {
+    mocks.rpcMock.mockResolvedValueOnce({
+      data: [
+        {
+          xp_awarded: 9,
+          xp_before: 21,
+          xp_after: 30,
+          should_evolve: false,
+          next_threshold: 100,
+          cap_applied: false,
+          level_before: 1,
+          level_after: 2,
+          tier_before: "Hatchling",
+          tier_after: "Hatchling",
+          earned_level_after: 2,
+          earned_tier_after: "Hatchling",
+          claimed_stage_after: 1,
+          pending_evolution_count: 0,
+        },
+      ],
+      error: null,
+    });
+
+    const { result } = await renderUseCompanion();
+
+    await act(async () => {
+      await result.current.awardXP.mutateAsync({
+        eventType: "focus_session",
+        xpAmount: 9,
+      });
+    });
+
+    expect(mocks.toastSuccessMock).toHaveBeenCalledWith(
+      "Level 2 reached!",
+      expect.objectContaining({ duration: MAX_TOAST_DURATION_MS }),
+    );
+  });
+
+  it("counts every pending visual boundary when XP jumps across multiple stages", async () => {
+    mocks.rpcMock.mockResolvedValueOnce({
+      data: [
+        {
+          xp_awarded: 1120,
+          xp_before: 80,
+          xp_after: 1200,
+          should_evolve: true,
+          next_threshold: 240,
+          cap_applied: false,
+          level_before: 4,
+          level_after: 13,
+          tier_before: "Hatchling",
+          tier_after: "Awakened",
+          earned_level_after: 13,
+          earned_tier_after: "Awakened",
+          claimed_stage_after: 1,
+          pending_evolution_count: 2,
+        },
+      ],
+      error: null,
+    });
+
+    const { result } = await renderUseCompanion();
+
+    let awardResult: Awaited<ReturnType<typeof result.current.awardXP.mutateAsync>>;
+    await act(async () => {
+      awardResult = await result.current.awardXP.mutateAsync({
+        eventType: "focus_session",
+        xpAmount: 1120,
+      });
+    });
+
+    expect(awardResult!).toEqual(
+      expect.objectContaining({
+        shouldEvolve: true,
+        claimedStage: 1,
+        earnedLevel: 13,
+        pendingEvolutionCount: 2,
+      }),
+    );
+    expect(mocks.toastSuccessMock).toHaveBeenCalledWith(
+      "2 new companion forms are ready.",
+      expect.objectContaining({ duration: MAX_TOAST_DURATION_MS }),
+    );
   });
 
   it("falls back to local evolution history when the repair RPC is unavailable", async () => {
@@ -653,7 +738,7 @@ describe("useCompanion evolveCompanion", () => {
 
     expect(result.current.companion?.current_stage).toBe(1);
     expect(result.current.companion?.current_image_url).toBe("https://example.com/stage-1.png");
-    expect(result.current.nextEvolutionXP).toBe(30);
+    expect(result.current.nextEvolutionXP).toBe(240);
     expect(result.current.canEvolve).toBe(true);
     expect(mocks.loggerWarnMock).toHaveBeenCalledWith(
       "Applied local companion claim fallback",
@@ -966,13 +1051,13 @@ describe("useCompanion evolveCompanion", () => {
     expect(mocks.userCompanionUpdatePayloads).toHaveLength(0);
   });
 
-  it("keeps later claimed stages ready without auto-advancing them", async () => {
+  it("keeps intermediate level gains from becoming manual evolutions", async () => {
     mocks.userCompanionResponses.length = 0;
     mocks.userCompanionResponses.push({
       data: {
         ...companionFixture,
-        current_stage: 2,
-        current_xp: 100,
+        current_stage: 1,
+        current_xp: 39,
       },
       error: null,
     });
@@ -980,8 +1065,58 @@ describe("useCompanion evolveCompanion", () => {
     const { result } = await renderUseCompanion();
 
     expect(result.current.nextEvolutionXP).toBe(60);
-    expect(result.current.progressToNext).toBe(100);
+    expect(result.current.canEvolve).toBe(false);
+  });
+
+  it("marks the next visual boundary as ready when earned XP reaches it", async () => {
+    mocks.userCompanionResponses.length = 0;
+    mocks.userCompanionResponses.push({
+      data: {
+        ...companionFixture,
+        current_stage: 4,
+        current_xp: 100,
+      },
+      error: null,
+    });
+
+    const { result } = await renderUseCompanion();
+
+    expect(result.current.nextEvolutionXP).toBe(240);
     expect(result.current.canEvolve).toBe(true);
+  });
+
+  it("targets Level 5 for manual evolution after intermediate levels are already earned", async () => {
+    let resolveInvoke: ((value: unknown) => void) | null = null;
+    mocks.invokeMock.mockImplementationOnce(
+      () => new Promise((resolve) => {
+        resolveInvoke = resolve;
+      }),
+    );
+    mocks.userCompanionResponses.length = 0;
+    const levelFiveReadyCompanion = {
+      ...companionFixture,
+      current_stage: 1,
+      current_xp: 100,
+    };
+    mocks.userCompanionResponses.push(
+      { data: levelFiveReadyCompanion, error: null },
+      { data: levelFiveReadyCompanion, error: null },
+    );
+
+    const { result } = await renderUseCompanion();
+
+    await act(async () => {
+      await result.current.triggerManualEvolution();
+    });
+
+    await waitFor(() => {
+      expect(result.current.evolveCompanion.variables).toMatchObject({
+        newStage: 5,
+        currentXP: 100,
+      });
+    });
+
+    resolveInvoke?.({ data: { evolved: true, new_stage: 5 }, error: null });
   });
 
   it("keeps stage 0 eggs hatch-ready without auto-advancing them", async () => {
@@ -1955,7 +2090,7 @@ describe("useCompanion evolveCompanion", () => {
       "generate-companion-evolution",
       expect.anything(),
     );
-    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: "companion-evolved" }));
+    expect(dispatchSpy).not.toHaveBeenCalledWith(expect.objectContaining({ type: "companion-evolved" }));
   });
 
   it("starts the hatch animation when the visible egg refreshes to stage 1", async () => {

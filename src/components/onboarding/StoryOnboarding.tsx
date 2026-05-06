@@ -1743,6 +1743,7 @@ export const StoryOnboarding = ({
                     ? "Pick the color, element, and species for the new AI-generated egg that will carry your fresh start."
                     : "Choose the color, element, and species that will define your AI-generated companion egg."
                 }
+                submitLabel="Continue"
                 onBack={handleCompanionBack}
               />
             )}

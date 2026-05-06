@@ -11,6 +11,11 @@ import {
   PLANNER_DURATION_BUCKETS,
   normalizePlannerDurationBucket,
 } from "../_shared/plannerDurationBuckets.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -182,6 +187,24 @@ serve(async (req) => {
     if (!OPENAI_API_KEY) {
       throw new Error("OPENAI_API_KEY is not configured");
     }
+
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "classify-task-intent",
+      featureKey: "ai_planner_text",
+      userId: auth.userId,
+      requestId,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["text"],
+      providers: ["openai"],
+      metadata: {
+        input_length: input.length,
+        has_clarification: Boolean(clarification),
+        has_epic_answers: Boolean(epicAnswers && Object.keys(epicAnswers).length > 0),
+      },
+    });
 
     const systemPrompt =
       `You are an intent classifier for a productivity app. Analyze the user's input and classify it as one of:
@@ -485,7 +508,7 @@ ${
 Now provide epic details with suggestedTargetDays calculated from their answers. Set needsClarification to false.`;
     }
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await guardedFetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${OPENAI_API_KEY}`,
@@ -593,6 +616,9 @@ Now provide epic details with suggestedTargetDays calculated from their answers.
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error("classify-task-intent error:", error);
     return createSafeErrorResponse(req, {
       status: 500,

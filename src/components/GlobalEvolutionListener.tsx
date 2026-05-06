@@ -23,6 +23,7 @@ import { isSupabaseMissingRelationError } from "@/utils/supabaseSchemaErrors";
 import {
   getProgressionLevelDisplay,
   getProgressionTierLabelForLevel,
+  isTierBoundaryLevel,
 } from "@/config/progression";
 import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
 
@@ -1113,6 +1114,10 @@ export const GlobalEvolutionListener = () => {
             return;
           }
 
+          if (!isTierBoundaryLevel(newLevel)) {
+            return;
+          }
+
           const companionId = typeof newData.id === "string" ? newData.id : null;
           if (!companionId) {
             logger.warn("Evolution listener: Missing companion id");
@@ -1528,7 +1533,7 @@ export const GlobalEvolutionListener = () => {
             ));
             void markEvolutionAnimationPresented(completedEvolutionId).then((marked) => {
               if (marked) {
-                queryClient.invalidateQueries({ queryKey: ["companion-evolution-replays"] });
+                queryClient.invalidateQueries({ queryKey: ["companion-evolution-moments"] });
               }
             });
 

@@ -15,6 +15,7 @@ import {
   isWallpaperValidationAcceptable,
   parseWallpaperValidationResult,
 } from "../rotate-daily-wallpapers/validation.ts";
+import { createCostGuardrailSession } from "./costGuardrails.ts";
 
 type SupabaseClient = any;
 
@@ -165,13 +166,14 @@ const logWallpaperRecipeValidationFailure = (args: {
 export const generateWallpaperImage = async (
   promptText: string,
   imageSize: string,
+  fetchImpl: typeof fetch = fetch,
 ) => {
   const openAIApiKey = getOpenAIApiKey();
   if (!openAIApiKey) {
     throw new Error("OPENAI_API_KEY is not configured");
   }
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  const response = await fetchImpl("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${openAIApiKey}`,
@@ -202,6 +204,7 @@ export const generateWallpaperImage = async (
 export const validateWallpaperImage = async (
   pageKey: WallpaperPageKey,
   imageUrl: string,
+  fetchImpl: typeof fetch = fetch,
 ) => {
   const openAIApiKey = getOpenAIApiKey();
   if (!openAIApiKey) {
@@ -209,7 +212,7 @@ export const validateWallpaperImage = async (
   }
 
   const spec = wallpaperGenerationSpecs[pageKey];
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  const response = await fetchImpl("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${openAIApiKey}`,
@@ -347,12 +350,30 @@ export const generateAndStoreWallpaperAsset = async (
     promptText: string;
     variantKey?: WallpaperPromptVariantKey | null;
     batchLabel?: string | null;
+    endpointKey?: string | null;
   },
 ): Promise<GeneratedWallpaperAssetRecord> => {
   const spec = wallpaperGenerationSpecs[args.pageKey];
+  const costGuardrails = createCostGuardrailSession({
+    supabase,
+    endpointKey: args.endpointKey ?? "wallpaper-pipeline",
+    featureKey: "ai_wallpapers",
+  });
+  const guardedFetch = costGuardrails.wrapFetch(fetch);
+  await costGuardrails.enforceAccess({
+    capabilities: ["image", "text"],
+    providers: ["openai"],
+    metadata: {
+      page_key: args.pageKey,
+      date_key: args.dateKey,
+      variant_key: args.variantKey ?? null,
+      batch_label: args.batchLabel ?? null,
+    },
+  });
+
   let generatedImageUrl: string;
   try {
-    generatedImageUrl = await generateWallpaperImage(args.promptText, spec.image.size);
+    generatedImageUrl = await generateWallpaperImage(args.promptText, spec.image.size, guardedFetch);
   } catch (error) {
     logWallpaperRecipeFailure({
       pageKey: args.pageKey,
@@ -367,7 +388,7 @@ export const generateAndStoreWallpaperAsset = async (
 
   let validation: WallpaperValidationResult;
   try {
-    validation = await validateWallpaperImage(args.pageKey, generatedImageUrl);
+    validation = await validateWallpaperImage(args.pageKey, generatedImageUrl, guardedFetch);
   } catch (error) {
     logWallpaperRecipeFailure({
       pageKey: args.pageKey,

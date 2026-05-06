@@ -1,5 +1,6 @@
 import {
   PROGRESSION_THRESHOLDS,
+  getNextUnclaimedVisualStageBoundaryLevel,
   getProgressionThreshold,
   getProgressionTier,
   getProgressionTierLabelForLevel,
@@ -33,7 +34,8 @@ export const useEvolutionThresholds = () => {
   };
 
   const shouldEvolve = (currentStage: number, currentXP: number): boolean => {
-    return resolveProgressionLevelFromXp(currentXP) > currentStage;
+    const earnedLevel = resolveProgressionLevelFromXp(currentXP);
+    return getNextUnclaimedVisualStageBoundaryLevel(currentStage, earnedLevel) !== null;
   };
 
   const getStageName = (stage: number): string => {

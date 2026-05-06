@@ -1,5 +1,10 @@
 import { toast as sonnerToast } from "@/components/ui/sonner";
-import { resolveProgressionLevelFromXp } from "@/config/progression";
+import {
+  getNextUnclaimedVisualStageBoundaryLevel,
+  getPendingVisualStageBoundaryCount,
+  getVisualStageDisplay,
+  resolveProgressionLevelFromXp,
+} from "@/config/progression";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -129,17 +134,24 @@ export const showMissionRewardFeedback = (
     : typeof result.level_after === "number"
       ? result.level_after
       : resolveProgressionLevelFromXp(result.xp_after ?? result.xp_before ?? 0);
-  const pendingEvolutionCount = typeof result.pending_evolution_count === "number"
-    ? result.pending_evolution_count
-    : Math.max(earnedLevelAfter - claimedStage, 0);
-  const shouldEvolve = Boolean(result.should_evolve ?? pendingEvolutionCount > 0);
+  if (earnedLevelAfter > earnedLevelBefore) {
+    const readyBoundaryLevel = getNextUnclaimedVisualStageBoundaryLevel(
+      claimedStage,
+      earnedLevelAfter,
+    );
+    const pendingEvolutionCount = getPendingVisualStageBoundaryCount(
+      claimedStage,
+      earnedLevelAfter,
+    );
 
-  if (shouldEvolve && earnedLevelAfter > earnedLevelBefore) {
-    const nextClaimedLevel = claimedStage + 1;
-    const extraReadyCopy = pendingEvolutionCount > 1
-      ? ` ${pendingEvolutionCount} evolutions are ready.`
-      : "";
-
-    sonnerToast.success(`Ready to evolve to Stage ${nextClaimedLevel}.${extraReadyCopy}`);
+    sonnerToast.success(
+      readyBoundaryLevel === null
+        ? `Level ${earnedLevelAfter} reached!`
+        : pendingEvolutionCount > 1
+          ? `${pendingEvolutionCount} new companion forms are ready.`
+          : readyBoundaryLevel === 1
+            ? "Your companion is ready to hatch."
+            : `New companion form ready: ${getVisualStageDisplay(readyBoundaryLevel)}.`,
+    );
   }
 };

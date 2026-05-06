@@ -50,9 +50,25 @@ describe("NextEvolutionPreview", () => {
       />,
     );
 
-    expect(screen.getByText("Ready to evolve to Level 5")).toBeInTheDocument();
-    expect(screen.getByText("Level 5 • Initiate")).toBeInTheDocument();
-    expect(screen.getByText("Next Level")).toBeInTheDocument();
+    expect(screen.getByText("New form ready: Stage 2 • Initiate")).toBeInTheDocument();
+    expect(screen.getByText("Stage 2 • Initiate")).toBeInTheDocument();
+    expect(screen.getByText("Next Stage")).toBeInTheDocument();
     expect(screen.getByTestId("next-evolution-progress")).not.toHaveClass("motion-safe:animate-pulse");
+  });
+
+  it("shows intermediate level progress without evolution readiness", () => {
+    render(
+      <NextEvolutionPreview
+        currentStage={1}
+        currentXP={39}
+        nextEvolutionXP={60}
+        progressPercent={30}
+        showBondProgress={false}
+      />,
+    );
+
+    expect(screen.getByText("21 XP needed")).toBeInTheDocument();
+    expect(screen.getByText("Level 3 • Hatchling")).toBeInTheDocument();
+    expect(screen.getByText("Next stage: Stage 2 • Initiate at Level 5")).toBeInTheDocument();
   });
 });

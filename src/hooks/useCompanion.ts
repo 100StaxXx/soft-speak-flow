@@ -5,7 +5,6 @@ import { useAchievements } from "./useAchievements";
 import { toast } from "@/components/ui/sonner";
 import { useRef, useMemo, useCallback, useEffect } from "react";
 import { useEvolution } from "@/contexts/EvolutionContext";
-import { useEvolutionThresholds } from "./useEvolutionThresholds";
 import { SYSTEM_XP_REWARDS } from "@/config/xpRewards";
 import type { CreateCompanionIfNotExistsResult } from "@/types/referral-functions";
 import { logger } from "@/utils/logger";
@@ -34,7 +33,12 @@ import {
   toUserFacingFunctionError,
 } from "@/utils/supabaseFunctionErrors";
 import {
+  getNextProgressionLevelXp,
+  getNextUnclaimedVisualStageBoundaryLevel,
+  getPendingVisualStageBoundaryCount,
+  getProgressPercentToNextLevel,
   getProgressionThreshold,
+  getVisualStageDisplay,
   resolveProgressionLevelFromXp,
 } from "@/config/progression";
 import { persistCompanionCustomName } from "@/lib/companionName";
@@ -136,10 +140,7 @@ const resolveHighestValidClaimedStageFromHistory = (
     }
   });
 
-  let lastRealStage = 0;
-  while (validStages.has(lastRealStage + 1)) {
-    lastRealStage += 1;
-  }
+  const lastRealStage = Math.max(0, ...validStages);
 
   const imageUrlByStage = new Map<number, string | null>();
   latestEvolutionByStage.forEach((row, stage) => {
@@ -580,6 +581,41 @@ type AwardXpResult = {
   pending_evolution_count?: number | null;
 };
 
+const getReadyVisualBoundaryLevel = (claimedStage: number, earnedLevel: number): number | null =>
+  getNextUnclaimedVisualStageBoundaryLevel(claimedStage, earnedLevel);
+
+const getPendingVisualEvolutionCount = (claimedStage: number, earnedLevel: number): number => (
+  getPendingVisualStageBoundaryCount(claimedStage, earnedLevel)
+);
+
+const getLevelProgressFeedback = ({
+  claimedStage,
+  earnedLevel,
+  earnedLevelBefore,
+}: {
+  claimedStage: number;
+  earnedLevel: number;
+  earnedLevelBefore: number;
+}): { message: string } | null => {
+  if (earnedLevel <= earnedLevelBefore) return null;
+
+  const readyBoundaryLevel = getReadyVisualBoundaryLevel(claimedStage, earnedLevel);
+  const pendingEvolutionCount = getPendingVisualEvolutionCount(claimedStage, earnedLevel);
+  if (readyBoundaryLevel !== null) {
+    return {
+      message: pendingEvolutionCount > 1
+        ? `${pendingEvolutionCount} new companion forms are ready.`
+        : readyBoundaryLevel === 1
+          ? "Your companion is ready to hatch."
+          : `New companion form ready: ${getVisualStageDisplay(readyBoundaryLevel)}.`,
+    };
+  }
+
+  return {
+    message: `Level ${earnedLevel} reached!`,
+  };
+};
+
 type RepairAutoAdvancedCompanionStateResult = {
   repaired: boolean;
   current_stage: number;
@@ -937,7 +973,6 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
   const queryClient = useQueryClient();
   const { checkCompanionAchievements } = useAchievements();
   const { isEvolvingLoading, setIsEvolvingLoading } = useEvolution();
-  const { getThreshold } = useEvolutionThresholds();
 
   // Prevent duplicate evolution/XP/companion creation requests during lag
   const evolutionInProgress = useRef(false);
@@ -1657,16 +1692,17 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
 
       return await performXPAward(companionToUse, xpAmount, eventType, metadata, user, idempotencyKey);
     },
-    onSuccess: ({ shouldEvolve, claimedStage, earnedLevel, earnedLevelBefore, pendingEvolutionCount }) => {
+    onSuccess: ({ claimedStage, earnedLevel, earnedLevelBefore }) => {
       queryClient.invalidateQueries({ queryKey: ["companion"] });
 
-      if (shouldEvolve && earnedLevel > earnedLevelBefore) {
-        const nextClaimedLevel = claimedStage + 1;
-        const extraReadyCopy = pendingEvolutionCount > 1
-          ? ` ${pendingEvolutionCount} evolutions are ready.`
-          : "";
+      const feedback = getLevelProgressFeedback({
+        claimedStage,
+        earnedLevel,
+        earnedLevelBefore,
+      });
 
-        toast.success(`Ready to evolve to Stage ${nextClaimedLevel}.${extraReadyCopy}`);
+      if (feedback) {
+        toast.success(feedback.message);
       }
     },
     onError: (error) => {
@@ -1770,10 +1806,8 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
     const claimedStage = typeof awardResult.claimed_stage_after === "number"
       ? awardResult.claimed_stage_after
       : companionData.current_stage;
-    const pendingEvolutionCount = typeof awardResult.pending_evolution_count === "number"
-      ? awardResult.pending_evolution_count
-      : Math.max(earnedLevel - claimedStage, 0);
-    const shouldEvolveNow = Boolean(awardResult.should_evolve ?? pendingEvolutionCount > 0);
+    const pendingEvolutionCount = getPendingVisualEvolutionCount(claimedStage, earnedLevel);
+    const shouldEvolveNow = pendingEvolutionCount > 0;
 
     logger.log("[XP Award Debug]", {
       eventType,
@@ -1957,8 +1991,10 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
   // Memoize calculated values to prevent unnecessary recalculations
   const nextEvolutionXP = useMemo(() => {
     if (!companion) return null;
-    return getThreshold(companion.current_stage + 1);
-  }, [companion, getThreshold]);
+    if (companion.current_stage === 0) return getProgressionThreshold(1);
+    const earnedLevel = resolveProgressionLevelFromXp(companion.current_xp);
+    return getNextProgressionLevelXp(earnedLevel);
+  }, [companion?.current_stage, companion?.current_xp]);
 
   const earnedLevel = useMemo(() => {
     if (!companion) return 0;
@@ -1966,17 +2002,17 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
   }, [companion?.current_xp]);
 
   const progressToNext = useMemo(() => {
-    if (!companion || !nextEvolutionXP) return 0;
-    const currentStageThreshold = getThreshold(companion.current_stage) ?? 0;
-    const stageRange = nextEvolutionXP - currentStageThreshold;
-    if (stageRange <= 0) return 100;
-    const progress = ((companion.current_xp - currentStageThreshold) / stageRange) * 100;
-    return Math.min(100, Math.max(0, progress));
-  }, [companion, getThreshold, nextEvolutionXP]);
+    if (!companion) return 0;
+    if (companion.current_stage === 0) {
+      const hatchThreshold = getProgressionThreshold(1) ?? 1;
+      return Math.min(100, Math.max(0, (companion.current_xp / hatchThreshold) * 100));
+    }
+    return getProgressPercentToNextLevel(earnedLevel, companion.current_xp);
+  }, [companion?.current_stage, companion?.current_xp, earnedLevel]);
 
   const canEvolve = useMemo(() => {
     if (!companion) return false;
-    return earnedLevel > companion.current_stage;
+    return getReadyVisualBoundaryLevel(companion.current_stage, earnedLevel) !== null;
   }, [companion, earnedLevel]);
 
   const isEvolutionBusy = evolveCompanion.isPending || hatchCompanion.isPending;
@@ -2006,7 +2042,11 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
     if (!latestCompanion) return;
 
     const latestEarnedLevel = resolveProgressionLevelFromXp(latestCompanion.current_xp);
-    const latestCanEvolve = latestEarnedLevel > latestCompanion.current_stage;
+    const nextVisualBoundaryLevel = getReadyVisualBoundaryLevel(
+      latestCompanion.current_stage,
+      latestEarnedLevel,
+    );
+    const latestCanEvolve = nextVisualBoundaryLevel !== null;
     const hatchAnimationSnapshot = options?.hatchAnimationSnapshot;
 
     if (!latestCanEvolve) {
@@ -2036,8 +2076,8 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         return;
       }
 
-      if (latestCompanion.current_stage > 0) {
-        window.dispatchEvent(new CustomEvent("companion-evolved"));
+      if (latestEarnedLevel > latestCompanion.current_stage) {
+        toast.success(`Level ${latestEarnedLevel} reached!`);
       }
       return;
     }
@@ -2052,7 +2092,8 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
       return;
     }
 
-    const nextStage = latestCompanion.current_stage + 1;
+    const nextStage = nextVisualBoundaryLevel;
+    if (nextStage === null) return;
 
     setIsEvolvingLoading(true);
     window.dispatchEvent(new CustomEvent("evolution-loading-start"));

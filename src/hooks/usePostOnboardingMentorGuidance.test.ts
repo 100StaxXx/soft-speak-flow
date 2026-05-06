@@ -348,6 +348,7 @@ describe("guided tutorial first-value loop", () => {
       expect(result.current.isIntroDialogueActive).toBe(true);
       expect(result.current.currentStep).toBe("new_goal");
       expect(result.current.dialogueActionLabel).toBe("Start Tutorial");
+      expect(result.current.completionOverlay).toBeUndefined();
     });
 
     await act(async () => {
@@ -516,13 +517,27 @@ describe("guided tutorial first-value loop", () => {
       expect(mocks.state.queryClient.refetchQueries).toHaveBeenCalled();
       expect(result.current.isActive).toBe(true);
       expect(result.current.currentStep).toBe("mentor_closeout");
-      expect(result.current.dialogueText).toBe("Your Companion is here.");
-      expect(result.current.dialogueSupportText).toBe("Finish setup to continue.");
-      expect(result.current.dialogueActionLabel).toBe("Finish");
+      expect(result.current.dialogueActionLabel).toBeUndefined();
+      expect(result.current.completionOverlay).toMatchObject({
+        title: "You're ready.",
+        body: "Your Companion is awake, your first path is set, and today has somewhere to go.",
+        highlights: ["Path created", "Companion hatched", "Next step ready"],
+        ctaLabel: "Start my journey",
+        mentorLine: "I'll be here when you need the next step.",
+      });
     });
 
+    expect(
+      mocks.state.profileUpdatePayloads.some((payload) => {
+        const guidedTutorial = (
+          payload.onboarding_data as { guided_tutorial?: { completed?: boolean } } | undefined
+        )?.guided_tutorial;
+        return guidedTutorial?.completed === true;
+      }),
+    ).toBe(false);
+
     await act(async () => {
-      result.current.onDialogueAction?.();
+      result.current.completionOverlay?.onComplete();
       await Promise.resolve();
     });
 
@@ -590,8 +605,11 @@ describe("guided tutorial first-value loop", () => {
       expect(mocks.state.queryClient.refetchQueries).toHaveBeenCalled();
       expect(result.current.isActive).toBe(true);
       expect(result.current.currentStep).toBe("mentor_closeout");
-      expect(result.current.dialogueText).toBe("Your Companion is here.");
-      expect(result.current.dialogueActionLabel).toBe("Finish");
+      expect(result.current.dialogueActionLabel).toBeUndefined();
+      expect(result.current.completionOverlay).toMatchObject({
+        title: "You're ready.",
+        ctaLabel: "Start my journey",
+      });
     });
 
     expect(
@@ -604,7 +622,7 @@ describe("guided tutorial first-value loop", () => {
     ).toBe(false);
 
     await act(async () => {
-      result.current.onDialogueAction?.();
+      result.current.completionOverlay?.onComplete();
       await Promise.resolve();
     });
 
@@ -680,6 +698,80 @@ describe("guided tutorial first-value loop", () => {
     });
 
     expect(mocks.state.profileUpdatePayloads).toHaveLength(0);
+  });
+
+  it("exposes completion overlay only on mentor closeout and persists completion from the overlay CTA", async () => {
+    mocks.state.guidedTutorial = {
+      ...createFreshTutorial(),
+      completedSteps: ["new_goal", "hatch_companion"],
+      xpAwardedSteps: [],
+      milestonesCompleted: [
+        "mentor_intro_hello",
+        "start_new_goal",
+        "complete_pathfinder_campaign",
+        "campaign_calendar_handoff",
+        "tap_hatch_companion",
+      ],
+    };
+    mocks.state.personality = {
+      name: "Sage",
+      slug: "sage",
+      tone: "warm",
+      style: "steady",
+      primary_color: "#f59e0b",
+    };
+
+    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/companion"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("mentor_closeout");
+      expect(result.current.dialogueActionLabel).toBeUndefined();
+      expect(result.current.completionOverlay).toMatchObject({
+        title: "You're ready.",
+        body: "Your Companion is awake, your first path is set, and today has somewhere to go.",
+        highlights: ["Path created", "Companion hatched", "Next step ready"],
+        ctaLabel: "Start my journey",
+        mentorLine: "Sage: I'll be here when you need the next step.",
+      });
+    });
+
+    expect(
+      mocks.state.profileUpdatePayloads.some((payload) => {
+        const guidedTutorial = (
+          payload.onboarding_data as { guided_tutorial?: { completed?: boolean } } | undefined
+        )?.guided_tutorial;
+        return guidedTutorial?.completed === true;
+      }),
+    ).toBe(false);
+
+    await act(async () => {
+      result.current.completionOverlay?.onComplete();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(
+        mocks.state.profileUpdatePayloads.some((payload) => {
+          const guidedTutorial = (
+            payload.onboarding_data as {
+              guided_tutorial?: {
+                completed?: boolean;
+                completedSteps?: string[];
+                milestonesCompleted?: string[];
+              };
+            } | undefined
+          )?.guided_tutorial;
+          return (
+            guidedTutorial?.completed === true &&
+            guidedTutorial.completedSteps?.includes("mentor_closeout") &&
+            guidedTutorial.milestonesCompleted?.includes("mentor_closeout_message")
+          );
+        }),
+      ).toBe(true);
+      expect(result.current.completionOverlay).toBeUndefined();
+    });
   });
 
   it("honors persisted dismissal without forcing the pre-hatch companion display", async () => {

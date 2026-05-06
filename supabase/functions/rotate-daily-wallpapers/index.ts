@@ -49,7 +49,10 @@ serve(async (req) => {
   }
 
   const body = await req.json().catch(() => ({})) as RotateDailyWallpapersRequestBody;
-  const options = resolveRotateDailyWallpapersOptions(body);
+  const options = {
+    ...resolveRotateDailyWallpapersOptions(body),
+    costEndpointKey: "rotate-daily-wallpapers",
+  };
   const { batchLabel, outcomes } = await rotateWallpaperAssignments(supabase, options);
 
   console.info(JSON.stringify({

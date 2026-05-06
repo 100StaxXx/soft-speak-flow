@@ -9,14 +9,19 @@ import { resolveJourneysCompanionLauncherAwayAssetUrl } from "@/lib/journeysComp
 import { getStoredCompanionCustomName } from "@/lib/companionName";
 import { isAiGeneratedCompanion } from "@/lib/companionPredicates";
 import { formatDisplayLabel } from "@/lib/utils";
+import { useEvolution } from "@/contexts/EvolutionContext";
 import { useCompanion } from "./useCompanion";
 import { useCompanionCareSignals } from "./useCompanionCareSignals";
 import { useCompanionHealth } from "./useCompanionHealth";
 
 const COMPANION_PLACEHOLDER = "/placeholder-companion.svg";
+const TRANSPARENT_LAUNCHER_IMAGE_FILE_KIND = "_launcher_transparent_stage";
 
 const isRemoteImageUrl = (value?: string | null): value is string =>
   typeof value === "string" && /^https?:\/\//i.test(value.trim());
+
+const isTransparentLauncherImageUrl = (value?: string | null): value is string =>
+  typeof value === "string" && value.includes(TRANSPARENT_LAUNCHER_IMAGE_FILE_KIND);
 
 export const useJourneysCompanionVisual = () => {
   const {
@@ -27,7 +32,18 @@ export const useJourneysCompanionVisual = () => {
   } = useCompanion();
   const { health } = useCompanionHealth();
   const { care } = useCompanionCareSignals();
+  const { pendingEvolutionReveal } = useEvolution();
 
+  const matchingPendingEvolutionReveal = useMemo(
+    () => (
+      companion &&
+      pendingEvolutionReveal?.companionId === companion.id &&
+      pendingEvolutionReveal.newStage === companion.current_stage
+        ? pendingEvolutionReveal
+        : null
+    ),
+    [companion, pendingEvolutionReveal],
+  );
   const { displayCompanion } = useMemo(
     () =>
       deriveCompanionDisplayState({
@@ -35,8 +51,9 @@ export const useJourneysCompanionVisual = () => {
         nextEvolutionXP,
         progressToNext,
         canEvolve,
+        pendingEvolutionReveal: matchingPendingEvolutionReveal,
       }),
-    [canEvolve, companion, nextEvolutionXP, progressToNext],
+    [canEvolve, companion, matchingPendingEvolutionReveal, nextEvolutionXP, progressToNext],
   );
 
   const isDormant = care?.dormancy?.isDormant ?? false;
@@ -113,26 +130,28 @@ export const useJourneysCompanionVisual = () => {
   ]);
 
   const companionLabel = useMemo(() => {
-    const customName = getStoredCompanionCustomName(companion);
+    const labelCompanion = displayCompanion ?? companion;
+    const customName = getStoredCompanionCustomName(labelCompanion);
     if (customName) return customName;
 
-    const cachedName = companion?.cached_creature_name?.trim();
+    const cachedName = labelCompanion?.cached_creature_name?.trim();
     if (cachedName) return cachedName;
 
-    const spiritAnimal = companion?.spirit_animal?.trim();
+    const spiritAnimal = labelCompanion?.spirit_animal?.trim();
     if (spiritAnimal) return formatDisplayLabel(spiritAnimal);
 
     return "Companion";
-  }, [companion]);
+  }, [companion, displayCompanion]);
 
-  const presetId = displayCompanion?.preset_id ?? companion?.preset_id ?? null;
-  const element = displayCompanion?.core_element ?? companion?.core_element ?? null;
-  const currentSceneImageUrl = companion?.current_image_url ?? null;
-  const isGeneratedCompanion = isAiGeneratedCompanion(companion);
+  const presetId = displayCompanion?.preset_id ?? null;
+  const element = displayCompanion?.core_element ?? null;
+  const currentSceneImageUrl = displayCompanion?.current_image_url ?? null;
+  const isGeneratedCompanion = isAiGeneratedCompanion(displayCompanion);
   const hasFreshLauncherImage = Boolean(
     isGeneratedCompanion
-    && companion?.launcher_image_url
-    && companion.launcher_image_source_url === currentSceneImageUrl,
+    && displayCompanion?.launcher_image_url
+    && isTransparentLauncherImageUrl(displayCompanion.launcher_image_url)
+    && displayCompanion.launcher_image_source_url === currentSceneImageUrl,
   );
   const generatedFallbackLauncherImageUrl = isGeneratedCompanion
     ? currentSceneImageUrl ?? imageUrl ?? null
@@ -149,12 +168,12 @@ export const useJourneysCompanionVisual = () => {
     }
 
     if (hasFreshLauncherImage) {
-      return companion?.launcher_image_url ?? null;
+      return displayCompanion?.launcher_image_url ?? null;
     }
 
     return generatedFallbackLauncherImageUrl;
   }, [
-    companion?.launcher_image_url,
+    displayCompanion?.launcher_image_url,
     element,
     generatedFallbackLauncherImageUrl,
     hasFreshLauncherImage,
@@ -186,16 +205,17 @@ export const useJourneysCompanionVisual = () => {
     currentSceneImageUrl,
     launcherAwayImageUrl,
     launcherAwayFocalX: hasFreshLauncherImage
-      ? companion?.launcher_image_focal_x ?? 0.5
+      ? displayCompanion?.launcher_image_focal_x ?? 0.5
       : launcherAwayImageUrl && launcherAwayImageUrl === generatedFallbackLauncherImageUrl
         ? focalPoint.x ?? 0.5
         : null,
     launcherAwayFocalY: hasFreshLauncherImage
-      ? companion?.launcher_image_focal_y ?? 0.5
+      ? displayCompanion?.launcher_image_focal_y ?? 0.5
       : launcherAwayImageUrl && launcherAwayImageUrl === generatedFallbackLauncherImageUrl
         ? focalPoint.y ?? 0.5
         : null,
     launcherAwayUsesPortraitShell,
+    launcherAwayHasTransparentBackground: hasFreshLauncherImage,
     needsLauncherImage,
   };
 };

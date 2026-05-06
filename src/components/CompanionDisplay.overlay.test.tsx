@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   companion: {
     id: "companion-1",
-    current_xp: 180,
+    current_xp: 510,
     current_stage: 8,
     current_image_url: "/companion-presets/phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__fire.png",
     current_image_focal_x: null as number | null,
@@ -71,7 +71,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/hooks/useCompanion", () => ({
   useCompanion: () => ({
     companion: mocks.companion,
-    nextEvolutionXP: 240,
+    nextEvolutionXP: 650,
     progressToNext: 75,
     isLoading: false,
     canEvolve: mocks.canEvolve,
@@ -242,16 +242,21 @@ vi.mock("@/components/companion/EvolveButton", () => ({
     onEvolve,
     actionLabel = "EVOLVE",
     loadingLabel = "EVOLVING...",
+    durationLabel,
     isEvolving,
   }: {
     onEvolve: () => void;
     actionLabel?: string;
     loadingLabel?: string;
+    durationLabel?: string;
     isEvolving: boolean;
   }) => (
-    <button type="button" onClick={onEvolve} disabled={isEvolving}>
-      {isEvolving ? loadingLabel : actionLabel}
-    </button>
+    <>
+      <button type="button" onClick={onEvolve} disabled={isEvolving}>
+        {isEvolving ? loadingLabel : actionLabel}
+      </button>
+      {isEvolving && durationLabel ? <p>{durationLabel}</p> : null}
+    </>
   ),
 }));
 
@@ -334,7 +339,7 @@ describe("CompanionDisplay overlay stack", () => {
     mocks.pendingEvolutionReveal = null;
     mocks.companion = {
       id: "companion-1",
-      current_xp: 180,
+      current_xp: 510,
       current_stage: 8,
       current_image_url: "/companion-presets/phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__fire.png",
       current_image_focal_x: null,
@@ -604,7 +609,7 @@ describe("CompanionDisplay overlay stack", () => {
 
     expect(screen.getByText("Ember Egg")).toBeInTheDocument();
     expect(screen.queryByText("Nova")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Ready to evolve to Level 1").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Ready to hatch").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "HATCH" })).toBeInTheDocument();
     expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Stage 0 • Egg");
     expect(screen.getByTestId("companion-level-chip")).toHaveTextContent("Level 0");
@@ -663,6 +668,30 @@ describe("CompanionDisplay overlay stack", () => {
     expect(image).toHaveAttribute("data-companion-image-fit", "portrait");
   });
 
+  it("shows earned intermediate levels without offering an EVOLVE action", async () => {
+    mocks.isRegenerating = false;
+    mocks.isDormant = false;
+    mocks.canEvolve = false;
+    mocks.companion = {
+      ...mocks.companion,
+      current_stage: 1,
+      current_xp: 39,
+      core_element: "fire",
+      current_image_url: "/companion-presets/fox/t1_youth/normal/fox__t1_youth__normal__fire.png",
+      preset_id: "fox",
+      spirit_animal: "Fox",
+      cached_creature_name: "Nova",
+    };
+
+    render(<CompanionDisplay />);
+
+    expect(await screen.findByText("Nova")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Stage 1 • Hatchling");
+    expect(screen.getByTestId("companion-level-chip")).toHaveTextContent("Level 2");
+    expect(screen.getByText("Next stage at Level 5 • Initiate")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "EVOLVE" })).not.toBeInTheDocument();
+  });
+
   it("holds the previous companion look while a claimed evolution reveal is preparing", async () => {
     mocks.isRegenerating = false;
     mocks.isDormant = false;
@@ -689,10 +718,11 @@ describe("CompanionDisplay overlay stack", () => {
 
     render(<CompanionDisplay />);
 
-    expect(await screen.findByTestId("companion-level-chip")).toHaveTextContent("Level 4");
-    const image = screen.getByAltText(/companion at level 4/i);
+    expect(await screen.findByTestId("companion-level-chip")).toHaveTextContent("Level 6");
+    const image = screen.getByAltText(/companion at level 6/i);
     expect(image).toHaveAttribute("src", "https://example.com/stage-4.png");
     expect(screen.getByRole("button", { name: "PREPARING..." })).toBeDisabled();
+    expect(screen.getByText("Rendering the reveal video. This can take a few minutes.")).toBeInTheDocument();
     expect(resolveCompanionName).not.toHaveBeenCalled();
   });
 

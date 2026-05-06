@@ -491,7 +491,7 @@ describe("GlobalEvolutionListener", () => {
     );
   });
 
-  it("shows same-tier stage advances so every generated evolution can reveal", async () => {
+  it("ignores non-boundary stage advances so intermediate levels do not open reveal UI", async () => {
     renderListener();
 
     await act(async () => {
@@ -511,16 +511,9 @@ describe("GlobalEvolutionListener", () => {
     });
 
     expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
-    await openPlayablePendingAnimation();
-
-    expect(mocks.companionEvolutionPropsMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        previousStage: 1,
-        newStage: 2,
-        previousImageUrl: "https://example.com/stage-1.png",
-        newImageUrl: "https://example.com/stage-2.png",
-      }),
-    );
+    expect(screen.queryByTestId("evolution-animation-preloader")).not.toBeInTheDocument();
+    expect(mocks.setPendingEvolutionRevealMock).not.toHaveBeenCalled();
+    expect(mocks.companionEvolutionPropsMock).not.toHaveBeenCalled();
   });
 
   it("defers the modal after preload and invites the user back to Companion", async () => {

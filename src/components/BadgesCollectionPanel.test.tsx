@@ -1,19 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   user: { id: "user-1" },
   achievements: [] as Array<{ achievement_type: string; earned_at: string }>,
   achievementsError: null as null | { code?: string; message?: string; details?: string | null; hint?: string | null },
-  companion: { id: "companion-1" } as {
-    id: string;
-  } | null,
-  evolutions: [] as Array<Record<string, unknown>>,
-  animationJobs: [] as Array<Record<string, unknown>>,
-  realtimeCallback: null as null | (() => void),
-  channel: vi.fn(),
-  removeChannel: vi.fn(),
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
@@ -31,90 +23,12 @@ vi.mock("@/integrations/supabase/client", () => ({
         };
       }
 
-      if (table === "user_companion") {
-        return {
-          select: () => ({
-            eq: () => ({
-              order: () => ({
-                limit: () => ({
-                  maybeSingle: async () => ({ data: mocks.companion, error: null }),
-                }),
-              }),
-            }),
-          }),
-        };
-      }
-
-      if (table === "companion_evolutions") {
-        return {
-          select: () => ({
-            eq: () => ({
-              in: () => ({
-                order: () => ({
-                  limit: async () => ({ data: mocks.evolutions, error: null }),
-                }),
-              }),
-            }),
-          }),
-        };
-      }
-
-      if (table === "companion_animation_jobs") {
-        return {
-          select: () => ({
-            eq: () => ({
-              eq: () => ({
-                in: () => ({
-                  order: () => ({
-                    limit: async () => ({ data: mocks.animationJobs, error: null }),
-                  }),
-                }),
-              }),
-            }),
-          }),
-        };
-      }
-
       throw new Error(`Unexpected table: ${table}`);
     },
-    channel: mocks.channel,
-    removeChannel: mocks.removeChannel,
   },
 }));
 
 import { BadgesCollectionPanel } from "@/components/BadgesCollectionPanel";
-
-const succeededReplay = {
-  id: "evolution-5",
-  stage: 5,
-  image_url: "https://example.com/stage-5.png",
-  evolved_at: "2026-05-01T12:00:00.000Z",
-  animation_status: "succeeded",
-  animation_video_url: "https://example.com/stage-5.mp4",
-  animation_completed_at: "2026-05-01T12:02:00.000Z",
-};
-
-const pendingReplay = {
-  id: "evolution-6",
-  stage: 6,
-  image_url: "https://example.com/stage-6.png",
-  evolved_at: "2026-05-02T12:00:00.000Z",
-  animation_status: "processing",
-  animation_video_url: null,
-  animation_completed_at: null,
-};
-
-const succeededJobReplay = {
-  id: "job-1",
-  evolution_id: "evolution-1",
-  stage: 1,
-  source_image_url: "https://example.com/stage-1.png",
-  status: "succeeded",
-  video_url: "https://example.com/stage-1.mp4",
-  completed_at: "2026-05-03T12:03:00.000Z",
-  requested_at: "2026-05-03T12:00:00.000Z",
-  updated_at: "2026-05-03T12:03:00.000Z",
-};
 
 const renderPanel = () => {
   const queryClient = new QueryClient({
@@ -130,105 +44,25 @@ const renderPanel = () => {
   );
 };
 
-describe("BadgesCollectionPanel evolution replays", () => {
+describe("BadgesCollectionPanel", () => {
   beforeEach(() => {
     mocks.achievements = [];
     mocks.achievementsError = null;
-    mocks.companion = { id: "companion-1" };
-    mocks.evolutions = [succeededReplay];
-    mocks.animationJobs = [];
-    mocks.realtimeCallback = null;
-    mocks.removeChannel.mockReset();
-    mocks.channel.mockReset();
-    mocks.channel.mockImplementation(() => {
-      const channel = {
-        on: vi.fn((_event, _config, callback) => {
-          mocks.realtimeCallback = callback;
-          return channel;
-        }),
-        subscribe: vi.fn(() => channel),
-      };
-      return channel;
-    });
   });
 
   afterEach(() => {
     cleanup();
   });
 
-  it("shows the replay strip on all and companion badge filters", async () => {
+  it("renders badges without the Evolutions moments section", async () => {
     renderPanel();
 
-    expect(await screen.findByRole("button", { name: /replay stage 5 evolution/i })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: /evolution replays/i })).toBeInTheDocument();
+    expect(await screen.findByText("Your Badges")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Companion" }));
-    expect(screen.getByRole("region", { name: /evolution replays/i })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Streaks" }));
-    expect(screen.queryByRole("region", { name: /evolution replays/i })).not.toBeInTheDocument();
-  });
-
-  it("opens a playable replay dialog for completed animation rows", async () => {
-    renderPanel();
-
-    fireEvent.click(await screen.findByRole("button", { name: /replay stage 5 evolution/i }));
-
-    const video = await screen.findByTestId("evolution-replay-video");
-    expect(video).toHaveAttribute("src", "https://example.com/stage-5.mp4");
-    expect(video).toHaveAttribute("controls");
-    expect(video).toHaveAttribute("playsinline");
-  });
-
-  it("shows pending animation rows as disabled generating cards", async () => {
-    mocks.evolutions = [pendingReplay];
-    renderPanel();
-
-    const generatingCard = await screen.findByRole("button", { name: /stage 6 evolution generating/i });
-    expect(generatingCard).toBeDisabled();
-    expect(screen.getByText("Generating")).toBeInTheDocument();
-
-    fireEvent.click(generatingCard);
-    expect(screen.queryByTestId("evolution-replay-video")).not.toBeInTheDocument();
-  });
-
-  it("shows a stage-one prewarm before the egg is claimed", async () => {
-    mocks.companion = { id: "companion-1" };
-    mocks.evolutions = [
-      {
-        ...succeededReplay,
-        id: "evolution-1",
-        stage: 1,
-      },
-    ];
-
-    renderPanel();
-
-    expect(await screen.findByRole("button", { name: /replay stage 1 evolution/i })).toBeInTheDocument();
-  });
-
-  it("shows succeeded animation jobs when the evolution row has not caught up", async () => {
-    mocks.companion = { id: "companion-1" };
-    mocks.evolutions = [];
-    mocks.animationJobs = [succeededJobReplay];
-
-    renderPanel();
-
-    fireEvent.click(await screen.findByRole("button", { name: /replay stage 1 evolution/i }));
-    expect(await screen.findByTestId("evolution-replay-video")).toHaveAttribute(
-      "src",
-      "https://example.com/stage-1.mp4",
-    );
-  });
-
-  it("does not show an empty replay section when no evolution videos exist", async () => {
-    mocks.evolutions = [];
-    renderPanel();
-
-    await screen.findByText("Your Badges");
     await waitFor(() => {
-      expect(screen.queryByRole("region", { name: /evolution replays/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: /evolutions/i })).not.toBeInTheDocument();
     });
+    expect(screen.queryByRole("button", { name: /watch stage/i })).not.toBeInTheDocument();
   });
 
   it("still renders when the achievements table has not reached the schema cache yet", async () => {
@@ -242,16 +76,6 @@ describe("BadgesCollectionPanel evolution replays", () => {
     renderPanel();
 
     expect(await screen.findByText("Your Badges")).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: /replay stage 5 evolution/i })).toBeInTheDocument();
-  });
-
-  it("falls back to the still image when replay video loading fails", async () => {
-    renderPanel();
-
-    fireEvent.click(await screen.findByRole("button", { name: /replay stage 5 evolution/i }));
-    fireEvent.error(await screen.findByTestId("evolution-replay-video"));
-
-    const fallback = await screen.findByTestId("evolution-replay-fallback-image");
-    expect(fallback).toHaveAttribute("src", "https://example.com/stage-5.png");
+    expect(screen.queryByRole("region", { name: /evolutions/i })).not.toBeInTheDocument();
   });
 });

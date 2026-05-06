@@ -604,7 +604,10 @@ const Companion = () => {
           style={COMPANION_GOLD_THEME_VARS}
         >
           {/* Fixed header - won't move on iOS overscroll */}
-          <header className="fixed top-0 left-0 right-0 z-40 w-full cosmiq-glass-header cosmiq-glass-header--companion safe-area-top">
+          <header
+            className="fixed top-0 left-0 right-0 z-40 w-full cosmiq-glass-header cosmiq-glass-header--companion safe-area-top"
+            data-tour="companion-header"
+          >
             <div
               className={cn(
                 "flex items-center justify-between py-4",

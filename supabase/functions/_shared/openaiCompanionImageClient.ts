@@ -39,6 +39,8 @@ interface BaseImageRequestArgs {
   prompt: string;
   size: string;
   quality?: "medium" | "high";
+  background?: "transparent" | "opaque" | "auto";
+  outputFormat?: "png" | "jpeg" | "webp";
   userId?: string | null;
 }
 
@@ -108,6 +110,8 @@ const buildBaseRequestBody = ({
   prompt,
   size,
   quality,
+  background,
+  outputFormat,
   userId,
 }: Omit<BaseImageRequestArgs, "guardedFetch" | "openAIApiKey">): Record<
   string,
@@ -121,6 +125,14 @@ const buildBaseRequestBody = ({
 
   if (quality) {
     body.quality = quality;
+  }
+
+  if (background) {
+    body.background = background;
+  }
+
+  if (outputFormat) {
+    body.output_format = outputFormat;
   }
 
   if (typeof userId === "string" && userId.trim().length > 0) {
@@ -400,6 +412,8 @@ const buildEditFormData = ({
   prompt,
   size,
   quality,
+  background,
+  outputFormat,
   userId,
   referenceFiles,
   includeInputFidelity,
@@ -408,6 +422,8 @@ const buildEditFormData = ({
   prompt: string;
   size: string;
   quality?: "medium" | "high";
+  background?: "transparent" | "opaque" | "auto";
+  outputFormat?: "png" | "jpeg" | "webp";
   userId?: string | null;
   referenceFiles: File[];
   includeInputFidelity: boolean;
@@ -419,6 +435,14 @@ const buildEditFormData = ({
 
   if (quality) {
     formData.append("quality", quality);
+  }
+
+  if (background) {
+    formData.append("background", background);
+  }
+
+  if (outputFormat) {
+    formData.append("output_format", outputFormat);
   }
 
   if (includeInputFidelity) {
@@ -442,6 +466,8 @@ const performMultipartEditRequest = async ({
   prompt,
   size,
   quality,
+  background,
+  outputFormat,
   userId,
   referenceImages,
 }: {
@@ -450,6 +476,8 @@ const performMultipartEditRequest = async ({
   prompt: string;
   size: string;
   quality?: "medium" | "high";
+  background?: "transparent" | "opaque" | "auto";
+  outputFormat?: "png" | "jpeg" | "webp";
   userId?: string | null;
   referenceImages: Array<{ imageUrl: string }>;
 }): Promise<CompanionImageGenerationResult> => {
@@ -482,6 +510,8 @@ const performMultipartEditRequest = async ({
           prompt,
           size: effectiveSize,
           quality: includeQuality,
+          background,
+          outputFormat,
           userId,
           referenceFiles,
           includeInputFidelity,
@@ -563,6 +593,8 @@ export const generateCompanionImage = async ({
   prompt,
   size,
   quality = "high",
+  background,
+  outputFormat,
   userId,
 }: BaseImageRequestArgs): Promise<CompanionImageGenerationResult> =>
   await (async () => {
@@ -572,6 +604,8 @@ export const generateCompanionImage = async ({
       prompt,
       size,
       quality,
+      background,
+      outputFormat,
       userId,
     });
 
@@ -605,6 +639,8 @@ export const editCompanionImage = async ({
   prompt,
   size,
   quality = "high",
+  background,
+  outputFormat,
   userId,
   referenceImages,
 }: EditCompanionImageArgs): Promise<CompanionImageGenerationResult> => {
@@ -620,6 +656,8 @@ export const editCompanionImage = async ({
     prompt,
     size,
     quality,
+    background,
+    outputFormat,
     userId,
     referenceImages,
   });

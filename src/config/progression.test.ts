@@ -2,10 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import {
   PROGRESSION_LEVEL_CAP,
+  PROGRESSION_VISUAL_BOUNDARY_LEVELS,
   didTierChange,
+  getCurrentVisualStageBoundaryLevel,
+  getNextUnclaimedVisualStageBoundaryLevel,
   getNextProgressionLevelXp,
   getNextTierBoundary,
   getNextVisualStageBoundaryLevel,
+  getPendingVisualStageBoundaryCount,
   getProgressPercentToNextLevel,
   getProgressionLevelAndTierDisplay,
   getProgressionLevelLabel,
@@ -78,6 +82,20 @@ describe("progression helpers", () => {
     expect(getVisualStage(56)).toBe(6);
     expect(getVisualStage(81)).toBe(7);
     expect(getVisualStage(100)).toBe(7);
+  });
+
+  it("distinguishes visual boundaries from intermediate levels", () => {
+    expect(PROGRESSION_VISUAL_BOUNDARY_LEVELS).toEqual([1, 5, 13, 21, 36, 56, 81]);
+    expect(getCurrentVisualStageBoundaryLevel(4)).toBe(1);
+    expect(getCurrentVisualStageBoundaryLevel(13)).toBe(13);
+    expect(getNextUnclaimedVisualStageBoundaryLevel(1, 4)).toBeNull();
+    expect(getNextUnclaimedVisualStageBoundaryLevel(1, 5)).toBe(5);
+    expect(getNextUnclaimedVisualStageBoundaryLevel(5, 80)).toBe(13);
+    expect(getNextUnclaimedVisualStageBoundaryLevel(81, 100)).toBeNull();
+    expect(getPendingVisualStageBoundaryCount(1, 4)).toBe(0);
+    expect(getPendingVisualStageBoundaryCount(1, 5)).toBe(1);
+    expect(getPendingVisualStageBoundaryCount(1, 13)).toBe(2);
+    expect(getPendingVisualStageBoundaryCount(13, 100)).toBe(4);
   });
 
   it("formats progression levels separately from visual stages", () => {

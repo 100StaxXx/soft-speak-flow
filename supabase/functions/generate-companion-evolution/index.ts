@@ -46,6 +46,10 @@ import {
   COMPANION_PRESET_BUCKET,
   resolveCompanionAssetPath,
 } from "../../../src/config/companionCatalog.ts";
+import {
+  getNextUnclaimedVisualStageBoundaryLevel,
+  resolveProgressionLevelFromXp,
+} from "../../../src/config/progression.ts";
 import { isPresetBackedCompanion } from "../../../src/lib/companionPredicates.ts";
 import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
 
@@ -430,11 +434,33 @@ export const handleGenerateCompanionEvolution = async (
       );
     }
 
+    const earnedLevel = resolveProgressionLevelFromXp(currentXP);
+    const nextStage = getNextUnclaimedVisualStageBoundaryLevel(currentStage, earnedLevel);
+
+    if (nextStage === null) {
+      const nextVisualThresholdData = thresholds.find((threshold) =>
+        threshold.stage > currentStage &&
+        getNextUnclaimedVisualStageBoundaryLevel(currentStage, threshold.stage) === threshold.stage
+      );
+
+      return new Response(
+        JSON.stringify({
+          evolved: false,
+          message: nextVisualThresholdData ? "Not enough XP" : "Max stage reached",
+          current_stage: currentStage,
+          earned_level: earnedLevel,
+          xp: currentXP,
+          next_threshold: nextVisualThresholdData?.xp_required ?? null,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const nextThresholdData = thresholds.find((threshold) =>
-      threshold.stage === currentStage + 1
+      threshold.stage === nextStage
     );
     if (!nextThresholdData) {
-      throw new Error(`No threshold found for stage ${currentStage + 1}`);
+      throw new Error(`No threshold found for stage ${nextStage}`);
     }
 
     if (currentXP < nextThresholdData.xp_required) {
@@ -450,7 +476,6 @@ export const handleGenerateCompanionEvolution = async (
       );
     }
 
-    const nextStage = currentStage + 1;
     const enqueueAnimationForEvolution = async (
       evolutionRecord: Record<string, unknown> | null | undefined,
       imageUrl: string | null | undefined,

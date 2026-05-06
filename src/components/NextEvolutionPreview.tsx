@@ -7,10 +7,13 @@ import { MAX_COMPANION_STAGE } from "@/config/companionCatalog";
 import { useCompanionMemories } from "@/hooks/useCompanionMemories";
 import { isNearEvolution } from "@/lib/companionEvolutionSignals";
 import {
+  getNextUnclaimedVisualStageBoundaryLevel,
   getNextVisualStageBoundaryLevel,
   getProgressionLevelAndTierDisplay,
   getProgressionLevelLabel,
+  getProgressionThreshold,
   getVisualStageDisplay,
+  resolveProgressionLevelFromXp,
 } from "@/config/progression";
 
 interface NextEvolutionPreviewProps {
@@ -37,15 +40,28 @@ export const NextEvolutionPreview = memo(({
   progressPercent,
   showBondProgress = true,
 }: NextEvolutionPreviewProps) => {
-  const nextStage = Math.min(currentStage + 1, MAX_COMPANION_STAGE);
-  const nextLevelLabel = getProgressionLevelAndTierDisplay(nextStage);
+  const earnedLevel = resolveProgressionLevelFromXp(currentXP);
+  const readyBoundaryLevel = getNextUnclaimedVisualStageBoundaryLevel(currentStage, earnedLevel);
+  const nextLevel = Math.min(earnedLevel + 1, MAX_COMPANION_STAGE);
+  const nextLevelLabel = getProgressionLevelAndTierDisplay(nextLevel);
+  const readyBoundaryDisplay = readyBoundaryLevel === null
+    ? null
+    : getVisualStageDisplay(readyBoundaryLevel);
+  const readyStateCopy = readyBoundaryLevel === null
+    ? null
+    : readyBoundaryLevel === 1
+      ? "Ready to hatch"
+      : `New form ready: ${readyBoundaryDisplay}`;
   const nextVisualStageBoundaryLevel = getNextVisualStageBoundaryLevel(currentStage);
   const nextVisualStageDisplay = nextVisualStageBoundaryLevel === null
     ? null
     : getVisualStageDisplay(nextVisualStageBoundaryLevel);
-  const xpNeeded = Math.max(0, nextEvolutionXP - currentXP);
-  const isMaxStage = currentStage >= MAX_COMPANION_STAGE;
-  const canEvolve = nextEvolutionXP > 0 && currentXP >= nextEvolutionXP;
+  const progressTargetXP = readyBoundaryLevel === null
+    ? nextEvolutionXP
+    : getProgressionThreshold(readyBoundaryLevel) ?? nextEvolutionXP;
+  const xpNeeded = Math.max(0, progressTargetXP - currentXP);
+  const isMaxStage = earnedLevel >= MAX_COMPANION_STAGE;
+  const canEvolve = readyBoundaryLevel !== null;
   const nearEvolution = isNearEvolution({ progressToNext: progressPercent, canEvolve });
 
   const { currentBond, isLoading: bondLoading } = useCompanionMemories();
@@ -93,9 +109,11 @@ export const NextEvolutionPreview = memo(({
             <TrendingUp className="h-5 w-5 text-primary" />
           </div>
           <div className="flex-1">
-            <h3 className="font-heading font-bold text-sm">Next Level</h3>
+            <h3 className="font-heading font-bold text-sm">
+              {readyBoundaryDisplay ? "Next Stage" : "Next Level"}
+            </h3>
             <p className="text-xs text-muted-foreground">
-              {nextLevelLabel}
+              {readyBoundaryDisplay ?? nextLevelLabel}
             </p>
           </div>
         </div>
@@ -108,12 +126,16 @@ export const NextEvolutionPreview = memo(({
           <div className="flex justify-between text-xs">
             <span className="text-muted-foreground">Progress</span>
             <span className="font-medium text-primary">
-              {xpNeeded > 0 ? `${xpNeeded} XP needed` : `Ready to evolve to ${getProgressionLevelLabel(nextStage)}`}
+              {readyStateCopy
+                ? readyStateCopy
+                : xpNeeded > 0
+                  ? `${xpNeeded} XP needed`
+                  : `Level ${earnedLevel} reached`}
             </span>
           </div>
-          <Progress value={progressPercent} className="h-2" />
+          <Progress value={readyBoundaryDisplay ? 100 : progressPercent} className="h-2" />
           <p className="text-xs text-muted-foreground">
-            {currentXP} / {nextEvolutionXP} XP
+            {currentXP} / {progressTargetXP} XP
           </p>
           {!isMaxStage && nextVisualStageBoundaryLevel !== null && nextVisualStageDisplay && (
             <p className="text-xs text-muted-foreground">

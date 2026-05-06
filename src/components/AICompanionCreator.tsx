@@ -43,6 +43,7 @@ interface AICompanionCreatorProps {
   onBack?: () => void;
   title?: string;
   description?: string;
+  submitLabel?: string;
 }
 
 const isKnownFavoriteColor = (value: string | null | undefined): value is string =>
@@ -71,6 +72,7 @@ export const AICompanionCreator = ({
   onBack,
   title = "Shape Your Companion Lineage",
   description = "Choose the color, element, and species that will define your egg's hidden destiny.",
+  submitLabel = "Create AI Egg",
 }: AICompanionCreatorProps) => {
   const isCompact = layout === "compact";
   const [favoriteColor, setFavoriteColor] = useState<string>(
@@ -377,7 +379,7 @@ export const AICompanionCreator = ({
                   })}
                 >
                   {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {isLoading ? "Forging Egg..." : "Create AI Egg"}
+                  {isLoading ? "Forging Egg..." : submitLabel}
                 </Button>
               </div>
             </div>

@@ -3,6 +3,11 @@ installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 import { buildTaskBreakdownSuggestions } from "../_shared/taskDecomposition.ts";
 
 const corsHeaders = {
@@ -27,7 +32,7 @@ serve(async (req) => {
     if (protectedRequest instanceof Response) {
       return protectedRequest;
     }
-    const { auth, requestId: protectedRequestId } = protectedRequest;
+    const { auth, supabase, requestId: protectedRequestId } = protectedRequest;
     requestId = protectedRequestId;
 
     const { taskTitle, taskDescription } = await req.json();
@@ -46,9 +51,26 @@ serve(async (req) => {
       throw new Error('OPENAI_API_KEY is not configured');
     }
 
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "decompose-task",
+      featureKey: "ai_planner_text",
+      userId: auth.userId,
+      requestId,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["text"],
+      providers: ["openai"],
+      metadata: {
+        task_title_length: String(taskTitle).length,
+        has_description: Boolean(taskDescription),
+      },
+    });
+
     console.log('Calling OpenAI to decompose task:', taskTitle);
     const subtasks = await buildTaskBreakdownSuggestions({
-      fetchImpl: fetch,
+      fetchImpl: guardedFetch,
       openAIApiKey: OPENAI_API_KEY,
       taskTitle,
       taskDescription,
@@ -60,6 +82,9 @@ serve(async (req) => {
     );
 
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error('Error in decompose-task:', error);
     return createSafeErrorResponse(req, {
       status: 500,
