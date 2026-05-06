@@ -1,10 +1,24 @@
 from __future__ import annotations
 
+import atexit
+import os
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Literal, Optional, Tuple
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from posthog import Posthog
 from pydantic import BaseModel, Field
+
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+
+posthog_client = Posthog(
+    api_key=os.environ.get("POSTHOG_API_KEY", ""),
+    host=os.environ.get("POSTHOG_HOST", "https://us.i.posthog.com"),
+    enable_exception_autocapture=True,
+)
+atexit.register(posthog_client.shutdown)
 
 try:
     from .policy import (
@@ -165,7 +179,13 @@ class SlotCandidate:
     reason_summary: str
 
 
-app = FastAPI(title="Planner Optimizer Service")
+@asynccontextmanager
+async def lifespan(app: FastAPI):  # noqa: F811
+    yield
+    posthog_client.flush()
+
+
+app = FastAPI(title="Planner Optimizer Service", lifespan=lifespan)
 
 
 def parse_clock(value: str) -> int:
@@ -604,6 +624,20 @@ def explicit_candidate(
 
 @app.post("/optimize", response_model=OptimizerResponse)
 def optimize_schedule(request: OptimizerRequest) -> OptimizerResponse:
+    posthog_client.capture(
+        distinct_id="planner_optimizer_service",
+        event="schedule_optimization_requested",
+        properties={
+            "scheduling_mode": request.scheduling_mode,
+            "tasks_to_schedule_count": len(request.tasks_to_schedule),
+            "existing_tasks_count": len(request.existing_tasks),
+            "calendar_events_count": len(request.calendar_events),
+            "planning_window_days": date_diff(
+                request.planning_window.start_date, request.planning_window.end_date
+            ) + 1,
+        },
+    )
+
     if not request.tasks_to_schedule:
         return OptimizerResponse(drafts=[], unscheduled=[])
 
@@ -705,6 +739,15 @@ def optimize_schedule(request: OptimizerRequest) -> OptimizerResponse:
 
     status = solver.Solve(model)
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+        posthog_client.capture(
+            distinct_id="planner_optimizer_service",
+            event="schedule_optimization_failed",
+            properties={
+                "scheduling_mode": request.scheduling_mode,
+                "tasks_to_schedule_count": len(request.tasks_to_schedule),
+                "solver_status": status,
+            },
+        )
         raise HTTPException(status_code=503, detail="optimizer did not find a feasible solution")
 
     drafts: list[DraftResponse] = []
@@ -718,6 +761,15 @@ def optimize_schedule(request: OptimizerRequest) -> OptimizerResponse:
                 break
 
         if selected_candidate is None:
+            posthog_client.capture(
+                distinct_id="planner_optimizer_service",
+                event="task_fallback_to_inbox",
+                properties={
+                    "scheduling_mode": request.scheduling_mode,
+                    "reason_codes": ["needs_manual_scheduling"],
+                    "cause": "no_safe_slot_found",
+                },
+            )
             draft = DraftResponse(
                 task_id=task.id,
                 title=task.title,
@@ -763,6 +815,15 @@ def optimize_schedule(request: OptimizerRequest) -> OptimizerResponse:
             )
         )
         if fallback_to_inbox:
+            posthog_client.capture(
+                distinct_id="planner_optimizer_service",
+                event="task_fallback_to_inbox",
+                properties={
+                    "scheduling_mode": request.scheduling_mode,
+                    "reason_codes": selected_candidate.reason_codes,
+                    "cause": "low_slot_score",
+                },
+            )
             unscheduled_tasks.append(
                 UnscheduledResponse(
                     task_id=task.id,
@@ -770,6 +831,19 @@ def optimize_schedule(request: OptimizerRequest) -> OptimizerResponse:
                     reason_codes=selected_candidate.reason_codes,
                 )
             )
+
+    scheduled_count = sum(1 for d in drafts if not d.fallback_to_inbox)
+    posthog_client.capture(
+        distinct_id="planner_optimizer_service",
+        event="schedule_optimization_succeeded",
+        properties={
+            "scheduling_mode": request.scheduling_mode,
+            "tasks_requested_count": len(request.tasks_to_schedule),
+            "scheduled_count": scheduled_count,
+            "unscheduled_count": len(unscheduled_tasks),
+            "fallback_to_inbox_count": sum(1 for d in drafts if d.fallback_to_inbox),
+        },
+    )
 
     return OptimizerResponse(
         drafts=drafts,

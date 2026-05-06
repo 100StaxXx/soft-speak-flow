@@ -766,6 +766,55 @@ describe("guided tutorial first-value loop", () => {
     });
   });
 
+  it("recovers current-flow bare completion to the final mentor closeout", async () => {
+    mocks.state.guidedTutorial = {
+      ...createFreshTutorial(),
+      completed: true,
+      completedAt: "2026-05-01T12:00:00.000Z",
+      completedSteps: [],
+      xpAwardedSteps: [],
+      milestonesCompleted: [],
+    };
+
+    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/companion"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isActive).toBe(true);
+      expect(result.current.currentStep).toBe("mentor_closeout");
+      expect(result.current.dialogueText).toBe("You're ready.");
+      expect(result.current.dialogueActionLabel).toBe("Start my journey");
+    });
+
+    await waitFor(() => {
+      expect(
+        mocks.state.profileUpdatePayloads.some((payload) => {
+          const guidedTutorial = (
+            payload.onboarding_data as {
+              guided_tutorial?: {
+                completed?: boolean;
+                completedAt?: string;
+                completedSteps?: string[];
+                milestonesCompleted?: string[];
+              };
+            } | undefined
+          )?.guided_tutorial;
+          return (
+            guidedTutorial?.completed === false &&
+            guidedTutorial.completedAt === undefined &&
+            guidedTutorial.completedSteps?.includes("new_goal") &&
+            guidedTutorial.completedSteps?.includes("hatch_companion") &&
+            !guidedTutorial.completedSteps?.includes("mentor_closeout") &&
+            guidedTutorial.milestonesCompleted?.includes("mentor_intro_hello") &&
+            guidedTutorial.milestonesCompleted?.includes("complete_companion_hatch") &&
+            !guidedTutorial.milestonesCompleted?.includes("mentor_closeout_message")
+          );
+        }),
+      ).toBe(true);
+    });
+  });
+
   it("honors persisted dismissal without forcing the pre-hatch companion display", async () => {
     mocks.state.guidedTutorial = {
       ...createFreshTutorial(),

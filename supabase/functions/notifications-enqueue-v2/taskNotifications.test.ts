@@ -68,6 +68,32 @@ Deno.test("enqueues both early reminder and quest start after the start time", (
   }
 });
 
+Deno.test("skips stale quest notifications hours after the scheduled time", () => {
+  const rows = buildTaskNotificationCandidates({
+    now: new Date("2026-04-11T19:55:00.000Z"),
+    profilesByUser: new Map([
+      ["user-1", { id: "user-1", timezone: "UTC", task_reminders_enabled: true }],
+    ]),
+    tasks: [{
+      id: "task-1",
+      user_id: "user-1",
+      task_text: "Workout",
+      xp_reward: 50,
+      task_date: "2026-04-11",
+      scheduled_time: "17:00:00",
+      start_notification_sent: false,
+      reminder_enabled: true,
+      reminder_sent: false,
+      reminder_minutes_before: 15,
+      completed: false,
+    }],
+  });
+
+  if (rows.length !== 0) {
+    throw new Error(`Expected no stale quest notifications, got ${JSON.stringify(rows)}`);
+  }
+});
+
 Deno.test("enqueues one quest reminder per due configured offset", () => {
   const rows = buildTaskNotificationCandidates({
     now: new Date("2026-04-11T21:50:00.000Z"),

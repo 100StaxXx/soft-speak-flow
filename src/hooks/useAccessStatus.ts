@@ -1,5 +1,6 @@
 import { useProfile } from "./useProfile";
 import { useAccessState } from "./useAccessState";
+import { hasCompletedFinalTutorialCloseout } from "@/utils/guidedTutorial";
 
 export type AccessSource = 'subscription' | 'promo_code' | 'trial' | 'none';
 export type AccessGateReason = 'none' | 'pre_trial_signup' | 'trial_expired';
@@ -10,8 +11,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const hasGuidedTutorialCompleted = (onboardingData: unknown): boolean => {
   if (!isRecord(onboardingData)) return false;
   const guidedTutorial = onboardingData.guided_tutorial;
-  if (!isRecord(guidedTutorial)) return false;
-  return guidedTutorial.completed === true;
+  return hasCompletedFinalTutorialCloseout(guidedTutorial);
 };
 
 const hasLocalGuidedTutorialCompleted = (profileId: unknown): boolean => {
@@ -24,8 +24,7 @@ const hasLocalGuidedTutorialCompleted = (profileId: unknown): boolean => {
     const raw = storage.getItem(`guided_tutorial_progress_${profileId}`);
     if (!raw) return false;
     const parsed: unknown = JSON.parse(raw);
-    if (!isRecord(parsed)) return false;
-    return parsed.completed === true;
+    return hasCompletedFinalTutorialCloseout(parsed);
   } catch {
     return false;
   }

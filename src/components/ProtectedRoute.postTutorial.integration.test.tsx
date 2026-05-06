@@ -90,7 +90,7 @@ describe("ProtectedRoute post-tutorial gating", () => {
     };
   });
 
-  it("shows pre-trial gate right after tutorial completion state is persisted", async () => {
+  it("shows pre-trial gate right after final closeout completion is persisted", async () => {
     const { rerender } = renderRoute();
 
     expect(screen.getByText("Tutorial Complete Screen")).toBeInTheDocument();
@@ -99,7 +99,10 @@ describe("ProtectedRoute post-tutorial gating", () => {
     profileState.profile = {
       ...profileState.profile,
       onboarding_data: {
-        guided_tutorial: { completed: true },
+        guided_tutorial: {
+          completed: true,
+          milestonesCompleted: ["mentor_closeout_message"],
+        },
       },
     };
 
@@ -122,6 +125,20 @@ describe("ProtectedRoute post-tutorial gating", () => {
       expect(screen.getByText("Paywall:pre_trial_signup")).toBeInTheDocument();
     });
     expect(screen.queryByText("Tutorial Complete Screen")).not.toBeInTheDocument();
+  });
+
+  it("keeps protected content visible for bare tutorial completion before final closeout", () => {
+    profileState.profile = {
+      ...profileState.profile,
+      onboarding_data: {
+        guided_tutorial: { completed: true },
+      },
+    };
+
+    renderRoute();
+
+    expect(screen.getByText("Tutorial Complete Screen")).toBeInTheDocument();
+    expect(screen.queryByText("Paywall:pre_trial_signup")).not.toBeInTheDocument();
   });
 
   it("still renders trial-expired gate when tutorial is not complete and trial is expired", () => {
@@ -147,7 +164,10 @@ describe("ProtectedRoute post-tutorial gating", () => {
     profileState.profile = {
       ...profileState.profile,
       onboarding_data: {
-        guided_tutorial: { completed: true },
+        guided_tutorial: {
+          completed: true,
+          completedSteps: ["mentor_closeout"],
+        },
       },
     };
 

@@ -35,9 +35,11 @@ export interface TaskNotificationCandidate {
 }
 
 export const MAX_TASK_REMINDER_MINUTES = 10080;
+export const DEFAULT_TASK_NOTIFICATION_MAX_LATE_MINUTES = 30;
 const TASK_REMINDER_SCAN_PAST_DAYS = 1;
 const TASK_REMINDER_SCAN_TIMEZONE_BUFFER_DAYS = 1;
 const DAY_MS = 24 * 60 * 60_000;
+const MINUTE_MS = 60_000;
 
 function toIsoDateAtDayOffset(now: Date, days: number): string {
   return new Date(now.getTime() + days * DAY_MS).toISOString().slice(0, 10);
@@ -90,12 +92,26 @@ function resolveSentReminderOffsets(task: TaskCandidateRow, reminderOffsets: num
   return task.reminder_sent ? reminderOffsets : [];
 }
 
+function isNotificationDueWithinFreshnessWindow(input: {
+  dueAt: Date;
+  now: Date;
+  maxLateMinutes: number;
+}): boolean {
+  if (input.dueAt > input.now) return false;
+  return input.now.getTime() - input.dueAt.getTime() <= input.maxLateMinutes * MINUTE_MS;
+}
+
 export function buildTaskNotificationCandidates(input: {
   tasks: readonly TaskCandidateRow[];
   profilesByUser: ReadonlyMap<string, TaskProfileRow>;
   now: Date;
+  maxLateMinutes?: number;
 }): TaskNotificationCandidate[] {
   const rows: TaskNotificationCandidate[] = [];
+  const maxLateMinutes =
+    typeof input.maxLateMinutes === "number" && Number.isFinite(input.maxLateMinutes) && input.maxLateMinutes >= 0
+      ? input.maxLateMinutes
+      : DEFAULT_TASK_NOTIFICATION_MAX_LATE_MINUTES;
 
   for (const task of input.tasks) {
     if (task.completed) continue;
@@ -107,7 +123,15 @@ export function buildTaskNotificationCandidates(input: {
 
     const remindersEnabled = profile?.task_reminders_enabled !== false;
 
-    if (scheduledAt <= input.now && !task.start_notification_sent && remindersEnabled) {
+    if (
+      !task.start_notification_sent &&
+      remindersEnabled &&
+      isNotificationDueWithinFreshnessWindow({
+        dueAt: scheduledAt,
+        now: input.now,
+        maxLateMinutes,
+      })
+    ) {
       rows.push({
         userId: task.user_id,
         type: "task_start",
@@ -133,7 +157,13 @@ export function buildTaskNotificationCandidates(input: {
 
         const reminderAt = new Date(scheduledAt.getTime() - minutesBefore * 60_000);
 
-        if (reminderAt <= input.now) {
+        if (
+          isNotificationDueWithinFreshnessWindow({
+            dueAt: reminderAt,
+            now: input.now,
+            maxLateMinutes,
+          })
+        ) {
           rows.push({
             userId: task.user_id,
             type: "task_reminder",

@@ -30,7 +30,7 @@ const createLegacyPlanStepTutorial = () => ({
 const createCompletedTutorial = () => ({
   ...createFreshTutorial(),
   completed: true,
-  completedSteps: ["new_goal", "hatch_companion"],
+  completedSteps: ["new_goal", "hatch_companion", "mentor_closeout"],
   xpAwardedSteps: ["new_goal"],
   milestonesCompleted: [
     "mentor_intro_hello",
@@ -39,6 +39,7 @@ const createCompletedTutorial = () => ({
     "campaign_calendar_handoff",
     "tap_hatch_companion",
     "complete_companion_hatch",
+    "mentor_closeout_message",
   ],
 });
 

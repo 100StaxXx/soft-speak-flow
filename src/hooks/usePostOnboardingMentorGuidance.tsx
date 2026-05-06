@@ -24,6 +24,7 @@ import {
   GUIDED_TUTORIAL_FLOW_VERSION,
   GUIDED_TUTORIAL_VERSION,
   getGuidedTutorialLocalProgressKey,
+  hasCompletedFinalTutorialCloseout,
 } from "@/utils/guidedTutorial";
 import { safeLocalStorage } from "@/utils/storage";
 import { resolveTutorialTargetFromSelectors } from "@/utils/tutorialTargets";
@@ -537,7 +538,16 @@ const migrateGuidedTutorialProgress = ({
     completedSteps.filter((stepId) => ACTIVE_GUIDED_STEP_ID_SET.has(stepId))
   );
 
-  const isLegacyTutorialComplete = completed || rawCompletedSet.has("mentor_closeout");
+  const hasFinalCloseoutEvidence = hasCompletedFinalTutorialCloseout({
+    completed,
+    completedSteps,
+    milestonesCompleted,
+  });
+  const isCurrentFlowPrematureCompletion =
+    completed && isCurrentFlowVersion && !hasFinalCloseoutEvidence;
+  const isLegacyTutorialComplete =
+    rawCompletedSet.has("mentor_closeout") ||
+    (completed && !isCurrentFlowPrematureCompletion);
   const shouldMarkNewGoalComplete =
     rawCompletedSet.has("new_goal") ||
     rawCompletedSet.has("meet_companion") ||
@@ -561,10 +571,10 @@ const migrateGuidedTutorialProgress = ({
   if (isLegacyTutorialComplete) {
     GUIDED_STEPS.forEach((step) => migratedCompletedSet.add(step.id));
   } else {
-    if (shouldMarkNewGoalComplete) {
+    if (shouldMarkNewGoalComplete || isCurrentFlowPrematureCompletion) {
       migratedCompletedSet.add("new_goal");
     }
-    if (shouldMarkHatchComplete) {
+    if (shouldMarkHatchComplete || isCurrentFlowPrematureCompletion) {
       migratedCompletedSet.add("hatch_companion");
     }
   }
@@ -584,6 +594,9 @@ const migrateGuidedTutorialProgress = ({
   const migratedMilestoneSet = new Set<GuidedMilestoneId>(
     milestonesCompleted.filter((milestoneId) => currentFlowMilestones.has(milestoneId)),
   );
+  if (isCurrentFlowPrematureCompletion) {
+    migratedMilestoneSet.add("mentor_intro_hello");
+  }
   if (migratedMilestoneSet.has("answer_plan_day_ai")) {
     migratedMilestoneSet.add("start_plan_my_day");
   }
@@ -627,20 +640,23 @@ const migrateGuidedTutorialProgress = ({
   const migratedCompleted = toActiveStepOrder(migratedCompletedSet);
   const migratedAwarded = toActiveStepOrder(migratedAwardedSet);
   const migratedMilestones = Array.from(migratedMilestoneSet);
+  const migratedCompletedFlag =
+    isLegacyTutorialComplete || GUIDED_STEPS.every((step) => migratedCompletedSet.has(step.id));
 
   const needsMigration =
     flowVersion !== GUIDED_TUTORIAL_FLOW_VERSION ||
     !setEquals(new Set(migratedCompleted), rawCompletedSet) ||
     !setEquals(new Set(migratedAwarded), rawAwardedSet) ||
-    !setEquals(new Set(migratedMilestones), rawMilestoneSet);
+    !setEquals(new Set(migratedMilestones), rawMilestoneSet) ||
+    completed !== migratedCompletedFlag;
 
   return {
     completedSteps: migratedCompleted,
     xpAwardedSteps: migratedAwarded,
     milestonesCompleted: migratedMilestones,
     createQuestProgress,
-    completed: isLegacyTutorialComplete || GUIDED_STEPS.every((step) => migratedCompletedSet.has(step.id)),
-    completedAt,
+    completed: migratedCompletedFlag,
+    completedAt: migratedCompletedFlag ? completedAt : undefined,
     evolutionInFlight,
     evolutionStartedAt,
     evolutionCompletedAt,

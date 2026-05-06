@@ -25,6 +25,7 @@ import { getCheckinReminderUrl } from "./reflectionNavigation.ts";
 import {
   buildTaskNotificationCandidates,
   buildTaskNotificationScanDateRange,
+  DEFAULT_TASK_NOTIFICATION_MAX_LATE_MINUTES,
   type TaskCandidateRow,
   type TaskProfileRow,
 } from "./taskNotifications.ts";
@@ -206,6 +207,10 @@ serve(async (req) => {
     const maxPep = parseIntEnv("NOTIFICATIONS_V2_PEP_SCAN_LIMIT", 300);
     const maxQuote = parseIntEnv("NOTIFICATIONS_V2_QUOTE_SCAN_LIMIT", 300);
     const taskPageSize = parseIntEnv("NOTIFICATIONS_V2_TASK_SCAN_LIMIT", 400);
+    const taskNotificationMaxLateMinutes = parseIntEnv(
+      "NOTIFICATIONS_V2_TASK_MAX_LATE_MINUTES",
+      DEFAULT_TASK_NOTIFICATION_MAX_LATE_MINUTES,
+    );
     const queueInsertBatchSize = parseIntEnv("NOTIFICATIONS_V2_QUEUE_INSERT_BATCH_SIZE", 500);
     const maxHabit = parseIntEnv("NOTIFICATIONS_V2_HABIT_SCAN_LIMIT", 200);
     const maxNudge = parseIntEnv("NOTIFICATIONS_V2_NUDGE_SCAN_LIMIT", 200);
@@ -635,6 +640,7 @@ serve(async (req) => {
           tasks: taskCandidates,
           profilesByUser: taskProfileByUser,
           now,
+          maxLateMinutes: taskNotificationMaxLateMinutes,
         })) {
           if (taskNotification.type === "task_start") {
             queuedTaskStarts += 1;
