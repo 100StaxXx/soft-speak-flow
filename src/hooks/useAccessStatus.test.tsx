@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
     subscribed: false,
   },
   accessLoading: false,
+  user: { id: "user-1" } as { id: string } | null,
 }));
 
 const localStorageState = vi.hoisted(() => ({
@@ -21,6 +22,12 @@ vi.mock("./useProfile", () => ({
   useProfile: () => ({
     profile: mocks.profile,
     loading: mocks.profileLoading,
+  }),
+}));
+
+vi.mock("./useAuth", () => ({
+  useAuth: () => ({
+    user: mocks.user,
   }),
 }));
 
@@ -74,6 +81,7 @@ describe("useAccessStatus", () => {
       trial_ends_at: null,
       subscribed: false,
     };
+    mocks.user = { id: "user-1" };
     mocks.profile = createProfile();
   });
 
@@ -226,5 +234,33 @@ describe("useAccessStatus", () => {
 
     expect(result.current.hasAccess).toBe(true);
     expect(result.current.gateReason).toBe("none");
+  });
+
+  it("does not fail open when profile is missing and trial is expired", () => {
+    mocks.profile = null;
+    mocks.accessState = {
+      has_access: false,
+      access_source: "none",
+      trial_ends_at: "2026-01-08T00:00:00.000Z",
+      subscribed: false,
+    };
+
+    const { result } = renderHook(() => useAccessStatus());
+
+    expect(result.current.hasAccess).toBe(false);
+    expect(result.current.gateReason).toBe("trial_expired");
+  });
+
+  it("uses local final closeout completion when the profile row is unavailable", () => {
+    mocks.profile = null;
+    globalThis.localStorage?.setItem?.(
+      "guided_tutorial_progress_user-1",
+      JSON.stringify({ completed: true, completedSteps: ["mentor_closeout"] })
+    );
+
+    const { result } = renderHook(() => useAccessStatus());
+
+    expect(result.current.hasAccess).toBe(false);
+    expect(result.current.gateReason).toBe("pre_trial_signup");
   });
 });

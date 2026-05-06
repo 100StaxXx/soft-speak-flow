@@ -12,13 +12,26 @@ import {
   buildPromoSubscriptionResponse,
 } from "../_shared/appleSubscriptions.ts";
 
-serve(async (req) => {
+type CheckAppleSubscriptionDeps = {
+  createSupabaseClient?: typeof createClient;
+};
+
+const defaultDeps: Required<CheckAppleSubscriptionDeps> = {
+  createSupabaseClient: createClient,
+};
+
+export async function handleCheckAppleSubscription(
+  req: Request,
+  deps: CheckAppleSubscriptionDeps = defaultDeps,
+) {
+  const { createSupabaseClient } = { ...defaultDeps, ...deps };
+
   if (req.method === "OPTIONS") {
     return handleCors(req);
   }
 
   try {
-    const supabaseClient = createClient(
+    const supabaseClient = createSupabaseClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
@@ -34,8 +47,9 @@ serve(async (req) => {
     }
 
     const entitlement = await fetchAccountEntitlementForUser(supabaseClient, user.id);
-    if (entitlement) {
-      return jsonResponse(req, buildAccessStateResponse(entitlement));
+    const entitlementResponse = entitlement ? buildAccessStateResponse(entitlement) : null;
+    if (entitlementResponse?.has_access) {
+      return jsonResponse(req, entitlementResponse);
     }
 
     const subscription = await fetchSubscriptionForUser(supabaseClient, user.id);
@@ -49,7 +63,7 @@ serve(async (req) => {
       return jsonResponse(req, buildPromoSubscriptionResponse(promoAccess.granted_until));
     }
 
-    return jsonResponse(req, subscriptionResponse);
+    return jsonResponse(req, entitlementResponse ?? subscriptionResponse);
   } catch (error) {
     console.error("Error checking subscription:", error);
 
@@ -66,4 +80,8 @@ serve(async (req) => {
 
     return errorResponse(req, errorMessage, statusCode);
   }
-});
+}
+
+if (Deno.env.get("SUPABASE_FUNCTIONS_TEST") !== "1") {
+  serve((req) => handleCheckAppleSubscription(req));
+}

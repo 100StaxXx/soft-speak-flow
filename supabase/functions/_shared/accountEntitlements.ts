@@ -42,6 +42,11 @@ function normalizePlan(value: unknown): "monthly" | "yearly" | undefined {
   return undefined;
 }
 
+const isFutureOrOpenEnded = (value: unknown, nowIso: string): boolean => {
+  if (typeof value !== "string" || value.trim().length === 0) return true;
+  return value > nowIso;
+};
+
 export function buildAccessStateResponse(entitlement: AccountEntitlement | null) {
   if (!entitlement) {
     return {
@@ -56,10 +61,17 @@ export function buildAccessStateResponse(entitlement: AccountEntitlement | null)
   }
 
   const accessSource = normalizeSource(entitlement.source);
-  const subscribed = entitlement.is_active && accessSource !== "trial" && accessSource !== "none";
+  const nowIso = new Date().toISOString();
+  const entitlementEnd = accessSource === "trial"
+    ? entitlement.trial_ends_at ?? entitlement.ends_at
+    : entitlement.ends_at ?? entitlement.trial_ends_at;
+  const hasAccess = entitlement.is_active &&
+    accessSource !== "none" &&
+    (accessSource === "manual" || isFutureOrOpenEnded(entitlementEnd, nowIso));
+  const subscribed = hasAccess && accessSource !== "trial";
 
   return {
-    has_access: entitlement.is_active,
+    has_access: hasAccess,
     access_source: accessSource,
     trial_ends_at: entitlement.trial_ends_at ?? null,
     subscribed,

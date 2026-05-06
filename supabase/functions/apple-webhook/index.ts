@@ -525,14 +525,12 @@ async function handleCancellation(
     updated_at: new Date().toISOString(),
   }).eq("user_id", userId);
 
-  const isStillActive = expiresDate > new Date();
-
   await upsertAccountEntitlement(supabase, {
     user_id: userId,
     source: "subscription",
     status: "cancelled",
-    is_active: isStillActive,
-    ends_at: expiresDate.toISOString(),
+    is_active: false,
+    ends_at: cancellationDate.toISOString(),
     metadata: {
       billing_provider: "storekit2",
       billing_source_of_truth: "storekit2_transaction",
@@ -542,7 +540,7 @@ async function handleCancellation(
   });
 
   console.log(`Subscription cancelled for user ${userId}, expires ${expiresDate.toISOString()}`);
-  await syncWinWinKitPremiumStatus(supabase, userId, isStillActive);
+  await syncWinWinKitPremiumStatus(supabase, userId, false);
 }
 
 async function handleRefund(

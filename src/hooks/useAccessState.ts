@@ -51,7 +51,9 @@ export function useAccessState() {
     () => {
       const baseState = query.data ?? DEFAULT_ACCESS_STATE;
 
-      if (!isPro || !currentEntitlement) {
+      // The backend entitlement is authoritative when it responds. StoreKit is
+      // only an outage fallback for already-active native subscriptions.
+      if (!query.isError || !isPro || !currentEntitlement) {
         return baseState;
       }
 
@@ -65,12 +67,12 @@ export function useAccessState() {
         subscription_end: currentEntitlement.expirationDate,
       };
     },
-    [activePlan, currentEntitlement, isPro, query.data],
+    [activePlan, currentEntitlement, isPro, query.data, query.isError],
   );
 
   return {
     accessState,
-    isLoading: authLoading || storeKitLoading || (!!user && query.isLoading),
+    isLoading: authLoading || (!!user && query.isLoading) || (!!user && query.isError && storeKitLoading),
     error: query.error,
     refetch: query.refetch,
   };
