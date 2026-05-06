@@ -15,6 +15,46 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function extractGeneratedScript(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "";
+
+  const choices = (payload as { choices?: unknown }).choices;
+  if (!Array.isArray(choices)) return "";
+
+  const firstChoice = choices[0];
+  if (!firstChoice || typeof firstChoice !== "object") return "";
+
+  const message = (firstChoice as { message?: unknown }).message;
+  if (!message || typeof message !== "object") return "";
+
+  const content = (message as { content?: unknown }).content;
+  return typeof content === "string" ? content.trim() : "";
+}
+
+function scriptMentionsMentorName(script: string, mentorName: string): boolean {
+  const trimmedName = mentorName.trim();
+  if (!trimmedName) return false;
+
+  const unprefixedName = trimmedName.replace(/^the\s+/i, "").trim();
+  const names = Array.from(new Set([trimmedName, unprefixedName]))
+    .filter((name) => name.length >= 4);
+
+  return names.some((name) => {
+    const escapedName = escapeRegExp(name);
+    const introPatterns = [
+      new RegExp(`^\\s*${escapedName}\\s*[:,.-]`, "i"),
+      new RegExp(`\\b(?:i\\s*(?:am|'m)|this is|it's)\\s+${escapedName}\\b`, "i"),
+      new RegExp(`\\b${escapedName}\\s+(?:wants|says|here|speaking|knows|believes)\\b`, "i"),
+    ];
+
+    return introPatterns.some((pattern) => pattern.test(script));
+  });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -183,6 +223,7 @@ TIME OF DAY CONTEXT: ${timeMap[time_of_day] || time_of_day}`;
 HABIT CONTEXT: ${habitMap[habit_context] || habit_context}`;
     }
 
+    const variationSeed = crypto.randomUUID();
     const systemPrompt = `You are writing a spoken motivational message for "Cosmiq" in the voice of ${mentor.name}.
 
 MENTOR PROFILE:
@@ -221,6 +262,9 @@ Write a 45-90 second spoken message that:
 - Uses NO emojis or special formatting
 - Sounds conversational and human when spoken aloud
 - Does NOT explicitly say "category" or "trigger"
+- Does NOT say, introduce, label, or mention the mentor's name in the script
+- Do NOT start with phrases like "${mentor.name} wants", "I'm ${mentor.name}", "${mentor.name} here", or "this is ${mentor.name}"
+- Speak as the mentor, not about the mentor
 - CRITICAL: Do NOT make specific assumptions about the listener's personal feelings (avoid "I can feel your pain", "I know you're hurting", "I sense your struggle")
 - Instead, speak to the challenge or state in general terms while remaining empathetic and supportive
 
@@ -248,6 +292,7 @@ NEVER USE:
 • Same metaphors or analogies
 • Identical sentence patterns
 • Generic motivational clichés
+• The mentor's name or third-person mentor references
 
 GOAL: Two scripts on the same topic should feel like different conversations entirely
 
@@ -263,7 +308,10 @@ Write ONLY the script text, nothing else.`;
         model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: "Generate the motivational script." },
+          {
+            role: "user",
+            content: `Generate the motivational script. Variation seed: ${variationSeed}. Do not mention the seed.`,
+          },
         ],
       }),
     });
@@ -290,7 +338,55 @@ Write ONLY the script text, nothing else.`;
     }
 
     const data = await response.json();
-    const script = data.choices[0].message.content.trim();
+    let script = extractGeneratedScript(data);
+    if (!script) {
+      return new Response(
+        JSON.stringify({ error: "AI response missing script text" }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (scriptMentionsMentorName(script, mentor.name)) {
+      console.warn(`Generated script mentioned mentor name for ${mentor.name}; retrying once`);
+      const retryResponse = await guardedFetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            { role: "system", content: systemPrompt },
+            {
+              role: "user",
+              content:
+                `Regenerate the script. The previous draft mentioned "${mentor.name}". ` +
+                "Do not say the mentor name, do not introduce yourself, and do not use third-person mentor references.",
+            },
+          ],
+        }),
+      });
+
+      if (!retryResponse.ok) {
+        const retryErrorText = await retryResponse.text();
+        console.error("AI gateway retry error:", retryResponse.status, retryErrorText);
+        return new Response(
+          JSON.stringify({ error: "AI gateway error" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const retryData = await retryResponse.json();
+      const retryScript = extractGeneratedScript(retryData);
+      if (!retryScript || scriptMentionsMentorName(retryScript, mentor.name)) {
+        return new Response(
+          JSON.stringify({ error: "AI response included mentor name" }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      script = retryScript;
+    }
 
     console.log(`Script generated successfully for ${mentor.name}`);
 

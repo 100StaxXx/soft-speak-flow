@@ -92,20 +92,39 @@ Deno.test("single daily pep talk generation uses idempotency and uniqueness conf
     "Expected existing daily pep talks to return before expensive guardrail checks",
   );
   assert(
-    source.includes("normalizePipelineFailureStatus") &&
-      source.includes("status === 429") &&
-      source.includes("AUDIO_PIPELINE_FAILED"),
-    "Expected upstream audio rate limits to be reported as pipeline failures instead of user request throttling",
+    source.includes("AUDIO_PIPELINE_FAILED") &&
+      source.includes("Failed to prepare pep talk audio"),
+    "Expected upstream audio failures to surface as pipeline failures",
   );
   assert(
-    source.includes("reuseMostRecentDailyPepTalkForDate") &&
-      source.includes("reused_fallback") &&
-      source.includes("audio_rate_limited"),
-    "Expected provider rate limits to reuse the latest working pep talk as today's daily row",
+    !source.includes("reuseMostRecentDailyPepTalkForDate") &&
+      !source.includes("reused_fallback") &&
+      !source.includes("audio_rate_limited"),
+    "Expected single refresh generation not to clone older pep talks as today's daily row",
   );
 });
 
-Deno.test("mentor audio retries ElevenLabs before falling back to OpenAI", async () => {
+Deno.test("batch pep talk fanout jobs are unscheduled for on-demand refresh generation", async () => {
+  const migration = await Deno.readTextFile(
+    new URL(
+      "../migrations/20260506124500_disable_batch_pep_talk_generation.sql",
+      import.meta.url,
+    ),
+  );
+
+  assert(
+    migration.includes("generate-daily-mentor-pep-talks") &&
+      migration.includes("generate-tomorrow-pep-talks") &&
+      migration.includes("cron.unschedule(job_name)"),
+    "Expected migration to unschedule both all-mentor pep talk fanout jobs",
+  );
+  assert(
+    !migration.includes("cron.schedule("),
+    "Expected migration to disable batch fanout without scheduling a replacement batch job",
+  );
+});
+
+Deno.test("mentor audio retries ElevenLabs before falling back to OpenAI and never uses canned scripts", async () => {
   const audioSource = await Deno.readTextFile(
     new URL("./generate-mentor-audio/index.ts", import.meta.url),
   );
@@ -134,9 +153,33 @@ Deno.test("mentor audio retries ElevenLabs before falling back to OpenAI", async
     "Expected audio storage path to flow through the pipeline for replay diagnostics",
   );
   assert(
-    fullAudioSource.includes("shouldUseFallbackScript") &&
-      fullAudioSource.includes("buildFallbackMentorScript") &&
-      fullAudioSource.includes("scriptFallback"),
-    "Expected script-provider throttling to use a local fallback script and continue to audio generation",
+    fullAudioSource.includes("SCRIPT_GENERATION_FAILED") &&
+      fullAudioSource.includes("SCRIPT_GENERATION_INVALID_RESPONSE") &&
+      fullAudioSource.includes("SCRIPT_GENERATION_INCOMPLETE_RESPONSE"),
+    "Expected script-generation failures to stop the pipeline instead of saving canned copy",
+  );
+  assert(
+    !fullAudioSource.includes("shouldUseFallbackScript") &&
+      !fullAudioSource.includes("buildFallbackMentorScript") &&
+      !fullAudioSource.includes("scriptFallback"),
+    "Expected full audio generation not to use the shared local fallback script",
+  );
+});
+
+Deno.test("mentor script prompt forbids mentor-name intros and retries once", async () => {
+  const scriptSource = await Deno.readTextFile(
+    new URL("./generate-mentor-script/index.ts", import.meta.url),
+  );
+
+  assert(
+    scriptSource.includes("Does NOT say, introduce, label, or mention the mentor's name") &&
+      scriptSource.includes("Do NOT start with phrases like"),
+    "Expected script prompt to explicitly forbid mentor-name intros",
+  );
+  assert(
+    scriptSource.includes("scriptMentionsMentorName") &&
+      scriptSource.includes("Regenerate the script") &&
+      scriptSource.includes("AI response included mentor name"),
+    "Expected generated scripts that mention mentor names to retry once and then fail",
   );
 });
