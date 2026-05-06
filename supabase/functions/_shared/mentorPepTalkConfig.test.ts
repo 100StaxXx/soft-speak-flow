@@ -81,6 +81,11 @@ Deno.test("mentor pep talk config provides voices for all supported mentors", ()
       `Expected ${mentorSlug} to resolve the intended ElevenLabs voice`,
     );
     assert(
+      typeof voiceConfig?.speed === "number" && voiceConfig.speed >= 0.7 &&
+        voiceConfig.speed <= 1.2,
+      `Expected ${mentorSlug} to have a valid ElevenLabs speech speed`,
+    );
+    assert(
       typeof OPENAI_TUTORIAL_VOICE_MAP[mentorSlug] === "string" &&
         OPENAI_TUTORIAL_VOICE_MAP[mentorSlug].length > 0,
       `Expected ${mentorSlug} to have a tutorial voice map entry`,
@@ -151,6 +156,14 @@ Deno.test("mentor pep talk config includes Lyra across backend mentor surfaces",
   assert(
     narrativeProfile?.storyRole === "synthetic_oracle",
     "Expected Lyra narrative profile",
+  );
+});
+
+Deno.test("mentor voice config keeps Princess pep talks brisker than default", () => {
+  const voiceConfig = resolveMentorVoiceConfig("princess");
+  assert(
+    voiceConfig?.speed === 1.12,
+    "Expected Princess voice speed to be faster than the ElevenLabs default",
   );
 });
 

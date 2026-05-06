@@ -244,15 +244,6 @@ interface MentorDialogueLine {
   support?: string;
 }
 
-export interface TutorialCompletionOverlayState {
-  title: string;
-  body: string;
-  highlights: string[];
-  mentorLine: string;
-  ctaLabel: string;
-  onComplete: () => void;
-}
-
 type TutorialDialogueKey =
   | "mentor_intro_hello"
   | "start_new_goal"
@@ -267,6 +258,11 @@ type TutorialDialogueKey =
   | "first_plan_closeout_message"
   | "mentor_closeout_message";
 
+const TUTORIAL_COMPLETION_TITLE = "You're ready.";
+const TUTORIAL_COMPLETION_BODY =
+  "Your Companion is awake, your first path is set, and today has somewhere to go.";
+const TUTORIAL_COMPLETION_CTA_LABEL = "Start my journey";
+
 const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, MentorDialogueLine>> = {
   sage: {
     mentor_intro_hello: { text: "Hey, I'm Sage. I'll walk you through this." },
@@ -280,7 +276,7 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
     tap_hatch_companion: { text: "Tap 'Hatch.'", support: "Your Companion is ready." },
     complete_companion_hatch: { text: "Let the hatch finish.", support: "I'll wrap up once it confirms." },
     first_plan_closeout_message: { text: "That's it.", support: "Take it one day at a time." },
-    mentor_closeout_message: { text: "Your Companion is here.", support: "Finish setup to continue." },
+    mentor_closeout_message: { text: TUTORIAL_COMPLETION_TITLE, support: TUTORIAL_COMPLETION_BODY },
   },
   lyra: {
     mentor_intro_hello: { text: "Hey, I'm Lyra. I'll help you get started." },
@@ -294,7 +290,7 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
     tap_hatch_companion: { text: "Tap 'Hatch.'", support: "Your Companion is ready to meet you." },
     complete_companion_hatch: { text: "Let the hatch finish.", support: "Almost there." },
     first_plan_closeout_message: { text: "You're set.", support: "Follow the signal." },
-    mentor_closeout_message: { text: "Your Companion is here.", support: "Finish setup to continue." },
+    mentor_closeout_message: { text: TUTORIAL_COMPLETION_TITLE, support: TUTORIAL_COMPLETION_BODY },
   },
   icon: {
     mentor_intro_hello: { text: "I'm Icon. Let's get this set up right." },
@@ -308,7 +304,7 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
     tap_hatch_companion: { text: "Tap 'Hatch.'", support: "You've earned the reveal." },
     complete_companion_hatch: { text: "Let the hatch finish.", support: "Hold the moment." },
     first_plan_closeout_message: { text: "You're set.", support: "Follow through." },
-    mentor_closeout_message: { text: "Your Companion is here.", support: "Finish setup to continue." },
+    mentor_closeout_message: { text: TUTORIAL_COMPLETION_TITLE, support: TUTORIAL_COMPLETION_BODY },
   },
   charles: {
     mentor_intro_hello: { text: "Charles. This won't take long." },
@@ -322,7 +318,7 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
     tap_hatch_companion: { text: "Tap 'Hatch.'", support: "You did enough. Shocking." },
     complete_companion_hatch: { text: "Let the hatch finish.", support: "Don't tap everything at once." },
     first_plan_closeout_message: { text: "Done.", support: "Now go do it." },
-    mentor_closeout_message: { text: "Your Companion is here.", support: "Finish setup to continue." },
+    mentor_closeout_message: { text: TUTORIAL_COMPLETION_TITLE, support: TUTORIAL_COMPLETION_BODY },
   },
   princess: {
     mentor_intro_hello: { text: "Hi, I'm Princess. Let's ease into this." },
@@ -336,7 +332,7 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
     tap_hatch_companion: { text: "Tap 'Hatch.'", support: "Your Companion is ready now." },
     complete_companion_hatch: { text: "Let the hatch finish.", support: "Almost done." },
     first_plan_closeout_message: { text: "You're doing great.", support: "Just keep going." },
-    mentor_closeout_message: { text: "Your Companion is here.", support: "Finish setup to continue." },
+    mentor_closeout_message: { text: TUTORIAL_COMPLETION_TITLE, support: TUTORIAL_COMPLETION_BODY },
   },
   operator: {
     mentor_intro_hello: { text: "Operator. Let's set your system." },
@@ -350,7 +346,7 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
     tap_hatch_companion: { text: "Tap 'Hatch.'", support: "Companion activation is ready." },
     complete_companion_hatch: { text: "Let the hatch finish.", support: "Awaiting confirmation." },
     first_plan_closeout_message: { text: "System ready.", support: "Execute." },
-    mentor_closeout_message: { text: "Your Companion is here.", support: "Finish setup to continue." },
+    mentor_closeout_message: { text: TUTORIAL_COMPLETION_TITLE, support: TUTORIAL_COMPLETION_BODY },
   },
   rival: {
     mentor_intro_hello: { text: "I'm Rival. Let's see what you do with this." },
@@ -364,7 +360,7 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
     tap_hatch_companion: { text: "Tap 'Hatch.'", support: "You've earned one decent reveal." },
     complete_companion_hatch: { text: "Let the hatch finish.", support: "Finish what you started." },
     first_plan_closeout_message: { text: "That's all you need.", support: "Don't waste it." },
-    mentor_closeout_message: { text: "Your Companion is here.", support: "Finish setup to continue." },
+    mentor_closeout_message: { text: TUTORIAL_COMPLETION_TITLE, support: TUTORIAL_COMPLETION_BODY },
   },
 };
 
@@ -387,19 +383,6 @@ const isTutorialDialogueKey = (value: string): value is TutorialDialogueKey =>
   TUTORIAL_DIALOGUE_KEYS.has(value);
 
 const FALLBACK_DIALOGUE: MentorDialogueLine = { text: "Let's keep going." };
-const TUTORIAL_COMPLETION_TITLE = "You're ready.";
-const TUTORIAL_COMPLETION_BODY =
-  "Your Companion is awake, your first path is set, and today has somewhere to go.";
-const TUTORIAL_COMPLETION_HIGHLIGHTS = [
-  "Path created",
-  "Companion hatched",
-  "Next step ready",
-];
-const TUTORIAL_COMPLETION_CTA_LABEL = "Start my journey";
-const TUTORIAL_COMPLETION_MENTOR_LINE = "I'll be here when you need the next step.";
-
-const getTutorialCompletionMentorLine = (mentorName: string | undefined): string =>
-  mentorName ? `${mentorName}: ${TUTORIAL_COMPLETION_MENTOR_LINE}` : TUTORIAL_COMPLETION_MENTOR_LINE;
 
 const getDialogueForMentor = (
   mentorSlug: string | undefined,
@@ -749,7 +732,6 @@ export interface PostOnboardingMentorGuidanceState {
   onSecondaryAction?: () => void;
   dialogueActionLabel?: string;
   onDialogueAction?: () => void;
-  completionOverlay?: TutorialCompletionOverlayState;
 }
 
 const DEFAULT_GUIDANCE_STATE: PostOnboardingMentorGuidanceState = {
@@ -774,7 +756,6 @@ const DEFAULT_GUIDANCE_STATE: PostOnboardingMentorGuidanceState = {
   onSecondaryAction: undefined,
   dialogueActionLabel: undefined,
   onDialogueAction: undefined,
-  completionOverlay: undefined,
 };
 
 const PostOnboardingMentorGuidanceContext = createContext<PostOnboardingMentorGuidanceState>(
@@ -1888,45 +1869,6 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   }, [campaignBuilderOpen, createQuestProgress.current, currentStep, evolutionInFlight, milestoneSet]);
 
   const isIntroDialogueActive = currentMilestone === "mentor_intro_hello";
-  const supportsDialogueAction =
-    currentMilestone === "mentor_intro_hello" ||
-    currentMilestone === "campaign_calendar_handoff" ||
-    currentMilestone === "meet_companion_intro" ||
-    currentMilestone === "first_plan_closeout_message" ||
-    currentMilestone === "quests_campaigns_intro" ||
-    currentMilestone === "companion_tab_intro" ||
-    currentMilestone === "post_evolution_companion_intro";
-  const dialogueActionLabel = supportsDialogueAction
-    ? currentMilestone === "mentor_intro_hello"
-      ? "Start Tutorial"
-      : currentMilestone === "campaign_calendar_handoff"
-      ? "Meet companion"
-      : currentMilestone === "first_plan_closeout_message"
-      ? "Finish"
-      : "Continue"
-    : undefined;
-  const onDialogueAction = useCallback(() => {
-    if (!currentMilestone || !supportsDialogueAction) return;
-    if (currentMilestone === "campaign_calendar_handoff") {
-      markMilestoneComplete("campaign_calendar_handoff");
-      void (async () => {
-        const completed = await markStepComplete("new_goal", {
-          beforeComplete: refreshCompanionForTutorialHandoff,
-        });
-        if (!completed) return;
-        navigate("/companion", { replace: true });
-      })();
-      return;
-    }
-    markMilestoneComplete(currentMilestone);
-  }, [
-    currentMilestone,
-    markMilestoneComplete,
-    markStepComplete,
-    navigate,
-    refreshCompanionForTutorialHandoff,
-    supportsDialogueAction,
-  ]);
 
   const dismissTutorial = useCallback(() => {
     if (!tutorialReady || tutorialMarkedComplete || tutorialDismissed) return;
@@ -2022,6 +1964,54 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     tutorialMarkedComplete,
     tutorialReady,
     user?.id,
+  ]);
+
+  const supportsDialogueAction =
+    currentMilestone === "mentor_intro_hello" ||
+    currentMilestone === "campaign_calendar_handoff" ||
+    currentMilestone === "meet_companion_intro" ||
+    currentMilestone === "first_plan_closeout_message" ||
+    currentMilestone === "quests_campaigns_intro" ||
+    currentMilestone === "companion_tab_intro" ||
+    currentMilestone === "post_evolution_companion_intro" ||
+    currentMilestone === "mentor_closeout_message";
+  const dialogueActionLabel = supportsDialogueAction
+    ? currentMilestone === "mentor_intro_hello"
+      ? "Start Tutorial"
+      : currentMilestone === "campaign_calendar_handoff"
+      ? "Meet companion"
+      : currentMilestone === "first_plan_closeout_message"
+      ? "Finish"
+      : currentMilestone === "mentor_closeout_message"
+      ? TUTORIAL_COMPLETION_CTA_LABEL
+      : "Continue"
+    : undefined;
+  const onDialogueAction = useCallback(() => {
+    if (!currentMilestone || !supportsDialogueAction) return;
+    if (currentMilestone === "campaign_calendar_handoff") {
+      markMilestoneComplete("campaign_calendar_handoff");
+      void (async () => {
+        const completed = await markStepComplete("new_goal", {
+          beforeComplete: refreshCompanionForTutorialHandoff,
+        });
+        if (!completed) return;
+        navigate("/companion", { replace: true });
+      })();
+      return;
+    }
+    if (currentMilestone === "mentor_closeout_message") {
+      completeTutorial();
+      return;
+    }
+    markMilestoneComplete(currentMilestone);
+  }, [
+    completeTutorial,
+    currentMilestone,
+    markMilestoneComplete,
+    markStepComplete,
+    navigate,
+    refreshCompanionForTutorialHandoff,
+    supportsDialogueAction,
   ]);
 
   const activeTargetSelectors = useMemo(
@@ -2290,21 +2280,6 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     isCampaignBuilderTutorialPaused ||
     campaignCreationAnimationPending ||
     isHatchRevealPending;
-  const isCompletionOverlayActive =
-    isActive &&
-    !tutorialUnavailable &&
-    currentStepId === "mentor_closeout" &&
-    currentMilestone === "mentor_closeout_message";
-  const completionOverlay: TutorialCompletionOverlayState | undefined = isCompletionOverlayActive
-    ? {
-        title: TUTORIAL_COMPLETION_TITLE,
-        body: TUTORIAL_COMPLETION_BODY,
-        highlights: TUTORIAL_COMPLETION_HIGHLIGHTS,
-        mentorLine: getTutorialCompletionMentorLine(personality?.name),
-        ctaLabel: TUTORIAL_COMPLETION_CTA_LABEL,
-        onComplete: completeTutorial,
-      }
-    : undefined;
   const secondaryActionLabel = undefined;
   const onSecondaryAction = undefined;
   const isPreHatchCompanionStep = !tutorialUnavailable && currentStepId === "hatch_companion";
@@ -2332,7 +2307,6 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     dialogueActionLabel: tutorialUnavailable ? undefined : dialogueActionLabel,
     onDialogueAction:
       tutorialUnavailable ? undefined : (supportsDialogueAction ? onDialogueAction : undefined),
-    completionOverlay,
   };
 };
 

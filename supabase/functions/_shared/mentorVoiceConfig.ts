@@ -9,6 +9,7 @@ export interface MentorVoiceConfig {
   stability: number;
   similarity_boost: number;
   style_exaggeration: number;
+  speed: number;
   use_speaker_boost?: boolean;
 }
 
@@ -23,6 +24,7 @@ export const ELEVENLABS_MENTOR_VOICES: Record<
     stability: 0.72,
     similarity_boost: 0.82,
     style_exaggeration: 0.28,
+    speed: 1,
     use_speaker_boost: true,
   },
   lyra: {
@@ -30,6 +32,7 @@ export const ELEVENLABS_MENTOR_VOICES: Record<
     stability: 0.74,
     similarity_boost: 0.84,
     style_exaggeration: 0.22,
+    speed: 1,
     use_speaker_boost: true,
   },
   icon: {
@@ -37,6 +40,7 @@ export const ELEVENLABS_MENTOR_VOICES: Record<
     stability: 0.7,
     similarity_boost: 0.84,
     style_exaggeration: 0.64,
+    speed: 1,
     use_speaker_boost: true,
   },
   charles: {
@@ -44,6 +48,7 @@ export const ELEVENLABS_MENTOR_VOICES: Record<
     stability: 0.76,
     similarity_boost: 0.86,
     style_exaggeration: 0.52,
+    speed: 1,
     use_speaker_boost: true,
   },
   princess: {
@@ -51,6 +56,7 @@ export const ELEVENLABS_MENTOR_VOICES: Record<
     stability: 0.82,
     similarity_boost: 0.88,
     style_exaggeration: 0.24,
+    speed: 1.12,
     use_speaker_boost: true,
   },
   operator: {
@@ -58,6 +64,7 @@ export const ELEVENLABS_MENTOR_VOICES: Record<
     stability: 0.58,
     similarity_boost: 0.96,
     style_exaggeration: 1,
+    speed: 1,
     use_speaker_boost: true,
   },
   rival: {
@@ -65,6 +72,7 @@ export const ELEVENLABS_MENTOR_VOICES: Record<
     stability: 0.68,
     similarity_boost: 0.88,
     style_exaggeration: 0.84,
+    speed: 1,
     use_speaker_boost: true,
   },
   reign: {
@@ -72,6 +80,7 @@ export const ELEVENLABS_MENTOR_VOICES: Record<
     stability: 0.52,
     similarity_boost: 0.97,
     style_exaggeration: 1,
+    speed: 1,
     use_speaker_boost: true,
   },
 };

@@ -6,6 +6,7 @@ import { JourneysCompanionLauncherPopup } from "@/components/journeys/JourneysCo
 import { useDraggableFAB } from "@/hooks/useDraggableFAB";
 import { useCompanionLauncherImage } from "@/hooks/useCompanionLauncherImage";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
+import { COMPANION_LAUNCHER_IMAGE_GENERATION_ENABLED } from "@/config/companionLauncherFeatureFlags";
 import { cn } from "@/lib/utils";
 import {
   createCompanionPlannerLaunchIntentId,
@@ -57,7 +58,7 @@ export const DraggableFAB = ({ onOpenCompanionPlanner, onTap }: DraggableFABProp
   useCompanionLauncherImage({
     companionId,
     sourceImageUrl: currentSceneImageUrl,
-    enabled: needsLauncherImage,
+    enabled: COMPANION_LAUNCHER_IMAGE_GENERATION_ENABLED && needsLauncherImage,
   });
   const handleDragCompleted = useCallback(() => {
     suppressTapRef.current = true;

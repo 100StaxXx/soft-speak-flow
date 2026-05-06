@@ -53,4 +53,22 @@ describe("CompanionImage", () => {
     expect(image).toHaveStyle({ objectPosition: "37.5% 62.5%" });
     expect(image.style.transform).toBe("");
   });
+
+  it("uses source aspect ratio for generated cover art when provided", () => {
+    render(
+      <CompanionImage
+        src="https://example.com/generated-companion.png"
+        alt="Generated Landscape Companion"
+        fit="cover"
+        focalX={0.32}
+        focalY={0.68}
+        sourceAspectRatio={1536 / 1024}
+      />,
+    );
+
+    const image = screen.getByRole("img", { name: "Generated Landscape Companion" });
+    expect(image).toHaveAttribute("data-companion-image-focal-source", "stored");
+    expect(image).toHaveClass("object-cover");
+    expect(image).toHaveStyle({ objectPosition: "0% 50%" });
+  });
 });

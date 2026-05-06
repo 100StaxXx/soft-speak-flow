@@ -8,6 +8,10 @@ import {
   QUESTIONNAIRE_PIPELINE_TIMEOUT_MS,
   StoryOnboarding,
 } from "./StoryOnboarding";
+import {
+  GUIDED_TUTORIAL_FLOW_VERSION,
+  GUIDED_TUTORIAL_VERSION,
+} from "@/utils/guidedTutorial";
 
 const QUESTIONNAIRE_ANSWERS = [
   {
@@ -693,8 +697,8 @@ describe("StoryOnboarding questionnaire submission flow", () => {
 
       const guidedTutorial = JSON.parse(rawProgress ?? "{}");
       expect(guidedTutorial).toMatchObject({
-        version: 2,
-        flowVersion: 9,
+        version: GUIDED_TUTORIAL_VERSION,
+        flowVersion: GUIDED_TUTORIAL_FLOW_VERSION,
         eligible: true,
         completed: false,
         dismissed: false,

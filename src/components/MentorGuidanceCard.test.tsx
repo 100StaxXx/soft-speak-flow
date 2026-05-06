@@ -30,16 +30,6 @@ const mocks = vi.hoisted(() => ({
     speakerName: "Sage",
     speakerSlug: "sage",
     speakerAvatarUrl: "",
-    completionOverlay: undefined as
-      | {
-          title: string;
-          body: string;
-          highlights: string[];
-          mentorLine: string;
-          ctaLabel: string;
-          onComplete: () => void;
-        }
-      | undefined,
   },
 }));
 
@@ -63,7 +53,6 @@ beforeEach(() => {
   mocks.guidance.onSecondaryAction = undefined;
   mocks.guidance.dialogueActionLabel = undefined;
   mocks.guidance.onDialogueAction = undefined;
-  mocks.guidance.completionOverlay = undefined;
   mocks.onDialogueAction.mockClear();
   mocks.onSecondaryAction.mockClear();
 });
@@ -236,20 +225,28 @@ describe("MentorGuidanceCard", () => {
     expect(mocks.onSecondaryAction).not.toHaveBeenCalled();
   });
 
-  it("hides the guidance card while the completion overlay is active", () => {
-    mocks.guidance.completionOverlay = {
-      title: "You're ready.",
-      body: "Your Companion is awake, your first path is set, and today has somewhere to go.",
-      highlights: ["Path created", "Companion hatched", "Next step ready"],
-      mentorLine: "I'll be here when you need the next step.",
-      ctaLabel: "Start my journey",
-      onComplete: mocks.onSecondaryAction,
-    };
+  it("renders the mentor closeout in the normal guide card format", () => {
+    mocks.guidance.currentStep = "mentor_closeout";
+    mocks.guidance.progressText = "Step 3 of 3";
+    mocks.guidance.activeTargetSelectors = [];
+    mocks.guidance.activeTargetSelector = null;
+    mocks.guidance.dialogueText = "You're ready.";
+    mocks.guidance.dialogueSupportText =
+      "Your Companion is awake, your first path is set, and today has somewhere to go.";
+    mocks.guidance.dialogueActionLabel = "Start my journey";
+    mocks.guidance.onDialogueAction = mocks.onDialogueAction;
 
     render(<MentorGuidanceCard />);
+    fireEvent.click(screen.getByRole("button", { name: "Start my journey" }));
 
-    expect(screen.queryByText("Sage portrait")).not.toBeInTheDocument();
-    expect(screen.queryByText("Create your first campaign.")).not.toBeInTheDocument();
+    expect(screen.getByText("Sage portrait")).toBeInTheDocument();
+    expect(screen.getByText("Sage")).toBeInTheDocument();
+    expect(screen.getByText("Step 3 of 3")).toBeInTheDocument();
+    expect(screen.getByText("You're ready.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Your Companion is awake, your first path is set, and today has somewhere to go.")
+    ).toBeInTheDocument();
+    expect(mocks.onDialogueAction).toHaveBeenCalledTimes(1);
   });
 
   it("renders continue action for non-intro explainer milestones", () => {

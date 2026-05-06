@@ -743,6 +743,7 @@ Deno.test("generate-mentor-audio resolves every supported mentor voice", async (
     const [mentorSlug, resolvedMentorSlug, voiceId] of EXPECTED_MENTOR_VOICE_IDS
   ) {
     const fetchedUrls: string[] = [];
+    let elevenLabsRequestBody: Record<string, unknown> = {};
     const supabase = createMockSupabase({}, {
       publicUrl: `https://example.com/${mentorSlug}-audio.mp3`,
     });
@@ -755,8 +756,11 @@ Deno.test("generate-mentor-audio resolves every supported mentor voice", async (
       {
         authorize: async () => ({ isInternal: true }),
         createSupabaseClient: () => supabase,
-        fetchImpl: async (input) => {
+        fetchImpl: async (input, init) => {
           fetchedUrls.push(String(input));
+          elevenLabsRequestBody = JSON.parse(
+            String(init?.body ?? "{}"),
+          ) as Record<string, unknown>;
           return new Response(new Uint8Array([1, 2, 3]), { status: 200 });
         },
         now: () => 1000,
@@ -782,6 +786,15 @@ Deno.test("generate-mentor-audio resolves every supported mentor voice", async (
     assert(
       fetchedUrls.some((url) => url.includes(voiceId)),
       `Expected ${mentorSlug} to use ElevenLabs voice ${voiceId}`,
+    );
+    const voiceSettings = elevenLabsRequestBody.voice_settings as Record<
+      string,
+      unknown
+    >;
+    assertEquals(
+      voiceSettings.speed,
+      mentorSlug === "princess" ? 1.12 : 1,
+      `Expected ${mentorSlug} to send configured speech speed`,
     );
   }
 });
@@ -933,8 +946,16 @@ Deno.test("generate-mentor-audio falls back to OpenAI TTS when ElevenLabs is rat
   );
 
   const body = await response.json();
-  assertEquals(response.status, 200, "Expected rate-limit fallback audio request to succeed");
-  assertEquals(body.provider, "openai", "Expected OpenAI fallback provider to be reported");
+  assertEquals(
+    response.status,
+    200,
+    "Expected rate-limit fallback audio request to succeed",
+  );
+  assertEquals(
+    body.provider,
+    "openai",
+    "Expected OpenAI fallback provider to be reported",
+  );
   assert(
     fetchedUrls.some((url) => url.includes("api.openai.com/v1/audio/speech")),
     "Expected OpenAI TTS fallback to be tried after ElevenLabs rate limiting",

@@ -348,7 +348,6 @@ describe("guided tutorial first-value loop", () => {
       expect(result.current.isIntroDialogueActive).toBe(true);
       expect(result.current.currentStep).toBe("new_goal");
       expect(result.current.dialogueActionLabel).toBe("Start Tutorial");
-      expect(result.current.completionOverlay).toBeUndefined();
     });
 
     await act(async () => {
@@ -517,14 +516,11 @@ describe("guided tutorial first-value loop", () => {
       expect(mocks.state.queryClient.refetchQueries).toHaveBeenCalled();
       expect(result.current.isActive).toBe(true);
       expect(result.current.currentStep).toBe("mentor_closeout");
-      expect(result.current.dialogueActionLabel).toBeUndefined();
-      expect(result.current.completionOverlay).toMatchObject({
-        title: "You're ready.",
-        body: "Your Companion is awake, your first path is set, and today has somewhere to go.",
-        highlights: ["Path created", "Companion hatched", "Next step ready"],
-        ctaLabel: "Start my journey",
-        mentorLine: "I'll be here when you need the next step.",
-      });
+      expect(result.current.dialogueText).toBe("You're ready.");
+      expect(result.current.dialogueSupportText).toBe(
+        "Your Companion is awake, your first path is set, and today has somewhere to go.",
+      );
+      expect(result.current.dialogueActionLabel).toBe("Start my journey");
     });
 
     expect(
@@ -537,7 +533,7 @@ describe("guided tutorial first-value loop", () => {
     ).toBe(false);
 
     await act(async () => {
-      result.current.completionOverlay?.onComplete();
+      result.current.onDialogueAction?.();
       await Promise.resolve();
     });
 
@@ -605,11 +601,8 @@ describe("guided tutorial first-value loop", () => {
       expect(mocks.state.queryClient.refetchQueries).toHaveBeenCalled();
       expect(result.current.isActive).toBe(true);
       expect(result.current.currentStep).toBe("mentor_closeout");
-      expect(result.current.dialogueActionLabel).toBeUndefined();
-      expect(result.current.completionOverlay).toMatchObject({
-        title: "You're ready.",
-        ctaLabel: "Start my journey",
-      });
+      expect(result.current.dialogueText).toBe("You're ready.");
+      expect(result.current.dialogueActionLabel).toBe("Start my journey");
     });
 
     expect(
@@ -622,7 +615,7 @@ describe("guided tutorial first-value loop", () => {
     ).toBe(false);
 
     await act(async () => {
-      result.current.completionOverlay?.onComplete();
+      result.current.onDialogueAction?.();
       await Promise.resolve();
     });
 
@@ -700,7 +693,7 @@ describe("guided tutorial first-value loop", () => {
     expect(mocks.state.profileUpdatePayloads).toHaveLength(0);
   });
 
-  it("exposes completion overlay only on mentor closeout and persists completion from the overlay CTA", async () => {
+  it("shows mentor closeout as a guide card and persists completion from its CTA", async () => {
     mocks.state.guidedTutorial = {
       ...createFreshTutorial(),
       completedSteps: ["new_goal", "hatch_companion"],
@@ -727,14 +720,12 @@ describe("guided tutorial first-value loop", () => {
 
     await waitFor(() => {
       expect(result.current.currentStep).toBe("mentor_closeout");
-      expect(result.current.dialogueActionLabel).toBeUndefined();
-      expect(result.current.completionOverlay).toMatchObject({
-        title: "You're ready.",
-        body: "Your Companion is awake, your first path is set, and today has somewhere to go.",
-        highlights: ["Path created", "Companion hatched", "Next step ready"],
-        ctaLabel: "Start my journey",
-        mentorLine: "Sage: I'll be here when you need the next step.",
-      });
+      expect(result.current.speakerName).toBe("Sage");
+      expect(result.current.dialogueText).toBe("You're ready.");
+      expect(result.current.dialogueSupportText).toBe(
+        "Your Companion is awake, your first path is set, and today has somewhere to go.",
+      );
+      expect(result.current.dialogueActionLabel).toBe("Start my journey");
     });
 
     expect(
@@ -747,7 +738,7 @@ describe("guided tutorial first-value loop", () => {
     ).toBe(false);
 
     await act(async () => {
-      result.current.completionOverlay?.onComplete();
+      result.current.onDialogueAction?.();
       await Promise.resolve();
     });
 
@@ -770,7 +761,8 @@ describe("guided tutorial first-value loop", () => {
           );
         }),
       ).toBe(true);
-      expect(result.current.completionOverlay).toBeUndefined();
+      expect(result.current.isActive).toBe(false);
+      expect(result.current.currentStep).toBeNull();
     });
   });
 

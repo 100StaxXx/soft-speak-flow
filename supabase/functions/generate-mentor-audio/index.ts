@@ -78,7 +78,9 @@ async function delay(ms: number): Promise<void> {
 }
 
 function getElevenLabsRetryDelayMs(): number {
-  return Deno.env.get("SUPABASE_FUNCTIONS_TEST") === "1" ? 0 : ELEVENLABS_RETRY_DELAY_MS;
+  return Deno.env.get("SUPABASE_FUNCTIONS_TEST") === "1"
+    ? 0
+    : ELEVENLABS_RETRY_DELAY_MS;
 }
 
 function isRetriableElevenLabsError(error: Error): boolean {
@@ -177,11 +179,13 @@ async function generateOpenAiAudio({
   apiKey,
   mentorSlug,
   script,
+  speed,
 }: {
   fetchImpl: typeof fetch;
   apiKey: string;
   mentorSlug: string;
   script: string;
+  speed: number;
 }): Promise<Uint8Array> {
   const response = await fetchAudioWithTimeout({
     fetchImpl,
@@ -197,6 +201,7 @@ async function generateOpenAiAudio({
         voice: resolveTutorialVoice(mentorSlug),
         input: script,
         response_format: "mp3",
+        speed,
       }),
     },
     timeoutMs: 55000,
@@ -271,7 +276,9 @@ async function generateMentorAudioBytes({
             model: ELEVENLABS_MENTOR_TTS_MODEL,
           };
         } catch (retryError) {
-          const retryFailure = retryError instanceof Error ? retryError : new Error(String(retryError));
+          const retryFailure = retryError instanceof Error
+            ? retryError
+            : new Error(String(retryError));
           primaryError = new Error(
             `ElevenLabs primary failed after retry: first (${primaryError.message}); retry (${retryFailure.message})`,
           );
@@ -307,14 +314,19 @@ async function generateMentorAudioBytes({
         apiKey: openAiApiKey,
         mentorSlug,
         script,
+        speed: voiceConfig.speed,
       }),
       provider: "openai",
       model: OPENAI_TTS_MODEL_NAME,
     };
   } catch (fallbackError) {
-    const fallbackFailure = fallbackError instanceof Error ? fallbackError : new Error(String(fallbackError));
+    const fallbackFailure = fallbackError instanceof Error
+      ? fallbackError
+      : new Error(String(fallbackError));
     throw new Error(
-      `ElevenLabs primary failed (${primaryError?.message ?? "unknown error"}); OpenAI TTS fallback failed (${fallbackFailure.message})`,
+      `ElevenLabs primary failed (${
+        primaryError?.message ?? "unknown error"
+      }); OpenAI TTS fallback failed (${fallbackFailure.message})`,
     );
   }
 }
@@ -414,6 +426,7 @@ export async function handleGenerateMentorAudio(
       stability: voiceConfig.stability,
       similarity_boost: voiceConfig.similarity_boost,
       style: voiceConfig.style_exaggeration,
+      speed: voiceConfig.speed,
       use_speaker_boost: voiceConfig.use_speaker_boost ?? true,
     };
 
@@ -467,7 +480,11 @@ export async function handleGenerateMentorAudio(
     );
 
     return new Response(
-      JSON.stringify({ audioUrl, provider: audioResult.provider, storagePath: filePath }),
+      JSON.stringify({
+        audioUrl,
+        provider: audioResult.provider,
+        storagePath: filePath,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {

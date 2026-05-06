@@ -25,11 +25,12 @@ vi.mock("framer-motion", async () => {
 const renderQuestionnaire = (
   isSubmitting = false,
   initialAnswers: OnboardingAnswer[] = [],
+  faction: "starfall" | "void" | "stellar" = "stellar",
 ) => {
   const onComplete = vi.fn();
   render(
     <StoryQuestionnaire
-      faction="stellar"
+      faction={faction}
       onComplete={onComplete}
       isSubmitting={isSubmitting}
       initialAnswers={initialAnswers}
@@ -82,6 +83,28 @@ describe("StoryQuestionnaire", () => {
     fireEvent.touchStart(screen.getByRole("button", { name: /continue/i }));
 
     expect(screen.getByText(/would you prefer your guide to be a man or a woman/i)).toBeInTheDocument();
+  });
+
+  it("ignores a delayed press from the previous question after advancing", () => {
+    renderQuestionnaire();
+
+    fireEvent.click(screen.getByRole("button", { name: /female/i }));
+    const firstQuestionContinue = screen.getByRole("button", { name: /continue/i });
+    fireEvent.click(firstQuestionContinue);
+
+    expect(screen.getByText(/would you prefer your guide to be a man or a woman/i)).toBeInTheDocument();
+
+    fireEvent.click(firstQuestionContinue);
+
+    expect(screen.getByText(/would you prefer your guide to be a man or a woman/i)).toBeInTheDocument();
+    expect(screen.queryByText(/what do you want to work on right now/i)).not.toBeInTheDocument();
+  });
+
+  it("falls back instead of crashing when a runtime faction value is unrecognized", () => {
+    renderQuestionnaire(false, [], "legacy_faction" as any);
+
+    expect(screen.getByText(/for generated title art/i)).toBeInTheDocument();
+    expect(screen.getByText(/the first constellation sketches/i)).toBeInTheDocument();
   });
 
   it("restores the previous selection when moving back", () => {

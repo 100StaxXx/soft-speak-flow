@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Clock3, Play, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -344,7 +344,6 @@ const EvolutionMomentsGrid = ({
                 <video
                   src={selectedMoment.animation_video_url}
                   className="max-h-[70vh] w-full bg-black object-contain"
-                  controls
                   autoPlay
                   muted
                   playsInline
@@ -393,7 +392,7 @@ const EvolutionMomentCard = ({
           ? "border-primary/30 bg-card hover:border-primary/60"
           : "cursor-not-allowed border-border/60 bg-secondary/30 opacity-75"
       }`}
-      aria-label={canPlay ? `Watch stage ${moment.stage} evolution` : `Stage ${moment.stage} evolution generating`}
+      aria-label={canPlay ? `Stage ${moment.stage} evolution` : `Stage ${moment.stage} evolution generating`}
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-secondary/40">
         {moment.image_url ? (
@@ -412,10 +411,6 @@ const EvolutionMomentCard = ({
         <div className="absolute inset-0 bg-gradient-to-t from-black/76 via-black/10 to-transparent" />
         <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-semibold text-white">
           Stage {moment.stage}
-        </span>
-        <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-[11px] font-semibold text-white">
-          {canPlay ? <Play className="h-3 w-3 fill-current" /> : <Clock3 className="h-3 w-3" />}
-          {canPlay ? "Watch" : "Generating"}
         </span>
       </div>
     </button>

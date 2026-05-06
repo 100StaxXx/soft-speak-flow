@@ -431,7 +431,6 @@ export const MentorGuidanceCard = () => {
     onSecondaryAction,
     dialogueActionLabel,
     onDialogueAction,
-    completionOverlay,
   } = usePostOnboardingMentorGuidance();
 
   const wrapperRef = useRef<HTMLElement | null>(null);
@@ -576,7 +575,7 @@ export const MentorGuidanceCard = () => {
   );
   const isCompact = placement.anchor === "floating" && placement.compact;
 
-  if (!isActive || !dialogueText || completionOverlay) {
+  if (!isActive || !dialogueText) {
     return null;
   }
 

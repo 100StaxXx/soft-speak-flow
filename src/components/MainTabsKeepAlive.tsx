@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { MainTabVisibilityProvider } from "@/contexts/MainTabVisibilityContext";
 import { logger } from "@/utils/logger";
 import { DraggableFAB } from "@/components/DraggableFAB";
+import { COMPANION_FLOATING_ACTION_BUTTON_ENABLED } from "@/config/companionLauncherFeatureFlags";
 import {
   warmDailyTasksQueryFromRemote,
   warmEpicsQueryFromRemote,
@@ -89,7 +90,11 @@ export const MainTabsKeepAlive = memo(({ activePath }: { activePath: MainTabPath
       },
     });
   }, [activePath, location.pathname, location.search, location.state, navigate]);
-  const showJourneysPlannerFab = !isMacDesignedForIPadIOSApp() && activePath === "/journeys";
+  const showJourneysPlannerFab = (
+    COMPANION_FLOATING_ACTION_BUTTON_ENABLED
+    && !isMacDesignedForIPadIOSApp()
+    && activePath === "/journeys"
+  );
 
   useEffect(() => {
     prefetchJourneysTasks();

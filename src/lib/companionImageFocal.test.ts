@@ -133,6 +133,25 @@ describe("companionImageFocal", () => {
     });
   });
 
+  it("uses known source dimensions to center generated landscape cover portraits", () => {
+    expect(
+      resolveCompanionImagePresentation({
+        src: "https://example.com/generated-companion.png",
+        fit: "cover",
+        focalX: 0.32,
+        focalY: 0.68,
+        sourceAspectRatio: 1536 / 1024,
+      }),
+    ).toEqual({
+      focalPoint: { x: 0.32, y: 0.68 },
+      focalSource: "stored",
+      assetKey: null,
+      style: {
+        objectPosition: "0% 50%",
+      },
+    });
+  });
+
   it("falls back cleanly for non-bundled images without stored focal metadata", () => {
     expect(
       resolveCompanionImagePresentation({

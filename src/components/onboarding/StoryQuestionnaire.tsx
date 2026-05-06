@@ -62,7 +62,8 @@ const getFactionNarrative = (faction: FactionType, questionIndex: number): strin
       "The stars ask what kind of orbit your days usually follow...",
     ],
   };
-  return narratives[faction][questionIndex] || narratives[faction][0];
+  const factionNarratives = narratives[faction] ?? narratives.stellar;
+  return factionNarratives[questionIndex] || factionNarratives[0];
 };
 
 const questions: StoryQuestion[] = [
@@ -176,6 +177,7 @@ export const StoryQuestionnaire = ({
   const [isTransitioning, setIsTransitioning] = useState(false);
   const continueLockRef = useRef(false);
   const recentNativePressRef = useRef<{ key: string; at: number } | null>(null);
+  const activeQuestionIdRef = useRef<string | null>(null);
 
   // Memoize star positions to prevent them from jumping on re-render
   const starPositions = useMemo(() => 
@@ -186,10 +188,13 @@ export const StoryQuestionnaire = ({
       delay: Math.random() * 2,
     })), []);
 
-  const currentQuestion = questions[currentIndex];
-  const currentAnswer = answers[currentIndex] ?? null;
-  const progress = ((currentIndex + 1) / questions.length) * 100;
+  const lastQuestionIndex = questions.length - 1;
+  const currentQuestionIndex = Math.min(Math.max(currentIndex, 0), lastQuestionIndex);
+  const currentQuestion = questions[currentQuestionIndex];
+  const currentAnswer = answers[currentQuestionIndex] ?? null;
+  const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
   const nativeIOSHandheld = useMemo(() => isNativeIOSHandheld(), []);
+  activeQuestionIdRef.current = currentQuestion.id;
 
   // Get faction-specific colors
   const factionColors: Record<FactionType, string> = {
@@ -197,17 +202,28 @@ export const StoryQuestionnaire = ({
     void: "#7F26D9",
     stellar: "#3DB8F5",
   };
-  const factionColor = factionColors[faction];
+  const factionColor = factionColors[faction] ?? factionColors.stellar;
 
   const controlsLocked = isSubmitting || isTransitioning;
-  const canGoBack = currentIndex > 0 && !controlsLocked;
+  const canGoBack = currentQuestionIndex > 0 && !controlsLocked;
   const canContinue = Boolean(currentAnswer) && !controlsLocked;
 
   useEffect(() => {
     if (isSubmitting) return;
     continueLockRef.current = false;
     setIsTransitioning(false);
-  }, [isSubmitting, currentIndex]);
+  }, [isSubmitting, currentQuestionIndex]);
+
+  useEffect(() => {
+    if (currentIndex === currentQuestionIndex) return;
+    continueLockRef.current = false;
+    setIsTransitioning(false);
+    setCurrentIndex(currentQuestionIndex);
+  }, [currentIndex, currentQuestionIndex]);
+
+  const isStaleQuestionEvent = (questionId: string) => {
+    return activeQuestionIdRef.current !== questionId;
+  };
 
   const wasNativePressRecentlyHandled = (key: string) => {
     const recentPress = recentNativePressRef.current;
@@ -216,8 +232,12 @@ export const StoryQuestionnaire = ({
     return recentPress.key === key && Date.now() - recentPress.at < NATIVE_PRESS_DEDUPE_WINDOW_MS;
   };
 
-  const handleSelectOption = (option: QuestionOption, source: InteractionSource) => {
-    if (controlsLocked) return;
+  const handleSelectOption = (
+    option: QuestionOption,
+    source: InteractionSource,
+    questionId: string,
+  ) => {
+    if (controlsLocked || isStaleQuestionEvent(questionId)) return;
 
     const nextAnswer: OnboardingAnswer = {
       questionId: currentQuestion.id,
@@ -228,57 +248,62 @@ export const StoryQuestionnaire = ({
 
     questionnaireLog.debug("Selected onboarding question option", {
       source,
-      currentIndex,
+      currentIndex: currentQuestionIndex,
       questionId: currentQuestion.id,
       optionId: option.optionId,
     });
 
     setAnswers((prev) => {
       const next = prev.slice();
-      next[currentIndex] = nextAnswer;
+      next[currentQuestionIndex] = nextAnswer;
       return next;
     });
   };
 
-  const handleContinue = (source: InteractionSource) => {
-    if (!currentAnswer || controlsLocked || continueLockRef.current) return;
+  const handleContinue = (source: InteractionSource, questionId: string) => {
+    if (
+      !currentAnswer
+      || controlsLocked
+      || continueLockRef.current
+      || isStaleQuestionEvent(questionId)
+    ) return;
 
     continueLockRef.current = true;
     setIsTransitioning(true);
 
     const finalizedAnswers = questions.flatMap((_, index) => {
-      const answer = index === currentIndex ? currentAnswer : answers[index];
+      const answer = index === currentQuestionIndex ? currentAnswer : answers[index];
       return answer ? [answer] : [];
     });
 
     questionnaireLog.debug("Continuing onboarding questionnaire", {
       source,
-      currentIndex,
+      currentIndex: currentQuestionIndex,
       questionId: currentQuestion.id,
       optionId: currentAnswer.optionId,
       answersCount: finalizedAnswers.length,
     });
 
-    if (currentIndex < questions.length - 1) {
-      setCurrentIndex((prev) => prev + 1);
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentIndex(currentQuestionIndex + 1);
       return;
     }
 
     onComplete(finalizedAnswers);
   };
 
-  const handleBack = (source: InteractionSource) => {
-    if (!canGoBack) return;
+  const handleBack = (source: InteractionSource, questionId: string) => {
+    if (!canGoBack || isStaleQuestionEvent(questionId)) return;
 
     questionnaireLog.debug("Moved back in onboarding questionnaire", {
       source,
-      currentIndex,
-      nextIndex: currentIndex - 1,
+      currentIndex: currentQuestionIndex,
+      nextIndex: currentQuestionIndex - 1,
     });
 
     continueLockRef.current = false;
     setIsTransitioning(false);
-    setCurrentIndex((prev) => Math.max(0, prev - 1));
+    setCurrentIndex(Math.max(0, currentQuestionIndex - 1));
   };
 
   const createPressHandlers = (
@@ -348,14 +373,18 @@ export const StoryQuestionnaire = ({
             size="sm"
             disabled={!canGoBack}
             className="gap-2 text-white/80 hover:text-white disabled:opacity-40 disabled:hover:text-white/70 border border-white/10 rounded-full px-3 py-1 bg-black/30 backdrop-blur-sm"
-            {...createPressHandlers("questionnaire-back", handleBack, !canGoBack)}
+            {...createPressHandlers(
+              "questionnaire-back",
+              (source) => handleBack(source, currentQuestion.id),
+              !canGoBack,
+            )}
           >
             <ChevronLeft className="h-4 w-4" />
             Back
           </Button>
           <span className="flex-1" />
           <span className="text-sm font-medium tabular-nums min-w-[72px] text-right">
-            {currentIndex + 1} of {questions.length}
+            {currentQuestionIndex + 1} of {questions.length}
           </span>
         </div>
         <Progress value={progress} className="h-2" />
@@ -370,7 +399,7 @@ export const StoryQuestionnaire = ({
       <div className="flex-1 flex flex-col justify-center items-center z-10">
         <AnimatePresence mode="wait">
           <motion.div
-            key={currentIndex}
+            key={currentQuestion.id}
             initial={{ opacity: 0, x: nativeIOSHandheld ? 0 : 50 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: nativeIOSHandheld ? 0 : -50 }}
@@ -384,7 +413,7 @@ export const StoryQuestionnaire = ({
               transition={{ delay: 0.2 }}
               className="text-white/60 text-sm italic mb-5 text-center leading-relaxed px-2"
             >
-              {getFactionNarrative(faction, currentIndex)}
+              {getFactionNarrative(faction, currentQuestionIndex)}
             </motion.p>
 
             {/* Question */}
@@ -436,7 +465,7 @@ export const StoryQuestionnaire = ({
                       onContextMenu={(event) => event.preventDefault()}
                       {...createPressHandlers(
                         `questionnaire-option-${currentQuestion.id}-${option.optionId}`,
-                        (source) => handleSelectOption(option, source),
+                        (source) => handleSelectOption(option, source, currentQuestion.id),
                         controlsLocked,
                       )}
                     >
@@ -485,7 +514,7 @@ export const StoryQuestionnaire = ({
                 }}
                 {...createPressHandlers(
                   `questionnaire-continue-${currentQuestion.id}`,
-                  handleContinue,
+                  (source) => handleContinue(source, currentQuestion.id),
                   !canContinue,
                 )}
               >

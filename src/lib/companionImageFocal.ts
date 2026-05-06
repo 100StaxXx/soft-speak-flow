@@ -15,6 +15,7 @@ export interface CompanionImagePresentationOptions {
   focalX?: number | null;
   focalY?: number | null;
   containerAspectRatio?: number;
+  sourceAspectRatio?: number | null;
 }
 
 export interface CompanionImagePresentation {
@@ -37,6 +38,13 @@ const DEFAULT_PRESENTATION: CompanionImagePresentation = {
 };
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
+
+const normalizePositiveAspectRatio = (value: unknown): number | null => {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  return value;
+};
 
 export const normalizeCompanionImageFocalValue = (value: unknown): number | null => {
   if (typeof value !== "number" || !Number.isFinite(value)) return null;
@@ -120,31 +128,35 @@ const resolveCoverObjectPosition = ({
   focalPoint,
   entry,
   containerAspectRatio,
+  sourceAspectRatio,
 }: {
   focalPoint: CompanionImageFocalPoint;
   entry: BundledCompanionImageFocalManifestEntry | null;
   containerAspectRatio: number;
+  sourceAspectRatio?: number | null;
 }) => {
-  if (!entry || entry.width <= 0 || entry.height <= 0) {
+  const resolvedSourceAspectRatio = normalizePositiveAspectRatio(sourceAspectRatio)
+    ?? (entry && entry.width > 0 && entry.height > 0 ? entry.width / entry.height : null);
+
+  if (!resolvedSourceAspectRatio) {
     return `${focalPoint.x * 100}% ${focalPoint.y * 100}%`;
   }
 
-  const sourceAspectRatio = entry.width / entry.height;
-  const safeContainerAspectRatio = containerAspectRatio > 0 ? containerAspectRatio : 1;
+  const safeContainerAspectRatio = normalizePositiveAspectRatio(containerAspectRatio) ?? 1;
 
-  if (Math.abs(sourceAspectRatio - safeContainerAspectRatio) < 0.0001) {
+  if (Math.abs(resolvedSourceAspectRatio - safeContainerAspectRatio) < 0.0001) {
     return "50% 50%";
   }
 
-  if (sourceAspectRatio > safeContainerAspectRatio) {
-    const renderedWidth = safeContainerAspectRatio / sourceAspectRatio;
+  if (resolvedSourceAspectRatio > safeContainerAspectRatio) {
+    const renderedWidth = safeContainerAspectRatio / resolvedSourceAspectRatio;
     const cropRange = 1 - renderedWidth;
     if (cropRange <= 0) return "50% 50%";
     const xPosition = clamp01((focalPoint.x - renderedWidth / 2) / cropRange) * 100;
     return `${xPosition}% 50%`;
   }
 
-  const renderedHeight = sourceAspectRatio / safeContainerAspectRatio;
+  const renderedHeight = resolvedSourceAspectRatio / safeContainerAspectRatio;
   const cropRange = 1 - renderedHeight;
   if (cropRange <= 0) return "50% 50%";
   const yPosition = clamp01((focalPoint.y - renderedHeight / 2) / cropRange) * 100;
@@ -172,6 +184,7 @@ export const resolveCompanionImagePresentation = ({
   focalX,
   focalY,
   containerAspectRatio = 1,
+  sourceAspectRatio,
 }: CompanionImagePresentationOptions): CompanionImagePresentation => {
   const storedFocalPoint = getStoredFocalPoint(focalX, focalY);
   const manifestEntry = getBundledCompanionImageFocalEntry(src);
@@ -204,6 +217,7 @@ export const resolveCompanionImagePresentation = ({
         focalPoint,
         entry: manifestEntry,
         containerAspectRatio,
+        sourceAspectRatio,
       }),
     },
   };

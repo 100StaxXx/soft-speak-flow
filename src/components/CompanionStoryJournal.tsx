@@ -1,4 +1,10 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  type SyntheticEvent as ReactSyntheticEvent,
+} from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionStory } from "@/hooks/useCompanionStory";
@@ -39,6 +45,7 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
   const [viewingLevel, setViewingLevel] = useState(0);
   const [debouncedLevel, setDebouncedLevel] = useState(0);
   const [showGallery, setShowGallery] = useState(false);
+  const [chapterImageSourceAspectRatio, setChapterImageSourceAspectRatio] = useState<number | null>(null);
   const isDesktop = layoutMode === "desktop";
 
   useEffect(() => {
@@ -137,6 +144,17 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
     companion,
     debouncedLevel,
   ]);
+
+  useEffect(() => {
+    setChapterImageSourceAspectRatio(null);
+  }, [chapterImage]);
+
+  const handleChapterImageLoad = useCallback((event: ReactSyntheticEvent<HTMLImageElement>) => {
+    const { naturalWidth, naturalHeight } = event.currentTarget;
+    setChapterImageSourceAspectRatio(
+      naturalWidth > 0 && naturalHeight > 0 ? naturalWidth / naturalHeight : null,
+    );
+  }, []);
 
   if (companionLoading) {
     return (
@@ -247,12 +265,15 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
                 alt={`${companion.spirit_animal} at ${chapterLabel}`}
                 focalX={chapterImageFocal.x}
                 focalY={chapterImageFocal.y}
+                sourceAspectRatio={chapterImageSourceAspectRatio}
                 className="w-full h-full object-cover"
                 onError={(event) => {
+                  setChapterImageSourceAspectRatio(null);
                   event.currentTarget.src = debouncedLevel === 0
                     ? "/placeholder-egg.svg"
                     : "/placeholder-companion.svg";
                 }}
+                onLoad={handleChapterImageLoad}
               />
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-2">
                 <p className="text-xs text-center font-medium text-foreground">

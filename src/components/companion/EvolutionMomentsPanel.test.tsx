@@ -147,7 +147,8 @@ describe("EvolutionMomentsPanel", () => {
   it("shows evolutions as first-class moments", async () => {
     renderPanel();
 
-    expect(await screen.findByRole("button", { name: /watch stage 5 evolution/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /stage 5 evolution/i })).toBeInTheDocument();
+    expect(screen.queryByText("Watch")).not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: /evolutions/i })).toBeInTheDocument();
     expect(screen.getByText("Evolutions")).toBeInTheDocument();
   });
@@ -155,12 +156,13 @@ describe("EvolutionMomentsPanel", () => {
   it("opens a playable evolution dialog for completed animation rows", async () => {
     renderPanel();
 
-    fireEvent.click(await screen.findByRole("button", { name: /watch stage 5 evolution/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /stage 5 evolution/i }));
 
     expect(await screen.findByRole("dialog", { name: /stage 5 evolution/i })).toBeInTheDocument();
     const video = await screen.findByTestId("evolution-moment-video");
     expect(video).toHaveAttribute("src", "https://example.com/stage-5.mp4");
-    expect(video).toHaveAttribute("controls");
+    expect(video).not.toHaveAttribute("controls");
+    expect(video).toHaveAttribute("autoplay");
     expect(video).toHaveAttribute("playsinline");
   });
 
@@ -170,7 +172,7 @@ describe("EvolutionMomentsPanel", () => {
 
     const generatingCard = await screen.findByRole("button", { name: /stage 6 evolution generating/i });
     expect(generatingCard).toBeDisabled();
-    expect(screen.getByText("Generating")).toBeInTheDocument();
+    expect(screen.queryByText("Generating")).not.toBeInTheDocument();
 
     fireEvent.click(generatingCard);
     expect(screen.queryByTestId("evolution-moment-video")).not.toBeInTheDocument();
@@ -187,7 +189,7 @@ describe("EvolutionMomentsPanel", () => {
 
     renderPanel();
 
-    expect(await screen.findByRole("button", { name: /watch stage 1 evolution/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /stage 1 evolution/i })).toBeInTheDocument();
   });
 
   it("shows succeeded animation jobs when the evolution row has not caught up", async () => {
@@ -196,7 +198,7 @@ describe("EvolutionMomentsPanel", () => {
 
     renderPanel();
 
-    fireEvent.click(await screen.findByRole("button", { name: /watch stage 1 evolution/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /stage 1 evolution/i }));
     expect(await screen.findByTestId("evolution-moment-video")).toHaveAttribute(
       "src",
       "https://example.com/stage-1.mp4",
@@ -210,13 +212,13 @@ describe("EvolutionMomentsPanel", () => {
     renderPanel();
 
     expect(await screen.findByText("No Evolutions Yet")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /watch stage/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /stage \d+ evolution/i })).not.toBeInTheDocument();
   });
 
   it("falls back to the still image when evolution video loading fails", async () => {
     renderPanel();
 
-    fireEvent.click(await screen.findByRole("button", { name: /watch stage 5 evolution/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /stage 5 evolution/i }));
     fireEvent.error(await screen.findByTestId("evolution-moment-video"));
 
     const fallback = await screen.findByTestId("evolution-moment-fallback-image");

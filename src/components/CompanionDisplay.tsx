@@ -71,6 +71,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type TouchEvent as ReactTouchEvent,
   type KeyboardEvent as ReactKeyboardEvent,
+  type SyntheticEvent as ReactSyntheticEvent,
 } from "react";
 import {
   MAX_COMPANION_STAGE,
@@ -201,6 +202,7 @@ export const CompanionDisplay = memo(({
   const expressionState = useCompanionExpressionState();
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [portraitSourceAspectRatio, setPortraitSourceAspectRatio] = useState<number | null>(null);
   const [imageKey, setImageKey] = useState(0); // Force image reload
   const [fallbackToDefaultPortrait, setFallbackToDefaultPortrait] = useState(false);
   const [showWelcomeBack, setShowWelcomeBack] = useState(false);
@@ -517,6 +519,7 @@ export const CompanionDisplay = memo(({
     previousImageUrl.current = effectiveImageUrl;
     setImageLoaded(false);
     setImageError(false);
+    setPortraitSourceAspectRatio(null);
   }, [effectiveImageUrl]);
 
   useEffect(() => {
@@ -529,6 +532,15 @@ export const CompanionDisplay = memo(({
     setImageError(false);
     setImageKey((prev) => prev + 1);
   }, [isVisible]);
+
+  const handlePortraitImageLoad = useCallback((event: ReactSyntheticEvent<HTMLImageElement>) => {
+    const { naturalWidth, naturalHeight } = event.currentTarget;
+    setPortraitSourceAspectRatio(
+      naturalWidth > 0 && naturalHeight > 0 ? naturalWidth / naturalHeight : null,
+    );
+    setImageLoaded(true);
+    setImageError(false);
+  }, []);
 
   useEffect(() => {
     setFallbackToDefaultPortrait(false);
@@ -924,13 +936,12 @@ export const CompanionDisplay = memo(({
                           element={displayCompanion.core_element}
                           focalX={effectiveImageFocal.x}
                           focalY={effectiveImageFocal.y}
+                          sourceAspectRatio={portraitSourceAspectRatio}
                           className="relative h-full w-full rounded-2xl"
                           style={{ ...skinStyles, ...careStyles, ...equippedCosmeticStyles }}
-                          onLoad={() => {
-                            setImageLoaded(true);
-                            setImageError(false);
-                          }}
+                          onLoad={handlePortraitImageLoad}
                           onError={() => {
+                            setPortraitSourceAspectRatio(null);
                             if (!fallbackToDefaultPortrait && expressiveImageUrl) {
                               setFallbackToDefaultPortrait(true);
                               setImageKey((prev) => prev + 1);
@@ -953,6 +964,7 @@ export const CompanionDisplay = memo(({
                         element={displayCompanion.core_element}
                         focalX={effectiveImageFocal.x}
                         focalY={effectiveImageFocal.y}
+                        sourceAspectRatio={portraitSourceAspectRatio}
                         className={cn(
                           "relative h-full w-full rounded-2xl shadow-2xl ring-4 transition-all duration-500 group-hover:scale-105",
                           imageLoaded ? "opacity-100" : "opacity-0 absolute",
@@ -961,11 +973,9 @@ export const CompanionDisplay = memo(({
                           activePortraitAnimationClass,
                         )}
                         style={{ ...skinStyles, ...careStyles, ...equippedCosmeticStyles }}
-                        onLoad={() => {
-                          setImageLoaded(true);
-                          setImageError(false);
-                        }}
+                        onLoad={handlePortraitImageLoad}
                         onError={() => {
+                          setPortraitSourceAspectRatio(null);
                           if (!fallbackToDefaultPortrait && expressiveImageUrl) {
                             setFallbackToDefaultPortrait(true);
                             setImageKey((prev) => prev + 1);

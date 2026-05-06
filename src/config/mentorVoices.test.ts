@@ -15,6 +15,9 @@ describe("mentorVoices", () => {
       expect(mentorVoices[slug]?.voiceId).toBe(
         ELEVENLABS_MENTOR_VOICES[slug]?.voiceId,
       );
+      expect(mentorVoices[slug]?.voiceSettings.speed).toBe(
+        ELEVENLABS_MENTOR_VOICES[slug]?.speed,
+      );
       expect(mentorVoices[slug]?.mentorSlug).toBe(slug);
     }
   });

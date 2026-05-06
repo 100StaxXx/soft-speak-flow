@@ -205,37 +205,24 @@ describe("MainTabsKeepAlive", () => {
     expect(screen.queryByTestId("main-tabs-universal-fab")).not.toBeInTheDocument();
   });
 
-  it("renders the planner fab on the journeys tab", () => {
+  it("does not render the planner fab on the journeys tab while the v1 pause is active", () => {
     mocks.location.pathname = "/journeys";
 
     render(<MainTabsKeepAlive activePath="/journeys" />);
 
-    expect(screen.getByTestId("main-tabs-universal-fab")).toBeInTheDocument();
+    expect(screen.queryByTestId("main-tabs-universal-fab")).not.toBeInTheDocument();
+    expect(mocks.lastFabHandler).toBeNull();
   });
 
-  it("preserves the current journeys location when the journeys planner fab launches in-place", () => {
+  it("leaves journeys planner fab launch handling dormant while the v1 pause is active", () => {
     mocks.location.pathname = "/journeys";
     mocks.location.search = "?section=inbox";
     mocks.location.state = { fromTest: true };
 
     render(<MainTabsKeepAlive activePath="/journeys" />);
 
-    fireEvent.click(screen.getByTestId("main-tabs-universal-fab"));
-
-    expect(mocks.navigate).toHaveBeenCalledWith(
-      {
-        pathname: "/journeys",
-        search: "?section=inbox",
-      },
-      {
-        state: {
-          fromTest: true,
-          companionPlannerLaunchIntent: expect.objectContaining({
-            id: "launch-1",
-          }),
-        },
-      },
-    );
+    expect(screen.queryByTestId("main-tabs-universal-fab")).not.toBeInTheDocument();
+    expect(mocks.navigate).not.toHaveBeenCalled();
   });
 
   it("preserves tab state and avoids remounting visited tabs", () => {

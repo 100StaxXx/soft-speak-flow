@@ -21,6 +21,7 @@ import { haptics } from "@/utils/haptics";
 import { useQuestCalendarSync } from "@/hooks/useQuestCalendarSync";
 import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
+import { COMPANION_FLOATING_ACTION_BUTTON_ENABLED } from "@/config/companionLauncherFeatureFlags";
 import { SEND_TO_CALENDAR_ENABLED } from "@/utils/calendarFeatureFlags";
 import { isMacDesignedForIPadIOSApp } from "@/utils/platformTargets";
 import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
@@ -332,8 +333,9 @@ const InboxPage = memo(function InboxPage() {
           )}
         </div>
 
-        {/* FAB */}
-        <DraggableFAB onTap={() => setShowAddQuest(true)} />
+        {COMPANION_FLOATING_ACTION_BUTTON_ENABLED ? (
+          <DraggableFAB onTap={() => setShowAddQuest(true)} />
+        ) : null}
 
         <AddQuestSheet
           open={showAddQuest}

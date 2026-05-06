@@ -155,7 +155,7 @@ describe("DraggableFAB", () => {
     expect(mocks.onOpenCompanionPlanner).not.toHaveBeenCalled();
   });
 
-  it("requests AI launcher art while showing the current companion image", () => {
+  it("pauses AI launcher art requests while showing the current companion image", () => {
     mocks.visual = {
       companionId: "companion-ai",
       companionLabel: "Nova",
@@ -179,7 +179,7 @@ describe("DraggableFAB", () => {
     expect(mocks.launcherImageCalls).toContainEqual({
       companionId: "companion-ai",
       sourceImageUrl: "https://assets.example.com/scenic-companion.png",
-      enabled: true,
+      enabled: false,
     });
     expect(screen.queryByTestId("journeys-companion-launcher-placeholder")).not.toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Nova" })).toHaveAttribute(

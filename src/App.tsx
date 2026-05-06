@@ -41,7 +41,6 @@ import { shouldShowBottomNav } from "@/utils/bottomNavVisibility";
 import { PostOnboardingMentorGuidanceProvider } from "@/hooks/usePostOnboardingMentorGuidance";
 import { MentorGuidanceCard } from "@/components/MentorGuidanceCard";
 import { MentorSpotlightGuard } from "@/components/tutorial/MentorSpotlightGuard";
-import { TutorialCompletionOverlay } from "@/components/tutorial/TutorialCompletionOverlay";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { ResilienceProvider } from "@/contexts/ResilienceContext";
 import { ResilienceStatusBanner } from "@/components/resilience/ResilienceStatusBanner";
@@ -166,21 +165,20 @@ const EvolutionAwareContent = memo(() => {
 EvolutionAwareContent.displayName = 'EvolutionAwareContent';
 
 const MentorTutorialLayer = memo(() => {
-  const { isActive, activeTargetSelector, activeTargetSelectors = [], isStrictLockActive, completionOverlay } =
+  const { isActive, activeTargetSelector, activeTargetSelectors = [], isStrictLockActive } =
     usePostOnboardingMentorGuidance();
   const hasResolvedSpotlightTarget = Boolean(
-    !completionOverlay && isActive && activeTargetSelector && activeTargetSelectors.length > 0,
+    isActive && activeTargetSelector && activeTargetSelectors.length > 0,
   );
 
   return (
     <>
-      {completionOverlay ? <TutorialCompletionOverlay {...completionOverlay} /> : null}
       <MentorSpotlightGuard
         active={hasResolvedSpotlightTarget}
         mode={isStrictLockActive ? "spotlight" : "outline"}
         targetSelector={activeTargetSelector}
       />
-      {completionOverlay ? null : <MentorGuidanceCard />}
+      <MentorGuidanceCard />
     </>
   );
 });
