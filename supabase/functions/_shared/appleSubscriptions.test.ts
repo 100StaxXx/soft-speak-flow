@@ -146,29 +146,3 @@ Deno.test("ensureAppleTransactionBinding rejects new bindings without an app-acc
     "Expected missing app-account token to fail closed",
   );
 });
-
-Deno.test("buildSubscriptionResponse keeps paid-through auto-renew cancellations active", () => {
-  const response = appleSubscriptionsModule.buildSubscriptionResponse({
-    status: "cancelled",
-    plan: "yearly",
-    current_period_end: "2999-01-01T00:00:00.000Z",
-    cancel_at: "2999-01-01T00:00:00.000Z",
-    cancelled_at: null,
-  });
-
-  assert(response.has_access === true, "Expected paid-through cancellation to keep access until period end");
-  assert(response.subscribed === true, "Expected paid-through cancellation to remain subscribed");
-});
-
-Deno.test("buildSubscriptionResponse denies explicitly revoked subscription rows", () => {
-  const response = appleSubscriptionsModule.buildSubscriptionResponse({
-    status: "cancelled",
-    plan: "yearly",
-    current_period_end: "2999-01-01T00:00:00.000Z",
-    cancel_at: "2999-01-01T00:00:00.000Z",
-    cancelled_at: "2026-05-01T00:00:00.000Z",
-  });
-
-  assert(response.has_access === false, "Expected revoked rows with cancelled_at to deny access");
-  assert(response.subscribed === false, "Expected revoked rows with cancelled_at to be unsubscribed");
-});

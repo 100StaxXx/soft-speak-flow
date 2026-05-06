@@ -153,10 +153,6 @@ export function buildSubscriptionStatus(
   return "active";
 }
 
-function hasRevokedAccess(cancelledAt?: Date | null, now: Date = new Date()) {
-  return Boolean(cancelledAt && cancelledAt <= now);
-}
-
 function selectLatestReceipt(receiptInfo: AppleReceiptInfo[]): AppleReceiptInfo | null {
   if (!Array.isArray(receiptInfo) || receiptInfo.length === 0) return null;
   return [...receiptInfo].sort((a, b) => {
@@ -349,16 +345,13 @@ export async function upsertSubscription(
     },
   });
 
-  const nowDate = new Date();
   const status = buildSubscriptionStatus(payload.expiresAt, payload.cancellationDate);
-  const now = nowDate.toISOString();
+  const now = new Date().toISOString();
   const amountCents = getPriceCents(payload.plan, {
     offerIdentifier: payload.offerIdentifier,
     offerType: payload.offerType,
   });
-  const isRevoked = hasRevokedAccess(payload.cancellationDate, nowDate);
-  const isActive = !isRevoked &&
-    payload.expiresAt > nowDate &&
+  const isActive = payload.expiresAt > new Date() &&
     (status === "active" || status === "trialing" || status === "past_due" || status === "cancelled");
 
   const { data: existingPayment } = await supabase
@@ -478,11 +471,9 @@ export function buildSubscriptionResponse(subscription: any) {
     };
   }
   const expiresAt = subscription.current_period_end ? new Date(subscription.current_period_end) : null;
-  const isRevoked = typeof subscription.cancelled_at === "string" && subscription.cancelled_at.trim().length > 0;
   const isActive = !!(
     expiresAt &&
     expiresAt > new Date() &&
-    !isRevoked &&
     (subscription.status === "active" ||
       subscription.status === "trialing" ||
       subscription.status === "past_due" ||

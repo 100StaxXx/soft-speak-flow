@@ -13,8 +13,6 @@ const mocks = vi.hoisted(() => ({
     { identifier: "cosmiq_premium_monthly", displayName: "Monthly", description: "", price: 9.99, displayPrice: "$9.99" },
     { identifier: "cosmiq_premium_yearly", displayName: "Yearly", description: "", price: 99.99, displayPrice: "$99.99" },
   ],
-  invalidateQueries: vi.fn().mockResolvedValue(undefined),
-  functionsInvoke: vi.fn().mockResolvedValue({ data: { success: true }, error: null }),
   user: { id: "11111111-1111-4111-8111-111111111111" } as { id: string } | null,
   appliedReferralCodeState: {
     code: null,
@@ -26,12 +24,6 @@ const mocks = vi.hoisted(() => ({
     apple_offer_code_expires_at: null,
     is_apple_offer_eligible: false,
   },
-}));
-
-vi.mock("@tanstack/react-query", () => ({
-  useQueryClient: () => ({
-    invalidateQueries: (...args: unknown[]) => mocks.invalidateQueries(...args),
-  }),
 }));
 
 vi.mock("@/hooks/use-toast", () => ({
@@ -80,14 +72,6 @@ vi.mock("@/utils/paywallTelemetry", () => ({
   trackPaywallEvent: vi.fn(),
 }));
 
-vi.mock("@/integrations/supabase/client", () => ({
-  supabase: {
-    functions: {
-      invoke: (...args: unknown[]) => mocks.functionsInvoke(...args),
-    },
-  },
-}));
-
 import { useAppleSubscription } from "./useAppleSubscription";
 
 describe("useAppleSubscription", () => {
@@ -112,8 +96,6 @@ describe("useAppleSubscription", () => {
     mocks.redeemOfferCode.mockResolvedValue({ status: "presented", entitlement: null });
     mocks.restorePurchases.mockResolvedValue({ productId: "cosmiq_premium_monthly", transactionId: "tx-r" });
     mocks.refreshProducts.mockResolvedValue(mocks.storeKitProducts);
-    mocks.functionsInvoke.mockResolvedValue({ data: { success: true }, error: null });
-    mocks.invalidateQueries.mockResolvedValue(undefined);
   });
 
   it("calls purchase for monthly products", async () => {
@@ -124,12 +106,6 @@ describe("useAppleSubscription", () => {
     });
 
     expect(mocks.purchase).toHaveBeenCalledWith("cosmiq_premium_monthly");
-    expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
-      body: { transactionId: "tx-1" },
-    });
-    expect(mocks.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ["access-state", "11111111-1111-4111-8111-111111111111"],
-    });
     expect(mocks.redeemOfferCode).not.toHaveBeenCalled();
   });
 
@@ -177,9 +153,6 @@ describe("useAppleSubscription", () => {
 
     expect(mocks.redeemOfferCode).toHaveBeenCalledTimes(1);
     expect(mocks.purchase).toHaveBeenCalledWith("cosmiq_premium_yearly");
-    expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
-      body: { transactionId: "tx-1" },
-    });
   });
 
   it("calls regular purchase for yearly when no offer code", async () => {
@@ -242,29 +215,6 @@ describe("useAppleSubscription", () => {
     });
 
     expect(success).toBe(false);
-    expect(mocks.functionsInvoke).not.toHaveBeenCalled();
-  });
-
-  it("returns false when server transaction sync fails after purchase", async () => {
-    mocks.functionsInvoke.mockResolvedValue({
-      data: null,
-      error: new Error("App Store verification unavailable"),
-    });
-
-    const { result } = renderHook(() => useAppleSubscription());
-
-    let success: boolean | undefined;
-    await act(async () => {
-      success = await result.current.handlePurchase("cosmiq_premium_monthly");
-    });
-
-    expect(success).toBe(false);
-    expect(mocks.toast).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: "Premium sync failed",
-        variant: "destructive",
-      }),
-    );
   });
 
   it("shows error toast when purchase throws", async () => {
@@ -292,29 +242,9 @@ describe("useAppleSubscription", () => {
     });
 
     expect(mocks.restorePurchases).toHaveBeenCalled();
-    expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
-      body: { transactionId: "tx-r" },
-    });
     expect(mocks.toast).toHaveBeenCalledWith(
       expect.objectContaining({ title: "Purchases restored" }),
     );
-  });
-
-  it("refreshes access state when restore finds no active entitlement", async () => {
-    mocks.restorePurchases.mockResolvedValue(null);
-
-    const { result } = renderHook(() => useAppleSubscription());
-
-    let success: boolean | undefined;
-    await act(async () => {
-      success = await result.current.handleRestore();
-    });
-
-    expect(success).toBe(false);
-    expect(mocks.functionsInvoke).not.toHaveBeenCalled();
-    expect(mocks.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ["access-state", "11111111-1111-4111-8111-111111111111"],
-    });
   });
 
   it("shows error toast when restore throws", async () => {

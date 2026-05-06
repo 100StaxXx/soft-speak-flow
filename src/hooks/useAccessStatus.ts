@@ -1,6 +1,5 @@
 import { useProfile } from "./useProfile";
 import { useAccessState } from "./useAccessState";
-import { useAuth } from "./useAuth";
 import { hasCompletedFinalTutorialCloseout } from "@/utils/guidedTutorial";
 
 export type AccessSource = 'subscription' | 'promo_code' | 'trial' | 'none';
@@ -53,7 +52,6 @@ interface AccessStatus {
 }
 
 export function useAccessStatus(): AccessStatus {
-  const { user } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
   const { accessState, isLoading: accessLoading } = useAccessState();
   const isSubscribed = accessState.subscribed;
@@ -75,10 +73,24 @@ export function useAccessStatus(): AccessStatus {
     };
   }
 
-  const profileId = profile?.id ?? user?.id;
+  // Profile should exist for authenticated users, but fail open if it does not.
+  if (!profile) {
+    return {
+      hasAccess: true,
+      isSubscribed,
+      isInTrial: false,
+      trialExpired: false,
+      trialDaysRemaining: 0,
+      accessSource: isSubscribed ? 'subscription' : 'none',
+      gateReason: 'none' as AccessGateReason,
+      trialEndsAt: null,
+      loading: false,
+    };
+  }
+
   const tutorialCompleted =
-    hasGuidedTutorialCompleted(profile?.onboarding_data) ||
-    hasLocalGuidedTutorialCompleted(profileId);
+    hasGuidedTutorialCompleted(profile.onboarding_data) ||
+    hasLocalGuidedTutorialCompleted(profile.id);
 
   const trialEndsAt = accessState.trial_ends_at ? new Date(accessState.trial_ends_at) : null;
 

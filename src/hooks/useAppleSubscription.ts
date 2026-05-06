@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { Capacitor } from "@capacitor/core";
 import { isNativeIOS } from "@/utils/platformTargets";
 import { useToast } from "./use-toast";
@@ -7,9 +6,6 @@ import { useAuth } from "./useAuth";
 import { useAppliedReferralCodeState } from "./useAppliedReferralCodeState";
 import { useStoreKit } from "./useStoreKit";
 import { trackPaywallEvent } from "@/utils/paywallTelemetry";
-import { supabase } from "@/integrations/supabase/client";
-import { queryKeys } from "@/lib/queryKeys";
-import type { StoreKitTransaction } from "@/plugins/StoreKitPlugin";
 
 function isIAPAvailable(): boolean {
   return Capacitor.isNativePlatform() && isNativeIOS();
@@ -30,7 +26,6 @@ function getErrorMessage(error: unknown): string {
 export function useAppleSubscription() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const queryClient = useQueryClient();
   const { appliedReferralCodeState } = useAppliedReferralCodeState();
   const {
     isAvailable,
@@ -49,68 +44,6 @@ export function useAppleSubscription() {
   const hasOfferCode = appliedReferralCodeState.is_apple_offer_eligible;
   const hasAppliedReferralCode = Boolean(appliedReferralCodeState.code);
   const appliedReferralCode = appliedReferralCodeState.code;
-
-  const refreshAccessQueries = useCallback(async () => {
-    if (!user?.id) return;
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: queryKeys.access.detail(user.id) }),
-      queryClient.invalidateQueries({ queryKey: ["profile", user.id] }),
-      queryClient.invalidateQueries({ queryKey: ["subscription"] }),
-    ]);
-  }, [queryClient, user?.id]);
-
-  const syncTransactionWithServer = useCallback(async (
-    transaction: StoreKitTransaction,
-    surface: string,
-  ): Promise<boolean> => {
-    if (!transaction.transactionId) {
-      const message = "The App Store did not return a transaction identifier.";
-      trackPaywallEvent("purchase_sync_failed", {
-        surface,
-        message,
-      });
-      setProductError(message);
-      toast({
-        title: "Premium sync failed",
-        description: "Your purchase completed, but we could not verify it yet. Please try Restore Purchases.",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    try {
-      const { error } = await supabase.functions.invoke("verify-apple-receipt", {
-        body: {
-          transactionId: transaction.transactionId,
-        },
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      trackPaywallEvent("purchase_sync_completed", {
-        surface,
-        productId: transaction.productId,
-      });
-      await refreshAccessQueries();
-      return true;
-    } catch (error) {
-      const message = getErrorMessage(error);
-      trackPaywallEvent("purchase_sync_failed", {
-        surface,
-        productId: transaction.productId,
-        message,
-      });
-      setProductError(message);
-      toast({
-        title: "Premium sync failed",
-        description: "Your purchase completed, but we could not verify premium access yet. Please try Restore Purchases.",
-        variant: "destructive",
-      });
-      return false;
-    }
-  }, [refreshAccessQueries, toast]);
 
   useEffect(() => {
     if (!hasOfferCode) {
@@ -183,9 +116,6 @@ export function useAppleSubscription() {
         });
 
         if (redemption.entitlement) {
-          const synced = await syncTransactionWithServer(redemption.entitlement, surface);
-          if (!synced) return false;
-
           toast({
             title: "Premium unlocked",
             description: "Your discounted yearly access is now active.",
@@ -221,9 +151,6 @@ export function useAppleSubscription() {
 
       setOfferCodePurchaseReady(false);
       trackPaywallEvent("purchase_completed", { surface, plan, productId, hasOfferCode });
-      const synced = await syncTransactionWithServer(result, surface);
-      if (!synced) return false;
-
       toast({
         title: "Premium unlocked",
         description: "Cosmiq Pro is now active on your account.",
@@ -256,7 +183,7 @@ export function useAppleSubscription() {
     } finally {
       setLoading(false);
     }
-  }, [hasOfferCode, offerCodePurchaseReady, purchase, redeemOfferCode, syncTransactionWithServer, toast, user?.id]);
+  }, [hasOfferCode, offerCodePurchaseReady, purchase, redeemOfferCode, toast, user?.id]);
 
   const handleRestore = useCallback(async (surface: string = "paywall") => {
     if (!isIAPAvailable()) {
@@ -272,12 +199,6 @@ export function useAppleSubscription() {
     try {
       trackPaywallEvent("restore_started", { surface });
       const entitlement = await restorePurchases();
-      if (entitlement) {
-        const synced = await syncTransactionWithServer(entitlement, surface);
-        if (!synced) return false;
-      } else {
-        await refreshAccessQueries();
-      }
 
       trackPaywallEvent("restore_completed", { surface });
       toast({
@@ -299,7 +220,7 @@ export function useAppleSubscription() {
     } finally {
       setLoading(false);
     }
-  }, [refreshAccessQueries, restorePurchases, syncTransactionWithServer, toast]);
+  }, [restorePurchases, toast]);
 
   const handleManageSubscriptions = useCallback(async () => {
     if (!isIAPAvailable()) {

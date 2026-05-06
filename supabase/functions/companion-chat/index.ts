@@ -3,7 +3,6 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
-import { hasPremiumAccess } from "../_shared/premiumAccess.ts";
 import {
   buildCostGuardrailBlockedResponse,
   createCostGuardrailSession,
@@ -208,6 +207,19 @@ const chooseBridgeReply = (message: string) => {
 
   return "That sounds like planning work. I’m switching us to Plan so I can shape it into confirmable changes without saving anything automatically.";
 };
+
+async function ensurePremiumAccess(supabase: any, userId: string) {
+  const nowIso = new Date().toISOString();
+  const { count, error } = await supabase
+    .from("subscriptions")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .in("status", ["active", "trialing"])
+    .gte("current_period_end", nowIso);
+
+  if (error) throw error;
+  return (count ?? 0) > 0;
+}
 
 async function enforceDailyTurnCap(supabase: any, userId: string) {
   const { count, error } = await supabase
@@ -720,9 +732,9 @@ export const handleCompanionChatRequest = async (req: Request) => {
     const surface = normalizeCompanionChatSurface(parsed.data.surface);
 
     if (surfaceRequiresPremiumAccess(surface)) {
-      const hasPremium = await hasPremiumAccess(protectedRequest.supabase, userId);
+      const hasPremiumAccess = await ensurePremiumAccess(protectedRequest.supabase, userId);
 
-      if (!hasPremium) {
+      if (!hasPremiumAccess) {
         return createSafeErrorResponse(req, {
           status: 403,
           code: "PREMIUM_REQUIRED",
