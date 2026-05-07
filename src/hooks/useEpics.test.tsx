@@ -969,6 +969,210 @@ describe("useEpics", () => {
     );
   });
 
+  it("shifts a new campaign ritual away from active campaign time conflicts", async () => {
+    mocks.loadLocalEpicsMock.mockResolvedValue([
+      {
+        ...buildActiveEpic("epic-existing"),
+        epic_habits: [
+          {
+            habit_id: "habit-existing",
+            habits: {
+              id: "habit-existing",
+              title: "Existing morning focus",
+              difficulty: "easy",
+              description: null,
+              frequency: "daily",
+              estimated_minutes: 30,
+              custom_days: null,
+              custom_month_days: null,
+              preferred_time: "08:00",
+              category: null,
+            },
+          },
+        ],
+      },
+    ]);
+
+    const habitsInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const epicsInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const linksInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const dailyTasksUpsertMock = vi.fn().mockResolvedValue({ error: null });
+
+    mocks.fromMock.mockImplementation((table: string) => {
+      if (table === "habits") {
+        return {
+          insert: habitsInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "epics") {
+        return {
+          insert: epicsInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "epic_habits") {
+        return {
+          insert: linksInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "daily_tasks") {
+        return {
+          upsert: dailyTasksUpsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      return createDefaultSupabaseTableMock();
+    });
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.createEpic({
+        title: "Second Morning Campaign",
+        target_days: 14,
+        habits: [
+          {
+            title: "New morning focus",
+            difficulty: "medium",
+            frequency: "daily",
+            custom_days: [0, 1, 2, 3, 4, 5, 6],
+            preferred_time: "08:00",
+            estimated_minutes: 30,
+          },
+        ],
+      });
+    });
+
+    expect(habitsInsertMock).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({
+        title: "New morning focus",
+        preferred_time: "08:30",
+      }),
+    ]));
+    expect(dailyTasksUpsertMock).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          task_text: "New morning focus",
+          scheduled_time: "08:30",
+          estimated_duration: 30,
+        }),
+      ]),
+      expect.objectContaining({
+        onConflict: "user_id,task_date,habit_source_id",
+      }),
+    );
+  });
+
+  it("spreads same-time rituals inside a new campaign before creating tasks", async () => {
+    const habitsInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const epicsInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const linksInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const dailyTasksUpsertMock = vi.fn().mockResolvedValue({ error: null });
+
+    mocks.fromMock.mockImplementation((table: string) => {
+      if (table === "habits") {
+        return {
+          insert: habitsInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "epics") {
+        return {
+          insert: epicsInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "epic_habits") {
+        return {
+          insert: linksInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "daily_tasks") {
+        return {
+          upsert: dailyTasksUpsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      return createDefaultSupabaseTableMock();
+    });
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.createEpic({
+        title: "Stacked Morning Campaign",
+        target_days: 14,
+        habits: [
+          {
+            title: "Morning focus",
+            difficulty: "easy",
+            frequency: "daily",
+            custom_days: [0, 1, 2, 3, 4, 5, 6],
+            preferred_time: "08:00",
+            estimated_minutes: 30,
+          },
+          {
+            title: "Morning review",
+            difficulty: "easy",
+            frequency: "daily",
+            custom_days: [0, 1, 2, 3, 4, 5, 6],
+            preferred_time: "08:00",
+            estimated_minutes: 30,
+          },
+        ],
+      });
+    });
+
+    expect(habitsInsertMock).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({
+        title: "Morning focus",
+        preferred_time: "08:00",
+      }),
+      expect.objectContaining({
+        title: "Morning review",
+        preferred_time: "08:30",
+      }),
+    ]));
+    expect(dailyTasksUpsertMock).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          task_text: "Morning focus",
+          scheduled_time: "08:00",
+        }),
+        expect.objectContaining({
+          task_text: "Morning review",
+          scheduled_time: "08:30",
+        }),
+      ]),
+      expect.objectContaining({
+        onConflict: "user_id,task_date,habit_source_id",
+      }),
+    );
+  });
+
   it("computes a local end date before inserting a newly created campaign", async () => {
     const habitsInsertMock = vi.fn().mockResolvedValue({ error: null });
     const epicsInsertMock = vi.fn().mockResolvedValue({ error: null });

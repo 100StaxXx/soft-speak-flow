@@ -226,7 +226,7 @@ describe("guided tutorial helpers", () => {
       "Tap 'Plan day.'",
     );
     expect(getMentorInstructionLines("hatch_companion", null, "sage")[0]).toBe(
-      "Tap 'Hatch.'",
+      "Scroll down and tap 'Hatch.'",
     );
 
     expect(getMentorInstructionLines("new_goal", null, "rival")[0]).toBe(
@@ -475,7 +475,7 @@ describe("guided tutorial first-value loop", () => {
     await waitFor(() => {
       expect(result.current.currentStep).toBe("hatch_companion");
       expect(result.current.stepRoute).toBe("/companion");
-      expect(result.current.dialogueText).toBe("Tap 'Hatch.'");
+      expect(result.current.dialogueText).toBe("Scroll down and tap 'Hatch.'");
       expect(result.current.activeTargetSelectors).toEqual([]);
       expect(result.current.activeTargetSelector).toBeNull();
       expect(mocks.state.awardCustomXP).not.toHaveBeenCalledWith(

@@ -7,7 +7,7 @@ import { useXPRewards } from "@/hooks/useXPRewards";
 import { CAMPAIGN_XP_REWARDS } from "@/config/xpRewards";
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
 import { useAchievements } from "@/hooks/useAchievements";
-import { format } from "date-fns";
+import { addDays, format, getDay } from "date-fns";
 import type { DailyTask } from "@/services/dailyTasksRemote";
 import type { StoryTypeSlug } from "@/types/narrativeTypes";
 import { getEpicsQueryKey, type EpicRecord } from "@/hooks/epicsQuery";
@@ -61,7 +61,9 @@ import {
   reconcileHabitLinkedTasks,
   type HabitTaskReconciliationResult,
   type HabitTaskTemplate,
+  type NormalizedRitualSchedule,
 } from "@/hooks/habitTaskReconciliation";
+import { isHabitScheduledForDate } from "@/utils/habitSchedule";
 
 const normalizeDifficulty = (value: string): "easy" | "medium" | "hard" => {
   const lower = value?.toLowerCase()?.trim() || "medium";
@@ -537,6 +539,11 @@ const normalizeFingerprintText = (value: string | null | undefined): string | nu
 
 const CAMPAIGN_RITUAL_TIME_FALLBACKS = ["08:00", "10:00", "14:00", "17:00", "19:00", "20:30"];
 const MAX_CAMPAIGN_RITUAL_ESTIMATED_MINUTES = 1440;
+const CAMPAIGN_RITUAL_DEFAULT_ESTIMATED_MINUTES = 30;
+const CAMPAIGN_RITUAL_SCHEDULING_HORIZON_DAYS = 30;
+const CAMPAIGN_RITUAL_SCHEDULING_STEP_MINUTES = 15;
+const CAMPAIGN_RITUAL_EARLIEST_START_MINUTES = 6 * 60;
+const CAMPAIGN_RITUAL_LATEST_END_MINUTES = 22 * 60;
 
 const normalizeCampaignHabitPreferredTime = (
   values: Array<string | null | undefined>,
@@ -570,6 +577,239 @@ const normalizeCampaignHabitEstimatedMinutes = (...values: Array<number | null |
   return null;
 };
 
+type CampaignRitualScheduleInput = {
+  frequency: string;
+  custom_days: number[] | null;
+  custom_month_days: number[] | null;
+};
+
+type CampaignRitualSchedulingBlock = {
+  schedule: NormalizedRitualSchedule;
+  startMinutes: number;
+  endMinutes: number;
+};
+
+const parseCampaignClockMinutes = (value: string | null | undefined): number | null => {
+  const normalized = normalizeCampaignHabitPreferredTime([value], null);
+  if (!normalized) return null;
+
+  const [hours, minutes] = normalized.split(":").map((part) => Number.parseInt(part, 10));
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+
+  return (hours * 60) + minutes;
+};
+
+const formatCampaignClockMinutes = (value: number): string => {
+  const normalized = Math.max(0, Math.min(23 * 60 + 59, value));
+  const hours = Math.floor(normalized / 60);
+  const minutes = normalized % 60;
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+};
+
+const normalizeCampaignSchedulingDuration = (estimatedMinutes: number | null | undefined): number => {
+  if (
+    typeof estimatedMinutes === "number"
+    && Number.isFinite(estimatedMinutes)
+    && estimatedMinutes > 0
+  ) {
+    return Math.min(Math.ceil(estimatedMinutes), MAX_CAMPAIGN_RITUAL_ESTIMATED_MINUTES);
+  }
+
+  return CAMPAIGN_RITUAL_DEFAULT_ESTIMATED_MINUTES;
+};
+
+const toPlannerWeekday = (targetDate: Date): number => {
+  const jsDay = getDay(targetDate);
+  return jsDay === 0 ? 6 : jsDay - 1;
+};
+
+const schedulesCanOccurTogether = (
+  left: NormalizedRitualSchedule,
+  right: NormalizedRitualSchedule,
+): boolean => {
+  const start = new Date();
+
+  for (let offset = 0; offset <= CAMPAIGN_RITUAL_SCHEDULING_HORIZON_DAYS; offset += 1) {
+    const targetDate = addDays(start, offset);
+    const weekday = toPlannerWeekday(targetDate);
+
+    if (
+      isHabitScheduledForDate(left, targetDate, weekday)
+      && isHabitScheduledForDate(right, targetDate, weekday)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+const intervalsOverlap = (
+  leftStart: number,
+  leftEnd: number,
+  rightStart: number,
+  rightEnd: number,
+): boolean => leftStart < rightEnd && leftEnd > rightStart;
+
+const buildCampaignRitualSchedulingBlock = (input: {
+  preferred_time: string | null;
+  estimated_minutes: number | null;
+  frequency: string;
+  custom_days: number[] | null;
+  custom_month_days: number[] | null;
+}): CampaignRitualSchedulingBlock | null => {
+  const startMinutes = parseCampaignClockMinutes(input.preferred_time);
+  if (startMinutes === null) return null;
+
+  const duration = normalizeCampaignSchedulingDuration(input.estimated_minutes);
+
+  return {
+    schedule: normalizeRitualSchedule({
+      frequency: input.frequency,
+      customDays: input.custom_days,
+      customMonthDays: input.custom_month_days,
+    }),
+    startMinutes,
+    endMinutes: Math.min(24 * 60, startMinutes + duration),
+  };
+};
+
+const collectActiveCampaignRitualSchedulingBlocks = (
+  activeEpics: EpicRecord[],
+): CampaignRitualSchedulingBlock[] =>
+  activeEpics
+    .filter((epic) => epic.status === "active")
+    .flatMap((epic) => epic.epic_habits ?? [])
+    .map((link) => link.habits)
+    .filter((habit): habit is NonNullable<typeof habit> => Boolean(habit))
+    .map((habit) =>
+      buildCampaignRitualSchedulingBlock({
+        preferred_time: habit.preferred_time ?? null,
+        estimated_minutes: habit.estimated_minutes ?? null,
+        frequency: habit.frequency ?? "daily",
+        custom_days: habit.custom_days ?? null,
+        custom_month_days: habit.custom_month_days ?? null,
+      })
+    )
+    .filter((block): block is CampaignRitualSchedulingBlock => Boolean(block));
+
+const buildCampaignRitualTimeCandidates = (
+  preferredTime: string | null,
+  fallbackTime: string,
+  durationMinutes: number,
+): string[] => {
+  const preferredMinutes =
+    parseCampaignClockMinutes(preferredTime) ??
+      parseCampaignClockMinutes(fallbackTime) ??
+      parseCampaignClockMinutes(CAMPAIGN_RITUAL_TIME_FALLBACKS[0]) ??
+      CAMPAIGN_RITUAL_EARLIEST_START_MINUTES;
+  const latestStart = CAMPAIGN_RITUAL_LATEST_END_MINUTES - durationMinutes;
+  const candidates: string[] = [];
+  const seen = new Set<string>();
+
+  const addCandidate = (minutes: number) => {
+    if (minutes < CAMPAIGN_RITUAL_EARLIEST_START_MINUTES || minutes > latestStart) return;
+    const alignedMinutes = Math.round(minutes / CAMPAIGN_RITUAL_SCHEDULING_STEP_MINUTES) *
+      CAMPAIGN_RITUAL_SCHEDULING_STEP_MINUTES;
+    if (alignedMinutes < CAMPAIGN_RITUAL_EARLIEST_START_MINUTES || alignedMinutes > latestStart) return;
+
+    const clock = formatCampaignClockMinutes(alignedMinutes);
+    if (seen.has(clock)) return;
+    seen.add(clock);
+    candidates.push(clock);
+  };
+
+  addCandidate(preferredMinutes);
+
+  for (
+    let offset = CAMPAIGN_RITUAL_SCHEDULING_STEP_MINUTES;
+    offset <= 8 * 60;
+    offset += CAMPAIGN_RITUAL_SCHEDULING_STEP_MINUTES
+  ) {
+    addCandidate(preferredMinutes + offset);
+    addCandidate(preferredMinutes - offset);
+  }
+
+  for (const fallback of CAMPAIGN_RITUAL_TIME_FALLBACKS) {
+    const fallbackMinutes = parseCampaignClockMinutes(fallback);
+    if (fallbackMinutes !== null) addCandidate(fallbackMinutes);
+  }
+
+  for (
+    let minutes = CAMPAIGN_RITUAL_EARLIEST_START_MINUTES;
+    minutes <= latestStart;
+    minutes += CAMPAIGN_RITUAL_SCHEDULING_STEP_MINUTES
+  ) {
+    addCandidate(minutes);
+  }
+
+  return candidates;
+};
+
+const isCampaignRitualCandidateAvailable = ({
+  candidateTime,
+  durationMinutes,
+  schedule,
+  occupied,
+}: {
+  candidateTime: string;
+  durationMinutes: number;
+  schedule: NormalizedRitualSchedule;
+  occupied: CampaignRitualSchedulingBlock[];
+}): boolean => {
+  const startMinutes = parseCampaignClockMinutes(candidateTime);
+  if (startMinutes === null) return false;
+
+  const endMinutes = startMinutes + durationMinutes;
+
+  return !occupied.some((block) =>
+    intervalsOverlap(startMinutes, endMinutes, block.startMinutes, block.endMinutes)
+    && schedulesCanOccurTogether(schedule, block.schedule)
+  );
+};
+
+const chooseSmartCampaignRitualTime = ({
+  preferredTime,
+  fallbackTime,
+  estimatedMinutes,
+  scheduleInput,
+  occupied,
+}: {
+  preferredTime: string | null;
+  fallbackTime: string;
+  estimatedMinutes: number | null;
+  scheduleInput: CampaignRitualScheduleInput;
+  occupied: CampaignRitualSchedulingBlock[];
+}): string | null => {
+  const normalizedPreferred = normalizeCampaignHabitPreferredTime([preferredTime], null);
+  const normalizedFallback = normalizeCampaignHabitPreferredTime([fallbackTime], CAMPAIGN_RITUAL_TIME_FALLBACKS[0]);
+  if (!normalizedFallback) return normalizedPreferred;
+
+  const durationMinutes = normalizeCampaignSchedulingDuration(estimatedMinutes);
+  const schedule = normalizeRitualSchedule({
+    frequency: scheduleInput.frequency,
+    customDays: scheduleInput.custom_days,
+    customMonthDays: scheduleInput.custom_month_days,
+  });
+
+  const candidates = buildCampaignRitualTimeCandidates(
+    normalizedPreferred,
+    normalizedFallback,
+    durationMinutes,
+  );
+  const selectedTime = candidates.find((candidateTime) =>
+    isCampaignRitualCandidateAvailable({
+      candidateTime,
+      durationMinutes,
+      schedule,
+      occupied,
+    })
+  );
+
+  return selectedTime ?? normalizedPreferred ?? normalizedFallback;
+};
+
 const sortNumbers = (values: number[] | null | undefined): number[] | null =>
   values?.length ? [...values].sort((left, right) => left - right) : null;
 
@@ -600,7 +840,8 @@ const normalizeFingerprintHabit = (
   frequency: normalizeFrequency(habit.frequency),
   custom_days: sortNumbers(habit.custom_days),
   custom_month_days: sortNumbers(habit.custom_month_days),
-  preferred_time: normalizeFingerprintText(habit.preferred_time),
+  // Preferred times can be shifted by smart scheduling, so they are not part of create idempotency.
+  preferred_time: null,
   estimated_minutes: habit.estimated_minutes ?? null,
   category: normalizeFingerprintText(habit.category),
   reminder_enabled: Boolean(habit.reminder_enabled),
@@ -1972,6 +2213,9 @@ export const useEpics = (options: EpicsOptions = {}) => {
         }
 
         const rememberedPayload = getRememberedEpicCreatePayload(fingerprint);
+        const existingCampaignRitualSchedulingBlocks = rememberedPayload
+          ? []
+          : collectActiveCampaignRitualSchedulingBlocks(await loadLocalEpics(user.id));
         const payload: LocalEpicPayload = rememberedPayload
           ? withNormalizedCampaignMilestonePercents(rememberedPayload)
           : (() => {
@@ -1979,28 +2223,50 @@ export const useEpics = (options: EpicsOptions = {}) => {
             const startDate = nowIso.split("T")[0];
             const epicId = createOfflinePlannerId("epic");
             const inviteCode = `EPIC-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-            const habits = epicData.habits.map((habit, index) => ({
-              id: createOfflinePlannerId("habit"),
-              user_id: user.id,
-              title: habit.title,
-              description: habit.description || null,
-              difficulty: normalizeDifficulty(habit.difficulty),
-              frequency: normalizeFrequency(habit.frequency),
-              custom_days: habit.custom_days?.length ? habit.custom_days : null,
-              custom_month_days: habit.custom_month_days?.length ? habit.custom_month_days : null,
-              preferred_time: normalizeCampaignHabitPreferredTime(
-                [habit.preferred_time, habit.preferredTime],
-                CAMPAIGN_RITUAL_TIME_FALLBACKS[index % CAMPAIGN_RITUAL_TIME_FALLBACKS.length],
-              ),
-              reminder_enabled: habit.reminder_enabled || false,
-              reminder_minutes_before: habit.reminder_minutes_before || 15,
-              estimated_minutes: normalizeCampaignHabitEstimatedMinutes(habit.estimated_minutes, habit.estimatedMinutes),
-              category: habit.category?.trim() || null,
-              is_active: true,
-              current_streak: 0,
-              longest_streak: 0,
-              created_at: nowIso,
-            })) satisfies LocalHabitRow[];
+            const occupiedRitualBlocks = [...existingCampaignRitualSchedulingBlocks];
+            const habits = epicData.habits.map((habit, index) => {
+              const frequency = normalizeFrequency(habit.frequency);
+              const customDays = habit.custom_days?.length ? habit.custom_days : null;
+              const customMonthDays = habit.custom_month_days?.length ? habit.custom_month_days : null;
+              const estimatedMinutes = normalizeCampaignHabitEstimatedMinutes(
+                habit.estimated_minutes,
+                habit.estimatedMinutes,
+              );
+              const preferredTime = chooseSmartCampaignRitualTime({
+                preferredTime: normalizeCampaignHabitPreferredTime([habit.preferred_time, habit.preferredTime], null),
+                fallbackTime: CAMPAIGN_RITUAL_TIME_FALLBACKS[index % CAMPAIGN_RITUAL_TIME_FALLBACKS.length],
+                estimatedMinutes,
+                scheduleInput: {
+                  frequency,
+                  custom_days: customDays,
+                  custom_month_days: customMonthDays,
+                },
+                occupied: occupiedRitualBlocks,
+              });
+              const nextHabit: LocalHabitRow = {
+                id: createOfflinePlannerId("habit"),
+                user_id: user.id,
+                title: habit.title,
+                description: habit.description || null,
+                difficulty: normalizeDifficulty(habit.difficulty),
+                frequency,
+                custom_days: customDays,
+                custom_month_days: customMonthDays,
+                preferred_time: preferredTime,
+                reminder_enabled: habit.reminder_enabled || false,
+                reminder_minutes_before: habit.reminder_minutes_before || 15,
+                estimated_minutes: estimatedMinutes,
+                category: habit.category?.trim() || null,
+                is_active: true,
+                current_streak: 0,
+                longest_streak: 0,
+                created_at: nowIso,
+              };
+              const block = buildCampaignRitualSchedulingBlock(nextHabit);
+              if (block) occupiedRitualBlocks.push(block);
+
+              return nextHabit;
+            }) satisfies LocalHabitRow[];
 
             const epic: LocalEpicRow = {
               id: epicId,
@@ -2775,6 +3041,25 @@ export const useEpics = (options: EpicsOptions = {}) => {
           throw new Error("Only active campaigns can receive new rituals");
         }
 
+        const frequency = normalizeFrequency(input.frequency);
+        const customDays = input.customDays?.length ? [...input.customDays] : null;
+        const customMonthDays = input.customMonthDays?.length ? [...input.customMonthDays] : null;
+        const estimatedMinutes = normalizeCampaignHabitEstimatedMinutes(input.estimatedMinutes);
+        const occupiedRitualBlocks = collectActiveCampaignRitualSchedulingBlocks(localEpics);
+        const preferredTime = chooseSmartCampaignRitualTime({
+          preferredTime: normalizeCampaignHabitPreferredTime([input.preferredTime], null),
+          fallbackTime: CAMPAIGN_RITUAL_TIME_FALLBACKS[
+            (epic.epic_habits?.length ?? occupiedRitualBlocks.length) % CAMPAIGN_RITUAL_TIME_FALLBACKS.length
+          ],
+          estimatedMinutes,
+          scheduleInput: {
+            frequency,
+            custom_days: customDays,
+            custom_month_days: customMonthDays,
+          },
+          occupied: occupiedRitualBlocks,
+        });
+
         const payload: LocalCampaignRitualPayload = {
           habit: {
             id: createOfflinePlannerId("habit"),
@@ -2782,12 +3067,12 @@ export const useEpics = (options: EpicsOptions = {}) => {
             title: trimmedTitle,
             description: input.description?.trim() ? input.description.trim() : null,
             difficulty: normalizeDifficulty(input.difficulty),
-            frequency: normalizeFrequency(input.frequency),
-            estimated_minutes: input.estimatedMinutes ?? null,
-            preferred_time: input.preferredTime ?? null,
+            frequency,
+            estimated_minutes: estimatedMinutes,
+            preferred_time: preferredTime,
             category: input.category ?? null,
-            custom_days: input.customDays?.length ? [...input.customDays] : null,
-            custom_month_days: input.customMonthDays?.length ? [...input.customMonthDays] : null,
+            custom_days: customDays,
+            custom_month_days: customMonthDays,
             reminder_enabled: input.reminderEnabled ?? false,
             reminder_minutes_before: input.reminderMinutesBefore ?? 15,
             is_active: true,

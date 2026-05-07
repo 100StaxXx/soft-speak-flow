@@ -275,7 +275,7 @@ describe("MentorGuidanceCard", () => {
     mocks.guidance.progressText = "Step 2 of 3";
     mocks.guidance.activeTargetSelectors = [];
     mocks.guidance.activeTargetSelector = null;
-    mocks.guidance.dialogueText = "Tap 'Hatch.'";
+    mocks.guidance.dialogueText = "Scroll down and tap 'Hatch.'";
     mocks.guidance.dialogueSupportText = "Your Companion is ready.";
     document.body.innerHTML = `
       <header data-tour="companion-header">Companion</header>
@@ -320,7 +320,7 @@ describe("MentorGuidanceCard", () => {
     mocks.guidance.progressText = "Step 2 of 3";
     mocks.guidance.activeTargetSelectors = [];
     mocks.guidance.activeTargetSelector = null;
-    mocks.guidance.dialogueText = "Tap 'Hatch.'";
+    mocks.guidance.dialogueText = "Scroll down and tap 'Hatch.'";
     mocks.guidance.dialogueSupportText = "Your Companion is ready.";
     let avoidTop = 180;
     document.body.innerHTML = `
@@ -668,7 +668,7 @@ describe("MentorGuidanceCard CSS var", () => {
     mocks.guidance.currentStep = "hatch_companion";
     mocks.guidance.activeTargetSelectors = [];
     mocks.guidance.activeTargetSelector = null;
-    mocks.guidance.dialogueText = "Tap 'Hatch.'";
+    mocks.guidance.dialogueText = "Scroll down and tap 'Hatch.'";
     document.documentElement.style.setProperty("--mentor-guidance-bottom-inset", "224px");
     document.body.innerHTML = `<header data-tour="companion-header">Companion</header>`;
     Object.defineProperty(window, "innerHeight", {

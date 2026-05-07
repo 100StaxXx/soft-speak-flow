@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -164,6 +164,27 @@ describe("EvolutionMomentsPanel", () => {
     expect(video).not.toHaveAttribute("controls");
     expect(video).toHaveAttribute("autoplay");
     expect(video).toHaveAttribute("playsinline");
+  });
+
+  it("autoplays the evolution video again when the moment is reopened", async () => {
+    renderPanel();
+
+    const momentCard = await screen.findByRole("button", { name: /stage 5 evolution/i });
+    fireEvent.click(momentCard);
+
+    expect(await screen.findByTestId("evolution-moment-video")).toHaveAttribute("autoplay");
+
+    fireEvent.click(screen.getByRole("button", { name: /close/i }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: /stage 5 evolution/i })).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(momentCard);
+
+    const reopenedVideo = await screen.findByTestId("evolution-moment-video");
+    expect(reopenedVideo).toHaveAttribute("src", "https://example.com/stage-5.mp4");
+    expect(reopenedVideo).toHaveAttribute("autoplay");
+    expect(reopenedVideo).toHaveAttribute("playsinline");
   });
 
   it("shows pending animation rows as disabled generating cards", async () => {
