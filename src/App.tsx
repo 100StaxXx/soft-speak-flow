@@ -199,14 +199,7 @@ MentorTutorialLayer.displayName = "MentorTutorialLayer";
 
 const DEFAULT_SONNER_BOTTOM_OFFSET = "calc(env(safe-area-inset-bottom, 0px) + 16px)";
 const BOTTOM_NAV_SONNER_BOTTOM_OFFSET = "calc(var(--bottom-nav-runtime-offset, var(--bottom-nav-safe-offset)) + 12px)";
-const NOTIFICATION_TRAY_HIDDEN_PATHS = new Set([
-  "/auth",
-  "/auth/reset-password",
-  "/welcome",
-  "/onboarding",
-  "/terms",
-  "/privacy",
-]);
+const NOTIFICATION_TRAY_VISIBLE_PATHS = new Set(["/mentor"]);
 
 const MentorConnectedThemeProvider = memo(({ children }: { children: ReactNode }) => {
   const { mentorId } = useMentorConnection();
@@ -352,7 +345,7 @@ const AppContent = memo(() => {
 
   const activeMainTabPath = isMainTabPath(location.pathname) ? location.pathname : null;
   const showBottomNav = shouldShowBottomNav(location.pathname, Boolean(session?.user));
-  const showNotificationTray = Boolean(session?.user) && !NOTIFICATION_TRAY_HIDDEN_PATHS.has(location.pathname);
+  const showNotificationTray = Boolean(session?.user) && NOTIFICATION_TRAY_VISIBLE_PATHS.has(location.pathname);
 
   useEffect(() => {
     const rootStyle = document.documentElement.style;
@@ -445,7 +438,7 @@ const AppContent = memo(() => {
                             </AnimatePresence>
                           )}
                           {showBottomNav && <BottomNav />}
-                          <GlobalNotificationTray enabled={showNotificationTray} />
+                          {showNotificationTray ? <GlobalNotificationTray /> : null}
                           <MentorTutorialLayer />
                           </Suspense>
                           </AstralEncounterProvider>
