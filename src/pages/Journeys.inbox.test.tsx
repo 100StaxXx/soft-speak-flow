@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Journeys from "./Journeys";
+import { JOURNEYS_RESET_TO_TODAY_EVENT } from "@/pages/journeysDateSync";
 
 const mocks = vi.hoisted(() => ({
   inboxTasks: [] as Array<{
@@ -74,6 +75,17 @@ const mocks = vi.hoisted(() => ({
   queueAction: vi.fn().mockResolvedValue(undefined),
   retryNow: vi.fn().mockResolvedValue(undefined),
   scrollIntoView: vi.fn(),
+  fetchDailyTaskByIdRemote: vi.fn().mockResolvedValue(null),
+  fetchHabitMaybeSingle: vi.fn().mockResolvedValue({
+    data: {
+      frequency: "daily",
+      custom_days: [],
+      custom_month_days: [],
+      description: null,
+    },
+    error: null,
+  }),
+  lastEditQuestTask: null as null | { id: string; task_text: string },
   activeEpics: [] as Array<{
     id: string;
     title: string;
@@ -236,11 +248,30 @@ vi.mock("@/components/StreakFreezePromptModal", () => ({
 }));
 
 vi.mock("@/features/quests/components/EditQuestDialog", () => ({
-  EditQuestDialog: () => null,
+  EditQuestDialog: ({ open, task }: { open: boolean; task?: { id: string; task_text: string } | null }) => {
+    mocks.lastEditQuestTask = task ?? null;
+    return open ? <div data-testid="edit-quest-dialog">{task?.task_text}</div> : null;
+  },
 }));
 
 vi.mock("@/components/EditRitualSheet", () => ({
-  EditRitualSheet: () => null,
+  EditRitualSheet: ({
+    open,
+    ritual,
+    onOpenChange,
+  }: {
+    open: boolean;
+    ritual?: { title?: string | null } | null;
+    onOpenChange?: (open: boolean) => void;
+  }) =>
+    open ? (
+      <div data-testid="edit-ritual-sheet">
+        <span>{ritual?.title}</span>
+        <button type="button" onClick={() => onOpenChange?.(false)}>
+          close-ritual
+        </button>
+      </div>
+    ) : null,
 }));
 
 vi.mock("@/components/HourlyViewModal", () => ({
@@ -297,6 +328,19 @@ vi.mock("@/hooks/useAuth", () => ({
   }),
 }));
 
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    from: () => {
+      const query = {
+        select: () => query,
+        eq: () => query,
+        maybeSingle: mocks.fetchHabitMaybeSingle,
+      };
+      return query;
+    },
+  },
+}));
+
 vi.mock("@/hooks/useProfile", () => ({
   useProfile: () => ({
     profile: {
@@ -332,6 +376,10 @@ vi.mock("@/hooks/useDailyTasks", () => ({
     isUpdating: false,
     isDeleting: false,
   }),
+}));
+
+vi.mock("@/services/dailyTasksRemote", () => ({
+  fetchDailyTaskByIdRemote: mocks.fetchDailyTaskByIdRemote,
 }));
 
 vi.mock("@/hooks/useInboxTasks", () => ({
@@ -505,6 +553,19 @@ describe("Journeys inbox integration", () => {
     mocks.toggleInboxTask.mockClear();
     mocks.deleteInboxTask.mockClear();
     mocks.scrollIntoView.mockClear();
+    mocks.fetchDailyTaskByIdRemote.mockReset();
+    mocks.fetchDailyTaskByIdRemote.mockResolvedValue(null);
+    mocks.fetchHabitMaybeSingle.mockReset();
+    mocks.fetchHabitMaybeSingle.mockResolvedValue({
+      data: {
+        frequency: "daily",
+        custom_days: [],
+        custom_month_days: [],
+        description: null,
+      },
+      error: null,
+    });
+    mocks.lastEditQuestTask = null;
     mocks.activeEpics = [];
     mocks.layoutMode = "mobile";
     mocks.weekCalendarTasks = [];
@@ -557,6 +618,150 @@ describe("Journeys inbox integration", () => {
     expect(screen.getByTestId("journeys-inbox-empty")).toBeInTheDocument();
 
     await waitFor(() => {
+      expect(mocks.scrollIntoView).toHaveBeenCalled();
+    });
+  });
+
+  it("opens a notification-linked scheduled quest from the taskId URL", async () => {
+    renderJourneys("/journeys?taskId=scheduled-1");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("edit-quest-dialog")).toHaveTextContent("Morning workout");
+      expect(mocks.lastEditQuestTask?.id).toBe("scheduled-1");
+    });
+  });
+
+  it("fetches and opens a future notification-linked quest outside the selected day", async () => {
+    mocks.dailyTasks = [];
+    mocks.fetchDailyTaskByIdRemote.mockResolvedValue({
+      id: "future-1",
+      user_id: "user-1",
+      task_text: "Future launch prep",
+      completed: false,
+      completed_at: null,
+      xp_reward: 15,
+      task_date: "2026-04-02",
+      scheduled_time: "10:00",
+      difficulty: "hard",
+      is_main_quest: false,
+      estimated_duration: null,
+      recurrence_pattern: null,
+      recurrence_days: null,
+      recurrence_month_days: null,
+      recurrence_custom_period: null,
+      recurrence_end_date: null,
+      is_recurring: false,
+      reminder_enabled: true,
+      reminder_minutes_before: 60,
+      reminder_offsets_minutes: [60],
+      reminder_sent_offsets_minutes: null,
+      reminder_sent: false,
+      parent_template_id: null,
+      category: null,
+      is_bonus: false,
+      created_at: null,
+      priority: null,
+      is_top_three: false,
+      actual_time_spent: null,
+      ai_generated: false,
+      context_id: null,
+      source: null,
+      habit_source_id: null,
+      epic_id: null,
+      contact_id: null,
+      auto_log_interaction: false,
+      image_url: null,
+      attachments: [],
+      notes: null,
+      location: null,
+      subtasks: [],
+    });
+
+    renderJourneys("/journeys?taskId=future-1");
+
+    await waitFor(() => {
+      expect(mocks.fetchDailyTaskByIdRemote).toHaveBeenCalledWith("user-1", "future-1");
+      expect(screen.getByTestId("edit-quest-dialog")).toHaveTextContent("Future launch prep");
+      expect(screen.getByTestId("todays-agenda-selected-date")).toHaveTextContent("2026-04-02");
+    });
+  });
+
+  it("clears the notification date pin after closing a notification-linked ritual", async () => {
+    mocks.dailyTasks = [];
+    mocks.fetchDailyTaskByIdRemote.mockResolvedValue({
+      id: "ritual-1",
+      user_id: "user-1",
+      task_text: "Future ritual prep",
+      completed: false,
+      completed_at: null,
+      xp_reward: 15,
+      task_date: "2026-04-02",
+      scheduled_time: "10:00",
+      difficulty: "medium",
+      is_main_quest: false,
+      estimated_duration: null,
+      recurrence_pattern: null,
+      recurrence_days: null,
+      recurrence_month_days: null,
+      recurrence_custom_period: null,
+      recurrence_end_date: null,
+      is_recurring: false,
+      reminder_enabled: true,
+      reminder_minutes_before: 60,
+      reminder_offsets_minutes: [60],
+      reminder_sent_offsets_minutes: null,
+      reminder_sent: false,
+      parent_template_id: null,
+      category: null,
+      is_bonus: false,
+      created_at: null,
+      priority: null,
+      is_top_three: false,
+      actual_time_spent: null,
+      ai_generated: false,
+      context_id: null,
+      source: null,
+      habit_source_id: "habit-1",
+      epic_id: null,
+      contact_id: null,
+      auto_log_interaction: false,
+      image_url: null,
+      attachments: [],
+      notes: null,
+      location: null,
+      subtasks: [],
+    });
+
+    renderJourneys("/journeys?taskId=ritual-1");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("edit-ritual-sheet")).toHaveTextContent("Future ritual prep");
+      expect(screen.getByTestId("todays-agenda-selected-date")).toHaveTextContent("2026-04-02");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "close-ritual" }));
+    window.dispatchEvent(new Event(JOURNEYS_RESET_TO_TODAY_EVENT));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("todays-agenda-selected-date")).not.toHaveTextContent("2026-04-02");
+    });
+  });
+
+  it("opens a notification-linked inbox quest from the taskId URL", async () => {
+    mocks.inboxTasks = [
+      {
+        id: "inbox-1",
+        task_text: "Email Alex",
+        completed: false,
+        task_date: null,
+        scheduled_time: null,
+      },
+    ];
+
+    renderJourneys("/journeys?taskId=inbox-1");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("edit-quest-dialog")).toHaveTextContent("Email Alex");
       expect(mocks.scrollIntoView).toHaveBeenCalled();
     });
   });

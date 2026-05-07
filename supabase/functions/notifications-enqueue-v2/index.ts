@@ -595,7 +595,7 @@ serve(async (req) => {
           summary: pepTalk?.summary ?? "Your daily pep talk is ready.",
           mentor_slug: pepTalk?.mentor_slug ?? null,
           type: "daily_pep",
-          url: "/pep-talks",
+          url: `/pep-talk/${push.daily_pep_talk_id}`,
         },
         companion: companionMap.get(push.user_id) ?? null,
       }));
@@ -663,7 +663,7 @@ serve(async (req) => {
           author: quote.author,
           mentor_slug: dailyQuote.mentor_slug,
           type: "daily_quote",
-          url: "/inspire?tab=quotes",
+          url: "/mentor",
         },
       }));
     }
@@ -675,7 +675,7 @@ serve(async (req) => {
       fetchPage: async (afterId, pageSize) => {
         let query = supabase
           .from("daily_tasks")
-          .select("id, user_id, task_text, xp_reward, task_date, scheduled_time, start_notification_sent, reminder_enabled, reminder_sent, reminder_minutes_before, reminder_offsets_minutes, reminder_sent_offsets_minutes, completed")
+          .select("id, user_id, task_text, xp_reward, task_date, scheduled_time, start_notification_sent, reminder_enabled, reminder_sent, reminder_minutes_before, reminder_offsets_minutes, reminder_sent_offsets_minutes, completed, habit_source_id")
           .gte("task_date", taskScanStartIso)
           .lte("task_date", taskScanEndIso)
           .eq("completed", false)
@@ -792,7 +792,7 @@ serve(async (req) => {
           habit_title: habit.title,
           local_date: reminder.habitLocalDate,
           type: "habit_reminder",
-          url: "/tasks",
+          url: "/journeys",
         },
       }));
     }

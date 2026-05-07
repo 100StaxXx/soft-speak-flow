@@ -5,6 +5,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import { buildCompletionFeedbackCopy } from "../../../src/shared/completionFeedbackCopy.ts";
 import {
   buildCostGuardrailBlockedResponse,
   createCostGuardrailSession,
@@ -36,6 +37,7 @@ const CompletionFeedbackRequestSchema = z.object({
 });
 
 const CompanionToneSchema = z.enum(["proud", "locked_in", "recovery", "calm", "hype"]);
+const GenerationSourceSchema = z.enum(["fallback", "ai"]);
 
 const CompletionFeedbackSchema = z.object({
   companion: z.object({
@@ -51,11 +53,13 @@ const CompletionFeedbackSchema = z.object({
     label: z.string().min(1).max(40),
     action: z.string().min(1).max(80),
   }).optional(),
+  generationSource: GenerationSourceSchema.optional(),
 });
 
 type CompletionFeedbackRequest = z.infer<typeof CompletionFeedbackRequestSchema>;
 type CompletionFeedback = z.infer<typeof CompletionFeedbackSchema>;
 type CompanionTone = z.infer<typeof CompanionToneSchema>;
+type GenerationSource = z.infer<typeof GenerationSourceSchema>;
 
 interface GenerateCompletionFeedbackDeps {
   protectRequest: typeof requireProtectedRequest;
@@ -334,55 +338,36 @@ export function shouldShowMentor(context: CompletionContext, signal: SignalScore
 }
 
 export function buildFallbackFeedback(context: CompletionContext): CompletionFeedback {
-  const title = context.title;
-  const campaign = context.campaignTitle;
-  let tone: CompanionTone = "proud";
-  let message: string;
-
-  if (context.completedAllRituals && campaign) {
-    tone = "hype";
-    message = `All rituals for ${campaign} are handled. That is momentum you can feel.`;
-  } else if (context.isRitual && campaign) {
-    tone = "locked_in";
-    message = `${title} is complete. ${campaign} just moved forward.`;
-  } else if (context.wasOverdue && campaign) {
-    tone = "recovery";
-    message = `You brought ${title} back on track for ${campaign}. That counts.`;
-  } else if (context.wasOverdue) {
-    tone = "recovery";
-    message = `You got ${title} done even after it slipped. Strong recovery.`;
-  } else if (context.isLateNight && context.isDifficult) {
-    tone = "locked_in";
-    message = `Late-night discipline on ${title}. That is the standard showing up.`;
-  } else if (context.isBuildingMomentum) {
-    tone = "locked_in";
-    message = `${title} is done, and the streak of completions is starting to move.`;
-  } else if (context.firstCompletionToday && campaign) {
-    tone = "proud";
-    message = `First win of the day: ${title}. ${campaign} just moved forward.`;
-  } else if (context.firstCompletionToday) {
-    tone = "proud";
-    message = `First win of the day: ${title}. Clean start.`;
-  } else if (context.isOverloaded) {
-    tone = "calm";
-    message = `${title} is off the board. One less thing pulling at you.`;
-  } else if (campaign) {
-    tone = "proud";
-    message = `${title} is done. Quiet progress toward ${campaign}.`;
-  } else {
-    tone = "proud";
-    message = `${title} is done. That is real progress.`;
-  }
+  const feedback = buildCompletionFeedbackCopy({
+    taskId: context.taskId,
+    title: context.title,
+    campaignTitle: context.campaignTitle,
+    completedAt: context.completedAt,
+    completionSource: context.completionSource,
+    isRitual: context.isRitual,
+    completedAllRituals: context.completedAllRituals,
+    wasOverdue: context.wasOverdue,
+    isLateNight: context.isLateNight,
+    isDifficult: context.isDifficult,
+    firstCompletionToday: context.firstCompletionToday,
+    isBuildingMomentum: context.isBuildingMomentum,
+    isOverloaded: context.isOverloaded,
+  });
 
   return {
     companion: {
-      message: truncateSentence(message),
-      tone,
+      message: truncateSentence(feedback.message),
+      tone: feedback.tone as CompanionTone,
     },
+    generationSource: feedback.generationSource,
   };
 }
 
-function sanitizeFeedback(feedback: CompletionFeedback, fallback: CompletionFeedback): CompletionFeedback {
+function sanitizeFeedback(
+  feedback: CompletionFeedback,
+  fallback: CompletionFeedback,
+  generationSource: GenerationSource,
+): CompletionFeedback {
   const companionMessage = truncateSentence(feedback.companion.message);
   const mentor = feedback.mentor?.show
     ? {
@@ -399,6 +384,7 @@ function sanitizeFeedback(feedback: CompletionFeedback, fallback: CompletionFeed
     },
     ...(mentor ? { mentor } : {}),
     ...(feedback.followUp ? { followUp: feedback.followUp } : {}),
+    generationSource,
   };
 }
 
@@ -661,7 +647,7 @@ async function generateAiFeedback(
 
   try {
     const parsed = CompletionFeedbackSchema.safeParse(JSON.parse(rawContent));
-    return parsed.success ? parsed.data : null;
+    return parsed.success ? { ...parsed.data, generationSource: "ai" } : null;
   } catch {
     return null;
   }
@@ -746,7 +732,7 @@ export async function handleGenerateCompletionFeedback(
       );
     }
 
-    const output = sanitizeFeedback(feedback ?? fallback, fallback);
+    const output = sanitizeFeedback(feedback ?? fallback, fallback, feedback ? "ai" : "fallback");
     if (!mentorDecision.show) {
       delete output.mentor;
     }

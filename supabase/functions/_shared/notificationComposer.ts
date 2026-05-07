@@ -38,6 +38,12 @@ function asNumber(value: unknown, fallback = 0): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+function isRitualTaskPayload(payload: Record<string, unknown>): boolean {
+  return payload.is_ritual === true
+    || asString(payload.habit_source_id).trim().length > 0
+    || asString(payload.habitSourceId).trim().length > 0;
+}
+
 function formatLeadMinutes(minutesBefore: number): string {
   if (minutesBefore >= 1440) {
     const days = Math.floor(minutesBefore / 1440);
@@ -82,21 +88,23 @@ export function composeNotificationCopy(input: NotificationComposeInput): Notifi
     }
 
     case "task_start": {
-      const taskText = asString(payload.task_text, "Your quest");
+      const isRitualTask = isRitualTaskPayload(payload);
+      const taskText = asString(payload.task_text, isRitualTask ? "Your ritual" : "Your quest");
       const xpReward = asNumber(payload.xp_reward, 0);
       return {
-        title: "Quest starting now",
+        title: isRitualTask ? "Ritual starting now" : "Quest starting now",
         body: xpReward > 0 ? `${taskText} (+${xpReward} XP)` : taskText,
       };
     }
 
     case "task_reminder": {
-      const taskText = asString(payload.task_text, "Your quest");
+      const isRitualTask = isRitualTaskPayload(payload);
+      const taskText = asString(payload.task_text, isRitualTask ? "Your ritual" : "Your quest");
       const xpReward = asNumber(payload.xp_reward, 0);
       const leadMinutes = asNumber(payload.reminder_minutes_before, 15);
       const leadLabel = formatLeadMinutes(leadMinutes);
       return {
-        title: "Quest reminder",
+        title: isRitualTask ? "Ritual reminder" : "Quest reminder",
         body: xpReward > 0
           ? `${taskText} starts in ${leadLabel} (+${xpReward} XP)`
           : `${taskText} starts in ${leadLabel}`,

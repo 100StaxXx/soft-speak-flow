@@ -29,7 +29,7 @@ import { EditRitualSheet, RitualData } from "@/components/EditRitualSheet";
 import { useResilience } from "@/contexts/ResilienceContext";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
-import type { DailyTask } from "@/services/dailyTasksRemote";
+import { fetchDailyTaskByIdRemote, type DailyTask } from "@/services/dailyTasksRemote";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
 import { useHabitSurfacing } from "@/hooks/useHabitSurfacing";
 import { useRecurringTaskSpawner } from "@/hooks/useRecurringTaskSpawner";
@@ -352,6 +352,8 @@ const Journeys = () => {
   const showPathfinderRef = useRef(showPathfinder);
   const scheduledTimeUpdateQueueRef = useRef<Map<string, Promise<void>>>(new Map());
   const inboxSectionRef = useRef<HTMLDivElement | null>(null);
+  const notificationTaskProcessedRef = useRef<string | null>(null);
+  const notificationTaskDatePinnedRef = useRef(false);
   const hasInitializedInboxVisibilityRef = useRef(false);
   const tutorialOverlayCleanupSignatureRef = useRef<string | null>(null);
   const hasConsumedCreationPopupResumeRef = useRef(false);
@@ -362,6 +364,10 @@ const Journeys = () => {
 
   const isInboxRequested = useMemo(
     () => new URLSearchParams(location.search).get("section") === "inbox",
+    [location.search],
+  );
+  const requestedTaskId = useMemo(
+    () => new URLSearchParams(location.search).get("taskId"),
     [location.search],
   );
   const isJourneysRouteActive = isTabActive && location.pathname === JOURNEYS_ROUTE;
@@ -390,6 +396,10 @@ const Journeys = () => {
 
   // Edit ritual state (for tasks linked to habits)
   const [editingRitual, setEditingRitual] = useState<RitualData | null>(null);
+  const closeEditingRitual = useCallback(() => {
+    notificationTaskDatePinnedRef.current = false;
+    setEditingRitual(null);
+  }, []);
   const finishPlannerQuestEdit = useCallback((result: PlannerQuestEditSessionResult) => {
     const resolver = plannerQuestEditResolverRef.current;
     plannerQuestEditResolverRef.current = null;
@@ -445,6 +455,7 @@ const Journeys = () => {
 
   const handleEditQuestDialogOpenChange = useCallback((nextOpen: boolean) => {
     if (nextOpen) return;
+    notificationTaskDatePinnedRef.current = false;
     setEditingTask(null);
     if (plannerQuestEditSession?.editor === "update") {
       finishPlannerQuestEdit({ saved: false });
@@ -613,6 +624,10 @@ const Journeys = () => {
       return;
     }
 
+    if (notificationTaskDatePinnedRef.current) {
+      return;
+    }
+
     pendingSelectedDateResetRef.current = false;
     hasUserDateInteractionRef.current = false;
     setDatePillCenterRequestKey((currentKey) => currentKey + 1);
@@ -623,10 +638,12 @@ const Journeys = () => {
   }, []);
 
   const handleUserDateInteraction = useCallback(() => {
+    notificationTaskDatePinnedRef.current = false;
     hasUserDateInteractionRef.current = true;
   }, []);
 
   const handleUserDateSelect = useCallback((date: Date) => {
+    notificationTaskDatePinnedRef.current = false;
     hasUserDateInteractionRef.current = true;
     setSelectedDate(date);
   }, []);
@@ -832,7 +849,7 @@ const Journeys = () => {
     setShowMonthView(false);
     setShowPageInfo(false);
     setEditingTask(null);
-    setEditingRitual(null);
+    closeEditingRitual();
     closeInteractionModalRef.current();
 
     if (tutorialStep !== "create_quest") {
@@ -1212,6 +1229,102 @@ const Journeys = () => {
       clearPendingTask();
     }
   }, [isTabActive, pendingTaskId, dailyTasks, dailyTasksLoading, clearPendingTask, handleEditQuest]);
+
+  useEffect(() => {
+    if (!requestedTaskId) {
+      notificationTaskProcessedRef.current = null;
+    }
+  }, [requestedTaskId]);
+
+  useEffect(() => {
+    if (!isTabActive || !requestedTaskId || notificationTaskProcessedRef.current === requestedTaskId) {
+      return;
+    }
+
+    if (dailyTasksLoading || inboxLoading) {
+      return;
+    }
+
+    let cancelled = false;
+    notificationTaskProcessedRef.current = requestedTaskId;
+
+    const clearTaskIdFromUrl = () => {
+      const params = new URLSearchParams(location.search);
+      params.delete("taskId");
+      const nextSearch = params.toString();
+      navigate(
+        {
+          pathname: location.pathname,
+          search: nextSearch ? `?${nextSearch}` : "",
+        },
+        { replace: true },
+      );
+    };
+
+    const openNotificationTask = async () => {
+      let sourceTask = [...dailyTasks, ...inboxTasks].find((task) => task.id === requestedTaskId) ?? null;
+
+      if (!sourceTask && user?.id) {
+        try {
+          sourceTask = await fetchDailyTaskByIdRemote(user.id, requestedTaskId);
+        } catch (error) {
+          logger.warn("[Journeys] Failed to fetch notification-linked task:", {
+            taskId: requestedTaskId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          notificationTaskProcessedRef.current = null;
+          return;
+        }
+      }
+
+      if (cancelled) return;
+
+      if (!sourceTask) {
+        logger.log("[Journeys] Notification task not found:", requestedTaskId);
+        clearTaskIdFromUrl();
+        return;
+      }
+
+      logger.log("[Journeys] Opening notification-linked task:", requestedTaskId);
+
+      if (sourceTask.task_date) {
+        const taskDate = parseISO(`${sourceTask.task_date}T12:00:00`);
+        if (!Number.isNaN(taskDate.getTime())) {
+          notificationTaskDatePinnedRef.current = true;
+          if (!isSameDay(taskDate, selectedDate)) {
+            setSelectedDate(taskDate);
+          }
+        }
+      } else {
+        setIsInboxExpanded(true);
+        window.requestAnimationFrame(() => {
+          inboxSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      }
+
+      await handleEditQuest(sourceTask);
+      clearTaskIdFromUrl();
+    };
+
+    void openNotificationTask();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    dailyTasks,
+    dailyTasksLoading,
+    handleEditQuest,
+    inboxLoading,
+    inboxTasks,
+    isTabActive,
+    location.pathname,
+    location.search,
+    navigate,
+    requestedTaskId,
+    selectedDate,
+    user?.id,
+  ]);
   
   const tasksPerDay = useMemo(() => {
     const map: Record<string, number> = {};
@@ -1688,8 +1801,8 @@ const Journeys = () => {
       console.error('Error deleting ritual:', error);
       toast.error('Failed to delete ritual');
     }
-    setEditingRitual(null);
-  }, [user?.id, queryClient]);
+    closeEditingRitual();
+  }, [user?.id, queryClient, closeEditingRitual]);
 
   // Handle date pill click - just navigate to that day
   const handleDatePillClick = useCallback((date: Date) => {
@@ -1977,7 +2090,7 @@ const Journeys = () => {
         <EditRitualSheet
           ritual={editingRitual}
           open={!!editingRitual}
-          onOpenChange={(open) => !open && setEditingRitual(null)}
+          onOpenChange={(open) => !open && closeEditingRitual()}
           onDelete={handleDeleteRitual}
         />
 

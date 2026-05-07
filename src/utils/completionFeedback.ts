@@ -1,8 +1,10 @@
 import type {
   CompletionCompanionTone,
   CompletionFeedbackEvent,
+  CompletionFeedbackGenerationSource,
   CompletionFeedbackResponse,
 } from "@/types/completionFeedback";
+import { buildCompletionFeedbackCopy } from "@/shared/completionFeedbackCopy";
 
 const VALID_TONES = new Set<CompletionCompanionTone>([
   "proud",
@@ -10,6 +12,11 @@ const VALID_TONES = new Set<CompletionCompanionTone>([
   "recovery",
   "calm",
   "hype",
+]);
+
+const VALID_GENERATION_SOURCES = new Set<CompletionFeedbackGenerationSource>([
+  "fallback",
+  "ai",
 ]);
 
 const cleanText = (value: unknown): string | null => {
@@ -56,38 +63,28 @@ export const buildCompletionFeedbackFallback = (
   const lateNight = now.getHours() >= 22 || now.getHours() < 5;
   const difficult = event.difficulty?.toLowerCase() === "hard";
   const overdue = isProbablyOverdue(event, now);
-
-  let tone: CompletionCompanionTone = "proud";
-  let message: string;
-
-  if (event.completedAllRituals && campaign) {
-    tone = "hype";
-    message = `All rituals for ${campaign} are handled. That is momentum you can feel.`;
-  } else if (source === "ritual" && campaign) {
-    tone = "locked_in";
-    message = `${title} is complete. ${campaign} just moved forward.`;
-  } else if (overdue && campaign) {
-    tone = "recovery";
-    message = `You brought ${title} back on track for ${campaign}. That counts.`;
-  } else if (overdue) {
-    tone = "recovery";
-    message = `You got ${title} done even after it slipped. Strong recovery.`;
-  } else if (lateNight && difficult) {
-    tone = "locked_in";
-    message = `Late-night discipline on ${title}. That is the standard showing up.`;
-  } else if (campaign) {
-    tone = "proud";
-    message = `${title} is done. Quiet progress toward ${campaign}.`;
-  } else {
-    tone = "proud";
-    message = `${title} is done. That is real progress.`;
-  }
+  const feedback = buildCompletionFeedbackCopy({
+    taskId: event.taskId,
+    title,
+    campaignTitle: campaign,
+    completedAt: event.completedAt ?? now.toISOString(),
+    completionSource: source,
+    isRitual: source === "ritual",
+    completedAllRituals: event.completedAllRituals === true,
+    wasOverdue: overdue,
+    isLateNight: lateNight,
+    isDifficult: difficult,
+    firstCompletionToday: event.firstCompletionToday === true,
+    isBuildingMomentum: event.isBuildingMomentum === true,
+    isOverloaded: event.isOverloaded === true,
+  });
 
   return {
     companion: {
-      message: trimCompletionFeedbackLine(message),
-      tone,
+      message: trimCompletionFeedbackLine(feedback.message),
+      tone: feedback.tone,
     },
+    generationSource: feedback.generationSource,
   };
 };
 
@@ -122,6 +119,10 @@ export const normalizeCompletionFeedbackResponse = (
   const followUpRecord = asRecord(root?.followUp);
   const followUpLabel = cleanText(followUpRecord?.label);
   const followUpAction = cleanText(followUpRecord?.action);
+  const generationSource = typeof root?.generationSource === "string"
+    && VALID_GENERATION_SOURCES.has(root.generationSource as CompletionFeedbackGenerationSource)
+    ? root.generationSource as CompletionFeedbackGenerationSource
+    : undefined;
 
   return {
     companion: {
@@ -132,5 +133,6 @@ export const normalizeCompletionFeedbackResponse = (
     ...(followUpLabel && followUpAction
       ? { followUp: { label: followUpLabel, action: followUpAction } }
       : {}),
+    ...(generationSource ? { generationSource } : {}),
   };
 };

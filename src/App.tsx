@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation, Navigate, useNavigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { useEffect, Suspense, lazy, memo, useRef, useState, type ReactNode } from "react";
@@ -28,7 +28,12 @@ import { UpdateAvailablePrompt } from "@/components/UpdateAvailablePrompt";
 
 
 import { hideSplashScreen } from "@/utils/capacitor";
-import { initializeNativePush, isNativePushSupported, unregisterNativePush } from "@/utils/nativePushNotifications";
+import {
+  initializeNativePush,
+  isNativePushSupported,
+  NATIVE_PUSH_RECEIVED_EVENT,
+  unregisterNativePush,
+} from "@/utils/nativePushNotifications";
 import { logger } from "@/utils/logger";
 import { AstralEncounterProvider } from "@/components/astral-encounters";
 import { WeeklyRecapModal } from "@/components/WeeklyRecapModal";
@@ -47,10 +52,17 @@ import { ResilienceStatusBanner } from "@/components/resilience/ResilienceStatus
 import { MentorConnectionProvider, useMentorConnection } from "@/contexts/MentorConnectionContext";
 import { WallpaperManifestProvider } from "@/contexts/WallpaperManifestContext";
 import { GlobalWidgetSyncBridge } from "@/components/GlobalWidgetSyncBridge";
+import { GlobalNotificationTray } from "@/components/GlobalNotificationTray";
 import { StoreKitProvider } from "@/providers/StoreKitProvider";
 import { EVENING_REFLECTION_CANONICAL_PATH } from "@/utils/eveningReflectionNavigation";
 import { useWinWinKitSync } from "@/hooks/useWinWinKitSync";
 import { useCreationPopupResume } from "@/hooks/useCreationPopupResume";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  PUSH_NOTIFICATIONS_INBOX_QUERY_KEY,
+  PUSH_NOTIFICATIONS_UNREAD_COUNT_QUERY_KEY,
+} from "@/hooks/usePushNotificationsInbox";
+import { normalizePushNotificationNavigationDetail } from "@/utils/pushNotificationNavigation";
 
 // Lazy load pages for code splitting
 const Home = lazy(() => import("./pages/Home"));
@@ -187,6 +199,14 @@ MentorTutorialLayer.displayName = "MentorTutorialLayer";
 
 const DEFAULT_SONNER_BOTTOM_OFFSET = "calc(env(safe-area-inset-bottom, 0px) + 16px)";
 const BOTTOM_NAV_SONNER_BOTTOM_OFFSET = "calc(var(--bottom-nav-runtime-offset, var(--bottom-nav-safe-offset)) + 12px)";
+const NOTIFICATION_TRAY_HIDDEN_PATHS = new Set([
+  "/auth",
+  "/auth/reset-password",
+  "/welcome",
+  "/onboarding",
+  "/terms",
+  "/privacy",
+]);
 
 const MentorConnectedThemeProvider = memo(({ children }: { children: ReactNode }) => {
   const { mentorId } = useMentorConnection();
@@ -208,6 +228,7 @@ const AppContent = memo(() => {
   const previousPushUserIdRef = useRef<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   useWinWinKitSync();
   
@@ -228,14 +249,37 @@ const AppContent = memo(() => {
   // Respond to native push navigation events
   useEffect(() => {
     const handler = (event: Event) => {
-      const url = (event as CustomEvent<string>).detail;
-      if (typeof url === 'string') {
-        navigate(url);
+      const detail = normalizePushNotificationNavigationDetail((event as CustomEvent<unknown>).detail);
+      if (!detail) return;
+
+      if (detail.queueId) {
+        void supabase.rpc("mark_push_notification_opened", {
+          p_queue_id: detail.queueId,
+        }).then(({ error }) => {
+          if (error) {
+            logger.warn("Failed to mark native push notification opened", { error: error.message });
+          }
+        }).finally(() => {
+          void queryClient.invalidateQueries({ queryKey: [PUSH_NOTIFICATIONS_INBOX_QUERY_KEY] });
+          void queryClient.invalidateQueries({ queryKey: [PUSH_NOTIFICATIONS_UNREAD_COUNT_QUERY_KEY] });
+        });
       }
+
+      navigate(detail.url);
     };
     window.addEventListener('native-push-navigation', handler as EventListener);
     return () => window.removeEventListener('native-push-navigation', handler as EventListener);
-  }, [navigate]);
+  }, [navigate, queryClient]);
+
+  useEffect(() => {
+    const handler = () => {
+      void queryClient.invalidateQueries({ queryKey: [PUSH_NOTIFICATIONS_INBOX_QUERY_KEY] });
+      void queryClient.invalidateQueries({ queryKey: [PUSH_NOTIFICATIONS_UNREAD_COUNT_QUERY_KEY] });
+    };
+
+    window.addEventListener(NATIVE_PUSH_RECEIVED_EVENT, handler);
+    return () => window.removeEventListener(NATIVE_PUSH_RECEIVED_EVENT, handler);
+  }, [queryClient]);
   
   // Respond to deep link navigation events (from widget taps)
   useEffect(() => {
@@ -308,6 +352,7 @@ const AppContent = memo(() => {
 
   const activeMainTabPath = isMainTabPath(location.pathname) ? location.pathname : null;
   const showBottomNav = shouldShowBottomNav(location.pathname, Boolean(session?.user));
+  const showNotificationTray = Boolean(session?.user) && !NOTIFICATION_TRAY_HIDDEN_PATHS.has(location.pathname);
 
   useEffect(() => {
     const rootStyle = document.documentElement.style;
@@ -400,6 +445,7 @@ const AppContent = memo(() => {
                             </AnimatePresence>
                           )}
                           {showBottomNav && <BottomNav />}
+                          <GlobalNotificationTray enabled={showNotificationTray} />
                           <MentorTutorialLayer />
                           </Suspense>
                           </AstralEncounterProvider>

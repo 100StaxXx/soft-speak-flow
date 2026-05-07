@@ -235,6 +235,7 @@ Deno.test("buildFallbackFeedback keeps deterministic copy short and contextual",
   assertEquals(feedback.companion.tone, "recovery");
   assert(feedback.companion.message.includes("Portfolio session"), "Expected task title in fallback");
   assert(feedback.companion.message.length <= 150, "Expected compact fallback message");
+  assertEquals(feedback.generationSource, "fallback");
 });
 
 Deno.test("buildFallbackFeedback uses ritual campaign copy before generic campaign copy", () => {
@@ -247,7 +248,9 @@ Deno.test("buildFallbackFeedback uses ritual campaign copy before generic campai
   } as any);
 
   assertEquals(feedback.companion.tone, "locked_in");
-  assertEquals(feedback.companion.message, "Portfolio session is complete. Launch Week just moved forward.");
+  assert(feedback.companion.message.includes("Portfolio session"), "Expected ritual title in fallback");
+  assert(feedback.companion.message.includes("Launch Week"), "Expected campaign title in fallback");
+  assertEquals(feedback.generationSource, "fallback");
 });
 
 Deno.test("generate-completion-feedback passes through auth failures", async () => {
@@ -291,6 +294,7 @@ Deno.test("generate-completion-feedback returns fallback without AI for routine 
   assertEquals(fetchCalled, false, "Expected routine completion to avoid live AI");
   assertEquals(json.companion.tone, "proud");
   assertEquals(json.mentor, undefined);
+  assertEquals(json.generationSource, "fallback");
 });
 
 Deno.test("generate-completion-feedback counts inbox completions by completed_at local day", async () => {
@@ -334,6 +338,7 @@ Deno.test("generate-completion-feedback counts inbox completions by completed_at
     assertEquals(fetchCalled, false, "Expected repeated inbox completions not to be first-win AI calls");
     assertEquals(json.companion.tone, "locked_in");
     assert(!json.companion.message.includes("First win"), "Expected non-first inbox copy");
+    assertEquals(json.generationSource, "fallback");
   } finally {
     if (previousKey === undefined) Deno.env.delete("OPENAI_API_KEY");
     else Deno.env.set("OPENAI_API_KEY", previousKey);
@@ -394,6 +399,7 @@ Deno.test("generate-completion-feedback accepts valid AI output for high-signal 
     assertEquals(json.companion.message, "You got the portfolio session done after a packed day.");
     assertEquals(json.companion.tone, "locked_in");
     assertEquals(json.mentor.message, "That is the standard. Keep it there.");
+    assertEquals(json.generationSource, "ai");
   } finally {
     if (previousKey === undefined) Deno.env.delete("OPENAI_API_KEY");
     else Deno.env.set("OPENAI_API_KEY", previousKey);
@@ -436,6 +442,7 @@ Deno.test("generate-completion-feedback suppresses mentor output when no mentor 
     assertEquals(response.status, 200);
     assertEquals(json.companion.message, "First win of the day. Launch moved closer.");
     assertEquals(json.mentor, undefined);
+    assertEquals(json.generationSource, "ai");
   } finally {
     if (previousKey === undefined) Deno.env.delete("OPENAI_API_KEY");
     else Deno.env.set("OPENAI_API_KEY", previousKey);
@@ -471,6 +478,7 @@ Deno.test("generate-completion-feedback falls back when AI output is invalid", a
     assertEquals(response.status, 200);
     assertEquals(json.companion.tone, "proud");
     assertEquals(json.mentor, undefined);
+    assertEquals(json.generationSource, "fallback");
   } finally {
     if (previousKey === undefined) Deno.env.delete("OPENAI_API_KEY");
     else Deno.env.set("OPENAI_API_KEY", previousKey);

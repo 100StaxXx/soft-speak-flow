@@ -59,7 +59,9 @@ vi.mock("@/utils/storage", () => ({
 import {
   buildForegroundPushToast,
   buildPushDeviceTokenClaimArgs,
+  dispatchNativePushReceived,
   getOrCreatePushInstallationId,
+  NATIVE_PUSH_RECEIVED_EVENT,
   saveDeviceTokenForInstallation,
   showForegroundPushNotificationToast,
 } from "@/utils/nativePushNotifications";
@@ -138,14 +140,15 @@ describe("native push registration", () => {
       title: "Epic Falling Behind",
       description: "Focus on its habits today.",
       url: "/companion",
+      queueId: "queue-1",
       dedupeKey: "mentor_nudge:native-id",
     });
   });
 
   it("shows an in-app foreground push toast with navigation action", () => {
-    const navigationEvents: string[] = [];
+    const navigationEvents: unknown[] = [];
     const handleNavigation = (event: Event) => {
-      navigationEvents.push((event as CustomEvent<string>).detail);
+      navigationEvents.push((event as CustomEvent<unknown>).detail);
     };
     window.addEventListener("native-push-navigation", handleNavigation);
 
@@ -179,9 +182,34 @@ describe("native push registration", () => {
         | undefined;
       options?.action?.onClick?.();
 
-      expect(navigationEvents).toEqual(["/companion"]);
+      expect(navigationEvents).toEqual([{ url: "/companion", queueId: "queue-2" }]);
     } finally {
       window.removeEventListener("native-push-navigation", handleNavigation);
+    }
+  });
+
+  it("dispatches foreground push received events for tray refresh", () => {
+    const receivedEvents: unknown[] = [];
+    const handleReceived = (event: Event) => {
+      receivedEvents.push((event as CustomEvent<unknown>).detail);
+    };
+    window.addEventListener(NATIVE_PUSH_RECEIVED_EVENT, handleReceived);
+
+    try {
+      dispatchNativePushReceived({
+        title: "Quest soon",
+        body: "Start the thing.",
+        data: {
+          type: "task_reminder",
+          queue_id: "queue-4",
+          task_id: "task-4",
+          url: "/tasks",
+        },
+      });
+
+      expect(receivedEvents).toEqual([{ url: "/journeys?taskId=task-4", queueId: "queue-4" }]);
+    } finally {
+      window.removeEventListener(NATIVE_PUSH_RECEIVED_EVENT, handleReceived);
     }
   });
 

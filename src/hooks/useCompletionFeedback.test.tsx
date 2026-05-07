@@ -76,10 +76,11 @@ describe("useCompletionFeedback", () => {
 
     await waitFor(() => {
       expect(mocks.showMock).toHaveBeenCalledWith(expect.objectContaining({
-        message: "Portfolio session is done. That is real progress.",
         tone: "proud",
       }));
     });
+    const fallbackMessage = (mocks.showMock.mock.calls[0]?.[0] as { message: string }).message;
+    expect(fallbackMessage).toContain("Portfolio session");
     expect(mocks.replaceCurrentMock).not.toHaveBeenCalled();
 
     deferred.resolve({
@@ -93,6 +94,7 @@ describe("useCompletionFeedback", () => {
           personality: "Disciplined",
           message: "That is the standard.",
         },
+        generationSource: "ai",
       },
       error: null,
     });
@@ -108,7 +110,7 @@ describe("useCompletionFeedback", () => {
           message: "That is the standard.",
         },
       }),
-      "Portfolio session is done. That is real progress.",
+      fallbackMessage,
     );
   });
 
@@ -128,7 +130,7 @@ describe("useCompletionFeedback", () => {
 
     await waitFor(() => {
       expect(mocks.showMock).toHaveBeenCalledWith(expect.objectContaining({
-        message: "Portfolio session is done. That is real progress.",
+        tone: "proud",
       }));
     });
 
@@ -139,6 +141,41 @@ describe("useCompletionFeedback", () => {
           message: "Portfolio session landed after a packed day.",
           tone: "locked_in",
         },
+        generationSource: "ai",
+      },
+      error: null,
+    });
+
+    await completionPromise;
+
+    expect(mocks.replaceCurrentMock).not.toHaveBeenCalled();
+  });
+
+  it("does not replace instant fallback when the server returns fallback metadata", async () => {
+    const deferred = createDeferred<{ data: unknown; error: null }>();
+    mocks.invokeMock.mockReturnValue(deferred.promise);
+
+    const { result } = renderHook(() => useCompletionFeedback());
+    const completionPromise = result.current.triggerCompletionFeedback({
+      taskId: "task-1",
+      taskTitle: "Portfolio session",
+      completionSource: "quest",
+      taskDate: getTodayTaskDate(),
+    });
+
+    await waitFor(() => {
+      expect(mocks.showMock).toHaveBeenCalledWith(expect.objectContaining({
+        tone: "proud",
+      }));
+    });
+
+    deferred.resolve({
+      data: {
+        companion: {
+          message: "Portfolio session cleared. Different fallback line.",
+          tone: "proud",
+        },
+        generationSource: "fallback",
       },
       error: null,
     });

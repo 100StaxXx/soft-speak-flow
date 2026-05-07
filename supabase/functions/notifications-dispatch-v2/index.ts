@@ -34,6 +34,7 @@ import {
   selectDeviceTokensForDispatch,
   type DispatchDeviceTokenRow,
 } from "./deviceTokens.ts";
+import { resolveBadgeCountAfterSend } from "./badgeCount.ts";
 
 interface QueueRow {
   id: string;
@@ -481,12 +482,14 @@ serve(async (req) => {
         row,
         companionContextMap.get(row.user_id) ?? null,
       );
+      const badgeCount = await resolveBadgeCountAfterSend(supabase, row);
 
       for (const token of tokensToAttempt) {
         try {
           const sendResult = await sendAPNSNotification(token.device_token, {
             title: deliveryCopy.title,
             body: deliveryCopy.body,
+            ...(badgeCount !== null ? { badge: badgeCount } : {}),
             data: {
               ...(row.payload ?? {}),
               queue_id: row.id,

@@ -5,7 +5,10 @@ import {
   requireAuthenticatedUser,
   type UserRequestAuth,
 } from "../_shared/auth.ts";
-import { maybeEnqueueCompanionAnimationJob } from "../_shared/companionAnimationJobs.ts";
+import {
+  getCompanionAnimationIneligibility,
+  maybeEnqueueCompanionAnimationJob,
+} from "../_shared/companionAnimationJobs.ts";
 import { createCostGuardrailSession } from "../_shared/costGuardrails.ts";
 import { invokeInternalFunction } from "../_shared/internalFunctionAuth.ts";
 import { getHiddenBoundaryAnchor } from "../_shared/companionLineage.ts";
@@ -15,7 +18,10 @@ import {
   COMPANION_PRESET_BUCKET,
   resolveCompanionAssetPath,
 } from "../../../src/config/companionCatalog.ts";
-import { getProgressionThreshold } from "../../../src/config/progression.ts";
+import {
+  getCurrentVisualStageBoundaryLevel,
+  getProgressionThreshold,
+} from "../../../src/config/progression.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -387,6 +393,94 @@ const fetchExistingAnimationJobId = async (
   return typeof data?.id === "string" ? data.id : null;
 };
 
+const fetchPreviousBoundaryEvolutionImageUrl = async (
+  supabase: any,
+  companionId: string,
+  stage: number,
+): Promise<string | null> => {
+  const previousBoundaryStage = getCurrentVisualStageBoundaryLevel(stage - 1);
+  if (previousBoundaryStage <= 0) return null;
+
+  const { data, error } = await supabase
+    .from("companion_evolutions")
+    .select("image_url")
+    .eq("companion_id", companionId)
+    .eq("stage", previousBoundaryStage)
+    .maybeSingle();
+
+  if (error) throw error;
+  return typeof data?.image_url === "string" ? data.image_url : null;
+};
+
+const getMetadataRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+
+const mergePrewarmGenerationMetadata = (
+  existingGenerationMetadata: unknown,
+  prewarmGenerationMetadata: Record<string, unknown>,
+): Record<string, unknown> => {
+  const existingRecord = getMetadataRecord(existingGenerationMetadata);
+  return existingRecord
+    ? { ...existingRecord, ...prewarmGenerationMetadata }
+    : prewarmGenerationMetadata;
+};
+
+const markExistingAnimationIneligible = async ({
+  supabase,
+  evolutionId,
+  animationStatus,
+  code,
+  message,
+  now,
+}: {
+  supabase: any;
+  evolutionId: string;
+  animationStatus: unknown;
+  code: string;
+  message: string;
+  now: Date;
+}) => {
+  const nowIso = now.toISOString();
+  const normalizedStatus = typeof animationStatus === "string"
+    ? animationStatus
+    : null;
+
+  if (normalizedStatus !== "succeeded") {
+    const { error } = await supabase
+      .from("companion_evolutions")
+      .update({
+        animation_status: "skipped",
+        animation_error_code: code,
+        animation_error_message: message,
+        animation_completed_at: nowIso,
+      })
+      .eq("id", evolutionId);
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  const { error: jobError } = await supabase
+    .from("companion_animation_jobs")
+    .update({
+      status: "failed",
+      error_code: code,
+      error_message: message,
+      completed_at: nowIso,
+      next_retry_at: null,
+      updated_at: nowIso,
+    })
+    .eq("evolution_id", evolutionId)
+    .in("status", ["queued", "processing"]);
+
+  if (jobError) {
+    throw jobError;
+  }
+};
+
 export const handlePrewarmCompanionAnimation = async (
   req: Request,
   deps: PrewarmCompanionAnimationDeps = defaultDeps,
@@ -438,7 +532,9 @@ export const handlePrewarmCompanionAnimation = async (
       : 0;
     const existingEvolution = await supabase
       .from("companion_evolutions")
-      .select("id, image_url, animation_status, animation_video_url")
+      .select(
+        "id, image_url, animation_status, animation_video_url, animation_error_code, generation_metadata",
+      )
       .eq("companion_id", companionId)
       .eq("stage", stage)
       .maybeSingle();
@@ -452,6 +548,27 @@ export const handlePrewarmCompanionAnimation = async (
     const existingEvolutionId = typeof existingEvolution.data?.id === "string"
       ? existingEvolution.data.id
       : null;
+
+    const ineligibility = getCompanionAnimationIneligibility({ stage });
+    if (ineligibility) {
+      if (existingEvolutionId) {
+        await markExistingAnimationIneligible({
+          supabase,
+          evolutionId: existingEvolutionId,
+          animationStatus: existingEvolution.data?.animation_status,
+          code: ineligibility.code,
+          message: ineligibility.message,
+          now: deps.now(),
+        });
+      }
+
+      return jsonResponse({
+        status: "skipped",
+        reason: ineligibility.code,
+        stage,
+      });
+    }
+
     const canCreatePreHatchEvolution = stage === 1 && currentStage === 0 &&
       isHatchReady;
     const canReuseClaimedEvolution = currentStage >= stage &&
@@ -479,13 +596,62 @@ export const handlePrewarmCompanionAnimation = async (
       });
     }
 
-    const generationMetadata = {
+    const existingGenerationMetadata = existingEvolution.data
+      ?.generation_metadata ?? null;
+    const previousImageUrl = await fetchPreviousBoundaryEvolutionImageUrl(
+      supabase,
+      companionId,
+      stage,
+    );
+    const imageIneligibility = getCompanionAnimationIneligibility({
+      stage,
+      generationMetadata: existingGenerationMetadata,
+      sourceImageUrl: imageUrl,
+      previousImageUrl,
+    });
+    const existingAnimationErrorCode =
+      typeof existingEvolution.data?.animation_error_code === "string"
+        ? existingEvolution.data.animation_error_code
+        : null;
+    const persistedIneligibility = existingAnimationErrorCode ===
+        "image_unchanged"
+      ? {
+        code: "image_unchanged",
+        message:
+          "Companion animation generation was skipped because the evolution image did not change",
+      }
+      : imageIneligibility;
+
+    if (persistedIneligibility) {
+      if (existingEvolutionId) {
+        await markExistingAnimationIneligible({
+          supabase,
+          evolutionId: existingEvolutionId,
+          animationStatus: existingEvolution.data?.animation_status,
+          code: persistedIneligibility.code,
+          message: persistedIneligibility.message,
+          now: deps.now(),
+        });
+      }
+
+      return jsonResponse({
+        status: "skipped",
+        reason: persistedIneligibility.code,
+        stage,
+      });
+    }
+
+    const prewarmGenerationMetadata = {
       animationPrewarmedAt: deps.now().toISOString(),
       animationPrewarmStage: stage,
       animationPrewarmSource: stage > currentStage
         ? "future_stage_reveal"
         : "current_stage_replay",
     };
+    const generationMetadata = mergePrewarmGenerationMetadata(
+      existingGenerationMetadata,
+      prewarmGenerationMetadata,
+    );
     const stageThreshold = getProgressionThreshold(stage) ?? 0;
     const xpAtEvolution = canCreatePreHatchEvolution
       ? Math.max(0, stageThreshold - 1)
@@ -554,6 +720,8 @@ export const handlePrewarmCompanionAnimation = async (
       evolutionId,
       stage,
       imageUrl,
+      generationMetadata,
+      previousImageUrl,
       element: companionRecord.core_element,
     });
 

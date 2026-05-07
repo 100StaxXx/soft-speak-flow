@@ -10,6 +10,10 @@ import { logger } from '@/utils/logger';
 import { isNativeIOSHandheld } from '@/utils/platformTargets';
 import { safeLocalStorage } from '@/utils/storage';
 import { toast } from '@/components/ui/sonner';
+import {
+  buildPushNotificationNavigationDetail,
+  type PushNotificationNavigationDetail,
+} from "@/utils/pushNotificationNavigation";
 
 let currentPushUserId: string | null = null;
 let initializedUserId: string | null = null;
@@ -19,6 +23,7 @@ let listenersBound = false;
 const PUSH_INSTALLATION_ID_STORAGE_KEY = 'native_push_installation_id';
 const FOREGROUND_PUSH_TOAST_DEDUPE_MS = 10_000;
 const foregroundPushToastShownAt = new Map<string, number>();
+export const NATIVE_PUSH_RECEIVED_EVENT = 'native-push-received';
 
 interface PushDeviceTokenRow {
   id: string;
@@ -53,6 +58,7 @@ export interface ForegroundPushToastDetails {
   title: string;
   description?: string;
   url?: string;
+  queueId?: string | null;
   dedupeKey: string;
 }
 
@@ -127,7 +133,8 @@ export function buildForegroundPushToast(
   }
 
   const type = readNonEmptyString(data.type);
-  const url = readNonEmptyString(data.url) ?? undefined;
+  const navigationDetail = buildPushNotificationNavigationDetail(data, type);
+  const url = navigationDetail.url;
   const stableId =
     readNonEmptyString(notification.id) ??
     readNonEmptyString(data.queue_id) ??
@@ -143,8 +150,20 @@ export function buildForegroundPushToast(
     title: title ?? 'Notification',
     description: description ?? undefined,
     url,
+    queueId: navigationDetail.queueId,
     dedupeKey,
   };
+}
+
+function dispatchNativePushNavigation(detail: PushNotificationNavigationDetail): void {
+  window.dispatchEvent(new CustomEvent('native-push-navigation', { detail }));
+}
+
+export function dispatchNativePushReceived(notification: ForegroundPushNotificationInput): void {
+  const data = isRecord(notification.data) ? notification.data : {};
+  window.dispatchEvent(new CustomEvent(NATIVE_PUSH_RECEIVED_EVENT, {
+    detail: buildPushNotificationNavigationDetail(data, readNonEmptyString(data.type)),
+  }));
 }
 
 export function showForegroundPushNotificationToast(
@@ -170,7 +189,10 @@ export function showForegroundPushNotificationToast(
       ? {
           label: 'Open',
           onClick: () => {
-            window.dispatchEvent(new CustomEvent('native-push-navigation', { detail: toastDetails.url }));
+            dispatchNativePushNavigation({
+              url: toastDetails.url!,
+              queueId: toastDetails.queueId,
+            });
           },
         }
       : undefined,
@@ -269,6 +291,7 @@ async function bindPushListenersOnce(): Promise<void> {
   handles.push(await PushNotifications.addListener('pushNotificationReceived', (notification) => {
     console.log('[NativePush] Notification received:', notification);
     logger.log('Push notification received:', notification);
+    dispatchNativePushReceived(notification);
     showForegroundPushNotificationToast(notification);
   }));
 
@@ -276,9 +299,9 @@ async function bindPushListenersOnce(): Promise<void> {
     console.log('[NativePush] Notification action performed:', notification);
     logger.log('Push notification action performed:', notification);
     const data = notification.notification.data;
-    if (data?.url) {
-      window.dispatchEvent(new CustomEvent('native-push-navigation', { detail: data.url }));
-    }
+    dispatchNativePushNavigation(
+      buildPushNotificationNavigationDetail(data, readNonEmptyString(data?.type)),
+    );
   }));
 
   listenerHandles = handles;

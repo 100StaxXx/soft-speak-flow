@@ -7,6 +7,19 @@ import {
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "./costGuardrails.ts";
+import { isTierBoundaryLevel } from "../../../src/config/progression.ts";
+
+export interface CompanionAnimationEligibilityParams {
+  stage: number;
+  generationMetadata?: unknown;
+  sourceImageUrl?: string | null;
+  previousImageUrl?: string | null;
+}
+
+export interface CompanionAnimationIneligibility {
+  code: string;
+  message: string;
+}
 
 const truthyEnvValue = (value: string | null | undefined): boolean => {
   const normalized = value?.trim().toLowerCase() ?? "";
@@ -26,6 +39,64 @@ const hasPublicHttpUrl = (
   }
 };
 
+const normalizeComparableImageUrl = (
+  value: string | null | undefined,
+): string | null => {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+};
+
+const getGenerationMetadataRecord = (
+  value: unknown,
+): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+
+const isReuseGenerationMetadata = (value: unknown): boolean => {
+  const metadata = getGenerationMetadataRecord(value);
+  return metadata?.sourceType === "reuse";
+};
+
+export const getCompanionAnimationIneligibility = ({
+  stage,
+  generationMetadata,
+  sourceImageUrl,
+  previousImageUrl,
+}: CompanionAnimationEligibilityParams): CompanionAnimationIneligibility | null => {
+  if (!isTierBoundaryLevel(stage)) {
+    return {
+      code: "stage_not_animatable",
+      message:
+        "Companion animation generation is only available for visual evolution boundary stages",
+    };
+  }
+
+  if (isReuseGenerationMetadata(generationMetadata)) {
+    return {
+      code: "image_unchanged",
+      message:
+        "Companion animation generation was skipped because this evolution reuses the prior image",
+    };
+  }
+
+  const normalizedSourceImageUrl = normalizeComparableImageUrl(sourceImageUrl);
+  const normalizedPreviousImageUrl = normalizeComparableImageUrl(previousImageUrl);
+  if (
+    normalizedSourceImageUrl &&
+    normalizedPreviousImageUrl &&
+    normalizedSourceImageUrl === normalizedPreviousImageUrl
+  ) {
+    return {
+      code: "image_unchanged",
+      message:
+        "Companion animation generation was skipped because the evolution image did not change",
+    };
+  }
+
+  return null;
+};
+
 interface EnqueueCompanionAnimationJobParams {
   supabase: any;
   createCostGuardrailSession: typeof createCostGuardrailSession;
@@ -34,6 +105,8 @@ interface EnqueueCompanionAnimationJobParams {
   evolutionId: string | null | undefined;
   stage: number;
   imageUrl: string | null | undefined;
+  generationMetadata?: unknown;
+  previousImageUrl?: string | null;
   element?: string | null;
   env?: Pick<typeof Deno.env, "get">;
   now?: () => Date;
@@ -81,6 +154,8 @@ export const maybeEnqueueCompanionAnimationJob = async ({
   evolutionId,
   stage,
   imageUrl,
+  generationMetadata,
+  previousImageUrl,
   element,
   env = Deno.env,
   now = () => new Date(),
@@ -122,6 +197,16 @@ export const maybeEnqueueCompanionAnimationJob = async ({
     }
     return { status: "skipped" as const, reason: code };
   };
+
+  const ineligibility = getCompanionAnimationIneligibility({
+    stage,
+    generationMetadata,
+    sourceImageUrl: imageUrl,
+    previousImageUrl,
+  });
+  if (ineligibility) {
+    return await markSkipped(ineligibility.code, ineligibility.message);
+  }
 
   if (!env.get("FAL_KEY")?.trim()) {
     return await markSkipped("fal_key_missing", "FAL_KEY is not configured");

@@ -479,6 +479,10 @@ export const handleGenerateCompanionEvolution = async (
     const enqueueAnimationForEvolution = async (
       evolutionRecord: Record<string, unknown> | null | undefined,
       imageUrl: string | null | undefined,
+      options: {
+        generationMetadata?: unknown;
+        previousImageUrl?: string | null;
+      } = {},
     ) => {
       const existingAnimationStatus =
         typeof evolutionRecord?.animation_status === "string"
@@ -502,6 +506,9 @@ export const handleGenerateCompanionEvolution = async (
           : null,
         stage: nextStage,
         imageUrl,
+        generationMetadata: options.generationMetadata ??
+          evolutionRecord?.generation_metadata,
+        previousImageUrl: options.previousImageUrl,
         element: typeof companion.core_element === "string"
           ? companion.core_element
           : null,
@@ -546,7 +553,11 @@ export const handleGenerateCompanionEvolution = async (
         throw new Error("Failed to update companion");
       }
 
-      await enqueueAnimationForEvolution(evolutionRecord, newImageUrl);
+      await enqueueAnimationForEvolution(evolutionRecord, newImageUrl, {
+        previousImageUrl: companion.current_image_url ??
+          companion.initial_image_url ??
+          null,
+      });
 
       return new Response(
         JSON.stringify({
@@ -623,6 +634,12 @@ export const handleGenerateCompanionEvolution = async (
       await enqueueAnimationForEvolution(
         evolutionRecord,
         hiddenStageOneAnchor.imageUrl,
+        {
+          generationMetadata,
+          previousImageUrl: companion.current_image_url ??
+            companion.initial_image_url ??
+            null,
+        },
       );
 
       return new Response(
@@ -662,18 +679,20 @@ export const handleGenerateCompanionEvolution = async (
         throw new Error("Companion is missing a portrait to reuse");
       }
 
+      const generationMetadata = buildCompanionGenerationMetadata({
+        sourceType: "reuse",
+        boundaryLevel: currentStage,
+        portraitRegenerated: false,
+        reusedFromStage: currentStage,
+      });
+
       const evolutionRecord = await upsertEvolutionRecordFn({
         supabase,
         companionId: companion.id,
         stage: nextStage,
         imageUrl: reusedImageUrl,
         xpAtEvolution: currentXP,
-        generationMetadata: buildCompanionGenerationMetadata({
-          sourceType: "reuse",
-          boundaryLevel: currentStage,
-          portraitRegenerated: false,
-          reusedFromStage: currentStage,
-        }),
+        generationMetadata,
       });
 
       const { error: updateError } = await supabase
@@ -691,7 +710,12 @@ export const handleGenerateCompanionEvolution = async (
         throw new Error("Failed to update companion");
       }
 
-      await enqueueAnimationForEvolution(evolutionRecord, reusedImageUrl);
+      await enqueueAnimationForEvolution(evolutionRecord, reusedImageUrl, {
+        generationMetadata,
+        previousImageUrl: companion.current_image_url ??
+          companion.initial_image_url ??
+          null,
+      });
 
       return new Response(
         JSON.stringify({
@@ -922,7 +946,12 @@ export const handleGenerateCompanionEvolution = async (
         throw new Error("Failed to update companion");
       }
 
-      await enqueueAnimationForEvolution(evolutionRecord, newImageUrl);
+      await enqueueAnimationForEvolution(evolutionRecord, newImageUrl, {
+        generationMetadata,
+        previousImageUrl: companion.current_image_url ??
+          companion.initial_image_url ??
+          null,
+      });
 
       return new Response(
         JSON.stringify({
@@ -1051,7 +1080,10 @@ export const handleGenerateCompanionEvolution = async (
       throw new Error("Failed to update companion");
     }
 
-    await enqueueAnimationForEvolution(evolutionRecord, newImageUrl);
+    await enqueueAnimationForEvolution(evolutionRecord, newImageUrl, {
+      generationMetadata,
+      previousImageUrl,
+    });
 
     return new Response(
       JSON.stringify({

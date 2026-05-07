@@ -198,15 +198,20 @@ import {
   RECURRENCE_REQUIRES_SCHEDULED_TIME_ERROR,
   RECURRENCE_REQUIRES_SCHEDULED_TIME_MESSAGE,
 } from "@/utils/recurrenceValidation";
+import {
+  getCompletionFeedbackDaySignalTasksQueryKey,
+  getCompletionFeedbackLocalCompletionsQueryKey,
+} from "@/utils/completionFeedbackDaySignals";
 
-const createWrapper = () => {
-  const queryClient = new QueryClient({
+const createTestQueryClient = () =>
+  new QueryClient({
     defaultOptions: {
       queries: { retry: false },
       mutations: { retry: false },
     },
   });
 
+const createWrapper = (queryClient = createTestQueryClient()) => {
   return ({ children }: { children: React.ReactNode }) =>
     React.createElement(QueryClientProvider, { client: queryClient }, children);
 };
@@ -714,8 +719,9 @@ describe("useTaskMutations attachment handling", () => {
   it("adds a plain quest live when online and healthy", async () => {
     setOnline(true);
 
+    const queryClient = createTestQueryClient();
     const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
-      wrapper: createWrapper(),
+      wrapper: createWrapper(queryClient),
     });
 
     let createdTask: any;
@@ -746,8 +752,9 @@ describe("useTaskMutations attachment handling", () => {
   it("preserves an explicit voice source through local and remote quest creation", async () => {
     setOnline(true);
 
+    const queryClient = createTestQueryClient();
     const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
-      wrapper: createWrapper(),
+      wrapper: createWrapper(queryClient),
     });
 
     await act(async () => {
@@ -1403,6 +1410,198 @@ describe("useTaskMutations attachment handling", () => {
     expect(completionUpdateSelectMock).toHaveBeenCalledTimes(1);
   });
 
+  it("remembers queued completions for later day-signal popups without showing feedback", async () => {
+    setOnline(false);
+    mocks.resilienceState.shouldQueueWrites = true;
+    const queryClient = createTestQueryClient();
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await act(async () => {
+      result.current.toggleTask({
+        taskId: "task-1",
+        completed: true,
+        xpReward: 16,
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({
+        title: "Quest update queued",
+      }));
+    });
+
+    expect(mocks.triggerCompletionFeedbackMock).not.toHaveBeenCalled();
+    expect(queryClient.getQueryData(getCompletionFeedbackLocalCompletionsQueryKey("user-1", "2026-02-20")))
+      .toEqual([
+        expect.objectContaining({
+          id: "task-1",
+          completed: true,
+          completed_at: expect.any(String),
+        }),
+      ]);
+  });
+
+  it("clears day-signal caches for queued undo without showing feedback", async () => {
+    setOnline(false);
+    mocks.resilienceState.shouldQueueWrites = true;
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(getCompletionFeedbackLocalCompletionsQueryKey("user-1", "2026-02-20"), [
+      { id: "task-1", completed: true, completed_at: "2026-02-20T09:05:00.000Z" },
+    ]);
+    queryClient.setQueryData(getCompletionFeedbackDaySignalTasksQueryKey("user-1", "2026-02-20"), [
+      { id: "task-1", completed: true, completed_at: "2026-02-20T09:05:00.000Z" },
+    ]);
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await act(async () => {
+      result.current.toggleTask({
+        taskId: "task-1",
+        completed: false,
+        xpReward: 16,
+        forceUndo: true,
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({
+        title: "Quest update queued",
+      }));
+    });
+
+    expect(mocks.triggerCompletionFeedbackMock).not.toHaveBeenCalled();
+    expect(queryClient.getQueryData(getCompletionFeedbackLocalCompletionsQueryKey("user-1", "2026-02-20")))
+      .toEqual([]);
+    expect(queryClient.getQueryData(getCompletionFeedbackDaySignalTasksQueryKey("user-1", "2026-02-20")))
+      .toEqual([
+        expect.objectContaining({
+          id: "task-1",
+          completed: false,
+          completed_at: null,
+        }),
+      ]);
+  });
+
+  it("uses the selected date when remembering queued completions without a local task row", async () => {
+    setOnline(false);
+    mocks.resilienceState.shouldQueueWrites = true;
+    mocks.getPlannerRecordMock.mockResolvedValue(null);
+    const queryClient = createTestQueryClient();
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-21"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await act(async () => {
+      result.current.toggleTask({
+        taskId: "task-1",
+        completed: true,
+        xpReward: 16,
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({
+        title: "Quest update queued",
+      }));
+    });
+
+    expect(mocks.triggerCompletionFeedbackMock).not.toHaveBeenCalled();
+    expect(queryClient.getQueryData(getCompletionFeedbackLocalCompletionsQueryKey("user-1", "2026-02-21")))
+      .toEqual([
+        expect.objectContaining({
+          id: "task-1",
+          completed: true,
+          completed_at: expect.any(String),
+        }),
+      ]);
+  });
+
+  it("uses the selected date when queueable errors remember completions without a local task row", async () => {
+    setOnline(true);
+    mocks.getPlannerRecordMock.mockResolvedValue(null);
+    const queryClient = createTestQueryClient();
+    const remoteFetchMaybeSingleMock = vi.fn().mockResolvedValue({
+      data: null,
+      error: new Error("Failed to fetch"),
+    });
+
+    mocks.fromMock.mockImplementation((table: string) => {
+      if (table === "daily_tasks") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: remoteFetchMaybeSingleMock,
+              })),
+            })),
+          })),
+          update: mocks.dailyTasksUpdateMock,
+        };
+      }
+
+      return {
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            eq: vi.fn(),
+            is: vi.fn(),
+          })),
+        })),
+        insert: vi.fn(),
+        delete: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            eq: vi.fn(),
+          })),
+        })),
+        update: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            eq: vi.fn(),
+          })),
+        })),
+      };
+    });
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-21"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await act(async () => {
+      result.current.toggleTask({
+        taskId: "task-1",
+        completed: true,
+        xpReward: 16,
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.queueTaskActionMock).toHaveBeenCalledWith(
+        "COMPLETE_TASK",
+        expect.objectContaining({
+          taskId: "task-1",
+          completed: true,
+          completedAt: expect.any(String),
+        }),
+      );
+    }, { timeout: 5000 });
+
+    await waitFor(() => {
+      expect(queryClient.getQueryData(getCompletionFeedbackLocalCompletionsQueryKey("user-1", "2026-02-21")))
+        .toEqual([
+          expect.objectContaining({
+            id: "task-1",
+            completed: true,
+            completed_at: expect.any(String),
+          }),
+        ]);
+    });
+    expect(mocks.triggerCompletionFeedbackMock).not.toHaveBeenCalled();
+  });
+
   it("suppresses completion feedback when a quest is redone after undo", async () => {
     setOnline(true);
     mocks.awardCustomXPMock.mockResolvedValue({ xpAwarded: 16 });
@@ -1417,8 +1616,9 @@ describe("useTaskMutations attachment handling", () => {
       ],
     });
 
+    const queryClient = createTestQueryClient();
     const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
-      wrapper: createWrapper(),
+      wrapper: createWrapper(queryClient),
     });
 
     await act(async () => {
@@ -1432,6 +1632,17 @@ describe("useTaskMutations attachment handling", () => {
     await waitFor(() => {
       expect(mocks.triggerCompletionFeedbackMock).toHaveBeenCalledTimes(1);
     });
+
+    expect(queryClient.getQueryData(getCompletionFeedbackLocalCompletionsQueryKey("user-1", "2026-02-20")))
+      .toEqual([
+        expect.objectContaining({
+          id: "task-1",
+          completed: true,
+        }),
+      ]);
+    queryClient.setQueryData(getCompletionFeedbackDaySignalTasksQueryKey("user-1", "2026-02-20"), [
+      { id: "task-1", completed: true, completed_at: "2026-02-20T09:05:00.000Z" },
+    ]);
 
     await act(async () => {
       result.current.toggleTask({
@@ -1447,6 +1658,16 @@ describe("useTaskMutations attachment handling", () => {
         title: "Quest undone",
       }));
     });
+    expect(queryClient.getQueryData(getCompletionFeedbackLocalCompletionsQueryKey("user-1", "2026-02-20")))
+      .toEqual([]);
+    expect(queryClient.getQueryData(getCompletionFeedbackDaySignalTasksQueryKey("user-1", "2026-02-20")))
+      .toEqual([
+        expect.objectContaining({
+          id: "task-1",
+          completed: false,
+          completed_at: null,
+        }),
+      ]);
 
     await act(async () => {
       result.current.toggleTask({
@@ -1464,6 +1685,13 @@ describe("useTaskMutations attachment handling", () => {
     });
 
     expect(mocks.triggerCompletionFeedbackMock).toHaveBeenCalledTimes(1);
+    expect(queryClient.getQueryData(getCompletionFeedbackLocalCompletionsQueryKey("user-1", "2026-02-20")))
+      .toEqual([
+        expect.objectContaining({
+          id: "task-1",
+          completed: true,
+        }),
+      ]);
     expect(completionUpdateSelectMock).toHaveBeenCalledTimes(2);
   });
 
@@ -1513,6 +1741,218 @@ describe("useTaskMutations attachment handling", () => {
           difficulty: "hard",
           firstRitualToday: true,
           completedAllRituals: true,
+        }),
+      );
+    });
+  });
+
+  it("passes first-completion day signal from the warmed day-signal cache", async () => {
+    setOnline(true);
+    mocks.awardCustomXPMock.mockResolvedValueOnce({ xpAwarded: 16 });
+    mockToggleTaskCompletionFlow({
+      completionReads: [
+        buildToggleTaskRemoteState({
+          task_text: "First focus block",
+        }),
+      ],
+    });
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(getCompletionFeedbackDaySignalTasksQueryKey("user-1", "2026-02-20"), []);
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await act(async () => {
+      result.current.toggleTask({
+        taskId: "task-1",
+        completed: true,
+        xpReward: 16,
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.triggerCompletionFeedbackMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          taskTitle: "First focus block",
+          firstCompletionToday: true,
+          isBuildingMomentum: false,
+          isOverloaded: false,
+        }),
+      );
+    });
+  });
+
+  it("keeps local daily completions separate from the fetched day-signal snapshot", async () => {
+    setOnline(true);
+    mocks.awardCustomXPMock.mockResolvedValueOnce({ xpAwarded: 16 });
+    mockToggleTaskCompletionFlow({
+      completionReads: [
+        buildToggleTaskRemoteState({
+          task_text: "Unwarmed focus block",
+        }),
+      ],
+    });
+    const queryClient = createTestQueryClient();
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await act(async () => {
+      result.current.toggleTask({
+        taskId: "task-1",
+        completed: true,
+        xpReward: 16,
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.triggerCompletionFeedbackMock).toHaveBeenCalledTimes(1);
+    });
+
+    const feedbackEvent = mocks.triggerCompletionFeedbackMock.mock.calls[0][0];
+    expect(feedbackEvent).not.toHaveProperty("firstCompletionToday");
+    expect(feedbackEvent).not.toHaveProperty("isBuildingMomentum");
+    expect(feedbackEvent).not.toHaveProperty("isOverloaded");
+    expect(queryClient.getQueryData(getCompletionFeedbackDaySignalTasksQueryKey("user-1", "2026-02-20")))
+      .toBeUndefined();
+    expect(queryClient.getQueryData(getCompletionFeedbackLocalCompletionsQueryKey("user-1", "2026-02-20")))
+      .toEqual([
+        expect.objectContaining({
+          id: "task-1",
+          completed: true,
+        }),
+      ]);
+  });
+
+  it("uses local daily completions with a warmed day-signal snapshot for later completions", async () => {
+    setOnline(true);
+    mocks.awardCustomXPMock.mockResolvedValueOnce({ xpAwarded: 16 });
+    mockToggleTaskCompletionFlow({
+      completionReads: [
+        buildToggleTaskRemoteState({
+          task_text: "Second focus block",
+        }),
+      ],
+    });
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(getCompletionFeedbackDaySignalTasksQueryKey("user-1", "2026-02-20"), []);
+    queryClient.setQueryData(getCompletionFeedbackLocalCompletionsQueryKey("user-1", "2026-02-20"), [
+      { id: "task-1", completed: true, completed_at: "2026-02-20T08:00:00.000Z" },
+    ]);
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await act(async () => {
+      result.current.toggleTask({
+        taskId: "task-2",
+        completed: true,
+        xpReward: 16,
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.triggerCompletionFeedbackMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          taskTitle: "Second focus block",
+          firstCompletionToday: false,
+          isBuildingMomentum: false,
+          isOverloaded: false,
+        }),
+      );
+    });
+
+    expect(queryClient.getQueryData(getCompletionFeedbackDaySignalTasksQueryKey("user-1", "2026-02-20")))
+      .toEqual([]);
+  });
+
+  it("passes momentum and overload day signals from the cached daily task list", async () => {
+    setOnline(true);
+    mocks.awardCustomXPMock.mockResolvedValueOnce({ xpAwarded: 16 });
+    mockToggleTaskCompletionFlow({
+      completionReads: [
+        buildToggleTaskRemoteState({
+          task_text: "Third focus block",
+        }),
+      ],
+    });
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(["daily-tasks", "user-1", "2026-02-20"], [
+      { id: "task-1", completed: false, completed_at: null },
+      { id: "task-2", completed: true, completed_at: "2026-02-20T08:00:00.000Z" },
+      { id: "task-3", completed: true, completed_at: "2026-02-20T08:30:00.000Z" },
+      { id: "task-4", completed: false, completed_at: null },
+      { id: "task-5", completed: false, completed_at: null },
+      { id: "task-6", completed: false, completed_at: null },
+      { id: "task-7", completed: false, completed_at: null },
+      { id: "task-8", completed: false, completed_at: null },
+    ]);
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await act(async () => {
+      result.current.toggleTask({
+        taskId: "task-1",
+        completed: true,
+        xpReward: 16,
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.triggerCompletionFeedbackMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          taskTitle: "Third focus block",
+          isBuildingMomentum: true,
+          isOverloaded: true,
+        }),
+      );
+    });
+  });
+
+  it("uses remote completed-day signals when the daily cache would miss inbox completions", async () => {
+    setOnline(true);
+    mocks.awardCustomXPMock.mockResolvedValueOnce({ xpAwarded: 16 });
+    mockToggleTaskCompletionFlow({
+      completionReads: [
+        buildToggleTaskRemoteState({
+          task_text: "Daily focus block",
+        }),
+      ],
+    });
+
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(getCompletionFeedbackDaySignalTasksQueryKey("user-1", "2026-02-20"), [
+      { id: "prior-inbox", completed: true, completed_at: "2026-02-20T08:00:00.000Z" },
+      { id: "task-1", completed: true, completed_at: "2026-02-20T09:00:00.000Z" },
+    ]);
+    queryClient.setQueryData(["daily-tasks", "user-1", "2026-02-20"], [
+      { id: "task-1", completed: false, completed_at: null },
+    ]);
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await act(async () => {
+      result.current.toggleTask({
+        taskId: "task-1",
+        completed: true,
+        xpReward: 16,
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.triggerCompletionFeedbackMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          taskTitle: "Daily focus block",
+          firstCompletionToday: false,
+          isBuildingMomentum: false,
+          isOverloaded: false,
         }),
       );
     });

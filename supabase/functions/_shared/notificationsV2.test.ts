@@ -283,6 +283,39 @@ Deno.test("composer formats daily quote copy", () => {
   }
 });
 
+Deno.test("composer formats ritual task copy from ritual payload hints", () => {
+  const ritualStart = composeNotificationCopy({
+    type: "task_start",
+    payload: {
+      task_text: "Morning stretch",
+      xp_reward: 20,
+      habit_source_id: "habit-1",
+      is_ritual: true,
+    },
+  });
+
+  if (ritualStart.title !== "Ritual starting now") {
+    throw new Error(`Expected ritual start title, got ${ritualStart.title}`);
+  }
+
+  const ritualReminder = composeNotificationCopy({
+    type: "task_reminder",
+    payload: {
+      task_text: "Morning stretch",
+      reminder_minutes_before: 30,
+      habitSourceId: "habit-1",
+    },
+  });
+
+  if (ritualReminder.title !== "Ritual reminder") {
+    throw new Error(`Expected ritual reminder title, got ${ritualReminder.title}`);
+  }
+
+  if (ritualReminder.body !== "Morning stretch starts in 30 minutes") {
+    throw new Error(`Unexpected ritual reminder body: ${ritualReminder.body}`);
+  }
+});
+
 Deno.test("dispatch mode defaults to send and rejects invalid values", () => {
   if (resolveDispatchMode(undefined) !== "send") {
     throw new Error("Expected undefined mode to default to send");

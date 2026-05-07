@@ -105,35 +105,7 @@ function isTaskAttachmentsRelationError(
     );
 }
 
-export async function fetchDailyTasksRemote(userId: string, taskDate: string): Promise<DailyTask[]> {
-  const fetchWithSelect = (selectClause: string) =>
-    supabase
-      .from("daily_tasks")
-      .select(selectClause)
-      .eq("user_id", userId)
-      .eq("task_date", taskDate)
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: false });
-
-  let { data, error } = await fetchWithSelect(DAILY_TASKS_SELECT_WITH_ATTACHMENTS);
-
-  if (isTaskAttachmentsRelationError(error)) {
-    console.warn("daily_tasks query could not embed task_attachments, retrying without attachments relation");
-    ({ data, error } = await fetchWithSelect(DAILY_TASKS_SELECT_WITHOUT_ATTACHMENTS));
-  }
-
-  if (error) {
-    if (isNetworkFetchFailure(error)) {
-      console.warn("Failed to fetch daily tasks (network):", {
-        message: error.message,
-      });
-      throw new Error(NETWORK_TASK_FETCH_ERROR_MESSAGE);
-    }
-
-    console.error("Failed to fetch daily tasks:", error);
-    throw error;
-  }
-
+async function mapDailyTaskRows(data: unknown[] | null | undefined): Promise<DailyTask[]> {
   const rawTasks = (data || []) as unknown as Array<DailyTask & Record<string, unknown>>;
   const signedUrlMap = await createQuestAttachmentSignedUrlMap(
     rawTasks.flatMap((task) =>
@@ -180,4 +152,63 @@ export async function fetchDailyTasksRemote(userId: string, taskDate: string): P
       attachments,
     };
   }) as DailyTask[];
+}
+
+function throwDailyTasksFetchError(error: { message?: string } | null, label: string): never {
+  if (isNetworkFetchFailure(error)) {
+    console.warn(`${label} (network):`, {
+      message: error?.message,
+    });
+    throw new Error(NETWORK_TASK_FETCH_ERROR_MESSAGE);
+  }
+
+  console.error(label, error);
+  throw error;
+}
+
+export async function fetchDailyTasksRemote(userId: string, taskDate: string): Promise<DailyTask[]> {
+  const fetchWithSelect = (selectClause: string) =>
+    supabase
+      .from("daily_tasks")
+      .select(selectClause)
+      .eq("user_id", userId)
+      .eq("task_date", taskDate)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: false });
+
+  let { data, error } = await fetchWithSelect(DAILY_TASKS_SELECT_WITH_ATTACHMENTS);
+
+  if (isTaskAttachmentsRelationError(error)) {
+    console.warn("daily_tasks query could not embed task_attachments, retrying without attachments relation");
+    ({ data, error } = await fetchWithSelect(DAILY_TASKS_SELECT_WITHOUT_ATTACHMENTS));
+  }
+
+  if (error) {
+    throwDailyTasksFetchError(error, "Failed to fetch daily tasks");
+  }
+
+  return mapDailyTaskRows(data);
+}
+
+export async function fetchDailyTaskByIdRemote(userId: string, taskId: string): Promise<DailyTask | null> {
+  const fetchWithSelect = (selectClause: string) =>
+    supabase
+      .from("daily_tasks")
+      .select(selectClause)
+      .eq("user_id", userId)
+      .eq("id", taskId)
+      .maybeSingle();
+
+  let { data, error } = await fetchWithSelect(DAILY_TASKS_SELECT_WITH_ATTACHMENTS);
+
+  if (isTaskAttachmentsRelationError(error)) {
+    console.warn("daily_tasks by id query could not embed task_attachments, retrying without attachments relation");
+    ({ data, error } = await fetchWithSelect(DAILY_TASKS_SELECT_WITHOUT_ATTACHMENTS));
+  }
+
+  if (error) {
+    throwDailyTasksFetchError(error, "Failed to fetch daily task by id");
+  }
+
+  return (await mapDailyTaskRows(data ? [data] : [])).at(0) ?? null;
 }

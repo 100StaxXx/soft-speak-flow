@@ -419,13 +419,8 @@ describe("CompanionEvolution", () => {
     await prepareEvolution();
 
     const dialog = screen.getByRole("alertdialog");
-    const video = screen.getByTestId("evolution-animation-video") as HTMLVideoElement;
 
-    expect(video).toHaveAttribute("src", props.animationVideoUrl);
-    expect(video.muted).toBe(true);
-    expect(video.playsInline).toBe(true);
-    expect(video).toHaveAttribute("data-animation-ready", "true");
-    expect(video).toHaveStyle({ opacity: "0" });
+    expect(screen.queryByTestId("evolution-animation-video")).not.toBeInTheDocument();
     expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
 
     await flushTimers(
@@ -437,6 +432,11 @@ describe("CompanionEvolution", () => {
     );
 
     expect(dialog).toHaveAttribute("data-phase", "reveal");
+    const video = screen.getByTestId("evolution-animation-video") as HTMLVideoElement;
+    expect(video).toHaveAttribute("src", props.animationVideoUrl);
+    expect(video.muted).toBe(true);
+    expect(video.playsInline).toBe(true);
+    expect(video).toHaveAttribute("data-animation-ready", "true");
     expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(1);
     expect(video).toHaveStyle({ opacity: "1" });
     expect(screen.getByTestId("evolution-reveal-art")).toHaveAttribute("data-hold-for-animation", "true");
@@ -450,8 +450,7 @@ describe("CompanionEvolution", () => {
       fireEvent.ended(video);
     });
 
-    expect(video).toHaveAttribute("data-animation-ended", "true");
-    expect(video).toHaveStyle({ opacity: "0" });
+    expect(screen.queryByTestId("evolution-animation-video")).not.toBeInTheDocument();
     expect(screen.getByTestId("evolution-reveal-art")).toHaveAttribute("data-hold-for-animation", "false");
     expect(screen.getByText("Tap anywhere to continue")).toBeInTheDocument();
   });
@@ -465,6 +464,13 @@ describe("CompanionEvolution", () => {
     render(<CompanionEvolution {...props} />);
     await prepareEvolution();
 
+    await flushTimers(
+      FULL_SEQUENCE_MS.hold +
+      FULL_SEQUENCE_MS.charge +
+      FULL_SEQUENCE_MS.conceal +
+      FULL_SEQUENCE_MS.strobe +
+      FULL_SEQUENCE_MS.apex,
+    );
     const video = screen.getByTestId("evolution-animation-video") as HTMLVideoElement;
 
     await act(async () => {
@@ -473,7 +479,7 @@ describe("CompanionEvolution", () => {
 
     expect(props.onAnimationError).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
-    expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
+    expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(1);
   });
 
   it("does not fall back to a still reveal when evolution animation playback is rejected", async () => {
@@ -504,7 +510,7 @@ describe("CompanionEvolution", () => {
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 
-  it("still renders the Kling evolution animation video in reduced motion", async () => {
+  it("still renders the Kling evolution animation video at the reduced-motion reveal", async () => {
     mocks.profile = "reduced";
     mocks.prefersReducedMotion = true;
 
@@ -515,6 +521,15 @@ describe("CompanionEvolution", () => {
       />,
     );
     await prepareEvolution();
+
+    expect(screen.queryByTestId("evolution-animation-video")).not.toBeInTheDocument();
+
+    await flushTimers(
+      REDUCED_SEQUENCE_MS.hold +
+      REDUCED_SEQUENCE_MS.charge +
+      REDUCED_SEQUENCE_MS.conceal +
+      REDUCED_SEQUENCE_MS.apex,
+    );
 
     expect(screen.getByTestId("evolution-animation-video")).toBeInTheDocument();
   });
@@ -600,12 +615,7 @@ describe("CompanionEvolution", () => {
     expect(screen.queryByTestId("evolution-hatch-video")).not.toBeInTheDocument();
 
     const dialog = screen.getByRole("alertdialog");
-    const video = screen.getByTestId("evolution-animation-video") as HTMLVideoElement;
-    expect(video).toHaveStyle({ opacity: "0" });
-
-    await act(async () => {
-      fireEvent.canPlay(video);
-    });
+    expect(screen.queryByTestId("evolution-animation-video")).not.toBeInTheDocument();
 
     await flushTimers(
       FULL_SEQUENCE_MS.hold +
@@ -616,6 +626,7 @@ describe("CompanionEvolution", () => {
     );
 
     expect(dialog).toHaveAttribute("data-phase", "reveal");
+    const video = screen.getByTestId("evolution-animation-video") as HTMLVideoElement;
     expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(1);
     expect(video).toHaveStyle({ opacity: "1" });
   });

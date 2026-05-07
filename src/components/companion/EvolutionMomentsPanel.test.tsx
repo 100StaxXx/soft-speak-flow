@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -9,6 +15,12 @@ const mocks = vi.hoisted(() => ({
   } | null,
   evolutions: [] as Array<Record<string, unknown>>,
   animationJobs: [] as Array<Record<string, unknown>>,
+  queryFilters: [] as Array<{
+    table: string;
+    method: "eq" | "in";
+    column: string;
+    value: unknown;
+  }>,
   realtimeCallback: null as null | (() => void),
   channel: vi.fn(),
   removeChannel: vi.fn(),
@@ -21,13 +33,32 @@ vi.mock("@/hooks/useAuth", () => ({
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (table: string) => {
+      const createListQuery = (rows: () => Array<Record<string, unknown>>) => {
+        const chain = {
+          eq: (column: string, value: unknown) => {
+            mocks.queryFilters.push({ table, method: "eq", column, value });
+            return chain;
+          },
+          in: (column: string, value: unknown) => {
+            mocks.queryFilters.push({ table, method: "in", column, value });
+            return chain;
+          },
+          order: () => chain,
+          limit: async () => ({ data: rows(), error: null }),
+        };
+        return chain;
+      };
+
       if (table === "user_companion") {
         return {
           select: () => ({
             eq: () => ({
               order: () => ({
                 limit: () => ({
-                  maybeSingle: async () => ({ data: mocks.companion, error: null }),
+                  maybeSingle: async () => ({
+                    data: mocks.companion,
+                    error: null,
+                  }),
                 }),
               }),
             }),
@@ -37,31 +68,13 @@ vi.mock("@/integrations/supabase/client", () => ({
 
       if (table === "companion_evolutions") {
         return {
-          select: () => ({
-            eq: () => ({
-              in: () => ({
-                order: () => ({
-                  limit: async () => ({ data: mocks.evolutions, error: null }),
-                }),
-              }),
-            }),
-          }),
+          select: () => createListQuery(() => mocks.evolutions),
         };
       }
 
       if (table === "companion_animation_jobs") {
         return {
-          select: () => ({
-            eq: () => ({
-              eq: () => ({
-                in: () => ({
-                  order: () => ({
-                    limit: async () => ({ data: mocks.animationJobs, error: null }),
-                  }),
-                }),
-              }),
-            }),
-          }),
+          select: () => createListQuery(() => mocks.animationJobs),
         };
       }
 
@@ -85,9 +98,9 @@ const succeededMoment = {
 };
 
 const pendingMoment = {
-  id: "evolution-6",
-  stage: 6,
-  image_url: "https://example.com/stage-6.png",
+  id: "evolution-13",
+  stage: 13,
+  image_url: "https://example.com/stage-13.png",
   evolved_at: "2026-05-02T12:00:00.000Z",
   animation_status: "processing",
   animation_video_url: null,
@@ -125,6 +138,7 @@ describe("EvolutionMomentsPanel", () => {
     mocks.companion = { id: "companion-1" };
     mocks.evolutions = [succeededMoment];
     mocks.animationJobs = [];
+    mocks.queryFilters = [];
     mocks.realtimeCallback = null;
     mocks.removeChannel.mockReset();
     mocks.channel.mockReset();
@@ -147,18 +161,26 @@ describe("EvolutionMomentsPanel", () => {
   it("shows evolutions as first-class moments", async () => {
     renderPanel();
 
-    expect(await screen.findByRole("button", { name: /stage 5 evolution/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: /stage 5 evolution/i }),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Watch")).not.toBeInTheDocument();
-    expect(screen.getByRole("region", { name: /evolutions/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: /evolutions/i }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Evolutions")).toBeInTheDocument();
   });
 
   it("opens a playable evolution dialog for completed animation rows", async () => {
     renderPanel();
 
-    fireEvent.click(await screen.findByRole("button", { name: /stage 5 evolution/i }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /stage 5 evolution/i }),
+    );
 
-    expect(await screen.findByRole("dialog", { name: /stage 5 evolution/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("dialog", { name: /stage 5 evolution/i }),
+    ).toBeInTheDocument();
     const video = await screen.findByTestId("evolution-moment-video");
     expect(video).toHaveAttribute("src", "https://example.com/stage-5.mp4");
     expect(video).not.toHaveAttribute("controls");
@@ -169,20 +191,29 @@ describe("EvolutionMomentsPanel", () => {
   it("autoplays the evolution video again when the moment is reopened", async () => {
     renderPanel();
 
-    const momentCard = await screen.findByRole("button", { name: /stage 5 evolution/i });
+    const momentCard = await screen.findByRole("button", {
+      name: /stage 5 evolution/i,
+    });
     fireEvent.click(momentCard);
 
-    expect(await screen.findByTestId("evolution-moment-video")).toHaveAttribute("autoplay");
+    expect(await screen.findByTestId("evolution-moment-video")).toHaveAttribute(
+      "autoplay",
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /close/i }));
     await waitFor(() => {
-      expect(screen.queryByRole("dialog", { name: /stage 5 evolution/i })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("dialog", { name: /stage 5 evolution/i }),
+      ).not.toBeInTheDocument();
     });
 
     fireEvent.click(momentCard);
 
     const reopenedVideo = await screen.findByTestId("evolution-moment-video");
-    expect(reopenedVideo).toHaveAttribute("src", "https://example.com/stage-5.mp4");
+    expect(reopenedVideo).toHaveAttribute(
+      "src",
+      "https://example.com/stage-5.mp4",
+    );
     expect(reopenedVideo).toHaveAttribute("autoplay");
     expect(reopenedVideo).toHaveAttribute("playsinline");
   });
@@ -191,12 +222,16 @@ describe("EvolutionMomentsPanel", () => {
     mocks.evolutions = [pendingMoment];
     renderPanel();
 
-    const generatingCard = await screen.findByRole("button", { name: /stage 6 evolution generating/i });
+    const generatingCard = await screen.findByRole("button", {
+      name: /stage 13 evolution generating/i,
+    });
     expect(generatingCard).toBeDisabled();
     expect(screen.queryByText("Generating")).not.toBeInTheDocument();
 
     fireEvent.click(generatingCard);
-    expect(screen.queryByTestId("evolution-moment-video")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("evolution-moment-video"),
+    ).not.toBeInTheDocument();
   });
 
   it("shows a stage-one prewarm before the egg is claimed", async () => {
@@ -210,7 +245,9 @@ describe("EvolutionMomentsPanel", () => {
 
     renderPanel();
 
-    expect(await screen.findByRole("button", { name: /stage 1 evolution/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: /stage 1 evolution/i }),
+    ).toBeInTheDocument();
   });
 
   it("shows succeeded animation jobs when the evolution row has not caught up", async () => {
@@ -219,7 +256,9 @@ describe("EvolutionMomentsPanel", () => {
 
     renderPanel();
 
-    fireEvent.click(await screen.findByRole("button", { name: /stage 1 evolution/i }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /stage 1 evolution/i }),
+    );
     expect(await screen.findByTestId("evolution-moment-video")).toHaveAttribute(
       "src",
       "https://example.com/stage-1.mp4",
@@ -233,16 +272,76 @@ describe("EvolutionMomentsPanel", () => {
     renderPanel();
 
     expect(await screen.findByText("No Evolutions Yet")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /stage \d+ evolution/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /stage \d+ evolution/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("hides completed videos for non-boundary stages that reuse the same art", async () => {
+    mocks.evolutions = [
+      {
+        ...succeededMoment,
+        id: "evolution-10",
+        stage: 10,
+        image_url: "https://example.com/stage-10.png",
+        animation_video_url: "https://example.com/stage-10.mp4",
+      },
+    ];
+    mocks.animationJobs = [
+      {
+        ...succeededJobMoment,
+        id: "job-11",
+        evolution_id: "evolution-11",
+        stage: 11,
+        source_image_url: "https://example.com/stage-11.png",
+        video_url: "https://example.com/stage-11.mp4",
+      },
+    ];
+
+    renderPanel();
+
+    expect(await screen.findByText("No Evolutions Yet")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /stage 10 evolution/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /stage 11 evolution/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("filters visual-boundary stages in the queries before limiting", async () => {
+    renderPanel();
+
+    await screen.findByRole("button", { name: /stage 5 evolution/i });
+
+    const evolutionStageFilter = mocks.queryFilters.find(
+      (filter) =>
+        filter.table === "companion_evolutions" &&
+        filter.method === "in" &&
+        filter.column === "stage",
+    );
+    const jobStageFilter = mocks.queryFilters.find(
+      (filter) =>
+        filter.table === "companion_animation_jobs" &&
+        filter.method === "in" &&
+        filter.column === "stage",
+    );
+
+    expect(evolutionStageFilter?.value).toEqual([1, 5, 13, 21, 36, 56, 81]);
+    expect(jobStageFilter?.value).toEqual([1, 5, 13, 21, 36, 56, 81]);
   });
 
   it("falls back to the still image when evolution video loading fails", async () => {
     renderPanel();
 
-    fireEvent.click(await screen.findByRole("button", { name: /stage 5 evolution/i }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /stage 5 evolution/i }),
+    );
     fireEvent.error(await screen.findByTestId("evolution-moment-video"));
 
-    const fallback = await screen.findByTestId("evolution-moment-fallback-image");
+    const fallback = await screen.findByTestId(
+      "evolution-moment-fallback-image",
+    );
     expect(fallback).toHaveAttribute("src", "https://example.com/stage-5.png");
   });
 });

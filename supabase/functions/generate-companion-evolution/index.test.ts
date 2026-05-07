@@ -493,6 +493,70 @@ Deno.test("maybeEnqueueCompanionAnimationJob records a skipped status when FAL_K
   assertEquals(harness.updates[0]?.payload.animation_error_code, "fal_key_missing", "Expected missing key metadata");
 });
 
+Deno.test("maybeEnqueueCompanionAnimationJob skips non-boundary stages before queueing", async () => {
+  const harness = createAnimationEnqueueHarness();
+
+  const result = await module.maybeEnqueueCompanionAnimationJob({
+    supabase: harness.supabase,
+    createCostGuardrailSession: harness.createCostGuardrailSession as never,
+    userId: USER_ID,
+    companionId: "companion-1",
+    evolutionId: "evo-1",
+    stage: 3,
+    imageUrl: "https://example.com/stage-3.png",
+    env: {
+      get: (name: string) => {
+        if (name === "COMPANION_ANIMATION_ENABLED") return "true";
+        if (name === "FAL_KEY") return "fal-key";
+        return undefined;
+      },
+    },
+    now: () => new Date("2026-05-02T12:00:00.000Z"),
+  });
+
+  assertEquals(result.status, "skipped", "Expected non-boundary stage to skip");
+  assertEquals(result.reason, "stage_not_animatable", "Expected stage skip reason");
+  assertEquals(harness.upserts.length, 0, "Expected no animation job for non-boundary stage");
+  assertEquals(harness.guardrailAccessCalls.length, 0, "Expected no video guardrail check for non-boundary stage");
+  assertEquals(harness.updates[0]?.payload.animation_status, "skipped", "Expected evolution metadata to record skip");
+  assertEquals(harness.updates[0]?.payload.animation_error_code, "stage_not_animatable", "Expected stage metadata");
+});
+
+Deno.test("maybeEnqueueCompanionAnimationJob skips reused evolution images before queueing", async () => {
+  const harness = createAnimationEnqueueHarness();
+
+  const result = await module.maybeEnqueueCompanionAnimationJob({
+    supabase: harness.supabase,
+    createCostGuardrailSession: harness.createCostGuardrailSession as never,
+    userId: USER_ID,
+    companionId: "companion-1",
+    evolutionId: "evo-1",
+    stage: 5,
+    imageUrl: "https://example.com/stage-1.png",
+    previousImageUrl: "https://example.com/stage-1.png",
+    generationMetadata: {
+      sourceType: "reuse",
+      portraitRegenerated: false,
+      reusedFromStage: 1,
+    },
+    env: {
+      get: (name: string) => {
+        if (name === "COMPANION_ANIMATION_ENABLED") return "true";
+        if (name === "FAL_KEY") return "fal-key";
+        return undefined;
+      },
+    },
+    now: () => new Date("2026-05-02T12:00:00.000Z"),
+  });
+
+  assertEquals(result.status, "skipped", "Expected reused image animation to skip");
+  assertEquals(result.reason, "image_unchanged", "Expected unchanged-image skip reason");
+  assertEquals(harness.upserts.length, 0, "Expected no animation job for reused images");
+  assertEquals(harness.guardrailAccessCalls.length, 0, "Expected no guardrail check for reused images");
+  assertEquals(harness.updates[0]?.payload.animation_status, "skipped", "Expected evolution metadata to record skip");
+  assertEquals(harness.updates[0]?.payload.animation_error_code, "image_unchanged", "Expected unchanged-image metadata");
+});
+
 Deno.test("maybeEnqueueCompanionAnimationJob enqueues only when enabled, credentialed, public, and allowed", async () => {
   const harness = createAnimationEnqueueHarness();
 

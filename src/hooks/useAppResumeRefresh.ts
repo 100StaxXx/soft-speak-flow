@@ -10,6 +10,10 @@ import {
   warmDailyTasksQueryFromRemote,
   warmEpicsQueryFromRemote,
 } from '@/utils/plannerSync';
+import {
+  PUSH_NOTIFICATIONS_INBOX_QUERY_KEY,
+  PUSH_NOTIFICATIONS_UNREAD_COUNT_QUERY_KEY,
+} from "@/hooks/usePushNotificationsInbox";
 
 const RESUME_COOLDOWN_MS = 10000; // 10 second cooldown to prevent spam
 
@@ -63,6 +67,8 @@ export const useAppResumeRefresh = ({ enabled = true }: UseAppResumeRefreshOptio
       queryClient.invalidateQueries({ queryKey: ['current-evolution-card'] }),
       queryClient.invalidateQueries({ queryKey: ['evolution-cards'] }),
       queryClient.invalidateQueries({ queryKey: ['wallpapers'] }),
+      queryClient.invalidateQueries({ queryKey: [PUSH_NOTIFICATIONS_INBOX_QUERY_KEY] }),
+      queryClient.invalidateQueries({ queryKey: [PUSH_NOTIFICATIONS_UNREAD_COUNT_QUERY_KEY] }),
     ]);
 
     if (user?.id) {

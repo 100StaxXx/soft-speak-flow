@@ -4,6 +4,10 @@ import {
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
+import {
+  type CompanionAnimationIneligibility,
+  getCompanionAnimationIneligibility,
+} from "../_shared/companionAnimationJobs.ts";
 import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
 import {
   COMPANION_ANIMATION_PROVIDER,
@@ -16,6 +20,7 @@ import {
   resolveFalKlingModelFromEnv,
   submitFalKlingVideo,
 } from "../_shared/falKlingVideoClient.ts";
+import { getCurrentVisualStageBoundaryLevel } from "../../../src/config/progression.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -361,6 +366,115 @@ const getTerminalJobResponse = async (
   return responseBody;
 };
 
+const fetchPreviousBoundaryEvolutionImageUrl = async (
+  supabase: SupabaseServiceClient,
+  companionId: string,
+  stage: number,
+): Promise<string | null> => {
+  const previousBoundaryStage = getCurrentVisualStageBoundaryLevel(stage - 1);
+  if (previousBoundaryStage <= 0) return null;
+
+  const { data, error } = await supabase
+    .from("companion_evolutions")
+    .select("image_url")
+    .eq("companion_id", companionId)
+    .eq("stage", previousBoundaryStage)
+    .maybeSingle();
+
+  if (error) throw error;
+  return typeof data?.image_url === "string" ? data.image_url : null;
+};
+
+const resolveJobAnimationIneligibility = async ({
+  supabase,
+  job,
+  deps,
+}: {
+  supabase: SupabaseServiceClient;
+  job: CompanionAnimationJob;
+  deps: ProcessCompanionAnimationJobDeps;
+}): Promise<CompanionAnimationIneligibility | null> => {
+  const stageIneligibility = getCompanionAnimationIneligibility({
+    stage: job.stage,
+    sourceImageUrl: job.source_image_url,
+  });
+  if (stageIneligibility) return stageIneligibility;
+
+  try {
+    const [evolutionResult, previousImageUrl] = await Promise.all([
+      supabase
+        .from("companion_evolutions")
+        .select("generation_metadata")
+        .eq("id", job.evolution_id)
+        .maybeSingle(),
+      fetchPreviousBoundaryEvolutionImageUrl(
+        supabase,
+        job.companion_id,
+        job.stage,
+      ),
+    ]);
+
+    if (evolutionResult.error) {
+      throw evolutionResult.error;
+    }
+
+    const evolution = evolutionResult.data;
+    return getCompanionAnimationIneligibility({
+      stage: job.stage,
+      generationMetadata: evolution?.generation_metadata,
+      sourceImageUrl: job.source_image_url,
+      previousImageUrl,
+    });
+  } catch (error) {
+    if (!(error instanceof TypeError)) {
+      throw error;
+    }
+
+    deps.warn("Failed to resolve companion animation eligibility context", {
+      jobId: job.id,
+      evolutionId: job.evolution_id,
+      stage: job.stage,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+};
+
+const markClaimedJobAnimationIneligible = async ({
+  supabase,
+  job,
+  ineligibility,
+  now,
+}: {
+  supabase: SupabaseServiceClient;
+  job: CompanionAnimationJob;
+  ineligibility: CompanionAnimationIneligibility;
+  now: Date;
+}) => {
+  const nowIso = toIso(now);
+  await updateEvolutionAnimation(supabase, job.evolution_id, {
+    animation_status: "skipped",
+    animation_error_code: ineligibility.code,
+    animation_error_message: ineligibility.message,
+    animation_completed_at: nowIso,
+  });
+  await updateJob(supabase, job.id, {
+    status: "failed",
+    error_code: ineligibility.code,
+    error_message: ineligibility.message,
+    completed_at: nowIso,
+    next_retry_at: null,
+    updated_at: nowIso,
+  });
+
+  return {
+    jobId: job.id,
+    status: "skipped",
+    reason: ineligibility.code,
+    code: ineligibility.code,
+  };
+};
+
 const uploadAnimationVideo = async ({
   supabase,
   job,
@@ -421,6 +535,20 @@ export const processClaimedCompanionAnimationJob = async ({
   job: CompanionAnimationJob;
   deps?: ProcessCompanionAnimationJobDeps;
 }) => {
+  const ineligibility = await resolveJobAnimationIneligibility({
+    supabase,
+    job,
+    deps,
+  });
+  if (ineligibility) {
+    return await markClaimedJobAnimationIneligible({
+      supabase,
+      job,
+      ineligibility,
+      now: deps.now(),
+    });
+  }
+
   const falKey = deps.env.get("FAL_KEY")?.trim();
   if (!falKey) {
     throw new JobProcessingError(

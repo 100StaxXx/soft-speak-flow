@@ -39,6 +39,14 @@ Deno.test("enqueues only the early reminder before the quest start time", () => 
   if (rows[0].dedupeKey !== "task_reminder:task-1:15") {
     throw new Error(`Unexpected reminder dedupe key: ${rows[0].dedupeKey}`);
   }
+
+  if (rows[0].payload.url !== "/journeys?taskId=task-1") {
+    throw new Error(`Expected reminder payload to route to the quest, got ${JSON.stringify(rows[0].payload)}`);
+  }
+
+  if (rows[0].payload.task_date !== "2026-04-11") {
+    throw new Error(`Expected reminder payload to carry the quest date, got ${JSON.stringify(rows[0].payload)}`);
+  }
 });
 
 Deno.test("enqueues both early reminder and quest start after the start time", () => {
@@ -123,6 +131,37 @@ Deno.test("enqueues one quest reminder per due configured offset", () => {
 
   if (rows[0].payload.reminder_offset_minutes !== 10) {
     throw new Error(`Expected reminder payload to carry the delivered offset, got ${JSON.stringify(rows[0].payload)}`);
+  }
+});
+
+Deno.test("carries ritual source hints for ritual task notifications", () => {
+  const rows = buildTaskNotificationCandidates({
+    now: new Date("2026-04-11T21:50:00.000Z"),
+    profilesByUser: new Map([
+      ["user-1", { id: "user-1", timezone: "UTC", task_reminders_enabled: true }],
+    ]),
+    tasks: [{
+      id: "task-1",
+      user_id: "user-1",
+      task_text: "Ritual",
+      xp_reward: 50,
+      task_date: "2026-04-11",
+      scheduled_time: "22:00:00",
+      start_notification_sent: false,
+      reminder_enabled: true,
+      reminder_sent: false,
+      reminder_minutes_before: 15,
+      completed: false,
+      habit_source_id: "habit-1",
+    }],
+  });
+
+  if (rows.length !== 1 || rows[0]?.type !== "task_reminder") {
+    throw new Error(`Expected one ritual task_reminder, got ${JSON.stringify(rows)}`);
+  }
+
+  if (rows[0].payload.habit_source_id !== "habit-1" || rows[0].payload.is_ritual !== true) {
+    throw new Error(`Expected ritual payload hints, got ${JSON.stringify(rows[0].payload)}`);
   }
 });
 

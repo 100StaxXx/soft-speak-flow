@@ -80,7 +80,7 @@ export const useCompletionFeedback = () => {
         if (error) throw error;
         const feedback = normalizeCompletionFeedbackResponse(data);
         const canReplaceFreshFallback = Date.now() - fallbackShownAt <= AI_FEEDBACK_REPLACE_WINDOW_MS;
-        if (feedback && canReplaceFreshFallback && !isSameFeedback(feedback, fallback)) {
+        if (feedback?.generationSource === "ai" && canReplaceFreshFallback && !isSameFeedback(feedback, fallback)) {
           await talkPopup.replaceCurrent(toPopupOptions(feedback), fallback.companion.message);
         }
       } catch (error) {

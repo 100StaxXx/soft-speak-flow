@@ -236,6 +236,92 @@ Deno.test("processClaimedCompanionAnimationJob submits a new fal queue request",
   );
 });
 
+Deno.test("processClaimedCompanionAnimationJob skips non-boundary stages before provider submission", async () => {
+  const { supabase, updates } = createSupabaseHarness();
+  let providerCalled = false;
+  const { deps, costGuardrailCalls } = createDeps({
+    fetchFn: (() => {
+      providerCalled = true;
+      return Promise.resolve(new Response("{}"));
+    }) as typeof fetch,
+  });
+
+  const result = await module.processClaimedCompanionAnimationJob({
+    supabase: supabase as never,
+    job: createJob({
+      stage: 10,
+      source_image_url: "https://example.com/stage-10.png",
+    }) as never,
+    deps,
+  });
+
+  const resultRecord = result as Record<string, unknown>;
+  assertEquals(resultRecord.status, "skipped");
+  assertEquals(resultRecord.reason, "stage_not_animatable");
+  assertEquals(providerCalled, false);
+  assertEquals(costGuardrailCalls.length, 0);
+  assertEquals(
+    updates.find((update) => update.table === "companion_evolutions")?.payload
+      .animation_status,
+    "skipped",
+  );
+  assertEquals(
+    updates.find((update) => update.table === "companion_animation_jobs")
+      ?.payload.status,
+    "failed",
+  );
+});
+
+Deno.test("processClaimedCompanionAnimationJob fails closed on generation metadata lookup errors", async () => {
+  let providerCalled = false;
+  const supabase = {
+    from: (table: string) => {
+      if (table !== "companion_evolutions") {
+        throw new Error(`Unexpected table: ${table}`);
+      }
+
+      return {
+        select: (columns: string) => {
+          const chain = {
+            eq: () => chain,
+            maybeSingle: async () => {
+              if (columns === "generation_metadata") {
+                return {
+                  data: null,
+                  error: new Error("metadata lookup failed"),
+                };
+              }
+
+              return { data: null, error: null };
+            },
+          };
+          return chain;
+        },
+      };
+    },
+  };
+  const { deps, costGuardrailCalls } = createDeps({
+    fetchFn: (() => {
+      providerCalled = true;
+      return Promise.resolve(new Response("{}"));
+    }) as typeof fetch,
+  });
+
+  await assertRejects(
+    () =>
+      module.processClaimedCompanionAnimationJob({
+        supabase: supabase as never,
+        job: createJob() as never,
+        deps,
+      }),
+    Error,
+    "metadata lookup failed",
+  );
+
+  assertEquals(providerCalled, false);
+  assertEquals(costGuardrailCalls.length, 0);
+});
+
 Deno.test("handleProcessCompanionAnimationJob submits explicit queued jobs without waiting for next_retry_at", async () => {
   const queuedJob = createJob({
     status: "queued",

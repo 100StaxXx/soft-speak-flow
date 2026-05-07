@@ -6257,8 +6257,10 @@ export type Database = {
           last_error: string | null
           next_retry_at: string | null
           notification_type: string
+          opened_at: string | null
           payload: Json
           priority: number
+          read_at: string | null
           scheduled_for: string
           source_id: string
           source_table: string
@@ -6281,8 +6283,10 @@ export type Database = {
           last_error?: string | null
           next_retry_at?: string | null
           notification_type: string
+          opened_at?: string | null
           payload?: Json
           priority: number
+          read_at?: string | null
           scheduled_for: string
           source_id: string
           source_table: string
@@ -6305,8 +6309,10 @@ export type Database = {
           last_error?: string | null
           next_retry_at?: string | null
           notification_type?: string
+          opened_at?: string | null
           payload?: Json
           priority?: number
+          read_at?: string | null
           scheduled_for?: string
           source_id?: string
           source_table?: string
@@ -8980,6 +8986,18 @@ export type Database = {
           is_apple_offer_eligible: boolean
           owner_type: string | null
         }[]
+      }
+      mark_all_push_notifications_read: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      mark_push_notification_opened: {
+        Args: { p_queue_id: string }
+        Returns: undefined
+      }
+      mark_push_notification_read: {
+        Args: { p_queue_id: string }
+        Returns: undefined
       }
       apply_companion_preset_selection: {
         Args: {

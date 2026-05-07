@@ -365,10 +365,11 @@ const CompanionEvolutionContent = ({
   );
   const levelDisplay = useMemo(() => getProgressionLevelDisplay(newStage), [newStage]);
   const sequence = prefersReducedMotion ? REDUCED_SEQUENCE_MS : FULL_SEQUENCE_MS;
-  const shouldRenderAnimationVideo = hasPlayableAnimationVideoUrl && !useHatchVideo;
-  const shouldUseAnimationVideo = shouldRenderAnimationVideo && animationVideoReady && !animationVideoFailed;
   const isAnimationRevealPhase = phase === "reveal" || phase === "settle";
+  const shouldUseGeneratedAnimationVideo = hasPlayableAnimationVideoUrl && !useHatchVideo;
+  const shouldUseAnimationVideo = shouldUseGeneratedAnimationVideo && animationVideoReady && !animationVideoFailed;
   const showAnimationVideo = shouldUseAnimationVideo && !animationVideoEnded && isAnimationRevealPhase;
+  const shouldRenderAnimationVideo = showAnimationVideo;
   const holdStillRevealForAnimation =
     shouldUseAnimationVideo && !animationVideoEnded && isAnimationRevealPhase;
   const canDismissNow = canDismiss && !holdStillRevealForAnimation;
@@ -434,7 +435,7 @@ const CompanionEvolutionContent = ({
     : `Your companion reached ${levelDisplay}.`;
 
   const animationVideoReadyForCinematic =
-    !shouldRenderAnimationVideo || animationVideoReady;
+    !shouldUseGeneratedAnimationVideo || animationVideoReady;
   const shouldStartCinematic =
     artReadiness.ready && animationVideoReadyForCinematic && !animationVideoFailed;
   const firstHatchImageFit = isFirstEvolution ? "portrait" : "cover";
@@ -827,7 +828,7 @@ const CompanionEvolutionContent = ({
     return null;
   }
 
-  if (shouldRenderAnimationVideo && animationVideoFailed) {
+  if (shouldUseGeneratedAnimationVideo && animationVideoFailed) {
     return null;
   }
 

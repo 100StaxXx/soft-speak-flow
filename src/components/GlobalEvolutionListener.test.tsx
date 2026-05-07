@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import {
@@ -23,14 +29,22 @@ const mocks = vi.hoisted(() => {
   const rpcMock = vi.fn();
   const companionMemoriesInsertMock = vi.fn();
   const state = {
-    callback: null as null | ((payload: Record<string, unknown>) => Promise<void>),
+    callback: null as
+      | null
+      | ((payload: Record<string, unknown>) => Promise<void>),
     mentorId: null as string | null,
-    mentorLookup: null as null | (() => Promise<{ data: unknown; error: unknown }>),
+    mentorLookup: null as
+      | null
+      | (() => Promise<{ data: unknown; error: unknown }>),
     pendingEvolutionReveal: null as null | Record<string, unknown>,
     userCompanionLookup: null as null | Record<string, unknown>,
   };
-  const companionEvolutionLookupResponses: Array<{ data: unknown; error: unknown }> = [];
-  const animationJobLookupResponses: Array<{ data: unknown; error: unknown }> = [];
+  const companionEvolutionLookupResponses: Array<{
+    data: unknown;
+    error: unknown;
+  }> = [];
+  const animationJobLookupResponses: Array<{ data: unknown; error: unknown }> =
+    [];
   const functionsInvokeMock = vi.fn();
 
   return {
@@ -118,8 +132,12 @@ vi.mock("@/components/CompanionEvolution", () => ({
         data-new-image-url={props.newImageUrl}
         data-animation-video-url={props.animationVideoUrl ?? ""}
       >
-        <button type="button" onClick={props.onComplete}>Complete evolution</button>
-        <button type="button" onClick={props.onAnimationError}>Fail evolution</button>
+        <button type="button" onClick={props.onComplete}>
+          Complete evolution
+        </button>
+        <button type="button" onClick={props.onAnimationError}>
+          Fail evolution
+        </button>
       </div>
     ) : null;
   },
@@ -144,15 +162,17 @@ vi.mock("@/integrations/supabase/client", () => ({
     removeChannel: mocks.removeChannelMock,
     from: vi.fn((table: string) => {
       if (table === "companion_evolutions") {
-        const maybeSingleMock = vi.fn(async () =>
-          mocks.companionEvolutionLookupResponses.shift() ?? {
-            data: {
-              id: "evo-1",
-              animation_video_url: "https://example.com/evolution.mp4",
-              animation_status: "succeeded",
+        const maybeSingleMock = vi.fn(
+          async () =>
+            mocks.companionEvolutionLookupResponses.shift() ?? {
+              data: {
+                id: "evo-1",
+                animation_video_url: "https://example.com/evolution.mp4",
+                animation_status: "succeeded",
+              },
+              error: null,
             },
-            error: null,
-          });
+        );
 
         return {
           select: vi.fn(() => ({
@@ -166,11 +186,13 @@ vi.mock("@/integrations/supabase/client", () => ({
       }
 
       if (table === "companion_animation_jobs") {
-        const maybeSingleMock = vi.fn(async () =>
-          mocks.animationJobLookupResponses.shift() ?? {
-            data: { id: "job-1" },
-            error: null,
-          });
+        const maybeSingleMock = vi.fn(
+          async () =>
+            mocks.animationJobLookupResponses.shift() ?? {
+              data: { id: "job-1" },
+              error: null,
+            },
+        );
 
         return {
           select: vi.fn(() => ({
@@ -190,7 +212,9 @@ vi.mock("@/integrations/supabase/client", () => ({
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
               maybeSingle: vi.fn().mockResolvedValue({
-                data: mocks.state.userCompanionLookup ?? { core_element: "fire" },
+                data: mocks.state.userCompanionLookup ?? {
+                  core_element: "fire",
+                },
                 error: null,
               }),
             })),
@@ -202,12 +226,14 @@ vi.mock("@/integrations/supabase/client", () => ({
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
-              maybeSingle: vi.fn(() => (
-                mocks.state.mentorLookup?.() ?? Promise.resolve({
-                  data: { slug: "atlas" },
-                  error: null,
-                })
-              )),
+              maybeSingle: vi.fn(
+                () =>
+                  mocks.state.mentorLookup?.() ??
+                  Promise.resolve({
+                    data: { slug: "atlas" },
+                    error: null,
+                  }),
+              ),
             })),
           })),
         };
@@ -239,11 +265,12 @@ import {
   GlobalEvolutionListener,
 } from "./GlobalEvolutionListener";
 
-const renderListener = () => render(
-  <MemoryRouter>
-    <GlobalEvolutionListener />
-  </MemoryRouter>,
-);
+const renderListener = () =>
+  render(
+    <MemoryRouter>
+      <GlobalEvolutionListener />
+    </MemoryRouter>,
+  );
 
 const preloadPlayablePendingAnimation = async () => {
   const preloader = screen.getByTestId("evolution-animation-preloader");
@@ -263,12 +290,14 @@ const requestReadyEvolutionReveal = async () => {
     newStage?: number;
   } | null;
   await act(async () => {
-    window.dispatchEvent(new CustomEvent(COMPANION_EVOLUTION_REVEAL_REQUESTED_EVENT, {
-      detail: {
-        companionId: pending?.companionId,
-        stage: pending?.newStage,
-      },
-    }));
+    window.dispatchEvent(
+      new CustomEvent(COMPANION_EVOLUTION_REVEAL_REQUESTED_EVENT, {
+        detail: {
+          companionId: pending?.companionId,
+          stage: pending?.newStage,
+        },
+      }),
+    );
   });
 };
 
@@ -295,17 +324,28 @@ describe("GlobalEvolutionListener", () => {
     mocks.animationJobLookupResponses.length = 0;
     mocks.rpcMock.mockResolvedValue({ data: [], error: null });
     mocks.companionMemoriesInsertMock.mockResolvedValue({ error: null });
-    mocks.functionsInvokeMock.mockResolvedValue({ data: { status: "processing", jobId: "job-1" }, error: null });
+    mocks.functionsInvokeMock.mockResolvedValue({
+      data: { status: "processing", jobId: "job-1" },
+      error: null,
+    });
     clearLocalEvolutionPresentationGuardsForTest();
     try {
-      window.localStorage.removeItem("companion-evolution-presented:user-1:evo-1");
-      window.localStorage.removeItem("companion-evolution-presented:user-1:evo-5");
+      window.localStorage.removeItem(
+        "companion-evolution-presented:user-1:evo-1",
+      );
+      window.localStorage.removeItem(
+        "companion-evolution-presented:user-1:evo-5",
+      );
     } catch {
       // Some test localStorage shims are intentionally partial.
     }
 
     mocks.onMock.mockImplementation(
-      (_event: string, _config: Record<string, unknown>, callback: (payload: Record<string, unknown>) => Promise<void>) => {
+      (
+        _event: string,
+        _config: Record<string, unknown>,
+        callback: (payload: Record<string, unknown>) => Promise<void>,
+      ) => {
         mocks.state.callback = callback;
         return {
           subscribe: mocks.subscribeMock,
@@ -340,11 +380,21 @@ describe("GlobalEvolutionListener", () => {
       });
     });
 
-    expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["companion"] });
-    expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["companion-health"] });
-    expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["companion-care-signals"] });
-    expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["current-evolution-card"] });
-    expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["evolution-cards"] });
+    expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: ["companion"],
+    });
+    expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: ["companion-health"],
+    });
+    expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: ["companion-care-signals"],
+    });
+    expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: ["current-evolution-card"],
+    });
+    expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: ["evolution-cards"],
+    });
     expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
   });
 
@@ -404,6 +454,37 @@ describe("GlobalEvolutionListener", () => {
     });
     expect(mocks.state.pendingEvolutionReveal).toBeNull();
     expect(mocks.onEvolutionCompleteMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("removes the hidden preloader when the prepared reveal starts", async () => {
+    renderListener();
+
+    await act(async () => {
+      await mocks.state.callback?.({
+        eventType: "UPDATE",
+        new: {
+          id: "companion-1",
+          current_stage: 5,
+          current_image_url: "https://example.com/stage-5.png",
+        },
+        old: {
+          id: "companion-1",
+          current_stage: 4,
+          current_image_url: "https://example.com/stage-4.png",
+        },
+      });
+    });
+
+    expect(
+      screen.getByTestId("evolution-animation-preloader"),
+    ).toBeInTheDocument();
+
+    await requestReadyEvolutionReveal();
+
+    expect(screen.getByTestId("companion-evolution")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("evolution-animation-preloader"),
+    ).not.toBeInTheDocument();
   });
 
   it("uses a local presented guard when the mark-presented RPC fails", async () => {
@@ -482,9 +563,13 @@ describe("GlobalEvolutionListener", () => {
     renderListener();
 
     await waitFor(() => {
-      expect(mocks.setPendingEvolutionRevealMock).toHaveBeenLastCalledWith(null);
+      expect(mocks.setPendingEvolutionRevealMock).toHaveBeenLastCalledWith(
+        null,
+      );
     });
-    expect(screen.queryByTestId("evolution-animation-preloader")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("evolution-animation-preloader"),
+    ).not.toBeInTheDocument();
     expect(mocks.toastInfoMock).not.toHaveBeenCalledWith(
       "Your companion's evolution is ready.",
       expect.anything(),
@@ -511,7 +596,9 @@ describe("GlobalEvolutionListener", () => {
     });
 
     expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("evolution-animation-preloader")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("evolution-animation-preloader"),
+    ).not.toBeInTheDocument();
     expect(mocks.setPendingEvolutionRevealMock).not.toHaveBeenCalled();
     expect(mocks.companionEvolutionPropsMock).not.toHaveBeenCalled();
   });
@@ -674,33 +761,39 @@ describe("GlobalEvolutionListener", () => {
     try {
       renderListener();
 
-      const callbackPromise = mocks.state.callback?.({
-        eventType: "UPDATE",
-        new: {
-          id: "companion-1",
-          current_stage: 5,
-          current_image_url: "https://example.com/stage-5.png",
-        },
-        old: {
-          id: "companion-1",
-          current_stage: 4,
-          current_image_url: "https://example.com/stage-4.png",
-        },
-      }) ?? Promise.resolve();
+      const callbackPromise =
+        mocks.state.callback?.({
+          eventType: "UPDATE",
+          new: {
+            id: "companion-1",
+            current_stage: 5,
+            current_image_url: "https://example.com/stage-5.png",
+          },
+          old: {
+            id: "companion-1",
+            current_stage: 4,
+            current_image_url: "https://example.com/stage-4.png",
+          },
+        }) ?? Promise.resolve();
 
       await act(async () => {
         await Promise.resolve();
         await Promise.resolve();
       });
-      expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
-      expect(mocks.functionsInvokeMock).toHaveBeenCalledWith("prewarm-companion-animation", {
-        body: {
-          companionId: "companion-1",
-          stage: 5,
-          force: false,
-          reason: "status_queued",
+      expect(
+        screen.queryByTestId("companion-evolution"),
+      ).not.toBeInTheDocument();
+      expect(mocks.functionsInvokeMock).toHaveBeenCalledWith(
+        "prewarm-companion-animation",
+        {
+          body: {
+            companionId: "companion-1",
+            stage: 5,
+            force: false,
+            reason: "status_queued",
+          },
         },
-      });
+      );
       await act(async () => {
         await flushMicrotasks();
       });
@@ -713,7 +806,9 @@ describe("GlobalEvolutionListener", () => {
       });
       void callbackPromise;
 
-      expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("companion-evolution"),
+      ).not.toBeInTheDocument();
       await openPlayablePendingAnimation();
 
       expect(screen.getByTestId("companion-evolution")).toHaveAttribute(
@@ -768,26 +863,29 @@ describe("GlobalEvolutionListener", () => {
     try {
       renderListener();
 
-      const callbackPromise = mocks.state.callback?.({
-        eventType: "UPDATE",
-        new: {
-          id: "companion-1",
-          current_stage: 5,
-          current_image_url: "https://example.com/stage-5.png",
-        },
-        old: {
-          id: "companion-1",
-          current_stage: 4,
-          current_image_url: "https://example.com/stage-4.png",
-        },
-      }) ?? Promise.resolve();
+      const callbackPromise =
+        mocks.state.callback?.({
+          eventType: "UPDATE",
+          new: {
+            id: "companion-1",
+            current_stage: 5,
+            current_image_url: "https://example.com/stage-5.png",
+          },
+          old: {
+            id: "companion-1",
+            current_stage: 4,
+            current_image_url: "https://example.com/stage-4.png",
+          },
+        }) ?? Promise.resolve();
 
       await act(async () => {
         await Promise.resolve();
         await Promise.resolve();
       });
 
-      expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("companion-evolution"),
+      ).not.toBeInTheDocument();
       expect(mocks.functionsInvokeMock).not.toHaveBeenCalled();
       await act(async () => {
         await flushMicrotasks();
@@ -797,15 +895,20 @@ describe("GlobalEvolutionListener", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await flushMicrotasks();
       });
-      expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
-      expect(mocks.functionsInvokeMock).toHaveBeenCalledWith("prewarm-companion-animation", {
-        body: {
-          companionId: "companion-1",
-          stage: 5,
-          force: false,
-          reason: "status_queued",
+      expect(
+        screen.queryByTestId("companion-evolution"),
+      ).not.toBeInTheDocument();
+      expect(mocks.functionsInvokeMock).toHaveBeenCalledWith(
+        "prewarm-companion-animation",
+        {
+          body: {
+            companionId: "companion-1",
+            stage: 5,
+            force: false,
+            reason: "status_queued",
+          },
         },
-      });
+      );
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(2000);
@@ -813,7 +916,9 @@ describe("GlobalEvolutionListener", () => {
       });
       await callbackPromise;
 
-      expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("companion-evolution"),
+      ).not.toBeInTheDocument();
       await openPlayablePendingAnimation();
 
       expect(screen.getByTestId("companion-evolution")).toHaveAttribute(
@@ -844,19 +949,20 @@ describe("GlobalEvolutionListener", () => {
     try {
       renderListener();
 
-      const callbackPromise = mocks.state.callback?.({
-        eventType: "UPDATE",
-        new: {
-          id: "companion-1",
-          current_stage: 5,
-          current_image_url: "https://example.com/stage-5.png",
-        },
-        old: {
-          id: "companion-1",
-          current_stage: 4,
-          current_image_url: "https://example.com/stage-4.png",
-        },
-      }) ?? Promise.resolve();
+      const callbackPromise =
+        mocks.state.callback?.({
+          eventType: "UPDATE",
+          new: {
+            id: "companion-1",
+            current_stage: 5,
+            current_image_url: "https://example.com/stage-5.png",
+          },
+          old: {
+            id: "companion-1",
+            current_stage: 4,
+            current_image_url: "https://example.com/stage-4.png",
+          },
+        }) ?? Promise.resolve();
 
       await act(async () => {
         await flushMicrotasks();
@@ -864,8 +970,12 @@ describe("GlobalEvolutionListener", () => {
       });
       await callbackPromise;
 
-      expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
-      expect(screen.queryByTestId("evolution-animation-preloader")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("companion-evolution"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("evolution-animation-preloader"),
+      ).not.toBeInTheDocument();
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(5000);
@@ -873,7 +983,10 @@ describe("GlobalEvolutionListener", () => {
       });
 
       const preloader = screen.getByTestId("evolution-animation-preloader");
-      expect(preloader).toHaveAttribute("src", "https://example.com/evolution.mp4");
+      expect(preloader).toHaveAttribute(
+        "src",
+        "https://example.com/evolution.mp4",
+      );
 
       await openPlayablePendingAnimation();
 
@@ -914,27 +1027,32 @@ describe("GlobalEvolutionListener", () => {
     try {
       renderListener();
 
-      const callbackPromise = mocks.state.callback?.({
-        eventType: "UPDATE",
-        new: {
-          id: "companion-1",
-          current_stage: 5,
-          current_image_url: "https://example.com/stage-5.png",
-        },
-        old: {
-          id: "companion-1",
-          current_stage: 4,
-          current_image_url: "https://example.com/stage-4.png",
-        },
-      }) ?? Promise.resolve();
+      const callbackPromise =
+        mocks.state.callback?.({
+          eventType: "UPDATE",
+          new: {
+            id: "companion-1",
+            current_stage: 5,
+            current_image_url: "https://example.com/stage-5.png",
+          },
+          old: {
+            id: "companion-1",
+            current_stage: 4,
+            current_image_url: "https://example.com/stage-4.png",
+          },
+        }) ?? Promise.resolve();
 
       await act(async () => {
         await flushMicrotasks();
         await callbackPromise;
       });
 
-      expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
-      expect(screen.queryByTestId("evolution-animation-preloader")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("companion-evolution"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("evolution-animation-preloader"),
+      ).not.toBeInTheDocument();
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(5000);
@@ -942,7 +1060,10 @@ describe("GlobalEvolutionListener", () => {
       });
 
       const preloader = screen.getByTestId("evolution-animation-preloader");
-      expect(preloader).toHaveAttribute("src", "https://example.com/recovered-evolution.mp4");
+      expect(preloader).toHaveAttribute(
+        "src",
+        "https://example.com/recovered-evolution.mp4",
+      );
 
       await openPlayablePendingAnimation();
 
@@ -955,20 +1076,73 @@ describe("GlobalEvolutionListener", () => {
     }
   });
 
+  it("settles non-retryable skipped animation rows without retrying forever", async () => {
+    const now = new Date().toISOString();
+    mocks.companionEvolutionLookupResponses.push({
+      data: {
+        id: "evo-5",
+        image_url: "https://example.com/stage-5.png",
+        animation_video_url: null,
+        animation_status: "skipped",
+        animation_error_code: "image_unchanged",
+        animation_requested_at: now,
+        animation_completed_at: now,
+        animation_presented_at: null,
+      },
+      error: null,
+    });
+
+    renderListener();
+
+    await act(async () => {
+      await mocks.state.callback?.({
+        eventType: "UPDATE",
+        new: {
+          id: "companion-1",
+          current_stage: 5,
+          current_image_url: "https://example.com/stage-5.png",
+        },
+        old: {
+          id: "companion-1",
+          current_stage: 4,
+          current_image_url: "https://example.com/stage-4.png",
+        },
+      });
+      await flushMicrotasks();
+    });
+
+    expect(mocks.functionsInvokeMock).not.toHaveBeenCalledWith(
+      "prewarm-companion-animation",
+      expect.anything(),
+    );
+    expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("evolution-animation-preloader"),
+    ).not.toBeInTheDocument();
+    expect(mocks.state.pendingEvolutionReveal).toBeNull();
+    expect(mocks.rpcMock).toHaveBeenCalledWith(
+      "mark_companion_evolution_animation_presented",
+      { p_evolution_id: "evo-5" },
+    );
+    expect(mocks.setIsEvolvingLoadingMock).toHaveBeenLastCalledWith(false);
+  });
+
   it("starts the first hatch animation from a local hatch event", async () => {
     renderListener();
 
     await act(async () => {
-      window.dispatchEvent(new CustomEvent(COMPANION_HATCH_STARTED_EVENT, {
-        detail: {
-          companionId: "companion-1",
-          previousStage: 0,
-          newStage: 1,
-          previousImageUrl: "https://example.com/egg.png",
-          newImageUrl: "https://example.com/hatchling.png",
-          element: "fire",
-        },
-      }));
+      window.dispatchEvent(
+        new CustomEvent(COMPANION_HATCH_STARTED_EVENT, {
+          detail: {
+            companionId: "companion-1",
+            previousStage: 0,
+            newStage: 1,
+            previousImageUrl: "https://example.com/egg.png",
+            newImageUrl: "https://example.com/hatchling.png",
+            element: "fire",
+          },
+        }),
+      );
     });
 
     await openPlayablePendingAnimation();
@@ -1011,17 +1185,19 @@ describe("GlobalEvolutionListener", () => {
       renderListener();
 
       await act(async () => {
-        window.dispatchEvent(new CustomEvent(COMPANION_HATCH_STARTED_EVENT, {
-          detail: {
-            companionId: "companion-1",
-            previousStage: 0,
-            newStage: 1,
-            previousImageUrl: "https://example.com/egg.png",
-            newImageUrl: "https://example.com/hatchling.png",
-            presetId: "fox",
-            element: "fire",
-          },
-        }));
+        window.dispatchEvent(
+          new CustomEvent(COMPANION_HATCH_STARTED_EVENT, {
+            detail: {
+              companionId: "companion-1",
+              previousStage: 0,
+              newStage: 1,
+              previousImageUrl: "https://example.com/egg.png",
+              newImageUrl: "https://example.com/hatchling.png",
+              presetId: "fox",
+              element: "fire",
+            },
+          }),
+        );
         await flushMicrotasks();
       });
 
@@ -1031,17 +1207,18 @@ describe("GlobalEvolutionListener", () => {
           animationVideoUrl: null,
         }),
       );
-      expect(screen.queryByTestId("evolution-animation-preloader")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("evolution-animation-preloader"),
+      ).not.toBeInTheDocument();
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(2_000);
         await flushMicrotasks();
       });
 
-      expect(screen.getByTestId("evolution-animation-preloader")).toHaveAttribute(
-        "src",
-        "https://example.com/hatch-kling.mp4",
-      );
+      expect(
+        screen.getByTestId("evolution-animation-preloader"),
+      ).toHaveAttribute("src", "https://example.com/hatch-kling.mp4");
       await openPlayablePendingAnimation();
 
       expect(screen.getByTestId("companion-evolution")).toHaveAttribute(
@@ -1060,16 +1237,18 @@ describe("GlobalEvolutionListener", () => {
     renderListener();
 
     await act(async () => {
-      window.dispatchEvent(new CustomEvent(COMPANION_HATCH_STARTED_EVENT, {
-        detail: {
-          companionId: "companion-1",
-          previousStage: 0,
-          newStage: 1,
-          previousImageUrl: "https://example.com/egg.png",
-          newImageUrl: "https://example.com/hatchling.png",
-          element: "fire",
-        },
-      }));
+      window.dispatchEvent(
+        new CustomEvent(COMPANION_HATCH_STARTED_EVENT, {
+          detail: {
+            companionId: "companion-1",
+            previousStage: 0,
+            newStage: 1,
+            previousImageUrl: "https://example.com/egg.png",
+            newImageUrl: "https://example.com/hatchling.png",
+            element: "fire",
+          },
+        }),
+      );
     });
 
     await openPlayablePendingAnimation();
@@ -1088,16 +1267,18 @@ describe("GlobalEvolutionListener", () => {
     renderListener();
 
     await act(async () => {
-      window.dispatchEvent(new CustomEvent(COMPANION_HATCH_STARTED_EVENT, {
-        detail: {
-          companionId: "companion-1",
-          previousStage: 0,
-          newStage: 1,
-          previousImageUrl: "https://example.com/egg.png",
-          newImageUrl: "https://example.com/hatchling.png",
-          element: "fire",
-        },
-      }));
+      window.dispatchEvent(
+        new CustomEvent(COMPANION_HATCH_STARTED_EVENT, {
+          detail: {
+            companionId: "companion-1",
+            previousStage: 0,
+            newStage: 1,
+            previousImageUrl: "https://example.com/egg.png",
+            newImageUrl: "https://example.com/hatchling.png",
+            element: "fire",
+          },
+        }),
+      );
     });
 
     await openPlayablePendingAnimation();
@@ -1174,7 +1355,9 @@ describe("GlobalEvolutionListener", () => {
     renderListener();
 
     await waitFor(() => {
-      expect(screen.getByTestId("evolution-animation-preloader")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("evolution-animation-preloader"),
+      ).toBeInTheDocument();
     });
     await openPlayablePendingAnimation();
 
@@ -1186,6 +1369,66 @@ describe("GlobalEvolutionListener", () => {
         newImageUrl: "https://example.com/stage-5.png",
         animationVideoUrl: "https://example.com/evolution.mp4",
       }),
+    );
+  });
+
+  it("does not hydrate intermediate level rows into a pending reveal", async () => {
+    mocks.state.userCompanionLookup = {
+      id: "companion-1",
+      current_stage: 2,
+      current_image_url: "https://example.com/stage-2.png",
+      preset_id: "phoenix",
+      core_element: "fire",
+      initial_image_url: "https://example.com/egg.png",
+    };
+
+    renderListener();
+
+    await act(async () => {
+      await flushMicrotasks();
+    });
+
+    expect(mocks.setPendingEvolutionRevealMock).not.toHaveBeenCalled();
+    expect(
+      screen.queryByTestId("evolution-animation-preloader"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not hydrate old evolution rows that have no animation work", async () => {
+    mocks.state.userCompanionLookup = {
+      id: "companion-1",
+      current_stage: 5,
+      current_image_url: "https://example.com/stage-5.png",
+      preset_id: "phoenix",
+      core_element: "fire",
+      initial_image_url: "https://example.com/egg.png",
+    };
+    mocks.companionEvolutionLookupResponses.push({
+      data: {
+        id: "evo-5",
+        image_url: "https://example.com/stage-5.png",
+        animation_video_url: null,
+        animation_status: null,
+        animation_requested_at: null,
+        animation_completed_at: null,
+        animation_presented_at: null,
+      },
+      error: null,
+    });
+
+    renderListener();
+
+    await act(async () => {
+      await flushMicrotasks();
+    });
+
+    expect(mocks.setPendingEvolutionRevealMock).not.toHaveBeenCalled();
+    expect(
+      screen.queryByTestId("evolution-animation-preloader"),
+    ).not.toBeInTheDocument();
+    expect(mocks.functionsInvokeMock).not.toHaveBeenCalledWith(
+      "prewarm-companion-animation",
+      expect.anything(),
     );
   });
 
@@ -1215,7 +1458,9 @@ describe("GlobalEvolutionListener", () => {
     });
 
     await waitFor(() => {
-      expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("companion-evolution"),
+      ).not.toBeInTheDocument();
     });
 
     expect(mocks.setEvolutionInProgressMock).not.toHaveBeenCalledWith(true);

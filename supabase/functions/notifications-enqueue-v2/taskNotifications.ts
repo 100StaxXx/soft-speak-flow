@@ -17,6 +17,7 @@ export interface TaskCandidateRow {
   reminder_offsets_minutes?: number[] | null;
   reminder_sent_offsets_minutes?: number[] | null;
   completed: boolean | null;
+  habit_source_id?: string | null;
 }
 
 export interface TaskProfileRow {
@@ -122,6 +123,12 @@ export function buildTaskNotificationCandidates(input: {
     if (!scheduledAt) continue;
 
     const remindersEnabled = profile?.task_reminders_enabled !== false;
+    const ritualPayload = task.habit_source_id
+      ? {
+          habit_source_id: task.habit_source_id,
+          is_ritual: true,
+        }
+      : {};
 
     if (
       !task.start_notification_sent &&
@@ -141,9 +148,11 @@ export function buildTaskNotificationCandidates(input: {
         payload: {
           task_id: task.id,
           task_text: task.task_text,
+          task_date: task.task_date,
           xp_reward: task.xp_reward,
           type: "task_start",
-          url: "/tasks",
+          url: `/journeys?taskId=${task.id}`,
+          ...ritualPayload,
         },
       });
     }
@@ -173,11 +182,13 @@ export function buildTaskNotificationCandidates(input: {
             payload: {
               task_id: task.id,
               task_text: task.task_text,
+              task_date: task.task_date,
               xp_reward: task.xp_reward,
               reminder_minutes_before: minutesBefore,
               reminder_offset_minutes: minutesBefore,
               type: "task_reminder",
-              url: "/tasks",
+              url: `/journeys?taskId=${task.id}`,
+              ...ritualPayload,
             },
           });
         }

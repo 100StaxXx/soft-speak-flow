@@ -2,6 +2,7 @@ export interface APNSNotificationPayload {
   title: string;
   body: string;
   data?: Record<string, unknown>;
+  badge?: number;
 }
 
 export interface APNSDeliveryResult {
@@ -113,17 +114,7 @@ async function sendWithEnvironment(
   const host = environment === "production" ? "api.push.apple.com" : "api.sandbox.push.apple.com";
   const url = `https://${host}/3/device/${deviceToken}`;
 
-  const body = {
-    aps: {
-      alert: {
-        title: payload.title,
-        body: payload.body,
-      },
-      sound: "default",
-      badge: 1,
-    },
-    ...(payload.data ?? {}),
-  };
+  const body = buildAPNSNotificationBody(payload);
 
   const response = await fetch(url, {
     method: "POST",
@@ -169,6 +160,24 @@ async function sendWithEnvironment(
     terminal: classification.terminal,
     shouldDeleteToken: classification.shouldDeleteToken,
     rawResponse: raw || null,
+  };
+}
+
+export function buildAPNSNotificationBody(payload: APNSNotificationPayload): Record<string, unknown> {
+  const badge = typeof payload.badge === "number" && Number.isFinite(payload.badge)
+    ? Math.max(0, Math.trunc(payload.badge))
+    : null;
+
+  return {
+    aps: {
+      alert: {
+        title: payload.title,
+        body: payload.body,
+      },
+      sound: "default",
+      ...(badge !== null ? { badge } : {}),
+    },
+    ...(payload.data ?? {}),
   };
 }
 

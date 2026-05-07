@@ -130,6 +130,7 @@ export const buildOverduePushQueueRow = (
       deepLink: "cosmiq://journeys/plan",
       planId: plan.id,
       blockId: overdue.block.id,
+      url: "/journeys",
     },
     status: "queued",
     source_table: "daily_plans",

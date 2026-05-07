@@ -44,7 +44,7 @@ import {
   upsertPlannerRecord,
   upsertPlannerRecords,
 } from "@/utils/plannerLocalStore";
-import { withPlannerRemoteSyncLock } from "@/utils/plannerSync";
+import { getDailyTasksQueryKey, withPlannerRemoteSyncLock } from "@/utils/plannerSync";
 import {
   getTaskCompletionDisciplineAward,
   isTaskCompletionOnTime,
@@ -61,6 +61,16 @@ import {
   forgetDeletedPlannerEntities,
   type DeletedPlannerEntity,
 } from "@/utils/deletedPlannerMemory";
+import {
+  buildCompletionFeedbackDaySignals,
+  getCompletionFeedbackDaySignalTasksQueryKey,
+  getCompletionFeedbackInboxTasksQueryKey,
+  getCompletionFeedbackLocalCompletionsQueryKey,
+  getCompletionFeedbackTaskDate,
+  mergeCompletionFeedbackDaySignalTasks,
+  type CompletionFeedbackDaySignalTask,
+  type CompletionFeedbackDaySignals,
+} from "@/utils/completionFeedbackDaySignals";
 
 export {
   getTaskCompletionDisciplineAward,
@@ -260,10 +270,15 @@ const CREATE_TASK_REMOTE_TIMEOUT_MS = 3_000;
 const CREATE_TASK_EXISTENCE_CHECK_MS = 1_500;
 const CREATE_TASK_EXISTENCE_CHECK_INTERVAL_MS = 150;
 
-const buildQueuedTogglePayload = (variables: ToggleTaskVariables) => ({
+const buildQueuedTogglePayload = (
+  variables: ToggleTaskVariables,
+  completedAt = variables.completed && !(variables.forceUndo ?? false)
+    ? new Date().toISOString()
+    : null,
+) => ({
   taskId: variables.taskId,
   completed: variables.completed,
-  completedAt: variables.completed ? new Date().toISOString() : null,
+  completedAt,
   forceUndo: variables.forceUndo ?? false,
 });
 
@@ -551,6 +566,156 @@ export const useTaskMutations = (taskDate: string) => {
       seenIds.add(subtask.id);
       return true;
     });
+  };
+
+  const getCompletionFeedbackDaySignals = (
+    completedTaskId: string | null | undefined,
+    completedTaskDate: string | null | undefined,
+    completedAt: string | null | undefined,
+  ): CompletionFeedbackDaySignals => {
+    if (!completedTaskId || !user?.id) return {};
+
+    const resolvedTaskDate = getCompletionFeedbackTaskDate(
+      completedTaskDate || taskDate,
+      completedAt,
+    );
+    const cachedDaySignalTasks = queryClient.getQueryData<CompletionFeedbackDaySignalTask[]>(
+      getCompletionFeedbackDaySignalTasksQueryKey(user.id, resolvedTaskDate),
+    );
+    const cachedInboxCompletions = queryClient.getQueryData<CompletionFeedbackDaySignalTask[]>(
+      getCompletionFeedbackInboxTasksQueryKey(user.id, resolvedTaskDate),
+    );
+    const cachedLocalCompletions = queryClient.getQueryData<CompletionFeedbackDaySignalTask[]>(
+      getCompletionFeedbackLocalCompletionsQueryKey(user.id, resolvedTaskDate),
+    );
+    const cachedInboxTasks = Array.isArray(cachedInboxCompletions) ? cachedInboxCompletions : [];
+    const cachedLocalTasks = mergeCompletionFeedbackDaySignalTasks(
+      [
+        ...cachedInboxTasks,
+        ...(Array.isArray(cachedLocalCompletions) ? cachedLocalCompletions : []),
+      ],
+      getRemoteTaskId,
+    );
+
+    if (Array.isArray(cachedDaySignalTasks)) {
+      return buildCompletionFeedbackDaySignals({
+        completedTaskId,
+        tasks: mergeCompletionFeedbackDaySignalTasks(
+          [...cachedDaySignalTasks, ...cachedLocalTasks],
+          getRemoteTaskId,
+        ),
+        normalizeTaskId: getRemoteTaskId,
+      });
+    }
+
+    const cachedTasks = queryClient.getQueryData<DailyTask[]>(
+      getDailyTasksQueryKey(user.id, resolvedTaskDate),
+    );
+    if (!Array.isArray(cachedTasks)) return {};
+
+    const cachedSignals = buildCompletionFeedbackDaySignals({
+      completedTaskId,
+      tasks: mergeCompletionFeedbackDaySignalTasks(
+        [...cachedTasks, ...cachedLocalTasks],
+        getRemoteTaskId,
+      ),
+      normalizeTaskId: getRemoteTaskId,
+    });
+
+    return {
+      ...(cachedSignals.isBuildingMomentum === true ? { isBuildingMomentum: true } : {}),
+      ...(cachedSignals.isOverloaded === true ? { isOverloaded: true } : {}),
+    };
+  };
+
+  const rememberCompletionFeedbackLocalDayCompletion = (
+    completedTaskId: string | null | undefined,
+    completedTaskDate: string | null | undefined,
+    completedAt: string | null | undefined,
+  ) => {
+    if (!completedTaskId || !user?.id) return;
+
+    const resolvedTaskDate = getCompletionFeedbackTaskDate(
+      completedTaskDate || taskDate,
+      completedAt,
+    );
+    queryClient.setQueryData<CompletionFeedbackDaySignalTask[]>(
+      getCompletionFeedbackLocalCompletionsQueryKey(user.id, resolvedTaskDate),
+      (current) => mergeCompletionFeedbackDaySignalTasks(
+        [
+          ...(Array.isArray(current) ? current : []),
+          {
+            id: completedTaskId,
+            completed: true,
+            completed_at: completedAt ?? new Date().toISOString(),
+          },
+        ],
+        getRemoteTaskId,
+      ),
+    );
+  };
+
+  const forgetCompletionFeedbackLocalDayCompletion = (
+    completedTaskId: string | null | undefined,
+    completedTaskDate: string | null | undefined,
+    completedAt: string | null | undefined,
+  ) => {
+    if (!completedTaskId || !user?.id) return;
+
+    const resolvedTaskDate = getCompletionFeedbackTaskDate(
+      completedTaskDate || taskDate,
+      completedAt,
+    );
+    const normalizedCompletedTaskId = getRemoteTaskId(completedTaskId);
+    queryClient.setQueryData<CompletionFeedbackDaySignalTask[]>(
+      getCompletionFeedbackLocalCompletionsQueryKey(user.id, resolvedTaskDate),
+      (current) => {
+        if (!Array.isArray(current)) return current;
+        return current.filter((task) => getRemoteTaskId(task.id) !== normalizedCompletedTaskId);
+      },
+    );
+  };
+
+  const markCompletionFeedbackDaySignalTaskIncomplete = (
+    completedTaskId: string | null | undefined,
+    completedTaskDate: string | null | undefined,
+    completedAt: string | null | undefined,
+  ) => {
+    if (!completedTaskId || !user?.id) return;
+
+    const resolvedTaskDate = getCompletionFeedbackTaskDate(
+      completedTaskDate || taskDate,
+      completedAt,
+    );
+    const normalizedCompletedTaskId = getRemoteTaskId(completedTaskId);
+    queryClient.setQueryData<CompletionFeedbackDaySignalTask[]>(
+      getCompletionFeedbackDaySignalTasksQueryKey(user.id, resolvedTaskDate),
+      (current) => {
+        if (!Array.isArray(current)) return current;
+        return current.map((task) => {
+          if (getRemoteTaskId(task.id) !== normalizedCompletedTaskId) return task;
+          return {
+            ...task,
+            completed: false,
+            completed_at: null,
+          };
+        });
+      },
+    );
+  };
+
+  const syncCompletionFeedbackQueuedDayCompletion = (
+    completedTaskId: string | null | undefined,
+    completed: boolean,
+    completedTaskDate: string | null | undefined,
+    completedAt: string | null | undefined,
+  ) => {
+    if (completed) {
+      rememberCompletionFeedbackLocalDayCompletion(completedTaskId, completedTaskDate, completedAt);
+    } else {
+      forgetCompletionFeedbackLocalDayCompletion(completedTaskId, completedTaskDate, completedAt);
+      markCompletionFeedbackDaySignalTaskIncomplete(completedTaskId, completedTaskDate, completedAt);
+    }
   };
 
   const rollbackLocalTaskCreate = async (taskId: string) => {
@@ -1393,7 +1558,7 @@ export const useTaskMutations = (taskDate: string) => {
 
       if (shouldQueueWrites) {
         const localHabitSourceId = localTask?.habit_source_id ?? null;
-        const localTaskDate = localTask?.task_date ?? format(new Date(), 'yyyy-MM-dd');
+        const localTaskDate = localTask?.task_date ?? taskDate ?? format(new Date(), 'yyyy-MM-dd');
 
         if (localHabitSourceId) {
           const completionId = await persistLocalHabitCompletion(
@@ -1415,7 +1580,8 @@ export const useTaskMutations = (taskDate: string) => {
           });
         }
 
-        await queueTaskAction("COMPLETE_TASK", buildQueuedTogglePayload(variables));
+        const queuedCompletedAt = completed && !forceUndo ? intendedCompletedAt : null;
+        await queueTaskAction("COMPLETE_TASK", buildQueuedTogglePayload(variables, queuedCompletedAt));
         return {
           queued: true,
           taskId,
@@ -1432,6 +1598,7 @@ export const useTaskMutations = (taskDate: string) => {
           taskDate: localTaskDate,
           epicId: localTask?.epic_id ?? null,
           epicTitle: localTask?.epic_title ?? null,
+          completedAt: queuedCompletedAt,
         };
       }
 
@@ -1621,6 +1788,7 @@ export const useTaskMutations = (taskDate: string) => {
         epicId,
         epicTitle,
         completionFeedback: variables.completionFeedback ?? null,
+        completedAt,
         contactId,
         autoLogInteraction,
         contact,
@@ -1643,6 +1811,7 @@ export const useTaskMutations = (taskDate: string) => {
         epicId,
         epicTitle,
         completionFeedback,
+        completedAt,
         contactId,
       } = result ?? {};
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
@@ -1655,7 +1824,14 @@ export const useTaskMutations = (taskDate: string) => {
         queryClient.invalidateQueries({ queryKey: ['epics'] });
       }
 
+      if (completed === false) {
+        syncCompletionFeedbackQueuedDayCompletion(taskId, false, taskDate, completedAt);
+      }
+
       if (result?.queued) {
+        if (completed === true && !wasAlreadyCompleted) {
+          syncCompletionFeedbackQueuedDayCompletion(taskId, true, taskDate, completedAt);
+        }
         toast({
           title: "Quest update queued",
           description: "We'll sync this change when connection is restored.",
@@ -1722,13 +1898,28 @@ export const useTaskMutations = (taskDate: string) => {
 
         const shouldSuppressRedoFeedback = typeof taskId === "string"
           && tasksAwaitingRedoFeedbackSuppression.current.delete(taskId);
+        const feedbackCompletedAt = typeof completedAt === "string"
+          ? completedAt
+          : now.toISOString();
 
+        const completionFeedbackDaySignals = shouldSuppressRedoFeedback
+          ? {}
+          : getCompletionFeedbackDaySignals(
+            taskId,
+            taskDate,
+            feedbackCompletedAt,
+          );
+        rememberCompletionFeedbackLocalDayCompletion(
+          taskId,
+          taskDate,
+          feedbackCompletedAt,
+        );
         if (!shouldSuppressRedoFeedback) {
           void triggerCompletionFeedback({
             taskId,
             taskTitle: taskText,
             completionSource: completionFeedback?.completionSource ?? (habitSourceId ? "ritual" : "quest"),
-            completedAt: now.toISOString(),
+            completedAt: feedbackCompletedAt,
             taskDate: taskDate ?? null,
             scheduledTime: taskScheduledTime ?? null,
             difficulty: taskDifficulty ?? null,
@@ -1738,6 +1929,7 @@ export const useTaskMutations = (taskDate: string) => {
             epicTitle: epicTitle ?? null,
             completedAllRituals: completionFeedback?.completedAllRituals === true,
             firstRitualToday: completionFeedback?.firstRitualToday === true,
+            ...completionFeedbackDaySignals,
           }).catch((feedbackError) => {
             console.warn("[TaskMutations] Completion feedback failed:", feedbackError);
           });
@@ -1792,16 +1984,45 @@ export const useTaskMutations = (taskDate: string) => {
     onError: (error: Error, variables: ToggleTaskVariables) => {
       if (isQueueableWriteError(error)) {
         reportApiFailure(error, { source: "task_toggle_onError" });
+        const queuedCompletedAt = variables.completed && !(variables.forceUndo ?? false)
+          ? new Date().toISOString()
+          : null;
+        const queuedPayload = buildQueuedTogglePayload(variables, queuedCompletedAt);
+        const completedForQueue = variables.completed && !(variables.forceUndo ?? false);
+        const fallbackTaskDate = taskDate ?? format(new Date(), 'yyyy-MM-dd');
+        syncCompletionFeedbackQueuedDayCompletion(
+          variables.taskId,
+          completedForQueue,
+          fallbackTaskDate,
+          queuedCompletedAt,
+        );
         void (async () => {
-          const localTask = await getPlannerRecord<DailyTask>('daily_tasks', variables.taskId);
-          const habitSourceId = localTask?.habit_source_id ?? null;
-          const taskDateValue = localTask?.task_date ?? format(new Date(), 'yyyy-MM-dd');
+          try {
+            const localTask = await getPlannerRecord<DailyTask>('daily_tasks', variables.taskId);
+            const habitSourceId = localTask?.habit_source_id ?? null;
+            const taskDateValue = localTask?.task_date ?? fallbackTaskDate;
 
-          if (habitSourceId) {
+            if (taskDateValue !== fallbackTaskDate) {
+              if (completedForQueue) {
+                forgetCompletionFeedbackLocalDayCompletion(
+                  variables.taskId,
+                  fallbackTaskDate,
+                  queuedCompletedAt,
+                );
+              }
+              syncCompletionFeedbackQueuedDayCompletion(
+                variables.taskId,
+                completedForQueue,
+                taskDateValue,
+                queuedCompletedAt,
+              );
+            }
+
+            if (!habitSourceId) return;
             const completionId = await persistLocalHabitCompletion(
               habitSourceId,
               taskDateValue,
-              variables.completed && !(variables.forceUndo ?? false),
+              completedForQueue,
             );
 
             await queueAction({
@@ -1812,12 +2033,20 @@ export const useTaskMutations = (taskDate: string) => {
                 completionId: completionId ?? undefined,
                 habitId: habitSourceId,
                 date: taskDateValue,
-                completed: variables.completed && !(variables.forceUndo ?? false),
+                completed: completedForQueue,
               },
             });
+          } catch (queuePrepError) {
+            console.warn("[TaskMutations] Failed to prepare queued completion side effects:", queuePrepError);
+            syncCompletionFeedbackQueuedDayCompletion(
+              variables.taskId,
+              completedForQueue,
+              fallbackTaskDate,
+              queuedCompletedAt,
+            );
           }
         })();
-        void queueTaskAction("COMPLETE_TASK", buildQueuedTogglePayload(variables));
+        void queueTaskAction("COMPLETE_TASK", queuedPayload);
 
         toast({
           title: "Quest update queued",

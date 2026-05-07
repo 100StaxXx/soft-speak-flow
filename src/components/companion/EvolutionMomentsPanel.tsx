@@ -10,6 +10,10 @@ import {
 } from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  PROGRESSION_VISUAL_BOUNDARY_LEVELS,
+  isTierBoundaryLevel,
+} from "@/config/progression";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
@@ -45,8 +49,11 @@ interface EvolutionMomentsPanelProps {
 
 const EVOLUTION_MOMENTS_QUERY_KEY = "companion-evolution-moments";
 const COMPANION_MOMENT_SOURCE_QUERY_KEY = "companion-moment-source";
+const ANIMATABLE_MOMENT_STAGES = [...PROGRESSION_VISUAL_BOUNDARY_LEVELS];
 
-const normalizeMomentStatus = (value: unknown): EvolutionMomentStatus | null => {
+const normalizeMomentStatus = (
+  value: unknown,
+): EvolutionMomentStatus | null => {
   if (value === "queued" || value === "processing" || value === "succeeded") {
     return value;
   }
@@ -54,11 +61,14 @@ const normalizeMomentStatus = (value: unknown): EvolutionMomentStatus | null => 
   return null;
 };
 
-const hasVisibleMomentState = (moment: EvolutionMoment) => (
-  moment.animation_status === "queued"
-  || moment.animation_status === "processing"
-  || (moment.animation_status === "succeeded" && Boolean(moment.animation_video_url))
-);
+const hasVisibleMomentState = (moment: EvolutionMoment) =>
+  moment.animation_status === "queued" ||
+  moment.animation_status === "processing" ||
+  (moment.animation_status === "succeeded" &&
+    Boolean(moment.animation_video_url));
+
+const hasAnimatableMomentStage = (stage: unknown): stage is number =>
+  typeof stage === "number" && isTierBoundaryLevel(stage);
 
 const getMomentSortTime = (moment: EvolutionMoment) => {
   const value = moment.animation_completed_at ?? moment.evolved_at;
@@ -67,7 +77,9 @@ const getMomentSortTime = (moment: EvolutionMoment) => {
   return Number.isFinite(timestamp) ? timestamp : 0;
 };
 
-export const EvolutionMomentsPanel = ({ layoutMode = "mobile" }: EvolutionMomentsPanelProps) => {
+export const EvolutionMomentsPanel = ({
+  layoutMode = "mobile",
+}: EvolutionMomentsPanelProps) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const isDesktop = layoutMode === "desktop";
@@ -90,8 +102,8 @@ export const EvolutionMomentsPanel = ({ layoutMode = "mobile" }: EvolutionMoment
       if (error) throw error;
       return typeof data?.id === "string"
         ? {
-          companionId: data.id,
-        }
+            companionId: data.id,
+          }
         : null;
     },
   });
@@ -103,7 +115,11 @@ export const EvolutionMomentsPanel = ({ layoutMode = "mobile" }: EvolutionMoment
     staleTime: 30 * 1000,
     refetchInterval: (query) => {
       const moments = query.state.data as EvolutionMoment[] | undefined;
-      return moments?.some((moment) => moment.animation_status === "queued" || moment.animation_status === "processing")
+      return moments?.some(
+        (moment) =>
+          moment.animation_status === "queued" ||
+          moment.animation_status === "processing",
+      )
         ? 5_000
         : false;
     },
@@ -112,9 +128,12 @@ export const EvolutionMomentsPanel = ({ layoutMode = "mobile" }: EvolutionMoment
 
       const { data, error } = await supabase
         .from("companion_evolutions")
-        .select("id, stage, image_url, evolved_at, animation_status, animation_video_url, animation_completed_at")
+        .select(
+          "id, stage, image_url, evolved_at, animation_status, animation_video_url, animation_completed_at",
+        )
         .eq("companion_id", companionId)
         .in("animation_status", ["queued", "processing", "succeeded"])
+        .in("stage", ANIMATABLE_MOMENT_STAGES)
         .order("evolved_at", { ascending: false })
         .limit(12);
 
@@ -122,14 +141,20 @@ export const EvolutionMomentsPanel = ({ layoutMode = "mobile" }: EvolutionMoment
 
       const { data: jobData, error: jobError } = await supabase
         .from("companion_animation_jobs")
-        .select("id, evolution_id, stage, source_image_url, status, video_url, completed_at, requested_at, updated_at")
+        .select(
+          "id, evolution_id, stage, source_image_url, status, video_url, completed_at, requested_at, updated_at",
+        )
         .eq("user_id", user.id)
         .eq("companion_id", companionId)
         .in("status", ["queued", "processing", "succeeded"])
+        .in("stage", ANIMATABLE_MOMENT_STAGES)
         .order("requested_at", { ascending: false })
         .limit(12);
 
-      if (jobError && !isSupabaseMissingRelationError(jobError, "companion_animation_jobs")) {
+      if (
+        jobError &&
+        !isSupabaseMissingRelationError(jobError, "companion_animation_jobs")
+      ) {
         throw jobError;
       }
 
@@ -137,13 +162,16 @@ export const EvolutionMomentsPanel = ({ layoutMode = "mobile" }: EvolutionMoment
       const momentsById = new Map<string, EvolutionMoment>();
 
       ((data ?? []) as EvolutionMoment[]).forEach((row) => {
+        if (!hasAnimatableMomentStage(row.stage)) return;
+
         const status = normalizeMomentStatus(row.animation_status);
         if (!status) return;
 
         const moment: EvolutionMoment = {
           ...row,
           animation_status: status,
-          animation_video_url: status === "succeeded" ? row.animation_video_url : null,
+          animation_video_url:
+            status === "succeeded" ? row.animation_video_url : null,
         };
         if (!hasVisibleMomentState(moment)) return;
 
@@ -153,12 +181,13 @@ export const EvolutionMomentsPanel = ({ layoutMode = "mobile" }: EvolutionMoment
 
       if (!jobError) {
         ((jobData ?? []) as AnimationJobMomentSource[]).forEach((job) => {
+          if (!hasAnimatableMomentStage(job.stage)) return;
+
           const status = normalizeMomentStatus(job.status);
           if (!status) return;
 
-          const videoUrl = status === "succeeded" && job.video_url
-            ? job.video_url
-            : null;
+          const videoUrl =
+            status === "succeeded" && job.video_url ? job.video_url : null;
           const existing = job.evolution_id
             ? momentsByEvolutionId.get(job.evolution_id)
             : null;
@@ -167,10 +196,17 @@ export const EvolutionMomentsPanel = ({ layoutMode = "mobile" }: EvolutionMoment
             const merged: EvolutionMoment = {
               ...existing,
               image_url: existing.image_url ?? job.source_image_url ?? null,
-              evolved_at: existing.evolved_at ?? job.requested_at ?? job.updated_at ?? null,
-              animation_status: videoUrl ? "succeeded" : existing.animation_status,
+              evolved_at:
+                existing.evolved_at ??
+                job.requested_at ??
+                job.updated_at ??
+                null,
+              animation_status: videoUrl
+                ? "succeeded"
+                : existing.animation_status,
               animation_video_url: existing.animation_video_url ?? videoUrl,
-              animation_completed_at: existing.animation_completed_at ?? job.completed_at ?? null,
+              animation_completed_at:
+                existing.animation_completed_at ?? job.completed_at ?? null,
             };
             if (!hasVisibleMomentState(merged)) return;
 
@@ -198,7 +234,9 @@ export const EvolutionMomentsPanel = ({ layoutMode = "mobile" }: EvolutionMoment
       }
 
       return Array.from(momentsById.values())
-        .sort((left, right) => getMomentSortTime(right) - getMomentSortTime(left))
+        .sort(
+          (left, right) => getMomentSortTime(right) - getMomentSortTime(left),
+        )
         .slice(0, 12);
     },
   });
@@ -217,8 +255,12 @@ export const EvolutionMomentsPanel = ({ layoutMode = "mobile" }: EvolutionMoment
           filter: `companion_id=eq.${companionId}`,
         },
         () => {
-          queryClient.invalidateQueries({ queryKey: [COMPANION_MOMENT_SOURCE_QUERY_KEY, user?.id] });
-          queryClient.invalidateQueries({ queryKey: [EVOLUTION_MOMENTS_QUERY_KEY, companionId] });
+          queryClient.invalidateQueries({
+            queryKey: [COMPANION_MOMENT_SOURCE_QUERY_KEY, user?.id],
+          });
+          queryClient.invalidateQueries({
+            queryKey: [EVOLUTION_MOMENTS_QUERY_KEY, companionId],
+          });
         },
       )
       .subscribe();
@@ -234,7 +276,9 @@ export const EvolutionMomentsPanel = ({ layoutMode = "mobile" }: EvolutionMoment
           filter: `companion_id=eq.${companionId}`,
         },
         () => {
-          queryClient.invalidateQueries({ queryKey: [EVOLUTION_MOMENTS_QUERY_KEY, companionId] });
+          queryClient.invalidateQueries({
+            queryKey: [EVOLUTION_MOMENTS_QUERY_KEY, companionId],
+          });
         },
       )
       .subscribe();
@@ -249,9 +293,14 @@ export const EvolutionMomentsPanel = ({ layoutMode = "mobile" }: EvolutionMoment
 
   if (isLoadingMoments && evolutionMoments.length === 0) {
     return (
-      <section aria-label="Evolutions" className={`space-y-4 ${isDesktop ? "mt-0" : "mt-6"}`}>
+      <section
+        aria-label="Evolutions"
+        className={`space-y-4 ${isDesktop ? "mt-0" : "mt-6"}`}
+      >
         <EvolutionMomentsHeader count={0} />
-        <div className={`grid gap-3 ${isDesktop ? "grid-cols-4" : "grid-cols-2 sm:grid-cols-3"}`}>
+        <div
+          className={`grid gap-3 ${isDesktop ? "grid-cols-4" : "grid-cols-2 sm:grid-cols-3"}`}
+        >
           {[0, 1, 2].map((index) => (
             <Skeleton key={index} className="aspect-[4/3] rounded-lg" />
           ))}
@@ -261,7 +310,10 @@ export const EvolutionMomentsPanel = ({ layoutMode = "mobile" }: EvolutionMoment
   }
 
   return (
-    <section aria-label="Evolutions" className={`space-y-4 ${isDesktop ? "mt-0" : "mt-6"}`}>
+    <section
+      aria-label="Evolutions"
+      className={`space-y-4 ${isDesktop ? "mt-0" : "mt-6"}`}
+    >
       <EvolutionMomentsHeader count={evolutionMoments.length} />
 
       {evolutionMoments.length > 0 ? (
@@ -301,7 +353,9 @@ const EvolutionMomentsGrid = ({
   isDesktop: boolean;
   moments: EvolutionMoment[];
 }) => {
-  const [selectedMoment, setSelectedMoment] = useState<EvolutionMoment | null>(null);
+  const [selectedMoment, setSelectedMoment] = useState<EvolutionMoment | null>(
+    null,
+  );
   const [videoFailed, setVideoFailed] = useState(false);
 
   useEffect(() => {
@@ -310,7 +364,9 @@ const EvolutionMomentsGrid = ({
 
   return (
     <>
-      <div className={`grid gap-3 ${isDesktop ? "grid-cols-4 xl:grid-cols-5" : "grid-cols-2 sm:grid-cols-3"}`}>
+      <div
+        className={`grid gap-3 ${isDesktop ? "grid-cols-4 xl:grid-cols-5" : "grid-cols-2 sm:grid-cols-3"}`}
+      >
         {moments.map((moment) => (
           <EvolutionMomentCard
             key={moment.id}
@@ -380,7 +436,9 @@ const EvolutionMomentCard = ({
   moment: EvolutionMoment;
   onSelect: (moment: EvolutionMoment) => void;
 }) => {
-  const canPlay = moment.animation_status === "succeeded" && Boolean(moment.animation_video_url);
+  const canPlay =
+    moment.animation_status === "succeeded" &&
+    Boolean(moment.animation_video_url);
 
   return (
     <button
@@ -392,7 +450,11 @@ const EvolutionMomentCard = ({
           ? "border-primary/30 bg-card hover:border-primary/60"
           : "cursor-not-allowed border-border/60 bg-secondary/30 opacity-75"
       }`}
-      aria-label={canPlay ? `Stage ${moment.stage} evolution` : `Stage ${moment.stage} evolution generating`}
+      aria-label={
+        canPlay
+          ? `Stage ${moment.stage} evolution`
+          : `Stage ${moment.stage} evolution generating`
+      }
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-secondary/40">
         {moment.image_url ? (

@@ -26,9 +26,11 @@ const createRequest = (body: Record<string, unknown>) =>
 const createHarness = ({
   companion,
   existingEvolution = null,
+  previousBoundaryEvolution = null,
 }: {
   companion: Record<string, unknown>;
   existingEvolution?: Record<string, unknown> | null;
+  previousBoundaryEvolution?: Record<string, unknown> | null;
 }) => {
   const upserts: Array<{ table: string; payload: Record<string, unknown> }> =
     [];
@@ -53,16 +55,18 @@ const createHarness = ({
 
       if (table === "companion_evolutions") {
         return {
-          select: () => ({
-            eq: () => ({
-              eq: () => ({
-                maybeSingle: async () => ({
-                  data: existingEvolution,
-                  error: null,
-                }),
+          select: (columns?: string) => {
+            const chain = {
+              eq: () => chain,
+              maybeSingle: async () => ({
+                data: columns === "image_url"
+                  ? previousBoundaryEvolution
+                  : existingEvolution,
+                error: null,
               }),
-            }),
-          }),
+            };
+            return chain;
+          },
           upsert: (payload: Record<string, unknown>) => {
             upserts.push({ table, payload });
             return {
@@ -81,12 +85,25 @@ const createHarness = ({
               }),
             };
           },
-          update: (payload: Record<string, unknown>) => ({
-            eq: async () => {
-              updates.push({ table, payload });
+          update: (payload: Record<string, unknown>) => {
+            let committed = false;
+            const commit = async () => {
+              if (!committed) {
+                updates.push({ table, payload });
+                committed = true;
+              }
               return { error: null };
-            },
-          }),
+            };
+            const chain = {
+              eq: () => chain,
+              in: commit,
+              then: (
+                resolve: (value: { error: null }) => unknown,
+                reject: (reason?: unknown) => unknown,
+              ) => commit().then(resolve, reject),
+            };
+            return chain;
+          },
         };
       }
 
@@ -97,12 +114,25 @@ const createHarness = ({
               maybeSingle: async () => ({ data: { id: "job-1" }, error: null }),
             }),
           }),
-          update: (payload: Record<string, unknown>) => ({
-            eq: async () => {
-              updates.push({ table, payload });
+          update: (payload: Record<string, unknown>) => {
+            let committed = false;
+            const commit = async () => {
+              if (!committed) {
+                updates.push({ table, payload });
+                committed = true;
+              }
               return { error: null };
-            },
-          }),
+            };
+            const chain = {
+              eq: () => chain,
+              in: commit,
+              then: (
+                resolve: (value: { error: null }) => unknown,
+                reject: (reason?: unknown) => unknown,
+              ) => commit().then(resolve, reject),
+            };
+            return chain;
+          },
         };
       }
 
@@ -234,7 +264,134 @@ Deno.test("prewarm-companion-animation skips arbitrary future stages", async () 
   assertEquals(harness.enqueueCalls.length, 0);
 });
 
-Deno.test("prewarm-companion-animation requeues an existing claimed later-stage evolution", async () => {
+Deno.test("prewarm-companion-animation requeues an existing claimed boundary evolution", async () => {
+  const harness = createHarness({
+    companion: {
+      id: "companion-1",
+      user_id: "user-1",
+      preset_id: null,
+      core_element: "water",
+      current_stage: 5,
+      current_xp: 100,
+      image_lineage_metadata: null,
+    },
+    existingEvolution: {
+      id: "evo-2",
+      image_url: "https://example.com/stage-5.png",
+      animation_status: "failed",
+      animation_video_url: null,
+    },
+  });
+
+  const response = await module.handlePrewarmCompanionAnimation(
+    createRequest({ companionId: "companion-1", stage: 5, force: true }),
+    harness.deps,
+  );
+  const body = await response.json();
+
+  assertEquals(response.status, 200);
+  assertEquals(body.status, "queued");
+  assertEquals(harness.upserts[0].payload.stage, 5);
+  assertEquals(
+    harness.upserts[0].payload.image_url,
+    "https://example.com/stage-5.png",
+  );
+  assertEquals(harness.enqueueCalls[0].evolutionId, "evo-1");
+  assertEquals(harness.enqueueCalls[0].stage, 5);
+  assertEquals(
+    harness.enqueueCalls[0].imageUrl,
+    "https://example.com/stage-5.png",
+  );
+});
+
+Deno.test("prewarm-companion-animation skips boundary reuse rows without requeueing", async () => {
+  const harness = createHarness({
+    companion: {
+      id: "companion-1",
+      user_id: "user-1",
+      preset_id: null,
+      core_element: "water",
+      current_stage: 13,
+      current_xp: 1200,
+      image_lineage_metadata: null,
+    },
+    existingEvolution: {
+      id: "evo-13",
+      image_url: "https://example.com/stage-13.png",
+      animation_status: "skipped",
+      animation_error_code: "image_unchanged",
+      animation_video_url: null,
+      generation_metadata: {
+        sourceType: "reuse",
+      },
+    },
+  });
+
+  const response = await module.handlePrewarmCompanionAnimation(
+    createRequest({ companionId: "companion-1", stage: 13, force: true }),
+    harness.deps,
+  );
+  const body = await response.json();
+
+  assertEquals(response.status, 200);
+  assertEquals(body.status, "skipped");
+  assertEquals(body.reason, "image_unchanged");
+  assertEquals(harness.upserts.length, 0);
+  assertEquals(harness.enqueueCalls.length, 0);
+  assertEquals(harness.workerCalls.length, 0);
+  assertEquals(
+    harness.updates.find((update) =>
+      update.table === "companion_animation_jobs"
+    )
+      ?.payload.status,
+    "failed",
+  );
+});
+
+Deno.test("prewarm-companion-animation skips boundary rows with unchanged source art", async () => {
+  const harness = createHarness({
+    companion: {
+      id: "companion-1",
+      user_id: "user-1",
+      preset_id: null,
+      core_element: "water",
+      current_stage: 13,
+      current_xp: 1200,
+      image_lineage_metadata: null,
+    },
+    existingEvolution: {
+      id: "evo-13",
+      image_url: "https://example.com/stage-13.png",
+      animation_status: "failed",
+      animation_video_url: null,
+      generation_metadata: {
+        sourceType: "edit",
+      },
+    },
+    previousBoundaryEvolution: {
+      image_url: "https://example.com/stage-13.png",
+    },
+  });
+
+  const response = await module.handlePrewarmCompanionAnimation(
+    createRequest({ companionId: "companion-1", stage: 13, force: true }),
+    harness.deps,
+  );
+  const body = await response.json();
+
+  assertEquals(response.status, 200);
+  assertEquals(body.status, "skipped");
+  assertEquals(body.reason, "image_unchanged");
+  assertEquals(
+    harness.updates.find((update) => update.table === "companion_evolutions")
+      ?.payload.animation_error_code,
+    "image_unchanged",
+  );
+  assertEquals(harness.upserts.length, 0);
+  assertEquals(harness.enqueueCalls.length, 0);
+});
+
+Deno.test("prewarm-companion-animation skips non-boundary stages even when a row exists", async () => {
   const harness = createHarness({
     companion: {
       id: "companion-1",
@@ -242,11 +399,11 @@ Deno.test("prewarm-companion-animation requeues an existing claimed later-stage 
       preset_id: null,
       core_element: "water",
       current_stage: 3,
-      current_xp: 100,
+      current_xp: 60,
       image_lineage_metadata: null,
     },
     existingEvolution: {
-      id: "evo-2",
+      id: "evo-3",
       image_url: "https://example.com/stage-3.png",
       animation_status: "failed",
       animation_video_url: null,
@@ -260,18 +417,54 @@ Deno.test("prewarm-companion-animation requeues an existing claimed later-stage 
   const body = await response.json();
 
   assertEquals(response.status, 200);
-  assertEquals(body.status, "queued");
-  assertEquals(harness.upserts[0].payload.stage, 3);
-  assertEquals(
-    harness.upserts[0].payload.image_url,
-    "https://example.com/stage-3.png",
+  assertEquals(body.status, "skipped");
+  assertEquals(body.reason, "stage_not_animatable");
+  assertEquals(harness.upserts.length, 0);
+  assertEquals(harness.enqueueCalls.length, 0);
+});
+
+Deno.test("prewarm-companion-animation marks active non-boundary animation rows terminal", async () => {
+  const harness = createHarness({
+    companion: {
+      id: "companion-1",
+      user_id: "user-1",
+      preset_id: null,
+      core_element: "water",
+      current_stage: 10,
+      current_xp: 790,
+      image_lineage_metadata: null,
+    },
+    existingEvolution: {
+      id: "evo-10",
+      image_url: "https://example.com/stage-10.png",
+      animation_status: "queued",
+      animation_video_url: null,
+    },
+  });
+
+  const response = await module.handlePrewarmCompanionAnimation(
+    createRequest({ companionId: "companion-1", stage: 10, force: true }),
+    harness.deps,
   );
-  assertEquals(harness.enqueueCalls[0].evolutionId, "evo-1");
-  assertEquals(harness.enqueueCalls[0].stage, 3);
+  const body = await response.json();
+
+  assertEquals(response.status, 200);
+  assertEquals(body.status, "skipped");
+  assertEquals(body.reason, "stage_not_animatable");
   assertEquals(
-    harness.enqueueCalls[0].imageUrl,
-    "https://example.com/stage-3.png",
+    harness.updates.find((update) => update.table === "companion_evolutions")
+      ?.payload.animation_status,
+    "skipped",
   );
+  assertEquals(
+    harness.updates.find((update) =>
+      update.table === "companion_animation_jobs"
+    )
+      ?.payload.status,
+    "failed",
+  );
+  assertEquals(harness.enqueueCalls.length, 0);
+  assertEquals(harness.workerCalls.length, 0);
 });
 
 Deno.test("prewarm-companion-animation kicks an existing queued animation worker", async () => {
@@ -281,20 +474,20 @@ Deno.test("prewarm-companion-animation kicks an existing queued animation worker
       user_id: "user-1",
       preset_id: null,
       core_element: "water",
-      current_stage: 3,
+      current_stage: 5,
       current_xp: 100,
       image_lineage_metadata: null,
     },
     existingEvolution: {
       id: "evo-2",
-      image_url: "https://example.com/stage-3.png",
+      image_url: "https://example.com/stage-5.png",
       animation_status: "queued",
       animation_video_url: null,
     },
   });
 
   const response = await module.handlePrewarmCompanionAnimation(
-    createRequest({ companionId: "companion-1", stage: 3 }),
+    createRequest({ companionId: "companion-1", stage: 5 }),
     harness.deps,
   );
   const body = await response.json();

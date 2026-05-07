@@ -5,6 +5,8 @@ export type CompletionCompanionTone =
   | "calm"
   | "hype";
 
+export type CompletionFeedbackGenerationSource = "fallback" | "ai";
+
 export interface CompletionFeedbackResponse {
   companion: {
     message: string;
@@ -19,6 +21,7 @@ export interface CompletionFeedbackResponse {
     label: string;
     action: string;
   };
+  generationSource?: CompletionFeedbackGenerationSource;
 }
 
 export type CompletionFeedbackSource = "quest" | "ritual" | "inbox";
@@ -37,4 +40,7 @@ export interface CompletionFeedbackEvent {
   epicTitle?: string | null;
   completedAllRituals?: boolean;
   firstRitualToday?: boolean;
+  firstCompletionToday?: boolean;
+  isBuildingMomentum?: boolean;
+  isOverloaded?: boolean;
 }
