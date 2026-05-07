@@ -18,7 +18,8 @@ export type QueueStatus =
   | "failed_terminal"
   | "shadow"
   | "skipped_rollout"
-  | "skipped_budget";
+  | "skipped_budget"
+  | "skipped_disabled";
 
 export interface LocalDateTimeParts {
   localDate: string;

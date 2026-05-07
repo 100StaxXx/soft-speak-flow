@@ -97,7 +97,11 @@ vi.mock("@/components/ui/select", () => ({
   SelectItem: ({ value, children }: { value: string; children: ReactNode }) => {
     const ctx = useContext(SelectContext);
     return (
-      <button role="option" onClick={() => ctx.onValueChange?.(value)}>
+      <button
+        role="option"
+        aria-selected={ctx.value === value}
+        onClick={() => ctx.onValueChange?.(value)}
+      >
         {children}
       </button>
     );
@@ -324,6 +328,40 @@ describe("PushNotificationSettings debug panel", () => {
     expect(setTimeoutSpy).not.toHaveBeenCalled();
     expect(queryClient.getQueryData(["profile", mocks.user.id])).toMatchObject({
       daily_push_time: "09:00",
+    });
+  });
+
+  it("updates daily quote delivery time using the backend afternoon default option", async () => {
+    mocks.profile = {
+      ...mocks.defaultProfile,
+      daily_quote_push_enabled: true,
+      daily_quote_push_time: null,
+    };
+    const { queryClient } = renderWithClient();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("option", { name: "2:00 PM" }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mocks.profileUpdateMock).toHaveBeenCalledWith({ daily_quote_push_time: "14:00" });
+    expect(mocks.profileUpdateEqMock).toHaveBeenCalledWith("id", mocks.user.id);
+    expect(queryClient.getQueryData(["profile", mocks.user.id])).toMatchObject({
+      daily_quote_push_time: "14:00",
+    });
+  });
+
+  it("selects the daily quote backend default when Supabase returns seconds", async () => {
+    mocks.profile = {
+      ...mocks.defaultProfile,
+      daily_quote_push_enabled: true,
+      daily_quote_push_time: "14:00:00",
+    };
+    renderWithClient();
+
+    await waitFor(() => {
+      expect(screen.getByRole("option", { name: "2:00 PM" }).getAttribute("aria-selected")).toBe("true");
     });
   });
 

@@ -31,6 +31,8 @@ const timeOptions = [
   { value: "09:00", label: "9:00 AM" },
   { value: "10:00", label: "10:00 AM" },
   { value: "12:00", label: "12:00 PM" },
+  { value: "14:00", label: "2:00 PM" },
+  { value: "16:00", label: "4:00 PM" },
   { value: "18:00", label: "6:00 PM" },
   { value: "19:00", label: "7:00 PM" },
   { value: "20:00", label: "8:00 PM" },
@@ -68,6 +70,21 @@ const QUEST_NOTIFICATION_TYPES = new Set([
   "task_reminder",
   "plan_day_overdue",
 ]);
+
+const normalizeTimeSelectValue = (
+  value: string | null | undefined,
+  fallback: string,
+): string => {
+  if (!value) return fallback;
+  const match = /^(\d{1,2}):(\d{2})(?::\d{2})?(?:\.\d+)?$/.exec(value.trim());
+  if (!match) return fallback;
+
+  const hour = Number.parseInt(match[1], 10);
+  const minute = Number.parseInt(match[2], 10);
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return fallback;
+
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+};
 
 const toQueuePayload = (value: QueueDebugRow["payload"]): Record<string, unknown> => {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -408,7 +425,7 @@ export const PushNotificationSettings = memo(() => {
             <div className="ml-0 space-y-2">
               <Label className="text-sm text-muted-foreground">Delivery Time</Label>
               <Select
-                value={profile.daily_push_time || "08:00"}
+                value={normalizeTimeSelectValue(profile.daily_push_time, "08:00")}
                 onValueChange={(value) => handleUpdateTime("daily_push_time", value)}
               >
                 <SelectTrigger className="w-full bg-background">
@@ -448,7 +465,7 @@ export const PushNotificationSettings = memo(() => {
             <div>
               <Label className="text-foreground font-medium">Daily Quote</Label>
               <p className="text-xs text-muted-foreground mt-1">
-                Inspiring quotes to start your day
+                Inspiring quotes for your day
               </p>
             </div>
             <Switch
@@ -462,7 +479,7 @@ export const PushNotificationSettings = memo(() => {
             <div className="ml-0 space-y-2">
               <Label className="text-sm text-muted-foreground">Delivery Time</Label>
               <Select
-                value={profile.daily_quote_push_time || "07:00"}
+                value={normalizeTimeSelectValue(profile.daily_quote_push_time, "14:00")}
                 onValueChange={(value) => handleUpdateTime("daily_quote_push_time", value)}
               >
                 <SelectTrigger className="w-full bg-background">
@@ -575,6 +592,7 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
     recentSkippedBudget: boolean;
     recentFailedTerminal: boolean;
     recentNoDeviceTokens: boolean;
+    recentSkippedDisabled: boolean;
     recentShadowMode: boolean;
     recentRollbackEnabled: boolean;
     recentRolloutBlocked: boolean;
@@ -605,6 +623,7 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
           recentSkippedBudget: false,
           recentFailedTerminal: false,
           recentNoDeviceTokens: false,
+          recentSkippedDisabled: false,
           recentShadowMode: false,
           recentRollbackEnabled: false,
           recentRolloutBlocked: false,
@@ -656,6 +675,7 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
         recentSkippedBudget: recentQueueRows.some((row) => row.status === "skipped_budget"),
         recentFailedTerminal: recentQueueRows.some((row) => row.status === "failed_terminal"),
         recentNoDeviceTokens: recentQueueRows.some((row) => row.last_error === "no_device_tokens"),
+        recentSkippedDisabled: recentQueueRows.some((row) => row.status === "skipped_disabled"),
         recentShadowMode: recentQueueRows.some((row) => row.last_error === "shadow_mode"),
         recentRollbackEnabled: recentQueueRows.some((row) => row.last_error === "rollback_enabled"),
         recentRolloutBlocked: recentQueueRows.some((row) => String(row.last_error ?? "").startsWith("rollout_")),
@@ -820,6 +840,11 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
                     Recent no_device_tokens
                   </span>
                 )}
+                {debugInfo.recentSkippedDisabled && (
+                  <span className="rounded-full border border-slate-500/40 bg-slate-500/10 px-2 py-1 text-xs text-slate-700 dark:text-slate-300">
+                    Recent disabled daily push
+                  </span>
+                )}
                 {debugInfo.recentShadowMode && (
                   <span className="rounded-full border border-sky-500/40 bg-sky-500/10 px-2 py-1 text-xs text-sky-700 dark:text-sky-300">
                     Recent shadow_mode
@@ -850,7 +875,7 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
                     Repeated logical notifications
                   </span>
                 )}
-                {!debugInfo.recentSkippedBudget && !debugInfo.recentFailedTerminal && !debugInfo.recentNoDeviceTokens && (
+                {!debugInfo.recentSkippedBudget && !debugInfo.recentFailedTerminal && !debugInfo.recentNoDeviceTokens && !debugInfo.recentSkippedDisabled && (
                   <span className="rounded-full border border-border bg-background px-2 py-1 text-xs text-muted-foreground">
                     No recent queue failures
                   </span>

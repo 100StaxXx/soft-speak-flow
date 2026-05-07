@@ -7,6 +7,7 @@ import {
   Flame,
   HeartPulse,
   ImageIcon,
+  LoaderCircle,
   Palette,
   RefreshCw,
   RotateCcw,
@@ -300,6 +301,20 @@ type TitleCardImageGateState = "idle" | "loading" | "loaded" | "failed";
 
 type LoadingStatePhase = "analysis" | "title-card";
 
+type CompanionStatAnalysisState = ReturnType<typeof useCompanionStatAnalysis>;
+
+type AnalysisContentProps = Pick<
+  CompanionStatAnalysisState,
+  | "analysis"
+  | "cached"
+  | "error"
+  | "isLoading"
+  | "isRefreshing"
+  | "isRegeneratingTitleCard"
+  | "refreshAnalysis"
+  | "regenerateTitleCard"
+>;
+
 interface LoadingStateProps {
   phase?: LoadingStatePhase;
   imageUrl?: string | null;
@@ -307,6 +322,37 @@ interface LoadingStateProps {
   imageState?: TitleCardImageGateState;
   onVerifiedPreviewCountChange?: (verifiedCount: number) => void;
   prefersReducedMotion: boolean;
+}
+
+const isTitleArtPreparing = ({
+  analysis,
+  isLoading,
+  isRegeneratingTitleCard,
+}: Pick<CompanionStatAnalysisState, "analysis" | "isLoading" | "isRegeneratingTitleCard">) => {
+  const titleCardStatus = analysis?.cosmiqTitleCard?.status;
+  return (
+    isLoading
+    || isRegeneratingTitleCard
+    || (!!analysis && (!analysis.cosmiqTitleCard || titleCardStatus === "generating"))
+  );
+};
+
+function AnalyzeStatsTitle({ showTitleArtLoading }: { showTitleArtLoading: boolean }) {
+  return (
+    <span className="inline-flex min-w-0 items-center gap-2">
+      <span>Analyze My Stats</span>
+      {showTitleArtLoading ? (
+        <span
+          aria-label="Generating title art"
+          className="inline-flex h-5 w-5 items-center justify-center text-primary"
+          data-testid="companion-stats-title-loading-indicator"
+          role="status"
+        >
+          <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+        </span>
+      ) : null}
+    </span>
+  );
 }
 
 function CosmiqTitleFrontCard({
@@ -1239,17 +1285,16 @@ function CompanionStatAnalysisView({
   );
 }
 
-function AnalysisContent() {
-  const {
-    analysis,
-    cached,
-    error,
-    isLoading,
-    isRefreshing,
-    isRegeneratingTitleCard,
-    refreshAnalysis,
-    regenerateTitleCard,
-  } = useCompanionStatAnalysis({ enabled: true });
+function AnalysisContent({
+  analysis,
+  cached,
+  error,
+  isLoading,
+  isRefreshing,
+  isRegeneratingTitleCard,
+  refreshAnalysis,
+  regenerateTitleCard,
+}: AnalysisContentProps) {
   const prefersReducedMotion = useReducedMotion();
   const [renderBoundaryKey, setRenderBoundaryKey] = useState(0);
 
@@ -1308,9 +1353,11 @@ export function CompanionStatAnalysisSurface({
   onOpenChange,
   layoutMode,
 }: CompanionStatAnalysisSurfaceProps) {
+  const analysisState = useCompanionStatAnalysis({ enabled: true });
+  const showTitleArtLoading = isTitleArtPreparing(analysisState);
   const sharedBody = (
     <div className="max-h-[75vh] overflow-y-auto px-4 pb-4 sm:px-1">
-      <AnalysisContent />
+      <AnalysisContent {...analysisState} />
     </div>
   );
 
@@ -1322,7 +1369,9 @@ export function CompanionStatAnalysisSurface({
           className="max-h-[88vh] max-w-4xl gap-0 overflow-hidden"
         >
           <DialogHeader className="px-6 pb-4 pt-6">
-            <DialogTitle>Analyze My Stats</DialogTitle>
+            <DialogTitle>
+              <AnalyzeStatsTitle showTitleArtLoading={showTitleArtLoading} />
+            </DialogTitle>
             <DialogDescription>
               A mentor-guided read on what your companion stats are saying and what has been shaping them lately.
             </DialogDescription>
@@ -1340,7 +1389,9 @@ export function CompanionStatAnalysisSurface({
         className="max-h-[88dvh] border-border/70 bg-card/96"
       >
         <DrawerHeader className="px-4 pb-3 pt-1 text-left">
-          <DrawerTitle>Analyze My Stats</DrawerTitle>
+          <DrawerTitle>
+            <AnalyzeStatsTitle showTitleArtLoading={showTitleArtLoading} />
+          </DrawerTitle>
           <DrawerDescription>
             A mentor-guided read on what your companion stats are saying and what has been shaping them lately.
           </DrawerDescription>

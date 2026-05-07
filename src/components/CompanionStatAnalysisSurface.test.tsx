@@ -310,6 +310,7 @@ describe("CompanionStatAnalysisSurface", () => {
 
     expect(screen.getByTestId("drawer-root")).toBeInTheDocument();
     expect(screen.getByTestId("companion-stats-analysis-drawer")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Generating title art")).not.toBeInTheDocument();
     expect(screen.getByTestId("companion-cosmiq-title-card")).toBeInTheDocument();
     expect(screen.getByAltText("The Oathbound Pathfinder archetype illustration")).toHaveAttribute(
       "src",
@@ -329,6 +330,39 @@ describe("CompanionStatAnalysisSurface", () => {
     expect(screen.getAllByText("Discipline / Alignment").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Eli")).toBeInTheDocument();
     expect(screen.getByText("Cached for today")).toBeInTheDocument();
+  });
+
+  it("shows a title loading indicator in the mobile drawer while title art is generating", () => {
+    mocks.useCompanionStatAnalysisMock.mockReturnValue({
+      analysis: {
+        ...analysis,
+        cosmiqTitleCard: {
+          ...analysis.cosmiqTitleCard,
+          imageUrl: null,
+          imageUrls: [],
+          status: "generating",
+        },
+      },
+      cached: false,
+      error: null,
+      isLoading: false,
+      isRefreshing: false,
+      isRegeneratingTitleCard: false,
+      refreshAnalysis: mocks.refreshAnalysisMock,
+      regenerateTitleCard: mocks.regenerateTitleCardMock,
+    });
+
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="mobile"
+      />,
+    );
+
+    expect(screen.getByTestId("companion-stats-analysis-drawer")).toBeInTheDocument();
+    expect(screen.getByLabelText("Generating title art")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-stats-title-loading-indicator")).toBeInTheDocument();
   });
 
   it("uses a dialog on desktop and refreshes on demand", () => {

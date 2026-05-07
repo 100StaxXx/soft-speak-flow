@@ -18,6 +18,12 @@ import {
   type NotificationType,
 } from "../_shared/notificationsV2.ts";
 import {
+  getDisabledDailyNotificationReason,
+  isDailyNotificationType,
+  type DailyNotificationDisabledReason,
+  type DailyNotificationToggleProfile,
+} from "../_shared/dailyNotificationToggles.ts";
+import {
   buildNoDeviceTokenFailureUpdate,
   resolveDeliveryCopy,
   resolveSourceAcknowledgement,
@@ -57,6 +63,10 @@ interface CompanionRow {
   created_at: string | null;
 }
 
+interface DailyNotificationProfileRow extends DailyNotificationToggleProfile {
+  id: string;
+}
+
 function toDateOrNull(value: string | null | undefined): Date | null {
   if (!value) return null;
   const parsed = new Date(value);
@@ -85,6 +95,36 @@ async function loadCompanionContextMap(
     companions: (data as CompanionRow[] | null) ?? [],
     logPrefix: "[notifications-dispatch-v2]",
   });
+}
+
+async function loadDailyNotificationProfile(
+  supabase: any,
+  userId: string,
+): Promise<DailyNotificationProfileRow | null> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, daily_push_enabled, daily_quote_push_enabled")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[notifications-dispatch-v2] daily profile lookup failed", userId, error);
+    return null;
+  }
+
+  return (data as DailyNotificationProfileRow | null) ?? null;
+}
+
+async function getCurrentDailyDisabledReason(
+  supabase: any,
+  row: QueueRow,
+): Promise<DailyNotificationDisabledReason | null> {
+  if (!isDailyNotificationType(row.notification_type)) {
+    return null;
+  }
+
+  const profile = await loadDailyNotificationProfile(supabase, row.user_id);
+  return getDisabledDailyNotificationReason(row.notification_type, profile);
 }
 
 function shouldLoadCompanionContext(notificationType: NotificationType): boolean {
@@ -269,7 +309,6 @@ serve(async (req) => {
           .map((row) => row.user_id),
       )],
     );
-
     const budgetCache = new Map<string, DeliveryBudgetState>();
 
     let processed = 0;
@@ -278,6 +317,7 @@ serve(async (req) => {
     let failedTerminal = 0;
     let skippedBudget = 0;
     let skippedRollout = 0;
+    let skippedDisabled = 0;
     let shadowed = 0;
 
     for (const candidate of queuedRows) {
@@ -340,6 +380,21 @@ serve(async (req) => {
         continue;
       }
 
+      const disabledReason = await getCurrentDailyDisabledReason(supabase, row);
+      if (disabledReason) {
+        skippedDisabled += 1;
+        await updateQueueStatus(supabase, row.id, {
+          status: "skipped_disabled",
+          delivered: true,
+          delivered_at: nowIso,
+          attempt_count: attemptCount,
+          last_error: disabledReason,
+          next_retry_at: null,
+        });
+        await acknowledgeSourceDelivery(supabase, row, nowIso);
+        continue;
+      }
+
       if (!budgetCache.has(row.user_id)) {
         budgetCache.set(row.user_id, await loadBudgetState(supabase, row.user_id, now));
       }
@@ -396,6 +451,21 @@ serve(async (req) => {
         }
         failedTerminal += 1;
         await updateQueueStatus(supabase, row.id, buildNoDeviceTokenFailureUpdate(attemptCount, nowIso));
+        continue;
+      }
+
+      const disabledReasonBeforeSend = await getCurrentDailyDisabledReason(supabase, row);
+      if (disabledReasonBeforeSend) {
+        skippedDisabled += 1;
+        await updateQueueStatus(supabase, row.id, {
+          status: "skipped_disabled",
+          delivered: true,
+          delivered_at: nowIso,
+          attempt_count: attemptCount,
+          last_error: disabledReasonBeforeSend,
+          next_retry_at: null,
+        });
+        await acknowledgeSourceDelivery(supabase, row, nowIso);
         continue;
       }
 
@@ -513,6 +583,7 @@ serve(async (req) => {
         failed_terminal: failedTerminal,
         skipped_budget: skippedBudget,
         skipped_rollout: skippedRollout,
+        skipped_disabled: skippedDisabled,
         shadowed,
         token_fanout_mode: tokenFanoutMode,
         mode,

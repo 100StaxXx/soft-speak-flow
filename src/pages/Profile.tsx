@@ -14,7 +14,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PushNotificationSettings } from "@/components/PushNotificationSettings";
-import { DailyQuoteSettings } from "@/components/DailyQuoteSettings";
 import { ReferralDashboard } from "@/components/ReferralDashboard";
 import { CompanionSkins } from "@/components/CompanionSkins";
 import { ReferralCodeRedeemCard } from "@/components/ReferralCodeRedeemCard";
@@ -632,7 +631,6 @@ const Profile = () => {
             {/* Notifications Tab */}
             <TabsContent value="notifications" className="space-y-4">
               <PushNotificationSettings />
-              <DailyQuoteSettings />
             </TabsContent>
 
             {/* Preferences Tab */}

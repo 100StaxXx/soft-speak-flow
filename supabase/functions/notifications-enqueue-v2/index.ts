@@ -14,6 +14,10 @@ import {
   toScheduledDateTime,
   type NotificationType,
 } from "../_shared/notificationsV2.ts";
+import {
+  getDisabledDailyNotificationReason,
+  type DailyNotificationToggleProfile,
+} from "../_shared/dailyNotificationToggles.ts";
 import { composeNotificationCopy, type CompanionNotificationContext } from "../_shared/notificationComposer.ts";
 import { resolveNotificationCompanionContextMap } from "../_shared/companionName.ts";
 import {
@@ -122,6 +126,10 @@ interface DailyQuoteSourceRow {
   scheduled_at: string;
 }
 
+interface DailyNotificationProfileRow extends DailyNotificationToggleProfile {
+  id: string;
+}
+
 function dailyContentKey(mentorSlug: string, localDate: string): string {
   return `${mentorSlug}:${localDate}`;
 }
@@ -147,6 +155,40 @@ async function loadCompanionContextMap(
     companions: (data as CompanionRow[] | null) ?? [],
     logPrefix,
   });
+}
+
+async function loadDailyNotificationProfileMap(
+  supabase: any,
+  userIds: string[],
+): Promise<Map<string, DailyNotificationProfileRow>> {
+  if (userIds.length === 0) {
+    return new Map();
+  }
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, daily_push_enabled, daily_quote_push_enabled")
+    .in("id", userIds);
+
+  if (error) throw error;
+
+  return new Map(((data as DailyNotificationProfileRow[] | null) ?? []).map((row) => [row.id, row]));
+}
+
+async function markDailySourcesSkipped(
+  supabase: any,
+  table: "user_daily_pushes" | "user_daily_quote_pushes",
+  sourceIds: string[],
+  nowIso: string,
+): Promise<void> {
+  if (sourceIds.length === 0) return;
+
+  const { error } = await supabase
+    .from(table)
+    .update({ delivered_at: nowIso })
+    .in("id", sourceIds);
+
+  if (error) throw error;
 }
 
 function rowForQueue(input: {
@@ -521,13 +563,24 @@ serve(async (req) => {
     if (pepError) throw pepError;
 
     const pepUserIds = [...new Set((duePepPushes ?? []).map((row) => row.user_id as string))];
+    const pepProfileMap = await loadDailyNotificationProfileMap(supabase, pepUserIds);
     const companionMap = await loadCompanionContextMap(
       supabase,
       pepUserIds,
       "[notifications-enqueue-v2] daily_pep",
     );
 
+    const disabledPepSourceIds: string[] = [];
     for (const push of duePepPushes ?? []) {
+      const disabledReason = getDisabledDailyNotificationReason(
+        "daily_pep",
+        pepProfileMap.get(push.user_id),
+      );
+      if (disabledReason) {
+        disabledPepSourceIds.push(push.id);
+        continue;
+      }
+
       const pepTalk = Array.isArray(push.daily_pep_talks) ? push.daily_pep_talks[0] : push.daily_pep_talks;
       inserts.push(rowForQueue({
         userId: push.user_id,
@@ -547,6 +600,7 @@ serve(async (req) => {
         companion: companionMap.get(push.user_id) ?? null,
       }));
     }
+    await markDailySourcesSkipped(supabase, "user_daily_pushes", disabledPepSourceIds, nowIso);
 
     // 2) Daily quote notifications
     const { data: dueQuotePushes, error: dueQuoteError } = await supabase
@@ -558,6 +612,8 @@ serve(async (req) => {
 
     if (dueQuoteError) throw dueQuoteError;
 
+    const quoteUserIds = [...new Set((dueQuotePushes ?? []).map((row) => row.user_id as string))];
+    const quoteProfileMap = await loadDailyNotificationProfileMap(supabase, quoteUserIds);
     const dueDailyQuoteIds = [...new Set((dueQuotePushes ?? []).map((row) => row.daily_quote_id as string))];
     const dueDailyQuotes = dueDailyQuoteIds.length > 0
       ? (await supabase
@@ -576,7 +632,17 @@ serve(async (req) => {
       : [];
     const dueQuoteById = new Map((dueQuotes ?? []).map((row) => [row.id, row]));
 
+    const disabledQuoteSourceIds: string[] = [];
     for (const push of dueQuotePushes ?? []) {
+      const disabledReason = getDisabledDailyNotificationReason(
+        "daily_quote",
+        quoteProfileMap.get(push.user_id),
+      );
+      if (disabledReason) {
+        disabledQuoteSourceIds.push(push.id);
+        continue;
+      }
+
       const dailyQuote = dueDailyQuoteById.get(push.daily_quote_id);
       if (!dailyQuote) continue;
 
@@ -601,6 +667,7 @@ serve(async (req) => {
         },
       }));
     }
+    await markDailySourcesSkipped(supabase, "user_daily_quote_pushes", disabledQuoteSourceIds, nowIso);
 
     // 3) Task start + reminder notifications
     await scanPaginatedRows<TaskCandidateRow>({
