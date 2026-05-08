@@ -37,7 +37,7 @@ export function QuestAttachmentPicker({
   const addButtonClassName = cn(
     "gap-2",
     isQuestSoft
-      ? "rounded-[16px] border-[3px] border-[#6b3416] bg-white/60 text-[#6b3416] shadow-[0_4px_0_rgba(77,40,17,0.16)] hover:bg-white/75 hover:text-[#4f240c]"
+      ? "rounded-[16px] border-[3px] border-border/70 bg-card/70 text-foreground shadow-[0_4px_0_hsl(var(--primary)_/_0.16)] hover:bg-card hover:text-foreground"
       : "",
   );
 
@@ -121,13 +121,13 @@ export function QuestAttachmentPicker({
             </Button>
           )}
         </div>
-        <span className={cn("text-xs", isQuestSoft ? "text-[#7f4a1d]/80" : "text-muted-foreground")}>
+        <span className={cn("text-xs", isQuestSoft ? "text-muted-foreground" : "text-muted-foreground")}>
           {attachments.length}/{MAX_ATTACHMENTS_PER_TASK}
         </span>
       </div>
 
       {helperText && (
-        <p className={cn("text-xs", isQuestSoft ? "text-[#7f4a1d]/80" : "text-muted-foreground")}>Up to 10 files, 10MB each.</p>
+        <p className={cn("text-xs", isQuestSoft ? "text-muted-foreground" : "text-muted-foreground")}>Up to 10 files, 10MB each.</p>
       )}
 
       {attachments.length > 0 && (
@@ -138,7 +138,7 @@ export function QuestAttachmentPicker({
               className={cn(
                 "relative p-2",
                 isQuestSoft
-                  ? "rounded-[16px] border-[3px] border-[#6b3416]/60 bg-white/55 shadow-[0_4px_0_rgba(77,40,17,0.16)]"
+                  ? "rounded-[16px] border-[3px] border-border/70 bg-card/60 shadow-[0_4px_0_hsl(var(--primary)_/_0.16)]"
                   : "rounded-lg border border-border/60 bg-card",
               )}
             >
@@ -148,7 +148,7 @@ export function QuestAttachmentPicker({
                 className={cn(
                   "absolute right-1 top-1 rounded-full p-1",
                   isQuestSoft
-                    ? "bg-white/75 text-[#7f4a1d] hover:bg-white hover:text-[#4f240c]"
+                    ? "bg-background/70 text-muted-foreground hover:bg-background hover:text-foreground"
                     : "bg-background/80 text-muted-foreground hover:text-destructive",
                 )}
                 aria-label={`Remove ${attachment.fileName}`}
@@ -171,20 +171,20 @@ export function QuestAttachmentPicker({
                   rel="noreferrer"
                   className={cn(
                     "flex h-16 items-center justify-center rounded",
-                    isQuestSoft ? "bg-white/55" : "bg-muted/30",
+                    isQuestSoft ? "bg-background/45" : "bg-muted/30",
                   )}
                 >
-                  <FileText className={cn("h-5 w-5", isQuestSoft ? "text-[#7f4a1d]/80" : "text-muted-foreground")} />
+                  <FileText className={cn("h-5 w-5", isQuestSoft ? "text-muted-foreground" : "text-muted-foreground")} />
                 </a>
               )}
 
               <div className="mt-2 flex items-center gap-1">
                 {attachment.isImage ? (
-                  <FileImage className={cn("h-3.5 w-3.5", isQuestSoft ? "text-[#7f4a1d]/80" : "text-muted-foreground")} />
+                  <FileImage className={cn("h-3.5 w-3.5", isQuestSoft ? "text-muted-foreground" : "text-muted-foreground")} />
                 ) : (
-                  <FileText className={cn("h-3.5 w-3.5", isQuestSoft ? "text-[#7f4a1d]/80" : "text-muted-foreground")} />
+                  <FileText className={cn("h-3.5 w-3.5", isQuestSoft ? "text-muted-foreground" : "text-muted-foreground")} />
                 )}
-                <span className={cn("truncate text-xs", isQuestSoft ? "text-[#6b3416]" : "text-muted-foreground")}>{attachment.fileName}</span>
+                <span className={cn("truncate text-xs", isQuestSoft ? "text-muted-foreground" : "text-muted-foreground")}>{attachment.fileName}</span>
               </div>
             </div>
           ))}

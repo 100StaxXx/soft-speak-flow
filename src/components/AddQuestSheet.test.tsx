@@ -180,7 +180,7 @@ describe("AddQuestSheet", () => {
     expect(screen.queryByText(/Name your quest.*Select a time/i)).not.toBeInTheDocument();
     expectElementToIncludeClasses(
       screen.getByTestId("add-quest-mobile-sheet"),
-      "border-[#4d2811] text-[#4f240c]",
+      "border-primary/55 text-foreground",
     );
     expect(screen.getByTestId("add-quest-editor-header").firstElementChild).toContainElement(
       screen.getByPlaceholderText("Quest Title"),
@@ -203,7 +203,7 @@ describe("AddQuestSheet", () => {
     expect(screen.getByTestId("add-quest-desktop-panel")).toBeInTheDocument();
     expectElementToIncludeClasses(
       screen.getByTestId("add-quest-desktop-panel"),
-      "border-[#4d2811] text-[#4f240c]",
+      "border-primary/55 text-foreground",
     );
     expect(screen.queryByTestId("add-quest-mobile-sheet")).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText("Quest Title")).toBeInTheDocument();

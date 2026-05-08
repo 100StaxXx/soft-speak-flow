@@ -37,20 +37,20 @@ describe("quest-shared time slots", () => {
   });
 });
 
-describe("quest-shared warm editor classes", () => {
+describe("quest-shared tokenized editor classes", () => {
   it("lets active option pill tones own their text color", () => {
     const classes = getQuestOptionPillClasses(true, DIFFICULTY_COLORS.medium.pill);
 
-    expect(classes).toContain("text-[#3c1f10]");
+    expect(classes).toContain("text-foreground");
     expect(classes).not.toContain("text-white");
   });
 
-  it("uses warm inactive icon contrast for difficulty bubbles", () => {
+  it("uses tokenized inactive icon contrast for difficulty bubbles", () => {
     const classes = getQuestDifficultyIconClasses("medium", false);
 
-    expect(classes).toContain("border-[#6b3416]/35");
-    expect(classes).toContain("bg-white/55");
-    expect(classes).toContain("text-[#7f4a1d]/80");
+    expect(classes).toContain("border-border/60");
+    expect(classes).toContain("bg-background/45");
+    expect(classes).toContain("text-muted-foreground");
     expect(classes).not.toContain("text-white");
   });
 });

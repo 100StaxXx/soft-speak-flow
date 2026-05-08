@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useState, type RefObject } from "react";
 import { JourneysCompanionLauncher } from "@/components/journeys/JourneysCompanionLauncher";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { QuestLocationLink } from "@/components/QuestLocationLink";
 import { cn } from "@/lib/utils";
 import { haptics } from "@/utils/haptics";
 import { Check, ChevronDown, Inbox, Pencil, Trash2 } from "lucide-react";
@@ -151,7 +152,7 @@ export const QuestInboxSection = memo(function QuestInboxSection({
                 {visibleTasks.map((task) => (
                   <div
                     key={task.id}
-                    className="flex items-center gap-3 rounded-2xl border border-border/55 bg-card/82 px-3 py-3 backdrop-blur-lg shadow-[0_8px_18px_rgba(0,0,0,0.16)]"
+                    className="flex items-start gap-3 rounded-2xl border border-border/55 bg-card/82 px-3 py-3 backdrop-blur-lg shadow-[0_8px_18px_rgba(0,0,0,0.16)]"
                   >
                     <button
                       type="button"
@@ -159,7 +160,7 @@ export const QuestInboxSection = memo(function QuestInboxSection({
                         haptics.light();
                         onToggleQuest(task.id, !task.completed);
                       }}
-                      className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border-2 border-muted-foreground/40 transition-colors hover:border-primary"
+                      className="mt-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border-2 border-muted-foreground/40 transition-colors hover:border-primary"
                       aria-label={task.completed ? "Mark quest incomplete" : "Mark quest complete"}
                     >
                       {task.completed ? <Check className="h-4 w-4 text-primary" /> : null}
@@ -177,9 +178,18 @@ export const QuestInboxSection = memo(function QuestInboxSection({
                       <p className="mt-1 text-xs text-muted-foreground">
                         No time assigned yet
                       </p>
+                      {task.location ? (
+                        <QuestLocationLink
+                          location={task.location}
+                          label="Address"
+                          className="mt-2 rounded-xl border-border/45 bg-muted/25 p-2"
+                          textClassName="text-xs text-muted-foreground"
+                          actionsClassName="mt-2"
+                        />
+                      ) : null}
                     </div>
 
-                    <div className="flex flex-shrink-0 items-center gap-1">
+                    <div className="mt-0.5 flex flex-shrink-0 items-center gap-1">
                       <button
                         type="button"
                         onClick={() => {

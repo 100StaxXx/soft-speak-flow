@@ -137,7 +137,7 @@ describe("EditCampaignSheet", () => {
     expect(screen.getByLabelText("Description")).toHaveValue("A focused campaign");
     expectElementToIncludeClasses(
       screen.getByTestId("edit-campaign-sheet-shell"),
-      "fixed border-[#4d2811] text-white",
+      "fixed border-primary/55 text-foreground",
     );
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
   });

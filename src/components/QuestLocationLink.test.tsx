@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { QuestLocationLink } from "@/components/QuestLocationLink";
 
@@ -14,18 +14,39 @@ vi.mock("@/utils/questLocationLinks", async () => {
 });
 
 describe("QuestLocationLink", () => {
+  beforeEach(() => {
+    openQuestLocationMock.mockClear();
+  });
+
   it("does not render for empty locations", () => {
     const { container } = render(<QuestLocationLink location="   " />);
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("renders the saved location and opens maps on click", () => {
+  it("renders the saved location and opens either maps provider", () => {
     render(<QuestLocationLink location="1 Infinite Loop, Cupertino, CA" />);
 
-    const button = screen.getByRole("button", { name: /open 1 infinite loop, cupertino, ca in maps/i });
-    expect(button).toHaveTextContent("1 Infinite Loop, Cupertino, CA");
+    expect(screen.getByText("1 Infinite Loop, Cupertino, CA")).toBeInTheDocument();
 
-    fireEvent.click(button);
-    expect(openQuestLocationMock).toHaveBeenCalledWith("1 Infinite Loop, Cupertino, CA");
+    fireEvent.click(screen.getByRole("button", { name: /open 1 infinite loop, cupertino, ca in apple maps/i }));
+    expect(openQuestLocationMock).toHaveBeenCalledWith("1 Infinite Loop, Cupertino, CA", "apple");
+
+    fireEvent.click(screen.getByRole("button", { name: /open 1 infinite loop, cupertino, ca in google maps/i }));
+    expect(openQuestLocationMock).toHaveBeenCalledWith("1 Infinite Loop, Cupertino, CA", "google");
+  });
+
+  it("does not bubble map actions to parent quest cards", () => {
+    const parentClick = vi.fn();
+
+    render(
+      <div onClick={parentClick}>
+        <QuestLocationLink location="Library" />
+      </div>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /open library in apple maps/i }));
+
+    expect(openQuestLocationMock).toHaveBeenCalledWith("Library", "apple");
+    expect(parentClick).not.toHaveBeenCalled();
   });
 });

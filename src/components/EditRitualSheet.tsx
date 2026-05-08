@@ -241,14 +241,14 @@ export const EditRitualSheet = memo(function EditRitualSheet({
 
         <SheetHeader className="relative z-10 shrink-0 px-4 pt-4 text-left sm:px-5 sm:pt-5">
           <div className={plannerPathfinderTheme.headerBar}>
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#b04b12] shadow-[0_5px_0_rgba(77,40,17,0.45)]">
+            <div className={cn(QUEST_FORM_STYLES.heroIcon, "h-12 w-12 shrink-0 rounded-[1rem]")}>
               <Repeat className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1 text-left">
-              <SheetTitle className="text-xl text-white">
+              <SheetTitle className="text-xl text-foreground">
                 Edit Ritual
               </SheetTitle>
-              <p className="text-sm text-white/[0.68]">
+              <p className="text-sm text-muted-foreground">
                 Changes sync to all instances of this ritual.
               </p>
               <SheetDescription className="sr-only">
@@ -268,8 +268,8 @@ export const EditRitualSheet = memo(function EditRitualSheet({
           </div>
         </SheetHeader>
 
-        <ScrollArea className="relative z-10 mx-4 mt-3 min-h-0 flex-1 rounded-[2rem] border-[4px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,248,225,0.9),rgba(255,216,128,0.82))] shadow-[0_12px_0_rgba(77,40,17,0.84)] sm:mx-5">
-          <div className="space-y-5 px-4 pb-10 pt-4 text-[#4f240c] sm:px-5" data-vaul-no-drag>
+        <ScrollArea className={cn("relative z-10 mx-4 mt-3 min-h-0 flex-1 rounded-[2rem] border-[4px] border-primary/45 shadow-[0_12px_0_hsl(var(--primary)_/_0.42)] sm:mx-5", QUEST_FORM_STYLES.body)}>
+          <div className="space-y-5 px-4 pb-10 pt-4 text-foreground sm:px-5" data-vaul-no-drag>
             <NaturalLanguageEditor onApply={handleNaturalLanguageApply} visualStyle="quest-soft" />
 
             <section className={cn(plannerPathfinderTheme.raisedPanel, "space-y-4 p-4")}>
@@ -430,12 +430,12 @@ export const EditRitualSheet = memo(function EditRitualSheet({
             </section>
 
             {onDelete && (
-              <section className="space-y-3 rounded-[1.5rem] border-[3px] border-[#8a2716] bg-[#ffd9bf] p-4 text-[#8a2716] shadow-[0_8px_0_rgba(154,71,24,0.18)]">
+              <section className="space-y-3 rounded-[1.5rem] border-[3px] border-destructive/45 bg-destructive/10 p-4 text-destructive shadow-[0_8px_0_hsl(var(--destructive)_/_0.18)]">
                 <div className="flex items-center gap-2">
                   <Trash2 className="h-4 w-4" />
                   <h3 className="text-sm font-semibold">Danger zone</h3>
                 </div>
-                <p className="text-sm text-[#8a2716]/80">
+                <p className="text-sm text-destructive/80">
                   Permanently delete this ritual and remove all future instances. Completed tasks stay in your history.
                 </p>
                 <Button

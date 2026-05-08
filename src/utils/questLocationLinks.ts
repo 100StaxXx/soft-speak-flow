@@ -1,5 +1,9 @@
 import { isNativeIOS } from "@/utils/platformTargets";
 
+export type QuestMapProvider = "apple" | "google";
+
+export const QUEST_MAP_PROVIDERS: QuestMapProvider[] = ["apple", "google"];
+
 export function normalizeQuestLocationQuery(location: string | null | undefined): string | null {
   const normalized = location?.trim();
   return normalized ? normalized : null;
@@ -7,13 +11,13 @@ export function normalizeQuestLocationQuery(location: string | null | undefined)
 
 export function buildQuestLocationUrl(
   location: string | null | undefined,
-  options?: { nativeIOS?: boolean },
+  provider: QuestMapProvider,
 ): string | null {
   const query = normalizeQuestLocationQuery(location);
   if (!query) return null;
 
   const encodedQuery = encodeURIComponent(query);
-  if (options?.nativeIOS) {
+  if (provider === "apple") {
     return `https://maps.apple.com/?q=${encodedQuery}`;
   }
 
@@ -22,18 +26,16 @@ export function buildQuestLocationUrl(
 
 export function openQuestLocation(
   location: string | null | undefined,
+  provider: QuestMapProvider,
   options?: {
-    nativeIOS?: boolean;
     openUrl?: (url: string) => void;
   },
 ): boolean {
-  const url = buildQuestLocationUrl(location, {
-    nativeIOS: options?.nativeIOS ?? isNativeIOS(),
-  });
+  const url = buildQuestLocationUrl(location, provider);
   if (!url) return false;
 
   const openUrl = options?.openUrl ?? ((targetUrl: string) => {
-    if (options?.nativeIOS ?? isNativeIOS()) {
+    if (isNativeIOS()) {
       window.location.href = targetUrl;
       return;
     }

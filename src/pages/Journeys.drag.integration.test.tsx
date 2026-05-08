@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { isSameDay } from "date-fns";
+import { format, isSameDay } from "date-fns";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { JOURNEYS_RESET_TO_TODAY_EVENT } from "@/pages/journeysDateSync";
@@ -78,6 +78,8 @@ const mocks = vi.hoisted(() => ({
   resetStreak: vi.fn(),
   addAppListener: vi.fn(async () => ({ remove: vi.fn(async () => {}) })),
   isTabActive: true,
+  warmDailyTasksQueryFromRemote: vi.fn().mockResolvedValue([]),
+  dispatchPlannerSyncFinished: vi.fn(),
   unsurfacedEpicHabitsCount: 0,
   pendingRecurringCount: 0,
   calendarConnections: [] as Array<{ provider: string; sync_mode: string }>,
@@ -654,6 +656,11 @@ vi.mock("@/hooks/useOnboardingTaskCleanup", () => ({
   useOnboardingTaskCleanup: vi.fn(),
 }));
 
+vi.mock("@/utils/plannerSync", () => ({
+  warmDailyTasksQueryFromRemote: (...args: unknown[]) => mocks.warmDailyTasksQueryFromRemote(...args),
+  dispatchPlannerSyncFinished: (...args: unknown[]) => mocks.dispatchPlannerSyncFinished(...args),
+}));
+
 vi.mock("@/contexts/DeepLinkContext", () => ({
   useDeepLink: () => ({
     pendingTaskId: mocks.pendingTaskId,
@@ -747,6 +754,12 @@ const performTouchTimelineDrag = (row: HTMLElement, moveY: number, startY = 100)
   vi.useRealTimers();
 };
 
+const performQuestListPullRefresh = (pane: HTMLElement, endY = 96) => {
+  fireEvent.touchStart(pane, { touches: [{ clientX: 40, clientY: 10 }] });
+  fireEvent.touchMove(pane, { touches: [{ clientX: 42, clientY: endY }] });
+  fireEvent.touchEnd(pane, { changedTouches: [{ clientX: 42, clientY: endY }] });
+};
+
 import Journeys from "./Journeys";
 
 describe("Journeys row drag integration", () => {
@@ -757,6 +770,7 @@ describe("Journeys row drag integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorageState.store.clear();
+    mocks.warmDailyTasksQueryFromRemote.mockResolvedValue([]);
     mocks.isTabActive = true;
     mocks.pendingTaskId = null;
     mocks.unsurfacedEpicHabitsCount = 0;
@@ -2066,6 +2080,58 @@ describe("Journeys row drag integration", () => {
       expect(screen.getByTestId("selected-date-iso").textContent).toBe(sameDaySelectedDateIso);
       expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeResetRequest);
     });
+  });
+
+  it("soft-refreshes from a quest-list pull by returning to today without reloading the page", async () => {
+    const originalHref = window.location.href;
+    const originalReload = window.location.reload;
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
+
+    let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+    await waitFor(() => {
+      staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
+    });
+    const centerKeyBeforePullRefresh = Number(screen.getByTestId("center-request-key").textContent);
+
+    performQuestListPullRefresh(await screen.findByTestId("scheduled-timeline-pane"));
+
+    await waitFor(() => {
+      const refreshedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      expect(refreshedDateIso).not.toBe(staleSelectedDateIso);
+      expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
+      expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforePullRefresh);
+    });
+
+    await waitFor(() => {
+      expect(mocks.warmDailyTasksQueryFromRemote).toHaveBeenCalledWith(
+        expect.any(QueryClient),
+        "user-1",
+        format(new Date(), "yyyy-MM-dd"),
+      );
+      expect(mocks.dispatchPlannerSyncFinished).toHaveBeenCalledTimes(1);
+    });
+    expect(window.location.href).toBe(originalHref);
+    expect(window.location.reload).toBe(originalReload);
   });
 
   it("snaps back to today after completing a task when the date has not been manually adjusted", async () => {

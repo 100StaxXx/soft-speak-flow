@@ -142,7 +142,7 @@ describe("EditRitualSheet", () => {
     });
   });
 
-  it("renders the warm planner shell with the core ritual fields and actions", () => {
+  it("renders the tokenized planner shell with the core ritual fields and actions", () => {
     render(
       <EditRitualSheet
         ritual={ritualFixture}
@@ -152,7 +152,7 @@ describe("EditRitualSheet", () => {
       />,
     );
 
-    expect(screen.getByTestId("edit-ritual-sheet-shell").className).toContain("border-[#4d2811]");
+    expect(screen.getByTestId("edit-ritual-sheet-shell").className).toContain("border-primary/55");
     expect(screen.getByText("Edit Ritual")).toBeInTheDocument();
     expect(screen.getByText("Changes sync to all instances of this ritual.")).toBeInTheDocument();
     expect(screen.getByTestId("natural-language-editor")).toHaveAttribute("data-visual-style", "quest-soft");

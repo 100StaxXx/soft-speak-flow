@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useEffect, useLayoutEffect, useCallback, memo, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
+import { useMemo, useRef, useState, useEffect, useLayoutEffect, useCallback, memo, type CSSProperties, type MouseEvent as ReactMouseEvent, type TouchEvent as ReactTouchEvent } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTimelineDrag } from "@/hooks/useTimelineDrag";
@@ -34,6 +34,7 @@ import {
   Mic,
   MicOff,
   Plus,
+  RefreshCw,
 } from "lucide-react";
 import { JourneysCompanionLauncher } from "@/components/journeys/JourneysCompanionLauncher";
 import {
@@ -48,6 +49,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
+import { QuestLocationLink } from "@/components/QuestLocationLink";
 import { cn, formatDisplayLabel, stripMarkdown } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { MAIN_QUEST_XP_MULTIPLIER } from "@/config/xpRewards";
@@ -134,6 +136,7 @@ interface Task {
   reminder_minutes_before?: number | null;
   category?: string | null;
   image_url?: string | null;
+  location?: string | null;
   attachments?: TaskAttachment[] | null;
   subtasks?: TaskSubtask[];
 }
@@ -257,6 +260,8 @@ interface TodaysAgendaProps {
   onOpenMonthView?: () => void;
   timedTaskDurationFallbackMinutes?: number;
   useMacDurationSizedDesktopTimelineRows?: boolean;
+  onPullRefresh?: () => Promise<void> | void;
+  isPullRefreshing?: boolean;
 }
 
 type ActiveEpic = NonNullable<TodaysAgendaProps["activeEpics"]>[number];
@@ -300,6 +305,35 @@ const EDGE_HOLD_NEAR_STEP_MULTIPLIER = 1;
 const EDGE_HOLD_MEDIUM_STEP_MULTIPLIER = 1;
 const EDGE_HOLD_HIGH_STEP_MULTIPLIER = 2;
 const EDGE_HOLD_EXTREME_STEP_MULTIPLIER = 3;
+const PULL_REFRESH_TRIGGER_DISTANCE_PX = 72;
+const PULL_REFRESH_MAX_VISUAL_DISTANCE_PX = 84;
+const PULL_REFRESH_ACTIVATION_SLOP_PX = 8;
+const PULL_REFRESH_REFRESHING_DISTANCE_PX = 40;
+
+interface PullRefreshGestureState {
+  startX: number;
+  startY: number;
+  active: boolean;
+  cancelled: boolean;
+}
+
+const isPullRefreshIgnoredTarget = (target: EventTarget | null): boolean => {
+  if (typeof HTMLElement === "undefined" || !(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return Boolean(target.closest([
+    "button",
+    "a",
+    "input",
+    "textarea",
+    "select",
+    '[role="button"]',
+    '[data-interactive="true"]',
+    '[data-tap-control="true"]',
+    '[contenteditable="true"]',
+  ].join(",")));
+};
 
 interface EdgeHoldProfile {
   repeatMs: number;
@@ -679,6 +713,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   onSendToCalendar,
   hasCalendarLink,
   onOpenMonthView,
+  onPullRefresh,
+  isPullRefreshing = false,
 }: TodaysAgendaProps) {
   const { user } = useAuth();
   const questCaptureDateLabel = isSameDay(selectedDate, new Date())
@@ -866,6 +902,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const suppressNextCheckboxClickRef = useRef(false);
   const suppressNextCheckboxClickTimeoutRef = useRef<number | null>(null);
   const desktopTaskClickTimersRef = useRef<Map<string, number>>(new Map());
+  const pullRefreshGestureRef = useRef<PullRefreshGestureState | null>(null);
+  const pullRefreshReadyRef = useRef(false);
+  const [pullRefreshDistance, setPullRefreshDistance] = useState(0);
+  const [pullRefreshReady, setPullRefreshReady] = useState(false);
 
   const clearDesktopTaskClickIntent = useCallback((taskId?: string) => {
     if (taskId) {
@@ -978,11 +1018,107 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     }, TOUCH_CLICK_SUPPRESSION_RESET_MS);
   }, []);
 
+  const resetPullRefreshGesture = useCallback(() => {
+    pullRefreshGestureRef.current = null;
+    pullRefreshReadyRef.current = false;
+    setPullRefreshDistance(0);
+    setPullRefreshReady(false);
+  }, []);
+
+  const isPullRefreshEnabled = Boolean(onPullRefresh) && !isDesktopLayout;
+
+  const handlePullRefreshTouchStart = useCallback((event: ReactTouchEvent<HTMLElement>) => {
+    if (!isPullRefreshEnabled || isPullRefreshing) return;
+    if (event.touches.length !== 1) return;
+    if (isPullRefreshIgnoredTarget(event.target)) return;
+    if (event.currentTarget.scrollTop > 0) return;
+
+    const touch = event.touches[0];
+    pullRefreshGestureRef.current = {
+      startX: touch.clientX,
+      startY: touch.clientY,
+      active: false,
+      cancelled: false,
+    };
+    pullRefreshReadyRef.current = false;
+    setPullRefreshDistance(0);
+    setPullRefreshReady(false);
+  }, [isPullRefreshEnabled, isPullRefreshing]);
+
+  const handlePullRefreshTouchMove = useCallback((event: ReactTouchEvent<HTMLElement>) => {
+    const gesture = pullRefreshGestureRef.current;
+    if (!gesture || gesture.cancelled || event.touches.length !== 1) return;
+
+    const touch = event.touches[0];
+    const deltaX = touch.clientX - gesture.startX;
+    const deltaY = touch.clientY - gesture.startY;
+    const absX = Math.abs(deltaX);
+
+    if (!gesture.active) {
+      if (deltaY < 0 || event.currentTarget.scrollTop > 0) {
+        gesture.cancelled = true;
+        resetPullRefreshGesture();
+        return;
+      }
+
+      if (absX > PULL_REFRESH_ACTIVATION_SLOP_PX && absX > deltaY) {
+        gesture.cancelled = true;
+        resetPullRefreshGesture();
+        return;
+      }
+
+      if (deltaY <= PULL_REFRESH_ACTIVATION_SLOP_PX || deltaY <= absX) {
+        return;
+      }
+
+      gesture.active = true;
+    }
+
+    if (event.currentTarget.scrollTop > 0) {
+      resetPullRefreshGesture();
+      return;
+    }
+
+    event.preventDefault();
+    const nextDistance = Math.min(
+      PULL_REFRESH_MAX_VISUAL_DISTANCE_PX,
+      Math.max(0, deltaY),
+    );
+    const nextReady = deltaY >= PULL_REFRESH_TRIGGER_DISTANCE_PX;
+
+    pullRefreshReadyRef.current = nextReady;
+    setPullRefreshDistance(nextDistance);
+    setPullRefreshReady(nextReady);
+  }, [resetPullRefreshGesture]);
+
+  const handlePullRefreshTouchEnd = useCallback(() => {
+    const shouldRefresh = pullRefreshGestureRef.current?.active && pullRefreshReadyRef.current;
+    resetPullRefreshGesture();
+
+    if (shouldRefresh && onPullRefresh && !isPullRefreshing) {
+      void onPullRefresh();
+    }
+  }, [isPullRefreshing, onPullRefresh, resetPullRefreshGesture]);
+
+  const pullRefreshTouchHandlers = isPullRefreshEnabled
+    ? {
+        onTouchStart: handlePullRefreshTouchStart,
+        onTouchMove: handlePullRefreshTouchMove,
+        onTouchEnd: handlePullRefreshTouchEnd,
+        onTouchCancel: resetPullRefreshGesture,
+      }
+    : undefined;
+
   useEffect(() => {
     return () => {
       clearTouchCheckboxClickSuppression();
     };
   }, [clearTouchCheckboxClickSuppression]);
+
+  useEffect(() => {
+    if (isPullRefreshEnabled) return;
+    resetPullRefreshGesture();
+  }, [isPullRefreshEnabled, resetPullRefreshGesture]);
 
   const scheduleComboReset = useCallback(() => {
     if (comboResetTimerRef.current !== null) {
@@ -1992,6 +2128,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       (task.subtasks && task.subtasks.length > 0) ||
       displayAttachments.length > 0 ||
       normalizeDetailText(ritualDescription) ||
+      task.location ||
       task.notes || 
       task.priority || 
       task.estimated_duration || 
@@ -2562,6 +2699,16 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 )
               )}
 
+              {task.location ? (
+                <QuestLocationLink
+                  location={task.location}
+                  label="Address"
+                  className="rounded-md border-border/40 bg-muted/20 p-2"
+                  textClassName="text-xs text-muted-foreground"
+                  actionsClassName="mt-2"
+                />
+              ) : null}
+
               {/* Badges row */}
               {hasDetailBadges && (
                 <div className="flex flex-wrap gap-1.5">
@@ -2823,6 +2970,39 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     ? undefined
     : { paddingBottom: mobileFabScrollClearance };
 
+  const pullRefreshIndicatorDistance = isPullRefreshing
+    ? PULL_REFRESH_REFRESHING_DISTANCE_PX
+    : pullRefreshDistance;
+  const isPullRefreshIndicatorVisible = pullRefreshIndicatorDistance > 0;
+  const pullRefreshIndicatorLabel = isPullRefreshing
+    ? "Refreshing quests"
+    : pullRefreshReady
+      ? "Release to refresh quests"
+      : "Pull to refresh quests";
+  const pullRefreshIndicator = isPullRefreshIndicatorVisible ? (
+    <div
+      className="pointer-events-none flex items-center justify-center overflow-hidden"
+      style={{
+        height: `${pullRefreshIndicatorDistance}px`,
+        opacity: isPullRefreshing ? 1 : Math.min(1, Math.max(0.25, pullRefreshIndicatorDistance / PULL_REFRESH_TRIGGER_DISTANCE_PX)),
+      }}
+      data-testid="journeys-pull-refresh-indicator"
+      aria-live="polite"
+    >
+      <RefreshCw
+        className={cn(
+          "h-4 w-4 text-primary transition-transform",
+          isPullRefreshing && "animate-spin",
+        )}
+        style={!isPullRefreshing
+          ? { transform: `rotate(${pullRefreshReady ? 180 : Math.round((pullRefreshIndicatorDistance / PULL_REFRESH_TRIGGER_DISTANCE_PX) * 120)}deg)` }
+          : undefined}
+        aria-hidden="true"
+      />
+      <span className="sr-only">{pullRefreshIndicatorLabel}</span>
+    </div>
+  ) : null;
+
   return (
     <div
       className={cn(
@@ -3045,7 +3225,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               )}
               style={isDesktopLayout && timelineBodyHeightPx ? { minHeight: `${timelineBodyHeightPx}px` } : undefined}
               data-testid="empty-state-pane"
+              {...(pullRefreshTouchHandlers ?? {})}
             >
+              {pullRefreshIndicator}
               <Circle className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />
               <p className="mb-2 text-sm font-medium text-foreground">
                 No tasks for this day
@@ -3121,11 +3303,13 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     )}
                     style={scheduledPaneStyle}
                     data-testid="scheduled-timeline-pane"
+                    {...(pullRefreshTouchHandlers ?? {})}
                   >
                     <div
                       data-testid="scheduled-timeline-content"
                       style={scheduledTimelineContentStyle}
                     >
+                      {pullRefreshIndicator}
                       {timelineRows.map((row, index) => {
                         if (row.kind === "marker") {
                           const marker = row.marker;

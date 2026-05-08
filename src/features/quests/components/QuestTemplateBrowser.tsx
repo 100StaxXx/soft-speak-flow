@@ -135,14 +135,14 @@ export function QuestTemplateBrowser({
             variant="ghost"
             size="sm"
             onClick={onBack}
-            className="gap-1.5 px-2 text-[#fff8e8]/82 hover:bg-white/10 hover:text-white"
+            className="gap-1.5 px-2 text-muted-foreground hover:bg-card/70 hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
             Back
           </Button>
           <div className="min-w-0 text-center">
-            <p className="font-fredoka text-[1.05rem] text-[#fff8e8]">Quest shortcuts</p>
-            <p className="text-xs text-[#ffe9ba]/78">Pick one to prefill your draft</p>
+            <p className="font-fredoka text-[1.05rem] text-foreground">Quest shortcuts</p>
+            <p className="text-xs text-muted-foreground">Pick one to prefill your draft</p>
           </div>
           <div className="w-14" aria-hidden="true" />
         </div>
@@ -162,7 +162,7 @@ export function QuestTemplateBrowser({
         </Tabs>
 
         <div className="mt-3 relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7f4a1d]/72" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
@@ -284,20 +284,20 @@ function TemplateRow({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-[#4f240c]">{title}</span>
-            <Badge variant="outline" className="border-[#6b3416]/25 bg-white/55 text-[10px] text-[#7f4a1d]">
+            <span className="text-sm font-semibold text-foreground">{title}</span>
+            <Badge variant="outline" className="border-border/60 bg-secondary/45 text-[10px] text-muted-foreground">
               {metaBadge}
             </Badge>
           </div>
-          <p className="mt-1 text-xs text-[#7f4a1d]/80">{description}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{description}</p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5">
-          <Badge variant="outline" className={cn("gap-1 border shadow-[0_8px_14px_rgba(0,0,0,0.12)]", config.className)}>
+          <Badge variant="outline" className={cn("gap-1 border shadow-[0_8px_14px_hsl(var(--background)_/_0.28)]", config.className)}>
             <DifficultyIcon className="h-3 w-3" />
             {config.label}
           </Badge>
           {duration !== null && (
-            <span className="inline-flex items-center gap-1 text-[11px] text-[#7f4a1d]/80">
+            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
               <Clock3 className="h-3 w-3" />
               {formatDuration(duration)}
             </span>
@@ -319,9 +319,9 @@ function TemplateEmptyState({
 }) {
   return (
     <div className={QUEST_TEMPLATE_BROWSER_STYLES.emptyState}>
-      <Icon className="mx-auto h-10 w-10 text-[#7f4a1d]/72" />
-      <p className="mt-3 text-sm font-semibold text-[#4f240c]">{title}</p>
-      <p className="mt-1 text-xs text-[#7f4a1d]/80">{description}</p>
+      <Icon className="mx-auto h-10 w-10 text-muted-foreground" />
+      <p className="mt-3 text-sm font-semibold text-foreground">{title}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{description}</p>
     </div>
   );
 }

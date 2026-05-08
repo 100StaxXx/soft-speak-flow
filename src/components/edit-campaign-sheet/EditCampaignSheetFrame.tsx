@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { EditRitualSheet, type RitualData } from "@/components/EditRitualSheet";
 import { RescheduleDrawer } from "@/components/RescheduleDrawer";
 import { plannerPathfinderTheme } from "@/components/companion/plannerPathfinderTheme";
-import { DIFFICULTY_COLORS, type QuestFormDifficulty } from "@/components/quest-shared";
+import { DIFFICULTY_COLORS, QUEST_FORM_STYLES, type QuestFormDifficulty } from "@/components/quest-shared";
 import { HABIT_XP_REWARDS } from "@/config/xpRewards";
 import { cn } from "@/lib/utils";
 import { resolveEpicEndDate } from "@/utils/epicDates";
@@ -128,7 +128,7 @@ function CampaignRitualDifficultySelector({
 }) {
   return (
     <div className="space-y-3">
-      <Label className="text-sm font-bold text-[#5d2a0f]">
+      <Label className="text-sm font-bold text-foreground">
         Difficulty (affects XP reward)
       </Label>
       <RadioGroup value={value} onValueChange={onChange} className="grid grid-cols-3 gap-3">
@@ -145,7 +145,7 @@ function CampaignRitualDifficultySelector({
                   "flex min-h-[5.75rem] cursor-pointer flex-col items-center justify-center gap-2 rounded-[16px] border-[3px] px-2.5 py-3 text-center transition-all duration-200 ease-out active:scale-[0.98] motion-safe:hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0",
                   isSelected
                     ? DIFFICULTY_COLORS[option.value].difficultyActive
-                    : "border-[#6b3416] bg-white/60 text-[#6b3416]/82 shadow-[0_4px_0_rgba(77,40,17,0.16)] hover:bg-white/75 hover:text-[#4f240c]",
+                    : "border-border/70 bg-card/70 text-muted-foreground shadow-[0_4px_0_hsl(var(--primary)_/_0.16)] hover:bg-card hover:text-foreground",
                 )}
               >
                 <span
@@ -153,13 +153,13 @@ function CampaignRitualDifficultySelector({
                     "flex h-7 w-7 items-center justify-center rounded-full border-2",
                     isSelected
                       ? DIFFICULTY_COLORS[option.value].iconBubble
-                      : "border-[#6b3416]/35 bg-white/55 text-[#7f4a1d]/80",
+                      : "border-border/60 bg-background/45 text-muted-foreground",
                   )}
                 >
                   <Icon className="h-[1.125rem] w-[1.125rem]" />
                 </span>
                 <span className="font-semibold">{option.label}</span>
-                <span className="text-xs text-[#7f4a1d]/80">
+                <span className="text-xs text-muted-foreground">
                   +{option.xp} XP
                 </span>
               </Label>
@@ -339,25 +339,25 @@ export function EditCampaignSheetFrame({
 
           <SheetHeader className="relative z-10 px-4 pt-4 sm:px-5 sm:pt-5">
             <div className={plannerPathfinderTheme.headerBar}>
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#b04b12] shadow-[0_5px_0_rgba(77,40,17,0.45)]">
+              <div className={cn(QUEST_FORM_STYLES.heroIcon, "h-12 w-12 shrink-0 rounded-[1rem]")}>
                 <Pencil className="h-5 w-5" />
               </div>
               <div className="min-w-0 text-left">
-                <SheetTitle className="text-xl text-white">
+                <SheetTitle className="text-xl text-foreground">
                   Edit Campaign
                 </SheetTitle>
-                <SheetDescription className="text-sm text-white/[0.68]">
+                <SheetDescription className="text-sm text-muted-foreground">
                   Update campaign details, manage linked rituals, or permanently delete this campaign.
                 </SheetDescription>
               </div>
             </div>
           </SheetHeader>
 
-          <ScrollArea className="relative z-10 mx-4 mt-3 min-h-0 flex-1 rounded-[2rem] border-[4px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,248,225,0.9),rgba(255,216,128,0.82))] shadow-[0_12px_0_rgba(77,40,17,0.84)] sm:mx-5">
-            <div className="space-y-5 px-4 py-4 text-[#4f240c] sm:px-5" data-vaul-no-drag>
+          <ScrollArea className={cn("relative z-10 mx-4 mt-3 min-h-0 flex-1 rounded-[2rem] border-[4px] border-primary/45 shadow-[0_12px_0_hsl(var(--primary)_/_0.42)] sm:mx-5", QUEST_FORM_STYLES.body)}>
+            <div className="space-y-5 px-4 py-4 text-foreground sm:px-5" data-vaul-no-drag>
               <section className={cn(plannerPathfinderTheme.raisedPanel, "space-y-4 p-4")}>
                 <div className="space-y-2">
-                  <Label htmlFor="campaign-title" className="text-[#5d2a0f]">Campaign name</Label>
+                  <Label htmlFor="campaign-title" className="text-foreground">Campaign name</Label>
                   <Input
                     id="campaign-title"
                     value={title}
@@ -367,7 +367,7 @@ export function EditCampaignSheetFrame({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="campaign-description" className="text-[#5d2a0f]">Description</Label>
+                  <Label htmlFor="campaign-description" className="text-foreground">Description</Label>
                   <Textarea
                     id="campaign-description"
                     value={description}
@@ -381,10 +381,10 @@ export function EditCampaignSheetFrame({
 
               <section className={cn(plannerPathfinderTheme.mutedPanel, "space-y-3 p-4")}>
                 <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-[#8d481c]" />
+                  <Calendar className="h-4 w-4 text-primary" />
                   <h3 className="text-sm font-semibold">Timeline</h3>
                 </div>
-                <p className="text-sm text-[#7f4a1d]/80">
+                <p className="text-sm text-muted-foreground">
                   {resolvedEndDate
                     ? `Deadline: ${new Date(resolvedEndDate).toLocaleDateString()}`
                     : "No deadline is set for this campaign yet."}
@@ -414,7 +414,7 @@ export function EditCampaignSheetFrame({
               <section className={cn(plannerPathfinderTheme.raisedPanel, "space-y-4 p-4")}>
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <Repeat className="h-4 w-4 text-[#8d481c]" />
+                    <Repeat className="h-4 w-4 text-primary" />
                     <h3 className="text-sm font-semibold">Rituals</h3>
                   </div>
                   <Button
@@ -432,7 +432,7 @@ export function EditCampaignSheetFrame({
                 {showAddRitual ? (
                   <div className={cn(plannerPathfinderTheme.mutedPanel, "space-y-4 border-dashed p-4")}>
                     <div className="space-y-2">
-                      <Label htmlFor="new-ritual-title" className="text-[#5d2a0f]">Ritual name</Label>
+                      <Label htmlFor="new-ritual-title" className="text-foreground">Ritual name</Label>
                       <Input
                         id="new-ritual-title"
                         value={newRitualTitle}
@@ -482,7 +482,7 @@ export function EditCampaignSheetFrame({
                         type="button"
                         variant="ghost"
                         disabled={isAddingRitual}
-                        className="text-[#6b3416] hover:bg-white/55 hover:text-[#4f240c]"
+                        className="text-muted-foreground hover:bg-card/70 hover:text-foreground"
                         onClick={() => {
                           setShowAddRitual(false);
                           setNewRitualTitle("");
@@ -506,7 +506,7 @@ export function EditCampaignSheetFrame({
                         type="button"
                         className={cn(
                           plannerPathfinderTheme.mutedPanel,
-                          "flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-transform hover:-translate-y-0.5 hover:bg-white/75",
+                          "flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-transform hover:-translate-y-0.5 hover:bg-card",
                         )}
                         onClick={() => {
                           if (visualPreview) return;
@@ -527,27 +527,27 @@ export function EditCampaignSheetFrame({
                       >
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium">{ritual.title}</p>
-                          <p className="text-xs text-[#7f4a1d]/80">
+                          <p className="text-xs text-muted-foreground">
                             {ritual.frequency ?? "daily"}
                           </p>
                         </div>
-                        <Pencil className="h-4 w-4 shrink-0 text-[#8d481c]" />
+                        <Pencil className="h-4 w-4 shrink-0 text-primary" />
                       </button>
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-[1.5rem] border-[3px] border-dashed border-[#6b3416] bg-white/45 px-4 py-6 text-center text-sm text-[#7f4a1d]/80">
+                  <div className="rounded-[1.5rem] border-[3px] border-dashed border-border/70 bg-card/45 px-4 py-6 text-center text-sm text-muted-foreground">
                     No rituals are linked to this campaign yet.
                   </div>
                 )}
               </section>
 
-              <section className="space-y-3 rounded-[1.5rem] border-[3px] border-[#8a2716] bg-[#ffd9bf] p-4 text-[#8a2716] shadow-[0_8px_0_rgba(154,71,24,0.18)]">
+              <section className="space-y-3 rounded-[1.5rem] border-[3px] border-destructive/45 bg-destructive/10 p-4 text-destructive shadow-[0_8px_0_hsl(var(--destructive)_/_0.18)]">
                 <div className="flex items-center gap-2">
                   <Trash2 className="h-4 w-4" />
                   <h3 className="text-sm font-semibold">Danger zone</h3>
                 </div>
-                <p className="text-sm text-[#8a2716]/80">
+                <p className="text-sm text-destructive/80">
                   Permanently delete this campaign, its linked rituals, and any incomplete ritual tasks.
                 </p>
                 <Button

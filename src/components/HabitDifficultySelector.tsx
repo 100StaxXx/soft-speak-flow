@@ -24,21 +24,21 @@ const difficultyOptions: Array<{
     label: "Easy",
     xp: HABIT_XP_REWARDS.EASY,
     icon: Zap,
-    defaultIconClassName: "h-5 w-5 text-green-500",
+    defaultIconClassName: "h-5 w-5 text-primary",
   },
   {
     value: "medium",
     label: "Medium",
     xp: HABIT_XP_REWARDS.MEDIUM,
     icon: Flame,
-    defaultIconClassName: "h-5 w-5 text-orange-500",
+    defaultIconClassName: "h-5 w-5 text-accent",
   },
   {
     value: "hard",
     label: "Hard",
     xp: HABIT_XP_REWARDS.HARD,
     icon: Mountain,
-    defaultIconClassName: "h-6 w-6 text-red-500",
+    defaultIconClassName: "h-6 w-6 text-destructive",
   },
 ];
 
@@ -52,7 +52,7 @@ export const HabitDifficultySelector = ({
 
   return (
     <div className="space-y-3">
-      <Label className={cn("text-sm font-bold", isQuestSoft && "text-[#5d2a0f]")}>
+      <Label className={cn("text-sm font-bold", isQuestSoft && "text-foreground")}>
         Difficulty (affects XP reward)
       </Label>
       <RadioGroup value={value} onValueChange={onChange} className="grid grid-cols-3 gap-3">
@@ -73,7 +73,7 @@ export const HabitDifficultySelector = ({
                   isQuestSoft && (
                     isSelected
                       ? DIFFICULTY_COLORS[option.value].difficultyActive
-                      : "border-[#6b3416] bg-white/60 text-[#6b3416]/82 shadow-[0_4px_0_rgba(77,40,17,0.16)] hover:bg-white/75 hover:text-[#4f240c]"
+                      : "border-border/70 bg-card/70 text-muted-foreground shadow-[0_4px_0_hsl(var(--primary)_/_0.16)] hover:bg-card hover:text-foreground"
                   ),
                 )}
               >
@@ -85,14 +85,14 @@ export const HabitDifficultySelector = ({
                     isQuestSoft && (
                       isSelected
                         ? DIFFICULTY_COLORS[option.value].iconBubble
-                        : "border-[#6b3416]/35 bg-white/55 text-[#7f4a1d]/80"
+                        : "border-border/60 bg-background/45 text-muted-foreground"
                     ),
                   )}
                 >
                   <Icon className={isQuestSoft ? "h-[1.125rem] w-[1.125rem]" : option.defaultIconClassName} />
                 </span>
                 <span className="font-semibold">{option.label}</span>
-                <span className={cn("text-xs", isQuestSoft ? "text-[#7f4a1d]/80" : "text-muted-foreground")}>
+                <span className={cn("text-xs", isQuestSoft ? "text-muted-foreground" : "text-muted-foreground")}>
                   +{option.xp} XP
                 </span>
               </Label>

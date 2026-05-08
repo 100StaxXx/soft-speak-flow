@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { QuoteCard } from "./QuoteCard";
 import { PepTalkCard } from "./PepTalkCard";
 import { Badge } from "./ui/badge";
+import { QuestLocationLink } from "@/components/QuestLocationLink";
 import { BookOpen, MessageSquare, Sparkles, Trophy, Target } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Skeleton } from "./ui/skeleton";
@@ -113,7 +114,7 @@ export const GlobalSearch = ({
         .from('daily_tasks')
         .select('*')
         .eq('user_id', user.id)
-        .or(`task_text.ilike.%${currentQuery}%,notes.ilike.%${currentQuery}%,category.ilike.%${currentQuery}%`)
+        .or(`task_text.ilike.%${currentQuery}%,notes.ilike.%${currentQuery}%,category.ilike.%${currentQuery}%,location.ilike.%${currentQuery}%`)
         .order('task_date', { ascending: false })
         .limit(10);
 
@@ -322,6 +323,15 @@ export const GlobalSearch = ({
                                   </>
                                 )}
                               </div>
+                              {task.location ? (
+                                <QuestLocationLink
+                                  location={task.location}
+                                  label="Address"
+                                  className="mt-3 rounded-xl border-border/50 bg-muted/30 p-2"
+                                  textClassName="text-xs text-muted-foreground"
+                                  actionsClassName="mt-2"
+                                />
+                              ) : null}
                             </div>
                             <div className="flex flex-col items-end gap-1">
                               {task.is_main_quest && (
@@ -470,6 +480,15 @@ export const GlobalSearch = ({
                           </>
                         )}
                       </div>
+                      {task.location ? (
+                        <QuestLocationLink
+                          location={task.location}
+                          label="Address"
+                          className="mt-3 rounded-xl border-border/50 bg-muted/30 p-2"
+                          textClassName="text-xs text-muted-foreground"
+                          actionsClassName="mt-2"
+                        />
+                      ) : null}
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       {task.is_main_quest && (
