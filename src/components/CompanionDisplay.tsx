@@ -7,8 +7,8 @@ import { useReferrals } from "@/hooks/useReferrals";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useCompanionExpressionState } from "@/hooks/useCompanionExpressionState";
 import { useCompanionVisualState } from "@/hooks/useCompanionVisualState";
-import { useCompanionRegenerate } from "@/hooks/useCompanionRegenerate";
 import { useCompanionWakeUp } from "@/hooks/useCompanionWakeUp";
+import { useCompanionCurrentEvolutionReplay } from "@/hooks/useCompanionCurrentEvolutionReplay";
 import { useEpicRewards } from "@/hooks/useEpicRewards";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { useEvolution } from "@/contexts/EvolutionContext";
@@ -17,13 +17,13 @@ import { AttributeTooltip } from "@/components/AttributeTooltip";
 import { CompanionBadge } from "@/components/CompanionBadge";
 import { CompanionBondBadge } from "@/components/companion/CompanionBondBadge";
 import { WelcomeBackModal } from "@/components/WelcomeBackModal";
-import { CompanionRegenerateDialog } from "@/components/CompanionRegenerateDialog";
 import { EvolveButton } from "@/components/companion/EvolveButton";
 import { EvolutionPathBadge } from "@/components/companion/EvolutionPathBadge";
 import { DormancyWarning, DormantOverlay } from "@/components/companion/DormancyWarning";
 import { CompanionDialogue } from "@/components/companion/CompanionDialogue";
 import { CompanionMotionSurface } from "@/components/companion/motion/CompanionMotionSurface";
 import { WakeUpCelebration } from "@/components/companion/WakeUpCelebration";
+import { CompanionChatModal } from "@/components/companion/CompanionChatModal";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
 import { CompanionStatAnalysisSurface } from "@/components/CompanionStatAnalysisSurface";
 import { CompanionPersonalization } from "@/components/CompanionPersonalization";
@@ -35,6 +35,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/sonner";
 import { AnimatePresence } from "framer-motion";
 import { cn, formatDisplayLabel } from "@/lib/utils";
 import { deriveCompanionPalette } from "@/lib/companionPalette";
@@ -98,6 +99,12 @@ interface CompanionDisplayProps {
 const LONG_PRESS_DURATION_MS = 800;
 const MOVE_CANCEL_THRESHOLD_PX = 12;
 const COMPANION_PLACEHOLDER = "/placeholder-companion.svg";
+
+interface InlineEvolutionReplayState {
+  videoUrl: string;
+  posterUrl: string;
+  stage: number;
+}
 
 // Convert hex color to color name (moved outside component for performance)
 const getColorName = (hexColor: string): string => {
@@ -165,7 +172,6 @@ export const CompanionDisplay = memo(({
   } = useCompanion();
   const { unlockedSkins } = useReferrals();
   const { health, needsWelcomeBack } = useCompanionHealth();
-  const { regenerate, isRegenerating, maxRegenerations, generationPhase, retryCount, resetProgress } = useCompanionRegenerate();
   const { equippedRewards } = useEpicRewards();
   const { isPreHatchCompanionStep } = usePostOnboardingMentorGuidance();
   const { pendingEvolutionReveal } = useEvolution();
@@ -207,10 +213,11 @@ export const CompanionDisplay = memo(({
   const [fallbackToDefaultPortrait, setFallbackToDefaultPortrait] = useState(false);
   const [showWelcomeBack, setShowWelcomeBack] = useState(false);
   const [welcomeBackDismissed, setWelcomeBackDismissed] = useState(false);
-  const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
   const [showStatsAnalysis, setShowStatsAnalysis] = useState(false);
   const [creatureName, setCreatureName] = useState<string | null>(null);
   const [hatchDialogOpen, setHatchDialogOpen] = useState(false);
+  const [companionChatOpen, setCompanionChatOpen] = useState(false);
+  const [inlineEvolutionReplay, setInlineEvolutionReplay] = useState<InlineEvolutionReplayState | null>(null);
   const isDesktop = layoutMode === "desktop";
   const imageSizeClass = isDesktop ? "h-72 w-72" : "h-64 w-64";
   const { profile, signals } = useMotionProfile();
@@ -220,9 +227,8 @@ export const CompanionDisplay = memo(({
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const touchStartPoint = useRef<{ x: number; y: number } | null>(null);
   const previousImageUrl = useRef<string | null>(null);
+  const inlineReplayPosterUrlRef = useRef(COMPANION_PLACEHOLDER);
   const wasVisible = useRef(isVisible);
-  const regenerationsUsed = companion?.image_regenerations_used ?? 0;
-  const regenerationsRemaining = Math.max(0, maxRegenerations - regenerationsUsed);
   const matchingPendingEvolutionReveal = useMemo(
     () => (
       companion &&
@@ -266,11 +272,54 @@ export const CompanionDisplay = memo(({
     && !isAiGeneratedCompanion(displayCompanion)
     && !hasCompanionStoredVisual(displayCompanion),
   );
+  const {
+    data: currentEvolutionReplay,
+    refetch: refetchCurrentEvolutionReplay,
+  } = useCompanionCurrentEvolutionReplay({
+    companion: displayCompanion,
+    enabled: Boolean(displayCompanion),
+  });
+
+  const openCompanionChat = useCallback(() => {
+    setCompanionChatOpen(true);
+  }, []);
+
+  const finishInlineEvolutionReplay = useCallback(() => {
+    setInlineEvolutionReplay(null);
+    openCompanionChat();
+  }, [openCompanionChat]);
+
+  const handleCompanionImageHoldAction = useCallback(async () => {
+    if (!displayCompanion || inlineEvolutionReplay) return;
+
+    const replay =
+      currentEvolutionReplay ??
+      (await refetchCurrentEvolutionReplay()).data ??
+      null;
+
+    if (replay?.videoUrl) {
+      setInlineEvolutionReplay({
+        videoUrl: replay.videoUrl,
+        posterUrl: replay.imageUrl ?? inlineReplayPosterUrlRef.current,
+        stage: replay.stage,
+      });
+      return;
+    }
+
+    toast.info("No evolution replay yet.");
+    openCompanionChat();
+  }, [
+    currentEvolutionReplay,
+    displayCompanion,
+    inlineEvolutionReplay,
+    openCompanionChat,
+    refetchCurrentEvolutionReplay,
+  ]);
 
   const handlePressStart = useCallback((
     event: ReactMouseEvent<HTMLDivElement> | ReactTouchEvent<HTMLDivElement>,
   ) => {
-    if (!displayCompanion || isRegenerating || regenerationsRemaining <= 0) return;
+    if (!displayCompanion || inlineEvolutionReplay) return;
 
     if ("touches" in event && event.touches[0]) {
       const touch = event.touches[0];
@@ -280,10 +329,10 @@ export const CompanionDisplay = memo(({
     }
 
     longPressTimer.current = setTimeout(() => {
-      resetProgress();
-      setShowRegenerateDialog(true);
+      longPressTimer.current = null;
+      void handleCompanionImageHoldAction();
     }, LONG_PRESS_DURATION_MS);
-  }, [displayCompanion, isRegenerating, regenerationsRemaining, resetProgress]);
+  }, [displayCompanion, handleCompanionImageHoldAction, inlineEvolutionReplay]);
 
   const handlePressEnd = useCallback(() => {
     if (longPressTimer.current) {
@@ -311,29 +360,9 @@ export const CompanionDisplay = memo(({
     if (event.key !== "Enter" && event.key !== " ") return;
 
     event.preventDefault();
-    if (!displayCompanion || isRegenerating || regenerationsRemaining <= 0) return;
-    setShowRegenerateDialog(true);
-  }, [displayCompanion, isRegenerating, regenerationsRemaining]);
-
-  const handleRegenerateConfirm = useCallback(() => {
-    if (!companion) return;
-
-    regenerate({
-      id: companion.id,
-      spirit_animal: companion.spirit_animal,
-      core_element: companion.core_element,
-      favorite_color: companion.favorite_color,
-      current_stage: companion.current_stage,
-      eye_color: companion.eye_color,
-      fur_color: companion.fur_color,
-    });
-  }, [companion, regenerate]);
-
-  const handleRegenerateDialogClose = useCallback(() => {
-    if (isRegenerating) return;
-    setShowRegenerateDialog(false);
-    resetProgress();
-  }, [isRegenerating, resetProgress]);
+    if (!displayCompanion || inlineEvolutionReplay) return;
+    void handleCompanionImageHoldAction();
+  }, [displayCompanion, handleCompanionImageHoldAction, inlineEvolutionReplay]);
 
   // Get equipped skin and calculate styles
   const equippedSkin = useMemo(() => {
@@ -523,6 +552,10 @@ export const CompanionDisplay = memo(({
   }, [effectiveImageUrl]);
 
   useEffect(() => {
+    inlineReplayPosterUrlRef.current = effectiveImageUrl;
+  }, [effectiveImageUrl]);
+
+  useEffect(() => {
     const becameVisible = isVisible && !wasVisible.current;
     wasVisible.current = isVisible;
 
@@ -673,7 +706,7 @@ export const CompanionDisplay = memo(({
   const shouldAnimateIdleDrift = !prefersReducedMotion
     && imageLoaded
     && !imageError
-    && !isRegenerating
+    && !inlineEvolutionReplay
     && !isDormant
     && !health.isNeglected
     && expressionState.mood === "calm";
@@ -845,7 +878,7 @@ export const CompanionDisplay = memo(({
               className="relative select-none focus-visible:ring-2 focus-visible:ring-primary/70 rounded-2xl outline-none"
               role="button"
               tabIndex={0}
-              aria-label={`Press and hold to refresh your companion's look. ${regenerationsRemaining} look refresh${regenerationsRemaining === 1 ? "" : "es"} remaining.`}
+              aria-label="Press and hold to replay your companion's latest evolution, then open companion chat."
               onMouseDown={handlePressStart}
               onMouseUp={handlePressEnd}
               onMouseLeave={handlePressEnd}
@@ -860,7 +893,7 @@ export const CompanionDisplay = memo(({
               <div className={`absolute inset-0 bg-gradient-to-br from-nebula-pink/30 to-celestial-blue/30 rounded-2xl blur-xl ${!prefersReducedMotion ? 'animate-pulse' : ''}`} aria-hidden="true" />
               <div
                 className={cn(
-                  "relative",
+                  "relative overflow-hidden rounded-2xl",
                   imageSizeClass,
                   shouldAnimateIdleDrift && "animate-companion-idle-drift",
                 )}
@@ -924,7 +957,6 @@ export const CompanionDisplay = memo(({
                           "h-full w-full rounded-2xl ring-4 shadow-2xl transition-all duration-500 group-hover:scale-105",
                           imageLoaded ? "opacity-100" : "opacity-0 absolute inset-0",
                           health.isNeglected ? "ring-destructive/50" : "ring-primary/30",
-                          isRegenerating && "animate-pulse",
                           activePortraitAnimationClass,
                         )}
                       >
@@ -969,7 +1001,6 @@ export const CompanionDisplay = memo(({
                           "relative h-full w-full rounded-2xl shadow-2xl ring-4 transition-all duration-500 group-hover:scale-105",
                           imageLoaded ? "opacity-100" : "opacity-0 absolute",
                           health.isNeglected ? "ring-destructive/50" : "ring-primary/30",
-                          isRegenerating && "animate-pulse",
                           activePortraitAnimationClass,
                         )}
                         style={{ ...skinStyles, ...careStyles, ...equippedCosmeticStyles }}
@@ -991,17 +1022,40 @@ export const CompanionDisplay = memo(({
                     )}
                   </>
                 </CompanionMotionSurface>
-              </div>
-              {isRegenerating && (
-                <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-background/50 backdrop-blur-sm" role="status" aria-live="polite" aria-label="Refreshing companion look">
-                  <div className="rounded-full border border-primary/35 bg-card/80 px-4 py-2 text-xs font-medium text-foreground shadow-lg">
-                    <span className="inline-flex items-center gap-2">
-                      <Sparkles className="h-3.5 w-3.5 animate-spin text-primary" aria-hidden="true" />
-                      Refreshing look...
-                    </span>
+                {inlineEvolutionReplay ? (
+                  <div
+                    className="absolute inset-0 z-30 overflow-hidden rounded-2xl bg-black shadow-2xl ring-4 ring-primary/30"
+                    data-testid="companion-inline-evolution-replay"
+                  >
+                    <video
+                      src={inlineEvolutionReplay.videoUrl}
+                      poster={inlineEvolutionReplay.posterUrl}
+                      className="h-full w-full rounded-2xl bg-black object-contain"
+                      autoPlay
+                      muted
+                      playsInline
+                      data-testid="companion-inline-evolution-video"
+                      aria-label={`Stage ${inlineEvolutionReplay.stage} evolution replay`}
+                      onEnded={finishInlineEvolutionReplay}
+                      onError={finishInlineEvolutionReplay}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="absolute right-3 top-3 h-8 rounded-full border-white/20 bg-black/45 px-3 text-xs text-white backdrop-blur-md hover:bg-black/60"
+                      onMouseDown={(event) => event.stopPropagation()}
+                      onTouchStart={(event) => event.stopPropagation()}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        finishInlineEvolutionReplay();
+                      }}
+                    >
+                      Skip
+                    </Button>
                   </div>
-                </div>
-              )}
+                ) : null}
+              </div>
               {/* Dormancy warning component */}
               <DormancyWarning 
                 show={hasDormancyWarning && !isDormant}
@@ -1147,16 +1201,6 @@ export const CompanionDisplay = memo(({
         bondLevel={wakeUpBondLevel}
       />
 
-      <CompanionRegenerateDialog
-        isOpen={showRegenerateDialog}
-        onClose={handleRegenerateDialogClose}
-        onConfirm={handleRegenerateConfirm}
-        isRegenerating={isRegenerating}
-        regenerationsRemaining={regenerationsRemaining}
-        generationPhase={generationPhase}
-        retryCount={retryCount}
-      />
-
       {showStatsAnalysis ? (
         <CompanionStatAnalysisSurface
           open={showStatsAnalysis}
@@ -1164,6 +1208,12 @@ export const CompanionDisplay = memo(({
           layoutMode={layoutMode}
         />
       ) : null}
+
+      <CompanionChatModal
+        open={companionChatOpen}
+        onOpenChange={setCompanionChatOpen}
+        layoutMode={layoutMode}
+      />
 
       <Dialog open={hatchDialogOpen} onOpenChange={setHatchDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">

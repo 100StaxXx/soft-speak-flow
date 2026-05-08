@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -37,6 +37,13 @@ const mocks = vi.hoisted(() => ({
   },
   resetProgress: vi.fn(),
   regenerate: vi.fn(),
+  toastInfo: vi.fn(),
+  currentEvolutionReplay: null as null | {
+    stage: number;
+    videoUrl: string;
+    imageUrl: string | null;
+  },
+  refetchCurrentEvolutionReplay: vi.fn(),
   triggerManualEvolution: vi.fn(),
   hatchCompanion: {
     mutateAsync: vi.fn(),
@@ -135,6 +142,19 @@ vi.mock("@/hooks/useCompanionRegenerate", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useCompanionCurrentEvolutionReplay", () => ({
+  useCompanionCurrentEvolutionReplay: () => ({
+    data: mocks.currentEvolutionReplay,
+    refetch: mocks.refetchCurrentEvolutionReplay,
+  }),
+}));
+
+vi.mock("@/components/ui/sonner", () => ({
+  toast: {
+    info: mocks.toastInfo,
+  },
+}));
+
 vi.mock("@/hooks/useCompanionWakeUp", () => ({
   useCompanionWakeUp: () => ({
     showCelebration: false,
@@ -227,6 +247,11 @@ vi.mock("@/components/WelcomeBackModal", () => ({
 
 vi.mock("@/components/CompanionRegenerateDialog", () => ({
   CompanionRegenerateDialog: () => null,
+}));
+
+vi.mock("@/components/companion/CompanionChatModal", () => ({
+  CompanionChatModal: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="companion-chat-modal">Companion Chat</div> : null,
 }));
 
 vi.mock("@/components/ui/dialog", () => ({
@@ -327,6 +352,10 @@ describe("CompanionDisplay overlay stack", () => {
     window.history.pushState({}, "", "/companion");
     mocks.resetProgress.mockClear();
     mocks.regenerate.mockClear();
+    mocks.toastInfo.mockClear();
+    mocks.currentEvolutionReplay = null;
+    mocks.refetchCurrentEvolutionReplay.mockReset();
+    mocks.refetchCurrentEvolutionReplay.mockResolvedValue({ data: null });
     mocks.triggerManualEvolution.mockClear();
     mocks.hatchCompanion.mutateAsync.mockClear();
     mocks.canEvolve = false;
@@ -370,10 +399,11 @@ describe("CompanionDisplay overlay stack", () => {
 
   afterEach(() => {
     window.history.pushState({}, "", "/");
+    vi.useRealTimers();
     vi.clearAllMocks();
   });
 
-  it("keeps backdrop and foreground motion planes active alongside regeneration and dormant overlays", async () => {
+  it("keeps backdrop and foreground motion planes active alongside dormant overlays", async () => {
     render(<CompanionDisplay />);
 
     const surface = screen.getByTestId("companion-motion-surface");
@@ -395,7 +425,7 @@ describe("CompanionDisplay overlay stack", () => {
     expect(surface.querySelector('[data-motion-plane="foreground"]')).not.toBeNull();
     expect(surface.querySelector('[data-overlay-layer="event-beam"]')).not.toBeNull();
 
-    expect(screen.getByLabelText("Refreshing companion look")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Refreshing companion look")).not.toBeInTheDocument();
     expect(screen.getByText("Dormant")).toBeInTheDocument();
     expect(
       screen.getByText("Your companion has fallen into a deep sleep"),
@@ -475,6 +505,114 @@ describe("CompanionDisplay overlay stack", () => {
     });
 
     expect(shell).toHaveClass("animate-companion-idle-drift");
+  });
+
+  it("long-presses the companion image to replay the latest evolution inside the image shell", async () => {
+    mocks.isRegenerating = false;
+    mocks.isDormant = false;
+    mocks.currentEvolutionReplay = {
+      stage: 5,
+      videoUrl: "https://example.com/stage-5.mp4",
+      imageUrl: "https://example.com/stage-5.png",
+    };
+
+    render(<CompanionDisplay />);
+    await screen.findByText("Nova");
+
+    const trigger = screen.getByRole("button", {
+      name: /replay your companion's latest evolution/i,
+    });
+    const shell = screen.getByTestId("companion-image-shell");
+
+    vi.useFakeTimers();
+    fireEvent.mouseDown(trigger);
+    act(() => {
+      vi.advanceTimersByTime(800);
+    });
+    vi.useRealTimers();
+
+    const replay = within(shell).getByTestId("companion-inline-evolution-replay");
+    const video = within(shell).getByTestId("companion-inline-evolution-video");
+
+    expect(replay).toBeInTheDocument();
+    expect(video).toHaveAttribute("src", "https://example.com/stage-5.mp4");
+    expect(video).toHaveAttribute("poster", "https://example.com/stage-5.png");
+    expect(video).toHaveAttribute("autoplay");
+    expect(video).toHaveAttribute("playsinline");
+    expect(screen.queryByTestId("companion-chat-modal")).not.toBeInTheDocument();
+  });
+
+  it("opens companion chat after the in-frame evolution replay ends and restores the image", async () => {
+    mocks.isRegenerating = false;
+    mocks.isDormant = false;
+    mocks.currentEvolutionReplay = {
+      stage: 5,
+      videoUrl: "https://example.com/stage-5.mp4",
+      imageUrl: "https://example.com/stage-5.png",
+    };
+
+    render(<CompanionDisplay />);
+    await screen.findByText("Nova");
+
+    fireEvent.keyDown(
+      screen.getByRole("button", {
+        name: /replay your companion's latest evolution/i,
+      }),
+      { key: "Enter" },
+    );
+
+    const video = await screen.findByTestId("companion-inline-evolution-video");
+    fireEvent.ended(video);
+
+    expect(await screen.findByTestId("companion-chat-modal")).toBeInTheDocument();
+    expect(screen.queryByTestId("companion-inline-evolution-video")).not.toBeInTheDocument();
+    expect(screen.getByAltText(/companion at level 8/i)).toBeInTheDocument();
+  });
+
+  it("opens companion chat if the in-frame evolution video cannot play", async () => {
+    mocks.isRegenerating = false;
+    mocks.isDormant = false;
+    mocks.currentEvolutionReplay = {
+      stage: 5,
+      videoUrl: "https://example.com/broken-stage-5.mp4",
+      imageUrl: "https://example.com/stage-5.png",
+    };
+
+    render(<CompanionDisplay />);
+    await screen.findByText("Nova");
+
+    fireEvent.keyDown(
+      screen.getByRole("button", {
+        name: /replay your companion's latest evolution/i,
+      }),
+      { key: "Enter" },
+    );
+
+    fireEvent.error(await screen.findByTestId("companion-inline-evolution-video"));
+
+    expect(await screen.findByTestId("companion-chat-modal")).toBeInTheDocument();
+    expect(screen.queryByTestId("companion-inline-evolution-video")).not.toBeInTheDocument();
+  });
+
+  it("opens companion chat immediately when no current-stage replay exists", async () => {
+    mocks.isRegenerating = false;
+    mocks.isDormant = false;
+    mocks.currentEvolutionReplay = null;
+    mocks.refetchCurrentEvolutionReplay.mockResolvedValue({ data: null });
+
+    render(<CompanionDisplay />);
+    await screen.findByText("Nova");
+
+    fireEvent.keyDown(
+      screen.getByRole("button", {
+        name: /replay your companion's latest evolution/i,
+      }),
+      { key: " " },
+    );
+
+    expect(await screen.findByTestId("companion-chat-modal")).toBeInTheDocument();
+    expect(mocks.toastInfo).toHaveBeenCalledWith("No evolution replay yet.");
+    expect(screen.queryByTestId("companion-inline-evolution-video")).not.toBeInTheDocument();
   });
 
   it("remounts the companion art when a hidden overview tab becomes visible again", async () => {
