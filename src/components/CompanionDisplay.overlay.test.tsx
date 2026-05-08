@@ -552,7 +552,7 @@ describe("CompanionDisplay overlay stack", () => {
     };
 
     render(<CompanionDisplay />);
-    await screen.findByText("Nova");
+    await screen.findByText("Stage 0 • Egg");
 
     fireEvent.keyDown(
       screen.getByRole("button", {
@@ -608,6 +608,34 @@ describe("CompanionDisplay overlay stack", () => {
         name: /replay your companion's latest evolution/i,
       }),
       { key: " " },
+    );
+
+    expect(await screen.findByTestId("companion-chat-modal")).toBeInTheDocument();
+    expect(mocks.toastInfo).toHaveBeenCalledWith("No evolution replay yet.");
+    expect(screen.queryByTestId("companion-inline-evolution-video")).not.toBeInTheDocument();
+  });
+
+  it("opens companion chat immediately for stage 0 eggs without rendering a replay", async () => {
+    mocks.isRegenerating = false;
+    mocks.isDormant = false;
+    mocks.currentEvolutionReplay = null;
+    mocks.refetchCurrentEvolutionReplay.mockResolvedValue({ data: null });
+    mocks.companion = {
+      ...mocks.companion,
+      current_xp: 0,
+      current_stage: 0,
+      current_image_url: "/companion-eggs/v2/egg__t0_egg__normal__fire.webp",
+      initial_image_url: "/companion-eggs/v2/egg__t0_egg__normal__fire.webp",
+    };
+
+    render(<CompanionDisplay />);
+    await screen.findByText("Nova");
+
+    fireEvent.keyDown(
+      screen.getByRole("button", {
+        name: /replay your companion's latest evolution/i,
+      }),
+      { key: "Enter" },
     );
 
     expect(await screen.findByTestId("companion-chat-modal")).toBeInTheDocument();

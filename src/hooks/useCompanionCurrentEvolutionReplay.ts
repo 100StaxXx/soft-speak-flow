@@ -75,7 +75,7 @@ export const fetchLatestCompanionEvolutionReplay = async ({
     .eq("companion_id", companionId)
     .eq("stage", stage)
     .eq("animation_status", "succeeded")
-    .order("animation_completed_at", { ascending: false })
+    .order("animation_completed_at", { ascending: false, nullsFirst: false })
     .order("evolved_at", { ascending: false })
     .limit(EVOLUTION_REPLAY_QUERY_LIMIT);
 
@@ -111,7 +111,7 @@ export const fetchLatestCompanionEvolutionReplay = async ({
     .eq("companion_id", companionId)
     .eq("stage", stage)
     .eq("status", "succeeded")
-    .order("completed_at", { ascending: false })
+    .order("completed_at", { ascending: false, nullsFirst: false })
     .order("requested_at", { ascending: false })
     .limit(EVOLUTION_REPLAY_QUERY_LIMIT);
 

@@ -5,6 +5,11 @@ const mocks = vi.hoisted(() => ({
   jobs: [] as Array<Record<string, unknown>>,
   jobError: null as null | { message: string; code?: string },
   filters: [] as Array<{ table: string; column: string; value: unknown }>,
+  orders: [] as Array<{
+    table: string;
+    column: string;
+    options: Record<string, unknown> | undefined;
+  }>,
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -16,7 +21,10 @@ vi.mock("@/integrations/supabase/client", () => ({
           mocks.filters.push({ table, column, value });
           return chain;
         },
-        order: () => chain,
+        order: (column: string, options?: Record<string, unknown>) => {
+          mocks.orders.push({ table, column, options });
+          return chain;
+        },
         limit: async () => {
           if (table === "companion_evolutions") {
             return { data: mocks.evolutions, error: null };
@@ -43,6 +51,7 @@ describe("useCompanionCurrentEvolutionReplay helpers", () => {
     mocks.jobs = [];
     mocks.jobError = null;
     mocks.filters = [];
+    mocks.orders = [];
   });
 
   it("resolves the current visual boundary stage and ignores eggs", () => {
@@ -96,6 +105,15 @@ describe("useCompanionCurrentEvolutionReplay helpers", () => {
         { table: "companion_evolutions", column: "animation_status", value: "succeeded" },
       ]),
     );
+    expect(mocks.orders).toEqual(
+      expect.arrayContaining([
+        {
+          table: "companion_evolutions",
+          column: "animation_completed_at",
+          options: { ascending: false, nullsFirst: false },
+        },
+      ]),
+    );
   });
 
   it("falls back to a succeeded animation job when the evolution row has no video", async () => {
@@ -135,6 +153,15 @@ describe("useCompanionCurrentEvolutionReplay helpers", () => {
       source: "job",
       evolutionId: "evo-5",
     });
+    expect(mocks.orders).toEqual(
+      expect.arrayContaining([
+        {
+          table: "companion_animation_jobs",
+          column: "completed_at",
+          options: { ascending: false, nullsFirst: false },
+        },
+      ]),
+    );
   });
 
   it("returns null when no playable replay exists", async () => {
