@@ -35,7 +35,7 @@ export function openQuestLocation(
   if (!url) return false;
 
   const openUrl = options?.openUrl ?? ((targetUrl: string) => {
-    if (isNativeIOS()) {
+    if (isNativeIOS() && provider === "apple") {
       window.location.href = targetUrl;
       return;
     }

@@ -14,6 +14,7 @@ import { BookOpen, MessageSquare, Sparkles, Trophy, Target } from "lucide-react"
 import { useNavigate } from "react-router-dom";
 import { Skeleton } from "./ui/skeleton";
 import { formatDisplayLabel } from "@/lib/utils";
+import { buildPostgrestIlikeOr } from "@/utils/postgrestSearchFilters";
 
 interface GlobalSearchProps {
   initialQuery?: string;
@@ -44,6 +45,11 @@ export const GlobalSearch = ({
   const currentQuery = isControlled ? searchQuery : internalQuery;
   const navigate = useNavigate();
   const { user } = useAuth();
+  const quoteSearchFilter = buildPostgrestIlikeOr(["text", "author"], currentQuery);
+  const pepTalkSearchFilter = buildPostgrestIlikeOr(["title", "description", "quote"], currentQuery);
+  const challengeSearchFilter = buildPostgrestIlikeOr(["title", "description"], currentQuery);
+  const taskSearchFilter = buildPostgrestIlikeOr(["task_text", "notes", "category", "location"], currentQuery);
+  const epicSearchFilter = buildPostgrestIlikeOr(["title", "description"], currentQuery);
 
   useEffect(() => {
     if (!isControlled) {
@@ -65,7 +71,7 @@ export const GlobalSearch = ({
       const { data, error } = await supabase
         .from("quotes")
         .select("*")
-        .or(`text.ilike.%${currentQuery}%,author.ilike.%${currentQuery}%`)
+        .or(quoteSearchFilter)
         .limit(10);
 
       if (error) throw error;
@@ -80,7 +86,7 @@ export const GlobalSearch = ({
       const { data, error } = await supabase
         .from("pep_talks")
         .select("*")
-        .or(`title.ilike.%${currentQuery}%,description.ilike.%${currentQuery}%,quote.ilike.%${currentQuery}%`)
+        .or(pepTalkSearchFilter)
         .limit(10);
 
       if (error) throw error;
@@ -95,7 +101,7 @@ export const GlobalSearch = ({
       const { data, error } = await supabase
         .from("challenges")
         .select("*")
-        .or(`title.ilike.%${currentQuery}%,description.ilike.%${currentQuery}%`)
+        .or(challengeSearchFilter)
         .limit(10);
 
       if (error) throw error;
@@ -114,7 +120,7 @@ export const GlobalSearch = ({
         .from('daily_tasks')
         .select('*')
         .eq('user_id', user.id)
-        .or(`task_text.ilike.%${currentQuery}%,notes.ilike.%${currentQuery}%,category.ilike.%${currentQuery}%,location.ilike.%${currentQuery}%`)
+        .or(taskSearchFilter)
         .order('task_date', { ascending: false })
         .limit(10);
 
@@ -135,7 +141,7 @@ export const GlobalSearch = ({
         .from('epics')
         .select('id, title, description, target_days, status, epic_members(user_id)')
         .or(`user_id.eq.${user.id},epic_members.user_id.eq.${user.id}`)
-        .or(`title.ilike.%${currentQuery}%,description.ilike.%${currentQuery}%`)
+        .or(epicSearchFilter)
         .order('created_at', { ascending: false })
         .limit(10);
 

@@ -541,6 +541,7 @@ export function EditQuestDialog({
                 location={location}
                 onLocationChange={setLocation}
                 selectedDate={parsedTaskDate ?? new Date()}
+                reminderDate={parsedTaskDate}
                 hideScheduledTime
                 hideDuration
                 hideMoreInformation
@@ -667,6 +668,7 @@ export function EditQuestDialog({
                     location={location}
                     onLocationChange={setLocation}
                     selectedDate={parsedTaskDate ?? new Date()}
+                    reminderDate={parsedTaskDate}
                     hideScheduledTime
                     hideDuration
                     hideMoreInformation

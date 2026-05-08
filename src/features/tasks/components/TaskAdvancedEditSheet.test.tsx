@@ -16,8 +16,8 @@ vi.mock('@/components/QuestAttachmentPicker', () => ({
   QuestAttachmentPicker: () => <div data-testid="quest-attachment-picker" />,
 }));
 
-function renderSheet(onSave = vi.fn()) {
-  const parsed = parseNaturalLanguage('Write report tomorrow at 9am');
+function renderSheet(onSave = vi.fn(), text = 'Write report tomorrow at 9am') {
+  const parsed = parseNaturalLanguage(text);
 
   render(
     <TaskAdvancedEditSheet
@@ -45,9 +45,30 @@ describe('TaskAdvancedEditSheet reminders', () => {
     expect(screen.getByRole('button', { name: 'Custom' })).toBeInTheDocument();
   });
 
-  it('saves custom quest reminder minutes as normalized offsets', async () => {
+  it('saves custom quest reminder date and time as normalized offsets', async () => {
     const onSave = vi.fn();
     renderSheet(onSave);
+
+    fireEvent.click(screen.getByRole('switch'));
+    fireEvent.click(screen.getByRole('button', { name: '15 minutes before' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Custom' }));
+    expect(screen.getByText('Custom reminder date')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Custom reminder time'), { target: { value: '07:30' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+        reminderEnabled: true,
+        reminderMinutesBefore: 90,
+        reminderOffsetsMinutes: [90],
+      }));
+    });
+  });
+
+  it('keeps custom reminder minutes as a fallback without a concrete quest date', async () => {
+    const onSave = vi.fn();
+    renderSheet(onSave, 'Write report');
 
     fireEvent.click(screen.getByRole('switch'));
     fireEvent.click(screen.getByRole('button', { name: '15 minutes before' }));

@@ -1065,6 +1065,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   location={location}
                   onLocationChange={setLocation}
                   selectedDate={dateObj}
+                  reminderDate={taskDate ? dateObj : null}
                   taskDifficulty={difficulty}
                   hideScheduledTime
                   hideDuration
@@ -1148,6 +1149,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   location={location}
                   onLocationChange={setLocation}
                   selectedDate={dateObj}
+                  reminderDate={taskDate ? dateObj : null}
                   taskDifficulty={difficulty}
                   hideScheduledTime
                   hideDuration
@@ -1209,6 +1211,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                       location={location}
                       onLocationChange={setLocation}
                       selectedDate={dateObj}
+                      reminderDate={taskDate ? dateObj : null}
                       taskDifficulty={difficulty}
                       hideScheduledTime
                       hideDuration

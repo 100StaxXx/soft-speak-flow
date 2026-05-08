@@ -37,6 +37,8 @@ import {
   formatQuestReminderOffset,
   getPrimaryQuestReminderOffset,
   normalizeQuestReminderOffsets,
+  parseQuestReminderDateTime,
+  resolveCustomQuestReminderOffset,
 } from '@/utils/questReminders';
 
 interface TaskAdvancedEditSheetProps {
@@ -110,6 +112,9 @@ export function TaskAdvancedEditSheet({
   const [reminderMinutes, setReminderMinutes] = useState(getPrimaryQuestReminderOffset(initialReminderOffsets));
   const [reminderOffsetsMinutes, setReminderOffsetsMinutes] = useState<number[]>(initialReminderOffsets);
   const [customReminderInput, setCustomReminderInput] = useState('');
+  const [customReminderDate, setCustomReminderDate] = useState<Date | undefined>();
+  const [customReminderTime, setCustomReminderTime] = useState('');
+  const [customReminderError, setCustomReminderError] = useState<string | null>(null);
   const [showCustomReminderInput, setShowCustomReminderInput] = useState(false);
   const [recurrencePattern, setRecurrencePattern] = useState(parsed.recurrencePattern || '');
   const [recurrenceDays, setRecurrenceDays] = useState<number[]>(() => {
@@ -162,6 +167,23 @@ export function TaskAdvancedEditSheet({
     : formatQuestReminderOffset(activeReminderOffsets[0] ?? reminderMinutes);
   const selectedReminderOffsets = new Set(activeReminderOffsets);
   const hasCustomReminderOffset = activeReminderOffsets.some((offset) => !REMINDER_PRESET_VALUES.has(offset));
+  const customReminderQuestStart = parseQuestReminderDateTime(scheduledDate, scheduledTime);
+  const usesCustomReminderDateTime = Boolean(customReminderQuestStart);
+  const customReminderOffsetCandidate = usesCustomReminderDateTime
+    ? resolveCustomQuestReminderOffset({
+      questDate: scheduledDate,
+      questTime: scheduledTime,
+      reminderDate: customReminderDate,
+      reminderTime: customReminderTime,
+    })
+    : null;
+  const parsedCustomReminderInput = Number.parseInt(customReminderInput, 10);
+  const customReminderApplyDisabled = usesCustomReminderDateTime
+    ? !customReminderOffsetCandidate
+    : !customReminderInput.trim()
+      || !Number.isFinite(parsedCustomReminderInput)
+      || parsedCustomReminderInput <= 0
+      || parsedCustomReminderInput > MAX_QUEST_REMINDER_MINUTES;
 
   const getReferenceDate = () => {
     if (scheduledDate) {
@@ -257,6 +279,7 @@ export function TaskAdvancedEditSheet({
       setReminderEnabled(false);
       setShowReminderPicker(false);
       setShowCustomReminderInput(false);
+      setCustomReminderError(null);
       return;
     }
 
@@ -267,9 +290,31 @@ export function TaskAdvancedEditSheet({
     applyReminderOffsets([minutes]);
     setShowReminderPicker(false);
     setShowCustomReminderInput(false);
+    setCustomReminderError(null);
+  };
+
+  const seedCustomReminderDateTime = () => {
+    if (!customReminderQuestStart) return;
+    const reminderAt = new Date(customReminderQuestStart.getTime() - 60 * 60_000);
+    setCustomReminderDate(reminderAt);
+    setCustomReminderTime(format(reminderAt, 'HH:mm'));
+    setCustomReminderError(null);
   };
 
   const applyCustomReminder = () => {
+    if (usesCustomReminderDateTime) {
+      if (!customReminderOffsetCandidate) {
+        setCustomReminderError('Choose a reminder before the quest starts, up to 1 week before.');
+        return;
+      }
+
+      applyReminderOffsets([customReminderOffsetCandidate]);
+      setCustomReminderError(null);
+      setShowReminderPicker(false);
+      setShowCustomReminderInput(false);
+      return;
+    }
+
     const minutes = Number.parseInt(customReminderInput, 10);
     if (!Number.isFinite(minutes) || minutes < 1 || minutes > MAX_QUEST_REMINDER_MINUTES) return;
 
@@ -487,46 +532,97 @@ export function TaskAdvancedEditSheet({
                         "w-full text-left px-3 py-2 text-sm hover:bg-muted rounded-md",
                         (showCustomReminderInput || hasCustomReminderOffset) && "bg-primary/10 text-primary"
                       )}
-                      onClick={() => setShowCustomReminderInput((current) => !current)}
+                      onClick={() => setShowCustomReminderInput((current) => {
+                        const next = !current;
+                        if (next && usesCustomReminderDateTime) {
+                          seedCustomReminderDateTime();
+                        }
+                        if (!next) {
+                          setCustomReminderError(null);
+                        }
+                        return next;
+                      })}
                     >
                       Custom
                     </button>
                     {showCustomReminderInput && (
                       <div className="space-y-2 border-t border-border/60 px-2 py-3">
-                        <Label htmlFor="task-custom-reminder-minutes" className="text-xs text-muted-foreground">
-                          Minutes before
-                        </Label>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            id="task-custom-reminder-minutes"
-                            type="number"
-                            min={1}
-                            max={MAX_QUEST_REMINDER_MINUTES}
-                            inputMode="numeric"
-                            value={customReminderInput}
-                            onChange={(event) => setCustomReminderInput(event.target.value)}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter') {
-                                event.preventDefault();
-                                applyCustomReminder();
-                              }
-                            }}
-                            placeholder="e.g. 180"
-                            className="h-9 text-sm"
-                          />
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={applyCustomReminder}
-                            disabled={
-                              !customReminderInput.trim()
-                              || Number.parseInt(customReminderInput, 10) <= 0
-                              || Number.parseInt(customReminderInput, 10) > MAX_QUEST_REMINDER_MINUTES
-                            }
-                          >
-                            Apply
-                          </Button>
-                        </div>
+                        {usesCustomReminderDateTime ? (
+                          <div className="space-y-3">
+                            <Label className="text-xs text-muted-foreground">
+                              Custom reminder date
+                            </Label>
+                            <Calendar
+                              mode="single"
+                              selected={customReminderDate}
+                              onSelect={(date) => {
+                                setCustomReminderDate(date);
+                                setCustomReminderError(null);
+                              }}
+                              className="pointer-events-auto rounded-md border"
+                            />
+                            <div className="space-y-1.5">
+                              <Label htmlFor="task-custom-reminder-time" className="text-xs text-muted-foreground">
+                                Custom reminder time
+                              </Label>
+                              <Input
+                                id="task-custom-reminder-time"
+                                type="time"
+                                value={customReminderTime}
+                                onChange={(event) => {
+                                  setCustomReminderTime(event.target.value);
+                                  setCustomReminderError(null);
+                                }}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter') {
+                                    event.preventDefault();
+                                    applyCustomReminder();
+                                  }
+                                }}
+                                className="h-9 text-sm"
+                              />
+                            </div>
+                            {customReminderError ? (
+                              <p className="text-xs text-destructive">{customReminderError}</p>
+                            ) : (
+                              <p className="text-xs text-muted-foreground">
+                                Pick a time before the quest starts.
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            <Label htmlFor="task-custom-reminder-minutes" className="text-xs text-muted-foreground">
+                              Minutes before
+                            </Label>
+                            <Input
+                              id="task-custom-reminder-minutes"
+                              type="number"
+                              min={1}
+                              max={MAX_QUEST_REMINDER_MINUTES}
+                              inputMode="numeric"
+                              value={customReminderInput}
+                              onChange={(event) => setCustomReminderInput(event.target.value)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter') {
+                                  event.preventDefault();
+                                  applyCustomReminder();
+                                }
+                              }}
+                              placeholder="e.g. 180"
+                              className="h-9 text-sm"
+                            />
+                          </>
+                        )}
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={applyCustomReminder}
+                          disabled={customReminderApplyDisabled}
+                          className="w-full"
+                        >
+                          Apply
+                        </Button>
                       </div>
                     )}
                   </div>

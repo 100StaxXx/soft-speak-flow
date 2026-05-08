@@ -49,4 +49,23 @@ describe("QuestLocationLink", () => {
     expect(openQuestLocationMock).toHaveBeenCalledWith("Library", "apple");
     expect(parentClick).not.toHaveBeenCalled();
   });
+
+  it("does not bubble mobile touch map actions to parent quest cards", () => {
+    const parentTouchEnd = vi.fn();
+    const parentClick = vi.fn();
+
+    render(
+      <div onClick={parentClick} onTouchEnd={parentTouchEnd}>
+        <QuestLocationLink location="City Hall" />
+      </div>,
+    );
+
+    const appleMapsButton = screen.getByRole("button", { name: /open city hall in apple maps/i });
+    fireEvent.touchEnd(appleMapsButton);
+    fireEvent.click(appleMapsButton);
+
+    expect(openQuestLocationMock).toHaveBeenCalledWith("City Hall", "apple");
+    expect(parentTouchEnd).not.toHaveBeenCalled();
+    expect(parentClick).not.toHaveBeenCalled();
+  });
 });

@@ -148,6 +148,47 @@ function MultiReminderHarness({ initialOffsets = [] }: { initialOffsets?: number
   );
 }
 
+function DateTimeReminderHarness() {
+  const [reminderOffsetsMinutes, setReminderOffsetsMinutes] = useState<number[]>([]);
+  const selectedDate = new Date(2026, 1, 13);
+
+  return (
+    <div>
+      <AdvancedQuestOptions
+        scheduledTime="09:30"
+        onScheduledTimeChange={vi.fn()}
+        estimatedDuration={30}
+        onEstimatedDurationChange={vi.fn()}
+        recurrencePattern={null}
+        onRecurrencePatternChange={vi.fn()}
+        recurrenceDays={[]}
+        onRecurrenceDaysChange={vi.fn()}
+        recurrenceMonthDays={[]}
+        onRecurrenceMonthDaysChange={vi.fn()}
+        recurrenceCustomPeriod={null}
+        onRecurrenceCustomPeriodChange={vi.fn()}
+        reminderEnabled={reminderOffsetsMinutes.length > 0}
+        onReminderEnabledChange={(enabled) => {
+          if (!enabled) {
+            setReminderOffsetsMinutes([]);
+          }
+        }}
+        reminderMinutesBefore={reminderOffsetsMinutes[0] ?? 15}
+        onReminderMinutesBeforeChange={vi.fn()}
+        reminderOffsetsMinutes={reminderOffsetsMinutes}
+        onReminderOffsetsMinutesChange={setReminderOffsetsMinutes}
+        moreInformation={null}
+        onMoreInformationChange={vi.fn()}
+        location={null}
+        onLocationChange={vi.fn()}
+        selectedDate={selectedDate}
+        reminderDate={selectedDate}
+      />
+      <div data-testid="reminder-offsets-state">{reminderOffsetsMinutes.join(",") || "none"}</div>
+    </div>
+  );
+}
+
 function getReminderSection() {
   const helperText = screen.getByText(/Add up to 5 early reminders/i);
   const section = helperText.parentElement;
@@ -343,12 +384,15 @@ describe("AdvancedQuestOptions reminder picker", () => {
     expect(screen.getByTestId("reminder-state")).toHaveTextContent("false|15");
   });
 
-  it("shows 2 days and custom reminder options", () => {
+  it("shows longer preset and custom reminder options", () => {
     render(<ReminderHarness />);
 
     fireEvent.click(getReminderSection().getByRole("button", { name: "None" }));
 
+    expect(screen.getByRole("button", { name: "1 hour before" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "2 hours before" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "2 days before" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "1 week before" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Custom" })).toBeInTheDocument();
   });
 
@@ -386,7 +430,7 @@ describe("AdvancedQuestOptions reminder picker", () => {
     expect(getReminderSection().getByRole("button", { name: "None" })).toBeInTheDocument();
   });
 
-  it("applies a custom reminder value", async () => {
+  it("falls back to custom reminder minutes without a concrete quest date", async () => {
     render(<ReminderHarness />);
 
     fireEvent.click(getReminderSection().getByRole("button", { name: "None" }));
@@ -399,6 +443,34 @@ describe("AdvancedQuestOptions reminder picker", () => {
     });
 
     expect(getReminderSection().getByRole("button", { name: "3 hours before" })).toBeInTheDocument();
+  });
+
+  it("applies a custom reminder date and time when the quest date is known", async () => {
+    render(<DateTimeReminderHarness />);
+
+    fireEvent.click(getReminderSection().getByRole("button", { name: "None" }));
+    fireEvent.click(screen.getByRole("button", { name: "Custom" }));
+
+    expect(screen.getByText("Custom reminder date")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Custom reminder time"), { target: { value: "08:00" } });
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("reminder-offsets-state")).toHaveTextContent("90");
+    });
+
+    expect(getReminderSection().getByRole("button", { name: "90 minutes before" })).toBeInTheDocument();
+  });
+
+  it("rejects a custom reminder date and time after the quest start", () => {
+    render(<DateTimeReminderHarness />);
+
+    fireEvent.click(getReminderSection().getByRole("button", { name: "None" }));
+    fireEvent.click(screen.getByRole("button", { name: "Custom" }));
+    fireEvent.change(screen.getByLabelText("Custom reminder time"), { target: { value: "10:00" } });
+
+    expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
+    expect(screen.getByTestId("reminder-offsets-state")).toHaveTextContent("none");
   });
 
   it("supports selecting multiple reminder offsets", async () => {
