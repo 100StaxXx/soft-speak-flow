@@ -212,6 +212,10 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
   const popoverClassName = isQuestSoft
     ? cn("w-[min(24rem,var(--radix-popover-trigger-width))] p-2", QUEST_FORM_STYLES.popover)
     : "w-[min(24rem,var(--radix-popover-trigger-width))] p-1";
+  const reminderPopoverClassName = cn(
+    popoverClassName,
+    "z-[80] max-h-[min(22rem,var(--radix-popover-content-available-height))] overflow-y-auto overscroll-contain",
+  );
   const dropdownItemClassName = (selected: boolean) => cn(
     isQuestSoft
       ? "w-full rounded-[18px] px-3 py-2.5 text-left text-sm font-medium transition-all duration-200 motion-reduce:transition-none"
@@ -610,12 +614,13 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
             </PopoverTrigger>
 
             <PopoverContent
+              data-testid="early-reminder-options"
               align="start"
               side="bottom"
               sideOffset={6}
-              className={popoverClassName}
+              className={reminderPopoverClassName}
             >
-              <div className="max-h-72 overflow-y-auto">
+              <div className="space-y-1">
                 {reminderOptions.map((option) => (
                   <button
                     key={option.value}

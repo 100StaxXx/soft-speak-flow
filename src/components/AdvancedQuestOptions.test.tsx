@@ -396,6 +396,15 @@ describe("AdvancedQuestOptions reminder picker", () => {
     expect(screen.getByRole("button", { name: "Custom" })).toBeInTheDocument();
   });
 
+  it("keeps the reminder options menu scroll-contained for mobile sheets", () => {
+    render(<ReminderHarness />);
+
+    fireEvent.click(getReminderSection().getByRole("button", { name: "None" }));
+
+    expect(screen.getByTestId("early-reminder-options")).toHaveClass("overflow-y-auto");
+    expect(screen.getByTestId("early-reminder-options").className).toContain("max-h-");
+  });
+
   it("enables reminders when selecting a preset", async () => {
     render(<ReminderHarness />);
 

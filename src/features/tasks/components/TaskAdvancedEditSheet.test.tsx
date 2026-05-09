@@ -43,6 +43,7 @@ describe('TaskAdvancedEditSheet reminders', () => {
     expect(screen.getByRole('button', { name: '2 days before' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '1 week before' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Custom' })).toBeInTheDocument();
+    expect(screen.getByTestId('task-early-reminder-options')).toHaveClass('overflow-y-auto');
   });
 
   it('saves custom quest reminder date and time as normalized offsets', async () => {

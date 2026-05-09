@@ -512,7 +512,10 @@ export function TaskAdvancedEditSheet({
                   {activeReminderLabel}
                 </Button>
                 {showReminderPicker && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 p-1">
+                  <div
+                    data-testid="task-early-reminder-options"
+                    className="absolute top-full left-0 right-0 mt-1 max-h-[min(22rem,calc(100dvh-12rem))] overflow-y-auto overscroll-contain bg-background border rounded-lg shadow-lg z-10 p-1"
+                  >
                     {QUEST_REMINDER_PRESET_OPTIONS.map(opt => (
                       <button
                         key={opt.value}
