@@ -401,8 +401,9 @@ describe("AdvancedQuestOptions reminder picker", () => {
 
     fireEvent.click(getReminderSection().getByRole("button", { name: "None" }));
 
-    expect(screen.getByTestId("early-reminder-options")).toHaveClass("overflow-y-auto");
-    expect(screen.getByTestId("early-reminder-options").className).toContain("max-h-");
+    expect(screen.getByTestId("early-reminder-options")).toHaveClass("overflow-hidden");
+    expect(screen.getByTestId("early-reminder-options-scroll")).toHaveClass("overflow-y-auto");
+    expect(screen.getByTestId("early-reminder-options-scroll").className).toContain("--radix-popover-content-available-height");
   });
 
   it("enables reminders when selecting a preset", async () => {

@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { QuestLocationAutocompleteInput } from "@/components/QuestLocationAutocompleteInput";
 
@@ -20,6 +20,10 @@ describe("QuestLocationAutocompleteInput", () => {
     mocks.configured = false;
     mocks.clearGoogleMapsAutocompleteListeners.mockClear();
     mocks.loadGoogleMapsPlacesLibrary.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("keeps manual location entry working without a Google Maps key", () => {
@@ -101,5 +105,27 @@ describe("QuestLocationAutocompleteInput", () => {
       expect(Autocomplete).toHaveBeenCalled();
     });
     expect(mocks.loadGoogleMapsPlacesLibrary).toHaveBeenCalledTimes(2);
+  });
+
+  it("replays typed text after a delayed autocomplete attachment", async () => {
+    mocks.configured = true;
+    const dispatchSpy = vi.spyOn(HTMLInputElement.prototype, "dispatchEvent");
+    const autocomplete = {
+      addListener: vi.fn(() => ({ remove: vi.fn() })),
+      getPlace: vi.fn(),
+    };
+    const Autocomplete = vi.fn(() => autocomplete);
+    mocks.loadGoogleMapsPlacesLibrary.mockResolvedValue({ Autocomplete });
+
+    render(<QuestLocationAutocompleteInput value="1157 canyon" onChange={vi.fn()} />);
+    const input = screen.getByPlaceholderText("Address or place name (optional)");
+
+    fireEvent.focus(input);
+
+    await waitFor(() => {
+      expect(Autocomplete).toHaveBeenCalled();
+    });
+
+    expect(dispatchSpy.mock.calls.some(([event]) => event.type === "input")).toBe(true);
   });
 });

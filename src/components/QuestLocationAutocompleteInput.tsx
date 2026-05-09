@@ -73,6 +73,10 @@ export function QuestLocationAutocompleteInput({
         const selectedLocation = place?.formatted_address?.trim() || place?.name?.trim() || inputRef.current?.value.trim() || null;
         onChangeRef.current(selectedLocation);
       });
+
+      if (inputRef.current.value.trim()) {
+        inputRef.current.dispatchEvent(new Event("input", { bubbles: true }));
+      }
     }).catch(() => {
       hasRequestedAutocompleteRef.current = false;
     });

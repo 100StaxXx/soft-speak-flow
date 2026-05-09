@@ -793,7 +793,7 @@ Deno.test("generate-mentor-audio resolves every supported mentor voice", async (
     >;
     assertEquals(
       voiceSettings.speed,
-      mentorSlug === "princess" ? 1.12 : 1,
+      mentorSlug === "princess" ? 1.2 : 1,
       `Expected ${mentorSlug} to send configured speech speed`,
     );
   }

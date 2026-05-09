@@ -1036,6 +1036,10 @@ All colors MUST be HSL.
     -webkit-touch-callout: default !important;
   }
 
+  .pac-container {
+    z-index: 2147483647 !important;
+  }
+
     html.walkthrough-scroll-locked,
     body.walkthrough-scroll-locked {
       overflow: hidden;

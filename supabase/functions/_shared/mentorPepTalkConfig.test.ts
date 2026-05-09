@@ -162,8 +162,8 @@ Deno.test("mentor pep talk config includes Lyra across backend mentor surfaces",
 Deno.test("mentor voice config keeps Princess pep talks brisker than default", () => {
   const voiceConfig = resolveMentorVoiceConfig("princess");
   assert(
-    voiceConfig?.speed === 1.12,
-    "Expected Princess voice speed to be faster than the ElevenLabs default",
+    voiceConfig?.speed === 1.2,
+    "Expected Princess voice speed to use the fastest supported ElevenLabs setting",
   );
 });
 

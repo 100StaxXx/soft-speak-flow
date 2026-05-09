@@ -56,7 +56,7 @@ export const ELEVENLABS_MENTOR_VOICES: Record<
     stability: 0.82,
     similarity_boost: 0.88,
     style_exaggeration: 0.24,
-    speed: 1.12,
+    speed: 1.2,
     use_speaker_boost: true,
   },
   operator: {
