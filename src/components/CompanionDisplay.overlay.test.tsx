@@ -552,7 +552,7 @@ describe("CompanionDisplay overlay stack", () => {
     };
 
     render(<CompanionDisplay />);
-    await screen.findByText("Stage 0 • Egg");
+    await screen.findByText("Nova");
 
     fireEvent.keyDown(
       screen.getByRole("button", {
@@ -629,7 +629,7 @@ describe("CompanionDisplay overlay stack", () => {
     };
 
     render(<CompanionDisplay />);
-    await screen.findByText("Nova");
+    await screen.findByText("Stage 0 • Egg");
 
     fireEvent.keyDown(
       screen.getByRole("button", {
