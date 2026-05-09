@@ -37,7 +37,7 @@ export function QuestAttachmentPicker({
   const addButtonClassName = cn(
     "gap-2",
     isQuestSoft
-      ? "rounded-[16px] border-[3px] border-border/70 bg-card/70 text-foreground shadow-[0_4px_0_hsl(var(--primary)_/_0.16)] hover:bg-card hover:text-foreground"
+      ? "rounded-[16px] border-[3px] border-celestial-blue/35 bg-card/70 text-foreground shadow-[0_4px_0_hsl(var(--stardust-gold)_/_0.16)] hover:border-stardust-gold/45 hover:bg-card hover:text-foreground"
       : "",
   );
 
@@ -138,7 +138,7 @@ export function QuestAttachmentPicker({
               className={cn(
                 "relative p-2",
                 isQuestSoft
-                  ? "rounded-[16px] border-[3px] border-border/70 bg-card/60 shadow-[0_4px_0_hsl(var(--primary)_/_0.16)]"
+                  ? "rounded-[16px] border-[3px] border-celestial-blue/30 bg-card/60 shadow-[0_4px_0_hsl(var(--stardust-gold)_/_0.16)]"
                   : "rounded-lg border border-border/60 bg-card",
               )}
             >

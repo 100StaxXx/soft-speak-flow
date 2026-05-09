@@ -878,7 +878,7 @@ export function Pathfinder({
                 <CapacityWarningBanner
                   isAtEpicLimit={hasReachedCampaignLimit}
                   isLoading={false}
-                  className="rounded-[1.5rem] border-[3px] border-[#9a4718] bg-[#ffd9bf] px-4 py-3 text-[#8a2716] shadow-[0_8px_0_rgba(154,71,24,0.18)]"
+                  className="rounded-[1.5rem] border-[3px] border-category-body/60 bg-category-body/15 px-4 py-3 text-category-body shadow-[0_8px_0_hsl(var(--category-body)_/_0.18)]"
                 />
               </div>
             )}
@@ -898,10 +898,10 @@ export function Pathfinder({
                         className={cn(
                           "flex h-9 w-9 items-center justify-center rounded-full border-[3px] text-sm font-semibold transition-all",
                           isActive
-                            ? "border-[#6b3416] bg-[linear-gradient(180deg,#fff8e8_0%,#ffcf6e_100%)] text-[#5d2a0f] shadow-[0_5px_0_rgba(77,40,17,0.35)]"
+                            ? "border-stardust-gold/70 bg-[linear-gradient(180deg,hsl(var(--stardust-gold)_/_0.98)_0%,hsl(var(--nebula-pink)_/_0.62)_100%)] text-[hsl(var(--deep-space))] shadow-[0_5px_0_hsl(var(--stardust-gold)_/_0.35)]"
                             : isComplete
-                              ? "border-[#315114] bg-[linear-gradient(180deg,#d7ff86_0%,#9fda3f_100%)] text-[#183304] shadow-[0_5px_0_rgba(49,81,20,0.28)]"
-                              : "border-[#8d481c]/30 bg-white/55 text-[#8d481c]/65",
+                              ? "border-epic-nature/70 bg-[linear-gradient(180deg,hsl(var(--epic-nature)_/_0.95)_0%,hsl(var(--category-soul)_/_0.62)_100%)] text-[hsl(var(--deep-space))] shadow-[0_5px_0_hsl(var(--epic-nature)_/_0.28)]"
+                              : "border-celestial-blue/30 bg-card/60 text-muted-foreground",
                         )}
                       >
                         {isComplete ? <Check className="h-4 w-4" /> : i + 1}
@@ -910,7 +910,7 @@ export function Pathfinder({
                         <div
                           className={cn(
                             "mx-1.5 h-1 w-6 rounded-full sm:w-8",
-                            isComplete ? "bg-[#a6de45]" : "bg-[#8d481c]/20",
+                            isComplete ? "bg-epic-nature" : "bg-celestial-blue/20",
                           )}
                         />
                       )}
@@ -936,9 +936,9 @@ export function Pathfinder({
                       className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-5"
                       style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
                     >
-                      <div className="space-y-4 py-4 text-[#4f240c]">
+                      <div className="space-y-4 py-4 text-foreground">
                         <div className={cn(plannerPathfinderTheme.raisedPanel, "space-y-3 p-4")}>
-                          <Label htmlFor="goal-input" className="text-base font-semibold text-[#5d2a0f]">
+                          <Label htmlFor="goal-input" className="text-base font-semibold text-stardust-gold">
                             What's your goal?
                           </Label>
                           <div className="relative">
@@ -954,8 +954,8 @@ export function Pathfinder({
                               size="icon"
                               variant={isRecording ? 'default' : 'ghost'}
                               className={cn(
-                                "absolute right-3 top-3 h-10 w-10 rounded-full border-[3px] border-[#4d2811] bg-white/65 text-[#7f3b12] hover:bg-white/80",
-                                isRecording && "animate-pulse border-[#7f1616] bg-[linear-gradient(180deg,#ffb8a7_0%,#ff7a59_100%)] text-[#4c0f0f]",
+                                "absolute right-3 top-3 h-10 w-10 rounded-full border-[3px] border-stardust-gold/55 bg-card/75 text-stardust-gold hover:bg-card",
+                                isRecording && "animate-pulse border-category-body/70 bg-[linear-gradient(180deg,hsl(var(--category-body)_/_0.34)_0%,hsl(var(--destructive)_/_0.22)_100%)] text-category-body",
                               )}
                               onClick={handleVoiceToggle}
                               disabled={isAutoStopping}
@@ -967,9 +967,9 @@ export function Pathfinder({
                         </div>
 
                         <div className={cn(plannerPathfinderTheme.mutedPanel, "space-y-3 p-4")}>
-                          <Label htmlFor="context-input" className="flex items-center gap-2 text-base font-semibold text-[#5d2a0f]">
+                          <Label htmlFor="context-input" className="flex items-center gap-2 text-base font-semibold text-stardust-gold">
                             List current experience
-                            <span className="text-sm font-normal text-[#7f4a1d]/80">(optional)</span>
+                            <span className="text-sm font-normal text-muted-foreground">(optional)</span>
                           </Label>
                           <Textarea
                             id="context-input"
@@ -982,8 +982,8 @@ export function Pathfinder({
                         </div>
 
                         <div className={cn(plannerPathfinderTheme.raisedPanel, "space-y-3 p-4")}>
-                          <Label className="flex items-center gap-2 text-base font-semibold text-[#5d2a0f]">
-                            <Calendar className="w-4 h-4 text-[#8d481c]" />
+                          <Label className="flex items-center gap-2 text-base font-semibold text-stardust-gold">
+                            <Calendar className="w-4 h-4 text-celestial-blue" />
                             When do you need to achieve this?
                           </Label>
                           <DeadlinePicker value={deadline} onChange={setDeadline} />
@@ -1038,7 +1038,7 @@ export function Pathfinder({
                           )}
                         </Button>
                         {error ? (
-                          <p className="text-center text-sm text-[#8a2716]">{error}</p>
+                          <p className="text-center text-sm text-category-body">{error}</p>
                         ) : null}
                       </div>
                     )}
@@ -1058,7 +1058,7 @@ export function Pathfinder({
                       className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-5"
                       style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
                     >
-                      <div className="space-y-4 py-4 text-[#4f240c]">
+                      <div className="space-y-4 py-4 text-foreground">
                         <TimelineView
                           feasibilityAssessment={schedule.feasibilityAssessment}
                           phases={schedule.phases}
@@ -1115,7 +1115,7 @@ export function Pathfinder({
                       className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-5"
                       style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
                     >
-                      <div className="space-y-4 py-4 text-[#4f240c]">
+                      <div className="space-y-4 py-4 text-foreground">
                         {schedule?.rituals && (
                           <RitualEditor
                             rituals={schedule.rituals}
@@ -1125,8 +1125,8 @@ export function Pathfinder({
                         )}
 
                         <div className={cn(plannerPathfinderTheme.raisedPanel, "space-y-3 p-4")}>
-                          <div className="flex items-center gap-2 text-sm font-semibold text-[#5d2a0f]">
-                            <Flag className="h-4 w-4 text-[#8d481c]" />
+                          <div className="flex items-center gap-2 text-sm font-semibold text-stardust-gold">
+                            <Flag className="h-4 w-4 text-epic-nature" />
                             Milestones ({selectedMilestones.length})
                           </div>
                           {selectedMilestones.map((m: any) => (
@@ -1187,9 +1187,9 @@ export function Pathfinder({
                       className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-5"
                       style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
                     >
-                      <div className="space-y-4 py-4 text-[#4f240c]">
+                      <div className="space-y-4 py-4 text-foreground">
                         <div className={cn(plannerPathfinderTheme.raisedPanel, "space-y-3 p-4")}>
-                          <Label htmlFor="epic-why" className="text-[#5d2a0f]">Your Why</Label>
+                          <Label htmlFor="epic-why" className="text-stardust-gold">Your Why</Label>
                           <Textarea
                             id="epic-why"
                             value={epicWhy}
@@ -1198,7 +1198,7 @@ export function Pathfinder({
                             rows={3}
                             className={cn(plannerPathfinderTheme.textField, "min-h-[132px]")}
                           />
-                          <p className="text-xs text-[#7f4a1d]/80">
+                          <p className="text-xs text-muted-foreground">
                             Define your purpose - this will fuel your motivation
                           </p>
                         </div>
@@ -1209,7 +1209,7 @@ export function Pathfinder({
                             animate={{ opacity: 1, y: 0 }}
                             className={cn(plannerPathfinderTheme.mutedPanel, "space-y-3 p-4")}
                           >
-                            <Label htmlFor="epic-title" className="text-[#5d2a0f]">Campaign Name</Label>
+                            <Label htmlFor="epic-title" className="text-stardust-gold">Campaign Name</Label>
                             <Input
                               id="epic-title"
                               value={epicTitle}
@@ -1223,12 +1223,12 @@ export function Pathfinder({
                         <div className={cn(plannerPathfinderTheme.successCard, "p-4")}>
                           <div className="flex items-center justify-between gap-3">
                             <div className="flex items-center gap-2">
-                              <Zap className="h-5 w-5 text-[#315114]" />
+                              <Zap className="h-5 w-5 text-epic-nature" />
                               <span className="font-medium">Completion Reward</span>
                             </div>
                             <span className="text-xl font-bold">+{calculateXP} XP</span>
                           </div>
-                          <p className="mt-1 text-xs text-[#315114]/80">
+                          <p className="mt-1 text-xs text-epic-nature/85">
                             {targetDays} days • {selectedHabits.length} rituals • {selectedMilestones.length} milestones
                           </p>
                         </div>

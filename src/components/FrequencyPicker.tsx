@@ -48,7 +48,7 @@ export const FrequencyPicker = ({
             onClick={selectAll}
             className={cn(
               "text-xs font-medium",
-              isQuestSoft ? "text-primary hover:text-foreground" : "text-primary hover:text-primary/80",
+              isQuestSoft ? "text-stardust-gold hover:text-foreground" : "text-primary hover:text-primary/80",
             )}
           >
             Select all
@@ -67,7 +67,7 @@ export const FrequencyPicker = ({
               selectedDays.includes(index)
                 ? cn(
                   isQuestSoft
-                    ? "border-transparent shadow-[0_4px_0_hsl(var(--primary)_/_0.18)]"
+                    ? "border-transparent shadow-[0_4px_0_hsl(var(--stardust-gold)_/_0.18)]"
                     : "bg-primary border-primary text-primary-foreground shadow-glow",
                   isQuestSoft && activeTone ? activeTone : "",
                 )

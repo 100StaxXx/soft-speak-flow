@@ -73,7 +73,7 @@ export const HabitDifficultySelector = ({
                   isQuestSoft && (
                     isSelected
                       ? DIFFICULTY_COLORS[option.value].difficultyActive
-                      : "border-border/70 bg-card/70 text-muted-foreground shadow-[0_4px_0_hsl(var(--primary)_/_0.16)] hover:bg-card hover:text-foreground"
+                      : "border-stage-tier-2/35 bg-card/70 text-muted-foreground shadow-[0_4px_0_hsl(var(--stardust-gold)_/_0.16)] hover:bg-card hover:text-foreground"
                   ),
                 )}
               >

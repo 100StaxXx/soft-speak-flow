@@ -207,7 +207,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
     )
     : "w-full px-3 py-2 text-sm text-left border rounded-lg transition-colors flex items-center justify-between bg-muted text-muted-foreground cursor-not-allowed opacity-70";
   const inputClassName = isQuestSoft
-    ? "border-[3px] border-primary/45 bg-card/80 text-foreground placeholder:text-muted-foreground"
+    ? "border-[3px] border-celestial-blue/45 bg-card/80 text-foreground placeholder:text-muted-foreground focus-visible:border-stardust-gold/70 focus-visible:ring-stardust-gold/35"
     : "";
   const popoverClassName = isQuestSoft
     ? cn("w-[min(24rem,var(--radix-popover-trigger-width))] p-2", QUEST_FORM_STYLES.popover)
@@ -218,7 +218,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
       : "w-full px-3 py-2 text-sm text-left hover:bg-accent transition-colors",
     isQuestSoft
       ? selected
-        ? cn(toneColors.pill, "shadow-[0_4px_0_hsl(var(--primary)_/_0.18)]")
+        ? cn(toneColors.pill, "shadow-[0_4px_0_hsl(var(--stardust-gold)_/_0.18)]")
         : "text-muted-foreground hover:bg-card/70 hover:text-foreground"
       : selected
         ? "bg-accent"
@@ -521,7 +521,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                   {isSuggestLoading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Sparkles className={cn("h-4 w-4", isQuestSoft ? "text-primary" : "text-primary")} />
+                    <Sparkles className={cn("h-4 w-4", isQuestSoft ? "text-stardust-gold" : "text-primary")} />
                   )}
                 </Button>
               </PopoverTrigger>
@@ -548,7 +548,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                         <div className="flex-1">
                           <div className="flex items-center gap-1.5">
                             {index === 0 && (
-                              <Star className="h-3 w-3 fill-primary text-primary" />
+                              <Star className={cn("h-3 w-3", isQuestSoft ? "fill-stardust-gold text-stardust-gold" : "fill-primary text-primary")} />
                             )}
                             <span className={cn("text-sm font-medium", isQuestSoft && "text-foreground")}>
                               {formatTime(slot.time)}
@@ -836,7 +836,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                       "h-8 rounded-md text-xs font-medium border transition-colors",
                       isQuestSoft
                         ? props.recurrenceMonthDays.includes(dayOfMonth)
-                          ? cn(toneColors.pill, "shadow-[0_4px_0_hsl(var(--primary)_/_0.18)]")
+                          ? cn(toneColors.pill, "shadow-[0_4px_0_hsl(var(--stardust-gold)_/_0.18)]")
                           : "border-border/60 bg-card/60 text-muted-foreground hover:bg-card hover:text-foreground"
                         : props.recurrenceMonthDays.includes(dayOfMonth)
                           ? "bg-primary border-primary text-primary-foreground"
@@ -885,7 +885,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
           className={cn(
             "min-h-[100px] resize-none",
             isQuestSoft
-              ? "border-[3px] border-primary/45 bg-card/80 text-foreground placeholder:text-muted-foreground"
+              ? "border-[3px] border-celestial-blue/45 bg-card/80 text-foreground placeholder:text-muted-foreground focus-visible:border-stardust-gold/70 focus-visible:ring-stardust-gold/35"
               : "bg-muted/30 border-border/50",
           )}
           style={{ touchAction: 'pan-y', WebkitTapHighlightColor: 'transparent' }}

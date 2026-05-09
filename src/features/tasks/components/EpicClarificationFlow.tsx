@@ -107,12 +107,19 @@ export function EpicClarificationFlow({
     >
       {/* Header */}
       <div className="flex items-start gap-3">
-        <div className={cn("rounded-lg p-2", isPlannerVariant ? "bg-[#f3b349]/25 text-[#7f3b12]" : "bg-primary/10")}>
-          <Sparkles className={cn("w-5 h-5", isPlannerVariant ? "text-[#7f3b12]" : "text-primary")} />
+        <div
+          className={cn(
+            "rounded-lg p-2",
+            isPlannerVariant
+              ? "border-[3px] border-stardust-gold/50 bg-[linear-gradient(180deg,hsl(var(--stardust-gold)_/_0.24),hsl(var(--nebula-pink)_/_0.14))] text-stardust-gold shadow-[0_4px_0_hsl(var(--stardust-gold)_/_0.28)]"
+              : "bg-primary/10",
+          )}
+        >
+          <Sparkles className={cn("w-5 h-5", isPlannerVariant ? "text-stardust-gold" : "text-primary")} />
         </div>
         <div className="flex-1">
           <h4 className="font-semibold text-sm">Let's personalize your epic</h4>
-          <p className={cn("mt-0.5 line-clamp-1 text-xs", isPlannerVariant ? "text-[#7f4a1d]/80" : "text-muted-foreground")}>
+          <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
             {goal}
           </p>
         </div>
@@ -131,8 +138,8 @@ export function EpicClarificationFlow({
               transition={{ delay: index * 0.1 }}
               className="space-y-2"
             >
-              <Label className={cn("flex items-center gap-2 text-sm", isPlannerVariant && "text-[#5d2a0f]")}>
-                <Icon className={cn("w-4 h-4", isPlannerVariant ? "text-[#8d481c]" : "text-muted-foreground")} />
+              <Label className={cn("flex items-center gap-2 text-sm", isPlannerVariant && "text-foreground")}>
+                <Icon className={cn("w-4 h-4", isPlannerVariant ? "text-celestial-blue" : "text-muted-foreground")} />
                 {question.question}
                 {question.required && <span className="text-destructive">*</span>}
               </Label>
@@ -253,7 +260,7 @@ export function EpicClarificationFlow({
       </div>
 
       {/* Helper text */}
-      <p className={cn("text-center text-xs", isPlannerVariant ? "text-[#7f4a1d]/80" : "text-muted-foreground")}>
+      <p className="text-center text-xs text-muted-foreground">
         This helps create a personalized study plan just for you
       </p>
     </motion.div>

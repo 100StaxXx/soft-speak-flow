@@ -40,6 +40,7 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   type CompanionAssistantMessage,
   useCompanionAssistant,
@@ -143,7 +144,7 @@ export const CompanionChatModal = memo(function CompanionChatModal({
   }, [assistant]);
 
   const avatar = (
-    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-white/15 bg-white/[0.06]">
+    <Avatar className="relative h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-white/15 bg-white/[0.06]">
       {imageUrl ? (
         canUsePortraitShell ? (
           <CompanionPortraitShell
@@ -173,12 +174,11 @@ export const CompanionChatModal = memo(function CompanionChatModal({
             className="object-cover"
           />
         )
-      ) : (
-        <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-white/80">
-          {companionLabel.charAt(0).toUpperCase()}
-        </div>
-      )}
-    </div>
+      ) : null}
+      <AvatarFallback className="rounded-2xl bg-transparent text-sm font-semibold text-white/80">
+        {companionLabel.charAt(0).toUpperCase()}
+      </AvatarFallback>
+    </Avatar>
   );
 
   const body = (

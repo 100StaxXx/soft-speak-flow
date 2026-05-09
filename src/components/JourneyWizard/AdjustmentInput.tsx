@@ -34,8 +34,8 @@ export function AdjustmentInput({ onSubmit, isLoading }: AdjustmentInputProps) {
   if (isLoading) {
     return (
       <div className={`${plannerPathfinderTheme.mutedPanel} flex items-center justify-center gap-2 p-4`}>
-        <Loader2 className="w-4 h-4 animate-spin text-[#8d481c]" />
-        <span className="text-sm text-[#7f4a1d]/80">Adjusting your plan...</span>
+        <Loader2 className="w-4 h-4 animate-spin text-celestial-blue" />
+        <span className="text-sm text-muted-foreground">Adjusting your plan...</span>
       </div>
     );
   }
@@ -43,7 +43,7 @@ export function AdjustmentInput({ onSubmit, isLoading }: AdjustmentInputProps) {
   return (
     <div className={`${plannerPathfinderTheme.raisedPanel} space-y-4 p-4`}>
       <p className="flex items-center gap-2 text-sm font-medium">
-        <MessageSquare className="w-4 h-4 text-[#8d481c]" />
+        <MessageSquare className="w-4 h-4 text-celestial-blue" />
         Want to adjust the plan?
       </p>
 

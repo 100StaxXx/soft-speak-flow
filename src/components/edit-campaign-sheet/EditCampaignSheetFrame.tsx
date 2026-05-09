@@ -145,7 +145,7 @@ function CampaignRitualDifficultySelector({
                   "flex min-h-[5.75rem] cursor-pointer flex-col items-center justify-center gap-2 rounded-[16px] border-[3px] px-2.5 py-3 text-center transition-all duration-200 ease-out active:scale-[0.98] motion-safe:hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0",
                   isSelected
                     ? DIFFICULTY_COLORS[option.value].difficultyActive
-                    : "border-border/70 bg-card/70 text-muted-foreground shadow-[0_4px_0_hsl(var(--primary)_/_0.16)] hover:bg-card hover:text-foreground",
+                    : "border-stage-tier-2/35 bg-card/70 text-muted-foreground shadow-[0_4px_0_hsl(var(--stardust-gold)_/_0.16)] hover:bg-card hover:text-foreground",
                 )}
               >
                 <span
@@ -353,7 +353,7 @@ export function EditCampaignSheetFrame({
             </div>
           </SheetHeader>
 
-          <ScrollArea className={cn("relative z-10 mx-4 mt-3 min-h-0 flex-1 rounded-[2rem] border-[4px] border-primary/45 shadow-[0_12px_0_hsl(var(--primary)_/_0.42)] sm:mx-5", QUEST_FORM_STYLES.body)}>
+          <ScrollArea className={cn("relative z-10 mx-4 mt-3 min-h-0 flex-1 rounded-[2rem] border-[4px] border-category-soul/45 shadow-[0_12px_0_hsl(var(--stardust-gold)_/_0.38)] sm:mx-5", QUEST_FORM_STYLES.body)}>
             <div className="space-y-5 px-4 py-4 text-foreground sm:px-5" data-vaul-no-drag>
               <section className={cn(plannerPathfinderTheme.raisedPanel, "space-y-4 p-4")}>
                 <div className="space-y-2">
@@ -381,7 +381,7 @@ export function EditCampaignSheetFrame({
 
               <section className={cn(plannerPathfinderTheme.mutedPanel, "space-y-3 p-4")}>
                 <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-primary" />
+                  <Calendar className="h-4 w-4 text-celestial-blue" />
                   <h3 className="text-sm font-semibold">Timeline</h3>
                 </div>
                 <p className="text-sm text-muted-foreground">
@@ -414,7 +414,7 @@ export function EditCampaignSheetFrame({
               <section className={cn(plannerPathfinderTheme.raisedPanel, "space-y-4 p-4")}>
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <Repeat className="h-4 w-4 text-primary" />
+                    <Repeat className="h-4 w-4 text-epic-nature" />
                     <h3 className="text-sm font-semibold">Rituals</h3>
                   </div>
                   <Button
@@ -531,7 +531,7 @@ export function EditCampaignSheetFrame({
                             {ritual.frequency ?? "daily"}
                           </p>
                         </div>
-                        <Pencil className="h-4 w-4 shrink-0 text-primary" />
+                        <Pencil className="h-4 w-4 shrink-0 text-stardust-gold" />
                       </button>
                     ))}
                   </div>

@@ -34,9 +34,9 @@ interface RitualCardProps {
 }
 
 const difficultyColors = {
-  easy: 'bg-green-500/10 text-green-500 border-green-500/30',
-  medium: 'bg-amber-500/10 text-amber-500 border-amber-500/30',
-  hard: 'bg-red-500/10 text-red-500 border-red-500/30',
+  easy: 'bg-epic-nature/10 text-epic-nature border-epic-nature/30',
+  medium: 'bg-stardust-gold/10 text-stardust-gold border-stardust-gold/30',
+  hard: 'bg-category-body/10 text-category-body border-category-body/30',
 };
 
 export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete, isEditing: initialEditing = false }: RitualCardProps) {
@@ -125,7 +125,7 @@ export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete,
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-10 px-2 text-xs text-[#7f4a1d]/80 hover:bg-white/60 hover:text-[#4f240c]"
+                className="h-10 px-2 text-xs text-muted-foreground hover:bg-card/70 hover:text-foreground"
                 onClick={() => setEditedRitual({
                   ...editedRitual,
                   preferredTime: null,
@@ -200,9 +200,9 @@ export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete,
   return (
     <motion.div
       layout
-      className={`${plannerPathfinderTheme.mutedPanel} group flex items-center gap-2 p-3 transition-colors hover:bg-white/75`}
+      className={`${plannerPathfinderTheme.mutedPanel} group flex items-center gap-2 p-3 transition-colors hover:bg-card/85`}
     >
-      <GripVertical className="w-4 h-4 cursor-grab text-[#8d481c]/45" />
+      <GripVertical className="w-4 h-4 cursor-grab text-celestial-blue/45" />
       
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
@@ -214,7 +214,7 @@ export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete,
             {ritual.difficulty}
           </Badge>
         </div>
-        <div className="flex items-center gap-2 text-xs text-[#7f4a1d]/80">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>{formatScheduleLabel({
             frequency: ritual.frequency,
             custom_days: ritual.customDays,
@@ -254,7 +254,7 @@ export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete,
         <Button
           size="icon"
           variant="ghost"
-          className="h-8 w-8 rounded-full border-[3px] border-[#8a2716] bg-white/60 p-0 text-[#8a2716] shadow-[0_6px_0_rgba(138,39,22,0.18)] hover:bg-white/75 hover:text-[#8a2716]"
+          className="h-8 w-8 rounded-full border-[3px] border-category-body/45 bg-category-body/10 p-0 text-category-body shadow-[0_6px_0_hsl(var(--category-body)_/_0.16)] hover:bg-category-body/15 hover:text-category-body"
           onClick={() => onDelete(ritual.id)}
         >
           <Trash2 className="w-3.5 h-3.5" />

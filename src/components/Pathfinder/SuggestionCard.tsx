@@ -40,8 +40,8 @@ export const SuggestionCard = memo(function SuggestionCard({
         'w-full p-4 rounded-xl border-2 text-left transition-all duration-200',
         'hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]',
         suggestion.selected
-          ? 'border-primary bg-primary/5 shadow-md'
-          : 'border-border/50 bg-card hover:border-primary/30'
+          ? 'border-stardust-gold/55 bg-[linear-gradient(180deg,hsl(var(--stardust-gold)_/_0.16),hsl(var(--nebula-pink)_/_0.08))] shadow-[0_6px_0_hsl(var(--stardust-gold)_/_0.22)]'
+          : 'border-celestial-blue/30 bg-card/70 hover:border-stardust-gold/45'
       )}
     >
       <div className="flex items-start gap-3">
@@ -50,7 +50,7 @@ export const SuggestionCard = memo(function SuggestionCard({
           className={cn(
             'w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all',
             suggestion.selected
-              ? 'border-primary bg-primary text-primary-foreground'
+              ? 'border-stardust-gold/70 bg-[linear-gradient(180deg,hsl(var(--stardust-gold))_0%,hsl(var(--nebula-pink))_100%)] text-[hsl(var(--deep-space))]'
               : 'border-muted-foreground/30'
           )}
         >
@@ -61,9 +61,9 @@ export const SuggestionCard = memo(function SuggestionCard({
           {/* Title and type badge */}
           <div className="flex items-center gap-2 mb-1">
             {isHabit ? (
-              <Repeat className="w-4 h-4 text-primary shrink-0" />
+              <Repeat className="w-4 h-4 text-epic-nature shrink-0" />
             ) : (
-              <Flag className="w-4 h-4 text-amber-500 shrink-0" />
+              <Flag className="w-4 h-4 text-stardust-gold shrink-0" />
             )}
             <span className="font-semibold text-foreground truncate">
               {suggestion.title}
@@ -82,8 +82,8 @@ export const SuggestionCard = memo(function SuggestionCard({
               className={cn(
                 'text-xs px-2 py-0.5 rounded-full border',
                 isHabit
-                  ? 'text-primary bg-primary/10 border-primary/20'
-                  : 'text-amber-500 bg-amber-500/10 border-amber-500/20'
+                  ? 'text-epic-nature bg-epic-nature/10 border-epic-nature/25'
+                  : 'text-stardust-gold bg-stardust-gold/10 border-stardust-gold/25'
               )}
             >
               {isHabit ? 'Habit' : 'Milestone'}

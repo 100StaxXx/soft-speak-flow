@@ -177,17 +177,17 @@ export function RitualEditor({
       </div>
 
       {/* Difficulty breakdown */}
-      <div className={`${plannerPathfinderTheme.mutedPanel} flex flex-wrap gap-3 px-4 py-3 text-xs text-[#7f4a1d]/80`}>
+      <div className={`${plannerPathfinderTheme.mutedPanel} flex flex-wrap gap-3 px-4 py-3 text-xs text-muted-foreground`}>
         <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-[#7ab72b]" />
+          <span className="h-2 w-2 rounded-full bg-epic-nature" />
           {rituals.filter(r => r.difficulty === 'easy').length} easy
         </span>
         <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-[#d38b22]" />
+          <span className="h-2 w-2 rounded-full bg-stardust-gold" />
           {rituals.filter(r => r.difficulty === 'medium').length} medium
         </span>
         <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-[#c45435]" />
+          <span className="h-2 w-2 rounded-full bg-category-body" />
           {rituals.filter(r => r.difficulty === 'hard').length} hard
         </span>
       </div>

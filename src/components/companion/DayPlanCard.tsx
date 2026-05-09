@@ -71,24 +71,24 @@ const energyMeta: Record<
   CompanionDayPlanBlockEnergyType,
   { label: string; icon: typeof Brain; tint: string }
 > = {
-  deep: { label: "Deep", icon: Brain, tint: "bg-[#fde7c4] text-[#7a3d0c]" },
-  admin: { label: "Admin", icon: Home, tint: "bg-[#e7eedf] text-[#3f5419]" },
+  deep: { label: "Deep", icon: Brain, tint: "bg-celestial-blue/10 text-celestial-blue" },
+  admin: { label: "Admin", icon: Home, tint: "bg-stage-tier-2/10 text-stage-tier-2" },
   physical: {
     label: "Physical",
     icon: Dumbbell,
-    tint: "bg-[#ffe1cb] text-[#8c2c0c]",
+    tint: "bg-category-body/10 text-category-body",
   },
-  errand: { label: "Errand", icon: Home, tint: "bg-[#ecdcc7] text-[#5d3d18]" },
-  social: { label: "Social", icon: Users, tint: "bg-[#fde2eb] text-[#85294a]" },
+  errand: { label: "Errand", icon: Home, tint: "bg-stardust-gold/10 text-stardust-gold" },
+  social: { label: "Social", icon: Users, tint: "bg-nebula-pink/10 text-nebula-pink" },
   creative: {
     label: "Creative",
     icon: Palette,
-    tint: "bg-[#ece5ff] text-[#4a2a85]",
+    tint: "bg-category-soul/10 text-category-soul",
   },
   recovery: {
     label: "Recovery",
     icon: Leaf,
-    tint: "bg-[#dff0e3] text-[#1f5530]",
+    tint: "bg-epic-nature/10 text-epic-nature",
   },
 };
 
@@ -186,7 +186,7 @@ export function DayPlanCard({
           <p className={plannerPathfinderTheme.sectionEyebrow}>
             {isCommitted ? "Plan locked in" : "Cosmiq's draft plan"}
           </p>
-          <h3 className="mt-1 truncate text-base font-semibold text-[#4f240c] sm:text-lg">
+          <h3 className="mt-1 truncate text-base font-semibold text-foreground sm:text-lg">
             {dateLabel}
           </h3>
         </div>
@@ -207,7 +207,7 @@ export function DayPlanCard({
           <div
             data-testid="companion-day-plan-overdue-hint"
             className={cn(
-              "mt-3 flex items-center gap-2 rounded-2xl border-[2px] border-[#8d481c]/40 bg-[#fff1da]/85 px-3 py-2 text-[12px] font-medium text-[#8d481c]",
+              "mt-3 flex items-center gap-2 rounded-2xl border-[2px] border-category-body/45 bg-category-body/10 px-3 py-2 text-[12px] font-medium text-category-body",
             )}
           >
             <AlarmClock className="h-4 w-4" aria-hidden />
@@ -238,24 +238,24 @@ export function DayPlanCard({
                 className={cn(
                   plannerPathfinderTheme.mutedPanel,
                   "flex items-stretch gap-3 p-3",
-                  overdue && "ring-2 ring-[#d48635]/55",
+                  overdue && "ring-2 ring-category-body/45",
                 )}
               >
-                <div className="flex w-20 shrink-0 flex-col justify-center text-[#4f240c]">
+                <div className="flex w-20 shrink-0 flex-col justify-center text-foreground">
                   <span className="text-sm font-semibold leading-tight">
                     {formatBlockTime(block)}
                   </span>
-                  <span className="text-[11px] uppercase tracking-wide text-[#8d481c]/80">
+                  <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
                     {formatBlockDuration(block)}
                   </span>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-[#4f240c]">
+                  <p className="truncate text-sm font-semibold text-foreground">
                     {block.title}
                   </p>
                   {block.reasoning
                     ? (
-                      <p className="mt-1 line-clamp-2 text-xs leading-snug text-[#6b3416]/80">
+                      <p className="mt-1 line-clamp-2 text-xs leading-snug text-muted-foreground">
                         {block.reasoning}
                       </p>
                     )
@@ -265,7 +265,7 @@ export function DayPlanCard({
                       ? (
                         <span
                           className={cn(
-                            "inline-flex items-center gap-1 rounded-full border border-[#6b3416]/30 px-2 py-0.5",
+                            "inline-flex items-center gap-1 rounded-full border border-celestial-blue/25 px-2 py-0.5",
                             energy.tint,
                           )}
                         >
@@ -274,12 +274,12 @@ export function DayPlanCard({
                         </span>
                       )
                       : null}
-                    <span className="rounded-full border border-[#6b3416]/30 bg-white/60 px-2 py-0.5 text-[#6b3416]">
+                    <span className="rounded-full border border-stardust-gold/25 bg-card/60 px-2 py-0.5 text-foreground">
                       {SOURCE_LABELS[block.source]}
                     </span>
                     {block.startTime
                       ? (
-                        <span className="rounded-full border border-[#6b3416]/30 bg-white/40 px-2 py-0.5 text-[#6b3416]/80">
+                        <span className="rounded-full border border-celestial-blue/25 bg-card/50 px-2 py-0.5 text-muted-foreground">
                           {formatBlockRange(block)}
                         </span>
                       )
@@ -287,7 +287,7 @@ export function DayPlanCard({
                     {overdue
                       ? (
                         <span
-                          className="inline-flex items-center gap-1 rounded-full border border-[#d48635]/55 bg-[#fff1da] px-2 py-0.5 text-[#8d481c]"
+                          className="inline-flex items-center gap-1 rounded-full border border-category-body/45 bg-category-body/10 px-2 py-0.5 text-category-body"
                           data-testid="companion-day-plan-overdue-badge"
                         >
                           <AlarmClock className="h-3 w-3" aria-hidden />
@@ -304,7 +304,7 @@ export function DayPlanCard({
       </ol>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-[#6b3416]/80">
+        <p className="text-xs text-muted-foreground">
           {isCommitted
             ? "These are now in today's quests."
             : "Review the plan, then lock it in to drop these into today's quests."}

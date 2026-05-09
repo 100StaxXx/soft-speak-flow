@@ -790,7 +790,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
             <div className={cn("flex-shrink-0 px-5 py-5", QUEST_FORM_STYLES.desktopPanelHeader)}>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary/80">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-stardust-gold/90">
                     New Quest
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">{summaryLine}</p>
@@ -905,7 +905,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
           <div className={cn("flex-shrink-0 px-5 py-4", QUEST_FORM_STYLES.desktopPanelHeader)}>
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary/80">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-stardust-gold/90">
                   Quest Shortcuts
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -939,7 +939,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
         {/* Scrollable Body */}
         <div className={cn("flex-1 min-h-0 overflow-y-auto overflow-x-hidden", QUEST_FORM_STYLES.body)}>
           {sheetView === "editor" ? (
-            <div className={cn(isDesktopPanel ? "px-5 py-5 space-y-5" : "px-4 py-4 space-y-4")}>
+            <div className={cn(isDesktopPanel ? "px-5 py-5 space-y-5" : "px-4 py-3 space-y-3")}>
               {topPersonalTemplates.length > 0 && (
                 <div className={cn(QUEST_FORM_STYLES.sectionCard, "px-4 py-4")}>
                   <div className="flex items-center justify-between gap-3">
@@ -950,7 +950,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                     <button
                       type="button"
                       onClick={() => openTemplateBrowser("yours")}
-                      className="text-xs font-semibold text-primary transition-colors hover:text-foreground"
+                      className="text-xs font-semibold text-stardust-gold transition-colors hover:text-foreground"
                     >
                       See all
                     </button>
@@ -1118,7 +1118,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   value={moreInformation || ""}
                   onChange={(e) => setMoreInformation(e.target.value || null)}
                   placeholder="Add notes, meeting links or phone numbers..."
-                  className="min-h-[88px] border-0 rounded-none bg-transparent resize-none px-4 py-4 text-sm text-foreground placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0"
+                  className="min-h-[72px] border-0 rounded-none bg-transparent resize-none px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 sm:min-h-[88px] sm:py-4"
                   style={{ touchAction: "pan-y", WebkitTapHighlightColor: "transparent" }}
                   data-vaul-no-drag
                 />

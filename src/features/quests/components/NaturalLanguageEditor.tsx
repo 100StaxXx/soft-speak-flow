@@ -79,8 +79,8 @@ export function NaturalLanguageEditor({ onApply, visualStyle = "default" }: Natu
         : "rounded-lg bg-muted/50 border border-border",
     )}>
       <div className="flex items-center gap-2">
-        <Sparkles className={cn("h-4 w-4", isQuestSoft ? "text-[#8d481c]" : "text-primary")} />
-        <span className={cn("text-sm font-medium", isQuestSoft && "text-[#5d2a0f]")}>Quick Edit</span>
+        <Sparkles className={cn("h-4 w-4", isQuestSoft ? "text-stardust-gold" : "text-celestial-blue")} />
+        <span className={cn("text-sm font-medium", isQuestSoft && "text-foreground")}>Quick Edit</span>
       </div>
 
       <div className="flex gap-2">
@@ -247,9 +247,9 @@ export function NaturalLanguageEditor({ onApply, visualStyle = "default" }: Natu
 // Helper component for badges
 function Badge({ children, color }: { children: React.ReactNode; color: string }) {
   const colorClasses: Record<string, string> = {
-    primary: "bg-primary/10 text-primary",
-    accent: "bg-accent/50 text-accent-foreground",
-    secondary: "bg-secondary text-secondary-foreground",
+    primary: "bg-celestial-blue/15 text-celestial-blue",
+    accent: "bg-nebula-pink/20 text-nebula-pink",
+    secondary: "bg-stardust-gold/18 text-stardust-gold",
     green: "bg-green-500/20 text-green-600 dark:text-green-400",
     red: "bg-red-500/20 text-red-600 dark:text-red-400",
     purple: "bg-purple-500/20 text-purple-600 dark:text-purple-400",

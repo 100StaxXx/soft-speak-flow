@@ -268,7 +268,7 @@ export const EditRitualSheet = memo(function EditRitualSheet({
           </div>
         </SheetHeader>
 
-        <ScrollArea className={cn("relative z-10 mx-4 mt-3 min-h-0 flex-1 rounded-[2rem] border-[4px] border-primary/45 shadow-[0_12px_0_hsl(var(--primary)_/_0.42)] sm:mx-5", QUEST_FORM_STYLES.body)}>
+        <ScrollArea className={cn("relative z-10 mx-4 mt-3 min-h-0 flex-1 rounded-[2rem] border-[4px] border-category-soul/45 shadow-[0_12px_0_hsl(var(--stardust-gold)_/_0.38)] sm:mx-5", QUEST_FORM_STYLES.body)}>
           <div className="space-y-5 px-4 pb-10 pt-4 text-foreground sm:px-5" data-vaul-no-drag>
             <NaturalLanguageEditor onApply={handleNaturalLanguageApply} visualStyle="quest-soft" />
 

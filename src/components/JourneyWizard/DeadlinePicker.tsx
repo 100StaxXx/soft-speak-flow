@@ -65,7 +65,7 @@ export function DeadlinePicker({ value, onChange, minDate }: DeadlinePickerProps
             className={cn(
               plannerPathfinderTheme.textField,
               'h-12 w-full justify-start text-left font-normal',
-              !value && 'text-[#9a6d47]'
+              !value && 'text-muted-foreground'
             )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
@@ -107,8 +107,8 @@ export function DeadlinePicker({ value, onChange, minDate }: DeadlinePickerProps
 
       {/* Time estimate display */}
       {value && daysUntilDeadline && (
-        <div className="flex items-center gap-2 text-sm text-[#7f4a1d]/80">
-          <Clock className="w-4 h-4 text-[#8d481c]" />
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Clock className="w-4 h-4 text-celestial-blue" />
           <span>
             {daysUntilDeadline} days until deadline
             {daysUntilDeadline <= 14 && (

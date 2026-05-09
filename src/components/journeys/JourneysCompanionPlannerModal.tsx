@@ -905,10 +905,10 @@ const JourneysCompanionThreadPicker = memo(
                   key={thread.sessionId}
                   type="button"
                   className={cn(
-                    "flex w-full items-start justify-between gap-3 rounded-[1.5rem] border-[3px] px-4 py-4 text-left transition-colors shadow-[0_8px_0_rgba(77,40,17,0.8)]",
+                    "flex w-full items-start justify-between gap-3 rounded-[1.5rem] border-[3px] px-4 py-4 text-left transition-colors shadow-[0_8px_0_hsl(var(--stardust-gold)_/_0.18)]",
                     canResumeThreads
-                      ? "border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,246,221,0.16),rgba(255,192,86,0.14))] hover:bg-[linear-gradient(180deg,rgba(255,249,231,0.2),rgba(255,192,86,0.18))]"
-                      : "cursor-not-allowed border-[#4d2811] bg-white/[0.03] opacity-70",
+                      ? "border-stardust-gold/45 bg-[linear-gradient(180deg,hsl(var(--stardust-gold)_/_0.16),hsl(var(--nebula-pink)_/_0.08))] hover:bg-[linear-gradient(180deg,hsl(var(--stardust-gold)_/_0.2),hsl(var(--nebula-pink)_/_0.12))]"
+                      : "cursor-not-allowed border-celestial-blue/25 bg-card/[0.03] opacity-70",
                   )}
                   onClick={() => {
                     void onResumeThread(thread.sessionId);
@@ -932,7 +932,7 @@ const JourneysCompanionThreadPicker = memo(
               ))}
             </div>
           ) : (
-            <div className="rounded-[1.5rem] border-[3px] border-dashed border-[#e1a54f] bg-white/[0.05] px-4 py-5 text-sm text-white/[0.72]">
+            <div className="rounded-[1.5rem] border-[3px] border-dashed border-stardust-gold/45 bg-card/[0.05] px-4 py-5 text-sm text-muted-foreground">
               {emptyStateMessage}
             </div>
           )}
@@ -1562,7 +1562,7 @@ const JourneysCompanionOverlayBody = memo(
                   >
                     <div
                       className={cn(
-                        "max-w-[85%] rounded-[1.7rem] border-[3px] px-4 py-3 shadow-[0_8px_0_rgba(77,40,17,0.8),0_18px_34px_-28px_rgba(36,12,4,0.52)] sm:max-w-[78%]",
+                        "max-w-[85%] rounded-[1.7rem] border-[3px] px-4 py-3 shadow-[0_8px_0_hsl(var(--stardust-gold)_/_0.18),0_18px_34px_-28px_hsl(var(--category-soul)_/_0.28)] sm:max-w-[78%]",
                         entry.role === "assistant"
                           ? plannerPathfinderTheme.assistantBubble
                           : plannerPathfinderTheme.userBubble,
@@ -1618,11 +1618,11 @@ const JourneysCompanionOverlayBody = memo(
                       >
                         Follow-up
                       </Badge>
-                      <p className="mt-3 text-sm font-semibold text-[#4f240c]">
+                      <p className="mt-3 text-sm font-semibold text-foreground">
                         {assistant.activeFollowUp.question}
                       </p>
                       {assistant.activeFollowUp.reason ? (
-                        <p className="mt-1 text-sm text-[#6b3416]/80">
+                        <p className="mt-1 text-sm text-muted-foreground">
                           {assistant.activeFollowUp.reason}
                         </p>
                       ) : null}
@@ -1691,12 +1691,12 @@ const JourneysCompanionOverlayBody = memo(
                           return (
                             <div
                               key={`${actionKey}-${index}`}
-                              className="border-t border-[#6b3416]/24 pt-3 first:border-t-0 first:pt-0"
+                              className="border-t border-celestial-blue/20 pt-3 first:border-t-0 first:pt-0"
                             >
                               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div className="min-w-0">
                                   <div className="flex flex-wrap items-center gap-2">
-                                    <p className="text-sm font-semibold text-[#4f240c]">
+                                    <p className="text-sm font-semibold text-foreground">
                                       {title}
                                     </p>
                                     <Badge
@@ -1707,12 +1707,12 @@ const JourneysCompanionOverlayBody = memo(
                                     </Badge>
                                   </div>
                                   {summary ? (
-                                    <p className="mt-1 text-sm text-[#6b3416]/80">
+                                    <p className="mt-1 text-sm text-muted-foreground">
                                       {summary}
                                     </p>
                                   ) : null}
                                   {action.reason ? (
-                                    <p className="mt-1 text-xs leading-5 text-[#6b3416]/70">
+                                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
                                       {action.reason}
                                     </p>
                                   ) : null}
@@ -1881,7 +1881,7 @@ const JourneysCompanionOverlayBody = memo(
                 <div
                   className={cn(
                     plannerPathfinderTheme.raisedPanel,
-                    "mb-3 px-3 py-3 text-[#5d2a0f]",
+                    "mb-3 px-3 py-3 text-foreground",
                   )}
                   data-testid="journeys-companion-planner-voice-preview"
                 >
@@ -1889,9 +1889,9 @@ const JourneysCompanionOverlayBody = memo(
                     isActive={
                       assistant.isRecording && !assistant.isAutoStopping
                     }
-                    className="justify-start text-[#b04b12]"
+                    className="justify-start text-stardust-gold"
                   />
-                  <p className="mt-2 text-sm text-[#5d2a0f]">
+                  <p className="mt-2 text-sm text-foreground">
                     {assistant.interimText || "Listening for your reply..."}
                   </p>
                 </div>
@@ -1905,7 +1905,7 @@ const JourneysCompanionOverlayBody = memo(
                   )}
                   data-testid="journeys-companion-planner-speaking-status"
                 >
-                  <div className="flex items-center gap-2 text-sm text-[#183304]">
+                  <div className="flex items-center gap-2 text-sm text-epic-nature">
                     <Waves className="h-4 w-4" />
                     Speaking{" "}
                     {assistant.speechProvider === "cloud"
@@ -1917,7 +1917,7 @@ const JourneysCompanionOverlayBody = memo(
                     type="button"
                     size="sm"
                     variant="ghost"
-                    className="text-[#183304] hover:bg-[#d2f38e] hover:text-[#183304]"
+                    className="text-epic-nature hover:bg-epic-nature/10 hover:text-epic-nature"
                     onClick={assistant.stopSpeaking}
                   >
                     Stop
@@ -1963,9 +1963,9 @@ const JourneysCompanionOverlayBody = memo(
                     size="icon"
                     variant="ghost"
                     className={cn(
-                      "h-11 w-11 shrink-0 rounded-full border-[3px] border-[#4d2811] bg-white/65 text-[#7f3b12] hover:bg-white/80",
+                      "h-11 w-11 shrink-0 rounded-full border-[3px] border-stardust-gold/55 bg-card/75 text-stardust-gold hover:bg-card",
                       assistant.isRecording &&
-                        "border-[#7f1616] bg-[linear-gradient(180deg,#ffb8a7_0%,#ff7a59_100%)] text-[#4c0f0f]",
+                        "border-category-body/70 bg-[linear-gradient(180deg,hsl(var(--category-body)_/_0.34)_0%,hsl(var(--destructive)_/_0.22)_100%)] text-category-body",
                     )}
                     onClick={handleVoiceToggle}
                     disabled={

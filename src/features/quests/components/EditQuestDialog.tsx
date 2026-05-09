@@ -380,7 +380,7 @@ export function EditQuestDialog({
           <div className={cn("flex-shrink-0 px-5 py-5", QUEST_FORM_STYLES.desktopPanelHeader)}>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary/80">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-stardust-gold/90">
                   Edit Quest
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">{summaryLine}</p>

@@ -57,10 +57,26 @@ export function TimelineView({
   }, [milestones]);
 
   const feasibilityColors: Record<string, { bg: string; text: string; border: string }> = {
-    comfortable: { bg: 'bg-[#dff5a7]', text: 'text-[#315114]', border: 'border-[#315114]' },
-    achievable: { bg: 'bg-[#fff0bb]', text: 'text-[#8d481c]', border: 'border-[#8d481c]' },
-    aggressive: { bg: 'bg-[#ffdba3]', text: 'text-[#9a4718]', border: 'border-[#9a4718]' },
-    very_aggressive: { bg: 'bg-[#ffcab2]', text: 'text-[#8a2716]', border: 'border-[#8a2716]' },
+    comfortable: {
+      bg: 'bg-[linear-gradient(180deg,hsl(var(--epic-nature)_/_0.22),hsl(var(--category-soul)_/_0.12))]',
+      text: 'text-epic-nature',
+      border: 'border-epic-nature/60',
+    },
+    achievable: {
+      bg: 'bg-[linear-gradient(180deg,hsl(var(--stardust-gold)_/_0.24),hsl(var(--nebula-pink)_/_0.12))]',
+      text: 'text-stardust-gold',
+      border: 'border-stardust-gold/60',
+    },
+    aggressive: {
+      bg: 'bg-[linear-gradient(180deg,hsl(var(--category-body)_/_0.2),hsl(var(--stardust-gold)_/_0.12))]',
+      text: 'text-category-body',
+      border: 'border-category-body/60',
+    },
+    very_aggressive: {
+      bg: 'bg-[linear-gradient(180deg,hsl(var(--category-body)_/_0.24),hsl(var(--destructive)_/_0.12))]',
+      text: 'text-category-body',
+      border: 'border-category-body/70',
+    },
   };
 
   const colors = feasibilityColors[feasibilityAssessment.feasibility] || feasibilityColors.achievable;
@@ -82,7 +98,7 @@ export function TimelineView({
                 {formatDisplayLabel(feasibilityAssessment.feasibility)}
               </Badge>
             </div>
-            <p className="text-sm text-[#7f4a1d]/80">
+            <p className="text-sm text-muted-foreground">
               {feasibilityAssessment.message}
             </p>
           </div>
@@ -90,19 +106,19 @@ export function TimelineView({
       </div>
 
       {/* Time Commitment */}
-      <div className={`${plannerPathfinderTheme.mutedPanel} flex flex-wrap items-center gap-4 px-4 py-3 text-sm text-[#7f4a1d]/80`}>
+      <div className={`${plannerPathfinderTheme.mutedPanel} flex flex-wrap items-center gap-4 px-4 py-3 text-sm text-muted-foreground`}>
         <div className="flex items-center gap-1.5">
-          <Clock className="w-4 h-4 text-[#8d481c]" />
+          <Clock className="w-4 h-4 text-celestial-blue" />
           <span>~{weeklyHoursEstimate} hrs/week</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <Star className="w-4 h-4 text-[#d38b22]" />
+          <Star className="w-4 h-4 text-stardust-gold" />
           <span>{postcardCount}/{maxPostcards} celebration milestones</span>
         </div>
       </div>
 
       {executionModel === 'overlap_early' && (
-        <div className={`${plannerPathfinderTheme.mutedPanel} px-3 py-3 text-sm text-[#7f4a1d]/80`}>
+        <div className={`${plannerPathfinderTheme.mutedPanel} px-3 py-3 text-sm text-muted-foreground`}>
           This plan starts the real work early and keeps momentum going throughout.
         </div>
       )}
@@ -137,23 +153,23 @@ export function TimelineView({
           className={`${plannerPathfinderTheme.successCard} p-4`}
         >
           <div className="flex items-center gap-3">
-            <div className="rounded-full border-[3px] border-[#315114] bg-white/35 p-2">
-              <Flag className="w-5 h-5 text-[#315114]" />
+            <div className="rounded-full border-[3px] border-epic-nature/60 bg-epic-nature/15 p-2">
+              <Flag className="w-5 h-5 text-epic-nature" />
             </div>
             <div>
               <p className="font-semibold">Goal Complete!</p>
-              <p className="text-sm text-[#315114]/80">
+              <p className="text-sm text-epic-nature/85">
                 {format(parseISO(deadline), 'EEEE, MMMM d, yyyy')}
               </p>
             </div>
-            <Sparkles className="w-5 h-5 text-[#315114] ml-auto animate-pulse" />
+            <Sparkles className="w-5 h-5 text-epic-nature ml-auto animate-pulse" />
           </div>
         </motion.div>
       </div>
 
       {/* Rituals Summary */}
       <div className={`${plannerPathfinderTheme.mutedPanel} p-4`}>
-        <p className="mb-2 text-xs font-medium text-[#7f4a1d]/80">
+        <p className="mb-2 text-xs font-medium text-muted-foreground">
           Daily & Weekly Rituals ({rituals.length})
         </p>
         <div className="flex flex-wrap gap-2">

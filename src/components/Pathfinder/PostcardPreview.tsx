@@ -23,7 +23,7 @@ export const PostcardPreview = memo(function PostcardPreview({ milestones, story
   return (
     <div className={cn('space-y-3', className)}>
       <div className={cn(plannerPathfinderTheme.raisedPanel, "flex items-center gap-2 p-4")}>
-        <Book className="w-4 h-4 text-[#8d481c]" />
+        <Book className="w-4 h-4 text-stardust-gold" />
         <span className="font-medium text-sm">Your Story Chapters</span>
         <Badge variant="outline" className={cn(plannerPathfinderTheme.chip, "ml-auto text-xs")}>
           {postcardMilestones.length} chapters
@@ -43,19 +43,19 @@ export const PostcardPreview = memo(function PostcardPreview({ milestones, story
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
             
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[1rem] border-[3px] border-[#d38b22] bg-[linear-gradient(180deg,#fff2bd_0%,#ffd46d_100%)]">
-                <Sparkles className="w-5 h-5 text-[#c67b17]" />
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[1rem] border-[3px] border-stardust-gold/65 bg-[linear-gradient(180deg,hsl(var(--stardust-gold))_0%,hsl(var(--nebula-pink))_100%)]">
+                <Sparkles className="w-5 h-5 text-[hsl(var(--deep-space))]" />
               </div>
               
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-xs font-medium text-[#c67b17]">
+                  <span className="text-xs font-medium text-stardust-gold">
                     Chapter {index + 1}
                   </span>
-                  <Star className="w-3 h-3 text-[#d38b22]" />
+                  <Star className="w-3 h-3 text-stardust-gold" />
                 </div>
                 <p className="font-medium text-sm truncate">{milestone.title}</p>
-                <div className="mt-1 flex items-center gap-1.5 text-xs text-[#7f4a1d]/80">
+                <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
                   <MapPin className="w-3 h-3" />
                   <span className="italic">Location revealed on completion</span>
                 </div>
@@ -69,7 +69,7 @@ export const PostcardPreview = memo(function PostcardPreview({ milestones, story
         ))}
       </div>
 
-      <p className="text-center text-xs text-[#7f4a1d]/80">
+      <p className="text-center text-xs text-muted-foreground">
         Complete milestones to unlock cosmic postcards from your companion's journey
       </p>
     </div>

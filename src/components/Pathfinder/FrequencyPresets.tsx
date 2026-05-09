@@ -247,7 +247,7 @@ export function FrequencyPresets({
               </button>
             ))}
           </div>
-          <p className={cn("text-[10px]", isPlannerVariant ? "text-[#7f4a1d]/80" : "text-muted-foreground")}>
+          <p className="text-[10px] text-muted-foreground">
             Short months automatically run on the last valid day. {formatScheduleSelectionShort({
               frequency,
               custom_days: customDays,
