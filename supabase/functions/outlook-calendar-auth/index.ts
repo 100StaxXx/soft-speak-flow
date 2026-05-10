@@ -469,12 +469,9 @@ Deno.serve(async (req) => {
 
     if (action === "getAuthUrl") {
       const userId = await getAuthedUserId(supabase, req);
-      let redirectUri = (body?.redirectUri || body?.redirect_uri) as string | undefined;
+      const redirectUri = (body?.redirectUri || body?.redirect_uri) as string | undefined;
       const requestedSyncMode = normalizeSyncMode(body?.syncMode ?? body?.sync_mode);
       const requestedSource = normalizeOAuthSource(body?.source ?? body?.calendar_source);
-      if (requestedSource === "native") {
-        redirectUri = buildFunctionCallbackUrl(req);
-      }
       if (!redirectUri) {
         return jsonResponse({ error: "redirectUri is required" }, 400);
       }
