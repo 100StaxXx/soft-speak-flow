@@ -790,7 +790,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
             <div className={cn("flex-shrink-0 px-5 py-5", QUEST_FORM_STYLES.desktopPanelHeader)}>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-stardust-gold/90">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[hsl(var(--stardust-gold))]">
                     New Quest
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">{summaryLine}</p>
@@ -905,7 +905,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
           <div className={cn("flex-shrink-0 px-5 py-4", QUEST_FORM_STYLES.desktopPanelHeader)}>
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-stardust-gold/90">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[hsl(var(--stardust-gold))]">
                   Quest Shortcuts
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -950,7 +950,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                     <button
                       type="button"
                       onClick={() => openTemplateBrowser("yours")}
-                      className="text-xs font-semibold text-stardust-gold transition-colors hover:text-foreground"
+                      className="text-xs font-semibold text-[hsl(var(--stardust-gold))] transition-colors hover:text-foreground"
                     >
                       See all
                     </button>

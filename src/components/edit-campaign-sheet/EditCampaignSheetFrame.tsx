@@ -143,10 +143,10 @@ function CampaignRitualDifficultySelector({
               <Label
                 htmlFor={`campaign-ritual-${option.value}`}
                 className={cn(
-                  "flex min-h-[5.75rem] cursor-pointer flex-col items-center justify-center gap-2 rounded-[16px] border-[3px] px-2.5 py-3 text-center transition-all duration-200 ease-out active:scale-[0.98] motion-safe:hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0",
+                  "flex min-h-[5.75rem] cursor-pointer flex-col items-center justify-center gap-2 rounded-[16px] border-[2px] px-2.5 py-3 text-center transition-all duration-200 ease-out active:scale-[0.98] motion-safe:hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0",
                   isSelected
                     ? DIFFICULTY_COLORS[option.value].difficultyActive
-                    : "border-stage-tier-2/35 bg-card/70 text-muted-foreground shadow-[0_4px_0_hsl(var(--stardust-gold)_/_0.16)] hover:bg-card hover:text-foreground",
+                    : QUEST_FORM_STYLES.difficultyButtonInactive,
                 )}
               >
                 <span
@@ -154,7 +154,7 @@ function CampaignRitualDifficultySelector({
                     "flex h-7 w-7 items-center justify-center rounded-full border-2",
                     isSelected
                       ? DIFFICULTY_COLORS[option.value].iconBubble
-                      : "border-border/60 bg-background/45 text-muted-foreground",
+                      : "border-[hsl(var(--border)_/_0.72)] bg-card/[0.72] text-muted-foreground",
                   )}
                 >
                   <Icon className="h-[1.125rem] w-[1.125rem]" />
@@ -535,7 +535,7 @@ export function EditCampaignSheetFrame({
                             {ritual.frequency ?? "daily"}
                           </p>
                         </div>
-                        <Pencil className="h-4 w-4 shrink-0 text-stardust-gold" />
+                        <Pencil className="h-4 w-4 shrink-0 text-[hsl(var(--stardust-gold))]" />
                       </button>
                     ))}
                   </div>

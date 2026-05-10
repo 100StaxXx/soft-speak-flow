@@ -48,8 +48,8 @@ describe("quest-shared tokenized editor classes", () => {
   it("uses tokenized inactive icon contrast for difficulty bubbles", () => {
     const classes = getQuestDifficultyIconClasses("medium", false);
 
-    expect(classes).toContain("border-border/60");
-    expect(classes).toContain("bg-background/45");
+    expect(classes).toContain("border-[hsl(var(--border)_/_0.72)]");
+    expect(classes).toContain("bg-card/[0.72]");
     expect(classes).toContain("text-muted-foreground");
     expect(classes).not.toContain("text-white");
   });

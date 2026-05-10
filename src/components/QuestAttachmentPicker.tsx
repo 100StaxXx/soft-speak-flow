@@ -37,7 +37,7 @@ export function QuestAttachmentPicker({
   const addButtonClassName = cn(
     "gap-2",
     isQuestSoft
-      ? "rounded-[16px] border-[3px] border-celestial-blue/35 bg-card/70 text-foreground shadow-[0_4px_0_hsl(var(--stardust-gold)_/_0.16)] hover:border-stardust-gold/45 hover:bg-card hover:text-foreground"
+      ? "rounded-[16px] border-[2px] border-[hsl(var(--celestial-blue)_/_0.42)] bg-card/[0.76] text-foreground shadow-[0_10px_22px_-20px_rgba(92,157,198,0.34),inset_0_1px_0_rgba(255,255,255,0.76)] hover:border-[hsl(var(--stardust-gold)_/_0.48)] hover:bg-card hover:text-foreground"
       : "",
   );
 
@@ -138,7 +138,7 @@ export function QuestAttachmentPicker({
               className={cn(
                 "relative p-2",
                 isQuestSoft
-                  ? "rounded-[16px] border-[3px] border-celestial-blue/30 bg-card/60 shadow-[0_4px_0_hsl(var(--stardust-gold)_/_0.16)]"
+                  ? "rounded-[16px] border-[2px] border-[hsl(var(--celestial-blue)_/_0.38)] bg-card/[0.64] shadow-[0_10px_22px_-20px_rgba(92,157,198,0.32),inset_0_1px_0_rgba(255,255,255,0.72)]"
                   : "rounded-lg border border-border/60 bg-card",
               )}
             >
@@ -171,7 +171,7 @@ export function QuestAttachmentPicker({
                   rel="noreferrer"
                   className={cn(
                     "flex h-16 items-center justify-center rounded",
-                    isQuestSoft ? "bg-background/45" : "bg-muted/30",
+                    isQuestSoft ? "bg-card/[0.54]" : "bg-muted/30",
                   )}
                 >
                   <FileText className={cn("h-5 w-5", isQuestSoft ? "text-muted-foreground" : "text-muted-foreground")} />

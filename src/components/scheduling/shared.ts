@@ -109,12 +109,12 @@ export function getSchedulingFieldStyles(variant: SchedulingFieldVariant) {
           "w-full flex items-center justify-center gap-2 text-sm font-semibold",
           QUEST_FORM_STYLES.selectorChip,
         ),
-      triggerOpen: "border-stardust-gold/70",
+      triggerOpen: "border-[hsl(var(--stardust-gold)_/_0.58)]",
       triggerMuted: QUEST_FORM_STYLES.selectorChipMuted,
       triggerRow: "flex gap-2",
       triggerIcon: "h-4 w-4",
       panel: "space-y-2",
-      input: "h-11 rounded-[20px] border-[3px] border-celestial-blue/45 bg-card/80 text-base text-foreground placeholder:text-muted-foreground focus-visible:border-stardust-gold/70 focus-visible:ring-stardust-gold/35",
+      input: "h-11 rounded-[20px] border-[2px] border-[hsl(var(--celestial-blue)_/_0.52)] bg-card/[0.88] text-base text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_2px_rgba(58,121,158,0.08)] focus-visible:border-[hsl(var(--celestial-blue)_/_0.78)] focus-visible:ring-celestial-blue/25",
       wheel: QUEST_FORM_STYLES.timeWheel,
       wheelFadeTop: QUEST_FORM_STYLES.timeWheelFadeTop,
       wheelFadeBottom: QUEST_FORM_STYLES.timeWheelFadeBottom,
@@ -132,7 +132,7 @@ export function getSchedulingFieldStyles(variant: SchedulingFieldVariant) {
       chipsWrapper: "space-y-2 px-1",
       chipsRow: "flex gap-2 flex-wrap",
       customPanel: cn("flex items-center gap-2 rounded-[20px] px-3 py-2", QUEST_FORM_STYLES.insetPanel),
-      customInput: "h-10 w-28 border-[3px] border-celestial-blue/45 bg-card/80 text-sm text-foreground focus-visible:border-stardust-gold/70 focus-visible:ring-stardust-gold/35",
+      customInput: "h-10 w-28 border-[2px] border-[hsl(var(--celestial-blue)_/_0.52)] bg-card/[0.88] text-sm text-foreground focus-visible:border-[hsl(var(--celestial-blue)_/_0.78)] focus-visible:ring-celestial-blue/25",
       customSuffix: "text-xs text-muted-foreground",
     } as const;
   }

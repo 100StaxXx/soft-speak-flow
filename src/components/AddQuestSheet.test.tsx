@@ -114,6 +114,23 @@ const expectElementToIncludeClasses = (element: HTMLElement, classes: string) =>
   }
 };
 
+const clickButtonForText = (text: string) => {
+  const label = screen.getByText(text);
+  const button = label.closest("button");
+  if (!button) {
+    throw new Error(`Button for "${text}" not found`);
+  }
+  fireEvent.click(button);
+};
+
+const clickTimeSlot = (time: string) => {
+  const slot = document.querySelector<HTMLButtonElement>(`[data-time-slot="${time}"]`);
+  if (!slot) {
+    throw new Error(`Time slot "${time}" not found`);
+  }
+  fireEvent.click(slot);
+};
+
 vi.mock("@/components/QuestAttachmentPicker", () => ({
   QuestAttachmentPicker: ({ onAttachmentsChange }: { onAttachmentsChange: (attachments: QuestAttachmentInput[]) => void }) => (
     <div>
@@ -189,7 +206,7 @@ describe("AddQuestSheet", () => {
     expect(screen.queryByText(/Name your quest.*Select a time/i)).not.toBeInTheDocument();
     expectElementToIncludeClasses(
       screen.getByTestId("add-quest-mobile-sheet"),
-      "border-celestial-blue/55 text-foreground",
+      "border-[hsl(var(--celestial-blue)_/_0.62)] text-foreground",
     );
     expect(screen.getByTestId("add-quest-editor-header").firstElementChild).toContainElement(
       screen.getByPlaceholderText("Quest Title"),
@@ -212,7 +229,7 @@ describe("AddQuestSheet", () => {
     expect(screen.getByTestId("add-quest-desktop-panel")).toBeInTheDocument();
     expectElementToIncludeClasses(
       screen.getByTestId("add-quest-desktop-panel"),
-      "border-celestial-blue/55 text-foreground",
+      "border-[hsl(var(--celestial-blue)_/_0.62)] text-foreground",
     );
     expect(screen.queryByTestId("add-quest-mobile-sheet")).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText("Quest Title")).toBeInTheDocument();
@@ -881,9 +898,9 @@ describe("AddQuestSheet", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Browse common quests" }));
-    fireEvent.click(screen.getByRole("button", { name: /Respond to emails/i }));
-    fireEvent.click(screen.getByRole("button", { name: "9:00 AM" }));
-    fireEvent.click(screen.getByRole("button", { name: "9:30 AM" }));
+    clickButtonForText("Respond to emails");
+    clickButtonForText("9:00 AM");
+    clickTimeSlot("09:30");
     fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
 
     await waitFor(() => {
@@ -906,12 +923,17 @@ describe("AddQuestSheet", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Browse common quests" }));
-    fireEvent.click(screen.getByRole("button", { name: /Respond to emails/i }));
+    clickButtonForText("Respond to emails");
     fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
       target: { value: "Respond to priority emails" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Add to Inbox instead" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Just this time" }));
+    const justThisTimeLabel = await screen.findByText("Just this time");
+    const justThisTimeButton = justThisTimeLabel.closest("button");
+    if (!justThisTimeButton) {
+      throw new Error("Just this time button not found");
+    }
+    fireEvent.click(justThisTimeButton);
 
     await waitFor(() => {
       expect(onAdd).toHaveBeenCalledTimes(1);

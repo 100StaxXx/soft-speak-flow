@@ -182,7 +182,7 @@ describe("EditQuestDialog", () => {
     expect(screen.getByTestId("edit-quest-desktop-panel")).toBeInTheDocument();
     expectElementToIncludeClasses(
       screen.getByTestId("edit-quest-desktop-panel"),
-      "border-celestial-blue/55 text-foreground",
+      "border-[hsl(var(--celestial-blue)_/_0.62)] text-foreground",
     );
     expect(screen.queryByTestId("edit-quest-mobile-sheet")).not.toBeInTheDocument();
     expect(screen.getByDisplayValue("Legacy quest")).toBeInTheDocument();

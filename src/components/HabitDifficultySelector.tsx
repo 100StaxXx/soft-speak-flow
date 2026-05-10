@@ -2,7 +2,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Flame, Zap, Mountain } from "lucide-react";
 import { HABIT_XP_REWARDS } from "@/config/xpRewards";
-import { DIFFICULTY_COLORS } from "@/components/quest-shared";
+import { DIFFICULTY_COLORS, QUEST_FORM_STYLES } from "@/components/quest-shared";
 import { cn } from "@/lib/utils";
 
 interface HabitDifficultySelectorProps {
@@ -68,12 +68,12 @@ export const HabitDifficultySelector = ({
                 htmlFor={optionId}
                 className={cn(
                   isQuestSoft
-                    ? "flex min-h-[5.75rem] cursor-pointer flex-col items-center justify-center gap-2 rounded-[16px] border-[3px] px-2.5 py-3 text-center transition-all duration-200 ease-out active:scale-[0.98] motion-safe:hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+                    ? "flex min-h-[5.75rem] cursor-pointer flex-col items-center justify-center gap-2 rounded-[16px] border-[2px] px-2.5 py-3 text-center transition-all duration-200 ease-out active:scale-[0.98] motion-safe:hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
                     : "flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-muted bg-background p-4 transition-all hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary",
                   isQuestSoft && (
                     isSelected
                       ? DIFFICULTY_COLORS[option.value].difficultyActive
-                      : "border-stage-tier-2/35 bg-card/70 text-muted-foreground shadow-[0_4px_0_hsl(var(--stardust-gold)_/_0.16)] hover:bg-card hover:text-foreground"
+                      : QUEST_FORM_STYLES.difficultyButtonInactive
                   ),
                 )}
               >
@@ -85,7 +85,7 @@ export const HabitDifficultySelector = ({
                     isQuestSoft && (
                       isSelected
                         ? DIFFICULTY_COLORS[option.value].iconBubble
-                        : "border-border/60 bg-background/45 text-muted-foreground"
+                        : "border-[hsl(var(--border)_/_0.72)] bg-card/[0.72] text-muted-foreground"
                     ),
                   )}
                 >

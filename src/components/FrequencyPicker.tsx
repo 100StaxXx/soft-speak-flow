@@ -48,7 +48,7 @@ export const FrequencyPicker = ({
             onClick={selectAll}
             className={cn(
               "text-xs font-medium",
-              isQuestSoft ? "text-stardust-gold hover:text-foreground" : "text-primary hover:text-primary/80",
+              isQuestSoft ? "text-[hsl(var(--stardust-gold))] hover:text-foreground" : "text-primary hover:text-primary/80",
             )}
           >
             Select all
@@ -67,12 +67,12 @@ export const FrequencyPicker = ({
               selectedDays.includes(index)
                 ? cn(
                   isQuestSoft
-                    ? "border-transparent shadow-[0_4px_0_hsl(var(--stardust-gold)_/_0.18)]"
+                    ? "border-transparent shadow-[0_10px_22px_-18px_rgba(92,157,198,0.38),inset_0_1px_0_rgba(255,255,255,0.88)]"
                     : "bg-primary border-primary text-primary-foreground shadow-glow",
                   isQuestSoft && activeTone ? activeTone : "",
                 )
                 : isQuestSoft
-                  ? "border-border/60 bg-card/60 text-muted-foreground hover:bg-card hover:text-foreground"
+                  ? "border-[hsl(var(--border)_/_0.72)] bg-card/[0.64] text-muted-foreground hover:bg-card hover:text-foreground"
                   : "border-border bg-card text-muted-foreground hover:border-primary/50"
             )}
           >
