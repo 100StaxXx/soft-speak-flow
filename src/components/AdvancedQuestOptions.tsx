@@ -101,11 +101,6 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
     { value: 120, label: "2h" },
   ];
 
-  const reminderOptions = [
-    { value: "none", label: "None" },
-    ...QUEST_REMINDER_PRESET_OPTIONS,
-  ];
-
   const monthDays = useMemo(() => Array.from({ length: 31 }, (_, index) => index + 1), []);
   const recurrenceOptions = [
     { value: 'none', label: 'None' },
@@ -124,9 +119,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
   );
 
   const reminderPresetValues = useMemo(
-    () => reminderOptions
-      .map((option) => option.value)
-      .filter((value): value is number => typeof value === "number"),
+    () => QUEST_REMINDER_PRESET_OPTIONS.map((option) => option.value),
     [],
   );
   const reminderOffsets = useMemo(
@@ -221,7 +214,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
   const dropdownItemClassName = (selected: boolean) => cn(
     isQuestSoft
       ? "w-full rounded-[18px] px-3 py-2.5 text-left text-sm font-medium transition-all duration-200 motion-reduce:transition-none"
-      : "w-full px-3 py-2 text-sm text-left hover:bg-accent transition-colors",
+      : "w-full rounded-md px-3 py-2 text-sm text-left hover:bg-accent transition-colors",
     isQuestSoft
       ? selected
         ? cn(toneColors.pill, "shadow-[0_4px_0_hsl(var(--stardust-gold)_/_0.18)]")
@@ -243,6 +236,11 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
     setCustomReminderTime(format(reminderAt, "HH:mm"));
     setCustomReminderError(null);
   }, [customReminderOffsets, customReminderQuestStart]);
+
+  const reminderOptionClassName = (selected: boolean) => cn(
+    dropdownItemClassName(selected),
+    "min-h-10 text-center leading-snug",
+  );
 
   useEffect(() => {
     if (recurrenceSelectionDisabled) {
@@ -628,28 +626,17 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                 className="max-h-[min(16rem,var(--radix-popover-content-available-height))] overflow-y-auto overscroll-contain touch-pan-y space-y-1 pr-1"
                 style={{ WebkitOverflowScrolling: "touch" }}
               >
-                <div className="space-y-1">
-                  {reminderOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => {
-                        if (option.value === "none") {
-                          applyReminderOffsets([]);
-                        } else if (typeof option.value === "number") {
-                          toggleReminderOffset(option.value);
-                        }
-                        setIsEditingCustomReminder(false);
-                      }}
-                      className={dropdownItemClassName(
-                        option.value === "none"
-                          ? reminderOffsets.length === 0
-                          : selectedReminderOffsets.has(option.value)
-                      )}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+                <div className="grid grid-cols-2 gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      applyReminderOffsets([]);
+                      setIsEditingCustomReminder(false);
+                    }}
+                    className={reminderOptionClassName(reminderOffsets.length === 0)}
+                  >
+                    None
+                  </button>
 
                   <button
                     type="button"
@@ -665,10 +652,24 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                         return next;
                       });
                     }}
-                    className={dropdownItemClassName(customReminderOffsets.length > 0)}
+                    className={reminderOptionClassName(customReminderOffsets.length > 0)}
                   >
                     Custom
                   </button>
+
+                  {QUEST_REMINDER_PRESET_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        toggleReminderOffset(option.value);
+                        setIsEditingCustomReminder(false);
+                      }}
+                      className={reminderOptionClassName(selectedReminderOffsets.has(option.value))}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
                 </div>
 
                 {reminderOffsets.length >= MAX_QUEST_REMINDER_OFFSETS && (

@@ -522,23 +522,10 @@ export function TaskAdvancedEditSheet({
                       className="max-h-[min(16rem,calc(100dvh-12rem))] overflow-y-auto overscroll-contain touch-pan-y space-y-1 pr-1"
                       style={{ WebkitOverflowScrolling: "touch" }}
                     >
-                      {QUEST_REMINDER_PRESET_OPTIONS.map(opt => (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          className={cn(
-                            "w-full text-left px-3 py-2 text-sm hover:bg-muted rounded-md",
-                            selectedReminderOffsets.has(opt.value) && "bg-primary/10 text-primary"
-                          )}
-                          onClick={() => handlePresetReminderSelect(opt.value)}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
                       <button
                         type="button"
                         className={cn(
-                          "w-full text-left px-3 py-2 text-sm hover:bg-muted rounded-md",
+                          "w-full text-center px-3 py-2 text-sm hover:bg-muted rounded-md",
                           (showCustomReminderInput || hasCustomReminderOffset) && "bg-primary/10 text-primary"
                         )}
                         onClick={() => setShowCustomReminderInput((current) => {
@@ -554,6 +541,21 @@ export function TaskAdvancedEditSheet({
                       >
                         Custom
                       </button>
+                      <div className="grid grid-cols-2 gap-1">
+                        {QUEST_REMINDER_PRESET_OPTIONS.map(opt => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            className={cn(
+                              "min-h-10 w-full rounded-md px-3 py-2 text-center text-sm leading-snug hover:bg-muted",
+                              selectedReminderOffsets.has(opt.value) && "bg-primary/10 text-primary"
+                            )}
+                            onClick={() => handlePresetReminderSelect(opt.value)}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
                       {showCustomReminderInput && (
                         <div className="space-y-2 border-t border-border/60 px-2 py-3">
                           {usesCustomReminderDateTime ? (

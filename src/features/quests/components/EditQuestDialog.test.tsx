@@ -209,6 +209,25 @@ describe("EditQuestDialog", () => {
     expect(reminderButton.compareDocumentPosition(addSubtaskInput) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("shows custom and long early reminder options from the edit quest dialog", () => {
+    render(
+      <EditQuestDialog
+        task={legacyTask}
+        open
+        onOpenChange={vi.fn()}
+        onSave={vi.fn().mockResolvedValue(undefined)}
+        isSaving={false}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "None" }));
+
+    expect(screen.getByRole("button", { name: "Custom" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "1 day before" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "2 days before" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "1 week before" })).toBeInTheDocument();
+  });
+
   it.each([undefined, "desktop-panel"] as const)(
     "shows Early Reminder above Advanced Settings without duplicating it for %s presentation",
     (presentation) => {

@@ -32,7 +32,7 @@ export const PlannerAppearanceSettings = memo(() => {
               Light planner screens
             </Label>
             <p className="text-xs text-muted-foreground">
-              Starts Pathfinder in the brighter Aqua style. Turn off for dark cosmic.
+              Starts Pathfinder in the frosted blue style. Turn off for dark cosmic.
             </p>
           </div>
           <Switch

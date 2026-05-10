@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
-import { isCompanionAgentSurfaceEnabled } from "@/config/companionAgentRollout";
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompanion } from "@/hooks/useCompanion";
@@ -793,9 +792,7 @@ export function useCompanionAssistant({
   const { trackInteraction } = useAIInteractionTracker();
   const { autoplayVoice, muteSpokenReplies } = useCompanionVoiceSettings();
   const queryClient = useQueryClient();
-  const agentSurfaceEnabled = isCompanionAgentSurfaceEnabled(surface);
-  const [useLegacyFallback, setUseLegacyFallback] =
-    useState(!agentSurfaceEnabled);
+  const [useLegacyFallback, setUseLegacyFallback] = useState(false);
   const unifiedAgentActive = !useLegacyFallback;
 
   const legacyAssistant = useLegacyCompanionAssistantAdapter({
@@ -1043,14 +1040,14 @@ export function useCompanionAssistant({
     if (scopeKeyRef.current === scopeKey) return;
 
     scopeKeyRef.current = scopeKey;
-    setUseLegacyFallback(!agentSurfaceEnabled);
+    setUseLegacyFallback(false);
     bootstrappedScopeRef.current = null;
     handledLaunchIntentIdRef.current = null;
     threadUiStateCacheRef.current.clear();
     openFreshThread({
       greetingText: baseGreeting,
     });
-  }, [agentSurfaceEnabled, baseGreeting, openFreshThread, scopeKey]);
+  }, [baseGreeting, openFreshThread, scopeKey]);
 
   useEffect(() => {
     if (!unifiedAgentActive) return;

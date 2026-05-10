@@ -8,7 +8,6 @@ const PERSONALIZED_QUEST_CAPTURE_OPENING =
   "Nova's ready. What quest are we capturing?";
 
 const mocks = vi.hoisted(() => ({
-  agentSurfaceEnabled: true,
   toastError: vi.fn(),
   listThreads: vi.fn(),
   loadThreadMessages: vi.fn(),
@@ -66,10 +65,6 @@ vi.mock("@/hooks/useCompanionDialogue", () => ({
     greeting: "You made it back.",
     voiceStyle: "steady",
   }),
-}));
-
-vi.mock("@/config/companionAgentRollout", () => ({
-  isCompanionAgentSurfaceEnabled: () => mocks.agentSurfaceEnabled,
 }));
 
 vi.mock("@/hooks/useAIInteractionTracker", () => ({
@@ -194,7 +189,6 @@ const createWrapper = () => {
 describe("useCompanionAssistant", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.agentSurfaceEnabled = true;
     mocks.legacySavedSuggestionProposalIds = [];
     mocks.legacyPendingSuggestionProposalId = null;
     mocks.generateThreadSessionId.mockReturnValue("fresh-session");
@@ -663,6 +657,12 @@ describe("useCompanionAssistant", () => {
     expect(result.current.messages.at(-1)?.content).toBe(
       "Tomorrow is pretty light.",
     );
+    const invokedFunctionNames = mocks.supabaseInvoke.mock.calls.map(
+      ([name]) => name,
+    );
+    expect(invokedFunctionNames).not.toContain("companion-chat");
+    expect(invokedFunctionNames).not.toContain("companion-planner-chat");
+    expect(mocks.legacySubmitMessage).not.toHaveBeenCalled();
     expect(mocks.trackInteraction).toHaveBeenCalledWith(
       expect.objectContaining({
         interactionType: "companion_agent",
@@ -675,6 +675,39 @@ describe("useCompanionAssistant", () => {
         }),
       }),
     );
+  });
+
+  it("submits companion chat surface turns through companion-agent without legacy endpoints", async () => {
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "companion" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("persisted-session");
+    });
+
+    await act(async () => {
+      await result.current.submitMessage("Can we talk through today?", "text");
+    });
+
+    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+      "companion-agent",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          sessionId: "persisted-session",
+          message: "Can we talk through today?",
+          surface: "companion",
+        }),
+      }),
+    );
+    const invokedFunctionNames = mocks.supabaseInvoke.mock.calls.map(
+      ([name]) => name,
+    );
+    expect(invokedFunctionNames).not.toContain("companion-chat");
+    expect(invokedFunctionNames).not.toContain("companion-planner-chat");
+    expect(mocks.legacySubmitMessage).not.toHaveBeenCalled();
   });
 
   it("requests draft opportunity cards after conversational Journeys replies", async () => {
@@ -2077,82 +2110,17 @@ describe("useCompanionAssistant", () => {
     });
   });
 
-  it("keeps unified thread history dormant when the legacy fallback is active from the start", async () => {
-    mocks.agentSurfaceEnabled = false;
-
-    const { wrapper } = createWrapper();
-    renderHook(() => useCompanionAssistant({ surface: "journeys" }), {
-      wrapper,
+  it("tries companion-agent before using legacy fallback for quest-capture replies", async () => {
+    mocks.supabaseInvoke.mockRejectedValueOnce(new Error("agent unavailable"));
+    mocks.parseFunctionInvokeError.mockResolvedValueOnce({
+      status: 404,
+      backendMessage: null,
+      name: "FunctionsHttpError",
+      message: "Function not found",
+      responsePayload: {
+        code: "function_not_found",
+      },
     });
-
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    expect(mocks.listThreads).not.toHaveBeenCalled();
-  });
-
-  it("runs launch intents through the legacy fallback without waiting on unified thread bootstrap", async () => {
-    mocks.agentSurfaceEnabled = false;
-
-    const { wrapper } = createWrapper();
-    renderHook(
-      () =>
-        useCompanionAssistant({
-          surface: "journeys",
-          launchIntent: {
-            id: "launch-fallback-1",
-            message: "Plan my day",
-            starterIntent: "plan_day",
-          },
-        }),
-      { wrapper },
-    );
-
-    await waitFor(() => {
-      expect(mocks.legacyStartTemplateThread).toHaveBeenCalled();
-      expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
-        "Plan my day",
-        "text",
-        { starterIntent: "plan_day", turnOrigin: "launcher" },
-      );
-    });
-    expect(mocks.listThreads).not.toHaveBeenCalled();
-  });
-
-  it("starts free-talk launcher templates in legacy fallback without submitting the opener", async () => {
-    mocks.agentSurfaceEnabled = false;
-    const consumed = vi.fn();
-
-    const { wrapper } = createWrapper();
-    renderHook(
-      () =>
-        useCompanionAssistant({
-          surface: "journeys",
-          launchIntent: {
-            id: "launch-free-talk-fallback-1",
-            message: "What's good, buddy?",
-            starterIntent: "free_talk_start",
-            target: "conversation",
-          },
-          onLaunchIntentConsumed: consumed,
-        }),
-      { wrapper },
-    );
-
-    await waitFor(() => {
-      expect(mocks.legacyStartTemplateThread).toHaveBeenCalledWith({
-        greetingText: "What's good, buddy?",
-        visibleAssistantOpening: true,
-      });
-    });
-    expect(mocks.legacySubmitMessage).not.toHaveBeenCalled();
-    expect(consumed).toHaveBeenCalledWith("launch-free-talk-fallback-1");
-    expect(mocks.listThreads).not.toHaveBeenCalled();
-  });
-
-  it("does not pass pending quest-capture as an explicit starter to legacy fallback replies", async () => {
-    mocks.agentSurfaceEnabled = false;
 
     const { wrapper } = createWrapper();
     const { result } = renderHook(
@@ -2172,9 +2140,8 @@ describe("useCompanionAssistant", () => {
     );
 
     await waitFor(() => {
-      expect(mocks.legacyStartQuestCaptureThread).toHaveBeenCalledWith(
+      expect(result.current.messages[0]?.content).toBe(
         PERSONALIZED_QUEST_CAPTURE_OPENING,
-        { selectedDate: "2026-02-13" },
       );
     });
 
@@ -2184,6 +2151,16 @@ describe("useCompanionAssistant", () => {
       await result.current.submitMessage("Pilates tomorrow at 8am", "text");
     });
 
+    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+      "companion-agent",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          message: "Pilates tomorrow at 8am",
+          starterIntent: "quest_capture",
+          selectedDate: "2026-02-13",
+        }),
+      }),
+    );
     expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
       "Pilates tomorrow at 8am",
       "text",
@@ -2192,11 +2169,9 @@ describe("useCompanionAssistant", () => {
         selectedDate: "2026-02-13",
       },
     );
-    expect(mocks.listThreads).not.toHaveBeenCalled();
   });
 
-  it("clears stale quest-capture context when legacy fallback handles another launcher", async () => {
-    mocks.agentSurfaceEnabled = false;
+  it("clears stale quest-capture context after switching into legacy fallback", async () => {
     const questLaunchIntent: CompanionPlannerLaunchIntent = {
       id: "launch-quest-fallback-1",
       message: PERSONALIZED_QUEST_CAPTURE_OPENING,
@@ -2211,6 +2186,16 @@ describe("useCompanionAssistant", () => {
       target: "planner",
       briefingContext: null,
     };
+    mocks.supabaseInvoke.mockRejectedValueOnce(new Error("agent unavailable"));
+    mocks.parseFunctionInvokeError.mockResolvedValueOnce({
+      status: 404,
+      backendMessage: null,
+      name: "FunctionsHttpError",
+      message: "Function not found",
+      responsePayload: {
+        code: "function_not_found",
+      },
+    });
 
     const { wrapper } = createWrapper();
     const { result, rerender } = renderHook(
@@ -2229,13 +2214,24 @@ describe("useCompanionAssistant", () => {
     );
 
     await waitFor(() => {
-      expect(mocks.legacyStartQuestCaptureThread).toHaveBeenCalledWith(
+      expect(result.current.messages[0]?.content).toBe(
         PERSONALIZED_QUEST_CAPTURE_OPENING,
-        { selectedDate: null },
       );
     });
 
     mocks.legacyStartQuestCaptureThread.mockClear();
+    mocks.legacySubmitMessage.mockClear();
+
+    await act(async () => {
+      await result.current.submitMessage("Pilates tomorrow at 8am", "text");
+    });
+
+    expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
+      "Pilates tomorrow at 8am",
+      "text",
+      undefined,
+    );
+
     mocks.legacySubmitMessage.mockClear();
 
     rerender({ launchIntent: planLaunchIntent });
@@ -2259,7 +2255,6 @@ describe("useCompanionAssistant", () => {
       "text",
       undefined,
     );
-    expect(mocks.listThreads).not.toHaveBeenCalled();
   });
 
   it("keeps planner context after confirming one suggestion so another can be prepared", async () => {

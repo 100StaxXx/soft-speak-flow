@@ -99,6 +99,15 @@ const getRecurrenceSection = (): HTMLElement => {
   return section as HTMLElement;
 };
 
+const getEarlyReminderControls = () => {
+  const reminderLabel = screen.getByText("Early Reminder");
+  const section = reminderLabel.parentElement?.parentElement;
+  if (!section) {
+    throw new Error("Early reminder section not found");
+  }
+  return within(section);
+};
+
 const expectElementToIncludeClasses = (element: HTMLElement, classes: string) => {
   for (const token of classes.split(" ").filter(Boolean)) {
     expect(element.className).toContain(token);
@@ -273,6 +282,25 @@ describe("AddQuestSheet", () => {
       expect(screen.getAllByText("Early Reminder")).toHaveLength(1);
     },
   );
+
+  it("shows custom and long early reminder options from the add quest sheet", () => {
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Time" }));
+    fireEvent.click(getEarlyReminderControls().getByRole("button", { name: "None" }));
+
+    expect(screen.getByRole("button", { name: "Custom" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "1 day before" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "2 days before" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "1 week before" })).toBeInTheDocument();
+  });
 
   it("does not auto-focus the title on open and still allows manual focus", () => {
     vi.useFakeTimers();

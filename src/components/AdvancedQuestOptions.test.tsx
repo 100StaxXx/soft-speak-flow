@@ -391,6 +391,7 @@ describe("AdvancedQuestOptions reminder picker", () => {
 
     expect(screen.getByRole("button", { name: "1 hour before" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "2 hours before" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "1 day before" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "2 days before" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "1 week before" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Custom" })).toBeInTheDocument();

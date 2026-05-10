@@ -1158,7 +1158,7 @@ describe("TodaysAgenda campaign visibility", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(screen.queryByText("Campaigns")).not.toBeInTheDocument();
+    expect(screen.getByText("Campaigns")).toBeInTheDocument();
     expect(screen.getByText("Hydrated Epic")).toBeInTheDocument();
   });
 

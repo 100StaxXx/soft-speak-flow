@@ -1924,16 +1924,22 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     );
   };
 
-  const renderCampaignSection = ({ inDesktopRail = false }: { inDesktopRail?: boolean } = {}) => (
-    <>
+  const renderCampaignSection = ({ inDesktopRail = false }: { inDesktopRail?: boolean } = {}) => {
+    const sectionLabel = inDesktopRail ? "Campaigns & rituals" : "Campaigns";
+    const campaignSectionHeader = (
+      <div className="flex items-center gap-2 mb-3">
+        {!inDesktopRail && <div className="w-9 flex-shrink-0" />}
+        {renderCampaignSectionLabel(sectionLabel)}
+        <div className="flex-1 border-t border-dashed border-border/40" />
+      </div>
+    );
+
+    return (
+      <>
       {/* Campaign quick-view launchers; ritual tasks render in the normal scheduler timeline. */}
       {campaignRitualGroups.length > 0 && (
         <div className={cn(inDesktopRail ? "space-y-3" : "mt-6 pt-4 border-t border-border/30")}>
-          <div className="flex items-center gap-2 mb-3">
-            {!inDesktopRail && <div className="w-9 flex-shrink-0" />}
-            {renderCampaignSectionLabel(inDesktopRail ? "Campaigns & rituals" : "Campaigns")}
-            <div className="flex-1 border-t border-dashed border-border/40" />
-          </div>
+          {campaignSectionHeader}
 
           <div className="space-y-2">
             {campaignRitualGroups.map((group) => {
@@ -2039,47 +2045,52 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
       {/* Campaign Strip (for epics with no rituals today) */}
       {activeEpics.length > 0 && campaignRitualGroups.length === 0 && (
-        <div className={cn(inDesktopRail ? "space-y-2" : "mt-4 pt-3 border-t border-border/20 space-y-2")}>
-          {activeEpics.map((epic) => {
-            const progress = Math.round(epic.progress_percentage ?? 0);
-            const daysLeft = getDaysLeft(epic);
-            const resolvedEndDate = resolveEpicEndDate(epic);
-            return (
-              <JourneyPathDrawer key={epic.id} epic={{
-                id: epic.id,
-                title: epic.title,
-                description: epic.description ?? undefined,
-                progress_percentage: epic.progress_percentage ?? 0,
-                target_days: epic.target_days,
-                start_date: epic.start_date,
-                end_date: resolvedEndDate,
-                epic_habits: epic.epic_habits,
-              }}>
-                <button
-                  type="button"
-                  aria-label={`Open campaign ${epic.title}`}
-                  className="w-full rounded-xl border border-border/30 bg-card/30 px-3 py-2 text-left hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <Target className="w-4 h-4 text-primary shrink-0" />
-                      <span className="text-sm font-medium truncate max-w-[140px]">{epic.title}</span>
+        <div className={cn(inDesktopRail ? "space-y-3" : "mt-4 pt-3 border-t border-border/20")}>
+          {campaignSectionHeader}
+
+          <div className="space-y-2">
+            {activeEpics.map((epic) => {
+              const progress = Math.round(epic.progress_percentage ?? 0);
+              const daysLeft = getDaysLeft(epic);
+              const resolvedEndDate = resolveEpicEndDate(epic);
+              return (
+                <JourneyPathDrawer key={epic.id} epic={{
+                  id: epic.id,
+                  title: epic.title,
+                  description: epic.description ?? undefined,
+                  progress_percentage: epic.progress_percentage ?? 0,
+                  target_days: epic.target_days,
+                  start_date: epic.start_date,
+                  end_date: resolvedEndDate,
+                  epic_habits: epic.epic_habits,
+                }}>
+                  <button
+                    type="button"
+                    aria-label={`Open campaign ${epic.title}`}
+                    className="w-full rounded-xl border border-border/30 bg-card/30 px-3 py-2 text-left hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Target className="w-4 h-4 text-primary shrink-0" />
+                        <span className="text-sm font-medium truncate max-w-[140px]">{epic.title}</span>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="text-primary font-bold text-xs shrink-0">{progress}%</span>
+                        {daysLeft !== null && (
+                          <span className="text-muted-foreground text-xs shrink-0">{daysLeft}d</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <span className="text-primary font-bold text-xs shrink-0">{progress}%</span>
-                      {daysLeft !== null && (
-                        <span className="text-muted-foreground text-xs shrink-0">{daysLeft}d</span>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              </JourneyPathDrawer>
-            );
-          })}
+                  </button>
+                </JourneyPathDrawer>
+              );
+            })}
+          </div>
         </div>
       )}
-    </>
-  );
+      </>
+    );
+  };
 
 
 
