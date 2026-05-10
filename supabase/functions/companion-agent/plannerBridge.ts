@@ -11,6 +11,7 @@ import {
   type PlannerContextTask,
   type PlannerDayLoad,
   type PlannerHorizon,
+  type PlannerBriefingContext,
   type PlannerMemoryProfile,
   type PlannerMoveSuggestion,
   type PlannerOpenSlot,
@@ -1145,6 +1146,7 @@ export function consultPlannerForAgent(params: {
   message: string;
   currentDateTime: string;
   selectedDate?: string | null;
+  briefingContext?: PlannerBriefingContext | null;
   surface: "companion" | "journeys";
   horizon?: PlannerHorizon;
   starterIntent?: string | null;
@@ -1196,6 +1198,7 @@ export function consultPlannerForAgent(params: {
     rituals,
     calendarEvents,
     scheduleInsights,
+    briefingContext: params.briefingContext ?? null,
     plannerMemory: {
       preferredTimeOfDay: asString(
         plannerMemoryForPlanning?.preferredTimeOfDay,
@@ -1289,6 +1292,7 @@ export function consultPlannerForAgent(params: {
       activeEpics,
       rituals,
       calendarEvents,
+      briefingContext: params.briefingContext ?? null,
       starterIntent: plannerStarterIntent ?? undefined,
       priorityScores,
       scheduleInsights,

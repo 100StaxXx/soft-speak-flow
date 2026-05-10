@@ -271,6 +271,14 @@ export const SelectedEntityIdsSchema = z.object({
   calendarEventIds: z.array(z.string()).max(12).optional(),
 }).optional();
 
+export const PlannerBriefingContextSchema = z.object({
+  content: z.string().min(1).max(2000),
+  actionPrompt: z.string().min(1).max(2000).nullable().optional(),
+  focus: z.string().min(1).max(500).nullable().optional(),
+  inferredGoals: z.array(z.string().min(1).max(200)).max(12).optional(),
+  dataSnapshot: z.record(z.unknown()).nullable().optional(),
+}).passthrough();
+
 export const CompanionAgentRequestSchema = z.object({
   surface: SurfaceSchema.default("companion"),
   sessionId: z.string().min(1).max(200),
@@ -285,6 +293,7 @@ export const CompanionAgentRequestSchema = z.object({
   visibleDateEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   horizonDays: z.number().int().min(1).max(31).optional(),
   selectedEntityIds: SelectedEntityIdsSchema,
+  briefingContext: PlannerBriefingContextSchema.nullable().optional(),
   activeFollowUp: CompanionAgentFollowUpSchema.nullable().optional(),
   activeProposedActions: z.array(CompanionAgentProposedActionSchema).max(8)
     .optional(),

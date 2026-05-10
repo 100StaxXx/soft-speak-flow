@@ -349,7 +349,12 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
 
   // Load saved preferences
   const loadPreferences = useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setSavedPreferences(null);
+      setStep('check_in');
+      setIsLoadingPreferences(false);
+      return;
+    }
     
     setIsLoadingPreferences(true);
     try {

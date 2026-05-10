@@ -1676,6 +1676,113 @@ describe("useCompanionAssistant", () => {
     );
   });
 
+  it("keeps plan-day briefing context on follow-up replies", async () => {
+    const briefingContext = {
+      content:
+        "Planning snapshot for Friday, February 13: 4 open quests, 2h estimated.",
+      focus: "Keep the day realistic.",
+      actionPrompt: "Preserve timed quests and avoid overload.",
+      dataSnapshot: {
+        selectedDate: "2026-02-13",
+        openQuestCount: 4,
+      },
+    };
+
+    mocks.supabaseInvoke
+      .mockResolvedValueOnce({
+        data: {
+          reply: "How much energy do you have for this plan?",
+          mode: "clarify",
+          intent: "plan_day",
+          confidence: 0.75,
+          understandingState: "needs_followup",
+          followUp: {
+            question: "How much energy do you have for this plan?",
+            reason: null,
+            expectedAnswerType: "choice",
+            options: ["Low", "Medium", "High"],
+            blocksDrafting: true,
+            metadata: {
+              questionId: "details",
+              selectedDate: "2026-02-13",
+              briefingContext,
+            },
+          },
+          proposedActions: [],
+          assumptions: [],
+          evidenceIds: [],
+          threadState: {
+            threadId: "fresh-session",
+            sessionId: "fresh-session",
+            openaiConversationId: null,
+            lastOpenAIResponseId: null,
+            hasPendingAction: false,
+          },
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          reply: "Here is the lighter plan.",
+          mode: "schedule_read",
+          intent: "plan_day",
+          confidence: 0.8,
+          understandingState: "ready_to_propose",
+          proposedActions: [],
+          assumptions: [],
+          evidenceIds: [],
+          threadState: {
+            threadId: "fresh-session",
+            sessionId: "fresh-session",
+            openaiConversationId: null,
+            lastOpenAIResponseId: null,
+            hasPendingAction: false,
+          },
+        },
+        error: null,
+      });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () =>
+        useCompanionAssistant({
+          surface: "journeys",
+          launchIntent: {
+            id: "launch-plan-day-follow-up-context",
+            message: "Plan my day for Friday, February 13",
+            starterIntent: "plan_day",
+            target: "planner",
+            selectedDate: "2026-02-13",
+            briefingContext,
+          },
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeFollowUp?.question).toBe(
+        "How much energy do you have for this plan?",
+      );
+    });
+
+    await act(async () => {
+      await result.current.submitMessage("Low", "text", {
+        turnOrigin: "follow_up_option",
+      });
+    });
+
+    expect(mocks.supabaseInvoke).toHaveBeenLastCalledWith(
+      "companion-agent",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          message: "Low",
+          selectedDate: "2026-02-13",
+          briefingContext,
+        }),
+      }),
+    );
+  });
+
   it("defers persisted bootstrap while a launcher template intent is pending", async () => {
     mocks.supabaseInvoke.mockImplementation(async (_functionName, options) => {
       const sessionId = options?.body?.sessionId ?? "missing-session";

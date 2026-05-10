@@ -3030,6 +3030,7 @@ function buildToolExecutor(params: {
           message: params.requestMessage,
           currentDateTime: params.context.currentDateTime,
           selectedDate: params.request.selectedDate ?? null,
+          briefingContext: params.request.briefingContext ?? null,
           surface: params.surface,
           horizon: parsed.horizon === "week" ? "week" : "day",
           starterIntent: params.request.starterIntent ?? null,
@@ -3302,6 +3303,7 @@ function buildDeterministicScheduleReadResult(params: {
     message: params.request.message,
     currentDateTime: params.context.currentDateTime,
     selectedDate: params.request.selectedDate ?? null,
+    briefingContext: params.request.briefingContext ?? null,
     surface: params.request.surface,
     horizon: "day",
     starterIntent: plannerStarterIntent,
@@ -3326,6 +3328,12 @@ function buildDeterministicScheduleReadResult(params: {
       metadata: {
         ...(plannerResult.questions[0].metadata ?? {}),
         questionId: plannerResult.questions[0].id,
+        ...(params.request.selectedDate
+          ? { selectedDate: params.request.selectedDate }
+          : {}),
+        ...(params.request.briefingContext
+          ? { briefingContext: params.request.briefingContext }
+          : {}),
       },
     }
     : null;
@@ -4236,6 +4244,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
       message: params.request.message,
       currentDateTime: context.currentDateTime,
       selectedDate: params.request.selectedDate ?? null,
+      briefingContext: params.request.briefingContext ?? null,
       surface: params.request.surface,
       horizon: "day",
       starterIntent: params.request.starterIntent ?? null,
@@ -4651,6 +4660,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
         message: params.request.message,
         currentDateTime: context.currentDateTime,
         selectedDate: params.request.selectedDate ?? null,
+        briefingContext: params.request.briefingContext ?? null,
         surface: params.request.surface,
         horizon: "day",
         starterIntent: plannerStarterIntent,
@@ -4690,6 +4700,12 @@ export async function runCompanionAgent(params: RunAgentParams) {
           metadata: {
             ...(plannerResult.questions[0].metadata ?? {}),
             questionId: plannerResult.questions[0].id,
+            ...(params.request.selectedDate
+              ? { selectedDate: params.request.selectedDate }
+              : {}),
+            ...(params.request.briefingContext
+              ? { briefingContext: params.request.briefingContext }
+              : {}),
             ...(plannerStarterIntent === "quest_capture" &&
                 params.request.selectedDate
               ? {

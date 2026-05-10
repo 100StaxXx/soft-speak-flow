@@ -85,6 +85,7 @@ import {
 import { QUEST_LAUNCHER_SCROLL_CLEARANCE_PX } from "@/components/quest-launchers/metrics";
 import { createCompanionPlannerQuestCaptureLaunchIntent } from "@/shared/companionPlannerSurfaceActions";
 import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
+import { createPlanDayCompanionLaunchIntent } from "@/utils/companionPlannerLaunchContext";
 import type { Habit } from "@/features/habits/types";
 
 // Helper to calculate days remaining
@@ -721,7 +722,17 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     ? "today"
     : safeFormat(selectedDate, "EEEE, MMMM d", "that day");
   const questCaptureSelectedDate = safeFormat(selectedDate, "yyyy-MM-dd");
-  const plannerLauncherAction = onOpenCompanionPlanner ?? onVoiceAddQuest ?? onAddQuest;
+  const planDayLauncherLabel = isSameDay(selectedDate, new Date()) ? "Plan Today" : "Plan Day";
+  const openPlanDayThread = useCallback(() => {
+    if (!onOpenCompanionPlanner) return;
+    onOpenCompanionPlanner(createPlanDayCompanionLaunchIntent({
+      selectedDate,
+      tasks,
+      activeEpics,
+      assumeTasksAreForSelectedDate: true,
+    }));
+  }, [activeEpics, onOpenCompanionPlanner, selectedDate, tasks]);
+  const plannerLauncherAction = onOpenCompanionPlanner ? openPlanDayThread : onVoiceAddQuest ?? onAddQuest;
   const openQuestCaptureThread = useCallback(() => {
     if (onOpenCompanionPlanner) {
       onOpenCompanionPlanner(createCompanionPlannerQuestCaptureLaunchIntent({
@@ -2889,7 +2900,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               <JourneysCompanionLauncher
                 variant="inline"
                 data-tour="add-quest-launcher"
-                text="Chat with companion"
+                text={planDayLauncherLabel}
                 className="w-full"
                 onClick={plannerLauncherAction}
               />
@@ -3174,9 +3185,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   variant="inline"
                   compact
                   data-tour="add-quest-launcher"
-                  text="Chat with companion"
+                  text={planDayLauncherLabel}
                   className="shadow-[0_14px_28px_rgba(122,61,255,0.2)]"
-                  onClick={onOpenCompanionPlanner}
+                  onClick={openPlanDayThread}
                 />
               ) : null}
               {quickCaptureControls}

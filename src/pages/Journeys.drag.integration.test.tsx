@@ -977,7 +977,7 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    const launcher = await screen.findByRole("button", { name: /Chat with companion/i });
+    const launcher = await screen.findByRole("button", { name: /Plan (Today|Day)/i });
     expect(launcher).toBeInTheDocument();
     expect(launcher).toHaveAttribute("data-tour", "add-quest-launcher");
     expect(screen.queryByTestId("draggable-fab")).not.toBeInTheDocument();
@@ -1029,7 +1029,7 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    const launcher = await screen.findByRole("button", { name: /Chat with companion/i });
+    const launcher = await screen.findByRole("button", { name: /Plan (Today|Day)/i });
     fireEvent.click(launcher);
 
     await waitFor(() => {

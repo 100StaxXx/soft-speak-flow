@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useSmartDayPlanner, WizardStep } from '@/hooks/useSmartDayPlanner';
 import { QuickStartStep } from './steps/QuickStartStep';
@@ -61,6 +61,7 @@ export function SmartDayPlannerWizard({
   const planner = useSmartDayPlanner(planDate);
   const { step, prevStep, reset, savedPreferences, loadPreferences, resetPreferences, applyDefaults } = planner;
   const config = STEP_CONFIG[step];
+  const showQuickStart = step === 'quick_start' && savedPreferences && !planner.isLoadingPreferences;
 
   useEffect(() => {
     if (open) {
@@ -104,8 +105,8 @@ export function SmartDayPlannerWizard({
                 </div>
               )}
               <div>
-                <h2 className="font-semibold text-foreground">{config.title}</h2>
-                <p className="text-xs text-muted-foreground">{config.subtitle}</p>
+                <DialogTitle className="font-semibold text-foreground">{config.title}</DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground">{config.subtitle}</DialogDescription>
               </div>
             </div>
             <Button variant="ghost" size="icon" onClick={handleClose} className="h-8 w-8">
@@ -131,13 +132,22 @@ export function SmartDayPlannerWizard({
         <div className="p-4 min-h-[400px] max-h-[60vh] overflow-y-auto">
           <AnimatePresence mode="wait">
             <motion.div
-              key={step}
+              key={planner.isLoadingPreferences ? 'loading' : step}
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.2 }}
             >
-              {step === 'quick_start' && savedPreferences && (
+              {planner.isLoadingPreferences && (
+                <div className="flex min-h-[320px] items-center justify-center">
+                  <div className="text-center">
+                    <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
+                    <p className="mt-4 text-sm font-medium text-foreground">Loading your planner...</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Checking for saved defaults.</p>
+                  </div>
+                </div>
+              )}
+              {showQuickStart && (
                 <QuickStartStep
                   savedPreferences={savedPreferences}
                   contactsNeedingAttentionCount={planner.contactsNeedingAttention.length}
@@ -145,6 +155,9 @@ export function SmartDayPlannerWizard({
                   onCustomize={() => planner.setStep('check_in')}
                   onReset={resetPreferences}
                 />
+              )}
+              {step === 'quick_start' && !showQuickStart && !planner.isLoadingPreferences && (
+                <CheckInStep context={planner.context} updateContext={planner.updateContext} onNext={planner.nextStep} />
               )}
               {step === 'check_in' && (
                 <CheckInStep context={planner.context} updateContext={planner.updateContext} onNext={planner.nextStep} />

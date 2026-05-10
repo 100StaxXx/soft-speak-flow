@@ -33,6 +33,8 @@ import {
   CAMPAIGN_RITUAL_CARD_CLASSES,
   isCampaignRitualTask,
 } from "@/utils/campaignRitualStyle";
+import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
+import { createPlanDayCompanionLaunchIntent } from "@/utils/companionPlannerLaunchContext";
 
 interface ActiveEpic {
   id: string;
@@ -71,7 +73,7 @@ interface DesktopWeekPlannerProps {
   onPlannerModeChange?: (mode: "week" | "day") => void;
   onToggle: (taskId: string, completed: boolean, xpReward: number) => void;
   onAddQuest: () => void;
-  onOpenCompanionPlanner?: () => void;
+  onOpenCompanionPlanner?: (intent?: CompanionPlannerLaunchIntent | null) => void;
   onVoiceAddQuest?: () => void;
   isVoiceAddRecording?: boolean;
   isVoiceAddSupported?: boolean;
@@ -398,6 +400,15 @@ export function DesktopWeekPlanner({
   onOpenCampaigns,
 }: DesktopWeekPlannerProps) {
   const hasCompanionPlannerShortcut = Boolean(onOpenCompanionPlanner);
+  const planDayLauncherLabel = isToday(selectedDate) ? "Plan Today" : "Plan Day";
+  const openPlanDayThread = useCallback(() => {
+    if (!onOpenCompanionPlanner) return;
+    onOpenCompanionPlanner(createPlanDayCompanionLaunchIntent({
+      selectedDate,
+      tasks,
+      activeEpics,
+    }));
+  }, [activeEpics, onOpenCompanionPlanner, selectedDate, tasks]);
   const voiceAddButtonLabel = isVoiceAddRecording ? "Stop voice capture" : "Start voice capture";
   const campaignSectionLabel = onOpenCampaigns ? (
     <button
@@ -747,9 +758,9 @@ export function DesktopWeekPlanner({
                 variant="inline"
                 compact
                 data-tour="add-quest-launcher"
-                text="Chat with companion"
+                text={planDayLauncherLabel}
                 className="shadow-[0_14px_28px_rgba(122,61,255,0.2)]"
-                onClick={onOpenCompanionPlanner}
+                onClick={openPlanDayThread}
               />
             ) : null}
             {quickCaptureControls}

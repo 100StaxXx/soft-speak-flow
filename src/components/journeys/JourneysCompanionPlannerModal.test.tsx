@@ -687,6 +687,48 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(mocks.assistant.submitTypedMessage).not.toHaveBeenCalled();
   });
 
+  it("renders planner briefing context for plan-day launch intents", async () => {
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+        launchIntent={{
+          id: "plan-launch-1",
+          message: "Plan my day",
+          starterIntent: "plan_day",
+          target: "planner",
+          selectedDate: "2026-04-18",
+          briefingContext: {
+            content:
+              "Planning snapshot for Saturday, April 18: 3 open quests, 1 ritual, 2h estimated.",
+            focus: "Keep this day realistic.",
+            actionPrompt: "Preserve timed quests and avoid overload.",
+            dataSnapshot: {
+              openQuestCount: 3,
+              scheduledQuestCount: 1,
+              anytimeQuestCount: 2,
+              ritualQuestCount: 1,
+              activeCampaignCount: 1,
+              estimatedLoadLabel: "2h",
+              loadSignal: "steady",
+            },
+          },
+        }}
+      />,
+    );
+
+    const briefing = await screen.findByTestId(
+      "journeys-companion-planner-briefing",
+    );
+
+    expect(briefing).toHaveTextContent("Planning snapshot for Saturday");
+    expect(within(briefing).getByText("Planning with")).toBeInTheDocument();
+    expect(within(briefing).getByText("Open")).toBeInTheDocument();
+    expect(within(briefing).getByText("3")).toBeInTheDocument();
+    expect(briefing).toHaveTextContent("Preserve timed quests");
+  });
+
   it("submits text after New Quest through normal assistant chat", async () => {
     mocks.state.draftInput = "Pilates tomorrow at 8am";
 

@@ -74,6 +74,7 @@ import type {
 import type {
   CompanionPlannerLaunchIntent,
   CompanionPlannerProposal,
+  PlannerBriefingContext,
 } from "@/types/companionPlanner";
 
 type JourneysCompanionPlannerModalPresentation = "dialog" | "drawer";
@@ -114,6 +115,92 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
+
+const readSnapshotValue = (
+  snapshot: Record<string, unknown> | null,
+  key: string,
+) => {
+  const value = snapshot?.[key];
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim().length > 0) return value.trim();
+  return null;
+};
+
+const getPlannerBriefingMetrics = (
+  snapshot: Record<string, unknown> | null,
+) =>
+  [
+    ["openQuestCount", "Open"],
+    ["scheduledQuestCount", "Timed"],
+    ["anytimeQuestCount", "Anytime"],
+    ["ritualQuestCount", "Rituals"],
+    ["activeCampaignCount", "Campaigns"],
+    ["estimatedLoadLabel", "Load"],
+  ]
+    .map(([key, label]) => {
+      const value = readSnapshotValue(snapshot, key);
+      return value === null ? null : { key, label, value };
+    })
+    .filter(
+      (metric): metric is { key: string; label: string; value: string | number } =>
+        Boolean(metric),
+    );
+
+const PlannerBriefingContextPanel = memo(function PlannerBriefingContextPanel({
+  briefing,
+}: {
+  briefing: PlannerBriefingContext;
+}) {
+  const snapshot = asRecord(briefing.dataSnapshot);
+  const metrics = getPlannerBriefingMetrics(snapshot);
+  const focus = briefing.focus?.trim();
+  const actionPrompt = briefing.actionPrompt?.trim();
+
+  return (
+    <div
+      className="flex w-full justify-start"
+      data-testid="journeys-companion-planner-briefing"
+    >
+      <div className={cn(plannerPathfinderTheme.raisedPanel, "max-w-[92%] p-4")}>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline" className={plannerPathfinderTheme.chip}>
+            Planning with
+          </Badge>
+          {snapshot?.loadSignal ? (
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium capitalize text-muted-foreground">
+              {String(snapshot.loadSignal)} load
+            </span>
+          ) : null}
+        </div>
+        <p className="mt-3 text-sm leading-6 text-foreground">
+          {briefing.content}
+        </p>
+        {metrics.length > 0 ? (
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {metrics.map((metric) => (
+              <div
+                key={metric.key}
+                className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2"
+              >
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/75">
+                  {metric.label}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-foreground">
+                  {metric.value}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {focus || actionPrompt ? (
+          <p className="mt-3 text-xs leading-5 text-muted-foreground">
+            {[focus, actionPrompt].filter(Boolean).join(" ")}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+});
 
 const stripUndefinedValues = (value: Record<string, unknown>) =>
   Object.fromEntries(
@@ -1010,6 +1097,10 @@ const JourneysCompanionOverlayBody = memo(
       onLaunchIntentConsumed,
       onOpenCampaignBuilder,
     });
+    const [plannerBriefing, setPlannerBriefing] =
+      useState<PlannerBriefingContext | null>(() =>
+        launchIntent?.briefingContext ?? null,
+      );
     const { themeModeClassName } = usePlannerPathfinderAppearance();
     const visibleMessages = useMemo(
       () => assistant.messages.filter((entry) => !entry.isSeed),
@@ -1053,6 +1144,18 @@ const JourneysCompanionOverlayBody = memo(
       () => getFollowUpKey(assistant.activeFollowUp),
       [assistant.activeFollowUp],
     );
+
+    useEffect(() => {
+      if (launchIntent?.briefingContext) {
+        setPlannerBriefing(launchIntent.briefingContext);
+      }
+    }, [launchIntent?.briefingContext, launchIntent?.id]);
+
+    useEffect(() => {
+      if (!open) {
+        setPlannerBriefing(null);
+      }
+    }, [open]);
 
     useEffect(() => {
       if (
@@ -1553,6 +1656,10 @@ const JourneysCompanionOverlayBody = memo(
                 }}
                 data-testid="journeys-companion-planner-transcript"
               >
+                {plannerBriefing ? (
+                  <PlannerBriefingContextPanel briefing={plannerBriefing} />
+                ) : null}
+
                 {displayMessages.map((entry) => (
                   <div
                     key={entry.id}

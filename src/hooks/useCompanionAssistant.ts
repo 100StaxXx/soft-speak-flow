@@ -113,10 +113,45 @@ const normalizeSelectedDateKey = (value: string | null | undefined) => {
   return DATE_KEY_PATTERN.test(trimmed) ? trimmed : null;
 };
 
+const readFollowUpBriefingContext = (
+  followUp: CompanionAgentFollowUp | null | undefined,
+): CompanionPlannerLaunchIntent["briefingContext"] => {
+  const value = followUp?.metadata?.briefingContext;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  if (typeof candidate.content !== "string" || !candidate.content.trim()) {
+    return null;
+  }
+
+  return {
+    content: candidate.content,
+    actionPrompt:
+      typeof candidate.actionPrompt === "string"
+        ? candidate.actionPrompt
+        : null,
+    focus: typeof candidate.focus === "string" ? candidate.focus : null,
+    inferredGoals: Array.isArray(candidate.inferredGoals)
+      ? candidate.inferredGoals.filter(
+          (goal): goal is string => typeof goal === "string",
+        )
+      : undefined,
+    dataSnapshot:
+      candidate.dataSnapshot &&
+      typeof candidate.dataSnapshot === "object" &&
+      !Array.isArray(candidate.dataSnapshot)
+        ? (candidate.dataSnapshot as Record<string, unknown>)
+        : null,
+  };
+};
+
 type CompanionAgentSubmitOptions = {
   starterIntent?: CompanionPlannerLaunchIntent["starterIntent"];
   turnOrigin?: CompanionAgentTurnOrigin;
   selectedDate?: string | null;
+  briefingContext?: CompanionPlannerLaunchIntent["briefingContext"];
   selectedProposedAction?: CompanionAgentProposedAction | null;
   selectedProposedActionIntent?: CompanionAgentSelectedProposedActionIntent;
 };
@@ -1345,6 +1380,9 @@ export function useCompanionAssistant({
         options?.starterIntent ??
         pendingStarterIntent ??
         inferStarterIntentFromMessage(message);
+      const briefingContext =
+        options?.briefingContext ??
+        (activeFollowUp ? readFollowUpBriefingContext(activeFollowUp) : null);
       const shouldConsumePendingStarterIntent = pendingStarterIntent !== null;
       const shouldEmitPlanDayAiAnswered =
         !starterIntent &&
@@ -1412,6 +1450,7 @@ export function useCompanionAssistant({
               turnOrigin: options?.turnOrigin,
               starterIntent,
               selectedDate: selectedDate ?? undefined,
+              briefingContext: briefingContext ?? undefined,
               activeFollowUp,
               activeProposedActions: proposedActions.slice(
                 0,
@@ -1998,10 +2037,21 @@ export function useCompanionAssistant({
           await startNewChat({ greetingText: null });
         }
 
-        const submitted = await submitMessage(launchMessage, "text", {
+        const launchSubmitOptions: CompanionAgentSubmitOptions = {
           starterIntent: launchIntent.starterIntent,
           turnOrigin: "launcher",
-        });
+        };
+        if (launchIntent.selectedDate) {
+          launchSubmitOptions.selectedDate = launchIntent.selectedDate;
+        }
+        if (launchIntent.briefingContext) {
+          launchSubmitOptions.briefingContext = launchIntent.briefingContext;
+        }
+        const submitted = await submitMessage(
+          launchMessage,
+          "text",
+          launchSubmitOptions,
+        );
         if (submitted && launchIntent.starterIntent === "plan_day") {
           window.dispatchEvent(
             new CustomEvent("companion-plan-my-day-started"),

@@ -1,9 +1,11 @@
-import { memo, useEffect, useMemo, useState, type RefObject } from "react";
+import { memo, useCallback, useEffect, useMemo, useState, type RefObject } from "react";
 import { JourneysCompanionLauncher } from "@/components/journeys/JourneysCompanionLauncher";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { QuestLocationLink } from "@/components/QuestLocationLink";
 import { cn } from "@/lib/utils";
+import { createCompanionPlannerLaunchIntentId } from "@/shared/companionPlannerSurfaceActions";
+import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
 import { haptics } from "@/utils/haptics";
 import { Check, ChevronDown, Inbox, Pencil, Trash2 } from "lucide-react";
 
@@ -36,7 +38,7 @@ interface QuestInboxSectionProps {
   isExpanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
   onAddQuest: () => void;
-  onOpenCompanionPlanner?: () => void;
+  onOpenCompanionPlanner?: (intent?: CompanionPlannerLaunchIntent | null) => void;
   onToggleQuest: (taskId: string, completed: boolean) => void;
   onEditQuest: (task: InboxQuestItem) => void | Promise<void>;
   onDeleteQuest: (taskId: string) => void | Promise<void>;
@@ -71,7 +73,35 @@ export const QuestInboxSection = memo(function QuestInboxSection({
   }, [showAllTasks, tasks]);
 
   const hiddenTaskCount = Math.max(0, tasks.length - visibleTasks.length);
-  const plannerLauncherAction = onOpenCompanionPlanner ?? onAddQuest;
+  const plannerLauncherAction = useCallback(() => {
+    if (!onOpenCompanionPlanner) {
+      onAddQuest();
+      return;
+    }
+
+    onOpenCompanionPlanner({
+      id: createCompanionPlannerLaunchIntentId(),
+      message: "Help me sort my quest inbox",
+      starterIntent: "make_room",
+      target: "planner",
+      briefingContext: {
+        content: `Inbox snapshot: ${tasks.length} quests do not have an assigned time yet.`,
+        focus: "Turn the inbox into a realistic next step.",
+        actionPrompt:
+          "Help triage these quests. Suggest what to schedule, what to defer, and what can stay in the inbox.",
+        dataSnapshot: {
+          inboxQuestCount: tasks.length,
+          topInboxQuests: tasks.slice(0, 8).map((task) => ({
+            id: task.id,
+            title: task.task_text,
+            estimatedMinutes: task.estimated_duration ?? null,
+            priority: task.difficulty ?? null,
+            category: task.category ?? null,
+          })),
+        },
+      },
+    });
+  }, [onAddQuest, onOpenCompanionPlanner, tasks]);
 
   return (
     <section
@@ -102,7 +132,7 @@ export const QuestInboxSection = memo(function QuestInboxSection({
             variant="inline"
             compact
             data-tour="add-quest-launcher"
-            text="Chat with companion"
+            text="Plan Inbox"
             onClick={() => {
               haptics.light();
               plannerLauncherAction();
