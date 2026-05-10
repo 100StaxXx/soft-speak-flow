@@ -1,122 +1,396 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { VitePWA } from 'vite-plugin-pwa';
 
-// https://vitejs.dev/config/
-export default defineConfig(() => ({
-  server: {
-    host: "::",
-    port: 8080,
-  },
-  plugins: [
-    react(), 
-    VitePWA({
-      registerType: 'autoUpdate',
-      minify: false,
-      includeAssets: ['favicon.ico', 'icon-192.svg', 'icon-512.svg'],
-      manifest: {
-        name: 'Cosmiq - Your Personal AI Mentor',
-        short_name: 'Cosmiq',
-        description: 'Your gamified self-improvement companion with AI mentor, evolving digital companion, and quest-based habit tracking.',
-        theme_color: '#000000',
-        background_color: '#000000',
-        display: 'standalone',
-        orientation: 'portrait',
-        scope: '/',
-        start_url: '/',
-        icons: [
-          {
-            src: '/icon-192.svg',
-            sizes: '192x192',
-            type: 'image/svg+xml',
-            purpose: 'any maskable'
-          },
-          {
-            src: '/icon-512.svg',
-            sizes: '512x512',
-            type: 'image/svg+xml',
-            purpose: 'any maskable'
-          }
-        ]
-      },
-      workbox: {
-        mode: 'development',
-        sourcemap: false,
-        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024, // 8 MB to allow high-res static backgrounds
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'google-fonts-cache',
-              expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          },
-          {
-            urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
-            // Do not cache authenticated API responses to avoid persisting
-            // user data offline. Always fetch fresh content instead.
-            handler: 'NetworkOnly',
-          }
-        ]
+function buildCalendarOAuthCallbackBridge(env: Record<string, string>): string {
+  const supabaseUrl = env.VITE_SUPABASE_URL ?? "";
+  const supabaseKey = env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "";
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Returning to Cosmiq</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #111827;
+        color: #f9fafb;
       }
-    })
-  ].filter(Boolean),
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: #111827;
+      }
+
+      main {
+        width: min(28rem, calc(100vw - 3rem));
+        text-align: center;
+      }
+
+      h1 {
+        margin: 0 0 0.75rem;
+        font-size: clamp(2rem, 10vw, 4rem);
+        line-height: 1;
+      }
+
+      p {
+        margin: 0 auto 1.5rem;
+        color: #cbd5e1;
+        font-size: 1rem;
+        line-height: 1.6;
+      }
+
+      a {
+        color: #93c5fd;
+        font-weight: 700;
+      }
+
+      .button {
+        display: inline-flex;
+        min-height: 3rem;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        padding: 0 1.25rem;
+        background: #bfdbfe;
+        color: #0f172a;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Returning to Cosmiq</h1>
+      <p id="status">Finishing your calendar connection...</p>
+      <a id="return-link" class="button" href="cosmiq://calendar/oauth/callback?provider=google&status=error">Return to Cosmiq</a>
+    </main>
+    <script>
+      (function () {
+        var config = {
+          supabaseUrl: ${JSON.stringify(supabaseUrl)},
+          supabaseKey: ${JSON.stringify(supabaseKey)}
+        };
+
+        var params = new URLSearchParams(window.location.search);
+        var statusNode = document.getElementById("status");
+        var returnLink = document.getElementById("return-link");
+
+        function setStatus(message) {
+          if (statusNode) statusNode.textContent = message;
+        }
+
+        function isProvider(value) {
+          return value === "google" || value === "outlook";
+        }
+
+        function isSource(value) {
+          return value === "web" || value === "native";
+        }
+
+        function decodeBase64Url(value) {
+          var normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+          var padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+          return window.atob(padded);
+        }
+
+        function getStateHint(state) {
+          if (!state) return null;
+          var rawPayload = state.split(".")[0];
+          if (!rawPayload) return null;
+
+          try {
+            var payload = JSON.parse(decodeBase64Url(rawPayload));
+            return {
+              provider: isProvider(payload.provider) ? payload.provider : null,
+              source: isSource(payload.source) ? payload.source : "web"
+            };
+          } catch (_error) {
+            return null;
+          }
+        }
+
+        function buildProfileRedirect(provider, status, message) {
+          var redirectParams = new URLSearchParams({
+            calendar_oauth_provider: provider,
+            calendar_oauth_status: status
+          });
+          if (message) redirectParams.set("calendar_oauth_message", message);
+          return "/profile?" + redirectParams.toString();
+        }
+
+        function buildNativeRedirect(provider, status, message) {
+          var redirectParams = new URLSearchParams({
+            provider: provider,
+            status: status
+          });
+          if (message) redirectParams.set("message", message);
+          return "cosmiq://calendar/oauth/callback?" + redirectParams.toString();
+        }
+
+        function redirectToApp(provider, status, source, message) {
+          var appUrl = buildNativeRedirect(provider, status, message);
+          if (returnLink) returnLink.setAttribute("href", appUrl);
+
+          if (source === "native") {
+            window.location.replace(appUrl);
+            window.setTimeout(function () {
+              setStatus("Tap the button below if Cosmiq did not reopen automatically.");
+            }, 1200);
+            return;
+          }
+
+          window.location.replace(buildProfileRedirect(provider, status, message));
+        }
+
+        function getRedirectUri(provider, source) {
+          var pathname = window.location.pathname.replace(/\\/$/, "");
+          var legacyProvider = params.get("calendar_provider");
+          if (isProvider(legacyProvider)) {
+            var legacyParams = new URLSearchParams({
+              calendar_provider: provider,
+              calendar_source: source
+            });
+            return window.location.origin + pathname + "?" + legacyParams.toString();
+          }
+          return window.location.origin + pathname;
+        }
+
+        async function run() {
+          var state = params.get("state");
+          var hint = getStateHint(state);
+          var provider = isProvider(params.get("calendar_provider"))
+            ? params.get("calendar_provider")
+            : hint && hint.provider
+              ? hint.provider
+              : "google";
+          var source = isSource(params.get("calendar_source"))
+            ? params.get("calendar_source")
+            : hint && hint.source
+              ? hint.source
+              : "native";
+          var oauthError = params.get("error");
+          var oauthErrorDescription = params.get("error_description");
+          var code = params.get("code");
+
+          if (oauthError) {
+            redirectToApp(provider, "error", source, oauthErrorDescription || "Calendar connection was cancelled.");
+            return;
+          }
+
+          if (!code) {
+            redirectToApp(provider, "error", source, "Missing authorization code from calendar provider.");
+            return;
+          }
+
+          if (!config.supabaseUrl || !config.supabaseKey) {
+            redirectToApp(provider, "error", source, "Calendar connection is not configured in this build.");
+            return;
+          }
+
+          var functionUrl = config.supabaseUrl.replace(/\\/$/, "") + "/functions/v1/" + provider + "-calendar-auth";
+          var response = await fetch(functionUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "apikey": config.supabaseKey,
+              "Authorization": "Bearer " + config.supabaseKey
+            },
+            body: JSON.stringify({
+              action: "exchangeCode",
+              code: code,
+              redirectUri: getRedirectUri(provider, source),
+              state: state || undefined
+            })
+          });
+
+          if (!response.ok) {
+            redirectToApp(provider, "error", source, "Calendar connection failed. Please try again.");
+            return;
+          }
+
+          redirectToApp(provider, "success", source);
+        }
+
+        run().catch(function () {
+          redirectToApp("google", "error", "native", "Calendar connection failed. Please try again.");
+        });
+      })();
+    </script>
+  </body>
+</html>
+`;
+}
+
+function calendarOAuthCallbackBridgePlugin(env: Record<string, string>): Plugin {
+  return {
+    name: "calendar-oauth-callback-bridge",
+    apply: "build",
+    generateBundle() {
+      const source = buildCalendarOAuthCallbackBridge(env);
+
+      this.emitFile({
+        type: "asset",
+        fileName: "calendar/oauth/callback",
+        source,
+      });
+
+      this.emitFile({
+        type: "asset",
+        fileName: "calendar/oauth/callback.html",
+        source,
+      });
+
+      this.emitFile({
+        type: "asset",
+        fileName: "_headers",
+        source: "/calendar/oauth/callback\n  Content-Type: text/html; charset=utf-8\n",
+      });
+
+      this.emitFile({
+        type: "asset",
+        fileName: "_redirects",
+        source: [
+          "/calendar/oauth/callback/ /calendar/oauth/callback 200",
+          "/* /index.html 200",
+          "",
+        ].join("\n"),
+      });
     },
-  },
-  build: {
-    target: 'esnext',
-    minify: 'esbuild', // 3-5x faster than terser
-    cssMinify: 'lightningcss',
-    rollupOptions: {
-      output: {
-        manualChunks: (id) => {
-          // CRITICAL: Keep React and all React-dependent libraries in a SINGLE chunk
-          // iOS WKWebView can load chunks out of order, causing "createContext" errors
-          // when React isn't loaded before components that use it
-          
-          if (id.includes('node_modules')) {
-            // Only split standalone libraries that don't use React contexts/hooks
-            // NOTE: recharts was removed - it uses React.useLayoutEffect and must stay with React
-            if (id.includes('date-fns')) return 'date-vendor';
-            // Only split pure three.js - NOT @react-three/fiber which uses React hooks
-            if (id.includes('node_modules/three/')) return 'three-vendor';
-            
-            // Everything else (React, Radix, React Query, Framer Motion, etc.)
-            // stays in a single vendor chunk for iOS compatibility
-            return 'vendor';
+  };
+}
+
+// https://vitejs.dev/config/
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "VITE_");
+
+  return {
+    server: {
+      host: "::",
+      port: 8080,
+    },
+    plugins: [
+      react(),
+      calendarOAuthCallbackBridgePlugin(env),
+      VitePWA({
+        registerType: 'autoUpdate',
+        minify: false,
+        includeAssets: ['favicon.ico', 'icon-192.svg', 'icon-512.svg'],
+        manifest: {
+          name: 'Cosmiq - Your Personal AI Mentor',
+          short_name: 'Cosmiq',
+          description: 'Your gamified self-improvement companion with AI mentor, evolving digital companion, and quest-based habit tracking.',
+          theme_color: '#000000',
+          background_color: '#000000',
+          display: 'standalone',
+          orientation: 'portrait',
+          scope: '/',
+          start_url: '/',
+          icons: [
+            {
+              src: '/icon-192.svg',
+              sizes: '192x192',
+              type: 'image/svg+xml',
+              purpose: 'any maskable'
+            },
+            {
+              src: '/icon-512.svg',
+              sizes: '512x512',
+              type: 'image/svg+xml',
+              purpose: 'any maskable'
+            }
+          ]
+        },
+        workbox: {
+          mode: 'development',
+          sourcemap: false,
+          maximumFileSizeToCacheInBytes: 8 * 1024 * 1024, // 8 MB to allow high-res static backgrounds
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+          runtimeCaching: [
+            {
+              urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'google-fonts-cache',
+                expiration: {
+                  maxEntries: 10,
+                  maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
+                },
+                cacheableResponse: {
+                  statuses: [0, 200]
+                }
+              }
+            },
+            {
+              urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
+              // Do not cache authenticated API responses to avoid persisting
+              // user data offline. Always fetch fresh content instead.
+              handler: 'NetworkOnly',
+            }
+          ]
+        }
+      })
+    ].filter(Boolean),
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "./src"),
+      },
+    },
+    build: {
+      target: 'esnext',
+      minify: 'esbuild', // 3-5x faster than terser
+      cssMinify: 'lightningcss',
+      rollupOptions: {
+        external: ['@capacitor-community/contacts'],
+        output: {
+          manualChunks: (id) => {
+            // Skip externalized modules (contacts has no web implementation)
+            if (id.includes('@capacitor-community/contacts')) {
+              return undefined;
+            }
+
+            // CRITICAL: Keep React and all React-dependent libraries in a SINGLE chunk
+            // iOS WKWebView can load chunks out of order, causing "createContext" errors
+            // when React isn't loaded before components that use it
+
+            if (id.includes('node_modules')) {
+              // Only split standalone libraries that don't use React contexts/hooks
+              // NOTE: recharts was removed - it uses React.useLayoutEffect and must stay with React
+              if (id.includes('date-fns')) return 'date-vendor';
+              // Only split pure three.js - NOT @react-three/fiber which uses React hooks
+              if (id.includes('node_modules/three/')) return 'three-vendor';
+
+              // Everything else (React, Radix, React Query, Framer Motion, etc.)
+              // stays in a single vendor chunk for iOS compatibility
+              return 'vendor';
+            }
           }
         },
       },
+      chunkSizeWarningLimit: 1300,
+      sourcemap: false, // Disable source maps in production for smaller bundle
+      reportCompressedSize: false, // Faster builds
     },
-    chunkSizeWarningLimit: 1300,
-    sourcemap: false, // Disable source maps in production for smaller bundle
-    reportCompressedSize: false, // Faster builds
-  },
-  optimizeDeps: {
-    include: [
-      'react', 
-      'react-dom', 
-      'react-router-dom', 
-      '@supabase/supabase-js',
-      '@tanstack/react-query',
-      'framer-motion'
-    ],
-    exclude: ['@radix-ui/react-icons'],
-  },
-  esbuild: {
-    logOverride: { 'this-is-undefined-in-esm': 'silent' },
-    drop: [],  // Temporarily keep console statements to debug iOS black screen
-  },
-}));
+    optimizeDeps: {
+      include: [
+        'react',
+        'react-dom',
+        'react-router-dom',
+        '@supabase/supabase-js',
+        '@tanstack/react-query',
+        'framer-motion'
+      ],
+      exclude: ['@radix-ui/react-icons'],
+    },
+    esbuild: {
+      logOverride: { 'this-is-undefined-in-esm': 'silent' },
+      drop: [],  // Temporarily keep console statements to debug iOS black screen
+    },
+  };
+});

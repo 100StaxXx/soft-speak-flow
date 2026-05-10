@@ -99,6 +99,7 @@ const mocks = vi.hoisted(() => ({
   draggableFabRenderCount: 0,
   lastDatePillSelectedDate: null as Date | null,
   lastDatePillCenterRequestKey: null as number | null,
+  lastDatePillCenterRequestDateKey: null as string | null,
   lastAddQuestSheetProps: null as null | {
     autoFillTimeOnFirstTap?: boolean;
     autoRestoreDraftOnOpen?: boolean;
@@ -227,19 +228,23 @@ vi.mock("@/components/DatePillsScroller", () => ({
     selectedDate,
     onDateSelect,
     centerRequestKey,
+    centerRequestDateKey,
     onUserDateInteraction,
   }: {
     selectedDate: Date;
     onDateSelect: (date: Date) => void;
     centerRequestKey?: number;
+    centerRequestDateKey?: string;
     onUserDateInteraction?: () => void;
   }) => {
     mocks.lastDatePillSelectedDate = selectedDate;
     mocks.lastDatePillCenterRequestKey = centerRequestKey ?? 0;
+    mocks.lastDatePillCenterRequestDateKey = centerRequestDateKey ?? null;
     return (
       <div data-testid="date-pills">
         <span data-testid="selected-date-iso">{selectedDate.toISOString()}</span>
         <span data-testid="center-request-key">{centerRequestKey ?? 0}</span>
+        <span data-testid="center-request-date-key">{centerRequestDateKey ?? ""}</span>
         <button
           type="button"
           onClick={() => {
@@ -2001,6 +2006,7 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       expect(screen.getByTestId("selected-date-iso").textContent).toBe(sameDaySelectedDateIso);
       expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeReentry);
+      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
     });
   });
 
@@ -2079,6 +2085,7 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       expect(screen.getByTestId("selected-date-iso").textContent).toBe(sameDaySelectedDateIso);
       expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeResetRequest);
+      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
     });
   });
 
@@ -2120,6 +2127,7 @@ describe("Journeys row drag integration", () => {
       expect(refreshedDateIso).not.toBe(staleSelectedDateIso);
       expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
       expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforePullRefresh);
+      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
     });
 
     await waitFor(() => {
@@ -2537,6 +2545,7 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       expect(screen.getByTestId("selected-date-iso").textContent).toBe(sameDaySelectedDateIso);
       expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeFocus);
+      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
     });
   });
 

@@ -19,10 +19,15 @@ interface DatePillsScrollerProps {
   daysToShow?: number;
   isActive?: boolean;
   centerRequestKey?: number;
+  centerRequestDateKey?: string;
   onUserDateInteraction?: () => void;
 }
 
 type CenterSelectedDateResult = "centered" | "retry";
+interface CompletedCenterRequest {
+  key: number;
+  dateKey: string;
+}
 
 const EDGE_THRESHOLD_PX = 80;
 const DEFAULT_EXTENSION_CHUNK = 14;
@@ -52,6 +57,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
   daysToShow = 14,
   isActive = true,
   centerRequestKey = 0,
+  centerRequestDateKey,
   onUserDateInteraction,
 }: DatePillsScrollerProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -61,7 +67,6 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     previousScrollLeft: number;
   } | null>(null);
   const isExpandingRef = useRef(false);
-  const lastCompletedCenterRequestKeyRef = useRef(centerRequestKey);
 
   const [rangeStart, setRangeStart] = useState<Date>(() => getInitialRange(selectedDate, daysToShow).start);
   const [rangeEnd, setRangeEnd] = useState<Date>(() => getInitialRange(selectedDate, daysToShow).end);
@@ -70,6 +75,11 @@ export const DatePillsScroller = memo(function DatePillsScroller({
 
   const extensionChunk = Math.max(DEFAULT_EXTENSION_CHUNK, daysToShow);
   const selectedDateKey = useMemo(() => format(selectedDate, "yyyy-MM-dd"), [selectedDate]);
+  const requestedCenterDateKey = centerRequestDateKey ?? selectedDateKey;
+  const lastCompletedCenterRequestRef = useRef<CompletedCenterRequest>({
+    key: centerRequestKey,
+    dateKey: requestedCenterDateKey,
+  });
   const handleUserDateInteraction = useCallback(() => {
     onUserDateInteraction?.();
   }, [onUserDateInteraction]);
@@ -126,25 +136,30 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     [tasksPerDay],
   );
 
-  const getSelectedPillElement = useCallback(() => {
+  const getPillElementByDateKey = useCallback((dateKey: string) => {
     const container = scrollRef.current;
     if (!container) return null;
 
     const selected = selectedRef.current;
-    if (selected?.dataset.dateKey === selectedDateKey) {
+    if (selected?.dataset.dateKey === dateKey) {
       return selected;
     }
 
     return container.querySelector<HTMLButtonElement>(
-      `button[data-date-pill='true'][data-date-key='${selectedDateKey}']`,
+      `button[data-date-pill='true'][data-date-key='${dateKey}']`,
     );
-  }, [selectedDateKey]);
+  }, []);
 
-  const calculateEdgeSpacerWidth = useCallback(() => {
+  const getSelectedPillElement = useCallback(
+    () => getPillElementByDateKey(selectedDateKey),
+    [getPillElementByDateKey, selectedDateKey],
+  );
+
+  const calculateEdgeSpacerWidth = useCallback((dateKey = selectedDateKey) => {
     const container = scrollRef.current;
     if (!container) return null;
 
-    const measuredPill = getSelectedPillElement();
+    const measuredPill = getPillElementByDateKey(dateKey);
     if (!measuredPill) return null;
 
     const containerWidth = container.offsetWidth;
@@ -152,7 +167,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     if (containerWidth === 0 || pillWidth === 0) return null;
 
     return Math.max(0, containerWidth / 2 - pillWidth / 2);
-  }, [getSelectedPillElement]);
+  }, [getPillElementByDateKey, selectedDateKey]);
 
   const recalculateEdgeSpacers = useCallback(() => {
     const nextWidth = calculateEdgeSpacerWidth();
@@ -234,12 +249,16 @@ export const DatePillsScroller = memo(function DatePillsScroller({
   const centerSelectedDate = useCallback(({
     behavior,
     force,
+    targetDateKey,
   }: {
     behavior: ScrollBehavior;
     force: boolean;
+    targetDateKey?: string;
   }): CenterSelectedDateResult => {
     const container = scrollRef.current;
-    const selected = getSelectedPillElement();
+    const selected = targetDateKey
+      ? getPillElementByDateKey(targetDateKey)
+      : getSelectedPillElement();
 
     if (!container || !selected) return "retry";
 
@@ -248,7 +267,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
 
     if (containerWidth === 0 || selectedWidth === 0) return "retry";
 
-    const nextSpacerWidth = calculateEdgeSpacerWidth();
+    const nextSpacerWidth = calculateEdgeSpacerWidth(targetDateKey);
     if (
       nextSpacerWidth !== null &&
       Math.abs(nextSpacerWidth - edgeSpacerWidth) >= 0.5
@@ -277,7 +296,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     }
 
     return "centered";
-  }, [calculateEdgeSpacerWidth, edgeSpacerWidth, getSelectedPillElement]);
+  }, [calculateEdgeSpacerWidth, edgeSpacerWidth, getPillElementByDateKey, getSelectedPillElement]);
 
   // Center the selected pill on selected-date, activation, or explicit center requests.
   // Range extensions from edge scrolls intentionally don't re-center, so the
@@ -287,7 +306,8 @@ export const DatePillsScroller = memo(function DatePillsScroller({
 
     let frameId: number | null = null;
     let isCancelled = false;
-    const isForcedCenterRequest = centerRequestKey !== lastCompletedCenterRequestKeyRef.current;
+    const lastCompletedCenterRequest = lastCompletedCenterRequestRef.current;
+    const isForcedCenterRequest = centerRequestKey !== lastCompletedCenterRequest.key;
 
     const scheduleCentering = (remainingAttempts: number) => {
       if (typeof window === "undefined") return;
@@ -303,6 +323,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
       const result = centerSelectedDate({
         behavior: isForcedCenterRequest || prefersReducedMotion ? "auto" : "smooth",
         force: isForcedCenterRequest,
+        targetDateKey: isForcedCenterRequest ? requestedCenterDateKey : undefined,
       });
       const shouldRetry = result === "retry" || isForcedCenterRequest;
 
@@ -312,7 +333,10 @@ export const DatePillsScroller = memo(function DatePillsScroller({
       }
 
       if (isForcedCenterRequest && result === "centered") {
-        lastCompletedCenterRequestKeyRef.current = centerRequestKey;
+        lastCompletedCenterRequestRef.current = {
+          key: centerRequestKey,
+          dateKey: requestedCenterDateKey,
+        };
       }
     };
 
@@ -324,7 +348,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
         window.cancelAnimationFrame(frameId);
       }
     };
-  }, [centerRequestKey, centerSelectedDate, isActive, prefersReducedMotion, selectedDateKey]);
+  }, [centerRequestKey, centerSelectedDate, isActive, prefersReducedMotion, requestedCenterDateKey, selectedDateKey]);
 
   return (
     <div

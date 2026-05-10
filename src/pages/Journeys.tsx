@@ -327,6 +327,9 @@ const Journeys = () => {
     : undefined;
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [datePillCenterRequestKey, setDatePillCenterRequestKey] = useState(0);
+  const [datePillCenterRequestDateKey, setDatePillCenterRequestDateKey] = useState(() =>
+    format(new Date(), "yyyy-MM-dd"),
+  );
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [isCompanionPlannerPinned, setIsCompanionPlannerPinned] = useState(false);
@@ -635,11 +638,10 @@ const Journeys = () => {
 
     pendingSelectedDateResetRef.current = false;
     hasUserDateInteractionRef.current = false;
+    const today = new Date();
+    setDatePillCenterRequestDateKey(format(today, "yyyy-MM-dd"));
     setDatePillCenterRequestKey((currentKey) => currentKey + 1);
-    setSelectedDate((current) => {
-      const today = new Date();
-      return isSameDay(current, today) ? current : today;
-    });
+    setSelectedDate((current) => (isSameDay(current, today) ? current : today));
   }, []);
 
   const handleUserDateInteraction = useCallback(() => {
@@ -1963,6 +1965,7 @@ const Journeys = () => {
                 tasksPerDay={tasksPerDay}
                 isActive={isJourneysRouteActive}
                 centerRequestKey={datePillCenterRequestKey}
+                centerRequestDateKey={datePillCenterRequestDateKey}
               />
             </motion.div>
           ) : null}

@@ -11,6 +11,7 @@ const MICROSOFT_TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.
 const MICROSOFT_ME_URL = "https://graph.microsoft.com/v1.0/me";
 const MICROSOFT_CALENDARS_URL = "https://graph.microsoft.com/v1.0/me/calendars?$select=id,name,isDefaultCalendar";
 const MICROSOFT_TASK_LISTS_URL = "https://graph.microsoft.com/v1.0/me/todo/lists?$select=id,displayName,wellknownListName";
+const NATIVE_CALLBACK_SCHEME_URL = "cosmiq://calendar/oauth/callback";
 
 const SCOPES = ["offline_access", "User.Read", "Calendars.ReadWrite", "Tasks.ReadWrite"].join(" ");
 
@@ -34,6 +35,50 @@ const jsonResponse = (body: unknown, status = 200) =>
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+
+class OAuthHttpError extends Error {
+  status: number;
+  details?: string;
+
+  constructor(message: string, status = 400, details?: string) {
+    super(message);
+    this.name = "OAuthHttpError";
+    this.status = status;
+    this.details = details;
+  }
+}
+
+const redirectResponse = (location: string) =>
+  new Response(null, {
+    status: 302,
+    headers: { ...corsHeaders, Location: location },
+  });
+
+function buildNativeCallbackRedirect(args: {
+  status: "success" | "error";
+  message?: string;
+}): string {
+  const params = new URLSearchParams({
+    provider: "outlook",
+    status: args.status,
+  });
+
+  if (args.message) {
+    params.set("message", args.message);
+  }
+
+  return `${NATIVE_CALLBACK_SCHEME_URL}?${params.toString()}`;
+}
+
+function buildFunctionCallbackUrl(req: Request): string {
+  const url = new URL(req.url);
+  url.pathname = url.pathname.endsWith("/")
+    ? `${url.pathname}callback`
+    : `${url.pathname}/callback`;
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+}
 
 function normalizeAction(raw: string | undefined): Action | null {
   if (!raw) return null;
@@ -204,6 +249,164 @@ async function listOutlookTaskLists(
   }));
 }
 
+async function exchangeOutlookConnection(args: {
+  supabase: any;
+  req?: Request;
+  code: string | undefined;
+  redirectUri: string | undefined;
+  state: string | undefined;
+  requestedSyncModeFromBody: SyncMode | null;
+  sourceFromBody?: unknown;
+  internalFunctionSecret: string | undefined;
+  clientId: string;
+  clientSecret: string;
+}): Promise<{
+  success: true;
+  connection: unknown;
+  calendars: Array<{ id: string; name: string; isDefaultCalendar: boolean }>;
+  taskLists: Array<{ id: string; name: string; isDefaultTaskList: boolean }>;
+  calendarEmail: string | null;
+}> {
+  const {
+    supabase,
+    req,
+    code,
+    redirectUri,
+    state,
+    requestedSyncModeFromBody,
+    sourceFromBody,
+    internalFunctionSecret,
+    clientId,
+    clientSecret,
+  } = args;
+
+  if (!code || !redirectUri) {
+    throw new OAuthHttpError("code and redirectUri are required", 400);
+  }
+
+  let userId = req ? await tryGetAuthedUserId(supabase, req) : null;
+  let requestedSyncMode: SyncMode = normalizeSyncMode(requestedSyncModeFromBody);
+  let requestedSource: OAuthSource = normalizeOAuthSource(sourceFromBody);
+
+  if (state) {
+    if (!internalFunctionSecret) {
+      throw new OAuthHttpError("OAuth state validation is not configured", 500);
+    }
+
+    try {
+      const verified = await verifySignedOAuthState({
+        state,
+        provider: "outlook",
+        secret: internalFunctionSecret,
+      });
+      if (userId && verified.userId !== userId) {
+        throw new OAuthHttpError("OAuth state does not match the authenticated user", 401);
+      }
+      userId = verified.userId;
+      if (!requestedSyncModeFromBody) {
+        requestedSyncMode = verified.syncMode;
+      }
+      requestedSource = verified.source;
+    } catch (error) {
+      if (error instanceof OAuthHttpError) {
+        throw error;
+      }
+      throw new OAuthHttpError("Invalid or expired OAuth state", 401);
+    }
+  } else if (!userId) {
+    throw new OAuthHttpError("Invalid or expired OAuth state", 401);
+  }
+
+  const tokenResponse = await fetch(MICROSOFT_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      code,
+      grant_type: "authorization_code",
+      redirect_uri: redirectUri,
+      scope: SCOPES,
+    }),
+  });
+
+  if (!tokenResponse.ok) {
+    const details = await tokenResponse.text();
+    throw new OAuthHttpError("Failed to exchange authorization code", 400, details);
+  }
+
+  const tokens = await tokenResponse.json();
+  const accessToken = tokens.access_token as string;
+  const refreshToken = (tokens.refresh_token as string | undefined) ?? null;
+  const tokenExpiresAt = new Date(Date.now() + Number(tokens.expires_in || 3600) * 1000).toISOString();
+
+  const meResp = await fetch(MICROSOFT_ME_URL, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  let calendarEmail: string | null = null;
+  if (meResp.ok) {
+    const me = await meResp.json();
+    calendarEmail = (me?.mail as string | undefined) || (me?.userPrincipalName as string | undefined) || null;
+  }
+
+  const calendars = await listOutlookCalendars(accessToken);
+  const primary = calendars.find((c) => c.isDefaultCalendar) ?? calendars[0] ?? null;
+  let taskLists: Array<{ id: string; name: string; isDefaultTaskList: boolean }> = [];
+  try {
+    taskLists = await listOutlookTaskLists(accessToken);
+  } catch {
+    taskLists = [];
+  }
+  const primaryTaskList = taskLists.find((list) => list.isDefaultTaskList) ?? taskLists[0] ?? null;
+
+  const { data: existing } = await supabase
+    .from("user_calendar_connections")
+    .select("id, refresh_token")
+    .eq("user_id", userId)
+    .eq("provider", "outlook")
+    .maybeSingle();
+
+  const { data: connection, error: upsertError } = await supabase
+    .from("user_calendar_connections")
+    .upsert(
+      {
+        user_id: userId,
+        provider: "outlook",
+        access_token: accessToken,
+        refresh_token: refreshToken ?? existing?.refresh_token ?? null,
+        token_expires_at: tokenExpiresAt,
+        calendar_id: primary?.id ?? null,
+        calendar_email: calendarEmail,
+        primary_calendar_id: primary?.id ?? null,
+        primary_calendar_name: primary?.name ?? null,
+        primary_task_list_id: primaryTaskList?.id ?? null,
+        primary_task_list_name: primaryTaskList?.name ?? null,
+        sync_enabled: true,
+        sync_mode: requestedSyncMode,
+        platform: requestedSource === "native" ? "ios" : "web",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,provider" },
+    )
+    .select(
+      "id, provider, calendar_email, primary_calendar_id, primary_calendar_name, primary_task_list_id, primary_task_list_name, sync_mode, sync_enabled, platform",
+    )
+    .single();
+
+  if (upsertError) {
+    throw new OAuthHttpError("Failed to store calendar connection", 500, upsertError.message);
+  }
+
+  return {
+    success: true,
+    connection,
+    calendars,
+    taskLists,
+    calendarEmail,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -220,18 +423,62 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Outlook Calendar integration not configured" }, 500);
     }
 
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const requestUrl = new URL(req.url);
+
+    if (req.method === "GET" && requestUrl.pathname.endsWith("/callback")) {
+      const code = requestUrl.searchParams.get("code") ?? undefined;
+      const state = requestUrl.searchParams.get("state") ?? undefined;
+      const providerError = requestUrl.searchParams.get("error");
+      const providerErrorDescription = requestUrl.searchParams.get("error_description");
+      const redirectUri = buildFunctionCallbackUrl(req);
+
+      if (providerError) {
+        return redirectResponse(buildNativeCallbackRedirect({
+          status: "error",
+          message: providerErrorDescription || providerError,
+        }));
+      }
+
+      try {
+        await exchangeOutlookConnection({
+          supabase,
+          code,
+          redirectUri,
+          state,
+          requestedSyncModeFromBody: null,
+          sourceFromBody: "native",
+          internalFunctionSecret,
+          clientId,
+          clientSecret,
+        });
+
+        return redirectResponse(buildNativeCallbackRedirect({
+          status: "success",
+          message: "Outlook Calendar connected successfully.",
+        }));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to connect Outlook Calendar";
+        return redirectResponse(buildNativeCallbackRedirect({
+          status: "error",
+          message,
+        }));
+      }
+    }
+
     const body = await req.json().catch(() => ({}));
     const action = normalizeAction(body?.action);
 
     if (!action) return jsonResponse({ error: "Invalid action" }, 400);
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
-
     if (action === "getAuthUrl") {
       const userId = await getAuthedUserId(supabase, req);
-      const redirectUri = (body?.redirectUri || body?.redirect_uri) as string | undefined;
+      let redirectUri = (body?.redirectUri || body?.redirect_uri) as string | undefined;
       const requestedSyncMode = normalizeSyncMode(body?.syncMode ?? body?.sync_mode);
       const requestedSource = normalizeOAuthSource(body?.source ?? body?.calendar_source);
+      if (requestedSource === "native") {
+        redirectUri = buildFunctionCallbackUrl(req);
+      }
       if (!redirectUri) {
         return jsonResponse({ error: "redirectUri is required" }, 400);
       }
@@ -257,7 +504,7 @@ Deno.serve(async (req) => {
       authUrl.searchParams.set("state", state);
 
       const url = authUrl.toString();
-      return jsonResponse({ url, auth_url: url });
+      return jsonResponse({ url, auth_url: url, redirect_uri: redirectUri });
     }
 
     if (action === "exchangeCode") {
@@ -268,128 +515,32 @@ Deno.serve(async (req) => {
         ? (body?.syncMode ?? body?.sync_mode)
         : null;
 
-      if (!code || !redirectUri) {
-        return jsonResponse({ error: "code and redirectUri are required" }, 400);
-      }
-
-      let userId = await tryGetAuthedUserId(supabase, req);
-      let requestedSyncMode: SyncMode = normalizeSyncMode(requestedSyncModeFromBody);
-      let requestedSource: OAuthSource = normalizeOAuthSource(body?.source ?? body?.calendar_source);
-
-      if (state) {
-        if (!internalFunctionSecret) {
-          return jsonResponse({ error: "OAuth state validation is not configured" }, 500);
-        }
-
-        try {
-          const verified = await verifySignedOAuthState({
-            state,
-            provider: "outlook",
-            secret: internalFunctionSecret,
-          });
-          if (userId && verified.userId !== userId) {
-            return jsonResponse({ error: "OAuth state does not match the authenticated user" }, 401);
-          }
-          userId = verified.userId;
-          if (!requestedSyncModeFromBody) {
-            requestedSyncMode = verified.syncMode;
-          }
-          requestedSource = verified.source;
-        } catch {
-          return jsonResponse({ error: "Invalid or expired OAuth state" }, 401);
-        }
-      } else if (!userId) {
-        return jsonResponse({ error: "Invalid or expired OAuth state" }, 401);
-      }
-
-      const tokenResponse = await fetch(MICROSOFT_TOKEN_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          client_id: clientId,
-          client_secret: clientSecret,
-          code,
-          grant_type: "authorization_code",
-          redirect_uri: redirectUri,
-          scope: SCOPES,
-        }),
-      });
-
-      if (!tokenResponse.ok) {
-        const details = await tokenResponse.text();
-        return jsonResponse({ error: "Failed to exchange authorization code", details }, 400);
-      }
-
-      const tokens = await tokenResponse.json();
-      const accessToken = tokens.access_token as string;
-      const refreshToken = (tokens.refresh_token as string | undefined) ?? null;
-      const tokenExpiresAt = new Date(Date.now() + Number(tokens.expires_in || 3600) * 1000).toISOString();
-
-      const meResp = await fetch(MICROSOFT_ME_URL, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-
-      let calendarEmail: string | null = null;
-      if (meResp.ok) {
-        const me = await meResp.json();
-        calendarEmail = (me?.mail as string | undefined) || (me?.userPrincipalName as string | undefined) || null;
-      }
-
-      const calendars = await listOutlookCalendars(accessToken);
-      const primary = calendars.find((c) => c.isDefaultCalendar) ?? calendars[0] ?? null;
-      let taskLists: Array<{ id: string; name: string; isDefaultTaskList: boolean }> = [];
       try {
-        taskLists = await listOutlookTaskLists(accessToken);
-      } catch {
-        taskLists = [];
+        const result = await exchangeOutlookConnection({
+          supabase,
+          req,
+          code,
+          redirectUri,
+          state,
+          requestedSyncModeFromBody,
+          sourceFromBody: body?.source ?? body?.calendar_source,
+          internalFunctionSecret,
+          clientId,
+          clientSecret,
+        });
+        return jsonResponse(result);
+      } catch (error) {
+        if (error instanceof OAuthHttpError) {
+          return jsonResponse(
+            {
+              error: error.message,
+              ...(error.details ? { details: error.details } : {}),
+            },
+            error.status,
+          );
+        }
+        throw error;
       }
-      const primaryTaskList = taskLists.find((list) => list.isDefaultTaskList) ?? taskLists[0] ?? null;
-
-      const { data: existing } = await supabase
-        .from("user_calendar_connections")
-        .select("id, refresh_token")
-        .eq("user_id", userId)
-        .eq("provider", "outlook")
-        .maybeSingle();
-
-      const { data: connection, error: upsertError } = await supabase
-        .from("user_calendar_connections")
-        .upsert(
-          {
-            user_id: userId,
-            provider: "outlook",
-            access_token: accessToken,
-            refresh_token: refreshToken ?? existing?.refresh_token ?? null,
-            token_expires_at: tokenExpiresAt,
-            calendar_id: primary?.id ?? null,
-            calendar_email: calendarEmail,
-            primary_calendar_id: primary?.id ?? null,
-            primary_calendar_name: primary?.name ?? null,
-            primary_task_list_id: primaryTaskList?.id ?? null,
-            primary_task_list_name: primaryTaskList?.name ?? null,
-            sync_enabled: true,
-            sync_mode: requestedSyncMode,
-            platform: requestedSource === "native" ? "ios" : "web",
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id,provider" },
-        )
-        .select(
-          "id, provider, calendar_email, primary_calendar_id, primary_calendar_name, primary_task_list_id, primary_task_list_name, sync_mode, sync_enabled, platform",
-        )
-        .single();
-
-      if (upsertError) {
-        return jsonResponse({ error: "Failed to store calendar connection", details: upsertError.message }, 500);
-      }
-
-      return jsonResponse({
-        success: true,
-        connection,
-        calendars,
-        taskLists,
-        calendarEmail,
-      });
     }
 
     const userId = await getAuthedUserId(supabase, req);

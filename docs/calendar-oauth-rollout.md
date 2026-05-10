@@ -25,8 +25,10 @@ For each environment, register the exact callback URIs the app can send during O
 
 - Web callback: `https://<app-domain>/calendar/oauth/callback`
 - Native callback: `<native_redirect_base>/calendar/oauth/callback`
+- Native Outlook fallback callback: `https://<project-ref>.supabase.co/functions/v1/outlook-calendar-auth/callback`
 
 Where `native_redirect_base` should match `VITE_NATIVE_REDIRECT_BASE` for that environment.
+The Outlook fallback callback is used by iOS builds when the public app domain cannot serve the React callback route directly.
 
 For Microsoft app registrations, add every production and staging web domain plus every native redirect base you expect shipped builds to use.
 Do not register or send callback URIs with query parameters; provider and native/web source are carried in signed OAuth state so Outlook.com personal accounts can complete the flow.

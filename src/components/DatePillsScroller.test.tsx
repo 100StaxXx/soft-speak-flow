@@ -731,6 +731,76 @@ describe("DatePillsScroller", () => {
     }
   });
 
+  it("uses an explicit center request date key instead of the selected date pill", async () => {
+    const onDateSelect = vi.fn();
+    const scrollToSpy = vi.fn(function (this: HTMLElement, options?: ScrollToOptions) {
+      if (typeof options?.left === "number") {
+        this.scrollLeft = options.left;
+      }
+    });
+    const originalScrollTo = HTMLElement.prototype.scrollTo;
+
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true,
+      value: scrollToSpy,
+    });
+
+    try {
+      const selectedDate = new Date("2026-02-19T08:00:00.000Z");
+      const { rerender, container } = render(
+        <DatePillsScroller
+          selectedDate={selectedDate}
+          onDateSelect={onDateSelect}
+          centerRequestKey={0}
+        />,
+      );
+
+      const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
+      const selectedButton = scroller.querySelector("button[data-date-key='2026-02-19']") as HTMLButtonElement;
+      const requestedButton = scroller.querySelector("button[data-date-key='2026-02-22']") as HTMLButtonElement;
+      expect(selectedButton).toBeTruthy();
+      expect(requestedButton).toBeTruthy();
+
+      setCenteringMetrics(scroller, selectedButton, {
+        scrollLeft: 0,
+        scrollWidth: 1400,
+        containerWidth: 220,
+        selectedLeft: 520,
+        selectedWidth: 60,
+      });
+      Object.defineProperty(requestedButton, "offsetLeft", {
+        configurable: true,
+        value: 140,
+      });
+      Object.defineProperty(requestedButton, "offsetWidth", {
+        configurable: true,
+        value: 60,
+      });
+
+      scrollToSpy.mockClear();
+      rerender(
+        <DatePillsScroller
+          selectedDate={selectedDate}
+          onDateSelect={onDateSelect}
+          centerRequestKey={1}
+          centerRequestDateKey="2026-02-22"
+        />,
+      );
+
+      await waitFor(() => {
+        expect(scroller.scrollLeft).toBe(60);
+      });
+      const lastOptions = scrollToSpy.mock.calls.at(-1)?.[0] as { left?: number };
+      expect(lastOptions.left).toBe(60);
+      expect(lastOptions.left).not.toBe(440);
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+        configurable: true,
+        value: originalScrollTo,
+      });
+    }
+  });
+
   it("recomputes forced center requests across animation frames when layout shifts", async () => {
     const onDateSelect = vi.fn();
     const scrollToSpy = vi.fn(function (this: HTMLElement, options?: ScrollToOptions) {
