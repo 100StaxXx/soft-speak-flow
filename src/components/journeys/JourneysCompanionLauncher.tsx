@@ -171,9 +171,10 @@ export function JourneysCompanionLauncher({
         ) : null}
         <span
           className={cn(
-            "relative flex items-center justify-center transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+            "relative flex items-center justify-center transition-transform duration-500",
             faceDirection === "away" ? "-scale-x-100 rotate-[3deg]" : "scale-x-100 rotate-0",
           )}
+          style={{ transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)" }}
         >
           {portrait}
         </span>

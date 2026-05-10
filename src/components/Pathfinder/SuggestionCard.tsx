@@ -11,9 +11,18 @@ interface SuggestionCardProps {
 }
 
 const difficultyConfig = {
-  easy: { label: 'Easy', color: 'text-green-500 bg-green-500/10 border-green-500/20' },
-  medium: { label: 'Medium', color: 'text-amber-500 bg-amber-500/10 border-amber-500/20' },
-  hard: { label: 'Hard', color: 'text-red-500 bg-red-500/10 border-red-500/20' },
+  easy: {
+    label: 'Easy',
+    color: 'border-[hsl(var(--category-soul)_/_0.35)] bg-[hsl(var(--category-soul)_/_0.12)] text-[hsl(var(--category-soul))]',
+  },
+  medium: {
+    label: 'Medium',
+    color: 'border-[hsl(var(--stardust-gold)_/_0.35)] bg-[hsl(var(--stardust-gold)_/_0.12)] text-[hsl(var(--stardust-gold))]',
+  },
+  hard: {
+    label: 'Hard',
+    color: 'border-[hsl(var(--category-body)_/_0.35)] bg-[hsl(var(--category-body)_/_0.1)] text-[hsl(var(--category-body))]',
+  },
 };
 
 const frequencyLabels: Record<string, string> = {

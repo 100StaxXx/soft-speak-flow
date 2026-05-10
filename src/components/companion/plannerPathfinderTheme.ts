@@ -23,6 +23,9 @@ const lightModeVars = [
   "[--nebula-pink:269_60%_64%]",
   "[--category-soul:203_82%_64%]",
   "[--epic-nature:155_62%_44%]",
+  "[--category-body:219_52%_66%]",
+  "[--epic-warrior:263_64%_70%]",
+  "[--stage-tier-2:205_36%_74%]",
   "[--deep-space:224_44%_14%]",
 ].join(" ");
 

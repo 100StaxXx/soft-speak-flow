@@ -1,10 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { createSignedOAuthState, verifySignedOAuthState } from "../_shared/oauthState.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
 
 const MICROSOFT_AUTH_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
 const MICROSOFT_TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
@@ -30,12 +26,6 @@ type Action =
   | "disconnect"
   | "refreshToken";
 
-const jsonResponse = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-
 class OAuthHttpError extends Error {
   status: number;
   details?: string;
@@ -47,12 +37,6 @@ class OAuthHttpError extends Error {
     this.details = details;
   }
 }
-
-const redirectResponse = (location: string) =>
-  new Response(null, {
-    status: 302,
-    headers: { ...corsHeaders, Location: location },
-  });
 
 function buildNativeCallbackRedirect(args: {
   status: "success" | "error";
@@ -409,8 +393,20 @@ async function exchangeOutlookConnection(args: {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return handleCors(req);
   }
+
+  const jsonResponse = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+    });
+
+  const redirectResponse = (location: string) =>
+    new Response(null, {
+      status: 302,
+      headers: { ...getCorsHeaders(req), Location: location },
+    });
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;

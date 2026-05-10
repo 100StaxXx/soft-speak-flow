@@ -616,7 +616,7 @@
         "npm:globals@^15.15.0",
         "npm:html-to-image@^1.11.13",
         "npm:input-otp@^1.4.2",
-        "npm:jsdom@^20.0.3",
+        "npm:jsdom@^29.1.1",
         "npm:lightningcss@^1.30.2",
         "npm:lucide-react@0.462",
         "npm:patch-package@^8.0.1",

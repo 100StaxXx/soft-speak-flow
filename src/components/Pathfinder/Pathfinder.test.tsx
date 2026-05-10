@@ -279,7 +279,7 @@ describe("Pathfinder", () => {
     expect(screen.getByTestId("pathfinder-shell")).toBeInTheDocument();
     expectElementToIncludeClasses(
       screen.getByTestId("pathfinder-shell"),
-      "border-[hsl(var(--celestial-blue)_/_0.38)] text-foreground",
+      "border-[hsl(var(--celestial-blue)_/_0.58)] text-foreground",
     );
     expect(screen.getByTestId("pathfinder-header")).toBeInTheDocument();
     expect(screen.getByTestId("pathfinder-progress")).toBeInTheDocument();
