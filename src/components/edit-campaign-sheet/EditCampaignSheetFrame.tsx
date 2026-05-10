@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { EditRitualSheet, type RitualData } from "@/components/EditRitualSheet";
 import { RescheduleDrawer } from "@/components/RescheduleDrawer";
 import { plannerPathfinderTheme } from "@/components/companion/plannerPathfinderTheme";
+import { usePlannerPathfinderAppearance } from "@/hooks/usePlannerPathfinderAppearance";
 import { DIFFICULTY_COLORS, QUEST_FORM_STYLES, type QuestFormDifficulty } from "@/components/quest-shared";
 import { HABIT_XP_REWARDS } from "@/config/xpRewards";
 import { cn } from "@/lib/utils";
@@ -180,6 +181,7 @@ export function EditCampaignSheetFrame({
   dependencies,
   visualPreview = false,
 }: EditCampaignSheetFrameProps) {
+  const { themeModeClassName } = usePlannerPathfinderAppearance();
   const currentEpic = useMemo(
     () => dependencies.activeEpics.find((candidate) => candidate.id === epic?.id) ?? epic,
     [dependencies.activeEpics, epic],
@@ -329,6 +331,7 @@ export function EditCampaignSheetFrame({
         <SheetContent
           side="bottom"
           className={cn(
+            themeModeClassName,
             plannerPathfinderTheme.shell,
             "fixed flex h-[88dvh] max-h-[88dvh] flex-col overflow-hidden rounded-t-[2.25rem] px-0 pb-0",
           )}
@@ -339,7 +342,7 @@ export function EditCampaignSheetFrame({
 
           <SheetHeader className="relative z-10 px-4 pt-4 sm:px-5 sm:pt-5">
             <div className={plannerPathfinderTheme.headerBar}>
-              <div className={cn(QUEST_FORM_STYLES.heroIcon, "h-12 w-12 shrink-0 rounded-[1rem]")}>
+              <div className={cn(plannerPathfinderTheme.heroIcon, "h-12 w-12 shrink-0 rounded-[1rem]")}>
                 <Pencil className="h-5 w-5" />
               </div>
               <div className="min-w-0 text-left">
@@ -353,7 +356,7 @@ export function EditCampaignSheetFrame({
             </div>
           </SheetHeader>
 
-          <ScrollArea className={cn("relative z-10 mx-4 mt-3 min-h-0 flex-1 rounded-[2rem] border-[4px] border-category-soul/45 shadow-[0_12px_0_hsl(var(--stardust-gold)_/_0.38)] sm:mx-5", QUEST_FORM_STYLES.body)}>
+          <ScrollArea className={plannerPathfinderTheme.scrollWell}>
             <div className="space-y-5 px-4 py-4 text-foreground sm:px-5" data-vaul-no-drag>
               <section className={cn(plannerPathfinderTheme.raisedPanel, "space-y-4 p-4")}>
                 <div className="space-y-2">
@@ -401,6 +404,7 @@ export function EditCampaignSheetFrame({
                       epicTitle={currentEpic.title}
                       epicGoal={currentEpic.description ?? undefined}
                       currentDeadline={resolvedEndDate}
+                      visualStyle="planner"
                     >
                       <Button type="button" variant="outline" className={cn(plannerPathfinderTheme.outlineButton, "gap-2")}>
                         <Wand2 className="h-4 w-4" />

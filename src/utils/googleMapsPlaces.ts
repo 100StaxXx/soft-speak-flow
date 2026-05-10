@@ -40,6 +40,7 @@ declare global {
 
 const GOOGLE_MAPS_PLACES_SCRIPT_ID = "google-maps-places-js";
 const GOOGLE_MAPS_PLACES_DIAGNOSTIC_PREFIX = "[Google Maps Places]";
+const GOOGLE_MAPS_AUTH_ALERT_MESSAGE = "This page can't load Google Maps correctly";
 
 let googleMapsPlacesPromise: Promise<GoogleMapsPlacesLibrary | null> | null = null;
 
@@ -88,6 +89,28 @@ const resetFailedGoogleMapsPlacesLoad = (script: HTMLScriptElement | null): void
   script?.remove();
 };
 
+const installGoogleMapsAuthAlertSuppressor = (): (() => void) => {
+  const previousAlert = window.alert;
+  const wrappedAlert: typeof window.alert = (message) => {
+    if (typeof message === "string" && message.includes(GOOGLE_MAPS_AUTH_ALERT_MESSAGE)) {
+      logGoogleMapsPlacesDiagnostic("Suppressed Google Maps authentication alert.", {
+        hasApiKey: true,
+      });
+      return;
+    }
+
+    previousAlert.call(window, message);
+  };
+
+  window.alert = wrappedAlert;
+
+  return () => {
+    if (window.alert === wrappedAlert) {
+      window.alert = previousAlert;
+    }
+  };
+};
+
 const resolveLoadedGoogleMapsPlaces = (script: HTMLScriptElement | null): GoogleMapsPlacesLibrary | null => {
   const places = getLoadedGoogleMapsPlacesLibrary();
   if (places) return places;
@@ -122,11 +145,13 @@ export const loadGoogleMapsPlacesLibrary = (): Promise<GoogleMapsPlacesLibrary |
   googleMapsPlacesPromise = new Promise((resolve) => {
     const existingScript = document.getElementById(GOOGLE_MAPS_PLACES_SCRIPT_ID) as HTMLScriptElement | null;
     const previousAuthFailure = window.gm_authFailure;
+    const restoreAuthAlert = installGoogleMapsAuthAlertSuppressor();
     let isSettled = false;
     const settle = (places: GoogleMapsPlacesLibrary | null) => {
       if (isSettled) return;
       isSettled = true;
       window.gm_authFailure = previousAuthFailure;
+      window.setTimeout(restoreAuthAlert, 0);
       resolve(places);
     };
     const handleAuthFailure = (script: HTMLScriptElement | null) => {

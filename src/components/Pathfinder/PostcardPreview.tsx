@@ -23,7 +23,7 @@ export const PostcardPreview = memo(function PostcardPreview({ milestones, story
   return (
     <div className={cn('space-y-3', className)}>
       <div className={cn(plannerPathfinderTheme.raisedPanel, "flex items-center gap-2 p-4")}>
-        <Book className="w-4 h-4 text-stardust-gold" />
+        <Book className="w-4 h-4 text-[hsl(var(--celestial-blue))]" />
         <span className="font-medium text-sm">Your Story Chapters</span>
         <Badge variant="outline" className={cn(plannerPathfinderTheme.chip, "ml-auto text-xs")}>
           {postcardMilestones.length} chapters
@@ -43,16 +43,16 @@ export const PostcardPreview = memo(function PostcardPreview({ milestones, story
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
             
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[1rem] border-[3px] border-stardust-gold/65 bg-[linear-gradient(180deg,hsl(var(--stardust-gold))_0%,hsl(var(--nebula-pink))_100%)]">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[1rem] border border-[hsl(var(--celestial-blue)_/_0.34)] bg-[linear-gradient(180deg,#ffffff_0%,hsl(var(--celestial-blue)_/_0.2)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
                 <Sparkles className="w-5 h-5 text-[hsl(var(--deep-space))]" />
               </div>
               
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-xs font-medium text-stardust-gold">
+                  <span className="text-xs font-medium text-[hsl(var(--celestial-blue))]">
                     Chapter {index + 1}
                   </span>
-                  <Star className="w-3 h-3 text-stardust-gold" />
+                  <Star className="w-3 h-3 text-[hsl(var(--celestial-blue))]" />
                 </div>
                 <p className="font-medium text-sm truncate">{milestone.title}</p>
                 <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">

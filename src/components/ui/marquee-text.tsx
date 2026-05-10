@@ -62,7 +62,7 @@ export function MarqueeText({
   const endPauseProportion = (pauseDuration / 1000) / totalDuration;
 
   return (
-    <div ref={containerRef} className={cn("overflow-hidden", className)}>
+    <div ref={containerRef} className={cn("min-w-0 w-full overflow-hidden", className)}>
       <motion.span
         ref={textRef}
         className={cn("whitespace-nowrap inline-block", textClassName)}

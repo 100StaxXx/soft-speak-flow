@@ -34,6 +34,7 @@ import type { ParsedTask } from "@/features/tasks/hooks";
 import { inferCustomPeriod } from "@/utils/habitSchedule";
 import { useRitualUpdate } from "@/hooks/useRitualUpdate";
 import { plannerPathfinderTheme } from "@/components/companion/plannerPathfinderTheme";
+import { usePlannerPathfinderAppearance } from "@/hooks/usePlannerPathfinderAppearance";
 import { QUEST_FORM_STYLES } from "@/components/quest-shared";
 
 type HabitCategory = 'mind' | 'body' | 'soul';
@@ -92,6 +93,7 @@ export const EditRitualSheet = memo(function EditRitualSheet({
   isDeleting,
 }: EditRitualSheetProps) {
   const { saveRitual } = useRitualUpdate();
+  const { themeModeClassName } = usePlannerPathfinderAppearance();
   
   // Form state
   const [title, setTitle] = useState("");
@@ -232,6 +234,7 @@ export const EditRitualSheet = memo(function EditRitualSheet({
         side="bottom"
         data-testid="edit-ritual-sheet-shell"
         className={cn(
+          themeModeClassName,
           plannerPathfinderTheme.shell,
           "fixed flex h-[88dvh] max-h-[88dvh] flex-col overflow-hidden rounded-t-[2.25rem] px-0 pb-0 pt-0",
         )}
@@ -241,7 +244,7 @@ export const EditRitualSheet = memo(function EditRitualSheet({
 
         <SheetHeader className="relative z-10 shrink-0 px-4 pt-4 text-left sm:px-5 sm:pt-5">
           <div className={plannerPathfinderTheme.headerBar}>
-            <div className={cn(QUEST_FORM_STYLES.heroIcon, "h-12 w-12 shrink-0 rounded-[1rem]")}>
+            <div className={cn(plannerPathfinderTheme.heroIcon, "h-12 w-12 shrink-0 rounded-[1rem]")}>
               <Repeat className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1 text-left">
@@ -268,7 +271,7 @@ export const EditRitualSheet = memo(function EditRitualSheet({
           </div>
         </SheetHeader>
 
-        <ScrollArea className={cn("relative z-10 mx-4 mt-3 min-h-0 flex-1 rounded-[2rem] border-[4px] border-category-soul/45 shadow-[0_12px_0_hsl(var(--stardust-gold)_/_0.38)] sm:mx-5", QUEST_FORM_STYLES.body)}>
+        <ScrollArea className={plannerPathfinderTheme.scrollWell}>
           <div className="space-y-5 px-4 pb-10 pt-4 text-foreground sm:px-5" data-vaul-no-drag>
             <NaturalLanguageEditor onApply={handleNaturalLanguageApply} visualStyle="quest-soft" />
 
@@ -419,6 +422,7 @@ export const EditRitualSheet = memo(function EditRitualSheet({
                       hideLocation
                       hideMoreInformation
                       visualStyle="quest-soft"
+                      portalClassName={cn(themeModeClassName, plannerPathfinderTheme.portalSurface)}
                     />
                   ) : (
                     <p className={QUEST_FORM_STYLES.helperText}>

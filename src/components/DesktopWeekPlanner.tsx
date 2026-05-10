@@ -117,6 +117,7 @@ const DEFAULT_TIMELINE_END_HOUR = 21;
 const HOUR_HEIGHT_PX = 84;
 const MIN_TASK_HEIGHT_PX = 28;
 const TASK_PAD_PX = 4;
+const WEEK_GRID_TEMPLATE_COLUMNS = "72px repeat(7, minmax(0, 1fr))";
 const JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME =
   "journeys-quest-card-shell overflow-hidden border transition-colors";
 const JOURNEYS_QUEST_CARD_SHELL_STANDARD_TONE_CLASS_NAME =
@@ -757,9 +758,16 @@ export function DesktopWeekPlanner({
 
         <div className="overflow-hidden rounded-[28px] border border-white/8 bg-black/10">
           <div className="overflow-auto" style={{ maxHeight: "min(72vh, 820px)" }}>
-            <div className="min-w-[1120px]">
+            <div
+              className="min-w-0"
+              data-testid="desktop-week-planner-grid"
+            >
               {/* Header row */}
-              <div className="sticky top-0 z-40 grid grid-cols-[72px_repeat(7,minmax(150px,1fr))]">
+              <div
+                className="sticky top-0 z-40 grid"
+                data-testid="desktop-week-header-grid"
+                style={{ gridTemplateColumns: WEEK_GRID_TEMPLATE_COLUMNS }}
+              >
                 <div className="border-b border-r border-white/8 bg-[rgba(19,16,29,0.98)] px-3 py-4 backdrop-blur-xl">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/75">
                     Schedule
@@ -771,13 +779,19 @@ export function DesktopWeekPlanner({
                   const dayStats = dayStatsByDate.get(dateKey) ?? { total: 0, completed: 0, timed: 0 };
                   const isSelected = isSameDay(day, selectedDate);
                   const dayIsToday = isToday(day);
+                  const progressLabel = dayStats.total === 0
+                    ? "Open day"
+                    : `${dayStats.completed}/${dayStats.total} done`;
+                  const compactProgressLabel = dayStats.total === 0
+                    ? "Open"
+                    : `${dayStats.completed}/${dayStats.total}`;
 
                   return (
                     <div
                       key={dateKey}
                       data-testid={`desktop-week-day-${dateKey}`}
                       className={cn(
-                        "border-b border-r border-white/8 px-3 py-3 backdrop-blur-xl",
+                        "min-w-0 border-b border-r border-white/8 px-3 py-3 backdrop-blur-xl",
                         isSelected
                           ? "bg-primary/[0.12]"
                           : dayIsToday
@@ -788,10 +802,10 @@ export function DesktopWeekPlanner({
                       <button
                         type="button"
                         onClick={() => onDateSelect(day)}
-                        className="w-full rounded-2xl text-left transition-opacity hover:opacity-90"
+                        className="min-w-0 w-full rounded-2xl text-left transition-opacity hover:opacity-90"
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <div>
+                          <div className="min-w-0">
                             <p
                               className={cn(
                                 "text-[11px] font-semibold uppercase tracking-[0.18em]",
@@ -807,12 +821,15 @@ export function DesktopWeekPlanner({
                             <h3 className="mt-1 text-2xl font-semibold leading-none text-foreground">
                               {format(day, "d")}
                             </h3>
-                            <p className="mt-1 text-xs text-muted-foreground">{format(day, "MMMM d")}</p>
+                            <p className="mt-1 truncate text-xs text-muted-foreground">
+                              <span className="hidden 2xl:inline">{format(day, "MMMM d")}</span>
+                              <span className="2xl:hidden">{format(day, "MMM d")}</span>
+                            </p>
                           </div>
                           {dayIsToday ? (
                             <span
                               className={cn(
-                                "rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide",
+                                "hidden rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide 2xl:inline-flex",
                                 isSelected ? "bg-white/14 text-white" : "bg-celestial-blue/15 text-celestial-blue",
                               )}
                             >
@@ -821,9 +838,12 @@ export function DesktopWeekPlanner({
                           ) : null}
                         </div>
 
-                        <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
-                          <span>{dayStats.total === 0 ? "Open day" : `${dayStats.completed}/${dayStats.total} done`}</span>
-                          <span>{dayStats.timed} timed</span>
+                        <div className="mt-2 flex min-w-0 items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                          <span className="min-w-0 truncate">
+                            <span className="hidden 2xl:inline">{progressLabel}</span>
+                            <span className="2xl:hidden">{compactProgressLabel}</span>
+                          </span>
+                          <span className="shrink-0">{dayStats.timed} timed</span>
                         </div>
                       </button>
                     </div>
@@ -833,7 +853,10 @@ export function DesktopWeekPlanner({
 
               {/* Anytime row */}
               {hideAnytimeRow ? null : (
-                <div className="grid grid-cols-[72px_repeat(7,minmax(150px,1fr))]">
+                <div
+                  className="grid"
+                  style={{ gridTemplateColumns: WEEK_GRID_TEMPLATE_COLUMNS }}
+                >
                   <div className="sticky left-0 z-20 border-b border-r border-white/8 bg-[rgba(19,16,29,0.98)] px-3 py-3 backdrop-blur-xl">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/75">
                       Anytime
@@ -851,7 +874,7 @@ export function DesktopWeekPlanner({
                         key={`${dateKey}-anytime`}
                         data-testid={`desktop-week-anytime-${dateKey}`}
                         className={cn(
-                          "min-h-[92px] border-b border-r border-white/8 p-2 align-top",
+                          "min-h-[92px] min-w-0 border-b border-r border-white/8 p-2 align-top",
                           isSelected
                             ? "bg-primary/[0.05]"
                             : dayIsToday
@@ -875,7 +898,10 @@ export function DesktopWeekPlanner({
               )}
 
               {/* Timeline with proportional task heights */}
-              <div className="grid grid-cols-[72px_repeat(7,minmax(150px,1fr))]">
+              <div
+                className="grid"
+                style={{ gridTemplateColumns: WEEK_GRID_TEMPLATE_COLUMNS }}
+              >
                 {/* Time labels column */}
                 <div className="sticky left-0 z-10 bg-[rgba(19,16,29,0.98)] backdrop-blur-xl">
                   {timelineHours.map((hour) => (
@@ -900,7 +926,7 @@ export function DesktopWeekPlanner({
                   return (
                     <div
                       key={`${dateKey}-timeline`}
-                      className="relative border-r border-white/8"
+                      className="relative min-w-0 border-r border-white/8"
                     >
                       {/* Hour grid lines */}
                       {timelineHours.map((hour) => (

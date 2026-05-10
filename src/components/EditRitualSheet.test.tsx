@@ -152,7 +152,7 @@ describe("EditRitualSheet", () => {
       />,
     );
 
-    expect(screen.getByTestId("edit-ritual-sheet-shell").className).toContain("border-celestial-blue/55");
+    expect(screen.getByTestId("edit-ritual-sheet-shell").className).toContain("border-[hsl(var(--celestial-blue)_/_0.38)]");
     expect(screen.getByText("Edit Ritual")).toBeInTheDocument();
     expect(screen.getByText("Changes sync to all instances of this ritual.")).toBeInTheDocument();
     expect(screen.getByTestId("natural-language-editor")).toHaveAttribute("data-visual-style", "quest-soft");

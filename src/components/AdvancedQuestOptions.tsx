@@ -67,6 +67,7 @@ interface AdvancedQuestOptionsProps {
   hideLocation?: boolean;
   requireScheduledTimeForRecurrence?: boolean;
   visualStyle?: "default" | "quest-soft";
+  portalClassName?: string;
 }
 
 // Helper to format 24h time to 12h
@@ -211,7 +212,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
     ? "border-[3px] border-celestial-blue/45 bg-card/80 text-foreground placeholder:text-muted-foreground focus-visible:border-stardust-gold/70 focus-visible:ring-stardust-gold/35"
     : "";
   const popoverClassName = isQuestSoft
-    ? cn("w-[min(24rem,var(--radix-popover-trigger-width))] p-2", QUEST_FORM_STYLES.popover)
+    ? cn("w-[min(24rem,var(--radix-popover-trigger-width))] p-2", QUEST_FORM_STYLES.popover, props.portalClassName)
     : "w-[min(24rem,var(--radix-popover-trigger-width))] p-1";
   const reminderPopoverClassName = cn(
     popoverClassName,

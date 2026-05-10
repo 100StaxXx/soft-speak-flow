@@ -94,6 +94,10 @@ describe("DesktopWeekPlanner", () => {
 
     expect(screen.getByTestId("desktop-week-day-2026-03-29")).toBeInTheDocument();
     expect(screen.getByTestId("desktop-week-day-2026-04-04")).toBeInTheDocument();
+    expect(screen.getByTestId("desktop-week-planner-grid")).toHaveClass("min-w-0");
+    expect(screen.getByTestId("desktop-week-header-grid")).toHaveStyle({
+      gridTemplateColumns: "72px repeat(7, minmax(0, 1fr))",
+    });
     expect(screen.getByTestId("desktop-week-hour-6")).toBeInTheDocument();
     expect(screen.getByRole("group", { name: /desktop planner mode/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Today" })).toBeInTheDocument();

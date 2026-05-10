@@ -2458,140 +2458,148 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               </button>
             </div>
 
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                {isRitual && (
-                  <Repeat className={cn("w-4 h-4 flex-shrink-0", isCampaignRitual ? "text-primary" : "text-accent")} />
-                )}
-                <MarqueeText
-                  text={task.task_text}
-                  className="flex-1"
-                  textClassName={cn(
-                    "text-sm",
-                    isComplete && "text-muted-foreground",
-                    isComplete && (justCompletedTasks.has(task.id) ? "animate-strikethrough" : "line-through")
+            <div className="grid flex-1 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-1.5">
+              <div className="min-w-0" data-testid={`mobile-quest-title-region-${task.id}`}>
+                <div
+                  className="flex min-w-0 w-full items-center gap-2"
+                  data-testid={`mobile-quest-title-row-${task.id}`}
+                >
+                  {isRitual && (
+                    <Repeat className={cn("w-4 h-4 flex-shrink-0", isCampaignRitual ? "text-primary" : "text-accent")} />
                   )}
-                />
+                  <MarqueeText
+                    text={task.task_text}
+                    className="min-w-0 w-full flex-1"
+                    textClassName={cn(
+                      "text-sm",
+                      isComplete && "text-muted-foreground",
+                      isComplete && (justCompletedTasks.has(task.id) ? "animate-strikethrough" : "line-through")
+                    )}
+                  />
+                </div>
+                {isCampaignRitual && (
+                  <span className="mt-1 inline-flex max-w-full items-center rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                    <span className="truncate">Campaign Ritual - {campaignTitle}</span>
+                  </span>
+                )}
+                {task.scheduled_time && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                    <Clock className="w-3 h-3" />
+                    {formatTime(task.scheduled_time)}
+                  </span>
+                )}
+                {overlapCount > 0 && (
+                  <span className="mt-1 inline-flex items-center rounded-full border border-primary/35 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                    Overlaps: {overlapCount}
+                  </span>
+                )}
               </div>
-              {isCampaignRitual && (
-                <span className="mt-1 inline-flex max-w-full items-center rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                  <span className="truncate">Campaign Ritual - {campaignTitle}</span>
-                </span>
-              )}
-              {task.scheduled_time && (
-                <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                  <Clock className="w-3 h-3" />
-                  {formatTime(task.scheduled_time)}
-                </span>
-              )}
-              {overlapCount > 0 && (
-                <span className="mt-1 inline-flex items-center rounded-full border border-primary/35 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                  Overlaps: {overlapCount}
-                </span>
-              )}
-            </div>
 
-            <div className="flex items-center gap-2">
-              {/* Quest action menu */}
-              {!isComplete && !isDragging && !isActivated && (onEditQuest || onSendToCalendar || onDeleteQuest || onMoveQuestToNextDay) && (
-                <DropdownMenu
-                  open={isActionMenuOpen}
-                  onOpenChange={(open) => {
-                    setOpenActionMenuTaskId((current) => {
-                      if (open) return task.id;
-                      return current === task.id ? null : current;
-                    });
-                  }}
-                >
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      data-interactive="true"
-                      data-tap-control="true"
-                      aria-label="Quest actions"
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9 -m-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 md:focus-visible:opacity-100 transition-opacity touch-manipulation"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreHorizontal className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-44">
-                    {onEditQuest && (
-                      <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenActionMenuTaskId(null);
-                          onEditQuest(task);
-                        }}
+              <div
+                className="flex min-w-max items-center justify-end gap-1.5"
+                data-testid={`mobile-quest-actions-${task.id}`}
+              >
+                {/* Quest action menu */}
+                {!isComplete && !isDragging && !isActivated && (onEditQuest || onSendToCalendar || onDeleteQuest || onMoveQuestToNextDay) && (
+                  <DropdownMenu
+                    open={isActionMenuOpen}
+                    onOpenChange={(open) => {
+                      setOpenActionMenuTaskId((current) => {
+                        if (open) return task.id;
+                        return current === task.id ? null : current;
+                      });
+                    }}
+                  >
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        data-interactive="true"
+                        data-tap-control="true"
+                        aria-label="Quest actions"
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 -m-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 md:focus-visible:opacity-100 transition-opacity touch-manipulation"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        <Pencil className="w-4 h-4 mr-2" />
-                        Edit quest
-                      </DropdownMenuItem>
-                    )}
-                    {onSendToCalendar && (
-                      <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenActionMenuTaskId(null);
-                          onSendToCalendar(task.id);
-                        }}
-                      >
-                        <CalendarPlus className="w-4 h-4 mr-2" />
-                        {hasCalendarLink?.(task.id) ? "Re-send to calendar" : "Send to calendar"}
-                      </DropdownMenuItem>
-                    )}
-                    {onMoveQuestToNextDay && !isRitual && (
-                      <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenActionMenuTaskId(null);
-                          onMoveQuestToNextDay(task.id);
-                        }}
-                      >
-                        <CalendarArrowUp className="w-4 h-4 mr-2" />
-                        Move to tomorrow
-                      </DropdownMenuItem>
-                    )}
-                    {onDeleteQuest && (
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenActionMenuTaskId(null);
-                          onDeleteQuest(task.id);
-                        }}
-                      >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Delete quest
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-              {task.is_main_quest && (
-                <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 bg-primary/10 border-primary/30">
-                  Main
-                </Badge>
-              )}
-              <span className="text-sm font-bold text-stardust-gold/80">+{effectiveTaskXP}</span>
+                        <MoreHorizontal className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                      {onEditQuest && (
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenActionMenuTaskId(null);
+                            onEditQuest(task);
+                          }}
+                        >
+                          <Pencil className="w-4 h-4 mr-2" />
+                          Edit quest
+                        </DropdownMenuItem>
+                      )}
+                      {onSendToCalendar && (
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenActionMenuTaskId(null);
+                            onSendToCalendar(task.id);
+                          }}
+                        >
+                          <CalendarPlus className="w-4 h-4 mr-2" />
+                          {hasCalendarLink?.(task.id) ? "Re-send to calendar" : "Send to calendar"}
+                        </DropdownMenuItem>
+                      )}
+                      {onMoveQuestToNextDay && !isRitual && (
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenActionMenuTaskId(null);
+                            onMoveQuestToNextDay(task.id);
+                          }}
+                        >
+                          <CalendarArrowUp className="w-4 h-4 mr-2" />
+                          Move to tomorrow
+                        </DropdownMenuItem>
+                      )}
+                      {onDeleteQuest && (
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenActionMenuTaskId(null);
+                            onDeleteQuest(task.id);
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete quest
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+                {task.is_main_quest && (
+                  <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 bg-primary/10 border-primary/30">
+                    Main
+                  </Badge>
+                )}
+                <span className="text-sm font-bold text-stardust-gold/80">+{effectiveTaskXP}</span>
 
-              {/* Chevron for expandable details - only shown if task has details */}
-              {hasDetails && (
-                <Button
-                  data-interactive="true"
-                  data-tap-control="true"
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 -m-1 flex-shrink-0"
-                  onClick={(e) => toggleTaskExpanded(task.id, e)}
-                >
-                  <ChevronDown className={cn(
-                    "w-4 h-4 text-muted-foreground transition-transform duration-200",
-                    isExpanded && "rotate-180"
-                  )} />
-                </Button>
-              )}
+                {/* Chevron for expandable details - only shown if task has details */}
+                {hasDetails && (
+                  <Button
+                    data-interactive="true"
+                    data-tap-control="true"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 -m-1 flex-shrink-0"
+                    onClick={(e) => toggleTaskExpanded(task.id, e)}
+                  >
+                    <ChevronDown className={cn(
+                      "w-4 h-4 text-muted-foreground transition-transform duration-200",
+                      isExpanded && "rotate-180"
+                    )} />
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
 

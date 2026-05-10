@@ -29,6 +29,7 @@ import { QuestBehaviorSettings } from "@/components/QuestBehaviorSettings";
 import { DisplayNameSetting } from "@/components/DisplayNameSetting";
 import { CompanionNameSetting } from "@/components/CompanionNameSetting";
 import { CalendarIntegrationsSettings } from "@/components/CalendarIntegrationsSettings";
+import { PlannerAppearanceSettings } from "@/components/PlannerAppearanceSettings";
 import { CinematicPageBackground } from "@/components/CinematicPageBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
@@ -636,6 +637,7 @@ const Profile = () => {
             {/* Preferences Tab */}
             <TabsContent value="preferences" className="space-y-4">
               <QuestBehaviorSettings />
+              <PlannerAppearanceSettings />
               <CalendarIntegrationsSettings />
               <CompanionAccessibilitySettings />
               <SoundSettings />

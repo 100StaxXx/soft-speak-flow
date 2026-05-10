@@ -34,8 +34,10 @@ import { useJourneySchedule, JourneyMilestone, JourneyPhase, JourneyRitual } fro
 import { useMilestones } from "@/hooks/useMilestones";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { usePlannerPathfinderAppearance } from "@/hooks/usePlannerPathfinderAppearance";
 import { useQueryClient } from "@tanstack/react-query";
 import { SmartRescheduleAdvisor } from "@/components/journey/SmartRescheduleAdvisor";
+import { plannerPathfinderTheme } from "@/components/companion/plannerPathfinderTheme";
 
 interface RescheduleDrawerProps {
   epicId: string;
@@ -43,6 +45,7 @@ interface RescheduleDrawerProps {
   epicGoal?: string;
   currentDeadline: string;
   children?: React.ReactNode;
+  visualStyle?: "default" | "planner";
 }
 
 // Legacy quick adjustments kept as fallback
@@ -59,7 +62,8 @@ export const RescheduleDrawer = ({
   epicTitle,
   epicGoal,
   currentDeadline,
-  children 
+  children,
+  visualStyle = "default",
 }: RescheduleDrawerProps) => {
   const [open, setOpen] = useState(false);
   const [adjustmentText, setAdjustmentText] = useState("");
@@ -70,6 +74,7 @@ export const RescheduleDrawer = ({
   const [showSmartAdvisor, setShowSmartAdvisor] = useState(true);
   
   const { user } = useAuth();
+  const { themeModeClassName } = usePlannerPathfinderAppearance();
   const queryClient = useQueryClient();
   const { milestones, milestonesByPhase, getJourneyHealth } = useMilestones(epicId);
   const journeyHealth = getJourneyHealth();
@@ -80,6 +85,8 @@ export const RescheduleDrawer = ({
     error: scheduleError,
     reset: resetSchedule 
   } = useJourneySchedule();
+  const isPlannerStyle = visualStyle === "planner";
+  const plannerPortalClassName = cn(themeModeClassName, plannerPathfinderTheme.portalSurface);
 
   // Convert current milestones to the format expected by adjustSchedule
   const currentSchedule = {
@@ -225,7 +232,16 @@ export const RescheduleDrawer = ({
           </Button>
         )}
       </DrawerTrigger>
-      <DrawerContent className="max-h-[90vh]">
+      <DrawerContent
+        className={cn(
+          "max-h-[90vh]",
+          isPlannerStyle &&
+            cn(
+              themeModeClassName,
+              "rounded-t-[2.25rem] border-2 border-[hsl(var(--celestial-blue)_/_0.34)] bg-[linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--card))_52%,hsl(var(--secondary))_100%)] text-foreground shadow-[0_-18px_56px_-36px_rgba(28,87,135,0.58),inset_0_1px_0_rgba(255,255,255,0.72)]",
+            ),
+        )}
+      >
         <DrawerHeader className="pb-2">
           <div className="flex items-center justify-between">
             <DrawerTitle className="flex items-center gap-2">
@@ -327,7 +343,10 @@ export const RescheduleDrawer = ({
                         {newDeadline ? format(newDeadline, "PPP") : "Pick a new deadline"}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
+                    <PopoverContent
+                      className={cn(isPlannerStyle && plannerPortalClassName, "w-auto p-0")}
+                      align="start"
+                    >
                       <Calendar
                         mode="single"
                         selected={newDeadline}

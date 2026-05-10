@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { DurationPickerField, TimePickerField, getNextTimeForStep } from '@/components/scheduling';
+import { usePlannerPathfinderAppearance } from '@/hooks/usePlannerPathfinderAppearance';
 import { cn } from '@/lib/utils';
 import type { JourneyRitual } from '@/hooks/useJourneySchedule';
 import { FrequencyPresets, formatDaysShort, getDefaultDaysForFrequency, getDefaultMonthDays } from './FrequencyPresets';
@@ -42,6 +43,7 @@ const difficultyColors = {
 export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete, isEditing: initialEditing = false }: RitualCardProps) {
   const [isEditing, setIsEditing] = useState(initialEditing);
   const [editedRitual, setEditedRitual] = useState(ritual);
+  const { themeModeClassName } = usePlannerPathfinderAppearance();
 
   const handleSave = () => {
     onUpdate(editedRitual);
@@ -161,7 +163,7 @@ export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete,
               <SelectTrigger className={cn(plannerPathfinderTheme.textField, "h-10 text-xs")}>
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className={cn(themeModeClassName, plannerPathfinderTheme.portalSurface)}>
                 <SelectItem value="easy">Easy</SelectItem>
                 <SelectItem value="medium">Medium</SelectItem>
                 <SelectItem value="hard">Hard</SelectItem>

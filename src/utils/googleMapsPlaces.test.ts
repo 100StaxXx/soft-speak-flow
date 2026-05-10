@@ -146,4 +146,36 @@ describe("googleMapsPlaces", () => {
     );
     expect(JSON.stringify(consoleInfoSpy.mock.calls)).not.toContain("maps-key");
   });
+
+  it("suppresses Google Maps auth alerts during script load and restores alerts afterward", async () => {
+    const originalAlert = window.alert;
+    const alertSpy = vi.fn();
+    window.alert = alertSpy;
+
+    try {
+      const { loadGoogleMapsPlacesLibrary } = await import("@/utils/googleMapsPlaces");
+
+      const load = loadGoogleMapsPlacesLibrary();
+      window.alert("This page can't load Google Maps correctly. Do you own this website?");
+
+      expect(alertSpy).not.toHaveBeenCalled();
+      expect(consoleInfoSpy).toHaveBeenCalledWith(
+        "[Google Maps Places]",
+        "Suppressed Google Maps authentication alert.",
+        expect.objectContaining({
+          hasApiKey: true,
+        }),
+      );
+
+      window.gm_authFailure?.();
+
+      await expect(load).resolves.toBeNull();
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
+
+      window.alert("Other alert");
+      expect(alertSpy).toHaveBeenCalledWith("Other alert");
+    } finally {
+      window.alert = originalAlert;
+    }
+  });
 });

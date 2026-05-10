@@ -48,6 +48,7 @@ import { TimelineView } from '@/components/JourneyWizard/TimelineView';
 import { AdjustmentInput } from '@/components/JourneyWizard/AdjustmentInput';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useJourneysCompanionVisual } from '@/hooks/useJourneysCompanionVisual';
+import { usePlannerPathfinderAppearance } from '@/hooks/usePlannerPathfinderAppearance';
 import { EPIC_XP_REWARDS } from '@/config/xpRewards';
 import { hasReachedActiveCampaignLimit } from '@/features/epics/constants';
 import type { StoryTypeSlug } from '@/types/narrativeTypes';
@@ -193,6 +194,7 @@ export function Pathfinder({
   
   const { preferences } = useUserAIContext();
   const { activeEpics } = useEpics({ enabled: open });
+  const { themeModeClassName } = usePlannerPathfinderAppearance();
   const hasReachedCampaignLimit = hasReachedActiveCampaignLimit(activeEpics.length);
   const {
     companionLabel,
@@ -839,7 +841,7 @@ export function Pathfinder({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] border-none bg-transparent p-0 shadow-none sm:max-w-3xl" hideCloseButton>
         <div
-          className={cn(plannerPathfinderTheme.shell, "mx-auto w-full")}
+          className={cn(themeModeClassName, plannerPathfinderTheme.shell, "mx-auto w-full")}
           data-tour="pathfinder-campaign-builder"
           data-testid="pathfinder-shell"
         >
@@ -852,12 +854,12 @@ export function Pathfinder({
                 {headerAvatar}
                 <span
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-[-18%] rounded-full bg-[radial-gradient(circle,rgba(125,211,252,0.3),transparent_70%)] blur-lg"
+                  className="pointer-events-none absolute inset-[-18%] rounded-full bg-[radial-gradient(circle,hsl(var(--celestial-blue)_/_0.24),transparent_70%)] blur-lg"
                 />
               </div>
               <DialogHeader className="min-w-0 flex-1 space-y-1 text-left">
-                <DialogTitle className="text-xl text-white">Pathfinder</DialogTitle>
-                <DialogDescription className="text-sm text-white/[0.68]">
+                <DialogTitle className="text-xl text-foreground">Pathfinder</DialogTitle>
+                <DialogDescription className="text-sm text-muted-foreground">
                   {stepDescriptions[step]}
                 </DialogDescription>
               </DialogHeader>
@@ -898,10 +900,10 @@ export function Pathfinder({
                         className={cn(
                           "flex h-9 w-9 items-center justify-center rounded-full border-[3px] text-sm font-semibold transition-all",
                           isActive
-                            ? "border-stardust-gold/70 bg-[linear-gradient(180deg,hsl(var(--stardust-gold)_/_0.98)_0%,hsl(var(--nebula-pink)_/_0.62)_100%)] text-[hsl(var(--deep-space))] shadow-[0_5px_0_hsl(var(--stardust-gold)_/_0.35)]"
+                            ? "border-[hsl(var(--celestial-blue)_/_0.46)] bg-[linear-gradient(180deg,#ffffff_0%,hsl(var(--celestial-blue)_/_0.2)_44%,hsl(var(--celestial-blue)_/_0.46)_100%)] text-[hsl(var(--deep-space))] shadow-[0_10px_20px_-16px_rgba(28,117,177,0.58),inset_0_1px_0_rgba(255,255,255,0.86)]"
                             : isComplete
-                              ? "border-epic-nature/70 bg-[linear-gradient(180deg,hsl(var(--epic-nature)_/_0.95)_0%,hsl(var(--category-soul)_/_0.62)_100%)] text-[hsl(var(--deep-space))] shadow-[0_5px_0_hsl(var(--epic-nature)_/_0.28)]"
-                              : "border-celestial-blue/30 bg-card/60 text-muted-foreground",
+                              ? "border-epic-nature/45 bg-[linear-gradient(180deg,hsl(var(--epic-nature)_/_0.22)_0%,hsl(var(--category-soul)_/_0.18)_100%)] text-foreground shadow-[0_10px_20px_-16px_rgba(40,120,92,0.38)]"
+                              : "border-[hsl(var(--celestial-blue)_/_0.22)] bg-card/70 text-muted-foreground",
                         )}
                       >
                         {isComplete ? <Check className="h-4 w-4" /> : i + 1}
@@ -910,7 +912,7 @@ export function Pathfinder({
                         <div
                           className={cn(
                             "mx-1.5 h-1 w-6 rounded-full sm:w-8",
-                            isComplete ? "bg-epic-nature" : "bg-celestial-blue/20",
+                            isComplete ? "bg-epic-nature/55" : "bg-[hsl(var(--celestial-blue)_/_0.2)]",
                           )}
                         />
                       )}
@@ -954,7 +956,7 @@ export function Pathfinder({
                               size="icon"
                               variant={isRecording ? 'default' : 'ghost'}
                               className={cn(
-                                "absolute right-3 top-3 h-10 w-10 rounded-full border-[3px] border-stardust-gold/55 bg-card/75 text-stardust-gold hover:bg-card",
+                                "absolute right-3 top-3 h-10 w-10 rounded-full border border-[hsl(var(--celestial-blue)_/_0.3)] bg-card/80 text-[hsl(var(--celestial-blue))] shadow-[inset_0_1px_0_rgba(255,255,255,0.68)] hover:bg-card",
                                 isRecording && "animate-pulse border-category-body/70 bg-[linear-gradient(180deg,hsl(var(--category-body)_/_0.34)_0%,hsl(var(--destructive)_/_0.22)_100%)] text-category-body",
                               )}
                               onClick={handleVoiceToggle}

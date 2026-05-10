@@ -60,6 +60,7 @@ import {
   type CompanionAssistantMessage,
   useCompanionAssistant,
 } from "@/hooks/useCompanionAssistant";
+import { usePlannerPathfinderAppearance } from "@/hooks/usePlannerPathfinderAppearance";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
 import { cn, stripMarkdown } from "@/lib/utils";
 import type { QuestComposerPrefillDraft } from "@/features/quests/types";
@@ -872,27 +873,28 @@ const JourneysCompanionThreadPicker = memo(
     emptyStateMessage,
     onResumeThread,
   }: JourneysCompanionThreadPickerProps) {
+    const { themeModeClassName } = usePlannerPathfinderAppearance();
     const body = (
       <div
-        className={plannerPathfinderTheme.threadPickerShell}
+        className={cn(themeModeClassName, plannerPathfinderTheme.threadPickerShell)}
         data-testid="journeys-companion-thread-picker"
       >
         <div className="mb-4 space-y-1">
-          <p className="text-sm font-semibold text-white">Thread history</p>
-          <p className="text-sm text-white/[0.62]">
+          <p className="text-sm font-semibold text-foreground">Thread history</p>
+          <p className="text-sm text-muted-foreground">
             Browse old conversations here and jump back in whenever you want.
           </p>
         </div>
 
         <div className="space-y-2">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/[0.45]">
+          <p className={plannerPathfinderTheme.sectionEyebrow}>
             Past chats
           </p>
           {isLoading ? (
             <div
               className={cn(
                 plannerPathfinderTheme.headerBar,
-                "px-4 py-5 text-sm text-white/[0.82]",
+                "px-4 py-5 text-sm text-muted-foreground",
               )}
             >
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -905,10 +907,10 @@ const JourneysCompanionThreadPicker = memo(
                   key={thread.sessionId}
                   type="button"
                   className={cn(
-                    "flex w-full items-start justify-between gap-3 rounded-[1.5rem] border-[3px] px-4 py-4 text-left transition-colors shadow-[0_8px_0_hsl(var(--stardust-gold)_/_0.18)]",
+                    "flex w-full items-start justify-between gap-3 rounded-[1.5rem] border px-4 py-4 text-left transition-colors shadow-[0_12px_30px_-26px_rgba(28,87,135,0.36),inset_0_1px_0_rgba(255,255,255,0.58)]",
                     canResumeThreads
-                      ? "border-stardust-gold/45 bg-[linear-gradient(180deg,hsl(var(--stardust-gold)_/_0.16),hsl(var(--nebula-pink)_/_0.08))] hover:bg-[linear-gradient(180deg,hsl(var(--stardust-gold)_/_0.2),hsl(var(--nebula-pink)_/_0.12))]"
-                      : "cursor-not-allowed border-celestial-blue/25 bg-card/[0.03] opacity-70",
+                      ? "border-[hsl(var(--celestial-blue)_/_0.24)] bg-card/[0.72] hover:bg-card"
+                      : "cursor-not-allowed border-[hsl(var(--celestial-blue)_/_0.16)] bg-card/40 opacity-70",
                   )}
                   onClick={() => {
                     void onResumeThread(thread.sessionId);
@@ -917,22 +919,22 @@ const JourneysCompanionThreadPicker = memo(
                   data-testid={`journeys-companion-thread-resume-${thread.sessionId}`}
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-white">
+                    <p className="truncate text-sm font-semibold text-foreground">
                       {thread.title}
                     </p>
-                    <p className="mt-1 line-clamp-2 text-sm text-white/[0.68]">
+                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
                       {thread.previewText}
                     </p>
-                    <p className="mt-3 text-xs text-white/[0.5]">
+                    <p className="mt-3 text-xs text-muted-foreground/80">
                       Updated {formatThreadTimestamp(thread.lastMessageAt)}
                     </p>
                   </div>
-                  <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-white/[0.48]" />
+                  <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                 </button>
               ))}
             </div>
           ) : (
-            <div className="rounded-[1.5rem] border-[3px] border-dashed border-stardust-gold/45 bg-card/[0.05] px-4 py-5 text-sm text-muted-foreground">
+            <div className="rounded-[1.5rem] border border-dashed border-[hsl(var(--celestial-blue)_/_0.28)] bg-card/50 px-4 py-5 text-sm text-muted-foreground">
               {emptyStateMessage}
             </div>
           )}
@@ -1008,6 +1010,7 @@ const JourneysCompanionOverlayBody = memo(
       onLaunchIntentConsumed,
       onOpenCampaignBuilder,
     });
+    const { themeModeClassName } = usePlannerPathfinderAppearance();
     const visibleMessages = useMemo(
       () => assistant.messages.filter((entry) => !entry.isSeed),
       [assistant.messages],
@@ -1439,7 +1442,7 @@ const JourneysCompanionOverlayBody = memo(
 
     return (
       <div
-        className={plannerPathfinderTheme.shell}
+        className={cn(themeModeClassName, plannerPathfinderTheme.shell)}
         data-testid="journeys-companion-planner-modal"
       >
         <div className={plannerPathfinderTheme.shellGloss} />
@@ -1463,14 +1466,14 @@ const JourneysCompanionOverlayBody = memo(
               {avatar}
               <span
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-[-18%] rounded-full bg-[radial-gradient(circle,rgba(125,211,252,0.3),transparent_70%)] blur-lg"
+                className="pointer-events-none absolute inset-[-18%] rounded-full bg-[radial-gradient(circle,hsl(var(--celestial-blue)_/_0.24),transparent_70%)] blur-lg"
               />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-white">
+              <p className="truncate text-sm font-semibold text-foreground">
                 {companionLabel}
               </p>
-              <p className="truncate text-xs text-white/[0.58]">{statusText}</p>
+              <p className="truncate text-xs text-muted-foreground">{statusText}</p>
             </div>
             <TooltipProvider>
               <div className="flex items-center gap-2">
@@ -1562,7 +1565,7 @@ const JourneysCompanionOverlayBody = memo(
                   >
                     <div
                       className={cn(
-                        "max-w-[85%] rounded-[1.7rem] border-[3px] px-4 py-3 shadow-[0_8px_0_hsl(var(--stardust-gold)_/_0.18),0_18px_34px_-28px_hsl(var(--category-soul)_/_0.28)] sm:max-w-[78%]",
+                        "max-w-[85%] rounded-[1.7rem] border px-4 py-3 shadow-[0_14px_32px_-28px_rgba(28,87,135,0.44),inset_0_1px_0_rgba(255,255,255,0.6)] sm:max-w-[78%]",
                         entry.role === "assistant"
                           ? plannerPathfinderTheme.assistantBubble
                           : plannerPathfinderTheme.userBubble,
@@ -1807,16 +1810,16 @@ const JourneysCompanionOverlayBody = memo(
                           )}
                         </Badge>
                       </div>
-                      <p className="mt-3 text-sm font-semibold text-white">
+                      <p className="mt-3 text-sm font-semibold text-foreground">
                         {assistant.pendingAction.summary}
                       </p>
                       {assistant.pendingAction.confirmationMessage ? (
-                        <p className="mt-1 text-sm text-white/[0.72]">
+                        <p className="mt-1 text-sm text-muted-foreground">
                           {assistant.pendingAction.confirmationMessage}
                         </p>
                       ) : null}
                       {assistant.readyPendingActionCount > 1 ? (
-                        <p className="mt-2 text-sm text-white/[0.72]">
+                        <p className="mt-2 text-sm text-muted-foreground">
                           {assistant.readyPendingActionCount} planner actions
                           are ready. Confirm all to save the batch, or confirm
                           them one at a time.
@@ -1963,7 +1966,7 @@ const JourneysCompanionOverlayBody = memo(
                     size="icon"
                     variant="ghost"
                     className={cn(
-                      "h-11 w-11 shrink-0 rounded-full border-[3px] border-stardust-gold/55 bg-card/75 text-stardust-gold hover:bg-card",
+                      "h-11 w-11 shrink-0 rounded-full border border-[hsl(var(--celestial-blue)_/_0.3)] bg-card/80 text-[hsl(var(--celestial-blue))] shadow-[inset_0_1px_0_rgba(255,255,255,0.68)] hover:bg-card",
                       assistant.isRecording &&
                         "border-category-body/70 bg-[linear-gradient(180deg,hsl(var(--category-body)_/_0.34)_0%,hsl(var(--destructive)_/_0.22)_100%)] text-category-body",
                     )}

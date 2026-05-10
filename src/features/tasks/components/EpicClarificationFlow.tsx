@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { plannerPathfinderTheme } from '@/components/companion/plannerPathfinderTheme';
+import { usePlannerPathfinderAppearance } from '@/hooks/usePlannerPathfinderAppearance';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -42,6 +43,7 @@ export function EpicClarificationFlow({
   variant = 'default',
 }: EpicClarificationFlowProps) {
   const [answers, setAnswers] = useState<Record<string, string | number | string[]>>({});
+  const { themeModeClassName } = usePlannerPathfinderAppearance();
   const isPlannerVariant = variant === 'planner';
 
   const handleChange = (questionId: string, value: string | number) => {
@@ -111,11 +113,11 @@ export function EpicClarificationFlow({
           className={cn(
             "rounded-lg p-2",
             isPlannerVariant
-              ? "border-[3px] border-stardust-gold/50 bg-[linear-gradient(180deg,hsl(var(--stardust-gold)_/_0.24),hsl(var(--nebula-pink)_/_0.14))] text-stardust-gold shadow-[0_4px_0_hsl(var(--stardust-gold)_/_0.28)]"
+              ? "border border-[hsl(var(--celestial-blue)_/_0.28)] bg-[linear-gradient(180deg,#ffffff,hsl(var(--celestial-blue)_/_0.16))] text-[hsl(var(--celestial-blue))] shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]"
               : "bg-primary/10",
           )}
         >
-          <Sparkles className={cn("w-5 h-5", isPlannerVariant ? "text-stardust-gold" : "text-primary")} />
+          <Sparkles className={cn("w-5 h-5", isPlannerVariant ? "text-[hsl(var(--celestial-blue))]" : "text-primary")} />
         </div>
         <div className="flex-1">
           <h4 className="font-semibold text-sm">Let's personalize your epic</h4>
@@ -180,7 +182,7 @@ export function EpicClarificationFlow({
                   <SelectTrigger className={cn("h-9", isPlannerVariant && plannerPathfinderTheme.textField)}>
                     <SelectValue placeholder="Select an option..." />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className={isPlannerVariant ? cn(themeModeClassName, plannerPathfinderTheme.portalSurface) : undefined}>
                     {question.options.map((option) => (
                       <SelectItem key={option} value={option}>
                         {option}

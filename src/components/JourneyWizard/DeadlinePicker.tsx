@@ -5,6 +5,7 @@ import { plannerPathfinderTheme } from '@/components/companion/plannerPathfinder
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { usePlannerPathfinderAppearance } from '@/hooks/usePlannerPathfinderAppearance';
 import { cn } from '@/lib/utils';
 
 interface DeadlinePickerProps {
@@ -23,6 +24,7 @@ const quickOptions = [
 
 export function DeadlinePicker({ value, onChange, minDate }: DeadlinePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const { themeModeClassName } = usePlannerPathfinderAppearance();
   
   const effectiveMinDate = minDate || addDays(new Date(), 1);
   
@@ -84,7 +86,11 @@ export function DeadlinePicker({ value, onChange, minDate }: DeadlinePickerProps
           </Button>
         </PopoverTrigger>
         <PopoverContent 
-          className="w-auto p-0 z-[100] pointer-events-auto" 
+          className={cn(
+            themeModeClassName,
+            plannerPathfinderTheme.portalSurface,
+            "w-auto p-0 z-[100] pointer-events-auto",
+          )}
           align="start"
           onOpenAutoFocus={(e) => e.preventDefault()}
         >

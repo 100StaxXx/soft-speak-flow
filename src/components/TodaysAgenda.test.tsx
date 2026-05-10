@@ -2133,6 +2133,57 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(readableShell).not.toHaveClass("bg-white/[0.04]");
   });
 
+  it("lets long mobile quest titles expand up to the action controls", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    const longTitle = "Social Media Engagement Strategy Review and Reflection";
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "ritual-title-width-1",
+            task_text: longTitle,
+            completed: false,
+            xp_reward: 14,
+            scheduled_time: "14:00",
+            habit_source_id: "habit-title-width-1",
+            epic_id: "epic-title-width-1",
+            epic_title: "Master UGC content creation",
+            notes: "Keep this expandable so the chevron action remains visible.",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        onEditQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const pane = screen.getByTestId("scheduled-timeline-pane");
+    const mobileRow = within(pane).getByTestId("timeline-row-ritual-title-width-1");
+    const titleRegion = within(mobileRow).getByTestId("mobile-quest-title-region-ritual-title-width-1");
+    const titleRow = within(mobileRow).getByTestId("mobile-quest-title-row-ritual-title-width-1");
+    const actions = within(mobileRow).getByTestId("mobile-quest-actions-ritual-title-width-1");
+    const marquee = within(titleRow).getByText(longTitle).parentElement as HTMLElement;
+
+    expect(titleRegion).toHaveClass("min-w-0");
+    expect(titleRow).toHaveClass("flex", "min-w-0", "w-full");
+    expect(marquee).toHaveClass("min-w-0", "w-full", "flex-1");
+    expect(actions).toHaveClass("min-w-max", "gap-1.5");
+    expect(within(actions).getByRole("button", { name: "Quest actions" })).toBeInTheDocument();
+    expect(within(actions).getByText("+14")).toBeInTheDocument();
+    expect(within(actions).getAllByRole("button")).toHaveLength(2);
+    expect(within(titleRegion).getByText("Campaign Ritual - Master UGC content creation")).toBeInTheDocument();
+  });
+
   it("uses row drag wiring for scheduled quests", () => {
     const queryClient = new QueryClient({
       defaultOptions: {

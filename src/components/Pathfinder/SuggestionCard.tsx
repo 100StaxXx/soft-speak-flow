@@ -37,20 +37,20 @@ export const SuggestionCard = memo(function SuggestionCard({
       transition={{ delay: index * 0.08, duration: 0.3 }}
       onClick={() => onToggle(suggestion.id)}
       className={cn(
-        'w-full p-4 rounded-xl border-2 text-left transition-all duration-200',
-        'hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]',
+        'w-full p-4 rounded-xl border text-left transition-all duration-200',
+        'hover:shadow-[0_14px_32px_-28px_rgba(28,87,135,0.44)] hover:scale-[1.02] active:scale-[0.98]',
         suggestion.selected
-          ? 'border-stardust-gold/55 bg-[linear-gradient(180deg,hsl(var(--stardust-gold)_/_0.16),hsl(var(--nebula-pink)_/_0.08))] shadow-[0_6px_0_hsl(var(--stardust-gold)_/_0.22)]'
-          : 'border-celestial-blue/30 bg-card/70 hover:border-stardust-gold/45'
+          ? 'border-[hsl(var(--celestial-blue)_/_0.42)] bg-[linear-gradient(180deg,#ffffff_0%,hsl(var(--celestial-blue)_/_0.16)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]'
+          : 'border-[hsl(var(--celestial-blue)_/_0.24)] bg-card/70 hover:border-[hsl(var(--celestial-blue)_/_0.42)]'
       )}
     >
       <div className="flex items-start gap-3">
         {/* Selection indicator */}
         <div
           className={cn(
-            'w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all',
+            'w-6 h-6 rounded-full border flex items-center justify-center shrink-0 mt-0.5 transition-all',
             suggestion.selected
-              ? 'border-stardust-gold/70 bg-[linear-gradient(180deg,hsl(var(--stardust-gold))_0%,hsl(var(--nebula-pink))_100%)] text-[hsl(var(--deep-space))]'
+              ? 'border-[hsl(var(--celestial-blue)_/_0.5)] bg-[linear-gradient(180deg,#ffffff_0%,hsl(var(--celestial-blue)_/_0.38)_100%)] text-[hsl(var(--deep-space))]'
               : 'border-muted-foreground/30'
           )}
         >

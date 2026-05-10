@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { usePlannerPathfinderAppearance } from '@/hooks/usePlannerPathfinderAppearance';
 import { cn } from '@/lib/utils';
 import type { JourneyPhase, JourneyMilestone } from '@/hooks/useJourneySchedule';
 
@@ -37,6 +38,7 @@ export function PhaseCard({
 }: PhaseCardProps) {
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
   const [expandedMilestones, setExpandedMilestones] = useState<Set<string>>(new Set());
+  const { themeModeClassName } = usePlannerPathfinderAppearance();
   const startDate = parseISO(phase.startDate);
 
   const toggleExpanded = (milestoneId: string) => {
@@ -54,11 +56,11 @@ export function PhaseCard({
   const durationDays = differenceInDays(endDate, startDate) + 1;
 
   const phaseColors = [
-    'border-stardust-gold/55 bg-[linear-gradient(180deg,hsl(var(--stardust-gold)_/_0.2),hsl(var(--nebula-pink)_/_0.1))]',
-    'border-celestial-blue/50 bg-[linear-gradient(180deg,hsl(var(--celestial-blue)_/_0.18),hsl(var(--category-soul)_/_0.1))]',
-    'border-epic-nature/50 bg-[linear-gradient(180deg,hsl(var(--epic-nature)_/_0.18),hsl(var(--category-soul)_/_0.1))]',
-    'border-nebula-pink/50 bg-[linear-gradient(180deg,hsl(var(--nebula-pink)_/_0.18),hsl(var(--stardust-gold)_/_0.1))]',
-    'border-category-body/50 bg-[linear-gradient(180deg,hsl(var(--category-body)_/_0.16),hsl(var(--destructive)_/_0.08))]',
+    'border-[hsl(var(--celestial-blue)_/_0.28)] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.96),hsl(var(--celestial-blue)_/_0.12))]',
+    'border-[hsl(var(--celestial-blue)_/_0.28)] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.96),hsl(var(--secondary)_/_0.72))]',
+    'border-epic-nature/28 bg-[linear-gradient(180deg,hsl(var(--card)_/_0.96),hsl(var(--epic-nature)_/_0.1))]',
+    'border-[hsl(var(--celestial-blue)_/_0.24)] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.96),hsl(var(--stardust-gold)_/_0.1))]',
+    'border-category-body/32 bg-[linear-gradient(180deg,hsl(var(--card)_/_0.96),hsl(var(--category-body)_/_0.08))]',
   ];
 
   const colorClass = phaseColors[(phase.phaseOrder - 1) % phaseColors.length];
@@ -67,17 +69,17 @@ export function PhaseCard({
     <div className="relative">
       {/* Timeline connector */}
       {!isFirst && (
-        <div className="absolute left-6 -top-4 h-4 w-1 rounded-full bg-category-soul/35" />
+        <div className="absolute left-6 -top-4 h-4 w-1 rounded-full bg-[hsl(var(--celestial-blue)_/_0.24)]" />
       )}
       
       <div className={cn(
-        'rounded-[1.7rem] border-[3px] p-4 shadow-[0_8px_0_hsl(var(--stardust-gold)_/_0.18)]',
+        'rounded-[1.7rem] border p-4 shadow-[0_14px_32px_-28px_rgba(28,87,135,0.44),inset_0_1px_0_rgba(255,255,255,0.58)]',
         colorClass
       )}>
         {/* Phase Header */}
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full border-[3px] border-stardust-gold/60 bg-background/45 text-sm font-bold text-stardust-gold">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[hsl(var(--celestial-blue)_/_0.34)] bg-card/70 text-sm font-bold text-[hsl(var(--celestial-blue))]">
               {phase.phaseOrder}
             </div>
             <div>
@@ -108,8 +110,8 @@ export function PhaseCard({
               <div
                 key={milestone.id}
                 className={cn(
-                  'w-full rounded-[1.2rem] border-[3px] p-3 text-left transition-all',
-                  'border-celestial-blue/30 bg-card/70 hover:bg-card',
+                  'w-full rounded-[1.2rem] border p-3 text-left transition-all',
+                  'border-[hsl(var(--celestial-blue)_/_0.22)] bg-card/70 hover:bg-card',
                   milestone.isPostcardMilestone && 'ring-2 ring-stardust-gold/35'
                 )}
               >
@@ -167,14 +169,17 @@ export function PhaseCard({
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        className="h-7 rounded-full border-[3px] border-celestial-blue/35 bg-card/70 px-2 text-xs text-foreground hover:border-stardust-gold/45 hover:bg-card hover:text-foreground"
+                        className="h-7 rounded-full border border-[hsl(var(--celestial-blue)_/_0.26)] bg-card/70 px-2 text-xs text-foreground hover:border-[hsl(var(--celestial-blue)_/_0.44)] hover:bg-card hover:text-foreground"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <Calendar className="w-3 h-3 mr-1" />
                         {format(parseISO(milestone.targetDate), 'MMM d')}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="end">
+                    <PopoverContent
+                      className={cn(themeModeClassName, plannerPathfinderTheme.portalSurface, "w-auto p-0")}
+                      align="end"
+                    >
                       <CalendarComponent
                         mode="single"
                         selected={parseISO(milestone.targetDate)}
@@ -202,7 +207,7 @@ export function PhaseCard({
 
       {/* Timeline connector */}
       {!isLast && (
-        <div className="absolute left-6 -bottom-4 h-4 w-1 rounded-full bg-category-soul/35" />
+        <div className="absolute left-6 -bottom-4 h-4 w-1 rounded-full bg-[hsl(var(--celestial-blue)_/_0.24)]" />
       )}
     </div>
   );

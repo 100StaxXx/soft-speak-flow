@@ -63,9 +63,9 @@ export function TimelineView({
       border: 'border-epic-nature/60',
     },
     achievable: {
-      bg: 'bg-[linear-gradient(180deg,hsl(var(--stardust-gold)_/_0.24),hsl(var(--nebula-pink)_/_0.12))]',
-      text: 'text-stardust-gold',
-      border: 'border-stardust-gold/60',
+      bg: 'bg-[linear-gradient(180deg,hsl(var(--celestial-blue)_/_0.16),hsl(var(--stardust-gold)_/_0.1))]',
+      text: 'text-[hsl(var(--celestial-blue))]',
+      border: 'border-[hsl(var(--celestial-blue)_/_0.4)]',
     },
     aggressive: {
       bg: 'bg-[linear-gradient(180deg,hsl(var(--category-body)_/_0.2),hsl(var(--stardust-gold)_/_0.12))]',
@@ -86,7 +86,7 @@ export function TimelineView({
       {/* Feasibility Assessment Header */}
       <div className={cn(plannerPathfinderTheme.raisedPanel, 'p-4')}>
         <div className="flex items-start gap-3">
-          <div className={cn('rounded-xl border-[3px] p-2', colors.bg, colors.border)}>
+          <div className={cn('rounded-xl border p-2', colors.bg, colors.border)}>
             <Calendar className={cn('w-5 h-5', colors.text)} />
           </div>
           <div className="flex-1">
@@ -153,7 +153,7 @@ export function TimelineView({
           className={`${plannerPathfinderTheme.successCard} p-4`}
         >
           <div className="flex items-center gap-3">
-            <div className="rounded-full border-[3px] border-epic-nature/60 bg-epic-nature/15 p-2">
+            <div className="rounded-full border border-epic-nature/38 bg-epic-nature/15 p-2">
               <Flag className="w-5 h-5 text-epic-nature" />
             </div>
             <div>
