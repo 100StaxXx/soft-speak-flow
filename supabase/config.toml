@@ -275,7 +275,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.google-calendar-auth]
-verify_jwt = true
+verify_jwt = false
 
 [functions.google-calendar-events]
 verify_jwt = true
