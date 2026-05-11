@@ -378,6 +378,38 @@ describe("useAppleSubscription", () => {
     }
   });
 
+  it("does not locally unlock unknown StoreKit products when verification is unreachable", async () => {
+    mocks.purchase.mockResolvedValueOnce({
+      productId: "com.example.monthly.tip",
+      transactionId: "unknown-product-tx",
+      expirationDate: "2099-01-01T00:00:00.000Z",
+      appAccountToken: "11111111-1111-4111-8111-111111111111",
+    });
+    mocks.functionsInvoke.mockResolvedValueOnce({
+      data: null,
+      error: new Error("Failed to send a request to the Edge Function"),
+    });
+
+    const { result } = renderHook(() => useAppleSubscription());
+
+    let success: boolean | undefined;
+    await act(async () => {
+      success = await result.current.handlePurchase("cosmiq_premium_monthly");
+    });
+
+    expect(success).toBe(false);
+    expect(mocks.setQueryData).not.toHaveBeenCalled();
+    expect(globalThis.localStorage.getItem(
+      "cosmiq.localSubscriptionAccess.v1.11111111-1111-4111-8111-111111111111",
+    )).toBeNull();
+    expect(mocks.toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Subscription activation failed",
+        variant: "destructive",
+      }),
+    );
+  });
+
   it("unlocks locally for active sandbox purchases missing Apple's app-account binding", async () => {
     mocks.purchase.mockResolvedValueOnce({
       productId: "cosmiq_premium_yearly",

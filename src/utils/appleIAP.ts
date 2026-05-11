@@ -15,6 +15,14 @@ export interface IAPProduct {
 
 export const PREMIUM_YEARLY_PRODUCT_ID = "cosmiq_premium_yearly";
 export const PREMIUM_MONTHLY_PRODUCT_ID = "cosmiq_premium_monthly";
+const PREMIUM_YEARLY_PRODUCT_IDS = [
+  PREMIUM_YEARLY_PRODUCT_ID,
+  "com.darrylgraham.revolution.yearly",
+] as const;
+const PREMIUM_MONTHLY_PRODUCT_IDS = [
+  PREMIUM_MONTHLY_PRODUCT_ID,
+  "com.darrylgraham.revolution.monthly",
+] as const;
 
 export const isIAPAvailable = (): boolean => {
   return Capacitor.isNativePlatform() && isNativeIOS();
@@ -23,8 +31,8 @@ export const isIAPAvailable = (): boolean => {
 export const resolvePlanFromProductId = (productId: string | null | undefined): IAPPlan | null => {
   if (!productId) return null;
   const id = productId.toLowerCase();
-  if (id.includes("yearly") || id.includes("annual") || id.includes("year")) return "yearly";
-  if (id.includes("monthly") || id.includes("month")) return "monthly";
+  if (PREMIUM_YEARLY_PRODUCT_IDS.some((knownId) => knownId.toLowerCase() === id)) return "yearly";
+  if (PREMIUM_MONTHLY_PRODUCT_IDS.some((knownId) => knownId.toLowerCase() === id)) return "monthly";
   return null;
 };
 

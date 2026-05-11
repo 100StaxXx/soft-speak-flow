@@ -206,7 +206,7 @@ describe("useAccessState", () => {
       isPro: false,
       activePlan: null,
       currentEntitlement: {
-        productId: "cosmiq_unknown_subscription",
+        productId: "com.example.monthly.tip",
         expirationDate: "2099-01-01T00:00:00.000Z",
         transactionId: "unknown-product-tx",
       } as typeof mocks.storeKit.currentEntitlement,

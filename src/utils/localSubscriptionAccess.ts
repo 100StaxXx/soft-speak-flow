@@ -50,8 +50,9 @@ export function buildLocalSubscriptionAccessState(
   const subscriptionEnd = getActiveSubscriptionEnd(transaction);
   if (!subscriptionEnd) return null;
 
-  const plan = planOverride ?? resolvePlanFromProductId(transaction?.productId);
-  if (!plan) return null;
+  const productPlan = resolvePlanFromProductId(transaction?.productId);
+  const plan = planOverride ?? productPlan;
+  if (!productPlan || !plan || plan !== productPlan) return null;
 
   return {
     has_access: true,

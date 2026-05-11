@@ -77,9 +77,11 @@ export function useAccessState() {
           ...((data ?? {}) as Partial<AccessState>),
         };
 
-        return response.subscribed ||
+        return (
+          response.subscribed ||
           isInactiveSubscriptionAccessState(response) ||
           !currentStoreKitAccessState
+        )
           ? response
           : currentStoreKitAccessState;
       } catch (error) {
