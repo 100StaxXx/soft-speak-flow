@@ -1669,7 +1669,7 @@ async function loadUserAIPreferences(supabase: any, userId: string) {
   return fallback;
 }
 
-async function loadCompanionAgentContext(params: {
+export async function loadCompanionAgentContext(params: {
   supabase: any;
   userId: string;
   companionId: string;
@@ -1835,7 +1835,7 @@ async function loadCompanionAgentContext(params: {
       params.supabase
         .from("habits")
         .select(
-          "id, title, frequency, preferred_time, estimated_minutes, description, category, reminder_enabled, reminder_minutes_before",
+          "id, title, frequency, preferred_time, estimated_minutes, description, category, current_streak, longest_streak, reminder_enabled, reminder_minutes_before",
         )
         .eq("user_id", params.userId)
         .eq("is_active", true)
@@ -1906,7 +1906,9 @@ async function loadCompanionAgentContext(params: {
       emptySingleResult(),
       params.supabase
         .from("profiles")
-        .select("onboarding_data")
+        .select(
+          "onboarding_data, current_habit_streak, longest_habit_streak, streak_at_risk, streak_at_risk_since, streak_freezes_available",
+        )
         .eq("id", params.userId)
         .maybeSingle(),
     ),
@@ -2060,13 +2062,16 @@ async function loadCompanionAgentContext(params: {
     .map((campaign) => campaign.title)
     .filter((entry): entry is string => typeof entry === "string");
 
+  const profileRecord = asRecord(profileResult.data);
+
   const recentMemory = {
     ai_learning: learningRecord,
     ai_learning_peak_productivity_times: learningRecord
       ?.peak_productivity_times,
     ai_preferences: asRecord(aiPreferences),
     planner_preferences: asRecord(plannerPreferences.data),
-    profile_onboarding: asRecord(profileResult.data?.onboarding_data),
+    profile: profileRecord,
+    profile_onboarding: asRecord(profileRecord?.onboarding_data),
     callback_memories: (companionMemories.data ?? []) as Array<
       Record<string, unknown>
     >,

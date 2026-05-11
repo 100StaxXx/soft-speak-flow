@@ -94,6 +94,7 @@ vi.mock("@/hooks/useLegacyCompanionAssistantAdapter", () => ({
     pendingSuggestionProposalId: mocks.legacyPendingSuggestionProposalId,
     pendingActionCount: 0,
     readyPendingActionCount: 0,
+    isOpeningThread: false,
     isSubmitting: false,
     isResolvingAction: false,
     submitMessage: mocks.legacySubmitMessage,
@@ -216,21 +217,47 @@ describe("useCompanionAssistant", () => {
       },
     ]);
     mocks.loadPendingAction.mockResolvedValue(null);
-    mocks.supabaseInvoke.mockResolvedValue({
-      data: {
-        reply: "Tomorrow is pretty light.",
-        mode: "schedule_read",
-        intent: "check_calendar",
-        confidence: 0.93,
-        threadState: {
-          threadId: "persisted-session",
-          sessionId: "persisted-session",
-          openaiConversationId: "conv_123",
-          lastOpenAIResponseId: "resp_123",
-          hasPendingAction: false,
+    mocks.supabaseInvoke.mockImplementation(async (functionName, options) => {
+      if (functionName === "companion-chat-opener") {
+        return {
+          data: {
+            sessionId: "fresh-session",
+            reply: "Fresh read: today has a little shape to it.",
+            speechText: "Fresh read: today has a little shape to it.",
+            createdAt: "2026-04-18T08:03:00.000Z",
+            persistenceReady: true,
+            thread: {
+              sessionId: "fresh-session",
+              companionId: "companion-1",
+              surface: "companion",
+              title: "Fresh read: today has a little shape to it.",
+              previewText: "Fresh read: today has a little shape to it.",
+              createdAt: "2026-04-18T08:03:00.000Z",
+              lastMessageAt: "2026-04-18T08:03:00.000Z",
+              archivedAt: null,
+              messageCount: 1,
+            },
+          },
+          error: null,
+        };
+      }
+
+      return {
+        data: {
+          reply: "Tomorrow is pretty light.",
+          mode: "schedule_read",
+          intent: "check_calendar",
+          confidence: 0.93,
+          threadState: {
+            threadId: options?.body?.sessionId ?? "persisted-session",
+            sessionId: options?.body?.sessionId ?? "persisted-session",
+            openaiConversationId: "conv_123",
+            lastOpenAIResponseId: "resp_123",
+            hasPendingAction: false,
+          },
         },
-      },
-      error: null,
+        error: null,
+      };
     });
   });
 
@@ -685,8 +712,11 @@ describe("useCompanionAssistant", () => {
     );
 
     await waitFor(() => {
-      expect(result.current.activeThread?.sessionId).toBe("persisted-session");
+      expect(result.current.messages[0]?.content).toBe(
+        "Fresh read: today has a little shape to it.",
+      );
     });
+    expect(result.current.activeThread?.sessionId).toBe("fresh-session");
 
     await act(async () => {
       await result.current.submitMessage("Can we talk through today?", "text");
@@ -696,7 +726,7 @@ describe("useCompanionAssistant", () => {
       "companion-agent",
       expect.objectContaining({
         body: expect.objectContaining({
-          sessionId: "persisted-session",
+          sessionId: "fresh-session",
           message: "Can we talk through today?",
           surface: "companion",
         }),
@@ -707,7 +737,148 @@ describe("useCompanionAssistant", () => {
     );
     expect(invokedFunctionNames).not.toContain("companion-chat");
     expect(invokedFunctionNames).not.toContain("companion-planner-chat");
+    expect(invokedFunctionNames).toContain("companion-chat-opener");
     expect(mocks.legacySubmitMessage).not.toHaveBeenCalled();
+  });
+
+  it("starts a generated companion opener on every closed-to-open cycle", async () => {
+    let openerCount = 0;
+    mocks.supabaseInvoke.mockImplementation(async (functionName, options) => {
+      if (functionName === "companion-chat-opener") {
+        openerCount += 1;
+        return {
+          data: {
+            sessionId: `fresh-session-${openerCount}`,
+            reply: `Fresh opener ${openerCount}`,
+            speechText: `Fresh opener ${openerCount}`,
+            createdAt: `2026-04-18T08:0${openerCount}:00.000Z`,
+            persistenceReady: true,
+            thread: {
+              sessionId: `fresh-session-${openerCount}`,
+              companionId: "companion-1",
+              surface: "companion",
+              title: `Fresh opener ${openerCount}`,
+              previewText: `Fresh opener ${openerCount}`,
+              createdAt: `2026-04-18T08:0${openerCount}:00.000Z`,
+              lastMessageAt: `2026-04-18T08:0${openerCount}:00.000Z`,
+              archivedAt: null,
+              messageCount: 1,
+            },
+          },
+          error: null,
+        };
+      }
+
+      return {
+        data: {
+          reply: "Reply",
+          mode: "conversation",
+          intent: "unknown",
+          confidence: 0.9,
+          threadState: {
+            threadId: options?.body?.sessionId,
+            sessionId: options?.body?.sessionId,
+            openaiConversationId: "conv_123",
+            lastOpenAIResponseId: "resp_123",
+            hasPendingAction: false,
+          },
+        },
+        error: null,
+      };
+    });
+
+    const { wrapper } = createWrapper();
+    const { result, rerender } = renderHook(
+      ({ enabled }) =>
+        useCompanionAssistant({
+          surface: "companion",
+          conversationEnabled: enabled,
+        }),
+      {
+        wrapper,
+        initialProps: { enabled: false },
+      },
+    );
+
+    expect(mocks.supabaseInvoke).not.toHaveBeenCalledWith(
+      "companion-chat-opener",
+      expect.anything(),
+    );
+
+    rerender({ enabled: true });
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("fresh-session-1");
+    });
+    expect(result.current.messages[0]?.content).toBe("Fresh opener 1");
+
+    rerender({ enabled: false });
+    rerender({ enabled: true });
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("fresh-session-2");
+    });
+    expect(result.current.messages[0]?.content).toBe("Fresh opener 2");
+    expect(
+      mocks.supabaseInvoke.mock.calls.filter(
+        ([functionName]) => functionName === "companion-chat-opener",
+      ),
+    ).toHaveLength(2);
+  });
+
+  it("uses the generated opener path when starting a new companion chat", async () => {
+    let openerCount = 0;
+    mocks.supabaseInvoke.mockImplementation(async (functionName) => {
+      if (functionName === "companion-chat-opener") {
+        openerCount += 1;
+        return {
+          data: {
+            sessionId: `fresh-session-${openerCount}`,
+            reply: `Fresh opener ${openerCount}`,
+            speechText: `Fresh opener ${openerCount}`,
+            createdAt: `2026-04-18T08:1${openerCount}:00.000Z`,
+            persistenceReady: true,
+            thread: {
+              sessionId: `fresh-session-${openerCount}`,
+              companionId: "companion-1",
+              surface: "companion",
+              title: `Fresh opener ${openerCount}`,
+              previewText: `Fresh opener ${openerCount}`,
+              createdAt: `2026-04-18T08:1${openerCount}:00.000Z`,
+              lastMessageAt: `2026-04-18T08:1${openerCount}:00.000Z`,
+              archivedAt: null,
+              messageCount: 1,
+            },
+          },
+          error: null,
+        };
+      }
+
+      return { data: null, error: null };
+    });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "companion" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("fresh-session-1");
+    });
+
+    await act(async () => {
+      await result.current.startNewChat();
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("fresh-session-2");
+    });
+    expect(result.current.messages[0]?.content).toBe("Fresh opener 2");
+    expect(mocks.archiveThread).not.toHaveBeenCalled();
+    expect(
+      mocks.supabaseInvoke.mock.calls.filter(
+        ([functionName]) => functionName === "companion-chat-opener",
+      ),
+    ).toHaveLength(2);
   });
 
   it("requests draft opportunity cards after conversational Journeys replies", async () => {

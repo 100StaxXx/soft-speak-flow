@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => {
   const setPrimaryTaskListMutateAsync = vi.fn();
   const connectAppleNativeMutateAsync = vi.fn();
   const syncProviderPullMutateAsync = vi.fn();
+  const refreshCalendarIntegrationsMock = vi.fn();
 
   const state = {
     integrationVisible: false,
@@ -41,6 +42,7 @@ const mocks = vi.hoisted(() => {
     setPrimaryTaskListMutateAsync,
     connectAppleNativeMutateAsync,
     syncProviderPullMutateAsync,
+    refreshCalendarIntegrationsMock,
     state,
   };
 });
@@ -118,6 +120,7 @@ vi.mock("@/hooks/useCalendarIntegrations", () => ({
     listProviderTaskLists: { mutateAsync: mocks.listProviderTaskListsMutateAsync },
     setPrimaryTaskList: { mutateAsync: mocks.setPrimaryTaskListMutateAsync },
     connectAppleNative: { mutateAsync: mocks.connectAppleNativeMutateAsync },
+    refreshCalendarIntegrations: mocks.refreshCalendarIntegrationsMock,
   }),
 }));
 
@@ -137,6 +140,7 @@ describe("CalendarIntegrationsSettings", () => {
     mocks.listProviderTaskListsMutateAsync.mockResolvedValue([]);
     mocks.setPrimaryCalendarMutateAsync.mockResolvedValue(undefined);
     mocks.setPrimaryTaskListMutateAsync.mockResolvedValue(undefined);
+    mocks.refreshCalendarIntegrationsMock.mockResolvedValue(undefined);
   });
 
   it("shows calendar integrations by default when nothing is connected", () => {
@@ -239,6 +243,37 @@ describe("CalendarIntegrationsSettings", () => {
         }),
       );
     });
+  });
+
+  it("refreshes calendar state and clears params after callback success", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/profile?calendar_oauth_provider=google&calendar_oauth_status=success",
+    );
+
+    mocks.state.integrationVisible = true;
+    mocks.state.connections = [
+      {
+        id: "conn-1",
+        provider: "google",
+      },
+    ];
+
+    render(<CalendarIntegrationsSettings />);
+
+    await waitFor(() => {
+      expect(mocks.toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Calendar connected",
+          description: "google connected successfully.",
+        }),
+      );
+      expect(mocks.refreshCalendarIntegrationsMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(window.location.pathname).toBe("/profile");
+    expect(window.location.search).toBe("");
   });
 
   it("auto-loads Outlook calendars and To Do lists for a new Outlook connection", async () => {

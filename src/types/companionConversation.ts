@@ -79,6 +79,15 @@ export interface CompanionChatResponse {
   sessionId?: string;
 }
 
+export interface CompanionChatOpenerResponse {
+  sessionId: string;
+  reply: string;
+  speechText: string;
+  createdAt: string;
+  persistenceReady: boolean;
+  thread: CompanionChatThreadSummary;
+}
+
 export interface CompanionChatThreadSummary {
   sessionId: string;
   companionId: string;

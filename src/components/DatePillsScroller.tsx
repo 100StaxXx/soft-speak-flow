@@ -33,6 +33,13 @@ const EDGE_THRESHOLD_PX = 80;
 const DEFAULT_EXTENSION_CHUNK = 14;
 const CENTER_RETRY_ATTEMPTS = 8;
 
+const dateKeyToDate = (dateKey: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return null;
+
+  const date = new Date(`${dateKey}T12:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
 const triggerHaptic = async (style: ImpactStyle) => {
   try {
     await Haptics.impact({ style });
@@ -80,9 +87,37 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     key: centerRequestKey,
     dateKey: requestedCenterDateKey,
   });
+  const lastAutoCenterSignatureRef = useRef<string | null>(null);
+  const isForcedCenterRequestPending = centerRequestKey !== lastCompletedCenterRequestRef.current.key;
   const handleUserDateInteraction = useCallback(() => {
     onUserDateInteraction?.();
   }, [onUserDateInteraction]);
+
+  const isDateKeyInRenderedRange = useCallback((dateKey: string) => {
+    const date = dateKeyToDate(dateKey);
+    if (!date) return false;
+
+    return differenceInCalendarDays(date, rangeStart) >= 0
+      && differenceInCalendarDays(date, rangeEnd) <= 0;
+  }, [rangeEnd, rangeStart]);
+
+  const resetRenderedRangeAroundDateKey = useCallback((dateKey: string) => {
+    const date = dateKeyToDate(dateKey);
+    if (!date) return false;
+
+    const nextRange = getInitialRange(date, daysToShow);
+    const shouldUpdateRange =
+      !isSameDay(nextRange.start, rangeStart)
+      || !isSameDay(nextRange.end, rangeEnd);
+
+    if (!shouldUpdateRange) return false;
+
+    pendingLeftCompensationRef.current = null;
+    isExpandingRef.current = false;
+    setRangeStart(nextRange.start);
+    setRangeEnd(nextRange.end);
+    return true;
+  }, [daysToShow, rangeEnd, rangeStart]);
 
   useEffect(() => {
     const nextRange = getInitialRange(selectedDate, daysToShow);
@@ -91,6 +126,8 @@ export const DatePillsScroller = memo(function DatePillsScroller({
   }, [daysToShow]);
 
   useEffect(() => {
+    if (isForcedCenterRequestPending && requestedCenterDateKey !== selectedDateKey) return;
+
     const selectedTime = selectedDate.getTime();
     const isOutOfRange = selectedTime < rangeStart.getTime() || selectedTime > rangeEnd.getTime();
 
@@ -99,7 +136,15 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     const nextRange = getInitialRange(selectedDate, daysToShow);
     setRangeStart(nextRange.start);
     setRangeEnd(nextRange.end);
-  }, [daysToShow, rangeEnd, rangeStart, selectedDate]);
+  }, [
+    daysToShow,
+    isForcedCenterRequestPending,
+    rangeEnd,
+    rangeStart,
+    requestedCenterDateKey,
+    selectedDate,
+    selectedDateKey,
+  ]);
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
@@ -273,7 +318,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
       Math.abs(nextSpacerWidth - edgeSpacerWidth) >= 0.5
     ) {
       setEdgeSpacerWidth(nextSpacerWidth);
-      if (!force) return "retry";
+      return "retry";
     }
 
     const selectedLeft = selected.offsetLeft;
@@ -302,12 +347,19 @@ export const DatePillsScroller = memo(function DatePillsScroller({
   // Range extensions from edge scrolls intentionally don't re-center, so the
   // user's scroll momentum is preserved.
   useLayoutEffect(() => {
-    if (!isActive) return;
+    if (!isActive) {
+      lastAutoCenterSignatureRef.current = null;
+      return;
+    }
 
     let frameId: number | null = null;
     let isCancelled = false;
     const lastCompletedCenterRequest = lastCompletedCenterRequestRef.current;
     const isForcedCenterRequest = centerRequestKey !== lastCompletedCenterRequest.key;
+    const autoCenterSignature = selectedDateKey;
+    const shouldAutoCenter = lastAutoCenterSignatureRef.current !== autoCenterSignature;
+
+    if (!isForcedCenterRequest && !shouldAutoCenter) return;
 
     const scheduleCentering = (remainingAttempts: number) => {
       if (typeof window === "undefined") return;
@@ -319,6 +371,10 @@ export const DatePillsScroller = memo(function DatePillsScroller({
 
     const runCentering = (remainingAttempts: number) => {
       if (isCancelled) return;
+
+      if (isForcedCenterRequest && !isDateKeyInRenderedRange(requestedCenterDateKey)) {
+        if (resetRenderedRangeAroundDateKey(requestedCenterDateKey)) return;
+      }
 
       const result = centerSelectedDate({
         behavior: isForcedCenterRequest || prefersReducedMotion ? "auto" : "smooth",
@@ -337,6 +393,11 @@ export const DatePillsScroller = memo(function DatePillsScroller({
           key: centerRequestKey,
           dateKey: requestedCenterDateKey,
         };
+        if (requestedCenterDateKey === selectedDateKey) {
+          lastAutoCenterSignatureRef.current = autoCenterSignature;
+        }
+      } else if (!isForcedCenterRequest && result === "centered") {
+        lastAutoCenterSignatureRef.current = autoCenterSignature;
       }
     };
 
@@ -348,7 +409,16 @@ export const DatePillsScroller = memo(function DatePillsScroller({
         window.cancelAnimationFrame(frameId);
       }
     };
-  }, [centerRequestKey, centerSelectedDate, isActive, prefersReducedMotion, requestedCenterDateKey, selectedDateKey]);
+  }, [
+    centerRequestKey,
+    centerSelectedDate,
+    isActive,
+    isDateKeyInRenderedRange,
+    prefersReducedMotion,
+    requestedCenterDateKey,
+    resetRenderedRangeAroundDateKey,
+    selectedDateKey,
+  ]);
 
   return (
     <div

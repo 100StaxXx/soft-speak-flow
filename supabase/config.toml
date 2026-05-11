@@ -211,6 +211,9 @@ verify_jwt = true
 [functions.companion-chat]
 verify_jwt = true
 
+[functions.companion-chat-opener]
+verify_jwt = true
+
 [functions.companion-agent]
 verify_jwt = true
 

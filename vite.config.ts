@@ -94,6 +94,10 @@ function buildCalendarOAuthCallbackBridge(env: Record<string, string>): string {
           return value === "web" || value === "native";
         }
 
+        function providerLabel(provider) {
+          return provider === "outlook" ? "Outlook" : "Google";
+        }
+
         function decodeBase64Url(value) {
           var normalized = value.replace(/-/g, "+").replace(/_/g, "/");
           var padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
@@ -162,7 +166,7 @@ function buildCalendarOAuthCallbackBridge(env: Record<string, string>): string {
           return window.location.origin + pathname;
         }
 
-        async function run() {
+        function getCallbackContext() {
           var state = params.get("state");
           var hint = getStateHint(state);
           var provider = isProvider(params.get("calendar_provider"))
@@ -175,6 +179,57 @@ function buildCalendarOAuthCallbackBridge(env: Record<string, string>): string {
             : hint && hint.source
               ? hint.source
               : "native";
+
+          return { provider: provider, source: source, state: state };
+        }
+
+        function toUserFacingConnectionError(provider, rawMessage) {
+          var fallback = "Calendar connection failed. Please try again.";
+          if (!rawMessage || typeof rawMessage !== "string") return fallback;
+
+          var normalized = rawMessage.toLowerCase();
+          if (normalized.indexOf("integration not configured") !== -1) {
+            return providerLabel(provider) + " Calendar is not configured on the server yet. Please contact support.";
+          }
+
+          if (normalized.indexOf("invalid or expired oauth state") !== -1) {
+            return "Calendar connection expired. Please try again.";
+          }
+
+          if (
+            normalized.indexOf("redirect_uri") !== -1 ||
+            normalized.indexOf("invalid_grant") !== -1 ||
+            normalized.indexOf("aadsts50011") !== -1
+          ) {
+            return providerLabel(provider) + " rejected this callback URI. Please verify the calendar redirect settings for this build.";
+          }
+
+          return rawMessage.length <= 180 ? rawMessage : fallback;
+        }
+
+        async function getResponseErrorMessage(response, provider) {
+          try {
+            var payload = await response.json();
+            var rawMessage = payload && (
+              typeof payload.details === "string"
+                ? payload.details
+                : typeof payload.error === "string"
+                  ? payload.error
+                  : typeof payload.message === "string"
+                    ? payload.message
+                    : ""
+            );
+            return toUserFacingConnectionError(provider, rawMessage);
+          } catch (_error) {
+            return "Calendar connection failed. Please try again.";
+          }
+        }
+
+        async function run() {
+          var context = getCallbackContext();
+          var state = context.state;
+          var provider = context.provider;
+          var source = context.source;
           var oauthError = params.get("error");
           var oauthErrorDescription = params.get("error_description");
           var code = params.get("code");
@@ -211,7 +266,7 @@ function buildCalendarOAuthCallbackBridge(env: Record<string, string>): string {
           });
 
           if (!response.ok) {
-            redirectToApp(provider, "error", source, "Calendar connection failed. Please try again.");
+            redirectToApp(provider, "error", source, await getResponseErrorMessage(response, provider));
             return;
           }
 
@@ -219,7 +274,8 @@ function buildCalendarOAuthCallbackBridge(env: Record<string, string>): string {
         }
 
         run().catch(function () {
-          redirectToApp("google", "error", "native", "Calendar connection failed. Please try again.");
+          var context = getCallbackContext();
+          redirectToApp(context.provider, "error", context.source, "Calendar connection failed. Please try again.");
         });
       })();
     </script>

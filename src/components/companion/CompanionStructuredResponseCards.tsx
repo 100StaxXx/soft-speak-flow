@@ -1,5 +1,6 @@
 import { memo } from "react";
 
+import { plannerPathfinderTheme } from "@/components/companion/plannerPathfinderTheme";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type {
@@ -34,16 +35,14 @@ const variantStyles = {
       "rounded-full border-[2px] border-[#6d3518] bg-white/60 px-2 py-1 text-[0.62rem] font-black uppercase tracking-[0.18em] text-[#8b4d1d]",
   },
   companion: {
-    card:
-      "rounded-[1.5rem] border border-white/10 bg-white/[0.06] text-white shadow-[0_24px_50px_-38px_rgba(59,130,246,0.55)]",
-    title:
-      "text-[0.72rem] font-black uppercase tracking-[0.2em] text-sky-100/70",
-    body: "text-sm leading-6 text-white",
-    subtext: "text-sm text-white/70",
+    card: plannerPathfinderTheme.raisedPanel,
+    title: plannerPathfinderTheme.sectionEyebrow,
+    body: "text-sm leading-6 text-foreground",
+    subtext: "text-sm text-muted-foreground",
     item:
-      "rounded-[1.15rem] border border-white/10 bg-white/[0.05] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]",
+      "rounded-[1.35rem] border border-[hsl(var(--celestial-blue)_/_0.36)] bg-card/[0.82] px-4 py-3 text-foreground shadow-[0_12px_30px_-28px_rgba(92,157,198,0.34),inset_0_1px_0_rgba(255,255,255,0.7)]",
     accent:
-      "rounded-full border border-white/10 bg-white/[0.06] px-2 py-1 text-[0.62rem] font-black uppercase tracking-[0.18em] text-white/70",
+      "rounded-full border border-[hsl(var(--celestial-blue)_/_0.38)] bg-card/[0.78] px-2 py-1 text-[0.62rem] font-black uppercase tracking-[0.18em] text-foreground",
   },
 } as const;
 
@@ -149,7 +148,7 @@ const renderQuestRow = (
                 "h-8 rounded-full px-3 text-[0.68rem] font-black uppercase tracking-[0.16em]",
                 variant === "journeys"
                   ? "border-[#6d3518] bg-white/70 text-[#6d3518] hover:bg-white"
-                  : "border-white/15 bg-white/[0.07] text-white hover:bg-white/[0.12]",
+                  : "border-[hsl(var(--celestial-blue)_/_0.48)] bg-card/[0.82] text-foreground shadow-[0_10px_24px_-22px_rgba(92,157,198,0.38),inset_0_1px_0_rgba(255,255,255,0.76)] hover:bg-card",
               )}
               onClick={() => {
                 void options.onConfirmSuggestion?.(quest.proposalId!);

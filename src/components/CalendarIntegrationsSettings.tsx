@@ -12,7 +12,7 @@ import {
   type CalendarSyncMode,
 } from '@/hooks/useCalendarIntegrations';
 import { useQuestCalendarSync } from '@/hooks/useQuestCalendarSync';
-import { getRedirectUrlWithPath } from '@/utils/redirectUrl';
+import { getCalendarOAuthRedirectUri, getCalendarOAuthSource } from '@/utils/calendarOAuthRedirect';
 
 const PROVIDERS: Array<{ key: CalendarProvider; label: string; web: boolean; ios: boolean }> = [
   { key: 'google', label: 'Google Calendar', web: true, ios: true },
@@ -47,6 +47,7 @@ export function CalendarIntegrationsSettings() {
     connectAppleNative,
     canConnectAppleNative,
     appleNativeUnavailableReason,
+    refreshCalendarIntegrations,
   } = useCalendarIntegrations();
 
   const { syncProviderPull } = useQuestCalendarSync();
@@ -92,6 +93,7 @@ export function CalendarIntegrationsSettings() {
     if (!provider || !status) return;
 
     if (status === 'success') {
+      void refreshCalendarIntegrations();
       toast({ title: 'Calendar connected', description: `${provider} connected successfully.` });
     } else {
       toast({
@@ -106,7 +108,7 @@ export function CalendarIntegrationsSettings() {
       'calendar_oauth_status',
       'calendar_oauth_message',
     ]);
-  }, [clearOauthParams, toast]);
+  }, [clearOauthParams, refreshCalendarIntegrations, toast]);
 
   const visibleProviders = useMemo(
     () => PROVIDERS.filter((provider) => (canUseApple ? provider.ios : provider.web)),
@@ -288,8 +290,8 @@ export function CalendarIntegrationsSettings() {
         return;
       }
 
-      const source = Capacitor.isNativePlatform() ? 'native' : 'web';
-      const callbackBase = getRedirectUrlWithPath('/calendar/oauth/callback');
+      const source = getCalendarOAuthSource();
+      const callbackBase = getCalendarOAuthRedirectUri({ provider, source });
       const url = await beginOAuthConnection.mutateAsync({
         provider,
         redirectUri: callbackBase,

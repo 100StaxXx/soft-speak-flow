@@ -686,6 +686,7 @@ const Journeys = () => {
       });
       toast.error("Couldn't refresh quests. Pull again in a moment.");
     } finally {
+      resetSelectedDateToToday({ deferIfAddSheetOpen: true });
       setIsQuestListPullRefreshing(false);
     }
   }, [isQuestListPullRefreshing, queryClient, resetSelectedDateToToday, user?.id]);

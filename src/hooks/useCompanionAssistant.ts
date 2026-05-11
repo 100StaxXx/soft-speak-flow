@@ -43,6 +43,7 @@ import type {
 } from "@/types/companionAgent";
 import type {
   CompanionChatInputMode,
+  CompanionChatOpenerResponse,
   CompanionChatSource,
   CompanionChatSurface,
   CompanionChatThreadSummary,
@@ -831,6 +832,7 @@ export function useCompanionAssistant({
     useState<string | null>(null);
   const [draftInput, setDraftInput] = useState("");
   const [interimText, setInterimText] = useState("");
+  const [isOpeningThread, setIsOpeningThread] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResolvingAction, setIsResolvingAction] = useState(false);
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
@@ -842,6 +844,7 @@ export function useCompanionAssistant({
   const localThreadCreatedAtRef = useRef(new Date().toISOString());
   const scopeKeyRef = useRef<string | null>(null);
   const bootstrappedScopeRef = useRef<string | null>(null);
+  const companionOpenCycleKeyRef = useRef<string | null>(null);
   const threadMutationVersionRef = useRef(0);
   const handledLaunchIntentIdRef = useRef<string | null>(null);
   const threadUiStateCacheRef = useRef<
@@ -1042,14 +1045,20 @@ export function useCompanionAssistant({
     scopeKeyRef.current = scopeKey;
     setUseLegacyFallback(false);
     bootstrappedScopeRef.current = null;
+    companionOpenCycleKeyRef.current = null;
     handledLaunchIntentIdRef.current = null;
     threadUiStateCacheRef.current.clear();
+    if (surface === "companion") {
+      openFreshThread();
+      return;
+    }
     openFreshThread({
       greetingText: baseGreeting,
     });
-  }, [baseGreeting, openFreshThread, scopeKey]);
+  }, [baseGreeting, openFreshThread, scopeKey, surface]);
 
   useEffect(() => {
+    if (surface === "companion") return;
     if (!unifiedAgentActive) return;
     if (!threadsQuery.isSuccess) return;
     if (bootstrappedScopeRef.current === scopeKey) return;
@@ -1117,6 +1126,7 @@ export function useCompanionAssistant({
     scopeKey,
     threadsQuery.data,
     threadsQuery.isSuccess,
+    surface,
     unifiedAgentActive,
   ]);
 
@@ -1217,6 +1227,112 @@ export function useCompanionAssistant({
       ),
     });
   }, [companion?.id, queryClient, surface, user?.id]);
+
+  const startGeneratedCompanionOpener = useCallback(async () => {
+    if (surface !== "companion") return null;
+
+    const fallbackOpening = baseGreeting.trim() || "I'm here. What's the move?";
+
+    if (!user?.id || !companion?.id) {
+      return openFreshThread({
+        greetingText: fallbackOpening,
+        markBootstrapped: true,
+        visibleAssistantOpening: true,
+      });
+    }
+
+    openFreshThread({
+      markBootstrapped: true,
+    });
+    const openerMutationVersion = threadMutationVersionRef.current;
+    setIsOpeningThread(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "companion-chat-opener",
+        {
+          body: {
+            companionId: companion.id,
+            surface: "companion",
+            currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
+          },
+        },
+      );
+
+      if (error) throw error;
+      if (threadMutationVersionRef.current !== openerMutationVersion) {
+        return null;
+      }
+
+      const response = data as CompanionChatOpenerResponse;
+      const createdAt = response.createdAt || new Date().toISOString();
+      localThreadCreatedAtRef.current = createdAt;
+      applyActiveSessionId(response.sessionId);
+      setDraftInput("");
+      setInterimText("");
+      setStructuredResponse(null);
+      setActiveFollowUp(null);
+      setUnderstandingState(null);
+      setProposedActions([]);
+      setPendingAction(null);
+      setSavedSuggestionProposalIds([]);
+      setPendingSuggestionProposalId(null);
+      lastStarterIntentRef.current = null;
+      lastReplayablePlannerMessageRef.current = null;
+      pendingStarterIntentRef.current = null;
+      pendingQuestCaptureSelectedDateRef.current = null;
+      setMessages([
+        createMessage("assistant", stripMarkdown(response.reply), {
+          createdAt,
+          source: "agent",
+        }),
+      ]);
+      void invalidateThreads();
+      return response.sessionId;
+    } catch (error) {
+      if (threadMutationVersionRef.current !== openerMutationVersion) {
+        return null;
+      }
+      console.error("Failed to start companion opener thread:", error);
+      toast.error("I couldn't start a fresh chat yet.");
+      setIsOpeningThread(false);
+      return openFreshThread({
+        greetingText: fallbackOpening,
+        markBootstrapped: true,
+        visibleAssistantOpening: true,
+      });
+    } finally {
+      if (threadMutationVersionRef.current === openerMutationVersion) {
+        setIsOpeningThread(false);
+      }
+    }
+  }, [
+    applyActiveSessionId,
+    baseGreeting,
+    companion?.id,
+    invalidateThreads,
+    openFreshThread,
+    surface,
+    user?.id,
+  ]);
+
+  useEffect(() => {
+    if (surface !== "companion") return;
+    if (!conversationEnabled) {
+      companionOpenCycleKeyRef.current = null;
+      return;
+    }
+
+    const openCycleKey = `${scopeKey}:${Date.now()}`;
+    if (companionOpenCycleKeyRef.current) return;
+    companionOpenCycleKeyRef.current = openCycleKey;
+    void startGeneratedCompanionOpener();
+  }, [
+    conversationEnabled,
+    scopeKey,
+    startGeneratedCompanionOpener,
+    surface,
+  ]);
 
   const appendAssistantResponse = useCallback(
     (
@@ -1362,7 +1478,7 @@ export function useCompanionAssistant({
       options?: CompanionAgentSubmitOptions,
     ) => {
       const message = rawMessage.trim();
-      if (!message || isSubmitting || isResolvingAction) return false;
+      if (!message || isOpeningThread || isSubmitting || isResolvingAction) return false;
       const pendingStarterIntent = pendingStarterIntentRef.current;
       const activeFollowUpSelectedDate =
         readFollowUpSelectedDate(activeFollowUp);
@@ -1592,6 +1708,7 @@ export function useCompanionAssistant({
       activeFollowUp,
       companion?.id,
       invalidateThreads,
+      isOpeningThread,
       isResolvingAction,
       isSubmitting,
       legacyAssistant,
@@ -1866,6 +1983,10 @@ export function useCompanionAssistant({
 
   const startNewChat = useCallback(
     async (options?: CompanionTemplateThreadOptions) => {
+      if (surface === "companion") {
+        return startGeneratedCompanionOpener();
+      }
+
       const threadToArchive =
         persistedActiveThread ??
         threadsQuery.data?.threads.find(
@@ -1894,6 +2015,8 @@ export function useCompanionAssistant({
       invalidateThreads,
       openFreshThread,
       persistedActiveThread,
+      startGeneratedCompanionOpener,
+      surface,
       threadsQuery.data?.threads,
     ],
   );
@@ -2113,12 +2236,17 @@ export function useCompanionAssistant({
     }
   }, [requestPermission, toggleRecording]);
 
-  const canStartNewChat = !isSubmitting && !isResolvingAction && !pendingAction;
+  const canStartNewChat =
+    !isOpeningThread && !isSubmitting && !isResolvingAction && !pendingAction;
   const canArchiveThread = canStartNewChat && hasPersistedActiveThread;
-  const newChatDisabledReason = pendingAction
+  const newChatDisabledReason = isOpeningThread
+    ? "Starting a fresh chat."
+    : pendingAction
     ? "Resolve or cancel the pending action first."
     : null;
-  const archiveDisabledReason = pendingAction
+  const archiveDisabledReason = isOpeningThread
+    ? "Starting a fresh chat."
+    : pendingAction
     ? "Resolve or cancel the pending action first."
     : hasPersistedActiveThread
       ? null
@@ -2153,6 +2281,7 @@ export function useCompanionAssistant({
       setDraftInput,
       interimText,
       isSubmitting: legacyAssistant.isSubmitting,
+      isOpeningThread: false,
       isResolvingAction: legacyAssistant.isResolvingAction,
       submitMessage,
       submitTypedMessage: () =>
@@ -2213,6 +2342,7 @@ export function useCompanionAssistant({
     setDraftInput,
     interimText,
     isSubmitting,
+    isOpeningThread,
     isResolvingAction,
     submitMessage,
     submitTypedMessage: () =>
@@ -2239,7 +2369,7 @@ export function useCompanionAssistant({
     },
     activeThread,
     historyThreads,
-    isLoadingThreads: threadsQuery.isLoading,
+    isLoadingThreads: threadsQuery.isLoading || isOpeningThread,
     hasPersistedActiveThread,
     canOpenThreadPicker: !threadsQuery.data?.setupUnavailable,
     threadHistoryEmptyStateMessage,

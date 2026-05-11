@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-05T16:39:56Z",
+  "generatedAt": "2026-05-11T05:37:12Z",
   "frontendInvoked": [
     "adjust-epic-plan",
     "analyze-user-patterns",
@@ -13,6 +13,7 @@
     "companion-agent",
     "companion-agent-action",
     "companion-chat",
+    "companion-chat-opener",
     "companion-draft-opportunity",
     "companion-planner-chat",
     "create-influencer-code",
@@ -124,6 +125,7 @@
     "companion-agent",
     "companion-agent-action",
     "companion-chat",
+    "companion-chat-opener",
     "companion-draft-opportunity",
     "companion-planner-chat",
     "cost-guardrail-monitor",

@@ -2092,6 +2092,12 @@ describe("Journeys row drag integration", () => {
   it("soft-refreshes from a quest-list pull by returning to today without reloading the page", async () => {
     const originalHref = window.location.href;
     const originalReload = window.location.reload;
+    let resolveWarmDailyTasks: (() => void) | null = null;
+    mocks.warmDailyTasksQueryFromRemote.mockImplementation(
+      () => new Promise<unknown[]>((resolve) => {
+        resolveWarmDailyTasks = () => resolve([]);
+      }),
+    );
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -2129,6 +2135,13 @@ describe("Journeys row drag integration", () => {
       expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforePullRefresh);
       expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
     });
+    const centerKeyDuringRefresh = Number(screen.getByTestId("center-request-key").textContent);
+    expect(mocks.dispatchPlannerSyncFinished).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveWarmDailyTasks?.();
+      await Promise.resolve();
+    });
 
     await waitFor(() => {
       expect(mocks.warmDailyTasksQueryFromRemote).toHaveBeenCalledWith(
@@ -2137,6 +2150,9 @@ describe("Journeys row drag integration", () => {
         format(new Date(), "yyyy-MM-dd"),
       );
       expect(mocks.dispatchPlannerSyncFinished).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyDuringRefresh);
     });
     expect(window.location.href).toBe(originalHref);
     expect(window.location.reload).toBe(originalReload);

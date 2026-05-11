@@ -24,13 +24,13 @@ supabase secrets list --profile <profile>
 For each environment, register the exact callback URIs the app can send during OAuth:
 
 - Web callback: `https://<app-domain>/calendar/oauth/callback`
-- Native callback: `<native_redirect_base>/calendar/oauth/callback`
-- Native Outlook fallback callback: `https://<project-ref>.supabase.co/functions/v1/outlook-calendar-auth/callback`
+- Native Google callback: `<native_redirect_base>/calendar/oauth/callback`
+- Native Outlook callback: `https://<project-ref>.supabase.co/functions/v1/outlook-calendar-auth/callback`
 
 Where `native_redirect_base` should match `VITE_NATIVE_REDIRECT_BASE` for that environment.
-The Outlook fallback callback is used by iOS builds when the public app domain cannot serve the React callback route directly.
+Native Outlook uses the Supabase callback so the Edge Function can exchange the Microsoft code server-side and then return to `cosmiq://calendar/oauth/callback`.
 
-For Microsoft app registrations, add every production and staging web domain plus every native redirect base you expect shipped builds to use.
+For Microsoft app registrations, add every production and staging web callback plus every Supabase Outlook callback you expect shipped builds to use.
 Do not register or send callback URIs with query parameters; provider and native/web source are carried in signed OAuth state so Outlook.com personal accounts can complete the flow.
 
 For Google OAuth testing before production verification, add each tester Gmail address under the OAuth consent screen test users list. Non-test users remain blocked until Google approves the app and requested Calendar scopes.

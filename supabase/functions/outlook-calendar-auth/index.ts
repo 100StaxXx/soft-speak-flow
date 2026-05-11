@@ -38,6 +38,33 @@ class OAuthHttpError extends Error {
   }
 }
 
+function toNativeCallbackErrorMessage(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return "Failed to connect Outlook Calendar";
+  }
+
+  const details = error instanceof OAuthHttpError ? error.details ?? "" : "";
+  const combined = `${error.message} ${details}`.toLowerCase();
+
+  if (combined.includes("invalid or expired oauth state")) {
+    return "Calendar connection expired. Please try again.";
+  }
+
+  if (
+    combined.includes("redirect_uri") ||
+    combined.includes("invalid_grant") ||
+    combined.includes("aadsts50011")
+  ) {
+    return "Outlook rejected this callback URI. Please verify the calendar redirect settings for this build.";
+  }
+
+  if (combined.includes("integration not configured")) {
+    return "Outlook Calendar is not configured on the server yet. Please contact support.";
+  }
+
+  return error.message || "Failed to connect Outlook Calendar";
+}
+
 function buildNativeCallbackRedirect(args: {
   status: "success" | "error";
   message?: string;
@@ -454,10 +481,9 @@ Deno.serve(async (req) => {
           message: "Outlook Calendar connected successfully.",
         }));
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Failed to connect Outlook Calendar";
         return redirectResponse(buildNativeCallbackRedirect({
           status: "error",
-          message,
+          message: toNativeCallbackErrorMessage(error),
         }));
       }
     }

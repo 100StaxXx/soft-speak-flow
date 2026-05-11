@@ -48,6 +48,7 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
     savedSuggestionProposalIds: [],
     pendingSuggestionProposalId: null,
     isSubmitting: false,
+    isOpeningThread: false,
     isResolvingAction: false,
     isRecording: false,
     isAutoStopping: false,
@@ -74,6 +75,14 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
     stopSpeaking: mocks.assistant.stopSpeaking,
     setShowPermissionDialog: mocks.assistant.setShowPermissionDialog,
     requestMicrophonePermission: mocks.assistant.requestMicrophonePermission,
+  }),
+}));
+
+vi.mock("@/hooks/usePlannerPathfinderAppearance", () => ({
+  usePlannerPathfinderAppearance: () => ({
+    themeMode: "light",
+    setThemeMode: vi.fn(),
+    themeModeClassName: "[--background:202_100%_98%]",
   }),
 }));
 
@@ -165,5 +174,14 @@ describe("CompanionChatModal", () => {
     renderOpenModal();
 
     expectOpenChatWithFallbackInitial();
+  });
+
+  it("uses the shared frosted blue Pathfinder shell styling", () => {
+    renderOpenModal();
+
+    const modal = screen.getByTestId("companion-chat-modal");
+
+    expect(modal.className).toContain("[--background:202_100%_98%]");
+    expect(modal.className).toContain("border-[hsl(var(--celestial-blue)_/_0.58)]");
   });
 });

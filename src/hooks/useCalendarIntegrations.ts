@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
@@ -138,14 +138,14 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
   const defaultProvider = (settings?.default_provider || null) as CalendarProvider | null;
   const integrationVisible = settings?.integration_visible ?? false;
 
-  const invalidate = async () => {
+  const refreshCalendarIntegrations = useCallback(async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['calendar-user-settings'] }),
       queryClient.invalidateQueries({ queryKey: ['calendar-connections'] }),
       queryClient.invalidateQueries({ queryKey: ['quest-calendar-links'] }),
       queryClient.invalidateQueries({ queryKey: ['quest-outlook-task-links'] }),
     ]);
-  };
+  }, [queryClient]);
 
   const upsertSettings = useMutation({
     mutationFn: async (updates: Partial<CalendarUserSettings>) => {
@@ -164,7 +164,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
 
       if (error) throw error;
     },
-    onSuccess: invalidate,
+    onSuccess: refreshCalendarIntegrations,
   });
 
   const beginOAuthConnection = useMutation({
@@ -225,7 +225,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
 
       return data;
     },
-    onSuccess: invalidate,
+    onSuccess: refreshCalendarIntegrations,
   });
 
   const disconnectProvider = useMutation({
@@ -253,7 +253,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
         });
       }
     },
-    onSuccess: invalidate,
+    onSuccess: refreshCalendarIntegrations,
   });
 
   const setProviderSyncMode = useMutation({
@@ -281,7 +281,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
         });
       }
     },
-    onSuccess: invalidate,
+    onSuccess: refreshCalendarIntegrations,
   });
 
   const listProviderCalendars = useMutation({
@@ -371,7 +371,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
         });
       }
     },
-    onSuccess: invalidate,
+    onSuccess: refreshCalendarIntegrations,
   });
 
   const listProviderTaskLists = useMutation({
@@ -425,7 +425,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
         });
       }
     },
-    onSuccess: invalidate,
+    onSuccess: refreshCalendarIntegrations,
   });
 
   const connectAppleNative = useMutation({
@@ -467,7 +467,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
 
       if (error) throw error;
     },
-    onSuccess: invalidate,
+    onSuccess: refreshCalendarIntegrations,
   });
 
   return {
@@ -480,6 +480,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
     canConnectAppleNative,
     appleNativeUnavailableReason,
     isLoading: settingsQuery.isLoading || connectionsQuery.isLoading,
+    refreshCalendarIntegrations,
 
     upsertSettings,
     beginOAuthConnection,
