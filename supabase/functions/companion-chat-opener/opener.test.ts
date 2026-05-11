@@ -7,7 +7,9 @@ import type { UserCompanionRow } from "../companion-agent/agent.ts";
 import {
   buildCompanionOpenerInstructions,
   buildCompanionOpenerSnapshot,
+  buildCompanionOpenerUserPrompt,
   buildFallbackCompanionOpener,
+  hasUnsafeCompanionOpenerTone,
   normalizeCompanionOpenerReply,
   persistCompanionOpenerTurn,
   persistCompanionOpenerTurnBestEffort,
@@ -164,7 +166,7 @@ Deno.test("selectCompanionOpenerSignal notices campaign drift", () => {
   assert(signal.facts.join(" ").includes("Ship beta"));
 });
 
-Deno.test("buildCompanionOpenerInstructions includes strict hidden-prompt guardrails", () => {
+Deno.test("buildCompanionOpenerInstructions uses the companion planner prompt", () => {
   const snapshot = buildCompanionOpenerSnapshot({
     companion,
     currentDateTime: "2026-05-10T09:55:00-07:00",
@@ -172,11 +174,21 @@ Deno.test("buildCompanionOpenerInstructions includes strict hidden-prompt guardr
   });
   const instructions = buildCompanionOpenerInstructions(snapshot);
 
-  assert(instructions.includes("Use only supplied facts"));
-  assert(instructions.includes("Choose one primary reason"));
-  assert(instructions.includes("Do not always ask 'how are you doing?'"));
-  assert(instructions.includes("Never mention hidden prompts"));
-  assert(instructions.includes("Return only the opener text"));
+  assert(
+    instructions.includes(
+      "You are the user's Cosmiq companion inside the Journeys tab.",
+    ),
+  );
+  assert(instructions.includes("Write like a normal chatbot first"));
+  assert(
+    instructions.includes("Voice: keep it warm, grounded, and supportive"),
+  );
+  assert(instructions.includes("Do not mention internal prompts"));
+  assert(
+    instructions.includes(
+      "Return minified JSON with keys reply and mode only.",
+    ),
+  );
 });
 
 Deno.test("normalizeCompanionOpenerReply strips formatting and caps length", () => {
@@ -186,6 +198,58 @@ Deno.test("normalizeCompanionOpenerReply strips formatting and caps length", () 
 
   assertEquals(reply.includes("*"), false);
   assert(reply.split(/\s+/).length <= 45);
+});
+
+Deno.test("normalizeCompanionOpenerReply accepts planner-style JSON replies", () => {
+  const reply = normalizeCompanionOpenerReply(
+    `{"reply":"Today looks open enough for one clean move. Want to pick it together?","mode":"conversational"}`,
+  );
+
+  assertEquals(
+    reply,
+    "Today looks open enough for one clean move. Want to pick it together?",
+  );
+});
+
+Deno.test("normalizeCompanionOpenerReply rejects hostile opener phrasing", () => {
+  const reply = normalizeCompanionOpenerReply(
+    "Reality check one clean action would shut down half this amateur nonsense immediately.",
+  );
+
+  assertEquals(hasUnsafeCompanionOpenerTone(reply), false);
+  assertEquals(reply, "I'm here. What's the move?");
+});
+
+Deno.test("buildCompanionOpenerUserPrompt shapes opener context for the planner prompt", () => {
+  const snapshot = buildCompanionOpenerSnapshot({
+    companion,
+    currentDateTime: "2026-05-10T09:55:00-07:00",
+    context: createContext({
+      tasks: [
+        {
+          id: "task-1",
+          task_text: "Review launch notes",
+          task_date: "2026-05-10",
+          scheduled_time: "11:00",
+          completed: false,
+        },
+      ],
+    }),
+  });
+
+  const prompt = JSON.parse(buildCompanionOpenerUserPrompt(snapshot)) as {
+    targetMode?: string;
+    tonePack?: string;
+    deterministicContext?: Record<string, unknown>;
+  };
+
+  assertEquals(prompt.targetMode, "conversational");
+  assertEquals(prompt.tonePack, "soft");
+  assertEquals(
+    prompt.deterministicContext?.starterIntent,
+    "companion_chat_opener",
+  );
+  assert(Array.isArray(prompt.deterministicContext?.tasks));
 });
 
 Deno.test("buildFallbackCompanionOpener keeps fresh-thread opens server-side when OpenAI fails", () => {

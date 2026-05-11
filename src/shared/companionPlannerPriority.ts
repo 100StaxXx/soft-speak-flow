@@ -56,6 +56,9 @@ export interface PlannerPriorityRitualInput {
   title: string;
   frequency: string | null;
   preferredTime: string | null;
+  customDays?: number[] | null;
+  customMonthDays?: number[] | null;
+  customPeriod?: "week" | "month" | null;
   currentStreak?: number | null;
 }
 

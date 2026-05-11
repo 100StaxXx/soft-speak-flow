@@ -148,6 +148,7 @@ const mocks = vi.hoisted(() => ({
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
     presentation?: string;
+    selectedDate?: Date | null;
     launchIntent?: unknown;
     onQuestProposalEditHandoff?: (proposal: {
       id: string;
@@ -356,6 +357,7 @@ vi.mock("@/components/journeys/JourneysCompanionPlannerModal", () => ({
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
     presentation?: string;
+    selectedDate?: Date | null;
     launchIntent?: unknown;
     onLaunchIntentConsumed?: (intentId: string) => void;
     onQuestProposalEditHandoff?: (proposal: {
@@ -1043,6 +1045,42 @@ describe("Journeys row drag integration", () => {
     expect(screen.getByTestId("journeys-companion-planner-modal")).toBeInTheDocument();
   });
 
+  it("passes the selected journeys date into the companion planner modal", async () => {
+    mocks.isMacHostedIOSApp = true;
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      writable: true,
+      value: 1100,
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(await screen.findByText("set-future-day"));
+    const selectedDate = mocks.lastDatePillSelectedDate;
+    const launcher = await screen.findByRole("button", { name: /Plan (Today|Day)/i });
+    fireEvent.click(launcher);
+
+    await waitFor(() => {
+      expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
+    });
+    expect(
+      mocks.lastCompanionPlannerModalProps?.selectedDate?.toDateString(),
+    ).toBe(selectedDate?.toDateString());
+  });
+
   it("keeps the planner closed on first load even when an old pinned preference exists", async () => {
     localStorageState.store.set("journeys-companion-planner-pinned-v1", "true");
 
@@ -1257,6 +1295,44 @@ describe("Journeys row drag integration", () => {
       }),
     );
     expect(mocks.lastAddQuestSheetProps?.open).not.toBe(true);
+  });
+
+  it("opens create quest from the floating fab route request without opening the companion planner", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={[{
+          pathname: "/journeys",
+          state: {
+            companionPlannerLaunchIntent: {
+              id: "stale-planner-intent-1",
+              message: "Plan my day",
+              starterIntent: "plan_day",
+              target: "planner",
+              briefingContext: null,
+            },
+            journeysCreateQuestRequest: {
+              id: "create-quest-fab-1",
+            },
+          },
+        }]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(mocks.lastAddQuestSheetProps?.open).toBe(true);
+    });
+
+    expect(mocks.lastCompanionPlannerModalProps?.open).not.toBe(true);
+    expect(mocks.lastAddQuestSheetProps?.prefillDraft).toBeNull();
   });
 
   it("keeps the planner open while a planner quest edit handoff is active and resolves back after save", async () => {

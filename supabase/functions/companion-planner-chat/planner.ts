@@ -206,6 +206,9 @@ export interface PlannerContextRitual {
   title: string;
   frequency: string | null;
   preferredTime: string | null;
+  customDays?: number[] | null;
+  customMonthDays?: number[] | null;
+  customPeriod?: "week" | "month" | null;
   estimatedMinutes?: number | null;
   actualDurationMinutes?: number | null;
   currentStreak?: number | null;
@@ -1245,7 +1248,7 @@ type QuestCaptureAssumption =
 type TimelineInterval = {
   id: string;
   title: string;
-  source: "quest" | "calendar";
+  source: "quest" | "calendar" | "ritual";
   startMinutes: number;
   endMinutes: number;
 };
@@ -4319,11 +4322,187 @@ const buildCalendarIntervalsForDate = (
     .sort((left, right) => left.startMinutes - right.startMinutes);
 };
 
+const normalizeRitualScheduleNumberList = (
+  values: number[] | null | undefined,
+): number[] => {
+  if (!values?.length) return [];
+  return [...new Set(values.filter((value) => Number.isFinite(value)))]
+    .sort((left, right) => left - right);
+};
+
+const inferRitualCustomPeriod = (
+  ritual: PlannerContextRitual,
+): "week" | "month" => {
+  if (ritual.customPeriod === "month") return "month";
+  if (ritual.customPeriod === "week") return "week";
+  if ((ritual.customMonthDays?.length ?? 0) > 0) return "month";
+  return "week";
+};
+
+const getPlannerWeekdayIndex = (date: Date): number => {
+  const jsWeekday = date.getDay();
+  return jsWeekday === 0 ? 6 : jsWeekday - 1;
+};
+
+const getClampedRitualMonthDays = (
+  monthDays: number[] | null | undefined,
+  targetDate: Date,
+): number[] => {
+  const lastDay = new Date(
+    targetDate.getFullYear(),
+    targetDate.getMonth() + 1,
+    0,
+  ).getDate();
+  return normalizeRitualScheduleNumberList(monthDays)
+    .map((day) => Math.min(Math.max(day, 1), lastDay));
+};
+
+const isRitualScheduledForDate = (
+  ritual: PlannerContextRitual,
+  date: string,
+): boolean => {
+  const targetDate = parseDateKey(date);
+  const frequency = ritual.frequency?.toLowerCase();
+  const weekdayIndex = getPlannerWeekdayIndex(targetDate);
+  const customDays = normalizeRitualScheduleNumberList(ritual.customDays);
+  const monthDays = getClampedRitualMonthDays(
+    ritual.customMonthDays,
+    targetDate,
+  );
+  const dayOfMonth = targetDate.getDate();
+
+  switch (frequency) {
+    case "daily":
+      return true;
+    case "weekly":
+      return (customDays[0] ?? 0) === weekdayIndex;
+    case "weekdays":
+    case "5x_week":
+      return weekdayIndex >= 0 && weekdayIndex <= 4;
+    case "weekends":
+      return weekdayIndex === 5 || weekdayIndex === 6;
+    case "3x_week":
+      return (customDays.length > 0 ? customDays : [0, 2, 4])
+        .includes(weekdayIndex);
+    case "monthly":
+      return (monthDays.length > 0 ? monthDays : [1]).includes(dayOfMonth);
+    case "custom":
+      if (inferRitualCustomPeriod(ritual) === "month") {
+        return (monthDays.length > 0 ? monthDays : [1])
+          .includes(dayOfMonth);
+      }
+      return customDays.includes(weekdayIndex);
+    default:
+      return true;
+  }
+};
+
+const getRitualDuration = (ritual: PlannerContextRitual): number =>
+  ritual.actualDurationMinutes ??
+  ritual.estimatedMinutes ??
+  DEFAULT_TASK_DURATION_MINUTES;
+
+const getRitualScheduleTime = (
+  ritual: PlannerContextRitual,
+): string | null => {
+  const minutes = parseTimeToMinutes(ritual.preferredTime);
+  return minutes === null ? null : formatMinutes(minutes);
+};
+
+const hasMaterializedRitualTaskForDate = (
+  input: PlannerBuildInput,
+  ritual: PlannerContextRitual,
+  date: string,
+): boolean =>
+  getScopedPlannerTasks(input).some((task) =>
+    task.taskDate === date && task.habitSourceId === ritual.id
+  );
+
+const getStructuredRitualStart = (
+  ritual: PlannerContextRitual,
+  date: string,
+): string | null => {
+  const time = getRitualScheduleTime(ritual);
+  return time ? `${date}T${time}:00` : null;
+};
+
+const getStructuredRitualEnd = (
+  ritual: PlannerContextRitual,
+  date: string,
+): string | null => {
+  const start = getStructuredRitualStart(ritual, date);
+  if (!start) return null;
+
+  const end = new Date(start);
+  end.setMinutes(end.getMinutes() + getRitualDuration(ritual));
+  return end.toISOString();
+};
+
+const collectRitualScheduleItemsForDate = (
+  input: PlannerBuildInput,
+  date: string,
+  remainingOnly: boolean,
+) => {
+  const currentDateKey = getLocalDateFromDateTime(input.currentDateTime);
+  const currentMinutes = getLocalMinutesFromDateTime(input.currentDateTime);
+
+  return getScopedPlannerRituals(input)
+    .filter((ritual) => isRitualScheduledForDate(ritual, date))
+    .filter((ritual) =>
+      !hasMaterializedRitualTaskForDate(input, ritual, date)
+    )
+    .filter((ritual) => {
+      if (!remainingOnly || date !== currentDateKey) return true;
+      const scheduledMinutes = parseTimeToMinutes(ritual.preferredTime);
+      if (scheduledMinutes === null || currentMinutes === null) return true;
+      return scheduledMinutes >= currentMinutes;
+    })
+    .map((ritual) => ({
+      id: `ritual:${ritual.id}:${date}`,
+      title: ritual.title,
+      label: buildAssistantTaskScheduleLabel({
+        title: ritual.title,
+        taskDate: date,
+        scheduledTime: getRitualScheduleTime(ritual),
+        estimatedDuration: getRitualDuration(ritual),
+        currentDate: input.currentDate,
+        currentDateTime: input.currentDateTime,
+      }),
+      startsAt: getStructuredRitualStart(ritual, date),
+      endsAt: getStructuredRitualEnd(ritual, date),
+      isAllDay: false,
+      source: "ritual" as const,
+      sortMinutes: parseTimeToMinutes(ritual.preferredTime),
+    }));
+};
+
+const buildRitualIntervalsForDate = (
+  input: PlannerBuildInput,
+  date: string,
+): TimelineInterval[] =>
+  collectRitualScheduleItemsForDate(input, date, false)
+    .map((item): TimelineInterval | null => {
+      if (item.sortMinutes === null) return null;
+      const ritualId = item.id.split(":")[1] ?? item.id;
+      const ritual = getScopedPlannerRituals(input)
+        .find((candidate) => candidate.id === ritualId);
+      return {
+        id: item.id,
+        title: item.title,
+        source: "ritual" as const,
+        startMinutes: item.sortMinutes,
+        endMinutes: item.sortMinutes +
+          (ritual ? getRitualDuration(ritual) : DEFAULT_TASK_DURATION_MINUTES),
+      };
+    })
+    .filter((interval): interval is TimelineInterval => interval !== null);
+
 const buildIntervalsForDate = (
   input: PlannerBuildInput,
   date: string,
 ): TimelineInterval[] => ([
   ...buildTaskIntervalsForDate(getScopedPlannerTasks(input), date),
+  ...buildRitualIntervalsForDate(input, date),
   ...buildCalendarIntervalsForDate(
     input.plannerContext.calendarEvents,
     date,
@@ -4404,6 +4583,15 @@ const collectScheduleItemsForDate = (
       sortMinutes: parseTimeToMinutes(task.scheduledTime),
     }));
 
+  const rituals = collectRitualScheduleItemsForDate(
+    input,
+    date,
+    remainingOnly,
+  ).map((ritual) => ({
+    label: ritual.label,
+    sortMinutes: ritual.sortMinutes,
+  }));
+
   const events = input.plannerContext.calendarEvents
     .filter((event) => {
       const end = new Date(event.end);
@@ -4435,7 +4623,7 @@ const collectScheduleItemsForDate = (
       ),
     }));
 
-  return [...tasks, ...events].sort((left, right) => (
+  return [...tasks, ...rituals, ...events].sort((left, right) => (
     (left.sortMinutes ?? 9999) - (right.sortMinutes ?? 9999)
   ));
 };
@@ -4493,6 +4681,12 @@ const collectStructuredScheduleItemsForDate = (
       sortMinutes: parseTimeToMinutes(task.scheduledTime),
     }));
 
+  const rituals = collectRitualScheduleItemsForDate(
+    input,
+    date,
+    remainingOnly,
+  );
+
   const events = input.plannerContext.calendarEvents
     .filter((event) => {
       const end = new Date(event.end);
@@ -4530,7 +4724,7 @@ const collectStructuredScheduleItemsForDate = (
       ),
     }));
 
-  return [...tasks, ...events]
+  return [...tasks, ...rituals, ...events]
     .sort((left, right) =>
       (left.sortMinutes ?? 9999) - (right.sortMinutes ?? 9999)
     )
@@ -4580,6 +4774,9 @@ const getStructuredScheduleItemStartMinutes = (
   if (item.source === "task") {
     const task = findPlannerTaskById(input, item.id);
     return parseTimeToMinutes(task?.scheduledTime ?? null);
+  }
+  if (item.source === "ritual") {
+    return parseTimeToMinutes(item.startsAt?.slice(11, 16) ?? null);
   }
   if (!item.startsAt) return null;
 
@@ -6997,10 +7194,18 @@ const buildComingUpStructuredOutput = (
   const tomorrowLoad = input.plannerContext.scheduleInsights?.dayLoads.find((
     day,
   ) => day.date === tomorrow);
-  const tomorrowSummary: CompanionTomorrowSummary = !tomorrowLoad ||
-      tomorrowLoad.status === "open"
+  const tomorrowItems = collectStructuredScheduleItemsForDate(
+    input,
+    tomorrow,
+    false,
+  );
+  const tomorrowSummary: CompanionTomorrowSummary = tomorrowItems.length === 0
     ? "open"
-    : tomorrowLoad.status === "balanced"
+    : tomorrowLoad &&
+        tomorrowLoad.status !== "open" &&
+        tomorrowLoad.status !== "balanced"
+    ? "busy"
+    : tomorrowItems.length <= 2 || tomorrowLoad?.status === "balanced"
     ? "light"
     : "busy";
   return {
@@ -8633,6 +8838,10 @@ const getScopedPlannerTasks = (input: PlannerBuildInput): PlannerContextTask[] =
   const scoped = getScopedPlannerTaskGroups(input);
   return [...scoped.tasks, ...scoped.inboxTasks];
 };
+
+const getScopedPlannerRituals = (
+  input: PlannerBuildInput,
+): PlannerContextRitual[] => getScopedPlannerTaskGroups(input).rituals;
 
 export const scopePlannerInputContext = (
   input: PlannerBuildInput,

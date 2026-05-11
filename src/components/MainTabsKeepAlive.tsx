@@ -17,6 +17,7 @@ import {
 } from "@/utils/plannerSync";
 import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
 import { isMacDesignedForIPadIOSApp } from "@/utils/platformTargets";
+import { createCompanionPlannerLaunchIntentId } from "@/shared/companionPlannerSurfaceActions";
 
 type MainTabPath = "/mentor" | "/journeys" | "/campaigns" | "/companion";
 
@@ -90,6 +91,33 @@ export const MainTabsKeepAlive = memo(({ activePath }: { activePath: MainTabPath
       },
     });
   }, [activePath, location.pathname, location.search, location.state, navigate]);
+
+  const openUniversalCreateQuest = useCallback(() => {
+    const request = { id: createCompanionPlannerLaunchIntentId() };
+
+    if (activePath === "/journeys") {
+      navigate(
+        {
+          pathname: location.pathname,
+          search: location.search,
+        },
+        {
+          state: {
+            ...((location.state as Record<string, unknown> | null) ?? {}),
+            journeysCreateQuestRequest: request,
+          },
+        },
+      );
+      return;
+    }
+
+    navigate("/journeys", {
+      state: {
+        journeysCreateQuestRequest: request,
+      },
+    });
+  }, [activePath, location.pathname, location.search, location.state, navigate]);
+
   const showJourneysPlannerFab = (
     COMPANION_FLOATING_ACTION_BUTTON_ENABLED
     && !isMacDesignedForIPadIOSApp()
@@ -171,7 +199,10 @@ export const MainTabsKeepAlive = memo(({ activePath }: { activePath: MainTabPath
         );
       })}
       {showJourneysPlannerFab ? (
-        <DraggableFAB onOpenCompanionPlanner={openUniversalCompanionPlanner} />
+        <DraggableFAB
+          onOpenCompanionPlanner={openUniversalCompanionPlanner}
+          onCreateQuest={openUniversalCreateQuest}
+        />
       ) : null}
     </div>
   );

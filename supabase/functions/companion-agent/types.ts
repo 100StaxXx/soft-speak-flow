@@ -108,7 +108,7 @@ const CompanionScheduleItemSchema = z.object({
   startsAt: z.string().nullable(),
   endsAt: z.string().nullable(),
   isAllDay: z.boolean(),
-  source: z.enum(["task", "calendar"]),
+  source: z.enum(["task", "calendar", "ritual"]),
 });
 
 const CompanionMissedItemSchema = z.object({

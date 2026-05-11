@@ -195,6 +195,9 @@ export interface PlannerContextRitual {
   title: string;
   frequency: string | null;
   preferredTime: string | null;
+  customDays?: number[] | null;
+  customMonthDays?: number[] | null;
+  customPeriod?: "week" | "month" | null;
   estimatedMinutes?: number | null;
   actualDurationMinutes?: number | null;
   currentStreak?: number | null;

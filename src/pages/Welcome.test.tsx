@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authState = vi.hoisted(() => ({
@@ -23,16 +23,7 @@ vi.mock("@/components/StaticBackgroundImage", () => ({
   StaticBackgroundImage: () => null,
 }));
 
-vi.mock("@/assets/backgrounds", () => ({
-  welcomeBackground: "",
-}));
-
 import Welcome from "./Welcome";
-
-const LocationProbe = () => {
-  const location = useLocation();
-  return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
-};
 
 describe("Welcome", () => {
   beforeEach(() => {
@@ -40,31 +31,28 @@ describe("Welcome", () => {
     authState.loading = false;
   });
 
-  it("shows account CTAs without preview language", () => {
+  it("renders an informational landing page without auth CTAs", () => {
     render(
       <MemoryRouter initialEntries={["/welcome"]}>
         <Welcome />
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("button", { name: /^create account$/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^sign in$/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /explore preview/i })).not.toBeInTheDocument();
-    expect(screen.queryByText(/preview/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^cosmiq quest$/i })).toBeInTheDocument();
+    expect(screen.getByText(/a cinematic habit companion/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /a daily path through the noise/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /create account/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /sign in/i })).not.toBeInTheDocument();
   });
 
-  it("opens auth in signup mode from the create account CTA", () => {
+  it("keeps legal links available", () => {
     render(
       <MemoryRouter initialEntries={["/welcome"]}>
-        <Routes>
-          <Route path="/welcome" element={<Welcome />} />
-          <Route path="/auth" element={<LocationProbe />} />
-        </Routes>
+        <Welcome />
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /^create account$/i }));
-
-    expect(screen.getByTestId("location")).toHaveTextContent("/auth?mode=signup");
+    expect(screen.getByRole("link", { name: /^terms$/i })).toHaveAttribute("href", "/terms");
+    expect(screen.getByRole("link", { name: /^privacy$/i })).toHaveAttribute("href", "/privacy");
   });
 });

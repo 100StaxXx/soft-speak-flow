@@ -315,6 +315,12 @@ const sanitizeRitual = (
     title,
     frequency: asNullableString(entry.frequency),
     preferredTime: asNullableString(entry.preferredTime),
+    customDays: asNumberArray(entry.customDays) ?? null,
+    customMonthDays: asNumberArray(entry.customMonthDays) ?? null,
+    customPeriod:
+      entry.customPeriod === "week" || entry.customPeriod === "month"
+        ? entry.customPeriod
+        : null,
     estimatedMinutes: asNullableNumber(entry.estimatedMinutes),
     actualDurationMinutes: asNullableNumber(entry.actualDurationMinutes),
     currentStreak: asNullableNumber(entry.currentStreak),

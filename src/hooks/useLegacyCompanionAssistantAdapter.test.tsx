@@ -84,7 +84,12 @@ vi.mock("@/hooks/useAuth", () => ({
 
 vi.mock("@/hooks/useCompanion", () => ({
   useCompanion: () => ({
-    companion: { id: "companion-1" },
+    companion: {
+      id: "companion-1",
+      companion_name: "Nova",
+      cached_creature_name: null,
+      spirit_animal: "fox",
+    },
   }),
 }));
 

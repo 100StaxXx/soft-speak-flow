@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
     target?: string;
     briefingContext?: null;
   } | null) => void),
+  lastCreateQuestFabHandler: null as null | (() => void),
   mountCounts: {
     mentor: 0,
     journeys: 0,
@@ -52,6 +53,7 @@ vi.mock("@/utils/platformTargets", () => ({
 vi.mock("@/components/DraggableFAB", () => ({
   DraggableFAB: ({
     onOpenCompanionPlanner,
+    onCreateQuest,
   }: {
     onOpenCompanionPlanner?: (intent?: {
       id: string;
@@ -60,22 +62,33 @@ vi.mock("@/components/DraggableFAB", () => ({
       target?: string;
       briefingContext?: null;
     } | null) => void;
+    onCreateQuest?: () => void;
   }) => {
     mocks.lastFabHandler = onOpenCompanionPlanner ?? null;
+    mocks.lastCreateQuestFabHandler = onCreateQuest ?? null;
     return (
-      <button
-        type="button"
-        data-testid="main-tabs-universal-fab"
-        onClick={() => onOpenCompanionPlanner?.({
-          id: "launch-1",
-          message: "Help me plan today",
-          starterIntent: "plan_day",
-          target: "planner",
-          briefingContext: null,
-        })}
-      >
-        universal fab
-      </button>
+      <div>
+        <button
+          type="button"
+          data-testid="main-tabs-universal-fab"
+          onClick={() => onOpenCompanionPlanner?.({
+            id: "launch-1",
+            message: "Help me plan today",
+            starterIntent: "plan_day",
+            target: "planner",
+            briefingContext: null,
+          })}
+        >
+          universal fab
+        </button>
+        <button
+          type="button"
+          data-testid="main-tabs-create-quest-fab"
+          onClick={() => onCreateQuest?.()}
+        >
+          create quest
+        </button>
+      </div>
     );
   },
 }));
@@ -165,6 +178,7 @@ describe("MainTabsKeepAlive", () => {
     mocks.location.search = "";
     mocks.location.state = null;
     mocks.lastFabHandler = null;
+    mocks.lastCreateQuestFabHandler = null;
 
     let rafId = 0;
     vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback: FrameRequestCallback) => {
@@ -212,6 +226,7 @@ describe("MainTabsKeepAlive", () => {
 
     expect(screen.getByTestId("main-tabs-universal-fab")).toBeInTheDocument();
     expect(mocks.lastFabHandler).not.toBeNull();
+    expect(mocks.lastCreateQuestFabHandler).not.toBeNull();
   });
 
   it("routes journeys planner fab launch intent into the current journeys route state", () => {
@@ -235,6 +250,31 @@ describe("MainTabsKeepAlive", () => {
             id: "launch-1",
             starterIntent: "plan_day",
           }),
+        },
+      },
+    );
+  });
+
+  it("routes journeys create quest fab requests into the current journeys route state", () => {
+    mocks.location.pathname = "/journeys";
+    mocks.location.search = "?section=inbox";
+    mocks.location.state = { fromTest: true };
+
+    render(<MainTabsKeepAlive activePath="/journeys" />);
+
+    fireEvent.click(screen.getByTestId("main-tabs-create-quest-fab"));
+
+    expect(mocks.navigate).toHaveBeenCalledWith(
+      {
+        pathname: "/journeys",
+        search: "?section=inbox",
+      },
+      {
+        state: {
+          fromTest: true,
+          journeysCreateQuestRequest: {
+            id: expect.any(String),
+          },
         },
       },
     );

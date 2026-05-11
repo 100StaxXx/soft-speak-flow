@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import {
   Archive,
   Check,
@@ -83,6 +83,7 @@ interface JourneysCompanionPlannerModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   presentation: JourneysCompanionPlannerModalPresentation;
+  selectedDate?: Date | null;
   launchIntent?: CompanionPlannerLaunchIntent | null;
   onLaunchIntentConsumed?: (intentId: string) => void;
   onOpenCampaignBuilder?: (message: string) => void;
@@ -1067,6 +1068,7 @@ const JourneysCompanionThreadPicker = memo(
 const JourneysCompanionOverlayBody = memo(
   ({
     presentation,
+    selectedDate,
     launchIntent,
     onLaunchIntentConsumed,
     onOpenCampaignBuilder,
@@ -1074,6 +1076,7 @@ const JourneysCompanionOverlayBody = memo(
     drawerLayout,
   }: {
     presentation: JourneysCompanionPlannerModalPresentation;
+    selectedDate?: Date | null;
     launchIntent?: CompanionPlannerLaunchIntent | null;
     onLaunchIntentConsumed?: (intentId: string) => void;
     onOpenCampaignBuilder?: (message: string) => void;
@@ -1093,6 +1096,7 @@ const JourneysCompanionOverlayBody = memo(
     const assistant = useCompanionAssistant({
       surface: "journeys",
       conversationEnabled: true,
+      defaultSelectedDate: selectedDate ? format(selectedDate, "yyyy-MM-dd") : null,
       launchIntent: launchIntent ?? null,
       onLaunchIntentConsumed,
       onOpenCampaignBuilder,
@@ -2146,6 +2150,7 @@ export const JourneysCompanionPlannerModal = memo(
     open,
     onOpenChange,
     presentation,
+    selectedDate,
     launchIntent,
     onLaunchIntentConsumed,
     onOpenCampaignBuilder,
@@ -2176,6 +2181,7 @@ export const JourneysCompanionPlannerModal = memo(
     const body = (
       <JourneysCompanionOverlayBody
         presentation={presentation}
+        selectedDate={selectedDate}
         launchIntent={launchIntent}
         onLaunchIntentConsumed={onLaunchIntentConsumed}
         onOpenCampaignBuilder={onOpenCampaignBuilder}

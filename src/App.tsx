@@ -147,6 +147,28 @@ const LoadingFallback = memo(() => (
 
 LoadingFallback.displayName = 'LoadingFallback';
 
+const RootRoute = memo(() => {
+  const { user, loading, status } = useAuth();
+  const authStatus = status ?? (loading ? 'loading' : user ? 'authenticated' : 'unauthenticated');
+  const isAuthPending = loading || authStatus === 'recovering' || authStatus === 'loading';
+
+  if (isAuthPending) {
+    return <LoadingFallback />;
+  }
+
+  if (!user || authStatus === 'unauthenticated') {
+    return <Welcome />;
+  }
+
+  return (
+    <ProtectedRoute>
+      <Home />
+    </ProtectedRoute>
+  );
+});
+
+RootRoute.displayName = "RootRoute";
+
 // Memoized scroll to top component
 const ScrollToTop = memo(() => {
   const { pathname } = useLocation();
@@ -399,7 +421,7 @@ const AppContent = memo(() => {
                   <Route path="/creator" element={<Creator />} />
                   <Route path="/creator/dashboard" element={<InfluencerDashboard />} />
                   <Route path="/onboarding" element={<Onboarding />} />
-                  <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+                  <Route path="/" element={<RootRoute />} />
                   
                   <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                   <Route path="/premium" element={<Navigate to="/" replace />} />

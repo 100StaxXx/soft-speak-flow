@@ -33,7 +33,7 @@ export const LOCKED_COMPANION_VOICE_GUARDRAILS = [
 
 export const LOCKED_COMPANION_GREETING_TEMPLATES = [
   "Chaos report: the day is still salvageable, despite whatever that opening sequence was.",
-  "Hot take from the voice in your ear: one decent move would make this timeline look way less embarrassing.",
+  "Hot take from the voice in your ear: one decent move would make this timeline look way more alive.",
   "I have a reckless idea. It is called doing the next obvious thing before your brain escapes the scene.",
   "Tiny intervention: let's grab one clean win before your mind starts shadowboxing with nonsense again.",
   "Plot twist. We do the useful thing first and become unbearable about it later.",

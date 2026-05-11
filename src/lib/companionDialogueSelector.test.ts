@@ -5,7 +5,12 @@ import {
   type DialogueHistoryEntry,
   type DialogueSelectionContext,
 } from "@/lib/companionDialogueSelector";
-import { getAllLinesForBucket, getLinesForToneAndBucket } from "@/config/companionDialoguePacks";
+import {
+  COMPANION_DIALOGUE_PACKS,
+  COMPANION_DIALOGUE_TONE_PACKS,
+  getAllLinesForBucket,
+  getLinesForToneAndBucket,
+} from "@/config/companionDialoguePacks";
 
 const NOW = new Date("2026-02-22T12:00:00.000Z");
 
@@ -95,6 +100,23 @@ const runToneDistribution = (
 };
 
 describe("companionDialogueSelector", () => {
+  it("keeps tone packs distinct and avoids hostile sass", () => {
+    expect(getLinesForToneAndBucket("soft", "base_greetings")[0].text)
+      .toMatch(/^Could we/);
+    expect(getLinesForToneAndBucket("playful", "base_greetings")[0].text)
+      .toMatch(/^Quick mission/);
+    expect(getLinesForToneAndBucket("witty_sassy", "base_greetings")[0].text)
+      .toMatch(/^Reality check/);
+
+    const hostilePattern =
+      /\b(amateur nonsense|clown production|because of you|underqualified|less embarrassing|shut down half|nonsense calcifies|train wreck)\b/i;
+    const allLines = COMPANION_DIALOGUE_TONE_PACKS.flatMap((tone) =>
+      Object.values(COMPANION_DIALOGUE_PACKS[tone]).flat()
+    );
+
+    expect(allLines.some((line) => hostilePattern.test(line.text))).toBe(false);
+  });
+
   it("returns a red-heavier distribution under dormancy warning", () => {
     const baseline = runShimmerDistribution(2000, {
       dialogueMood: "content",

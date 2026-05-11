@@ -964,7 +964,35 @@ const Journeys = () => {
   }, []);
 
   useEffect(() => {
-    const routeState = (location.state as { companionPlannerLaunchIntent?: CompanionPlannerLaunchIntent | null } | null) ?? null;
+    const routeState = (location.state as {
+      companionPlannerLaunchIntent?: CompanionPlannerLaunchIntent | null;
+      journeysCreateQuestRequest?: { id?: string | null } | null;
+    } | null) ?? null;
+    const nextCreateQuestRequest = routeState?.journeysCreateQuestRequest ?? null;
+    if (nextCreateQuestRequest?.id) {
+      setPlannerLaunchIntent(null);
+      setIsCompanionPlannerPinned(false);
+      openAddQuestSheet();
+
+      const nextState = {
+        ...(routeState ?? {}),
+        companionPlannerLaunchIntent: null,
+        journeysCreateQuestRequest: null,
+      };
+
+      navigate(
+        {
+          pathname: location.pathname,
+          search: location.search,
+        },
+        {
+          replace: true,
+          state: nextState,
+        },
+      );
+      return;
+    }
+
     const nextLaunchIntent = routeState?.companionPlannerLaunchIntent ?? null;
     if (!nextLaunchIntent?.id) return;
 
@@ -985,7 +1013,7 @@ const Journeys = () => {
         state: nextState,
       },
     );
-  }, [location.pathname, location.search, location.state, navigate, openCompanionPlanner]);
+  }, [location.pathname, location.search, location.state, navigate, openAddQuestSheet, openCompanionPlanner]);
 
   useEffect(() => {
     if (!isMacHostedIOSApp || location.pathname !== JOURNEYS_ROUTE) return;
@@ -2084,6 +2112,7 @@ const Journeys = () => {
           open={showCompanionPlanner}
           onOpenChange={setIsCompanionPlannerPinned}
           presentation={isDesktopLayout || isMacHostedIOSApp ? "dialog" : "drawer"}
+          selectedDate={selectedDate}
           launchIntent={plannerLaunchIntent}
           onLaunchIntentConsumed={(intentId) => {
             setPlannerLaunchIntent((currentIntent) =>

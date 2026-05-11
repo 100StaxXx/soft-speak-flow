@@ -328,6 +328,8 @@ export const mapRitualsToPlannerContext = (epics: EpicRecord[]): PlannerContextR
         title: link.habits?.title ?? "Untitled ritual",
         frequency: link.habits?.frequency ?? null,
         preferredTime: link.habits?.preferred_time ?? null,
+        customDays: link.habits?.custom_days ?? null,
+        customMonthDays: link.habits?.custom_month_days ?? null,
         estimatedMinutes: link.habits?.estimated_minutes ?? null,
       })),
   );

@@ -32,6 +32,7 @@ type MockCompanionRow = {
 type MockSupabaseOptions = {
   companion?: Partial<MockCompanionRow>;
   messages?: unknown[];
+  tableData?: Record<string, unknown[]>;
   tableErrors?: Record<string, unknown>;
 };
 
@@ -103,6 +104,15 @@ function createQueryResult(
 
   if (table === "companion_chats" && operation === "select") {
     return { data: options.messages ?? [], error: null, count: 0 };
+  }
+
+  if (operation === "select" && options.tableData?.[table]) {
+    const rows = options.tableData[table] ?? [];
+    return {
+      data: maybeSingle ? rows[0] ?? null : rows,
+      error: null,
+      count: rows.length,
+    };
   }
 
   if (
@@ -789,6 +799,131 @@ Deno.test("runCompanionAgent answers typed upcoming schedule reads without OpenA
     assertEquals(result.followUp, null);
     assertEquals(result.pendingAction, undefined);
   }
+});
+
+Deno.test("runCompanionAgent includes active campaign rituals in upcoming reads without OpenAI", async () => {
+  const supabase = createMockSupabase({
+    tableData: {
+      epics: [
+        {
+          id: "epic-launch",
+          title: "Launch campaign",
+          status: "active",
+          completed_at: null,
+          end_date: "2026-05-01",
+          progress_percentage: 25,
+        },
+      ],
+      epic_habits: [
+        {
+          epic_id: "epic-launch",
+          habit_id: "ritual-focus",
+          habits: {
+            id: "ritual-focus",
+            title: "Campaign focus ritual",
+            frequency: "daily",
+            preferred_time: "12:00",
+            estimated_minutes: 20,
+            custom_days: null,
+            custom_month_days: null,
+            is_active: true,
+          },
+        },
+      ],
+    },
+  });
+  let guardedFetchCalled = false;
+  const guardedFetch = (async (input: string | URL | Request) => {
+    guardedFetchCalled = true;
+    throw new Error(
+      `Upcoming schedule reads should not call OpenAI: ${String(input)}`,
+    );
+  }) as typeof fetch;
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-upcoming-campaign-ritual",
+      message: "What do I have coming up?",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T10:30:00-07:00",
+      turnOrigin: "composer",
+    },
+  });
+
+  assertEquals(guardedFetchCalled, false);
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.reply.includes("Campaign focus ritual"), true);
+  assertEquals(
+    result.structuredResponse?.comingUp?.remainingToday.some((item) =>
+      item.title === "Campaign focus ritual" && item.source === "ritual"
+    ),
+    true,
+  );
+});
+
+Deno.test("runCompanionAgent uses selected date for upcoming campaign ritual reads", async () => {
+  const supabase = createMockSupabase({
+    tableData: {
+      epics: [
+        {
+          id: "epic-launch",
+          title: "Launch campaign",
+          status: "active",
+          completed_at: null,
+          end_date: "2026-05-01",
+          progress_percentage: 25,
+        },
+      ],
+      epic_habits: [
+        {
+          epic_id: "epic-launch",
+          habit_id: "ritual-tuesday",
+          habits: {
+            id: "ritual-tuesday",
+            title: "Tuesday campaign ritual",
+            frequency: "weekly",
+            preferred_time: "09:00",
+            estimated_minutes: 20,
+            custom_days: [1],
+            custom_month_days: null,
+            is_active: true,
+          },
+        },
+      ],
+    },
+  });
+  let guardedFetchCalled = false;
+  const guardedFetch = (async (input: string | URL | Request) => {
+    guardedFetchCalled = true;
+    throw new Error(
+      `Upcoming schedule reads should not call OpenAI: ${String(input)}`,
+    );
+  }) as typeof fetch;
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-upcoming-selected-campaign-ritual",
+      message: "What do I have coming up?",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T10:30:00-07:00",
+      selectedDate: "2026-04-21",
+      turnOrigin: "composer",
+    },
+  });
+
+  assertEquals(guardedFetchCalled, false);
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.reply.includes("Tuesday campaign ritual"), true);
 });
 
 Deno.test("runCompanionAgent answers upcoming reads even with stale UI follow-up context", async () => {

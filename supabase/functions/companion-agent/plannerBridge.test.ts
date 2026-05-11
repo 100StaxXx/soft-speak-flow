@@ -68,6 +68,90 @@ Deno.test("consultPlannerForAgent returns a schedule read for schedule questions
   assertMatch(result.reply, /tomorrow/i);
 });
 
+Deno.test("consultPlannerForAgent includes due campaign rituals in coming up reads", () => {
+  const result = consultPlannerForAgent({
+    message: "What do I have coming up?",
+    currentDateTime: "2026-04-18T10:30:00-07:00",
+    surface: "journeys",
+    horizon: "day",
+    starterIntent: "upcoming_start",
+    context: buildContext({
+      currentDateTime: "2026-04-18T10:30:00-07:00",
+      campaigns: [
+        {
+          id: "epic-launch",
+          title: "Launch campaign",
+          status: "active",
+          end_date: "2026-05-01",
+          progress_percentage: 25,
+        },
+      ],
+      rituals: [
+        {
+          id: "ritual-focus",
+          epic_id: "epic-launch",
+          epic_title: "Launch campaign",
+          title: "Campaign focus ritual",
+          frequency: "daily",
+          preferred_time: "12:00",
+          estimated_minutes: 20,
+          custom_days: null,
+          custom_month_days: null,
+        },
+      ],
+    }),
+  });
+
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.reply.includes("Campaign focus ritual"), true);
+  assertEquals(
+    result.structuredResponse?.comingUp?.remainingToday.some((item) =>
+      item.title === "Campaign focus ritual" && item.source === "ritual"
+    ),
+    true,
+  );
+});
+
+Deno.test("consultPlannerForAgent uses selected date for coming up schedule reads", () => {
+  const result = consultPlannerForAgent({
+    message: "What do I have coming up?",
+    currentDateTime: "2026-04-18T10:30:00-07:00",
+    selectedDate: "2026-04-21",
+    surface: "journeys",
+    horizon: "day",
+    starterIntent: "upcoming_start",
+    context: buildContext({
+      currentDateTime: "2026-04-18T10:30:00-07:00",
+      campaigns: [
+        {
+          id: "epic-launch",
+          title: "Launch campaign",
+          status: "active",
+          end_date: "2026-05-01",
+          progress_percentage: 25,
+        },
+      ],
+      rituals: [
+        {
+          id: "ritual-tuesday",
+          epic_id: "epic-launch",
+          epic_title: "Launch campaign",
+          title: "Tuesday campaign ritual",
+          frequency: "weekly",
+          preferred_time: "09:00",
+          estimated_minutes: 20,
+          custom_days: [1],
+          custom_month_days: null,
+        },
+      ],
+    }),
+  });
+
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.scheduleInsights.selectedDate, "2026-04-21");
+  assertEquals(result.reply.includes("Tuesday campaign ritual"), true);
+});
+
 Deno.test("consultPlannerForAgent converts planner proposals into v1 task action hints", () => {
   const result = consultPlannerForAgent({
     message: "Move my workout to tomorrow at 7am",

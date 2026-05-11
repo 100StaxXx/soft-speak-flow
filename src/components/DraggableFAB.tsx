@@ -17,6 +17,7 @@ import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
 
 interface DraggableFABProps {
   onOpenCompanionPlanner?: (intent?: CompanionPlannerLaunchIntent | null) => void;
+  onCreateQuest?: () => void;
   onTap?: () => void;
 }
 
@@ -39,7 +40,7 @@ const getPopupWidthPx = () => {
   return Math.max(0, Math.min(19 * safeRootFontSize, window.innerWidth - (POPUP_VIEWPORT_GUTTER_PX * 2)));
 };
 
-export const DraggableFAB = ({ onOpenCompanionPlanner, onTap }: DraggableFABProps) => {
+export const DraggableFAB = ({ onOpenCompanionPlanner, onCreateQuest, onTap }: DraggableFABProps) => {
   const { user } = useAuth();
   const suppressTapRef = useRef(false);
   const suppressTapResetRef = useRef<number | null>(null);
@@ -177,6 +178,10 @@ export const DraggableFAB = ({ onOpenCompanionPlanner, onTap }: DraggableFABProp
       window.dispatchEvent(new CustomEvent("companion-new-goal-started"));
     }
     if (template.id === "quest") {
+      if (onCreateQuest) {
+        onCreateQuest();
+        return;
+      }
       onOpenCompanionPlanner(createCompanionPlannerQuestCaptureLaunchIntent({
         source: "companion_planner",
         companionLabel,
@@ -191,7 +196,7 @@ export const DraggableFAB = ({ onOpenCompanionPlanner, onTap }: DraggableFABProp
       briefingContext: null,
     };
     onOpenCompanionPlanner(launchIntent);
-  }, [closeMenu, companionLabel, launcherTemplates, onOpenCompanionPlanner]);
+  }, [closeMenu, companionLabel, launcherTemplates, onCreateQuest, onOpenCompanionPlanner]);
 
   const handleOpenHistory = useCallback(() => {
     if (!onOpenCompanionPlanner) {

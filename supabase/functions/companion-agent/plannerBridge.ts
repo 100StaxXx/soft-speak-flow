@@ -167,6 +167,13 @@ const asStringArray = (value: unknown): string[] =>
     ? value.filter((entry): entry is string => typeof entry === "string")
     : [];
 
+const asNumberArray = (value: unknown): number[] =>
+  Array.isArray(value)
+    ? value.filter((entry): entry is number =>
+      typeof entry === "number" && Number.isFinite(entry)
+    )
+    : [];
+
 const isReminderEnabled = (value: unknown) => value === true;
 
 const parseTimeToMinutes = (
@@ -818,6 +825,12 @@ const mapRitual = (ritual: Record<string, unknown>): PlannerContextRitual => ({
   title: asString(ritual.title) ?? "Untitled ritual",
   frequency: asString(ritual.frequency),
   preferredTime: asString(ritual.preferred_time),
+  customDays: asNumberArray(ritual.custom_days),
+  customMonthDays: asNumberArray(ritual.custom_month_days),
+  customPeriod:
+    ritual.custom_period === "week" || ritual.custom_period === "month"
+      ? ritual.custom_period
+      : null,
   estimatedMinutes: asNumber(ritual.estimated_minutes),
   actualDurationMinutes: asNumber(ritual.actual_duration_minutes),
 });
@@ -1290,6 +1303,7 @@ export function consultPlannerForAgent(params: {
       inboxTasks,
       recentCompletedTasks,
       activeEpics,
+      activeHabitIds: Array.from(new Set(rituals.map((ritual) => ritual.id))),
       rituals,
       calendarEvents,
       briefingContext: params.briefingContext ?? null,

@@ -56,7 +56,12 @@ vi.mock("@/hooks/useAuth", () => ({
 
 vi.mock("@/hooks/useCompanion", () => ({
   useCompanion: () => ({
-    companion: { id: "companion-1" },
+    companion: {
+      id: "companion-1",
+      companion_name: "Nova",
+      cached_creature_name: null,
+      spirit_animal: "fox",
+    },
   }),
 }));
 
@@ -86,7 +91,7 @@ vi.mock("@/hooks/useCompanionVoiceSettings", () => ({
 vi.mock("@/hooks/useLegacyCompanionAssistantAdapter", () => ({
   useLegacyCompanionAssistantAdapter: () => ({
     todayLabel: "Saturday, April 18",
-    placeholder: "Talk to Cosmiq",
+    placeholder: "Talk to Nova",
     messages: [],
     structuredResponse: null,
     pendingAction: null,
@@ -471,7 +476,7 @@ describe("useCompanionAssistant", () => {
         }),
       ]),
     );
-    expect(result.current.placeholder).toBe("Answer Cosmiq's follow-up.");
+    expect(result.current.placeholder).toBe("Answer Nova's follow-up.");
     expect(result.current.messages.at(-1)).toEqual(
       expect.objectContaining({
         understandingState: "needs_followup",
@@ -881,7 +886,7 @@ describe("useCompanionAssistant", () => {
     ).toHaveLength(2);
   });
 
-  it("falls back to a local companion opener when the opener endpoint fails", async () => {
+  it("falls back to a local companion opener without surfacing opener internals", async () => {
     mocks.supabaseInvoke.mockImplementation(async (functionName) => {
       if (functionName === "companion-chat-opener") {
         return {
@@ -915,12 +920,15 @@ describe("useCompanionAssistant", () => {
     );
 
     await waitFor(() => {
-      expect(mocks.toastError).toHaveBeenCalledWith(
-        "I couldn't load a generated opener, so I started a basic chat.",
+      expect(result.current.messages[0]?.content).toBe(
+        "I'm here. What's the move?",
       );
     });
 
-    expect(result.current.messages[0]?.content).toBe("You made it back.");
+    expect(result.current.messages[0]?.content).toBe(
+      "I'm here. What's the move?",
+    );
+    expect(mocks.toastError).not.toHaveBeenCalled();
     expect(result.current.canSubmitMessage).toBe(true);
 
     await act(async () => {
@@ -1155,6 +1163,41 @@ describe("useCompanionAssistant", () => {
       expect.objectContaining({
         modifications: expect.objectContaining({
           starterIntent: "upcoming_start",
+        }),
+      }),
+    );
+  });
+
+  it("sends the default selected date for typed Journeys upcoming reads", async () => {
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () =>
+        useCompanionAssistant({
+          surface: "journeys",
+          defaultSelectedDate: "2026-02-13",
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("persisted-session");
+    });
+
+    act(() => {
+      result.current.setDraftInput("What do I have coming up?");
+    });
+
+    await act(async () => {
+      await result.current.submitTypedMessage();
+    });
+
+    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+      "companion-agent",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          message: "What do I have coming up?",
+          starterIntent: "upcoming_start",
+          selectedDate: "2026-02-13",
         }),
       }),
     );
@@ -1772,6 +1815,38 @@ describe("useCompanionAssistant", () => {
           body: expect.objectContaining({
             message: "Plan my day",
             starterIntent: "plan_day",
+            turnOrigin: "launcher",
+          }),
+        }),
+      );
+    });
+  });
+
+  it("uses the default selected date for launcher planner intents", async () => {
+    const { wrapper } = createWrapper();
+
+    renderHook(
+      () =>
+        useCompanionAssistant({
+          surface: "journeys",
+          defaultSelectedDate: "2026-02-13",
+          launchIntent: {
+            id: "launch-selected-date-1",
+            message: "Plan my day",
+            starterIntent: "plan_day",
+          },
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+        "companion-agent",
+        expect.objectContaining({
+          body: expect.objectContaining({
+            message: "Plan my day",
+            starterIntent: "plan_day",
+            selectedDate: "2026-02-13",
             turnOrigin: "launcher",
           }),
         }),

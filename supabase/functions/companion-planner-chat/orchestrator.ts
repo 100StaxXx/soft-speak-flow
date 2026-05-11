@@ -238,7 +238,7 @@ const buildAvailabilityFacts = (
   };
 };
 
-const buildSystemPrompt = (
+export const buildSystemPrompt = (
   mode: PlannerResponseMode,
   tonePack: PlannerBuildInput["tonePack"],
   options?: {

@@ -687,6 +687,26 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(mocks.assistant.submitTypedMessage).not.toHaveBeenCalled();
   });
 
+  it("passes the selected Journeys date into the assistant hook", async () => {
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+        selectedDate={new Date("2026-02-13T00:00:00")}
+      />,
+    );
+
+    expect(
+      await screen.findByText(
+        "I can help you shape that into something concrete when you're ready.",
+      ),
+    ).toBeInTheDocument();
+    expect(mocks.assistantOptions.at(-1)?.defaultSelectedDate).toBe(
+      "2026-02-13",
+    );
+  });
+
   it("renders planner briefing context for plan-day launch intents", async () => {
     render(
       <JourneysCompanionPlannerModal

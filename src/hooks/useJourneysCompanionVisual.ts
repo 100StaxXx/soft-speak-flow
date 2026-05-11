@@ -6,9 +6,8 @@ import {
   isCompanionSceneImageSource,
 } from "@/lib/companionImageFocal";
 import { resolveJourneysCompanionLauncherAwayAssetUrl } from "@/lib/journeysCompanionLauncherArt";
-import { getStoredCompanionCustomName } from "@/lib/companionName";
+import { resolveCompanionDisplayLabel } from "@/lib/companionDisplayLabel";
 import { isAiGeneratedCompanion } from "@/lib/companionPredicates";
-import { formatDisplayLabel } from "@/lib/utils";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { useCompanion } from "./useCompanion";
 import { useCompanionCareSignals } from "./useCompanionCareSignals";
@@ -124,16 +123,7 @@ export const useJourneysCompanionVisual = () => {
 
   const companionLabel = useMemo(() => {
     const labelCompanion = displayCompanion ?? companion;
-    const customName = getStoredCompanionCustomName(labelCompanion);
-    if (customName) return customName;
-
-    const cachedName = labelCompanion?.cached_creature_name?.trim();
-    if (cachedName) return cachedName;
-
-    const spiritAnimal = labelCompanion?.spirit_animal?.trim();
-    if (spiritAnimal) return formatDisplayLabel(spiritAnimal);
-
-    return "Companion";
+    return resolveCompanionDisplayLabel(labelCompanion);
   }, [companion, displayCompanion]);
 
   const presetId = displayCompanion?.preset_id ?? null;

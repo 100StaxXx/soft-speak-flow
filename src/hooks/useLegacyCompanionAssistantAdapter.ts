@@ -9,6 +9,7 @@ import { useCompanionDialogue } from "@/hooks/useCompanionDialogue";
 import { useCompanionPlanner } from "@/hooks/useCompanionPlanner";
 import { useJourneysCompanionConversation } from "@/hooks/useJourneysCompanionConversation";
 import { useJourneysCompanionThreads } from "@/hooks/useJourneysCompanionThreads";
+import { resolveCompanionDisplayLabel } from "@/lib/companionDisplayLabel";
 import { stripMarkdown } from "@/lib/utils";
 import {
   analyzeSchedulingIntent,
@@ -455,6 +456,10 @@ export function useLegacyCompanionAssistantAdapter({
 }: UseLegacyCompanionAssistantAdapterOptions) {
   const { user } = useAuth();
   const { companion } = useCompanion();
+  const companionLabel = useMemo(
+    () => resolveCompanionDisplayLabel(companion, "Cosmiq"),
+    [companion],
+  );
   const { greeting } = useCompanionDialogue();
   const companionChat = useCompanionChat({
     enabled: enabled && surface === "companion" && conversationEnabled,
@@ -561,8 +566,8 @@ export function useLegacyCompanionAssistantAdapter({
   const placeholder = hasOpenPlannerThread
     ? "Reply here..."
     : surface === "journeys"
-    ? "Talk to Cosmiq"
-    : "Talk to Cosmiq naturally.";
+    ? `Talk to ${companionLabel}`
+    : `Talk to ${companionLabel} naturally.`;
 
   const hydrateFromUnifiedState = useCallback((
     input: LegacyFallbackHydrationInput,

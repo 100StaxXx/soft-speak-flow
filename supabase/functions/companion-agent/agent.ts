@@ -1445,6 +1445,45 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     ? value as Record<string, unknown>
     : null;
 
+const asEmbeddedRecord = (value: unknown): Record<string, unknown> | null => {
+  if (Array.isArray(value)) return asRecord(value[0]);
+  return asRecord(value);
+};
+
+const normalizeCampaignRitualLinks = (
+  rows: Array<Record<string, unknown>>,
+  activeCampaignById: Map<string, Record<string, unknown>>,
+) => {
+  const seenHabitIds = new Set<string>();
+  const rituals: Array<Record<string, unknown>> = [];
+
+  for (const row of rows) {
+    const campaignId = typeof row.epic_id === "string" ? row.epic_id : null;
+    const campaign = campaignId ? activeCampaignById.get(campaignId) : null;
+    const habit = asEmbeddedRecord(row.habits);
+    const habitId = typeof habit?.id === "string"
+      ? habit.id
+      : typeof row.habit_id === "string"
+      ? row.habit_id
+      : null;
+
+    if (!campaignId || !campaign || !habit || !habitId) continue;
+    if (habit.is_active === false || seenHabitIds.has(habitId)) continue;
+
+    rituals.push({
+      ...habit,
+      id: habitId,
+      epic_id: campaignId,
+      epic_title: typeof campaign.title === "string"
+        ? campaign.title
+        : "your campaign",
+    });
+    seenHabitIds.add(habitId);
+  }
+
+  return rituals;
+};
+
 const proposedActionContextKey = (value: Record<string, unknown>) => {
   const payload = asRecord(value.normalizedPayload);
   const payloadTitle = typeof payload?.title === "string" ? payload.title : "";
@@ -1835,7 +1874,7 @@ export async function loadCompanionAgentContext(params: {
       params.supabase
         .from("habits")
         .select(
-          "id, title, frequency, preferred_time, estimated_minutes, description, category, current_streak, longest_streak, reminder_enabled, reminder_minutes_before",
+          "id, title, frequency, preferred_time, estimated_minutes, description, category, current_streak, longest_streak, reminder_enabled, reminder_minutes_before, custom_days, custom_month_days, is_active",
         )
         .eq("user_id", params.userId)
         .eq("is_active", true)
@@ -1999,9 +2038,52 @@ export async function loadCompanionAgentContext(params: {
       ),
   });
   const tasks = [...datedTasks, ...inboxTasks];
-  const ritualRows = (ritualsResult.data ?? []) as Array<
+  const campaigns = (campaignsResult.data ?? []) as Array<
     Record<string, unknown>
   >;
+  const activeCampaignById = new Map(
+    campaigns
+      .filter((campaign) => typeof campaign.id === "string")
+      .map((campaign) => [String(campaign.id), campaign]),
+  );
+  const activeCampaignIds = [...activeCampaignById.keys()];
+  const campaignRitualLinks = activeCampaignIds.length > 0
+    ? await loadCompanionContextBestEffort({
+      requestId: params.requestId,
+      source: "epic_habits.campaign_rituals",
+      required: false,
+      fallback: { data: [], error: null },
+      warnings: loadWarnings,
+      load: async () => {
+        const result = await params.supabase
+          .from("epic_habits")
+          .select(
+            "epic_id, habit_id, habits(id, title, frequency, preferred_time, estimated_minutes, description, category, current_streak, longest_streak, reminder_enabled, reminder_minutes_before, custom_days, custom_month_days, is_active)",
+          )
+          .in("epic_id", activeCampaignIds)
+          .limit(MAX_RITUALS);
+        if (result.error) throw result.error;
+        return { ...result, error: null };
+      },
+    })
+    : { data: [], error: null };
+  const campaignRitualRows = normalizeCampaignRitualLinks(
+    (campaignRitualLinks.data ?? []) as Array<Record<string, unknown>>,
+    activeCampaignById,
+  );
+  const campaignRitualIdSet = new Set(
+    campaignRitualRows.map((ritual) => String(ritual.id)),
+  );
+  const standaloneRitualRows = ((ritualsResult.data ?? []) as Array<
+    Record<string, unknown>
+  >)
+    .filter((ritual) => !campaignRitualIdSet.has(String(ritual.id ?? "")))
+    .map((ritual) => ({
+      ...ritual,
+      epic_id: "general",
+      epic_title: "your goals",
+    }));
+  const ritualRows = [...campaignRitualRows, ...standaloneRitualRows];
   const ritualDurationStart = `${
     addDays(toDateOnly(params.request.currentDateTime), -59)
   }T00:00:00.000Z`;
@@ -2022,9 +2104,6 @@ export async function loadCompanionAgentContext(params: {
         ritualDurationStart,
       ),
   });
-  const campaigns = (campaignsResult.data ?? []) as Array<
-    Record<string, unknown>
-  >;
   const calendarEvents = (calendarResult.data ?? []) as Array<
     Record<string, unknown>
   >;

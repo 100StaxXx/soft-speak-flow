@@ -30,6 +30,10 @@ import {
 import { COMPANION_PLANNER_QUEST_CAPTURE_OPENING } from "@/shared/companionPlannerSurfaceActions";
 import { getCompanionPlannerOpener } from "@/shared/companionPlannerCopy";
 import { isUpcomingScheduleDigestMessage } from "@/shared/schedulingIntent";
+import {
+  resolveCompanionDisplayLabel,
+  toPossessiveCompanionLabel,
+} from "@/lib/companionDisplayLabel";
 import type {
   ActionReceiptView,
   CompanionAgentFollowUp,
@@ -84,6 +88,7 @@ export interface CompanionAssistantMessage {
 interface UseCompanionAssistantOptions {
   surface: CompanionAssistantSurface;
   conversationEnabled?: boolean;
+  defaultSelectedDate?: string | null;
   launchIntent?: CompanionPlannerLaunchIntent | null;
   onLaunchIntentConsumed?: (intentId: string) => void;
   onOpenCampaignBuilder?: (message: string) => void;
@@ -172,6 +177,14 @@ const inferStarterIntentFromMessage = (
   message: string,
 ): CompanionPlannerLaunchIntent["starterIntent"] | undefined =>
   isUpcomingScheduleDigestMessage(message) ? "upcoming_start" : undefined;
+
+const shouldApplyDefaultSelectedDateToStarterIntent = (
+  starterIntent: CompanionPlannerLaunchIntent["starterIntent"] | null | undefined,
+) =>
+  Boolean(starterIntent) &&
+  starterIntent !== "free_talk_start" &&
+  starterIntent !== "thread_history" &&
+  starterIntent !== "quest_capture";
 
 const parseDraftOpportunityActions = (
   response: CompanionDraftOpportunityResponse,
@@ -783,6 +796,7 @@ const shouldFallbackToLegacyAgent = (
 export function useCompanionAssistant({
   surface,
   conversationEnabled = true,
+  defaultSelectedDate = null,
   launchIntent = null,
   onLaunchIntentConsumed,
   onOpenCampaignBuilder,
@@ -866,14 +880,18 @@ export function useCompanionAssistant({
     surface === "journeys"
       ? getCompanionPlannerOpener({ userId: user?.id ?? null })
       : greeting;
+  const companionLabel = useMemo(
+    () => resolveCompanionDisplayLabel(companion, "Cosmiq"),
+    [companion],
+  );
   const todayLabel = getTodayLabel();
   const placeholder = pendingAction
     ? "Reply here or confirm the pending action."
     : activeFollowUp
-      ? "Answer Cosmiq's follow-up."
+      ? `Answer ${toPossessiveCompanionLabel(companionLabel)} follow-up.`
       : surface === "journeys"
-        ? "Talk to Cosmiq"
-        : "Talk to Cosmiq naturally.";
+        ? `Talk to ${companionLabel}`
+        : `Talk to ${companionLabel} naturally.`;
 
   const threadsQuery = useQuery({
     queryKey: getCompanionChatThreadsQueryKey(user?.id, companion?.id, surface),
@@ -1231,7 +1249,7 @@ export function useCompanionAssistant({
   const startGeneratedCompanionOpener = useCallback(async () => {
     if (surface !== "companion") return null;
 
-    const fallbackOpening = baseGreeting.trim() || "I'm here. What's the move?";
+    const fallbackOpening = "I'm here. What's the move?";
 
     if (!user?.id || !companion?.id) {
       return openFreshThread({
@@ -1303,9 +1321,6 @@ export function useCompanionAssistant({
         return null;
       }
       console.error("Failed to start companion opener thread:", error);
-      toast.error(
-        "I couldn't load a generated opener, so I started a basic chat.",
-      );
       setIsOpeningThread(false);
       void invalidateThreads();
       return openFreshThread({
@@ -1501,19 +1516,24 @@ export function useCompanionAssistant({
         return false;
       }
       const pendingStarterIntent = pendingStarterIntentRef.current;
+      const starterIntent =
+        options?.starterIntent ??
+        pendingStarterIntent ??
+        inferStarterIntentFromMessage(message);
       const activeFollowUpSelectedDate =
         readFollowUpSelectedDate(activeFollowUp);
+      const normalizedDefaultSelectedDate =
+        normalizeSelectedDateKey(defaultSelectedDate);
       const selectedDate =
         normalizeSelectedDateKey(options?.selectedDate) ??
         (pendingStarterIntent === "quest_capture"
           ? pendingQuestCaptureSelectedDateRef.current
           : null) ??
         activeFollowUpSelectedDate ??
-        (activeFollowUp ? pendingQuestCaptureSelectedDateRef.current : null);
-      const starterIntent =
-        options?.starterIntent ??
-        pendingStarterIntent ??
-        inferStarterIntentFromMessage(message);
+        (activeFollowUp ? pendingQuestCaptureSelectedDateRef.current : null) ??
+        (shouldApplyDefaultSelectedDateToStarterIntent(starterIntent)
+          ? normalizedDefaultSelectedDate
+          : null);
       const briefingContext =
         options?.briefingContext ??
         (activeFollowUp ? readFollowUpBriefingContext(activeFollowUp) : null);
@@ -1728,6 +1748,7 @@ export function useCompanionAssistant({
       appendAssistantResponse,
       activeFollowUp,
       companion?.id,
+      defaultSelectedDate,
       invalidateThreads,
       isOpeningThread,
       isResolvingAction,

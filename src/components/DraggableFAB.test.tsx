@@ -32,6 +32,7 @@ vi.mock("@/utils/storage", () => ({
 
 const mocks = vi.hoisted(() => ({
   onOpenCompanionPlanner: vi.fn(),
+  onCreateQuest: vi.fn(),
   launcherImageCalls: [] as Array<Record<string, unknown>>,
   visual: {
     companionId: "companion-1",
@@ -340,7 +341,25 @@ describe("DraggableFAB", () => {
     expect(screen.queryByTestId("journeys-companion-launcher-option-low-energy")).not.toBeInTheDocument();
   });
 
-  it("launches the quest option as a local quest-capture starter", () => {
+  it("opens create quest from the quest option when a create quest callback is available", async () => {
+    render(
+      <DraggableFAB
+        onOpenCompanionPlanner={mocks.onOpenCompanionPlanner}
+        onCreateQuest={mocks.onCreateQuest}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
+    fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-quest"));
+
+    expect(mocks.onCreateQuest).toHaveBeenCalledTimes(1);
+    expect(mocks.onOpenCompanionPlanner).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.getByTestId("journeys-companion-launcher-popup")).toHaveStyle("opacity: 0");
+    });
+  });
+
+  it("falls back to the planner quest-capture starter when no create quest callback is available", () => {
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
 
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));

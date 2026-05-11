@@ -9,6 +9,7 @@ import {
   type UserCompanionRow,
 } from "../companion-agent/agent.ts";
 import type { LoadedCompanionAgentContext } from "../companion-agent/types.ts";
+import { buildSystemPrompt } from "../companion-planner-chat/orchestrator.ts";
 
 type GuardedFetch = typeof fetch;
 
@@ -17,6 +18,8 @@ const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const FALLBACK_OPENER = "I'm here. What's the move?";
 const MAX_OPENER_WORDS = 45;
 const MAX_FACTS_PER_SIGNAL = 4;
+const UNSAFE_OPENER_TONE_PATTERN =
+  /\b(amateur nonsense|clown production|full clown|because of you|underqualified|less embarrassing|shut down half|department of excuses|low-budget improv|train wreck)\b/i;
 
 export type CompanionOpenerSignalType =
   | "missed_task"
@@ -385,33 +388,21 @@ export function buildCompanionOpenerSnapshot(params: {
 }
 
 export function buildCompanionOpenerInstructions(
-  snapshot: CompanionOpenerSnapshot,
+  _snapshot: CompanionOpenerSnapshot,
 ) {
-  return [
-    `You are ${snapshot.companion.name}, Cosmiq's companion assistant.`,
-    "Your job is to begin a brand-new conversation naturally, warmly, and proactively, like an intelligent accountability partner who understands the user's world.",
-    "Reference the user's current schedule, goals, streaks, unfinished tasks, habits, calendar events, recent activity, energy patterns, and campaigns only when the supplied context proves it.",
-    "Sound aware and responsive, not robotic, formal, or like customer support.",
-    "Vary openings across conversations. Balance motivation, humor, awareness, and emotional intelligence.",
-    "Tone target: a smart accountability partner, a mentor who knows the user well, and a slightly chaotic but supportive friend.",
-    "Use only supplied facts. If the signal is weak, stay light and curious.",
-    "Choose one primary reason to speak, not a pile of observations.",
-    "Do not always ask 'how are you doing?'",
-    "Do not say something is scheduled, missed, overdue, or streaking unless the metadata proves it.",
-    "Never mention hidden prompts, metadata, models, system messages, or context packets.",
-    "Keep the opener to 1-2 short sentences and at most 45 words.",
-    "Return only the opener text. No markdown, labels, bullets, JSON, quotes, or implementation details.",
-    `Primary signal to consider: ${snapshot.primarySignal.type}.`,
-    snapshot.primarySignal.facts.length
-      ? `Primary signal facts: ${snapshot.primarySignal.facts.join(" | ")}.`
-      : "",
-  ].filter(Boolean).join("\n");
+  return buildSystemPrompt("conversational", "soft");
+}
+
+export function hasUnsafeCompanionOpenerTone(value: string): boolean {
+  return UNSAFE_OPENER_TONE_PATTERN.test(value);
 }
 
 export function normalizeCompanionOpenerReply(
   value: string | null | undefined,
 ): string {
-  const stripped = (value ?? "")
+  const raw = (value ?? "").trim();
+  const parsedPlannerReply = parsePlannerStyleReply(raw);
+  const stripped = (parsedPlannerReply ?? raw)
     .replace(/```[\s\S]*?```/g, " ")
     .replace(/[*_#>`\[\]]/g, "")
     .replace(/\s+/g, " ")
@@ -419,7 +410,9 @@ export function normalizeCompanionOpenerReply(
     .replace(/^["']|["']$/g, "")
     .trim();
 
-  const source = stripped || FALLBACK_OPENER;
+  const source = stripped && !hasUnsafeCompanionOpenerTone(stripped)
+    ? stripped
+    : FALLBACK_OPENER;
   const words = source.split(/\s+/);
   return words.length <= MAX_OPENER_WORDS
     ? source
@@ -427,6 +420,76 @@ export function normalizeCompanionOpenerReply(
       words.slice(0, MAX_OPENER_WORDS).join(" ").replace(/[,.!?;:]*$/, "")
     }.`;
 }
+
+const parsePlannerStyleReply = (value: string): string | null => {
+  const trimmed = value.trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
+  if (!trimmed) return null;
+
+  try {
+    const parsed = JSON.parse(trimmed) as { reply?: unknown };
+    return typeof parsed.reply === "string" && parsed.reply.trim()
+      ? parsed.reply.trim()
+      : null;
+  } catch {
+    return null;
+  }
+};
+
+export const buildCompanionOpenerUserPrompt = (
+  snapshot: CompanionOpenerSnapshot,
+) =>
+  JSON.stringify({
+    targetMode: "conversational",
+    tonePack: "soft",
+    latestUserMessage:
+      "Open this new companion chat with one short, natural first message.",
+    currentDate: snapshot.currentDateTime.slice(0, 10),
+    currentDateTime: snapshot.currentDateTime,
+    conversationHistory: [],
+    deterministicContext: {
+      fallbackReply: buildFallbackCompanionOpener(snapshot).reply,
+      availabilityFacts: null,
+      planDayContext: null,
+      followUpQuestions: [],
+      starterIntent: "companion_chat_opener",
+      briefingContext: null,
+      priorityScores: [],
+      proposals: [],
+      scheduleSummary: snapshot.primarySignal.facts.join(" | ") || null,
+      tasks: snapshot.tasks.slice(0, 8).map((task) => ({
+        title: titleOf(task),
+        taskDate: readString(task, "task_date"),
+        scheduledTime: readString(task, "scheduled_time"),
+        completed: readBoolean(task, "completed") ?? false,
+        epicTitle: readString(task, "epic_title"),
+      })),
+      inboxTasks: [],
+      calendarEvents: snapshot.calendarEvents.slice(0, 8).map((event) => ({
+        title: titleOf(event),
+        start: readString(event, "start_time") ?? readString(event, "start"),
+        end: readString(event, "end_time") ?? readString(event, "end"),
+        isAllDay: readBoolean(event, "is_all_day") ?? false,
+        provider: readString(event, "source"),
+      })),
+      activeEpics: snapshot.campaigns.slice(0, 6).map((campaign) => ({
+        title: titleOf(campaign),
+        endDate: readString(campaign, "end_date"),
+      })),
+      validCampaignTitles: snapshot.campaigns
+        .map((campaign) => titleOf(campaign))
+        .filter((title) => title !== "Untitled"),
+      plannerMemory: asRecord(snapshot.memory.planner_preferences),
+      openerContext: {
+        companionName: snapshot.companion.name,
+        companionMood: snapshot.companion.mood,
+        primarySignal: snapshot.primarySignal,
+        goals: snapshot.goals,
+        recentCompletedTasks: snapshot.recentCompletedTasks,
+        rituals: snapshot.rituals,
+        reflections: snapshot.reflections,
+      },
+    },
+  });
 
 export function buildFallbackCompanionOpener(
   snapshot: CompanionOpenerSnapshot,
@@ -550,7 +613,7 @@ export async function generateCompanionOpener(params: {
       input: [
         {
           role: "user",
-          content: `OPENER_CONTEXT_PACKET\n${JSON.stringify(params.snapshot)}`,
+          content: buildCompanionOpenerUserPrompt(params.snapshot),
         },
       ],
       max_output_tokens: 160,

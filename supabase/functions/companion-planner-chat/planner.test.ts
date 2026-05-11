@@ -5329,6 +5329,204 @@ Deno.test("upcoming_start keeps late calendar events on the local current day", 
   );
 });
 
+Deno.test("upcoming_start includes due campaign rituals without materialized tasks", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What do I have coming up?",
+    plannerContext: {
+      activeEpics: [
+        {
+          id: "epic-launch",
+          title: "Launch campaign",
+          endDate: "2026-05-01",
+        },
+      ],
+      activeHabitIds: ["ritual-focus"],
+      rituals: [
+        {
+          id: "ritual-focus",
+          epicId: "epic-launch",
+          epicTitle: "Launch campaign",
+          title: "Campaign focus ritual",
+          frequency: "daily",
+          preferredTime: "12:00",
+          estimatedMinutes: 20,
+        },
+      ],
+      starterIntent: "upcoming_start",
+    },
+  }));
+
+  assertEquals(result.mode, "schedule_read");
+  assertStringIncludes(result.reply, "Campaign focus ritual");
+  assertEquals(
+    result.structuredResponse?.comingUp?.remainingToday.some((item) =>
+      item.title === "Campaign focus ritual" && item.source === "ritual"
+    ),
+    true,
+  );
+  assertEquals(
+    result.structuredResponse?.comingUp?.nextEvent?.title,
+    "Campaign focus ritual",
+  );
+  assertEquals(result.structuredResponse?.comingUp?.tomorrowSummary, "light");
+});
+
+Deno.test("upcoming_start respects campaign ritual cadence", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What do I have coming up?",
+    plannerContext: {
+      activeEpics: [
+        {
+          id: "epic-launch",
+          title: "Launch campaign",
+          endDate: "2026-05-01",
+        },
+      ],
+      activeHabitIds: [
+        "ritual-saturday",
+        "ritual-monday",
+        "ritual-monthly-19",
+        "ritual-monthly-20",
+      ],
+      rituals: [
+        {
+          id: "ritual-saturday",
+          epicId: "epic-launch",
+          epicTitle: "Launch campaign",
+          title: "Saturday campaign ritual",
+          frequency: "weekly",
+          preferredTime: "12:00",
+          customDays: [5],
+          estimatedMinutes: 15,
+        },
+        {
+          id: "ritual-monday",
+          epicId: "epic-launch",
+          epicTitle: "Launch campaign",
+          title: "Monday campaign ritual",
+          frequency: "weekly",
+          preferredTime: "12:30",
+          customDays: [0],
+          estimatedMinutes: 15,
+        },
+        {
+          id: "ritual-monthly-19",
+          epicId: "epic-launch",
+          epicTitle: "Launch campaign",
+          title: "Monthly campaign ritual",
+          frequency: "monthly",
+          preferredTime: "09:00",
+          customMonthDays: [19],
+          estimatedMinutes: 30,
+        },
+        {
+          id: "ritual-monthly-20",
+          epicId: "epic-launch",
+          epicTitle: "Launch campaign",
+          title: "Off-day campaign ritual",
+          frequency: "monthly",
+          preferredTime: "09:30",
+          customMonthDays: [20],
+          estimatedMinutes: 30,
+        },
+      ],
+      starterIntent: "upcoming_start",
+    },
+  }));
+
+  assertStringIncludes(result.reply, "Saturday campaign ritual");
+  assertStringIncludes(result.reply, "Monthly campaign ritual");
+  assertEquals(result.reply.includes("Monday campaign ritual"), false);
+  assertEquals(result.reply.includes("Off-day campaign ritual"), false);
+});
+
+Deno.test("upcoming_start skips virtual rituals when a daily task is materialized", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What do I have coming up?",
+    plannerContext: {
+      activeEpics: [
+        {
+          id: "epic-launch",
+          title: "Launch campaign",
+          endDate: "2026-05-01",
+        },
+      ],
+      activeHabitIds: ["ritual-materialized"],
+      tasks: [
+        {
+          id: "task-ritual",
+          title: "Materialized campaign ritual",
+          taskDate: "2026-04-18",
+          scheduledTime: "13:00",
+          estimatedDuration: 20,
+          recurrencePattern: null,
+          habitSourceId: "ritual-materialized",
+          epicId: "epic-launch",
+          epicTitle: "Launch campaign",
+        },
+      ],
+      rituals: [
+        {
+          id: "ritual-materialized",
+          epicId: "epic-launch",
+          epicTitle: "Launch campaign",
+          title: "Materialized campaign ritual",
+          frequency: "daily",
+          preferredTime: "13:00",
+          estimatedMinutes: 20,
+        },
+      ],
+      starterIntent: "upcoming_start",
+    },
+  }));
+
+  const matches = result.structuredResponse?.comingUp?.remainingToday.filter(
+    (item) => item.title === "Materialized campaign ritual",
+  ) ?? [];
+  assertEquals(matches.length, 1);
+  assertEquals(matches[0]?.source, "task");
+});
+
+Deno.test("upcoming_start excludes campaign rituals outside active campaigns", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What do I have coming up?",
+    plannerContext: {
+      activeEpics: [
+        {
+          id: "epic-active",
+          title: "Active campaign",
+          endDate: "2026-05-01",
+        },
+      ],
+      activeHabitIds: ["ritual-active", "ritual-abandoned"],
+      rituals: [
+        {
+          id: "ritual-active",
+          epicId: "epic-active",
+          epicTitle: "Active campaign",
+          title: "Active campaign ritual",
+          frequency: "daily",
+          preferredTime: "12:00",
+          estimatedMinutes: 20,
+        },
+        {
+          id: "ritual-abandoned",
+          epicId: "epic-abandoned",
+          epicTitle: "Abandoned campaign",
+          title: "Abandoned campaign ritual",
+          frequency: "daily",
+          preferredTime: "12:30",
+          estimatedMinutes: 20,
+        },
+      ],
+      starterIntent: "upcoming_start",
+    },
+  }));
+
+  assertStringIncludes(result.reply, "Active campaign ritual");
+  assertEquals(result.reply.includes("Abandoned campaign ritual"), false);
+});
+
 Deno.test("upcoming_start drops standalone habit tasks whose habit is no longer active", () => {
   const result = buildPlannerResponse(baseInput({
     message: "What do I have coming up?",

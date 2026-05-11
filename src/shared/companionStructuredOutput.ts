@@ -172,7 +172,7 @@ export interface CompanionScheduleItem {
   startsAt: string | null;
   endsAt: string | null;
   isAllDay: boolean;
-  source: "task" | "calendar";
+  source: "task" | "calendar" | "ritual";
 }
 
 export type CompanionTomorrowSummary = "busy" | "light" | "open";

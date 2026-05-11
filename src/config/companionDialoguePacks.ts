@@ -321,11 +321,11 @@ const WITTY_RAW: RawTonePack = {
     ["Reality check", "Chaos report", "Hot take", "Tiny intervention", "Field note", "Plot twist"],
     [
       "one finished task would instantly improve this timeline and your reputation inside it",
-      "we should steal a quick win before your brain turns this into a low-budget improv workshop",
-      "a five-minute move beats another grand speech from the Department of Excuses",
-      "one clean action would shut down half this amateur nonsense immediately",
-      "we can grab momentum before the day gets weird again because of you",
-      "your future self is begging for one competent move out of this full clown production",
+      "we should steal a quick win before your brain turns this into a wandering side quest",
+      "a five-minute move beats another grand speech from the Department of Very Reasonable Delays",
+      "one clean action would quiet half the noise immediately",
+      "we can grab momentum before the day gets weird again on its own",
+      "your future self is campaigning for one crisp move from this whole production",
     ],
     [
       " right now.",
@@ -340,10 +340,10 @@ const WITTY_RAW: RawTonePack = {
     ["Status update", "Power bulletin", "Momentum memo", "Chaos forecast", "Professional opinion"],
     [
       "we are one sharp move away from a very funny glow-up",
-      "this is the kind of moment that compounds fast if you stop fumbling it",
+      "this is the kind of moment that compounds fast once we pick a lane",
       "one focused action now could shove the whole story forward",
-      "the next move has dangerous levels of momentum in it, assuming you break up with distraction",
-      "our trajectory is basically daring us to go bigger and less embarrassing",
+      "the next move has loud levels of momentum in it if distraction takes a seat",
+      "our trajectory is basically daring us to go bigger and cleaner",
     ],
     [" today.", " right now.", " before the window gets cocky and leaves."],
     COMPANION_DIALOGUE_BUCKET_COUNTS.growth_moments,
@@ -352,9 +352,9 @@ const WITTY_RAW: RawTonePack = {
     ["Clarity pass", "Planner ambush", "Quick alignment", "Decision prompt"],
     [
       "let's pick the one move that is actually worth the oxygen",
-      "we should choose the highest-impact step and stop fake-browsing our options like underqualified royalty",
-      "a sixty-second review would rescue this plan from the decorative chaos you draped over it",
-      "I can cut the noise and point at the move that matters before you wander off and adopt three worse ideas",
+      "we should choose the highest-impact step before the options start wearing costumes",
+      "a sixty-second review would rescue this plan from decorative chaos",
+      "I can cut the noise and point at the move that matters before three extra ideas sneak in",
     ],
     [" right now.", " in one minute.", " before your attention starts parkouring."],
     COMPANION_DIALOGUE_BUCKET_COUNTS.clarity_moments,
@@ -380,7 +380,7 @@ const WITTY_RAW: RawTonePack = {
       "we can stop the slide with an easy task before this turns into a full collapse montage",
       "starting small is still the sharpest move on the board, even if your ego hates it",
       "one clean win gets us back in the driver's seat instead of whatever that last hour was",
-      "we should reboot momentum before the nonsense calcifies into a lifestyle",
+      "we should reboot momentum before the noise starts acting permanent",
     ],
     [" right now.", " before this gets louder.", " with the least possible melodrama."],
     COMPANION_DIALOGUE_BUCKET_COUNTS.repair_moments,
@@ -413,8 +413,8 @@ const WITTY_RAW: RawTonePack = {
   ],
   critical_gentle_moments: [
     "Okay. Voice-in-your-ear time. We go tiny from here.",
-    "No speeches. One doable move. That's the whole trick, you magnificent train wreck.",
-    "No shame required. Just one honest step and less theatrical collapse.",
+    "No speeches. One doable move. That's the whole trick, you absolute legend-in-progress.",
+    "No shame required. Just one honest step and less theatrical pressure.",
     "We can still turn today without pretending to be superheroes.",
     "Let's lower the pressure and keep the dignity.",
     "One completed task would steady this whole situation.",
@@ -426,8 +426,8 @@ const WITTY_RAW: RawTonePack = {
 };
 
 const RAW_PACKS: Record<CompanionDialogueTonePack, RawTonePack> = {
-  soft: WITTY_RAW,
-  playful: WITTY_RAW,
+  soft: SOFT_RAW,
+  playful: PLAYFUL_RAW,
   witty_sassy: WITTY_RAW,
 };
 
@@ -437,64 +437,28 @@ for (const tone of COMPANION_DIALOGUE_TONE_PACKS) {
   }
 }
 
+const buildDialoguePack = (tone: CompanionDialogueTonePack) => ({
+  base_greetings: toDialogueLines(tone, "base_greetings", RAW_PACKS[tone].base_greetings),
+  growth_moments: toDialogueLines(tone, "growth_moments", RAW_PACKS[tone].growth_moments),
+  clarity_moments: toDialogueLines(tone, "clarity_moments", RAW_PACKS[tone].clarity_moments),
+  mystery_moments: toDialogueLines(tone, "mystery_moments", RAW_PACKS[tone].mystery_moments),
+  repair_moments: toDialogueLines(tone, "repair_moments", RAW_PACKS[tone].repair_moments),
+  legendary_moments: toDialogueLines(tone, "legendary_moments", RAW_PACKS[tone].legendary_moments),
+  recovery_moments: toDialogueLines(tone, "recovery_moments", RAW_PACKS[tone].recovery_moments),
+  critical_gentle_moments: toDialogueLines(
+    tone,
+    "critical_gentle_moments",
+    RAW_PACKS[tone].critical_gentle_moments,
+  ),
+});
+
 export const COMPANION_DIALOGUE_PACKS: Record<
   CompanionDialogueTonePack,
   Record<CompanionDialogueBucketKey, CompanionDialogueLine[]>
 > = {
-  soft: {
-    base_greetings: toDialogueLines("soft", "base_greetings", WITTY_RAW.base_greetings),
-    growth_moments: toDialogueLines("soft", "growth_moments", WITTY_RAW.growth_moments),
-    clarity_moments: toDialogueLines("soft", "clarity_moments", WITTY_RAW.clarity_moments),
-    mystery_moments: toDialogueLines("soft", "mystery_moments", WITTY_RAW.mystery_moments),
-    repair_moments: toDialogueLines("soft", "repair_moments", WITTY_RAW.repair_moments),
-    legendary_moments: toDialogueLines("soft", "legendary_moments", WITTY_RAW.legendary_moments),
-    recovery_moments: toDialogueLines("soft", "recovery_moments", WITTY_RAW.recovery_moments),
-    critical_gentle_moments: toDialogueLines(
-      "soft",
-      "critical_gentle_moments",
-      WITTY_RAW.critical_gentle_moments,
-    ),
-  },
-  playful: {
-    base_greetings: toDialogueLines("playful", "base_greetings", WITTY_RAW.base_greetings),
-    growth_moments: toDialogueLines("playful", "growth_moments", WITTY_RAW.growth_moments),
-    clarity_moments: toDialogueLines("playful", "clarity_moments", WITTY_RAW.clarity_moments),
-    mystery_moments: toDialogueLines("playful", "mystery_moments", WITTY_RAW.mystery_moments),
-    repair_moments: toDialogueLines("playful", "repair_moments", WITTY_RAW.repair_moments),
-    legendary_moments: toDialogueLines(
-      "playful",
-      "legendary_moments",
-      WITTY_RAW.legendary_moments,
-    ),
-    recovery_moments: toDialogueLines("playful", "recovery_moments", WITTY_RAW.recovery_moments),
-    critical_gentle_moments: toDialogueLines(
-      "playful",
-      "critical_gentle_moments",
-      WITTY_RAW.critical_gentle_moments,
-    ),
-  },
-  witty_sassy: {
-    base_greetings: toDialogueLines("witty_sassy", "base_greetings", WITTY_RAW.base_greetings),
-    growth_moments: toDialogueLines("witty_sassy", "growth_moments", WITTY_RAW.growth_moments),
-    clarity_moments: toDialogueLines("witty_sassy", "clarity_moments", WITTY_RAW.clarity_moments),
-    mystery_moments: toDialogueLines("witty_sassy", "mystery_moments", WITTY_RAW.mystery_moments),
-    repair_moments: toDialogueLines("witty_sassy", "repair_moments", WITTY_RAW.repair_moments),
-    legendary_moments: toDialogueLines(
-      "witty_sassy",
-      "legendary_moments",
-      WITTY_RAW.legendary_moments,
-    ),
-    recovery_moments: toDialogueLines(
-      "witty_sassy",
-      "recovery_moments",
-      WITTY_RAW.recovery_moments,
-    ),
-    critical_gentle_moments: toDialogueLines(
-      "witty_sassy",
-      "critical_gentle_moments",
-      WITTY_RAW.critical_gentle_moments,
-    ),
-  },
+  soft: buildDialoguePack("soft"),
+  playful: buildDialoguePack("playful"),
+  witty_sassy: buildDialoguePack("witty_sassy"),
 };
 
 export const getLinesForToneAndBucket = (
