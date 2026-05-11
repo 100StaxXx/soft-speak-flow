@@ -128,7 +128,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.verify-apple-receipt]
-verify_jwt = true
+verify_jwt = false
 
 [functions.check-apple-subscription]
 verify_jwt = true

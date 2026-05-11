@@ -4,16 +4,20 @@ import { handleCors, jsonResponse } from "../_shared/cors.ts";
 import {
   APPLE_BINDING_CONFLICT_ERROR,
   APPLE_BINDING_MISSING_ERROR,
-  verifyReceiptWithApple,
+  buildSubscriptionResponse,
   extractLatestTransaction,
   resolvePlanFromProduct,
   upsertSubscription,
-  buildSubscriptionResponse,
+  verifyReceiptWithApple,
 } from "../_shared/appleSubscriptions.ts";
 import {
   isAppleApiError,
   verifyTransaction,
 } from "../_shared/appleServerAPI.ts";
+import {
+  handleAppleWebhookNotification,
+  isAppleServerNotificationPayload,
+} from "../apple-webhook/index.ts";
 
 const APPLE_BINDING_CONFLICT_CODE = "APPLE_BINDING_CONFLICT";
 const APPLE_BINDING_MISSING_CODE = "APPLE_BINDING_MISSING";
@@ -138,6 +142,14 @@ export async function handleVerifyAppleReceipt(
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
+    const body = await req.json();
+    if (isAppleServerNotificationPayload(body)) {
+      return await handleAppleWebhookNotification(req, {
+        payload: body,
+        supabaseClient: serviceClient,
+      });
+    }
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       throw new Error("Unauthorized");
@@ -150,7 +162,7 @@ export async function handleVerifyAppleReceipt(
         global: {
           headers: { Authorization: authHeader },
         },
-      }
+      },
     );
 
     const {
@@ -161,7 +173,6 @@ export async function handleVerifyAppleReceipt(
       throw new Error("Unauthorized");
     }
 
-    const body = await req.json();
     const transactionId = body?.transactionId as string | undefined;
     const receipt = body?.receipt as string | undefined;
 
@@ -169,9 +180,13 @@ export async function handleVerifyAppleReceipt(
     // when App Store Server API verification fails and a receipt is available.
     if (transactionId) {
       try {
-        console.log(`[verify-apple-receipt] Using App Store Server API v2 for transaction: ${transactionId}`);
+        console.log(
+          `[verify-apple-receipt] Using App Store Server API v2 for transaction: ${transactionId}`,
+        );
 
-        const { transactionInfo, environment } = await verifyTransactionImpl(transactionId);
+        const { transactionInfo, environment } = await verifyTransactionImpl(
+          transactionId,
+        );
 
         if (transactionInfo.type !== "Auto-Renewable Subscription") {
           throw new Error(APPLE_UNSUPPORTED_TRANSACTION_TYPE_ERROR);
@@ -191,7 +206,8 @@ export async function handleVerifyAppleReceipt(
         const subscription = await upsertSubscriptionImpl(serviceClient, {
           userId: user.id,
           transactionId: transactionInfo.transactionId,
-          originalTransactionId: transactionInfo.originalTransactionId || transactionInfo.transactionId,
+          originalTransactionId: transactionInfo.originalTransactionId ||
+            transactionInfo.transactionId,
           productId: transactionInfo.productId,
           appAccountToken: transactionInfo.appAccountToken ?? null,
           allowCreateWithoutAppAccountToken: isSandboxEnvironment(environment),
@@ -203,7 +219,9 @@ export async function handleVerifyAppleReceipt(
           source: "receipt",
         });
 
-        console.log(`[verify-apple-receipt] Subscription verified via API v2: ${subscription?.id}`);
+        console.log(
+          `[verify-apple-receipt] Subscription verified via API v2: ${subscription?.id}`,
+        );
 
         return jsonResponse(req, {
           success: true,
@@ -212,7 +230,9 @@ export async function handleVerifyAppleReceipt(
           subscription: buildSubscriptionResponseImpl(subscription),
         });
       } catch (txError) {
-        const txErrorMessage = txError instanceof Error ? txError.message : String(txError ?? "");
+        const txErrorMessage = txError instanceof Error
+          ? txError.message
+          : String(txError ?? "");
         if (
           txErrorMessage === APPLE_BINDING_CONFLICT_ERROR ||
           txErrorMessage === APPLE_BINDING_MISSING_ERROR
@@ -222,14 +242,17 @@ export async function handleVerifyAppleReceipt(
         if (!receipt) {
           throw txError;
         }
-        console.warn("[verify-apple-receipt] App Store Server API v2 verification failed; falling back to legacy receipt verification:", txError);
+        console.warn(
+          "[verify-apple-receipt] App Store Server API v2 verification failed; falling back to legacy receipt verification:",
+          txError,
+        );
       }
     }
 
     // Fallback to legacy receipt verification
     if (receipt) {
       console.log("[verify-apple-receipt] Using legacy verifyReceipt API");
-      
+
       const { result, environment } = await verifyReceiptWithAppleImpl(receipt);
       const latestTransaction = extractLatestTransactionImpl(result);
 
@@ -257,7 +280,9 @@ export async function handleVerifyAppleReceipt(
         source: "receipt",
       });
 
-      console.log(`[verify-apple-receipt] Subscription verified via legacy API: ${subscription?.id}`);
+      console.log(
+        `[verify-apple-receipt] Subscription verified via legacy API: ${subscription?.id}`,
+      );
 
       return jsonResponse(req, {
         success: true,
@@ -280,7 +305,8 @@ export async function handleVerifyAppleReceipt(
         ...(typeof errorPayload.upstreamStatus === "number"
           ? { upstream_status: errorPayload.upstreamStatus }
           : {}),
-        ...(typeof errorPayload.upstreamError === "string" && errorPayload.upstreamError.length > 0
+        ...(typeof errorPayload.upstreamError === "string" &&
+            errorPayload.upstreamError.length > 0
           ? { upstream_error: errorPayload.upstreamError }
           : {}),
       },

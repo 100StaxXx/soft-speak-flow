@@ -5,16 +5,14 @@ import { upsertAccountEntitlement } from "../_shared/accountEntitlements.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import {
   fetchAppleTransactionBinding,
-  getPriceCents,
   getDiscountedYearlyOfferId,
+  getPriceCents,
   isDiscountedYearlyOffer,
   resolvePlanFromProduct,
   upsertSubscription,
 } from "../_shared/appleSubscriptions.ts";
 import { normalizeAppAccountToken } from "../_shared/appleServerAPI.ts";
-import {
-  markAffiliateConversionAudit,
-} from "../_shared/referralState.ts";
+import { markAffiliateConversionAudit } from "../_shared/referralState.ts";
 import { createOrUpdateWinWinKitUser } from "../_shared/winwinkit.ts";
 
 const defaultAppleBundleId = "com.darrylgraham.revolution";
@@ -28,23 +26,25 @@ if (appleWebhookAudiences.length === 0) {
   appleWebhookAudiences.push(defaultAppleBundleId);
 }
 
-const appleWebhookJWKS = createRemoteJWKSet(new URL("https://appleid.apple.com/auth/keys"));
+const appleWebhookJWKS = createRemoteJWKSet(
+  new URL("https://appleid.apple.com/auth/keys"),
+);
 
 /**
  * Apple Server-to-Server Notification Webhook
- * 
+ *
  * This endpoint handles automatic notifications from Apple about subscription events:
  * - Renewals
  * - Cancellations
  * - Billing issues
  * - Refunds
  * - Plan changes
- * 
+ *
  * Setup in App Store Connect:
  * 1. Go to App Information > App Store Server Notifications
  * 2. Add this URL as webhook endpoint
  * 3. Apple will send POST requests for subscription events
- * 
+ *
  * SECURITY NOTE: Apple webhooks don't send Origin headers, so CORS is permissive.
  * The security comes from the signed JWT payload, which we now verify with Apple's JWKS.
  */
@@ -69,20 +69,40 @@ enum NotificationSubtype {
   INITIAL_BUY = "INITIAL_BUY",
 }
 
-serve(async (req) => {
+type AppleWebhookOptions = {
+  payload?: any;
+  supabaseClient?: any;
+};
+
+export function isAppleServerNotificationPayload(
+  payload: unknown,
+): payload is { signedPayload: string } {
+  return Boolean(
+    payload &&
+      typeof payload === "object" &&
+      typeof (payload as { signedPayload?: unknown }).signedPayload ===
+        "string" &&
+      (payload as { signedPayload: string }).signedPayload.length > 0,
+  );
+}
+
+export async function handleAppleWebhookNotification(
+  req: Request,
+  options: AppleWebhookOptions = {},
+): Promise<Response> {
   if (req.method === "OPTIONS") {
     return handleCors(req);
   }
 
   try {
     // Create Supabase client with service role for server operations
-    const supabaseClient = createClient(
+    const supabaseClient = options.supabaseClient ?? createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    const payload = await req.json();
-    
+    const payload = options.payload ?? await req.json();
+
     console.log("Received Apple notification:", {
       type: payload.notification_type ?? payload?.notificationType,
       timestamp: new Date().toISOString(),
@@ -92,15 +112,25 @@ serve(async (req) => {
     try {
       notificationContext = await buildNotificationContext(payload);
     } catch (verificationError) {
-      console.error("Apple webhook signature verification failed:", verificationError);
+      console.error(
+        "Apple webhook signature verification failed:",
+        verificationError,
+      );
       return new Response("Invalid signature", {
         status: 401,
         headers: getCorsHeaders(req),
       });
     }
 
-    const { notificationType, notificationSubtype, latestReceiptInfo, autoRenewStatus, transactionInfo, environment } = notificationContext;
-    
+    const {
+      notificationType,
+      notificationSubtype,
+      latestReceiptInfo,
+      autoRenewStatus,
+      transactionInfo,
+      environment,
+    } = notificationContext;
+
     if (!latestReceiptInfo) {
       console.error("No receipt info in notification");
       return new Response("No receipt info", { status: 400 });
@@ -108,18 +138,27 @@ serve(async (req) => {
 
     // Extract subscription details
     const originalTransactionId = latestReceiptInfo.original_transaction_id;
-    const latestTransactionId = latestReceiptInfo.transaction_id ?? originalTransactionId;
+    const latestTransactionId = latestReceiptInfo.transaction_id ??
+      originalTransactionId;
     const productId = latestReceiptInfo.product_id;
     const expiresDateMs = latestReceiptInfo.expires_date_ms;
     const purchaseDateMs = latestReceiptInfo.purchase_date_ms;
     const cancellationDateMs = latestReceiptInfo.cancellation_date_ms;
     const appAccountToken = normalizeAppAccountToken(
-      typeof transactionInfo?.appAccountToken === "string" ? transactionInfo.appAccountToken : null,
+      typeof transactionInfo?.appAccountToken === "string"
+        ? transactionInfo.appAccountToken
+        : null,
     );
 
-    const binding = await fetchAppleTransactionBinding(supabaseClient, originalTransactionId)
+    const binding = await fetchAppleTransactionBinding(
+      supabaseClient,
+      originalTransactionId,
+    )
       .catch((bindingError) => {
-        console.error("Error fetching Apple transaction binding:", bindingError);
+        console.error(
+          "Error fetching Apple transaction binding:",
+          bindingError,
+        );
         return null;
       });
 
@@ -132,8 +171,8 @@ serve(async (req) => {
         "- waiting for verified app-account restore",
       );
       // Still return 200 to prevent Apple from retrying
-      return new Response("OK", { 
-        status: 200, 
+      return new Response("OK", {
+        status: 200,
         headers: getCorsHeaders(req),
       });
     }
@@ -153,8 +192,12 @@ serve(async (req) => {
           originalTransactionId,
           appAccountToken,
           productId,
-          typeof transactionInfo?.offerIdentifier === "string" ? transactionInfo.offerIdentifier : null,
-          typeof transactionInfo?.offerType === "number" ? transactionInfo.offerType : null,
+          typeof transactionInfo?.offerIdentifier === "string"
+            ? transactionInfo.offerIdentifier
+            : null,
+          typeof transactionInfo?.offerType === "number"
+            ? transactionInfo.offerType
+            : null,
           expiresDateMs,
           purchaseDateMs,
           environment,
@@ -169,12 +212,16 @@ serve(async (req) => {
             originalTransactionId,
             plan,
             productId,
-            typeof transactionInfo?.offerIdentifier === "string" ? transactionInfo.offerIdentifier : null,
-            typeof transactionInfo?.offerType === "number" ? transactionInfo.offerType : null,
+            typeof transactionInfo?.offerIdentifier === "string"
+              ? transactionInfo.offerIdentifier
+              : null,
+            typeof transactionInfo?.offerType === "number"
+              ? transactionInfo.offerType
+              : null,
           );
         }
         break;
-        
+
       case NotificationType.DID_RENEW:
       case NotificationType.DID_RECOVER:
         // Subscription renewed or recovered
@@ -185,8 +232,12 @@ serve(async (req) => {
           originalTransactionId,
           appAccountToken,
           productId,
-          typeof transactionInfo?.offerIdentifier === "string" ? transactionInfo.offerIdentifier : null,
-          typeof transactionInfo?.offerType === "number" ? transactionInfo.offerType : null,
+          typeof transactionInfo?.offerIdentifier === "string"
+            ? transactionInfo.offerIdentifier
+            : null,
+          typeof transactionInfo?.offerType === "number"
+            ? transactionInfo.offerType
+            : null,
           expiresDateMs,
           purchaseDateMs,
           environment,
@@ -200,7 +251,7 @@ serve(async (req) => {
           supabaseClient,
           userId,
           willRenew,
-          expiresDateMs
+          expiresDateMs,
         );
         break;
       }
@@ -211,7 +262,7 @@ serve(async (req) => {
           supabaseClient,
           userId,
           plan,
-          expiresDateMs
+          expiresDateMs,
         );
         break;
 
@@ -220,7 +271,7 @@ serve(async (req) => {
         await handleBillingIssue(
           supabaseClient,
           userId,
-          expiresDateMs
+          expiresDateMs,
         );
         break;
 
@@ -256,17 +307,20 @@ serve(async (req) => {
       status: 200,
       headers: getCorsHeaders(req),
     });
-
   } catch (error) {
     console.error("Error processing Apple notification:", error);
-    
+
     // Still return 200 to prevent Apple from retrying
     return new Response("OK", {
       status: 200,
       headers: getCorsHeaders(req),
     });
   }
-});
+}
+
+if (import.meta.main && Deno.env.get("SUPABASE_FUNCTIONS_TEST") !== "1") {
+  serve((req) => handleAppleWebhookNotification(req));
+}
 
 async function handleActivation(
   supabase: any,
@@ -331,29 +385,48 @@ async function syncWinWinKitPremiumStatus(
 type AppleJWSPayload = Record<string, unknown>;
 
 async function buildNotificationContext(body: any) {
-  let notificationType = body?.notification_type as NotificationType | undefined;
+  let notificationType = body?.notification_type as
+    | NotificationType
+    | undefined;
   let notificationSubtype = body?.subtype as NotificationSubtype | undefined;
   let latestReceiptInfo = body?.latest_receipt_info;
   let autoRenewStatus = body?.auto_renew_status;
   let transactionInfo: AppleJWSPayload | null = null;
-  let environment = typeof body?.environment === "string" ? body.environment : undefined;
+  let environment = typeof body?.environment === "string"
+    ? body.environment
+    : undefined;
 
   if (body?.signedPayload) {
-    const rootPayload = await verifyAppleNotification(body.signedPayload, appleWebhookAudiences);
+    const rootPayload = await verifyAppleNotification(
+      body.signedPayload,
+      appleWebhookAudiences,
+    );
     notificationType = rootPayload.notificationType as NotificationType;
-    notificationSubtype = rootPayload.subtype as NotificationSubtype | undefined;
+    notificationSubtype = rootPayload.subtype as
+      | NotificationSubtype
+      | undefined;
 
     const data = (rootPayload.data ?? {}) as Record<string, unknown>;
-    const bundleAudience = typeof data.bundleId === "string" ? data.bundleId : appleWebhookAudiences;
-    environment = typeof data.environment === "string" ? data.environment : environment;
+    const bundleAudience = typeof data.bundleId === "string"
+      ? data.bundleId
+      : appleWebhookAudiences;
+    environment = typeof data.environment === "string"
+      ? data.environment
+      : environment;
 
     if (typeof data.signedTransactionInfo === "string") {
-      transactionInfo = await verifyAppleNotification(data.signedTransactionInfo, bundleAudience);
+      transactionInfo = await verifyAppleNotification(
+        data.signedTransactionInfo,
+        bundleAudience,
+      );
     }
 
     let renewalInfo: AppleJWSPayload | null = null;
     if (typeof data.signedRenewalInfo === "string") {
-      renewalInfo = await verifyAppleNotification(data.signedRenewalInfo, bundleAudience);
+      renewalInfo = await verifyAppleNotification(
+        data.signedRenewalInfo,
+        bundleAudience,
+      );
       if (renewalInfo?.autoRenewStatus !== undefined) {
         autoRenewStatus = renewalInfo.autoRenewStatus;
       }
@@ -368,13 +441,24 @@ async function buildNotificationContext(body: any) {
     throw new Error("Apple notification missing type");
   }
 
-  return { notificationType, notificationSubtype, latestReceiptInfo, autoRenewStatus, transactionInfo, environment };
+  return {
+    notificationType,
+    notificationSubtype,
+    latestReceiptInfo,
+    autoRenewStatus,
+    transactionInfo,
+    environment,
+  };
 }
 
-async function verifyAppleNotification(token: string, audience: string | string[]) {
-  const normalizedAudience = (Array.isArray(audience) ? audience : [audience]).filter(
-    (value): value is string => Boolean(value),
-  );
+async function verifyAppleNotification(
+  token: string,
+  audience: string | string[],
+) {
+  const normalizedAudience = (Array.isArray(audience) ? audience : [audience])
+    .filter(
+      (value): value is string => Boolean(value),
+    );
 
   if (normalizedAudience.length === 0) {
     throw new Error("Missing Apple webhook audience configuration");
@@ -389,12 +473,19 @@ async function verifyAppleNotification(token: string, audience: string | string[
 
 function convertTransactionToLegacyShape(transactionInfo: AppleJWSPayload) {
   return {
-    original_transaction_id: transactionInfo.originalTransactionId ?? transactionInfo.transactionId,
+    original_transaction_id: transactionInfo.originalTransactionId ??
+      transactionInfo.transactionId,
     transaction_id: transactionInfo.transactionId,
     product_id: transactionInfo.productId,
-    expires_date_ms: normalizeMillis(transactionInfo.expiresDate ?? transactionInfo.expiresDateMs),
-    purchase_date_ms: normalizeMillis(transactionInfo.purchaseDate ?? transactionInfo.purchaseDateMs),
-    cancellation_date_ms: normalizeMillis(transactionInfo.revocationDate ?? transactionInfo.revocationDateMs),
+    expires_date_ms: normalizeMillis(
+      transactionInfo.expiresDate ?? transactionInfo.expiresDateMs,
+    ),
+    purchase_date_ms: normalizeMillis(
+      transactionInfo.purchaseDate ?? transactionInfo.purchaseDateMs,
+    ),
+    cancellation_date_ms: normalizeMillis(
+      transactionInfo.revocationDate ?? transactionInfo.revocationDateMs,
+    ),
   };
 }
 
@@ -426,7 +517,7 @@ async function handleRenewalStatusChange(
   supabase: any,
   userId: string,
   willRenew: boolean,
-  expiresDateMs: string
+  expiresDateMs: string,
 ) {
   const expiresDate = new Date(parseInt(expiresDateMs));
 
@@ -449,14 +540,18 @@ async function handleRenewalStatusChange(
     },
   });
 
-  console.log(`Renewal status changed for user ${userId}: ${willRenew ? "enabled" : "disabled"}`);
+  console.log(
+    `Renewal status changed for user ${userId}: ${
+      willRenew ? "enabled" : "disabled"
+    }`,
+  );
 }
 
 async function handlePlanChange(
   supabase: any,
   userId: string,
   newPlan: string,
-  expiresDateMs: string
+  expiresDateMs: string,
 ) {
   const expiresDate = new Date(parseInt(expiresDateMs));
 
@@ -485,7 +580,7 @@ async function handlePlanChange(
 async function handleBillingIssue(
   supabase: any,
   userId: string,
-  expiresDateMs: string
+  expiresDateMs: string,
 ) {
   const expiresDate = new Date(parseInt(expiresDateMs));
 
@@ -516,7 +611,7 @@ async function handleCancellation(
   supabase: any,
   userId: string,
   cancellationDateMs: string,
-  expiresDateMs: string
+  expiresDateMs: string,
 ) {
   const cancellationDate = new Date(parseInt(cancellationDateMs));
   const expiresDate = new Date(parseInt(expiresDateMs));
@@ -544,7 +639,9 @@ async function handleCancellation(
     },
   });
 
-  console.log(`Subscription cancelled for user ${userId}, expires ${expiresDate.toISOString()}`);
+  console.log(
+    `Subscription cancelled for user ${userId}, expires ${expiresDate.toISOString()}`,
+  );
   await syncWinWinKitPremiumStatus(supabase, userId, isStillActive);
 }
 
@@ -555,8 +652,12 @@ async function handleRefund(
   revokedAtMs?: string,
   webhookEvent = "refund",
 ) {
-  const revokedAtTimestamp = revokedAtMs ? Number.parseInt(revokedAtMs, 10) : Number.NaN;
-  const revokedAtDate = Number.isFinite(revokedAtTimestamp) ? new Date(revokedAtTimestamp) : new Date();
+  const revokedAtTimestamp = revokedAtMs
+    ? Number.parseInt(revokedAtMs, 10)
+    : Number.NaN;
+  const revokedAtDate = Number.isFinite(revokedAtTimestamp)
+    ? new Date(revokedAtTimestamp)
+    : new Date();
   const revokedAt = revokedAtDate.toISOString();
 
   // Immediately revoke access
@@ -617,7 +718,9 @@ async function createReferralPayout(
   // Find the referral_code record with owner info
   const { data: codeData } = await supabase
     .from("referral_codes")
-    .select("id, owner_type, owner_user_id, affiliate_provider, is_active, apple_offer_code_status, apple_offer_code_expires_at")
+    .select(
+      "id, owner_type, owner_user_id, affiliate_provider, is_active, apple_offer_code_status, apple_offer_code_expires_at",
+    )
     .eq("code", referralCode)
     .single();
 
@@ -629,26 +732,34 @@ async function createReferralPayout(
   const isProviderLinkedAffiliate = codeData.affiliate_provider === "winwinkit";
   const isAppleOfferCodeEligible = Boolean(
     codeData.is_active &&
-    codeData.apple_offer_code_status === "active" &&
-    (!codeData.apple_offer_code_expires_at || codeData.apple_offer_code_expires_at >= new Date().toISOString().slice(0, 10)),
+      codeData.apple_offer_code_status === "active" &&
+      (!codeData.apple_offer_code_expires_at ||
+        codeData.apple_offer_code_expires_at >=
+          new Date().toISOString().slice(0, 10)),
   );
-  const hasDiscountedYearlyOffer = plan === "yearly" && isDiscountedYearlyOffer({
-    offerIdentifier,
-    offerType,
-  });
+  const hasDiscountedYearlyOffer = plan === "yearly" &&
+    isDiscountedYearlyOffer({
+      offerIdentifier,
+      offerType,
+    });
 
   if (isProviderLinkedAffiliate && !isAppleOfferCodeEligible) {
-    console.log(`Skipping WinWinKit conversion audit for code ${referralCode} because the Apple custom offer code is not active`);
+    console.log(
+      `Skipping WinWinKit conversion audit for code ${referralCode} because the Apple custom offer code is not active`,
+    );
     return;
   }
 
   if (!hasDiscountedYearlyOffer) {
-    console.log(`Skipping affiliate commission for code ${referralCode} because the yearly offer-code discount was not redeemed`);
+    console.log(
+      `Skipping affiliate commission for code ${referralCode} because the yearly offer-code discount was not redeemed`,
+    );
     return;
   }
 
   if (isProviderLinkedAffiliate) {
-    const normalizedOfferIdentifier = offerIdentifier?.trim() || getDiscountedYearlyOfferId();
+    const normalizedOfferIdentifier = offerIdentifier?.trim() ||
+      getDiscountedYearlyOfferId();
     const revenueCents = getPriceCents("yearly", {
       offerIdentifier: normalizedOfferIdentifier,
       offerType,
@@ -673,7 +784,10 @@ async function createReferralPayout(
     return;
   }
 
-  const yearlyPriceCents = getPriceCents("yearly", { offerIdentifier, offerType });
+  const yearlyPriceCents = getPriceCents("yearly", {
+    offerIdentifier,
+    offerType,
+  });
   const payoutAmount = Number(((yearlyPriceCents / 100) * 0.2).toFixed(2));
   const payoutType = "first_year";
 
@@ -687,7 +801,9 @@ async function createReferralPayout(
     .maybeSingle();
 
   if (existingPayout) {
-    console.log(`Payout already exists for code ${referralCode}, referee ${userId}`);
+    console.log(
+      `Payout already exists for code ${referralCode}, referee ${userId}`,
+    );
     return;
   }
 
@@ -709,11 +825,17 @@ async function createReferralPayout(
     console.error(`Failed to create payout for code ${referralCode}:`, error);
     return;
   }
-  
-  console.log(`Created ${payoutType} payout of $${payoutAmount} for code ${referralCode} (${codeData.owner_type})`);
+
+  console.log(
+    `Created ${payoutType} payout of $${payoutAmount} for code ${referralCode} (${codeData.owner_type})`,
+  );
 
   // Auto-approve payouts when threshold is reached ($50 minimum)
-  await autoApprovePayoutsIfThresholdReached(supabase, codeData.id, referralCode);
+  await autoApprovePayoutsIfThresholdReached(
+    supabase,
+    codeData.id,
+    referralCode,
+  );
 }
 
 const MINIMUM_PAYOUT_THRESHOLD = 50.00;
@@ -721,7 +843,7 @@ const MINIMUM_PAYOUT_THRESHOLD = 50.00;
 async function autoApprovePayoutsIfThresholdReached(
   supabase: any,
   referralCodeId: string,
-  referralCode: string
+  referralCode: string,
 ) {
   // Get total pending payouts for this referral code
   const { data: pendingPayouts, error } = await supabase
@@ -735,27 +857,38 @@ async function autoApprovePayoutsIfThresholdReached(
     return;
   }
 
-  const totalPending = pendingPayouts.reduce((sum: number, p: { amount: number }) => sum + p.amount, 0);
+  const totalPending = pendingPayouts.reduce(
+    (sum: number, p: { amount: number }) => sum + p.amount,
+    0,
+  );
 
   if (totalPending >= MINIMUM_PAYOUT_THRESHOLD) {
     // Auto-approve all pending payouts for this referral code
     const payoutIds = pendingPayouts.map((p: { id: string }) => p.id);
-    
+
     const { error: updateError } = await supabase
       .from("referral_payouts")
-      .update({ 
+      .update({
         status: "approved",
         admin_notes: "Auto-approved: threshold reached",
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .in("id", payoutIds);
 
     if (updateError) {
       console.error("Failed to auto-approve payouts:", updateError);
     } else {
-      console.log(`Auto-approved ${payoutIds.length} payouts ($${totalPending.toFixed(2)}) for code ${referralCode}`);
+      console.log(
+        `Auto-approved ${payoutIds.length} payouts ($${
+          totalPending.toFixed(2)
+        }) for code ${referralCode}`,
+      );
     }
   } else {
-    console.log(`Total pending $${totalPending.toFixed(2)} for code ${referralCode} - below threshold ($${MINIMUM_PAYOUT_THRESHOLD})`);
+    console.log(
+      `Total pending $${
+        totalPending.toFixed(2)
+      } for code ${referralCode} - below threshold ($${MINIMUM_PAYOUT_THRESHOLD})`,
+    );
   }
 }

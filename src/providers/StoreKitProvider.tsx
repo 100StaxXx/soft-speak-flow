@@ -13,6 +13,7 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { isNativeIOS } from "@/utils/platformTargets";
 import { StoreKit, type StoreKitProduct, type StoreKitTransaction } from "@/plugins/StoreKitPlugin";
 import { useAuth } from "@/hooks/useAuth";
+import { resolvePlanFromProductId } from "@/utils/appleIAP";
 
 const PRODUCT_IDS = ["cosmiq_premium_monthly", "cosmiq_premium_yearly"];
 const OFFER_CODE_REDEMPTION_URL = import.meta.env.VITE_APPLE_OFFER_CODE_REDEMPTION_URL;
@@ -40,14 +41,6 @@ type StoreKitContextValue = {
 };
 
 const StoreKitContext = createContext<StoreKitContextValue | undefined>(undefined);
-
-function resolvePlan(productId: string | undefined): StoreKitPlan | null {
-  if (!productId) return null;
-  const id = productId.toLowerCase();
-  if (id.includes("yearly") || id.includes("annual") || id.includes("year")) return "yearly";
-  if (id.includes("monthly") || id.includes("month")) return "monthly";
-  return null;
-}
 
 function normalizeAccountToken(value: string | null | undefined): string | null {
   const normalized = value?.trim().toLowerCase();
@@ -246,9 +239,12 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     await refreshEntitlement();
   }, [isAvailable, refreshEntitlement]);
 
-  const isPro = entitlementIsCurrent(currentEntitlement) &&
-    entitlementBelongsToUser(currentEntitlement, user?.id);
-  const activePlan = isPro ? resolvePlan(currentEntitlement?.productId) : null;
+  const activePlan = resolvePlanFromProductId(currentEntitlement?.productId);
+  const isPro = Boolean(
+    activePlan &&
+    entitlementIsCurrent(currentEntitlement) &&
+    entitlementBelongsToUser(currentEntitlement, user?.id),
+  );
   const expirationDate = isPro && currentEntitlement?.expirationDate
     ? new Date(currentEntitlement.expirationDate)
     : null;
