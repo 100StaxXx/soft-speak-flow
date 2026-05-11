@@ -38,16 +38,21 @@ serve(async (req) => {
     if (entitlementResponse.has_access) {
       return jsonResponse(req, entitlementResponse);
     }
+    const hasInactiveSubscriptionEntitlement = entitlement?.source === "subscription";
 
     const subscription = await fetchSubscriptionForUser(supabaseClient, user.id);
     const subscriptionResponse = buildSubscriptionResponse(subscription);
-    if (subscriptionResponse.has_access) {
+    if (subscriptionResponse.has_access && !hasInactiveSubscriptionEntitlement) {
       return jsonResponse(req, subscriptionResponse);
     }
 
     const promoAccess = await fetchActivePromoAccessForUser(supabaseClient, user.id);
     if (promoAccess?.granted_until) {
       return jsonResponse(req, buildPromoSubscriptionResponse(promoAccess.granted_until));
+    }
+
+    if (hasInactiveSubscriptionEntitlement) {
+      return jsonResponse(req, entitlementResponse);
     }
 
     return jsonResponse(req, entitlement ? entitlementResponse : subscriptionResponse);

@@ -13,6 +13,21 @@ const mocks = vi.hoisted(() => {
     isNativePlatform: vi.fn(() => false),
     loggerDebug: vi.fn(),
     loggerError: vi.fn(),
+    accessLoading: false,
+    accessState: {
+      has_access: false,
+      access_source: "none",
+      trial_ends_at: null,
+      subscribed: false,
+    } as {
+      has_access: boolean;
+      access_source: "subscription" | "promo_code" | "trial" | "manual" | "none";
+      trial_ends_at: string | null;
+      subscribed: boolean;
+      status?: string;
+      plan?: string;
+      subscription_end?: string;
+    },
     profile: {
       created_at: "2026-04-29T12:00:00.000Z",
       referral_code: null as string | null,
@@ -41,6 +56,13 @@ vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
     status: mocks.status,
     user: mocks.user,
+  }),
+}));
+
+vi.mock("@/hooks/useAccessState", () => ({
+  useAccessState: () => ({
+    accessState: mocks.accessState,
+    isLoading: mocks.accessLoading,
   }),
 }));
 
@@ -104,6 +126,13 @@ describe("useWinWinKitSync", () => {
     mocks.user = { id: "user-1" };
     mocks.isNativePlatform.mockReturnValue(false);
     mocks.isNativeIOSHandheld.mockReturnValue(false);
+    mocks.accessLoading = false;
+    mocks.accessState = {
+      has_access: false,
+      access_source: "none",
+      trial_ends_at: null,
+      subscribed: false,
+    };
     setOnline(true);
   });
 
@@ -143,6 +172,43 @@ describe("useWinWinKitSync", () => {
       });
     });
 
+    expect(mocks.loggerError).not.toHaveBeenCalled();
+  });
+
+  it("syncs premium from the hardened subscription access state", async () => {
+    mocks.accessState = {
+      has_access: true,
+      access_source: "subscription",
+      trial_ends_at: null,
+      subscribed: true,
+      status: "active",
+      plan: "yearly",
+      subscription_end: "2099-01-01T00:00:00.000Z",
+    };
+    mocks.isNativePlatform.mockReturnValue(true);
+    mocks.isNativeIOSHandheld.mockReturnValue(true);
+    mocks.invoke.mockResolvedValue({
+      data: {
+        user: {
+          referral_code: null,
+          referred_by: null,
+        },
+      },
+      error: null,
+    });
+
+    renderHook(() => useWinWinKitSync());
+
+    await waitFor(() => {
+      expect(mocks.invoke).toHaveBeenCalledWith("sync-winwinkit-user", {
+        body: {
+          first_seen_at: "2026-04-29T12:00:00.000Z",
+          is_premium: true,
+        },
+      });
+    });
+
+    expect(mocks.setIsPremium).toHaveBeenCalledWith({ isPremium: true });
     expect(mocks.loggerError).not.toHaveBeenCalled();
   });
 

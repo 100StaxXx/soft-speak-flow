@@ -391,6 +391,18 @@ const AUXILIARY_FETCH_TIMEOUT_MS = 25_000;
 const REPLAY_IMAGE_HEAD_TIMEOUT_MS = 2_500;
 const COMPANION_IMAGE_REQUEST_IN_PROGRESS_STATUS = 409;
 const IDEMPOTENCY_KEY_MAX_LENGTH = 160;
+const COMPANION_IMAGE_BACKGROUND = "transparent" as const;
+const COMPANION_IMAGE_OUTPUT_FORMAT = "png" as const;
+
+const TRANSPARENT_COMPANION_OUTPUT_DIRECTION = [
+  "Transparent output:",
+  "- Render the companion or egg as a clean cutout on a transparent background.",
+  "- Do not include a scenic/environmental backdrop, floor, frame, border, card, or solid background.",
+  "- Aura, glow, and particles may surround the subject but should sit over transparency.",
+].join("\n");
+
+const appendTransparentCompanionOutputDirection = (prompt: string) =>
+  `${prompt}\n\n${TRANSPARENT_COMPANION_OUTPUT_DIRECTION}`;
 
 type CompanionImageFlowType = "onboarding" | "regenerate" | "evolution" | "background" | "admin" | "ai_onboarding_egg";
 
@@ -1153,11 +1165,15 @@ serve(async (req) => {
       }
 
       const promptBuildStartedAt = Date.now();
-      const starterPromptBase = buildStage1BootstrapPrompt(visualIdentityProfile);
+      const starterPromptBase = appendTransparentCompanionOutputDirection(
+        buildStage1BootstrapPrompt(visualIdentityProfile),
+      );
       const starterPrompt = spiritLockPromptBlock
         ? `${starterPromptBase}\n\nMechanical spirit-lock:\n${spiritLockPromptBlock}`
         : starterPromptBase;
-      const eggPromptBase = buildEggFromStage1Prompt(visualIdentityProfile);
+      const eggPromptBase = appendTransparentCompanionOutputDirection(
+        buildEggFromStage1Prompt(visualIdentityProfile),
+      );
       const eggPrompt = spiritLockPromptBlock
         ? `${eggPromptBase}\n\nMechanical spirit-lock:\n${spiritLockPromptBlock}`
         : eggPromptBase;
@@ -1226,6 +1242,8 @@ serve(async (req) => {
             prompt,
             size: imageSize,
             quality: hiddenImageQuality,
+            background: COMPANION_IMAGE_BACKGROUND,
+            outputFormat: COMPANION_IMAGE_OUTPUT_FORMAT,
             userId: user.id,
           }),
       });
@@ -1257,6 +1275,8 @@ serve(async (req) => {
                 prompt,
                 size: imageSize,
                 quality: finalImageQuality,
+                background: COMPANION_IMAGE_BACKGROUND,
+                outputFormat: COMPANION_IMAGE_OUTPUT_FORMAT,
                 userId: user.id,
                 referenceImages: [
                   {
@@ -1287,6 +1307,8 @@ serve(async (req) => {
                 prompt,
                 size: imageSize,
                 quality: finalImageQuality,
+                background: COMPANION_IMAGE_BACKGROUND,
+                outputFormat: COMPANION_IMAGE_OUTPUT_FORMAT,
                 userId: user.id,
               }),
           });
@@ -1732,6 +1754,7 @@ NOT photorealistic; avoid extreme/chibi cartoon exaggeration.
 Painterly digital art with rich saturated colors, soft but defined edges.
 Slightly brighter exposure with lifted midtones and clearer highlights for readability.`;
     }
+    fullPrompt = appendTransparentCompanionOutputDirection(fullPrompt);
     promptBuildDurationMs = Date.now() - promptBuildStartedAt;
     console.log(`[CompanionImageTiming] prompt_build_ms=${promptBuildDurationMs}`);
 
@@ -1791,6 +1814,8 @@ Slightly brighter exposure with lifted midtones and clearer highlights for reada
               messages: [{ role: "user", content: messageContent }],
               modalities: ["image", "text"],
               image_size: imageSize,
+              background: COMPANION_IMAGE_BACKGROUND,
+              output_format: COMPANION_IMAGE_OUTPUT_FORMAT,
             })
           },
           GENERATION_FETCH_TIMEOUT_MS,

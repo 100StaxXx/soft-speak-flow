@@ -1,9 +1,10 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
+import { useAccessState } from "./useAccessState";
 import { useStoreKit } from "./useStoreKit";
 
 export interface Subscription {
   status: "active" | "cancelled" | "past_due" | "trialing" | "incomplete" | "expired";
-  plan: "monthly" | "yearly";
+  plan?: "monthly" | "yearly" | null;
   trial_ends_at?: string | null;
   current_period_end?: string | null;
   product_identifier?: string | null;
@@ -19,22 +20,39 @@ export function useSubscription() {
     isLoading,
     refreshEntitlement,
   } = useStoreKit();
+  const {
+    accessState,
+    isLoading: accessLoading,
+    error: accessError,
+    refetch: refetchAccessState,
+  } = useAccessState();
 
   const subscription = useMemo((): Subscription | null => {
-    if (!isPro || !activePlan || !currentEntitlement) return null;
+    if (isPro && activePlan && currentEntitlement) {
+      return {
+        status: "active",
+        plan: activePlan,
+        current_period_end: currentEntitlement.expirationDate ?? null,
+        product_identifier: currentEntitlement.productId,
+        billing_provider: "storekit2",
+        trial_ends_at: null,
+      };
+    }
+
+    if (!accessState.subscribed || accessState.access_source !== "subscription") return null;
 
     return {
-      status: "active",
-      plan: activePlan,
-      current_period_end: currentEntitlement.expirationDate ?? null,
-      product_identifier: currentEntitlement.productId,
+      status: (accessState.status as Subscription["status"] | undefined) ?? "active",
+      plan: accessState.plan === "monthly" || accessState.plan === "yearly" ? accessState.plan : null,
+      current_period_end: accessState.subscription_end ?? null,
+      product_identifier: currentEntitlement?.productId ?? null,
       billing_provider: "storekit2",
-      trial_ends_at: null,
+      trial_ends_at: accessState.trial_ends_at,
     };
-  }, [activePlan, currentEntitlement, isPro]);
+  }, [accessState, activePlan, currentEntitlement, isPro]);
 
-  const isActive = isPro;
-  const isCancelled = false; // StoreKit 2 entitlements are only present while active
+  const isActive = Boolean(subscription);
+  const isCancelled = subscription?.status === "cancelled";
 
   const nextBillingDate = useMemo(() => {
     if (subscription?.current_period_end) {
@@ -49,11 +67,16 @@ export function useSubscription() {
     return null;
   }, [subscription?.plan]);
 
+  const refetch = useCallback(async () => {
+    await refreshEntitlement();
+    await refetchAccessState();
+  }, [refetchAccessState, refreshEntitlement]);
+
   return {
     subscription,
-    isLoading,
-    error: null,
-    refetch: refreshEntitlement,
+    isLoading: isLoading || accessLoading,
+    error: accessError,
+    refetch,
     isActive,
     isCancelled,
     hasPremium: isActive,

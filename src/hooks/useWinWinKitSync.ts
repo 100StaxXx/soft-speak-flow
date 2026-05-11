@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Capacitor } from "@capacitor/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAccessState } from "@/hooks/useAccessState";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useStoreKit } from "@/hooks/useStoreKit";
@@ -23,16 +24,25 @@ export function useWinWinKitSync() {
   const { user, status } = useAuth();
   const { profile } = useProfile();
   const { isPro } = useStoreKit();
+  const { accessState, isLoading: accessLoading } = useAccessState();
   const queryClient = useQueryClient();
   const lastSyncKeyRef = useRef<string | null>(null);
+  const isPremium = Boolean(
+    isPro ||
+    (
+      accessState.has_access &&
+      accessState.subscribed &&
+      accessState.access_source === "subscription"
+    ),
+  );
 
   useEffect(() => {
-    if (status !== "authenticated" || !user || !profile?.created_at) {
+    if (status !== "authenticated" || !user || !profile?.created_at || accessLoading) {
       lastSyncKeyRef.current = null;
       return;
     }
 
-    const syncKey = [user.id, profile.created_at, isPro ? "premium" : "free"].join(":");
+    const syncKey = [user.id, profile.created_at, isPremium ? "premium" : "free"].join(":");
     if (lastSyncKeyRef.current === syncKey) {
       return;
     }
@@ -125,13 +135,13 @@ export function useWinWinKitSync() {
           await WinWinKit.configure();
           await WinWinKit.setAppUserId({ appUserId: user.id });
           await WinWinKit.setFirstSeenAt({ isoDate: profile.created_at });
-          await WinWinKit.setIsPremium({ isPremium: Boolean(isPro) });
+          await WinWinKit.setIsPremium({ isPremium });
         }
 
         const { data, error } = await supabase.functions.invoke("sync-winwinkit-user", {
           body: {
             first_seen_at: profile.created_at,
-            is_premium: Boolean(isPro),
+            is_premium: isPremium,
           },
         });
 
@@ -190,7 +200,8 @@ export function useWinWinKitSync() {
       }
     };
   }, [
-    isPro,
+    accessLoading,
+    isPremium,
     profile?.created_at,
     profile?.referral_code,
     profile?.referred_by_code,

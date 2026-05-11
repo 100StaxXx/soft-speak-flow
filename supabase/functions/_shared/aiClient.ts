@@ -204,6 +204,12 @@ async function handleImageRequest(
         model: mapModel(body.model, true),
         prompt: `${prompt}${referenceHint}`,
         size,
+        ...(body.background === "transparent" || body.background === "opaque" || body.background === "auto"
+          ? { background: body.background }
+          : {}),
+        ...(body.output_format === "png" || body.output_format === "jpeg" || body.output_format === "webp"
+          ? { output_format: body.output_format }
+          : {}),
       }),
     });
 

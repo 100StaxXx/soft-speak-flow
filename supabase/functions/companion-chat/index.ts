@@ -214,8 +214,12 @@ const chooseBridgeReply = (message: string) => {
 
 async function ensurePremiumAccess(supabase: any, userId: string) {
   const entitlement = await fetchAccountEntitlementForUser(supabase, userId);
-  if (buildAccessStateResponse(entitlement).has_access) {
+  const entitlementAccess = buildAccessStateResponse(entitlement);
+  if (entitlementAccess.has_access) {
     return true;
+  }
+  if (entitlementAccess.access_source === "subscription") {
+    return false;
   }
 
   const nowIso = new Date().toISOString();
@@ -223,7 +227,7 @@ async function ensurePremiumAccess(supabase: any, userId: string) {
     .from("subscriptions")
     .select("id", { count: "exact", head: true })
     .eq("user_id", userId)
-    .in("status", ["active", "trialing"])
+    .in("status", ["active", "trialing", "past_due", "cancelled"])
     .gte("current_period_end", nowIso);
 
   if (error) throw error;

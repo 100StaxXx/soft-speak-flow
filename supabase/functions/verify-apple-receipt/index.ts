@@ -22,6 +22,10 @@ const APPLE_MISSING_EXPIRATION_ERROR =
 const APPLE_UNSUPPORTED_TRANSACTION_TYPE_ERROR =
   "This Apple transaction is not an auto-renewable subscription.";
 
+function isSandboxEnvironment(environment: string | undefined): boolean {
+  return environment?.toLowerCase() === "sandbox";
+}
+
 type VerifyAppleReceiptDeps = {
   createSupabaseClient?: typeof createClient;
   verifyTransactionImpl?: typeof verifyTransaction;
@@ -190,6 +194,7 @@ export async function handleVerifyAppleReceipt(
           originalTransactionId: transactionInfo.originalTransactionId || transactionInfo.transactionId,
           productId: transactionInfo.productId,
           appAccountToken: transactionInfo.appAccountToken ?? null,
+          allowCreateWithoutAppAccountToken: isSandboxEnvironment(environment),
           plan,
           expiresAt,
           purchaseDate,
@@ -244,6 +249,7 @@ export async function handleVerifyAppleReceipt(
         originalTransactionId: latestTransaction.originalTransactionId,
         productId: latestTransaction.productId,
         plan,
+        allowCreateWithoutAppAccountToken: isSandboxEnvironment(environment),
         expiresAt: latestTransaction.expiresAt,
         purchaseDate: latestTransaction.purchaseDate,
         cancellationDate: latestTransaction.cancellationDate ?? undefined,

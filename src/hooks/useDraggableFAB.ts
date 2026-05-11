@@ -20,6 +20,7 @@ export interface FABPopupAlignment {
 
 export const DRAGGABLE_FAB_LEGACY_STORAGE_KEY = "add-quest-fab-position";
 export const DRAGGABLE_FAB_STORAGE_KEY_V2 = "add-quest-fab-position-v2";
+export const DRAGGABLE_FAB_STORAGE_KEY_V3 = "companion-planner-fab-position-v1";
 
 const LONG_PRESS_DURATION = 500;
 const LONG_PRESS_MOVE_THRESHOLD_PX = 12;
@@ -228,33 +229,10 @@ const parseStoredPosition = (value: string | null): FABCoordinates | null => {
   return null;
 };
 
-const migrateLegacyCornerPosition = (value: string | null, bounds: FABViewportBounds): FABCoordinates | null => {
-  switch (value) {
-    case "top-left":
-      return { x: bounds.minX, y: bounds.minY };
-    case "top-right":
-      return { x: bounds.maxX, y: bounds.minY };
-    case "bottom-left":
-      return { x: bounds.minX, y: bounds.maxY };
-    case "bottom-right":
-      return { x: bounds.maxX, y: bounds.maxY };
-    default:
-      return null;
-  }
-};
-
 const getInitialPosition = (bounds: FABViewportBounds, fallback?: FABCoordinates) => {
-  const storedPosition = parseStoredPosition(safeLocalStorage.getItem(DRAGGABLE_FAB_STORAGE_KEY_V2));
+  const storedPosition = parseStoredPosition(safeLocalStorage.getItem(DRAGGABLE_FAB_STORAGE_KEY_V3));
   if (storedPosition) {
     return clampPositionToBounds(storedPosition, bounds);
-  }
-
-  const migratedPosition = migrateLegacyCornerPosition(
-    safeLocalStorage.getItem(DRAGGABLE_FAB_LEGACY_STORAGE_KEY),
-    bounds,
-  );
-  if (migratedPosition) {
-    return migratedPosition;
   }
 
   return getDefaultPosition(bounds, fallback);
@@ -320,7 +298,7 @@ export const useDraggableFAB = ({
 
   useEffect(() => {
     if (isDragging) return;
-    safeLocalStorage.setItem(DRAGGABLE_FAB_STORAGE_KEY_V2, JSON.stringify(position));
+    safeLocalStorage.setItem(DRAGGABLE_FAB_STORAGE_KEY_V3, JSON.stringify(position));
   }, [isDragging, position]);
 
   useEffect(() => {

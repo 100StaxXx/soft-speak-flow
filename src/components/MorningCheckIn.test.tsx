@@ -9,8 +9,15 @@ const mocks = vi.hoisted(() => ({
     intention: "Ship the thing",
     mentor_response: "Consistency beats intensity.",
   } as {
+    id?: string;
+    user_id?: string;
+    check_in_type?: string;
+    check_in_date?: string;
+    mood?: string | null;
+    reflection?: string | null;
+    created_at?: string;
     completed_at: string | null;
-    intention: string;
+    intention: string | null;
     mentor_response: string | null;
   } | null,
   personality: {
@@ -29,12 +36,16 @@ const mocks = vi.hoisted(() => ({
   toUserFacingFunctionError: vi.fn(),
   queryClient: {
     invalidateQueries: vi.fn().mockResolvedValue(undefined),
+    setQueryData: vi.fn((_queryKey: unknown, data: unknown) => {
+      mocks.existingCheckIn = data as typeof mocks.existingCheckIn;
+    }),
   },
   toast: vi.fn(),
   awardCheckInComplete: vi.fn(),
   checkDailyCompletionAchievement: vi.fn().mockResolvedValue(undefined),
   checkFirstTimeAchievements: vi.fn().mockResolvedValue(undefined),
   triggerReaction: vi.fn().mockResolvedValue(undefined),
+  refreshSession: vi.fn().mockResolvedValue(undefined),
   setPendingMentorMood: vi.fn(),
   logger: {
     error: vi.fn(),
@@ -44,6 +55,7 @@ const mocks = vi.hoisted(() => ({
   queryError: null as Error | null,
   refetchExistingCheckIn: vi.fn(),
   insertCheckIn: vi.fn(),
+  updateCheckIn: vi.fn(),
   countCheckIns: vi.fn(),
   invokeFunction: vi.fn(),
   storage: new Map<string, string>(),
@@ -78,7 +90,7 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
-  useAuth: () => ({ user: mocks.user }),
+  useAuth: () => ({ user: mocks.user, refreshSession: mocks.refreshSession }),
 }));
 
 vi.mock("@/utils/storage", () => ({
@@ -160,6 +172,15 @@ vi.mock("@/integrations/supabase/client", () => ({
               maybeSingle: mocks.insertCheckIn,
             }),
           }),
+          update: () => {
+            const updateChain = {
+              eq: vi.fn(() => updateChain),
+              select: () => ({
+                maybeSingle: mocks.updateCheckIn,
+              }),
+            };
+            return updateChain;
+          },
         };
       }
 
@@ -211,11 +232,13 @@ describe("MorningCheckIn completion portrait", () => {
     mocks.parseFunctionInvokeError.mockReset();
     mocks.toUserFacingFunctionError.mockReset();
     mocks.queryClient.invalidateQueries.mockClear();
+    mocks.queryClient.setQueryData.mockClear();
     mocks.toast.mockClear();
     mocks.awardCheckInComplete.mockClear();
     mocks.checkDailyCompletionAchievement.mockClear();
     mocks.checkFirstTimeAchievements.mockClear();
     mocks.triggerReaction.mockClear();
+    mocks.refreshSession.mockClear();
     mocks.setPendingMentorMood.mockClear();
     mocks.logger.error.mockClear();
     mocks.logger.log.mockClear();
@@ -223,6 +246,7 @@ describe("MorningCheckIn completion portrait", () => {
     mocks.queryError = null;
     mocks.refetchExistingCheckIn.mockReset();
     mocks.insertCheckIn.mockReset();
+    mocks.updateCheckIn.mockReset();
     mocks.countCheckIns.mockReset();
     mocks.countCheckIns.mockResolvedValue({ count: 2, error: null });
     mocks.invokeFunction.mockReset();
@@ -405,14 +429,177 @@ describe("MorningCheckIn completion portrait", () => {
     );
   });
 
-  it("shows static copy when saving the check-in fails", async () => {
+  it("uses an existing saved row when insert hits the daily uniqueness guard", async () => {
     mocks.existingCheckIn = null;
+    const duplicateError = {
+      code: "23505",
+      message: "duplicate key value violates unique constraint daily_check_ins_user_date_type_unique",
+    };
     mocks.insertCheckIn
       .mockResolvedValueOnce({ data: null, error: null })
+      .mockResolvedValueOnce({ data: null, error: duplicateError })
       .mockResolvedValueOnce({
-        data: null,
-        error: new Error("new row violates row-level security policy"),
+        data: {
+          id: "check-in-existing",
+          user_id: "user-1",
+          check_in_type: "morning",
+          check_in_date: "2026-05-11",
+          mood: "focused",
+          intention: "Ship it",
+          reflection: null,
+          mentor_response: null,
+          completed_at: "2026-05-11T15:00:00.000Z",
+          created_at: "2026-05-11T15:00:00.000Z",
+        },
+        error: null,
       });
+    mocks.invokeFunction.mockResolvedValue({ error: null });
+
+    render(<MorningCheckIn />);
+
+    fireEvent.click(screen.getByRole("button", { name: /focused/i }));
+    fireEvent.change(screen.getByPlaceholderText("I will..."), {
+      target: { value: "Ship it" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /check in/i }));
+
+    await waitFor(() => {
+      expect(mocks.queryClient.setQueryData).toHaveBeenCalledWith(
+        expect.arrayContaining(["morning-check-in"]),
+        expect.objectContaining({ id: "check-in-existing" }),
+      );
+    });
+
+    expect(mocks.awardCheckInComplete).not.toHaveBeenCalled();
+    expect(mocks.invokeFunction).toHaveBeenCalledWith("generate-check-in-response", {
+      body: { checkInId: "check-in-existing" },
+    });
+    expect(mocks.toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Couldn't save check-in" }),
+    );
+  });
+
+  it("completes an unfinished row found during duplicate recovery", async () => {
+    mocks.existingCheckIn = null;
+    const duplicateError = {
+      code: "23505",
+      message: "duplicate key value violates unique constraint daily_check_ins_user_date_type_unique",
+    };
+    mocks.insertCheckIn
+      .mockResolvedValueOnce({ data: null, error: null })
+      .mockResolvedValueOnce({ data: null, error: duplicateError })
+      .mockResolvedValueOnce({
+        data: {
+          id: "check-in-partial",
+          user_id: "user-1",
+          check_in_type: "morning",
+          check_in_date: "2026-05-11",
+          mood: null,
+          intention: null,
+          reflection: null,
+          mentor_response: null,
+          completed_at: null,
+          created_at: "2026-05-11T14:59:00.000Z",
+        },
+        error: null,
+      });
+    mocks.updateCheckIn.mockResolvedValueOnce({
+      data: {
+        id: "check-in-partial",
+        user_id: "user-1",
+        check_in_type: "morning",
+        check_in_date: "2026-05-11",
+        mood: "focused",
+        intention: "Ship it",
+        reflection: null,
+        mentor_response: null,
+        completed_at: "2026-05-11T15:00:00.000Z",
+        created_at: "2026-05-11T14:59:00.000Z",
+      },
+      error: null,
+    });
+    mocks.countCheckIns.mockResolvedValue({ count: 2, error: null });
+    mocks.invokeFunction.mockResolvedValue({ error: null });
+
+    render(<MorningCheckIn />);
+
+    fireEvent.click(screen.getByRole("button", { name: /focused/i }));
+    fireEvent.change(screen.getByPlaceholderText("I will..."), {
+      target: { value: "Ship it" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /check in/i }));
+
+    await waitFor(() => {
+      expect(mocks.updateCheckIn).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mocks.awardCheckInComplete).toHaveBeenCalledTimes(1);
+    expect(mocks.queryClient.setQueryData).toHaveBeenCalledWith(
+      expect.arrayContaining(["morning-check-in"]),
+      expect.objectContaining({ id: "check-in-partial", completed_at: "2026-05-11T15:00:00.000Z" }),
+    );
+    expect(mocks.toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Couldn't save check-in" }),
+    );
+  });
+
+  it("refreshes the session once when a check-in write hits an auth policy error", async () => {
+    mocks.existingCheckIn = null;
+    const authError = {
+      code: "42501",
+      message: "new row violates row-level security policy",
+    };
+    mocks.insertCheckIn
+      .mockResolvedValueOnce({ data: null, error: null })
+      .mockResolvedValueOnce({ data: null, error: authError })
+      .mockResolvedValueOnce({
+        data: {
+          id: "check-in-after-refresh",
+          user_id: "user-1",
+          check_in_type: "morning",
+          check_in_date: "2026-05-11",
+          mood: "focused",
+          intention: "Ship it",
+          reflection: null,
+          mentor_response: null,
+          completed_at: "2026-05-11T15:00:00.000Z",
+          created_at: "2026-05-11T15:00:00.000Z",
+        },
+        error: null,
+      });
+    mocks.countCheckIns.mockResolvedValue({ count: 2, error: null });
+    mocks.invokeFunction.mockResolvedValue({ error: null });
+
+    render(<MorningCheckIn />);
+
+    fireEvent.click(screen.getByRole("button", { name: /focused/i }));
+    fireEvent.change(screen.getByPlaceholderText("I will..."), {
+      target: { value: "Ship it" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /check in/i }));
+
+    await waitFor(() => {
+      expect(mocks.refreshSession).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mocks.queryClient.setQueryData).toHaveBeenCalledWith(
+      expect.arrayContaining(["morning-check-in"]),
+      expect.objectContaining({ id: "check-in-after-refresh" }),
+    );
+    expect(mocks.toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Couldn't save check-in" }),
+    );
+  });
+
+  it("shows static copy when saving the check-in fails", async () => {
+    mocks.existingCheckIn = null;
+    const authError = {
+      code: "42501",
+      message: "new row violates row-level security policy",
+    };
+    mocks.insertCheckIn
+      .mockResolvedValueOnce({ data: null, error: null })
+      .mockResolvedValue({ data: null, error: authError });
 
     render(<MorningCheckIn />);
 

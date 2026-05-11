@@ -110,6 +110,57 @@ Deno.test("verify-apple-receipt falls back to receipt verification when a receip
   );
 });
 
+Deno.test("verify-apple-receipt allows sandbox transactions without app-account token", async () => {
+  const upsertPayloads: Array<{
+    allowCreateWithoutAppAccountToken?: boolean;
+    appAccountToken?: string | null;
+  }> = [];
+
+  const response = await verifyAppleReceiptModule.handleVerifyAppleReceipt(
+    new Request("http://localhost", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer access-token",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ transactionId: "sandbox-tokenless-tx" }),
+    }),
+    {
+      createSupabaseClient: () => createAuthenticatedClient() as never,
+      verifyTransactionImpl: async () => ({
+        transactionInfo: {
+          transactionId: "sandbox-tokenless-tx",
+          originalTransactionId: "sandbox-tokenless-orig",
+          productId: "cosmiq_premium_monthly",
+          purchaseDate: Date.parse("2026-05-01T00:00:00.000Z"),
+          expiresDate: Date.parse("2026-06-01T00:00:00.000Z"),
+          type: "Auto-Renewable Subscription",
+          environment: "Sandbox",
+        },
+        environment: "Sandbox",
+        isValid: true,
+      }),
+      upsertSubscriptionImpl: async (_client, payload) => {
+        upsertPayloads.push(payload);
+        return {
+          id: "subscription-1",
+          status: "active",
+          plan: "monthly",
+          current_period_end: "2026-06-01T00:00:00.000Z",
+        };
+      },
+    },
+  );
+
+  assert(response.status === 200, `Expected sandbox tokenless success, got ${response.status}`);
+  const upsertPayload = upsertPayloads[0];
+  assert(upsertPayload?.appAccountToken === null, "Expected tokenless sandbox payload");
+  assert(
+    upsertPayload?.allowCreateWithoutAppAccountToken === true,
+    "Expected sandbox payload to allow binding creation without appAccountToken",
+  );
+});
+
 Deno.test("verify-apple-receipt preserves binding errors even when a receipt is present", async () => {
   const response = await verifyAppleReceiptModule.handleVerifyAppleReceipt(
     new Request("http://localhost", {

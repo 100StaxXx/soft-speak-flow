@@ -27,7 +27,7 @@ import { CompanionChatModal } from "@/components/companion/CompanionChatModal";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
 import { CompanionStatAnalysisSurface } from "@/components/CompanionStatAnalysisSurface";
 import { CompanionPersonalization } from "@/components/CompanionPersonalization";
-import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
+import { CompanionImage } from "@/components/CompanionImage";
 import {
   Dialog,
   DialogContent,
@@ -495,8 +495,16 @@ export const CompanionDisplay = memo(({
   const usesEggPortraitShell = isCompanionEggImageSource(effectiveImageUrl);
   const usesSceneEggPortraitShell =
     getCompanionEggImageAssetKey(effectiveImageUrl)?.startsWith("companion-eggs/v2/") ?? false;
-  const usesScenePortraitShell = effectiveImageUrl !== COMPANION_PLACEHOLDER;
-  const portraitImageFit = usesPresetPortraitShell || (usesEggPortraitShell && !usesSceneEggPortraitShell)
+  const usesGeneratedCompanionCutout = Boolean(
+    displayCompanion
+    && isAiGeneratedCompanion(displayCompanion)
+    && effectiveImageUrl !== COMPANION_PLACEHOLDER
+    && !usesPresetPortraitShell
+    && !usesEggPortraitShell,
+  );
+  const portraitImageFit = usesGeneratedCompanionCutout
+    || usesPresetPortraitShell
+    || (usesEggPortraitShell && !usesSceneEggPortraitShell)
     ? "portrait"
     : "cover";
   const portraitSceneContentClassName = cn(
@@ -948,18 +956,16 @@ export const CompanionDisplay = memo(({
                         </div>
                       </div>
                     )}
-                    {usesScenePortraitShell ? (
-                      <CompanionPortraitShell
-                        src={effectiveImageUrl}
-                        element={displayCompanion.core_element}
-                        contentClassName={portraitSceneContentClassName}
-                        className={cn(
-                          "h-full w-full rounded-2xl ring-4 shadow-2xl transition-all duration-500 group-hover:scale-105",
-                          imageLoaded ? "opacity-100" : "opacity-0 absolute inset-0",
-                          health.isNeglected ? "ring-destructive/50" : "ring-primary/30",
-                          activePortraitAnimationClass,
-                        )}
-                      >
+                    <div
+                      data-testid="companion-primary-image-frame"
+                      className={cn(
+                        "relative h-full w-full overflow-hidden rounded-2xl ring-4 shadow-2xl transition-all duration-500 group-hover:scale-105",
+                        imageLoaded ? "opacity-100" : "opacity-0 absolute inset-0",
+                        health.isNeglected ? "ring-destructive/50" : "ring-primary/30",
+                        activePortraitAnimationClass,
+                      )}
+                    >
+                      <div className={cn("h-full w-full", portraitSceneContentClassName)}>
                         <CompanionImage
                           key={imageKey}
                           src={effectiveImageUrl}
@@ -986,40 +992,8 @@ export const CompanionDisplay = memo(({
                           decoding="async"
                           draggable={false}
                         />
-                      </CompanionPortraitShell>
-                    ) : (
-                      <CompanionImage
-                        key={imageKey}
-                        src={effectiveImageUrl}
-                        alt={`${visualStageLabel} companion at level ${earnedLevel}`}
-                        fit="cover"
-                        element={displayCompanion.core_element}
-                        focalX={effectiveImageFocal.x}
-                        focalY={effectiveImageFocal.y}
-                        sourceAspectRatio={portraitSourceAspectRatio}
-                        className={cn(
-                          "relative h-full w-full rounded-2xl shadow-2xl ring-4 transition-all duration-500 group-hover:scale-105",
-                          imageLoaded ? "opacity-100" : "opacity-0 absolute",
-                          health.isNeglected ? "ring-destructive/50" : "ring-primary/30",
-                          activePortraitAnimationClass,
-                        )}
-                        style={{ ...skinStyles, ...careStyles, ...equippedCosmeticStyles }}
-                        onLoad={handlePortraitImageLoad}
-                        onError={() => {
-                          setPortraitSourceAspectRatio(null);
-                          if (!fallbackToDefaultPortrait && expressiveImageUrl) {
-                            setFallbackToDefaultPortrait(true);
-                            setImageKey((prev) => prev + 1);
-                            return;
-                          }
-                          setImageError(true);
-                          setImageLoaded(false);
-                        }}
-                        loading="lazy"
-                        decoding="async"
-                        draggable={false}
-                      />
-                    )}
+                      </div>
+                    </div>
                   </>
                 </CompanionMotionSurface>
                 {inlineEvolutionReplay ? (

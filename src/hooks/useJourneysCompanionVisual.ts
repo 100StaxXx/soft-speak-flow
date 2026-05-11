@@ -15,13 +15,6 @@ import { useCompanionCareSignals } from "./useCompanionCareSignals";
 import { useCompanionHealth } from "./useCompanionHealth";
 
 const COMPANION_PLACEHOLDER = "/placeholder-companion.svg";
-const TRANSPARENT_LAUNCHER_IMAGE_FILE_KIND = "_launcher_transparent_stage";
-
-const isRemoteImageUrl = (value?: string | null): value is string =>
-  typeof value === "string" && /^https?:\/\//i.test(value.trim());
-
-const isTransparentLauncherImageUrl = (value?: string | null): value is string =>
-  typeof value === "string" && value.includes(TRANSPARENT_LAUNCHER_IMAGE_FILE_KIND);
 
 export const useJourneysCompanionVisual = () => {
   const {
@@ -147,13 +140,7 @@ export const useJourneysCompanionVisual = () => {
   const element = displayCompanion?.core_element ?? null;
   const currentSceneImageUrl = displayCompanion?.current_image_url ?? null;
   const isGeneratedCompanion = isAiGeneratedCompanion(displayCompanion);
-  const hasFreshLauncherImage = Boolean(
-    isGeneratedCompanion
-    && displayCompanion?.launcher_image_url
-    && isTransparentLauncherImageUrl(displayCompanion.launcher_image_url)
-    && displayCompanion.launcher_image_source_url === currentSceneImageUrl,
-  );
-  const generatedFallbackLauncherImageUrl = isGeneratedCompanion
+  const generatedLauncherImageUrl = isGeneratedCompanion
     ? currentSceneImageUrl ?? imageUrl ?? null
     : null;
   const launcherAwayImageUrl = useMemo(() => {
@@ -167,29 +154,14 @@ export const useJourneysCompanionVisual = () => {
       return bundledLauncherUrl;
     }
 
-    if (hasFreshLauncherImage) {
-      return displayCompanion?.launcher_image_url ?? null;
-    }
-
-    return generatedFallbackLauncherImageUrl;
-  }, [
-    displayCompanion?.launcher_image_url,
-    element,
-    generatedFallbackLauncherImageUrl,
-    hasFreshLauncherImage,
-    presetId,
-  ]);
+    return generatedLauncherImageUrl;
+  }, [element, generatedLauncherImageUrl, presetId]);
   const launcherAwayUsesPortraitShell = useMemo(
     () => (
       getBundledCompanionImageAssetKey(launcherAwayImageUrl) !== null ||
-      (isGeneratedCompanion && !hasFreshLauncherImage && Boolean(launcherAwayImageUrl))
+      (isGeneratedCompanion && Boolean(launcherAwayImageUrl))
     ),
-    [hasFreshLauncherImage, isGeneratedCompanion, launcherAwayImageUrl],
-  );
-  const needsLauncherImage = Boolean(
-    isGeneratedCompanion
-    && isRemoteImageUrl(currentSceneImageUrl)
-    && !hasFreshLauncherImage,
+    [isGeneratedCompanion, launcherAwayImageUrl],
   );
 
   return {
@@ -204,18 +176,16 @@ export const useJourneysCompanionVisual = () => {
     isGeneratedCompanion,
     currentSceneImageUrl,
     launcherAwayImageUrl,
-    launcherAwayFocalX: hasFreshLauncherImage
-      ? displayCompanion?.launcher_image_focal_x ?? 0.5
-      : launcherAwayImageUrl && launcherAwayImageUrl === generatedFallbackLauncherImageUrl
+    launcherAwayFocalX:
+      launcherAwayImageUrl && launcherAwayImageUrl === generatedLauncherImageUrl
         ? focalPoint.x ?? 0.5
         : null,
-    launcherAwayFocalY: hasFreshLauncherImage
-      ? displayCompanion?.launcher_image_focal_y ?? 0.5
-      : launcherAwayImageUrl && launcherAwayImageUrl === generatedFallbackLauncherImageUrl
+    launcherAwayFocalY:
+      launcherAwayImageUrl && launcherAwayImageUrl === generatedLauncherImageUrl
         ? focalPoint.y ?? 0.5
         : null,
     launcherAwayUsesPortraitShell,
-    launcherAwayHasTransparentBackground: hasFreshLauncherImage,
-    needsLauncherImage,
+    launcherAwayHasTransparentBackground: isGeneratedCompanion && Boolean(launcherAwayImageUrl),
+    needsLauncherImage: false,
   };
 };

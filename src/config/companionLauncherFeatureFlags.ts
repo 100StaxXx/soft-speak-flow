@@ -1,5 +1,5 @@
-// V1 pause: the companion floating launcher is hidden until the interaction is stable.
-export const COMPANION_FLOATING_ACTION_BUTTON_ENABLED = false;
+// The Journeys companion launcher uses the canonical companion image moving forward.
+export const COMPANION_FLOATING_ACTION_BUTTON_ENABLED = true;
 
-// The transparent launcher cutout is only needed by the paused floating launcher.
+// Keep the separate launcher image pipeline disabled; current_image_url is the canonical art.
 export const COMPANION_LAUNCHER_IMAGE_GENERATION_ENABLED = false;

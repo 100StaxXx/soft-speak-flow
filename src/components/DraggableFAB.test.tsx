@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DraggableFAB } from "./DraggableFAB";
-import { DRAGGABLE_FAB_STORAGE_KEY_V2 } from "@/hooks/useDraggableFAB";
+import { DRAGGABLE_FAB_STORAGE_KEY_V3 } from "@/hooks/useDraggableFAB";
 import { getJourneysCompanionLauncherGreeting } from "@/shared/journeysCompanionLauncherTemplates";
 
 const storage = vi.hoisted(() => {
@@ -48,6 +48,7 @@ const mocks = vi.hoisted(() => ({
     launcherAwayFocalX: null,
     launcherAwayFocalY: null,
     launcherAwayUsesPortraitShell: true,
+    launcherAwayHasTransparentBackground: false,
     needsLauncherImage: false,
   } as Record<string, unknown>,
 }));
@@ -126,6 +127,7 @@ describe("DraggableFAB", () => {
       launcherAwayFocalX: null,
       launcherAwayFocalY: null,
       launcherAwayUsesPortraitShell: true,
+      launcherAwayHasTransparentBackground: false,
       needsLauncherImage: false,
     };
     vi.useRealTimers();
@@ -155,7 +157,7 @@ describe("DraggableFAB", () => {
     expect(mocks.onOpenCompanionPlanner).not.toHaveBeenCalled();
   });
 
-  it("pauses AI launcher art requests while showing the current companion image", () => {
+  it("does not request AI launcher art while showing the current companion image", () => {
     mocks.visual = {
       companionId: "companion-ai",
       companionLabel: "Nova",
@@ -171,7 +173,8 @@ describe("DraggableFAB", () => {
       launcherAwayFocalX: 0.4,
       launcherAwayFocalY: 0.58,
       launcherAwayUsesPortraitShell: true,
-      needsLauncherImage: true,
+      launcherAwayHasTransparentBackground: true,
+      needsLauncherImage: false,
     };
 
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
@@ -352,7 +355,7 @@ describe("DraggableFAB", () => {
   });
 
   it("reports top-left popup placement when the launcher sits in the upper-left half", () => {
-    storage.safeLocalStorage.setItem(DRAGGABLE_FAB_STORAGE_KEY_V2, JSON.stringify({ x: 16, y: 120 }));
+    storage.safeLocalStorage.setItem(DRAGGABLE_FAB_STORAGE_KEY_V3, JSON.stringify({ x: 16, y: 120 }));
 
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
@@ -363,7 +366,7 @@ describe("DraggableFAB", () => {
   });
 
   it("reports bottom-right popup placement when the launcher sits in the lower-right half", () => {
-    storage.safeLocalStorage.setItem(DRAGGABLE_FAB_STORAGE_KEY_V2, JSON.stringify({ x: 216, y: 520 }));
+    storage.safeLocalStorage.setItem(DRAGGABLE_FAB_STORAGE_KEY_V3, JSON.stringify({ x: 216, y: 520 }));
 
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));

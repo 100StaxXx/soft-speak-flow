@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { MoodSelector } from "./MoodSelector";
 import { Sunrise, Target, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
@@ -46,11 +47,50 @@ type MentorResponseIssue =
     }
   | null;
 
+type DailyCheckInRow = Database["public"]["Tables"]["daily_check_ins"]["Row"];
+type DailyCheckInInsert = Database["public"]["Tables"]["daily_check_ins"]["Insert"];
+type DailyCheckInUpdate = Database["public"]["Tables"]["daily_check_ins"]["Update"];
+
 const CHECK_IN_TIMEOUT_MESSAGE =
   "Your check-in was saved, but your guide's personalized reply is taking longer than expected.";
 
+const getErrorField = (error: unknown, field: "code" | "message" | "details" | "hint") => {
+  if (!error || typeof error !== "object" || !(field in error)) return "";
+  const value = (error as Record<string, unknown>)[field];
+  return typeof value === "string" ? value : "";
+};
+
+const getErrorText = (error: unknown) => [
+  getErrorField(error, "message"),
+  getErrorField(error, "details"),
+  getErrorField(error, "hint"),
+].join(" ").toLowerCase();
+
+const isDuplicateCheckInError = (error: unknown) => {
+  const code = getErrorField(error, "code");
+  const text = getErrorText(error);
+
+  return (
+    code === "23505"
+    || code === "PGRST409"
+    || (text.includes("duplicate key") && text.includes("daily_check_ins"))
+  );
+};
+
+const isAuthPolicyWriteError = (error: unknown) => {
+  const code = getErrorField(error, "code");
+  const text = getErrorText(error);
+
+  return (
+    code === "42501"
+    || text.includes("row-level security")
+    || text.includes("jwt")
+    || text.includes("not authenticated")
+  );
+};
+
 const MorningCheckInContent = () => {
-  const { user } = useAuth();
+  const { user, refreshSession } = useAuth();
   const { profile } = useProfile();
   const { toast } = useToast();
   const personality = useMentorPersonality();
@@ -125,26 +165,28 @@ const MorningCheckInContent = () => {
       });
   };
 
+  const fetchTodayMorningCheckIn = async (): Promise<DailyCheckInRow | null> => {
+    if (!user) return null;
+
+    const { data, error } = await supabase
+      .from('daily_check_ins')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('check_in_type', 'morning')
+      .eq('check_in_date', today)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
+  };
+
   const {
     data: existingCheckIn,
     error: existingCheckInError,
     refetch: refetchExistingCheckIn,
   } = useQuery({
     queryKey: ['morning-check-in', today, user?.id],
-    queryFn: async () => {
-      if (!user) return null;
-      
-      const { data, error } = await supabase
-        .from('daily_check_ins')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('check_in_type', 'morning')
-        .eq('check_in_date', today)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data;
-    },
+    queryFn: fetchTodayMorningCheckIn,
     enabled: !!user,
     // Poll every 2 seconds if check-in exists but mentor response is still pending
     refetchInterval: (query) => {
@@ -260,7 +302,7 @@ const MorningCheckInContent = () => {
     }
 
     // Prevent duplicate submissions
-    if (existingCheckIn || isSubmitting) {
+    if (existingCheckIn?.completed_at || isSubmitting) {
       toast({ 
         title: "Already checked in", 
         description: "You've already completed your check-in today",
@@ -273,10 +315,32 @@ const MorningCheckInContent = () => {
     setMentorResponseIssue(null);
 
     try {
+      const checkInPayload: DailyCheckInInsert = {
+        user_id: user.id,
+        check_in_type: 'morning',
+        check_in_date: today,
+        mood,
+        intention: intention.trim(),
+        completed_at: new Date().toISOString(),
+      };
+      const checkInCompletionPatch: DailyCheckInUpdate = {
+        mood: checkInPayload.mood,
+        intention: checkInPayload.intention,
+        completed_at: checkInPayload.completed_at,
+      };
+
+      const updateExistingCheckIn = (checkInId: string) => supabase
+        .from('daily_check_ins')
+        .update(checkInCompletionPatch)
+        .eq('id', checkInId)
+        .eq('user_id', user.id)
+        .select()
+        .maybeSingle();
+
       // Double-check right before insert (cache could be stale)
       const { data: recentCheck, error: recentCheckError } = await supabase
         .from('daily_check_ins')
-        .select('id')
+        .select('*')
         .eq('user_id', user.id)
         .eq('check_in_type', 'morning')
         .eq('check_in_date', today)
@@ -284,29 +348,65 @@ const MorningCheckInContent = () => {
 
       if (recentCheckError) throw recentCheckError;
 
-      if (recentCheck) {
-        toast({ 
-          title: "Already checked in", 
-          description: "You've already completed your check-in today",
-          variant: "destructive" 
-        });
-        setIsSubmitting(false);
-        queryClient.invalidateQueries({ queryKey: ['morning-check-in'] });
+      if (recentCheck?.completed_at) {
+        await finishSavedCheckIn(recentCheck, { awardCompletion: false });
         return;
       }
 
-      const { data: checkIn, error } = await supabase
+      if (recentCheck?.id) {
+        let { data: updatedCheckIn, error: updateError } = await updateExistingCheckIn(recentCheck.id);
+
+        if (updateError && isAuthPolicyWriteError(updateError)) {
+          logger.warn('Check-in update hit auth policy; refreshing session and retrying:', updateError);
+          await refreshSession();
+          ({ data: updatedCheckIn, error: updateError } = await updateExistingCheckIn(recentCheck.id));
+        }
+
+        if (updateError) throw updateError;
+        if (!updatedCheckIn) throw new Error("Existing check-in row could not be completed");
+
+        await finishSavedCheckIn(updatedCheckIn, { awardCompletion: true });
+        return;
+      }
+
+      const insertCheckIn = () => supabase
         .from('daily_check_ins')
-        .insert({
-          user_id: user.id,
-          check_in_type: 'morning',
-          check_in_date: today,
-          mood,
-          intention: intention.trim(),
-          completed_at: new Date().toISOString(),
-        })
+        .insert(checkInPayload)
         .select()
         .maybeSingle();
+
+      let awardCompletion = true;
+      let { data: checkIn, error } = await insertCheckIn();
+
+      if (error && isAuthPolicyWriteError(error)) {
+        logger.warn('Check-in write hit auth policy; refreshing session and retrying:', error);
+        await refreshSession();
+        ({ data: checkIn, error } = await insertCheckIn());
+      }
+
+      if (error && isDuplicateCheckInError(error)) {
+        logger.warn('Check-in already exists for this day; loading saved row:', error);
+        const duplicateError = error;
+        const savedCheckIn = await fetchTodayMorningCheckIn();
+
+        if (!savedCheckIn) {
+          throw duplicateError;
+        }
+
+        if (savedCheckIn.completed_at) {
+          checkIn = savedCheckIn;
+          error = null;
+          awardCompletion = false;
+        } else {
+          ({ data: checkIn, error } = await updateExistingCheckIn(savedCheckIn.id));
+          if (error && isAuthPolicyWriteError(error)) {
+            logger.warn('Check-in duplicate recovery update hit auth policy; refreshing session and retrying:', error);
+            await refreshSession();
+            ({ data: checkIn, error } = await updateExistingCheckIn(savedCheckIn.id));
+          }
+          awardCompletion = true;
+        }
+      }
 
       if (error) {
         logger.error('Check-in error:', error);
@@ -317,16 +417,38 @@ const MorningCheckInContent = () => {
         throw new Error("Check-in row was inserted but could not be read back");
       }
 
-      // Award XP only on successful INSERT (not update)
+      await finishSavedCheckIn(checkIn, { awardCompletion });
+    } catch (error) {
+      logger.error('Check-in save error:', error);
+      toast({
+        title: "Couldn't save check-in",
+        description: "Please try again. We couldn't save your check-in.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const finishSavedCheckIn = async (
+    checkIn: DailyCheckInRow,
+    options: { awardCompletion: boolean },
+  ) => {
+    if (!user) throw new Error("No user found");
+
+    queryClient.setQueryData(['morning-check-in', today, user.id], checkIn);
+
+    // Award XP only on successful INSERT (not update)
+    if (options.awardCompletion) {
       void Promise.resolve(awardCheckInComplete()).catch((err) => {
         logger.warn("XP award failed after check-in:", err);
       });
-      
+
       // Trigger mentor companion reaction for check-in completion
-      triggerReaction('mentor', { momentType: 'discipline_win' }).catch(err => 
+      triggerReaction('mentor', { momentType: 'discipline_win' }).catch(err =>
         logger.log('[LivingCompanion] Mentor reaction failed:', err)
       );
-      
+
       try {
         const { count, error: countError } = await supabase
           .from('daily_check_ins')
@@ -349,22 +471,24 @@ const MorningCheckInContent = () => {
       } catch (achievementErr) {
         logger.warn('Daily completion achievement check failed:', achievementErr);
       }
+    }
 
-      // Trigger astral encounter check
-      window.dispatchEvent(new CustomEvent('quest-completed'));
-      window.dispatchEvent(new CustomEvent('morning-checkin-completed'));
-      setPendingMentorMood(null);
-      clearMorningCheckInDraftSnapshot(user.id);
+    // Trigger astral encounter check
+    window.dispatchEvent(new CustomEvent('quest-completed'));
+    window.dispatchEvent(new CustomEvent('morning-checkin-completed'));
+    setPendingMentorMood(null);
+    clearMorningCheckInDraftSnapshot(user.id);
 
-      // Start polling timer (using ref to avoid stale closure)
-      pollStartTimeRef.current = Date.now();
+    // Start polling timer (using ref to avoid stale closure)
+    pollStartTimeRef.current = Date.now();
 
-      // Generate mentor response in background with error handling
+    // Generate mentor response in background with error handling
+    if (!checkIn.mentor_response) {
       try {
         const { error: invocationError } = await supabase.functions.invoke('generate-check-in-response', {
           body: { checkInId: checkIn.id }
         });
-        
+
         if (invocationError) {
           logger.error('Edge function invocation error:', invocationError);
           const parsedError = await parseFunctionInvokeError(invocationError);
@@ -385,18 +509,9 @@ const MorningCheckInContent = () => {
           }),
         });
       }
-
-      queryClient.invalidateQueries({ queryKey: ['morning-check-in'] });
-    } catch (error) {
-      logger.error('Check-in save error:', error);
-      toast({ 
-        title: "Couldn't save check-in",
-        description: "Please try again. We couldn't save your check-in.",
-        variant: "destructive" 
-      });
-    } finally {
-      setIsSubmitting(false);
     }
+
+    queryClient.invalidateQueries({ queryKey: ['morning-check-in'] });
   };
 
   if (existingCheckInError) {
@@ -549,7 +664,7 @@ const MorningCheckInContent = () => {
           onClick={submitCheckIn} 
           data-tour="checkin-submit"
           data-tutorial-highlight={isTutorialMorningCheckinStep ? "true" : undefined}
-          disabled={isSubmitting || !mood || !intention.trim() || !!existingCheckIn}
+          disabled={isSubmitting || !mood || !intention.trim() || !!existingCheckIn?.completed_at}
           variant="gradient"
           className={cn(
             "w-full h-13 text-base",

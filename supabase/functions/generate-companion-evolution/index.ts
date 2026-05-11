@@ -62,6 +62,8 @@ const corsHeaders = {
 };
 
 const IMAGE_BUCKET = "evolution-cards";
+const COMPANION_IMAGE_BACKGROUND = "transparent" as const;
+const COMPANION_IMAGE_OUTPUT_FORMAT = "png" as const;
 const JUDGE_MINIMUMS = {
   overall: 7,
   continuity: 6,
@@ -864,6 +866,8 @@ export const handleGenerateCompanionEvolution = async (
             prompt,
             size: imageSize,
             quality: finalImageQuality,
+            background: COMPANION_IMAGE_BACKGROUND,
+            outputFormat: COMPANION_IMAGE_OUTPUT_FORMAT,
             userId: resolvedUserId,
           }),
       });
@@ -996,6 +1000,8 @@ export const handleGenerateCompanionEvolution = async (
           prompt,
           size: imageSize,
           quality: finalImageQuality,
+          background: COMPANION_IMAGE_BACKGROUND,
+          outputFormat: COMPANION_IMAGE_OUTPUT_FORMAT,
           userId: resolvedUserId,
           referenceImages: [
             {

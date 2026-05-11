@@ -177,6 +177,7 @@ export const buildCompanionAnimationPrompt = ({
     "Animate this exact companion portrait into a short evolution reveal.",
     "Preserve the companion identity, silhouette, species, colors, expression, and framing.",
     `Motion style: ${prestige}; ${elementLanguage}.`,
+    "Create a soft, stable, element-themed background environment behind the companion during the animation; do not leave a blank or transparent canvas.",
     "One continuous shot with no cuts. The subject breathes subtly and settles into the final pose.",
     "Camera movement is minimal and cinematic; premium reveal energy surrounds the companion without obscuring it.",
   ].join(" ");

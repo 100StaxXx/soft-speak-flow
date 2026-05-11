@@ -226,12 +226,13 @@ serve(async (req) => {
 
       case NotificationType.CANCEL:
       case NotificationType.REVOKE:
-        // User cancelled or subscription revoked
-        await handleCancellation(
+        // Apple revoked the entitlement; remove access immediately.
+        await handleRefund(
           supabaseClient,
           userId,
-          cancellationDateMs || Date.now().toString(),
-          expiresDateMs
+          latestTransactionId,
+          cancellationDateMs,
+          notificationType.toLowerCase(),
         );
         break;
 
@@ -240,7 +241,9 @@ serve(async (req) => {
         await handleRefund(
           supabaseClient,
           userId,
-          latestTransactionId
+          latestTransactionId,
+          cancellationDateMs,
+          "refund",
         );
         break;
 
@@ -548,13 +551,21 @@ async function handleCancellation(
 async function handleRefund(
   supabase: any,
   userId: string,
-  transactionId: string
+  transactionId: string,
+  revokedAtMs?: string,
+  webhookEvent = "refund",
 ) {
+  const revokedAtTimestamp = revokedAtMs ? Number.parseInt(revokedAtMs, 10) : Number.NaN;
+  const revokedAtDate = Number.isFinite(revokedAtTimestamp) ? new Date(revokedAtTimestamp) : new Date();
+  const revokedAt = revokedAtDate.toISOString();
+
   // Immediately revoke access
   await supabase.from("subscriptions").update({
     status: "cancelled",
-    cancelled_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    cancelled_at: revokedAt,
+    cancel_at: revokedAt,
+    current_period_end: revokedAt,
+    updated_at: revokedAt,
   }).eq("user_id", userId);
 
   await upsertAccountEntitlement(supabase, {
@@ -562,11 +573,11 @@ async function handleRefund(
     source: "subscription",
     status: "cancelled",
     is_active: false,
-    ends_at: new Date().toISOString(),
+    ends_at: revokedAt,
     metadata: {
       billing_provider: "storekit2",
       billing_source_of_truth: "storekit2_transaction",
-      webhook_event: "refund",
+      webhook_event: webhookEvent,
       refunded_transaction_id: transactionId,
     },
   });

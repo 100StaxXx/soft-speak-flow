@@ -101,7 +101,7 @@ describe("useJourneysCompanionVisual", () => {
     };
   });
 
-  it("uses fresh AI launcher art for the Journeys FAB", () => {
+  it("uses canonical AI companion art for the Journeys FAB even when launcher art exists", () => {
     mocks.companion = baseCompanion({
       launcher_image_url:
         "https://assets.example.com/user-1/companion_user-1_launcher_transparent_stage3.png",
@@ -113,16 +113,14 @@ describe("useJourneysCompanionVisual", () => {
     const { result } = renderHook(() => useJourneysCompanionVisual());
 
     expect(result.current.isGeneratedCompanion).toBe(true);
-    expect(result.current.launcherAwayImageUrl).toBe(
-      "https://assets.example.com/user-1/companion_user-1_launcher_transparent_stage3.png",
-    );
-    expect(result.current.launcherAwayFocalX).toBe(0.51);
-    expect(result.current.launcherAwayFocalY).toBe(0.47);
+    expect(result.current.launcherAwayImageUrl).toBe("https://assets.example.com/scene.png");
+    expect(result.current.launcherAwayFocalX).toBe(0.44);
+    expect(result.current.launcherAwayFocalY).toBe(0.58);
     expect(result.current.launcherAwayHasTransparentBackground).toBe(true);
     expect(result.current.needsLauncherImage).toBe(false);
   });
 
-  it("regenerates legacy AI launcher art that was saved before transparent cutouts", () => {
+  it("ignores legacy AI launcher art saved before transparent companion cutouts", () => {
     mocks.companion = baseCompanion({
       launcher_image_url: "https://assets.example.com/launcher.png",
       launcher_image_focal_x: 0.51,
@@ -133,8 +131,8 @@ describe("useJourneysCompanionVisual", () => {
     const { result } = renderHook(() => useJourneysCompanionVisual());
 
     expect(result.current.launcherAwayImageUrl).toBe("https://assets.example.com/scene.png");
-    expect(result.current.launcherAwayHasTransparentBackground).toBe(false);
-    expect(result.current.needsLauncherImage).toBe(true);
+    expect(result.current.launcherAwayHasTransparentBackground).toBe(true);
+    expect(result.current.needsLauncherImage).toBe(false);
   });
 
   it("shows the current companion art while lazy AI launcher art is missing", () => {
@@ -146,12 +144,12 @@ describe("useJourneysCompanionVisual", () => {
     expect(result.current.launcherAwayFocalX).toBe(0.44);
     expect(result.current.launcherAwayFocalY).toBe(0.58);
     expect(result.current.launcherAwayUsesPortraitShell).toBe(true);
-    expect(result.current.launcherAwayHasTransparentBackground).toBe(false);
-    expect(result.current.needsLauncherImage).toBe(true);
+    expect(result.current.launcherAwayHasTransparentBackground).toBe(true);
+    expect(result.current.needsLauncherImage).toBe(false);
     expect(result.current.currentSceneImageUrl).toBe("https://assets.example.com/scene.png");
   });
 
-  it("keeps the previous FAB launcher art while an evolution reveal is pending", () => {
+  it("keeps the previous companion art while an evolution reveal is pending", () => {
     mocks.companion = baseCompanion({
       current_stage: 4,
       current_image_url: "https://assets.example.com/stage-4-scene.png",
@@ -179,11 +177,9 @@ describe("useJourneysCompanionVisual", () => {
     const { result } = renderHook(() => useJourneysCompanionVisual());
 
     expect(result.current.currentSceneImageUrl).toBe("https://assets.example.com/stage-3-scene.png");
-    expect(result.current.launcherAwayImageUrl).toBe(
-      "https://assets.example.com/user-1/companion_user-1_launcher_transparent_stage3.png",
-    );
-    expect(result.current.launcherAwayFocalX).toBe(0.45);
-    expect(result.current.launcherAwayFocalY).toBe(0.55);
+    expect(result.current.launcherAwayImageUrl).toBe("https://assets.example.com/stage-3-scene.png");
+    expect(result.current.launcherAwayFocalX).toBe(0.61);
+    expect(result.current.launcherAwayFocalY).toBe(0.42);
     expect(result.current.launcherAwayHasTransparentBackground).toBe(true);
     expect(result.current.needsLauncherImage).toBe(false);
   });
@@ -205,8 +201,8 @@ describe("useJourneysCompanionVisual", () => {
     expect(result.current.launcherAwayImageUrl).toBe("https://assets.example.com/stage-4-scene.png");
     expect(result.current.launcherAwayFocalX).toBe(0.61);
     expect(result.current.launcherAwayFocalY).toBe(0.42);
-    expect(result.current.launcherAwayHasTransparentBackground).toBe(false);
-    expect(result.current.needsLauncherImage).toBe(true);
+    expect(result.current.launcherAwayHasTransparentBackground).toBe(true);
+    expect(result.current.needsLauncherImage).toBe(false);
   });
 
   it("ignores stale launcher art when the current scene image changes", () => {
@@ -220,7 +216,8 @@ describe("useJourneysCompanionVisual", () => {
 
     expect(result.current.launcherAwayImageUrl).toBe("https://assets.example.com/new-scene.png");
     expect(result.current.launcherAwayUsesPortraitShell).toBe(true);
-    expect(result.current.needsLauncherImage).toBe(true);
+    expect(result.current.launcherAwayHasTransparentBackground).toBe(true);
+    expect(result.current.needsLauncherImage).toBe(false);
   });
 
   it("keeps preset companions on bundled launcher-away art", () => {

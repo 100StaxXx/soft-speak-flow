@@ -23,6 +23,9 @@ Deno.test("buildCompanionAnimationPrompt asks for a stable continuous reveal", (
   if (!prompt.includes("warm ember motes")) {
     throw new Error("Expected element-specific motion language");
   }
+  if (!prompt.includes("background environment behind the companion")) {
+    throw new Error("Expected prompt to create an animation background");
+  }
 });
 
 Deno.test("submitFalKlingVideo posts the Kling image-to-video queue payload", async () => {

@@ -16,6 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 const PRODUCT_IDS = ["cosmiq_premium_monthly", "cosmiq_premium_yearly"];
 const OFFER_CODE_REDEMPTION_URL = import.meta.env.VITE_APPLE_OFFER_CODE_REDEMPTION_URL;
+const OFFER_CODE_ENTITLEMENT_POLL_DELAYS_MS = [0, 500, 1000, 1500];
 
 export type StoreKitPlan = "monthly" | "yearly";
 
@@ -25,6 +26,7 @@ type StoreKitContextValue = {
   products: StoreKitProduct[];
   productsLoading: boolean;
   currentEntitlement: StoreKitTransaction | null;
+  entitlementError: boolean;
   isPro: boolean;
   activePlan: StoreKitPlan | null;
   expirationDate: Date | null;
@@ -71,15 +73,19 @@ function entitlementIsCurrent(entitlement: StoreKitTransaction | null): boolean 
   return !Number.isNaN(expirationDate.getTime()) && expirationDate > new Date();
 }
 
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
   const { user, status } = useAuth();
+  const isAvailable = Capacitor.isNativePlatform() && isNativeIOS();
   const [products, setProducts] = useState<StoreKitProduct[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [currentEntitlement, setCurrentEntitlement] = useState<StoreKitTransaction | null>(null);
-  const [entitlementLoading, setEntitlementLoading] = useState(false);
+  const [entitlementLoading, setEntitlementLoading] = useState(isAvailable);
+  const [entitlementError, setEntitlementError] = useState(false);
   const listenerStartedRef = useRef(false);
-
-  const isAvailable = Capacitor.isNativePlatform() && isNativeIOS();
 
   const refreshProducts = useCallback(async () => {
     if (!isAvailable) return [];
@@ -117,7 +123,9 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     try {
       const { entitlement } = await StoreKit.getCurrentEntitlement();
       setCurrentEntitlement(entitlement);
+      setEntitlementError(false);
     } catch (error) {
+      setEntitlementError(true);
       console.error("[StoreKit] Failed to get entitlement:", error);
     } finally {
       setEntitlementLoading(false);
@@ -140,6 +148,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     void StoreKit.addListener("transactionUpdate", (transaction) => {
       if (!transaction.cancelled && !transaction.pending) {
         setCurrentEntitlement(transaction);
+        setEntitlementError(false);
       }
     });
   }, [isAvailable]);
@@ -170,6 +179,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
       void refreshEntitlement();
     } else {
       setCurrentEntitlement(null);
+      setEntitlementError(false);
     }
   }, [isAvailable, refreshEntitlement, status, user?.id]);
 
@@ -181,6 +191,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     });
     if (result.cancelled || result.pending) return null;
     setCurrentEntitlement(result);
+    setEntitlementError(false);
     return result;
   }, [isAvailable, user?.id]);
 
@@ -202,8 +213,18 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     });
 
     await refreshProducts();
-    const { entitlement } = await StoreKit.getCurrentEntitlement();
-    setCurrentEntitlement(entitlement);
+    let entitlement: StoreKitTransaction | null = null;
+    for (const delay of OFFER_CODE_ENTITLEMENT_POLL_DELAYS_MS) {
+      if (delay > 0) {
+        await wait(delay);
+      }
+
+      const result = await StoreKit.getCurrentEntitlement();
+      entitlement = result.entitlement;
+      setCurrentEntitlement(entitlement);
+      setEntitlementError(false);
+      if (entitlement) break;
+    }
 
     return {
       status: result.status,
@@ -215,6 +236,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     if (!isAvailable) return null;
     const { entitlement } = await StoreKit.restorePurchases();
     setCurrentEntitlement(entitlement);
+    setEntitlementError(false);
     return entitlement;
   }, [isAvailable]);
 
@@ -237,6 +259,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     products,
     productsLoading,
     currentEntitlement,
+    entitlementError,
     isPro,
     activePlan,
     expirationDate,
@@ -250,6 +273,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
   }), [
     activePlan,
     currentEntitlement,
+    entitlementError,
     entitlementLoading,
     expirationDate,
     isAvailable,

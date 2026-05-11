@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   refreshProducts: vi.fn(),
   functionsInvoke: vi.fn(),
   invalidateQueries: vi.fn(),
+  setQueryData: vi.fn(),
   storeKitProducts: [
     { identifier: "cosmiq_premium_monthly", displayName: "Monthly", description: "", price: 9.99, displayPrice: "$9.99" },
     { identifier: "cosmiq_premium_yearly", displayName: "Yearly", description: "", price: 99.99, displayPrice: "$99.99" },
@@ -28,9 +29,34 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
+const localStorageState = vi.hoisted(() => ({
+  store: new Map<string, string>(),
+}));
+
+Object.defineProperty(globalThis, "localStorage", {
+  configurable: true,
+  value: {
+    getItem: (key: string) => localStorageState.store.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      localStorageState.store.set(key, value);
+    },
+    removeItem: (key: string) => {
+      localStorageState.store.delete(key);
+    },
+    clear: () => {
+      localStorageState.store.clear();
+    },
+    key: (index: number) => Array.from(localStorageState.store.keys())[index] ?? null,
+    get length() {
+      return localStorageState.store.size;
+    },
+  },
+});
+
 vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({
     invalidateQueries: (...args: unknown[]) => mocks.invalidateQueries(...args),
+    setQueryData: (...args: unknown[]) => mocks.setQueryData(...args),
   }),
 }));
 
@@ -93,6 +119,7 @@ import { useAppleSubscription } from "./useAppleSubscription";
 describe("useAppleSubscription", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorageState.store.clear();
     mocks.storeKitProducts = [
       { identifier: "cosmiq_premium_monthly", displayName: "Monthly", description: "", price: 9.99, displayPrice: "$9.99" },
       { identifier: "cosmiq_premium_yearly", displayName: "Yearly", description: "", price: 99.99, displayPrice: "$99.99" },
@@ -108,9 +135,19 @@ describe("useAppleSubscription", () => {
       apple_offer_code_expires_at: null,
       is_apple_offer_eligible: false,
     };
-    mocks.purchase.mockResolvedValue({ productId: "cosmiq_premium_monthly", transactionId: "tx-1" });
+    mocks.purchase.mockResolvedValue({
+      productId: "cosmiq_premium_monthly",
+      transactionId: "tx-1",
+      expirationDate: "2099-01-01T00:00:00.000Z",
+      appAccountToken: "11111111-1111-4111-8111-111111111111",
+    });
     mocks.redeemOfferCode.mockResolvedValue({ status: "presented", entitlement: null });
-    mocks.restorePurchases.mockResolvedValue({ productId: "cosmiq_premium_monthly", transactionId: "tx-r" });
+    mocks.restorePurchases.mockResolvedValue({
+      productId: "cosmiq_premium_monthly",
+      transactionId: "tx-r",
+      expirationDate: "2099-01-01T00:00:00.000Z",
+      appAccountToken: "11111111-1111-4111-8111-111111111111",
+    });
     mocks.refreshProducts.mockResolvedValue(mocks.storeKitProducts);
     mocks.functionsInvoke.mockResolvedValue({ data: { success: true }, error: null });
   });
@@ -262,6 +299,121 @@ describe("useAppleSubscription", () => {
 
     expect(success).toBe(false);
     expect(mocks.toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Subscription activation failed",
+        variant: "destructive",
+      }),
+    );
+  });
+
+  it("unlocks locally when Apple succeeds but the verification function is unreachable", async () => {
+    mocks.functionsInvoke.mockResolvedValueOnce({
+      data: null,
+      error: new Error("Failed to send a request to the Edge Function"),
+    });
+
+    const { result } = renderHook(() => useAppleSubscription());
+
+    let success: boolean | undefined;
+    await act(async () => {
+      success = await result.current.handlePurchase("cosmiq_premium_monthly");
+    });
+
+    expect(success).toBe(true);
+    expect(mocks.setQueryData).toHaveBeenCalledWith(
+      ["access-state", "11111111-1111-4111-8111-111111111111"],
+      expect.objectContaining({
+        has_access: true,
+        access_source: "subscription",
+        subscribed: true,
+        plan: "monthly",
+        subscription_end: "2099-01-01T00:00:00.000Z",
+      }),
+    );
+    expect(mocks.toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Subscription activation failed",
+        variant: "destructive",
+      }),
+    );
+    expect(globalThis.localStorage.getItem(
+      "cosmiq.localSubscriptionAccess.v1.11111111-1111-4111-8111-111111111111",
+    )).toContain("2099-01-01T00:00:00.000Z");
+  });
+
+  it("silently retries server verification after a deferred local unlock", async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.functionsInvoke
+        .mockResolvedValueOnce({
+          data: null,
+          error: new Error("Failed to send a request to the Edge Function"),
+        })
+        .mockResolvedValueOnce({ data: { success: true }, error: null });
+
+      const { result } = renderHook(() => useAppleSubscription());
+
+      await act(async () => {
+        await result.current.handlePurchase("cosmiq_premium_monthly");
+      });
+
+      expect(mocks.functionsInvoke).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_000);
+      });
+
+      expect(mocks.functionsInvoke).toHaveBeenCalledTimes(2);
+      expect(mocks.invalidateQueries).toHaveBeenCalledWith({
+        queryKey: ["access-state", "11111111-1111-4111-8111-111111111111"],
+      });
+      expect(mocks.toast).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Subscription activation failed",
+          variant: "destructive",
+        }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("unlocks locally for active sandbox purchases missing Apple's app-account binding", async () => {
+    mocks.purchase.mockResolvedValueOnce({
+      productId: "cosmiq_premium_yearly",
+      transactionId: "tokenless-sandbox-tx",
+      expirationDate: "2099-01-01T00:00:00.000Z",
+    });
+    mocks.functionsInvoke.mockResolvedValueOnce({
+      data: null,
+      error: {
+        message: "Edge Function returned a non-2xx status code",
+        status: 400,
+        context: new Response(JSON.stringify({
+          error: "This purchase is missing its app-account binding. Update the app and restore the purchase again.",
+          code: "APPLE_BINDING_MISSING",
+        }), { status: 400 }),
+      },
+    });
+
+    const { result } = renderHook(() => useAppleSubscription());
+
+    let success: boolean | undefined;
+    await act(async () => {
+      success = await result.current.handlePurchase("cosmiq_premium_yearly");
+    });
+
+    expect(success).toBe(true);
+    expect(mocks.setQueryData).toHaveBeenCalledWith(
+      ["access-state", "11111111-1111-4111-8111-111111111111"],
+      expect.objectContaining({
+        has_access: true,
+        access_source: "subscription",
+        subscribed: true,
+        plan: "yearly",
+      }),
+    );
+    expect(mocks.toast).not.toHaveBeenCalledWith(
       expect.objectContaining({
         title: "Subscription activation failed",
         variant: "destructive",

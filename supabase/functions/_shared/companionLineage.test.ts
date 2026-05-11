@@ -1,6 +1,10 @@
 import {
+  buildAiEvolutionPrompt,
+  buildEggFromStage1Prompt,
   buildCompanionGenerationMetadata,
   buildInitialImageLineageMetadata,
+  buildStage1BootstrapPrompt,
+  type VisualIdentityProfile,
 } from "./companionLineage.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -91,5 +95,44 @@ Deno.test("companion lineage metadata follows OPENAI_COMPANION_IMAGE_MODEL overr
       originalCompanionImageModel ?? undefined,
     );
     restoreEnv("OPENAI_IMAGE_MODEL", originalImageModel ?? undefined);
+  }
+});
+
+Deno.test("future companion image prompts ask for transparent cutout output", () => {
+  const profile: VisualIdentityProfile = {
+    schemaVersion: 1,
+    spiritAnimal: "Wolf",
+    coreElement: "Fire",
+    favoriteColor: "#FF6B35",
+    storyTone: "epic_adventure",
+    bodyPlan: "grounded quadruped with strong silhouette",
+    silhouetteAnchors: ["alert ears"],
+    faceAnchors: ["bright eyes"],
+    signatureFeatures: ["ember ruff"],
+    paletteRules: ["warm orange anchor"],
+    elementManifestation: ["embers around paws"],
+    personalityRead: "brave and loyal",
+    continuityRules: ["keep wolf family readable"],
+  };
+
+  const prompts = [
+    buildStage1BootstrapPrompt(profile),
+    buildEggFromStage1Prompt(profile),
+    buildAiEvolutionPrompt({
+      profile,
+      previousLevel: 1,
+      nextLevel: 5,
+    }),
+  ];
+
+  for (const prompt of prompts) {
+    assert(
+      prompt.includes("transparent") && prompt.includes("background"),
+      "Expected companion prompt to request transparent background output",
+    );
+    assert(
+      prompt.includes("no scenic") || prompt.includes("No scenic"),
+      "Expected companion prompt to reject scenic backdrops",
+    );
   }
 });

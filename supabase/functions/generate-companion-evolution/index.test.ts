@@ -312,6 +312,13 @@ Deno.test("legacy stage-1 backfill generates a fresh starter and marks provenanc
   assertEquals(payload.portrait_regenerated, true, "Expected legacy backfill to render a new stage-1 portrait");
   assertEquals(harness.generateCalls.length, 1, "Expected legacy backfill to generate a starter form once");
   assertEquals(harness.editCalls.length, 0, "Expected legacy backfill to avoid boundary edit rendering");
+  assertEquals(harness.generateCalls[0]?.background, "transparent", "Expected stage-1 generation to request a transparent background");
+  assertEquals(harness.generateCalls[0]?.outputFormat, "png", "Expected stage-1 generation to request PNG output");
+  assert(
+    typeof harness.generateCalls[0]?.prompt === "string" &&
+      harness.generateCalls[0].prompt.includes("transparent background"),
+    "Expected stage-1 generation prompt to request transparent background output",
+  );
 
   const upsertCall = harness.upsertCalls[0];
   assert(upsertCall, "Expected legacy backfill to upsert an evolution record");
@@ -398,6 +405,8 @@ Deno.test("boundary evolutions retry after low judge scores and edit from the pr
   const secondEditCall = harness.editCalls[1];
   const firstReferenceImages = firstEditCall.referenceImages as Array<{ imageUrl: string }>;
   assertEquals(firstReferenceImages[0]?.imageUrl, "https://example.com/stage-4.png", "Expected boundary edit to use the previous portrait as reference");
+  assertEquals(firstEditCall.background, "transparent", "Expected boundary edit to request a transparent background");
+  assertEquals(firstEditCall.outputFormat, "png", "Expected boundary edit to request PNG output");
   assert(
     typeof secondEditCall.prompt === "string" && secondEditCall.prompt.includes("Retry critique:"),
     "Expected second boundary edit prompt to include judge critique feedback",

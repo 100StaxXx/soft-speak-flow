@@ -98,6 +98,14 @@ Deno.test("generateCompanionImage downloads direct image URLs with guardedFetch"
           body.size === "1536x1024",
           `Expected requested size to be forwarded, got ${String(body.size)}`,
         );
+        assert(
+          body.background === "transparent",
+          `Expected transparent background to be forwarded, got ${String(body.background)}`,
+        );
+        assert(
+          body.output_format === "png",
+          `Expected PNG output format to be forwarded, got ${String(body.output_format)}`,
+        );
         return createJsonResponse({
           data: [
             {
@@ -121,6 +129,8 @@ Deno.test("generateCompanionImage downloads direct image URLs with guardedFetch"
       prompt: "draw a companion",
       size: "1536x1024",
       quality: "high",
+      background: "transparent",
+      outputFormat: "png",
       userId: "user-1",
     });
 

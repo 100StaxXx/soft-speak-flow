@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { isNativeIOS } from "@/utils/platformTargets";
@@ -9,8 +9,14 @@ import { useStoreKit } from "./useStoreKit";
 import { trackPaywallEvent } from "@/utils/paywallTelemetry";
 import { supabase } from "@/integrations/supabase/client";
 import { queryKeys } from "@/lib/queryKeys";
-import { parseFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
+import { parseFunctionInvokeError, type ParsedFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
 import type { StoreKitTransaction } from "@/plugins/StoreKitPlugin";
+import {
+  buildLocalSubscriptionAccessState,
+  rememberLocalSubscriptionAccess,
+} from "@/utils/localSubscriptionAccess";
+
+const DEFERRED_VERIFICATION_RETRY_DELAYS_MS = [5_000, 30_000, 120_000] as const;
 
 function isIAPAvailable(): boolean {
   return Capacitor.isNativePlatform() && isNativeIOS();
@@ -26,6 +32,29 @@ function getErrorMessage(error: unknown): string {
   if (typeof error === "string" && error) return error;
   if (error instanceof Error && error.message) return error.message;
   return "Something went wrong with subscriptions. Please try again.";
+}
+
+class SubscriptionVerificationError extends Error {
+  parsed?: ParsedFunctionInvokeError;
+
+  constructor(message: string, parsed?: ParsedFunctionInvokeError) {
+    super(message);
+    this.name = "SubscriptionVerificationError";
+    this.parsed = parsed;
+  }
+}
+
+function canDeferServerVerification(error: unknown): boolean {
+  if (!(error instanceof SubscriptionVerificationError)) return false;
+
+  const parsed = error.parsed;
+  if (!parsed) return false;
+
+  if (parsed.code === "APPLE_BINDING_MISSING") return true;
+  if (parsed.category === "network" || parsed.category === "relay") return true;
+  if (typeof parsed.status === "number" && parsed.status >= 500) return true;
+
+  return false;
 }
 
 export function useAppleSubscription() {
@@ -47,6 +76,7 @@ export function useAppleSubscription() {
   const [manageLoading, setManageLoading] = useState(false);
   const [productError, setProductError] = useState<string | null>(null);
   const [offerCodePurchaseReady, setOfferCodePurchaseReady] = useState(false);
+  const deferredVerificationTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const hasOfferCode = appliedReferralCodeState.is_apple_offer_eligible;
   const hasAppliedReferralCode = Boolean(appliedReferralCodeState.code);
   const appliedReferralCode = appliedReferralCodeState.code;
@@ -105,7 +135,7 @@ export function useAppleSubscription() {
         status: parsed.status,
         message,
       });
-      throw new Error(message);
+      throw new SubscriptionVerificationError(message, parsed);
     }
 
     const verification = data as { success?: boolean; error?: string; code?: string } | null;
@@ -130,6 +160,57 @@ export function useAppleSubscription() {
     });
   }, [hasOfferCode, invalidateSubscriptionState]);
 
+  const grantLocalSubscriptionAccess = useCallback((
+    transaction: StoreKitTransaction,
+    plan: "monthly" | "yearly",
+  ) => {
+    if (!user?.id) return false;
+
+    const accessState = buildLocalSubscriptionAccessState(transaction, user.id, plan);
+    if (!accessState) return false;
+
+    queryClient.setQueryData(queryKeys.access.detail(user.id), accessState);
+    rememberLocalSubscriptionAccess(user.id, accessState);
+    return true;
+  }, [queryClient, user?.id]);
+
+  const clearDeferredVerificationTimers = useCallback(() => {
+    deferredVerificationTimersRef.current.forEach((timer) => clearTimeout(timer));
+    deferredVerificationTimersRef.current = [];
+  }, []);
+
+  useEffect(() => clearDeferredVerificationTimers, [clearDeferredVerificationTimers]);
+
+  const scheduleDeferredVerificationRetry = useCallback((
+    transaction: StoreKitTransaction,
+    surface: string,
+    plan: "monthly" | "yearly",
+  ) => {
+    clearDeferredVerificationTimers();
+
+    DEFERRED_VERIFICATION_RETRY_DELAYS_MS.forEach((delayMs) => {
+      const timer = setTimeout(() => {
+        void (async () => {
+          try {
+            await verifyStoreKitTransaction(transaction, `${surface}_deferred_retry`, plan);
+            grantLocalSubscriptionAccess(transaction, plan);
+            clearDeferredVerificationTimers();
+          } catch (error) {
+            if (!canDeferServerVerification(error)) {
+              clearDeferredVerificationTimers();
+            }
+          }
+        })();
+      }, delayMs);
+
+      deferredVerificationTimersRef.current.push(timer);
+    });
+  }, [
+    clearDeferredVerificationTimers,
+    grantLocalSubscriptionAccess,
+    verifyStoreKitTransaction,
+  ]);
+
   const verifyCompletedTransaction = useCallback(async (
     transaction: StoreKitTransaction,
     surface: string,
@@ -137,8 +218,25 @@ export function useAppleSubscription() {
   ) => {
     try {
       await verifyStoreKitTransaction(transaction, surface, plan);
+      grantLocalSubscriptionAccess(transaction, plan);
       return true;
     } catch (error) {
+      if (canDeferServerVerification(error) && grantLocalSubscriptionAccess(transaction, plan)) {
+        const parsed = error instanceof SubscriptionVerificationError ? error.parsed : undefined;
+        trackPaywallEvent("purchase_verification_deferred", {
+          surface,
+          plan,
+          productId: transaction.productId,
+          hasOfferCode,
+          code: parsed?.code,
+          status: parsed?.status,
+          message: getErrorMessage(error),
+        });
+        setProductError(null);
+        scheduleDeferredVerificationRetry(transaction, surface, plan);
+        return true;
+      }
+
       const message = getErrorMessage(error);
       setProductError(message);
       toast({
@@ -148,7 +246,13 @@ export function useAppleSubscription() {
       });
       return false;
     }
-  }, [toast, verifyStoreKitTransaction]);
+  }, [
+    grantLocalSubscriptionAccess,
+    hasOfferCode,
+    scheduleDeferredVerificationRetry,
+    toast,
+    verifyStoreKitTransaction,
+  ]);
 
   const reloadProducts = useCallback(async () => {
     setProductError(null);

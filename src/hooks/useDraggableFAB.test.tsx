@@ -46,6 +46,7 @@ vi.mock("@capacitor/haptics", () => ({
 import {
   DRAGGABLE_FAB_LEGACY_STORAGE_KEY,
   DRAGGABLE_FAB_STORAGE_KEY_V2,
+  DRAGGABLE_FAB_STORAGE_KEY_V3,
   useDraggableFAB,
 } from "./useDraggableFAB";
 
@@ -135,7 +136,7 @@ describe("useDraggableFAB", () => {
   });
 
   it("restores a previously saved freeform position from local storage", () => {
-    storage.safeLocalStorage.setItem(DRAGGABLE_FAB_STORAGE_KEY_V2, JSON.stringify({ x: 72, y: 128 }));
+    storage.safeLocalStorage.setItem(DRAGGABLE_FAB_STORAGE_KEY_V3, JSON.stringify({ x: 72, y: 128 }));
 
     const { result } = renderHook(() => useDraggableFAB());
 
@@ -143,17 +144,18 @@ describe("useDraggableFAB", () => {
     expect(result.current.popupAlignment).toEqual({ horizontal: "left", vertical: "top" });
   });
 
-  it("migrates the legacy corner value into a saved freeform position", async () => {
+  it("ignores legacy launcher positions after the companion FAB relaunch", async () => {
     storage.safeLocalStorage.setItem(DRAGGABLE_FAB_LEGACY_STORAGE_KEY, "top-left");
+    storage.safeLocalStorage.setItem(DRAGGABLE_FAB_STORAGE_KEY_V2, JSON.stringify({ x: 72, y: 128 }));
 
     const { result } = renderHook(() => useDraggableFAB());
 
-    expect(result.current.position).toEqual({ x: 16, y: 80 });
+    expect(result.current.position).toEqual({ x: 240, y: 536 });
 
     await waitFor(() => {
       expect(storage.safeLocalStorage.setItem).toHaveBeenCalledWith(
-        DRAGGABLE_FAB_STORAGE_KEY_V2,
-        JSON.stringify({ x: 16, y: 80 }),
+        DRAGGABLE_FAB_STORAGE_KEY_V3,
+        JSON.stringify({ x: 240, y: 536 }),
       );
     });
   });
@@ -291,13 +293,13 @@ describe("useDraggableFAB", () => {
     expect(result.current.isLongPressing).toBe(false);
 
     expect(storage.safeLocalStorage.setItem).toHaveBeenLastCalledWith(
-      DRAGGABLE_FAB_STORAGE_KEY_V2,
+      DRAGGABLE_FAB_STORAGE_KEY_V3,
       JSON.stringify({ x: 150, y: 210 }),
     );
   });
 
   it("re-clamps a saved position when the viewport shrinks", async () => {
-    storage.safeLocalStorage.setItem(DRAGGABLE_FAB_STORAGE_KEY_V2, JSON.stringify({ x: 260, y: 620 }));
+    storage.safeLocalStorage.setItem(DRAGGABLE_FAB_STORAGE_KEY_V3, JSON.stringify({ x: 260, y: 620 }));
 
     const { result } = renderHook(() => useDraggableFAB());
 
