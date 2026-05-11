@@ -1,11 +1,10 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { Check, Mail, Sparkles } from "lucide-react";
+import { LogIn, UserPlus } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { StaticBackgroundImage } from "@/components/StaticBackgroundImage";
 import type { StaticBackgroundAsset } from "@/assets/backgrounds";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectPath } from "@/utils/authRedirect";
 
 const createLandingBackdrop = (src: string, src2x = src): StaticBackgroundAsset => ({
@@ -72,10 +71,6 @@ const Welcome = () => {
   const prefersReducedMotion = useReducedMotion();
   const navigate = useNavigate();
   const { user, loading } = useAuth();
-  const [email, setEmail] = useState("");
-  const [website, setWebsite] = useState("");
-  const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
-  const [message, setMessage] = useState("");
 
   useEffect(() => {
     if (!loading && user) {
@@ -87,79 +82,16 @@ const Welcome = () => {
     }
   }, [user, loading, navigate]);
 
-  const submitEarlyAccess = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const normalizedEmail = email.trim().toLowerCase();
-
-    if (!normalizedEmail) {
-      setStatus("error");
-      setMessage("Enter your email to request access.");
-      return;
-    }
-
-    setStatus("submitting");
-    setMessage("");
-
-    if (website.trim()) {
-      setStatus("success");
-      setMessage("You are on the early access list. I will send the next opening your way.");
-      setEmail("");
-      setWebsite("");
-      return;
-    }
-
-    const { error } = await supabase.rpc("record_early_access_signup", {
-      p_email: normalizedEmail,
-      p_source: window.location.pathname,
-      p_referrer: document.referrer || null,
-      p_user_agent: window.navigator.userAgent,
-      p_request_metadata: {
-        created_from: "landing_page",
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      },
-    });
-
-    if (error) {
-      setStatus("error");
-      setMessage(error.message || "Something went sideways. Try again in a moment.");
-      return;
-    }
-
-    setStatus("success");
-    setMessage("You are on the early access list. I will send the next opening your way.");
-    setEmail("");
-    setWebsite("");
-  };
-
   return (
     <div className="h-screen min-h-[100svh] overflow-hidden bg-[#05080d] text-white">
-      <header className="pointer-events-none fixed left-0 right-0 top-0 z-30 px-5 pt-[calc(env(safe-area-inset-top,0px)+1rem)]">
-        <div className="mx-auto flex max-w-6xl items-center justify-between border-b border-white/14 pb-4">
-          <div className="flex items-center gap-3 text-white">
-            <span
-              aria-hidden="true"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-white/10 backdrop-blur-md"
-            >
-              <Sparkles className="h-4 w-4 text-cyan-100" />
-            </span>
-            <a href="/" className="pointer-events-auto text-sm font-semibold uppercase tracking-[0.24em]">
-              Cosmiq
-            </a>
-          </div>
-          <p className="hidden text-xs font-semibold uppercase tracking-[0.22em] text-white/70 sm:block">
-            Mythic habit quests
-          </p>
-        </div>
-      </header>
-
       <main
         data-landing-scroll
         className="h-full snap-y snap-mandatory overflow-y-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         <LandscapeSection
-          id="early-access"
+          id="start"
           background={landingBackdrops.quests}
-          contentClassName="items-center justify-center pb-[calc(env(safe-area-inset-bottom,0px)+2rem)] pt-[calc(env(safe-area-inset-top,0px)+6.5rem)]"
+          contentClassName="items-center justify-center pb-[calc(env(safe-area-inset-bottom,0px)+2rem)] pt-[calc(env(safe-area-inset-top,0px)+2rem)]"
           imagePosition="50% 42%"
           loading="eager"
         >
@@ -171,7 +103,7 @@ const Welcome = () => {
             className="w-full max-w-2xl text-center"
           >
             <p className="mb-5 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-100 sm:text-sm">
-              Early access
+              Start your quest
             </p>
             <h1 className="text-5xl font-semibold leading-[0.94] tracking-normal sm:text-7xl lg:text-8xl">
               Cosmiq Quest
@@ -180,61 +112,29 @@ const Welcome = () => {
               A cinematic habit app for building better days like a mythic journey.
             </p>
 
-            <form
-              onSubmit={submitEarlyAccess}
-              className="pointer-events-auto mx-auto mt-9 flex w-full max-w-xl flex-col gap-3 sm:flex-row"
-            >
-              <label className="sr-only" htmlFor="early-access-email">Email address</label>
-              <div className="relative min-w-0 flex-1">
-                <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/52" />
-                <input
-                  id="early-access-email"
-                  type="email"
-                  autoComplete="email"
-                  inputMode="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="you@example.com"
-                  className="h-14 w-full border border-white/22 bg-black/34 pl-12 pr-4 text-base text-white shadow-[0_20px_70px_rgba(0,0,0,0.25)] outline-none backdrop-blur-md transition placeholder:text-white/42 focus:border-cyan-200 focus:bg-black/44"
-                  disabled={status === "submitting" || status === "success"}
-                  required
-                />
-              </div>
-              <label className="sr-only" htmlFor="early-access-website">Website</label>
-              <input
-                id="early-access-website"
-                type="text"
-                tabIndex={-1}
-                autoComplete="off"
-                value={website}
-                onChange={(event) => setWebsite(event.target.value)}
-                className="hidden"
-                aria-hidden="true"
-              />
-              <button
-                type="submit"
-                className="inline-flex h-14 items-center justify-center gap-2 border border-cyan-100/70 bg-cyan-100 px-6 text-sm font-semibold uppercase tracking-[0.18em] text-slate-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-72"
-                disabled={status === "submitting" || status === "success"}
+            <div className="pointer-events-auto mx-auto mt-9 flex w-full max-w-xl flex-col gap-3 sm:flex-row sm:justify-center">
+              <a
+                href="/auth?mode=signup"
+                className="inline-flex h-14 flex-1 items-center justify-center gap-2 border border-cyan-100/70 bg-cyan-100 px-6 text-sm font-semibold uppercase tracking-[0.18em] text-slate-950 transition hover:bg-white sm:max-w-[16rem]"
               >
-                {status === "success" ? <Check className="h-4 w-4" /> : null}
-                {status === "submitting" ? "Sending" : status === "success" ? "Requested" : "Request access"}
-              </button>
-            </form>
-            {message ? (
-              <p
-                className={`mx-auto mt-4 max-w-xl text-sm leading-6 ${status === "error" ? "text-rose-100" : "text-cyan-50"}`}
-                role={status === "error" ? "alert" : "status"}
+                <UserPlus className="h-4 w-4" />
+                Register
+              </a>
+              <a
+                href="/auth"
+                className="inline-flex h-14 flex-1 items-center justify-center gap-2 border border-white/24 bg-black/28 px-6 text-sm font-semibold uppercase tracking-[0.18em] text-white backdrop-blur-md transition hover:border-white/48 hover:bg-white/12 sm:max-w-[16rem]"
               >
-                {message}
-              </p>
-            ) : null}
+                <LogIn className="h-4 w-4" />
+                Sign in
+              </a>
+            </div>
           </motion.div>
         </LandscapeSection>
 
         <LandscapeSection
           id="features"
           background={landingBackdrops.guide}
-          contentClassName="flex-col justify-end pb-[calc(env(safe-area-inset-bottom,0px)+3.25rem)] pt-[calc(env(safe-area-inset-top,0px)+6.5rem)] sm:pb-16"
+          contentClassName="flex-col justify-end pb-[calc(env(safe-area-inset-bottom,0px)+3.25rem)] pt-[calc(env(safe-area-inset-top,0px)+2rem)] sm:pb-16"
           imagePosition="50% 44%"
         >
           <motion.div
@@ -268,7 +168,7 @@ const Welcome = () => {
         <LandscapeSection
           id="closing"
           background={landingBackdrops.profile}
-          contentClassName="flex-col justify-end pb-[calc(env(safe-area-inset-bottom,0px)+2.5rem)] pt-[calc(env(safe-area-inset-top,0px)+6.5rem)] sm:pb-14"
+          contentClassName="flex-col justify-end pb-[calc(env(safe-area-inset-bottom,0px)+2.5rem)] pt-[calc(env(safe-area-inset-top,0px)+2rem)] sm:pb-14"
           imagePosition="50% 55%"
         >
           <motion.div

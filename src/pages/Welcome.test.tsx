@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -7,20 +7,12 @@ const authState = vi.hoisted(() => ({
   loading: false,
 }));
 
-const invokeMock = vi.hoisted(() => vi.fn());
-
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => authState,
 }));
 
 vi.mock("@/utils/authRedirect", () => ({
   getAuthRedirectPath: vi.fn(),
-}));
-
-vi.mock("@/integrations/supabase/client", () => ({
-  supabase: {
-    rpc: invokeMock,
-  },
 }));
 
 vi.mock("@/components/PageLoader", () => ({
@@ -39,8 +31,6 @@ describe("Welcome", () => {
   beforeEach(() => {
     authState.user = null;
     authState.loading = false;
-    invokeMock.mockReset();
-    invokeMock.mockResolvedValue({ data: { success: true }, error: null });
     vi.stubGlobal(
       "IntersectionObserver",
       class IntersectionObserver {
@@ -51,7 +41,7 @@ describe("Welcome", () => {
     );
   });
 
-  it("renders an informational landing page without auth CTAs", () => {
+  it("renders an informational landing page with auth CTAs", () => {
     render(
       <MemoryRouter initialEntries={["/welcome"]}>
         <Welcome />
@@ -59,40 +49,17 @@ describe("Welcome", () => {
     );
 
     expect(screen.getByRole("heading", { name: /^cosmiq quest$/i })).toBeInTheDocument();
-    expect(screen.getByText(/early access/i)).toBeInTheDocument();
+    expect(screen.getByText(/start your quest/i)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /one place for quests, guidance, and momentum/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /the story is the system/i })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: /email address/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /register/i })).toHaveAttribute("href", "/auth?mode=signup");
+    expect(screen.getByRole("link", { name: /sign in/i })).toHaveAttribute("href", "/auth");
+    expect(screen.queryByRole("link", { name: /^cosmiq$/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/mythic habit quests/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: /email address/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /request access/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /more signal\. fewer screens\. a clearer day/i })).not.toBeInTheDocument();
     expect(screen.queryByAltText(/companion artwork/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /create account/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /sign in/i })).not.toBeInTheDocument();
-  });
-
-  it("submits an early access request", async () => {
-    render(
-      <MemoryRouter initialEntries={["/welcome"]}>
-        <Welcome />
-      </MemoryRouter>,
-    );
-
-    fireEvent.change(screen.getByRole("textbox", { name: /email address/i }), {
-      target: { value: "User@Example.com" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /request access/i }));
-
-    await waitFor(() => {
-      expect(invokeMock).toHaveBeenCalledWith("record_early_access_signup", expect.objectContaining({
-        p_email: "user@example.com",
-        p_source: expect.any(String),
-        p_user_agent: expect.any(String),
-        p_request_metadata: expect.objectContaining({
-          created_from: "landing_page",
-        }),
-      }));
-    });
-
-    expect(await screen.findByText(/you are on the early access list/i)).toBeInTheDocument();
   });
 
   it("keeps legal links available", () => {
