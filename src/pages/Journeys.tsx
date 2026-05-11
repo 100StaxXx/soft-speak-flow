@@ -90,6 +90,7 @@ import {
   dispatchPlannerSyncFinished,
   warmDailyTasksQueryFromRemote,
 } from "@/utils/plannerSync";
+import { getEffectiveMissionDate } from "@/utils/timezone";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -312,6 +313,7 @@ const createPlannerLaunchIntentId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+const parseDateKeyAtNoon = (dateKey: string): Date => parseISO(`${dateKey}T12:00:00`);
 
 const Journeys = () => {
   const prefersReducedMotion = useReducedMotion();
@@ -325,10 +327,13 @@ const Journeys = () => {
   const macTimedTaskDurationFallbackMinutes = isMacDesktopSession
     ? MAC_TIMED_TASK_DURATION_FALLBACK_MINUTES
     : undefined;
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(() =>
+    parseDateKeyAtNoon(getEffectiveMissionDate()),
+  );
   const [datePillCenterRequestKey, setDatePillCenterRequestKey] = useState(0);
+  const [agendaCenterNowRequestKey, setAgendaCenterNowRequestKey] = useState(0);
   const [datePillCenterRequestDateKey, setDatePillCenterRequestDateKey] = useState(() =>
-    format(new Date(), "yyyy-MM-dd"),
+    getEffectiveMissionDate(),
   );
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
@@ -356,6 +361,7 @@ const Journeys = () => {
   const previousJourneysLocationSignatureRef = useRef<string | null>(null);
   const pendingSelectedDateResetRef = useRef(false);
   const hasUserDateInteractionRef = useRef(false);
+  const previousEffectiveTodayDateKeyRef = useRef<string | null>(null);
   const showAddSheetRef = useRef(showAddSheet);
   const showPathfinderRef = useRef(showPathfinder);
   const scheduledTimeUpdateQueueRef = useRef<Map<string, Promise<void>>>(new Map());
@@ -386,6 +392,14 @@ const Journeys = () => {
   const queryClient = useQueryClient();
   const { queueAction, shouldQueueWrites, retryNow } = useResilience();
   const { profile, loading: profileLoading } = useProfile();
+  const effectiveTodayDateKey = useMemo(
+    () => getEffectiveMissionDate(profile?.timezone ?? undefined),
+    [profile?.timezone],
+  );
+  const effectiveTodayDate = useMemo(
+    () => parseDateKeyAtNoon(effectiveTodayDateKey),
+    [effectiveTodayDateKey],
+  );
 
   // Streak freeze
   const { 
@@ -638,11 +652,26 @@ const Journeys = () => {
 
     pendingSelectedDateResetRef.current = false;
     hasUserDateInteractionRef.current = false;
-    const today = new Date();
-    setDatePillCenterRequestDateKey(format(today, "yyyy-MM-dd"));
+    setDatePillCenterRequestDateKey(effectiveTodayDateKey);
     setDatePillCenterRequestKey((currentKey) => currentKey + 1);
-    setSelectedDate((current) => (isSameDay(current, today) ? current : today));
-  }, []);
+    setAgendaCenterNowRequestKey((currentKey) => currentKey + 1);
+    setSelectedDate((current) => (isSameDay(current, effectiveTodayDate) ? current : effectiveTodayDate));
+  }, [effectiveTodayDate, effectiveTodayDateKey]);
+
+  useEffect(() => {
+    const previousEffectiveTodayDateKey = previousEffectiveTodayDateKeyRef.current;
+    previousEffectiveTodayDateKeyRef.current = effectiveTodayDateKey;
+
+    if (previousEffectiveTodayDateKey === null || previousEffectiveTodayDateKey === effectiveTodayDateKey) {
+      return;
+    }
+
+    if (!isJourneysRouteActive || hasUserDateInteractionRef.current || notificationTaskDatePinnedRef.current) {
+      return;
+    }
+
+    resetSelectedDateToToday({ deferIfAddSheetOpen: true });
+  }, [effectiveTodayDateKey, isJourneysRouteActive, resetSelectedDateToToday]);
 
   const handleUserDateInteraction = useCallback(() => {
     notificationTaskDatePinnedRef.current = false;
@@ -667,9 +696,8 @@ const Journeys = () => {
     resetSelectedDateToToday({ deferIfAddSheetOpen: true });
 
     try {
-      const todayKey = format(new Date(), "yyyy-MM-dd");
       if (user?.id) {
-        await warmDailyTasksQueryFromRemote(queryClient, user.id, todayKey);
+        await warmDailyTasksQueryFromRemote(queryClient, user.id, effectiveTodayDateKey);
       }
 
       await Promise.all([
@@ -689,7 +717,7 @@ const Journeys = () => {
       resetSelectedDateToToday({ deferIfAddSheetOpen: true });
       setIsQuestListPullRefreshing(false);
     }
-  }, [isQuestListPullRefreshing, queryClient, resetSelectedDateToToday, user?.id]);
+  }, [effectiveTodayDateKey, isQuestListPullRefreshing, queryClient, resetSelectedDateToToday, user?.id]);
 
   useLayoutEffect(() => {
     const shouldResetForRouteEntry =
@@ -2082,6 +2110,7 @@ const Journeys = () => {
                 currentStreak={currentStreak}
                 desktopPlannerMode={desktopPlannerMode}
                 desktopInteractionResetKey={desktopInteractionResetKey}
+                centerNowRequestKey={agendaCenterNowRequestKey}
                 timedTaskDurationFallbackMinutes={macTimedTaskDurationFallbackMinutes}
                 useMacDurationSizedDesktopTimelineRows={isMacDesktopSession}
                 onUndoToggle={handleUndoToggle}

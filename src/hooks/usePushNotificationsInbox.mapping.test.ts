@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   getPushNotificationSourceLabel,
   mapPushNotificationRowToInboxItem,
-  shouldSyncPushNotificationBadge,
 } from "@/hooks/usePushNotificationsInbox";
 
 describe("push notification inbox mapping", () => {
@@ -64,15 +63,4 @@ describe("push notification inbox mapping", () => {
     expect(item.sourceLabel).toBe("Ritual reminder");
   });
 
-  it("only syncs the native badge after a successful unread-count query", () => {
-    expect(shouldSyncPushNotificationBadge({
-      enabled: true,
-      unreadCountQuerySucceeded: true,
-    })).toBe(true);
-
-    expect(shouldSyncPushNotificationBadge({
-      enabled: true,
-      unreadCountQuerySucceeded: false,
-    })).toBe(false);
-  });
 });

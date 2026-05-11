@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { useAuth } from "@/hooks/useAuth";
-import { setAppBadgeCount } from "@/utils/appBadge";
 import { resolvePushNotificationDestination } from "@/utils/pushNotificationNavigation";
 
 export const PUSH_NOTIFICATIONS_INBOX_QUERY_KEY = "push-notifications-inbox";
@@ -177,13 +176,6 @@ async function fetchRitualDailyTaskIdsForNotificationRows(
   );
 }
 
-export function shouldSyncPushNotificationBadge(input: {
-  enabled: boolean;
-  unreadCountQuerySucceeded: boolean;
-}): boolean {
-  return input.enabled && input.unreadCountQuerySucceeded;
-}
-
 export async function fetchPushNotificationInboxItems(userId: string): Promise<PushNotificationInboxItem[]> {
   const { data, error } = await supabase
     .from("push_notification_queue")
@@ -270,17 +262,6 @@ export function usePushNotificationsInbox(options: { enabled?: boolean } = {}) {
 
   const unreadCount = unreadCountQuery.data ?? 0;
   const items = inboxQuery.data ?? [];
-
-  useEffect(() => {
-    if (!shouldSyncPushNotificationBadge({
-      enabled,
-      unreadCountQuerySucceeded: unreadCountQuery.isSuccess,
-    })) {
-      return;
-    }
-
-    void setAppBadgeCount(unreadCount);
-  }, [enabled, unreadCount, unreadCountQuery.isSuccess]);
 
   return useMemo(() => ({
     items,

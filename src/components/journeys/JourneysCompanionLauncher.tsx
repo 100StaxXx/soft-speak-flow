@@ -156,7 +156,7 @@ export function JourneysCompanionLauncher({
         className={cn(
           "group relative flex items-center justify-center transition-transform duration-300 hover:scale-[1.02]",
           isFloatingHero
-            ? "h-36 w-36 overflow-visible bg-transparent p-0"
+            ? "h-36 w-36 overflow-visible rounded-full border border-celestial-blue/32 bg-celestial-blue/14 p-0 text-cyan-50 shadow-[0_14px_32px_rgba(16,75,130,0.2)] backdrop-blur-xl hover:border-celestial-blue/42 hover:bg-celestial-blue/20 hover:text-white"
             : "h-12 w-12 rounded-full border border-white/12 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),rgba(255,255,255,0.04)_48%,rgba(15,23,42,0.92))] shadow-[0_12px_28px_rgba(0,0,0,0.22)]",
           className,
         )}

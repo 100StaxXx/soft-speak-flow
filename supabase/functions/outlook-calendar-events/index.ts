@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getLocalDateTimeParts, toScheduledDateTime } from "../_shared/notificationsV2.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -65,6 +66,10 @@ interface DailyTask {
   recurrence_end_date: string | null;
   location: string | null;
   notes: string | null;
+}
+
+interface ProfileRow {
+  timezone: string | null;
 }
 
 const jsonResponse = (body: unknown, status = 200) =>
@@ -168,14 +173,20 @@ async function refreshAccessTokenIfNeeded(
   return tokens.access_token as string;
 }
 
-function buildTimedDate(taskDate: string, hhmm: string): Date {
-  const [h, m] = hhmm.split(":").map(Number);
-  const base = new Date(`${taskDate}T00:00:00`);
-  base.setHours(h || 0, m || 0, 0, 0);
-  return base;
+function buildTimedDate(taskDate: string, hhmm: string, timezone: string | null | undefined): Date {
+  const scheduledAt = toScheduledDateTime(taskDate, hhmm, timezone);
+  if (!scheduledAt) {
+    throw new Error("Task has an invalid scheduled time for the selected timezone");
+  }
+
+  return scheduledAt;
 }
 
-function getTaskEventWindow(task: DailyTask, fallbackDurationMinutes = 30): {
+function toGraphDateTime(date: Date): string {
+  return date.toISOString().replace("Z", "");
+}
+
+function getTaskEventWindow(task: DailyTask, timezone: string | null | undefined, fallbackDurationMinutes = 30): {
   isAllDay: boolean;
   start: Date;
   end: Date;
@@ -191,7 +202,7 @@ function getTaskEventWindow(task: DailyTask, fallbackDurationMinutes = 30): {
     return { isAllDay: true, start, end };
   }
 
-  const start = buildTimedDate(task.task_date, task.scheduled_time);
+  const start = buildTimedDate(task.task_date, task.scheduled_time, timezone);
   const minutes = task.estimated_duration && task.estimated_duration > 0
     ? task.estimated_duration
     : fallbackDurationMinutes;
@@ -413,8 +424,12 @@ export function toTaskRecurrenceFields(event: Record<string, any>): TaskRecurren
   return empty;
 }
 
-function toOutlookEventPayload(task: DailyTask, override: Record<string, unknown> = {}) {
-  const window = getTaskEventWindow(task);
+export function toOutlookEventPayload(
+  task: DailyTask,
+  timezone: string | null | undefined,
+  override: Record<string, unknown> = {},
+) {
+  const window = getTaskEventWindow(task, timezone);
 
   const subject = (override.title as string | undefined) ?? task.task_text;
   const bodyText = (override.description as string | undefined) ?? task.notes ?? "";
@@ -431,11 +446,11 @@ function toOutlookEventPayload(task: DailyTask, override: Record<string, unknown
       content: bodyText,
     },
     start: {
-      dateTime: window.start.toISOString(),
+      dateTime: toGraphDateTime(window.start),
       timeZone: "UTC",
     },
     end: {
-      dateTime: window.end.toISOString(),
+      dateTime: toGraphDateTime(window.end),
       timeZone: "UTC",
     },
     isAllDay: window.isAllDay,
@@ -446,7 +461,27 @@ function toOutlookEventPayload(task: DailyTask, override: Record<string, unknown
   };
 }
 
-function mapOutlookEventToTaskUpdate(event: Record<string, any>): Partial<DailyTask> {
+function parseProviderDateTime(raw: string): Date | null {
+  const normalized = /[zZ]|[+-]\d{2}:\d{2}$/.test(raw) ? raw : `${raw}Z`;
+  const parsed = new Date(normalized);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function toLocalTaskDateTime(date: Date, timezone: string | null | undefined): {
+  taskDate: string;
+  scheduledTime: string;
+} {
+  const parts = getLocalDateTimeParts(date, timezone || "UTC");
+  return {
+    taskDate: parts.localDate,
+    scheduledTime: `${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`,
+  };
+}
+
+export function mapOutlookEventToTaskUpdate(
+  event: Record<string, any>,
+  timezone: string | null | undefined,
+): Partial<DailyTask> {
   const title = (event.subject as string | undefined) ?? "(No title)";
   const location = (event.location?.displayName as string | undefined) ?? null;
   const notes = (event.body?.content as string | undefined) ?? null;
@@ -459,14 +494,21 @@ function mapOutlookEventToTaskUpdate(event: Record<string, any>): Partial<DailyT
     return { task_text: title, location, notes };
   }
 
-  const taskDate = startIso.slice(0, 10);
-  const scheduledTime = isAllDay ? null : startIso.slice(11, 16);
+  const startDateObj = parseProviderDateTime(startIso);
+  if (!startDateObj) {
+    return { task_text: title, location, notes };
+  }
+
+  const localStart = toLocalTaskDateTime(startDateObj, timezone);
+  const taskDate = isAllDay ? startIso.slice(0, 10) : localStart.taskDate;
+  const scheduledTime = isAllDay ? null : localStart.scheduledTime;
 
   let estimatedDuration = 1440;
   if (!isAllDay && endIso) {
-    const start = new Date(startIso);
-    const end = new Date(endIso);
-    estimatedDuration = Math.max(1, Math.round((end.getTime() - start.getTime()) / 60_000));
+    const endDateObj = parseProviderDateTime(endIso);
+    if (endDateObj) {
+      estimatedDuration = Math.max(1, Math.round((endDateObj.getTime() - startDateObj.getTime()) / 60_000));
+    }
   }
   const reminderEnabled = Boolean(event.isReminderOn);
   const reminderMinutesRaw = Number(event.reminderMinutesBeforeStart);
@@ -523,9 +565,7 @@ async function outlookApi(
 export function parseGraphDateTime(dateTimeObj: Record<string, any> | undefined): string | null {
   if (!dateTimeObj?.dateTime) return null;
   const raw = String(dateTimeObj.dateTime);
-  const normalized = /[zZ]|[+-]\d{2}:\d{2}$/.test(raw) ? raw : `${raw}Z`;
-  const parsed = new Date(normalized);
-  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+  return parseProviderDateTime(raw)?.toISOString() ?? null;
 }
 
 async function listOutlookCalendarWindow(
@@ -533,11 +573,14 @@ async function listOutlookCalendarWindow(
   calendarId: string,
   startDate: string,
   endDate: string,
+  timezone: string | null | undefined,
 ): Promise<Record<string, any>[]> {
+  const start = toScheduledDateTime(startDate, "00:00", timezone) ?? new Date(`${startDate}T00:00:00.000Z`);
+  const end = toScheduledDateTime(endDate, "23:59:59", timezone) ?? new Date(`${endDate}T23:59:59.999Z`);
   let path =
     `/me/calendars/${encodeURIComponent(calendarId)}/calendarView`
-    + `?startDateTime=${encodeURIComponent(new Date(`${startDate}T00:00:00.000Z`).toISOString())}`
-    + `&endDateTime=${encodeURIComponent(new Date(`${endDate}T23:59:59.999Z`).toISOString())}`
+    + `?startDateTime=${encodeURIComponent(start.toISOString())}`
+    + `&endDateTime=${encodeURIComponent(end.toISOString())}`
     + "&$top=250"
     + "&$select=id,subject,body,start,end,isAllDay,location,lastModifiedDateTime,isCancelled";
 
@@ -632,6 +675,16 @@ async function getTaskById(
   return data as DailyTask;
 }
 
+async function getUserTimezone(supabase: any, userId: string): Promise<string> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("timezone")
+    .eq("id", userId)
+    .maybeSingle();
+
+  return (data as ProfileRow | null)?.timezone || "UTC";
+}
+
 async function getOutlookConnection(
   supabase: any,
   userId: string,
@@ -685,6 +738,7 @@ async function handleOutlookCalendarEvents(req: Request) {
       }
 
       const task = await getTaskById(supabase, userId, taskId);
+      const timezone = await getUserTimezone(supabase, userId);
       const syncMode = normalizeSyncMode(body?.syncMode ?? body?.sync_mode ?? connection.sync_mode);
       const externalCalendarId =
         (body?.calendarId || body?.calendar_id) as string | undefined ||
@@ -695,7 +749,7 @@ async function handleOutlookCalendarEvents(req: Request) {
         return jsonResponse({ error: "No primary Outlook calendar selected" }, 400);
       }
 
-      const eventPayload = toOutlookEventPayload(task, {
+      const eventPayload = toOutlookEventPayload(task, timezone, {
         title: body?.title,
         description: body?.description,
         location: body?.location,
@@ -751,6 +805,7 @@ async function handleOutlookCalendarEvents(req: Request) {
       }
 
       const task = await getTaskById(supabase, userId, taskId);
+      const timezone = await getUserTimezone(supabase, userId);
 
       const { data: link, error: linkError } = await supabase
         .from("quest_calendar_links")
@@ -774,7 +829,7 @@ async function handleOutlookCalendarEvents(req: Request) {
         return jsonResponse({ error: "No primary Outlook calendar selected" }, 400);
       }
 
-      const eventPayload = toOutlookEventPayload(task, {
+      const eventPayload = toOutlookEventPayload(task, timezone, {
         title: body?.title,
         description: body?.description,
         location: body?.location,
@@ -838,6 +893,7 @@ async function handleOutlookCalendarEvents(req: Request) {
     }
 
     if (action === "syncLinkedChanges") {
+      const timezone = await getUserTimezone(supabase, userId);
       const { data: links, error: linksError } = await supabase
         .from("quest_calendar_links")
         .select("*")
@@ -881,7 +937,7 @@ async function handleOutlookCalendarEvents(req: Request) {
           }
 
           if (normalizeSyncMode(link.sync_mode) === "full_sync" && providerWins) {
-            const taskPatch = mapOutlookEventToTaskUpdate(event);
+            const taskPatch = mapOutlookEventToTaskUpdate(event, timezone);
             await supabase
               .from("daily_tasks")
               .update({
@@ -946,9 +1002,10 @@ async function handleOutlookCalendarEvents(req: Request) {
         ? body.endDate
         : new Date(now.getTime() + 29 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
       const syncedAt = new Date().toISOString();
+      const timezone = await getUserTimezone(supabase, userId);
 
       const [events, linkedEventResponse] = await Promise.all([
-        listOutlookCalendarWindow(accessToken, externalCalendarId, startDate, endDate),
+        listOutlookCalendarWindow(accessToken, externalCalendarId, startDate, endDate, timezone),
         supabase
           .from("quest_calendar_links")
           .select("external_event_id")

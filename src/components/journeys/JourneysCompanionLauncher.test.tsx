@@ -39,7 +39,7 @@ describe("JourneysCompanionLauncher", () => {
     });
   });
 
-  it("renders the floating hero launcher as larger art-only portrait treatment", () => {
+  it("renders the floating hero launcher with the frosted blue portrait treatment", () => {
     render(
       <JourneysCompanionLauncher
         variant="floating"
@@ -52,8 +52,16 @@ describe("JourneysCompanionLauncher", () => {
     const image = screen.getByRole("img", { name: "Nova" });
     const heroWrapper = launcher.firstElementChild as HTMLElement;
 
-    expect(launcher).toHaveClass("h-36", "w-36", "overflow-visible", "bg-transparent", "p-0");
-    expect(launcher.className).not.toContain("backdrop-blur-xl");
+    expect(launcher).toHaveClass(
+      "h-36",
+      "w-36",
+      "overflow-visible",
+      "rounded-full",
+      "border-celestial-blue/32",
+      "bg-celestial-blue/14",
+      "backdrop-blur-xl",
+      "p-0",
+    );
     expect(launcher.className).not.toContain("border-[#4d2811]");
     expect(launcher.querySelectorAll('[aria-hidden="true"]')).toHaveLength(0);
     expect(image).toHaveAttribute("data-companion-image-fit", "portrait");

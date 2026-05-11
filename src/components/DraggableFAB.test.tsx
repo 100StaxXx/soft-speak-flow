@@ -144,8 +144,15 @@ describe("DraggableFAB", () => {
     const launcher = screen.getByTestId("journeys-companion-launcher-floating");
     const image = screen.getByRole("img", { name: "Nova" });
 
-    expect(launcher).toHaveClass("h-36", "w-36", "overflow-visible", "bg-transparent");
-    expect(launcher.className).not.toContain("backdrop-blur-xl");
+    expect(launcher).toHaveClass(
+      "h-36",
+      "w-36",
+      "overflow-visible",
+      "rounded-full",
+      "border-celestial-blue/32",
+      "bg-celestial-blue/14",
+      "backdrop-blur-xl",
+    );
     expect(launcher.querySelectorAll('[aria-hidden="true"]')).toHaveLength(0);
     expect(image.parentElement).toHaveClass("h-[7.75rem]", "w-[7.75rem]");
     expect(launcher.style.boxShadow).toBe("");

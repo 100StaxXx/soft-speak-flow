@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getLocalDateTimeParts, toScheduledDateTime } from "../_shared/notificationsV2.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -41,6 +42,10 @@ interface DailyTask {
   estimated_duration: number | null;
   location: string | null;
   notes: string | null;
+}
+
+interface ProfileRow {
+  timezone: string | null;
 }
 
 const jsonResponse = (body: unknown, status = 200) =>
@@ -157,14 +162,16 @@ async function refreshAccessTokenIfNeeded(
   return tokens.access_token as string;
 }
 
-function buildTimedDate(taskDate: string, hhmm: string): Date {
-  const [h, m] = hhmm.split(":").map(Number);
-  const base = new Date(`${taskDate}T00:00:00`);
-  base.setHours(h || 0, m || 0, 0, 0);
-  return base;
+function buildTimedDate(taskDate: string, hhmm: string, timezone: string | null | undefined): Date {
+  const scheduledAt = toScheduledDateTime(taskDate, hhmm, timezone);
+  if (!scheduledAt) {
+    throw new Error("Task has an invalid scheduled time for the selected timezone");
+  }
+
+  return scheduledAt;
 }
 
-function getTaskEventWindow(task: DailyTask, fallbackDurationMinutes = 30): {
+function getTaskEventWindow(task: DailyTask, timezone: string | null | undefined, fallbackDurationMinutes = 30): {
   isAllDay: boolean;
   start: Date;
   end: Date;
@@ -180,7 +187,7 @@ function getTaskEventWindow(task: DailyTask, fallbackDurationMinutes = 30): {
     return { isAllDay: true, start, end };
   }
 
-  const start = buildTimedDate(task.task_date, task.scheduled_time);
+  const start = buildTimedDate(task.task_date, task.scheduled_time, timezone);
   const minutes = task.estimated_duration && task.estimated_duration > 0
     ? task.estimated_duration
     : fallbackDurationMinutes;
@@ -189,8 +196,12 @@ function getTaskEventWindow(task: DailyTask, fallbackDurationMinutes = 30): {
   return { isAllDay: false, start, end };
 }
 
-function toGoogleEventPayload(task: DailyTask, override: Record<string, unknown> = {}) {
-  const window = getTaskEventWindow(task);
+export function toGoogleEventPayload(
+  task: DailyTask,
+  timezone: string | null | undefined,
+  override: Record<string, unknown> = {},
+) {
+  const window = getTaskEventWindow(task, timezone);
 
   const title = (override.title as string | undefined) ?? task.task_text;
   const location = (override.location as string | undefined) ?? task.location ?? undefined;
@@ -215,7 +226,21 @@ function toGoogleEventPayload(task: DailyTask, override: Record<string, unknown>
   };
 }
 
-function mapGoogleEventToTaskUpdate(event: Record<string, any>): Partial<DailyTask> {
+function toLocalTaskDateTime(date: Date, timezone: string | null | undefined): {
+  taskDate: string;
+  scheduledTime: string;
+} {
+  const parts = getLocalDateTimeParts(date, timezone || "UTC");
+  return {
+    taskDate: parts.localDate,
+    scheduledTime: `${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`,
+  };
+}
+
+export function mapGoogleEventToTaskUpdate(
+  event: Record<string, any>,
+  timezone: string | null | undefined,
+): Partial<DailyTask> {
   const title = (event.summary as string | undefined) ?? "(No title)";
   const location = (event.location as string | undefined) ?? null;
   const notes = (event.description as string | undefined) ?? null;
@@ -246,16 +271,26 @@ function mapGoogleEventToTaskUpdate(event: Record<string, any>): Partial<DailyTa
   }
 
   const startDateObj = new Date(startIso);
-  const endDateObj = endIso ? new Date(endIso) : new Date(startDateObj.getTime() + 30 * 60_000);
+  if (Number.isNaN(startDateObj.getTime())) {
+    return {
+      task_text: title,
+      location,
+      notes,
+    };
+  }
 
-  const taskDate = startIso.slice(0, 10);
-  const scheduledTime = startIso.slice(11, 16);
+  const parsedEndDateObj = endIso ? new Date(endIso) : null;
+  const endDateObj = parsedEndDateObj && !Number.isNaN(parsedEndDateObj.getTime())
+    ? parsedEndDateObj
+    : new Date(startDateObj.getTime() + 30 * 60_000);
+
+  const localStart = toLocalTaskDateTime(startDateObj, timezone);
   const estimatedDuration = Math.max(1, Math.round((endDateObj.getTime() - startDateObj.getTime()) / 60_000));
 
   return {
     task_text: title,
-    task_date: taskDate,
-    scheduled_time: scheduledTime,
+    task_date: localStart.taskDate,
+    scheduled_time: localStart.scheduledTime,
     estimated_duration: estimatedDuration,
     location,
     notes,
@@ -305,6 +340,16 @@ async function getTaskById(
   return data as DailyTask;
 }
 
+async function getUserTimezone(supabase: any, userId: string): Promise<string> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("timezone")
+    .eq("id", userId)
+    .maybeSingle();
+
+  return (data as ProfileRow | null)?.timezone || "UTC";
+}
+
 async function getGoogleConnection(
   supabase: any,
   userId: string,
@@ -323,7 +368,7 @@ async function getGoogleConnection(
   return data as CalendarConnection;
 }
 
-Deno.serve(async (req) => {
+async function handleGoogleCalendarEvents(req: Request) {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -397,6 +442,7 @@ Deno.serve(async (req) => {
       }
 
       const task = await getTaskById(supabase, userId, taskId);
+      const timezone = await getUserTimezone(supabase, userId);
       const syncMode = normalizeSyncMode(body?.syncMode ?? body?.sync_mode ?? connection.sync_mode);
       const externalCalendarId =
         (body?.calendarId || body?.calendar_id) as string | undefined ||
@@ -404,7 +450,7 @@ Deno.serve(async (req) => {
         connection.calendar_id ||
         "primary";
 
-      const eventPayload = toGoogleEventPayload(task, {
+      const eventPayload = toGoogleEventPayload(task, timezone, {
         title: body?.title,
         description: body?.description,
         location: body?.location,
@@ -461,6 +507,7 @@ Deno.serve(async (req) => {
       }
 
       const task = await getTaskById(supabase, userId, taskId);
+      const timezone = await getUserTimezone(supabase, userId);
 
       const { data: link, error: linkError } = await supabase
         .from("quest_calendar_links")
@@ -481,7 +528,7 @@ Deno.serve(async (req) => {
         connection.calendar_id ||
         "primary";
 
-      const eventPayload = toGoogleEventPayload(task, {
+      const eventPayload = toGoogleEventPayload(task, timezone, {
         title: body?.title,
         description: body?.description,
         location: body?.location,
@@ -545,6 +592,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === "legacySync" || action === "syncLinkedChanges") {
+      const timezone = await getUserTimezone(supabase, userId);
       const { data: links, error: linksError } = await supabase
         .from("quest_calendar_links")
         .select("*")
@@ -588,7 +636,7 @@ Deno.serve(async (req) => {
           }
 
           if (normalizeSyncMode(link.sync_mode) === "full_sync" && providerWins) {
-            const taskPatch = mapGoogleEventToTaskUpdate(event);
+            const taskPatch = mapGoogleEventToTaskUpdate(event, timezone);
             await supabase
               .from("daily_tasks")
               .update({
@@ -634,4 +682,10 @@ Deno.serve(async (req) => {
     const status = message.toLowerCase().includes("unauthorized") ? 401 : 500;
     return jsonResponse({ error: message }, status);
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleGoogleCalendarEvents);
+}
+
+export { handleGoogleCalendarEvents };

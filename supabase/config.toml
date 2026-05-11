@@ -235,6 +235,9 @@ verify_jwt = true
 [functions.send-apns-notification]
 verify_jwt = false
 
+[functions.early-access-signup]
+verify_jwt = false
+
 [functions.create-influencer-code]
 verify_jwt = false
 

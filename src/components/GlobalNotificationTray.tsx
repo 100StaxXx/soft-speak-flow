@@ -18,6 +18,7 @@ import {
   usePushNotificationsInbox,
   type PushNotificationInboxItem,
 } from "@/hooks/usePushNotificationsInbox";
+import { useRemainingTodayBadgeCount } from "@/hooks/useDailyTaskBadgeSync";
 import { cn } from "@/lib/utils";
 import { logger } from "@/utils/logger";
 
@@ -38,6 +39,10 @@ export const GlobalNotificationTray = memo(({ enabled = true }: { enabled?: bool
     markAllRead,
     isMarkingAllRead,
   } = usePushNotificationsInbox({ enabled });
+  const { count: remainingTodayCount } = useRemainingTodayBadgeCount({ enabled });
+  const remainingTodayLabel = remainingTodayCount === 1
+    ? "1 item left today"
+    : `${remainingTodayCount} items left today`;
 
   const handleOpenNotification = useCallback(async (item: PushNotificationInboxItem) => {
     try {
@@ -52,6 +57,11 @@ export const GlobalNotificationTray = memo(({ enabled = true }: { enabled?: bool
     setOpen(false);
     navigate(item.destinationPath);
   }, [markOpened, navigate]);
+
+  const handleOpenRemainingToday = useCallback(() => {
+    setOpen(false);
+    navigate("/journeys");
+  }, [navigate]);
 
   const handleMarkAllRead = useCallback(async () => {
     try {
@@ -73,12 +83,12 @@ export const GlobalNotificationTray = memo(({ enabled = true }: { enabled?: bool
           variant="outline"
           size="icon"
           className="fixed right-4 top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-40 h-10 w-10 rounded-full border-border/70 bg-card/82 shadow-[0_12px_28px_rgba(0,0,0,0.22)] backdrop-blur-xl"
-          aria-label={unreadCount > 0 ? `Open notifications, ${unreadCount} unread` : "Open notifications"}
+          aria-label={remainingTodayCount > 0 ? `Open notifications, ${remainingTodayCount} remaining today` : "Open notifications"}
         >
           <Bell className="h-4 w-4" />
-          {unreadCount > 0 ? (
+          {remainingTodayCount > 0 ? (
             <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-none text-destructive-foreground">
-              {unreadCount > 99 ? "99+" : unreadCount}
+              {remainingTodayCount > 99 ? "99+" : remainingTodayCount}
             </span>
           ) : null}
         </Button>
@@ -90,8 +100,8 @@ export const GlobalNotificationTray = memo(({ enabled = true }: { enabled?: bool
               <div className="flex items-center gap-2">
                 <SheetTitle>Notifications</SheetTitle>
                 {unreadCount > 0 ? (
-                  <Badge variant="destructive" className="px-2 py-0 text-[11px]">
-                    {unreadCount}
+                  <Badge variant="secondary" className="px-2 py-0 text-[11px]">
+                    {unreadCount} unread
                   </Badge>
                 ) : null}
               </div>
@@ -126,6 +136,25 @@ export const GlobalNotificationTray = memo(({ enabled = true }: { enabled?: bool
 
         <ScrollArea className="min-h-0 flex-1">
           <div className="space-y-2 p-4">
+            {remainingTodayCount > 0 ? (
+              <button
+                type="button"
+                className="w-full rounded-lg border border-primary/35 bg-primary/[0.08] p-3 text-left transition-colors hover:bg-primary/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={handleOpenRemainingToday}
+                aria-label={`Open remaining today, ${remainingTodayCount} remaining`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="flex h-8 min-w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                    {remainingTodayCount > 99 ? "99+" : remainingTodayCount}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold text-foreground">Remaining today</div>
+                    <div className="text-xs text-muted-foreground">{remainingTodayLabel}</div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </div>
+              </button>
+            ) : null}
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />

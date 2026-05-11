@@ -57,6 +57,10 @@ import { StoreKitProvider } from "@/providers/StoreKitProvider";
 import { EVENING_REFLECTION_CANONICAL_PATH } from "@/utils/eveningReflectionNavigation";
 import { useWinWinKitSync } from "@/hooks/useWinWinKitSync";
 import { useCreationPopupResume } from "@/hooks/useCreationPopupResume";
+import {
+  REMAINING_TODAY_BADGE_COUNT_QUERY_KEY,
+  useDailyTaskBadgeSync,
+} from "@/hooks/useDailyTaskBadgeSync";
 import { supabase } from "@/integrations/supabase/client";
 import {
   PUSH_NOTIFICATIONS_INBOX_QUERY_KEY,
@@ -150,11 +154,6 @@ LoadingFallback.displayName = 'LoadingFallback';
 const RootRoute = memo(() => {
   const { user, loading, status } = useAuth();
   const authStatus = status ?? (loading ? 'loading' : user ? 'authenticated' : 'unauthenticated');
-  const isAuthPending = loading || authStatus === 'recovering' || authStatus === 'loading';
-
-  if (isAuthPending) {
-    return <LoadingFallback />;
-  }
 
   if (!user || authStatus === 'unauthenticated') {
     return <Welcome />;
@@ -250,6 +249,7 @@ const AppContent = memo(() => {
   // Refresh critical data on app resume (iOS/Android) or tab visibility (web)
   useAppResumeRefresh({ enabled: status === "authenticated" && Boolean(session?.user) });
   useCreationPopupResume();
+  useDailyTaskBadgeSync();
   
   // Handle password recovery tokens BEFORE routes render - prevents paywall from blocking reset
   useEffect(() => {
@@ -290,6 +290,7 @@ const AppContent = memo(() => {
     const handler = () => {
       void queryClient.invalidateQueries({ queryKey: [PUSH_NOTIFICATIONS_INBOX_QUERY_KEY] });
       void queryClient.invalidateQueries({ queryKey: [PUSH_NOTIFICATIONS_UNREAD_COUNT_QUERY_KEY] });
+      void queryClient.invalidateQueries({ queryKey: [REMAINING_TODAY_BADGE_COUNT_QUERY_KEY] });
     };
 
     window.addEventListener(NATIVE_PUSH_RECEIVED_EVENT, handler);

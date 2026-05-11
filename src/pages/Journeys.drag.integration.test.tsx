@@ -11,6 +11,15 @@ import {
   getCreationPopupMarkerStorageKey,
 } from "@/utils/accountLocalState";
 
+if (!HTMLElement.prototype.scrollTo) {
+  Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+    value: () => undefined,
+    configurable: true,
+    writable: true,
+  });
+}
+const elementScrollToSpy = vi.spyOn(HTMLElement.prototype, "scrollTo").mockImplementation(() => undefined);
+
 vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
   useJourneysCompanionVisual: () => ({
     companionLabel: "Nova",
@@ -96,6 +105,7 @@ const mocks = vi.hoisted(() => ({
   }>,
   epicsLoading: false,
   isMacHostedIOSApp: false,
+  profileTimezone: null as string | null,
   draggableFabRenderCount: 0,
   lastDatePillSelectedDate: null as Date | null,
   lastDatePillCenterRequestKey: null as number | null,
@@ -523,6 +533,7 @@ vi.mock("@/hooks/useProfile", () => ({
       completed_tasks_stay_in_place: true,
       onboarding_completed: true,
       onboarding_data: {},
+      timezone: mocks.profileTimezone,
     },
     loading: false,
   }),
@@ -776,6 +787,7 @@ describe("Journeys row drag integration", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    elementScrollToSpy.mockClear();
     localStorageState.store.clear();
     mocks.warmDailyTasksQueryFromRemote.mockResolvedValue([]);
     mocks.isTabActive = true;
@@ -785,6 +797,7 @@ describe("Journeys row drag integration", () => {
     mocks.calendarConnections = [];
     mocks.epics = [];
     mocks.isMacHostedIOSApp = false;
+    mocks.profileTimezone = null;
     mocks.draggableFabRenderCount = 0;
     mocks.lastDatePillSelectedDate = null;
     mocks.lastDatePillCenterRequestKey = null;
@@ -1052,6 +1065,7 @@ describe("Journeys row drag integration", () => {
       writable: true,
       value: 1100,
     });
+    const expectedDateKey = new Date().toISOString().slice(0, 10);
 
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -1068,8 +1082,6 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.click(await screen.findByText("set-future-day"));
-    const selectedDate = mocks.lastDatePillSelectedDate;
     const launcher = await screen.findByRole("button", { name: /Plan (Today|Day)/i });
     fireEvent.click(launcher);
 
@@ -1077,8 +1089,8 @@ describe("Journeys row drag integration", () => {
       expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
     });
     expect(
-      mocks.lastCompanionPlannerModalProps?.selectedDate?.toDateString(),
-    ).toBe(selectedDate?.toDateString());
+      mocks.lastCompanionPlannerModalProps?.selectedDate?.toISOString().slice(0, 10),
+    ).toBe(expectedDateKey);
   });
 
   it("keeps the planner closed on first load even when an old pinned preference exists", async () => {
@@ -2068,6 +2080,7 @@ describe("Journeys row drag integration", () => {
       expect(isSameDay(new Date(sameDaySelectedDateIso), new Date())).toBe(true);
     });
     const centerKeyBeforeReentry = Number(screen.getByTestId("center-request-key").textContent);
+    elementScrollToSpy.mockClear();
 
     fireEvent.click(screen.getByRole("button", { name: "go-inbox" }));
     await waitFor(() => {
@@ -2083,6 +2096,7 @@ describe("Journeys row drag integration", () => {
       expect(screen.getByTestId("selected-date-iso").textContent).toBe(sameDaySelectedDateIso);
       expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeReentry);
       expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
+      expect(elementScrollToSpy).toHaveBeenCalled();
     });
   });
 
@@ -2125,6 +2139,50 @@ describe("Journeys row drag integration", () => {
     });
   });
 
+  it("resets to the effective mission date before the 2 AM day boundary", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-05-12T08:30:00.000Z"));
+    mocks.profileTimezone = "America/Los_Angeles";
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-date-iso").textContent).toContain("2026-05-11");
+      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent("2026-05-11");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
+
+    let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+    await waitFor(() => {
+      staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      expect(staleSelectedDateIso).not.toContain("2026-05-11");
+    });
+
+    act(() => {
+      window.dispatchEvent(new Event(JOURNEYS_RESET_TO_TODAY_EVENT));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-date-iso").textContent).toContain("2026-05-11");
+      expect(screen.getByTestId("selected-date-iso").textContent).not.toBe(staleSelectedDateIso);
+      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent("2026-05-11");
+    });
+  });
+
   it("requests date-pill recentering when the active quests tab requests today and the selected date is already today", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -2153,6 +2211,7 @@ describe("Journeys row drag integration", () => {
       expect(isSameDay(new Date(sameDaySelectedDateIso), new Date())).toBe(true);
     });
     const centerKeyBeforeResetRequest = Number(screen.getByTestId("center-request-key").textContent);
+    elementScrollToSpy.mockClear();
 
     act(() => {
       window.dispatchEvent(new Event(JOURNEYS_RESET_TO_TODAY_EVENT));
@@ -2162,6 +2221,7 @@ describe("Journeys row drag integration", () => {
       expect(screen.getByTestId("selected-date-iso").textContent).toBe(sameDaySelectedDateIso);
       expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeResetRequest);
       expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
+      expect(elementScrollToSpy).toHaveBeenCalled();
     });
   });
 

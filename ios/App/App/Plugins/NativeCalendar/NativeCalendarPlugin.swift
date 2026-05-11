@@ -27,6 +27,18 @@ public class NativeCalendarPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    private func parseIsoDate(_ value: String) -> Date? {
+        let fractionalFormatter = ISO8601DateFormatter()
+        fractionalFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = fractionalFormatter.date(from: value) {
+            return date
+        }
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: value)
+    }
+
     // MARK: - Plugin Methods
     @objc public func isAvailable(_ call: CAPPluginCall) {
         call.resolve(["available": true])
@@ -78,9 +90,8 @@ public class NativeCalendarPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
-        let isoFormatter = ISO8601DateFormatter()
-        guard let startDate = isoFormatter.date(from: startDateString),
-              let endDate = isoFormatter.date(from: endDateString) else {
+        guard let startDate = parseIsoDate(startDateString),
+              let endDate = parseIsoDate(endDateString) else {
             call.reject("Invalid startDate or endDate format")
             return
         }

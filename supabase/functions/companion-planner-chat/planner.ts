@@ -4418,6 +4418,12 @@ const hasMaterializedRitualTaskForDate = (
     task.taskDate === date && task.habitSourceId === ritual.id
   );
 
+const shouldIncludeVirtualRitualScheduleItems = (
+  input: PlannerBuildInput,
+): boolean =>
+  input.plannerContext.starterIntent === "upcoming_start" ||
+  isUpcomingScheduleDigestMessage(input.message);
+
 const getStructuredRitualStart = (
   ritual: PlannerContextRitual,
   date: string,
@@ -4479,8 +4485,10 @@ const collectRitualScheduleItemsForDate = (
 const buildRitualIntervalsForDate = (
   input: PlannerBuildInput,
   date: string,
-): TimelineInterval[] =>
-  collectRitualScheduleItemsForDate(input, date, false)
+): TimelineInterval[] => {
+  if (!shouldIncludeVirtualRitualScheduleItems(input)) return [];
+
+  return collectRitualScheduleItemsForDate(input, date, false)
     .map((item): TimelineInterval | null => {
       if (item.sortMinutes === null) return null;
       const ritualId = item.id.split(":")[1] ?? item.id;
@@ -4496,6 +4504,7 @@ const buildRitualIntervalsForDate = (
       };
     })
     .filter((interval): interval is TimelineInterval => interval !== null);
+};
 
 const buildIntervalsForDate = (
   input: PlannerBuildInput,
@@ -4583,14 +4592,14 @@ const collectScheduleItemsForDate = (
       sortMinutes: parseTimeToMinutes(task.scheduledTime),
     }));
 
-  const rituals = collectRitualScheduleItemsForDate(
-    input,
-    date,
-    remainingOnly,
-  ).map((ritual) => ({
-    label: ritual.label,
-    sortMinutes: ritual.sortMinutes,
-  }));
+  const rituals = shouldIncludeVirtualRitualScheduleItems(input)
+    ? collectRitualScheduleItemsForDate(input, date, remainingOnly).map((
+      ritual,
+    ) => ({
+      label: ritual.label,
+      sortMinutes: ritual.sortMinutes,
+    }))
+    : [];
 
   const events = input.plannerContext.calendarEvents
     .filter((event) => {
@@ -4681,11 +4690,9 @@ const collectStructuredScheduleItemsForDate = (
       sortMinutes: parseTimeToMinutes(task.scheduledTime),
     }));
 
-  const rituals = collectRitualScheduleItemsForDate(
-    input,
-    date,
-    remainingOnly,
-  );
+  const rituals = shouldIncludeVirtualRitualScheduleItems(input)
+    ? collectRitualScheduleItemsForDate(input, date, remainingOnly)
+    : [];
 
   const events = input.plannerContext.calendarEvents
     .filter((event) => {

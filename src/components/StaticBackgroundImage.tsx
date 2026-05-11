@@ -6,6 +6,7 @@ interface StaticBackgroundImageProps {
   className?: string;
   style?: CSSProperties;
   objectPosition?: CSSProperties["objectPosition"];
+  loading?: "eager" | "lazy";
   onError?: ReactEventHandler<HTMLImageElement>;
   testId?: string;
 }
@@ -18,6 +19,7 @@ export const StaticBackgroundImage = ({
   className,
   style,
   objectPosition,
+  loading = "eager",
   onError,
   testId,
 }: StaticBackgroundImageProps) => (
@@ -30,7 +32,7 @@ export const StaticBackgroundImage = ({
     className={className ?? DEFAULT_CLASSNAME}
     draggable={false}
     decoding="async"
-    loading="eager"
+    loading={loading}
     style={{ objectPosition, ...style }}
     onError={onError}
     data-testid={testId}

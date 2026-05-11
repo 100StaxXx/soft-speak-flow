@@ -8987,6 +8987,10 @@ export type Database = {
           owner_type: string | null
         }[]
       }
+      get_remaining_today_badge_count: {
+        Args: { p_now?: string; p_user_id?: string }
+        Returns: number
+      }
       mark_all_push_notifications_read: {
         Args: Record<PropertyKey, never>
         Returns: undefined

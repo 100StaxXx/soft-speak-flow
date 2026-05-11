@@ -183,6 +183,11 @@ vi.mock("@/hooks/useAppResumeRefresh", () => ({
   useAppResumeRefresh: () => undefined,
 }));
 
+vi.mock("@/hooks/useDailyTaskBadgeSync", () => ({
+  REMAINING_TODAY_BADGE_COUNT_QUERY_KEY: "remaining-today-badge-count",
+  useDailyTaskBadgeSync: () => undefined,
+}));
+
 vi.mock("@/hooks/useWinWinKitSync", () => ({
   useWinWinKitSync: () => undefined,
 }));

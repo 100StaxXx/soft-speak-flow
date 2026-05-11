@@ -3,22 +3,29 @@ interface BadgeQueueRow {
   user_id: string;
 }
 
-export async function resolveBadgeCountAfterSend(
+export async function resolveRemainingDailyTaskBadgeCount(
   supabase: any,
-  row: BadgeQueueRow,
+  userId: string,
+  now = new Date(),
 ): Promise<number | null> {
-  const { count, error } = await supabase
-    .from("push_notification_queue")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", row.user_id)
-    .eq("status", "sent")
-    .not("delivered_at", "is", null)
-    .is("read_at", null);
+  const { data, error } = await supabase.rpc("get_remaining_today_badge_count", {
+    p_user_id: userId,
+    p_now: now.toISOString(),
+  });
 
   if (error) {
-    console.error("[notifications-dispatch-v2] badge count lookup failed", row.id, error);
+    console.error("[notifications-dispatch-v2] badge remaining count lookup failed", userId, error);
     return null;
   }
 
-  return Math.max(1, (count ?? 0) + 1);
+  const count = Number(data ?? 0);
+  return Number.isFinite(count) ? Math.max(0, Math.trunc(count)) : 0;
+}
+
+export async function resolveBadgeCountAfterSend(
+  supabase: any,
+  row: BadgeQueueRow,
+  now = new Date(),
+): Promise<number | null> {
+  return resolveRemainingDailyTaskBadgeCount(supabase, row.user_id, now);
 }
