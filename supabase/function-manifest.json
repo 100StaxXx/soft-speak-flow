@@ -21,7 +21,6 @@
     "delete-quest-attachment",
     "delete-user",
     "detect-promotion-opportunities",
-    "early-access-signup",
     "enrich-user-context",
     "generate-activity-comment",
     "generate-adversary-image",

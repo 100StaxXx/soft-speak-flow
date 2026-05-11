@@ -9003,6 +9003,31 @@ export type Database = {
         Args: { p_queue_id: string }
         Returns: undefined
       }
+      record_early_access_signup: {
+        Args: {
+          p_email: string
+          p_referrer?: string | null
+          p_request_metadata?: Json
+          p_source?: string | null
+          p_user_agent?: string | null
+        }
+        Returns: {
+          created_at: string
+          email: string
+          id: string
+          last_signup_at: string
+          owner_notification_error: string | null
+          owner_notification_status: string
+          owner_notified_at: string | null
+          referrer: string | null
+          request_metadata: Json
+          signup_count: number
+          source: string | null
+          status: string
+          updated_at: string
+          user_agent: string | null
+        }
+      }
       apply_companion_preset_selection: {
         Args: {
           p_companion_id: string

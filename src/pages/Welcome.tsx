@@ -14,7 +14,6 @@ const createLandingBackdrop = (src: string, src2x = src): StaticBackgroundAsset 
 });
 
 const landingBackdrops = {
-  campaigns: createLandingBackdrop("/landing-backdrops/campaigns.webp", "/landing-backdrops/campaigns@2x.webp"),
   companion: createLandingBackdrop("/landing-backdrops/companion.webp", "/landing-backdrops/companion@2x.webp"),
   guide: createLandingBackdrop("/landing-backdrops/guide.webp", "/landing-backdrops/guide@2x.webp"),
   profile: createLandingBackdrop("/landing-backdrops/profile.webp", "/landing-backdrops/profile@2x.webp"),
@@ -34,13 +33,6 @@ const featureGroups = [
     title: "Companion",
     text: "Watch a personal myth grow around the consistency you are already building.",
   },
-];
-
-const operatingRhythms = [
-  "Start with a daily focus instead of an endless list.",
-  "Break long goals into campaigns, milestones, and small quests.",
-  "Use recaps, streaks, and resets to keep momentum visible.",
-  "Return when the day changes, and choose the next useful move.",
 ];
 
 interface LandscapeSectionProps {
@@ -108,12 +100,22 @@ const Welcome = () => {
     setStatus("submitting");
     setMessage("");
 
-    const { error } = await supabase.functions.invoke("early-access-signup", {
-      body: {
-        email: normalizedEmail,
-        website,
-        source: window.location.pathname,
-        referrer: document.referrer || null,
+    if (website.trim()) {
+      setStatus("success");
+      setMessage("You are on the early access list. I will send the next opening your way.");
+      setEmail("");
+      setWebsite("");
+      return;
+    }
+
+    const { error } = await supabase.rpc("record_early_access_signup", {
+      p_email: normalizedEmail,
+      p_source: window.location.pathname,
+      p_referrer: document.referrer || null,
+      p_user_agent: window.navigator.userAgent,
+      p_request_metadata: {
+        created_from: "landing_page",
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       },
     });
 
@@ -258,35 +260,6 @@ const Welcome = () => {
                     {feature.text}
                   </p>
                 </div>
-              ))}
-            </div>
-          </motion.div>
-        </LandscapeSection>
-
-        <LandscapeSection
-          id="rhythm"
-          background={landingBackdrops.campaigns}
-          contentClassName="flex-col items-end justify-end pb-[calc(env(safe-area-inset-bottom,0px)+3.25rem)] pt-[calc(env(safe-area-inset-top,0px)+6.5rem)] text-right sm:pb-16"
-          imagePosition="50% 45%"
-        >
-          <motion.div
-            initial={prefersReducedMotion ? false : { y: 12, opacity: 1 }}
-            whileInView={{ y: 0, opacity: 1 }}
-            viewport={{ amount: 0.72, once: false }}
-            transition={{ duration: prefersReducedMotion ? 0 : 0.34, ease: "easeOut" }}
-            className="relative z-20 w-full max-w-3xl"
-          >
-            <p className="mb-4 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-100 sm:text-sm">
-              How it works
-            </p>
-            <h2 className="text-4xl font-semibold leading-[0.98] tracking-normal sm:text-6xl lg:text-7xl">
-              More signal. Fewer screens. A clearer day.
-            </h2>
-            <div className="mt-7 grid gap-3 text-left sm:grid-cols-2">
-              {operatingRhythms.map((item) => (
-                <p key={item} className="border-t border-white/22 pt-4 text-base leading-7 text-white/78 sm:text-lg">
-                  {item}
-                </p>
               ))}
             </div>
           </motion.div>

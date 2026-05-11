@@ -39,7 +39,7 @@ describe("JourneysCompanionLauncher", () => {
     });
   });
 
-  it("renders the floating hero launcher with the frosted blue portrait treatment", () => {
+  it("renders the floating hero launcher without a visible shell around the art", () => {
     render(
       <JourneysCompanionLauncher
         variant="floating"
@@ -57,9 +57,9 @@ describe("JourneysCompanionLauncher", () => {
       "w-36",
       "overflow-visible",
       "rounded-full",
-      "border-celestial-blue/32",
-      "bg-celestial-blue/14",
-      "backdrop-blur-xl",
+      "border-0",
+      "bg-transparent",
+      "shadow-none",
       "p-0",
     );
     expect(launcher.className).not.toContain("border-[#4d2811]");

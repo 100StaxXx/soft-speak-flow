@@ -52,7 +52,6 @@ import { ResilienceStatusBanner } from "@/components/resilience/ResilienceStatus
 import { MentorConnectionProvider, useMentorConnection } from "@/contexts/MentorConnectionContext";
 import { WallpaperManifestProvider } from "@/contexts/WallpaperManifestContext";
 import { GlobalWidgetSyncBridge } from "@/components/GlobalWidgetSyncBridge";
-import { GlobalNotificationTray } from "@/components/GlobalNotificationTray";
 import { StoreKitProvider } from "@/providers/StoreKitProvider";
 import { EVENING_REFLECTION_CANONICAL_PATH } from "@/utils/eveningReflectionNavigation";
 import { useWinWinKitSync } from "@/hooks/useWinWinKitSync";
@@ -220,7 +219,6 @@ MentorTutorialLayer.displayName = "MentorTutorialLayer";
 
 const DEFAULT_SONNER_BOTTOM_OFFSET = "calc(env(safe-area-inset-bottom, 0px) + 16px)";
 const BOTTOM_NAV_SONNER_BOTTOM_OFFSET = "calc(var(--bottom-nav-runtime-offset, var(--bottom-nav-safe-offset)) + 12px)";
-const NOTIFICATION_TRAY_VISIBLE_PATHS = new Set(["/mentor"]);
 
 const MentorConnectedThemeProvider = memo(({ children }: { children: ReactNode }) => {
   const { mentorId } = useMentorConnection();
@@ -368,7 +366,6 @@ const AppContent = memo(() => {
 
   const activeMainTabPath = isMainTabPath(location.pathname) ? location.pathname : null;
   const showBottomNav = shouldShowBottomNav(location.pathname, Boolean(session?.user));
-  const showNotificationTray = Boolean(session?.user) && NOTIFICATION_TRAY_VISIBLE_PATHS.has(location.pathname);
 
   useEffect(() => {
     const rootStyle = document.documentElement.style;
@@ -461,7 +458,6 @@ const AppContent = memo(() => {
                             </AnimatePresence>
                           )}
                           {showBottomNav && <BottomNav />}
-                          {showNotificationTray ? <GlobalNotificationTray /> : null}
                           <MentorTutorialLayer />
                           </Suspense>
                           </AstralEncounterProvider>

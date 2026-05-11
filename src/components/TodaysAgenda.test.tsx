@@ -421,7 +421,7 @@ describe("TodaysAgenda subtasks", () => {
     });
   });
 
-  it("shows subtasks when expanded and persists subtask toggle", async () => {
+  it("shows subtasks for untimed quests when expanded and persists subtask toggle", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -429,7 +429,7 @@ describe("TodaysAgenda subtasks", () => {
       },
     });
 
-    const { container } = render(
+    render(
       <TodaysAgenda
         tasks={[
           {
@@ -437,7 +437,7 @@ describe("TodaysAgenda subtasks", () => {
             task_text: "Launch campaign",
             completed: false,
             xp_reward: 50,
-            scheduled_time: "09:00",
+            scheduled_time: null,
             subtasks: [
               {
                 id: "subtask-1",
@@ -457,7 +457,11 @@ describe("TodaysAgenda subtasks", () => {
       { wrapper: createWrapper(queryClient) }
     );
 
-    const chevron = container.querySelector("svg.lucide-chevron-down");
+    fireEvent.click(screen.getByTestId("untimed-quests-drawer-trigger"));
+
+    const drawer = await screen.findByTestId("untimed-quests-drawer");
+    const untimedQuest = within(drawer).getByTestId("untimed-quest-task-1");
+    const chevron = untimedQuest.querySelector("svg.lucide-chevron-down");
     expect(chevron).toBeTruthy();
     const chevronButton = chevron?.closest("button");
     expect(chevronButton).toBeTruthy();
@@ -784,6 +788,7 @@ describe("TodaysAgenda campaign visibility", () => {
             completed: false,
             xp_reward: 15,
             scheduled_time: "07:00",
+            estimated_duration: 60,
             habit_source_id: "habit-1",
             epic_id: "epic-1",
             epic_title: "Fallback Campaign",
@@ -975,7 +980,7 @@ describe("TodaysAgenda campaign visibility", () => {
     expect(mocks.journeyPathDrawerOpenMock).toHaveBeenCalledWith("epic-2");
   });
 
-  it("shows linked habit descriptions from the scheduled campaign ritual card", async () => {
+  it("keeps scheduled campaign ritual details out of the inline timeline row", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1032,13 +1037,9 @@ describe("TodaysAgenda campaign visibility", () => {
     const ritualCard = ritualLabel.closest('[data-quest-card-shell="true"]');
     expect(ritualCard).toBeTruthy();
 
-    await waitFor(() => {
-      expect(within(ritualCard as HTMLElement).getAllByRole("button")).toHaveLength(1);
-    });
-
-    fireEvent.click(within(ritualCard as HTMLElement).getByRole("button"));
-
-    expect(await screen.findByText("Capture wins, friction, and tomorrow's focus.")).toBeInTheDocument();
+    expect(ritualCard).toHaveAttribute("data-scheduled-timeline-card", "true");
+    expect(within(ritualCard as HTMLElement).queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.queryByText("Capture wins, friction, and tomorrow's focus.")).not.toBeInTheDocument();
   });
 
   it("renders newly added campaign rituals directly as normal scheduled rows", () => {
@@ -1058,6 +1059,7 @@ describe("TodaysAgenda campaign visibility", () => {
             completed: false,
             xp_reward: 15,
             scheduled_time: "07:00",
+            estimated_duration: 60,
             habit_source_id: "habit-1",
             epic_id: "epic-1",
             epic_title: "Fallback Campaign",
@@ -1085,6 +1087,7 @@ describe("TodaysAgenda campaign visibility", () => {
             completed: false,
             xp_reward: 15,
             scheduled_time: "07:00",
+            estimated_duration: 60,
             habit_source_id: "habit-1",
             epic_id: "epic-1",
             epic_title: "Fallback Campaign",
@@ -1095,6 +1098,7 @@ describe("TodaysAgenda campaign visibility", () => {
             completed: false,
             xp_reward: 12,
             scheduled_time: "18:00",
+            estimated_duration: 60,
             habit_source_id: "habit-2",
             epic_id: "epic-2",
             epic_title: "New Campaign",
@@ -1194,7 +1198,7 @@ describe("TodaysAgenda campaign visibility", () => {
 });
 
 describe("TodaysAgenda ritual descriptions", () => {
-  it("gives ritual rows a chevron when the linked description is their only extra detail", async () => {
+  it("gives untimed ritual rows a chevron when the linked description is their only extra detail", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1210,7 +1214,7 @@ describe("TodaysAgenda ritual descriptions", () => {
             task_text: "Hydrate",
             completed: false,
             xp_reward: 12,
-            scheduled_time: "07:00",
+            scheduled_time: null,
             habit_source_id: "habit-1",
             epic_id: "epic-1",
             epic_title: "Hydrated Campaign",
@@ -1247,7 +1251,10 @@ describe("TodaysAgenda ritual descriptions", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    const ritualLabel = screen.getByText("Hydrate");
+    fireEvent.click(screen.getByTestId("untimed-quests-drawer-trigger"));
+
+    const drawer = await screen.findByTestId("untimed-quests-drawer");
+    const ritualLabel = within(drawer).getByText("Hydrate");
     const ritualCard = ritualLabel.closest('[data-quest-card-shell="true"]');
     expect(ritualCard).toBeTruthy();
 
@@ -1276,7 +1283,7 @@ describe("TodaysAgenda ritual descriptions", () => {
             task_text: "Lift",
             completed: false,
             xp_reward: 18,
-            scheduled_time: "08:00",
+            scheduled_time: null,
             habit_source_id: "habit-1",
             epic_id: "epic-1",
             epic_title: "Strength Campaign",
@@ -1314,7 +1321,10 @@ describe("TodaysAgenda ritual descriptions", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    const ritualLabel = screen.getByText("Lift");
+    fireEvent.click(screen.getByTestId("untimed-quests-drawer-trigger"));
+
+    const drawer = await screen.findByTestId("untimed-quests-drawer");
+    const ritualLabel = within(drawer).getByText("Lift");
     const ritualCard = ritualLabel.closest('[data-quest-card-shell="true"]');
     expect(ritualCard).toBeTruthy();
 
@@ -1365,7 +1375,7 @@ describe("TodaysAgenda attachments", () => {
       },
     });
 
-    const { container } = render(
+    render(
       <TodaysAgenda
         tasks={[
           {
@@ -1373,7 +1383,7 @@ describe("TodaysAgenda attachments", () => {
             task_text: "Review budget",
             completed: false,
             xp_reward: 25,
-            scheduled_time: "10:00",
+            scheduled_time: null,
             attachments: [
               {
                 id: "att-1",
@@ -1399,7 +1409,11 @@ describe("TodaysAgenda attachments", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    const chevron = container.querySelector("svg.lucide-chevron-down");
+    fireEvent.click(screen.getByTestId("untimed-quests-drawer-trigger"));
+
+    const drawer = await screen.findByTestId("untimed-quests-drawer");
+    const untimedQuest = within(drawer).getByTestId("untimed-quest-task-1");
+    const chevron = untimedQuest.querySelector("svg.lucide-chevron-down");
     expect(chevron).toBeTruthy();
     const chevronButton = chevron?.closest("button");
     expect(chevronButton).toBeTruthy();
@@ -1420,7 +1434,7 @@ describe("TodaysAgenda attachments", () => {
       },
     });
 
-    const { container } = render(
+    render(
       <TodaysAgenda
         tasks={[
           {
@@ -1428,7 +1442,7 @@ describe("TodaysAgenda attachments", () => {
             task_text: "Legacy image quest",
             completed: false,
             xp_reward: 12,
-            scheduled_time: "11:00",
+            scheduled_time: null,
             image_url: "https://example.com/legacy-image.png",
           },
         ]}
@@ -1441,7 +1455,11 @@ describe("TodaysAgenda attachments", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    const chevron = container.querySelector("svg.lucide-chevron-down");
+    fireEvent.click(screen.getByTestId("untimed-quests-drawer-trigger"));
+
+    const drawer = await screen.findByTestId("untimed-quests-drawer");
+    const untimedQuest = within(drawer).getByTestId("untimed-quest-task-legacy");
+    const chevron = untimedQuest.querySelector("svg.lucide-chevron-down");
     expect(chevron).toBeTruthy();
     const chevronButton = chevron?.closest("button");
     expect(chevronButton).toBeTruthy();
@@ -1521,11 +1539,21 @@ describe("TodaysAgenda combo feedback", () => {
     fireEvent.click(screen.getAllByRole("checkbox", { name: /mark task as incomplete/i })[0]);
 
     await waitFor(() => {
-      expect(screen.queryByTestId("combo-banner")).not.toBeInTheDocument();
+      const comboBanner = screen.queryByTestId("combo-banner");
+      if (comboBanner) {
+        expect(comboBanner).toHaveStyle({ opacity: "0" });
+      } else {
+        expect(comboBanner).not.toBeInTheDocument();
+      }
     });
 
     fireEvent.click(screen.getAllByRole("checkbox", { name: /mark task as complete/i })[0]);
-    expect(screen.queryByTestId("combo-banner")).not.toBeInTheDocument();
+    const comboBanner = screen.queryByTestId("combo-banner");
+    if (comboBanner) {
+      expect(comboBanner).toHaveStyle({ opacity: "0" });
+    } else {
+      expect(comboBanner).not.toBeInTheDocument();
+    }
   });
 
   it("does not chain combo when completion window is exceeded", () => {
@@ -2133,7 +2161,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(readableShell).not.toHaveClass("bg-white/[0.04]");
   });
 
-  it("lets long mobile quest titles expand up to the action controls", () => {
+  it("lets long mobile quest titles fit beside scheduled action controls", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -2151,6 +2179,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
             completed: false,
             xp_reward: 14,
             scheduled_time: "14:00",
+            estimated_duration: 60,
             habit_source_id: "habit-title-width-1",
             epic_id: "epic-title-width-1",
             epic_title: "Master UGC content creation",
@@ -2180,7 +2209,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(actions).toHaveClass("min-w-max", "gap-1.5");
     expect(within(actions).getByRole("button", { name: "Quest actions" })).toBeInTheDocument();
     expect(within(actions).getByText("+14")).toBeInTheDocument();
-    expect(within(actions).getAllByRole("button")).toHaveLength(2);
+    expect(within(actions).getAllByRole("button")).toHaveLength(1);
     expect(within(titleRegion).getByText("Campaign Ritual - Master UGC content creation")).toBeInTheDocument();
   });
 
@@ -3877,6 +3906,137 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(Number(wrapper.getAttribute("data-top-px"))).toBeCloseTo(156);
     expect(Number(wrapper.getAttribute("data-duration-height-px"))).toBeCloseTo(104);
     expect(wrapper).toHaveStyle({ top: "156px", height: "104px" });
+  });
+
+  it("clips 30-minute scheduled quest cards to one grid slot", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Half-hour focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "09:00",
+            estimated_duration: 30,
+            subtasks: [
+              {
+                id: "subtask-compact-1",
+                title: "Do not expand inside the grid",
+                completed: false,
+                sort_order: 0,
+              },
+            ],
+          },
+        ]}
+        selectedDate={new Date("2000-01-01T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const wrapper = getTimelineRowWrapper("task-scheduled-1");
+    const row = screen.getByTestId("timeline-row-task-scheduled-1");
+    const shell = getQuestCardShell(row);
+
+    expect(Number(wrapper.getAttribute("data-duration-height-px"))).toBeCloseTo(52);
+    expect(wrapper).toHaveStyle({ height: "52px" });
+    expect(row).toHaveStyle({ overflow: "hidden" });
+    expect(row).toHaveAttribute("data-timeline-compact", "true");
+    expect(shell).toHaveAttribute("data-compact-timeline-card", "true");
+    expect(row.querySelector("svg.lucide-chevron-down")).toBeNull();
+  });
+
+  it("keeps compact 30-minute ritual rows dense while retaining essentials", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "ritual-compact-1",
+            task_text: "Daily ritual",
+            completed: false,
+            xp_reward: 20,
+            scheduled_time: "07:00",
+            estimated_duration: 30,
+            habit_source_id: "habit-compact-1",
+            epic_id: "epic-compact-1",
+            epic_title: "Compact Campaign",
+          },
+        ]}
+        selectedDate={new Date("2000-01-01T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        onEditQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const row = screen.getByTestId("timeline-row-ritual-compact-1");
+
+    expect(within(row).getByText("Daily ritual")).toBeInTheDocument();
+    expect(within(row).getByText("7:00 AM")).toBeInTheDocument();
+    expect(within(row).getByText("+20")).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: "Quest actions" })).toBeInTheDocument();
+    expect(within(row).queryByText("Campaign Ritual - Compact Campaign")).not.toBeInTheDocument();
+  });
+
+  it("keeps 60-minute scheduled quest rows non-compact", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-60",
+            task_text: "Full hour focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "10:00",
+            estimated_duration: 60,
+          },
+        ]}
+        selectedDate={new Date("2000-01-01T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const wrapper = getTimelineRowWrapper("task-scheduled-60");
+    const row = screen.getByTestId("timeline-row-task-scheduled-60");
+    const shell = getQuestCardShell(row);
+
+    expect(Number(wrapper.getAttribute("data-duration-height-px"))).toBeCloseTo(104);
+    expect(wrapper).toHaveStyle({ height: "104px" });
+    expect(row.style.overflow).toBe("");
+    expect(row).not.toHaveAttribute("data-timeline-compact");
+    expect(shell).not.toHaveAttribute("data-compact-timeline-card");
   });
 
   it("places overlapping timed quests into separate lanes", () => {

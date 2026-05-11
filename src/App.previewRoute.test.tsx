@@ -94,14 +94,6 @@ vi.mock("@/components/GlobalWidgetSyncBridge", () => ({
   GlobalWidgetSyncBridge: () => null,
 }));
 
-vi.mock("@/components/GlobalNotificationTray", () => ({
-  GlobalNotificationTray: () => (
-    <button type="button" aria-label="Open notifications">
-      Notifications
-    </button>
-  ),
-}));
-
 vi.mock("@/providers/StoreKitProvider", () => ({
   StoreKitProvider: passthroughProvider,
 }));
@@ -308,22 +300,7 @@ describe("App preview route", () => {
     expect(screen.getByTestId("main-tabs")).toHaveTextContent("/journeys");
   });
 
-  it("shows the notifications tray only on the guide tab", async () => {
-    authMock.session = { user: { id: "user-1" } };
-    authMock.user = { id: "user-1" };
-    authMock.status = "authenticated";
-    isMainTabPathMock.mockImplementation((pathname: string) =>
-      ["/mentor", "/journeys", "/campaigns", "/companion"].includes(pathname),
-    );
-
-    window.history.pushState({}, "", "/mentor");
-
-    render(<App />);
-
-    expect(await screen.findByRole("button", { name: /open notifications/i })).toBeInTheDocument();
-  });
-
-  it.each(["/journeys", "/companion", "/campaigns"])(
+  it.each(["/mentor", "/journeys", "/companion", "/campaigns"])(
     "hides the notifications tray on %s",
     async (pathname) => {
       authMock.session = { user: { id: "user-1" } };

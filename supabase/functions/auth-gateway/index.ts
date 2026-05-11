@@ -3,24 +3,42 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 import { applyAbuseProtection, createAbuseAdminClient, createSafeErrorResponse, getClientIpAddress, normalizeEmailTarget } from "../_shared/abuseProtection.ts";
 import { findMissingRequiredEnv, logAuthEvent, logAuthSafeError, readSafeErrorResponseContext, toAuthErrorMessage } from "../_shared/authLogging.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import { sendAPNSNotification } from "../_shared/apns.ts";
 
 type AuthGatewayAction =
   | "sign_in_password"
   | "sign_up_password"
-  | "reset_password";
+  | "reset_password"
+  | "early_access_signup";
 
 interface AuthGatewayRequest {
   action?: AuthGatewayAction;
   email?: string;
   password?: string;
   redirectTo?: string;
+  referrer?: string | null;
+  source?: string | null;
   timezone?: string;
+  website?: string | null;
 }
 
 interface AuthGatewayDeps {
   createAdminClient: () => any;
   createAnonClient: (supabaseUrl: string, supabaseAnonKey: string) => any;
   applyAbuseProtectionFn: typeof applyAbuseProtection;
+}
+
+interface EarlyAccessSignupRow {
+  id: string;
+  email: string;
+}
+
+interface DeviceTokenRow {
+  id: string;
+  user_id: string;
+  device_token: string;
+  updated_at: string | null;
+  installation_id: string | null;
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -36,6 +54,126 @@ const defaultDeps: AuthGatewayDeps = {
   }),
   applyAbuseProtectionFn: applyAbuseProtection,
 };
+
+function normalizeOptionalText(value: unknown, maxLength: number): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  if (!normalized) return null;
+  return normalized.slice(0, maxLength);
+}
+
+function readConfiguredOwnerUserIds(): string[] {
+  const raw = Deno.env.get("EARLY_ACCESS_NOTIFICATION_USER_IDS") ??
+    Deno.env.get("OWNER_NOTIFICATION_USER_IDS") ??
+    Deno.env.get("OWNER_NOTIFICATION_USER_ID") ??
+    "";
+
+  return raw
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+async function resolveEarlyAccessOwnerUserIds(supabase: any): Promise<string[]> {
+  const configured = readConfiguredOwnerUserIds();
+  if (configured.length > 0) {
+    return [...new Set(configured)];
+  }
+
+  const { data, error } = await supabase
+    .from("user_roles")
+    .select("user_id")
+    .eq("role", "admin");
+
+  if (error) {
+    console.error("[auth-gateway] early access admin lookup failed", error);
+    return [];
+  }
+
+  return [...new Set(((data as Array<{ user_id: string }> | null) ?? []).map((row) => row.user_id))];
+}
+
+function pickNewestDeviceTokens(rows: DeviceTokenRow[]): DeviceTokenRow[] {
+  const byKey = new Map<string, DeviceTokenRow>();
+
+  for (const row of rows) {
+    const key = row.installation_id?.trim() || row.device_token;
+    const current = byKey.get(key);
+    const currentTime = current?.updated_at ? Date.parse(current.updated_at) : 0;
+    const rowTime = row.updated_at ? Date.parse(row.updated_at) : 0;
+
+    if (!current || rowTime >= currentTime) {
+      byKey.set(key, row);
+    }
+  }
+
+  return [...byKey.values()];
+}
+
+async function notifyEarlyAccessOwners(
+  supabase: any,
+  signup: EarlyAccessSignupRow,
+): Promise<{ status: string; error: string | null; sentCount: number }> {
+  const ownerUserIds = await resolveEarlyAccessOwnerUserIds(supabase);
+  if (ownerUserIds.length === 0) {
+    return { status: "no_owner_configured", error: null, sentCount: 0 };
+  }
+
+  const { data: tokenRows, error: tokenError } = await supabase
+    .from("push_device_tokens")
+    .select("id, user_id, device_token, updated_at, installation_id")
+    .in("user_id", ownerUserIds)
+    .eq("platform", "ios")
+    .order("updated_at", { ascending: false });
+
+  if (tokenError) {
+    return { status: "token_lookup_failed", error: tokenError.message, sentCount: 0 };
+  }
+
+  const tokens = pickNewestDeviceTokens((tokenRows as DeviceTokenRow[] | null) ?? []);
+  if (tokens.length === 0) {
+    return { status: "no_owner_device_token", error: null, sentCount: 0 };
+  }
+
+  let sentCount = 0;
+  const errors: string[] = [];
+
+  for (const token of tokens) {
+    try {
+      const result = await sendAPNSNotification(token.device_token, {
+        title: "New Cosmiq early access signup",
+        body: signup.email,
+        data: {
+          type: "early_access_signup",
+          signup_id: signup.id,
+          email: signup.email,
+        },
+      });
+
+      if (result.success) {
+        sentCount += 1;
+      } else {
+        errors.push(result.reason ?? `apns_status_${result.status}`);
+      }
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  if (sentCount > 0) {
+    return {
+      status: errors.length > 0 ? "sent_with_errors" : "sent",
+      error: errors.length > 0 ? errors.slice(0, 3).join("; ") : null,
+      sentCount,
+    };
+  }
+
+  return {
+    status: "send_failed",
+    error: errors.slice(0, 3).join("; ") || "Unknown APNs failure",
+    sentCount: 0,
+  };
+}
 
 function jsonSuccess(req: Request, body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -296,12 +434,19 @@ export async function handleAuthGateway(
     const email = normalizeEmailTarget(payload.email);
     const requestContext = buildRequestContext(action, ipAddress, payload);
 
-    if (!action || !["sign_in_password", "sign_up_password", "reset_password"].includes(action)) {
+    if (!action || !["sign_in_password", "sign_up_password", "reset_password", "early_access_signup"].includes(action)) {
       return createLoggedSafeErrorResponse({
         status: 400,
         code: "INVALID_ACTION",
         error: "Invalid request payload",
       }, requestContext);
+    }
+
+    if (action === "early_access_signup" && normalizeOptionalText(payload.website, 200)) {
+      return jsonSuccess(req, {
+        success: true,
+        status: "received",
+      });
     }
 
     if (!email || !EMAIL_REGEX.test(email)) {
@@ -328,6 +473,76 @@ export async function handleAuthGateway(
       }, {
         ...requestContext,
         errorMessage: toAuthErrorMessage(error),
+      });
+    }
+
+    if (action === "early_access_signup") {
+      const protection = await deps.applyAbuseProtectionFn(req, adminClient, {
+        profileKey: "auth.sign_up",
+        endpointName: "auth-gateway:early_access_signup",
+        requestId,
+        ipAddress,
+        emailTarget: email,
+        blockedMessage: "Too many early access requests. Please try again later.",
+        metadata: {
+          action,
+        },
+      });
+
+      if (protection instanceof Response) {
+        logAuthEvent("auth-gateway", protection.status >= 500 ? "error" : "warn", "Early access abuse protection blocked request", {
+          ...requestContext,
+          phase: "early_access",
+          ...(await readSafeErrorResponseContext(protection)),
+        });
+        return protection;
+      }
+
+      const { data: signup, error: signupError } = await adminClient.rpc("record_early_access_signup", {
+        p_email: email,
+        p_source: normalizeOptionalText(payload.source, 200),
+        p_referrer: normalizeOptionalText(payload.referrer, 500),
+        p_user_agent: req.headers.get("user-agent"),
+        p_request_metadata: {
+          ip_address: ipAddress,
+          origin: req.headers.get("origin"),
+          created_from: "landing_page",
+          request_id: requestId,
+        },
+      });
+
+      if (signupError || !signup) {
+        logAuthEvent("auth-gateway", "error", "Early access signup failed", {
+          ...requestContext,
+          requestId,
+          phase: "record_signup",
+          providerErrorMessage: signupError?.message,
+        });
+        return createLoggedSafeErrorResponse({
+          status: 500,
+          code: "EARLY_ACCESS_SIGNUP_FAILED",
+          error: "Could not save that email. Try again in a moment.",
+        }, {
+          ...requestContext,
+          phase: "record_signup",
+        });
+      }
+
+      const notification = await notifyEarlyAccessOwners(adminClient, signup as EarlyAccessSignupRow);
+
+      await adminClient
+        .from("early_access_signups")
+        .update({
+          owner_notification_status: notification.status,
+          owner_notification_error: notification.error,
+          owner_notified_at: notification.sentCount > 0 ? new Date().toISOString() : null,
+        })
+        .eq("id", (signup as EarlyAccessSignupRow).id);
+
+      return jsonSuccess(req, {
+        success: true,
+        status: "saved",
+        notificationStatus: notification.status,
       });
     }
 

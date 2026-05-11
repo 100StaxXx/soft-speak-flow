@@ -149,9 +149,9 @@ describe("DraggableFAB", () => {
       "w-36",
       "overflow-visible",
       "rounded-full",
-      "border-celestial-blue/32",
-      "bg-celestial-blue/14",
-      "backdrop-blur-xl",
+      "border-0",
+      "bg-transparent",
+      "shadow-none",
     );
     expect(launcher.querySelectorAll('[aria-hidden="true"]')).toHaveLength(0);
     expect(image.parentElement).toHaveClass("h-[7.75rem]", "w-[7.75rem]");

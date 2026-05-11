@@ -23,11 +23,24 @@ CREATE UNIQUE INDEX IF NOT EXISTS early_access_signups_email_unique
 CREATE INDEX IF NOT EXISTS early_access_signups_created_at_idx
   ON public.early_access_signups (created_at DESC);
 
+CREATE TABLE IF NOT EXISTS public.early_access_notification_recipients (
+  user_id uuid PRIMARY KEY REFERENCES public.profiles(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT timezone('utc', now())
+);
+
 ALTER TABLE public.early_access_signups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.early_access_notification_recipients ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Admins can manage early access signups" ON public.early_access_signups;
 CREATE POLICY "Admins can manage early access signups"
   ON public.early_access_signups
+  FOR ALL
+  USING (public.has_role(auth.uid(), 'admin'::public.app_role))
+  WITH CHECK (public.has_role(auth.uid(), 'admin'::public.app_role));
+
+DROP POLICY IF EXISTS "Admins can manage early access notification recipients" ON public.early_access_notification_recipients;
+CREATE POLICY "Admins can manage early access notification recipients"
+  ON public.early_access_notification_recipients
   FOR ALL
   USING (public.has_role(auth.uid(), 'admin'::public.app_role))
   WITH CHECK (public.has_role(auth.uid(), 'admin'::public.app_role));
@@ -53,6 +66,8 @@ AS $$
 DECLARE
   v_email text := lower(btrim(p_email));
   v_signup public.early_access_signups;
+  v_owner_id uuid;
+  v_queued_count integer := 0;
 BEGIN
   IF v_email IS NULL OR v_email = '' OR v_email !~* '^[^@\s]+@[^@\s]+\.[^@\s]+$' THEN
     RAISE EXCEPTION 'Invalid email address';
@@ -89,9 +104,96 @@ BEGIN
     updated_at = timezone('utc', now())
   RETURNING * INTO v_signup;
 
+  BEGIN
+    FOR v_owner_id IN
+      SELECT DISTINCT recipients.user_id
+      FROM public.early_access_notification_recipients AS recipients
+      INNER JOIN public.profiles AS profiles
+        ON profiles.id = recipients.user_id
+      UNION
+      SELECT DISTINCT roles.user_id
+      FROM public.user_roles AS roles
+      INNER JOIN public.profiles AS profiles
+        ON profiles.id = roles.user_id
+      WHERE roles.role = 'admin'::public.app_role
+    LOOP
+      INSERT INTO public.push_notification_queue (
+        user_id,
+        notification_type,
+        title,
+        body,
+        scheduled_for,
+        context,
+        delivered,
+        status,
+        source_table,
+        source_id,
+        dedupe_key,
+        priority,
+        payload,
+        channel
+      )
+      VALUES (
+        v_owner_id,
+        'plan_day_overdue',
+        'New Cosmiq early access signup',
+        v_email,
+        timezone('utc', now()),
+        jsonb_build_object(
+          'type', 'early_access_signup',
+          'signup_id', v_signup.id,
+          'email', v_email,
+          'signup_count', v_signup.signup_count
+        ),
+        false,
+        'queued',
+        'early_access_signups',
+        v_signup.id,
+        'early_access_signup:' || v_signup.id::text || ':' || v_signup.signup_count::text,
+        100,
+        jsonb_build_object(
+          'type', 'early_access_signup',
+          'signup_id', v_signup.id,
+          'email', v_email,
+          'signup_count', v_signup.signup_count
+        ),
+        'apns'
+      )
+      ON CONFLICT (dedupe_key) DO NOTHING;
+
+      IF FOUND THEN
+        v_queued_count := v_queued_count + 1;
+      END IF;
+    END LOOP;
+
+    UPDATE public.early_access_signups
+    SET
+      owner_notification_status = CASE
+        WHEN v_queued_count > 0 THEN 'queued'
+        ELSE 'no_owner_configured'
+      END,
+      owner_notification_error = NULL,
+      owner_notified_at = CASE
+        WHEN v_queued_count > 0 THEN timezone('utc', now())
+        ELSE owner_notified_at
+      END,
+      updated_at = timezone('utc', now())
+    WHERE id = v_signup.id
+    RETURNING * INTO v_signup;
+  EXCEPTION
+    WHEN OTHERS THEN
+      UPDATE public.early_access_signups
+      SET
+        owner_notification_status = 'enqueue_failed',
+        owner_notification_error = SQLERRM,
+        updated_at = timezone('utc', now())
+      WHERE id = v_signup.id
+      RETURNING * INTO v_signup;
+  END;
+
   RETURN v_signup;
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.record_early_access_signup(text, text, text, text, jsonb) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.record_early_access_signup(text, text, text, text, jsonb) TO service_role;
+REVOKE ALL ON FUNCTION public.record_early_access_signup(text, text, text, text, jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.record_early_access_signup(text, text, text, text, jsonb) TO anon, authenticated, service_role;

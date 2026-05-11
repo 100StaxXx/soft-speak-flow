@@ -278,6 +278,12 @@ interface TodaysAgendaProps {
 
 type ActiveEpic = NonNullable<TodaysAgendaProps["activeEpics"]>[number];
 
+interface TimelineTaskRenderContext {
+  isScheduledTimeline?: boolean;
+  heightPx?: number;
+  isCompact?: boolean;
+}
+
 // Helper to format time in 12-hour format
 const formatTime = (time: string) => {
   const [hours, minutes] = time.split(':');
@@ -300,6 +306,7 @@ const OUTLOOK_TIMELINE_HEIGHT_PX = FULL_DAY_END_MINUTE * OUTLOOK_TIMELINE_PX_PER
 const OUTLOOK_TIMELINE_GUTTER_WIDTH_PX = 52;
 const OUTLOOK_TIMELINE_EVENT_GAP_PX = 4;
 const OUTLOOK_TIMELINE_MIN_EVENT_HEIGHT_PX = 52;
+const COMPACT_TIMELINE_ROW_MAX_HEIGHT_PX = OUTLOOK_TIMELINE_MIN_EVENT_HEIGHT_PX;
 const NOW_MARKER_VIEWPORT_TARGET = 0.45;
 const DEFAULT_BOTTOM_NAV_SAFE_OFFSET_PX = 104;
 const MOBILE_FAB_SCROLL_CLEARANCE_PX = QUEST_LAUNCHER_SCROLL_CLEARANCE_PX;
@@ -2037,6 +2044,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     task: Task,
     dragProps?: ListDragHandleProps,
     overlapCount = 0,
+    timelineContext?: TimelineTaskRenderContext,
   ) => {
     const isComplete = !!task.completed || optimisticCompleted.has(task.id);
     const isRitual = !!task.habit_source_id;
@@ -2050,6 +2058,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     const isActivated = dragProps?.isActivated ?? false;
     const isActionMenuOpen = openActionMenuTaskId === task.id;
     const isExpanded = expandedTasks.has(task.id);
+    const isScheduledTimelineItem = timelineContext?.isScheduledTimeline === true;
+    const isCompactTimelineItem = isScheduledTimelineItem && timelineContext?.isCompact === true;
+    const canRenderInlineDetails = !isScheduledTimelineItem;
+    const isInlineExpanded = canRenderInlineDetails && isExpanded;
     const hasDetails = hasExpandableDetails(task);
     const CategoryIcon = getCategoryIcon(task.category);
     const subtasks = task.subtasks ?? [];
@@ -2209,14 +2221,22 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       );
     }
 
-    const isMobileQuestShellActive = isExpanded || (isActivated && !isDragging);
+    const isMobileQuestShellActive = isInlineExpanded || (isActivated && !isDragging);
     const taskContent = (
-      <Collapsible open={isExpanded} onOpenChange={() => {}}>
+      <Collapsible
+        open={isInlineExpanded}
+        onOpenChange={() => {}}
+        className={cn(isCompactTimelineItem && "h-full min-h-0")}
+      >
         <div
           data-quest-card-shell="true"
+          data-scheduled-timeline-card={isScheduledTimelineItem ? "true" : undefined}
+          data-compact-timeline-card={isCompactTimelineItem ? "true" : undefined}
+          data-timeline-card-height-px={timelineContext?.heightPx ?? undefined}
           className={cn(
             JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME,
             "rounded-[22px] px-2",
+            isCompactTimelineItem && "h-full min-h-0 rounded-[18px]",
             readableQuestCardsEnabled
               ? JOURNEYS_QUEST_CARD_SHELL_READABLE_CLASS_NAME
               : JOURNEYS_QUEST_CARD_SHELL_STANDARD_TONE_CLASS_NAME,
@@ -2233,8 +2253,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           <div
             className={cn(
               "flex items-center gap-3 transition-all relative group",
-              "no-text-select select-none min-h-[46px]",
-              isRitual ? "py-3" : "py-2",
+              "no-text-select select-none",
+              isCompactTimelineItem
+                ? "h-full min-h-0 gap-2 py-0.5"
+                : "min-h-[46px]",
+              !isCompactTimelineItem && (isRitual ? "py-3" : "py-2"),
               isDragging && "cursor-grabbing",
             )}
             onContextMenu={suppressNativeContextMenu}
@@ -2345,7 +2368,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     )}
                   />
                 </div>
-                {isCampaignRitual && (
+                {isCampaignRitual && !isCompactTimelineItem && (
                   <span className="mt-1 inline-flex max-w-full items-center rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
                     <span className="truncate">Campaign Ritual - {campaignTitle}</span>
                   </span>
@@ -2356,7 +2379,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     {formatTime(task.scheduled_time)}
                   </span>
                 )}
-                {overlapCount > 0 && (
+                {overlapCount > 0 && !isCompactTimelineItem && (
                   <span className="mt-1 inline-flex items-center rounded-full border border-primary/35 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
                     Overlaps: {overlapCount}
                   </span>
@@ -2452,7 +2475,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 <span className="text-sm font-bold text-stardust-gold/80">+{effectiveTaskXP}</span>
 
                 {/* Chevron for expandable details - only shown if task has details */}
-                {hasDetails && (
+                {hasDetails && canRenderInlineDetails && (
                   <Button
                     data-interactive="true"
                     data-tap-control="true"
@@ -2471,180 +2494,181 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             </div>
           </div>
 
-          {/* Expandable details section */}
-          <CollapsibleContent>
-            <div className="pl-8 pr-2 pb-2 space-y-2">
-              {/* Subtasks */}
-              {subtasks.length > 0 && (
-                <div className="space-y-1.5 rounded-md border border-border/40 bg-muted/20 p-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                      Subtasks
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {completedSubtaskCount}/{subtasks.length}
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    {subtasks.map((subtask) => (
-                      <label
-                        key={subtask.id}
-                        className="flex items-center gap-2 rounded-sm px-1 py-1 text-xs"
-                      >
-                        <Checkbox
-                          checked={!!subtask.completed}
-                          onCheckedChange={(checked) => {
-                            toggleSubtask.mutate({
-                              taskId: task.id,
-                              subtaskId: subtask.id,
-                              completed: !!checked,
-                            });
-                          }}
-                          onClick={(event) => event.stopPropagation()}
-                          className="h-3.5 w-3.5"
-                        />
-                        <span
-                          className={cn(
-                            "text-xs",
-                            subtask.completed && "text-muted-foreground line-through"
-                          )}
+          {canRenderInlineDetails ? (
+            <CollapsibleContent>
+              <div className="pl-8 pr-2 pb-2 space-y-2">
+                {/* Subtasks */}
+                {subtasks.length > 0 && (
+                  <div className="space-y-1.5 rounded-md border border-border/40 bg-muted/20 p-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Subtasks
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {completedSubtaskCount}/{subtasks.length}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      {subtasks.map((subtask) => (
+                        <label
+                          key={subtask.id}
+                          className="flex items-center gap-2 rounded-sm px-1 py-1 text-xs"
                         >
-                          {subtask.title}
-                        </span>
-                      </label>
-                    ))}
+                          <Checkbox
+                            checked={!!subtask.completed}
+                            onCheckedChange={(checked) => {
+                              toggleSubtask.mutate({
+                                taskId: task.id,
+                                subtaskId: subtask.id,
+                                completed: !!checked,
+                              });
+                            }}
+                            onClick={(event) => event.stopPropagation()}
+                            className="h-3.5 w-3.5"
+                          />
+                          <span
+                            className={cn(
+                              "text-xs",
+                              subtask.completed && "text-muted-foreground line-through"
+                            )}
+                          >
+                            {subtask.title}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {displayAttachments.length > 0 && (
-                <div className="space-y-1.5 rounded-md border border-border/40 bg-muted/20 p-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                      Attachments
+                {displayAttachments.length > 0 && (
+                  <div className="space-y-1.5 rounded-md border border-border/40 bg-muted/20 p-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Attachments
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {displayAttachments.length}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      {displayAttachments.map((attachment, index) => (
+                        <a
+                          key={`${attachment.fileUrl}-${index}`}
+                          href={attachment.fileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-2 rounded-sm px-1 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+                        >
+                          {attachment.isImage ? (
+                            <FileImage className="h-3.5 w-3.5 flex-shrink-0" />
+                          ) : (
+                            <Paperclip className="h-3.5 w-3.5 flex-shrink-0" />
+                          )}
+                          <span className="truncate">{attachment.fileName}</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {shouldRenderRitualDescription && (
+                  useLiteAnimations ? (
+                    <p className="text-sm leading-relaxed whitespace-pre-line text-celestial-blue/80">
+                      {stripMarkdown(ritualDescription)}
                     </p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {displayAttachments.length}
-                    </p>
+                  ) : (
+                    <motion.p className="text-sm leading-relaxed whitespace-pre-line text-celestial-blue/80">
+                      {stripMarkdown(ritualDescription)}
+                    </motion.p>
+                  )
+                )}
+
+                {/* Notes */}
+                {shouldRenderNotes && (
+                  useLiteAnimations ? (
+                    <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                      <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs leading-relaxed whitespace-pre-line">{stripMarkdown(task.notes)}</p>
+                    </div>
+                  ) : (
+                    <motion.div className="flex items-start gap-2 text-sm text-muted-foreground">
+                      <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs leading-relaxed whitespace-pre-line">{stripMarkdown(task.notes)}</p>
+                    </motion.div>
+                  )
+                )}
+
+                {task.location ? (
+                  <QuestLocationLink
+                    location={task.location}
+                    label="Address"
+                    className="rounded-md border-border/40 bg-muted/20 p-2"
+                    textClassName="text-xs text-muted-foreground"
+                    actionsClassName="mt-2"
+                  />
+                ) : null}
+
+                {/* Badges row */}
+                {hasDetailBadges && (
+                  <div className="flex flex-wrap gap-1.5">
+                  {/* Category */}
+                  {CategoryIcon && task.category && (
+                    <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 border-muted-foreground/30">
+                      <CategoryIcon className="w-3 h-3" />
+                      {task.category}
+                    </Badge>
+                  )}
+
+                  {/* Difficulty */}
+                  {task.difficulty && (
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "text-xs px-1.5 py-0.5 h-5",
+                        task.difficulty === 'easy' && "bg-green-500/10 text-green-500 border-green-500/30",
+                        task.difficulty === 'medium' && "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
+                        task.difficulty === 'hard' && "bg-red-500/10 text-red-500 border-red-500/30"
+                      )}
+                    >
+                      {task.difficulty}
+                    </Badge>
+                  )}
+
+                  {/* Priority */}
+                  {task.priority && (
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "text-xs px-1.5 py-0.5 h-5",
+                        task.priority === 'high' && "bg-red-500/10 text-red-500 border-red-500/30",
+                        task.priority === 'medium' && "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
+                        task.priority === 'low' && "bg-blue-500/10 text-blue-500 border-blue-500/30"
+                      )}
+                    >
+                      {task.priority} priority
+                    </Badge>
+                  )}
+
+                  {/* Duration */}
+                  {task.estimated_duration && (
+                    <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 border-muted-foreground/30">
+                      <Timer className="w-3 h-3" />
+                      {task.estimated_duration}m
+                    </Badge>
+                  )}
+
+                  {/* Recurrence */}
+                  {task.is_recurring && task.recurrence_pattern && (
+                    <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 bg-accent/10 text-accent border-accent/30">
+                      <Repeat className="w-3 h-3" />
+                      {formatDisplayLabel(task.recurrence_pattern)}
+                    </Badge>
+                  )}
                   </div>
-                  <div className="space-y-1">
-                    {displayAttachments.map((attachment, index) => (
-                      <a
-                        key={`${attachment.fileUrl}-${index}`}
-                        href={attachment.fileUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center gap-2 rounded-sm px-1 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
-                      >
-                        {attachment.isImage ? (
-                          <FileImage className="h-3.5 w-3.5 flex-shrink-0" />
-                        ) : (
-                          <Paperclip className="h-3.5 w-3.5 flex-shrink-0" />
-                        )}
-                        <span className="truncate">{attachment.fileName}</span>
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {shouldRenderRitualDescription && (
-                useLiteAnimations ? (
-                  <p className="text-sm leading-relaxed whitespace-pre-line text-celestial-blue/80">
-                    {stripMarkdown(ritualDescription)}
-                  </p>
-                ) : (
-                  <motion.p className="text-sm leading-relaxed whitespace-pre-line text-celestial-blue/80">
-                    {stripMarkdown(ritualDescription)}
-                  </motion.p>
-                )
-              )}
-
-              {/* Notes */}
-              {shouldRenderNotes && (
-                useLiteAnimations ? (
-                  <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs leading-relaxed whitespace-pre-line">{stripMarkdown(task.notes)}</p>
-                  </div>
-                ) : (
-                  <motion.div className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs leading-relaxed whitespace-pre-line">{stripMarkdown(task.notes)}</p>
-                  </motion.div>
-                )
-              )}
-
-              {task.location ? (
-                <QuestLocationLink
-                  location={task.location}
-                  label="Address"
-                  className="rounded-md border-border/40 bg-muted/20 p-2"
-                  textClassName="text-xs text-muted-foreground"
-                  actionsClassName="mt-2"
-                />
-              ) : null}
-
-              {/* Badges row */}
-              {hasDetailBadges && (
-                <div className="flex flex-wrap gap-1.5">
-                {/* Category */}
-                {CategoryIcon && task.category && (
-                  <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 border-muted-foreground/30">
-                    <CategoryIcon className="w-3 h-3" />
-                    {task.category}
-                  </Badge>
                 )}
-
-                {/* Difficulty */}
-                {task.difficulty && (
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      "text-xs px-1.5 py-0.5 h-5",
-                      task.difficulty === 'easy' && "bg-green-500/10 text-green-500 border-green-500/30",
-                      task.difficulty === 'medium' && "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
-                      task.difficulty === 'hard' && "bg-red-500/10 text-red-500 border-red-500/30"
-                    )}
-                  >
-                    {task.difficulty}
-                  </Badge>
-                )}
-
-                {/* Priority */}
-                {task.priority && (
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      "text-xs px-1.5 py-0.5 h-5",
-                      task.priority === 'high' && "bg-red-500/10 text-red-500 border-red-500/30",
-                      task.priority === 'medium' && "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
-                      task.priority === 'low' && "bg-blue-500/10 text-blue-500 border-blue-500/30"
-                    )}
-                  >
-                    {task.priority} priority
-                  </Badge>
-                )}
-
-                {/* Duration */}
-                {task.estimated_duration && (
-                  <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 border-muted-foreground/30">
-                    <Timer className="w-3 h-3" />
-                    {task.estimated_duration}m
-                  </Badge>
-                )}
-
-                {/* Recurrence */}
-                {task.is_recurring && task.recurrence_pattern && (
-                  <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 bg-accent/10 text-accent border-accent/30">
-                    <Repeat className="w-3 h-3" />
-                    {formatDisplayLabel(task.recurrence_pattern)}
-                  </Badge>
-                )}
-                </div>
-              )}
-            </div>
-          </CollapsibleContent>
+              </div>
+            </CollapsibleContent>
+          ) : null}
         </div>
       </Collapsible>
     );
@@ -3323,6 +3347,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                           }
                         : undefined;
                       const overlapCount = timelineConflictMap.get(task.id)?.size ?? 0;
+                      const isCompactTimelineRow = !isDesktopLayout && entry.heightPx <= COMPACT_TIMELINE_ROW_MAX_HEIGHT_PX;
 
                       const rowStyle: CSSProperties = {
                         WebkitUserSelect: "none",
@@ -3389,16 +3414,18 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                           }}
                         >
                           <div
-                            className="h-full min-w-0"
+                            className={cn("h-full min-w-0", isCompactTimelineRow && "overflow-hidden")}
                             data-testid={`timeline-row-${task.id}`}
                             data-timeline-lane={entry.laneIndex}
                             data-timeline-lane-count={entry.laneCount}
                             data-timeline-overlap={entry.overlapCount}
+                            data-timeline-compact={isCompactTimelineRow ? "true" : undefined}
                             data-start-minute={entry.startMinute}
                             data-top-px={entry.topPx}
                             data-duration-minutes={task.estimated_duration ?? undefined}
                             data-duration-height-px={entry.heightPx}
                             style={{
+                              overflow: isCompactTimelineRow ? "hidden" : undefined,
                               minHeight: desktopTimelineDurationLayout
                                 ? `${durationMinutesToPixels(task.estimated_duration, desktopTimelineDurationLayout)}px`
                                 : undefined,
@@ -3407,7 +3434,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                             <span className="sr-only" data-testid="timeline-row-time">
                               {isThisDragging ? timelinePreviewTime ?? task.scheduled_time : task.scheduled_time}
                             </span>
-                            {renderTaskItem(task, undefined, overlapCount)}
+                            {renderTaskItem(task, undefined, overlapCount, {
+                              isScheduledTimeline: true,
+                              heightPx: entry.heightPx,
+                              isCompact: isCompactTimelineRow,
+                            })}
                           </div>
                         </motion.div>
                       );
