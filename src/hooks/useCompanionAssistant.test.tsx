@@ -881,7 +881,7 @@ describe("useCompanionAssistant", () => {
     ).toHaveLength(2);
   });
 
-  it("does not create a local companion fallback when the opener endpoint fails", async () => {
+  it("falls back to a local companion opener when the opener endpoint fails", async () => {
     mocks.supabaseInvoke.mockImplementation(async (functionName) => {
       if (functionName === "companion-chat-opener") {
         return {
@@ -916,26 +916,26 @@ describe("useCompanionAssistant", () => {
 
     await waitFor(() => {
       expect(mocks.toastError).toHaveBeenCalledWith(
-        "I couldn't start a fresh chat yet. Tap + to retry.",
+        "I couldn't load a generated opener, so I started a basic chat.",
       );
     });
 
-    expect(result.current.messages).toEqual([]);
-    expect(result.current.canSubmitMessage).toBe(false);
+    expect(result.current.messages[0]?.content).toBe("You made it back.");
+    expect(result.current.canSubmitMessage).toBe(true);
 
     await act(async () => {
       const submitted = await result.current.submitMessage("Can we talk?");
-      expect(submitted).toBe(false);
+      expect(submitted).toBe(true);
     });
 
     expect(
       mocks.supabaseInvoke.mock.calls.some(
         ([functionName]) => functionName === "companion-agent",
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it("blocks companion sends when the generated opener is not persistence-ready", async () => {
+  it("keeps the generated opener usable when opener persistence is not ready", async () => {
     mocks.supabaseInvoke.mockImplementation(async (functionName) => {
       if (functionName === "companion-chat-opener") {
         return {
@@ -986,24 +986,24 @@ describe("useCompanionAssistant", () => {
     );
 
     await waitFor(() => {
-      expect(mocks.toastError).toHaveBeenCalledWith(
-        "I couldn't start a fresh chat yet. Tap + to retry.",
+      expect(result.current.messages[0]?.content).toBe(
+        "Fresh opener without storage.",
       );
     });
 
-    expect(result.current.messages).toEqual([]);
-    expect(result.current.canSubmitMessage).toBe(false);
+    expect(mocks.toastError).not.toHaveBeenCalled();
+    expect(result.current.canSubmitMessage).toBe(true);
 
     await act(async () => {
       const submitted = await result.current.submitMessage("Can we talk?");
-      expect(submitted).toBe(false);
+      expect(submitted).toBe(true);
     });
 
     expect(
       mocks.supabaseInvoke.mock.calls.some(
         ([functionName]) => functionName === "companion-agent",
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("requests draft opportunity cards after conversational Journeys replies", async () => {

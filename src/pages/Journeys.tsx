@@ -1373,10 +1373,14 @@ const Journeys = () => {
     return map;
   }, [allCalendarTasks]);
 
+  const handleOpenCalendarPreferences = useCallback(() => {
+    navigate("/profile", { state: { openTab: "preferences" } });
+  }, [navigate]);
+
   const handleSendTaskToCalendar = useCallback(async (taskId: string) => {
     const routeToCalendarPreferences = () => {
       toast.error("No calendar connected. Opening Preferences...");
-      navigate("/profile", { state: { openTab: "preferences" } });
+      handleOpenCalendarPreferences();
     };
 
     if (calendarConnections.length === 0) {
@@ -1478,7 +1482,7 @@ const Journeys = () => {
 
       toast.error(message);
     }
-  }, [calendarConnections.length, navigate, selectedDate, sendTaskToCalendar]);
+  }, [calendarConnections.length, handleOpenCalendarPreferences, selectedDate, sendTaskToCalendar]);
 
   const handleAddQuest = useCallback(async (data: AddQuestData) => {
     const taskDate = data.sendToInbox
@@ -2109,6 +2113,7 @@ const Journeys = () => {
           autoRestoreDraftOnOpen={autoRestoreQuestDraftOnOpen}
           persistenceRoute="/journeys"
           onCreateCampaign={() => openCampaignBuilder()}
+          onOpenCalendarPreferences={handleOpenCalendarPreferences}
         />
         
         {/* Edit Quest Dialog (for regular quests) */}

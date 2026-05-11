@@ -154,12 +154,13 @@ SELECT is(
 );
 
 SELECT test_security.set_auth('authenticated', '10000000-0000-0000-0000-000000000001');
-SELECT ok(
-  test_security.attempt_sql($sql$
+SELECT is(
+  test_security.exec_row_count($sql$
     UPDATE public.account_entitlements
     SET is_active = true
     WHERE user_id = '10000000-0000-0000-0000-000000000001'
-  $sql$) IS NOT NULL,
+  $sql$),
+  0,
   'premium entitlements cannot be forged through direct table writes'
 );
 
@@ -191,15 +192,14 @@ SELECT is(
   'users can list their own quest attachment objects'
 );
 
-SELECT is(
-  test_security.insert_storage_object(
+SELECT ok(
+  test_security.try_insert_storage_object(
     '28000000-0000-0000-0000-000000000002',
     'quest-attachments',
     '10000000-0000-0000-0000-000000000001/new-upload.txt',
     '10000000-0000-0000-0000-000000000001'
-  ),
-  1,
-  'users can upload inside their own quest attachment folder'
+  ) IS NOT NULL,
+  'direct client quest attachment uploads are blocked; uploads use backend-issued signed URLs'
 );
 
 SELECT ok(

@@ -9,6 +9,10 @@ import {
   createCostGuardrailSupabaseClient,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
+import {
+  buildAccessStateResponse,
+  fetchAccountEntitlementForUser,
+} from "../_shared/accountEntitlements.ts";
 
 const RequestSchema = z.object({
   text: z.string().min(1).max(5000).trim(),
@@ -25,6 +29,11 @@ const startOfTodayUtc = () => {
 };
 
 async function ensurePremiumAccess(supabase: any, userId: string) {
+  const entitlement = await fetchAccountEntitlementForUser(supabase, userId);
+  if (buildAccessStateResponse(entitlement).has_access) {
+    return true;
+  }
+
   const nowIso = new Date().toISOString();
   const { count, error } = await supabase
     .from("subscriptions")

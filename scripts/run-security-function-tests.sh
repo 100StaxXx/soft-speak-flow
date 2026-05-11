@@ -49,35 +49,27 @@ INTERNAL_FUNCTION_SECRET=$INTERNAL_FUNCTION_SECRET
 OPENAI_API_KEY=$OPENAI_API_KEY
 EOF
 
-health_status="$(
-  curl -sS -o /dev/null -w "%{http_code}" \
-    -X POST "${SUPABASE_FUNCTIONS_URL}/verify-admin-access" \
-    -H "Content-Type: application/json" \
-    -d '{}' || true
-)"
+supabase functions serve --no-verify-jwt --env-file "$tmp_env" >"$tmp_log" 2>&1 &
+serve_pid="$!"
 
-if [[ "$health_status" == "000" ]]; then
-  supabase functions serve --env-file "$tmp_env" >"$tmp_log" 2>&1 &
-  serve_pid="$!"
-
-  for _ in $(seq 1 30); do
-    health_status="$(
-      curl -sS -o /dev/null -w "%{http_code}" \
-        -X POST "${SUPABASE_FUNCTIONS_URL}/verify-admin-access" \
-        -H "Content-Type: application/json" \
-        -d '{}' || true
-    )"
-    if [[ "$health_status" != "000" ]]; then
-      break
-    fi
-    sleep 1
-  done
-
-  if [[ "$health_status" == "000" ]]; then
-    echo "Local edge functions did not come up for security testing." >&2
-    cat "$tmp_log" >&2 || true
-    exit 1
+health_status="000"
+for _ in $(seq 1 30); do
+  health_status="$(
+    curl -sS -o /dev/null -w "%{http_code}" \
+      -X POST "${SUPABASE_FUNCTIONS_URL}/verify-admin-access" \
+      -H "Content-Type: application/json" \
+      -d '{}' || true
+  )"
+  if [[ "$health_status" == "401" || "$health_status" == "403" ]]; then
+    break
   fi
+  sleep 1
+done
+
+if [[ "$health_status" != "401" && "$health_status" != "403" ]]; then
+  echo "Local edge functions did not come up for security testing (status: ${health_status})." >&2
+  cat "$tmp_log" >&2 || true
+  exit 1
 fi
 
 deno test --allow-env --allow-net --allow-read --allow-run=supabase supabase/tests/security/edge_functions.test.ts

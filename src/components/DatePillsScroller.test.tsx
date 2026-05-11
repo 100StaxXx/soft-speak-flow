@@ -795,6 +795,70 @@ describe("DatePillsScroller", () => {
     }
   });
 
+  it("ignores scroll events emitted by a forced center request", async () => {
+    const onDateSelect = vi.fn();
+    const scrollToSpy = vi.fn(function (this: HTMLElement, options?: ScrollToOptions) {
+      if (typeof options?.left === "number") {
+        this.scrollLeft = options.left;
+      }
+    });
+    const originalScrollTo = HTMLElement.prototype.scrollTo;
+
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true,
+      value: scrollToSpy,
+    });
+
+    try {
+      const selectedDate = new Date("2026-05-10T12:00:00.000Z");
+      const selectedDateKey = format(selectedDate, "yyyy-MM-dd");
+      const { rerender, container } = render(
+        <DatePillsScroller
+          selectedDate={selectedDate}
+          onDateSelect={onDateSelect}
+          centerRequestKey={0}
+          centerRequestDateKey={selectedDateKey}
+        />,
+      );
+
+      const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
+      const selectedButton = scroller.querySelector(`button[data-date-key='${selectedDateKey}']`) as HTMLButtonElement;
+      setCenteringMetrics(scroller, selectedButton, {
+        scrollLeft: 700,
+        scrollWidth: 1000,
+        containerWidth: 320,
+        selectedLeft: 360,
+        selectedWidth: 60,
+      });
+
+      const initialCount = scroller.querySelectorAll("button[data-date-pill='true']").length;
+
+      scrollToSpy.mockClear();
+      rerender(
+        <DatePillsScroller
+          selectedDate={selectedDate}
+          onDateSelect={onDateSelect}
+          centerRequestKey={1}
+          centerRequestDateKey={selectedDateKey}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(scrollToSpy).toHaveBeenCalled();
+      });
+
+      setScrollMetrics(scroller, { scrollLeft: 700, clientWidth: 320, scrollWidth: 1000 });
+      fireEvent.scroll(scroller);
+
+      expect(scroller.querySelectorAll("button[data-date-pill='true']").length).toBe(initialCount);
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+        configurable: true,
+        value: originalScrollTo,
+      });
+    }
+  });
+
   it("uses an explicit center request date key instead of the selected date pill", async () => {
     const onDateSelect = vi.fn();
     const scrollToSpy = vi.fn(function (this: HTMLElement, options?: ScrollToOptions) {

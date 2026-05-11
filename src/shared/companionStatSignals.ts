@@ -37,7 +37,7 @@ export type CompanionMissInterpretation =
 
 export type CompanionStatNeedLevel = "low" | "medium" | "high";
 
-export interface CompanionStatScores extends Record<CompanionStatAttribute, number> {}
+export type CompanionStatScores = Record<CompanionStatAttribute, number>;
 
 export interface CompanionStatEventInput {
   attribute: CompanionStatAttribute;

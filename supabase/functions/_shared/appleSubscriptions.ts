@@ -54,6 +54,8 @@ export const APPLE_BINDING_CONFLICT_ERROR =
   "This purchase is already linked to another account.";
 export const APPLE_BINDING_MISSING_ERROR =
   "This purchase is missing its app-account binding. Update the app and restore the purchase again.";
+export const APPLE_UNSUPPORTED_PRODUCT_ERROR =
+  "This Apple product is not configured as a premium subscription.";
 
 export function getDiscountedYearlyOfferId() {
   return (
@@ -113,13 +115,14 @@ const yearlyProductIds = normalizeProductIds("APPLE_YEARLY_PRODUCT_IDS", [
 
 export function resolvePlanFromProduct(productId: string | undefined): "monthly" | "yearly" {
   const normalized = (productId ?? "").toLowerCase();
-  if (
-    yearlyProductIds.some((id) => normalized.includes(id.toLowerCase())) ||
-    normalized.includes("year")
-  ) {
+  if (yearlyProductIds.some((id) => normalized === id.toLowerCase())) {
     return "yearly";
   }
-  return monthlyProductIds.some((id) => normalized.includes(id.toLowerCase())) ? "monthly" : "monthly";
+  if (monthlyProductIds.some((id) => normalized === id.toLowerCase())) {
+    return "monthly";
+  }
+
+  throw new Error(APPLE_UNSUPPORTED_PRODUCT_ERROR);
 }
 
 function parseAppleDate(value?: string | null) {

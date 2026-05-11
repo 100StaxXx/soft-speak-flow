@@ -146,3 +146,26 @@ Deno.test("ensureAppleTransactionBinding rejects new bindings without an app-acc
     "Expected missing app-account token to fail closed",
   );
 });
+
+Deno.test("resolvePlanFromProduct rejects unknown Apple product ids", () => {
+  assert(
+    appleSubscriptionsModule.resolvePlanFromProduct("cosmiq_premium_yearly") === "yearly",
+    "Expected configured yearly product id to resolve",
+  );
+  assert(
+    appleSubscriptionsModule.resolvePlanFromProduct("cosmiq_premium_monthly") === "monthly",
+    "Expected configured monthly product id to resolve",
+  );
+
+  let error: unknown = null;
+  try {
+    appleSubscriptionsModule.resolvePlanFromProduct("com.example.unrelated.yearly.tip");
+  } catch (caught) {
+    error = caught;
+  }
+
+  assert(
+    error instanceof Error && error.message === appleSubscriptionsModule.APPLE_UNSUPPORTED_PRODUCT_ERROR,
+    "Expected unknown Apple products to fail closed instead of defaulting to monthly",
+  );
+});

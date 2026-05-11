@@ -78,7 +78,6 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
 
   const monthlyProduct = useMemo(() => getProductForPlan("monthly", products), [products]);
   const yearlyProduct = useMemo(() => getProductForPlan("yearly", products), [products]);
-  const selectedProduct = selectedPlan === "yearly" ? yearlyProduct : monthlyProduct;
   const selectedProductId = useMemo(
     () => getPurchaseProductIdForPlan(selectedPlan, products),
     [selectedPlan, products],
@@ -93,15 +92,6 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
   }, [hasOfferCode, variant]);
 
   const handleSubscribe = async () => {
-    if (!selectedProduct) {
-      toast({
-        title: "Almost ready",
-        description: "We're still fetching pricing details. Please try again in a moment.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     trackPaywallEvent("package_selected", {
       surface: "paywall",
       plan: selectedPlan,
@@ -433,7 +423,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
         {/* Subscribe Button */}
         <Button
           onClick={() => { void handleSubscribe(); }}
-          disabled={!isAvailable || loading || productsLoading || !selectedProduct}
+          disabled={!isAvailable || loading || productsLoading}
           className="w-full py-6 text-base font-semibold bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground shadow-glow"
         >
           {loading ? "Processing..." : ctaLabel}

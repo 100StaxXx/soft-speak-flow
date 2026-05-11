@@ -210,6 +210,7 @@ Deno.test("edge-function security regression suite", async (t) => {
       body: target.body,
       headers: {
         ...harness.anonHeaders,
+        "cf-connecting-ip": testIp,
         "x-forwarded-for": testIp,
       },
     });

@@ -17,6 +17,10 @@ import {
 
 const APPLE_BINDING_CONFLICT_CODE = "APPLE_BINDING_CONFLICT";
 const APPLE_BINDING_MISSING_CODE = "APPLE_BINDING_MISSING";
+const APPLE_MISSING_EXPIRATION_ERROR =
+  "This Apple transaction is missing its subscription expiration date.";
+const APPLE_UNSUPPORTED_TRANSACTION_TYPE_ERROR =
+  "This Apple transaction is not an auto-renewable subscription.";
 
 type VerifyAppleReceiptDeps = {
   createSupabaseClient?: typeof createClient;
@@ -89,6 +93,9 @@ function buildErrorPayload(error: unknown): {
 
   if (
     errorMessage.includes("invalid") ||
+    errorMessage.includes("missing") ||
+    errorMessage.includes("not configured") ||
+    errorMessage.includes("not an auto-renewable") ||
     errorMessage.includes("required") ||
     errorMessage.includes("already register")
   ) {
@@ -162,10 +169,16 @@ export async function handleVerifyAppleReceipt(
 
         const { transactionInfo, environment } = await verifyTransactionImpl(transactionId);
 
+        if (transactionInfo.type !== "Auto-Renewable Subscription") {
+          throw new Error(APPLE_UNSUPPORTED_TRANSACTION_TYPE_ERROR);
+        }
+
+        if (!transactionInfo.expiresDate) {
+          throw new Error(APPLE_MISSING_EXPIRATION_ERROR);
+        }
+
         const plan = resolvePlanFromProductImpl(transactionInfo.productId);
-        const expiresAt = transactionInfo.expiresDate
-          ? new Date(transactionInfo.expiresDate)
-          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // Default 30 days if no expiry
+        const expiresAt = new Date(transactionInfo.expiresDate);
         const purchaseDate = new Date(transactionInfo.purchaseDate);
         const cancellationDate = transactionInfo.revocationDate
           ? new Date(transactionInfo.revocationDate)

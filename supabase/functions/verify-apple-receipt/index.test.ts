@@ -138,3 +138,81 @@ Deno.test("verify-apple-receipt preserves binding errors even when a receipt is 
     `Expected binding missing code, got ${payload.code}`,
   );
 });
+
+Deno.test("verify-apple-receipt rejects StoreKit transactions without subscription expiry", async () => {
+  let upsertCalled = false;
+  const response = await verifyAppleReceiptModule.handleVerifyAppleReceipt(
+    new Request("http://localhost", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer access-token",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ transactionId: "tx-no-expiry" }),
+    }),
+    {
+      createSupabaseClient: () => createAuthenticatedClient() as never,
+      verifyTransactionImpl: async () => ({
+        transactionInfo: {
+          transactionId: "tx-no-expiry",
+          originalTransactionId: "orig-no-expiry",
+          productId: "cosmiq_premium_monthly",
+          purchaseDate: Date.parse("2026-05-01T00:00:00.000Z"),
+          type: "Auto-Renewable Subscription",
+          environment: "Sandbox",
+        },
+        environment: "Sandbox",
+        isValid: true,
+      }),
+      upsertSubscriptionImpl: async () => {
+        upsertCalled = true;
+        throw new Error("upsertSubscriptionImpl should not be called without expiresDate");
+      },
+    },
+  );
+
+  assert(response.status === 400, `Expected missing expiry to be rejected, got ${response.status}`);
+  assert(!upsertCalled, "Expected subscription upsert not to run for transactions without expiry");
+  const payload = await response.json();
+  assert(
+    payload.error === "This Apple transaction is missing its subscription expiration date.",
+    `Expected missing expiry error, got ${payload.error}`,
+  );
+});
+
+Deno.test("verify-apple-receipt rejects non-subscription StoreKit transactions", async () => {
+  let upsertCalled = false;
+  const response = await verifyAppleReceiptModule.handleVerifyAppleReceipt(
+    new Request("http://localhost", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer access-token",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ transactionId: "tx-consumable" }),
+    }),
+    {
+      createSupabaseClient: () => createAuthenticatedClient() as never,
+      verifyTransactionImpl: async () => ({
+        transactionInfo: {
+          transactionId: "tx-consumable",
+          originalTransactionId: "orig-consumable",
+          productId: "cosmiq_tip_pack",
+          purchaseDate: Date.parse("2026-05-01T00:00:00.000Z"),
+          expiresDate: Date.parse("2026-06-01T00:00:00.000Z"),
+          type: "Consumable",
+          environment: "Sandbox",
+        },
+        environment: "Sandbox",
+        isValid: true,
+      }),
+      upsertSubscriptionImpl: async () => {
+        upsertCalled = true;
+        throw new Error("upsertSubscriptionImpl should not be called for non-subscriptions");
+      },
+    },
+  );
+
+  assert(response.status === 400, `Expected non-subscription transaction to be rejected, got ${response.status}`);
+  assert(!upsertCalled, "Expected subscription upsert not to run for non-subscription transactions");
+});

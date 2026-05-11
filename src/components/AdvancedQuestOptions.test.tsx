@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 import { AdvancedQuestOptions } from "./AdvancedQuestOptions";
 
@@ -10,6 +10,12 @@ vi.mock("@/hooks/useSmartScheduling", () => ({
     isLoading: false,
   }),
 }));
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 function RecurrenceHarness({ selectedDate }: { selectedDate?: Date }) {
   const [recurrencePattern, setRecurrencePattern] = useState<string | null>(null);
@@ -148,14 +154,19 @@ function MultiReminderHarness({ initialOffsets = [] }: { initialOffsets?: number
   );
 }
 
-function DateTimeReminderHarness() {
+function DateTimeReminderHarness({
+  selectedDate = new Date(Date.now() + DAY_MS),
+  scheduledTime = "09:30",
+}: {
+  selectedDate?: Date;
+  scheduledTime?: string;
+} = {}) {
   const [reminderOffsetsMinutes, setReminderOffsetsMinutes] = useState<number[]>([]);
-  const selectedDate = new Date(2026, 1, 13);
 
   return (
     <div>
       <AdvancedQuestOptions
-        scheduledTime="09:30"
+        scheduledTime={scheduledTime}
         onScheduledTimeChange={vi.fn()}
         estimatedDuration={30}
         onEstimatedDurationChange={vi.fn()}
@@ -460,9 +471,14 @@ describe("AdvancedQuestOptions reminder picker", () => {
     render(<DateTimeReminderHarness />);
 
     fireEvent.click(getReminderSection().getByRole("button", { name: "None" }));
-    fireEvent.click(screen.getByRole("button", { name: "Custom" }));
+    const customButton = screen.getByRole("button", { name: "Custom" });
+    fireEvent.click(customButton);
 
     expect(screen.getByText("Custom reminder date")).toBeInTheDocument();
+    expect(screen.getByLabelText("Custom reminder time")).toBeInTheDocument();
+    const activeCustomButton = screen.getByRole("button", { name: "Custom" });
+    expect(activeCustomButton).toHaveAttribute("aria-pressed", "true");
+    expect(activeCustomButton.className).toContain("bg-accent");
     fireEvent.change(screen.getByLabelText("Custom reminder time"), { target: { value: "08:00" } });
     fireEvent.click(screen.getByRole("button", { name: "Apply" }));
 
@@ -473,6 +489,17 @@ describe("AdvancedQuestOptions reminder picker", () => {
     expect(getReminderSection().getByRole("button", { name: "90 minutes before" })).toBeInTheDocument();
   });
 
+  it("renders the custom reminder date and time editor before preset options", () => {
+    render(<DateTimeReminderHarness />);
+
+    fireEvent.click(getReminderSection().getByRole("button", { name: "None" }));
+    fireEvent.click(screen.getByRole("button", { name: "Custom" }));
+
+    const dateLabel = screen.getByText("Custom reminder date");
+    const firstPreset = screen.getByRole("button", { name: "5 minutes before" });
+    expect(dateLabel.compareDocumentPosition(firstPreset) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("rejects a custom reminder date and time after the quest start", () => {
     render(<DateTimeReminderHarness />);
 
@@ -480,6 +507,43 @@ describe("AdvancedQuestOptions reminder picker", () => {
     fireEvent.click(screen.getByRole("button", { name: "Custom" }));
     fireEvent.change(screen.getByLabelText("Custom reminder time"), { target: { value: "10:00" } });
 
+    expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
+    expect(screen.getByTestId("reminder-offsets-state")).toHaveTextContent("none");
+  });
+
+  it("shows a clear message when the quest start time is already past", () => {
+    render(
+      <DateTimeReminderHarness
+        selectedDate={new Date(Date.now() - DAY_MS)}
+        scheduledTime="07:00"
+      />,
+    );
+
+    fireEvent.click(getReminderSection().getByRole("button", { name: "None" }));
+    fireEvent.click(screen.getByRole("button", { name: "Custom" }));
+
+    expect(screen.getByText("Custom reminder date")).toBeInTheDocument();
+    expect(screen.getByLabelText("Custom reminder time")).toBeInTheDocument();
+    expect(screen.getByText("Choose a future quest time before adding a custom reminder.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
+  });
+
+  it("rejects a custom reminder time that is already past for a future quest", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 1, 13, 12, 0));
+
+    render(
+      <DateTimeReminderHarness
+        selectedDate={new Date(2026, 1, 13)}
+        scheduledTime="18:00"
+      />,
+    );
+
+    fireEvent.click(getReminderSection().getByRole("button", { name: "None" }));
+    fireEvent.click(screen.getByRole("button", { name: "Custom" }));
+    fireEvent.change(screen.getByLabelText("Custom reminder time"), { target: { value: "11:00" } });
+
+    expect(screen.getByText("Choose a reminder time in the future.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
     expect(screen.getByTestId("reminder-offsets-state")).toHaveTextContent("none");
   });

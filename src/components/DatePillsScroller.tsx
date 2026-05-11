@@ -74,6 +74,8 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     previousScrollLeft: number;
   } | null>(null);
   const isExpandingRef = useRef(false);
+  const ignoreProgrammaticScrollRef = useRef(false);
+  const releaseProgrammaticScrollFrameRef = useRef<number | null>(null);
 
   const [rangeStart, setRangeStart] = useState<Date>(() => getInitialRange(selectedDate, daysToShow).start);
   const [rangeEnd, setRangeEnd] = useState<Date>(() => getInitialRange(selectedDate, daysToShow).end);
@@ -224,6 +226,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
   const handleScroll = useCallback(() => {
     const container = scrollRef.current;
     if (!container) return;
+    if (ignoreProgrammaticScrollRef.current) return;
     if (isExpandingRef.current) return;
 
     const { scrollLeft, clientWidth, scrollWidth } = container;
@@ -243,6 +246,23 @@ export const DatePillsScroller = memo(function DatePillsScroller({
       setRangeEnd((currentEnd) => addDays(currentEnd, extensionChunk));
     }
   }, [extensionChunk]);
+
+  const ignoreNextForcedScrollEvents = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    ignoreProgrammaticScrollRef.current = true;
+
+    if (releaseProgrammaticScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(releaseProgrammaticScrollFrameRef.current);
+    }
+
+    releaseProgrammaticScrollFrameRef.current = window.requestAnimationFrame(() => {
+      releaseProgrammaticScrollFrameRef.current = window.requestAnimationFrame(() => {
+        ignoreProgrammaticScrollRef.current = false;
+        releaseProgrammaticScrollFrameRef.current = null;
+      });
+    });
+  }, []);
 
   useLayoutEffect(() => {
     const container = scrollRef.current;
@@ -271,6 +291,12 @@ export const DatePillsScroller = memo(function DatePillsScroller({
       }
     };
   }, [rangeEnd, rangeStart]);
+
+  useEffect(() => () => {
+    if (releaseProgrammaticScrollFrameRef.current !== null && typeof window !== "undefined") {
+      window.cancelAnimationFrame(releaseProgrammaticScrollFrameRef.current);
+    }
+  }, []);
 
   useLayoutEffect(() => {
     recalculateEdgeSpacers();
@@ -326,6 +352,10 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     const maxScrollLeft = Math.max(0, container.scrollWidth - containerWidth);
     const clampedLeft = Math.min(Math.max(targetLeft, 0), maxScrollLeft);
 
+    if (force) {
+      ignoreNextForcedScrollEvents();
+    }
+
     try {
       container.scrollTo({
         left: clampedLeft,
@@ -341,7 +371,13 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     }
 
     return "centered";
-  }, [calculateEdgeSpacerWidth, edgeSpacerWidth, getPillElementByDateKey, getSelectedPillElement]);
+  }, [
+    calculateEdgeSpacerWidth,
+    edgeSpacerWidth,
+    getPillElementByDateKey,
+    getSelectedPillElement,
+    ignoreNextForcedScrollEvents,
+  ]);
 
   // Center the selected pill on selected-date, activation, or explicit center requests.
   // Range extensions from edge scrolls intentionally don't re-center, so the

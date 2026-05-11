@@ -11,6 +11,18 @@ export const useProfileRealtime = () => {
   useEffect(() => {
     if (!user?.id) return;
 
+    const invalidateAccountState = () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["mentor"] });
+      queryClient.invalidateQueries({ queryKey: ["mentor-page-data"] });
+      queryClient.invalidateQueries({ queryKey: ["mentor-personality"] });
+      queryClient.invalidateQueries({ queryKey: ["selected-mentor"] });
+      queryClient.invalidateQueries({ queryKey: ["streak-freezes"] });
+      queryClient.invalidateQueries({ queryKey: ["subscription"] });
+      queryClient.invalidateQueries({ queryKey: ["access-state"] });
+      queryClient.invalidateQueries({ queryKey: ["referral-stats"] });
+    };
+
     const channel = supabase
       .channel(`profile-sync-${user.id}`)
       .on(
@@ -21,16 +33,27 @@ export const useProfileRealtime = () => {
           table: "profiles",
           filter: `id=eq.${user.id}`,
         },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["profile"] });
-          queryClient.invalidateQueries({ queryKey: ["mentor"] });
-          queryClient.invalidateQueries({ queryKey: ["mentor-page-data"] });
-          queryClient.invalidateQueries({ queryKey: ["mentor-personality"] });
-          queryClient.invalidateQueries({ queryKey: ["selected-mentor"] });
-          queryClient.invalidateQueries({ queryKey: ["streak-freezes"] });
-          queryClient.invalidateQueries({ queryKey: ["subscription"] });
-          queryClient.invalidateQueries({ queryKey: ["referral-stats"] });
+        invalidateAccountState,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "account_entitlements",
+          filter: `user_id=eq.${user.id}`,
         },
+        invalidateAccountState,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "subscriptions",
+          filter: `user_id=eq.${user.id}`,
+        },
+        invalidateAccountState,
       )
       .subscribe((status, err) => {
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {

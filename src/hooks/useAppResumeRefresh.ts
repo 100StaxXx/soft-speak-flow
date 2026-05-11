@@ -43,6 +43,12 @@ export const useAppResumeRefresh = ({ enabled = true }: UseAppResumeRefreshOptio
     // Refetch profile first (mentor ID depends on it)
     await queryClient.refetchQueries({ queryKey: ['profile'] });
 
+    // Subscription and entitlement state drives the hard paywall and can change while backgrounded.
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['access-state'] }),
+      queryClient.invalidateQueries({ queryKey: ['subscription'] }),
+    ]);
+
     // Invalidate mentor queries used across mentor tab/chat/profile/nav
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['mentor-page-data'] }),

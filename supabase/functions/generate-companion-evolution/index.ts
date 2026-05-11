@@ -393,6 +393,16 @@ export const handleGenerateCompanionEvolution = async (
 
     const supabase = createSupabaseClient(supabaseUrl, supabaseKey);
 
+    const rateLimit = await checkRateLimitFn(
+      supabase,
+      resolvedUserId,
+      "companion-evolution",
+      RATE_LIMITS["companion-evolution"],
+    );
+    if (!rateLimit.allowed) {
+      return createRateLimitResponseFn(rateLimit, corsHeaders);
+    }
+
     const { data: companion, error: companionError } = await supabase
       .from("user_companion")
       .select("*")
@@ -756,16 +766,6 @@ export const handleGenerateCompanionEvolution = async (
       capabilities: ["image", "text"],
       providers: ["openai"],
     });
-
-    const rateLimit = await checkRateLimitFn(
-      supabase,
-      resolvedUserId,
-      "companion-evolution",
-      RATE_LIMITS["companion-evolution"],
-    );
-    if (!rateLimit.allowed) {
-      return createRateLimitResponseFn(rateLimit, corsHeaders);
-    }
 
     const imageSize = resolveCompanionImageSizeForUserFn(resolvedUserId);
     const spiritLockProfile = resolveCompanionSpiritLockProfile(

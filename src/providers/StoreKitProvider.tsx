@@ -47,6 +47,30 @@ function resolvePlan(productId: string | undefined): StoreKitPlan | null {
   return null;
 }
 
+function normalizeAccountToken(value: string | null | undefined): string | null {
+  const normalized = value?.trim().toLowerCase();
+  return normalized && normalized.length > 0 ? normalized : null;
+}
+
+function entitlementBelongsToUser(
+  entitlement: StoreKitTransaction | null,
+  userId: string | null | undefined,
+): boolean {
+  const appAccountToken = normalizeAccountToken(entitlement?.appAccountToken);
+  const normalizedUserId = normalizeAccountToken(userId);
+  return Boolean(appAccountToken && normalizedUserId && appAccountToken === normalizedUserId);
+}
+
+function entitlementIsCurrent(entitlement: StoreKitTransaction | null): boolean {
+  if (!entitlement || entitlement.cancelled || entitlement.pending || entitlement.revocationDate) {
+    return false;
+  }
+
+  if (!entitlement.expirationDate) return false;
+  const expirationDate = new Date(entitlement.expirationDate);
+  return !Number.isNaN(expirationDate.getTime()) && expirationDate > new Date();
+}
+
 export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
   const { user, status } = useAuth();
   const [products, setProducts] = useState<StoreKitProduct[]>([]);
@@ -200,9 +224,10 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     await refreshEntitlement();
   }, [isAvailable, refreshEntitlement]);
 
-  const isPro = Boolean(currentEntitlement && !currentEntitlement.revocationDate);
-  const activePlan = resolvePlan(currentEntitlement?.productId);
-  const expirationDate = currentEntitlement?.expirationDate
+  const isPro = entitlementIsCurrent(currentEntitlement) &&
+    entitlementBelongsToUser(currentEntitlement, user?.id);
+  const activePlan = isPro ? resolvePlan(currentEntitlement?.productId) : null;
+  const expirationDate = isPro && currentEntitlement?.expirationDate
     ? new Date(currentEntitlement.expirationDate)
     : null;
 

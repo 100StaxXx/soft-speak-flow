@@ -18,6 +18,9 @@ BEGIN
 END;
 $$;
 
+GRANT USAGE ON SCHEMA test_security TO anon, authenticated, service_role;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA test_security TO anon, authenticated, service_role;
+
 CREATE OR REPLACE FUNCTION test_security.reset_auth()
 RETURNS VOID
 LANGUAGE plpgsql

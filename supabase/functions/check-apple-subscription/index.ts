@@ -34,8 +34,9 @@ serve(async (req) => {
     }
 
     const entitlement = await fetchAccountEntitlementForUser(supabaseClient, user.id);
-    if (entitlement) {
-      return jsonResponse(req, buildAccessStateResponse(entitlement));
+    const entitlementResponse = buildAccessStateResponse(entitlement);
+    if (entitlementResponse.has_access) {
+      return jsonResponse(req, entitlementResponse);
     }
 
     const subscription = await fetchSubscriptionForUser(supabaseClient, user.id);
@@ -49,7 +50,7 @@ serve(async (req) => {
       return jsonResponse(req, buildPromoSubscriptionResponse(promoAccess.granted_until));
     }
 
-    return jsonResponse(req, subscriptionResponse);
+    return jsonResponse(req, entitlement ? entitlementResponse : subscriptionResponse);
   } catch (error) {
     console.error("Error checking subscription:", error);
 

@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   restorePurchases: vi.fn(),
   manageSubscriptions: vi.fn(),
   refreshProducts: vi.fn(),
+  functionsInvoke: vi.fn(),
+  invalidateQueries: vi.fn(),
   storeKitProducts: [
     { identifier: "cosmiq_premium_monthly", displayName: "Monthly", description: "", price: 9.99, displayPrice: "$9.99" },
     { identifier: "cosmiq_premium_yearly", displayName: "Yearly", description: "", price: 99.99, displayPrice: "$99.99" },
@@ -23,6 +25,20 @@ const mocks = vi.hoisted(() => ({
     apple_offer_campaign_identifier: null,
     apple_offer_code_expires_at: null,
     is_apple_offer_eligible: false,
+  },
+}));
+
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({
+    invalidateQueries: (...args: unknown[]) => mocks.invalidateQueries(...args),
+  }),
+}));
+
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    functions: {
+      invoke: (...args: unknown[]) => mocks.functionsInvoke(...args),
+    },
   },
 }));
 
@@ -96,6 +112,7 @@ describe("useAppleSubscription", () => {
     mocks.redeemOfferCode.mockResolvedValue({ status: "presented", entitlement: null });
     mocks.restorePurchases.mockResolvedValue({ productId: "cosmiq_premium_monthly", transactionId: "tx-r" });
     mocks.refreshProducts.mockResolvedValue(mocks.storeKitProducts);
+    mocks.functionsInvoke.mockResolvedValue({ data: { success: true }, error: null });
   });
 
   it("calls purchase for monthly products", async () => {
@@ -106,6 +123,9 @@ describe("useAppleSubscription", () => {
     });
 
     expect(mocks.purchase).toHaveBeenCalledWith("cosmiq_premium_monthly");
+    expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
+      body: { transactionId: "tx-1" },
+    });
     expect(mocks.redeemOfferCode).not.toHaveBeenCalled();
   });
 
@@ -153,6 +173,9 @@ describe("useAppleSubscription", () => {
 
     expect(mocks.redeemOfferCode).toHaveBeenCalledTimes(1);
     expect(mocks.purchase).toHaveBeenCalledWith("cosmiq_premium_yearly");
+    expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
+      body: { transactionId: "tx-1" },
+    });
   });
 
   it("calls regular purchase for yearly when no offer code", async () => {
@@ -169,6 +192,9 @@ describe("useAppleSubscription", () => {
     });
 
     expect(mocks.purchase).toHaveBeenCalledWith("cosmiq_premium_yearly");
+    expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
+      body: { transactionId: "tx-1" },
+    });
     expect(mocks.redeemOfferCode).not.toHaveBeenCalled();
   });
 
@@ -182,6 +208,9 @@ describe("useAppleSubscription", () => {
     });
 
     expect(mocks.purchase).toHaveBeenCalledWith("cosmiq_premium_yearly");
+    expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
+      body: { transactionId: "tx-1" },
+    });
     expect(mocks.toast).not.toHaveBeenCalledWith(
       expect.objectContaining({ title: "Unavailable" }),
     );
@@ -215,6 +244,29 @@ describe("useAppleSubscription", () => {
     });
 
     expect(success).toBe(false);
+    expect(mocks.functionsInvoke).not.toHaveBeenCalled();
+  });
+
+  it("shows an activation error when Apple succeeds but server verification fails", async () => {
+    mocks.functionsInvoke.mockResolvedValueOnce({
+      data: null,
+      error: new Error("Verification unavailable"),
+    });
+
+    const { result } = renderHook(() => useAppleSubscription());
+
+    let success: boolean | undefined;
+    await act(async () => {
+      success = await result.current.handlePurchase("cosmiq_premium_monthly");
+    });
+
+    expect(success).toBe(false);
+    expect(mocks.toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Subscription activation failed",
+        variant: "destructive",
+      }),
+    );
   });
 
   it("shows error toast when purchase throws", async () => {
@@ -242,6 +294,9 @@ describe("useAppleSubscription", () => {
     });
 
     expect(mocks.restorePurchases).toHaveBeenCalled();
+    expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
+      body: { transactionId: "tx-r" },
+    });
     expect(mocks.toast).toHaveBeenCalledWith(
       expect.objectContaining({ title: "Purchases restored" }),
     );

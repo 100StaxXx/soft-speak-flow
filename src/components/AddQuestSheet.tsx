@@ -94,6 +94,7 @@ interface AddQuestSheetProps {
   onAdd: (data: AddQuestData) => Promise<void>;
   isAdding?: boolean;
   onCreateCampaign?: () => void;
+  onOpenCalendarPreferences?: () => void;
   preventClose?: boolean;
   onPreventedCloseAttempt?: () => void;
   autoRestoreDraftOnOpen?: boolean;
@@ -123,6 +124,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   onAdd,
   isAdding = false,
   onCreateCampaign,
+  onOpenCalendarPreferences,
   preventClose = false,
   onPreventedCloseAttempt,
   autoRestoreDraftOnOpen = false,
@@ -166,18 +168,25 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const { integrationVisible, defaultProvider, connections } = useCalendarIntegrations();
+  const { defaultProvider, connections } = useCalendarIntegrations();
   const effectiveProvider = useMemo(() => {
     const connectedDefaultProvider = defaultProvider
       ? connections.find((connection) => connection.provider === defaultProvider)?.provider ?? null
       : null;
     return connectedDefaultProvider || connections[0]?.provider || null;
   }, [connections, defaultProvider]);
-  const canShowCalendarSendOption = Boolean(
+  const hasCalendarConnection = Boolean(SEND_TO_CALENDAR_ENABLED && connections.length > 0 && effectiveProvider);
+  const canShowCalendarSendOption = hasCalendarConnection;
+  const calendarProviderLabel = effectiveProvider === "apple"
+    ? "Apple"
+    : effectiveProvider === "google"
+      ? "Google"
+      : effectiveProvider === "outlook"
+        ? "Outlook"
+        : null;
+  const canShowCalendarSection = Boolean(
     SEND_TO_CALENDAR_ENABLED
-      && integrationVisible
-      && connections.length > 0
-      && effectiveProvider,
+      && (hasCalendarConnection || onOpenCalendarPreferences),
   );
 
   const subtaskInputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -247,6 +256,12 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   useEffect(() => {
     if (prefilledTime) setScheduledTime(prefilledTime);
   }, [prefilledTime]);
+
+  useEffect(() => {
+    if (!canShowCalendarSendOption && sendToCalendar) {
+      setSendToCalendar(false);
+    }
+  }, [canShowCalendarSendOption, sendToCalendar]);
 
   // Reset when sheet closes
   useEffect(() => {
@@ -606,7 +621,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       contactId: null,
       autoLogInteraction: true,
       sendToInbox: intent === "inbox",
-      sendToCalendar: intent === "scheduled" && isDesktopPanel && sendToCalendar && canShowCalendarSendOption,
+      sendToCalendar: intent === "scheduled" && sendToCalendar && canShowCalendarSendOption,
       subtasks: subtasks.filter(s => s.trim()),
       imageUrl: attachments.find((attachment) => attachment.isImage)?.fileUrl ?? null,
       attachments,
@@ -614,7 +629,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     });
     clearQuestDraftSnapshot(user?.id);
     onOpenChange(false);
-  }, [taskText, recurrencePattern, creationSource, scheduledTime, onAdd, taskDate, difficulty, estimatedDuration, recurrenceDays, recurrenceMonthDays, recurrenceCustomPeriod, reminderEnabled, reminderMinutesBefore, reminderOffsetsMinutes, moreInformation, location, isDesktopPanel, sendToCalendar, canShowCalendarSendOption, subtasks, attachments, onOpenChange, user?.id]);
+  }, [taskText, recurrencePattern, creationSource, scheduledTime, onAdd, taskDate, difficulty, estimatedDuration, recurrenceDays, recurrenceMonthDays, recurrenceCustomPeriod, reminderEnabled, reminderMinutesBefore, reminderOffsetsMinutes, moreInformation, location, sendToCalendar, canShowCalendarSendOption, subtasks, attachments, onOpenChange, user?.id]);
 
   const submitWithTemplateHandling = useCallback(async (intent: SubmitIntent) => {
     if (selectedTemplate && hasTemplateCustomizations) {
@@ -1244,21 +1259,68 @@ export const AddQuestSheet = memo(function AddQuestSheet({
             )}
           >
             {isDesktopPanel && (
-              <>
-                <div className={QUEST_FORM_STYLES.footerReview}>
-                  <p className="text-xs text-foreground">
-                    {reviewTitle} · {reviewTimeLabel} · {reviewDateLabel}
-                  </p>
-                </div>
-                {canShowCalendarSendOption && (
-                  <div className={cn(QUEST_FORM_STYLES.sectionCardSoft, "flex items-center justify-between px-4 py-3")}>
-                    <div className="text-xs text-muted-foreground">
-                      Send to {effectiveProvider === "apple" ? "Apple" : effectiveProvider === "google" ? "Google" : "Outlook"} Calendar after create
+              <div className={QUEST_FORM_STYLES.footerReview}>
+                <p className="text-xs text-foreground">
+                  {reviewTitle} · {reviewTimeLabel} · {reviewDateLabel}
+                </p>
+              </div>
+            )}
+            {canShowCalendarSection && (
+              <div
+                data-testid="add-quest-calendar-section"
+                className={cn(QUEST_FORM_STYLES.sectionCardSoft, "px-4 py-3")}
+              >
+                {hasCalendarConnection ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 text-left">
+                      <p className="flex items-center gap-2 text-xs font-semibold text-foreground">
+                        <CalendarIcon className="h-3.5 w-3.5" />
+                        Calendar
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Send to {calendarProviderLabel} Calendar after create
+                      </p>
                     </div>
-                    <Switch checked={sendToCalendar} onCheckedChange={setSendToCalendar} />
+                    <Switch
+                      checked={sendToCalendar}
+                      onCheckedChange={setSendToCalendar}
+                      aria-label={`Send to ${calendarProviderLabel} Calendar after create`}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 text-left">
+                      <p className="flex items-center gap-2 text-xs font-semibold text-foreground">
+                        <CalendarIcon className="h-3.5 w-3.5" />
+                        Calendar
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Connect Google, Outlook, or Apple Calendar to send this quest.
+                      </p>
+                    </div>
+                    {onOpenCalendarPreferences && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={onOpenCalendarPreferences}
+                        className="h-8 shrink-0 rounded-full px-3 text-xs"
+                      >
+                        Connect calendar
+                      </Button>
+                    )}
                   </div>
                 )}
-              </>
+                {hasCalendarConnection && onOpenCalendarPreferences && (
+                  <button
+                    type="button"
+                    onClick={onOpenCalendarPreferences}
+                    className="mt-2 text-xs font-semibold text-[hsl(var(--stardust-gold))] transition-colors hover:text-foreground"
+                  >
+                    Manage calendar
+                  </button>
+                )}
+              </div>
             )}
             <Button
               onClick={handleSubmit}

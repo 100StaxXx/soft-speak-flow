@@ -12,7 +12,7 @@ type PlannerProposalLike = {
 
 const normalizePlannerReplyForDetection = (reply: string): string =>
   reply
-    .replace(/[*_`~>#\[\]()]/g, " ")
+    .replace(/[*_`~>#[\]()]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();

@@ -83,6 +83,9 @@ function toAppDayIndex(date: Date): number {
   return jsDay === 0 ? 6 : jsDay - 1; // 0 = Mon, ... 6 = Sun
 }
 
+const CUSTOM_REMINDER_PAST_START_MESSAGE = "Choose a future quest time before adding a custom reminder.";
+const CUSTOM_REMINDER_PAST_TIME_MESSAGE = "Choose a reminder time in the future.";
+
 export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
   const { suggestedSlots, getSuggestedSlots, isLoading: isSuggestLoading } = useSmartScheduling();
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -146,6 +149,18 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
     [customReminderQuestDate, props.scheduledTime],
   );
   const usesCustomReminderDateTime = Boolean(customReminderQuestStart);
+  const customReminderAt = useMemo(
+    () => usesCustomReminderDateTime
+      ? parseQuestReminderDateTime(customReminderDate, customReminderTime)
+      : null,
+    [customReminderDate, customReminderTime, usesCustomReminderDateTime],
+  );
+  const isCustomReminderQuestStartPast = Boolean(
+    customReminderQuestStart && customReminderQuestStart.getTime() <= Date.now(),
+  );
+  const isCustomReminderTimePast = Boolean(
+    customReminderAt && customReminderAt.getTime() <= Date.now(),
+  );
   const customReminderOffsetCandidate = useMemo(
     () => usesCustomReminderDateTime
       ? resolveCustomQuestReminderOffset({
@@ -165,7 +180,9 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
   );
   const parsedCustomReminderInput = Number.parseInt(customReminderInput, 10);
   const customReminderApplyDisabled = usesCustomReminderDateTime
-    ? !customReminderOffsetCandidate
+    ? isCustomReminderQuestStartPast
+      || isCustomReminderTimePast
+      || !customReminderOffsetCandidate
       || (
         reminderOffsets.length >= MAX_QUEST_REMINDER_OFFSETS
         && !selectedReminderOffsets.has(customReminderOffsetCandidate)
@@ -241,6 +258,12 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
     dropdownItemClassName(selected),
     "min-h-10 text-center leading-snug",
   );
+  const isCustomReminderActive = isEditingCustomReminder || customReminderOffsets.length > 0;
+  const displayedCustomReminderError = isCustomReminderQuestStartPast
+    ? CUSTOM_REMINDER_PAST_START_MESSAGE
+    : isCustomReminderTimePast
+      ? CUSTOM_REMINDER_PAST_TIME_MESSAGE
+    : customReminderError;
 
   useEffect(() => {
     if (recurrenceSelectionDisabled) {
@@ -447,6 +470,14 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
 
   const applyCustomReminder = useCallback(() => {
     if (usesCustomReminderDateTime) {
+      if (isCustomReminderQuestStartPast) {
+        setCustomReminderError(CUSTOM_REMINDER_PAST_START_MESSAGE);
+        return;
+      }
+      if (isCustomReminderTimePast) {
+        setCustomReminderError(CUSTOM_REMINDER_PAST_TIME_MESSAGE);
+        return;
+      }
       if (!customReminderOffsetCandidate) {
         setCustomReminderError("Choose a reminder before the quest starts, up to 1 week before.");
         return;
@@ -481,6 +512,8 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
     applyReminderOffsets,
     customReminderInput,
     customReminderOffsetCandidate,
+    isCustomReminderQuestStartPast,
+    isCustomReminderTimePast,
     reminderOffsets,
     selectedReminderOffsets,
     usesCustomReminderDateTime,
@@ -626,129 +659,139 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                 className="max-h-[min(16rem,var(--radix-popover-content-available-height))] overflow-y-auto overscroll-contain touch-pan-y space-y-1 pr-1"
                 style={{ WebkitOverflowScrolling: "touch" }}
               >
-                <div className="grid grid-cols-2 gap-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      applyReminderOffsets([]);
-                      setIsEditingCustomReminder(false);
-                    }}
-                    className={reminderOptionClassName(reminderOffsets.length === 0)}
-                  >
-                    None
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsEditingCustomReminder((current) => {
-                        const next = !current;
-                        if (next && usesCustomReminderDateTime) {
-                          seedCustomReminderDateTime();
-                        }
-                        if (!next) {
-                          setCustomReminderError(null);
-                        }
-                        return next;
-                      });
-                    }}
-                    className={reminderOptionClassName(customReminderOffsets.length > 0)}
-                  >
-                    Custom
-                  </button>
-
-                  {QUEST_REMINDER_PRESET_OPTIONS.map((option) => (
+                <div className="space-y-1">
+                  <div className="grid grid-cols-2 gap-1">
                     <button
-                      key={option.value}
                       type="button"
                       onClick={() => {
-                        toggleReminderOffset(option.value);
+                        applyReminderOffsets([]);
                         setIsEditingCustomReminder(false);
                       }}
-                      className={reminderOptionClassName(selectedReminderOffsets.has(option.value))}
+                      className={reminderOptionClassName(reminderOffsets.length === 0)}
+                      aria-pressed={reminderOffsets.length === 0}
                     >
-                      {option.label}
+                      None
                     </button>
-                  ))}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditingCustomReminder((current) => {
+                          const next = !current;
+                          if (next && usesCustomReminderDateTime) {
+                            if (isCustomReminderQuestStartPast) {
+                              setCustomReminderError(CUSTOM_REMINDER_PAST_START_MESSAGE);
+                            } else {
+                              seedCustomReminderDateTime();
+                            }
+                          }
+                          if (!next) {
+                            setCustomReminderError(null);
+                          }
+                          return next;
+                        });
+                      }}
+                      className={reminderOptionClassName(isCustomReminderActive)}
+                      aria-pressed={isCustomReminderActive}
+                    >
+                      Custom
+                    </button>
+                  </div>
+
+                  {isEditingCustomReminder && (
+                    <div className={cn("space-y-2 border-t pt-3 px-2 pb-2", isQuestSoft ? "border-border/50" : "border-border/60")}>
+                      {usesCustomReminderDateTime ? (
+                        <div className="space-y-3">
+                          <Label className={cn("text-xs font-medium", isQuestSoft ? "text-muted-foreground" : "text-muted-foreground")}>
+                            Custom reminder date
+                          </Label>
+                          <CalendarPicker
+                            mode="single"
+                            selected={customReminderDate}
+                            onSelect={(date) => {
+                              setCustomReminderDate(date);
+                              setCustomReminderError(null);
+                            }}
+                            className="pointer-events-auto rounded-md border"
+                          />
+                          <div className="space-y-1.5">
+                            <Label htmlFor="custom-reminder-time" className={cn("text-xs font-medium", isQuestSoft ? "text-muted-foreground" : "text-muted-foreground")}>
+                              Custom reminder time
+                            </Label>
+                            <Input
+                              id="custom-reminder-time"
+                              type="time"
+                              value={customReminderTime}
+                              onChange={(event) => {
+                                setCustomReminderTime(event.target.value);
+                                setCustomReminderError(null);
+                              }}
+                              onKeyDown={handleCustomReminderKeyDown}
+                              className={cn("h-10 text-sm", inputClassName)}
+                            />
+                          </div>
+                          {displayedCustomReminderError ? (
+                            <p className={cn("text-xs", isQuestSoft ? "text-destructive" : "text-destructive")}>
+                              {displayedCustomReminderError}
+                            </p>
+                          ) : (
+                            <p className={cn("text-xs", isQuestSoft ? "text-muted-foreground" : "text-muted-foreground")}>
+                              Pick a time before the quest starts.
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <>
+                          <Label htmlFor="custom-reminder-minutes" className={cn("text-xs font-medium", isQuestSoft ? "text-muted-foreground" : "text-muted-foreground")}>
+                            Minutes before
+                          </Label>
+                          <Input
+                            id="custom-reminder-minutes"
+                            type="number"
+                            min={1}
+                            max={MAX_QUEST_REMINDER_MINUTES}
+                            inputMode="numeric"
+                            value={customReminderInput}
+                            onChange={(event) => setCustomReminderInput(event.target.value)}
+                            onKeyDown={handleCustomReminderKeyDown}
+                            placeholder="e.g. 180"
+                            className={cn("h-10 text-sm", inputClassName)}
+                          />
+                        </>
+                      )}
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={applyCustomReminder}
+                        disabled={customReminderApplyDisabled}
+                        className={isQuestSoft ? cn("w-full font-fredoka", toneColors.primaryButton) : "w-full"}
+                      >
+                        Apply
+                      </Button>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-1">
+                    {QUEST_REMINDER_PRESET_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          toggleReminderOffset(option.value);
+                          setIsEditingCustomReminder(false);
+                        }}
+                        className={reminderOptionClassName(selectedReminderOffsets.has(option.value))}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {reminderOffsets.length >= MAX_QUEST_REMINDER_OFFSETS && (
                   <p className={cn("px-2 pt-2 text-xs", isQuestSoft ? "text-muted-foreground" : "text-muted-foreground")}>
                     Limit reached
                   </p>
-                )}
-
-                {isEditingCustomReminder && (
-                  <div className={cn("mt-1 space-y-2 border-t pt-3 px-2 pb-2", isQuestSoft ? "border-border/50" : "border-border/60")}>
-                    {usesCustomReminderDateTime ? (
-                      <div className="space-y-3">
-                        <Label className={cn("text-xs font-medium", isQuestSoft ? "text-muted-foreground" : "text-muted-foreground")}>
-                          Custom reminder date
-                        </Label>
-                        <CalendarPicker
-                          mode="single"
-                          selected={customReminderDate}
-                          onSelect={(date) => {
-                            setCustomReminderDate(date);
-                            setCustomReminderError(null);
-                          }}
-                          className="pointer-events-auto rounded-md border"
-                        />
-                        <div className="space-y-1.5">
-                          <Label htmlFor="custom-reminder-time" className={cn("text-xs font-medium", isQuestSoft ? "text-muted-foreground" : "text-muted-foreground")}>
-                            Custom reminder time
-                          </Label>
-                          <Input
-                            id="custom-reminder-time"
-                            type="time"
-                            value={customReminderTime}
-                            onChange={(event) => {
-                              setCustomReminderTime(event.target.value);
-                              setCustomReminderError(null);
-                            }}
-                            onKeyDown={handleCustomReminderKeyDown}
-                            className={cn("h-10 text-sm", inputClassName)}
-                          />
-                        </div>
-                        {customReminderError ? (
-                          <p className={cn("text-xs", isQuestSoft ? "text-destructive" : "text-destructive")}>
-                            {customReminderError}
-                          </p>
-                        ) : (
-                          <p className={cn("text-xs", isQuestSoft ? "text-muted-foreground" : "text-muted-foreground")}>
-                            Pick a time before the quest starts.
-                          </p>
-                        )}
-                      </div>
-                    ) : (
-                      <>
-                        <Label htmlFor="custom-reminder-minutes" className={cn("text-xs font-medium", isQuestSoft ? "text-muted-foreground" : "text-muted-foreground")}>
-                          Minutes before
-                        </Label>
-                        <Input
-                          id="custom-reminder-minutes"
-                          type="number"
-                          min={1}
-                          max={MAX_QUEST_REMINDER_MINUTES}
-                          inputMode="numeric"
-                          value={customReminderInput}
-                          onChange={(event) => setCustomReminderInput(event.target.value)}
-                          onKeyDown={handleCustomReminderKeyDown}
-                          placeholder="e.g. 180"
-                          className={cn("h-10 text-sm", inputClassName)}
-                        />
-                      </>
-                    )}
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={applyCustomReminder}
-                      disabled={customReminderApplyDisabled}
-                      className={isQuestSoft ? cn("w-full font-fredoka", toneColors.primaryButton) : "w-full"}
-                    >
-                      Apply
-                    </Button>
-                  </div>
                 )}
               </div>
             </PopoverContent>

@@ -6,7 +6,10 @@ import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { PromptBuilder } from "../_shared/promptBuilder.ts";
 import { OutputValidator } from "../_shared/outputValidator.ts";
 import {
+  checkRateLimit,
+  createRateLimitResponse,
   logRateLimitedInvocation,
+  RATE_LIMITS,
 } from "../_shared/rateLimiter.ts";
 import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
@@ -289,6 +292,7 @@ export async function handleMentorChat(req: Request) {
     );
     const userId = protectedRequest.auth.userId;
     const supabaseAdmin = protectedRequest.supabase;
+
     const costGuardrails = createCostGuardrailSession({
       supabase: supabaseAdmin,
       endpointKey: "mentor-chat",
@@ -360,6 +364,16 @@ export async function handleMentorChat(req: Request) {
         }),
         { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    const rateLimit = await checkRateLimit(
+      supabaseAdmin,
+      userId,
+      "mentor-chat",
+      RATE_LIMITS["mentor-chat"],
+    );
+    if (!rateLimit.allowed) {
+      return createRateLimitResponse(rateLimit, corsHeaders);
     }
 
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");

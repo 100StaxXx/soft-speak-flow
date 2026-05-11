@@ -57,10 +57,14 @@ const InboxPage = memo(function InboxPage() {
   });
   const { connections: calendarConnections } = useCalendarIntegrations({ enabled: isTabActive });
 
+  const handleOpenCalendarPreferences = useCallback(() => {
+    navigate("/profile", { state: { openTab: "preferences" } });
+  }, [navigate]);
+
   const handleSendTaskToCalendar = useCallback(async (taskId: string) => {
     const routeToCalendarPreferences = () => {
       toast.error("No calendar connected. Opening Preferences...");
-      navigate("/profile", { state: { openTab: "preferences" } });
+      handleOpenCalendarPreferences();
     };
 
     if (calendarConnections.length === 0) {
@@ -162,7 +166,7 @@ const InboxPage = memo(function InboxPage() {
 
       toast.error(message);
     }
-  }, [calendarConnections.length, navigate, sendTaskToCalendar]);
+  }, [calendarConnections.length, handleOpenCalendarPreferences, sendTaskToCalendar]);
 
   const handleSaveEdit = useCallback(async (taskId: string, updates: any) => {
     const updateResult = await updateTask({ taskId, updates });
@@ -343,6 +347,7 @@ const InboxPage = memo(function InboxPage() {
           selectedDate={new Date()}
           onAdd={handleAddQuest}
           presentation={isMacHostedIOSApp ? "desktop-panel" : "mobile-sheet"}
+          onOpenCalendarPreferences={handleOpenCalendarPreferences}
         />
 
         <EditQuestDialog

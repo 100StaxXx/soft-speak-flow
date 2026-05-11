@@ -22,6 +22,7 @@ export interface FunctionInvocationResult {
 const TEXT_DECODER = new TextDecoder();
 const DEFAULT_INTERNAL_FUNCTION_SECRET = "security-test-internal-secret";
 const DEFAULT_PASSWORD = "SecuritySuite123!";
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 function stripWrappingQuotes(value: string): string {
   const trimmed = value.trim();
@@ -176,6 +177,7 @@ export class LocalSupabaseHarness {
     if (!createResponse.ok) {
       throw new Error(`Failed to create test user ${label}: ${await createResponse.text()}`);
     }
+    await createResponse.body?.cancel();
 
     const signInResponse = await fetch(`${this.config.apiUrl}/auth/v1/token?grant_type=password`, {
       method: "POST",
@@ -325,18 +327,32 @@ export class LocalSupabaseHarness {
       ? "resolution=merge-duplicates,return=minimal"
       : "return=minimal";
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        ...this.serviceHeaders,
-        "Content-Type": "application/json",
-        Prefer: prefer,
-      },
-      body: JSON.stringify(rows),
-    });
+    let lastError = "";
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          ...this.serviceHeaders,
+          "Content-Type": "application/json",
+          Prefer: prefer,
+        },
+        body: JSON.stringify(rows),
+      });
+      const responseText = await response.text();
 
-    if (!response.ok) {
-      throw new Error(`Failed to seed ${table}: ${await response.text()}`);
+      if (response.ok) {
+        return;
+      }
+
+      lastError = responseText;
+      if (response.status >= 500 && attempt < 3) {
+        await sleep(150 * attempt);
+        continue;
+      }
+
+      break;
     }
+
+    throw new Error(`Failed to seed ${table}: ${lastError}`);
   }
 }

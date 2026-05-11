@@ -29,6 +29,10 @@ import {
   formatAssistantTime,
   normalizeAssistantTimeText,
 } from "../_shared/assistantScheduleCopy.ts";
+import {
+  buildAccessStateResponse,
+  fetchAccountEntitlementForUser,
+} from "../_shared/accountEntitlements.ts";
 
 const JourneysTaskSchema = z.object({
   title: z.string(),
@@ -209,6 +213,11 @@ const chooseBridgeReply = (message: string) => {
 };
 
 async function ensurePremiumAccess(supabase: any, userId: string) {
+  const entitlement = await fetchAccountEntitlementForUser(supabase, userId);
+  if (buildAccessStateResponse(entitlement).has_access) {
+    return true;
+  }
+
   const nowIso = new Date().toISOString();
   const { count, error } = await supabase
     .from("subscriptions")

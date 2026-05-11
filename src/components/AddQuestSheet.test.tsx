@@ -347,7 +347,7 @@ describe("AddQuestSheet", () => {
     }
   });
 
-  it("keeps footer extras out of the default mobile sheet", () => {
+  it("keeps desktop-only footer extras out of the default mobile sheet", () => {
     mocks.integrationVisible = true;
     mocks.defaultProvider = "google";
     mocks.connections = [{ provider: "google" }];
@@ -365,7 +365,61 @@ describe("AddQuestSheet", () => {
     expect(screen.queryByText(/Name your quest.*Select a time/i)).not.toBeInTheDocument();
     expect(screen.queryByText("Or create a Campaign")).not.toBeInTheDocument();
     expect(screen.queryByText("Max 2 active")).not.toBeInTheDocument();
-    expect(screen.queryByText(/Send to .* Calendar after create/i)).not.toBeInTheDocument();
+    expect(screen.getByText("Send to Google Calendar after create")).toBeInTheDocument();
+  });
+
+  it("shows a mobile calendar connect action when no provider is connected", () => {
+    const onOpenCalendarPreferences = vi.fn();
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+        onOpenCalendarPreferences={onOpenCalendarPreferences}
+      />
+    );
+
+    expect(screen.getByTestId("add-quest-calendar-section")).toBeInTheDocument();
+    expect(screen.getByText("Connect Google, Outlook, or Apple Calendar to send this quest.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Connect calendar" }));
+
+    expect(onOpenCalendarPreferences).toHaveBeenCalledTimes(1);
+  });
+
+  it("submits a mobile scheduled quest with sendToCalendar when toggled", async () => {
+    const onAdd = vi.fn<(data: AddQuestData) => Promise<void>>()
+      .mockResolvedValue(undefined);
+    mocks.defaultProvider = "google";
+    mocks.connections = [{ provider: "google" }];
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        prefilledTime="09:00"
+        onAdd={onAdd}
+      />
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+      target: { value: "Calendar-ready quest" },
+    });
+    fireEvent.click(screen.getByRole("switch", { name: "Send to Google Calendar after create" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
+
+    await waitFor(() => {
+      expect(onAdd).toHaveBeenCalledTimes(1);
+    });
+
+    expect(onAdd.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
+      text: "Calendar-ready quest",
+      scheduledTime: "09:00",
+      sendToCalendar: true,
+    }));
   });
 
   it("shows campaign creation CTA with inline max cap hint in the desktop footer", () => {
@@ -1440,8 +1494,8 @@ describe("AddQuestSheet", () => {
     expect(screen.queryByText(/Send to .* Calendar after create/i)).not.toBeInTheDocument();
   });
 
-  it("hides send-to-calendar option while feature is disabled", () => {
-    mocks.integrationVisible = true;
+  it("falls back to the first connected provider when the default provider is stale", () => {
+    mocks.integrationVisible = false;
     mocks.defaultProvider = "outlook";
     mocks.connections = [{ provider: "google" }];
 
@@ -1454,7 +1508,8 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    expect(screen.queryByText("Send to Google Calendar after create")).not.toBeInTheDocument();
+    expect(screen.getByText("Send to Google Calendar after create")).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Send to Google Calendar after create" })).toBeInTheDocument();
   });
 
   it("blocks close requests when preventClose is enabled", () => {

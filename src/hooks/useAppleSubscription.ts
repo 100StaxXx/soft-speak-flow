@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
+import { useQueryClient } from "@tanstack/react-query";
 import { isNativeIOS } from "@/utils/platformTargets";
 import { useToast } from "./use-toast";
 import { useAuth } from "./useAuth";
 import { useAppliedReferralCodeState } from "./useAppliedReferralCodeState";
 import { useStoreKit } from "./useStoreKit";
 import { trackPaywallEvent } from "@/utils/paywallTelemetry";
+import { supabase } from "@/integrations/supabase/client";
+import { queryKeys } from "@/lib/queryKeys";
+import { parseFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
+import type { StoreKitTransaction } from "@/plugins/StoreKitPlugin";
 
 function isIAPAvailable(): boolean {
   return Capacitor.isNativePlatform() && isNativeIOS();
@@ -26,6 +31,7 @@ function getErrorMessage(error: unknown): string {
 export function useAppleSubscription() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { appliedReferralCodeState } = useAppliedReferralCodeState();
   const {
     isAvailable,
@@ -52,6 +58,97 @@ export function useAppleSubscription() {
   }, [hasOfferCode]);
 
   const hasLoadedProducts = products.length > 0;
+
+  const invalidateSubscriptionState = useCallback(async () => {
+    if (!user?.id) return;
+
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.access.detail(user.id) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.subscription.detail(user.id) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.profile.detail(user.id) }),
+      queryClient.invalidateQueries({ queryKey: ["subscription"] }),
+      queryClient.invalidateQueries({ queryKey: ["referral-stats", user.id] }),
+      queryClient.invalidateQueries({ queryKey: ["applied-referral-code-state", user.id] }),
+    ]);
+  }, [queryClient, user?.id]);
+
+  const verifyStoreKitTransaction = useCallback(async (
+    transaction: StoreKitTransaction,
+    surface: string,
+    plan: "monthly" | "yearly",
+  ) => {
+    const transactionId = transaction.transactionId?.trim();
+    if (!transactionId) {
+      throw new Error("Apple returned a purchase without a transaction identifier. Restore purchases and try again.");
+    }
+
+    trackPaywallEvent("purchase_verification_started", {
+      surface,
+      plan,
+      productId: transaction.productId,
+      hasOfferCode,
+    });
+
+    const { data, error } = await supabase.functions.invoke("verify-apple-receipt", {
+      body: { transactionId },
+    });
+
+    if (error) {
+      const parsed = await parseFunctionInvokeError(error);
+      const message = parsed.backendMessage ?? parsed.message ?? getErrorMessage(error);
+      trackPaywallEvent("purchase_verification_failed", {
+        surface,
+        plan,
+        productId: transaction.productId,
+        hasOfferCode,
+        code: parsed.code,
+        status: parsed.status,
+        message,
+      });
+      throw new Error(message);
+    }
+
+    const verification = data as { success?: boolean; error?: string; code?: string } | null;
+    if (verification?.error) {
+      trackPaywallEvent("purchase_verification_failed", {
+        surface,
+        plan,
+        productId: transaction.productId,
+        hasOfferCode,
+        code: verification.code,
+        message: verification.error,
+      });
+      throw new Error(verification.error);
+    }
+
+    await invalidateSubscriptionState();
+    trackPaywallEvent("purchase_verification_completed", {
+      surface,
+      plan,
+      productId: transaction.productId,
+      hasOfferCode,
+    });
+  }, [hasOfferCode, invalidateSubscriptionState]);
+
+  const verifyCompletedTransaction = useCallback(async (
+    transaction: StoreKitTransaction,
+    surface: string,
+    plan: "monthly" | "yearly",
+  ) => {
+    try {
+      await verifyStoreKitTransaction(transaction, surface, plan);
+      return true;
+    } catch (error) {
+      const message = getErrorMessage(error);
+      setProductError(message);
+      toast({
+        title: "Subscription activation failed",
+        description: message,
+        variant: "destructive",
+      });
+      return false;
+    }
+  }, [toast, verifyStoreKitTransaction]);
 
   const reloadProducts = useCallback(async () => {
     setProductError(null);
@@ -116,6 +213,9 @@ export function useAppleSubscription() {
         });
 
         if (redemption.entitlement) {
+          const verified = await verifyCompletedTransaction(redemption.entitlement, surface, plan);
+          if (!verified) return false;
+
           toast({
             title: "Premium unlocked",
             description: "Your discounted yearly access is now active.",
@@ -150,6 +250,9 @@ export function useAppleSubscription() {
       }
 
       setOfferCodePurchaseReady(false);
+      const verified = await verifyCompletedTransaction(result, surface, plan);
+      if (!verified) return false;
+
       trackPaywallEvent("purchase_completed", { surface, plan, productId, hasOfferCode });
       toast({
         title: "Premium unlocked",
@@ -183,7 +286,7 @@ export function useAppleSubscription() {
     } finally {
       setLoading(false);
     }
-  }, [hasOfferCode, offerCodePurchaseReady, purchase, redeemOfferCode, toast, user?.id]);
+  }, [hasOfferCode, offerCodePurchaseReady, purchase, redeemOfferCode, toast, user?.id, verifyCompletedTransaction]);
 
   const handleRestore = useCallback(async (surface: string = "paywall") => {
     if (!isIAPAvailable()) {
@@ -199,6 +302,12 @@ export function useAppleSubscription() {
     try {
       trackPaywallEvent("restore_started", { surface });
       const entitlement = await restorePurchases();
+
+      if (entitlement) {
+        const plan = entitlement.productId.includes("yearly") ? "yearly" : "monthly";
+        const verified = await verifyCompletedTransaction(entitlement, surface, plan);
+        if (!verified) return false;
+      }
 
       trackPaywallEvent("restore_completed", { surface });
       toast({
@@ -220,7 +329,7 @@ export function useAppleSubscription() {
     } finally {
       setLoading(false);
     }
-  }, [restorePurchases, toast]);
+  }, [restorePurchases, toast, verifyCompletedTransaction]);
 
   const handleManageSubscriptions = useCallback(async () => {
     if (!isIAPAvailable()) {

@@ -42,6 +42,32 @@ function normalizePlan(value: unknown): "monthly" | "yearly" | undefined {
   return undefined;
 }
 
+function parseDate(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+export function isAccountEntitlementActive(
+  entitlement: AccountEntitlement | null,
+  now = new Date(),
+): boolean {
+  if (!entitlement?.is_active) return false;
+
+  const accessSource = normalizeSource(entitlement.source);
+  if (accessSource === "none") return false;
+
+  const endsAt = parseDate(entitlement.ends_at);
+  const trialEndsAt = parseDate(entitlement.trial_ends_at);
+
+  if (accessSource === "manual") {
+    return !endsAt || endsAt > now;
+  }
+
+  const accessEndsAt = accessSource === "trial" ? trialEndsAt ?? endsAt : endsAt;
+  return Boolean(accessEndsAt && accessEndsAt > now);
+}
+
 export function buildAccessStateResponse(entitlement: AccountEntitlement | null) {
   if (!entitlement) {
     return {
@@ -56,10 +82,11 @@ export function buildAccessStateResponse(entitlement: AccountEntitlement | null)
   }
 
   const accessSource = normalizeSource(entitlement.source);
-  const subscribed = entitlement.is_active && accessSource !== "trial" && accessSource !== "none";
+  const hasAccess = isAccountEntitlementActive(entitlement);
+  const subscribed = hasAccess && accessSource !== "trial" && accessSource !== "none";
 
   return {
-    has_access: entitlement.is_active,
+    has_access: hasAccess,
     access_source: accessSource,
     trial_ends_at: entitlement.trial_ends_at ?? null,
     subscribed,

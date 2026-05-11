@@ -7,7 +7,6 @@ SELECT no_plan();
 \ir _support/helpers.sql
 
 SELECT test_security.seed_fixtures();
-SELECT test_security.set_auth('authenticated', '10000000-0000-0000-0000-000000000001');
 
 UPDATE public.user_companion
 SET
@@ -52,6 +51,8 @@ VALUES
     NOW() - INTERVAL '1 minute'
   );
 
+SELECT test_security.set_auth('authenticated', '10000000-0000-0000-0000-000000000001');
+
 SELECT is(
   public.get_highest_valid_claimed_companion_stage('22000000-0000-0000-0000-000000000001'::uuid),
   1,
@@ -80,6 +81,8 @@ SELECT is(
   'https://example.com/security-user-a-stage1.png',
   'repair restores the latest valid claimed-stage image'
 );
+
+SELECT test_security.reset_auth();
 
 SELECT is(
   test_security.exec_row_count($$
@@ -115,6 +118,8 @@ SET
   current_image_url = 'https://example.com/security-user-a-stage2.png',
   updated_at = NOW()
 WHERE id = '22000000-0000-0000-0000-000000000001';
+
+SELECT test_security.set_auth('authenticated', '10000000-0000-0000-0000-000000000001');
 
 SELECT is(
   public.get_highest_valid_claimed_companion_stage('22000000-0000-0000-0000-000000000001'::uuid),
@@ -166,6 +171,8 @@ SELECT is(
   'https://example.com/security-user-a-stage2.png',
   'valid claimed-stage images survive reconciliation'
 );
+
+SELECT test_security.reset_auth();
 
 SELECT set_config('app.settings.supabase_url', 'https://example.supabase.co', true);
 
@@ -221,6 +228,8 @@ SET
   updated_at = NOW()
 WHERE id = '22000000-0000-0000-0000-000000000001';
 
+SELECT test_security.set_auth('authenticated', '10000000-0000-0000-0000-000000000001');
+
 SELECT ok(
   (SELECT repaired
    FROM public.repair_auto_advanced_companion_state('22000000-0000-0000-0000-000000000001'::uuid)
@@ -268,6 +277,8 @@ SELECT is(
   'legacy preset-backed repair restores the later-tier companion art instead of leaving the egg art in place'
 );
 
+SELECT test_security.reset_auth();
+
 UPDATE public.profiles
 SET
   onboarding_completed = false,
@@ -304,6 +315,8 @@ SET
   initial_image_url = '/companion-eggs/egg__t0_egg__normal__fire.png',
   updated_at = NOW()
 WHERE id = '22000000-0000-0000-0000-000000000001';
+
+SELECT test_security.set_auth('authenticated', '10000000-0000-0000-0000-000000000001');
 
 SELECT is(
   (SELECT repaired
