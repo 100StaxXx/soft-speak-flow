@@ -55,6 +55,7 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
     isVoiceSupported: true,
     isSpeaking: false,
     isLoadingThreads: false,
+    canSubmitMessage: true,
     canStartNewChat: true,
     canArchiveThread: true,
     draftInput: "",

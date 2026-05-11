@@ -398,3 +398,69 @@ Deno.test("persistCompanionOpenerTurnBestEffort reports persistence failure with
     false,
   );
 });
+
+Deno.test("persistCompanionOpenerTurnBestEffort keeps opener ready when archive cleanup fails", async () => {
+  const calls: Array<{ table: string; action: string; payload?: unknown }> = [];
+  const supabase = {
+    from(table: string) {
+      const builder = {
+        update(payload: unknown) {
+          calls.push({ table, action: "update", payload });
+          return builder;
+        },
+        insert(payload: unknown) {
+          calls.push({ table, action: "insert", payload });
+          return Promise.resolve({ error: null });
+        },
+        select() {
+          calls.push({ table, action: "select" });
+          return builder;
+        },
+        eq() {
+          return builder;
+        },
+        neq() {
+          return builder;
+        },
+        is() {
+          return Promise.resolve({
+            error: { code: "57014", message: "archive timeout" },
+          });
+        },
+        maybeSingle() {
+          return Promise.resolve({ data: null, error: null });
+        },
+      };
+      return builder;
+    },
+  };
+
+  const ready = await persistCompanionOpenerTurnBestEffort({
+    supabase,
+    userId: "user-1",
+    companionId: "companion-1",
+    sessionId: "session-new",
+    reply: "I'm here. What's the move?",
+    signal: { type: "open_context", facts: [] },
+    currentDateTime: "2026-05-10T09:55:00-07:00",
+    createdAt: "2026-05-10T16:55:00.000Z",
+    requestId: "request-1",
+  });
+
+  assertEquals(ready, true);
+  assertEquals(
+    calls.some((call) =>
+      call.table === "companion_chats" && call.action === "insert"
+    ),
+    true,
+  );
+  assertEquals(
+    calls.some((call) =>
+      call.table === "companion_chat_threads" &&
+      call.action === "update" &&
+      (call.payload as Record<string, unknown>)?.archived_at ===
+        "2026-05-10T16:55:00.000Z"
+    ),
+    true,
+  );
+});

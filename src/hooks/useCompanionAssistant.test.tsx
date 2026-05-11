@@ -881,6 +881,131 @@ describe("useCompanionAssistant", () => {
     ).toHaveLength(2);
   });
 
+  it("does not create a local companion fallback when the opener endpoint fails", async () => {
+    mocks.supabaseInvoke.mockImplementation(async (functionName) => {
+      if (functionName === "companion-chat-opener") {
+        return {
+          data: null,
+          error: new Error("opener unavailable"),
+        };
+      }
+
+      return {
+        data: {
+          reply: "Reply",
+          mode: "conversation",
+          intent: "unknown",
+          confidence: 0.9,
+          threadState: {
+            threadId: "fresh-session",
+            sessionId: "fresh-session",
+            openaiConversationId: "conv_123",
+            lastOpenAIResponseId: "resp_123",
+            hasPendingAction: false,
+          },
+        },
+        error: null,
+      };
+    });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "companion" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        "I couldn't start a fresh chat yet. Tap + to retry.",
+      );
+    });
+
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.canSubmitMessage).toBe(false);
+
+    await act(async () => {
+      const submitted = await result.current.submitMessage("Can we talk?");
+      expect(submitted).toBe(false);
+    });
+
+    expect(
+      mocks.supabaseInvoke.mock.calls.some(
+        ([functionName]) => functionName === "companion-agent",
+      ),
+    ).toBe(false);
+  });
+
+  it("blocks companion sends when the generated opener is not persistence-ready", async () => {
+    mocks.supabaseInvoke.mockImplementation(async (functionName) => {
+      if (functionName === "companion-chat-opener") {
+        return {
+          data: {
+            sessionId: "fresh-session",
+            reply: "Fresh opener without storage.",
+            speechText: "Fresh opener without storage.",
+            createdAt: "2026-04-18T08:03:00.000Z",
+            persistenceReady: false,
+            thread: {
+              sessionId: "fresh-session",
+              companionId: "companion-1",
+              surface: "companion",
+              title: "Fresh opener without storage.",
+              previewText: "Fresh opener without storage.",
+              createdAt: "2026-04-18T08:03:00.000Z",
+              lastMessageAt: "2026-04-18T08:03:00.000Z",
+              archivedAt: null,
+              messageCount: 1,
+            },
+          },
+          error: null,
+        };
+      }
+
+      return {
+        data: {
+          reply: "Reply",
+          mode: "conversation",
+          intent: "unknown",
+          confidence: 0.9,
+          threadState: {
+            threadId: "fresh-session",
+            sessionId: "fresh-session",
+            openaiConversationId: "conv_123",
+            lastOpenAIResponseId: "resp_123",
+            hasPendingAction: false,
+          },
+        },
+        error: null,
+      };
+    });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "companion" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        "I couldn't start a fresh chat yet. Tap + to retry.",
+      );
+    });
+
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.canSubmitMessage).toBe(false);
+
+    await act(async () => {
+      const submitted = await result.current.submitMessage("Can we talk?");
+      expect(submitted).toBe(false);
+    });
+
+    expect(
+      mocks.supabaseInvoke.mock.calls.some(
+        ([functionName]) => functionName === "companion-agent",
+      ),
+    ).toBe(false);
+  });
+
   it("requests draft opportunity cards after conversational Journeys replies", async () => {
     mocks.supabaseInvoke.mockImplementation(async (functionName, options) => {
       if (functionName === "companion-draft-opportunity") {

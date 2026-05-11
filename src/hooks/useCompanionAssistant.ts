@@ -833,6 +833,9 @@ export function useCompanionAssistant({
   const [draftInput, setDraftInput] = useState("");
   const [interimText, setInterimText] = useState("");
   const [isOpeningThread, setIsOpeningThread] = useState(false);
+  const [companionOpenerError, setCompanionOpenerError] = useState<
+    string | null
+  >(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResolvingAction, setIsResolvingAction] = useState(false);
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
@@ -917,6 +920,7 @@ export function useCompanionAssistant({
         options?.sessionId ?? generateCompanionThreadSessionId();
       const greetingText = options?.greetingText?.trim();
       localThreadCreatedAtRef.current = new Date().toISOString();
+      setCompanionOpenerError(null);
       applyActiveSessionId(nextSessionId);
       setDraftInput("");
       setInterimText("");
@@ -1231,14 +1235,8 @@ export function useCompanionAssistant({
   const startGeneratedCompanionOpener = useCallback(async () => {
     if (surface !== "companion") return null;
 
-    const fallbackOpening = baseGreeting.trim() || "I'm here. What's the move?";
-
     if (!user?.id || !companion?.id) {
-      return openFreshThread({
-        greetingText: fallbackOpening,
-        markBootstrapped: true,
-        visibleAssistantOpening: true,
-      });
+      return null;
     }
 
     openFreshThread({
@@ -1265,6 +1263,14 @@ export function useCompanionAssistant({
       }
 
       const response = data as CompanionChatOpenerResponse;
+      if (
+        !response?.sessionId ||
+        !response?.reply ||
+        !response.persistenceReady
+      ) {
+        throw new Error("Companion opener was not persisted.");
+      }
+
       const createdAt = response.createdAt || new Date().toISOString();
       localThreadCreatedAtRef.current = createdAt;
       applyActiveSessionId(response.sessionId);
@@ -1294,13 +1300,13 @@ export function useCompanionAssistant({
         return null;
       }
       console.error("Failed to start companion opener thread:", error);
-      toast.error("I couldn't start a fresh chat yet.");
+      const message = "I couldn't start a fresh chat yet. Tap + to retry.";
+      setCompanionOpenerError(message);
+      setMessages([]);
+      toast.error(message);
       setIsOpeningThread(false);
-      return openFreshThread({
-        greetingText: fallbackOpening,
-        markBootstrapped: true,
-        visibleAssistantOpening: true,
-      });
+      void invalidateThreads();
+      return null;
     } finally {
       if (threadMutationVersionRef.current === openerMutationVersion) {
         setIsOpeningThread(false);
@@ -1308,7 +1314,6 @@ export function useCompanionAssistant({
     }
   }, [
     applyActiveSessionId,
-    baseGreeting,
     companion?.id,
     invalidateThreads,
     openFreshThread,
@@ -1322,6 +1327,7 @@ export function useCompanionAssistant({
       companionOpenCycleKeyRef.current = null;
       return;
     }
+    if (!user?.id || !companion?.id) return;
 
     const openCycleKey = `${scopeKey}:${Date.now()}`;
     if (companionOpenCycleKeyRef.current) return;
@@ -1329,9 +1335,11 @@ export function useCompanionAssistant({
     void startGeneratedCompanionOpener();
   }, [
     conversationEnabled,
+    companion?.id,
     scopeKey,
     startGeneratedCompanionOpener,
     surface,
+    user?.id,
   ]);
 
   const appendAssistantResponse = useCallback(
@@ -1478,7 +1486,15 @@ export function useCompanionAssistant({
       options?: CompanionAgentSubmitOptions,
     ) => {
       const message = rawMessage.trim();
-      if (!message || isOpeningThread || isSubmitting || isResolvingAction) return false;
+      if (
+        !message ||
+        isOpeningThread ||
+        isSubmitting ||
+        isResolvingAction ||
+        (surface === "companion" && companionOpenerError)
+      ) {
+        return false;
+      }
       const pendingStarterIntent = pendingStarterIntentRef.current;
       const activeFollowUpSelectedDate =
         readFollowUpSelectedDate(activeFollowUp);
@@ -1706,6 +1722,7 @@ export function useCompanionAssistant({
       applyActiveSessionId,
       appendAssistantResponse,
       activeFollowUp,
+      companionOpenerError,
       companion?.id,
       invalidateThreads,
       isOpeningThread,
@@ -2236,6 +2253,12 @@ export function useCompanionAssistant({
     }
   }, [requestPermission, toggleRecording]);
 
+  const canSubmitMessage =
+    !isOpeningThread &&
+    !isSubmitting &&
+    !isResolvingAction &&
+    !pendingAction &&
+    !(surface === "companion" && companionOpenerError);
   const canStartNewChat =
     !isOpeningThread && !isSubmitting && !isResolvingAction && !pendingAction;
   const canArchiveThread = canStartNewChat && hasPersistedActiveThread;
@@ -2283,6 +2306,11 @@ export function useCompanionAssistant({
       isSubmitting: legacyAssistant.isSubmitting,
       isOpeningThread: false,
       isResolvingAction: legacyAssistant.isResolvingAction,
+      canSubmitMessage:
+        !legacyAssistant.isOpeningThread &&
+        !legacyAssistant.isSubmitting &&
+        !legacyAssistant.isResolvingAction &&
+        !legacyAssistant.pendingAction,
       submitMessage,
       submitTypedMessage: () =>
         submitMessage(draftInput, "text", { turnOrigin: "composer" }),
@@ -2344,6 +2372,7 @@ export function useCompanionAssistant({
     isSubmitting,
     isOpeningThread,
     isResolvingAction,
+    canSubmitMessage,
     submitMessage,
     submitTypedMessage: () =>
       submitMessage(draftInput, "text", { turnOrigin: "composer" }),

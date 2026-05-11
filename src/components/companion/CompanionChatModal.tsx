@@ -92,7 +92,8 @@ export const CompanionChatModal = memo(function CompanionChatModal({
     assistant.isOpeningThread ||
     assistant.isSubmitting ||
     assistant.isResolvingAction;
-  const sendDisabled = actionDisabled || !assistant.draftInput.trim();
+  const sendDisabled =
+    !assistant.canSubmitMessage || !assistant.draftInput.trim();
   const statusText = assistant.isOpeningThread
     ? "Starting"
     : assistant.isSubmitting
