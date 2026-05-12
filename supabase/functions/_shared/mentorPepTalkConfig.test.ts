@@ -32,7 +32,7 @@ const EXPECTED_VOICE_IDS: Record<SupportedMentorSlug, string> = {
   charles: "jRAAK67SEFE9m7ci5DhD",
   princess: "uIZsnBL0YK1S5j69bAih",
   operator: "pNInz6obpgDQGcFmaJgB",
-  rival: "KLZOWyG48RjZkAAjuM89",
+  rival: "V33LkP9pVLdcjeB2y5Na",
   reign: "GTQ4ImqrRljZAa9VJX6B",
 };
 

@@ -135,7 +135,25 @@ export const createPlanDayBriefingContext = ({
       loadSignal,
       activeCampaignCount: activeEpics.length,
       activeCampaignTitles,
+      activeCampaigns: activeEpics.slice(0, 8).map((epic) => ({
+        id: epic.id,
+        title: epic.title,
+        progress_percentage: epic.progress_percentage ?? null,
+      })),
       topOpenQuests: openTasks.slice(0, 6).map(summarizeTask),
+      visibleQuests: openTasks.slice(0, 12).map((task) => ({
+        id: task.id,
+        task_text: task.task_text,
+        task_date: task.task_date ?? null,
+        completed: task.completed ?? false,
+        scheduled_time: task.scheduled_time ?? null,
+        estimated_duration: task.estimated_duration ?? null,
+        habit_source_id: task.habit_source_id ?? null,
+        epic_id: task.epic_id ?? null,
+        epic_title: task.epic_title ?? null,
+        is_main_quest: task.is_main_quest ?? false,
+        priority: task.priority ?? null,
+      })),
     },
   };
 };

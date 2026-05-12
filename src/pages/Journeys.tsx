@@ -55,11 +55,13 @@ import { useQuestCalendarSync } from "@/hooks/useQuestCalendarSync";
 import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
 import { HourlyViewModal } from "@/components/HourlyViewModal";
 import { JourneysCompanionPlannerModal } from "@/components/journeys/JourneysCompanionPlannerModal";
+import { DraggableFAB } from "@/components/DraggableFAB";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { JOURNEYS_RESET_TO_TODAY_EVENT, JOURNEYS_ROUTE } from "@/pages/journeysDateSync";
 import { isOnboardingCleanupEligible } from "@/pages/journeysCleanupEligibility";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 import { SEND_TO_CALENDAR_ENABLED } from "@/utils/calendarFeatureFlags";
+import { COMPANION_FLOATING_ACTION_BUTTON_ENABLED } from "@/config/companionLauncherFeatureFlags";
 import { useJourneysLayoutMode } from "@/hooks/useJourneysLayoutMode";
 import { isMacDesignedForIPadIOSApp, isMacSession } from "@/utils/platformTargets";
 import { QuestInboxSection } from "@/components/QuestInboxSection";
@@ -75,8 +77,6 @@ import { useVoiceInput } from "@/hooks/useVoiceInput";
 import type {
   CompanionPlannerLaunchIntent,
   CompanionPlannerProposal,
-  CompanionPlannerStarterIntent,
-  PlannerBriefingContext,
 } from "@/types/companionPlanner";
 import {
   clearCampaignBuilderDraftSnapshot,
@@ -91,6 +91,7 @@ import {
   warmDailyTasksQueryFromRemote,
 } from "@/utils/plannerSync";
 import { getEffectiveMissionDate } from "@/utils/timezone";
+import { createPlanDayCompanionLaunchIntent } from "@/utils/companionPlannerLaunchContext";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -502,21 +503,6 @@ const Journeys = () => {
     }
     setIsCompanionPlannerPinned(true);
   }, [openCampaignBuilder]);
-
-  const launchPlannerIntent = useCallback((
-    message: string,
-    starterIntent: CompanionPlannerStarterIntent,
-    options?: { briefingContext?: PlannerBriefingContext | null },
-  ) => {
-    setPlannerLaunchIntent({
-      id: createPlannerLaunchIntentId(),
-      message,
-      starterIntent,
-      target: "planner",
-      briefingContext: options?.briefingContext ?? null,
-    });
-    setIsCompanionPlannerPinned(true);
-  }, []);
 
   const {
     isRecording: isVoiceAddRecording,
@@ -963,6 +949,30 @@ const Journeys = () => {
   );
   const { tasks: allCalendarTasks } = useCalendarTasks(selectedDate, "month", { enabled: isTabActive });
   const { tasks: weekCalendarTasks } = useCalendarTasks(selectedDate, "week", { enabled: isTabActive });
+  const isSelectedDateToday = isSameDay(selectedDate, effectiveTodayDate);
+  const fabPlanDayLabel = isSelectedDateToday ? "Plan Today" : "Plan Day";
+  const createFabPlanDayLaunchIntent = useCallback(() => {
+    const useVisibleWeekContext = isDesktopLayout && desktopPlannerMode === "week";
+
+    return createPlanDayCompanionLaunchIntent({
+      selectedDate,
+      tasks: useVisibleWeekContext ? weekCalendarTasks : dailyTasks,
+      activeEpics,
+      assumeTasksAreForSelectedDate: !useVisibleWeekContext,
+    });
+  }, [
+    activeEpics,
+    dailyTasks,
+    desktopPlannerMode,
+    isDesktopLayout,
+    selectedDate,
+    weekCalendarTasks,
+  ]);
+  const showJourneysPlannerFab = (
+    COMPANION_FLOATING_ACTION_BUTTON_ENABLED
+    && !isMacHostedIOSApp
+    && isJourneysRouteActive
+  );
 
   useEffect(() => {
     if (hasInitializedInboxVisibilityRef.current) return;
@@ -2151,6 +2161,15 @@ const Journeys = () => {
           onOpenCampaignBuilder={openCampaignBuilderFromAssistant}
           onQuestProposalEditHandoff={handleQuestProposalEditHandoff}
         />
+
+        {showJourneysPlannerFab ? (
+          <DraggableFAB
+            onOpenCompanionPlanner={openCompanionPlanner}
+            onCreateQuest={() => openAddQuestSheet()}
+            createPlanDayLaunchIntent={createFabPlanDayLaunchIntent}
+            planDayLabel={fabPlanDayLabel}
+          />
+        ) : null}
 
         {/* Add Quest Sheet */}
         <AddQuestSheet

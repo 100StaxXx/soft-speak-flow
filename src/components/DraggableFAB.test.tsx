@@ -323,19 +323,41 @@ describe("DraggableFAB", () => {
     }));
   });
 
-  it("routes the plan-day option through the planner as the exact daily planning starter", () => {
+  it("routes the plan-day option through the contextual launch intent when provided", () => {
     const newGoalStarted = vi.fn();
+    const contextualIntent = {
+      id: "contextual-plan-day",
+      target: "planner" as const,
+      starterIntent: "plan_day" as const,
+      message: "Plan my day",
+      selectedDate: "2026-05-12",
+      briefingContext: {
+        content: "Planning snapshot for Tuesday, May 12: 3 open quests",
+        dataSnapshot: {
+          selectedDate: "2026-05-12",
+          activeCampaignTitles: ["Ship the planner"],
+          ritualQuestCount: 1,
+        },
+      },
+    };
+    const createPlanDayLaunchIntent = vi.fn(() => contextualIntent);
     window.addEventListener("companion-new-goal-started", newGoalStarted);
-    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
+    render(
+      <DraggableFAB
+        onOpenCompanionPlanner={mocks.onOpenCompanionPlanner}
+        createPlanDayLaunchIntent={createPlanDayLaunchIntent}
+        planDayLabel="Plan Today"
+      />,
+    );
 
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-plan-day"));
+    const planDayButton = screen.getByTestId("journeys-companion-launcher-option-plan-day");
 
-    expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
-      target: "planner",
-      starterIntent: "plan_day",
-      message: "Plan my day",
-    }));
+    expect(planDayButton).toHaveTextContent("Plan Today");
+    fireEvent.click(planDayButton);
+
+    expect(createPlanDayLaunchIntent).toHaveBeenCalledTimes(1);
+    expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(contextualIntent);
     expect(newGoalStarted).not.toHaveBeenCalled();
     window.removeEventListener("companion-new-goal-started", newGoalStarted);
   });

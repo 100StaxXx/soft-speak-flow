@@ -181,6 +181,8 @@ const mocks = vi.hoisted(() => ({
     onSave?: (taskId: string, updates: Record<string, unknown>) => Promise<void>;
   },
   lastDraggableFabOnOpenCompanionPlanner: null as null | ((intent?: unknown) => void),
+  lastDraggableFabCreatePlanDayLaunchIntent: null as null | (() => unknown),
+  lastDraggableFabPlanDayLabel: null as string | null,
   lastPathfinderProps: null as null | {
     open?: boolean;
     initialGoal?: string;
@@ -201,7 +203,7 @@ const mocks = vi.hoisted(() => ({
     completed: boolean;
     xp_reward: number;
     task_date: string;
-    scheduled_time: string;
+    scheduled_time: string | null;
     difficulty: string;
     is_main_quest: boolean;
     habit_source_id?: string | null;
@@ -464,11 +466,17 @@ vi.mock("@/components/CampaignCreatedAnimation", () => ({
 vi.mock("@/components/DraggableFAB", () => ({
   DraggableFAB: ({
     onOpenCompanionPlanner,
+    createPlanDayLaunchIntent,
+    planDayLabel,
   }: {
     onOpenCompanionPlanner?: (intent?: unknown) => void;
+    createPlanDayLaunchIntent?: () => unknown;
+    planDayLabel?: string;
   }) => {
     mocks.draggableFabRenderCount += 1;
     mocks.lastDraggableFabOnOpenCompanionPlanner = onOpenCompanionPlanner ?? null;
+    mocks.lastDraggableFabCreatePlanDayLaunchIntent = createPlanDayLaunchIntent ?? null;
+    mocks.lastDraggableFabPlanDayLabel = planDayLabel ?? null;
     return (
       <div data-testid="draggable-fab">
         <button
@@ -805,6 +813,8 @@ describe("Journeys row drag integration", () => {
     mocks.lastCompanionPlannerModalProps = null;
     mocks.lastEditQuestDialogProps = null;
     mocks.lastDraggableFabOnOpenCompanionPlanner = null;
+    mocks.lastDraggableFabCreatePlanDayLaunchIntent = null;
+    mocks.lastDraggableFabPlanDayLabel = null;
     mocks.lastPathfinderProps = null;
     mocks.tutorialGuidance = {
       isActive: false,
@@ -831,7 +841,11 @@ describe("Journeys row drag integration", () => {
     });
     Object.defineProperty(window, "visualViewport", {
       configurable: true,
-      value: { height: 720 },
+      value: {
+        height: 720,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
     });
   });
 
@@ -1023,7 +1037,115 @@ describe("Journeys row drag integration", () => {
     );
 
     expect(await screen.findByLabelText("Add quest")).toHaveAttribute("data-tour", "add-quest-fab");
-    expect(mocks.draggableFabRenderCount).toBe(0);
+    expect(mocks.draggableFabRenderCount).toBeGreaterThan(0);
+  });
+
+  it("builds the FAB Plan Today intent from the visible journeys context", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-05-12T12:00:00"));
+    mocks.dailyTasks = [
+      {
+        id: "ritual-task",
+        task_text: "Morning ritual",
+        completed: false,
+        xp_reward: 10,
+        task_date: "2026-05-12",
+        scheduled_time: "07:30",
+        difficulty: "easy",
+        is_main_quest: false,
+        habit_source_id: "habit-1",
+        epic_id: "epic-1",
+        epic_title: "Launch Planner",
+      },
+      {
+        id: "campaign-task",
+        task_text: "Draft launch notes",
+        completed: false,
+        xp_reward: 20,
+        task_date: "2026-05-12",
+        scheduled_time: null,
+        difficulty: "medium",
+        is_main_quest: true,
+        epic_id: "epic-1",
+        epic_title: "Launch Planner",
+      },
+    ];
+    mocks.epics = [{
+      id: "epic-1",
+      title: "Launch Planner",
+      status: "active",
+      progress_percentage: 40,
+      target_days: 30,
+      start_date: "2026-05-01",
+      end_date: null,
+    }];
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(mocks.lastDraggableFabCreatePlanDayLaunchIntent).not.toBeNull();
+    });
+
+    const launchIntent =
+      mocks.lastDraggableFabCreatePlanDayLaunchIntent?.() as {
+        starterIntent?: string;
+        selectedDate?: string | null;
+        briefingContext?: {
+          content?: string;
+          dataSnapshot?: Record<string, unknown> | null;
+        } | null;
+      };
+
+    expect(mocks.lastDraggableFabPlanDayLabel).toBe("Plan Today");
+    expect(launchIntent).toEqual(expect.objectContaining({
+      starterIntent: "plan_day",
+      selectedDate: "2026-05-12",
+    }));
+    expect(launchIntent.briefingContext?.content).toContain("2 open quests");
+    expect(launchIntent.briefingContext?.dataSnapshot).toEqual(expect.objectContaining({
+      selectedDate: "2026-05-12",
+      ritualQuestCount: 1,
+      activeCampaignTitles: ["Launch Planner"],
+      activeCampaigns: [expect.objectContaining({
+        id: "epic-1",
+        title: "Launch Planner",
+      })],
+      topOpenQuests: expect.arrayContaining([
+        expect.stringContaining("Morning ritual"),
+        expect.stringContaining("campaign: Launch Planner"),
+      ]),
+      visibleQuests: expect.arrayContaining([
+        expect.objectContaining({
+          id: "ritual-task",
+          habit_source_id: "habit-1",
+          epic_id: "epic-1",
+          epic_title: "Launch Planner",
+        }),
+        expect.objectContaining({
+          id: "campaign-task",
+          epic_id: "epic-1",
+          epic_title: "Launch Planner",
+        }),
+      ]),
+    }));
+
+    act(() => {
+      mocks.lastDraggableFabOnOpenCompanionPlanner?.(launchIntent);
+    });
+
+    expect(mocks.lastCompanionPlannerModalProps?.launchIntent).toEqual(launchIntent);
   });
 
   it("opens the companion planner modal from the desktop journeys launcher", async () => {
@@ -1065,7 +1187,7 @@ describe("Journeys row drag integration", () => {
       writable: true,
       value: 1100,
     });
-    const expectedDateKey = new Date().toISOString().slice(0, 10);
+    const expectedDateKey = format(new Date(), "yyyy-MM-dd");
 
     const queryClient = new QueryClient({
       defaultOptions: {

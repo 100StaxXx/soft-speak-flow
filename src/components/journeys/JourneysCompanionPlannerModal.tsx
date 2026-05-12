@@ -428,6 +428,11 @@ const getProposedActionKey = (action: CompanionAgentProposedAction) =>
     action.reason?.trim() ?? "",
   ].join("::");
 
+const getProposedActionProposalId = (action: CompanionAgentProposedAction) => {
+  const source = getProposedActionPayloadSource(action);
+  return readFirstString(source, ["proposalId", "proposal_id"]);
+};
+
 const getCampaignStartInitialGoal = (action: CompanionAgentProposedAction) => {
   const source = getProposedActionPayloadSource(action);
   return (
@@ -1473,6 +1478,21 @@ const JourneysCompanionOverlayBody = memo(
       [assistant, localActionPending],
     );
 
+    const handleStructuredSuggestionConfirm = useCallback(
+      (proposalId: string) => {
+        const proposedAction = assistant.proposedActions.find((action) =>
+          getProposedActionProposalId(action) === proposalId
+        );
+        if (proposedAction) {
+          handleProposedActionDraft(proposedAction);
+          return;
+        }
+
+        void assistant.confirmSuggestedQuest(proposalId);
+      },
+      [assistant, handleProposedActionDraft],
+    );
+
     const assistantActionDisabled =
       assistant.isSubmitting ||
       assistant.isResolvingAction ||
@@ -1704,7 +1724,7 @@ const JourneysCompanionOverlayBody = memo(
                   <CompanionStructuredResponseCards
                     structuredResponse={assistant.structuredResponse}
                     variant="journeys"
-                    onConfirmSuggestion={assistant.confirmSuggestedQuest}
+                    onConfirmSuggestion={handleStructuredSuggestionConfirm}
                     savedProposalIds={assistant.savedSuggestionProposalIds}
                     pendingProposalId={assistant.pendingSuggestionProposalId}
                     actionDisabled={

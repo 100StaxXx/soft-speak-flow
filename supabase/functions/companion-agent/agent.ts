@@ -1074,6 +1074,19 @@ export const isCompanionScheduleReadFastPathRequest = (
 const isDeterministicScheduleReadRequest =
   isCompanionScheduleReadFastPathRequest;
 
+export const isContextualPlanDayFastPathRequest = (
+  request: CompanionAgentRequest,
+): boolean => {
+  if (request.selectedProposalId || request.selectedProposedAction) {
+    return false;
+  }
+
+  return request.surface === "journeys" &&
+    request.starterIntent === "plan_day" &&
+    isLauncherTurn(request) &&
+    Boolean(request.briefingContext);
+};
+
 const looksLikePlannerActionMessage = (message: string): boolean => {
   const normalized = normalizeBareStarterPrompt(message);
   return /\b(add|block|calendar|catch up|create|deadline|delete|do next|finish|habit|make|move|plan|quest|remind|reschedule|ritual|schedule|task|today|tomorrow|week)\b/
@@ -1423,6 +1436,10 @@ function normalizeBareStarterResult(params: {
   request: CompanionAgentRequest;
   result: AgentRunResult["result"];
 }) {
+  if (isContextualPlanDayFastPathRequest(params.request)) {
+    return;
+  }
+
   const followUpConfig = resolveBareStarterFollowUp(params.request);
   if (!followUpConfig) {
     return;
@@ -3592,10 +3609,84 @@ function buildDeterministicScheduleReadResult(params: {
         .filter((hint) => hint.actionType && hint.normalizedPayload)
         .map((hint) => ({
           type: hint.actionType ?? "unknown",
+          title: hint.title,
           summary: hint.summary,
           reason: hint.unsupportedReason ?? null,
+          proposalId: hint.proposalId,
           normalizedPayload: hint.normalizedPayload ?? {},
           confidence: 0.55,
+        })),
+      assumptions: [],
+      evidenceIds: [],
+      structuredResponse: plannerResult.structuredResponse ?? null,
+      preparedActionId: null,
+    },
+    openaiConversationId: params.context.thread?.openai_conversation_id ?? null,
+    lastOpenAIResponseId: params.context.thread?.last_openai_response_id ??
+      null,
+    draftDecisionSource: "deterministic",
+  };
+}
+
+function buildDeterministicPlanDayTriageResult(params: {
+  request: CompanionAgentRequest;
+  context: LoadedCompanionAgentContext;
+}): AgentRunResult {
+  const plannerResult = consultPlannerForAgent({
+    message: params.request.message,
+    currentDateTime: params.context.currentDateTime,
+    selectedDate: params.request.selectedDate ?? null,
+    briefingContext: params.request.briefingContext ?? null,
+    surface: params.request.surface,
+    starterIntent: "plan_day",
+    activeFollowUp: null,
+    context: params.context,
+  });
+  const mode = plannerResult.questions.length > 0
+    ? "clarify" as CompanionAgentMode
+    : plannerResult.mode === "proposal" || plannerResult.mode === "schedule_read"
+    ? "schedule_read" as CompanionAgentMode
+    : "conversation" as CompanionAgentMode;
+  const followUp = plannerResult.questions[0]
+    ? {
+      question: plannerResult.questions[0].prompt,
+      reason: plannerResult.questions[0].reason ?? null,
+      expectedAnswerType: plannerResult.questions[0].options?.length
+        ? "choice" as const
+        : "free_text" as const,
+      options: plannerResult.questions[0].options ?? [],
+      blocksDrafting: true,
+      metadata: {
+        ...(plannerResult.questions[0].metadata ?? {}),
+        questionId: plannerResult.questions[0].id,
+        ...(params.request.selectedDate
+          ? { selectedDate: params.request.selectedDate }
+          : {}),
+        ...(params.request.briefingContext
+          ? { briefingContext: params.request.briefingContext }
+          : {}),
+      },
+    }
+    : null;
+
+  return {
+    result: {
+      reply: plannerResult.reply,
+      mode,
+      intent: "plan_day" as CompanionAgentIntent,
+      confidence: 0.82,
+      understandingState: deriveUnderstandingState({ mode, followUp }),
+      followUp,
+      proposedActions: plannerResult.actionHints
+        .filter((hint) => hint.actionType && hint.normalizedPayload)
+        .map((hint) => ({
+          type: hint.actionType ?? "unknown",
+          title: hint.title,
+          summary: hint.summary,
+          reason: hint.unsupportedReason ?? null,
+          proposalId: hint.proposalId,
+          normalizedPayload: hint.normalizedPayload ?? {},
+          confidence: 0.62,
         })),
       assumptions: [],
       evidenceIds: [],
@@ -4463,6 +4554,9 @@ export async function runCompanionAgent(params: RunAgentParams) {
   const scheduleReadFastPath = isCompanionScheduleReadFastPathRequest(
     params.request,
   );
+  const contextualPlanDayFastPath = isContextualPlanDayFastPathRequest(
+    params.request,
+  );
   const requiredScheduleReadWarnings = scheduleReadFastPath
     ? getRequiredScheduleReadContextWarnings(context)
     : [];
@@ -4477,6 +4571,11 @@ export async function runCompanionAgent(params: RunAgentParams) {
         request: params.request,
         context,
       })
+    : contextualPlanDayFastPath
+    ? buildDeterministicPlanDayTriageResult({
+      request: params.request,
+      context,
+    })
     : null;
 
   const preparedActions = new Map<string, PendingActionCandidate>();
@@ -4522,9 +4621,11 @@ export async function runCompanionAgent(params: RunAgentParams) {
         followUp: null,
         proposedActions: [{
           type: candidate.actionType,
+          title: candidate.summary,
           summary: candidate.summary,
           reason:
             "User selected a structured suggestion to turn into a confirmable action.",
+          proposalId: params.request.selectedProposalId,
           normalizedPayload: candidate.normalizedPayload,
           confidence: 0.82,
         }],
@@ -4978,8 +5079,10 @@ export async function runCompanionAgent(params: RunAgentParams) {
             .filter((hint) => hint.actionType && hint.normalizedPayload)
             .map((hint) => ({
               type: hint.actionType ?? "unknown",
+              title: hint.title,
               summary: hint.summary,
               reason: hint.unsupportedReason ?? null,
+              proposalId: hint.proposalId,
               normalizedPayload: hint.normalizedPayload ?? {},
               confidence: 0.55,
             })),

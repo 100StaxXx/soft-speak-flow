@@ -1678,9 +1678,11 @@ describe("JourneysCompanionPlannerModal", () => {
 
   it("lets the user confirm a specific structured quest suggestion", () => {
     const previousPendingAction = mocks.state.pendingAction;
+    const previousProposedActions = mocks.state.proposedActions;
     const previousSavedSuggestionProposalIds =
       mocks.state.savedSuggestionProposalIds;
     mocks.state.pendingAction = null;
+    mocks.state.proposedActions = [];
     mocks.state.savedSuggestionProposalIds = [];
 
     render(
@@ -1701,6 +1703,67 @@ describe("JourneysCompanionPlannerModal", () => {
     );
 
     mocks.state.pendingAction = previousPendingAction;
+    mocks.state.proposedActions = previousProposedActions;
+    mocks.state.savedSuggestionProposalIds = previousSavedSuggestionProposalIds;
+  });
+
+  it("opens a local edit draft when a structured suggestion has a matching proposed action", async () => {
+    const previousPendingAction = mocks.state.pendingAction;
+    const previousProposedActions = mocks.state.proposedActions;
+    const previousSavedSuggestionProposalIds =
+      mocks.state.savedSuggestionProposalIds;
+    const onQuestProposalEditHandoff = vi.fn().mockResolvedValue({
+      saved: false,
+    });
+    const proposedAction = {
+      type: "task_update",
+      title: "Move Outline the launch checklist",
+      summary: "Move it to tomorrow.",
+      reason: "Today is overloaded.",
+      proposalId: "proposal-plan-1",
+      normalizedPayload: {
+        task_id: "task-1",
+        task_date: "2026-04-19",
+        scheduled_time: "10:00",
+      },
+    };
+
+    mocks.state.pendingAction = null;
+    mocks.state.proposedActions = [proposedAction];
+    mocks.state.savedSuggestionProposalIds = [];
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+        onQuestProposalEditHandoff={onQuestProposalEditHandoff}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByTestId("structured-suggestion-confirm-plan-1"),
+      );
+    });
+
+    expect(onQuestProposalEditHandoff).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "update_quest",
+        title: "Move Outline the launch checklist",
+        payload: expect.objectContaining({
+          taskId: "task-1",
+          updates: expect.objectContaining({
+            task_date: "2026-04-19",
+            scheduled_time: "10:00",
+          }),
+        }),
+      }),
+    );
+    expect(mocks.assistant.confirmSuggestedQuest).not.toHaveBeenCalled();
+
+    mocks.state.pendingAction = previousPendingAction;
+    mocks.state.proposedActions = previousProposedActions;
     mocks.state.savedSuggestionProposalIds = previousSavedSuggestionProposalIds;
   });
 

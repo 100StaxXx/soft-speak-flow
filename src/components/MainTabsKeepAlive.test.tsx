@@ -4,20 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   warmDailyTasksQueryFromRemote: vi.fn().mockResolvedValue([]),
   warmEpicsQueryFromRemote: vi.fn().mockResolvedValue([]),
-  navigate: vi.fn(),
-  location: {
-    pathname: "/mentor",
-    search: "",
-    state: null as Record<string, unknown> | null,
-  },
-  lastFabHandler: null as null | ((intent?: {
-    id: string;
-    message: string;
-    starterIntent: string;
-    target?: string;
-    briefingContext?: null;
-  } | null) => void),
-  lastCreateQuestFabHandler: null as null | (() => void),
   mountCounts: {
     mentor: 0,
     journeys: 0,
@@ -30,11 +16,6 @@ vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({}),
 }));
 
-vi.mock("react-router-dom", () => ({
-  useLocation: () => mocks.location,
-  useNavigate: () => mocks.navigate,
-}));
-
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
     user: { id: "user-1" },
@@ -44,53 +25,6 @@ vi.mock("@/hooks/useAuth", () => ({
 vi.mock("@/utils/plannerSync", () => ({
   warmDailyTasksQueryFromRemote: (...args: unknown[]) => mocks.warmDailyTasksQueryFromRemote(...args),
   warmEpicsQueryFromRemote: (...args: unknown[]) => mocks.warmEpicsQueryFromRemote(...args),
-}));
-
-vi.mock("@/utils/platformTargets", () => ({
-  isMacDesignedForIPadIOSApp: () => false,
-}));
-
-vi.mock("@/components/DraggableFAB", () => ({
-  DraggableFAB: ({
-    onOpenCompanionPlanner,
-    onCreateQuest,
-  }: {
-    onOpenCompanionPlanner?: (intent?: {
-      id: string;
-      message: string;
-      starterIntent: string;
-      target?: string;
-      briefingContext?: null;
-    } | null) => void;
-    onCreateQuest?: () => void;
-  }) => {
-    mocks.lastFabHandler = onOpenCompanionPlanner ?? null;
-    mocks.lastCreateQuestFabHandler = onCreateQuest ?? null;
-    return (
-      <div>
-        <button
-          type="button"
-          data-testid="main-tabs-universal-fab"
-          onClick={() => onOpenCompanionPlanner?.({
-            id: "launch-1",
-            message: "Help me plan today",
-            starterIntent: "plan_day",
-            target: "planner",
-            briefingContext: null,
-          })}
-        >
-          universal fab
-        </button>
-        <button
-          type="button"
-          data-testid="main-tabs-create-quest-fab"
-          onClick={() => onCreateQuest?.()}
-        >
-          create quest
-        </button>
-      </div>
-    );
-  },
 }));
 
 vi.mock("@/pages/Mentor", async () => {
@@ -173,12 +107,6 @@ describe("MainTabsKeepAlive", () => {
     mocks.mountCounts.journeys = 0;
     mocks.mountCounts.campaigns = 0;
     mocks.mountCounts.companion = 0;
-    mocks.navigate.mockReset();
-    mocks.location.pathname = "/mentor";
-    mocks.location.search = "";
-    mocks.location.state = null;
-    mocks.lastFabHandler = null;
-    mocks.lastCreateQuestFabHandler = null;
 
     let rafId = 0;
     vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback: FrameRequestCallback) => {
@@ -211,73 +139,6 @@ describe("MainTabsKeepAlive", () => {
     expect(mocks.warmDailyTasksQueryFromRemote).toHaveBeenCalledWith(expect.any(Object), "user-1", expect.any(String));
     expect(mocks.warmEpicsQueryFromRemote).toHaveBeenCalledTimes(1);
     expect(mocks.warmEpicsQueryFromRemote).toHaveBeenCalledWith(expect.any(Object), "user-1");
-  });
-
-  it("does not render the planner fab outside the journeys tab", () => {
-    render(<MainTabsKeepAlive activePath="/mentor" />);
-
-    expect(screen.queryByTestId("main-tabs-universal-fab")).not.toBeInTheDocument();
-  });
-
-  it("renders the planner fab on the journeys tab", () => {
-    mocks.location.pathname = "/journeys";
-
-    render(<MainTabsKeepAlive activePath="/journeys" />);
-
-    expect(screen.getByTestId("main-tabs-universal-fab")).toBeInTheDocument();
-    expect(mocks.lastFabHandler).not.toBeNull();
-    expect(mocks.lastCreateQuestFabHandler).not.toBeNull();
-  });
-
-  it("routes journeys planner fab launch intent into the current journeys route state", () => {
-    mocks.location.pathname = "/journeys";
-    mocks.location.search = "?section=inbox";
-    mocks.location.state = { fromTest: true };
-
-    render(<MainTabsKeepAlive activePath="/journeys" />);
-
-    fireEvent.click(screen.getByTestId("main-tabs-universal-fab"));
-
-    expect(mocks.navigate).toHaveBeenCalledWith(
-      {
-        pathname: "/journeys",
-        search: "?section=inbox",
-      },
-      {
-        state: {
-          fromTest: true,
-          companionPlannerLaunchIntent: expect.objectContaining({
-            id: "launch-1",
-            starterIntent: "plan_day",
-          }),
-        },
-      },
-    );
-  });
-
-  it("routes journeys create quest fab requests into the current journeys route state", () => {
-    mocks.location.pathname = "/journeys";
-    mocks.location.search = "?section=inbox";
-    mocks.location.state = { fromTest: true };
-
-    render(<MainTabsKeepAlive activePath="/journeys" />);
-
-    fireEvent.click(screen.getByTestId("main-tabs-create-quest-fab"));
-
-    expect(mocks.navigate).toHaveBeenCalledWith(
-      {
-        pathname: "/journeys",
-        search: "?section=inbox",
-      },
-      {
-        state: {
-          fromTest: true,
-          journeysCreateQuestRequest: {
-            id: expect.any(String),
-          },
-        },
-      },
-    );
   });
 
   it("preserves tab state and avoids remounting visited tabs", () => {

@@ -53,7 +53,6 @@ const OPTION_META: Record<
     iconClassName: "bg-[#fff7dc] text-[#b04b12]",
   },
   "plan-day": {
-    label: "Plan day",
     Icon: CalendarCheck,
     className: "border-[#6b3416] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#3c1f10]",
     iconClassName: "bg-[#fff7dc] text-[#b04b12]",

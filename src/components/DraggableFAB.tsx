@@ -18,6 +18,8 @@ import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
 interface DraggableFABProps {
   onOpenCompanionPlanner?: (intent?: CompanionPlannerLaunchIntent | null) => void;
   onCreateQuest?: () => void;
+  createPlanDayLaunchIntent?: () => CompanionPlannerLaunchIntent;
+  planDayLabel?: string;
   onTap?: () => void;
 }
 
@@ -40,7 +42,13 @@ const getPopupWidthPx = () => {
   return Math.max(0, Math.min(19 * safeRootFontSize, window.innerWidth - (POPUP_VIEWPORT_GUTTER_PX * 2)));
 };
 
-export const DraggableFAB = ({ onOpenCompanionPlanner, onCreateQuest, onTap }: DraggableFABProps) => {
+export const DraggableFAB = ({
+  onOpenCompanionPlanner,
+  onCreateQuest,
+  createPlanDayLaunchIntent,
+  planDayLabel,
+  onTap,
+}: DraggableFABProps) => {
   const { user } = useAuth();
   const suppressTapRef = useRef(false);
   const suppressTapResetRef = useRef<number | null>(null);
@@ -86,8 +94,13 @@ export const DraggableFAB = ({ onOpenCompanionPlanner, onCreateQuest, onTap }: D
 
   const canTriggerTap = !isDragging && !isLongPressing;
   const launcherTemplates = useMemo(
-    () => getJourneysCompanionLauncherTemplates({ userId: user?.id ?? null }),
-    [user?.id],
+    () =>
+      getJourneysCompanionLauncherTemplates({ userId: user?.id ?? null }).map((template) =>
+        template.id === "plan-day" && planDayLabel
+          ? { ...template, label: planDayLabel }
+          : template
+      ),
+    [planDayLabel, user?.id],
   );
 
   const popupPlacement = (() => {
@@ -188,6 +201,10 @@ export const DraggableFAB = ({ onOpenCompanionPlanner, onCreateQuest, onTap }: D
       }));
       return;
     }
+    if (template.id === "plan-day" && createPlanDayLaunchIntent) {
+      onOpenCompanionPlanner(createPlanDayLaunchIntent());
+      return;
+    }
     const launchIntent: CompanionPlannerLaunchIntent = {
       id: createCompanionPlannerLaunchIntentId(),
       message: template.message,
@@ -196,7 +213,14 @@ export const DraggableFAB = ({ onOpenCompanionPlanner, onCreateQuest, onTap }: D
       briefingContext: null,
     };
     onOpenCompanionPlanner(launchIntent);
-  }, [closeMenu, companionLabel, launcherTemplates, onCreateQuest, onOpenCompanionPlanner]);
+  }, [
+    closeMenu,
+    companionLabel,
+    createPlanDayLaunchIntent,
+    launcherTemplates,
+    onCreateQuest,
+    onOpenCompanionPlanner,
+  ]);
 
   const handleOpenHistory = useCallback(() => {
     if (!onOpenCompanionPlanner) {

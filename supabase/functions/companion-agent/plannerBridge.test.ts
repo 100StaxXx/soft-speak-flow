@@ -360,6 +360,88 @@ Deno.test("consultPlannerForAgent asks a clarifying plan-day question with no an
   assertMatch(result.reply, /what kind of day/i);
 });
 
+Deno.test("consultPlannerForAgent turns contextual plan_day briefing into triage", () => {
+  const result = consultPlannerForAgent({
+    message: "Plan my day",
+    currentDateTime: "2026-04-18T10:30:00-07:00",
+    selectedDate: "2026-04-18",
+    surface: "journeys",
+    starterIntent: "plan_day",
+    briefingContext: {
+      content:
+        "Planning snapshot for Saturday, April 18: 3 open quests, 1 rituals, 1 active campaigns",
+      dataSnapshot: {
+        selectedDate: "2026-04-18",
+        ritualQuestCount: 1,
+        activeCampaignTitles: ["Launch campaign"],
+      },
+    },
+    context: buildContext({
+      currentDateTime: "2026-04-18T10:30:00-07:00",
+      campaigns: [
+        {
+          id: "epic-launch",
+          title: "Launch campaign",
+          status: "active",
+          end_date: "2026-05-01",
+          progress_percentage: 30,
+        },
+      ],
+      rituals: [
+        {
+          id: "ritual-focus",
+          epic_id: "epic-launch",
+          epic_title: "Launch campaign",
+          title: "Campaign focus ritual",
+          frequency: "daily",
+          preferred_time: "09:00",
+          estimated_minutes: 20,
+          custom_days: null,
+          custom_month_days: null,
+        },
+      ],
+      tasks: [
+        {
+          id: "missed-task",
+          task_text: "Missed admin",
+          task_date: "2026-04-18",
+          scheduled_time: "08:00",
+          estimated_duration: 20,
+          completed: false,
+        },
+        {
+          id: "ritual-task",
+          task_text: "Campaign focus ritual",
+          task_date: "2026-04-18",
+          scheduled_time: "09:00",
+          estimated_duration: 20,
+          completed: false,
+          epic_id: "epic-launch",
+          habit_source_id: "ritual-focus",
+        },
+        {
+          id: "campaign-task",
+          task_text: "Draft launch notes",
+          task_date: "2026-04-18",
+          scheduled_time: null,
+          estimated_duration: 45,
+          completed: false,
+          epic_id: "epic-launch",
+          priority: "high",
+        },
+      ],
+    }),
+  });
+
+  assertEquals(result.questions.length, 0);
+  assertEquals(result.reply.includes("focus, recovery, or catching up"), false);
+  assertMatch(result.reply, /Missed or slipped quests/i);
+  assertMatch(result.reply, /Campaign work to protect/i);
+  assertMatch(result.reply, /Rituals due or linked today/i);
+  assertMatch(result.reply, /Protected priorities/i);
+  assertEquals(result.structuredResponse?.planDay?.campaignFocus?.campaignTitle, "Launch campaign");
+});
+
 Deno.test("consultPlannerForAgent ignores abandoned campaigns with null completed_at", () => {
   const result = consultPlannerForAgent({
     message: "Focus",

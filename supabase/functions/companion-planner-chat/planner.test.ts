@@ -8,7 +8,6 @@ import {
   normalizePlannerBuildResultText,
   type PlannerBuildResult,
   type PlannerBuildInput,
-  synthesizeDayPlanFromProposals,
 } from "./planner.ts";
 import { buildPlanDayToolUserPrompt } from "./planDayTools.ts";
 
@@ -1540,6 +1539,126 @@ Deno.test("bare plan_day with campaign rituals still asks before drafting", () =
   assertEquals(result.followUpQuestions.length, 1);
   assertEquals(result.structuredResponse, null);
   assertEquals(result.sessionState.pendingStarterIntent, "plan_day");
+});
+
+Deno.test("contextual plan_day briefing skips vague choices and returns campaign ritual triage", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Plan my day",
+    parsedInput: {
+      text: "Plan my day",
+    },
+    plannerContext: {
+      starterIntent: "plan_day",
+      briefingContext: {
+        content:
+          "Planning snapshot for Saturday, April 18: 3 open quests, 1 rituals, 1 active campaigns",
+        dataSnapshot: {
+          selectedDate: "2026-04-18",
+          ritualQuestCount: 1,
+          activeCampaignTitles: ["Launch Planner"],
+        },
+      },
+      activeEpics: [{
+        id: "epic-launch",
+        title: "Launch Planner",
+        endDate: "2026-05-01",
+        progressPercentage: 30,
+        habitCount: 1,
+      }],
+      rituals: [{
+        id: "habit-focus",
+        epicId: "epic-launch",
+        epicTitle: "Launch Planner",
+        title: "Campaign focus ritual",
+        frequency: "daily",
+        preferredTime: "09:00",
+        estimatedMinutes: 20,
+      }],
+      tasks: [
+        plannerTask({
+          id: "missed-task",
+          title: "Missed admin",
+          taskDate: "2026-04-18",
+          scheduledTime: "08:00",
+          estimatedDuration: 20,
+        }),
+        plannerTask({
+          id: "ritual-task",
+          title: "Campaign focus ritual",
+          taskDate: "2026-04-18",
+          scheduledTime: "09:00",
+          habitSourceId: "habit-focus",
+          epicId: "epic-launch",
+          epicTitle: "Launch Planner",
+          estimatedDuration: 20,
+        }),
+        plannerTask({
+          id: "campaign-task",
+          title: "Draft launch notes",
+          taskDate: "2026-04-18",
+          epicId: "epic-launch",
+          epicTitle: "Launch Planner",
+          estimatedDuration: 45,
+          priority: "high",
+        }),
+        plannerTask({
+          id: "move-me",
+          title: "Low stakes cleanup",
+          taskDate: "2026-04-18",
+          estimatedDuration: 90,
+        }),
+      ],
+      priorityScores: [
+        {
+          id: "task:campaign-task",
+          kind: "task",
+          title: "Draft launch notes",
+          score: 92,
+          reasons: ["Protects Launch Planner."],
+          taskId: "campaign-task",
+          epicId: "epic-launch",
+          targetDate: "2026-04-18",
+        },
+      ],
+      scheduleInsights: {
+        horizon: "week",
+        selectedDate: "2026-04-18",
+        dayLoads: [{
+          date: "2026-04-18",
+          totalMinutes: 175,
+          taskCount: 4,
+          status: "busy",
+        }],
+        overloadedDates: [],
+        emptyDates: ["2026-04-19"],
+        conflicts: [],
+        suggestedSlots: [],
+        moveSuggestions: [{
+          fromDate: "2026-04-18",
+          toDate: "2026-04-19",
+          taskId: "move-me",
+          taskTitle: "Low stakes cleanup",
+          reason: "Tomorrow has room and this is flexible.",
+        }],
+      },
+    },
+  }));
+
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(result.proposals[0]?.kind, "update_quest");
+  assertEquals(result.proposals[0]?.payload, {
+    taskId: "move-me",
+    updates: {
+      task_date: "2026-04-19",
+    },
+  });
+  assertEquals(result.reply.includes("What kind of day"), false);
+  assertEquals(result.reply.includes("focus, recovery, or catching up"), false);
+  assertStringIncludes(result.reply, "Missed or slipped quests");
+  assertStringIncludes(result.reply, "Move or reassign");
+  assertStringIncludes(result.reply, "Campaign work to protect");
+  assertStringIncludes(result.reply, "Rituals due or linked today");
+  assertStringIncludes(result.reply, "Protected priorities");
 });
 
 Deno.test("plan_day no-room copy explains hidden campaign ritual load", () => {

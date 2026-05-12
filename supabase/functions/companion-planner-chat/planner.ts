@@ -9350,6 +9350,16 @@ const isGenericPlanDayStarterRequest = (input: PlannerBuildInput): boolean => {
   );
 };
 
+const hasContextualPlanDayBriefing = (input: PlannerBuildInput): boolean => {
+  const briefing = input.plannerContext.briefingContext;
+  if (!briefing) return false;
+  if (briefing.content.trim().length > 0) return true;
+  if (briefing.focus?.trim()) return true;
+  return Boolean(
+    briefing.dataSnapshot && Object.keys(briefing.dataSnapshot).length > 0,
+  );
+};
+
 const isVaguePlanDayDirection = (input: PlannerBuildInput): boolean => {
   const parsedTitle = sanitizeProposalTitle(input.parsedInput?.text);
   const normalized = normalizeText(parsedTitle || input.message);
@@ -11145,6 +11155,312 @@ const getTodayScoredTaskEntries = (input: PlannerBuildInput) =>
     )
     .sort((left, right) => right.score.score - left.score.score);
 
+const uniquePlanDayTasks = (
+  tasks: ReadonlyArray<PlannerContextTask>,
+): PlannerContextTask[] => {
+  const seen = new Set<string>();
+  const unique: PlannerContextTask[] = [];
+  for (const task of tasks) {
+    if (seen.has(task.id)) continue;
+    seen.add(task.id);
+    unique.push(task);
+  }
+  return unique;
+};
+
+const getPlanDayTriageTasksForDate = (
+  loadBreakdown: PlanDayLoadBreakdown,
+): PlannerContextTask[] =>
+  uniquePlanDayTasks([
+    ...loadBreakdown.visibleStandaloneQuests,
+    ...loadBreakdown.campaignLinkedQuests,
+    ...loadBreakdown.surfacedCampaignRituals,
+    ...loadBreakdown.datedInboxItems,
+  ]);
+
+const buildPlanDayMoveProposals = (
+  input: PlannerBuildInput,
+  targetDate: string,
+): PlannerProposal[] => {
+  const seenTaskIds = new Set<string>();
+  const suggestions = input.plannerContext.scheduleInsights?.moveSuggestions ??
+    [];
+  const proposals: PlannerProposal[] = [];
+
+  for (const suggestion of suggestions) {
+    if (suggestion.fromDate !== targetDate) continue;
+    if (!suggestion.toDate || suggestion.toDate === suggestion.fromDate) {
+      continue;
+    }
+    if (!suggestion.taskId || seenTaskIds.has(suggestion.taskId)) continue;
+
+    const task = findPlannerTaskById(input, suggestion.taskId);
+    if (!task || task.completed === true || task.taskDate !== targetDate) {
+      continue;
+    }
+
+    seenTaskIds.add(task.id);
+    proposals.push({
+      id: createId(),
+      kind: "update_quest",
+      title: `Move ${task.title}`,
+      summary: suggestion.suggestedTime
+        ? `Move "${task.title}" from ${suggestion.fromDate} to ${suggestion.toDate} at ${suggestion.suggestedTime}.`
+        : `Move "${task.title}" from ${suggestion.fromDate} to ${suggestion.toDate}.`,
+      reasoning: suggestion.reason,
+      payload: {
+        taskId: task.id,
+        updates: stripUndefined({
+          task_date: suggestion.toDate,
+          scheduled_time: suggestion.suggestedTime ?? undefined,
+        }),
+      },
+      status: "pending",
+      readyToConfirm: true,
+      missingFields: [],
+    });
+
+    if (proposals.length >= 3) break;
+  }
+
+  return proposals;
+};
+
+const buildPlanDayMissedTriageLine = (
+  input: PlannerBuildInput,
+  targetDate: string,
+): string | null => {
+  const actualToday = input.currentDateTime.slice(0, 10);
+  const slippedTasks = targetDate < actualToday
+    ? getScopedPlannerTasks(input)
+      .filter((task) =>
+        task.completed !== true && task.taskDate === targetDate
+      )
+      .map((task) => ({ id: task.id, title: task.title }))
+    : targetDate === actualToday
+    ? collectMissedTasksForToday(input)
+    : [];
+
+  const uniqueSlippedTasks = slippedTasks.filter((task, index, tasks) =>
+    tasks.findIndex((candidate) => candidate.id === task.id) === index
+  );
+
+  if (uniqueSlippedTasks.length === 0) {
+    return targetDate <= actualToday
+      ? "Missed or slipped quests: none that need triage in the loaded context."
+      : null;
+  }
+
+  const titles = uniqueSlippedTasks.map((task) => task.title).slice(0, 3);
+  const extra = uniqueSlippedTasks.length > titles.length
+    ? ` plus ${uniqueSlippedTasks.length - titles.length} more`
+    : "";
+  return `Missed or slipped quests: ${formatPlanDayInlineList(titles)}${extra}. Decide what still belongs today before adding anything new.`;
+};
+
+const buildPlanDayMoveTriageLine = (
+  input: PlannerBuildInput,
+  targetDate: string,
+  proposals: ReadonlyArray<PlannerProposal>,
+): string | null => {
+  if (proposals.length > 0) {
+    const titles = proposals
+      .map((proposal) => proposal.title.replace(/^Move\s+/i, ""))
+      .slice(0, 3);
+    return `Move or reassign: ${formatPlanDayInlineList(titles)} ${
+      proposals.length === 1 ? "is" : "are"
+    } safe to surface as confirmable update_quest moves.`;
+  }
+
+  const looseSuggestion = input.plannerContext.scheduleInsights
+    ?.moveSuggestions.find((suggestion) =>
+      suggestion.fromDate === targetDate && suggestion.toDate !== targetDate
+    );
+  if (looseSuggestion) {
+    return `Move or reassign: ${looseSuggestion.taskTitle ?? "one item"} looks movable, but I do not have a safe quest update payload for it, so this stays read-only.`;
+  }
+
+  const status = getPlanDayLoadStatus(input, targetDate);
+  if (status === "overloaded" || status === "busy") {
+    return `Move or reassign: ${formatScheduleReference(input.currentDate, targetDate)} is ${status}; defer the lowest-stakes flexible quest before protecting new work.`;
+  }
+
+  return null;
+};
+
+const buildPlanDayCampaignTriageLine = (
+  input: PlannerBuildInput,
+  loadBreakdown: PlanDayLoadBreakdown,
+): string | null => {
+  const campaignFocus = buildPlanDayCampaignFocus(input, loadBreakdown);
+  const campaignTasks = uniquePlanDayTasks([
+    ...loadBreakdown.campaignLinkedQuests,
+    ...loadBreakdown.surfacedCampaignRituals,
+  ]);
+  const activeCampaignTitles = input.plannerContext.activeEpics
+    .map((epic) => epic.title)
+    .filter(Boolean)
+    .slice(0, 3);
+
+  if (campaignTasks.length > 0) {
+    const taskTitles = campaignTasks.map((task) => task.title).slice(0, 3);
+    const campaignTitle = campaignFocus?.campaignTitle ??
+      formatPlanDayInlineList(activeCampaignTitles);
+    return `Campaign work to protect: ${formatPlanDayInlineList(taskTitles)}${
+      campaignTitle ? ` for ${campaignTitle}` : ""
+    }. Treat this as protected priority, not filler.`;
+  }
+
+  if (activeCampaignTitles.length > 0) {
+    return `Active campaigns: ${formatPlanDayInlineList(activeCampaignTitles)}. No campaign quest is scheduled on this date, so only add campaign work if it outranks the current plan.`;
+  }
+
+  return null;
+};
+
+const buildPlanDayRitualTriageLine = (
+  loadBreakdown: PlanDayLoadBreakdown,
+): string | null => {
+  const ritualTasks = getPlanDayTriageTasksForDate(loadBreakdown)
+    .filter((task) => Boolean(task.habitSourceId));
+  if (ritualTasks.length === 0) return null;
+
+  const titles = ritualTasks.map((task) => task.title).slice(0, 3);
+  const extra = ritualTasks.length > titles.length
+    ? ` plus ${ritualTasks.length - titles.length} more`
+    : "";
+  return `Rituals due or linked today: ${formatPlanDayInlineList(titles)}${extra}. Keep them visible and small enough to actually happen.`;
+};
+
+const getPlanDayProtectedPriorityTitles = (
+  input: PlannerBuildInput,
+  targetDate: string,
+  loadBreakdown: PlanDayLoadBreakdown,
+): string[] => {
+  const titles: string[] = [];
+  const seen = new Set<string>();
+  const addTitle = (title: string | null | undefined) => {
+    const cleanTitle = title?.trim();
+    if (!cleanTitle) return;
+    const key = normalizeText(cleanTitle);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    titles.push(cleanTitle);
+  };
+
+  for (const score of getPlanDayRankedScores(input)) {
+    if (score.kind === "task" && score.taskId) {
+      const task = findPlannerTaskById(input, score.taskId);
+      if (task?.taskDate && task.taskDate !== targetDate) continue;
+    }
+    addTitle(score.title);
+    if (titles.length >= 3) return titles;
+  }
+
+  for (const task of getPlanDayTriageTasksForDate(loadBreakdown)) {
+    addTitle(task.title);
+    if (titles.length >= 3) return titles;
+  }
+
+  return titles;
+};
+
+const buildPlanDayProtectedPrioritiesLine = (
+  protectedTitles: ReadonlyArray<string>,
+): string | null => {
+  if (protectedTitles.length === 0) return null;
+  return `Protected priorities: ${formatPlanDayInlineList([...protectedTitles])}. Keep these visible; defer lower-signal work first.`;
+};
+
+const buildPlanDayKeepDeferReassignLine = (
+  loadBreakdown: PlanDayLoadBreakdown,
+  protectedTitles: ReadonlyArray<string>,
+  proposals: ReadonlyArray<PlannerProposal>,
+): string => {
+  const keep = protectedTitles[0] ?? loadBreakdown.campaignLinkedQuests[0]?.title ??
+    loadBreakdown.visibleStandaloneQuests[0]?.title ?? "the clearest priority";
+  const deferCandidate = [
+    ...loadBreakdown.undatedInboxItems,
+    ...loadBreakdown.datedInboxItems,
+    ...loadBreakdown.visibleStandaloneQuests,
+  ].find((task) =>
+    !protectedTitles.some((title) =>
+      normalizeText(title) === normalizeText(task.title)
+    )
+  );
+  const reassignTitle = proposals[0]?.title.replace(/^Move\s+/i, "") ??
+    "anything stale, overloaded, or no longer realistic";
+
+  return `Keep: ${keep}. Defer: ${deferCandidate?.title ?? "low-urgency extras"}. Reassign: ${reassignTitle}.`;
+};
+
+const buildContextualPlanDayTriageResponse = (
+  input: PlannerBuildInput,
+  sessionState: PlannerSessionState,
+  classificationHint: ClassificationHint,
+  loadBreakdown: PlanDayLoadBreakdown,
+  memoryUpdates: PlannerBuildResult["memoryUpdates"],
+): PlannerBuildResult => {
+  const targetDate = getPlanDayTargetDate(input);
+  const dateLabel = formatScheduleReference(input.currentDate, targetDate);
+  const proposals = buildPlanDayMoveProposals(input, targetDate);
+  const protectedTitles = getPlanDayProtectedPriorityTitles(
+    input,
+    targetDate,
+    loadBreakdown,
+  );
+  const campaignLoadMessage = buildPlanDayCampaignLoadMessage(
+    input,
+    dateLabel,
+    loadBreakdown,
+  );
+  const atRiskLine = buildPlanDayCampaignGoalsAtRiskLine(input, proposals);
+  const readOnlyLine = proposals.length > 0
+    ? "Nothing moves automatically; those update_quest suggestions still need confirmation."
+    : "No safe automatic move payload surfaced, so this is a read-only triage.";
+  const reply = [
+    `Plan day triage for ${dateLabel}:`,
+    buildPlanDayMissedTriageLine(input, targetDate),
+    buildPlanDayMoveTriageLine(input, targetDate, proposals),
+    campaignLoadMessage,
+    buildPlanDayCampaignTriageLine(input, loadBreakdown),
+    buildPlanDayRitualTriageLine(loadBreakdown),
+    atRiskLine,
+    buildPlanDayProtectedPrioritiesLine(protectedTitles),
+    buildPlanDayKeepDeferReassignLine(
+      loadBreakdown,
+      protectedTitles,
+      proposals,
+    ),
+    readOnlyLine,
+  ].filter(Boolean).join(" ");
+
+  return {
+    mode: proposals.length > 0 ? "proposal" : "conversational",
+    reply,
+    followUpQuestions: [],
+    proposals,
+    suggestedReminders: [],
+    structuredResponse: buildPlanDayStructuredOutput(
+      input,
+      reply,
+      classificationHint,
+      proposals,
+      loadBreakdown,
+    ),
+    memoryUpdates,
+    sessionState: {
+      ...sessionState,
+      draft: {},
+      openQuestionIds: [],
+      pendingStarterIntent: "plan_day",
+      planDayEnergy: sessionState.planDayEnergy,
+      planningConsent: null,
+      lastClassification: classificationHint.type,
+    },
+  };
+};
+
 const buildPlanDayConversationResponse = (
   input: PlannerBuildInput,
   sessionState: PlannerSessionState,
@@ -11199,6 +11515,16 @@ const buildPlanDayConversationResponse = (
         lastClassification: classificationHint.type,
       },
     };
+  }
+
+  if (hasContextualPlanDayBriefing(input)) {
+    return buildContextualPlanDayTriageResponse(
+      input,
+      sessionState,
+      classificationHint,
+      loadBreakdown,
+      memoryUpdates,
+    );
   }
 
   const targetTotal = getPlanDayTargetTotal(input, targetDate);
@@ -11352,7 +11678,10 @@ const buildPlanDayStarterResponse = (
     ...sessionState,
     planDayEnergy: null,
   };
-  if (isGenericPlanDayStarterRequest(input)) {
+  if (
+    isGenericPlanDayStarterRequest(input) &&
+    !hasContextualPlanDayBriefing(input)
+  ) {
     return buildPlanDayClarificationResponse(
       input,
       freshSessionState,
@@ -11590,6 +11919,12 @@ const maybeRequirePlanningLauncherConsent = (
   starterIntent: PlannerStarterIntent,
 ): PlannerBuildResult => {
   if (!isConsentFirstPlanningStarterIntent(starterIntent)) return result;
+  if (starterIntent === "plan_day" && hasContextualPlanDayBriefing(input)) {
+    return {
+      ...result,
+      sessionState: withPlanningConsentCleared(result.sessionState),
+    };
+  }
   if (result.proposals.length === 0 && result.suggestedReminders.length === 0) {
     return {
       ...result,

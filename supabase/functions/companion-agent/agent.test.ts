@@ -1217,6 +1217,113 @@ Deno.test("runCompanionAgent asks a follow-up instead of proposing quests for ba
   );
 });
 
+Deno.test("runCompanionAgent triages contextual Plan my day without OpenAI", async () => {
+  const supabase = createMockSupabase({
+    tableData: {
+      daily_tasks: [
+        {
+          id: "missed-task",
+          task_text: "Missed admin",
+          task_date: "2026-04-18",
+          scheduled_time: "08:00",
+          estimated_duration: 20,
+          completed: false,
+        },
+        {
+          id: "ritual-task",
+          task_text: "Campaign focus ritual",
+          task_date: "2026-04-18",
+          scheduled_time: "09:00",
+          estimated_duration: 20,
+          completed: false,
+          epic_id: "epic-launch",
+          habit_source_id: "ritual-focus",
+        },
+        {
+          id: "campaign-task",
+          task_text: "Draft launch notes",
+          task_date: "2026-04-18",
+          scheduled_time: null,
+          estimated_duration: 45,
+          completed: false,
+          epic_id: "epic-launch",
+          priority: "high",
+        },
+      ],
+      epics: [
+        {
+          id: "epic-launch",
+          title: "Launch campaign",
+          status: "active",
+          completed_at: null,
+          end_date: "2026-05-01",
+          progress_percentage: 30,
+        },
+      ],
+      epic_habits: [
+        {
+          epic_id: "epic-launch",
+          habit_id: "ritual-focus",
+          habits: {
+            id: "ritual-focus",
+            title: "Campaign focus ritual",
+            frequency: "daily",
+            preferred_time: "09:00",
+            estimated_minutes: 20,
+            custom_days: null,
+            custom_month_days: null,
+            is_active: true,
+          },
+        },
+      ],
+    },
+  });
+  let guardedFetchCalled = false;
+  const guardedFetch = (async (input: string | URL | Request) => {
+    guardedFetchCalled = true;
+    throw new Error(
+      `Contextual Plan my day should not call OpenAI: ${String(input)}`,
+    );
+  }) as typeof fetch;
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-contextual-plan-day",
+      message: "Plan my day",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T10:30:00-07:00",
+      starterIntent: "plan_day",
+      turnOrigin: "launcher",
+      selectedDate: "2026-04-18",
+      briefingContext: {
+        content:
+          "Planning snapshot for Saturday, April 18: 3 open quests, 1 rituals, 1 active campaigns",
+        dataSnapshot: {
+          selectedDate: "2026-04-18",
+          ritualQuestCount: 1,
+          activeCampaignTitles: ["Launch campaign"],
+        },
+      },
+    },
+  });
+
+  assertEquals(guardedFetchCalled, false);
+  assertEquals(result.mode, "conversation");
+  assertEquals(result.intent, "plan_day");
+  assertEquals(result.followUp, null);
+  assertEquals(result.reply.includes("focus, recovery, or catching up"), false);
+  assert(result.reply.includes("Missed or slipped quests"));
+  assert(result.reply.includes("Campaign work to protect"));
+  assert(result.reply.includes("Rituals due or linked today"));
+  assert(result.reply.includes("Protected priorities"));
+  assertEquals(result.structuredResponse?.planDay?.campaignFocus?.campaignTitle, "Launch campaign");
+});
+
 Deno.test("runCompanionAgent answers typed upcoming schedule reads without OpenAI", async () => {
   for (
     const message of [
