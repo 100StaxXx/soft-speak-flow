@@ -156,6 +156,57 @@ Deno.test("validateAndPrunePlannerContext drops client-only deleted campaign con
   assertEquals(result.activeHabitIds, []);
 });
 
+Deno.test("validateAndPrunePlannerContext keeps active standalone rituals", async () => {
+  const context = baseContext({
+    rituals: [{
+      id: HABIT_ACTIVE_ID,
+      epicId: "general",
+      epicTitle: "your goals",
+      title: "Mobility reset",
+      frequency: "custom",
+      preferredTime: "08:00",
+      customDays: [2],
+      estimatedMinutes: 20,
+    }],
+    priorityScores: [{
+      id: `ritual:${HABIT_ACTIVE_ID}`,
+      kind: "ritual",
+      title: "Mobility reset",
+      score: 68,
+      reasons: ["due tomorrow"],
+      ritualId: HABIT_ACTIVE_ID,
+      epicId: "general",
+    }],
+  });
+
+  const result = await validateAndPrunePlannerContext(
+    createMockSupabase({
+      epics: [],
+      daily_tasks: [],
+      habits: [{
+        id: HABIT_ACTIVE_ID,
+        user_id: "user-1",
+        is_active: true,
+      }],
+    }),
+    "user-1",
+    context,
+  );
+
+  assertEquals(result.rituals.length, 1);
+  assertEquals(result.rituals[0]?.id, HABIT_ACTIVE_ID);
+  assertEquals(result.rituals[0]?.epicId, "general");
+  assertEquals(result.rituals[0]?.epicTitle, "your goals");
+  assertEquals(result.rituals[0]?.title, "Mobility reset");
+  assertEquals(result.rituals[0]?.preferredTime, "08:00");
+  assertEquals(result.rituals[0]?.customDays, [2]);
+  assertEquals(result.rituals[0]?.estimatedMinutes, 20);
+  assertEquals(result.priorityScores?.map((score) => score.id), [
+    `ritual:${HABIT_ACTIVE_ID}`,
+  ]);
+  assertEquals(result.activeHabitIds, [HABIT_ACTIVE_ID]);
+});
+
 Deno.test("validateAndPrunePlannerContext strips tombstoned ids and excluded completed history", async () => {
   const context = baseContext({
     activeEpics: [{

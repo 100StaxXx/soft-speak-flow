@@ -4,6 +4,7 @@ import { addDays, format } from "date-fns";
 import { toast } from "@/components/ui/sonner";
 import { useResilience } from "@/contexts/ResilienceContext";
 import { applySubtaskTitlePlan } from "@/features/tasks/lib/subtaskWrites";
+import type { Habit } from "@/features/habits/types";
 import { supabase } from "@/integrations/supabase/client";
 import { useIntentClassifier } from "@/hooks/useIntentClassifier";
 import type { IntentClassification } from "@/hooks/useIntentClassifier";
@@ -111,6 +112,8 @@ const MAX_CONTEXT_TASKS = 18;
 const OUTLOOK_PLANNER_SYNC_INTERVAL_MS = 90_000;
 const PLANNER_PREFLIGHT_TIMEOUT_MS = 3_000;
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const STANDALONE_RITUAL_EPIC_ID = "general";
+const STANDALONE_RITUAL_EPIC_TITLE = "your goals";
 
 const normalizeSelectedDateKey = (value: string | null | undefined) => {
   const trimmed = value?.trim() ?? "";
@@ -1152,6 +1155,40 @@ const mapRitualsToContext = (epics: EpicRecord[]): PlannerContextRitual[] =>
       }))
   );
 
+type LocalPlannerHabit = Habit & {
+  estimated_minutes?: number | null;
+  preferred_time?: string | null;
+};
+
+const collectCampaignRitualIds = (epics: EpicRecord[]): Set<string> =>
+  new Set(
+    epics.flatMap((epic) =>
+      (epic.epic_habits ?? [])
+        .map((link) => link.habits?.id ?? link.habit_id)
+        .filter((habitId): habitId is string => Boolean(habitId))
+    ),
+  );
+
+const mapStandaloneHabitsToRitualContext = (
+  habits: LocalPlannerHabit[],
+  campaignRitualIds: ReadonlySet<string>,
+): PlannerContextRitual[] =>
+  habits
+    .filter((habit) => habit.is_active !== false)
+    .filter((habit) => !campaignRitualIds.has(habit.id))
+    .map((habit) => ({
+      id: habit.id,
+      epicId: STANDALONE_RITUAL_EPIC_ID,
+      epicTitle: STANDALONE_RITUAL_EPIC_TITLE,
+      title: habit.title ?? "Untitled ritual",
+      frequency: habit.frequency ?? null,
+      preferredTime: habit.preferred_time ?? null,
+      customDays: habit.custom_days ?? null,
+      customMonthDays: habit.custom_month_days ?? null,
+      estimatedMinutes: habit.estimated_minutes ?? null,
+      currentStreak: habit.current_streak ?? null,
+    }));
+
 const hasOwnMemoryUpdate = (
   updates: CompanionPlannerResponse["memoryUpdates"],
   key: keyof CompanionPlannerResponse["memoryUpdates"],
@@ -1344,7 +1381,7 @@ export function useCompanionPlanner({
     placeholderData: (previousData) => previousData,
     refetchOnWindowFocus: false,
   });
-  const { activeEpics, createEpic, renameEpic, createCampaignRitual } =
+  const { epics, activeEpics, createEpic, renameEpic, createCampaignRitual } =
     useEpics({ enabled });
   const { addTask, updateTask } = useTaskMutations(todayIso);
   const { saveRitual } = useRitualUpdate();
@@ -1769,11 +1806,18 @@ export function useCompanionPlanner({
 
   const baseRituals = useMemo(
     () => {
-      const rituals = mapRitualsToContext(activeEpics);
+      const campaignRituals = mapRitualsToContext(activeEpics);
+      const standaloneRituals = habitsQuery.data
+        ? mapStandaloneHabitsToRitualContext(
+          habitsQuery.data as LocalPlannerHabit[],
+          collectCampaignRitualIds(epics),
+        )
+        : [];
+      const rituals = [...campaignRituals, ...standaloneRituals];
       if (!activeHabitIdScope) return rituals;
       return rituals.filter((ritual) => activeHabitIdScope.has(ritual.id));
     },
-    [activeEpics, activeHabitIdScope],
+    [activeEpics, activeHabitIdScope, epics, habitsQuery.data],
   );
   const activeRitualIds = useMemo(
     () => new Set(baseRituals.map((ritual) => ritual.id)),

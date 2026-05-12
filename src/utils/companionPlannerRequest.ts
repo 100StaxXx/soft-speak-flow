@@ -390,7 +390,7 @@ const scopePlannerRitualsToActiveCampaigns = (
   activeHabitIds: ReadonlySet<string> | null = null,
 ): PlannerContext["rituals"] =>
   rituals.filter((ritual) =>
-    activeEpicIds.has(ritual.epicId) &&
+    (activeEpicIds.has(ritual.epicId) || ritual.epicId === "general") &&
     (!activeHabitIds || activeHabitIds.has(ritual.id))
   );
 
@@ -466,7 +466,7 @@ const scopePriorityScoresToActiveCampaigns = (
           score.ritualId &&
           activeRitualIds.has(score.ritualId) &&
           score.epicId &&
-          activeEpicIds.has(score.epicId)
+          (activeEpicIds.has(score.epicId) || score.epicId === "general")
         ) {
           scopedScores.push({
             ...score,
@@ -496,7 +496,9 @@ const scopePriorityScoresToActiveCampaigns = (
               score.title,
           };
           scopedScores.push(
-            canonicalScore.epicId && !activeEpicIds.has(canonicalScore.epicId)
+            canonicalScore.epicId &&
+              canonicalScore.epicId !== "general" &&
+              !activeEpicIds.has(canonicalScore.epicId)
               ? { ...canonicalScore, epicId: null }
               : canonicalScore,
           );
@@ -504,7 +506,11 @@ const scopePriorityScoresToActiveCampaigns = (
         return scopedScores;
       }
 
-      if (!score.epicId || activeEpicIds.has(score.epicId)) {
+      if (
+        !score.epicId ||
+        activeEpicIds.has(score.epicId) ||
+        score.epicId === "general"
+      ) {
         scopedScores.push(score);
         return scopedScores;
       }

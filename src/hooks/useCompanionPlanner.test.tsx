@@ -29,6 +29,8 @@ const mocks = vi.hoisted(() => ({
   weekTasks: [] as Array<Record<string, unknown>>,
   monthTasks: [] as Array<Record<string, unknown>>,
   inboxTasks: [] as Array<Record<string, unknown>>,
+  habits: null as Array<Record<string, unknown>> | null,
+  epics: null as Array<Record<string, unknown>> | null,
   activeEpics: [] as Array<Record<string, unknown>>,
   queuedReceipts: [] as Array<Record<string, unknown>>,
   user: {
@@ -40,10 +42,20 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: () => ({
-    data: null,
-    isLoading: false,
-  }),
+  useQuery: (options?: { queryKey?: unknown[] }) => {
+    const queryKey = options?.queryKey;
+    if (Array.isArray(queryKey) && queryKey[0] === "habits") {
+      return {
+        data: mocks.habits,
+        isLoading: false,
+      };
+    }
+
+    return {
+      data: null,
+      isLoading: false,
+    };
+  },
   useQueryClient: () => ({
     invalidateQueries: mocks.invalidateQueries,
   }),
@@ -140,6 +152,7 @@ vi.mock("@/hooks/useInboxTasks", () => ({
 
 vi.mock("@/hooks/useEpics", () => ({
   useEpics: () => ({
+    epics: mocks.epics ?? mocks.activeEpics,
     activeEpics: mocks.activeEpics,
     createEpic: vi.fn(),
     renameEpic: vi.fn(),
@@ -274,6 +287,8 @@ describe("useCompanionPlanner", () => {
     mocks.weekTasks = [];
     mocks.monthTasks = [];
     mocks.inboxTasks = [];
+    mocks.habits = null;
+    mocks.epics = null;
     mocks.activeEpics = [];
     mocks.queuedReceipts = [];
     Object.defineProperty(window, "localStorage", {
@@ -1834,6 +1849,121 @@ describe("useCompanionPlanner", () => {
       ]),
     );
     expect(JSON.stringify(plannerContext)).not.toContain("Daily Hydration");
+  });
+
+  it("keeps active standalone rituals in upcoming planner context", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-11T20:00:00-07:00"));
+    mocks.habits = [
+      {
+        id: "habit-standalone",
+        user_id: "user-1",
+        title: "Mobility reset",
+        frequency: "custom",
+        custom_days: [2],
+        custom_month_days: null,
+        difficulty: "easy",
+        category: "body",
+        is_active: true,
+        current_streak: 3,
+        longest_streak: 5,
+        created_at: "2026-05-01T00:00:00.000Z",
+        preferred_time: "08:00",
+        estimated_minutes: 20,
+      },
+      {
+        id: "habit-inactive-campaign",
+        user_id: "user-1",
+        title: "Inactive campaign ritual",
+        frequency: "daily",
+        custom_days: null,
+        custom_month_days: null,
+        difficulty: "medium",
+        category: "mind",
+        is_active: true,
+        current_streak: 0,
+        longest_streak: 0,
+        created_at: "2026-05-01T00:00:00.000Z",
+        preferred_time: "09:00",
+        estimated_minutes: 15,
+      },
+    ];
+    mocks.epics = [{
+      id: "epic-inactive",
+      user_id: "user-1",
+      title: "Paused Campaign",
+      description: null,
+      status: "paused",
+      progress_percentage: 10,
+      target_days: 30,
+      start_date: "2026-05-01",
+      end_date: null,
+      created_at: "2026-05-01T00:00:00.000Z",
+      epic_habits: [
+        {
+          habit_id: "habit-inactive-campaign",
+          habits: {
+            id: "habit-inactive-campaign",
+            title: "Inactive campaign ritual",
+            difficulty: "medium",
+            frequency: "daily",
+            preferred_time: "09:00",
+            estimated_minutes: 15,
+          },
+        },
+      ],
+    }];
+    mocks.activeEpics = [];
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "schedule_read",
+        reply: "Tomorrow: Mobility reset.",
+        followUpQuestions: [],
+        proposals: [],
+        suggestedReminders: [],
+        memoryUpdates: {},
+        sessionState: {
+          draft: {},
+          openQuestionIds: [],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          lastClassification: "conversation",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
+
+    await act(async () => {
+      await result.current.submitMessage("What do I have coming up?", "text");
+    });
+
+    const request = mocks.invoke.mock.calls[0]?.[1];
+    const plannerContext = request?.body.plannerContext;
+    expect(plannerContext.starterIntent).toBe("upcoming_start");
+    expect(plannerContext.activeHabitIds).toEqual([
+      "habit-standalone",
+      "habit-inactive-campaign",
+    ]);
+    expect(plannerContext.rituals).toEqual([
+      expect.objectContaining({
+        id: "habit-standalone",
+        epicId: "general",
+        epicTitle: "your goals",
+        title: "Mobility reset",
+        preferredTime: "08:00",
+        estimatedMinutes: 20,
+      }),
+    ]);
+    expect(plannerContext.rituals).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "habit-inactive-campaign" }),
+      ]),
+    );
   });
 
   it("marks queued campaign ritual creates as pending local habits", async () => {

@@ -407,6 +407,56 @@ describe("sanitizePlannerContext", () => {
     expect(JSON.stringify(sanitized)).not.toContain("Daily Hydration");
   });
 
+  it("keeps active standalone rituals in the general scope", () => {
+    const context: CompanionPlannerRequest["plannerContext"] = {
+      tasks: [],
+      inboxTasks: [],
+      activeEpics: [],
+      activeHabitIds: ["habit-active"],
+      rituals: [
+        {
+          id: "habit-active",
+          epicId: "general",
+          epicTitle: "your goals",
+          title: "Mobility reset",
+          frequency: "custom",
+          preferredTime: "08:00",
+          customDays: [2],
+          estimatedMinutes: 20,
+        },
+      ],
+      calendarEvents: [],
+      priorityScores: [
+        {
+          id: "ritual:habit-active",
+          kind: "ritual",
+          title: "Mobility reset",
+          score: 68,
+          reasons: ["due tomorrow"],
+          ritualId: "habit-active",
+          epicId: "general",
+        },
+      ],
+    };
+
+    const sanitized = sanitizePlannerContext(context);
+
+    expect(sanitized.rituals).toEqual([
+      expect.objectContaining({
+        id: "habit-active",
+        epicId: "general",
+        epicTitle: "your goals",
+        title: "Mobility reset",
+      }),
+    ]);
+    expect(sanitized.priorityScores).toEqual([
+      expect.objectContaining({
+        id: "ritual:habit-active",
+        title: "Mobility reset",
+      }),
+    ]);
+  });
+
   it("treats an empty active habit scope as authoritative", () => {
     const context: CompanionPlannerRequest["plannerContext"] = {
       tasks: [

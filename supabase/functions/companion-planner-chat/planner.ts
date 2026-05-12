@@ -8737,7 +8737,7 @@ export const scopePlannerPriorityScoresToActiveCampaigns = (
         score.ritualId &&
         activeCampaignRitualIds.has(score.ritualId) &&
         score.epicId &&
-        activeCampaignIds.has(score.epicId)
+        (activeCampaignIds.has(score.epicId) || score.epicId === "general")
       ) {
         scopedScores.push({
           ...score,
@@ -8767,7 +8767,9 @@ export const scopePlannerPriorityScoresToActiveCampaigns = (
             score.title,
         };
         scopedScores.push(
-          canonicalScore.epicId && !activeCampaignIds.has(canonicalScore.epicId)
+          canonicalScore.epicId &&
+            canonicalScore.epicId !== "general" &&
+            !activeCampaignIds.has(canonicalScore.epicId)
             ? { ...canonicalScore, epicId: null }
             : canonicalScore,
         );
@@ -8775,7 +8777,11 @@ export const scopePlannerPriorityScoresToActiveCampaigns = (
       return scopedScores;
     }
 
-    if (!score.epicId || activeCampaignIds.has(score.epicId)) {
+    if (
+      !score.epicId ||
+      activeCampaignIds.has(score.epicId) ||
+      score.epicId === "general"
+    ) {
       scopedScores.push(score);
       return scopedScores;
     }

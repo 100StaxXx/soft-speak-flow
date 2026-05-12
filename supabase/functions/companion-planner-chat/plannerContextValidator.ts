@@ -257,6 +257,15 @@ const filterRitualsWithDbRows = (
     ) {
       return scoped;
     }
+    if (ritual.epicId === "general") {
+      if (!activeHabitIds.has(ritual.id)) return scoped;
+      scoped.push({
+        ...ritual,
+        epicId: "general",
+        epicTitle: ritual.epicTitle || "your goals",
+      });
+      return scoped;
+    }
     const epic = activeEpicsById.get(ritual.epicId);
     if (!epic || !activeHabitIds.has(ritual.id)) return scoped;
     scoped.push({
@@ -285,7 +294,7 @@ const filterPriorityScoresWithDbRows = (
         score.ritualId &&
         activeRitualIds.has(score.ritualId) &&
         score.epicId &&
-        activeEpicIds.has(score.epicId)
+        (activeEpicIds.has(score.epicId) || score.epicId === "general")
       ) {
         scoped.push({
           ...score,
@@ -313,7 +322,9 @@ const filterPriorityScoresWithDbRows = (
           title: titleMaps.activeTaskTitleById.get(score.taskId) ?? score.title,
         };
         scoped.push(
-          canonicalScore.epicId && !activeEpicIds.has(canonicalScore.epicId)
+          canonicalScore.epicId &&
+            canonicalScore.epicId !== "general" &&
+            !activeEpicIds.has(canonicalScore.epicId)
             ? { ...canonicalScore, epicId: null }
             : canonicalScore,
         );
@@ -321,7 +332,11 @@ const filterPriorityScoresWithDbRows = (
       return scoped;
     }
 
-    if (!score.epicId || activeEpicIds.has(score.epicId)) {
+    if (
+      !score.epicId ||
+      activeEpicIds.has(score.epicId) ||
+      score.epicId === "general"
+    ) {
       scoped.push(score);
     }
     return scoped;
