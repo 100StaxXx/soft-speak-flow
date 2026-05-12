@@ -21,6 +21,7 @@ export interface ParsedFunctionInvokeError {
     requestId?: string;
     stage?: string;
     failureReason?: string;
+    details?: string;
     status?: string;
     retryable?: boolean;
     retryAfterSeconds?: number;
@@ -28,6 +29,7 @@ export interface ParsedFunctionInvokeError {
     upstreamError?: string;
   };
   backendMessage?: string;
+  details?: string;
   retryAfterSeconds?: number;
   upstreamStatus?: number;
   upstreamError?: string;
@@ -185,6 +187,7 @@ export async function parseFunctionInvokeError(
         const payloadRequestId = asString(payloadRecord.requestId);
         const payloadStage = asString(payloadRecord.stage);
         const payloadFailureReason = asString(payloadRecord.failureReason);
+        const payloadDetails = asString(payloadRecord.details);
         const payloadStatus = asString(payloadRecord.status);
         const payloadRetryable = asBoolean(payloadRecord.retryable);
         const payloadRetryAfterSeconds =
@@ -201,6 +204,7 @@ export async function parseFunctionInvokeError(
           payloadRequestId ||
           payloadStage ||
           payloadFailureReason ||
+          payloadDetails ||
           payloadStatus ||
           typeof payloadRetryable === "boolean" ||
           payloadRetryAfterSeconds ||
@@ -214,6 +218,7 @@ export async function parseFunctionInvokeError(
             requestId: payloadRequestId,
             stage: payloadStage,
             failureReason: payloadFailureReason,
+            details: payloadDetails,
             status: payloadStatus,
             retryable: payloadRetryable,
             retryAfterSeconds: payloadRetryAfterSeconds,
@@ -232,10 +237,12 @@ export async function parseFunctionInvokeError(
   const stage = responsePayload?.stage;
   const failureReason = responsePayload?.failureReason;
   const backendMessage = responsePayload?.message ?? responsePayload?.error;
+  const details = responsePayload?.details;
   const retryAfterSeconds = responsePayload?.retryAfterSeconds;
   const upstreamStatus =
     responsePayload?.upstreamStatus ??
     inferUpstreamStatusFromMessage(responsePayload?.upstreamError) ??
+    inferUpstreamStatusFromMessage(details) ??
     inferUpstreamStatusFromMessage(backendMessage) ??
     inferUpstreamStatusFromMessage(message);
   const upstreamError = responsePayload?.upstreamError;
@@ -257,6 +264,7 @@ export async function parseFunctionInvokeError(
     failureReason,
     responsePayload,
     backendMessage,
+    details,
     retryAfterSeconds,
     upstreamStatus,
     upstreamError,

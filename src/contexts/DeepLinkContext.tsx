@@ -45,7 +45,7 @@ export const DeepLinkProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    if (data.type === 'auth_recovery' && data.path) {
+    if ((data.type === 'auth_recovery' || data.type === 'calendar_oauth_callback') && data.path) {
       window.dispatchEvent(new CustomEvent('deep-link-navigation', {
         detail: { path: data.path },
       }));

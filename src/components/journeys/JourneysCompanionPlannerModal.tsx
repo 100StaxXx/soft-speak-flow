@@ -154,8 +154,10 @@ const PlannerBriefingContextPanel = memo(function PlannerBriefingContextPanel({
 }) {
   const snapshot = asRecord(briefing.dataSnapshot);
   const metrics = getPlannerBriefingMetrics(snapshot);
-  const focus = briefing.focus?.trim();
-  const actionPrompt = briefing.actionPrompt?.trim();
+  const insightStatement =
+    typeof snapshot?.plannerInsightStatement === "string"
+      ? snapshot.plannerInsightStatement.trim()
+      : null;
 
   return (
     <div
@@ -193,9 +195,9 @@ const PlannerBriefingContextPanel = memo(function PlannerBriefingContextPanel({
             ))}
           </div>
         ) : null}
-        {focus || actionPrompt ? (
+        {insightStatement ? (
           <p className="mt-3 text-xs leading-5 text-muted-foreground">
-            {[focus, actionPrompt].filter(Boolean).join(" ")}
+            {insightStatement}
           </p>
         ) : null}
       </div>

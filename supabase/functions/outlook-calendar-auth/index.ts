@@ -52,14 +52,31 @@ function toNativeCallbackErrorMessage(error: unknown): string {
 
   if (
     combined.includes("redirect_uri") ||
-    combined.includes("invalid_grant") ||
+    combined.includes("redirect uri") ||
+    combined.includes("reply address") ||
     combined.includes("aadsts50011")
   ) {
     return "Outlook rejected this callback URI. Please verify the calendar redirect settings for this build.";
   }
 
+  if (
+    combined.includes("authorization code is invalid") ||
+    combined.includes("authorization code has expired") ||
+    combined.includes("code has expired") ||
+    combined.includes("code was already redeemed") ||
+    combined.includes("code has already been redeemed") ||
+    combined.includes("aadsts54005") ||
+    combined.includes("aadsts70000")
+  ) {
+    return "Calendar connection expired or was already used. Please try connecting again.";
+  }
+
+  if (combined.includes("invalid_grant")) {
+    return "The calendar provider rejected this authorization code. Please try connecting again.";
+  }
+
   if (combined.includes("integration not configured")) {
-    return "Outlook Calendar is not configured on the server yet. Please contact support.";
+    return "Outlook Calendar is not configured correctly on the server yet. Please contact support.";
   }
 
   return error.message || "Failed to connect Outlook Calendar";

@@ -79,4 +79,29 @@ describe("CalendarOAuthCallback helpers", () => {
         "https://app.cosmiq.quest/calendar/oauth/callback?calendar_provider=google&calendar_source=native",
     });
   });
+
+  it("uses original hosted origin for native universal-link callbacks", () => {
+    const state = stateFor({
+      v: 1,
+      provider: "google",
+      source: "native",
+      syncMode: "send_only",
+      userId: "user-1",
+    });
+
+    expect(
+      getCalendarOAuthCallbackContext({
+        search:
+          `?code=oauth-code&state=${encodeURIComponent(state)}&calendar_callback_origin=https%3A%2F%2Fapp.cosmiq.quest`,
+        origin: "capacitor://localhost",
+        pathname: "/calendar/oauth/callback",
+      }),
+    ).toMatchObject({
+      provider: "google",
+      source: "native",
+      code: "oauth-code",
+      state,
+      redirectUri: "https://app.cosmiq.quest/calendar/oauth/callback",
+    });
+  });
 });

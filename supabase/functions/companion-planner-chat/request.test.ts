@@ -146,6 +146,36 @@ Deno.test("accepts quest notes and subtask titles in planner task context", () =
   ]);
 });
 
+Deno.test("preserves ritual cadence fields in planner context", () => {
+  const parsed = PlannerRequestSchema.parse({
+    ...baseRequest(),
+    plannerContext: {
+      ...baseRequest().plannerContext,
+      rituals: [{
+        id: "ritual-1",
+        epicId: "general",
+        epicTitle: "your goals",
+        title: "Mobility reset",
+        frequency: "custom",
+        preferredTime: "08:00",
+        customDays: [1, 3, 5],
+        customMonthDays: [12, 28],
+        customPeriod: "week",
+        estimatedMinutes: 20,
+        actualDurationMinutes: 25,
+        currentStreak: 4,
+      }],
+    },
+  });
+
+  assertEquals(parsed.plannerContext.rituals[0]?.customDays, [1, 3, 5]);
+  assertEquals(parsed.plannerContext.rituals[0]?.customMonthDays, [12, 28]);
+  assertEquals(parsed.plannerContext.rituals[0]?.customPeriod, "week");
+  assertEquals(parsed.plannerContext.rituals[0]?.estimatedMinutes, 20);
+  assertEquals(parsed.plannerContext.rituals[0]?.actualDurationMinutes, 25);
+  assertEquals(parsed.plannerContext.rituals[0]?.currentStreak, 4);
+});
+
 Deno.test("normalizes legacy starter intent and classifier aliases instead of rejecting the request", () => {
   const parsed = PlannerRequestSchema.parse({
     ...baseRequest(),

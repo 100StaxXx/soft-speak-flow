@@ -6,10 +6,12 @@ export type CalendarOAuthProvider = 'google' | 'outlook';
 export type CalendarOAuthStatus = 'success' | 'error';
 
 const AUTH_RESET_PATH = '/auth/reset-password';
-const AUTH_RESET_HOSTS = new Set(['app.cosmiq.quest', 'cosmiq.quest']);
+const CALENDAR_OAUTH_CALLBACK_PATH = '/calendar/oauth/callback';
+const HOSTED_APP_LINK_HOSTS = new Set(['app.cosmiq.quest', 'cosmiq.quest']);
+const CALENDAR_CALLBACK_ORIGIN_PARAM = 'calendar_callback_origin';
 
 export interface DeepLinkData {
-  type: 'task' | 'calendar_oauth' | 'auth_recovery' | 'unknown';
+  type: 'task' | 'calendar_oauth' | 'calendar_oauth_callback' | 'auth_recovery' | 'unknown';
   taskId?: string;
   provider?: CalendarOAuthProvider;
   status?: CalendarOAuthStatus;
@@ -21,7 +23,7 @@ export interface DeepLinkData {
 const isNativeAuthRecoveryLink = (parsed: URL): boolean => {
   const isWebRecoveryLink = (
     ['https:', 'http:'].includes(parsed.protocol) &&
-    AUTH_RESET_HOSTS.has(parsed.hostname) &&
+    HOSTED_APP_LINK_HOSTS.has(parsed.hostname) &&
     parsed.pathname === AUTH_RESET_PATH
   );
 
@@ -34,6 +36,19 @@ const isNativeAuthRecoveryLink = (parsed: URL): boolean => {
   );
 
   return (isWebRecoveryLink || isSchemeRecoveryLink) && parsed.hash.includes('type=recovery');
+};
+
+const isHostedCalendarOAuthCallbackLink = (parsed: URL): boolean => (
+  ['https:', 'http:'].includes(parsed.protocol) &&
+  HOSTED_APP_LINK_HOSTS.has(parsed.hostname) &&
+  parsed.pathname === CALENDAR_OAUTH_CALLBACK_PATH
+);
+
+const buildHostedCalendarOAuthCallbackPath = (parsed: URL): string => {
+  const params = new URLSearchParams(parsed.search);
+  params.set(CALENDAR_CALLBACK_ORIGIN_PARAM, parsed.origin);
+  const search = params.toString();
+  return `${CALENDAR_OAUTH_CALLBACK_PATH}${search ? `?${search}` : ''}${parsed.hash}`;
 };
 
 /**
@@ -66,6 +81,14 @@ export const parseDeepLink = (url: string): DeepLinkData => {
     }
 
     const parsed = new URL(url);
+
+    if (isHostedCalendarOAuthCallbackLink(parsed)) {
+      return {
+        type: 'calendar_oauth_callback',
+        path: buildHostedCalendarOAuthCallbackPath(parsed),
+        rawUrl: url,
+      };
+    }
 
     if (isNativeAuthRecoveryLink(parsed)) {
       return {

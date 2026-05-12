@@ -6,7 +6,9 @@
         "appID": "B6VW78ABTR.com.darrylgraham.revolution",
         "paths": [
           "/auth",
-          "/auth/*"
+          "/auth/*",
+          "/calendar/oauth/callback",
+          "/calendar/oauth/callback/*"
         ]
       }
     ]

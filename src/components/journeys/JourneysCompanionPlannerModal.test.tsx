@@ -721,7 +721,7 @@ describe("JourneysCompanionPlannerModal", () => {
           selectedDate: "2026-04-18",
           briefingContext: {
             content:
-              "Planning snapshot for Saturday, April 18: 3 open quests, 1 ritual, 2h estimated.",
+              "Saturday, April 18 looks steady: 3 open quests, 1 timed and 2 anytime, with about 2h planned.",
             focus: "Keep this day realistic.",
             actionPrompt: "Preserve timed quests and avoid overload.",
             dataSnapshot: {
@@ -732,6 +732,8 @@ describe("JourneysCompanionPlannerModal", () => {
               activeCampaignCount: 1,
               estimatedLoadLabel: "2h",
               loadSignal: "steady",
+              plannerInsightStatement:
+                "The day is workable. Choose the next important quest, then keep the rest in a simple order.",
             },
           },
         }}
@@ -742,11 +744,12 @@ describe("JourneysCompanionPlannerModal", () => {
       "journeys-companion-planner-briefing",
     );
 
-    expect(briefing).toHaveTextContent("Planning snapshot for Saturday");
+    expect(briefing).toHaveTextContent("Saturday, April 18 looks steady");
     expect(within(briefing).getByText("Planning with")).toBeInTheDocument();
     expect(within(briefing).getByText("Open")).toBeInTheDocument();
     expect(within(briefing).getByText("3")).toBeInTheDocument();
-    expect(briefing).toHaveTextContent("Preserve timed quests");
+    expect(briefing).toHaveTextContent("The day is workable");
+    expect(briefing).not.toHaveTextContent("Preserve timed quests");
   });
 
   it("submits text after New Quest through normal assistant chat", async () => {

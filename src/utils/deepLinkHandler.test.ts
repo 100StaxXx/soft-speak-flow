@@ -37,6 +37,19 @@ describe("parseDeepLink", () => {
     });
   });
 
+  it("parses hosted calendar oauth callback universal links", () => {
+    const parsed = parseDeepLink(
+      "https://app.cosmiq.quest/calendar/oauth/callback?code=oauth-code&state=signed-state",
+    );
+    expect(parsed).toEqual({
+      type: "calendar_oauth_callback",
+      path:
+        "/calendar/oauth/callback?code=oauth-code&state=signed-state&calendar_callback_origin=https%3A%2F%2Fapp.cosmiq.quest",
+      rawUrl:
+        "https://app.cosmiq.quest/calendar/oauth/callback?code=oauth-code&state=signed-state",
+    });
+  });
+
   it("parses custom-scheme auth recovery links", () => {
     const parsed = parseDeepLink(
       "cosmiq://auth/reset-password#access_token=token&refresh_token=refresh&type=recovery",

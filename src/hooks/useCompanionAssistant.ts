@@ -166,6 +166,20 @@ type CompanionTemplateThreadOptions = {
   visibleAssistantOpening?: boolean;
 };
 
+type PendingLegacyFallbackReplay = {
+  message: string;
+  inputMode: CompanionChatInputMode;
+  options?: CompanionAgentSubmitOptions;
+  pendingStarterIntent: CompanionPlannerLaunchIntent["starterIntent"] | null;
+  shouldConsumePendingStarterIntent: boolean;
+};
+
+const hasPlanDaySnapshotBriefing = (
+  launchIntent: CompanionPlannerLaunchIntent | null | undefined,
+) =>
+  launchIntent?.starterIntent === "plan_day" &&
+  Boolean(launchIntent.briefingContext?.dataSnapshot);
+
 const readFollowUpSelectedDate = (
   followUp: CompanionAgentFollowUp | null | undefined,
 ) => {
@@ -873,6 +887,9 @@ export function useCompanionAssistant({
     CompanionPlannerLaunchIntent["starterIntent"] | null
   >(null);
   const pendingQuestCaptureSelectedDateRef = useRef<string | null>(null);
+  const pendingLegacyFallbackReplayRef =
+    useRef<PendingLegacyFallbackReplay | null>(null);
+  const [legacyFallbackReplayKey, setLegacyFallbackReplayKey] = useState(0);
 
   const scopeKey = `${surface}:${user?.id ?? "anon"}:${
     companion?.id ?? "none"
@@ -1063,6 +1080,7 @@ export function useCompanionAssistant({
 
     scopeKeyRef.current = scopeKey;
     setUseLegacyFallback(false);
+    pendingLegacyFallbackReplayRef.current = null;
     bootstrappedScopeRef.current = null;
     companionOpenCycleKeyRef.current = null;
     handledLaunchIntentIdRef.current = null;
@@ -1075,6 +1093,35 @@ export function useCompanionAssistant({
       greetingText: baseGreeting,
     });
   }, [baseGreeting, openFreshThread, scopeKey, surface]);
+
+  useEffect(() => {
+    if (!useLegacyFallback) return;
+    const replay = pendingLegacyFallbackReplayRef.current;
+    if (!replay) return;
+
+    pendingLegacyFallbackReplayRef.current = null;
+    void (async () => {
+      try {
+        await legacyAssistant.submitMessage(
+          replay.message,
+          replay.inputMode,
+          replay.options,
+        );
+        if (
+          replay.shouldConsumePendingStarterIntent &&
+          pendingStarterIntentRef.current === replay.pendingStarterIntent
+        ) {
+          pendingStarterIntentRef.current = null;
+          pendingQuestCaptureSelectedDateRef.current = null;
+        }
+      } catch (error) {
+        console.error(
+          "Failed to replay message through legacy companion fallback:",
+          error,
+        );
+      }
+    })();
+  }, [legacyAssistant, legacyFallbackReplayKey, useLegacyFallback]);
 
   useEffect(() => {
     if (surface === "companion") return;
@@ -1731,13 +1778,6 @@ export function useCompanionAssistant({
         });
 
         if (shouldFallback) {
-          legacyAssistant.hydrateFromUnifiedState?.({
-            sessionId: activeSessionIdRef.current,
-            messages: nextUnifiedMessages,
-            savedSuggestionProposalIds,
-            pendingSuggestionProposalId,
-          });
-          setUseLegacyFallback(true);
           const legacyStarterIntent =
             pendingStarterIntent === "quest_capture" && !options?.starterIntent
               ? undefined
@@ -1750,18 +1790,21 @@ export function useCompanionAssistant({
                   starterIntent: legacyStarterIntent,
                   ...(selectedDate ? { selectedDate } : {}),
                 };
-          await legacyAssistant.submitMessage(
+          legacyAssistant.hydrateFromUnifiedState?.({
+            sessionId: activeSessionIdRef.current,
+            messages: nextUnifiedMessages,
+            savedSuggestionProposalIds,
+            pendingSuggestionProposalId,
+          });
+          pendingLegacyFallbackReplayRef.current = {
             message,
             inputMode,
-            legacySubmitOptions,
-          );
-          if (
-            shouldConsumePendingStarterIntent &&
-            pendingStarterIntentRef.current === pendingStarterIntent
-          ) {
-            pendingStarterIntentRef.current = null;
-            pendingQuestCaptureSelectedDateRef.current = null;
-          }
+            options: legacySubmitOptions,
+            pendingStarterIntent,
+            shouldConsumePendingStarterIntent,
+          };
+          setUseLegacyFallback(true);
+          setLegacyFallbackReplayKey((key) => key + 1);
           return true;
         }
 
@@ -2182,6 +2225,8 @@ export function useCompanionAssistant({
       launchIntent.starterIntent === "free_talk_start";
     const isQuestCaptureStarter =
       launchIntent.starterIntent === "quest_capture";
+    const isSnapshotOnlyPlanDayStarter =
+      hasPlanDaySnapshotBriefing(launchIntent);
 
     void (async () => {
       threadMutationVersionRef.current += 1;
@@ -2219,6 +2264,23 @@ export function useCompanionAssistant({
           pendingStarterIntentRef.current = "quest_capture";
           pendingQuestCaptureSelectedDateRef.current =
             launchIntent.selectedDate ?? null;
+          return;
+        }
+
+        if (isSnapshotOnlyPlanDayStarter) {
+          if (useLegacyFallback) {
+            legacyAssistant.startTemplateThread?.();
+          } else {
+            startTemplateThread({ greetingText: null });
+          }
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent("companion-plan-my-day-started"),
+            );
+            window.dispatchEvent(
+              new CustomEvent("companion-plan-my-day-snapshot-shown"),
+            );
+          }
           return;
         }
 

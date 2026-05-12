@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
-import { parseFunctionInvokeError, toUserFacingFunctionError } from '@/utils/supabaseFunctionErrors';
+import { toUserFacingCalendarOAuthError } from '@/utils/calendarOAuthErrors';
+import { parseFunctionInvokeError } from '@/utils/supabaseFunctionErrors';
 import { supabase } from '@/integrations/supabase/client';
 import type { CalendarProvider } from '@/hooks/useCalendarIntegrations';
 
@@ -12,6 +13,8 @@ interface OAuthStateHint {
   provider: OAuthProvider;
   source: OAuthSource;
 }
+
+const CALLBACK_ORIGIN_PARAM = 'calendar_callback_origin';
 
 const isOAuthProvider = (value: string | null): value is OAuthProvider =>
   value === 'google' || value === 'outlook';
@@ -58,6 +61,21 @@ const getLegacyRedirectUri = (args: {
   pathname: string;
 }): string => `${args.origin}${args.pathname}?calendar_provider=${args.provider}&calendar_source=${args.source}`;
 
+const getCallbackRedirectOrigin = (params: URLSearchParams, fallbackOrigin: string): string => {
+  const rawOrigin = params.get(CALLBACK_ORIGIN_PARAM);
+  if (!rawOrigin) return fallbackOrigin;
+
+  try {
+    const parsed = new URL(rawOrigin);
+    if (parsed.protocol !== 'https:' || parsed.pathname !== '/' || parsed.search || parsed.hash) {
+      return fallbackOrigin;
+    }
+    return parsed.origin;
+  } catch {
+    return fallbackOrigin;
+  }
+};
+
 export const getCalendarOAuthCallbackContext = (args: {
   search: string;
   origin: string;
@@ -72,6 +90,7 @@ export const getCalendarOAuthCallbackContext = (args: {
   redirectUri: string;
 } => {
   const params = new URLSearchParams(args.search);
+  const redirectOrigin = getCallbackRedirectOrigin(params, args.origin);
   const legacyProvider = params.get('calendar_provider');
   const legacySource = params.get('calendar_source');
   const state = params.get('state');
@@ -86,10 +105,10 @@ export const getCalendarOAuthCallbackContext = (args: {
     ? getLegacyRedirectUri({
       provider,
       source,
-      origin: args.origin,
+      origin: redirectOrigin,
       pathname: args.pathname,
     })
-    : `${args.origin}${args.pathname}`;
+    : `${redirectOrigin}${args.pathname}`;
 
   return {
     provider,
@@ -134,18 +153,6 @@ const buildNativeRedirect = (args: {
   }
 
   return `cosmiq://calendar/oauth/callback?${params.toString()}`;
-};
-
-const getProviderConfigErrorMessage = (
-  provider: OAuthProvider,
-  parsed: Awaited<ReturnType<typeof parseFunctionInvokeError>>,
-): string | null => {
-  const backend = `${parsed.backendMessage ?? ''} ${parsed.message ?? ''}`.toLowerCase();
-  if (!backend.includes('integration not configured')) {
-    return null;
-  }
-
-  return `${providerLabel(provider)} Calendar is not configured on the server yet. Please contact support.`;
 };
 
 export default function CalendarOAuthCallback() {
@@ -226,11 +233,10 @@ export default function CalendarOAuthCallback() {
 
       if (exchangeError) {
         const parsed = await parseFunctionInvokeError(exchangeError);
-        const configMessage = getProviderConfigErrorMessage(provider, parsed);
         finish({
           provider,
           status: 'error',
-          message: configMessage ?? toUserFacingFunctionError(parsed, { action: 'connect your calendar' }),
+          message: toUserFacingCalendarOAuthError(provider, parsed),
         });
         return;
       }

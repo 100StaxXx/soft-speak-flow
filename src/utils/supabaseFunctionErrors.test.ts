@@ -42,6 +42,29 @@ describe("supabaseFunctionErrors", () => {
     expect(parsed.responsePayload?.requestId).toBe("req-auth-1");
   });
 
+  it("preserves provider details returned by function payloads", async () => {
+    const response = new Response(
+      JSON.stringify({
+        error: "Failed to exchange authorization code",
+        details: '{"error":"invalid_grant","error_description":"AADSTS50011: redirect_uri mismatch"}',
+      }),
+      {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+
+    const parsed = await parseFunctionInvokeError({
+      name: "FunctionsHttpError",
+      message: "Edge Function returned a non-2xx status code",
+      context: response,
+    });
+
+    expect(parsed.backendMessage).toBe("Failed to exchange authorization code");
+    expect(parsed.details).toContain("invalid_grant");
+    expect(parsed.responsePayload?.details).toContain("AADSTS50011");
+  });
+
   it("parses JSON-readable function error contexts used in mocks", async () => {
     const parsed = await parseFunctionInvokeError({
       name: "FunctionsHttpError",

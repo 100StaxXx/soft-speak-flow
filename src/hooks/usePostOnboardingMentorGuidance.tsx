@@ -1660,6 +1660,23 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       });
 
       listeners.push({
+        eventName: "companion-plan-my-day-snapshot-shown",
+        handler: () => {
+          if (location.pathname !== "/journeys") return;
+          if (!milestoneSet.has("start_plan_my_day")) {
+            markMilestoneComplete("start_plan_my_day");
+          }
+          if (!milestoneSet.has("answer_plan_day_ai")) {
+            markMilestoneComplete("answer_plan_day_ai");
+          }
+          if (!milestoneSet.has("save_plan_day_action")) {
+            markMilestoneComplete("save_plan_day_action");
+          }
+          void markStepComplete("plan_my_day");
+        },
+      });
+
+      listeners.push({
         eventName: "companion-plan-my-day-action-saved",
         handler: () => {
           if (location.pathname !== "/journeys") return;

@@ -189,7 +189,7 @@ function buildCalendarOAuthCallbackBridge(env: Record<string, string>): string {
 
           var normalized = rawMessage.toLowerCase();
           if (normalized.indexOf("integration not configured") !== -1) {
-            return providerLabel(provider) + " Calendar is not configured on the server yet. Please contact support.";
+            return providerLabel(provider) + " Calendar is not configured correctly on the server yet. Please contact support.";
           }
 
           if (normalized.indexOf("invalid or expired oauth state") !== -1) {
@@ -198,10 +198,27 @@ function buildCalendarOAuthCallbackBridge(env: Record<string, string>): string {
 
           if (
             normalized.indexOf("redirect_uri") !== -1 ||
-            normalized.indexOf("invalid_grant") !== -1 ||
+            normalized.indexOf("redirect uri") !== -1 ||
+            normalized.indexOf("reply address") !== -1 ||
             normalized.indexOf("aadsts50011") !== -1
           ) {
             return providerLabel(provider) + " rejected this callback URI. Please verify the calendar redirect settings for this build.";
+          }
+
+          if (
+            normalized.indexOf("authorization code is invalid") !== -1 ||
+            normalized.indexOf("authorization code has expired") !== -1 ||
+            normalized.indexOf("code has expired") !== -1 ||
+            normalized.indexOf("code was already redeemed") !== -1 ||
+            normalized.indexOf("code has already been redeemed") !== -1 ||
+            normalized.indexOf("aadsts54005") !== -1 ||
+            normalized.indexOf("aadsts70000") !== -1
+          ) {
+            return "Calendar connection expired or was already used. Please try connecting again.";
+          }
+
+          if (normalized.indexOf("invalid_grant") !== -1) {
+            return "The calendar provider rejected this authorization code. Please try connecting again.";
           }
 
           return rawMessage.length <= 180 ? rawMessage : fallback;
@@ -306,7 +323,15 @@ function calendarOAuthCallbackBridgePlugin(env: Record<string, string>): Plugin 
       this.emitFile({
         type: "asset",
         fileName: "_headers",
-        source: "/calendar/oauth/callback\n  Content-Type: text/html; charset=utf-8\n",
+        source: [
+          "/apple-app-site-association",
+          "  Content-Type: application/json; charset=utf-8",
+          "/.well-known/apple-app-site-association",
+          "  Content-Type: application/json; charset=utf-8",
+          "/calendar/oauth/callback",
+          "  Content-Type: text/html; charset=utf-8",
+          "",
+        ].join("\n"),
       });
 
       this.emitFile({

@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { NativeCalendar } from '@/plugins/NativeCalendarPlugin';
 import { parseFunctionInvokeError, toUserFacingFunctionError } from '@/utils/supabaseFunctionErrors';
+import { toUserFacingCalendarOAuthError } from '@/utils/calendarOAuthErrors';
 
 export type CalendarProvider = 'google' | 'outlook' | 'apple';
 export type CalendarSyncMode = 'send_only' | 'full_sync';
@@ -57,10 +58,6 @@ function isPluginAvailable(pluginName: string): boolean {
   return typeof maybeChecker === 'function' ? maybeChecker(pluginName) : false;
 }
 
-function providerLabel(provider: Exclude<CalendarProvider, 'apple'>): string {
-  return provider === 'google' ? 'Google' : 'Outlook';
-}
-
 async function toCalendarInvokeError(args: {
   provider: Exclude<CalendarProvider, 'apple'>;
   action: string;
@@ -68,12 +65,9 @@ async function toCalendarInvokeError(args: {
 }): Promise<Error> {
   const { provider, action, error } = args;
   const parsed = await parseFunctionInvokeError(error);
-  const backend = `${parsed.backendMessage ?? ''} ${parsed.message ?? ''}`.toLowerCase();
 
-  if (backend.includes('integration not configured')) {
-    return new Error(
-      `${providerLabel(provider)} Calendar is not configured on the server yet. Please contact support.`,
-    );
+  if (action === 'connect your calendar' || action === 'start calendar connection') {
+    return new Error(toUserFacingCalendarOAuthError(provider, parsed));
   }
 
   return new Error(toUserFacingFunctionError(parsed, { action }));

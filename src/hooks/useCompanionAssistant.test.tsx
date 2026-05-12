@@ -1149,6 +1149,10 @@ describe("useCompanionAssistant", () => {
       await result.current.submitTypedMessage();
     });
 
+    expect(mocks.supabaseInvoke).not.toHaveBeenCalledWith(
+      "companion-agent",
+      expect.anything(),
+    );
     expect(mocks.legacyHydrateFromUnifiedState).toHaveBeenCalledWith(
       expect.objectContaining({
         sessionId: "persisted-session",
@@ -1157,12 +1161,10 @@ describe("useCompanionAssistant", () => {
     expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
       "What do I have coming up?",
       "text",
-      {
-        turnOrigin: "composer",
+      expect.objectContaining({
         starterIntent: "upcoming_start",
-      },
+      }),
     );
-    expect(mocks.supabaseInvoke).not.toHaveBeenCalled();
   });
 
   it("sends the default selected date to local Journeys upcoming reads", async () => {
@@ -1188,14 +1190,17 @@ describe("useCompanionAssistant", () => {
       await result.current.submitTypedMessage();
     });
 
+    expect(mocks.supabaseInvoke).not.toHaveBeenCalledWith(
+      "companion-agent",
+      expect.anything(),
+    );
     expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
       "What do I have coming up?",
       "text",
-      {
-        turnOrigin: "composer",
+      expect.objectContaining({
         starterIntent: "upcoming_start",
         selectedDate: "2026-02-13",
-      },
+      }),
     );
   });
 
@@ -1511,18 +1516,21 @@ describe("useCompanionAssistant", () => {
     });
 
     expect(submitted).toBe(true);
+    expect(mocks.supabaseInvoke).not.toHaveBeenCalledWith(
+      "companion-agent",
+      expect.anything(),
+    );
     expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
       "What do I have coming up?",
       "text",
-      {
+      expect.objectContaining({
         starterIntent: "upcoming_start",
         turnOrigin: "launcher",
-      },
+      }),
     );
     expect(mocks.toastError).not.toHaveBeenCalledWith(
       "Companion agent hit a snag. Please try again.",
     );
-    expect(mocks.supabaseInvoke).not.toHaveBeenCalled();
   });
 
   it("confirms the active pending action through the deterministic executor path", async () => {
@@ -1815,6 +1823,58 @@ describe("useCompanionAssistant", () => {
     });
   });
 
+  it("opens plan-day snapshot launchers without submitting synthetic chat", async () => {
+    const consumed = vi.fn();
+    const started = vi.fn();
+    const snapshotShown = vi.fn();
+    window.addEventListener("companion-plan-my-day-started", started);
+    window.addEventListener(
+      "companion-plan-my-day-snapshot-shown",
+      snapshotShown,
+    );
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () =>
+        useCompanionAssistant({
+          surface: "journeys",
+          launchIntent: {
+            id: "launch-snapshot-plan-1",
+            message: "Plan my day",
+            starterIntent: "plan_day",
+            target: "planner",
+            selectedDate: "2026-02-13",
+            briefingContext: {
+              content:
+                "Friday, February 13 looks light: 2 open quests, both already timed, with about 1h planned.",
+              dataSnapshot: {
+                selectedDate: "2026-02-13",
+                openQuestCount: 2,
+                plannerInsightStatement:
+                  "You have a manageable list and the important pieces are timed.",
+              },
+            },
+          },
+          onLaunchIntentConsumed: consumed,
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(consumed).toHaveBeenCalledWith("launch-snapshot-plan-1");
+    });
+
+    expect(mocks.supabaseInvoke).not.toHaveBeenCalled();
+    expect(result.current.activeThread?.sessionId).toBe("fresh-session");
+    expect(result.current.messages).toEqual([]);
+    expect(started).toHaveBeenCalledTimes(1);
+    expect(snapshotShown).toHaveBeenCalledTimes(1);
+    window.removeEventListener("companion-plan-my-day-started", started);
+    window.removeEventListener(
+      "companion-plan-my-day-snapshot-shown",
+      snapshotShown,
+    );
+  });
+
   it("opens free-talk launcher templates as companion-authored visible openers", async () => {
     const consumed = vi.fn();
     const { wrapper } = createWrapper();
@@ -2044,7 +2104,7 @@ describe("useCompanionAssistant", () => {
   it("keeps plan-day briefing context on follow-up replies", async () => {
     const briefingContext = {
       content:
-        "Planning snapshot for Friday, February 13: 4 open quests, 2h estimated.",
+        "Friday, February 13 looks steady: 4 open quests, 2 timed and 2 anytime, with about 2h planned.",
       focus: "Keep the day realistic.",
       actionPrompt: "Preserve timed quests and avoid overload.",
       dataSnapshot: {
@@ -2112,17 +2172,25 @@ describe("useCompanionAssistant", () => {
       () =>
         useCompanionAssistant({
           surface: "journeys",
-          launchIntent: {
-            id: "launch-plan-day-follow-up-context",
-            message: "Plan my day for Friday, February 13",
-            starterIntent: "plan_day",
-            target: "planner",
-            selectedDate: "2026-02-13",
-            briefingContext,
-          },
         }),
       { wrapper },
     );
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("persisted-session");
+    });
+
+    await act(async () => {
+      await result.current.submitMessage(
+        "Plan my day for Friday, February 13",
+        "text",
+        {
+          starterIntent: "plan_day",
+          selectedDate: "2026-02-13",
+          briefingContext,
+        },
+      );
+    });
 
     await waitFor(() => {
       expect(result.current.activeFollowUp?.question).toBe(
