@@ -5,6 +5,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useState,
 } from "react";
 import {
   Archive,
@@ -59,8 +60,57 @@ interface CompanionChatModalProps {
   layoutMode?: CompanionLayoutMode;
 }
 
+type CompanionChatDrawerLayout = {
+  shellHeight: number;
+  bottomInset: number;
+};
+
+const MOBILE_CHAT_DRAWER_HEIGHT_RATIO = 0.78;
+const MOBILE_CHAT_DRAWER_HEIGHT_MIN_PX = 320;
+const MOBILE_CHAT_DRAWER_HANDLE_SPACE_PX = 22;
+const MOBILE_CHAT_DRAWER_VIEWPORT_OFFSET_PX = 24;
+
 const getVisibleMessages = (messages: CompanionAssistantMessage[]) =>
   messages.filter((message) => !message.isSeed);
+
+const getCompanionChatDrawerLayout = (): CompanionChatDrawerLayout => {
+  if (typeof window === "undefined") {
+    return {
+      shellHeight: MOBILE_CHAT_DRAWER_HEIGHT_MIN_PX,
+      bottomInset: 0,
+    };
+  }
+
+  const visualViewport = window.visualViewport;
+  const viewportHeight = visualViewport?.height ?? window.innerHeight;
+  const safeViewportHeight = Number.isFinite(viewportHeight)
+    ? viewportHeight
+    : window.innerHeight;
+  const viewportOffsetTop =
+    visualViewport && Number.isFinite(visualViewport.offsetTop)
+      ? visualViewport.offsetTop
+      : 0;
+  const visibleViewportBottom = viewportOffsetTop + safeViewportHeight;
+  const bottomInset = Math.max(0, window.innerHeight - visibleViewportBottom);
+  const defaultShellHeight = Math.round(
+    window.innerHeight * MOBILE_CHAT_DRAWER_HEIGHT_RATIO,
+  );
+  const availableShellHeight = Math.max(
+    0,
+    safeViewportHeight -
+      MOBILE_CHAT_DRAWER_VIEWPORT_OFFSET_PX -
+      MOBILE_CHAT_DRAWER_HANDLE_SPACE_PX,
+  );
+  const targetShellHeight = Math.min(defaultShellHeight, availableShellHeight);
+
+  return {
+    shellHeight: Math.max(
+      Math.min(MOBILE_CHAT_DRAWER_HEIGHT_MIN_PX, availableShellHeight),
+      targetShellHeight,
+    ),
+    bottomInset,
+  };
+};
 
 export const CompanionChatModal = memo(function CompanionChatModal({
   open,
@@ -69,6 +119,8 @@ export const CompanionChatModal = memo(function CompanionChatModal({
 }: CompanionChatModalProps) {
   const isDesktop = layoutMode === "desktop";
   const transcriptRef = useRef<HTMLDivElement | null>(null);
+  const [drawerLayout, setDrawerLayout] =
+    useState<CompanionChatDrawerLayout>(() => getCompanionChatDrawerLayout());
   const { themeModeClassName } = usePlannerPathfinderAppearance();
   const {
     companionLabel,
@@ -107,6 +159,25 @@ export const CompanionChatModal = memo(function CompanionChatModal({
           : "Companion chat";
   const canUsePortraitShell =
     usesPortraitShell || isCompanionSceneImageSource(imageUrl);
+
+  useEffect(() => {
+    if (isDesktop || !open) return;
+
+    const syncLayout = () => {
+      setDrawerLayout(getCompanionChatDrawerLayout());
+    };
+
+    syncLayout();
+    window.addEventListener("resize", syncLayout);
+    window.visualViewport?.addEventListener("resize", syncLayout);
+    window.visualViewport?.addEventListener("scroll", syncLayout);
+
+    return () => {
+      window.removeEventListener("resize", syncLayout);
+      window.visualViewport?.removeEventListener("resize", syncLayout);
+      window.visualViewport?.removeEventListener("scroll", syncLayout);
+    };
+  }, [isDesktop, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -191,13 +262,18 @@ export const CompanionChatModal = memo(function CompanionChatModal({
     </Avatar>
   );
 
+  const mobileShellStyle = isDesktop
+    ? undefined
+    : { height: `${drawerLayout.shellHeight}px` };
+
   const body = (
     <div
       className={cn(
         themeModeClassName,
         plannerPathfinderTheme.shell,
-        isDesktop ? "h-[min(80vh,44rem)]" : "h-[78dvh] rounded-b-none",
+        isDesktop ? "h-[min(80vh,44rem)]" : "rounded-b-none",
       )}
+      style={mobileShellStyle}
       data-testid="companion-chat-modal"
     >
       <div className={plannerPathfinderTheme.shellGloss} />
@@ -256,6 +332,7 @@ export const CompanionChatModal = memo(function CompanionChatModal({
 
         <div
           className={plannerPathfinderTheme.contentWell}
+          data-vaul-no-drag
           data-testid="companion-chat-dialogue-screen"
         >
           <div
@@ -380,7 +457,12 @@ export const CompanionChatModal = memo(function CompanionChatModal({
           </div>
 
           <div
-            className={cn(plannerPathfinderTheme.footerBar, "p-3")}
+            className={cn(
+              plannerPathfinderTheme.footerBar,
+              "p-3",
+              !isDesktop &&
+                "pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))]",
+            )}
             data-testid="companion-chat-footer"
           >
             {assistant.isRecording || assistant.interimText ? (
@@ -517,8 +599,12 @@ export const CompanionChatModal = memo(function CompanionChatModal({
   }
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="border-none bg-transparent p-0 shadow-none">
+    <Drawer open={open} onOpenChange={onOpenChange} repositionInputs={false}>
+      <DrawerContent
+        className="max-h-none border-none bg-transparent p-0 shadow-none"
+        style={{ bottom: `${drawerLayout.bottomInset}px` }}
+        data-testid="companion-chat-drawer-content"
+      >
         <DrawerHeader className="sr-only">
           <DrawerTitle>Companion chat</DrawerTitle>
           <DrawerDescription>Talk with your companion.</DrawerDescription>

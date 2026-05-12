@@ -1,6 +1,6 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { render, screen, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   visual: {
@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
     setShowPermissionDialog: vi.fn(),
     requestMicrophonePermission: vi.fn(),
   },
+  drawerRootProps: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
@@ -101,10 +102,30 @@ vi.mock("@/components/ui/dialog", () => ({
 }));
 
 vi.mock("@/components/ui/drawer", () => ({
-  Drawer: ({ open, children }: { open: boolean; children: ReactNode }) =>
-    open ? <div>{children}</div> : null,
-  DrawerContent: ({ children, className }: { children: ReactNode; className?: string }) => (
-    <div className={className}>{children}</div>
+  Drawer: ({
+    open,
+    children,
+    ...props
+  }: {
+    open: boolean;
+    children: ReactNode;
+  } & Record<string, unknown>) => {
+    mocks.drawerRootProps.push({ open, ...props });
+    return open ? <div>{children}</div> : null;
+  },
+  DrawerContent: ({
+    children,
+    className,
+    style,
+    ...props
+  }: {
+    children: ReactNode;
+    className?: string;
+    style?: CSSProperties;
+  } & Record<string, unknown>) => (
+    <div className={className} style={style} {...props}>
+      {children}
+    </div>
   ),
   DrawerDescription: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   DrawerHeader: ({ children, className }: { children: ReactNode; className?: string }) => (
@@ -140,14 +161,45 @@ const expectOpenChatWithFallbackInitial = () => {
 };
 
 describe("CompanionChatModal", () => {
+  const originalInnerHeight = window.innerHeight;
+  const originalVisualViewport = window.visualViewport;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.drawerRootProps.length = 0;
     mocks.visual.companionLabel = "Nova";
     mocks.visual.imageUrl = "/placeholder-companion.svg";
     mocks.visual.focalX = null;
     mocks.visual.focalY = null;
     mocks.visual.element = "fire";
     mocks.visual.usesPortraitShell = false;
+
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      writable: true,
+      value: 852,
+    });
+    Object.defineProperty(window, "visualViewport", {
+      configurable: true,
+      value: {
+        height: 852,
+        offsetTop: 0,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      writable: true,
+      value: originalInnerHeight,
+    });
+    Object.defineProperty(window, "visualViewport", {
+      configurable: true,
+      value: originalVisualViewport,
+    });
   });
 
   it("wraps portrait-shell companion images in an Avatar root", () => {
@@ -184,5 +236,64 @@ describe("CompanionChatModal", () => {
 
     expect(modal.className).toContain("[--background:202_100%_98%]");
     expect(modal.className).toContain("border-[hsl(var(--celestial-blue)_/_0.58)]");
+  });
+
+  it("disables Vaul input repositioning for the mobile drawer", () => {
+    renderOpenModal();
+
+    expect(mocks.drawerRootProps[0]).toMatchObject({
+      open: true,
+      repositionInputs: false,
+    });
+  });
+
+  it("keeps the mobile drawer flush and near 78dvh when no keyboard inset is present", () => {
+    renderOpenModal();
+
+    expect(screen.getByTestId("companion-chat-drawer-content")).toHaveStyle({
+      bottom: "0px",
+    });
+    expect(screen.getByTestId("companion-chat-modal")).toHaveStyle({
+      height: "665px",
+    });
+  });
+
+  it("anchors and shrinks the mobile drawer to the visible viewport when the keyboard opens", () => {
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      writable: true,
+      value: 852,
+    });
+    Object.defineProperty(window, "visualViewport", {
+      configurable: true,
+      value: {
+        height: 500,
+        offsetTop: 0,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+    });
+
+    renderOpenModal();
+
+    expect(screen.getByTestId("companion-chat-drawer-content")).toHaveStyle({
+      bottom: "352px",
+    });
+    expect(screen.getByTestId("companion-chat-modal")).toHaveStyle({
+      height: "454px",
+    });
+  });
+
+  it("adds mobile safe-area padding and disables drawer dragging inside the chat well", () => {
+    renderOpenModal();
+
+    expect(screen.getByTestId("companion-chat-footer")).toHaveClass(
+      "pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]",
+      "sm:pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))]",
+    );
+    expect(screen.getByTestId("companion-chat-dialogue-screen")).toHaveAttribute(
+      "data-vaul-no-drag",
+      "true",
+    );
   });
 });
