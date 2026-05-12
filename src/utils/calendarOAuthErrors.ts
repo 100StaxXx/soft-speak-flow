@@ -26,8 +26,24 @@ function isProviderConfigError(text: string): boolean {
   return (
     text.includes('integration not configured') ||
     text.includes('invalid_client') ||
+    text.includes('client_assertion') ||
     text.includes('client_secret') ||
-    text.includes('aadsts7000215')
+    text.includes('client secret') ||
+    text.includes('client assertion') ||
+    text.includes('aadsts7000215') ||
+    text.includes('aadsts7000218')
+  );
+}
+
+function isOAuthClientTypeError(text: string): boolean {
+  return (
+    text.includes('aadsts9002325') ||
+    text.includes('aadsts9002326') ||
+    text.includes('proof key for code exchange') ||
+    text.includes('pkce') ||
+    text.includes('single-page application') ||
+    text.includes('cross-origin token redemption') ||
+    text.includes('public client')
   );
 }
 
@@ -70,6 +86,10 @@ export function toUserFacingCalendarOAuthError(
 
   if (text.includes('invalid or expired oauth state')) {
     return 'Calendar connection expired. Please try again.';
+  }
+
+  if (provider === 'outlook' && isOAuthClientTypeError(text)) {
+    return 'Outlook rejected this OAuth client type. Register the callback as a Web redirect URI in Microsoft Entra and use the matching client secret.';
   }
 
   if (isProviderConfigError(text)) {

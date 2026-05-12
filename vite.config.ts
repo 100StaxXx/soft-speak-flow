@@ -197,6 +197,21 @@ function buildCalendarOAuthCallbackBridge(env: Record<string, string>): string {
           }
 
           if (
+            provider === "outlook" &&
+            (
+              normalized.indexOf("aadsts9002325") !== -1 ||
+              normalized.indexOf("aadsts9002326") !== -1 ||
+              normalized.indexOf("proof key for code exchange") !== -1 ||
+              normalized.indexOf("pkce") !== -1 ||
+              normalized.indexOf("single-page application") !== -1 ||
+              normalized.indexOf("cross-origin token redemption") !== -1 ||
+              normalized.indexOf("public client") !== -1
+            )
+          ) {
+            return "Outlook rejected this OAuth client type. Register the callback as a Web redirect URI in Microsoft Entra and use the matching client secret.";
+          }
+
+          if (
             normalized.indexOf("redirect_uri") !== -1 ||
             normalized.indexOf("redirect uri") !== -1 ||
             normalized.indexOf("reply address") !== -1 ||
@@ -219,6 +234,18 @@ function buildCalendarOAuthCallbackBridge(env: Record<string, string>): string {
 
           if (normalized.indexOf("invalid_grant") !== -1) {
             return "The calendar provider rejected this authorization code. Please try connecting again.";
+          }
+
+          if (
+            normalized.indexOf("invalid_client") !== -1 ||
+            normalized.indexOf("client_secret") !== -1 ||
+            normalized.indexOf("client secret") !== -1 ||
+            normalized.indexOf("client_assertion") !== -1 ||
+            normalized.indexOf("client assertion") !== -1 ||
+            normalized.indexOf("aadsts7000215") !== -1 ||
+            normalized.indexOf("aadsts7000218") !== -1
+          ) {
+            return providerLabel(provider) + " Calendar is not configured correctly on the server yet. Please contact support.";
           }
 
           return rawMessage.length <= 180 ? rawMessage : fallback;

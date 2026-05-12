@@ -8,6 +8,7 @@ import { useCompanionDialogue } from "@/hooks/useCompanionDialogue";
 import { useLegacyCompanionAssistantAdapter } from "@/hooks/useLegacyCompanionAssistantAdapter";
 import { useCompanionVoiceSettings } from "@/hooks/useCompanionVoiceSettings";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
+import { parseNaturalLanguage } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { stripMarkdown } from "@/lib/utils";
@@ -29,7 +30,10 @@ import {
 } from "@/services/companionSpeech";
 import { COMPANION_PLANNER_QUEST_CAPTURE_OPENING } from "@/shared/companionPlannerSurfaceActions";
 import { getCompanionPlannerOpener } from "@/shared/companionPlannerCopy";
-import { isUpcomingScheduleDigestMessage } from "@/shared/schedulingIntent";
+import {
+  analyzeSchedulingIntent,
+  isUpcomingScheduleDigestMessage,
+} from "@/shared/schedulingIntent";
 import {
   resolveCompanionDisplayLabel,
   toPossessiveCompanionLabel,
@@ -46,8 +50,10 @@ import type {
   PendingActionView,
 } from "@/types/companionAgent";
 import type {
+  CompanionChatRequest,
   CompanionChatInputMode,
   CompanionChatOpenerResponse,
+  CompanionChatResponse,
   CompanionChatSource,
   CompanionChatSurface,
   CompanionChatThreadSummary,
@@ -64,6 +70,7 @@ import {
   parseFunctionInvokeError,
   toUserFacingFunctionError,
 } from "@/utils/supabaseFunctionErrors";
+import { resolveCompanionChatError } from "@/utils/companionChatErrors";
 
 export type CompanionAssistantSurface = "companion" | "journeys";
 
@@ -111,6 +118,7 @@ type ThreadsQueryResult = {
 };
 
 const MAX_ACTIVE_PROPOSED_ACTIONS = 8;
+const MAX_DIRECT_CHAT_HISTORY_MESSAGES = 8;
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 const normalizeSelectedDateKey = (value: string | null | undefined) => {
@@ -231,6 +239,58 @@ const shouldRequestDraftOpportunitySidecar = (params: {
   if (response.understandingState === "ready_to_draft") return false;
   return true;
 };
+
+const shouldUseDirectCompanionChat = (params: {
+  message: string;
+  starterIntent?: CompanionPlannerLaunchIntent["starterIntent"] | null;
+  turnOrigin?: CompanionAgentTurnOrigin;
+  selectedDate?: string | null;
+  selectedProposedAction?: CompanionAgentProposedAction | null;
+  activeFollowUp?: CompanionAgentFollowUp | null;
+  pendingAction?: PendingActionView | null;
+  proposedActions: CompanionAgentProposedAction[];
+}) => {
+  if (params.selectedProposedAction) return false;
+  if (params.activeFollowUp) return false;
+  if (params.pendingAction) return false;
+  if (params.proposedActions.length > 0) return false;
+  if (params.selectedDate) return false;
+  if (
+    params.turnOrigin === "follow_up_option" ||
+    params.turnOrigin === "proposed_action"
+  ) {
+    return false;
+  }
+  if (params.starterIntent && params.starterIntent !== "free_talk_start") {
+    return false;
+  }
+
+  const parsed = parseNaturalLanguage(params.message);
+  const analysis = analyzeSchedulingIntent(params.message, parsed);
+
+  if (analysis.disposition === "schedule_action") return false;
+  if (analysis.isScheduleRead) return false;
+  if (analysis.isDirectDayPlanning) return false;
+  if (analysis.isChatFirstCoaching) return false;
+  if (analysis.hasExplicitPlannerAction) return false;
+  if (analysis.hasConcreteSchedulingPayload) return false;
+  if (analysis.isAggressiveBundle || analysis.isOpportunisticSingle) {
+    return false;
+  }
+
+  return true;
+};
+
+const buildDirectChatHistory = (
+  messages: CompanionAssistantMessage[],
+): CompanionChatRequest["conversationHistory"] =>
+  messages
+    .filter((message) => !message.isSeed)
+    .slice(-MAX_DIRECT_CHAT_HISTORY_MESSAGES)
+    .map((message) => ({
+      role: message.role,
+      content: message.content,
+    }));
 
 const generateMessageId = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -1656,17 +1716,111 @@ export function useCompanionAssistant({
       setDraftInput("");
       setInterimText("");
 
+      const shouldUseDirectChat = shouldUseDirectCompanionChat({
+        message,
+        starterIntent,
+        turnOrigin: options?.turnOrigin,
+        selectedDate,
+        selectedProposedAction: options?.selectedProposedAction ?? null,
+        activeFollowUp,
+        pendingAction,
+        proposedActions,
+      });
+      const directChatHistory = shouldUseDirectChat
+        ? buildDirectChatHistory(messages)
+        : [];
       const optimisticUserMessage = createMessage("user", message, {
         inputMode,
-        source: "agent",
+        source: shouldUseDirectChat ? "chat" : "agent",
       });
       setMessages((previous) => [...previous, optimisticUserMessage]);
       const nextUnifiedMessages = [...messages, optimisticUserMessage];
 
       try {
         lastStarterIntentRef.current = starterIntent ?? null;
-        lastReplayablePlannerMessageRef.current = message;
+        lastReplayablePlannerMessageRef.current = shouldUseDirectChat
+          ? null
+          : message;
         const currentDateTime = formatCurrentDateTimeWithOffset(new Date());
+
+        if (shouldUseDirectChat) {
+          const { data, error } = await supabase.functions.invoke(
+            "companion-chat",
+            {
+              body: {
+                message,
+                conversationHistory: directChatHistory,
+                companionId: companion.id,
+                inputMode,
+                surface,
+                sessionId: activeSessionIdRef.current,
+                currentDateTime,
+              } satisfies CompanionChatRequest,
+            },
+          );
+
+          if (error) throw error;
+
+          const response = data as CompanionChatResponse;
+          const nextSessionId = response.sessionId ?? activeSessionIdRef.current;
+          if (response.sessionId) {
+            applyActiveSessionId(response.sessionId);
+          }
+          if (response.persistenceReady === false) {
+            console.warn(
+              "Companion chat reply was not persisted; continuing locally.",
+            );
+          }
+
+          const reply = response.reply?.trim() || "I'm here with you.";
+          setMessages((previous) => [
+            ...previous,
+            createMessage("assistant", stripMarkdown(reply), {
+              source: "chat",
+            }),
+          ]);
+          setStructuredResponse(null);
+          setActiveFollowUp(null);
+          setUnderstandingState(null);
+          setProposedActions([]);
+          setPendingAction(null);
+          setSavedSuggestionProposalIds([]);
+          setPendingSuggestionProposalId(null);
+          pendingQuestCaptureSelectedDateRef.current = null;
+
+          await trackInteraction({
+            interactionType:
+              surface === "journeys"
+                ? "journeys_companion_chat"
+                : "companion_chat",
+            inputText: message,
+            detectedIntent: response.handoffToPlanner
+              ? "planning_handoff"
+              : "conversation",
+            aiResponse: {
+              reply,
+              speechText: response.speechText,
+              memoryUpdateApplied: response.memoryUpdateApplied,
+              handoffToPlanner: response.handoffToPlanner,
+              surface,
+            },
+            userAction: "accepted",
+          });
+
+          if (
+            shouldConsumePendingStarterIntent &&
+            pendingStarterIntentRef.current === pendingStarterIntent
+          ) {
+            pendingStarterIntentRef.current = null;
+          }
+          void invalidateThreads();
+          void speakAssistantReply(
+            response.speechText?.trim() || reply,
+            nextSessionId,
+          );
+          return true;
+        }
+
         const { data, error } = await supabase.functions.invoke(
           "companion-agent",
           {
@@ -1755,6 +1909,12 @@ export function useCompanionAssistant({
         void invalidateThreads();
         return true;
       } catch (error) {
+        if (shouldUseDirectChat) {
+          console.error("Failed to submit companion chat message:", error);
+          toast.error(await resolveCompanionChatError(error));
+          return false;
+        }
+
         const parsed = await parseFunctionInvokeError(error);
         const allowReadOnlyScheduleFallback =
           starterIntent === "upcoming_start" &&
@@ -1826,7 +1986,9 @@ export function useCompanionAssistant({
       isSubmitting,
       legacyAssistant,
       messages,
+      pendingAction,
       requestDraftOpportunitySidecar,
+      speakAssistantReply,
       trackInteraction,
       pendingSuggestionProposalId,
       proposedActions,

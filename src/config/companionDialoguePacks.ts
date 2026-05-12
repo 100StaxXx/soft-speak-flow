@@ -354,7 +354,7 @@ const WITTY_RAW: RawTonePack = {
       "let's pick the one move that is actually worth the oxygen",
       "we should choose the highest-impact step before the options start wearing costumes",
       "a sixty-second review would rescue this plan from decorative chaos",
-      "I can cut the noise and point at the move that matters before three extra ideas sneak in",
+      "I can cut the noise and name the move that matters before three extra ideas sneak in",
     ],
     [" right now.", " in one minute.", " before your attention starts parkouring."],
     COMPANION_DIALOGUE_BUCKET_COUNTS.clarity_moments,

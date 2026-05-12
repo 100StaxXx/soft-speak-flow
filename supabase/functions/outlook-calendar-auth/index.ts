@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import { buildSupabaseFunctionCallbackUrl } from "../_shared/oauthCallbackUrl.ts";
 import { createSignedOAuthState, verifySignedOAuthState } from "../_shared/oauthState.ts";
 
 const MICROSOFT_AUTH_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
@@ -45,9 +46,22 @@ function toNativeCallbackErrorMessage(error: unknown): string {
 
   const details = error instanceof OAuthHttpError ? error.details ?? "" : "";
   const combined = `${error.message} ${details}`.toLowerCase();
+  const diagnosticCode = extractOAuthDiagnosticCode(details);
 
   if (combined.includes("invalid or expired oauth state")) {
     return "Calendar connection expired. Please try again.";
+  }
+
+  if (
+    combined.includes("aadsts9002325") ||
+    combined.includes("aadsts9002326") ||
+    combined.includes("proof key for code exchange") ||
+    combined.includes("pkce") ||
+    combined.includes("single-page application") ||
+    combined.includes("cross-origin token redemption") ||
+    combined.includes("public client")
+  ) {
+    return "Outlook rejected this OAuth client type. Register the callback as a Web redirect URI in Microsoft Entra and use the matching client secret.";
   }
 
   if (
@@ -71,6 +85,18 @@ function toNativeCallbackErrorMessage(error: unknown): string {
     return "Calendar connection expired or was already used. Please try connecting again.";
   }
 
+  if (
+    combined.includes("invalid_client") ||
+    combined.includes("client_secret") ||
+    combined.includes("client secret") ||
+    combined.includes("client_assertion") ||
+    combined.includes("client assertion") ||
+    combined.includes("aadsts7000215") ||
+    combined.includes("aadsts7000218")
+  ) {
+    return "Outlook Calendar is not configured correctly on the server yet. Please verify the client ID and client secret.";
+  }
+
   if (combined.includes("invalid_grant")) {
     return "The calendar provider rejected this authorization code. Please try connecting again.";
   }
@@ -79,7 +105,23 @@ function toNativeCallbackErrorMessage(error: unknown): string {
     return "Outlook Calendar is not configured correctly on the server yet. Please contact support.";
   }
 
+  if (error instanceof OAuthHttpError && error.message === "Failed to exchange authorization code") {
+    return diagnosticCode
+      ? `Outlook rejected this authorization code (${diagnosticCode}). Please try connecting again.`
+      : "Outlook rejected this authorization code. Please try connecting again.";
+  }
+
   return error.message || "Failed to connect Outlook Calendar";
+}
+
+function extractOAuthDiagnosticCode(details: string): string | null {
+  const aadstsMatch = details.match(/\bAADSTS\d+\b/i);
+  if (aadstsMatch?.[0]) {
+    return aadstsMatch[0].toUpperCase();
+  }
+
+  const oauthErrorMatch = details.match(/"error"\s*:\s*"([^"]+)"/i);
+  return oauthErrorMatch?.[1]?.toUpperCase() ?? null;
 }
 
 function buildNativeCallbackRedirect(args: {
@@ -99,13 +141,7 @@ function buildNativeCallbackRedirect(args: {
 }
 
 function buildFunctionCallbackUrl(req: Request): string {
-  const url = new URL(req.url);
-  url.pathname = url.pathname.endsWith("/")
-    ? `${url.pathname}callback`
-    : `${url.pathname}/callback`;
-  url.search = "";
-  url.hash = "";
-  return url.toString();
+  return buildSupabaseFunctionCallbackUrl(req.url);
 }
 
 function normalizeAction(raw: string | undefined): Action | null {

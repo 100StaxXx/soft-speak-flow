@@ -6,6 +6,7 @@ const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_CALENDAR_LIST_URL = "https://www.googleapis.com/calendar/v3/users/me/calendarList";
 const GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo";
+const NATIVE_CALLBACK_SCHEME_URL = "cosmiq://calendar/oauth/callback";
 
 const SCOPES = [
   "https://www.googleapis.com/auth/calendar.events",
@@ -25,6 +26,85 @@ type Action =
   | "setSyncMode"
   | "disconnect"
   | "refreshToken";
+
+class OAuthHttpError extends Error {
+  status: number;
+  details?: string;
+
+  constructor(message: string, status = 400, details?: string) {
+    super(message);
+    this.name = "OAuthHttpError";
+    this.status = status;
+    this.details = details;
+  }
+}
+
+function toNativeCallbackErrorMessage(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return "Failed to connect Google Calendar";
+  }
+
+  const details = error instanceof OAuthHttpError ? error.details ?? "" : "";
+  const combined = `${error.message} ${details}`.toLowerCase();
+
+  if (combined.includes("invalid or expired oauth state")) {
+    return "Calendar connection expired. Please try again.";
+  }
+
+  if (combined.includes("redirect_uri") || combined.includes("redirect uri")) {
+    return "Google rejected this callback URI. Please verify the calendar redirect settings for this build.";
+  }
+
+  if (
+    combined.includes("authorization code is invalid") ||
+    combined.includes("authorization code has expired") ||
+    combined.includes("code has expired") ||
+    combined.includes("code was already redeemed") ||
+    combined.includes("code has already been redeemed")
+  ) {
+    return "Calendar connection expired or was already used. Please try connecting again.";
+  }
+
+  if (combined.includes("invalid_grant")) {
+    return "The calendar provider rejected this authorization code. Please try connecting again.";
+  }
+
+  if (combined.includes("integration not configured")) {
+    return "Google Calendar is not configured correctly on the server yet. Please contact support.";
+  }
+
+  return error.message || "Failed to connect Google Calendar";
+}
+
+function buildNativeCallbackRedirect(args: {
+  status: "success" | "error";
+  message?: string;
+}): string {
+  const params = new URLSearchParams({
+    provider: "google",
+    status: args.status,
+  });
+
+  if (args.message) {
+    params.set("message", args.message);
+  }
+
+  return `${NATIVE_CALLBACK_SCHEME_URL}?${params.toString()}`;
+}
+
+function buildFunctionCallbackUrl(req: Request): string {
+  const url = new URL(req.url);
+  const normalizedPath = url.pathname.replace(/\/+$/, "");
+  const callbackSuffix = "/callback";
+
+  url.pathname = normalizedPath.endsWith(callbackSuffix)
+    ? normalizedPath
+    : `${normalizedPath}${callbackSuffix}`;
+  url.search = "";
+  url.hash = "";
+
+  return url.toString();
+}
 
 function normalizeAction(raw: string | undefined): Action | null {
   if (!raw) return null;
@@ -177,6 +257,150 @@ async function listGoogleCalendars(accessToken: string): Promise<Array<{ id: str
   }));
 }
 
+async function exchangeGoogleConnection(args: {
+  supabase: any;
+  req?: Request;
+  code: string | undefined;
+  redirectUri: string | undefined;
+  state: string | undefined;
+  requestedSyncModeFromBody: SyncMode | null;
+  sourceFromBody?: unknown;
+  internalFunctionSecret: string | undefined;
+  googleClientId: string;
+  googleClientSecret: string;
+}): Promise<{
+  success: true;
+  connection: unknown;
+  calendars: Array<{ id: string; summary: string; primary: boolean }>;
+  calendarEmail: string | null;
+}> {
+  const {
+    supabase,
+    req,
+    code,
+    redirectUri,
+    state,
+    requestedSyncModeFromBody,
+    sourceFromBody,
+    internalFunctionSecret,
+    googleClientId,
+    googleClientSecret,
+  } = args;
+
+  if (!code || !redirectUri) {
+    throw new OAuthHttpError("code and redirectUri are required", 400);
+  }
+
+  let userId = req ? await tryGetAuthedUserId(supabase, req) : null;
+  let requestedSyncMode: SyncMode = normalizeSyncMode(requestedSyncModeFromBody);
+  let requestedSource: OAuthSource = normalizeOAuthSource(sourceFromBody);
+
+  if (state) {
+    if (!internalFunctionSecret) {
+      throw new OAuthHttpError("OAuth state validation is not configured", 500);
+    }
+
+    try {
+      const verified = await verifySignedOAuthState({
+        state,
+        provider: "google",
+        secret: internalFunctionSecret,
+      });
+      if (userId && verified.userId !== userId) {
+        throw new OAuthHttpError("OAuth state does not match the authenticated user", 401);
+      }
+      userId = verified.userId;
+      if (!requestedSyncModeFromBody) {
+        requestedSyncMode = verified.syncMode;
+      }
+      requestedSource = verified.source;
+    } catch (error) {
+      if (error instanceof OAuthHttpError) {
+        throw error;
+      }
+      throw new OAuthHttpError("Invalid or expired OAuth state", 401);
+    }
+  } else if (!userId) {
+    throw new OAuthHttpError("Invalid or expired OAuth state", 401);
+  }
+
+  const tokenResponse = await fetch(GOOGLE_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: googleClientId,
+      client_secret: googleClientSecret,
+      code,
+      grant_type: "authorization_code",
+      redirect_uri: redirectUri,
+    }),
+  });
+
+  if (!tokenResponse.ok) {
+    const details = await tokenResponse.text();
+    throw new OAuthHttpError("Failed to exchange authorization code", 400, details);
+  }
+
+  const tokens = await tokenResponse.json();
+  const accessToken = tokens.access_token as string;
+  const refreshToken = (tokens.refresh_token as string | undefined) ?? null;
+  const tokenExpiresAt = new Date(Date.now() + Number(tokens.expires_in || 3600) * 1000).toISOString();
+
+  let calendarEmail: string | null = null;
+  const userInfoResponse = await fetch(GOOGLE_USERINFO_URL, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (userInfoResponse.ok) {
+    const userInfo = await userInfoResponse.json();
+    calendarEmail = (userInfo?.email as string | undefined) ?? null;
+  }
+
+  const calendars = await listGoogleCalendars(accessToken);
+  const primary = calendars.find((c) => c.primary) ?? calendars[0] ?? { id: "primary", summary: "Primary", primary: true };
+
+  const { data: existing } = await supabase
+    .from("user_calendar_connections")
+    .select("id, refresh_token")
+    .eq("user_id", userId)
+    .eq("provider", "google")
+    .maybeSingle();
+
+  const { data: connection, error: upsertError } = await supabase
+    .from("user_calendar_connections")
+    .upsert(
+      {
+        user_id: userId,
+        provider: "google",
+        access_token: accessToken,
+        refresh_token: refreshToken ?? existing?.refresh_token ?? null,
+        token_expires_at: tokenExpiresAt,
+        calendar_id: primary.id,
+        calendar_email: calendarEmail,
+        primary_calendar_id: primary.id,
+        primary_calendar_name: primary.summary,
+        sync_enabled: true,
+        sync_mode: requestedSyncMode,
+        platform: requestedSource === "native" ? "ios" : "web",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,provider" },
+    )
+    .select("id, provider, calendar_email, primary_calendar_id, primary_calendar_name, sync_mode, sync_enabled, platform")
+    .single();
+
+  if (upsertError) {
+    throw new OAuthHttpError("Failed to store calendar connection", 500, upsertError.message);
+  }
+
+  return {
+    success: true,
+    connection,
+    calendars,
+    calendarEmail,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return handleCors(req);
@@ -186,6 +410,12 @@ Deno.serve(async (req) => {
     new Response(JSON.stringify(body), {
       status,
       headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+    });
+
+  const redirectResponse = (location: string) =>
+    new Response(null, {
+      status: 302,
+      headers: { ...getCorsHeaders(req), Location: location },
     });
 
   try {
@@ -199,14 +429,54 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Google Calendar integration not configured" }, 500);
     }
 
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const requestUrl = new URL(req.url);
+
+    if (req.method === "GET" && requestUrl.pathname.endsWith("/callback")) {
+      const code = requestUrl.searchParams.get("code") ?? undefined;
+      const state = requestUrl.searchParams.get("state") ?? undefined;
+      const providerError = requestUrl.searchParams.get("error");
+      const providerErrorDescription = requestUrl.searchParams.get("error_description");
+      const redirectUri = buildFunctionCallbackUrl(req);
+
+      if (providerError) {
+        return redirectResponse(buildNativeCallbackRedirect({
+          status: "error",
+          message: providerErrorDescription || providerError,
+        }));
+      }
+
+      try {
+        await exchangeGoogleConnection({
+          supabase,
+          code,
+          redirectUri,
+          state,
+          requestedSyncModeFromBody: null,
+          sourceFromBody: "native",
+          internalFunctionSecret,
+          googleClientId,
+          googleClientSecret,
+        });
+
+        return redirectResponse(buildNativeCallbackRedirect({
+          status: "success",
+          message: "Google Calendar connected successfully.",
+        }));
+      } catch (error) {
+        return redirectResponse(buildNativeCallbackRedirect({
+          status: "error",
+          message: toNativeCallbackErrorMessage(error),
+        }));
+      }
+    }
+
     const body = await req.json().catch(() => ({}));
     const action = normalizeAction(body?.action);
 
     if (!action) {
       return jsonResponse({ error: "Invalid action" }, 400);
     }
-
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     if (action === "getAuthUrl") {
       const userId = await getAuthedUserId(supabase, req);
@@ -250,115 +520,32 @@ Deno.serve(async (req) => {
         ? (body?.syncMode ?? body?.sync_mode)
         : null;
 
-      if (!code || !redirectUri) {
-        return jsonResponse({ error: "code and redirectUri are required" }, 400);
-      }
-
-      let userId = await tryGetAuthedUserId(supabase, req);
-      let requestedSyncMode: SyncMode = normalizeSyncMode(requestedSyncModeFromBody);
-      let requestedSource: OAuthSource = normalizeOAuthSource(body?.source ?? body?.calendar_source);
-
-      if (state) {
-        if (!internalFunctionSecret) {
-          return jsonResponse({ error: "OAuth state validation is not configured" }, 500);
-        }
-
-        try {
-          const verified = await verifySignedOAuthState({
-            state,
-            provider: "google",
-            secret: internalFunctionSecret,
-          });
-          if (userId && verified.userId !== userId) {
-            return jsonResponse({ error: "OAuth state does not match the authenticated user" }, 401);
-          }
-          userId = verified.userId;
-          if (!requestedSyncModeFromBody) {
-            requestedSyncMode = verified.syncMode;
-          }
-          requestedSource = verified.source;
-        } catch {
-          return jsonResponse({ error: "Invalid or expired OAuth state" }, 401);
-        }
-      } else if (!userId) {
-        return jsonResponse({ error: "Invalid or expired OAuth state" }, 401);
-      }
-
-      const tokenResponse = await fetch(GOOGLE_TOKEN_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          client_id: googleClientId,
-          client_secret: googleClientSecret,
+      try {
+        const result = await exchangeGoogleConnection({
+          supabase,
+          req,
           code,
-          grant_type: "authorization_code",
-          redirect_uri: redirectUri,
-        }),
-      });
-
-      if (!tokenResponse.ok) {
-        const details = await tokenResponse.text();
-        return jsonResponse({ error: "Failed to exchange authorization code", details }, 400);
+          redirectUri,
+          state,
+          requestedSyncModeFromBody,
+          sourceFromBody: body?.source ?? body?.calendar_source,
+          internalFunctionSecret,
+          googleClientId,
+          googleClientSecret,
+        });
+        return jsonResponse(result);
+      } catch (error) {
+        if (error instanceof OAuthHttpError) {
+          return jsonResponse(
+            {
+              error: error.message,
+              ...(error.details ? { details: error.details } : {}),
+            },
+            error.status,
+          );
+        }
+        throw error;
       }
-
-      const tokens = await tokenResponse.json();
-      const accessToken = tokens.access_token as string;
-      const refreshToken = (tokens.refresh_token as string | undefined) ?? null;
-      const tokenExpiresAt = new Date(Date.now() + Number(tokens.expires_in || 3600) * 1000).toISOString();
-
-      let calendarEmail: string | null = null;
-      const userInfoResponse = await fetch(GOOGLE_USERINFO_URL, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-
-      if (userInfoResponse.ok) {
-        const userInfo = await userInfoResponse.json();
-        calendarEmail = (userInfo?.email as string | undefined) ?? null;
-      }
-
-      const calendars = await listGoogleCalendars(accessToken);
-      const primary = calendars.find((c) => c.primary) ?? calendars[0] ?? { id: "primary", summary: "Primary", primary: true };
-
-      const { data: existing } = await supabase
-        .from("user_calendar_connections")
-        .select("id, refresh_token")
-        .eq("user_id", userId)
-        .eq("provider", "google")
-        .maybeSingle();
-
-      const { data: connection, error: upsertError } = await supabase
-        .from("user_calendar_connections")
-        .upsert(
-          {
-            user_id: userId,
-            provider: "google",
-            access_token: accessToken,
-            refresh_token: refreshToken ?? existing?.refresh_token ?? null,
-            token_expires_at: tokenExpiresAt,
-            calendar_id: primary.id,
-            calendar_email: calendarEmail,
-            primary_calendar_id: primary.id,
-            primary_calendar_name: primary.summary,
-            sync_enabled: true,
-            sync_mode: requestedSyncMode,
-            platform: requestedSource === "native" ? "ios" : "web",
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id,provider" },
-        )
-        .select("id, provider, calendar_email, primary_calendar_id, primary_calendar_name, sync_mode, sync_enabled, platform")
-        .single();
-
-      if (upsertError) {
-        return jsonResponse({ error: "Failed to store calendar connection", details: upsertError.message }, 500);
-      }
-
-      return jsonResponse({
-        success: true,
-        connection,
-        calendars,
-        calendarEmail,
-      });
     }
 
     const userId = await getAuthedUserId(supabase, req);

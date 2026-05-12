@@ -13,6 +13,7 @@ vi.mock('@capacitor/core', () => ({
 }));
 
 import {
+  getGoogleNativeOAuthCallbackUrl,
   getCalendarOAuthRedirectUri,
   getCalendarOAuthSource,
   getOutlookNativeOAuthCallbackUrl,
@@ -39,7 +40,7 @@ describe('calendarOAuthRedirect', () => {
     ).toBe('https://project-ref.supabase.co/functions/v1/outlook-calendar-auth/callback');
   });
 
-  it('keeps native Google on the app callback bridge', () => {
+  it('routes native Google through the Supabase function callback', () => {
     capacitorMocks.isNativePlatform.mockReturnValue(true);
     capacitorMocks.getPlatform.mockReturnValue('ios');
 
@@ -48,7 +49,7 @@ describe('calendarOAuthRedirect', () => {
         provider: 'google',
         source: 'native',
       }),
-    ).toBe('https://app.cosmiq.quest/calendar/oauth/callback');
+    ).toBe('https://project-ref.supabase.co/functions/v1/google-calendar-auth/callback');
   });
 
   it('uses the current web origin for web Outlook', () => {
@@ -74,6 +75,14 @@ describe('calendarOAuthRedirect', () => {
 
     expect(() => getOutlookNativeOAuthCallbackUrl()).toThrow(
       'Missing VITE_SUPABASE_URL for Outlook native calendar redirects',
+    );
+  });
+
+  it('requires Supabase URL before building the Google native callback', () => {
+    vi.stubEnv('VITE_SUPABASE_URL', '');
+
+    expect(() => getGoogleNativeOAuthCallbackUrl()).toThrow(
+      'Missing VITE_SUPABASE_URL for Google native calendar redirects',
     );
   });
 });

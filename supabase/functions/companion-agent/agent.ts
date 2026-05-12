@@ -30,6 +30,7 @@ import {
   type LoadedCompanionAgentContext,
   type PendingActionCandidate,
   type PendingActionRow,
+  type SubmitCompanionResult,
   SubmitCompanionResultSchema,
 } from "./types.ts";
 import { consultPlannerForAgent } from "./plannerBridge.ts";
@@ -230,7 +231,7 @@ const buildChatReasoningConfig = (model: string) =>
   supportsNoReasoningEffort(model) ? { reasoning_effort: "none" as const } : {};
 
 const OPENAI_PROVIDER_UNAVAILABLE_REPLY =
-  "I'm having trouble reaching my AI brain right now. Try again in a moment, and I'll pick this back up.";
+  "I'm having trouble reaching OpenAI right now. Try again in a moment, and I'll pick this back up.";
 const OPENAI_EMPTY_OUTPUT_REPLY =
   "I reached my AI path, but it came back blank. Try again in a moment and I'll pick this up.";
 
@@ -1103,6 +1104,130 @@ const isFreeTalkProviderFallbackRequest = (
   (request.activeProposedActions?.length ?? 0) === 0 &&
   !isDeterministicScheduleReadRequest(request) &&
   !looksLikePlannerActionMessage(request.message);
+
+const normalizeModelMode = (value: unknown): CompanionAgentMode | null => {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  switch (normalized) {
+    case "conversation":
+    case "conversational":
+    case "chat":
+      return "conversation";
+    case "clarify":
+    case "clarification":
+      return "clarify";
+    case "schedule_read":
+    case "schedule-read":
+      return "schedule_read";
+    case "pending_confirmation":
+    case "pending-confirmation":
+      return "pending_confirmation";
+    case "receipt":
+      return "receipt";
+    default:
+      return null;
+  }
+};
+
+const normalizeModelIntent = (value: unknown): CompanionAgentIntent | null => {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  switch (normalized) {
+    case "schedule_task":
+    case "plan_day":
+    case "plan_week":
+    case "check_calendar":
+    case "update_existing_plan":
+    case "goal_setting":
+    case "journal":
+    case "explore":
+    case "reflect":
+    case "unknown":
+      return normalized as CompanionAgentIntent;
+    case "conversation":
+    case "conversational":
+    case "chat":
+    case "general":
+      return "unknown";
+    default:
+      return null;
+  }
+};
+
+const normalizeModelUnderstandingState = (
+  value: unknown,
+): CompanionAgentUnderstandingState | null => {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  switch (normalized) {
+    case "needs_followup":
+    case "needs-followup":
+      return "needs_followup";
+    case "enough_to_discuss":
+    case "enough-to-discuss":
+    case "enough":
+      return "enough_to_discuss";
+    case "ready_to_propose":
+    case "ready-to-propose":
+      return "ready_to_propose";
+    case "ready_to_draft":
+    case "ready-to-draft":
+      return "ready_to_draft";
+    default:
+      return null;
+  }
+};
+
+const clampConfidence = (value: unknown, fallback = 0.65) =>
+  typeof value === "number" && Number.isFinite(value)
+    ? Math.min(1, Math.max(0, value))
+    : fallback;
+
+const buildLenientChatSubmitResult = (
+  raw: unknown,
+): SubmitCompanionResult | null => {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const record = raw as Record<string, unknown>;
+  const reply = typeof record.reply === "string" ? record.reply.trim() : "";
+  if (!reply) return null;
+
+  const mode = normalizeModelMode(record.mode) ?? "conversation";
+  const intent = normalizeModelIntent(record.intent) ?? "unknown";
+  const understandingState =
+    normalizeModelUnderstandingState(record.understanding_state) ??
+      deriveUnderstandingState({
+        mode,
+        preparedActionId: null,
+        followUp: null,
+      });
+
+  return {
+    reply,
+    mode,
+    intent,
+    confidence: clampConfidence(record.confidence),
+    understanding_state: understandingState,
+    follow_up: null,
+    proposed_actions: [],
+    assumptions: [],
+    evidence_ids: [],
+    structured_response: null,
+    prepared_action_id: null,
+  };
+};
+
+const parseSubmitCompanionResultArguments = (
+  argumentsText: string,
+  options: { allowLenientChatResult?: boolean } = {},
+): SubmitCompanionResult => {
+  const raw = JSON.parse(argumentsText || "{}");
+  const strict = SubmitCompanionResultSchema.safeParse(raw);
+  if (strict.success) return strict.data;
+
+  if (options.allowLenientChatResult) {
+    const lenientResult = buildLenientChatSubmitResult(raw);
+    if (lenientResult) return lenientResult;
+  }
+
+  throw strict.error;
+};
 
 const EXPLICIT_COMPANION_WRITE_STARTER_INTENTS = new Set<string>([
   "quest_capture",
@@ -2426,6 +2551,7 @@ function buildInstructions(params: {
     "Never invent task, ritual, campaign, reminder, or calendar state.",
     "Never say something is scheduled, saved, moved, updated, logged, or confirmed unless it has already executed. Preparation is not execution.",
     "Keep replies natural, warm, concise, and non-robotic.",
+    "Do not use profanity, vulgar wording, or insults.",
     "External calendar events are read-only in v1. If the user wants to change a calendar event directly, explain the limitation and offer a task-based alternative when appropriate.",
     "If there is already an active pending action, be aware of it and avoid stacking multiple confirms in one reply.",
     "Include assumptions and evidence_ids when they help the app/debugger understand why you made the decision. Evidence IDs should reference actual task, ritual, campaign, reminder, or calendar IDs from context.",
@@ -4830,8 +4956,17 @@ export async function runCompanionAgent(params: RunAgentParams) {
           call.name === "submit_companion_result"
         );
         if (finalCall) {
-          const payload = SubmitCompanionResultSchema.parse(
-            JSON.parse(finalCall.arguments || "{}"),
+          const payload = parseSubmitCompanionResultArguments(
+            finalCall.arguments,
+            {
+              allowLenientChatResult: isFreeTalkProviderFallbackRequest(
+                params.request,
+              ) || isJourneysSidecarManagedTurn(params.request) ||
+                (
+                  params.request.surface === "companion" &&
+                  !isExplicitCompanionWriteRequest(params.request)
+                ),
+            },
           );
           const payloadReply = payload.reply.trim();
           const followUp = payload.follow_up ?? null;
@@ -5132,12 +5267,52 @@ export async function runCompanionAgent(params: RunAgentParams) {
       };
     }
 
+    function buildOpenAIOutputUnavailableResult(
+      providerDiagnostics: OpenAIProviderDiagnostics,
+    ): AgentRunResult {
+      console.warn("[companion-agent] openai output fallback", {
+        sessionId: params.request.sessionId,
+        providerDiagnostics: loggableOpenAIProviderDiagnostics(
+          providerDiagnostics,
+        ),
+      });
+
+      return {
+        result: {
+          reply: OPENAI_EMPTY_OUTPUT_REPLY,
+          mode: "conversation" as CompanionAgentMode,
+          intent: "unknown" as CompanionAgentIntent,
+          confidence: 0.1,
+          understandingState:
+            "enough_to_discuss" as CompanionAgentUnderstandingState,
+          followUp: null,
+          proposedActions: [],
+          assumptions: [],
+          evidenceIds: [],
+          structuredResponse: null,
+          preparedActionId: null,
+        },
+        openaiConversationId: context.thread?.openai_conversation_id ?? null,
+        lastOpenAIResponseId: context.thread?.last_openai_response_id ?? null,
+        draftDecisionSource: "deterministic",
+        providerDiagnostics,
+      };
+    }
+
     function buildFallbackResultForOpenAIError(error: unknown): AgentRunResult {
       const providerDiagnostics = getOpenAIProviderDiagnostics(error);
       if (
         providerDiagnostics && isFreeTalkProviderFallbackRequest(params.request)
       ) {
         return buildProviderUnavailableResult(providerDiagnostics);
+      }
+      if (isFreeTalkProviderFallbackRequest(params.request)) {
+        return buildOpenAIOutputUnavailableResult(
+          providerDiagnostics ??
+            buildOpenAIEmptyOutputDiagnostics({
+              responseId: context.thread?.last_openai_response_id ?? null,
+            }),
+        );
       }
 
       return buildPlannerFallbackResult(getErrorMessage(error), {

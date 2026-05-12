@@ -19,6 +19,18 @@ describe('calendarOAuthErrors', () => {
     ).toBe('Outlook rejected this callback URI. Please verify the calendar redirect settings for this build.');
   });
 
+  it('maps Microsoft client-type/PKCE errors to Entra redirect platform guidance', () => {
+    expect(
+      toUserFacingCalendarOAuthError('outlook', {
+        ...baseParsed,
+        details:
+          '{"error":"invalid_request","error_description":"AADSTS9002325: Proof Key for Code Exchange is required for cross-origin authorization code redemption."}',
+      }),
+    ).toBe(
+      'Outlook rejected this OAuth client type. Register the callback as a Web redirect URI in Microsoft Entra and use the matching client secret.',
+    );
+  });
+
   it('maps reused or expired authorization codes to retry guidance', () => {
     expect(
       toUserFacingCalendarOAuthError('google', {

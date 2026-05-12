@@ -252,6 +252,20 @@ describe("useCompanionAssistant", () => {
         };
       }
 
+      if (functionName === "companion-chat") {
+        return {
+          data: {
+            reply: "Direct chat reply.",
+            speechText: "Direct chat reply.",
+            handoffToPlanner: false,
+            memoryUpdateApplied: false,
+            persistenceReady: true,
+            sessionId: options?.body?.sessionId ?? "persisted-session",
+          },
+          error: null,
+        };
+      }
+
       return {
         data: {
           reply: "Tomorrow is pretty light.",
@@ -714,6 +728,53 @@ describe("useCompanionAssistant", () => {
     );
   });
 
+  it("routes casual unified chat through companion-chat instead of companion-agent", async () => {
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "companion" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.messages[0]?.content).toBe(
+        "Fresh read: today has a little shape to it.",
+      );
+    });
+
+    await act(async () => {
+      await result.current.submitMessage("Not much. How are you?", "text");
+    });
+
+    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+      "companion-chat",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          sessionId: "fresh-session",
+          message: "Not much. How are you?",
+          surface: "companion",
+        }),
+      }),
+    );
+    expect(result.current.messages.at(-1)).toEqual(
+      expect.objectContaining({
+        content: "Direct chat reply.",
+        role: "assistant",
+        source: "chat",
+      }),
+    );
+    const invokedFunctionNames = mocks.supabaseInvoke.mock.calls.map(
+      ([name]) => name,
+    );
+    expect(invokedFunctionNames).not.toContain("companion-agent");
+    expect(mocks.trackInteraction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        interactionType: "companion_chat",
+        inputText: "Not much. How are you?",
+        detectedIntent: "conversation",
+      }),
+    );
+  });
+
   it("submits companion chat surface turns through companion-agent without legacy endpoints", async () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(
@@ -774,6 +835,20 @@ describe("useCompanionAssistant", () => {
               archivedAt: null,
               messageCount: 1,
             },
+          },
+          error: null,
+        };
+      }
+
+      if (functionName === "companion-chat") {
+        return {
+          data: {
+            reply: "Direct chat reply.",
+            speechText: "Direct chat reply.",
+            handoffToPlanner: false,
+            memoryUpdateApplied: false,
+            persistenceReady: true,
+            sessionId: "fresh-session",
           },
           error: null,
         };
@@ -943,9 +1018,14 @@ describe("useCompanionAssistant", () => {
 
     expect(
       mocks.supabaseInvoke.mock.calls.some(
-        ([functionName]) => functionName === "companion-agent",
+        ([functionName]) => functionName === "companion-chat",
       ),
     ).toBe(true);
+    expect(
+      mocks.supabaseInvoke.mock.calls.some(
+        ([functionName]) => functionName === "companion-agent",
+      ),
+    ).toBe(false);
   });
 
   it("keeps the generated opener usable when opener persistence is not ready", async () => {
@@ -969,6 +1049,20 @@ describe("useCompanionAssistant", () => {
               archivedAt: null,
               messageCount: 1,
             },
+          },
+          error: null,
+        };
+      }
+
+      if (functionName === "companion-chat") {
+        return {
+          data: {
+            reply: "Direct chat reply.",
+            speechText: "Direct chat reply.",
+            handoffToPlanner: false,
+            memoryUpdateApplied: false,
+            persistenceReady: false,
+            sessionId: "fresh-session",
           },
           error: null,
         };
@@ -1014,9 +1108,14 @@ describe("useCompanionAssistant", () => {
 
     expect(
       mocks.supabaseInvoke.mock.calls.some(
-        ([functionName]) => functionName === "companion-agent",
+        ([functionName]) => functionName === "companion-chat",
       ),
     ).toBe(true);
+    expect(
+      mocks.supabaseInvoke.mock.calls.some(
+        ([functionName]) => functionName === "companion-agent",
+      ),
+    ).toBe(false);
   });
 
   it("requests draft opportunity cards after conversational Journeys replies", async () => {

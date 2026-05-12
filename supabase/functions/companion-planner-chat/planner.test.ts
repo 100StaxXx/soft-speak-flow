@@ -4380,7 +4380,7 @@ Deno.test("treats an empty route request like a short empty schedule summary", (
   assertEquals(result.followUpQuestions.length, 0);
   assertEquals(result.reply, "Today: nothing scheduled.");
   assertEquals(result.reply.includes("time is all you got"), false);
-  assertEquals(result.reply.includes("bullshit"), false);
+  assertEquals(result.reply.includes("decorative noise"), false);
 });
 
 Deno.test("reads upcoming named weekdays instead of falling back to today", () => {
@@ -5445,6 +5445,38 @@ Deno.test("upcoming_start keeps late calendar events on the local current day", 
   assertEquals(
     result.structuredResponse?.comingUp?.nextEvent?.title,
     "Dinner",
+  );
+});
+
+Deno.test("upcoming_start accepts database time strings with seconds", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What do I have coming up?",
+    currentDate: "2026-05-12",
+    currentDateTime: "2026-05-12T12:26:00-07:00",
+    plannerContext: {
+      tasks: [
+        {
+          id: "task-db-time",
+          title: "Database time quest",
+          taskDate: "2026-05-12",
+          scheduledTime: "15:00:00",
+          estimatedDuration: 45,
+          recurrencePattern: null,
+        },
+      ],
+      starterIntent: "upcoming_start",
+    },
+  }));
+
+  assertEquals(result.mode, "schedule_read");
+  assertStringIncludes(result.reply, "Database time quest");
+  assertEquals(
+    result.structuredResponse?.comingUp?.nextEvent?.startsAt,
+    "2026-05-12T15:00:00",
+  );
+  assertEquals(
+    result.structuredResponse?.comingUp?.nextEvent?.title,
+    "Database time quest",
   );
 });
 
@@ -8585,8 +8617,8 @@ Deno.test("uses witty_sassy voice for conversational planner replies", () => {
 
   assertEquals(result.mode, "conversational");
   assertEquals(result.proposals.length, 0);
-  assertStringIncludes(result.reply, "I'm with you");
-  assertStringIncludes(result.reply, "point at the bullshit");
+  assertStringIncludes(result.reply, "I'm here");
+  assertStringIncludes(result.reply, "talk it through");
 });
 
 Deno.test("uses witty_sassy voice for proposal replies without implying the draft is already saved", () => {
@@ -8615,7 +8647,7 @@ Deno.test("uses witty_sassy voice for proposal replies without implying the draf
 
   assertEquals(result.mode, "proposal");
   assertEquals(result.proposals[0].readyToConfirm, true);
-  assertStringIncludes(result.reply, "spare me the fake ceremony");
+  assertStringIncludes(result.reply, "skip the extra ceremony");
   assertEquals(result.reply.includes("already saved"), false);
 });
 

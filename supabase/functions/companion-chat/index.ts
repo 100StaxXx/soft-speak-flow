@@ -490,6 +490,7 @@ const buildSystemPrompt = (context: {
       ? `Journeys schedule context: ${journeysSnapshot}`
       : "",
     "Be concise, emotionally present, and natural.",
+    "Do not use profanity, vulgar wording, or insults.",
     "Keep the performance original. Do not imitate or name any real actor, celebrity, or copyrighted character, even if the user asks.",
     "Reply in plain text only. No markdown, no bold markers, and no bullet lists with asterisks. Keep most answers under 120 words unless the user asks for more.",
     "Do not mention internal context, models, memory extraction, or implementation details.",

@@ -1740,8 +1740,13 @@ const formatMinutes = (minutes: number): string => {
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 };
 
-const normalizeClockTime = (value: string): string | null => {
-  const match = value.match(/^(\d{1,2}):(\d{2})$/);
+const normalizeClockTime = (
+  value: string | null | undefined,
+): string | null => {
+  if (!value) return null;
+  const match = value.match(
+    /^(\d{1,2}):(\d{2})(?::([0-5]\d)(?:\.\d+)?)?$/,
+  );
   if (!match) return null;
 
   const hour = Number.parseInt(match[1] ?? "", 10);
@@ -4449,7 +4454,9 @@ const getStructuredRitualEnd = (
   if (!start) return null;
 
   const end = new Date(start);
+  if (Number.isNaN(end.getTime())) return null;
   end.setMinutes(end.getMinutes() + getRitualDuration(ritual));
+  if (Number.isNaN(end.getTime())) return null;
   return end.toISOString();
 };
 
@@ -4649,8 +4656,9 @@ const collectScheduleItemsForDate = (
 const getStructuredTaskStart = (
   task: PlannerContextTask,
 ): string | null => {
-  if (!task.taskDate || !task.scheduledTime) return null;
-  return `${task.taskDate}T${task.scheduledTime}:00`;
+  const scheduledTime = normalizeClockTime(task.scheduledTime);
+  if (!task.taskDate || !scheduledTime) return null;
+  return `${task.taskDate}T${scheduledTime}:00`;
 };
 
 const getStructuredTaskEnd = (
@@ -4660,7 +4668,9 @@ const getStructuredTaskEnd = (
   if (!start) return null;
 
   const end = new Date(start);
+  if (Number.isNaN(end.getTime())) return null;
   end.setMinutes(end.getMinutes() + getTaskDuration(task));
+  if (Number.isNaN(end.getTime())) return null;
   return end.toISOString();
 };
 
@@ -7341,7 +7351,7 @@ const buildMakeRoomStarterReply = (input: PlannerBuildInput): string => {
       "Here's the room I see right now, minus the decorative chaos."
     : "Here's the room I see right now.";
   const closer = isWittySassyTone(input.tonePack)
-    ? "Tell me what actually matters, and I'll help make room for it without the decorative bullshit."
+    ? "Tell me what actually matters, and I'll help make room for it without the decorative noise."
     : "Tell me what matters most, and I'll help make room for it.";
 
   return [
@@ -7414,8 +7424,8 @@ const buildReadOnlyScheduleReply = (
     if (freeWindows.length === 0) {
       if (isWittySassyTone(input.tonePack)) {
         return dayPart
-          ? `I don't see a clean ${dayPart.label} opening on ${targetLabel} yet. The calendar is being difficult, not mystical. If you want, I'll help drag the bullshit out of the schedule and make room.`
-          : `I don't see a clear opening on ${targetLabel} yet. The calendar is being difficult, not mystical. If you want, I'll help drag the bullshit out of the schedule and make room.`;
+          ? `I don't see a clean ${dayPart.label} opening on ${targetLabel} yet. The calendar is being difficult, not mystical. If you want, I'll help clear the clutter from the schedule and make room.`
+          : `I don't see a clear opening on ${targetLabel} yet. The calendar is being difficult, not mystical. If you want, I'll help clear the clutter from the schedule and make room.`;
       }
 
       return dayPart
@@ -8384,12 +8394,12 @@ const composeReply = (
     if (readyToConfirm) {
       return `${interpretationLead ? `${interpretationLead} ` : ""}${
         questCaptureReplyLead || `I drafted this as a ${baseLabel}. `
-      }Review it, confirm it if it holds up, and spare me the fake ceremony.`;
+      }Review it, confirm it if it holds up, and we can skip the extra ceremony.`;
     }
 
     return `${
       interpretationLead ? `${interpretationLead} ` : ""
-    }${memoryLead}I can shape this into a ${baseLabel}, but I need one real detail before we dress vague intentions up like a finished plan.`;
+    }${memoryLead}I can shape this into a ${baseLabel}, but I need one real detail before we turn a vague intention into a finished plan.`;
   }
 
   if (readyToConfirm) {
@@ -8411,8 +8421,8 @@ const buildConversationalResponse = (
   return {
     mode: "conversational",
     reply: isWittySassyTone(input.tonePack)
-      ? "I'm with you. Tell me what actually matters, or point at the bullshit and I'll help turn it into a draft quest or campaign."
-      : "I'm here with you. Tell me what feels most important, or ask me to turn it into a draft quest or campaign when you're ready.",
+      ? "I'm here. Say what's on your mind, and we can talk it through or turn it into a quest or campaign when you're ready."
+      : "I'm here with you. Say what's on your mind, and we can talk it through or shape it into a quest or campaign when you're ready.",
     followUpQuestions: [],
     proposals: [],
     suggestedReminders: [],

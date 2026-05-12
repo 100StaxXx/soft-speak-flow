@@ -2583,6 +2583,83 @@ Deno.test("runCompanionAgent reads raw Responses message text for free-talk repl
   assertEquals(result.pendingAction, undefined);
 });
 
+Deno.test("runCompanionAgent keeps malformed free-talk tool replies out of planner fallback", async () => {
+  const supabase = createMockSupabase({
+    messages: [
+      {
+        id: "msg-free-talk-opener",
+        role: "assistant",
+        content: "What's good, champ?",
+        created_at: "2026-05-03T16:12:00.000Z",
+        input_mode: null,
+        source: "agent",
+        surface: "journeys",
+        session_id: "session-free-talk-lenient-output",
+        metadata: { agentDecision: { followUp: null } },
+      },
+    ],
+  });
+  const responseBodies: Array<Record<string, unknown>> = [];
+  const guardedFetch = (async (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ) => {
+    const url = String(input);
+    if (url.endsWith("/conversations")) {
+      return jsonResponse({ id: "conv_free_talk_lenient" });
+    }
+
+    if (url.endsWith("/responses")) {
+      responseBodies.push(JSON.parse(String(init?.body ?? "{}")));
+      return jsonResponse({
+        id: "resp_free_talk_lenient",
+        conversation: { id: "conv_free_talk_lenient" },
+        output: [
+          {
+            type: "function_call",
+            call_id: "call_submit",
+            name: "submit_companion_result",
+            arguments: JSON.stringify({
+              reply: "I'm doing well. What do you want to get into?",
+              mode: "conversational",
+              intent: "conversation",
+              confidence: 0.9,
+              understanding_state: "enough-to-discuss",
+            }),
+          },
+        ],
+      });
+    }
+
+    throw new Error(`Unexpected fetch: ${url}`);
+  }) as typeof fetch;
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-free-talk-lenient-output",
+      message: "Not much. How are you?",
+      inputMode: "text",
+      currentDateTime: "2026-05-03T21:12:00-07:00",
+      turnOrigin: "composer",
+    },
+  });
+
+  assertEquals(responseBodies.length, 1);
+  assertEquals(result.mode, "conversation");
+  assertEquals(result.intent, "unknown");
+  assertEquals(
+    result.reply,
+    "I'm doing well. What do you want to get into?",
+  );
+  assertEquals(result.proposedActions, []);
+  assertEquals(result.pendingAction, undefined);
+});
+
 Deno.test("runCompanionAgent records provider diagnostics for model access failures", async () => {
   const supabase = createMockSupabase({
     messages: [
@@ -2630,7 +2707,7 @@ Deno.test("runCompanionAgent records provider diagnostics for model access failu
   assertEquals(responseBodies[0].model, DEFAULT_COMPANION_AGENT_MODEL);
   assertEquals(responseBodies[0].reasoning, { effort: "none" });
   assertEquals(result.mode, "conversation");
-  assert(result.reply.includes("having trouble reaching my AI brain"));
+  assert(result.reply.includes("having trouble reaching OpenAI"));
 
   const diagnostics = (result as Record<string, unknown>)
     .providerDiagnostics as Record<string, unknown>;
@@ -2689,7 +2766,7 @@ Deno.test("runCompanionAgent records provider diagnostics for invalid API keys",
   });
 
   assertEquals(result.mode, "conversation");
-  assert(result.reply.includes("having trouble reaching my AI brain"));
+  assert(result.reply.includes("having trouble reaching OpenAI"));
 
   const diagnostics = (result as Record<string, unknown>)
     .providerDiagnostics as Record<string, unknown>;
