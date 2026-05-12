@@ -809,9 +809,10 @@ export function useCompanionAssistant({
   const queryClient = useQueryClient();
   const [useLegacyFallback, setUseLegacyFallback] = useState(false);
   const unifiedAgentActive = !useLegacyFallback;
+  const localScheduleReadEnabled = surface === "journeys";
 
   const legacyAssistant = useLegacyCompanionAssistantAdapter({
-    enabled: useLegacyFallback,
+    enabled: useLegacyFallback || localScheduleReadEnabled,
     surface,
     conversationEnabled,
     onOpenCampaignBuilder,
@@ -1572,6 +1573,33 @@ export function useCompanionAssistant({
         return true;
       }
 
+      if (
+        localScheduleReadEnabled &&
+        starterIntent === "upcoming_start" &&
+        !options?.selectedProposedAction
+      ) {
+        legacyAssistant.hydrateFromUnifiedState?.({
+          sessionId: activeSessionIdRef.current,
+          messages,
+          savedSuggestionProposalIds,
+          pendingSuggestionProposalId,
+        });
+        setUseLegacyFallback(true);
+        await legacyAssistant.submitMessage(message, inputMode, {
+          ...options,
+          starterIntent,
+          ...(selectedDate ? { selectedDate } : {}),
+        });
+        if (
+          shouldConsumePendingStarterIntent &&
+          pendingStarterIntentRef.current === pendingStarterIntent
+        ) {
+          pendingStarterIntentRef.current = null;
+          pendingQuestCaptureSelectedDateRef.current = null;
+        }
+        return true;
+      }
+
       if (!user?.id || !companion?.id) {
         toast.error("Your companion is still loading. Try again in a moment.");
         return false;
@@ -1754,6 +1782,7 @@ export function useCompanionAssistant({
       isResolvingAction,
       isSubmitting,
       legacyAssistant,
+      localScheduleReadEnabled,
       messages,
       requestDraftOpportunitySidecar,
       trackInteraction,

@@ -1130,7 +1130,7 @@ describe("useCompanionAssistant", () => {
     );
   });
 
-  it("tags typed upcoming schedule reads with the upcoming starter intent", async () => {
+  it("routes typed Journeys upcoming schedule reads through the local planner context", async () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(
       () => useCompanionAssistant({ surface: "journeys" }),
@@ -1149,26 +1149,23 @@ describe("useCompanionAssistant", () => {
       await result.current.submitTypedMessage();
     });
 
-    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
-      "companion-agent",
+    expect(mocks.legacyHydrateFromUnifiedState).toHaveBeenCalledWith(
       expect.objectContaining({
-        body: expect.objectContaining({
-          message: "What do I have coming up?",
-          turnOrigin: "composer",
-          starterIntent: "upcoming_start",
-        }),
+        sessionId: "persisted-session",
       }),
     );
-    expect(mocks.trackInteraction).toHaveBeenCalledWith(
-      expect.objectContaining({
-        modifications: expect.objectContaining({
-          starterIntent: "upcoming_start",
-        }),
-      }),
+    expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
+      "What do I have coming up?",
+      "text",
+      {
+        turnOrigin: "composer",
+        starterIntent: "upcoming_start",
+      },
     );
+    expect(mocks.supabaseInvoke).not.toHaveBeenCalled();
   });
 
-  it("sends the default selected date for typed Journeys upcoming reads", async () => {
+  it("sends the default selected date to local Journeys upcoming reads", async () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(
       () =>
@@ -1191,15 +1188,14 @@ describe("useCompanionAssistant", () => {
       await result.current.submitTypedMessage();
     });
 
-    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
-      "companion-agent",
-      expect.objectContaining({
-        body: expect.objectContaining({
-          message: "What do I have coming up?",
-          starterIntent: "upcoming_start",
-          selectedDate: "2026-02-13",
-        }),
-      }),
+    expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
+      "What do I have coming up?",
+      "text",
+      {
+        turnOrigin: "composer",
+        starterIntent: "upcoming_start",
+        selectedDate: "2026-02-13",
+      },
     );
   });
 
@@ -1494,35 +1490,7 @@ describe("useCompanionAssistant", () => {
     consoleError.mockRestore();
   });
 
-  it("falls back to the local upcoming digest when companion-agent fails the read-only starter", async () => {
-    const consoleError = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => {});
-    mocks.supabaseInvoke.mockRejectedValueOnce(
-      Object.assign(new Error("Edge Function returned a non-2xx status code"), {
-        name: "FunctionsHttpError",
-      }),
-    );
-    mocks.parseFunctionInvokeError.mockResolvedValueOnce({
-      name: "FunctionsHttpError",
-      message: "Edge Function returned a non-2xx status code",
-      status: 500,
-      code: "COMPANION_AGENT_FAILED",
-      requestId: "req-upcoming-agent-failure",
-      stage: "agent_run",
-      failureReason: "context_load.agent_run_failed",
-      responsePayload: {
-        code: "COMPANION_AGENT_FAILED",
-        error: "Companion agent hit a snag. Please try again.",
-        requestId: "req-upcoming-agent-failure",
-        stage: "agent_run",
-        failureReason: "context_load.agent_run_failed",
-      },
-      backendMessage: "Companion agent hit a snag. Please try again.",
-      isOffline: false,
-      category: "http",
-    });
-
+  it("uses the local upcoming digest for launcher upcoming reads", async () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(
       () => useCompanionAssistant({ surface: "journeys" }),
@@ -1554,14 +1522,7 @@ describe("useCompanionAssistant", () => {
     expect(mocks.toastError).not.toHaveBeenCalledWith(
       "Companion agent hit a snag. Please try again.",
     );
-    expect(consoleError).toHaveBeenCalledWith(
-      "Failed to submit companion agent message:",
-      expect.objectContaining({
-        code: "COMPANION_AGENT_FAILED",
-        fallbackToLegacy: true,
-      }),
-    );
-    consoleError.mockRestore();
+    expect(mocks.supabaseInvoke).not.toHaveBeenCalled();
   });
 
   it("confirms the active pending action through the deterministic executor path", async () => {
