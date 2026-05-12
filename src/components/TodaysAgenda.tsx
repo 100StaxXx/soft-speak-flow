@@ -969,6 +969,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         return;
       }
 
+      if (deltaY > 0 && deltaY >= absX) {
+        event.preventDefault();
+      }
+
       if (deltaY <= PULL_REFRESH_ACTIVATION_SLOP_PX || deltaY <= absX) {
         return;
       }

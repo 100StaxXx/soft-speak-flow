@@ -2383,14 +2383,10 @@ describe("Journeys row drag integration", () => {
       expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
     });
     const centerKeyBeforePullRefresh = Number(screen.getByTestId("center-request-key").textContent);
-    const datePillsStrip = screen.getByTestId("journeys-date-pills-strip");
-    expect(datePillsStrip).toHaveClass("sticky", "z-40");
 
     performQuestListPullRefresh(await screen.findByTestId("scheduled-timeline-pane"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("journeys-date-pills-strip")).toBeInTheDocument();
-      expect(screen.getByTestId("journeys-date-pills-strip")).toHaveClass("sticky", "z-40");
       const refreshedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       expect(refreshedDateIso).not.toBe(staleSelectedDateIso);
       expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);

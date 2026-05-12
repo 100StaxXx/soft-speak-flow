@@ -95,14 +95,6 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     onUserDateInteraction?.();
   }, [onUserDateInteraction]);
 
-  const isDateKeyInRenderedRange = useCallback((dateKey: string) => {
-    const date = dateKeyToDate(dateKey);
-    if (!date) return false;
-
-    return differenceInCalendarDays(date, rangeStart) >= 0
-      && differenceInCalendarDays(date, rangeEnd) <= 0;
-  }, [rangeEnd, rangeStart]);
-
   const resetRenderedRangeAroundDateKey = useCallback((dateKey: string) => {
     const date = dateKeyToDate(dateKey);
     if (!date) return false;
@@ -408,7 +400,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     const runCentering = (remainingAttempts: number) => {
       if (isCancelled) return;
 
-      if (isForcedCenterRequest && !isDateKeyInRenderedRange(requestedCenterDateKey)) {
+      if (isForcedCenterRequest) {
         if (resetRenderedRangeAroundDateKey(requestedCenterDateKey)) return;
       }
 
@@ -449,7 +441,6 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     centerRequestKey,
     centerSelectedDate,
     isActive,
-    isDateKeyInRenderedRange,
     prefersReducedMotion,
     requestedCenterDateKey,
     resetRenderedRangeAroundDateKey,
