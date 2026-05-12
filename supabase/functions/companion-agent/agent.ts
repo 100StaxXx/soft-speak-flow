@@ -1091,6 +1091,62 @@ const isFreeTalkProviderFallbackRequest = (
   !isDeterministicScheduleReadRequest(request) &&
   !looksLikePlannerActionMessage(request.message);
 
+const EXPLICIT_COMPANION_WRITE_STARTER_INTENTS = new Set<string>([
+  "quest_capture",
+  "goal_breakdown_start",
+]);
+
+const SCHEDULE_WRITE_REQUEST_PATTERNS = [
+  /^(?:please\s+|pls\s+)?schedule\b/,
+  /\b(?:can|could|would|will)\s+(?:you|we)\s+schedule\b/,
+  /\b(?:help me|i need(?: you)? to|i want(?: you)? to|let's|lets)\s+schedule\b/,
+];
+
+const UPDATE_WRITE_REQUEST_PATTERNS = [
+  /^(?:please\s+|pls\s+)?(?:move|reschedule|update|cancel|delete|remove|complete)\b.+/,
+  /\b(?:can|could|would|will)\s+you\s+(?:move|reschedule|update|cancel|delete|remove|complete)\b/,
+  /\b(?:help me|i need(?: you)? to|i want(?: you)? to)\s+(?:move|reschedule|update|cancel|delete|remove|complete)\b/,
+  /\bmark\b.+\b(?:done|complete|completed)\b/,
+];
+
+const isExplicitCompanionWriteMessage = (message: string): boolean => {
+  const normalized = normalizeBareStarterPrompt(message);
+  const isScheduleReadQuestion =
+    /\b(?:what(?:'s| is)|whats|how|show|check|read|view|see)\b.*\bschedule\b/
+      .test(normalized);
+
+  const isScheduleWriteRequest = !isScheduleReadQuestion &&
+    SCHEDULE_WRITE_REQUEST_PATTERNS.some((pattern) => pattern.test(normalized));
+  const isUpdateWriteRequest = UPDATE_WRITE_REQUEST_PATTERNS.some((pattern) =>
+    pattern.test(normalized)
+  );
+
+  return /\b(create|add|draft|save|log)\b/.test(normalized) ||
+    /\b(remind me|set(?: up)? (?:a )?reminder)\b/.test(normalized) ||
+    /\b(?:new quest|quest for|task for|ritual for)\b/.test(normalized) ||
+    /\b(?:turn|make|convert)\b.+\b(?:into|as)\b.+\b(?:quest|task|reminder|ritual|journal)\b/
+      .test(normalized) ||
+    /\b(?:put|place|block)\b.+\b(?:on|for|at|calendar|schedule|today|tomorrow)\b/
+      .test(normalized) ||
+    isScheduleWriteRequest ||
+    isUpdateWriteRequest;
+};
+
+function isExplicitCompanionWriteRequest(
+  request: CompanionAgentRequest,
+): boolean {
+  if (request.surface !== "companion") return true;
+  if (request.selectedProposalId || request.selectedProposedAction) return true;
+  if (
+    request.starterIntent &&
+    EXPLICIT_COMPANION_WRITE_STARTER_INTENTS.has(request.starterIntent)
+  ) {
+    return true;
+  }
+
+  return isExplicitCompanionWriteMessage(request.message);
+}
+
 const getScheduleReadStarterIntent = (
   request: CompanionAgentRequest,
 ): string | null =>
@@ -2237,6 +2293,8 @@ function buildInstructions(params: {
   const currentMood = params.companion.current_mood?.trim() || "steady";
   const modeConfig = getCompanionModeConfig(params.context.companionMode);
   const sidecarManagedTurn = isJourneysSidecarManagedTurn(params.request);
+  const companionChatOnlyTurn = params.surface === "companion" &&
+    !isExplicitCompanionWriteRequest(params.request);
   const writePolicyInstructions = sidecarManagedTurn
     ? [
       "For this Journeys turn, you are the user-facing chat only. Do not call prepare tools, do not return pending_confirmation, and do not return proposed_actions for drafts or campaigns.",
@@ -2244,6 +2302,14 @@ function buildInstructions(params: {
       "Do not ask structured draft-consent follow-ups like 'Should I draft this?' or 'Would you like to start a campaign?' The sidecar handles card-or-nothing opportunities.",
       "If a normal conversational question would help, ask it in your reply text with mode conversation and understanding_state enough_to_discuss.",
       "Never say you drafted, prepared, saved, queued, or opened something from a sidecar-managed turn.",
+    ]
+    : companionChatOnlyTurn
+    ? [
+      "This Companion tab turn has no explicit write request. Reply as direct natural chat only.",
+      "Do not call prepare tools, do not return pending_confirmation, ready_to_draft, proposed_actions, or structured planner proposals.",
+      "Do not ask structured draft-consent follow-ups like 'Should I draft this?' or 'Would you like me to turn this into a quest?'",
+      "Words like future, thinking, vibing, goal, or plan are conversational unless the user explicitly asks you to create, add, draft, schedule, move, reschedule, update, cancel, delete, save, remind, log, or turn something into a quest.",
+      "Never say you drafted, prepared, saved, queued, opened, created, added, or scheduled something from this turn.",
     ]
     : [
       "You must never execute writes. You may only use read tools and prepare tools.",
@@ -2268,6 +2334,11 @@ function buildInstructions(params: {
         "For Journeys planning launchers, keep the visible experience conversational and read-only. Do not create structured draft-consent follow-ups or pending drafts.",
         "If the user names a concrete task, plan change, or campaign goal, respond to it in chat. The sidecar owns quest and campaign suggestion cards.",
       ]
+      : companionChatOnlyTurn
+      ? [
+        "For Companion chat without explicit write intent, treat the user as talking directly to the chatbot. Stay conversational and read-only.",
+        "If the user is reflecting, venting, exploring possibilities, or thinking out loud, respond to that content instead of converting it into an app action.",
+      ]
       : [
         "For planning launchers, keep the experience conversational and read-only until the user explicitly opts into drafting. This covers Plan my day, What should I do right now, Adjust my day, Make room, What matters, Prepare me for tomorrow, Advance my campaign, Relationship touch, and low-energy planning.",
         "If a planning-launcher follow-up names a concrete task, ask the generic confirmation 'Would you like to form a quest?' with Yes and No options. Do not echo an inferred title, draft the quest, or carry hidden quest fields in that same turn.",
@@ -2275,17 +2346,17 @@ function buildInstructions(params: {
         "If a planning launcher would require moving tasks, creating a campaign reset, or drafting any planner change, ask for explicit consent first, such as 'Would you like me to draft those schedule changes?' or 'Would you like me to draft a campaign adjustment?'",
         "After the user answers the follow-up or explicitly asks you to draft, create, add, save, move, or schedule something specific, you may use consult_planner and prepare tools when helpful.",
       ]),
-    sidecarManagedTurn
+    sidecarManagedTurn || companionChatOnlyTurn
       ? "Your job is to answer the user in chat. Do not show plans as structured proposals, suggest quest cards, or prepare confirmable actions from this turn."
       : "Your job is to choose whether to answer, ask a follow-up, show a plan, suggest quests, or prepare a confirmable action.",
-    sidecarManagedTurn
+    sidecarManagedTurn || companionChatOnlyTurn
       ? "If you need more information, ask conversationally in the reply text instead of returning a structured follow_up."
       : "Follow-ups are normal and often appropriate. Ask because one more answer would materially improve the plan or avoid a wrong action, not because the prompt is short.",
-    sidecarManagedTurn
+    sidecarManagedTurn || companionChatOnlyTurn
       ? "Avoid generic questions that ask the user to repeat data the app already supplied."
       : "A good follow-up is specific and grounded in the provided schedule, tasks, campaigns, rituals, or current moment. Avoid generic questions that ask the user to repeat data the app already supplied.",
     "Use understanding_state in submit_companion_result: needs_followup when you ask a question, enough_to_discuss when chatting or reflecting, ready_to_propose when showing a plan/suggestions, and ready_to_draft when you prepared a pending action.",
-    sidecarManagedTurn
+    sidecarManagedTurn || companionChatOnlyTurn
       ? "Do not include follow_up in submit_companion_result for this turn."
       : "When you ask a follow-up, include follow_up with the exact question, why it matters, the expected answer type, and short options when useful. Preserve the original intent across the follow-up loop.",
     ...writePolicyInstructions,
@@ -2306,6 +2377,8 @@ function buildInstructions(params: {
     "Include assumptions and evidence_ids when they help the app/debugger understand why you made the decision. Evidence IDs should reference actual task, ritual, campaign, reminder, or calendar IDs from context.",
     sidecarManagedTurn
       ? "Do not include proposed_actions on this turn. The separate sidecar owns suggestion cards."
+      : companionChatOnlyTurn
+      ? "Do not include proposed_actions on this turn. Companion chat is read-only until the user explicitly asks for an app action."
       : "If you are ready to draft but do not use a prepare tool, include a supported proposed_actions item with enough normalizedPayload for the app to validate and create a pending confirmation.",
     "Always finish by calling submit_companion_result. Do not end with a plain assistant message.",
     `Surface: ${params.surface}.`,
@@ -2385,6 +2458,54 @@ function normalizeSidecarManagedResult(result: AgentRunResult["result"]) {
   if (!hasActionState) return;
 
   result.mode = "conversation";
+  result.understandingState = "enough_to_discuss";
+  result.followUp = null;
+  result.proposedActions = [];
+  result.structuredResponse = null;
+  result.preparedActionId = null;
+}
+
+const COMPANION_CHAT_ONLY_FALLBACK_REPLY =
+  "I'm here with you. We can think it through without turning it into a quest unless you ask me to.";
+
+const looksLikeDraftOrConfirmationReply = (reply: string): boolean => {
+  const normalized = normalizeBareStarterPrompt(reply);
+  return /\b(?:i|i've|i have)\s+(?:drafted|prepared|queued|saved|opened|scheduled|created|added)\b/
+    .test(normalized) ||
+    /\b(?:i can|i could|would you like me to|want me to)\s+(?:draft|prepare|create|add|schedule|save|log)\b/
+      .test(normalized) ||
+    /\b(?:review it|confirm it|pending confirmation|quest draft|drafted this|prepared this)\b/
+      .test(normalized);
+};
+
+function normalizeCompanionChatOnlyResult(result: AgentRunResult["result"]) {
+  const hasStructuredOrActionState = result.mode === "pending_confirmation" ||
+    result.understandingState === "ready_to_draft" ||
+    (result.understandingState === "ready_to_propose" &&
+      result.mode !== "schedule_read") ||
+    Boolean(result.followUp) ||
+    Boolean(result.preparedActionId) ||
+    result.proposedActions.length > 0 ||
+    Boolean(result.structuredResponse);
+  const hasDraftLanguage = looksLikeDraftOrConfirmationReply(result.reply);
+
+  if (!hasStructuredOrActionState && !hasDraftLanguage) return;
+
+  result.reply = hasDraftLanguage
+    ? COMPANION_CHAT_ONLY_FALLBACK_REPLY
+    : result.reply;
+  result.mode = "conversation";
+  if (
+    result.intent === "schedule_task" ||
+    result.intent === "plan_day" ||
+    result.intent === "plan_week" ||
+    result.intent === "update_existing_plan" ||
+    result.intent === "goal_setting" ||
+    result.intent === "journal"
+  ) {
+    result.intent = "unknown";
+  }
+  result.confidence = Math.min(result.confidence, 0.65);
   result.understandingState = "enough_to_discuss";
   result.followUp = null;
   result.proposedActions = [];
@@ -4973,6 +5094,9 @@ export async function runCompanionAgent(params: RunAgentParams) {
     )
   ) {
     normalizeSidecarManagedResult(agentResult.result);
+  }
+  if (!isExplicitCompanionWriteRequest(params.request)) {
+    normalizeCompanionChatOnlyResult(agentResult.result);
   }
 
   let persistedPendingAction: PendingActionRow | null =

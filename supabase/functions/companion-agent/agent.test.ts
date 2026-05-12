@@ -268,6 +268,72 @@ function createInstructionCaptureFetch(reply = "I’m here.") {
   return { guardedFetch, responseBodies };
 }
 
+function createModelQuestDraftAttemptFetch(params: {
+  reply?: string;
+  mode?: string;
+  intent?: string;
+  understandingState?: string;
+  confidence?: number;
+  proposedActions?: unknown[];
+} = {}) {
+  const responseBodies: Array<Record<string, unknown>> = [];
+  const proposedActions = params.proposedActions ?? [
+    {
+      type: "quest.create",
+      title: "Think About The Future",
+      summary: "Add Think About The Future for tomorrow.",
+      normalizedPayload: {
+        title: "Think About The Future",
+        date: "2026-04-19",
+        durationMinutes: 30,
+      },
+      confidence: 0.86,
+    },
+  ];
+  const guardedFetch = (async (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ) => {
+    const url = String(input);
+    if (url.endsWith("/conversations")) {
+      return jsonResponse({ id: `conv_${responseBodies.length + 1}` });
+    }
+
+    if (url.endsWith("/responses")) {
+      const body = JSON.parse(String(init?.body ?? "{}")) as Record<
+        string,
+        unknown
+      >;
+      responseBodies.push(body);
+      return jsonResponse({
+        id: `resp_${responseBodies.length}`,
+        conversation: { id: `conv_${responseBodies.length}` },
+        output: [
+          {
+            type: "function_call",
+            call_id: "call_submit",
+            name: "submit_companion_result",
+            arguments: JSON.stringify({
+              reply: params.reply ??
+                "I drafted this as a quest. Review it and confirm if it fits.",
+              mode: params.mode ?? "pending_confirmation",
+              intent: params.intent ?? "schedule_task",
+              confidence: params.confidence ?? 0.9,
+              understanding_state: params.understandingState ??
+                "ready_to_draft",
+              proposed_actions: proposedActions,
+            }),
+          },
+        ],
+      });
+    }
+
+    throw new Error(`Unexpected fetch: ${url}`);
+  }) as typeof fetch;
+
+  return { guardedFetch, responseBodies };
+}
+
 function createInstructionAndDraftOpportunityFetch(params: {
   reply: string;
   decision: Record<string, unknown>;
@@ -514,6 +580,264 @@ Deno.test("runCompanionAgent keeps composer conversation chat-only when model do
       entry.table === "companion_pending_actions"
     ),
     false,
+  );
+});
+
+Deno.test("runCompanionAgent blocks non-explicit Companion reflections from quest drafts", async () => {
+  const supabase = createMockSupabase();
+  const { guardedFetch, responseBodies } = createModelQuestDraftAttemptFetch();
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "companion",
+      sessionId: "session-companion-reflection-no-draft",
+      message: "Just vibing. Thinking about the future",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      turnOrigin: "composer",
+    },
+  });
+
+  const instructions = String(responseBodies[0]?.instructions ?? "");
+  assert(
+    instructions.includes(
+      "This Companion tab turn has no explicit write request. Reply as direct natural chat only.",
+    ),
+    "expected Companion chat-only instruction for non-explicit turns",
+  );
+  assertEquals(result.mode, "conversation");
+  assertEquals(result.intent, "unknown");
+  assertEquals(result.understandingState, "enough_to_discuss");
+  assert(
+    result.reply.includes("without turning it into a quest"),
+    "expected draft wording to be replaced with conversational fallback",
+  );
+  assertEquals(result.proposedActions, []);
+  assertEquals(result.pendingAction, undefined);
+  assertEquals(result.threadState.hasPendingAction, false);
+  assertEquals(
+    supabase.inserts.some((entry) =>
+      entry.table === "companion_pending_actions"
+    ),
+    false,
+  );
+});
+
+Deno.test("runCompanionAgent allows explicit Companion quest creation requests to draft", async () => {
+  const supabase = createMockSupabase();
+  const { guardedFetch, responseBodies } = createModelQuestDraftAttemptFetch({
+    reply:
+      "I drafted this quest for tomorrow. Review it and confirm if it fits.",
+  });
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "companion",
+      sessionId: "session-companion-explicit-draft",
+      message: "Create a quest to think about my future tomorrow",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      turnOrigin: "composer",
+    },
+  });
+
+  const instructions = String(responseBodies[0]?.instructions ?? "");
+  assert(
+    !instructions.includes(
+      "This Companion tab turn has no explicit write request.",
+    ),
+    "explicit Companion write requests should not use chat-only instructions",
+  );
+  assertEquals(result.mode, "pending_confirmation");
+  assertEquals(result.intent, "schedule_task");
+  assertEquals(result.understandingState, "ready_to_draft");
+  assertEquals(result.pendingAction?.actionType, "task_create");
+  assertEquals(
+    result.pendingAction?.normalizedPayload.title,
+    "Think About The Future",
+  );
+  assertEquals(result.threadState.hasPendingAction, true);
+});
+
+Deno.test("runCompanionAgent allows explicit Companion schedule requests without time anchors", async () => {
+  const supabase = createMockSupabase();
+  const { guardedFetch, responseBodies } = createModelQuestDraftAttemptFetch({
+    reply: "I drafted this quest. Review it and confirm if it fits.",
+    proposedActions: [
+      {
+        type: "quest.create",
+        title: "Dentist Appointment",
+        summary: "Add Dentist Appointment.",
+        normalizedPayload: {
+          title: "Dentist Appointment",
+        },
+        confidence: 0.86,
+      },
+    ],
+  });
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "companion",
+      sessionId: "session-companion-explicit-schedule-no-anchor",
+      message: "Schedule a dentist appointment",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      turnOrigin: "composer",
+    },
+  });
+
+  const instructions = String(responseBodies[0]?.instructions ?? "");
+  assert(
+    !instructions.includes(
+      "This Companion tab turn has no explicit write request.",
+    ),
+    "schedule commands should not use chat-only instructions",
+  );
+  assertEquals(result.mode, "pending_confirmation");
+  assertEquals(result.intent, "schedule_task");
+  assertEquals(result.pendingAction?.actionType, "task_create");
+  assertEquals(
+    result.pendingAction?.normalizedPayload.title,
+    "Dentist Appointment",
+  );
+});
+
+Deno.test("runCompanionAgent allows explicit Companion move requests to draft updates", async () => {
+  const supabase = createMockSupabase();
+  const { guardedFetch, responseBodies } = createModelQuestDraftAttemptFetch({
+    reply: "I prepared this move. Review it and confirm if it fits.",
+    intent: "update_existing_plan",
+    proposedActions: [
+      {
+        type: "task.update",
+        title: "Move Gym",
+        summary: "Move Gym to tomorrow at 3:00 PM.",
+        normalizedPayload: {
+          task_id: "11111111-1111-4111-8111-111111111111",
+          title: "Gym",
+          date: "2026-04-19",
+          startTime: "15:00",
+        },
+        confidence: 0.86,
+      },
+    ],
+  });
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "companion",
+      sessionId: "session-companion-explicit-move",
+      message: "Move Gym to tomorrow at 3",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      turnOrigin: "composer",
+    },
+  });
+
+  const instructions = String(responseBodies[0]?.instructions ?? "");
+  assert(
+    !instructions.includes(
+      "This Companion tab turn has no explicit write request.",
+    ),
+    "move commands should not use chat-only instructions",
+  );
+  assertEquals(result.mode, "pending_confirmation");
+  assertEquals(result.intent, "update_existing_plan");
+  assertEquals(result.pendingAction?.actionType, "task_update");
+  assertEquals(
+    result.pendingAction?.normalizedPayload.task_id,
+    "11111111-1111-4111-8111-111111111111",
+  );
+});
+
+Deno.test("runCompanionAgent downgrades non-explicit Companion ready-to-propose states", async () => {
+  const supabase = createMockSupabase();
+  const { guardedFetch } = createModelQuestDraftAttemptFetch({
+    reply: "That sounds like a tender thing to think through.",
+    mode: "conversation",
+    intent: "plan_day",
+    understandingState: "ready_to_propose",
+    proposedActions: [],
+  });
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "companion",
+      sessionId: "session-companion-ready-to-propose-no-draft",
+      message: "Just thinking about what kind of future I want",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      turnOrigin: "composer",
+    },
+  });
+
+  assertEquals(result.mode, "conversation");
+  assertEquals(result.intent, "unknown");
+  assertEquals(result.understandingState, "enough_to_discuss");
+  assertEquals(result.pendingAction, undefined);
+  assertEquals(result.threadState.hasPendingAction, false);
+});
+
+Deno.test("runCompanionAgent allows selected Companion proposed actions to draft", async () => {
+  const supabase = createMockSupabase();
+  const { guardedFetch } = createModelQuestDraftAttemptFetch({
+    reply: "I pulled that suggestion into a quest draft.",
+    proposedActions: [],
+  });
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "companion",
+      sessionId: "session-companion-selected-draft",
+      message: "Draft it",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      turnOrigin: "proposed_action",
+      selectedProposedActionIntent: "draft",
+      selectedProposedAction: {
+        type: "quest.create",
+        title: "Think About The Future",
+        summary: "Add Think About The Future for tomorrow.",
+        normalizedPayload: {
+          title: "Think About The Future",
+          date: "2026-04-19",
+          durationMinutes: 30,
+        },
+      },
+    },
+  });
+
+  assertEquals(result.mode, "pending_confirmation");
+  assertEquals(result.intent, "schedule_task");
+  assertEquals(result.pendingAction?.actionType, "task_create");
+  assertEquals(
+    result.pendingAction?.normalizedPayload.title,
+    "Think About The Future",
   );
 });
 
