@@ -182,6 +182,8 @@ export const CompanionStructuredResponseCards = memo(
     const styles = variantStyles[variant];
     const planDayCampaignFocus =
       structuredResponse.planDay?.campaignFocus ?? null;
+    const comingUpTomorrowSchedule =
+      structuredResponse.comingUp?.tomorrowSchedule ?? [];
 
     return (
       <div className={cn("space-y-3", className)}>
@@ -615,6 +617,23 @@ export const CompanionStructuredResponseCards = memo(
               <p className={cn("mt-4", styles.subtext)}>
                 Tomorrow looks {structuredResponse.comingUp.tomorrowSummary}.
               </p>
+              {comingUpTomorrowSchedule.length > 0
+                ? (
+                  <div className="mt-3">
+                    <p className={styles.title}>Tomorrow</p>
+                    <div className="mt-2 space-y-2">
+                      {comingUpTomorrowSchedule.map((item) => (
+                        <div key={item.id} className={styles.item}>
+                          <p className="text-sm font-semibold">{item.title}</p>
+                          <p className={cn("mt-1", styles.subtext)}>
+                            {item.label}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+                : null}
               {structuredResponse.comingUp.missedItems.length > 0
                 ? (
                   <div className="mt-3 space-y-2">

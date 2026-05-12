@@ -112,6 +112,40 @@ Deno.test("consultPlannerForAgent includes due campaign rituals in coming up rea
   );
 });
 
+Deno.test("consultPlannerForAgent includes active standalone rituals due tomorrow in coming up reads", () => {
+  const result = consultPlannerForAgent({
+    message: "What do I have coming up?",
+    currentDateTime: "2026-04-18T20:32:00-07:00",
+    surface: "journeys",
+    horizon: "day",
+    starterIntent: "upcoming_start",
+    context: buildContext({
+      currentDateTime: "2026-04-18T20:32:00-07:00",
+      rituals: [
+        {
+          id: "ritual-standalone",
+          title: "Morning standalone ritual",
+          frequency: "daily",
+          preferred_time: "08:00",
+          estimated_minutes: 20,
+          custom_days: null,
+          custom_month_days: null,
+        },
+      ],
+    }),
+  });
+
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.reply.includes("Tomorrow: nothing scheduled."), false);
+  assertMatch(result.reply, /Morning standalone ritual/);
+  assertEquals(
+    result.structuredResponse?.comingUp?.tomorrowSchedule?.some((item) =>
+      item.title === "Morning standalone ritual" && item.source === "ritual"
+    ),
+    true,
+  );
+});
+
 Deno.test("consultPlannerForAgent uses selected date for coming up schedule reads", () => {
   const result = consultPlannerForAgent({
     message: "What do I have coming up?",

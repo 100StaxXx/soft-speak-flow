@@ -201,6 +201,7 @@ const CompanionStructuredResponseSchema = z.object({
     nextEvent: CompanionScheduleItemSchema.nullable(),
     nextBestAction: CompanionSuggestedQuestSchema.nullable(),
     remainingToday: z.array(CompanionScheduleItemSchema).max(24),
+    tomorrowSchedule: z.array(CompanionScheduleItemSchema).max(24).optional(),
     tomorrowSummary: z.enum(["busy", "light", "open"]),
     missedItems: z.array(CompanionMissedItemSchema).max(24),
   }).nullable().optional(),

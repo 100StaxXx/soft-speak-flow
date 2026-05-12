@@ -894,6 +894,9 @@ const collectPlannerResultProtectedDataText = (
   ...(result.structuredResponse?.comingUp?.remainingToday.map((item) =>
     item.title
   ) ?? []),
+  ...(result.structuredResponse?.comingUp?.tomorrowSchedule?.map((item) =>
+    item.title
+  ) ?? []),
   ...(result.structuredResponse?.comingUp?.missedItems.map((item) =>
     item.title
   ) ?? []),
@@ -1167,6 +1170,12 @@ export const normalizePlannerBuildResultText = (
               label: data(item.label),
             }),
           ),
+          tomorrowSchedule: result.structuredResponse.comingUp.tomorrowSchedule
+            ?.map((item) => ({
+              ...item,
+              title: data(item.title),
+              label: data(item.label),
+            })),
           missedItems: result.structuredResponse.comingUp.missedItems.map(
             (item) => ({
               ...item,
@@ -7231,6 +7240,7 @@ const buildComingUpStructuredOutput = (
       nextEvent,
       nextBestAction,
       remainingToday,
+      tomorrowSchedule: tomorrowItems,
       tomorrowSummary,
       missedItems: collectMissedTasksForToday(input),
     },
@@ -8704,7 +8714,7 @@ export const scopePlannerRitualsToActiveCampaigns = (
   activeHabitIds: ReadonlySet<string> | null = null,
 ): PlannerContextRitual[] =>
   rituals.filter((ritual) =>
-    activeCampaignIds.has(ritual.epicId) &&
+    (activeCampaignIds.has(ritual.epicId) || ritual.epicId === "general") &&
     (!activeHabitIds || activeHabitIds.has(ritual.id))
   );
 

@@ -5371,6 +5371,39 @@ Deno.test("upcoming_start includes due campaign rituals without materialized tas
   assertEquals(result.structuredResponse?.comingUp?.tomorrowSummary, "light");
 });
 
+Deno.test("upcoming_start includes active standalone rituals due tomorrow", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What do I have coming up?",
+    currentDateTime: "2026-04-18T20:32:00-07:00",
+    plannerContext: {
+      activeHabitIds: ["ritual-standalone"],
+      rituals: [
+        {
+          id: "ritual-standalone",
+          epicId: "general",
+          epicTitle: "your goals",
+          title: "Morning standalone ritual",
+          frequency: "daily",
+          preferredTime: "08:00",
+          estimatedMinutes: 20,
+        },
+      ],
+      starterIntent: "upcoming_start",
+    },
+  }));
+
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.reply.includes("Tomorrow: nothing scheduled."), false);
+  assertStringIncludes(result.reply, "Morning standalone ritual");
+  assertEquals(result.structuredResponse?.comingUp?.tomorrowSummary, "light");
+  assertEquals(
+    result.structuredResponse?.comingUp?.tomorrowSchedule?.some((item) =>
+      item.title === "Morning standalone ritual" && item.source === "ritual"
+    ),
+    true,
+  );
+});
+
 Deno.test("upcoming_start respects campaign ritual cadence", () => {
   const result = buildPlannerResponse(baseInput({
     message: "What do I have coming up?",

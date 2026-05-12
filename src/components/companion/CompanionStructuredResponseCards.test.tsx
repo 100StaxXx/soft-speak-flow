@@ -156,6 +156,44 @@ describe("CompanionStructuredResponseCards", () => {
     expect(button).toBeDisabled();
   });
 
+  it("renders tomorrow schedule items in coming-up cards", () => {
+    const structuredResponse: CompanionStructuredResponse = {
+      intent: baseIntent,
+      comingUp: {
+        message: "Today is clear, but tomorrow has a real anchor.",
+        nextEvent: null,
+        nextBestAction: null,
+        remainingToday: [],
+        tomorrowSummary: "light",
+        tomorrowSchedule: [
+          {
+            id: "ritual:morning:2026-04-19",
+            title: "Morning ritual",
+            label: "Morning ritual (tomorrow at 8:00 am)",
+            startsAt: "2026-04-19T08:00:00",
+            endsAt: "2026-04-19T08:20:00.000Z",
+            isAllDay: false,
+            source: "ritual",
+          },
+        ],
+        missedItems: [],
+      },
+    };
+
+    render(
+      <CompanionStructuredResponseCards
+        structuredResponse={structuredResponse}
+        variant="companion"
+      />,
+    );
+
+    expect(screen.getByTestId("structured-coming-up"))
+      .toHaveTextContent("Tomorrow looks light.");
+    expect(screen.getByText("Morning ritual")).toBeInTheDocument();
+    expect(screen.getByText("Morning ritual (tomorrow at 8:00 am)"))
+      .toBeInTheDocument();
+  });
+
   it("renders weekly proposal actions and confirms them from the shared quest row", () => {
     const onConfirmSuggestion = vi.fn();
     const structuredResponse: CompanionStructuredResponse = {

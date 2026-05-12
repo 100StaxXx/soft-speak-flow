@@ -1096,32 +1096,69 @@ const EXPLICIT_COMPANION_WRITE_STARTER_INTENTS = new Set<string>([
   "goal_breakdown_start",
 ]);
 
+const WRITE_TARGET_HINT_PATTERN =
+  /\b(?:quest|task|reminder|ritual|journal|reflection|calendar|schedule|campaign|goal|habit|appointment|meeting|call|gym|pilates|workout|today|tomorrow|tonight|morning|afternoon|evening|daily|weekly|monthly|monday|tuesday|wednesday|thursday|friday|saturday|sunday|at\s+\d{1,2}(?::\d{2})?(?:\s*(?:am|pm))?|\d{1,2}:\d{2})\b/;
+
+const DIRECT_WRITE_REQUEST_PATTERNS = [
+  /^(?:please\s+|pls\s+)?(?:add|draft|save|log)\b.+/,
+  /\b(?:can|could|would|will)\s+you\s+(?:add|draft|save|log)\b/,
+  /\bi\s+(?:need|want)\s+you\s+to\s+(?:add|draft|save|log)\b/,
+];
+
+const TARGETED_WRITE_REQUEST_PATTERNS = [
+  /^(?:please\s+|pls\s+)?create\b.+/,
+  /\b(?:can|could|would|will)\s+you\s+create\b.+/,
+  /\bi\s+(?:need|want)\s+you\s+to\s+create\b.+/,
+  /\b(?:help me|let's|lets)\s+(?:create|add|draft|save|log)\b.+/,
+  /\b(?:can|could|would|will)\s+we\s+(?:create|add|draft|save|log)\b.+/,
+  /\bi\s+(?:need|want|would like)\s+to\s+(?:create|add|draft|save|log)\b.+/,
+  /\b(?:i'd|id)\s+like\s+to\s+(?:create|add|draft|save|log)\b.+/,
+];
+
 const SCHEDULE_WRITE_REQUEST_PATTERNS = [
   /^(?:please\s+|pls\s+)?schedule\b/,
   /\b(?:can|could|would|will)\s+(?:you|we)\s+schedule\b/,
   /\b(?:help me|i need(?: you)? to|i want(?: you)? to|let's|lets)\s+schedule\b/,
 ];
 
-const UPDATE_WRITE_REQUEST_PATTERNS = [
+const CORE_UPDATE_WRITE_REQUEST_PATTERNS = [
   /^(?:please\s+|pls\s+)?(?:move|reschedule|update|cancel|delete|remove|complete)\b.+/,
   /\b(?:can|could|would|will)\s+you\s+(?:move|reschedule|update|cancel|delete|remove|complete)\b/,
-  /\b(?:help me|i need(?: you)? to|i want(?: you)? to)\s+(?:move|reschedule|update|cancel|delete|remove|complete)\b/,
+  /\b(?:help me|i need(?: you)? to|i want(?: you)? to)\s+(?:move|reschedule|update|cancel|delete|remove|complete)\b.+/,
+];
+
+const EXTENDED_UPDATE_WRITE_REQUEST_PATTERNS = [
+  /^(?:please\s+|pls\s+)?(?:shift|push|pull|adjust|edit|rename|book|fit|squeeze|slot|lock\s+in)\b.+/,
+  /\b(?:can|could|would|will)\s+you\s+(?:shift|push|pull|adjust|edit|rename|book|fit|squeeze|slot|lock\s+in)\b.+/,
+  /\b(?:help me|i need(?: you)? to|i want(?: you)? to)\s+(?:shift|push|pull|adjust|edit|rename|book|fit|squeeze|slot|lock\s+in)\b.+/,
   /\bmark\b.+\b(?:done|complete|completed)\b/,
 ];
 
 const isExplicitCompanionWriteMessage = (message: string): boolean => {
   const normalized = normalizeBareStarterPrompt(message);
+  const hasWriteTargetHint = WRITE_TARGET_HINT_PATTERN.test(normalized);
   const isScheduleReadQuestion =
     /\b(?:what(?:'s| is)|whats|how|show|check|read|view|see)\b.*\bschedule\b/
       .test(normalized);
 
+  const isDirectWriteRequest =
+    DIRECT_WRITE_REQUEST_PATTERNS.some((pattern) => pattern.test(normalized)) ||
+    (hasWriteTargetHint &&
+      TARGETED_WRITE_REQUEST_PATTERNS.some((pattern) =>
+        pattern.test(normalized)
+      ));
   const isScheduleWriteRequest = !isScheduleReadQuestion &&
     SCHEDULE_WRITE_REQUEST_PATTERNS.some((pattern) => pattern.test(normalized));
-  const isUpdateWriteRequest = UPDATE_WRITE_REQUEST_PATTERNS.some((pattern) =>
-    pattern.test(normalized)
-  );
+  const isUpdateWriteRequest =
+    CORE_UPDATE_WRITE_REQUEST_PATTERNS.some((pattern) =>
+      pattern.test(normalized)
+    ) ||
+    (hasWriteTargetHint &&
+      EXTENDED_UPDATE_WRITE_REQUEST_PATTERNS.some((pattern) =>
+        pattern.test(normalized)
+      ));
 
-  return /\b(create|add|draft|save|log)\b/.test(normalized) ||
+  return isDirectWriteRequest ||
     /\b(remind me|set(?: up)? (?:a )?reminder)\b/.test(normalized) ||
     /\b(?:new quest|quest for|task for|ritual for)\b/.test(normalized) ||
     /\b(?:turn|make|convert)\b.+\b(?:into|as)\b.+\b(?:quest|task|reminder|ritual|journal)\b/
@@ -2308,7 +2345,7 @@ function buildInstructions(params: {
       "This Companion tab turn has no explicit write request. Reply as direct natural chat only.",
       "Do not call prepare tools, do not return pending_confirmation, ready_to_draft, proposed_actions, or structured planner proposals.",
       "Do not ask structured draft-consent follow-ups like 'Should I draft this?' or 'Would you like me to turn this into a quest?'",
-      "Words like future, thinking, vibing, goal, or plan are conversational unless the user explicitly asks you to create, add, draft, schedule, move, reschedule, update, cancel, delete, save, remind, log, or turn something into a quest.",
+      "Words like future, thinking, vibing, goal, or plan are conversational unless the user explicitly asks you to create, add, draft, schedule, move, reschedule, shift, push, pull, adjust, edit, rename, book, fit, squeeze, lock in, update, cancel, delete, save, remind, log, or turn something into a quest.",
       "Never say you drafted, prepared, saved, queued, opened, created, added, or scheduled something from this turn.",
     ]
     : [

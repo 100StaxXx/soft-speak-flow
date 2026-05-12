@@ -189,6 +189,7 @@ export interface CompanionComingUpStructuredOutput {
   nextEvent: CompanionScheduleItem | null;
   nextBestAction: CompanionSuggestedQuest | null;
   remainingToday: CompanionScheduleItem[];
+  tomorrowSchedule?: CompanionScheduleItem[];
   tomorrowSummary: CompanionTomorrowSummary;
   missedItems: CompanionMissedItem[];
 }

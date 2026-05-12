@@ -627,6 +627,63 @@ Deno.test("runCompanionAgent blocks non-explicit Companion reflections from ques
   );
 });
 
+Deno.test("runCompanionAgent keeps conversational write verbs chat-only without planner targets", async () => {
+  const cases = [
+    {
+      sessionId: "session-companion-create-future-no-draft",
+      message: "I want to create a calmer future",
+    },
+    {
+      sessionId: "session-companion-add-joy-no-draft",
+      message: "Trying to add more joy to my life",
+    },
+    {
+      sessionId: "session-companion-can-we-create-no-draft",
+      message: "Can we create a calmer future together?",
+    },
+  ];
+
+  for (const testCase of cases) {
+    const supabase = createMockSupabase();
+    const { guardedFetch, responseBodies } =
+      createModelQuestDraftAttemptFetch();
+
+    const result = await runCompanionAgent({
+      guardedFetch,
+      supabase: supabase.client,
+      userId: "00000000-0000-4000-8000-000000000001",
+      openAIApiKey: "test-openai-key",
+      request: {
+        surface: "companion",
+        sessionId: testCase.sessionId,
+        message: testCase.message,
+        inputMode: "text",
+        currentDateTime: "2026-04-18T08:00:00-07:00",
+        turnOrigin: "composer",
+      },
+    });
+
+    const instructions = String(responseBodies[0]?.instructions ?? "");
+    assert(
+      instructions.includes(
+        "This Companion tab turn has no explicit write request. Reply as direct natural chat only.",
+      ),
+      `expected chat-only instruction for ${testCase.message}`,
+    );
+    assertEquals(result.mode, "conversation");
+    assertEquals(result.intent, "unknown");
+    assertEquals(result.understandingState, "enough_to_discuss");
+    assertEquals(result.pendingAction, undefined);
+    assertEquals(result.threadState.hasPendingAction, false);
+    assertEquals(
+      supabase.inserts.some((entry) =>
+        entry.table === "companion_pending_actions"
+      ),
+      false,
+    );
+  }
+});
+
 Deno.test("runCompanionAgent allows explicit Companion quest creation requests to draft", async () => {
   const supabase = createMockSupabase();
   const { guardedFetch, responseBodies } = createModelQuestDraftAttemptFetch({
@@ -665,6 +722,40 @@ Deno.test("runCompanionAgent allows explicit Companion quest creation requests t
     "Think About The Future",
   );
   assertEquals(result.threadState.hasPendingAction, true);
+});
+
+Deno.test("runCompanionAgent allows targeted Companion create requests to draft", async () => {
+  const supabase = createMockSupabase();
+  const { guardedFetch, responseBodies } = createModelQuestDraftAttemptFetch({
+    reply:
+      "I drafted this quest for tomorrow. Review it and confirm if it fits.",
+  });
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "companion",
+      sessionId: "session-companion-targeted-create-draft",
+      message: "Can you create a quest to think about my future tomorrow?",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      turnOrigin: "composer",
+    },
+  });
+
+  const instructions = String(responseBodies[0]?.instructions ?? "");
+  assert(
+    !instructions.includes(
+      "This Companion tab turn has no explicit write request.",
+    ),
+    "targeted create requests should not use chat-only instructions",
+  );
+  assertEquals(result.mode, "pending_confirmation");
+  assertEquals(result.intent, "schedule_task");
+  assertEquals(result.pendingAction?.actionType, "task_create");
 });
 
 Deno.test("runCompanionAgent allows explicit Companion schedule requests without time anchors", async () => {
@@ -765,6 +856,54 @@ Deno.test("runCompanionAgent allows explicit Companion move requests to draft up
     result.pendingAction?.normalizedPayload.task_id,
     "11111111-1111-4111-8111-111111111111",
   );
+});
+
+Deno.test("runCompanionAgent allows explicit Companion extended update verbs to draft", async () => {
+  const supabase = createMockSupabase();
+  const { guardedFetch, responseBodies } = createModelQuestDraftAttemptFetch({
+    reply: "I prepared this shift. Review it and confirm if it fits.",
+    intent: "update_existing_plan",
+    proposedActions: [
+      {
+        type: "task.update",
+        title: "Shift Gym",
+        summary: "Shift Gym to tomorrow at 3:00 PM.",
+        normalizedPayload: {
+          task_id: "11111111-1111-4111-8111-111111111111",
+          title: "Gym",
+          date: "2026-04-19",
+          startTime: "15:00",
+        },
+        confidence: 0.86,
+      },
+    ],
+  });
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "companion",
+      sessionId: "session-companion-explicit-shift",
+      message: "Shift Gym to tomorrow at 3",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T08:00:00-07:00",
+      turnOrigin: "composer",
+    },
+  });
+
+  const instructions = String(responseBodies[0]?.instructions ?? "");
+  assert(
+    !instructions.includes(
+      "This Companion tab turn has no explicit write request.",
+    ),
+    "shift commands should not use chat-only instructions",
+  );
+  assertEquals(result.mode, "pending_confirmation");
+  assertEquals(result.intent, "update_existing_plan");
+  assertEquals(result.pendingAction?.actionType, "task_update");
 });
 
 Deno.test("runCompanionAgent downgrades non-explicit Companion ready-to-propose states", async () => {
@@ -1185,6 +1324,58 @@ Deno.test("runCompanionAgent includes active campaign rituals in upcoming reads 
   assertEquals(
     result.structuredResponse?.comingUp?.remainingToday.some((item) =>
       item.title === "Campaign focus ritual" && item.source === "ritual"
+    ),
+    true,
+  );
+});
+
+Deno.test("runCompanionAgent includes active standalone rituals due tomorrow in upcoming reads without OpenAI", async () => {
+  const supabase = createMockSupabase({
+    tableData: {
+      habits: [
+        {
+          id: "ritual-standalone",
+          title: "Morning standalone ritual",
+          frequency: "daily",
+          preferred_time: "08:00",
+          estimated_minutes: 20,
+          custom_days: null,
+          custom_month_days: null,
+          is_active: true,
+        },
+      ],
+    },
+  });
+  let guardedFetchCalled = false;
+  const guardedFetch = (async (input: string | URL | Request) => {
+    guardedFetchCalled = true;
+    throw new Error(
+      `Upcoming schedule reads should not call OpenAI: ${String(input)}`,
+    );
+  }) as typeof fetch;
+
+  const result = await runCompanionAgent({
+    guardedFetch,
+    supabase: supabase.client,
+    userId: "00000000-0000-4000-8000-000000000001",
+    openAIApiKey: "test-openai-key",
+    request: {
+      surface: "journeys",
+      sessionId: "session-upcoming-standalone-ritual",
+      message: "What do I have coming up?",
+      inputMode: "text",
+      currentDateTime: "2026-04-18T20:32:00-07:00",
+      turnOrigin: "composer",
+    },
+  });
+
+  assertEquals(guardedFetchCalled, false);
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.reply.includes("Tomorrow: nothing scheduled."), false);
+  assertEquals(result.reply.includes("Morning standalone ritual"), true);
+  assertEquals(
+    result.structuredResponse?.comingUp?.tomorrowSchedule?.some((item) =>
+      item.title === "Morning standalone ritual" && item.source === "ritual"
     ),
     true,
   );
