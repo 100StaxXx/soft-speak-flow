@@ -823,10 +823,9 @@ export function useCompanionAssistant({
   const queryClient = useQueryClient();
   const [useLegacyFallback, setUseLegacyFallback] = useState(false);
   const unifiedAgentActive = !useLegacyFallback;
-  const localScheduleReadEnabled = surface === "journeys";
 
   const legacyAssistant = useLegacyCompanionAssistantAdapter({
-    enabled: useLegacyFallback || localScheduleReadEnabled,
+    enabled: useLegacyFallback,
     surface,
     conversationEnabled,
     onOpenCampaignBuilder,
@@ -1621,29 +1620,30 @@ export function useCompanionAssistant({
       }
 
       if (
-        localScheduleReadEnabled &&
+        surface === "journeys" &&
         starterIntent === "upcoming_start" &&
         !options?.selectedProposedAction
       ) {
+        const legacySubmitOptions = {
+          ...options,
+          starterIntent,
+          ...(selectedDate ? { selectedDate } : {}),
+        };
         legacyAssistant.hydrateFromUnifiedState?.({
           sessionId: activeSessionIdRef.current,
           messages,
           savedSuggestionProposalIds,
           pendingSuggestionProposalId,
         });
+        pendingLegacyFallbackReplayRef.current = {
+          message,
+          inputMode,
+          options: legacySubmitOptions,
+          pendingStarterIntent,
+          shouldConsumePendingStarterIntent,
+        };
         setUseLegacyFallback(true);
-        await legacyAssistant.submitMessage(message, inputMode, {
-          ...options,
-          starterIntent,
-          ...(selectedDate ? { selectedDate } : {}),
-        });
-        if (
-          shouldConsumePendingStarterIntent &&
-          pendingStarterIntentRef.current === pendingStarterIntent
-        ) {
-          pendingStarterIntentRef.current = null;
-          pendingQuestCaptureSelectedDateRef.current = null;
-        }
+        setLegacyFallbackReplayKey((key) => key + 1);
         return true;
       }
 
@@ -1825,7 +1825,6 @@ export function useCompanionAssistant({
       isResolvingAction,
       isSubmitting,
       legacyAssistant,
-      localScheduleReadEnabled,
       messages,
       requestDraftOpportunitySidecar,
       trackInteraction,

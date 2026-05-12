@@ -93,6 +93,11 @@ describe("createPlanDayBriefingContext", () => {
       [],
     ],
     [
+      "empty_day",
+      [],
+      [],
+    ],
+    [
       "steady_progress",
       [
         task("a", { scheduled_time: "09:00" }),
@@ -111,5 +116,20 @@ describe("createPlanDayBriefingContext", () => {
     expect(snapshot.plannerInsightCategory).toBe(category);
     expect(snapshot.plannerInsightStatement).toEqual(expect.any(String));
     expect(String(snapshot.plannerInsightStatement).length).toBeGreaterThan(20);
+  });
+
+  it("uses empty-day copy when nothing is scheduled", () => {
+    const briefing = createPlanDayBriefingContext({
+      selectedDate,
+      currentTime,
+      tasks: [],
+      activeEpics: [],
+    });
+    const snapshot = briefing.dataSnapshot as Record<string, unknown>;
+
+    expect(briefing.content).toContain("no open quests");
+    expect(snapshot.plannerInsightCategory).toBe("empty_day");
+    expect(snapshot.plannerInsightStatement).toMatch(/day|scheduled|quest/i);
+    expect(snapshot.plannerInsightStatement).not.toMatch(/next important quest/i);
   });
 });

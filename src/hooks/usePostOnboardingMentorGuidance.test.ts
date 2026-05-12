@@ -693,6 +693,46 @@ describe("guided tutorial first-value loop", () => {
     expect(mocks.state.profileUpdatePayloads).toHaveLength(0);
   });
 
+  it("completes legacy Plan day milestones when the snapshot is shown", async () => {
+    mocks.state.guidedTutorial = {
+      ...createFreshTutorial(),
+      milestonesCompleted: ["mentor_intro_hello", "start_plan_my_day"],
+    };
+
+    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/journeys"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("new_goal");
+    });
+
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent("companion-plan-my-day-snapshot-shown"),
+      );
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(
+        mocks.state.profileUpdatePayloads.some((payload) => {
+          const guidedTutorial = (
+            payload.onboarding_data as
+              | { guided_tutorial?: { milestonesCompleted?: string[] } }
+              | undefined
+          )?.guided_tutorial;
+
+          return (
+            guidedTutorial?.milestonesCompleted?.includes("start_plan_my_day") &&
+            guidedTutorial.milestonesCompleted.includes("answer_plan_day_ai") &&
+            guidedTutorial.milestonesCompleted.includes("save_plan_day_action")
+          );
+        }),
+      ).toBe(true);
+    });
+  });
+
   it("shows mentor closeout as a guide card and persists completion from its CTA", async () => {
     mocks.state.guidedTutorial = {
       ...createFreshTutorial(),

@@ -151,6 +151,11 @@ const MILESTONE_ID_SET = new Set<GuidedMilestoneId>([
   "post_evolution_companion_intro",
   "mentor_closeout_message",
 ]);
+const PLAN_DAY_SNAPSHOT_MILESTONES: GuidedMilestoneId[] = [
+  "start_plan_my_day",
+  "answer_plan_day_ai",
+  "save_plan_day_action",
+];
 
 const isGuidedMilestoneId = (value: unknown): value is GuidedMilestoneId =>
   typeof value === "string" && MILESTONE_ID_SET.has(value as GuidedMilestoneId);
@@ -1429,6 +1434,27 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     [awardCustomXP, awardedSet, completedSet, hasPendingIntroDialogue, persistProgress, tutorialReady]
   );
 
+  const markPlanDaySnapshotComplete = useCallback(() => {
+    const nextMilestones = new Set<GuidedMilestoneId>([
+      ...Array.from(milestoneSet),
+      ...PLAN_DAY_SNAPSHOT_MILESTONES,
+    ]);
+    PLAN_DAY_SNAPSHOT_MILESTONES.forEach((milestoneId) => {
+      if (!milestoneSet.has(milestoneId)) {
+        markMilestoneComplete(milestoneId);
+      }
+    });
+    void persistProgress({
+      milestonesCompleted: Array.from(nextMilestones),
+    });
+    void markStepComplete("plan_my_day");
+  }, [
+    markMilestoneComplete,
+    markStepComplete,
+    milestoneSet,
+    persistProgress,
+  ]);
+
   useEffect(() => {
     if (!tutorialComplete || completionPersistRef.current) return;
 
@@ -1660,23 +1686,6 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       });
 
       listeners.push({
-        eventName: "companion-plan-my-day-snapshot-shown",
-        handler: () => {
-          if (location.pathname !== "/journeys") return;
-          if (!milestoneSet.has("start_plan_my_day")) {
-            markMilestoneComplete("start_plan_my_day");
-          }
-          if (!milestoneSet.has("answer_plan_day_ai")) {
-            markMilestoneComplete("answer_plan_day_ai");
-          }
-          if (!milestoneSet.has("save_plan_day_action")) {
-            markMilestoneComplete("save_plan_day_action");
-          }
-          void markStepComplete("plan_my_day");
-        },
-      });
-
-      listeners.push({
         eventName: "companion-plan-my-day-action-saved",
         handler: () => {
           if (location.pathname !== "/journeys") return;
@@ -1695,6 +1704,17 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
             navigate("/companion", { replace: true });
           })();
         },
+      });
+    }
+
+    if (
+      currentStep.id === "plan_my_day" ||
+      milestoneSet.has("start_plan_my_day") ||
+      milestoneSet.has("answer_plan_day_ai")
+    ) {
+      listeners.push({
+        eventName: "companion-plan-my-day-snapshot-shown",
+        handler: markPlanDaySnapshotComplete,
       });
     }
 
@@ -1816,6 +1836,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     location.pathname,
     markCreateQuestSubstepComplete,
     markMilestoneComplete,
+    markPlanDaySnapshotComplete,
     markStepComplete,
     milestoneSet,
     navigate,

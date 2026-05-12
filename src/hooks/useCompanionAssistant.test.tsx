@@ -38,6 +38,7 @@ const mocks = vi.hoisted(() => ({
   legacyStartTemplateThread: vi.fn(),
   legacyStartQuestCaptureThread: vi.fn(),
   legacyHydrateFromUnifiedState: vi.fn(),
+  legacyAdapterOptions: [] as Array<{ enabled?: boolean; surface?: string }>,
   legacySavedSuggestionProposalIds: [] as string[],
   legacyPendingSuggestionProposalId: null as string | null,
 }));
@@ -89,45 +90,48 @@ vi.mock("@/hooks/useCompanionVoiceSettings", () => ({
 }));
 
 vi.mock("@/hooks/useLegacyCompanionAssistantAdapter", () => ({
-  useLegacyCompanionAssistantAdapter: () => ({
-    todayLabel: "Saturday, April 18",
-    placeholder: "Talk to Nova",
-    messages: [],
-    structuredResponse: null,
-    pendingAction: null,
-    savedSuggestionProposalIds: mocks.legacySavedSuggestionProposalIds,
-    pendingSuggestionProposalId: mocks.legacyPendingSuggestionProposalId,
-    pendingActionCount: 0,
-    readyPendingActionCount: 0,
-    isOpeningThread: false,
-    isSubmitting: false,
-    isResolvingAction: false,
-    submitMessage: mocks.legacySubmitMessage,
-    confirmPendingAction: mocks.legacyConfirmPendingAction,
-    cancelPendingAction: mocks.legacyCancelPendingAction,
-    confirmSuggestedQuest: mocks.legacyConfirmSuggestedQuest,
-    confirmAllPendingActions: mocks.legacyConfirmAllPendingActions,
-    startTemplateThread: mocks.legacyStartTemplateThread,
-    startQuestCaptureThread: mocks.legacyStartQuestCaptureThread,
-    hydrateFromUnifiedState: mocks.legacyHydrateFromUnifiedState,
-    isSpeaking: false,
-    speechProvider: "none" as const,
-    stopSpeaking: vi.fn(),
-    activeThread: null,
-    historyThreads: [],
-    isLoadingThreads: false,
-    hasPersistedActiveThread: false,
-    canOpenThreadPicker: false,
-    threadHistoryEmptyStateMessage:
-      "Past chats will show up here after at least one real exchange.",
-    resumeThread: vi.fn(),
-    archiveCurrentThread: vi.fn(),
-    canArchiveThread: false,
-    archiveDisabledReason: null,
-    startNewChat: vi.fn(),
-    canStartNewChat: false,
-    newChatDisabledReason: null,
-  }),
+  useLegacyCompanionAssistantAdapter: (options: { enabled?: boolean; surface?: string }) => {
+    mocks.legacyAdapterOptions.push(options);
+    return {
+      todayLabel: "Saturday, April 18",
+      placeholder: "Talk to Nova",
+      messages: [],
+      structuredResponse: null,
+      pendingAction: null,
+      savedSuggestionProposalIds: mocks.legacySavedSuggestionProposalIds,
+      pendingSuggestionProposalId: mocks.legacyPendingSuggestionProposalId,
+      pendingActionCount: 0,
+      readyPendingActionCount: 0,
+      isOpeningThread: false,
+      isSubmitting: false,
+      isResolvingAction: false,
+      submitMessage: mocks.legacySubmitMessage,
+      confirmPendingAction: mocks.legacyConfirmPendingAction,
+      cancelPendingAction: mocks.legacyCancelPendingAction,
+      confirmSuggestedQuest: mocks.legacyConfirmSuggestedQuest,
+      confirmAllPendingActions: mocks.legacyConfirmAllPendingActions,
+      startTemplateThread: mocks.legacyStartTemplateThread,
+      startQuestCaptureThread: mocks.legacyStartQuestCaptureThread,
+      hydrateFromUnifiedState: mocks.legacyHydrateFromUnifiedState,
+      isSpeaking: false,
+      speechProvider: "none" as const,
+      stopSpeaking: vi.fn(),
+      activeThread: null,
+      historyThreads: [],
+      isLoadingThreads: false,
+      hasPersistedActiveThread: false,
+      canOpenThreadPicker: false,
+      threadHistoryEmptyStateMessage:
+        "Past chats will show up here after at least one real exchange.",
+      resumeThread: vi.fn(),
+      archiveCurrentThread: vi.fn(),
+      canArchiveThread: false,
+      archiveDisabledReason: null,
+      startNewChat: vi.fn(),
+      canStartNewChat: false,
+      newChatDisabledReason: null,
+    };
+  },
 }));
 
 vi.mock("@/hooks/useVoiceInput", () => ({
@@ -195,6 +199,7 @@ const createWrapper = () => {
 describe("useCompanionAssistant", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.legacyAdapterOptions = [];
     mocks.legacySavedSuggestionProposalIds = [];
     mocks.legacyPendingSuggestionProposalId = null;
     mocks.generateThreadSessionId.mockReturnValue("fresh-session");
@@ -1130,7 +1135,7 @@ describe("useCompanionAssistant", () => {
     );
   });
 
-  it("routes typed Journeys upcoming schedule reads through the local planner context", async () => {
+  it("routes typed Journeys upcoming schedule reads through the local planner context on demand", async () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(
       () => useCompanionAssistant({ surface: "journeys" }),
@@ -1140,6 +1145,12 @@ describe("useCompanionAssistant", () => {
     await waitFor(() => {
       expect(result.current.activeThread?.sessionId).toBe("persisted-session");
     });
+    expect(mocks.legacyAdapterOptions.at(-1)).toEqual(
+      expect.objectContaining({
+        enabled: false,
+        surface: "journeys",
+      }),
+    );
 
     act(() => {
       result.current.setDraftInput("What do I have coming up?");
@@ -1158,11 +1169,19 @@ describe("useCompanionAssistant", () => {
         sessionId: "persisted-session",
       }),
     );
-    expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
-      "What do I have coming up?",
-      "text",
+    await waitFor(() => {
+      expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
+        "What do I have coming up?",
+        "text",
+        expect.objectContaining({
+          starterIntent: "upcoming_start",
+        }),
+      );
+    });
+    expect(mocks.legacyAdapterOptions.at(-1)).toEqual(
       expect.objectContaining({
-        starterIntent: "upcoming_start",
+        enabled: true,
+        surface: "journeys",
       }),
     );
   });
@@ -1194,14 +1213,16 @@ describe("useCompanionAssistant", () => {
       "companion-agent",
       expect.anything(),
     );
-    expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
-      "What do I have coming up?",
-      "text",
-      expect.objectContaining({
-        starterIntent: "upcoming_start",
-        selectedDate: "2026-02-13",
-      }),
-    );
+    await waitFor(() => {
+      expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
+        "What do I have coming up?",
+        "text",
+        expect.objectContaining({
+          starterIntent: "upcoming_start",
+          selectedDate: "2026-02-13",
+        }),
+      );
+    });
   });
 
   it("marks follow-up option submissions with the follow-up turn origin", async () => {
@@ -1520,14 +1541,16 @@ describe("useCompanionAssistant", () => {
       "companion-agent",
       expect.anything(),
     );
-    expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
-      "What do I have coming up?",
-      "text",
-      expect.objectContaining({
-        starterIntent: "upcoming_start",
-        turnOrigin: "launcher",
-      }),
-    );
+    await waitFor(() => {
+      expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
+        "What do I have coming up?",
+        "text",
+        expect.objectContaining({
+          starterIntent: "upcoming_start",
+          turnOrigin: "launcher",
+        }),
+      );
+    });
     expect(mocks.toastError).not.toHaveBeenCalledWith(
       "Companion agent hit a snag. Please try again.",
     );

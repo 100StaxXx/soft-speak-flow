@@ -41,6 +41,7 @@ type PlannerInsightCategory =
   | "campaign_opening"
   | "reschedule_overload"
   | "light_structured"
+  | "empty_day"
   | "steady_progress";
 
 const PLANNER_INSIGHT_STATEMENTS: Record<PlannerInsightCategory, string[]> = {
@@ -68,6 +69,11 @@ const PLANNER_INSIGHT_STATEMENTS: Record<PlannerInsightCategory, string[]> = {
     "You have a manageable list and the important pieces are timed. Follow the schedule before adding more.",
     "This is already a clean little plan. Stay with the timed quests and let the day stay light.",
     "The day has enough structure to move without overthinking it. Complete the scheduled pieces first.",
+  ],
+  empty_day: [
+    "Nothing is scheduled here yet. This is a good moment to choose one useful next step before the day fills itself.",
+    "The day is open. Add one clear quest if there is a goal you want to keep moving.",
+    "There is room to decide what matters. Schedule one small anchor if you want the day to have direction.",
   ],
   steady_progress: [
     "The day is workable. Choose the next important quest, then keep the rest in a simple order.",
@@ -157,6 +163,7 @@ const choosePlannerInsightCategory = ({
   if (openQuestCount <= 2 && activeCampaignCount > 0 && scheduledQuestCount <= 1) {
     return "campaign_opening";
   }
+  if (openQuestCount === 0) return "empty_day";
   if (lightlyScheduled) return "needs_schedule";
   if (openQuestCount <= 2 && scheduledQuestCount > 0) return "light_structured";
   return "steady_progress";
