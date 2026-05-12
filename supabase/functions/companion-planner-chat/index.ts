@@ -7,7 +7,6 @@ import {
 import {
   buildCostGuardrailBlockedResponse,
   createCostGuardrailSession,
-  createCostGuardrailSupabaseClient,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
 import {
@@ -99,6 +98,7 @@ const shouldReturnDeterministicStarterImmediately = (
   starterIntent === "what_matters" ||
   starterIntent === "relationship_touch" ||
   starterIntent === "briefing_followup" ||
+  starterIntent === "upcoming_start" ||
   starterIntent === "plan_day";
 
 const PLANNING_LAUNCHER_CONSENT_QUESTION_IDS = new Set([
@@ -183,7 +183,7 @@ serve(async (req) => {
 
     const parsedPlannerContext = parsed.data
       .plannerContext as unknown as PlannerBuildInput["plannerContext"];
-    const validatorClient = createCostGuardrailSupabaseClient();
+    const validatorClient = protectedRequest.supabase;
     const deletedPlannerEntities = await loadDeletedPlannerEntities(
       validatorClient,
       protectedRequest.auth.userId,
@@ -227,19 +227,6 @@ serve(async (req) => {
       protectedDataText: collectPlannerContextProtectedDataText(plannerInput),
     };
 
-    const costGuardrails = createCostGuardrailSession({
-      supabase: createCostGuardrailSupabaseClient(),
-      endpointKey: "companion-planner-chat",
-      featureKey: "ai_companion_planner",
-      userId: protectedRequest.auth.userId,
-      requestId,
-    });
-    const guardedFetch = costGuardrails.wrapFetch(fetch);
-    await costGuardrails.enforceAccess({
-      capabilities: ["text"],
-      providers: ["openai"],
-    });
-
     const requestStarterIntent = plannerInput.plannerContext.starterIntent;
     const starterIntent = requestStarterIntent && requestStarterIntent !== "general"
       ? requestStarterIntent
@@ -254,6 +241,14 @@ serve(async (req) => {
     ) || hasPlanningLauncherConsentQuestion(result);
 
     if (starterIntent === "upcoming_start") {
+      const costGuardrails = createCostGuardrailSession({
+        supabase: protectedRequest.supabase,
+        endpointKey: "companion-planner-chat",
+        featureKey: "ai_companion_planner",
+        userId: protectedRequest.auth.userId,
+        requestId,
+      });
+      const guardedFetch = costGuardrails.wrapFetch(fetch);
       const aiResult = await runPlannerStageWithTimeout({
         work: () =>
           buildUpcomingAIResponse({
@@ -309,6 +304,19 @@ serve(async (req) => {
         },
       });
     }
+
+    const costGuardrails = createCostGuardrailSession({
+      supabase: protectedRequest.supabase,
+      endpointKey: "companion-planner-chat",
+      featureKey: "ai_companion_planner",
+      userId: protectedRequest.auth.userId,
+      requestId,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["text"],
+      providers: ["openai"],
+    });
 
     const enrichedResult = await runPlannerStageWithTimeout({
       work: () =>

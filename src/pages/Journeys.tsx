@@ -2023,22 +2023,29 @@ const Journeys = () => {
 
         <QuestsErrorBoundary>
           {!isDesktopLayout ? (
-            <motion.div
-              initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: prefersReducedMotion ? 0 : 0.04, duration: prefersReducedMotion ? 0 : 0.2 }}
-              className="mb-4"
+            <div
+              data-testid="journeys-date-pills-strip"
+              className={cn(
+                "sticky top-[calc(var(--safe-area-inset-top)+0.25rem)] z-40 -mx-4 mb-4 px-4 pb-2 pt-1",
+                "border-b border-white/10 bg-background/90 backdrop-blur-md shadow-[0_14px_28px_rgba(0,0,0,0.16)]",
+              )}
             >
-              <DatePillsScroller
-                selectedDate={selectedDate}
-                onDateSelect={handleDatePillClick}
-                onUserDateInteraction={handleUserDateInteraction}
-                tasksPerDay={tasksPerDay}
-                isActive={isJourneysRouteActive}
-                centerRequestKey={datePillCenterRequestKey}
-                centerRequestDateKey={datePillCenterRequestDateKey}
-              />
-            </motion.div>
+              <motion.div
+                initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: prefersReducedMotion ? 0 : 0.04, duration: prefersReducedMotion ? 0 : 0.2 }}
+              >
+                <DatePillsScroller
+                  selectedDate={selectedDate}
+                  onDateSelect={handleDatePillClick}
+                  onUserDateInteraction={handleUserDateInteraction}
+                  tasksPerDay={tasksPerDay}
+                  isActive={isJourneysRouteActive}
+                  centerRequestKey={datePillCenterRequestKey}
+                  centerRequestDateKey={datePillCenterRequestDateKey}
+                />
+              </motion.div>
+            </div>
           ) : null}
 
           {isInboxRequested || inboxCount > 0 ? (
