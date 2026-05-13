@@ -1650,8 +1650,16 @@ export function useCompanionAssistant({
         Boolean(activeFollowUp) &&
         (lastStarterIntentRef.current === "plan_day" ||
           hasRecentPlanDayStarter(messages));
+      const shouldStartFreshLauncherThread =
+        localScheduleReadEnabled &&
+        starterIntent === "upcoming_start" &&
+        options?.turnOrigin === "launcher" &&
+        !options?.selectedProposedAction;
 
       if (useLegacyFallback) {
+        if (shouldStartFreshLauncherThread) {
+          legacyAssistant.startTemplateThread?.({ greetingText: null });
+        }
         const legacyStarterIntent =
           pendingStarterIntent === "quest_capture" && !options?.starterIntent
             ? undefined
@@ -1689,12 +1697,16 @@ export function useCompanionAssistant({
           starterIntent,
           ...(selectedDate ? { selectedDate } : {}),
         };
-        legacyAssistant.hydrateFromUnifiedState?.({
-          sessionId: activeSessionIdRef.current,
-          messages,
-          savedSuggestionProposalIds,
-          pendingSuggestionProposalId,
-        });
+        if (shouldStartFreshLauncherThread) {
+          legacyAssistant.startTemplateThread?.({ greetingText: null });
+        } else {
+          legacyAssistant.hydrateFromUnifiedState?.({
+            sessionId: activeSessionIdRef.current,
+            messages,
+            savedSuggestionProposalIds,
+            pendingSuggestionProposalId,
+          });
+        }
         setUseLegacyFallback(true);
         await legacyAssistant.submitMessage(
           message,
@@ -2235,6 +2247,7 @@ export function useCompanionAssistant({
       isResolvingAction,
       isSubmitting,
       legacyAssistant,
+      localScheduleReadEnabled,
       messages,
       pendingAction,
       structuredResponse,

@@ -1268,6 +1268,7 @@ describe("useCompanionAssistant", () => {
         sessionId: "persisted-session",
       }),
     );
+    expect(mocks.legacyStartTemplateThread).not.toHaveBeenCalled();
     await waitFor(() => {
       expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
         "What do I have coming up?",
@@ -1650,6 +1651,10 @@ describe("useCompanionAssistant", () => {
         }),
       );
     });
+    expect(mocks.legacyStartTemplateThread).toHaveBeenCalledWith({
+      greetingText: null,
+    });
+    expect(mocks.legacyHydrateFromUnifiedState).not.toHaveBeenCalled();
     expect(mocks.toastError).not.toHaveBeenCalledWith(
       "Companion agent hit a snag. Please try again.",
     );
@@ -1686,6 +1691,9 @@ describe("useCompanionAssistant", () => {
           turnOrigin: "launcher",
         }),
       );
+    });
+    expect(mocks.legacyStartTemplateThread).toHaveBeenCalledWith({
+      greetingText: null,
     });
     expect(mocks.supabaseInvoke).not.toHaveBeenCalledWith(
       "companion-agent",
