@@ -22,7 +22,7 @@ import {
   replaceLocalTasksForDate,
   upsertPlannerRecords,
 } from "@/utils/plannerLocalStore";
-import { getPendingActionCount } from "@/utils/offlineStorage";
+import { getPendingActionCount, isOfflineDBTemporarilyUnavailable } from "@/utils/offlineStorage";
 import { fetchDailyTasksRemote, type DailyTask } from "@/services/dailyTasksRemote";
 import {
   attachJourneyPathSnapshotToEpic,
@@ -134,7 +134,11 @@ export async function withPlannerRemoteSyncLock<T>(
 export async function canSyncPlannerFromRemote(userId: string): Promise<boolean> {
   if (typeof navigator !== "undefined" && !navigator.onLine) return false;
   if (hasPlannerRemoteSyncLock(userId)) return false;
-  return (await getPendingActionCount(userId)) === 0;
+  if (isOfflineDBTemporarilyUnavailable()) return false;
+
+  const pendingActionCount = await getPendingActionCount(userId);
+  if (isOfflineDBTemporarilyUnavailable()) return false;
+  return pendingActionCount === 0;
 }
 
 export async function canApplyPlannerRemoteSnapshot(

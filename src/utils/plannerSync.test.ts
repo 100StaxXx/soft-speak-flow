@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
   const getPendingActionCountMock = vi.fn();
+  const isOfflineDBTemporarilyUnavailableMock = vi.fn();
   const fetchDailyTasksRemoteMock = vi.fn();
   const fetchEpicsMock = vi.fn();
   const replaceLocalTasksForDateMock = vi.fn();
@@ -10,6 +11,7 @@ const mocks = vi.hoisted(() => {
 
   return {
     getPendingActionCountMock,
+    isOfflineDBTemporarilyUnavailableMock,
     fetchDailyTasksRemoteMock,
     fetchEpicsMock,
     replaceLocalTasksForDateMock,
@@ -20,6 +22,7 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("@/utils/offlineStorage", () => ({
   getPendingActionCount: (...args: unknown[]) => mocks.getPendingActionCountMock(...args),
+  isOfflineDBTemporarilyUnavailable: (...args: unknown[]) => mocks.isOfflineDBTemporarilyUnavailableMock(...args),
 }));
 
 vi.mock("@/services/dailyTasksRemote", () => ({
@@ -119,6 +122,7 @@ describe("plannerSync", () => {
     __resetPlannerLocalDBForTests();
     setOnline(true);
     mocks.getPendingActionCountMock.mockResolvedValue(0);
+    mocks.isOfflineDBTemporarilyUnavailableMock.mockReturnValue(false);
     mocks.replaceLocalTasksForDateMock.mockResolvedValue(undefined);
     mocks.fetchEpicsMock.mockResolvedValue([]);
     Object.keys(mocks.supabaseTables).forEach((key) => {
@@ -142,6 +146,13 @@ describe("plannerSync", () => {
     release();
 
     await expect(canSyncPlannerFromRemote("user-1")).resolves.toBe(true);
+  });
+
+  it("blocks remote sync while offline queue storage is unavailable", async () => {
+    mocks.isOfflineDBTemporarilyUnavailableMock.mockReturnValue(true);
+
+    await expect(canSyncPlannerFromRemote("user-1")).resolves.toBe(false);
+    expect(mocks.getPendingActionCountMock).not.toHaveBeenCalled();
   });
 
   it("skips replacing local tasks if a write lock appears before remote data is applied", async () => {

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
@@ -31,12 +31,51 @@ type RemoteCalendarTask = DailyTask & {
   epics?: { title: string | null } | null;
 };
 
+const REMOTE_REFRESH_RETRY_DELAY_MS = 30_000;
+const REMOTE_REFRESH_WARN_COOLDOWN_MS = 60_000;
+
+let lastRemoteRefreshWarnAt = 0;
+
+const toLocalDateFromKey = (dateKey: string) => {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(year, month - 1, day);
+};
+
 const normalizeRemoteCalendarTask = (task: RemoteCalendarTask): DailyTask => {
   const { epics, ...dailyTask } = task;
   return {
     ...dailyTask,
     epic_title: dailyTask.epic_title ?? epics?.title ?? null,
   };
+};
+
+const sortCalendarTasks = (tasks: DailyTask[]) =>
+  tasks
+    .slice()
+    .sort((a, b) => {
+      const dateCompare = (a.task_date ?? "").localeCompare(b.task_date ?? "");
+      if (dateCompare !== 0) return dateCompare;
+
+      const timeA = a.scheduled_time ?? "99:99";
+      const timeB = b.scheduled_time ?? "99:99";
+      if (timeA !== timeB) return timeA.localeCompare(timeB);
+
+      return (b.created_at ?? "").localeCompare(a.created_at ?? "");
+    });
+
+const filterTasksToRange = (tasks: DailyTask[], startDate: string, endDate: string) =>
+  sortCalendarTasks(
+    tasks.filter((task) => task.task_date && task.task_date >= startDate && task.task_date <= endDate),
+  );
+
+const warnRemoteRefreshFailure = (error: unknown) => {
+  const now = Date.now();
+  if (now - lastRemoteRefreshWarnAt < REMOTE_REFRESH_WARN_COOLDOWN_MS) {
+    return;
+  }
+
+  lastRemoteRefreshWarnAt = now;
+  console.warn("Failed to refresh local calendar tasks from remote:", error);
 };
 
 export const useCalendarTasks = (
@@ -47,29 +86,39 @@ export const useCalendarTasks = (
   const { user } = useAuth();
   const { enabled = true } = options;
   const queryClient = useQueryClient();
+  const refreshControlRef = useRef({
+    inFlight: false,
+    retryAfter: 0,
+  });
 
-  const getDateRange = () => {
+  const selectedDateKey = format(selectedDate, "yyyy-MM-dd");
+  const { startDate, endDate, datesInRange } = useMemo(() => {
+    const date = toLocalDateFromKey(selectedDateKey);
+    let rangeStart: Date;
+    let rangeEnd: Date;
+
     if (view === "month") {
-      const monthStart = startOfMonth(selectedDate);
-      const monthEnd = endOfMonth(selectedDate);
-      const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
-      const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
-      return { start: calendarStart, end: calendarEnd };
+      const monthStart = startOfMonth(date);
+      const monthEnd = endOfMonth(date);
+      rangeStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+      rangeEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
     } else if (view === "week") {
-      const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
-      const weekEnd = addDays(weekStart, 6);
-      return { start: weekStart, end: weekEnd };
+      rangeStart = startOfWeek(date, { weekStartsOn: 0 });
+      rangeEnd = addDays(rangeStart, 6);
     } else {
       // For list view, just get the week
-      const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
-      const weekEnd = addDays(weekStart, 6);
-      return { start: weekStart, end: weekEnd };
+      rangeStart = startOfWeek(date, { weekStartsOn: 0 });
+      rangeEnd = addDays(rangeStart, 6);
     }
-  };
 
-  const { start, end } = getDateRange();
-  const startDate = format(start, 'yyyy-MM-dd');
-  const endDate = format(end, 'yyyy-MM-dd');
+    return {
+      startDate: format(rangeStart, "yyyy-MM-dd"),
+      endDate: format(rangeEnd, "yyyy-MM-dd"),
+      datesInRange: eachDayOfInterval({ start: rangeStart, end: rangeEnd }).map((dateInRange) =>
+        format(dateInRange, "yyyy-MM-dd"),
+      ),
+    };
+  }, [selectedDateKey, view]);
 
   const query = useQuery({
     queryKey: ['calendar-tasks', user?.id, startDate, endDate, view],
@@ -79,19 +128,7 @@ export const useCalendarTasks = (
       }
 
       const tasks = await getAllLocalTasksForUser<DailyTask>(user.id);
-      return tasks
-        .filter((task) => task.task_date && task.task_date >= startDate && task.task_date <= endDate)
-        .slice()
-        .sort((a, b) => {
-          const dateCompare = (a.task_date ?? "").localeCompare(b.task_date ?? "");
-          if (dateCompare !== 0) return dateCompare;
-
-          const timeA = a.scheduled_time ?? "99:99";
-          const timeB = b.scheduled_time ?? "99:99";
-          if (timeA !== timeB) return timeA.localeCompare(timeB);
-
-          return (b.created_at ?? "").localeCompare(a.created_at ?? "");
-        });
+      return filterTasksToRange(tasks, startDate, endDate);
     },
     enabled: enabled && !!user,
     staleTime: 2 * 60 * 1000, // 2 minutes - calendar data changes infrequently
@@ -104,6 +141,14 @@ export const useCalendarTasks = (
     let disposed = false;
 
     const refreshFromRemote = async () => {
+      const refreshControl = refreshControlRef.current;
+      const now = Date.now();
+      if (refreshControl.inFlight || refreshControl.retryAfter > now) {
+        return;
+      }
+
+      refreshControl.inFlight = true;
+
       try {
         const syncEpoch = getPlannerRemoteSyncEpoch(user.id);
         if (!(await canSyncPlannerFromRemote(user.id))) {
@@ -135,7 +180,6 @@ export const useCalendarTasks = (
         });
 
         await withPlannerRemoteSnapshotApply(user.id, syncEpoch, async () => {
-          const datesInRange = eachDayOfInterval({ start, end }).map((date) => format(date, "yyyy-MM-dd"));
           for (const date of datesInRange) {
             if (disposed) {
               return;
@@ -150,24 +194,17 @@ export const useCalendarTasks = (
           queryClient.setQueryData(
             ['calendar-tasks', user.id, startDate, endDate, view],
             await getAllLocalTasksForUser<DailyTask>(user.id).then((tasks) =>
-              tasks
-                .filter((task) => task.task_date && task.task_date >= startDate && task.task_date <= endDate)
-                .slice()
-                .sort((a, b) => {
-                  const dateCompare = (a.task_date ?? "").localeCompare(b.task_date ?? "");
-                  if (dateCompare !== 0) return dateCompare;
-
-                  const timeA = a.scheduled_time ?? "99:99";
-                  const timeB = b.scheduled_time ?? "99:99";
-                  if (timeA !== timeB) return timeA.localeCompare(timeB);
-
-                  return (b.created_at ?? "").localeCompare(a.created_at ?? "");
-                }),
+              filterTasksToRange(tasks, startDate, endDate),
             ),
           );
         });
+
+        refreshControl.retryAfter = 0;
       } catch (error) {
-        console.warn("Failed to refresh local calendar tasks from remote:", error);
+        refreshControl.retryAfter = Date.now() + REMOTE_REFRESH_RETRY_DELAY_MS;
+        warnRemoteRefreshFailure(error);
+      } finally {
+        refreshControl.inFlight = false;
       }
     };
 
@@ -182,7 +219,7 @@ export const useCalendarTasks = (
       disposed = true;
       window.removeEventListener(PLANNER_SYNC_EVENT, handlePlannerSync);
     };
-  }, [enabled, end, endDate, queryClient, start, startDate, user?.id, view]);
+  }, [datesInRange, enabled, endDate, queryClient, startDate, user?.id, view]);
 
   return { tasks: query.data ?? [], isLoading: query.isLoading };
 };

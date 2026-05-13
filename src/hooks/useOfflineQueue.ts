@@ -8,6 +8,7 @@ import {
   getQueuedActionCount,
   getQueuedActions,
   initOfflineDB,
+  isOfflineDBTemporarilyUnavailable,
   retryQueuedAction,
   type QueueActionKind,
   type QueueEntityType,
@@ -1174,7 +1175,9 @@ export function useOfflineQueue() {
           }
         }
       } catch (error) {
-        console.error("Failed to initialize offline queue:", error);
+        if (!isOfflineDBTemporarilyUnavailable(error)) {
+          console.error("Failed to initialize offline queue:", error);
+        }
       }
     };
 

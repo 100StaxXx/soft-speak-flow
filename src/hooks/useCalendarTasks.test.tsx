@@ -212,6 +212,28 @@ describe("useCalendarTasks", () => {
     });
   });
 
+  it("does not restart remote calendar refreshes on rerender with the same selected day", async () => {
+    mocks.canSyncPlannerFromRemoteMock.mockResolvedValue(true);
+    mocks.getAllLocalTasksForUserMock.mockResolvedValue([]);
+
+    const { rerender } = renderHook(
+      ({ selectedDate }) => useCalendarTasks(selectedDate, "week"),
+      {
+        initialProps: { selectedDate: new Date("2026-02-10T08:00:00") },
+        wrapper: createWrapper(),
+      },
+    );
+
+    await waitFor(() => {
+      expect(mocks.supabaseOrderSecondMock).toHaveBeenCalledTimes(1);
+    });
+
+    rerender({ selectedDate: new Date("2026-02-10T18:00:00") });
+
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+    expect(mocks.supabaseOrderSecondMock).toHaveBeenCalledTimes(1);
+  });
+
   it("does not apply remote calendar rows when a local planner mutation happened during the fetch", async () => {
     mocks.canSyncPlannerFromRemoteMock.mockResolvedValue(true);
     mocks.withPlannerRemoteSnapshotApplyMock.mockResolvedValue(null);
