@@ -35,7 +35,7 @@ import {
   unregisterNativePush,
 } from "@/utils/nativePushNotifications";
 import { logger } from "@/utils/logger";
-import { AstralEncounterProvider } from "@/components/astral-encounters";
+import { AstralEncounterProvider } from "@/components/astral-encounters/AstralEncounterProvider";
 import { WeeklyRecapModal } from "@/components/WeeklyRecapModal";
 import { WeeklyRecapProvider } from "@/contexts/WeeklyRecapContext";
 import { useAppResumeRefresh } from "@/hooks/useAppResumeRefresh";

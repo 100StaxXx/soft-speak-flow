@@ -1,14 +1,29 @@
-import { useEffect, useCallback, useState, useRef } from 'react';
+import { lazy, Suspense, useEffect, useCallback, useState, useRef } from 'react';
 import { AstralEncounterContextProvider, useAstralEncounterContext } from '@/contexts/AstralEncounterContext';
 import { useEncounterPasses } from '@/hooks/useEncounterPasses';
-import { AstralEncounterModal } from './AstralEncounterModal';
-import { AstralEncounterTriggerOverlay } from './AstralEncounterTriggerOverlay';
-import { DisableEncountersDialog } from './DisableEncountersDialog';
 import { AdversaryTier } from '@/types/astralEncounters';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { isMacSession } from '@/utils/platformTargets';
 import { toast } from "@/components/ui/sonner";
+
+const AstralEncounterModal = lazy(() =>
+  import("./AstralEncounterModal").then((module) => ({
+    default: module.AstralEncounterModal,
+  })),
+);
+
+const AstralEncounterTriggerOverlay = lazy(() =>
+  import("./AstralEncounterTriggerOverlay").then((module) => ({
+    default: module.AstralEncounterTriggerOverlay,
+  })),
+);
+
+const DisableEncountersDialog = lazy(() =>
+  import("./DisableEncountersDialog").then((module) => ({
+    default: module.DisableEncountersDialog,
+  })),
+);
 
 interface AstralEncounterProviderProps {
   children: React.ReactNode;
@@ -170,34 +185,42 @@ const AstralEncounterProviderInner = ({ children }: AstralEncounterProviderProps
       {children}
 
       {/* Epic trigger animation overlay */}
-      {!isMacBlockedSession && (
-        <AstralEncounterTriggerOverlay
-          isVisible={showTriggerOverlay}
-          tier={pendingTier}
-          onComplete={handleTriggerOverlayComplete}
-        />
+      {!isMacBlockedSession && showTriggerOverlay && (
+        <Suspense fallback={null}>
+          <AstralEncounterTriggerOverlay
+            isVisible={showTriggerOverlay}
+            tier={pendingTier}
+            onComplete={handleTriggerOverlayComplete}
+          />
+        </Suspense>
       )}
 
       {/* Main encounter modal */}
-      {!isMacBlockedSession && (
-        <AstralEncounterModal
-          open={showEncounterModal}
-          onOpenChange={handleModalOpenChange}
-          encounter={activeEncounter?.encounter || null}
-          adversary={activeEncounter?.adversary || null}
-          questInterval={activeEncounter?.questInterval}
-          onComplete={handleComplete}
-          onPass={handlePass}
-        />
+      {!isMacBlockedSession && showEncounterModal && (
+        <Suspense fallback={null}>
+          <AstralEncounterModal
+            open={showEncounterModal}
+            onOpenChange={handleModalOpenChange}
+            encounter={activeEncounter?.encounter || null}
+            adversary={activeEncounter?.adversary || null}
+            questInterval={activeEncounter?.questInterval}
+            onComplete={handleComplete}
+            onPass={handlePass}
+          />
+        </Suspense>
       )}
 
       {/* Disable encounters prompt */}
-      <DisableEncountersDialog
-        open={showDisableDialog}
-        onDisable={handleDisableEncounters}
-        onKeepOn={handleKeepEncountersOn}
-        passCount={passCount}
-      />
+      {showDisableDialog && (
+        <Suspense fallback={null}>
+          <DisableEncountersDialog
+            open={showDisableDialog}
+            onDisable={handleDisableEncounters}
+            onKeepOn={handleKeepEncountersOn}
+            passCount={passCount}
+          />
+        </Suspense>
+      )}
     </>
   );
 };

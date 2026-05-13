@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -97,6 +97,13 @@ vi.mock("@/pages/Companion", async () => {
 
 import { MainTabsKeepAlive } from "@/components/MainTabsKeepAlive";
 
+const renderMainTabsKeepAlive = (activePath: Parameters<typeof MainTabsKeepAlive>[0]["activePath"]) =>
+  render(<MainTabsKeepAlive activePath={activePath} />);
+
+const renderMainTabsKeepAliveElement = (
+  activePath: Parameters<typeof MainTabsKeepAlive>[0]["activePath"],
+) => <MainTabsKeepAlive activePath={activePath} />;
+
 describe("MainTabsKeepAlive", () => {
   beforeEach(() => {
     mocks.warmDailyTasksQueryFromRemote.mockReset();
@@ -121,54 +128,59 @@ describe("MainTabsKeepAlive", () => {
     vi.restoreAllMocks();
   });
 
-  it("provides active/inactive tab visibility through context", () => {
-    const { rerender } = render(<MainTabsKeepAlive activePath="/mentor" />);
+  it("provides active/inactive tab visibility through context", async () => {
+    const { rerender } = renderMainTabsKeepAlive("/mentor");
 
-    expect(screen.getByTestId("mentor-visibility")).toHaveTextContent("active");
+    expect(await screen.findByTestId("mentor-visibility")).toHaveTextContent("active");
 
-    rerender(<MainTabsKeepAlive activePath="/campaigns" />);
+    rerender(renderMainTabsKeepAliveElement("/campaigns"));
 
     expect(screen.getByTestId("mentor-visibility")).toHaveTextContent("inactive");
-    expect(screen.getByTestId("campaigns-visibility")).toHaveTextContent("active");
+    expect(await screen.findByTestId("campaigns-visibility")).toHaveTextContent("active");
   });
 
-  it("prefetches journeys tasks and epics on mount", () => {
-    render(<MainTabsKeepAlive activePath="/mentor" />);
+  it("prefetches journeys tasks and epics on mount", async () => {
+    renderMainTabsKeepAlive("/mentor");
 
-    expect(mocks.warmDailyTasksQueryFromRemote).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(mocks.warmDailyTasksQueryFromRemote).toHaveBeenCalledTimes(1);
+      expect(mocks.warmEpicsQueryFromRemote).toHaveBeenCalledTimes(1);
+    });
     expect(mocks.warmDailyTasksQueryFromRemote).toHaveBeenCalledWith(expect.any(Object), "user-1", expect.any(String));
-    expect(mocks.warmEpicsQueryFromRemote).toHaveBeenCalledTimes(1);
     expect(mocks.warmEpicsQueryFromRemote).toHaveBeenCalledWith(expect.any(Object), "user-1");
   });
 
-  it("preserves tab state and avoids remounting visited tabs", () => {
-    const { rerender } = render(<MainTabsKeepAlive activePath="/mentor" />);
+  it("preserves tab state and avoids remounting visited tabs", async () => {
+    const { rerender } = renderMainTabsKeepAlive("/mentor");
 
-    fireEvent.click(screen.getByText("Increment mentor"));
+    fireEvent.click(await screen.findByText("Increment mentor"));
     expect(screen.getByTestId("mentor-counter")).toHaveTextContent("1");
     expect(mocks.mountCounts.mentor).toBe(1);
 
-    rerender(<MainTabsKeepAlive activePath="/campaigns" />);
-    rerender(<MainTabsKeepAlive activePath="/mentor" />);
+    rerender(renderMainTabsKeepAliveElement("/campaigns"));
+    await screen.findByTestId("campaigns-visibility");
+    rerender(renderMainTabsKeepAliveElement("/mentor"));
 
     expect(screen.getByTestId("mentor-counter")).toHaveTextContent("1");
     expect(mocks.mountCounts.mentor).toBe(1);
   });
 
-  it("skips no-op scroll restoration when already at target scroll", () => {
+  it("skips no-op scroll restoration when already at target scroll", async () => {
     const scrollToSpy = vi.spyOn(window, "scrollTo");
-    const { rerender } = render(<MainTabsKeepAlive activePath="/mentor" />);
+    const { rerender } = renderMainTabsKeepAlive("/mentor");
+    await screen.findByTestId("mentor-visibility");
 
     // Initial render should not force scroll restoration.
     expect(scrollToSpy).not.toHaveBeenCalled();
 
     (window as Window & { scrollY: number }).scrollY = 150;
-    rerender(<MainTabsKeepAlive activePath="/campaigns" />);
+    rerender(renderMainTabsKeepAliveElement("/campaigns"));
+    await screen.findByTestId("campaigns-visibility");
     expect(scrollToSpy).toHaveBeenCalled();
 
     scrollToSpy.mockClear();
     (window as Window & { scrollY: number }).scrollY = 150;
-    rerender(<MainTabsKeepAlive activePath="/mentor" />);
+    rerender(renderMainTabsKeepAliveElement("/mentor"));
 
     expect(scrollToSpy).not.toHaveBeenCalled();
   });

@@ -164,6 +164,10 @@ vi.mock("@/components/astral-encounters", () => ({
   AstralEncounterProvider: passthroughProvider,
 }));
 
+vi.mock("@/components/astral-encounters/AstralEncounterProvider", () => ({
+  AstralEncounterProvider: passthroughProvider,
+}));
+
 vi.mock("@/components/MainTabsKeepAlive", () => ({
   MainTabsKeepAlive: ({ activePath }: { activePath: string }) => (
     <div data-testid="main-tabs">{activePath}</div>

@@ -1,10 +1,17 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentType } from "react";
+import {
+  lazy,
+  memo,
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ComponentType,
+  type LazyExoticComponent,
+} from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import Mentor from "@/pages/Mentor";
-import Companion from "@/pages/Companion";
-import Journeys from "@/pages/Journeys";
-import Campaigns from "@/pages/Campaigns";
 import { useAuth } from "@/hooks/useAuth";
 import { MainTabVisibilityProvider } from "@/contexts/MainTabVisibilityContext";
 import { logger } from "@/utils/logger";
@@ -17,11 +24,11 @@ type MainTabPath = "/mentor" | "/journeys" | "/campaigns" | "/companion";
 
 const TAB_ORDER: MainTabPath[] = ["/mentor", "/journeys", "/campaigns", "/companion"];
 
-const TAB_COMPONENTS: Record<MainTabPath, ComponentType> = {
-  "/mentor": Mentor,
-  "/journeys": Journeys,
-  "/campaigns": Campaigns,
-  "/companion": Companion,
+const TAB_COMPONENTS: Record<MainTabPath, LazyExoticComponent<ComponentType>> = {
+  "/mentor": lazy(() => import("@/pages/Mentor")),
+  "/journeys": lazy(() => import("@/pages/Journeys")),
+  "/campaigns": lazy(() => import("@/pages/Campaigns")),
+  "/companion": lazy(() => import("@/pages/Companion")),
 };
 
 export const isMainTabPath = (pathname: string): pathname is MainTabPath =>
@@ -35,6 +42,14 @@ const initialScrollPositions: Record<MainTabPath, number> = {
 };
 
 const SCROLL_RESTORE_EPSILON_PX = 1;
+
+const MainTabLoadingFallback = memo(() => (
+  <div className="flex min-h-[60vh] items-center justify-center" aria-label="Loading tab">
+    <div className="h-10 w-10 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+  </div>
+));
+
+MainTabLoadingFallback.displayName = "MainTabLoadingFallback";
 
 export const MainTabsKeepAlive = memo(({ activePath }: { activePath: MainTabPath }) => {
   const queryClient = useQueryClient();
@@ -127,7 +142,9 @@ export const MainTabsKeepAlive = memo(({ activePath }: { activePath: MainTabPath
           <div key={path} style={{ display: isActive ? "block" : "none" }} aria-hidden={!isActive}>
             <MainTabVisibilityProvider isTabActive={isActive}>
               <section>
-                <TabPage />
+                <Suspense fallback={isActive ? <MainTabLoadingFallback /> : null}>
+                  <TabPage />
+                </Suspense>
               </section>
             </MainTabVisibilityProvider>
           </div>

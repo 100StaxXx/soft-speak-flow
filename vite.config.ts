@@ -418,9 +418,25 @@ export default defineConfig(({ mode }) => {
         workbox: {
           mode: 'development',
           sourcemap: false,
-          maximumFileSizeToCacheInBytes: 8 * 1024 * 1024, // 8 MB to allow high-res static backgrounds
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+          maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // Keep the install-time precache focused on the app shell.
+          globPatterns: ['**/*.{js,css,html,ico,svg,woff,woff2}'],
           runtimeCaching: [
+            {
+              urlPattern: ({ request, sameOrigin }) => (
+                sameOrigin && request.destination === 'image'
+              ),
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'cosmiq-image-cache',
+                expiration: {
+                  maxEntries: 80,
+                  maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+                },
+                cacheableResponse: {
+                  statuses: [0, 200]
+                }
+              }
+            },
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
               handler: 'CacheFirst',
