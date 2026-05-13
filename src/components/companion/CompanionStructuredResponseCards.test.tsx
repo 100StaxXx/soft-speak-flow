@@ -110,7 +110,7 @@ describe("CompanionStructuredResponseCards", () => {
     expect(screen.getByText(/Day status:/)).toHaveTextContent("Busy");
   });
 
-  it("keeps the plan-day assessment as Day status when daily load is present", () => {
+  it("prefers the simple daily-load label when Plan My Day provides one", () => {
     const structuredResponse: CompanionStructuredResponse = {
       intent: baseIntent,
       planDay: {
@@ -137,7 +137,7 @@ describe("CompanionStructuredResponseCards", () => {
       />,
     );
 
-    expect(screen.getByText(/Day status:/)).toHaveTextContent("Busy");
+    expect(screen.getByText(/Day status:/)).toHaveTextContent("Overwhelming");
   });
 
   it("shows pending coming-up proposals as saving", () => {

@@ -358,7 +358,8 @@ export const CompanionStructuredResponseCards = memo(
               <p className={cn("mt-3 text-sm font-medium", styles.subtext)}>
                 Day status:{" "}
                 {formatPlanDayStatusLabel(
-                  structuredResponse.planDay.dayAssessment,
+                  structuredResponse.planDay.dailyLoad?.label ??
+                    structuredResponse.planDay.dayAssessment,
                 )}
               </p>
               {planDayCampaignFocus

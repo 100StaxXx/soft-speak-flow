@@ -2326,6 +2326,46 @@ Deno.test("plan_day daily load ignores scheduled times from tasks dated elsewher
   );
 });
 
+Deno.test("plan_day daily load ignores all-day calendar events as scheduled workload", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Focus",
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T07:00:00-07:00",
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+      openQuestionIds: ["details"],
+    },
+    parsedInput: {
+      text: "Focus",
+    },
+    plannerContext: {
+      starterIntent: undefined,
+      activeEpics: [],
+      tasks: [],
+      inboxTasks: [],
+      rituals: [],
+      calendarEvents: [{
+        id: "birthday",
+        title: "Birthday",
+        start: "2026-04-18T00:00:00-07:00",
+        end: "2026-04-19T00:00:00-07:00",
+        isAllDay: true,
+        provider: "google",
+        readOnly: true,
+      }],
+    },
+  }));
+
+  assertEquals(
+    result.structuredResponse?.planDay?.dailyLoad?.scheduledMinutes,
+    0,
+  );
+  assertEquals(
+    result.structuredResponse?.planDay?.dailyLoad?.label,
+    "barely_anything",
+  );
+});
+
 Deno.test("plan_day daily load counts only gaps between scheduled blocks", () => {
   const result = buildPlannerResponse(baseInput({
     message: "Focus",

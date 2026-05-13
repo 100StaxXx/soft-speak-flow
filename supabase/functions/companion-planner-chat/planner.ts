@@ -10472,7 +10472,7 @@ export const getPlanDayDailyLoad = (
   const intervals = mergeIntervalsWithinDay([
     ...buildTaskDailyLoadIntervalsForDate(allScopedTasks, targetDate),
     ...buildCalendarIntervalsForDate(
-      input.plannerContext.calendarEvents,
+      input.plannerContext.calendarEvents.filter((event) => !event.isAllDay),
       targetDate,
       input.currentDateTime,
       input.plannerContext.plannerMemory,
