@@ -341,6 +341,60 @@ describe("CompanionStructuredResponseCards", () => {
     expect(screen.queryByText("6:00 am-6:30 am")).not.toBeInTheDocument();
   });
 
+  it("prefers current schedule rows over mismatched missed labels", () => {
+    const structuredResponse: CompanionStructuredResponse = {
+      intent: baseIntent,
+      comingUp: {
+        message: "Here is the rest of the day.",
+        nextEvent: {
+          id: "event-cardio",
+          title: "Daily Cardio",
+          label: "Daily Cardio (6:00 am-6:30 am, in progress)",
+          startsAt: "2026-05-13T13:00:00.000Z",
+          endsAt: "2026-05-13T13:30:00.000Z",
+          isAllDay: false,
+          source: "calendar",
+        },
+        nextBestAction: null,
+        remainingToday: [
+          {
+            id: "event-cardio",
+            title: "Daily Cardio",
+            label: "Daily Cardio (6:00 am-6:30 am, in progress)",
+            startsAt: "2026-05-13T13:00:00.000Z",
+            endsAt: "2026-05-13T13:30:00.000Z",
+            isAllDay: false,
+            source: "calendar",
+          },
+        ],
+        tomorrowSummary: "light",
+        missedItems: [
+          {
+            id: "task-cardio",
+            title: "Daily Cardio",
+            label: "Daily Cardio (started at 6:00 am)",
+            source: "task",
+          },
+        ],
+      },
+    };
+
+    render(
+      <CompanionStructuredResponseCards
+        structuredResponse={structuredResponse}
+        variant="journeys"
+      />,
+    );
+
+    expect(screen.getByText("Next")).toBeInTheDocument();
+    expect(screen.getAllByText("Daily Cardio")).toHaveLength(1);
+    expect(screen.getByText("Daily Cardio (6:00 am-6:30 am, in progress)"))
+      .toBeInTheDocument();
+    expect(screen.queryByText("Earlier Today")).not.toBeInTheDocument();
+    expect(screen.queryByText("Daily Cardio (started at 6:00 am)"))
+      .not.toBeInTheDocument();
+  });
+
   it("adds tomorrow context to repeated morning schedule labels", () => {
     const structuredResponse: CompanionStructuredResponse = {
       intent: baseIntent,

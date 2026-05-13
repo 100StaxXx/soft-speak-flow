@@ -1291,6 +1291,24 @@ const getLocalRitualDuration = (ritual: PlannerContextRitual): number =>
   ritual.estimatedMinutes ??
   LOCAL_COMING_UP_DEFAULT_DURATION_MINUTES;
 
+const isLocalScheduleBlockCurrentOrUpcoming = (
+  startMinutes: number | null,
+  currentMinutes: number | null,
+  durationMinutes: number,
+): boolean => {
+  if (startMinutes === null || currentMinutes === null) return true;
+  return startMinutes + Math.max(1, durationMinutes) > currentMinutes;
+};
+
+const isLocalScheduleBlockMissed = (
+  startMinutes: number | null,
+  currentMinutes: number | null,
+  durationMinutes: number,
+): boolean => {
+  if (startMinutes === null || currentMinutes === null) return false;
+  return startMinutes + Math.max(1, durationMinutes) <= currentMinutes;
+};
+
 const buildLocalTaskDateTime = (
   taskDate: string | null | undefined,
   clock: string | null | undefined,
@@ -1508,8 +1526,11 @@ const collectLocalComingUpScheduleItemsForDate = (
     .filter((task) => {
       if (!remainingOnly || dateKey !== currentDateKey) return true;
       const scheduledMinutes = parseLocalClockMinutes(task.scheduledTime);
-      if (scheduledMinutes === null || currentMinutes === null) return true;
-      return scheduledMinutes >= currentMinutes;
+      return isLocalScheduleBlockCurrentOrUpcoming(
+        scheduledMinutes,
+        currentMinutes,
+        getLocalTaskDuration(task),
+      );
     })
     .map((task): LocalComingUpScheduleItem => {
       const startsAt = buildLocalTaskDateTime(task.taskDate, task.scheduledTime);
@@ -1532,8 +1553,11 @@ const collectLocalComingUpScheduleItemsForDate = (
     .filter((ritual) => {
       if (!remainingOnly || dateKey !== currentDateKey) return true;
       const scheduledMinutes = parseLocalClockMinutes(ritual.preferredTime);
-      if (scheduledMinutes === null || currentMinutes === null) return true;
-      return scheduledMinutes >= currentMinutes;
+      return isLocalScheduleBlockCurrentOrUpcoming(
+        scheduledMinutes,
+        currentMinutes,
+        getLocalRitualDuration(ritual),
+      );
     })
     .map((ritual): LocalComingUpScheduleItem => {
       const startsAt = buildLocalTaskDateTime(dateKey, ritual.preferredTime);
@@ -1594,7 +1618,11 @@ const collectLocalComingUpMissedItems = (
     )
     .filter((task) => {
       const scheduledMinutes = parseLocalClockMinutes(task.scheduledTime);
-      return scheduledMinutes !== null && scheduledMinutes < currentMinutes;
+      return isLocalScheduleBlockMissed(
+        scheduledMinutes,
+        currentMinutes,
+        getLocalTaskDuration(task),
+      );
     })
     .sort((left, right) =>
       (parseLocalClockMinutes(left.scheduledTime) ?? 9999) -

@@ -2326,6 +2326,44 @@ Deno.test("plan_day daily load ignores scheduled times from tasks dated elsewher
   );
 });
 
+Deno.test("plan_day daily load counts completedAt in the user's local day", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Focus",
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T23:45:00-07:00",
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+      openQuestionIds: ["details"],
+    },
+    parsedInput: {
+      text: "Focus",
+    },
+    plannerContext: {
+      starterIntent: undefined,
+      activeEpics: [],
+      tasks: [],
+      inboxTasks: [],
+      rituals: [],
+      calendarEvents: [],
+      recentCompletedTasks: [{
+        id: "late-done",
+        title: "Late done",
+        taskDate: null,
+        scheduledTime: null,
+        estimatedDuration: 30,
+        recurrencePattern: null,
+        completed: true,
+        completedAt: "2026-04-19T06:30:00.000Z",
+      }],
+    },
+  }));
+
+  assertEquals(
+    result.structuredResponse?.planDay?.dailyLoad?.completedTasks,
+    1,
+  );
+});
+
 Deno.test("plan_day daily load ignores all-day calendar events as scheduled workload", () => {
   const result = buildPlannerResponse(baseInput({
     message: "Focus",
@@ -2364,6 +2402,7 @@ Deno.test("plan_day daily load ignores all-day calendar events as scheduled work
     result.structuredResponse?.planDay?.dailyLoad?.label,
     "barely_anything",
   );
+  assertEquals(result.reply.includes("scheduled blocks"), false);
 });
 
 Deno.test("plan_day daily load counts only gaps between scheduled blocks", () => {
@@ -5801,6 +5840,47 @@ Deno.test("upcoming_start dedupes task and calendar mirrors by local start time"
 
   assertEquals(cardioItems.length, 1);
   assertEquals(cardioItems[0]?.source, "task");
+  assertEquals(result.reply.match(/Daily Cardio/g)?.length ?? 0, 1);
+});
+
+Deno.test("upcoming_start keeps in-progress task mirrors out of missed", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What do I have coming up?",
+    currentDate: "2026-05-13",
+    currentDateTime: "2026-05-13T06:15:00-07:00",
+    plannerContext: {
+      tasks: [
+        {
+          id: "task-cardio",
+          title: "Daily Cardio",
+          taskDate: "2026-05-13",
+          scheduledTime: "06:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+        },
+      ],
+      calendarEvents: [
+        {
+          id: "event-cardio",
+          title: "Daily Cardio",
+          start: "2026-05-13T13:00:00.000Z",
+          end: "2026-05-13T13:30:00.000Z",
+          isAllDay: false,
+          provider: "google",
+          readOnly: true,
+        },
+      ],
+      starterIntent: "upcoming_start",
+    },
+  }));
+
+  const cardioItems = result.structuredResponse?.comingUp?.remainingToday
+    .filter((item) => item.title === "Daily Cardio") ?? [];
+
+  assertEquals(cardioItems.length, 1);
+  assertEquals(cardioItems[0]?.source, "task");
+  assertEquals(result.structuredResponse?.comingUp?.nextEvent?.source, "task");
+  assertEquals(result.structuredResponse?.comingUp?.missedItems, []);
   assertEquals(result.reply.match(/Daily Cardio/g)?.length ?? 0, 1);
 });
 

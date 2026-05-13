@@ -4416,6 +4416,24 @@ const getRitualDuration = (ritual: PlannerContextRitual): number =>
   ritual.estimatedMinutes ??
   DEFAULT_TASK_DURATION_MINUTES;
 
+const isScheduleBlockCurrentOrUpcoming = (
+  startMinutes: number | null,
+  currentMinutes: number | null,
+  durationMinutes: number,
+): boolean => {
+  if (startMinutes === null || currentMinutes === null) return true;
+  return startMinutes + Math.max(1, durationMinutes) > currentMinutes;
+};
+
+const isScheduleBlockMissed = (
+  startMinutes: number | null,
+  currentMinutes: number | null,
+  durationMinutes: number,
+): boolean => {
+  if (startMinutes === null || currentMinutes === null) return false;
+  return startMinutes + Math.max(1, durationMinutes) <= currentMinutes;
+};
+
 const getRitualScheduleTime = (
   ritual: PlannerContextRitual,
 ): string | null => {
@@ -4476,8 +4494,11 @@ const collectRitualScheduleItemsForDate = (
     .filter((ritual) => {
       if (!remainingOnly || date !== currentDateKey) return true;
       const scheduledMinutes = parseTimeToMinutes(ritual.preferredTime);
-      if (scheduledMinutes === null || currentMinutes === null) return true;
-      return scheduledMinutes >= currentMinutes;
+      return isScheduleBlockCurrentOrUpcoming(
+        scheduledMinutes,
+        currentMinutes,
+        getRitualDuration(ritual),
+      );
     })
     .map((ritual) => ({
       id: `ritual:${ritual.id}:${date}`,
@@ -4530,6 +4551,20 @@ const buildIntervalsForDate = (
   ...buildRitualIntervalsForDate(input, date),
   ...buildCalendarIntervalsForDate(
     input.plannerContext.calendarEvents,
+    date,
+    input.currentDateTime,
+    input.plannerContext.plannerMemory,
+  ),
+].sort((left, right) => left.startMinutes - right.startMinutes));
+
+const buildTimedScheduleIntervalsForDate = (
+  input: PlannerBuildInput,
+  date: string,
+): TimelineInterval[] => ([
+  ...buildTaskIntervalsForDate(getScopedPlannerTasks(input), date),
+  ...buildRitualIntervalsForDate(input, date),
+  ...buildCalendarIntervalsForDate(
+    input.plannerContext.calendarEvents.filter((event) => !event.isAllDay),
     date,
     input.currentDateTime,
     input.plannerContext.plannerMemory,
@@ -4664,8 +4699,11 @@ const collectScheduleItemsForDate = (
     .filter((task) => {
       if (!remainingOnly || date !== currentDateKey) return true;
       const scheduledMinutes = parseTimeToMinutes(task.scheduledTime);
-      if (scheduledMinutes === null || currentMinutes === null) return true;
-      return scheduledMinutes >= currentMinutes;
+      return isScheduleBlockCurrentOrUpcoming(
+        scheduledMinutes,
+        currentMinutes,
+        getTaskDuration(task),
+      );
     })
     .map((task) => ({
       title: task.title,
@@ -4768,8 +4806,11 @@ const collectStructuredScheduleItemsForDate = (
     .filter((task) => {
       if (!remainingOnly || date !== currentDateKey) return true;
       const scheduledMinutes = parseTimeToMinutes(task.scheduledTime);
-      if (scheduledMinutes === null || currentMinutes === null) return true;
-      return scheduledMinutes >= currentMinutes;
+      return isScheduleBlockCurrentOrUpcoming(
+        scheduledMinutes,
+        currentMinutes,
+        getTaskDuration(task),
+      );
     })
     .map((task) => ({
       id: task.id,
@@ -4854,8 +4895,11 @@ const collectMissedTasksForToday = (
     )
     .filter((task) => {
       const scheduledMinutes = parseTimeToMinutes(task.scheduledTime);
-      if (scheduledMinutes === null || currentMinutes === null) return false;
-      return scheduledMinutes < currentMinutes;
+      return isScheduleBlockMissed(
+        scheduledMinutes,
+        currentMinutes,
+        getTaskDuration(task),
+      );
     })
     .sort((left, right) =>
       (parseTimeToMinutes(left.scheduledTime) ?? 9999) -
@@ -9087,7 +9131,7 @@ const getPlanDayTargetTotal = (
 const hasPlanDayScheduledBlocks = (
   input: PlannerBuildInput,
   targetDate: string,
-): boolean => buildIntervalsForDate(input, targetDate).length > 0;
+): boolean => buildTimedScheduleIntervalsForDate(input, targetDate).length > 0;
 
 const PLAN_DAY_GENERIC_FOCUS_TERMS = new Set([
   "active",
@@ -10359,13 +10403,29 @@ export const evaluatePlanDayDailyLoad = (
   };
 };
 
+const isTimestampInOffsetDate = (
+  value: string | null | undefined,
+  targetDate: string,
+  currentDateTime: string,
+): boolean => {
+  if (typeof value !== "string") return false;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value === targetDate;
+
+  const timestamp = new Date(value);
+  if (Number.isNaN(timestamp.getTime())) return false;
+
+  const { start, end } = buildOffsetDateWindow(currentDateTime, targetDate);
+  return timestamp >= start && timestamp < end;
+};
+
 const isTaskCompletedOnDate = (
   task: PlannerContextTask,
   targetDate: string,
+  currentDateTime: string,
 ): boolean =>
   task.completed === true &&
   (task.taskDate === targetDate ||
-    task.completedAt?.slice(0, 10) === targetDate);
+    isTimestampInOffsetDate(task.completedAt, targetDate, currentDateTime));
 
 const uniqueTasksById = (
   tasks: ReadonlyArray<PlannerContextTask>,
@@ -10459,7 +10519,7 @@ export const getPlanDayDailyLoad = (
     ...scoped.recentCompletedTasks,
   ]);
   const completedTasks = allScopedTasks.filter((task) =>
-    isTaskCompletedOnDate(task, targetDate)
+    isTaskCompletedOnDate(task, targetDate, input.currentDateTime)
   );
   const openTasks =
     loadBreakdown.visibleStandaloneQuests.length +

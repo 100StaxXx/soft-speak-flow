@@ -124,6 +124,9 @@ const getComingUpStartMinutes = (item: ComingUpScheduleItem): number | null =>
   parseComingUpClockMinutes(item.label) ??
     getComingUpDateClockMinutes(item.startsAt);
 
+const getMissedItemStartMinutes = (item: ComingUpMissedItem): number | null =>
+  parseComingUpClockMinutes(item.label);
+
 const getScheduleItemDedupeKey = (item: ComingUpScheduleItem): string => {
   const title = normalizeComingUpKeyPart(item.title);
   const startMinutes = getComingUpStartMinutes(item);
@@ -152,10 +155,13 @@ const dedupeScheduleItems = (
   });
 };
 
-const getMissedItemDedupeKey = (item: ComingUpMissedItem): string =>
-  `${normalizeComingUpKeyPart(item.title)}|${
-    normalizeComingUpKeyPart(item.label)
-  }`;
+const getMissedItemDedupeKey = (item: ComingUpMissedItem): string => {
+  const title = normalizeComingUpKeyPart(item.title);
+  const startMinutes = getMissedItemStartMinutes(item);
+  const label = normalizeComingUpKeyPart(item.label);
+  const temporalKey = startMinutes !== null ? `minute:${startMinutes}` : label;
+  return `${title}|${temporalKey}`;
+};
 
 const dedupeMissedItems = (
   items: ComingUpMissedItem[],
@@ -175,10 +181,24 @@ const scheduleItemMatchesMissedItem = (
 ): boolean => {
   if (scheduleItem.id === missedItem.id) return true;
 
-  return normalizeComingUpKeyPart(scheduleItem.title) ===
-      normalizeComingUpKeyPart(missedItem.title) &&
+  if (
+    normalizeComingUpKeyPart(scheduleItem.title) !==
+      normalizeComingUpKeyPart(missedItem.title)
+  ) {
+    return false;
+  }
+
+  if (
     normalizeComingUpKeyPart(scheduleItem.label) ===
-      normalizeComingUpKeyPart(missedItem.label);
+      normalizeComingUpKeyPart(missedItem.label)
+  ) {
+    return true;
+  }
+
+  const scheduleStartMinutes = getComingUpStartMinutes(scheduleItem);
+  const missedStartMinutes = getMissedItemStartMinutes(missedItem);
+  return scheduleStartMinutes !== null && missedStartMinutes !== null &&
+    scheduleStartMinutes === missedStartMinutes;
 };
 
 const scheduleItemsMatch = (
@@ -321,26 +341,25 @@ export const CompanionStructuredResponseCards = memo(
     const styles = variantStyles[variant];
     const planDayCampaignFocus =
       structuredResponse.planDay?.campaignFocus ?? null;
-    const comingUpMissedItems = dedupeMissedItems(
+    const rawComingUpMissedItems = dedupeMissedItems(
       structuredResponse.comingUp?.missedItems ?? [],
     );
     const rawComingUpNextEvent = structuredResponse.comingUp?.nextEvent ?? null;
-    const comingUpNextEvent = rawComingUpNextEvent &&
-        !comingUpMissedItems.some((item) =>
-          scheduleItemMatchesMissedItem(rawComingUpNextEvent, item)
-        )
-      ? rawComingUpNextEvent
-      : null;
+    const comingUpNextEvent = rawComingUpNextEvent;
     const comingUpRemainingToday = dedupeScheduleItems(
       structuredResponse.comingUp?.remainingToday ?? [],
     ).filter((item) =>
-      !comingUpMissedItems.some((missedItem) =>
-        scheduleItemMatchesMissedItem(item, missedItem)
-      ) &&
       (!comingUpNextEvent || !scheduleItemsMatch(item, comingUpNextEvent))
     );
     const comingUpTomorrowSchedule = dedupeScheduleItems(
       structuredResponse.comingUp?.tomorrowSchedule ?? [],
+    );
+    const comingUpMissedItems = rawComingUpMissedItems.filter((missedItem) =>
+      !(comingUpNextEvent &&
+        scheduleItemMatchesMissedItem(comingUpNextEvent, missedItem)) &&
+      !comingUpRemainingToday.some((item) =>
+        scheduleItemMatchesMissedItem(item, missedItem)
+      )
     );
 
     return (
