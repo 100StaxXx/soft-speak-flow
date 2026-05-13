@@ -51,7 +51,11 @@ const mocks = vi.hoisted(() => ({
     launcherAwayUsesPortraitShell: true,
     launcherAwayHasTransparentBackground: false,
     needsLauncherImage: false,
+    currentStage: 3,
   } as Record<string, unknown>,
+  guidance: {
+    currentStep: null as string | null,
+  },
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
@@ -72,6 +76,10 @@ vi.mock("@/hooks/useCompanionLauncherImage", () => ({
       error: null,
     };
   },
+}));
+
+vi.mock("@/hooks/usePostOnboardingMentorGuidance", () => ({
+  usePostOnboardingMentorGuidance: () => mocks.guidance,
 }));
 
 const setViewport = ({ width, height }: { width: number; height: number }) => {
@@ -130,12 +138,59 @@ describe("DraggableFAB", () => {
       launcherAwayUsesPortraitShell: true,
       launcherAwayHasTransparentBackground: false,
       needsLauncherImage: false,
+      currentStage: 3,
+    };
+    mocks.guidance = {
+      currentStep: null,
     };
     vi.useRealTimers();
     setViewport({ width: 400, height: 800 });
     setSafeAreaVars({ top: 0, right: 0, bottom: 0, left: 0 });
     document.documentElement.style.setProperty("--bottom-nav-runtime-offset", "96px");
     document.documentElement.style.setProperty("--bottom-nav-safe-offset", "96px");
+  });
+
+  it("hides the floating launcher during tutorial when the companion is still an egg", () => {
+    mocks.visual = {
+      ...mocks.visual,
+      currentStage: 0,
+      needsLauncherImage: true,
+    };
+    mocks.guidance = {
+      currentStep: "new_goal",
+    };
+
+    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
+
+    expect(screen.queryByTestId("journeys-companion-launcher-floating")).not.toBeInTheDocument();
+    expect(mocks.launcherImageCalls).toContainEqual(expect.objectContaining({
+      enabled: false,
+    }));
+  });
+
+  it("keeps the egg launcher visible outside tutorial", () => {
+    mocks.visual = {
+      ...mocks.visual,
+      currentStage: 0,
+    };
+
+    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
+
+    expect(screen.getByTestId("journeys-companion-launcher-floating")).toBeInTheDocument();
+  });
+
+  it("keeps the launcher visible during tutorial after the egg hatches", () => {
+    mocks.visual = {
+      ...mocks.visual,
+      currentStage: 1,
+    };
+    mocks.guidance = {
+      currentStep: "hatch_companion",
+    };
+
+    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
+
+    expect(screen.getByTestId("journeys-companion-launcher-floating")).toBeInTheDocument();
   });
 
   it("opens the popup menu and flips the launcher to face forward on tap", () => {
@@ -165,7 +220,7 @@ describe("DraggableFAB", () => {
     expect(mocks.onOpenCompanionPlanner).not.toHaveBeenCalled();
   });
 
-  it("does not request AI launcher art while showing the current companion image", () => {
+  it("requests AI launcher art and hides raw scene art until the transparent cutout exists", () => {
     mocks.visual = {
       companionId: "companion-ai",
       companionLabel: "Nova",
@@ -177,12 +232,12 @@ describe("DraggableFAB", () => {
       usesPortraitShell: false,
       isGeneratedCompanion: true,
       currentSceneImageUrl: "https://assets.example.com/scenic-companion.png",
-      launcherAwayImageUrl: "https://assets.example.com/scenic-companion.png",
-      launcherAwayFocalX: 0.4,
-      launcherAwayFocalY: 0.58,
-      launcherAwayUsesPortraitShell: true,
-      launcherAwayHasTransparentBackground: true,
-      needsLauncherImage: false,
+      launcherAwayImageUrl: null,
+      launcherAwayFocalX: null,
+      launcherAwayFocalY: null,
+      launcherAwayUsesPortraitShell: false,
+      launcherAwayHasTransparentBackground: false,
+      needsLauncherImage: true,
     };
 
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
@@ -190,13 +245,10 @@ describe("DraggableFAB", () => {
     expect(mocks.launcherImageCalls).toContainEqual({
       companionId: "companion-ai",
       sourceImageUrl: "https://assets.example.com/scenic-companion.png",
-      enabled: false,
+      enabled: true,
     });
-    expect(screen.queryByTestId("journeys-companion-launcher-placeholder")).not.toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "Nova" })).toHaveAttribute(
-      "src",
-      "https://assets.example.com/scenic-companion.png",
-    );
+    expect(screen.getByTestId("journeys-companion-launcher-placeholder")).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Nova" })).not.toBeInTheDocument();
   });
 
   it("suppresses popup open after a completed long-press drag interaction", async () => {

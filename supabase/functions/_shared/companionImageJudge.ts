@@ -9,6 +9,7 @@ export interface CompanionImageJudgeScores {
   difference: number;
   anatomy: number;
   centering: number;
+  backgroundCutout: number;
   overall: number;
   subjectCenterX: number | null;
   subjectCenterY: number | null;
@@ -50,6 +51,7 @@ const buildJudgeInstructions = ({
         "Difference should be 10 for bootstrap images because there is no prior portrait to compare against.",
         "Anatomy means: no extra limbs, no broken face logic, and no obvious malformed body plan.",
         "Centering means: the subject is well framed and not awkwardly cropped.",
+        "BackgroundCutout means: 10 for a clean companion-only transparent/empty cutout; 0-4 for any visible sky, clouds, landscape, room, floor, frame, card, rectangular backdrop, or scenic environment.",
       ].join("\n");
     case "egg":
       return [
@@ -63,6 +65,7 @@ const buildJudgeInstructions = ({
         "Difference should be 10 when the candidate is a convincing egg with no obvious full-body reveal.",
         "Anatomy means: the egg is coherent, readable, and not malformed.",
         "Centering means: the egg is cleanly framed and visually centered.",
+        "BackgroundCutout means: 10 for a clean egg-only transparent/empty cutout; 0-4 for any visible sky, clouds, landscape, room, floor, frame, card, rectangular backdrop, or scenic environment.",
       ].join("\n");
     case "evolution":
     default:
@@ -77,6 +80,7 @@ const buildJudgeInstructions = ({
         "Difference means: clearly more evolved at thumbnail size, with meaningful silhouette or posture change and stronger elemental expression.",
         "Anatomy means: no malformed limbs, duplicate heads, or broken body logic.",
         "Centering means: the subject is framed well and not awkwardly cropped.",
+        "BackgroundCutout means: 10 for a clean companion-only transparent/empty cutout; 0-4 for any visible sky, clouds, landscape, room, floor, frame, card, rectangular backdrop, or scenic environment.",
       ].join("\n");
   }
 };
@@ -112,12 +116,13 @@ export const judgeCompanionImage = async ({
           difference: { type: "number" },
           anatomy: { type: "number" },
           centering: { type: "number" },
+          backgroundCutout: { type: "number" },
           overall: { type: "number" },
           subjectCenterX: { type: "number" },
           subjectCenterY: { type: "number" },
           notes: { type: "string" },
         },
-        required: ["continuity", "difference", "anatomy", "centering", "overall", "subjectCenterX", "subjectCenterY", "notes"],
+        required: ["continuity", "difference", "anatomy", "centering", "backgroundCutout", "overall", "subjectCenterX", "subjectCenterY", "notes"],
         additionalProperties: false,
       },
     },
@@ -202,6 +207,7 @@ export const judgeCompanionImage = async ({
       difference: clampScore(typeof parsed.difference === "number" ? parsed.difference : 0),
       anatomy: clampScore(typeof parsed.anatomy === "number" ? parsed.anatomy : 0),
       centering: clampScore(typeof parsed.centering === "number" ? parsed.centering : 0),
+      backgroundCutout: clampScore(typeof parsed.backgroundCutout === "number" ? parsed.backgroundCutout : 0),
       overall: clampScore(typeof parsed.overall === "number" ? parsed.overall : 0),
       subjectCenterX: clampNormalizedCenter(
         typeof parsed.subjectCenterX === "number" ? parsed.subjectCenterX : null,

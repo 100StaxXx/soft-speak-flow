@@ -420,7 +420,9 @@ describe("CompanionEvolution", () => {
 
     const dialog = screen.getByRole("alertdialog");
 
-    expect(screen.queryByTestId("evolution-animation-video")).not.toBeInTheDocument();
+    const primedVideo = screen.getByTestId("evolution-animation-video");
+    expect(primedVideo).toHaveAttribute("data-animation-visible", "false");
+    expect(primedVideo).toHaveStyle({ opacity: "0" });
     expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
 
     await flushTimers(
@@ -450,7 +452,8 @@ describe("CompanionEvolution", () => {
       fireEvent.ended(video);
     });
 
-    expect(screen.queryByTestId("evolution-animation-video")).not.toBeInTheDocument();
+    expect(video).toHaveAttribute("data-animation-ended", "true");
+    expect(video).toHaveAttribute("data-animation-visible", "false");
     expect(screen.getByTestId("evolution-reveal-art")).toHaveAttribute("data-hold-for-animation", "false");
     expect(screen.getByText("Tap anywhere to continue")).toBeInTheDocument();
   });
@@ -522,7 +525,10 @@ describe("CompanionEvolution", () => {
     );
     await prepareEvolution();
 
-    expect(screen.queryByTestId("evolution-animation-video")).not.toBeInTheDocument();
+    expect(screen.getByTestId("evolution-animation-video")).toHaveAttribute(
+      "data-animation-visible",
+      "false",
+    );
 
     await flushTimers(
       REDUCED_SEQUENCE_MS.hold +
@@ -531,7 +537,10 @@ describe("CompanionEvolution", () => {
       REDUCED_SEQUENCE_MS.apex,
     );
 
-    expect(screen.getByTestId("evolution-animation-video")).toBeInTheDocument();
+    expect(screen.getByTestId("evolution-animation-video")).toHaveAttribute(
+      "data-animation-visible",
+      "true",
+    );
   });
 
   it("starts the first hatch reveal without a hatchery intro splash", async () => {
@@ -615,7 +624,10 @@ describe("CompanionEvolution", () => {
     expect(screen.queryByTestId("evolution-hatch-video")).not.toBeInTheDocument();
 
     const dialog = screen.getByRole("alertdialog");
-    expect(screen.queryByTestId("evolution-animation-video")).not.toBeInTheDocument();
+    expect(screen.getByTestId("evolution-animation-video")).toHaveAttribute(
+      "data-animation-visible",
+      "false",
+    );
 
     await flushTimers(
       FULL_SEQUENCE_MS.hold +

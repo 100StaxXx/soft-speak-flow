@@ -133,9 +133,9 @@ Preserve the exact companion identity:
 Change only the presentation:
 - Show only the companion, full body, centered, with ears/wings/tail fully inside the frame
 - Use a clean readable silhouette with 12-18% padding on all sides
-- Use a transparent background so only the companion remains visible
-- No scenic environment, no forest, room, starscape, frame, card, UI, props, text, watermark, border, or decorative backdrop
-- No cast shadow, contact shadow, backdrop glow, or floor plane
+- Use a true transparent background / alpha canvas so only the companion remains visible
+- Remove any reference-image scenery completely; do not preserve sky, clouds, horizon, landscape, forest, room, starscape, floor, frame, card, UI, props, text, watermark, border, solid rectangle, or decorative backdrop
+- No cast shadow, contact shadow, backdrop glow, floor plane, or sticker rectangle
 
 Output a polished square transparent PNG-style render for a mobile floating action button.`;
 };

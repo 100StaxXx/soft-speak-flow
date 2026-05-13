@@ -71,4 +71,23 @@ describe("CompanionImage", () => {
     expect(image).toHaveClass("object-cover");
     expect(image).toHaveStyle({ objectPosition: "0% 50%" });
   });
+
+  it("keeps generated portrait art centered when stored focal metadata is used with portrait fit", () => {
+    render(
+      <CompanionImage
+        src="https://example.com/generated-companion.png"
+        alt="Generated Portrait Companion"
+        fit="portrait"
+        focalX={0.32}
+        focalY={0.68}
+      />,
+    );
+
+    const image = screen.getByRole("img", { name: "Generated Portrait Companion" });
+    expect(image).toHaveAttribute("data-companion-image-focal-source", "stored");
+    expect(image).toHaveAttribute("data-companion-image-fit", "portrait");
+    expect(image).toHaveClass("object-contain");
+    expect(image).toHaveStyle({ objectPosition: "center center" });
+    expect(image.style.transform).toBe("");
+  });
 });

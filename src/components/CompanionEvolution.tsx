@@ -367,9 +367,10 @@ const CompanionEvolutionContent = ({
   const sequence = prefersReducedMotion ? REDUCED_SEQUENCE_MS : FULL_SEQUENCE_MS;
   const isAnimationRevealPhase = phase === "reveal" || phase === "settle";
   const shouldUseGeneratedAnimationVideo = hasPlayableAnimationVideoUrl && !useHatchVideo;
+  const shouldPrepareAnimationVideo = shouldUseGeneratedAnimationVideo && !animationVideoFailed;
   const shouldUseAnimationVideo = shouldUseGeneratedAnimationVideo && animationVideoReady && !animationVideoFailed;
   const showAnimationVideo = shouldUseAnimationVideo && !animationVideoEnded && isAnimationRevealPhase;
-  const shouldRenderAnimationVideo = showAnimationVideo;
+  const shouldRenderAnimationVideo = shouldPrepareAnimationVideo;
   const holdStillRevealForAnimation =
     shouldUseAnimationVideo && !animationVideoEnded && isAnimationRevealPhase;
   const canDismissNow = canDismiss && !holdStillRevealForAnimation;
@@ -474,11 +475,30 @@ const CompanionEvolutionContent = ({
 
   useEffect(() => {
     const videoElement = animationVideoRef.current;
+    if (!shouldPrepareAnimationVideo || !videoElement) return;
+
+    videoElement.muted = true;
+    videoElement.playsInline = true;
+    videoElement.preload = "auto";
+
+    try {
+      videoElement.currentTime = 0;
+    } catch {
+      // Some mobile browsers only allow seeking after metadata is available.
+    }
+  }, [animationVideoUrl, shouldPrepareAnimationVideo]);
+
+  useEffect(() => {
+    const videoElement = animationVideoRef.current;
     if (!showAnimationVideo || !videoElement) return;
 
     videoElement.muted = true;
     videoElement.playsInline = true;
-    videoElement.currentTime = 0;
+    try {
+      videoElement.currentTime = 0;
+    } catch {
+      // Playback can still begin from the initial frame if early seeking is blocked.
+    }
 
     void videoElement.play().catch((error) => {
       log.warn("Evolution animation video playback failed", {
@@ -1312,6 +1332,7 @@ const CompanionEvolutionContent = ({
                     ref={animationVideoRef}
                     src={animationVideoUrl}
                     className="absolute inset-0 z-[4] h-full w-full rounded-[2rem] object-contain shadow-2xl transition-opacity duration-500"
+                    aria-hidden={!showAnimationVideo}
                     muted
                     playsInline
                     preload="auto"
@@ -1320,6 +1341,7 @@ const CompanionEvolutionContent = ({
                     data-animation-ready={animationVideoReady ? "true" : "false"}
                     data-animation-failed={animationVideoFailed ? "true" : "false"}
                     data-animation-ended={animationVideoEnded ? "true" : "false"}
+                    data-animation-visible={showAnimationVideo ? "true" : "false"}
                     onCanPlay={() => setAnimationVideoReady(true)}
                     onLoadedData={() => setAnimationVideoReady(true)}
                     onEnded={() => setAnimationVideoEnded(true)}
@@ -1333,9 +1355,11 @@ const CompanionEvolutionContent = ({
                     style={{
                       opacity: showAnimationVideo ? 1 : 0,
                       pointerEvents: "none",
-                      border: `3px solid hsl(${theme.glowA} / ${phase === "reveal" || phase === "settle" ? 0.62 : 0.24})`,
+                      border: showAnimationVideo
+                        ? `3px solid hsl(${theme.glowA} / ${phase === "reveal" || phase === "settle" ? 0.62 : 0.24})`
+                        : "3px solid transparent",
                       boxShadow:
-                        phase === "reveal" || phase === "settle"
+                        showAnimationVideo && (phase === "reveal" || phase === "settle")
                           ? `0 0 54px ${theme.revealBurstColor}, inset 0 0 26px hsl(${theme.glowB} / 0.18)`
                           : "none",
                     }}

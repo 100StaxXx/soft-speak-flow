@@ -178,6 +178,10 @@ const resolveContainStyle = (focalPoint: CompanionImageFocalPoint): CSSPropertie
   return style;
 };
 
+const CENTERED_CONTAIN_STYLE: CSSProperties = {
+  objectPosition: "center center",
+};
+
 export const resolveCompanionImagePresentation = ({
   src,
   fit = "cover",
@@ -204,7 +208,7 @@ export const resolveCompanionImagePresentation = ({
       focalPoint,
       focalSource,
       assetKey,
-      style: resolveContainStyle(focalPoint),
+      style: manifestEntry ? resolveContainStyle(focalPoint) : CENTERED_CONTAIN_STYLE,
     };
   }
 

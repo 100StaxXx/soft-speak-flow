@@ -1,5 +1,5 @@
-// The Journeys companion launcher uses the canonical companion image moving forward.
+// The Journeys companion launcher uses dedicated cutout art for AI companions.
 export const COMPANION_FLOATING_ACTION_BUTTON_ENABLED = true;
 
-// Keep the separate launcher image pipeline disabled; current_image_url is the canonical art.
-export const COMPANION_LAUNCHER_IMAGE_GENERATION_ENABLED = false;
+// Generate transparent launcher cutouts instead of rendering full companion scene art in the FAB.
+export const COMPANION_LAUNCHER_IMAGE_GENERATION_ENABLED = true;

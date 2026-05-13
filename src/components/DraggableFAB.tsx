@@ -6,6 +6,7 @@ import { JourneysCompanionLauncherPopup } from "@/components/journeys/JourneysCo
 import { useDraggableFAB } from "@/hooks/useDraggableFAB";
 import { useCompanionLauncherImage } from "@/hooks/useCompanionLauncherImage";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
+import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { COMPANION_LAUNCHER_IMAGE_GENERATION_ENABLED } from "@/config/companionLauncherFeatureFlags";
 import { cn } from "@/lib/utils";
 import {
@@ -55,6 +56,7 @@ export const DraggableFAB = ({
   const {
     companionId,
     companionLabel,
+    currentStage,
     isGeneratedCompanion,
     currentSceneImageUrl,
     launcherAwayImageUrl,
@@ -64,10 +66,13 @@ export const DraggableFAB = ({
     launcherAwayHasTransparentBackground,
     needsLauncherImage,
   } = useJourneysCompanionVisual();
+  const { currentStep: tutorialStep } = usePostOnboardingMentorGuidance();
+  const shouldHideTutorialEggFab =
+    Boolean(tutorialStep) && typeof currentStage === "number" && currentStage <= 0;
   useCompanionLauncherImage({
     companionId,
     sourceImageUrl: currentSceneImageUrl,
-    enabled: COMPANION_LAUNCHER_IMAGE_GENERATION_ENABLED && needsLauncherImage,
+    enabled: COMPANION_LAUNCHER_IMAGE_GENERATION_ENABLED && needsLauncherImage && !shouldHideTutorialEggFab,
   });
   const handleDragCompleted = useCallback(() => {
     suppressTapRef.current = true;
@@ -237,6 +242,10 @@ export const DraggableFAB = ({
     };
     onOpenCompanionPlanner(launchIntent);
   }, [closeMenu, onOpenCompanionPlanner]);
+
+  if (shouldHideTutorialEggFab) {
+    return null;
+  }
 
   return (
     <motion.div

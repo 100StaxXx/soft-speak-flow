@@ -457,16 +457,16 @@ describe("CompanionDisplay overlay stack", () => {
     expect(image).not.toHaveAttribute("src", "https://assets.example.com/launcher-cutout-source.png");
     const imageFrame = screen.getByTestId("companion-primary-image-frame");
     expect(imageFrame.style.backgroundImage).toBe("");
-    expect(image).toHaveAttribute("data-companion-image-fit", "portrait");
+    expect(image).toHaveAttribute("data-companion-image-fit", "cover");
     Object.defineProperty(image, "naturalWidth", { configurable: true, value: 1536 });
     Object.defineProperty(image, "naturalHeight", { configurable: true, value: 1024 });
 
     fireEvent.load(image);
 
     await waitFor(() => {
-      expect(image).toHaveStyle({ objectPosition: "center center" });
+      expect(image).toHaveStyle({ objectPosition: "0% 50%" });
     });
-    expect(image.style.transform).toBe("translate(18.000%, -18.000%)");
+    expect(image.style.transform).toBe("");
   });
 
   it("renders the stats analysis trigger directly below the stat grid", async () => {

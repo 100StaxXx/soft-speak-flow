@@ -152,6 +152,25 @@ describe("companionImageFocal", () => {
     });
   });
 
+  it("keeps stored remote portrait focal metadata centered without translating the image", () => {
+    const presentation = resolveCompanionImagePresentation({
+      src: "https://example.com/generated-companion.png",
+      fit: "portrait",
+      focalX: 0.32,
+      focalY: 0.68,
+    });
+
+    expect(presentation).toMatchObject({
+      focalPoint: { x: 0.32, y: 0.68 },
+      focalSource: "stored",
+      assetKey: null,
+      style: {
+        objectPosition: "center center",
+      },
+    });
+    expect(presentation.style.transform).toBeUndefined();
+  });
+
   it("falls back cleanly for non-bundled images without stored focal metadata", () => {
     expect(
       resolveCompanionImagePresentation({

@@ -112,6 +112,7 @@ const createPassingScores = (difference = 7) => ({
   difference,
   anatomy: 8,
   centering: 8,
+  backgroundCutout: 8,
   overall: 8,
   subjectCenterX: 0.44,
   subjectCenterY: 0.56,
@@ -125,10 +126,17 @@ const createFailingScores = () => ({
   difference: 1,
   anatomy: 4,
   centering: 4,
+  backgroundCutout: 4,
   overall: 4,
   subjectCenterX: 0.2,
   subjectCenterY: 0.2,
   notes: "too similar to previous portrait",
+});
+
+const createBackgroundFailingScores = () => ({
+  ...createPassingScores(7),
+  backgroundCutout: 3,
+  notes: "visible sky and cloud backdrop behind the companion",
 });
 
 const createSupabaseHarness = ({
@@ -581,7 +589,7 @@ Deno.test("boundary evolutions retry after low judge scores and generate from vi
       { stage: 5, xp_required: 100 },
       { stage: 6, xp_required: 240 },
     ],
-    judgeScores: [createFailingScores(), createPassingScores(7)],
+    judgeScores: [createBackgroundFailingScores(), createPassingScores(7)],
   });
 
   const response = await withEnvValue(
@@ -641,8 +649,9 @@ Deno.test("boundary evolutions retry after low judge scores and generate from vi
   );
   assert(
     typeof secondGenerateCall.prompt === "string" &&
-      secondGenerateCall.prompt.includes("Retry critique:"),
-    "Expected second boundary generation prompt to include judge critique feedback",
+      secondGenerateCall.prompt.includes("Retry critique:") &&
+      secondGenerateCall.prompt.includes("visible sky and cloud backdrop"),
+    "Expected second boundary generation prompt to include background critique feedback",
   );
 
   const upsertCall = harness.upsertCalls[0];

@@ -396,9 +396,10 @@ const COMPANION_IMAGE_OUTPUT_FORMAT = "png" as const;
 
 const TRANSPARENT_COMPANION_OUTPUT_DIRECTION = [
   "Transparent output:",
-  "- Render the companion or egg as a clean cutout on a transparent background.",
-  "- Do not include a scenic/environmental backdrop, floor, frame, border, card, or solid background.",
-  "- Aura, glow, and particles may surround the subject but should sit over transparency.",
+  "- Render the companion or egg as isolated subject-only art on a true transparent background / alpha canvas.",
+  "- Do not include a scenic/environmental backdrop, sky, clouds, horizon, landscape, room, floor, frame, border, card, shadow plane, or solid rectangular background.",
+  "- The image must not read as a cropped scene or sticker placed on a visible rectangle.",
+  "- Aura, glow, and particles may surround the subject but must sit over transparency with no backdrop behind them.",
 ].join("\n");
 
 const appendTransparentCompanionOutputDirection = (prompt: string) =>
@@ -488,7 +489,13 @@ const JUDGE_MINIMUMS = {
   overall: 7,
   continuity: 6,
   anatomy: 6,
+  backgroundCutout: 7,
 };
+
+const getJudgeBackgroundCutoutScore = (
+  scores: Awaited<ReturnType<typeof judgeCompanionImage>>,
+): number =>
+  scores && typeof scores.backgroundCutout === "number" ? scores.backgroundCutout : 0;
 
 const parseDataUrl = (dataUrl: string): Uint8Array => {
   const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, "");
@@ -864,6 +871,7 @@ const judgeScoresPass = ({
     scores.overall < JUDGE_MINIMUMS.overall
     || scores.continuity < JUDGE_MINIMUMS.continuity
     || scores.anatomy < JUDGE_MINIMUMS.anatomy
+    || getJudgeBackgroundCutoutScore(scores) < JUDGE_MINIMUMS.backgroundCutout
   ) {
     return false;
   }
@@ -886,6 +894,7 @@ const rankJudgeScores = (scores: Awaited<ReturnType<typeof judgeCompanionImage>>
     scores.overall * 4
     + scores.continuity * 3
     + scores.anatomy * 2
+    + getJudgeBackgroundCutoutScore(scores) * 2
     + scores.centering
     + scores.difference
   );
@@ -1787,7 +1796,9 @@ Slightly brighter exposure with lifted midtones and clearer highlights for reada
       subjectCenterY?: number;
       centeringScore?: number;
       materialFidelity?: number;
+      backgroundCutout?: number;
       compositionIssues?: string[];
+      backgroundIssues?: string[];
       materialIssues?: string[];
       issues: string[];
       shouldRetry: boolean;
@@ -1915,13 +1926,15 @@ Slightly brighter exposure with lifted midtones and clearer highlights for reada
                 subjectCenterX: { type: "number", description: "Normalized 0-1 horizontal center of the visible subject mass. 0.5 means perfectly centered horizontally." },
                 subjectCenterY: { type: "number", description: "Normalized 0-1 vertical center of the visible subject mass. 0.5 means perfectly centered vertically." },
                 centeringScore: { type: "number", description: "Score 0-100: How naturally centered is the subject within the frame?" },
+                backgroundCutoutScore: { type: "number", description: "Score 0-100: 100 = isolated subject-only transparent/empty cutout; 0 = visible scenic background, sky, clouds, floor, frame, card, shadow plane, or rectangular backdrop." },
                 compositionIssues: { type: "array", items: { type: "string" }, description: "List any composition issues such as subject too high, low, left, right, cropped, or visually off-center." },
+                backgroundIssues: { type: "array", items: { type: "string" }, description: "List any visible background/backdrop problems such as sky, clouds, landscape, room, floor, frame, card, shadow plane, solid rectangle, or non-transparent canvas." },
                 anatomyIssues: { type: "array", items: { type: "string" }, description: "List any anatomical issues (extra limbs, wrong body parts, mutations)" },
                 overallQuality: { type: "number", description: "Overall quality score 0-100 considering all factors" },
                 materialFidelityScore: { type: "number", description: "Score 0-100: For mechanical species, how well the output preserves mechanical identity (metallic scales, articulated joints, gear motifs, engineered energy core)." },
                 materialIssues: { type: "array", items: { type: "string" }, description: "List spirit-lock issues such as organic drift, missing mechanical anchors, or biological textures." }
               },
-              required: ["limbCountScore", "actualLimbCount", "speciesFidelityScore", "colorMatchScore", "subjectCenterX", "subjectCenterY", "centeringScore", "compositionIssues", "anatomyIssues", "overallQuality"],
+              required: ["limbCountScore", "actualLimbCount", "speciesFidelityScore", "colorMatchScore", "subjectCenterX", "subjectCenterY", "centeringScore", "backgroundCutoutScore", "compositionIssues", "backgroundIssues", "anatomyIssues", "overallQuality"],
               additionalProperties: false
             }
           }
@@ -1938,6 +1951,7 @@ Expected characteristics:
 - Color variety is allowed: ${favoriteColor} must remain clearly visible as the anchor, while secondary/tertiary accent colors are acceptable
 - Estimate the visible subject center as normalized coordinates where the full frame is 0..1 in each direction
 - Score how naturally centered the subject appears in the frame; images with the subject pushed too high/low/left/right should score poorly
+- Score the background/cutout strictly. The image should be isolated companion-only transparent-background art. Penalize any visible sky, clouds, horizon, landscape, room, floor, frame, card, shadow plane, solid rectangle, or scene-like backdrop.
 ${extractedMetadata ? `- Reference eye color: ${extractedMetadata.hexEyeColor}` : ''}
 ${spiritLockActive ? `- SPIRIT LOCK: Mechanical Dragon must remain mechanical.
 - Required anchors: metallic scales, articulated joints, gear/clockwork motifs, engineered energy core.
@@ -1989,6 +2003,12 @@ Score each aspect from 0-100 and list any issues.`;
             const compositionIssues = Array.isArray(scores.compositionIssues)
               ? scores.compositionIssues.filter((value: unknown): value is string => typeof value === "string")
               : [];
+            const backgroundCutout = typeof scores.backgroundCutoutScore === "number"
+              ? scores.backgroundCutoutScore
+              : 0;
+            const backgroundIssues = Array.isArray(scores.backgroundIssues)
+              ? scores.backgroundIssues.filter((value: unknown): value is string => typeof value === "string")
+              : [];
             const materialFidelity = typeof scores.materialFidelityScore === "number"
               ? scores.materialFidelityScore
               : undefined;
@@ -2006,6 +2026,7 @@ Score each aspect from 0-100 and list any issues.`;
             const materialRetryRequired = spiritLockActive
               ? (typeof materialFidelity === "number" ? materialFidelity < 70 : true) || materialIssues.length > 0
               : false;
+            const backgroundRetryRequired = backgroundCutout < 70 || backgroundIssues.length > 0;
             qualityScore = {
               overall: scores.overallQuality || 0,
               limbCount: scores.limbCountScore || 0,
@@ -2015,15 +2036,19 @@ Score each aspect from 0-100 and list any issues.`;
               subjectCenterY,
               centeringScore,
               compositionIssues,
+              backgroundCutout,
+              backgroundIssues,
               materialFidelity,
               materialIssues,
               issues: [
                 ...(Array.isArray(scores.anatomyIssues) ? scores.anatomyIssues : []),
                 ...compositionIssues,
+                ...backgroundIssues,
               ],
               shouldRetry:
                 scores.overallQuality < 60
                 || scores.limbCountScore < 50
+                || backgroundRetryRequired
                 || materialRetryRequired
                 || centeringRetryRequired,
             };
@@ -2073,7 +2098,7 @@ Score each aspect from 0-100 and list any issues.`;
 
       if (qualityScore?.shouldRetry && currentAttempt < effectiveMaxInternalRetries) {
         console.log(
-          `Quality too low (overall: ${qualityScore.overall}, limbs: ${qualityScore.limbCount}, centering: ${qualityScore.centeringScore ?? "n/a"}), retrying... (${currentAttempt + 1}/${effectiveMaxInternalRetries})`,
+          `Quality too low (overall: ${qualityScore.overall}, limbs: ${qualityScore.limbCount}, centering: ${qualityScore.centeringScore ?? "n/a"}, background: ${qualityScore.backgroundCutout ?? "n/a"}), retrying... (${currentAttempt + 1}/${effectiveMaxInternalRetries})`,
         );
         currentAttempt++;
         continue;

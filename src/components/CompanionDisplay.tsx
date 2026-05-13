@@ -495,15 +495,7 @@ export const CompanionDisplay = memo(({
   const usesEggPortraitShell = isCompanionEggImageSource(effectiveImageUrl);
   const usesSceneEggPortraitShell =
     getCompanionEggImageAssetKey(effectiveImageUrl)?.startsWith("companion-eggs/v2/") ?? false;
-  const usesGeneratedCompanionCutout = Boolean(
-    displayCompanion
-    && isAiGeneratedCompanion(displayCompanion)
-    && effectiveImageUrl !== COMPANION_PLACEHOLDER
-    && !usesPresetPortraitShell
-    && !usesEggPortraitShell,
-  );
-  const portraitImageFit = usesGeneratedCompanionCutout
-    || usesPresetPortraitShell
+  const portraitImageFit = usesPresetPortraitShell
     || (usesEggPortraitShell && !usesSceneEggPortraitShell)
     ? "portrait"
     : "cover";
