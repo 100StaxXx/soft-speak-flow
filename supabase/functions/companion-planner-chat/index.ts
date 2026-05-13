@@ -21,7 +21,6 @@ import {
 } from "./planner.ts";
 import {
   buildOrchestratedPlannerResponse,
-  buildUpcomingAIResponse,
   sanitizeReadyQuestProposalResponse,
 } from "./orchestrator.ts";
 import { enrichQuestPlannerResult } from "./questEnrichment.ts";
@@ -34,7 +33,6 @@ import {
   PLANNER_ORCHESTRATION_TIMEOUT_MS,
   QUEST_ENRICHMENT_TIMEOUT_MS,
   runPlannerStageWithTimeout,
-  UPCOMING_AI_TIMEOUT_MS,
 } from "./latencyBudget.ts";
 import { validateAndPrunePlannerContext } from "./plannerContextValidator.ts";
 import {
@@ -239,52 +237,6 @@ serve(async (req) => {
     const isPlanningLauncherConsentTurn = hasPlanningLauncherConsentState(
       plannerInput.sessionState,
     ) || hasPlanningLauncherConsentQuestion(result);
-
-    if (starterIntent === "upcoming_start") {
-      const costGuardrails = createCostGuardrailSession({
-        supabase: protectedRequest.supabase,
-        endpointKey: "companion-planner-chat",
-        featureKey: "ai_companion_planner",
-        userId: protectedRequest.auth.userId,
-        requestId,
-      });
-      const guardedFetch = costGuardrails.wrapFetch(fetch);
-      const aiResult = await runPlannerStageWithTimeout({
-        work: () =>
-          buildUpcomingAIResponse({
-            guardedFetch,
-            input: plannerInput,
-            baseResult: result,
-          }),
-        timeoutMs: UPCOMING_AI_TIMEOUT_MS,
-        operation: "companion planner upcoming ai response",
-        timeoutCode: "PLANNER_UPCOMING_TIMEOUT",
-        fallbackValue: null,
-        onTimeout: () => {
-          console.warn(
-            "[companion-planner-chat] upcoming_start AI timed out, falling back to deterministic",
-            { requestId, timeoutMs: UPCOMING_AI_TIMEOUT_MS },
-          );
-        },
-      });
-      if (aiResult) {
-        const responseResult = sanitizeReadyQuestProposalResponse(
-          normalizePlannerBuildResultText(aiResult, textNormalizationOptions),
-          textNormalizationOptions,
-        );
-        return new Response(JSON.stringify(responseResult), {
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-            "X-Request-Id": requestId,
-          },
-        });
-      }
-      console.warn(
-        "[companion-planner-chat] upcoming_start AI failed, falling back to deterministic",
-        { requestId },
-      );
-    }
 
     if (
       isPlanningLauncherConsentTurn ||

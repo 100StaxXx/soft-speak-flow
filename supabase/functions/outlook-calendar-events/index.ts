@@ -10,14 +10,12 @@ const MICROSOFT_TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.
 const GRAPH_BASE = "https://graph.microsoft.com/v1.0";
 const SCOPES = ["offline_access", "User.Read", "Calendars.ReadWrite", "Tasks.ReadWrite"].join(" ");
 
-type SyncMode = "send_only" | "full_sync";
+type SyncMode = "send_only";
 
 type Action =
   | "createLinkedEvent"
   | "updateLinkedEvent"
-  | "deleteLinkedEvent"
-  | "syncLinkedChanges"
-  | "syncPlannerWindow";
+  | "deleteLinkedEvent";
 
 export interface TaskRecurrenceFields {
   recurrence_pattern: "daily" | "weekdays" | "weekly" | "biweekly" | "monthly" | "custom" | null;
@@ -26,16 +24,6 @@ export interface TaskRecurrenceFields {
   recurrence_custom_period: "week" | "month" | null;
   recurrence_end_date: string | null;
   is_recurring: boolean;
-}
-
-export interface PlannerCalendarEvent {
-  id: string;
-  title: string;
-  start: string;
-  end: string;
-  isAllDay: boolean;
-  provider: "outlook";
-  readOnly: true;
 }
 
 interface CalendarConnection {
@@ -87,16 +75,12 @@ function normalizeAction(raw: string | undefined): Action | null {
     update_linked_event: "updateLinkedEvent",
     deleteLinkedEvent: "deleteLinkedEvent",
     delete_linked_event: "deleteLinkedEvent",
-    syncLinkedChanges: "syncLinkedChanges",
-    sync_linked_changes: "syncLinkedChanges",
-    syncPlannerWindow: "syncPlannerWindow",
-    sync_planner_window: "syncPlannerWindow",
   };
   return map[raw] ?? null;
 }
 
 function normalizeSyncMode(mode: unknown): SyncMode {
-  return mode === "full_sync" ? "full_sync" : "send_only";
+  return "send_only";
 }
 
 function getBearerToken(req: Request): string | null {
@@ -562,98 +546,6 @@ async function outlookApi(
   return await resp.json();
 }
 
-export function parseGraphDateTime(dateTimeObj: Record<string, any> | undefined): string | null {
-  if (!dateTimeObj?.dateTime) return null;
-  const raw = String(dateTimeObj.dateTime);
-  return parseProviderDateTime(raw)?.toISOString() ?? null;
-}
-
-async function listOutlookCalendarWindow(
-  accessToken: string,
-  calendarId: string,
-  startDate: string,
-  endDate: string,
-  timezone: string | null | undefined,
-): Promise<Record<string, any>[]> {
-  const start = toScheduledDateTime(startDate, "00:00", timezone) ?? new Date(`${startDate}T00:00:00.000Z`);
-  const end = toScheduledDateTime(endDate, "23:59:59", timezone) ?? new Date(`${endDate}T23:59:59.999Z`);
-  let path =
-    `/me/calendars/${encodeURIComponent(calendarId)}/calendarView`
-    + `?startDateTime=${encodeURIComponent(start.toISOString())}`
-    + `&endDateTime=${encodeURIComponent(end.toISOString())}`
-    + "&$top=250"
-    + "&$select=id,subject,body,start,end,isAllDay,location,lastModifiedDateTime,isCancelled";
-
-  const events: Record<string, any>[] = [];
-
-  while (path) {
-    const payload = await outlookApi(accessToken, path, "GET");
-    events.push(...(Array.isArray(payload?.value) ? payload.value : []));
-    path = typeof payload?.["@odata.nextLink"] === "string" ? payload["@odata.nextLink"] : "";
-  }
-
-  return events;
-}
-
-export function buildPlannerEventCacheRows(args: {
-  events: Record<string, any>[];
-  linkedEventIds: Set<string>;
-  userId: string;
-  connectionId: string;
-  syncedAt: string;
-}): {
-  rows: Array<Record<string, unknown>>;
-  plannerEvents: PlannerCalendarEvent[];
-} {
-  const rows: Array<Record<string, unknown>> = [];
-  const plannerEvents: PlannerCalendarEvent[] = [];
-
-  for (const event of args.events) {
-    const externalEventId = typeof event.id === "string" ? event.id : null;
-    if (!externalEventId || args.linkedEventIds.has(externalEventId) || event.isCancelled === true) {
-      continue;
-    }
-
-    const startTime = parseGraphDateTime(event.start as Record<string, any> | undefined);
-    const endTime = parseGraphDateTime(event.end as Record<string, any> | undefined);
-    if (!startTime || !endTime) continue;
-
-    const title = typeof event.subject === "string" && event.subject.trim().length > 0
-      ? event.subject
-      : "(No title)";
-    const description = typeof event.body?.content === "string" ? event.body.content : null;
-    const location = typeof event.location?.displayName === "string" ? event.location.displayName : null;
-    const isAllDay = Boolean(event.isAllDay);
-
-    rows.push({
-      user_id: args.userId,
-      connection_id: args.connectionId,
-      external_event_id: externalEventId,
-      title,
-      description,
-      start_time: startTime,
-      end_time: endTime,
-      is_all_day: isAllDay,
-      location,
-      source: "outlook",
-      raw_data: event,
-      synced_at: args.syncedAt,
-    });
-
-    plannerEvents.push({
-      id: externalEventId,
-      title,
-      start: startTime,
-      end: endTime,
-      isAllDay,
-      provider: "outlook",
-      readOnly: true,
-    });
-  }
-
-  return { rows, plannerEvents };
-}
-
 async function getTaskById(
   supabase: any,
   userId: string,
@@ -890,184 +782,6 @@ async function handleOutlookCalendarEvents(req: Request) {
       }
 
       return jsonResponse({ success: true, deletedLinks: (links ?? []).length });
-    }
-
-    if (action === "syncLinkedChanges") {
-      const timezone = await getUserTimezone(supabase, userId);
-      const { data: links, error: linksError } = await supabase
-        .from("quest_calendar_links")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("provider", "outlook");
-
-      if (linksError) {
-        return jsonResponse({ error: "Failed to fetch links", details: linksError.message }, 500);
-      }
-
-      let synced = 0;
-      let pulledProviderChanges = 0;
-      let removedCancelled = 0;
-
-      for (const link of links ?? []) {
-        const externalCalendarId = link.external_calendar_id || connection.primary_calendar_id || connection.calendar_id;
-        if (!externalCalendarId) continue;
-
-        try {
-          const event = await outlookApi(
-            accessToken,
-            `/me/calendars/${encodeURIComponent(externalCalendarId)}/events/${encodeURIComponent(link.external_event_id)}`,
-            "GET",
-          );
-
-          const providerUpdatedAt = event?.lastModifiedDateTime ? new Date(event.lastModifiedDateTime) : null;
-          const appSyncedAt = link.last_app_sync_at ? new Date(link.last_app_sync_at) : null;
-
-          const providerWins =
-            !appSyncedAt ||
-            !providerUpdatedAt ||
-            Number.isNaN(providerUpdatedAt.getTime())
-              ? true
-              : providerUpdatedAt.getTime() >= appSyncedAt.getTime();
-
-          if (event?.isCancelled === true) {
-            await supabase.from("daily_tasks").delete().eq("id", link.task_id).eq("user_id", userId);
-            await supabase.from("quest_calendar_links").delete().eq("id", link.id);
-            removedCancelled += 1;
-            continue;
-          }
-
-          if (normalizeSyncMode(link.sync_mode) === "full_sync" && providerWins) {
-            const taskPatch = mapOutlookEventToTaskUpdate(event, timezone);
-            await supabase
-              .from("daily_tasks")
-              .update({
-                task_text: taskPatch.task_text,
-                task_date: taskPatch.task_date,
-                scheduled_time: taskPatch.scheduled_time,
-                estimated_duration: taskPatch.estimated_duration,
-                reminder_enabled: taskPatch.reminder_enabled,
-                reminder_minutes_before: taskPatch.reminder_minutes_before,
-                recurrence_pattern: taskPatch.recurrence_pattern,
-                recurrence_days: taskPatch.recurrence_days,
-                recurrence_month_days: taskPatch.recurrence_month_days,
-                recurrence_custom_period: taskPatch.recurrence_custom_period,
-                recurrence_end_date: taskPatch.recurrence_end_date,
-                is_recurring: Boolean(taskPatch.recurrence_pattern),
-                location: taskPatch.location,
-                notes: taskPatch.notes,
-              })
-              .eq("id", link.task_id)
-              .eq("user_id", userId);
-
-            pulledProviderChanges += 1;
-          }
-
-          await supabase
-            .from("quest_calendar_links")
-            .update({
-              last_provider_sync_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", link.id);
-
-          synced += 1;
-        } catch {
-          await supabase.from("quest_calendar_links").delete().eq("id", link.id);
-        }
-      }
-
-      return jsonResponse({
-        success: true,
-        linksChecked: synced,
-        pulledProviderChanges,
-        removedCancelled,
-      });
-    }
-
-    if (action === "syncPlannerWindow") {
-      const externalCalendarId =
-        ((body?.calendarId || body?.calendar_id) as string | undefined) ||
-        connection.primary_calendar_id ||
-        connection.calendar_id;
-
-      if (!externalCalendarId) {
-        return jsonResponse({ error: "No primary Outlook calendar selected" }, 400);
-      }
-
-      const now = new Date();
-      const startDate = typeof body?.startDate === "string" && body.startDate.length > 0
-        ? body.startDate
-        : now.toISOString().slice(0, 10);
-      const endDate = typeof body?.endDate === "string" && body.endDate.length > 0
-        ? body.endDate
-        : new Date(now.getTime() + 29 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-      const syncedAt = new Date().toISOString();
-      const timezone = await getUserTimezone(supabase, userId);
-
-      const [events, linkedEventResponse] = await Promise.all([
-        listOutlookCalendarWindow(accessToken, externalCalendarId, startDate, endDate, timezone),
-        supabase
-          .from("quest_calendar_links")
-          .select("external_event_id")
-          .eq("user_id", userId)
-          .eq("connection_id", connection.id)
-          .eq("provider", "outlook"),
-      ]);
-
-      if (linkedEventResponse.error) {
-        return jsonResponse({ error: "Failed to fetch linked Outlook events", details: linkedEventResponse.error.message }, 500);
-      }
-
-      const linkedEventIds = new Set(
-        ((linkedEventResponse.data ?? []) as Array<{ external_event_id: string | null }>)
-          .map((row) => row.external_event_id)
-          .filter((value): value is string => typeof value === "string" && value.length > 0),
-      );
-
-      const { rows, plannerEvents } = buildPlannerEventCacheRows({
-        events,
-        linkedEventIds,
-        userId,
-        connectionId: connection.id,
-        syncedAt,
-      });
-
-      const { error: clearError } = await supabase
-        .from("external_calendar_events")
-        .delete()
-        .eq("user_id", userId)
-        .eq("connection_id", connection.id)
-        .eq("source", "outlook");
-
-      if (clearError) {
-        return jsonResponse({ error: "Failed to refresh Outlook event cache", details: clearError.message }, 500);
-      }
-
-      if (rows.length > 0) {
-        const { error: insertError } = await supabase
-          .from("external_calendar_events")
-          .insert(rows);
-
-        if (insertError) {
-          return jsonResponse({ error: "Failed to cache Outlook planner events", details: insertError.message }, 500);
-        }
-      }
-
-      await supabase
-        .from("user_calendar_connections")
-        .update({
-          last_synced_at: syncedAt,
-          updated_at: syncedAt,
-        })
-        .eq("id", connection.id);
-
-      return jsonResponse({
-        success: true,
-        startDate,
-        endDate,
-        events: plannerEvents,
-        cachedCount: rows.length,
-      });
     }
 
     return jsonResponse({ error: "Unsupported action" }, 400);

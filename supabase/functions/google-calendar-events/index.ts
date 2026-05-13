@@ -9,16 +9,12 @@ const corsHeaders = {
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3";
 
-type SyncMode = "send_only" | "full_sync";
+type SyncMode = "send_only";
 
 type Action =
   | "createLinkedEvent"
   | "updateLinkedEvent"
-  | "deleteLinkedEvent"
-  | "syncLinkedChanges"
-  | "legacySync"
-  | "legacyGetEvents"
-  | "legacyClearCache";
+  | "deleteLinkedEvent";
 
 interface CalendarConnection {
   id: string;
@@ -64,20 +60,13 @@ function normalizeAction(raw: string | undefined): Action | null {
     update_linked_event: "updateLinkedEvent",
     deleteLinkedEvent: "deleteLinkedEvent",
     delete_linked_event: "deleteLinkedEvent",
-    syncLinkedChanges: "syncLinkedChanges",
-    sync_linked_changes: "syncLinkedChanges",
-
-    // Backward-compatible aliases
-    sync: "legacySync",
-    get_events: "legacyGetEvents",
-    clear_cache: "legacyClearCache",
   };
 
   return map[raw] ?? null;
 }
 
 function normalizeSyncMode(mode: unknown): SyncMode {
-  return mode === "full_sync" ? "full_sync" : "send_only";
+  return "send_only";
 }
 
 function getBearerToken(req: Request): string | null {
@@ -393,45 +382,6 @@ async function handleGoogleCalendarEvents(req: Request) {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const userId = await getAuthedUserId(supabase, req);
 
-    // Backward-compatible legacy endpoints still used by older clients.
-    if (action === "legacyGetEvents") {
-      const startDate = (body?.startDate || body?.start_date) as string | undefined;
-      const endDate = (body?.endDate || body?.end_date) as string | undefined;
-
-      if (!startDate || !endDate) {
-        return jsonResponse({ error: "startDate and endDate are required" }, 400);
-      }
-
-      const { data: events, error } = await supabase
-        .from("external_calendar_events")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("source", "google")
-        .gte("start_time", new Date(startDate).toISOString())
-        .lte("start_time", new Date(endDate).toISOString())
-        .order("start_time", { ascending: true });
-
-      if (error) {
-        return jsonResponse({ error: "Failed to fetch events", details: error.message }, 500);
-      }
-
-      return jsonResponse({ events: events ?? [] });
-    }
-
-    if (action === "legacyClearCache") {
-      const { error } = await supabase
-        .from("external_calendar_events")
-        .delete()
-        .eq("user_id", userId)
-        .eq("source", "google");
-
-      if (error) {
-        return jsonResponse({ error: "Failed to clear event cache", details: error.message }, 500);
-      }
-
-      return jsonResponse({ success: true });
-    }
-
     const connection = await getGoogleConnection(supabase, userId);
     const accessToken = await refreshAccessTokenIfNeeded(supabase, connection, googleClientId, googleClientSecret);
 
@@ -589,91 +539,6 @@ async function handleGoogleCalendarEvents(req: Request) {
       }
 
       return jsonResponse({ success: true, deletedLinks: (links ?? []).length });
-    }
-
-    if (action === "legacySync" || action === "syncLinkedChanges") {
-      const timezone = await getUserTimezone(supabase, userId);
-      const { data: links, error: linksError } = await supabase
-        .from("quest_calendar_links")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("provider", "google");
-
-      if (linksError) {
-        return jsonResponse({ error: "Failed to fetch links", details: linksError.message }, 500);
-      }
-
-      let synced = 0;
-      let pulledProviderChanges = 0;
-      let removedCancelled = 0;
-
-      for (const link of links ?? []) {
-        const externalCalendarId =
-          link.external_calendar_id || connection.primary_calendar_id || connection.calendar_id || "primary";
-
-        try {
-          const event = await googleApi(
-            accessToken,
-            `/calendars/${encodeURIComponent(externalCalendarId)}/events/${encodeURIComponent(link.external_event_id)}`,
-            "GET",
-          );
-
-          const providerUpdatedAt = event?.updated ? new Date(event.updated) : null;
-          const appSyncedAt = link.last_app_sync_at ? new Date(link.last_app_sync_at) : null;
-
-          const providerWins =
-            !appSyncedAt ||
-            !providerUpdatedAt ||
-            Number.isNaN(providerUpdatedAt.getTime())
-              ? true
-              : providerUpdatedAt.getTime() >= appSyncedAt.getTime();
-
-          if (event?.status === "cancelled") {
-            await supabase.from("daily_tasks").delete().eq("id", link.task_id).eq("user_id", userId);
-            await supabase.from("quest_calendar_links").delete().eq("id", link.id);
-            removedCancelled += 1;
-            continue;
-          }
-
-          if (normalizeSyncMode(link.sync_mode) === "full_sync" && providerWins) {
-            const taskPatch = mapGoogleEventToTaskUpdate(event, timezone);
-            await supabase
-              .from("daily_tasks")
-              .update({
-                task_text: taskPatch.task_text,
-                task_date: taskPatch.task_date,
-                scheduled_time: taskPatch.scheduled_time,
-                estimated_duration: taskPatch.estimated_duration,
-                location: taskPatch.location,
-                notes: taskPatch.notes,
-              })
-              .eq("id", link.task_id)
-              .eq("user_id", userId);
-
-            pulledProviderChanges += 1;
-          }
-
-          await supabase
-            .from("quest_calendar_links")
-            .update({
-              last_provider_sync_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", link.id);
-
-          synced += 1;
-        } catch {
-          // If event no longer exists remotely, drop local link. Keep quest.
-          await supabase.from("quest_calendar_links").delete().eq("id", link.id);
-        }
-      }
-
-      return jsonResponse({
-        success: true,
-        linksChecked: synced,
-        pulledProviderChanges,
-        removedCancelled,
-      });
     }
 
     return jsonResponse({ error: "Unsupported action" }, 400);

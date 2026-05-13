@@ -187,7 +187,6 @@ const MAX_INBOX_TASKS = 8;
 const MAX_RECENT_COMPLETED_TASKS = 24;
 const MAX_RITUALS = 10;
 const MAX_CAMPAIGNS = 8;
-const MAX_CALENDAR_EVENTS = 16;
 const MAX_REFLECTIONS = 8;
 const AGENT_RESPONSE_TIMEOUT_MS = 5_000;
 const DRAFT_OPPORTUNITY_TIMEOUT_MS = 2_500;
@@ -1985,7 +1984,6 @@ export async function loadCompanionAgentContext(params: {
   let recentCompletedTasksResult: any;
   let ritualsResult: any;
   let campaignsResult: any;
-  let calendarResult: any;
   let aiLearning: any;
   let plannerPreferences: any;
   let profileResult: any;
@@ -2003,7 +2001,6 @@ export async function loadCompanionAgentContext(params: {
     recentCompletedTasksResult,
     ritualsResult,
     campaignsResult,
-    calendarResult,
     aiLearning,
     plannerPreferences,
     profileResult,
@@ -2130,27 +2127,6 @@ export async function loadCompanionAgentContext(params: {
         .is("completed_at", null)
         .order("updated_at", { ascending: false })
         .limit(MAX_CAMPAIGNS),
-    ),
-    queryBestEffort(
-      "external_calendar_events",
-      true,
-      emptyRowsResult(),
-      params.supabase
-        .from("external_calendar_events")
-        .select(
-          "id, title, start_time, end_time, is_all_day, location, description, source",
-        )
-        .eq("user_id", params.userId)
-        .lt(
-          "start_time",
-          buildOffsetDateTime(addDays(range.end, 1), "00:00", range.timezone),
-        )
-        .gte(
-          "end_time",
-          buildOffsetDateTime(range.start, "00:00", range.timezone),
-        )
-        .order("start_time", { ascending: true })
-        .limit(MAX_CALENDAR_EVENTS),
     ),
     queryBestEffort(
       "user_ai_learning",
@@ -2339,9 +2315,7 @@ export async function loadCompanionAgentContext(params: {
         ritualDurationStart,
       ),
   });
-  const calendarEvents = (calendarResult.data ?? []) as Array<
-    Record<string, unknown>
-  >;
+  const calendarEvents: Array<Record<string, unknown>> = [];
 
   const reminders = [
     ...tasks
@@ -2552,7 +2526,7 @@ function buildInstructions(params: {
     "Never say something is scheduled, saved, moved, updated, logged, or confirmed unless it has already executed. Preparation is not execution.",
     "Keep replies natural, warm, concise, and non-robotic.",
     "Do not use profanity, vulgar wording, or insults.",
-    "External calendar events are read-only in v1. If the user wants to change a calendar event directly, explain the limitation and offer a task-based alternative when appropriate.",
+    "External calendar reads are disabled. If the user asks about an external calendar event, explain the limitation and offer to help with Cosmiq tasks instead.",
     "If there is already an active pending action, be aware of it and avoid stacking multiple confirms in one reply.",
     "Include assumptions and evidence_ids when they help the app/debugger understand why you made the decision. Evidence IDs should reference actual task, ritual, campaign, reminder, or calendar IDs from context.",
     sidecarManagedTurn
@@ -2793,7 +2767,7 @@ function buildAgentContextPacket(params: {
     safety: {
       writesRequirePreparedAction: true,
       userConfirmationRequiredBeforeExecution: true,
-      externalCalendarEventsReadOnly: true,
+      externalCalendarReadsEnabled: false,
     },
   };
 }
@@ -3011,7 +2985,7 @@ export function buildToolDefinitions() {
     ),
     functionTool(
       "get_calendar_range",
-      "Return scheduled tasks and calendar events in the visible range or in a requested local date range.",
+      "Return scheduled Cosmiq tasks in the visible range or in a requested local date range.",
       {
         type: "object",
         additionalProperties: false,
@@ -3023,7 +2997,7 @@ export function buildToolDefinitions() {
     ),
     functionTool(
       "get_today_calendar",
-      "Return today's scheduled tasks and calendar events.",
+      "Return today's scheduled Cosmiq tasks.",
       {
         type: "object",
         additionalProperties: false,

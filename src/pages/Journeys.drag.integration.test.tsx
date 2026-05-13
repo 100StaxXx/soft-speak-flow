@@ -64,11 +64,7 @@ const mocks = vi.hoisted(() => ({
   moveTaskToDate: vi.fn(),
   toggleInboxTask: vi.fn(),
   deleteInboxTask: vi.fn(),
-  syncTaskUpdateMutate: vi.fn(),
-  syncTaskUpdateMutateAsync: vi.fn().mockResolvedValue(undefined),
-  syncTaskDeleteMutateAsync: vi.fn().mockResolvedValue(undefined),
   sendTaskToCalendarMutateAsync: vi.fn().mockResolvedValue(undefined),
-  syncProviderPullMutate: vi.fn(),
   hasLinkedEvent: vi.fn(() => false),
   createEpic: vi.fn(),
   queueAction: vi.fn().mockResolvedValue(undefined),
@@ -586,16 +582,6 @@ vi.mock("@/hooks/useQuestCalendarSync", () => ({
     sendTaskToCalendar: {
       mutateAsync: mocks.sendTaskToCalendarMutateAsync,
       isPending: false,
-    },
-    syncTaskUpdate: {
-      mutate: mocks.syncTaskUpdateMutate,
-      mutateAsync: mocks.syncTaskUpdateMutateAsync,
-    },
-    syncTaskDelete: {
-      mutateAsync: mocks.syncTaskDeleteMutateAsync,
-    },
-    syncProviderPull: {
-      mutate: mocks.syncProviderPullMutate,
     },
     hasLinkedEvent: mocks.hasLinkedEvent,
   }),
@@ -1709,7 +1695,6 @@ describe("Journeys row drag integration", () => {
     });
 
     expect(mocks.updateTask).not.toHaveBeenCalled();
-    expect(mocks.syncTaskUpdateMutateAsync).not.toHaveBeenCalled();
     expect(screen.getByText("Plan your quests for the week ahead.")).toBeInTheDocument();
   });
 
@@ -1738,7 +1723,6 @@ describe("Journeys row drag integration", () => {
     });
 
     expect(mocks.updateTask).not.toHaveBeenCalled();
-    expect(mocks.syncTaskUpdateMutateAsync).not.toHaveBeenCalled();
   });
 
   it("does not reschedule a quest from the timeline row touch drag path on /journeys", async () => {
@@ -1762,7 +1746,6 @@ describe("Journeys row drag integration", () => {
     performTouchTimelineDrag(row, 820);
 
     expect(mocks.updateTask).not.toHaveBeenCalled();
-    expect(mocks.syncTaskUpdateMutateAsync).not.toHaveBeenCalled();
   });
 
   it("does not start the scheduled-time update queue from touch drag", async () => {
@@ -1786,7 +1769,6 @@ describe("Journeys row drag integration", () => {
     performTouchTimelineDrag(row, 825);
 
     expect(mocks.updateTask).not.toHaveBeenCalled();
-    expect(mocks.syncTaskUpdateMutateAsync).not.toHaveBeenCalled();
   });
 
   it("does not run calendar sync after touch drag", async () => {
@@ -1812,7 +1794,6 @@ describe("Journeys row drag integration", () => {
     performTouchTimelineDrag(row, 825);
 
     expect(mocks.updateTask).not.toHaveBeenCalled();
-    expect(mocks.syncTaskUpdateMutateAsync).not.toHaveBeenCalled();
   });
 
   it("does not reschedule when row is clicked without drag movement", async () => {
@@ -1839,7 +1820,6 @@ describe("Journeys row drag integration", () => {
     });
 
     expect(mocks.updateTask).not.toHaveBeenCalled();
-    expect(mocks.syncTaskUpdateMutateAsync).not.toHaveBeenCalled();
   });
 
   it("does not reschedule any quest from touch drag when multiple quests are present", async () => {
@@ -1887,7 +1867,6 @@ describe("Journeys row drag integration", () => {
     performTouchTimelineDrag(rowTaskOne, 825);
 
     expect(mocks.updateTask).not.toHaveBeenCalled();
-    expect(mocks.syncTaskUpdateMutateAsync).not.toHaveBeenCalled();
   });
 
   it("does not clamp far-below touch drag movement into a quest time update", async () => {
@@ -1935,7 +1914,6 @@ describe("Journeys row drag integration", () => {
     performTouchTimelineDrag(rowTaskOne, 6000);
 
     expect(mocks.updateTask).not.toHaveBeenCalled();
-    expect(mocks.syncTaskUpdateMutateAsync).not.toHaveBeenCalled();
   });
 
   it("skips polling and auto-surface side effects while tab is inactive", async () => {
@@ -1945,7 +1923,7 @@ describe("Journeys row drag integration", () => {
     mocks.calendarConnections = [
       {
         provider: "google",
-        sync_mode: "full_sync",
+        sync_mode: "send_only",
       },
     ];
 
@@ -1970,7 +1948,6 @@ describe("Journeys row drag integration", () => {
 
     expect(mocks.surfaceAllEpicHabits).not.toHaveBeenCalled();
     expect(mocks.spawnRecurringTasks).not.toHaveBeenCalled();
-    expect(mocks.syncProviderPullMutate).not.toHaveBeenCalled();
   });
 
   it("surfaces newly added campaign rituals when the unsurfaced count grows on the same date", async () => {

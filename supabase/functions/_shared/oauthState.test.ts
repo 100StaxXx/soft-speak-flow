@@ -41,7 +41,7 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 async function createLegacyStateWithoutSource(args: {
   provider: "google" | "outlook";
   userId: string;
-  syncMode: "send_only" | "full_sync";
+  syncMode: "send_only";
   secret: string;
 }): Promise<string> {
   const payload = {
@@ -68,7 +68,7 @@ Deno.test("oauthState creates and verifies signed state payloads", async () => {
   const state = await createSignedOAuthState({
     provider: "google",
     userId: "user-1",
-    syncMode: "full_sync",
+    syncMode: "send_only",
     source: "native",
     secret: "test-secret",
   });
@@ -81,7 +81,7 @@ Deno.test("oauthState creates and verifies signed state payloads", async () => {
 
   assertEquals(payload.provider, "google");
   assertEquals(payload.userId, "user-1");
-  assertEquals(payload.syncMode, "full_sync");
+  assertEquals(payload.syncMode, "send_only");
   assertEquals(payload.source, "native");
   assert(payload.exp > Math.floor(Date.now() / 1000));
 });

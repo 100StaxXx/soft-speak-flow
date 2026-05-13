@@ -12,7 +12,7 @@ const NATIVE_CALLBACK_SCHEME_URL = "cosmiq://calendar/oauth/callback";
 
 const SCOPES = ["offline_access", "User.Read", "Calendars.ReadWrite", "Tasks.ReadWrite"].join(" ");
 
-type SyncMode = "send_only" | "full_sync";
+type SyncMode = "send_only";
 type OAuthSource = "web" | "native";
 
 type Action =
@@ -23,7 +23,6 @@ type Action =
   | "listTaskLists"
   | "setPrimaryCalendar"
   | "setPrimaryTaskList"
-  | "setSyncMode"
   | "disconnect"
   | "refreshToken";
 
@@ -162,8 +161,6 @@ function normalizeAction(raw: string | undefined): Action | null {
     set_primary_calendar: "setPrimaryCalendar",
     setPrimaryTaskList: "setPrimaryTaskList",
     set_primary_task_list: "setPrimaryTaskList",
-    setSyncMode: "setSyncMode",
-    set_sync_mode: "setSyncMode",
     disconnect: "disconnect",
     refreshToken: "refreshToken",
     refresh_token: "refreshToken",
@@ -172,11 +169,11 @@ function normalizeAction(raw: string | undefined): Action | null {
 }
 
 function normalizeSyncMode(mode: unknown): SyncMode {
-  return mode === "full_sync" ? "full_sync" : "send_only";
+  return "send_only";
 }
 
 function isSyncMode(mode: unknown): mode is SyncMode {
-  return mode === "send_only" || mode === "full_sync";
+  return mode === "send_only";
 }
 
 function normalizeOAuthSource(source: unknown): OAuthSource {
@@ -652,7 +649,7 @@ Deno.serve(async (req) => {
         primaryTaskListId: connection?.primary_task_list_id ?? null,
         primaryTaskListName: connection?.primary_task_list_name ?? null,
         syncEnabled: connection?.sync_enabled ?? false,
-        syncMode: connection?.sync_mode ?? "send_only",
+        syncMode: "send_only",
         lastSyncedAt: connection?.last_synced_at ?? null,
         connectedAt: connection?.created_at ?? null,
       });
@@ -674,20 +671,6 @@ Deno.serve(async (req) => {
 
     if (!connection || connectionError) {
       return jsonResponse({ error: "No Outlook Calendar connection found" }, 404);
-    }
-
-    if (action === "setSyncMode") {
-      const syncMode = normalizeSyncMode(body?.syncMode ?? body?.sync_mode);
-      const { error } = await supabase
-        .from("user_calendar_connections")
-        .update({ sync_mode: syncMode, updated_at: new Date().toISOString() })
-        .eq("id", connection.id);
-
-      if (error) {
-        return jsonResponse({ error: "Failed to update sync mode", details: error.message }, 500);
-      }
-
-      return jsonResponse({ success: true, syncMode });
     }
 
     const accessToken = await refreshAccessTokenIfNeeded(supabase, connection, clientId, clientSecret);

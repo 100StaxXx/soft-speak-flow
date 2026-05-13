@@ -13,13 +13,11 @@ const mocks = vi.hoisted(() => {
   const beginOAuthConnectionMutateAsync = vi.fn();
   const completeOAuthConnectionMutateAsync = vi.fn();
   const disconnectProviderMutateAsync = vi.fn();
-  const setProviderSyncModeMutateAsync = vi.fn();
   const listProviderCalendarsMutateAsync = vi.fn();
   const setPrimaryCalendarMutateAsync = vi.fn();
   const listProviderTaskListsMutateAsync = vi.fn();
   const setPrimaryTaskListMutateAsync = vi.fn();
   const connectAppleNativeMutateAsync = vi.fn();
-  const syncProviderPullMutateAsync = vi.fn();
   const refreshCalendarIntegrationsMock = vi.fn();
   const browserOpenMock = vi.fn();
 
@@ -37,13 +35,11 @@ const mocks = vi.hoisted(() => {
     beginOAuthConnectionMutateAsync,
     completeOAuthConnectionMutateAsync,
     disconnectProviderMutateAsync,
-    setProviderSyncModeMutateAsync,
     listProviderCalendarsMutateAsync,
     setPrimaryCalendarMutateAsync,
     listProviderTaskListsMutateAsync,
     setPrimaryTaskListMutateAsync,
     connectAppleNativeMutateAsync,
-    syncProviderPullMutateAsync,
     refreshCalendarIntegrationsMock,
     browserOpenMock,
     state,
@@ -102,14 +98,6 @@ vi.mock("@/hooks/use-toast", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useQuestCalendarSync", () => ({
-  useQuestCalendarSync: () => ({
-    syncProviderPull: {
-      mutateAsync: mocks.syncProviderPullMutateAsync,
-    },
-  }),
-}));
-
 vi.mock("@/hooks/useCalendarIntegrations", () => ({
   useCalendarIntegrations: () => ({
     integrationVisible: mocks.state.integrationVisible,
@@ -123,7 +111,6 @@ vi.mock("@/hooks/useCalendarIntegrations", () => ({
     beginOAuthConnection: { mutateAsync: mocks.beginOAuthConnectionMutateAsync },
     completeOAuthConnection: { mutateAsync: mocks.completeOAuthConnectionMutateAsync },
     disconnectProvider: { mutateAsync: mocks.disconnectProviderMutateAsync },
-    setProviderSyncMode: { mutateAsync: mocks.setProviderSyncModeMutateAsync },
     listProviderCalendars: { mutateAsync: mocks.listProviderCalendarsMutateAsync },
     setPrimaryCalendar: { mutateAsync: mocks.setPrimaryCalendarMutateAsync },
     listProviderTaskLists: { mutateAsync: mocks.listProviderTaskListsMutateAsync },
@@ -146,19 +133,17 @@ describe("CalendarIntegrationsSettings", () => {
     mocks.state.nativePlatform = false;
     mocks.upsertSettingsMutateAsync.mockResolvedValue(undefined);
     mocks.beginOAuthConnectionMutateAsync.mockResolvedValue("https://accounts.google.com/o/oauth2/v2/auth");
-    mocks.setProviderSyncModeMutateAsync.mockResolvedValue(undefined);
     mocks.listProviderCalendarsMutateAsync.mockResolvedValue([]);
     mocks.listProviderTaskListsMutateAsync.mockResolvedValue([]);
     mocks.setPrimaryCalendarMutateAsync.mockResolvedValue(undefined);
     mocks.setPrimaryTaskListMutateAsync.mockResolvedValue(undefined);
-    mocks.syncProviderPullMutateAsync.mockResolvedValue(null);
     mocks.refreshCalendarIntegrationsMock.mockResolvedValue(undefined);
   });
 
   it("shows calendar integrations by default when nothing is connected", () => {
     render(<CalendarIntegrationsSettings />);
 
-    expect(screen.getByText("Optional sync. Choose send-only or full sync per provider.")).toBeInTheDocument();
+    expect(screen.getByText("Connect destinations for sending quests to external calendars.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /connect outlook calendar/i })).toBeInTheDocument();
   });
 
@@ -194,7 +179,7 @@ describe("CalendarIntegrationsSettings", () => {
     });
   });
 
-  it("updates provider sync mode for a connected provider", async () => {
+  it("does not expose provider sync mode controls for a connected provider", async () => {
     mocks.state.integrationVisible = true;
     mocks.state.defaultProvider = "google";
     mocks.state.connections = [
@@ -218,15 +203,8 @@ describe("CalendarIntegrationsSettings", () => {
 
     render(<CalendarIntegrationsSettings />);
 
-    const fullSyncOption = screen.getByRole("option", { name: "Full sync" });
-    fireEvent.click(fullSyncOption);
-
-    await waitFor(() => {
-      expect(mocks.setProviderSyncModeMutateAsync).toHaveBeenCalledWith({
-        provider: "google",
-        syncMode: "full_sync",
-      });
-    });
+    expect(screen.queryByRole("option", { name: /sync/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Google Calendar" })).toBeInTheDocument();
   });
 
   it("shows callback error toast from calendar oauth query params", async () => {
@@ -309,7 +287,7 @@ describe("CalendarIntegrationsSettings", () => {
     });
   });
 
-  it("auto-loads Outlook calendars and To Do lists for a new Outlook connection", async () => {
+  it("does not auto-load Outlook destinations for a connected account", async () => {
     mocks.state.integrationVisible = true;
     mocks.state.connections = [
       {
@@ -331,124 +309,17 @@ describe("CalendarIntegrationsSettings", () => {
         platform: "web",
       },
     };
-    mocks.listProviderCalendarsMutateAsync.mockResolvedValue([
-      { id: "calendar-1", name: "Calendar", isPrimary: true },
-    ]);
-    mocks.listProviderTaskListsMutateAsync.mockResolvedValue([
-      { id: "list-1", name: "Tasks", isPrimary: true },
-    ]);
-
     render(<CalendarIntegrationsSettings />);
 
-    await waitFor(() => {
-      expect(mocks.listProviderCalendarsMutateAsync).toHaveBeenCalledWith("outlook");
-      expect(mocks.listProviderTaskListsMutateAsync).toHaveBeenCalledWith("outlook");
-    });
-
-    await waitFor(() => {
-      expect(mocks.setPrimaryCalendarMutateAsync).toHaveBeenCalledWith({
-        provider: "outlook",
-        calendarId: "calendar-1",
-        calendarName: "Calendar",
-      });
-      expect(mocks.setPrimaryTaskListMutateAsync).toHaveBeenCalledWith({
-        taskListId: "list-1",
-        taskListName: "Tasks",
-      });
-    });
+    expect(await screen.findByRole("button", { name: /load calendars/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /load to do lists/i })).toBeInTheDocument();
+    expect(mocks.listProviderCalendarsMutateAsync).not.toHaveBeenCalled();
+    expect(mocks.listProviderTaskListsMutateAsync).not.toHaveBeenCalled();
+    expect(mocks.setPrimaryCalendarMutateAsync).not.toHaveBeenCalled();
+    expect(mocks.setPrimaryTaskListMutateAsync).not.toHaveBeenCalled();
   });
 
-  it("activates Outlook planning with one click", async () => {
-    mocks.state.integrationVisible = true;
-    mocks.state.connections = [
-      {
-        id: "conn-outlook-2",
-        provider: "outlook",
-      },
-    ];
-    mocks.state.connectedByProvider = {
-      outlook: {
-        id: "conn-outlook-2",
-        provider: "outlook",
-        calendar_email: "user@example.com",
-        primary_calendar_id: "calendar-2",
-        primary_calendar_name: "Calendar",
-        primary_task_list_id: "list-2",
-        primary_task_list_name: "Tasks",
-        sync_mode: "send_only",
-        sync_enabled: true,
-        platform: "web",
-      },
-    };
-    mocks.listProviderCalendarsMutateAsync.mockResolvedValue([
-      { id: "calendar-2", name: "Calendar", isPrimary: true },
-    ]);
-    mocks.listProviderTaskListsMutateAsync.mockResolvedValue([
-      { id: "list-2", name: "Tasks", isPrimary: true },
-    ]);
-
-    render(<CalendarIntegrationsSettings />);
-
-    const activateButton = await screen.findByRole("button", { name: /use outlook for planning/i });
-    fireEvent.click(activateButton);
-
-    await waitFor(() => {
-      expect(mocks.setProviderSyncModeMutateAsync).toHaveBeenCalledWith({
-        provider: "outlook",
-        syncMode: "full_sync",
-      });
-      expect(mocks.upsertSettingsMutateAsync).toHaveBeenCalledWith({
-        default_provider: "outlook",
-        integration_visible: true,
-      });
-    });
-  });
-
-  it("syncs Outlook now and reports a visible summary", async () => {
-    mocks.state.integrationVisible = true;
-    mocks.state.defaultProvider = "outlook";
-    mocks.state.connections = [
-      {
-        id: "conn-outlook-3",
-        provider: "outlook",
-      },
-    ];
-    mocks.state.connectedByProvider = {
-      outlook: {
-        id: "conn-outlook-3",
-        provider: "outlook",
-        calendar_email: "user@example.com",
-        primary_calendar_id: "calendar-3",
-        primary_calendar_name: "Calendar",
-        primary_task_list_id: "list-3",
-        primary_task_list_name: "Tasks",
-        sync_mode: "full_sync",
-        sync_enabled: true,
-        platform: "web",
-      },
-    };
-    mocks.syncProviderPullMutateAsync.mockResolvedValue({
-      linkedEvents: { linksChecked: 1, pulledProviderChanges: 1 },
-      linkedTasks: { linksChecked: 1 },
-      plannerTasks: { importedCount: 2, removedMissing: 1 },
-      plannerWindow: { cachedCount: 3 },
-    });
-
-    render(<CalendarIntegrationsSettings />);
-
-    const syncButton = await screen.findByRole("button", { name: /sync now/i });
-    fireEvent.click(syncButton);
-
-    await waitFor(() => {
-      expect(mocks.syncProviderPullMutateAsync).toHaveBeenCalledWith({ provider: "outlook" });
-      expect(mocks.toastMock).toHaveBeenCalledWith({
-        title: "Outlook Calendar synced",
-        description: "2 linked items checked, 2 To Do tasks imported, 1 item updated, 1 stale item removed.",
-      });
-    });
-  });
-
-  it("moves destination reload buttons behind Advanced once Outlook planning is active", async () => {
+  it("keeps destination reload buttons visible for connected Outlook destinations", async () => {
     mocks.state.integrationVisible = true;
     mocks.state.defaultProvider = "outlook";
     mocks.state.connections = [
@@ -466,7 +337,7 @@ describe("CalendarIntegrationsSettings", () => {
         primary_calendar_name: "Calendar",
         primary_task_list_id: "list-4",
         primary_task_list_name: "Tasks",
-        sync_mode: "full_sync",
+        sync_mode: "send_only",
         sync_enabled: true,
         platform: "web",
       },
@@ -474,12 +345,9 @@ describe("CalendarIntegrationsSettings", () => {
 
     render(<CalendarIntegrationsSettings />);
 
-    expect(screen.queryByRole("button", { name: /load calendars/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /load to do lists/i })).not.toBeInTheDocument();
-
-    fireEvent.click(await screen.findByRole("button", { name: /advanced/i }));
-
     expect(await screen.findByRole("button", { name: /load calendars/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /load to do lists/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /sync now/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /use outlook for planning/i })).not.toBeInTheDocument();
   });
 });

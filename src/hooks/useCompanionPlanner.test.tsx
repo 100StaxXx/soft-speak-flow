@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getCompanionPlannerOpener } from "@/shared/companionPlannerCopy";
 
 const mocks = vi.hoisted(() => ({
-  externalCalendarHorizons: [] as string[],
   classify: vi.fn(),
   invoke: vi.fn(),
   rpc: vi.fn(),
@@ -21,9 +20,6 @@ const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
   toastMessage: vi.fn(),
   trackInteraction: vi.fn(),
-  sendTaskToCalendar: vi.fn(),
-  syncPlanningContext: vi.fn(),
-  useCalendarIntegrations: vi.fn(),
   enrichedContext: null as Record<string, unknown> | null,
   todayTasks: [] as Array<Record<string, unknown>>,
   weekTasks: [] as Array<Record<string, unknown>>,
@@ -134,16 +130,6 @@ vi.mock("@/hooks/useCalendarTasks", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useExternalCalendarEvents", () => ({
-  useExternalCalendarEvents: (_date: Date, horizon: string) => {
-    mocks.externalCalendarHorizons.push(horizon);
-    return {
-      events: [],
-      isLoading: false,
-    };
-  },
-}));
-
 vi.mock("@/hooks/useInboxTasks", () => ({
   useInboxTasks: () => ({
     inboxTasks: mocks.inboxTasks,
@@ -170,22 +156,6 @@ vi.mock("@/hooks/useTaskMutations", () => ({
 vi.mock("@/hooks/useRitualUpdate", () => ({
   useRitualUpdate: () => ({
     saveRitual: vi.fn(),
-  }),
-}));
-
-vi.mock("@/hooks/useCalendarIntegrations", () => ({
-  useCalendarIntegrations: (...args: unknown[]) =>
-    mocks.useCalendarIntegrations(...args),
-}));
-
-vi.mock("@/hooks/useQuestCalendarSync", () => ({
-  useQuestCalendarSync: () => ({
-    sendTaskToCalendar: {
-      mutateAsync: (...args: unknown[]) => mocks.sendTaskToCalendar(...args),
-    },
-    syncPlanningContext: {
-      mutateAsync: (...args: unknown[]) => mocks.syncPlanningContext(...args),
-    },
   }),
 }));
 
@@ -251,7 +221,6 @@ describe("useCompanionPlanner", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.externalCalendarHorizons.length = 0;
     mocks.classify.mockResolvedValue(null);
     mocks.user = { id: "user-1" };
     mocks.companion = { id: "companion-1" };
@@ -276,12 +245,6 @@ describe("useCompanionPlanner", () => {
     mocks.queueAction.mockResolvedValue(undefined);
     mocks.trackTaskCreation.mockResolvedValue(undefined);
     mocks.trackScheduleModification.mockResolvedValue(undefined);
-    mocks.sendTaskToCalendar.mockResolvedValue(undefined);
-    mocks.syncPlanningContext.mockResolvedValue(null);
-    mocks.useCalendarIntegrations.mockReturnValue({
-      connectedByProvider: {},
-      defaultProvider: null,
-    });
     mocks.enrichedContext = null;
     mocks.todayTasks = [];
     mocks.weekTasks = [];
@@ -302,13 +265,12 @@ describe("useCompanionPlanner", () => {
     });
   });
 
-  it("initializes the default horizon before dependent event queries run", () => {
+  it("initializes the default horizon without external calendar event queries", () => {
     const { result } = renderHook(() =>
       useCompanionPlanner({ bootstrapGreeting: false })
     );
 
     expect(result.current.horizon).toBe("day");
-    expect(mocks.externalCalendarHorizons).toEqual(["day", "week"]);
   });
 
   it("does not bootstrap a hardcoded planner opener", async () => {
@@ -1517,54 +1479,9 @@ describe("useCompanionPlanner", () => {
     );
   });
 
-  it("uses refreshed Outlook planner context when the preflight completes in time", async () => {
+  it("uses local planner context without Outlook sync preflight", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-04-19T09:30:00.000Z"));
-    mocks.useCalendarIntegrations.mockReturnValue({
-      connectedByProvider: {
-        outlook: {
-          id: "conn-outlook-1",
-          provider: "outlook",
-          sync_mode: "full_sync",
-        },
-      },
-      defaultProvider: "outlook",
-    });
-    mocks.syncPlanningContext.mockResolvedValue({
-      calendarEvents: [
-        {
-          id: "evt-1",
-          title: "Outlook block",
-          start: "2026-04-19T12:00:00.000Z",
-          end: "2026-04-19T13:00:00.000Z",
-          isAllDay: false,
-          provider: "outlook",
-          readOnly: true,
-        },
-      ],
-      tasks: [
-        {
-          id: "task-sync-1",
-          task_text: "Imported Outlook task",
-          task_date: null,
-          scheduled_time: null,
-          estimated_duration: null,
-          notes: null,
-          difficulty: null,
-          recurrence_pattern: null,
-          recurrence_end_date: null,
-          completed: false,
-          priority: null,
-          source: "outlook_sync",
-          habit_source_id: null,
-          epic_id: null,
-          epic_title: null,
-          contact_id: null,
-          subtasks: [],
-        },
-      ],
-      removedTaskIds: [],
-    });
     mocks.invoke.mockResolvedValue({
       data: {
         mode: "conversational",
@@ -1596,47 +1513,14 @@ describe("useCompanionPlanner", () => {
       );
     });
 
-    expect(mocks.syncPlanningContext).toHaveBeenCalledWith({
-      startDate: "2026-04-19",
-      endDate: "2026-04-19",
-    });
     const request = mocks.invoke.mock.calls.at(-1)?.[1];
-    expect(request?.body.plannerContext.inboxTasks).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          id: "task-sync-1",
-          title: "Imported Outlook task",
-          source: "outlook_sync",
-        }),
-      ]),
-    );
-    expect(request?.body.plannerContext.calendarEvents).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          id: "evt-1",
-          title: "Outlook block",
-          provider: "outlook",
-        }),
-      ]),
-    );
+    expect(request?.body.plannerContext.inboxTasks).toEqual([]);
+    expect(request?.body.plannerContext.calendarEvents).toEqual([]);
   });
 
-  it("falls back to the local planner context when Outlook sync preflight times out", async () => {
+  it("does not wait on Outlook sync before submitting planner requests", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-04-19T09:30:00.000Z"));
-    mocks.useCalendarIntegrations.mockReturnValue({
-      connectedByProvider: {
-        outlook: {
-          id: "conn-outlook-1",
-          provider: "outlook",
-          sync_mode: "full_sync",
-        },
-      },
-      defaultProvider: "outlook",
-    });
-    mocks.syncPlanningContext.mockImplementation(
-      () => new Promise(() => undefined),
-    );
     mocks.invoke.mockResolvedValue({
       data: {
         mode: "conversational",
@@ -1662,19 +1546,13 @@ describe("useCompanionPlanner", () => {
     );
 
     await act(async () => {
-      const submitPromise = result.current.submitMessage(
+      await result.current.submitMessage(
         "Plan my day with Outlook in mind.",
         "text",
       );
-      await vi.advanceTimersByTimeAsync(3_000);
-      await submitPromise;
     });
 
     const request = mocks.invoke.mock.calls.at(-1)?.[1];
-    expect(mocks.syncPlanningContext).toHaveBeenCalledWith({
-      startDate: "2026-04-19",
-      endDate: "2026-04-19",
-    });
     expect(request?.body.plannerContext.inboxTasks).toEqual([]);
     expect(request?.body.plannerContext.calendarEvents).toEqual([]);
   });
@@ -2803,17 +2681,7 @@ describe("useCompanionPlanner", () => {
     expect(mocks.addTask).toHaveBeenCalledTimes(2);
   });
 
-  it("auto-publishes confirmed quest creations to Outlook when Outlook is the full-sync default", async () => {
-    mocks.useCalendarIntegrations.mockReturnValue({
-      connectedByProvider: {
-        outlook: {
-          id: "conn-outlook-2",
-          provider: "outlook",
-          sync_mode: "full_sync",
-        },
-      },
-      defaultProvider: "outlook",
-    });
+  it("keeps confirmed quest creations local until the user sends them", async () => {
     mocks.addTask.mockResolvedValue({
       id: "task-created-1",
       queued: false,
@@ -2873,12 +2741,11 @@ describe("useCompanionPlanner", () => {
       await result.current.confirmProposal("proposal-outlook-1");
     });
 
-    expect(mocks.sendTaskToCalendar).toHaveBeenCalledWith({
-      taskId: "task-created-1",
-      options: {
-        provider: "outlook",
-      },
-    });
+    expect(mocks.addTask).toHaveBeenCalledWith(expect.objectContaining({
+      taskText: "Deep Work Block",
+      taskDate: "2026-04-19",
+      scheduledTime: "09:00",
+    }));
   });
 
   it("applies update quest subtask plans after confirming the proposal", async () => {

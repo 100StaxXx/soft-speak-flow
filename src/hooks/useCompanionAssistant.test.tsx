@@ -1246,7 +1246,7 @@ describe("useCompanionAssistant", () => {
     });
     expect(mocks.legacyAdapterOptions.at(-1)).toEqual(
       expect.objectContaining({
-        enabled: false,
+        enabled: true,
         surface: "journeys",
       }),
     );
@@ -1653,6 +1653,45 @@ describe("useCompanionAssistant", () => {
     expect(mocks.toastError).not.toHaveBeenCalledWith(
       "Companion agent hit a snag. Please try again.",
     );
+  });
+
+  it("handles launcher upcoming reads without waiting for thread hydration", async () => {
+    mocks.listThreads.mockImplementation(
+      () => new Promise(() => undefined),
+    );
+    const consumed = vi.fn();
+    const { wrapper } = createWrapper();
+
+    renderHook(
+      () =>
+        useCompanionAssistant({
+          surface: "journeys",
+          launchIntent: {
+            id: "launch-upcoming-1",
+            message: "What do I have coming up?",
+            starterIntent: "upcoming_start",
+            target: "planner",
+          },
+          onLaunchIntentConsumed: consumed,
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
+        "What do I have coming up?",
+        "text",
+        expect.objectContaining({
+          starterIntent: "upcoming_start",
+          turnOrigin: "launcher",
+        }),
+      );
+    });
+    expect(mocks.supabaseInvoke).not.toHaveBeenCalledWith(
+      "companion-agent",
+      expect.anything(),
+    );
+    expect(consumed).toHaveBeenCalledWith("launch-upcoming-1");
   });
 
   it("confirms the active pending action through the deterministic executor path", async () => {

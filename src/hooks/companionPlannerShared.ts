@@ -5,7 +5,6 @@ import { addDays, format } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
 import { useEpics } from "@/hooks/useEpics";
-import { useExternalCalendarEvents } from "@/hooks/useExternalCalendarEvents";
 import { useInboxTasks } from "@/hooks/useInboxTasks";
 import { useTasksQuery } from "@/hooks/useTasksQuery";
 import { useUserAIContext } from "@/hooks/useUserAIContext";
@@ -39,6 +38,7 @@ import type {
 
 export const COMPANION_PLANNER_STORAGE_KEY = "companion-planner-preferences-v1";
 const MAX_CONTEXT_TASKS = 18;
+const EMPTY_CALENDAR_EVENTS: PlannerContextCalendarEvent[] = [];
 
 export type StoredPlannerPreferences = {
   tonePack?: PlannerTonePack;
@@ -370,8 +370,6 @@ export function useCompanionPlanningContext({
   const todayTasksQuery = useTasksQuery(today);
   const weekTasksQuery = useCalendarTasks(today, "week");
   const monthTasksQuery = useCalendarTasks(today, "month");
-  const activeEventsQuery = useExternalCalendarEvents(today, horizon);
-  const contextEventsQuery = useExternalCalendarEvents(today, horizon === "month" ? "month" : "week");
   const { inboxTasks } = useInboxTasks();
   const { activeEpics } = useEpics();
   const { enrichedContext } = useUserAIContext();
@@ -588,12 +586,12 @@ export function useCompanionPlanningContext({
   const scheduleInsights = useMemo<PlannerScheduleInsights>(() =>
     buildCompanionPlannerScheduleInsights({
       tasks: activeTasks.map(serializeTaskToPlannerContext),
-      calendarEvents: activeEventsQuery.events,
+      calendarEvents: EMPTY_CALENDAR_EVENTS,
       horizon,
       selectedDate: todayIso,
       currentDateTime: formatCurrentDateTimeWithOffset(today),
       plannerMemory,
-    }), [activeEventsQuery.events, activeTasks, horizon, plannerMemory, today, todayIso]);
+    }), [activeTasks, horizon, plannerMemory, today, todayIso]);
 
   const plannerContext = useMemo<CompanionPlannerRequest["plannerContext"]>(() =>
     sanitizePlannerContext({
@@ -604,11 +602,11 @@ export function useCompanionPlanningContext({
       ),
       activeEpics: mapEpicsToPlannerContext(activeEpics),
       rituals: ritualsQuery.data ?? baseRituals,
-      calendarEvents: contextEventsQuery.events,
+      calendarEvents: EMPTY_CALENDAR_EVENTS,
       scheduleInsights,
       plannerMemory,
       aiSignals: enrichedContext,
-    }, deletedPlannerEntitiesQuery.data ?? []), [activeEpics, baseRituals, contextEventsQuery.events, contextTasks, deletedPlannerEntitiesQuery.data, enrichedContext, inboxTasks, plannerMemory, recentCompletedTasksQuery.data, ritualsQuery.data, scheduleInsights]);
+    }, deletedPlannerEntitiesQuery.data ?? []), [activeEpics, baseRituals, contextTasks, deletedPlannerEntitiesQuery.data, enrichedContext, inboxTasks, plannerMemory, recentCompletedTasksQuery.data, ritualsQuery.data, scheduleInsights]);
 
   return {
     today,
@@ -616,8 +614,8 @@ export function useCompanionPlanningContext({
     todayLabel: format(today, "EEEE, MMMM d"),
     activeTasks,
     contextTasks,
-    activeCalendarEvents: activeEventsQuery.events as PlannerContextCalendarEvent[],
-    contextCalendarEvents: contextEventsQuery.events as PlannerContextCalendarEvent[],
+    activeCalendarEvents: EMPTY_CALENDAR_EVENTS,
+    contextCalendarEvents: EMPTY_CALENDAR_EVENTS,
     inboxTasks,
     activeEpics,
     plannerMemory,
@@ -628,8 +626,6 @@ export function useCompanionPlanningContext({
       todayTasksQuery.isLoading
       || weekTasksQuery.isLoading
       || monthTasksQuery.isLoading
-      || activeEventsQuery.isLoading
-      || contextEventsQuery.isLoading
       || plannerMemoryQuery.isLoading
       || ritualsQuery.isLoading
       || recentCompletedTasksQuery.isLoading,

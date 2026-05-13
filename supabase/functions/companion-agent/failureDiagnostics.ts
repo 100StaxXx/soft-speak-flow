@@ -125,7 +125,6 @@ export const isCompanionAgentSetupFailure = (source: string) => {
     "cost_guardrail_state",
     "user_companion",
     "daily_tasks",
-    "external_calendar_events",
     "companion_memories",
     "user_reflections",
     "daily_check_ins",

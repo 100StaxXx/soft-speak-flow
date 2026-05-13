@@ -202,6 +202,31 @@ describe("useOfflineQueue", () => {
     });
   });
 
+  it("does not enter syncing state on visibility changes when the queue is empty", async () => {
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "hidden",
+    });
+
+    const { result } = renderHook(() => useOfflineQueue());
+
+    await waitFor(() => {
+      expect(result.current.pendingCount).toBe(0);
+    });
+
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
+
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    expect(mocks.invoke).not.toHaveBeenCalled();
+    expect(result.current.syncStatus).toBe("idle");
+  });
+
   it("retries queued actions when the tab becomes visible again", async () => {
     await enqueueQueuedSupportReport();
     mocks.invoke.mockResolvedValue({ data: null, error: null });

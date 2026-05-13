@@ -5,7 +5,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { NativeCalendar } from '@/plugins/NativeCalendarPlugin';
 import { useCalendarIntegrations, type CalendarProvider, type ConnectedCalendar } from '@/hooks/useCalendarIntegrations';
 import { parseScheduledTime } from '@/utils/scheduledTime';
-import { dispatchPlannerSyncFinished } from '@/utils/plannerSync';
 import { calendarProviderDisplayName } from '@/utils/calendarDestinationOptions';
 
 export interface QuestCalendarLink {
@@ -16,7 +15,7 @@ export interface QuestCalendarLink {
   provider: CalendarProvider;
   external_calendar_id: string | null;
   external_event_id: string;
-  sync_mode: 'send_only' | 'full_sync';
+  sync_mode: string;
   last_app_sync_at: string | null;
   last_provider_sync_at: string | null;
 }
@@ -29,7 +28,7 @@ export interface QuestOutlookTaskLink {
   provider: 'outlook';
   external_task_list_id: string;
   external_task_id: string;
-  sync_mode: 'send_only' | 'full_sync';
+  sync_mode: string;
   last_app_sync_at: string | null;
   last_provider_sync_at: string | null;
 }
@@ -59,50 +58,6 @@ interface QuestCalendarSyncOptions {
   enabled?: boolean;
 }
 
-export interface PlannerSyncCalendarEvent {
-  id: string;
-  title: string;
-  start: string;
-  end: string;
-  isAllDay: boolean;
-  provider: 'outlook';
-  readOnly: true;
-}
-
-export interface PlannerSyncTaskSnapshot {
-  id: string;
-  task_text: string;
-  task_date: string | null;
-  scheduled_time: string | null;
-  estimated_duration: number | null;
-  notes?: string | null;
-  difficulty?: string | null;
-  recurrence_pattern: string | null;
-  recurrence_end_date?: string | null;
-  completed?: boolean | null;
-  priority?: string | null;
-  source?: string | null;
-  habit_source_id?: string | null;
-  epic_id?: string | null;
-  epic_title?: string | null;
-  contact_id?: string | null;
-  subtasks?: Array<{ title: string | null } | null> | null;
-}
-
-export interface OutlookPlanningContextSyncResult {
-  calendarEvents: PlannerSyncCalendarEvent[];
-  tasks: PlannerSyncTaskSnapshot[];
-  removedTaskIds: string[];
-}
-
-export interface ProviderPullSyncResult {
-  provider: Exclude<CalendarProvider, 'apple'>;
-  linkedEvents: Record<string, unknown> | null;
-  linkedTasks: Record<string, unknown> | null;
-  plannerWindow: Record<string, unknown> | null;
-  plannerTasks: Record<string, unknown> | null;
-}
-
 export interface SendTaskToCalendarResult {
   provider: CalendarProvider;
   providerLabel: string;
@@ -120,6 +75,7 @@ type SupabaseLikeError = {
 
 const TASK_SELECT_WITH_MONTH_RECURRENCE = 'id, task_text, task_date, scheduled_time, estimated_duration, recurrence_pattern, recurrence_days, recurrence_month_days, recurrence_custom_period, location, notes';
 const TASK_SELECT_LEGACY_RECURRENCE = 'id, task_text, task_date, scheduled_time, estimated_duration, recurrence_pattern, recurrence_days, location, notes';
+const SEND_ONLY_SYNC_MODE = 'send_only';
 
 function isDailyTasksRecurrenceColumnsMissingError(error: SupabaseLikeError | null | undefined): boolean {
   if (!error) return false;
@@ -288,7 +244,6 @@ export function useQuestCalendarSync(options: QuestCalendarSyncOptions = {}) {
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] }),
       queryClient.invalidateQueries({ queryKey: ['inbox-tasks'] }),
       queryClient.invalidateQueries({ queryKey: ['inbox-count'] }),
-      queryClient.invalidateQueries({ queryKey: ['external-calendar-events'] }),
     ]);
   };
 
@@ -308,16 +263,6 @@ export function useQuestCalendarSync(options: QuestCalendarSyncOptions = {}) {
     const first = connections[0]?.provider;
     if (!first) throw new Error('NO_CALENDAR_CONNECTION');
     return first;
-  };
-
-  const isFullSyncCalendarLink = (link: QuestCalendarLink): boolean => {
-    if (link.sync_mode === 'full_sync') return true;
-    return getProviderConnection(link.provider)?.sync_mode === 'full_sync';
-  };
-
-  const isFullSyncOutlookTaskLink = (link: QuestOutlookTaskLink): boolean => {
-    if (link.sync_mode === 'full_sync') return true;
-    return getProviderConnection('outlook')?.sync_mode === 'full_sync';
   };
 
   const fetchTask = async (taskId: string): Promise<TaskLite> => {
@@ -401,11 +346,11 @@ export function useQuestCalendarSync(options: QuestCalendarSyncOptions = {}) {
 
       const data = await invokeCalendarFunction(
         'outlook-todo-tasks',
-        {
-          action: existingOutlookTaskLink ? 'updateLinkedTask' : 'createLinkedTask',
-          taskId,
-          syncMode: connection.sync_mode,
-        },
+          {
+            action: existingOutlookTaskLink ? 'updateLinkedTask' : 'createLinkedTask',
+            taskId,
+            syncMode: SEND_ONLY_SYNC_MODE,
+          },
         'Failed to sync task to Outlook To Do',
       );
       const link = readInvokeLink(data);
@@ -437,7 +382,7 @@ export function useQuestCalendarSync(options: QuestCalendarSyncOptions = {}) {
       {
         action: existingCalendarLink ? 'updateLinkedEvent' : 'createLinkedEvent',
         taskId,
-        syncMode: connection.sync_mode,
+        syncMode: SEND_ONLY_SYNC_MODE,
       },
       'Failed to sync task to Outlook Calendar',
     );
@@ -527,7 +472,7 @@ export function useQuestCalendarSync(options: QuestCalendarSyncOptions = {}) {
               provider: 'apple',
               external_calendar_id: primaryCalendarId,
               external_event_id: eventId,
-              sync_mode: connection.sync_mode,
+              sync_mode: SEND_ONLY_SYNC_MODE,
               last_app_sync_at: nowIso,
               last_provider_sync_at: nowIso,
             },
@@ -550,7 +495,7 @@ export function useQuestCalendarSync(options: QuestCalendarSyncOptions = {}) {
         body: {
           action,
           taskId,
-          syncMode: connection.sync_mode,
+          syncMode: SEND_ONLY_SYNC_MODE,
         },
       });
 
@@ -570,217 +515,6 @@ export function useQuestCalendarSync(options: QuestCalendarSyncOptions = {}) {
     onSuccess: invalidateSyncQueries,
   });
 
-  const syncTaskUpdate = useMutation({
-    mutationFn: async ({ taskId }: { taskId: string }) => {
-      if (!user?.id) throw new Error('User not authenticated');
-
-      const taskLinks = (linksByTask.get(taskId) || []).filter(isFullSyncCalendarLink);
-      const outlookLinks = (outlookTaskLinksByTask.get(taskId) || []).filter(isFullSyncOutlookTaskLink);
-      if (taskLinks.length === 0 && outlookLinks.length === 0) return;
-
-      const task = await fetchTask(taskId);
-      enforceCalendarRecurrenceSupport(task);
-      const outlookConnection = getProviderConnection('outlook');
-      const outlookCalendarLink = taskLinks.find((link) => link.provider === 'outlook');
-      const outlookTaskLink = outlookLinks.find((link) => link.provider === 'outlook');
-
-      if (task.task_date && task.scheduled_time) {
-        for (const link of taskLinks.filter((candidate) => candidate.provider !== 'outlook')) {
-          if (link.provider === 'apple') {
-            const connection = getProviderConnection('apple');
-            if (!connection?.primary_calendar_id) continue;
-
-            const range = toIsoRange(task);
-            const { eventId } = await NativeCalendar.createOrUpdateEvent({
-              calendarId: link.external_calendar_id || connection.primary_calendar_id,
-              eventId: link.external_event_id,
-              title: task.task_text,
-              notes: task.notes,
-              location: task.location,
-              startDate: range.startDate,
-              endDate: range.endDate,
-              isAllDay: false,
-            });
-
-            await supabase
-              .from('quest_calendar_links')
-              .update({
-                external_event_id: eventId,
-                last_app_sync_at: new Date().toISOString(),
-              })
-              .eq('id', link.id)
-              .eq('user_id', user.id);
-
-            continue;
-          }
-
-          const functionName = `${link.provider}-calendar-events`;
-          const { error } = await supabase.functions.invoke(functionName, {
-            body: {
-              action: 'updateLinkedEvent',
-              taskId,
-            },
-          });
-
-          if (error) throw new Error(error.message || `Failed full sync update for ${link.provider}`);
-        }
-      }
-
-      if ((outlookCalendarLink || outlookTaskLink) && outlookConnection) {
-        await syncOutlookRoutedTask({
-          taskId,
-          task,
-          connection: outlookConnection,
-          existingCalendarLink: outlookCalendarLink,
-          existingOutlookTaskLink: outlookTaskLink,
-        });
-      }
-    },
-    onSuccess: invalidateSyncQueries,
-  });
-
-  const syncTaskDelete = useMutation({
-    mutationFn: async ({ taskId }: { taskId: string }) => {
-      if (!user?.id) throw new Error('User not authenticated');
-
-      const taskLinks = (linksByTask.get(taskId) || []).filter(isFullSyncCalendarLink);
-      const outlookLinks = (outlookTaskLinksByTask.get(taskId) || []).filter(isFullSyncOutlookTaskLink);
-      if (taskLinks.length === 0 && outlookLinks.length === 0) return;
-
-      for (const link of taskLinks) {
-        if (link.provider === 'apple') {
-          await NativeCalendar.deleteEvent({ eventId: link.external_event_id }).catch(() => null);
-          await supabase.from('quest_calendar_links').delete().eq('id', link.id).eq('user_id', user.id);
-          continue;
-        }
-
-        const functionName = `${link.provider}-calendar-events`;
-        await supabase.functions.invoke(functionName, {
-          body: {
-            action: 'deleteLinkedEvent',
-            taskId,
-          },
-        });
-      }
-
-      if (outlookLinks.length > 0) {
-        await supabase.functions.invoke('outlook-todo-tasks', {
-          body: {
-            action: 'deleteLinkedTask',
-            taskId,
-          },
-        });
-      }
-    },
-    onSuccess: invalidateSyncQueries,
-  });
-
-  const syncPlanningContext = useMutation({
-    mutationFn: async ({
-      startDate,
-      endDate,
-    }: {
-      startDate?: string;
-      endDate?: string;
-    } = {}): Promise<OutlookPlanningContextSyncResult> => {
-      const outlookConnection = getProviderConnection('outlook');
-      if (!outlookConnection) {
-        return {
-          calendarEvents: [],
-          tasks: [],
-          removedTaskIds: [],
-        };
-      }
-
-      const calendarResponse = await invokeCalendarFunction(
-        'outlook-calendar-events',
-        {
-          action: 'syncPlannerWindow',
-          startDate,
-          endDate,
-        },
-        'Failed to sync Outlook calendar availability',
-      );
-
-      const todoResponse = await invokeCalendarFunction(
-        'outlook-todo-tasks',
-        {
-          action: 'syncPlannerTasks',
-        },
-        'Failed to sync Outlook Microsoft To Do tasks',
-      );
-
-      return {
-        calendarEvents: Array.isArray(calendarResponse?.events)
-          ? (calendarResponse.events as PlannerSyncCalendarEvent[])
-          : [],
-        tasks: Array.isArray(todoResponse?.tasks)
-          ? (todoResponse.tasks as PlannerSyncTaskSnapshot[])
-          : [],
-        removedTaskIds: Array.isArray(todoResponse?.removedTaskIds)
-          ? (todoResponse.removedTaskIds as string[])
-          : [],
-      };
-    },
-    onSuccess: async () => {
-      await invalidateSyncQueries();
-      dispatchPlannerSyncFinished();
-    },
-  });
-
-  const syncProviderPull = useMutation({
-    mutationFn: async ({ provider }: { provider: Exclude<CalendarProvider, 'apple'> }) => {
-      const functionName = `${provider}-calendar-events`;
-      const linkedEvents = await invokeCalendarFunction(
-        functionName,
-        {
-          action: 'syncLinkedChanges',
-        },
-        `Failed to sync ${provider} updates`,
-      );
-
-      let linkedTasks: Record<string, unknown> | null = null;
-      let plannerWindow: Record<string, unknown> | null = null;
-      let plannerTasks: Record<string, unknown> | null = null;
-
-      if (provider === 'outlook') {
-        linkedTasks = await invokeCalendarFunction(
-          'outlook-todo-tasks',
-          {
-            action: 'syncLinkedChanges',
-          },
-          'Failed to sync Outlook To Do updates',
-        );
-        plannerWindow = await invokeCalendarFunction(
-          'outlook-calendar-events',
-          {
-            action: 'syncPlannerWindow',
-          },
-          'Failed to refresh Outlook planner availability',
-        );
-        plannerTasks = await invokeCalendarFunction(
-          'outlook-todo-tasks',
-          {
-            action: 'syncPlannerTasks',
-          },
-          'Failed to refresh Outlook planner tasks',
-        );
-      }
-
-      return {
-        provider,
-        linkedEvents: linkedEvents ?? null,
-        linkedTasks,
-        plannerWindow,
-        plannerTasks,
-      } satisfies ProviderPullSyncResult;
-    },
-    onSuccess: async () => {
-      await invalidateSyncQueries();
-      dispatchPlannerSyncFinished();
-    },
-  });
-
   const hasLinkedEvent = (taskId: string) =>
     (linksByTask.get(taskId) || []).length > 0 || (outlookTaskLinksByTask.get(taskId) || []).length > 0;
 
@@ -791,9 +525,5 @@ export function useQuestCalendarSync(options: QuestCalendarSyncOptions = {}) {
     outlookTaskLinksByTask,
     hasLinkedEvent,
     sendTaskToCalendar,
-    syncTaskUpdate,
-    syncTaskDelete,
-    syncProviderPull,
-    syncPlanningContext,
   };
 }

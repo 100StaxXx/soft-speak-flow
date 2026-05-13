@@ -960,9 +960,11 @@ export function useOfflineQueue() {
   });
 
   const isSyncingRef = useRef(false);
+  const pendingCountRef = useRef(0);
 
   const refreshQueueState = useCallback(async () => {
     if (!user?.id) {
+      pendingCountRef.current = 0;
       setState((prev) => ({ ...prev, pendingCount: 0, receipts: [] }));
       return {
         pendingCount: 0,
@@ -975,6 +977,7 @@ export function useOfflineQueue() {
       getQueuedActions(user.id),
     ]);
 
+    pendingCountRef.current = pendingCount;
     setState((prev) => ({
       ...prev,
       pendingCount,
@@ -1064,13 +1067,18 @@ export function useOfflineQueue() {
     [queueAction],
   );
 
-  const syncPendingActions = useCallback(async (): Promise<{ success: number; failed: number }> => {
+  const syncPendingActions = useCallback(async (
+    options: { force?: boolean } = {},
+  ): Promise<{ success: number; failed: number }> => {
     if (isSyncingRef.current || !navigator.onLine || !user?.id) {
       return { success: 0, failed: 0 };
     }
 
+    if (!options.force && pendingCountRef.current <= 0) {
+      return { success: 0, failed: 0 };
+    }
+
     isSyncingRef.current = true;
-    setState((prev) => ({ ...prev, syncStatus: "syncing", lastSyncError: null }));
 
     let successCount = 0;
     let failedCount = 0;
@@ -1078,6 +1086,12 @@ export function useOfflineQueue() {
 
     try {
       const actions = await getActiveQueuedActions(user.id);
+      if (actions.length === 0) {
+        await refreshQueueState();
+        return { success: 0, failed: 0 };
+      }
+
+      setState((prev) => ({ ...prev, syncStatus: "syncing", lastSyncError: null }));
 
       for (const action of actions) {
         if (action.status === "failed" && action.retry_count >= MAX_AUTO_RETRIES) {
@@ -1270,7 +1284,7 @@ export function useOfflineQueue() {
     }
 
     await resetFailedActions();
-    return syncPendingActions();
+    return syncPendingActions({ force: true });
   }, [resetFailedActions, syncPendingActions, toast, user?.id]);
 
   return {

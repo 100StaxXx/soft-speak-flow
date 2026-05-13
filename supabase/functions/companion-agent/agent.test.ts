@@ -1923,10 +1923,6 @@ Deno.test("runCompanionAgent returns in-chat failure when core upcoming context 
         message: "epics core context unavailable",
         code: "PGRST000",
       },
-      "external_calendar_events:select": {
-        message: "external_calendar_events core context unavailable",
-        code: "PGRST000",
-      },
     },
   });
   let guardedFetchCalled = false;

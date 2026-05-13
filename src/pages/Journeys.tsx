@@ -100,14 +100,6 @@ import { createPlanDayCompanionLaunchIntent } from "@/utils/companionPlannerLaun
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-const isQueuedTaskMutationResult = (
-  value: unknown,
-): value is { queued: true } => (
-  typeof value === "object"
-  && value !== null
-  && "queued" in value
-  && (value as { queued?: boolean }).queued === true
-);
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -826,7 +818,7 @@ const Journeys = () => {
   );
   
   const { currentStreak } = useStreakMultiplier();
-  const { sendTaskToCalendar, syncTaskUpdate, syncTaskDelete, syncProviderPull, hasLinkedEvent } = useQuestCalendarSync({
+  const { sendTaskToCalendar, hasLinkedEvent } = useQuestCalendarSync({
     enabled: isTabActive,
   });
   const {
@@ -1540,7 +1532,7 @@ const Journeys = () => {
     } catch (error) {
       let message = error instanceof Error ? error.message : "Failed to send quest to calendar";
       if (message.includes("MULTI_DAY_MONTHLY_UNSUPPORTED")) {
-        toast.error("Calendar sync doesn't support multi-day monthly recurrence yet.");
+        toast.error("Calendar send doesn't support multi-day monthly recurrence yet.");
         return;
       }
       if (message.includes("NO_CALENDAR_CONNECTION")) {
@@ -1592,7 +1584,7 @@ const Journeys = () => {
         } catch (retryError) {
           message = retryError instanceof Error ? retryError.message : "Failed to send quest to calendar";
           if (message.includes("MULTI_DAY_MONTHLY_UNSUPPORTED")) {
-            toast.error("Calendar sync doesn't support multi-day monthly recurrence yet.");
+            toast.error("Calendar send doesn't support multi-day monthly recurrence yet.");
             return;
           }
           if (message.includes("NO_CALENDAR_CONNECTION")) {
@@ -1669,11 +1661,11 @@ const Journeys = () => {
     clearQuestCreationPopupState();
 
     if (SEND_TO_CALENDAR_ENABLED && data.sendToCalendar && createdTask?.id) {
-      const calendarSyncStartedAt = Date.now();
+      const calendarSendStartedAt = Date.now();
       void handleSendTaskToCalendar(createdTask.id, data.sendToCalendarTarget).finally(() => {
-        trackResilienceEvent("task_create_calendar_sync", {
+        trackResilienceEvent("task_create_calendar_send", {
           taskId: createdTask.id,
-          calendarSyncMs: Date.now() - calendarSyncStartedAt,
+          calendarSendMs: Date.now() - calendarSendStartedAt,
         });
       });
     }
@@ -1748,17 +1740,7 @@ const Journeys = () => {
     subtasks?: string[];
   }) => {
     const { subtasks: nextSubtasks, ...taskUpdates } = updates;
-    const updateResult = await updateTask({ taskId, updates: taskUpdates });
-    if (!isQueuedTaskMutationResult(updateResult)) {
-      await syncTaskUpdate.mutateAsync({ taskId }).catch((error) => {
-        const message = error instanceof Error ? error.message : "";
-        if (message.includes("MULTI_DAY_MONTHLY_UNSUPPORTED")) {
-          toast.error("Calendar sync doesn't support multi-day monthly recurrence yet.");
-          return;
-        }
-        toast.error("Saved quest, but failed to sync linked calendar event");
-      });
-    }
+    await updateTask({ taskId, updates: taskUpdates });
     if (Array.isArray(nextSubtasks) && user?.id) {
       await applySubtaskTitlePlan({
         mode: "replace",
@@ -1790,7 +1772,6 @@ const Journeys = () => {
     queueAction,
     retryNow,
     shouldQueueWrites,
-    syncTaskUpdate,
     updateTask,
     user?.id,
   ]);
@@ -1800,17 +1781,7 @@ const Journeys = () => {
     const nextTaskUpdate = previousTaskUpdate
       .catch(() => undefined)
       .then(async () => {
-        const updateResult = await updateTask({ taskId, updates: { scheduled_time: newTime } });
-        if (isQueuedTaskMutationResult(updateResult)) {
-          return;
-        }
-
-        await syncTaskUpdate.mutateAsync({ taskId }).catch((error) => {
-          const message = error instanceof Error ? error.message : "";
-          if (message.includes("MULTI_DAY_MONTHLY_UNSUPPORTED")) {
-            toast.error("Calendar sync doesn't support multi-day monthly recurrence yet.");
-          }
-        });
+        await updateTask({ taskId, updates: { scheduled_time: newTime } });
       })
       .catch((error) => {
         logger.warn("Failed to update quest scheduled time from timeline drag", {
@@ -1825,20 +1796,17 @@ const Journeys = () => {
       });
 
     scheduledTimeUpdateQueueRef.current.set(taskId, nextTaskUpdate);
-  }, [updateTask, syncTaskUpdate]);
+  }, [updateTask]);
 
   const handleDeleteQuest = useCallback(async (taskId: string, isAIGenerated?: boolean) => {
     // Track deletion for AI learning
     if (isAIGenerated) {
       trackDailyPlanOutcome(taskId, 'deleted');
     }
-    await syncTaskDelete.mutateAsync({ taskId }).catch(() => {
-      toast.error("Failed to remove linked calendar event");
-    });
     await deleteTask(taskId);
     toast.success("Quest deleted");
     setEditingTask(null);
-  }, [deleteTask, trackDailyPlanOutcome, syncTaskDelete]);
+  }, [deleteTask, trackDailyPlanOutcome]);
 
   const createRestorableTaskData = useCallback((task: DailyTask) => ({
     task_text: task.task_text,
@@ -1879,9 +1847,6 @@ const Journeys = () => {
       // Haptics not available on web
     }
 
-    await syncTaskDelete.mutateAsync({ taskId: task.id }).catch(() => {
-      toast.error("Failed to remove linked calendar event");
-    });
     await deleteTask(task.id);
 
     toast("Quest deleted", {
@@ -1898,7 +1863,7 @@ const Journeys = () => {
         },
       },
     });
-  }, [createRestorableTaskData, deleteTask, restoreTask, syncTaskDelete, trackDailyPlanOutcome]);
+  }, [createRestorableTaskData, deleteTask, restoreTask, trackDailyPlanOutcome]);
 
   const handleMoveQuestToNextDayFromWeekPlanner = useCallback(async (task: DailyTask) => {
     if (!task.task_date) return;
@@ -1913,48 +1878,19 @@ const Journeys = () => {
     const nextDay = addDays(taskDate, 1);
     const nextDayStr = format(nextDay, 'yyyy-MM-dd');
 
-    const syncMovedQuest = (movedTaskId: string) => {
-      void syncTaskUpdate.mutateAsync({ taskId: movedTaskId }).catch((error) => {
-        const message = error instanceof Error ? error.message : "";
-        if (message.includes("MULTI_DAY_MONTHLY_UNSUPPORTED")) {
-          toast.error("Calendar sync doesn't support multi-day monthly recurrence yet.");
-          return;
-        }
-        toast.error("Moved quest, but failed to sync linked calendar event");
-      });
-    };
-
-    moveTaskToDate(
-      { taskId: task.id, targetDate: nextDayStr },
-      {
-        onSuccess: (result) => {
-          if (!isQueuedTaskMutationResult(result)) {
-            syncMovedQuest(task.id);
-          }
-        },
-      },
-    );
+    moveTaskToDate({ taskId: task.id, targetDate: nextDayStr });
 
     toast(`Moved to ${format(nextDay, "EEEE, MMM d")}`, {
       duration: QUEST_ACTION_TOAST_DURATION_MS,
       action: {
         label: "Undo",
         onClick: () => {
-          moveTaskToDate(
-            { taskId: task.id, targetDate: task.task_date! },
-            {
-              onSuccess: (result) => {
-                if (!isQueuedTaskMutationResult(result)) {
-                  syncMovedQuest(task.id);
-                }
-              },
-            },
-          );
+          moveTaskToDate({ taskId: task.id, targetDate: task.task_date! });
           toast.success("Move undone");
         },
       },
     });
-  }, [moveTaskToDate, syncTaskUpdate]);
+  }, [moveTaskToDate]);
 
   const handleToggleInboxQuest = useCallback((taskId: string, completed: boolean) => {
     toggleInboxTask({ taskId, completed }, {
@@ -1967,12 +1903,9 @@ const Journeys = () => {
   }, [requestTaskActivityDateSnap, toggleInboxTask]);
 
   const handleDeleteInboxQuest = useCallback(async (taskId: string) => {
-    await syncTaskDelete.mutateAsync({ taskId }).catch(() => {
-      toast.error("Failed to remove linked calendar event");
-    });
     deleteInboxTask(taskId);
     setEditingTask((currentTask) => (currentTask?.id === taskId ? null : currentTask));
-  }, [deleteInboxTask, syncTaskDelete]);
+  }, [deleteInboxTask]);
 
   const handleDeleteEditingQuest = useCallback(async (taskId: string) => {
     if (editingTask?.task_date == null) {
@@ -2039,31 +1972,6 @@ const Journeys = () => {
     if (!taskToMove) return;
     await handleMoveQuestToNextDayFromWeekPlanner(taskToMove);
   }, [dailyTasks, handleMoveQuestToNextDayFromWeekPlanner]);
-
-  // Pull external updates for full-sync providers on an interval.
-  useEffect(() => {
-    if (!isTabActive) return;
-    const fullSyncProviders = calendarConnections
-      .filter((connection) => connection.sync_mode === 'full_sync' && (connection.provider === 'google' || connection.provider === 'outlook'))
-      .map((connection) => connection.provider as 'google' | 'outlook');
-
-    if (fullSyncProviders.length === 0) return;
-
-    const doPull = () => {
-      for (const provider of fullSyncProviders) {
-        syncProviderPull.mutate({ provider });
-      }
-    };
-
-    doPull();
-    const id = window.setInterval(() => {
-      doPull();
-    }, 2 * 60 * 1000);
-
-    return () => {
-      window.clearInterval(id);
-    };
-  }, [isTabActive, calendarConnections, syncProviderPull]);
 
   // Handle campaign creation
   const handleCreateCampaign = useCallback(async (data: Parameters<typeof createEpic>[0]) => {

@@ -1,5 +1,5 @@
 export type OAuthProvider = "google" | "outlook";
-export type OAuthSyncMode = "send_only" | "full_sync";
+export type OAuthSyncMode = "send_only";
 export type OAuthSource = "web" | "native";
 
 const OAUTH_STATE_VERSION = 1;
@@ -59,7 +59,7 @@ function secureEqual(a: Uint8Array, b: Uint8Array): boolean {
 }
 
 function isSyncMode(value: unknown): value is OAuthSyncMode {
-  return value === "send_only" || value === "full_sync";
+  return value === "send_only";
 }
 
 function isProvider(value: unknown): value is OAuthProvider {

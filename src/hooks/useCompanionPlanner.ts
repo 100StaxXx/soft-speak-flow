@@ -11,7 +11,6 @@ import type { IntentClassification } from "@/hooks/useIntentClassifier";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { useTasksQuery } from "@/hooks/useTasksQuery";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
-import { useExternalCalendarEvents } from "@/hooks/useExternalCalendarEvents";
 import { useInboxTasks } from "@/hooks/useInboxTasks";
 import { useEpics } from "@/hooks/useEpics";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
@@ -27,12 +26,6 @@ import { useSchedulingLearner } from "@/hooks/useSchedulingLearner";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionCareSignals } from "@/hooks/useCompanionCareSignals";
-import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
-import {
-  type OutlookPlanningContextSyncResult,
-  type PlannerSyncTaskSnapshot,
-  useQuestCalendarSync,
-} from "@/hooks/useQuestCalendarSync";
 import { parseNaturalLanguage } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import { normalizePlannerDurationBucket } from "@/shared/plannerDurationBuckets";
 import { buildPlannerAISignals } from "@/utils/companionPlannerAiSignals";
@@ -109,7 +102,6 @@ import type {
 
 const STORAGE_KEY = "companion-planner-preferences-v1";
 const MAX_CONTEXT_TASKS = 18;
-const OUTLOOK_PLANNER_SYNC_INTERVAL_MS = 90_000;
 const PLANNER_PREFLIGHT_TIMEOUT_MS = 3_000;
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const STANDALONE_RITUAL_EPIC_ID = "general";
@@ -175,6 +167,7 @@ const DEFAULT_SESSION_STATE: CompanionPlannerSessionState = {
 };
 
 const DEFAULT_TONE_PACK: PlannerTonePack = LOCKED_COMPANION_TONE_PACK;
+const EMPTY_CALENDAR_EVENTS: PlannerContextCalendarEvent[] = [];
 
 const generateId = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -243,22 +236,6 @@ const collectAllowedPlannerTitles = (
       ...(context.recentCompletedTasks ?? []).map((task) => task.title),
     ].filter((title): title is string => Boolean(title?.trim()))),
   );
-
-const getPlannerSyncRange = (date: Date, horizon: PlannerHorizon) => {
-  const start = new Date(date);
-  start.setHours(0, 0, 0, 0);
-
-  const end = addDays(
-    start,
-    horizon === "month" ? 30 : horizon === "week" ? 7 : 1,
-  );
-  end.setHours(0, 0, 0, 0);
-
-  return {
-    startDate: format(start, "yyyy-MM-dd"),
-    endDate: format(addDays(end, -1), "yyyy-MM-dd"),
-  };
-};
 
 const isRecord = (
   value: Json | null | undefined,
@@ -1070,65 +1047,6 @@ const scopeTasksToActiveCampaigns = (
     return scopedTasks;
   }, []);
 
-const mergePlannerTasks = (
-  currentTasks: PlannerContextTask[],
-  syncedTasks: PlannerSyncTaskSnapshot[],
-  removedTaskIds: string[],
-  mode: "scheduled" | "inbox",
-): PlannerContextTask[] => {
-  const removed = new Set(removedTaskIds);
-  const nextTasks = currentTasks.filter((task) => !removed.has(task.id));
-  const indexById = new Map(nextTasks.map((task, index) => [task.id, index]));
-
-  syncedTasks
-    .filter((
-      task,
-    ) => (mode === "inbox" ? task.task_date === null : task.task_date !== null))
-    .forEach((task) => {
-      const serialized = serializeTaskContext(task);
-      const existingIndex = indexById.get(task.id);
-
-      if (existingIndex === undefined) {
-        indexById.set(task.id, nextTasks.length);
-        nextTasks.push(serialized);
-        return;
-      }
-
-      nextTasks[existingIndex] = serialized;
-    });
-
-  return mapTasksToContext(nextTasks);
-};
-
-const mergePlannerContextWithOutlookSync = (
-  baseContext: CompanionPlannerRequest["plannerContext"],
-  syncResult: OutlookPlanningContextSyncResult | null,
-): CompanionPlannerRequest["plannerContext"] => {
-  if (!syncResult) return baseContext;
-
-  return {
-    ...baseContext,
-    tasks: mergePlannerTasks(
-      baseContext.tasks,
-      syncResult.tasks,
-      syncResult.removedTaskIds,
-      "scheduled",
-    ),
-    inboxTasks: mergePlannerTasks(
-      baseContext.inboxTasks,
-      syncResult.tasks,
-      syncResult.removedTaskIds,
-      "inbox",
-    ),
-    calendarEvents: [
-      ...baseContext.calendarEvents.filter((event) =>
-        event.provider !== "outlook"
-      ),
-      ...syncResult.calendarEvents,
-    ].sort((left, right) => left.start.localeCompare(right.start)),
-  };
-};
-
 const mapEpicsToContext = (
   epics: EpicRecord[],
   currentDate: string,
@@ -1838,14 +1756,6 @@ export function useCompanionPlanner({
   const todayTasksQuery = useTasksQuery(today, { enabled });
   const weekTasksQuery = useCalendarTasks(today, "week", { enabled });
   const monthTasksQuery = useCalendarTasks(today, "month", { enabled });
-  const activeEventsQuery = useExternalCalendarEvents(today, horizon, {
-    enabled,
-  });
-  const contextEventsQuery = useExternalCalendarEvents(
-    today,
-    horizon === "month" ? "month" : "week",
-    { enabled },
-  );
   const { inboxTasks } = useInboxTasks({ enabled });
   const habitsQuery = useQuery({
     queryKey: ["habits", user?.id],
@@ -1861,12 +1771,6 @@ export function useCompanionPlanner({
     useEpics({ enabled });
   const { addTask, updateTask } = useTaskMutations(todayIso);
   const { saveRitual } = useRitualUpdate();
-  const { connectedByProvider, defaultProvider } = useCalendarIntegrations({
-    enabled,
-  });
-  const { sendTaskToCalendar, syncPlanningContext } = useQuestCalendarSync({
-    enabled,
-  });
   const { enrichedContext } = useUserAIContext({ enabled });
   const { trackInteraction } = useAIInteractionTracker();
   const { trackTaskCreation, trackScheduleModification } =
@@ -1877,10 +1781,6 @@ export function useCompanionPlanner({
     shouldQueueWrites,
     retryNow,
   } = useResilience();
-  const outlookConnection = connectedByProvider.outlook ?? null;
-  const shouldAutoPublishToOutlook = defaultProvider === "outlook" &&
-    outlookConnection?.sync_mode === "full_sync";
-
   const tonePack: PlannerTonePack = threadPersistence?.surface === "journeys"
     ? "soft"
     : DEFAULT_TONE_PACK;
@@ -1918,9 +1818,6 @@ export function useCompanionPlanner({
     briefingContext: null,
   });
   const pendingQuestCaptureSelectedDateRef = useRef<string | null>(null);
-  const outlookPlannerSyncPromiseRef = useRef<
-    Promise<OutlookPlanningContextSyncResult | null> | null
-  >(null);
 
   const plannerMemoryQuery = useQuery({
     queryKey: ["companion-planner-memory", user?.id],
@@ -2515,14 +2412,13 @@ export function useCompanionPlanner({
     () =>
       buildCompanionPlannerScheduleInsights({
         tasks: activePlannerTasks,
-        calendarEvents: activeEventsQuery.events,
+        calendarEvents: EMPTY_CALENDAR_EVENTS,
         horizon,
         selectedDate: todayIso,
         currentDateTime: formatCurrentDateTimeWithOffset(today),
         plannerMemory,
       }, deletedPlannerEntitiesQuery.data ?? []),
     [
-      activeEventsQuery.events,
       activePlannerTasks,
       horizon,
       plannerMemory,
@@ -2648,8 +2544,7 @@ export function useCompanionPlanner({
         inboxTasks: inboxPlannerTasks,
         activeEpics: mapEpicsToContext(activeEpics, todayIso),
         rituals: baseRituals,
-        calendarEvents: contextEventsQuery
-          .events as PlannerContextCalendarEvent[],
+        calendarEvents: EMPTY_CALENDAR_EVENTS,
         contactsNeedingAttention: contactsAttentionQuery.data ?? [],
         reflectionSignals: reflectionSignalsQuery.data ?? [],
         careSignals,
@@ -2668,7 +2563,6 @@ export function useCompanionPlanner({
       baseRituals,
       careSignals,
       contactsAttentionQuery.data,
-      contextEventsQuery.events,
       contextPlannerTasks,
       effectivePlannerMemory,
       inboxPlannerTasks,
@@ -2699,8 +2593,7 @@ export function useCompanionPlanner({
           ? { pendingLocalHabitIds: pendingPlannerCreateIds.habitIds }
           : {}),
         rituals: ritualsQuery.data ?? baseRituals,
-        calendarEvents: contextEventsQuery
-          .events as PlannerContextCalendarEvent[],
+        calendarEvents: EMPTY_CALENDAR_EVENTS,
         contactsNeedingAttention: contactsAttentionQuery.data ?? [],
         reflectionSignals: reflectionSignalsQuery.data ?? [],
         careSignals,
@@ -2716,7 +2609,6 @@ export function useCompanionPlanner({
       baseRituals,
       careSignals,
       contactsAttentionQuery.data,
-      contextEventsQuery.events,
       contextPlannerTasks,
       effectivePlannerMemory,
       inboxPlannerTasks,
@@ -2744,40 +2636,6 @@ export function useCompanionPlanner({
         content: message.content,
       }))
   ), [messages]);
-
-  const plannerSyncRange = useMemo(
-    () => getPlannerSyncRange(today, horizon),
-    [horizon, todayIso],
-  );
-
-  const syncOutlookPlanningContext = useCallback(async () => {
-    if (!enabled) return null;
-    if (!outlookConnection) return null;
-
-    if (!outlookPlannerSyncPromiseRef.current) {
-      outlookPlannerSyncPromiseRef.current = (async () => {
-        try {
-          return await syncPlanningContext.mutateAsync({
-            startDate: plannerSyncRange.startDate,
-            endDate: plannerSyncRange.endDate,
-          });
-        } catch (error) {
-          console.warn("Failed to sync Outlook planning context:", error);
-          return null;
-        } finally {
-          outlookPlannerSyncPromiseRef.current = null;
-        }
-      })();
-    }
-
-    return await outlookPlannerSyncPromiseRef.current;
-  }, [
-    outlookConnection?.id,
-    enabled,
-    plannerSyncRange.endDate,
-    plannerSyncRange.startDate,
-    syncPlanningContext,
-  ]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -2809,46 +2667,6 @@ export function useCompanionPlanner({
     sessionState.reminderPreference,
     tonePack,
   ]);
-
-  useEffect(() => {
-    if (!enabled) return;
-    if (!outlookConnection) return;
-    void syncOutlookPlanningContext();
-  }, [
-    enabled,
-    outlookConnection?.id,
-    plannerSyncRange.endDate,
-    plannerSyncRange.startDate,
-    syncOutlookPlanningContext,
-  ]);
-
-  useEffect(() => {
-    if (!enabled) return;
-    if (!outlookConnection) return;
-
-    const handleFocus = () => {
-      void syncOutlookPlanningContext();
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        void syncOutlookPlanningContext();
-      }
-    };
-
-    const intervalId = window.setInterval(() => {
-      void syncOutlookPlanningContext();
-    }, OUTLOOK_PLANNER_SYNC_INTERVAL_MS);
-
-    window.addEventListener("focus", handleFocus);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      window.clearInterval(intervalId);
-      window.removeEventListener("focus", handleFocus);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [enabled, outlookConnection?.id, syncOutlookPlanningContext]);
 
   const persistPlannerThreadRows = useCallback(async (
     rows: Array<{
@@ -3249,20 +3067,6 @@ export function useCompanionPlanner({
       const requestCurrentDateTime = formatCurrentDateTimeWithOffset(
         new Date(),
       );
-      const outlookSyncPromise = withTimeout(
-        () => syncOutlookPlanningContext(),
-        {
-          timeoutMs: PLANNER_PREFLIGHT_TIMEOUT_MS,
-          operation: "planner Outlook sync",
-          timeoutCode: "PLANNER_OUTLOOK_SYNC_TIMEOUT",
-        },
-      ).catch((error) => {
-        console.warn(
-          "Planner Outlook sync preflight timed out; continuing with local context.",
-          error,
-        );
-        return null;
-      });
       const classificationPromise = withTimeout(
         () => classify(message),
         {
@@ -3276,25 +3080,16 @@ export function useCompanionPlanner({
         );
         return null;
       });
-      const [
-        outlookPlanningContext,
-        classification,
-      ] = await Promise.all([
-        outlookSyncPromise,
-        classificationPromise,
-      ]);
-      const mergedPlannerContext = mergePlannerContextWithOutlookSync(
-        plannerContext,
-        outlookPlanningContext,
-      );
+      const classification = await classificationPromise;
+      const activePlannerContext = plannerContext;
       const mergedActiveEpicIds = new Set(
-        mergedPlannerContext.activeEpics.map((epic) => epic.id),
+        activePlannerContext.activeEpics.map((epic) => epic.id),
       );
-      const mergedActiveHabitIds = mergedPlannerContext.activeHabitIds
-        ? new Set(mergedPlannerContext.activeHabitIds)
+      const mergedActiveHabitIds = activePlannerContext.activeHabitIds
+        ? new Set(activePlannerContext.activeHabitIds)
         : null;
       const mergedActiveRitualIds = new Set(
-        mergedPlannerContext.rituals
+        activePlannerContext.rituals
           .filter((ritual) =>
             mergedActiveEpicIds.has(ritual.epicId) &&
             (!mergedActiveHabitIds || mergedActiveHabitIds.has(ritual.id))
@@ -3304,21 +3099,21 @@ export function useCompanionPlanner({
       const deletedPlannerEntities = deletedPlannerEntitiesQuery.data ?? [];
       const syncedPlannerContext = sanitizePlannerContext(
         {
-          ...mergedPlannerContext,
+          ...activePlannerContext,
           tasks: scopeTasksToActiveCampaigns(
-            mergedPlannerContext.tasks,
+            activePlannerContext.tasks,
             mergedActiveEpicIds,
             mergedActiveRitualIds,
             mergedActiveHabitIds,
           ),
           inboxTasks: scopeTasksToActiveCampaigns(
-            mergedPlannerContext.inboxTasks,
+            activePlannerContext.inboxTasks,
             mergedActiveEpicIds,
             mergedActiveRitualIds,
             mergedActiveHabitIds,
           ),
           recentCompletedTasks: scopeTasksToActiveCampaigns(
-            mergedPlannerContext.recentCompletedTasks ?? [],
+            activePlannerContext.recentCompletedTasks ?? [],
             mergedActiveEpicIds,
             mergedActiveRitualIds,
             mergedActiveHabitIds,
@@ -3633,7 +3428,6 @@ export function useCompanionPlanner({
     careSignals,
     classify,
     contactsAttentionQuery.data,
-    contextEventsQuery.events,
     contextTasks,
     conversationHistory,
     dayPlan,
@@ -3650,39 +3444,10 @@ export function useCompanionPlanner({
     reflectionSignalsQuery.data,
     scheduleInsights,
     sessionState,
-    syncOutlookPlanningContext,
     todayIso,
     tonePack,
     trackInteraction,
   ]);
-
-  const autoPublishConfirmedQuestToOutlook = useCallback(async (
-    proposal: CompanionPlannerProposal,
-    taskId: string | null,
-    mutationResult?: { queued?: boolean } | null,
-  ) => {
-    if (!shouldAutoPublishToOutlook) return true;
-    if (!taskId || mutationResult?.queued) return true;
-    if (
-      !["create_quest", "update_quest", "suggest_reminder"].includes(
-        proposal.kind,
-      )
-    ) return true;
-
-    try {
-      await sendTaskToCalendar.mutateAsync({
-        taskId,
-        options: {
-          provider: "outlook",
-        },
-      });
-      return true;
-    } catch (error) {
-      console.error("Failed to auto-publish planner quest to Outlook:", error);
-      toast("Saved locally. Outlook still needs another sync pass.");
-      return false;
-    }
-  }, [sendTaskToCalendar, shouldAutoPublishToOutlook]);
 
   const handleConfirmProposal = useCallback(async (proposalId: string) => {
     if (!enabled) return;
@@ -3696,7 +3461,6 @@ export function useCompanionPlanner({
     try {
       let confirmationContent = `Saved: ${proposal.title}.`;
       let localTaskId: string | null = null;
-      let mutationResult: { queued?: boolean } | null = null;
 
       switch (proposal.kind) {
         case "create_quest": {
@@ -3705,7 +3469,6 @@ export function useCompanionPlanner({
           localTaskId = typeof createResult?.id === "string"
             ? createResult.id
             : null;
-          mutationResult = createResult as { queued?: boolean } | null;
           await trackTaskCreation(
             payload.scheduledTime ?? null,
             payload.difficulty ?? "medium",
@@ -3738,9 +3501,7 @@ export function useCompanionPlanner({
           const previousTask = activeTasks.find((task) => task.id === taskId) ??
             inboxTasks.find((task) => task.id === taskId);
 
-          mutationResult = await updateTask(taskUpdatePayload) as {
-            queued?: boolean;
-          } | null;
+          await updateTask(taskUpdatePayload);
           localTaskId = taskId;
 
           const nextScheduledTime = typeof updates?.scheduled_time === "string"
@@ -3910,24 +3671,12 @@ export function useCompanionPlanner({
           const payload = proposal.payload as unknown as Parameters<
             typeof updateTask
           >[0];
-          mutationResult = await updateTask(payload) as
-            | { queued?: boolean }
-            | null;
+          await updateTask(payload);
           localTaskId = payload.taskId;
           break;
         }
         default:
           return;
-      }
-
-      const autoPublishSucceeded = await autoPublishConfirmedQuestToOutlook(
-        proposal,
-        localTaskId,
-        mutationResult,
-      );
-      if (!autoPublishSucceeded) {
-        confirmationContent =
-          `Saved: ${proposal.title}. Outlook still needs another sync pass.`;
       }
 
       setProposals((previous) =>
@@ -4018,7 +3767,6 @@ export function useCompanionPlanner({
     persistPlannerThreadRows,
     recordPlannerEvent,
     shouldQueueWrites,
-    autoPublishConfirmedQuestToOutlook,
     strongestPlannerNeed,
     trackInteraction,
     trackScheduleModification,
@@ -4558,8 +4306,6 @@ export function useCompanionPlanner({
     isLoadingContext: todayTasksQuery.isLoading ||
       weekTasksQuery.isLoading ||
       monthTasksQuery.isLoading ||
-      activeEventsQuery.isLoading ||
-      contextEventsQuery.isLoading ||
       plannerMemoryQuery.isLoading ||
       contactsAttentionQuery.isLoading ||
       reflectionSignalsQuery.isLoading ||

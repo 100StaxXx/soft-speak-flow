@@ -14,10 +14,13 @@ import { isNativeIOS } from "@/utils/platformTargets";
 import { StoreKit, type StoreKitProduct, type StoreKitTransaction } from "@/plugins/StoreKitPlugin";
 import { useAuth } from "@/hooks/useAuth";
 import { resolvePlanFromProductId } from "@/utils/appleIAP";
+import { withTimeout } from "@/utils/asyncTimeout";
 
 const PRODUCT_IDS = ["cosmiq_premium_monthly", "cosmiq_premium_yearly"];
 const OFFER_CODE_REDEMPTION_URL = import.meta.env.VITE_APPLE_OFFER_CODE_REDEMPTION_URL;
 const OFFER_CODE_ENTITLEMENT_POLL_DELAYS_MS = [0, 500, 1000, 1500];
+const STOREKIT_PRODUCTS_TIMEOUT_MS = 5000;
+const STOREKIT_ENTITLEMENT_TIMEOUT_MS = 5000;
 
 export type StoreKitPlan = "monthly" | "yearly";
 
@@ -84,7 +87,14 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     if (!isAvailable) return [];
     setProductsLoading(true);
     try {
-      const { products: loaded } = await StoreKit.getProducts({ productIds: PRODUCT_IDS });
+      const { products: loaded } = await withTimeout(
+        () => StoreKit.getProducts({ productIds: PRODUCT_IDS }),
+        {
+          timeoutMs: STOREKIT_PRODUCTS_TIMEOUT_MS,
+          operation: "StoreKit product fetch",
+          timeoutCode: "STOREKIT_TIMEOUT",
+        },
+      );
       console.info("[StoreKit] Loaded products", {
         productIds: PRODUCT_IDS,
         loadedCount: loaded.length,
@@ -114,7 +124,14 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     if (!isAvailable) return;
     setEntitlementLoading(true);
     try {
-      const { entitlement } = await StoreKit.getCurrentEntitlement();
+      const { entitlement } = await withTimeout(
+        () => StoreKit.getCurrentEntitlement(),
+        {
+          timeoutMs: STOREKIT_ENTITLEMENT_TIMEOUT_MS,
+          operation: "StoreKit entitlement refresh",
+          timeoutCode: "STOREKIT_TIMEOUT",
+        },
+      );
       setCurrentEntitlement(entitlement);
       setEntitlementError(false);
     } catch (error) {
@@ -212,7 +229,14 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
         await wait(delay);
       }
 
-      const result = await StoreKit.getCurrentEntitlement();
+      const result = await withTimeout(
+        () => StoreKit.getCurrentEntitlement(),
+        {
+          timeoutMs: STOREKIT_ENTITLEMENT_TIMEOUT_MS,
+          operation: "StoreKit entitlement refresh",
+          timeoutCode: "STOREKIT_TIMEOUT",
+        },
+      );
       entitlement = result.entitlement;
       setCurrentEntitlement(entitlement);
       setEntitlementError(false);
@@ -251,7 +275,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
 
   const value = useMemo<StoreKitContextValue>(() => ({
     isAvailable,
-    isLoading: productsLoading || entitlementLoading,
+    isLoading: entitlementLoading,
     products,
     productsLoading,
     currentEntitlement,

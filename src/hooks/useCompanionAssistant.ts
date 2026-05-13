@@ -773,7 +773,6 @@ const isCompanionAgentSetupError = (parsed: ParsedFunctionInvokeError) => {
     "cost_guardrail_state",
     "user_companion",
     "daily_tasks",
-    "external_calendar_events",
     "companion_memories",
     "user_reflections",
     "daily_check_ins",
@@ -883,9 +882,10 @@ export function useCompanionAssistant({
   const queryClient = useQueryClient();
   const [useLegacyFallback, setUseLegacyFallback] = useState(false);
   const unifiedAgentActive = !useLegacyFallback;
+  const localScheduleReadEnabled = surface === "journeys";
 
   const legacyAssistant = useLegacyCompanionAssistantAdapter({
-    enabled: useLegacyFallback,
+    enabled: useLegacyFallback || localScheduleReadEnabled,
     surface,
     conversationEnabled,
     onOpenCampaignBuilder,
@@ -1680,7 +1680,7 @@ export function useCompanionAssistant({
       }
 
       if (
-        surface === "journeys" &&
+        localScheduleReadEnabled &&
         starterIntent === "upcoming_start" &&
         !options?.selectedProposedAction
       ) {
@@ -1695,15 +1695,19 @@ export function useCompanionAssistant({
           savedSuggestionProposalIds,
           pendingSuggestionProposalId,
         });
-        pendingLegacyFallbackReplayRef.current = {
+        setUseLegacyFallback(true);
+        await legacyAssistant.submitMessage(
           message,
           inputMode,
-          options: legacySubmitOptions,
-          pendingStarterIntent,
-          shouldConsumePendingStarterIntent,
-        };
-        setUseLegacyFallback(true);
-        setLegacyFallbackReplayKey((key) => key + 1);
+          legacySubmitOptions,
+        );
+        if (
+          shouldConsumePendingStarterIntent &&
+          pendingStarterIntentRef.current === pendingStarterIntent
+        ) {
+          pendingStarterIntentRef.current = null;
+          pendingQuestCaptureSelectedDateRef.current = null;
+        }
         return true;
       }
 
@@ -1990,6 +1994,7 @@ export function useCompanionAssistant({
       requestDraftOpportunitySidecar,
       speakAssistantReply,
       trackInteraction,
+      localScheduleReadEnabled,
       pendingSuggestionProposalId,
       proposedActions,
       savedSuggestionProposalIds,
@@ -2369,7 +2374,13 @@ export function useCompanionAssistant({
       pendingQuestCaptureSelectedDateRef.current = null;
     }
     if (launchIntent.starterIntent === "thread_history") return;
-    if (!useLegacyFallback && !threadsQuery.isSuccess) return;
+    if (
+      !useLegacyFallback &&
+      !threadsQuery.isSuccess &&
+      launchIntent.starterIntent !== "upcoming_start"
+    ) {
+      return;
+    }
 
     handledLaunchIntentIdRef.current = launchIntent.id;
 
@@ -2388,6 +2399,9 @@ export function useCompanionAssistant({
       launchIntent.starterIntent === "quest_capture";
     const isSnapshotOnlyPlanDayStarter =
       hasPlanDaySnapshotBriefing(launchIntent);
+    const isLocalUpcomingStarter =
+      localScheduleReadEnabled &&
+      launchIntent.starterIntent === "upcoming_start";
 
     void (async () => {
       threadMutationVersionRef.current += 1;
@@ -2445,6 +2459,18 @@ export function useCompanionAssistant({
           return;
         }
 
+        if (isLocalUpcomingStarter) {
+          const launchSubmitOptions: CompanionAgentSubmitOptions = {
+            starterIntent: launchIntent.starterIntent,
+            turnOrigin: "launcher",
+          };
+          if (launchIntent.selectedDate) {
+            launchSubmitOptions.selectedDate = launchIntent.selectedDate;
+          }
+          await submitMessage(launchMessage, "text", launchSubmitOptions);
+          return;
+        }
+
         if (useLegacyFallback) {
           legacyAssistant.startTemplateThread?.();
         } else {
@@ -2484,6 +2510,7 @@ export function useCompanionAssistant({
   }, [
     launchIntent,
     legacyAssistant,
+    localScheduleReadEnabled,
     onLaunchIntentConsumed,
     onOpenCampaignBuilder,
     startNewChat,

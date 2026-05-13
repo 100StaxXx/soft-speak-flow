@@ -57,10 +57,7 @@ const mocks = vi.hoisted(() => ({
   moveTaskToDate: vi.fn(),
   toggleInboxTask: vi.fn(),
   deleteInboxTask: vi.fn(),
-  syncTaskUpdateMutateAsync: vi.fn().mockResolvedValue(undefined),
-  syncTaskDeleteMutateAsync: vi.fn().mockResolvedValue(undefined),
   sendTaskToCalendarMutateAsync: vi.fn().mockResolvedValue(undefined),
-  syncProviderPullMutate: vi.fn(),
   hasLinkedEvent: vi.fn(() => false),
   createEpic: vi.fn(),
   useFreeze: vi.fn(),
@@ -475,15 +472,6 @@ vi.mock("@/hooks/useQuestCalendarSync", () => ({
     sendTaskToCalendar: {
       mutateAsync: mocks.sendTaskToCalendarMutateAsync,
       isPending: false,
-    },
-    syncTaskUpdate: {
-      mutateAsync: mocks.syncTaskUpdateMutateAsync,
-    },
-    syncTaskDelete: {
-      mutateAsync: mocks.syncTaskDeleteMutateAsync,
-    },
-    syncProviderPull: {
-      mutate: mocks.syncProviderPullMutate,
     },
     hasLinkedEvent: mocks.hasLinkedEvent,
   }),
