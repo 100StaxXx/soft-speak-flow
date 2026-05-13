@@ -39,6 +39,8 @@
 		"SharePlugin",
 		"SplashScreenPlugin",
 		"FilePickerPlugin",
-		"SocialLoginPlugin"
+		"SocialLoginPlugin",
+		"PurchasesPlugin",
+		"RevenueCatUIPlugin"
 	]
 }

@@ -10,19 +10,41 @@ import {
 } from "react";
 import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
+import {
+  LOG_LEVEL,
+  PAYWALL_RESULT,
+  PRODUCT_CATEGORY,
+  Purchases,
+  type CustomerInfo,
+  type PurchasesEntitlementInfo,
+  type PurchasesOfferings,
+  type PurchasesPackage,
+  type PurchasesStoreProduct,
+  type PurchasesStoreTransaction,
+} from "@revenuecat/purchases-capacitor";
+import { RevenueCatUI } from "@revenuecat/purchases-capacitor-ui";
 import { isNativeIOS } from "@/utils/platformTargets";
-import { StoreKit, type StoreKitProduct, type StoreKitTransaction } from "@/plugins/StoreKitPlugin";
 import { useAuth } from "@/hooks/useAuth";
-import { resolvePlanFromProductId } from "@/utils/appleIAP";
+import {
+  COSMIQ_PRO_ENTITLEMENT_ID,
+  COSMIQ_PRO_ENTITLEMENT_NAME,
+  REVENUECAT_IOS_API_KEY,
+  REVENUECAT_PRODUCT_IDS,
+  resolvePlanFromProductId,
+} from "@/utils/appleIAP";
 import { withTimeout } from "@/utils/asyncTimeout";
+import type { StoreKitProduct, StoreKitTransaction } from "@/types/subscription";
 
-const PRODUCT_IDS = ["cosmiq_premium_monthly", "cosmiq_premium_yearly"];
-const OFFER_CODE_REDEMPTION_URL = import.meta.env.VITE_APPLE_OFFER_CODE_REDEMPTION_URL;
+const CUSTOMER_INFO_TIMEOUT_MS = 5000;
+const REVENUECAT_PRODUCTS_TIMEOUT_MS = 8000;
+const REVENUECAT_CONFIGURE_TIMEOUT_MS = 10000;
 const OFFER_CODE_ENTITLEMENT_POLL_DELAYS_MS = [0, 500, 1000, 1500];
-const STOREKIT_PRODUCTS_TIMEOUT_MS = 5000;
-const STOREKIT_ENTITLEMENT_TIMEOUT_MS = 5000;
+const COSMIQ_PRO_ENTITLEMENT_ALIASES = [
+  COSMIQ_PRO_ENTITLEMENT_ID,
+  COSMIQ_PRO_ENTITLEMENT_NAME,
+] as const;
 
-export type StoreKitPlan = "monthly" | "yearly";
+type StoreKitPlan = "monthly" | "yearly";
 
 type StoreKitContextValue = {
   isAvailable: boolean;
@@ -30,47 +52,160 @@ type StoreKitContextValue = {
   products: StoreKitProduct[];
   productsLoading: boolean;
   currentEntitlement: StoreKitTransaction | null;
+  customerInfo: CustomerInfo | null;
+  offerings: PurchasesOfferings | null;
   entitlementError: boolean;
   isPro: boolean;
   activePlan: StoreKitPlan | null;
   expirationDate: Date | null;
   purchase: (productId: string) => Promise<StoreKitTransaction | null>;
-  purchaseWithPromoOffer: (productId: string) => Promise<StoreKitTransaction | null>;
-  redeemOfferCode: () => Promise<{ status: "presented" | "opened_url"; entitlement: StoreKitTransaction | null }>;
+  redeemOfferCode: () => Promise<{ status: "presented"; entitlement: StoreKitTransaction | null }>;
   restorePurchases: () => Promise<StoreKitTransaction | null>;
   manageSubscriptions: () => Promise<void>;
+  presentPaywall: () => Promise<boolean>;
+  presentPaywallIfNeeded: () => Promise<boolean>;
+  presentCustomerCenter: () => Promise<void>;
   refreshEntitlement: () => Promise<void>;
   refreshProducts: () => Promise<StoreKitProduct[]>;
 };
 
 const StoreKitContext = createContext<StoreKitContextValue | undefined>(undefined);
 
-function normalizeAccountToken(value: string | null | undefined): string | null {
-  const normalized = value?.trim().toLowerCase();
-  return normalized && normalized.length > 0 ? normalized : null;
-}
-
-function entitlementBelongsToUser(
-  entitlement: StoreKitTransaction | null,
-  userId: string | null | undefined,
-): boolean {
-  const appAccountToken = normalizeAccountToken(entitlement?.appAccountToken);
-  const normalizedUserId = normalizeAccountToken(userId);
-  return Boolean(appAccountToken && normalizedUserId && appAccountToken === normalizedUserId);
-}
-
-function entitlementIsCurrent(entitlement: StoreKitTransaction | null): boolean {
-  if (!entitlement || entitlement.cancelled || entitlement.pending || entitlement.revocationDate) {
-    return false;
-  }
-
-  if (!entitlement.expirationDate) return false;
-  const expirationDate = new Date(entitlement.expirationDate);
-  return !Number.isNaN(expirationDate.getTime()) && expirationDate > new Date();
-}
-
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function parseSubscriptionPeriod(period: string | null): {
+  subscriptionPeriodUnit?: number;
+  subscriptionPeriodValue?: number;
+} {
+  if (!period) return {};
+
+  const match = /^P(\d+)([DWMY])$/.exec(period);
+  if (!match) return {};
+
+  const value = Number(match[1]);
+  if (!Number.isFinite(value)) return {};
+
+  const unit = match[2] === "D"
+    ? 0
+    : match[2] === "W"
+      ? 1
+      : match[2] === "M"
+        ? 2
+        : 3;
+
+  return {
+    subscriptionPeriodUnit: unit,
+    subscriptionPeriodValue: value,
+  };
+}
+
+function revenueCatProductToStoreKitProduct(product: PurchasesStoreProduct): StoreKitProduct {
+  return {
+    identifier: product.identifier,
+    displayName: product.title,
+    description: product.description,
+    displayPrice: product.priceString,
+    price: product.price,
+    type: product.productType,
+    ...parseSubscriptionPeriod(product.subscriptionPeriod),
+  };
+}
+
+function mergeProducts(products: PurchasesStoreProduct[]): StoreKitProduct[] {
+  const byIdentifier = new Map<string, PurchasesStoreProduct>();
+  for (const product of products) {
+    byIdentifier.set(product.identifier, product);
+  }
+  const configuredProductIds = new Set<string>(REVENUECAT_PRODUCT_IDS);
+
+  const ordered = [
+    ...REVENUECAT_PRODUCT_IDS
+      .map((productId) => byIdentifier.get(productId))
+      .filter((product): product is PurchasesStoreProduct => Boolean(product)),
+    ...products.filter((product) => !configuredProductIds.has(product.identifier)),
+  ];
+
+  return ordered.map(revenueCatProductToStoreKitProduct);
+}
+
+function packagesFromOfferings(offerings: PurchasesOfferings | null): PurchasesPackage[] {
+  if (!offerings) return [];
+
+  const packages: PurchasesPackage[] = [];
+  const seen = new Set<string>();
+  const addPackage = (pkg: PurchasesPackage | null | undefined) => {
+    if (!pkg || seen.has(`${pkg.presentedOfferingContext.offeringIdentifier}:${pkg.identifier}:${pkg.product.identifier}`)) {
+      return;
+    }
+    seen.add(`${pkg.presentedOfferingContext.offeringIdentifier}:${pkg.identifier}:${pkg.product.identifier}`);
+    packages.push(pkg);
+  };
+
+  offerings.current?.availablePackages.forEach(addPackage);
+  Object.values(offerings.all).forEach((offering) => {
+    offering.availablePackages.forEach(addPackage);
+  });
+
+  return packages;
+}
+
+function activeCosmiqProEntitlement(customerInfo: CustomerInfo | null): PurchasesEntitlementInfo | null {
+  if (!customerInfo) return null;
+
+  for (const entitlementId of COSMIQ_PRO_ENTITLEMENT_ALIASES) {
+    const entitlement = customerInfo.entitlements.active[entitlementId];
+    if (entitlement?.isActive) return entitlement;
+  }
+
+  return null;
+}
+
+function transactionIdFor(
+  entitlement: PurchasesEntitlementInfo,
+  subscription: CustomerInfo["subscriptionsByProductIdentifier"][string] | undefined,
+  transaction?: PurchasesStoreTransaction | null,
+): string {
+  return (
+    transaction?.transactionIdentifier ||
+    subscription?.storeTransactionId ||
+    `${entitlement.productIdentifier}:${entitlement.latestPurchaseDateMillis}`
+  );
+}
+
+function customerInfoToTransaction(
+  customerInfo: CustomerInfo | null,
+  transaction?: PurchasesStoreTransaction | null,
+): StoreKitTransaction | null {
+  const entitlement = activeCosmiqProEntitlement(customerInfo);
+  if (!customerInfo || !entitlement) return null;
+
+  const subscription = customerInfo.subscriptionsByProductIdentifier[entitlement.productIdentifier];
+  const transactionId = transactionIdFor(entitlement, subscription, transaction);
+
+  return {
+    transactionId,
+    originalTransactionId: subscription?.storeTransactionId ?? transactionId,
+    productId: entitlement.productIdentifier,
+    purchaseDate: entitlement.latestPurchaseDate ?? subscription?.purchaseDate ?? customerInfo.requestDate,
+    expirationDate: entitlement.expirationDate ?? subscription?.expiresDate ?? undefined,
+    appAccountToken: customerInfo.originalAppUserId,
+  };
+}
+
+function paywallSucceeded(result: PAYWALL_RESULT): boolean {
+  return result === PAYWALL_RESULT.PURCHASED || result === PAYWALL_RESULT.RESTORED;
+}
+
+function revenueCatErrorMessage(error: unknown): string {
+  if (typeof error === "string" && error.trim()) return error;
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "object" && error !== null) {
+    const maybeMessage = (error as { message?: unknown }).message;
+    if (typeof maybeMessage === "string" && maybeMessage.trim()) return maybeMessage;
+  }
+  return "RevenueCat request failed";
 }
 
 export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
@@ -78,39 +213,79 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
   const isAvailable = Capacitor.isNativePlatform() && isNativeIOS();
   const [products, setProducts] = useState<StoreKitProduct[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
+  const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
   const [currentEntitlement, setCurrentEntitlement] = useState<StoreKitTransaction | null>(null);
+  const [offerings, setOfferings] = useState<PurchasesOfferings | null>(null);
   const [entitlementLoading, setEntitlementLoading] = useState(isAvailable);
   const [entitlementError, setEntitlementError] = useState(false);
-  const listenerStartedRef = useRef(false);
+  const [isConfigured, setIsConfigured] = useState(false);
+  const configuredAppUserIdRef = useRef<string | null>(null);
+  const packagesRef = useRef<PurchasesPackage[]>([]);
+  const storeProductsRef = useRef<Map<string, PurchasesStoreProduct>>(new Map());
+
+  const applyCustomerInfo = useCallback((
+    nextCustomerInfo: CustomerInfo | null,
+    transaction?: PurchasesStoreTransaction | null,
+  ) => {
+    setCustomerInfo(nextCustomerInfo);
+    setCurrentEntitlement(customerInfoToTransaction(nextCustomerInfo, transaction));
+  }, []);
+
+  const fetchCustomerInfo = useCallback(async () => {
+    const { customerInfo: nextCustomerInfo } = await withTimeout(
+      () => Purchases.getCustomerInfo(),
+      {
+        timeoutMs: CUSTOMER_INFO_TIMEOUT_MS,
+        operation: "RevenueCat customer info refresh",
+        timeoutCode: "REVENUECAT_TIMEOUT",
+      },
+    );
+    applyCustomerInfo(nextCustomerInfo);
+    return nextCustomerInfo;
+  }, [applyCustomerInfo]);
 
   const refreshProducts = useCallback(async () => {
-    if (!isAvailable) return [];
+    if (!isAvailable || !isConfigured) return [];
+
     setProductsLoading(true);
     try {
-      const { products: loaded } = await withTimeout(
-        () => StoreKit.getProducts({ productIds: PRODUCT_IDS }),
+      const [nextOfferings, productResult] = await withTimeout(
+        () => Promise.all([
+          Purchases.getOfferings(),
+          Purchases.getProducts({
+            productIdentifiers: [...REVENUECAT_PRODUCT_IDS],
+            type: PRODUCT_CATEGORY.SUBSCRIPTION,
+          }),
+        ]),
         {
-          timeoutMs: STOREKIT_PRODUCTS_TIMEOUT_MS,
-          operation: "StoreKit product fetch",
-          timeoutCode: "STOREKIT_TIMEOUT",
+          timeoutMs: REVENUECAT_PRODUCTS_TIMEOUT_MS,
+          operation: "RevenueCat offerings and products fetch",
+          timeoutCode: "REVENUECAT_TIMEOUT",
         },
       );
-      console.info("[StoreKit] Loaded products", {
-        productIds: PRODUCT_IDS,
-        loadedCount: loaded.length,
-        platform: Capacitor.getPlatform(),
-      });
-      if (!loaded.length) {
-        console.warn("[StoreKit] Product fetch returned no products", {
-          productIds: PRODUCT_IDS,
+
+      setOfferings(nextOfferings);
+      const offeringPackages = packagesFromOfferings(nextOfferings);
+      packagesRef.current = offeringPackages;
+
+      const packageProducts = offeringPackages.map((pkg) => pkg.product);
+      const allProducts = [...packageProducts, ...productResult.products];
+      storeProductsRef.current = new Map(allProducts.map((product) => [product.identifier, product]));
+
+      const mappedProducts = mergeProducts(allProducts);
+      setProducts(mappedProducts);
+
+      if (!mappedProducts.length) {
+        console.warn("[RevenueCat] Product fetch returned no products", {
+          productIds: REVENUECAT_PRODUCT_IDS,
           platform: Capacitor.getPlatform(),
         });
       }
-      setProducts(loaded);
-      return loaded;
+
+      return mappedProducts;
     } catch (error) {
-      console.error("[StoreKit] Failed to load products", {
-        productIds: PRODUCT_IDS,
+      console.error("[RevenueCat] Failed to load offerings/products", {
+        productIds: REVENUECAT_PRODUCT_IDS,
         platform: Capacitor.getPlatform(),
         error,
       });
@@ -118,54 +293,128 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setProductsLoading(false);
     }
-  }, [isAvailable]);
+  }, [isAvailable, isConfigured]);
 
   const refreshEntitlement = useCallback(async () => {
-    if (!isAvailable) return;
+    if (!isAvailable || !isConfigured) return;
+
     setEntitlementLoading(true);
     try {
-      const { entitlement } = await withTimeout(
-        () => StoreKit.getCurrentEntitlement(),
-        {
-          timeoutMs: STOREKIT_ENTITLEMENT_TIMEOUT_MS,
-          operation: "StoreKit entitlement refresh",
-          timeoutCode: "STOREKIT_TIMEOUT",
-        },
-      );
-      setCurrentEntitlement(entitlement);
+      await fetchCustomerInfo();
       setEntitlementError(false);
     } catch (error) {
       setEntitlementError(true);
-      console.error("[StoreKit] Failed to get entitlement:", error);
+      console.error("[RevenueCat] Failed to get customer info:", error);
     } finally {
       setEntitlementLoading(false);
     }
-  }, [isAvailable]);
+  }, [fetchCustomerInfo, isAvailable, isConfigured]);
 
-  // Initialize on mount
   useEffect(() => {
-    if (!isAvailable) return;
-    void refreshProducts();
-    void refreshEntitlement();
-  }, [isAvailable, refreshProducts, refreshEntitlement]);
+    if (!isAvailable) {
+      setEntitlementLoading(false);
+      return;
+    }
 
-  // Start transaction listener
-  useEffect(() => {
-    if (!isAvailable || listenerStartedRef.current) return;
-    listenerStartedRef.current = true;
+    if (status !== "authenticated" || !user?.id) {
+      applyCustomerInfo(null);
+      setEntitlementLoading(false);
+      return;
+    }
 
-    void StoreKit.startTransactionListener();
-    void StoreKit.addListener("transactionUpdate", (transaction) => {
-      if (!transaction.cancelled && !transaction.pending) {
-        setCurrentEntitlement(transaction);
-        setEntitlementError(false);
+    let cancelled = false;
+
+    void (async () => {
+      setEntitlementLoading(true);
+      try {
+        if (!configuredAppUserIdRef.current) {
+          await Purchases.setLogLevel({
+            level: import.meta.env.DEV ? LOG_LEVEL.DEBUG : LOG_LEVEL.INFO,
+          });
+          await withTimeout(
+            () => Purchases.configure({
+              apiKey: REVENUECAT_IOS_API_KEY,
+              appUserID: user.id,
+            }),
+            {
+              timeoutMs: REVENUECAT_CONFIGURE_TIMEOUT_MS,
+              operation: "RevenueCat configure",
+              timeoutCode: "REVENUECAT_TIMEOUT",
+            },
+          );
+          configuredAppUserIdRef.current = user.id;
+          if (!cancelled) setIsConfigured(true);
+          const nextCustomerInfo = await fetchCustomerInfo();
+          if (!cancelled) {
+            applyCustomerInfo(nextCustomerInfo);
+          }
+        } else if (configuredAppUserIdRef.current !== user.id) {
+          const result = await Purchases.logIn({ appUserID: user.id });
+          configuredAppUserIdRef.current = user.id;
+          if (!cancelled) {
+            setIsConfigured(true);
+            applyCustomerInfo(result.customerInfo);
+          }
+        } else {
+          if (!cancelled) setIsConfigured(true);
+          const nextCustomerInfo = await fetchCustomerInfo();
+          if (!cancelled) applyCustomerInfo(nextCustomerInfo);
+        }
+
+        if (!cancelled) {
+          setEntitlementError(false);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setEntitlementError(true);
+          console.error("[RevenueCat] Configuration failed:", revenueCatErrorMessage(error));
+        }
+      } finally {
+        if (!cancelled) {
+          setEntitlementLoading(false);
+        }
       }
-    });
-  }, [isAvailable]);
+    })();
 
-  // Refresh on app resume
+    return () => {
+      cancelled = true;
+    };
+  }, [applyCustomerInfo, fetchCustomerInfo, isAvailable, status, user?.id]);
+
   useEffect(() => {
-    if (!isAvailable) return;
+    if (!isAvailable || !isConfigured) return;
+    void refreshProducts();
+  }, [isAvailable, isConfigured, refreshProducts]);
+
+  useEffect(() => {
+    if (!isAvailable || !isConfigured) return;
+
+    let listenerId: string | null = null;
+    let cancelled = false;
+
+    void Purchases.addCustomerInfoUpdateListener((nextCustomerInfo) => {
+      applyCustomerInfo(nextCustomerInfo);
+      setEntitlementError(false);
+    }).then((id) => {
+      if (cancelled) {
+        void Purchases.removeCustomerInfoUpdateListener({ listenerToRemove: id });
+      } else {
+        listenerId = id;
+      }
+    }).catch((error) => {
+      console.error("[RevenueCat] Failed to register customer info listener:", error);
+    });
+
+    return () => {
+      cancelled = true;
+      if (listenerId) {
+        void Purchases.removeCustomerInfoUpdateListener({ listenerToRemove: listenerId });
+      }
+    };
+  }, [applyCustomerInfo, isAvailable, isConfigured]);
+
+  useEffect(() => {
+    if (!isAvailable || !isConfigured) return;
 
     let handle: { remove: () => Promise<void> } | null = null;
 
@@ -180,95 +429,98 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       void handle?.remove();
     };
-  }, [isAvailable, refreshEntitlement, refreshProducts]);
-
-  // Refresh entitlement when auth changes
-  useEffect(() => {
-    if (!isAvailable) return;
-    if (status === "authenticated" && user?.id) {
-      void refreshEntitlement();
-    } else {
-      setCurrentEntitlement(null);
-      setEntitlementError(false);
-    }
-  }, [isAvailable, refreshEntitlement, status, user?.id]);
+  }, [isAvailable, isConfigured, refreshEntitlement, refreshProducts]);
 
   const purchase = useCallback(async (productId: string): Promise<StoreKitTransaction | null> => {
-    if (!isAvailable) return null;
-    const result = await StoreKit.purchase({
-      productId,
-      appAccountToken: user?.id,
-    });
-    if (result.cancelled || result.pending) return null;
-    setCurrentEntitlement(result);
-    setEntitlementError(false);
-    return result;
-  }, [isAvailable, user?.id]);
+    if (!isAvailable || !isConfigured) return null;
 
-  const purchaseWithPromoOffer = useCallback(async (productId: string): Promise<StoreKitTransaction | null> => {
-    if (!isAvailable) {
-      throw new Error("Promotional offers are no longer used for the affiliate yearly discount flow.");
-    }
+    const packageToPurchase = packagesRef.current.find((pkg) => pkg.product.identifier === productId);
+    let result;
+    if (packageToPurchase) {
+      result = await Purchases.purchasePackage({ aPackage: packageToPurchase });
+    } else {
+      const directProduct = storeProductsRef.current.get(productId) ?? (
+        await Purchases.getProducts({
+          productIdentifiers: [productId],
+          type: PRODUCT_CATEGORY.SUBSCRIPTION,
+        })
+      ).products[0];
 
-    throw new Error("Promotional offers are no longer used for the affiliate yearly discount flow.");
-  }, [isAvailable]);
-
-  const redeemOfferCode = useCallback(async () => {
-    if (!isAvailable) {
-      throw new Error("Offer code redemption is only available on iOS devices");
-    }
-
-    const result = await StoreKit.presentOfferCodeRedeemSheet({
-      redemptionURL: OFFER_CODE_REDEMPTION_URL,
-    });
-
-    await refreshProducts();
-    let entitlement: StoreKitTransaction | null = null;
-    for (const delay of OFFER_CODE_ENTITLEMENT_POLL_DELAYS_MS) {
-      if (delay > 0) {
-        await wait(delay);
+      if (!directProduct) {
+        throw new Error(`RevenueCat product not found: ${productId}`);
       }
 
-      const result = await withTimeout(
-        () => StoreKit.getCurrentEntitlement(),
-        {
-          timeoutMs: STOREKIT_ENTITLEMENT_TIMEOUT_MS,
-          operation: "StoreKit entitlement refresh",
-          timeoutCode: "STOREKIT_TIMEOUT",
-        },
-      );
-      entitlement = result.entitlement;
-      setCurrentEntitlement(entitlement);
-      setEntitlementError(false);
+      result = await Purchases.purchaseStoreProduct({ product: directProduct });
+    }
+
+    applyCustomerInfo(result.customerInfo, result.transaction);
+    setEntitlementError(false);
+    return customerInfoToTransaction(result.customerInfo, result.transaction);
+  }, [applyCustomerInfo, isAvailable, isConfigured]);
+
+  const redeemOfferCode = useCallback(async () => {
+    if (!isAvailable || !isConfigured) {
+      throw new Error("Offer code redemption is only available after RevenueCat is configured on iOS.");
+    }
+
+    await Purchases.presentCodeRedemptionSheet();
+    await refreshProducts();
+
+    let entitlement: StoreKitTransaction | null = null;
+    for (const delay of OFFER_CODE_ENTITLEMENT_POLL_DELAYS_MS) {
+      if (delay > 0) await wait(delay);
+
+      const nextCustomerInfo = await fetchCustomerInfo();
+      entitlement = customerInfoToTransaction(nextCustomerInfo);
+      applyCustomerInfo(nextCustomerInfo);
       if (entitlement) break;
     }
 
     return {
-      status: result.status,
+      status: "presented" as const,
       entitlement,
     };
-  }, [isAvailable, refreshProducts]);
+  }, [applyCustomerInfo, fetchCustomerInfo, isAvailable, isConfigured, refreshProducts]);
 
   const restorePurchasesHandler = useCallback(async (): Promise<StoreKitTransaction | null> => {
-    if (!isAvailable) return null;
-    const { entitlement } = await StoreKit.restorePurchases();
-    setCurrentEntitlement(entitlement);
+    if (!isAvailable || !isConfigured) return null;
+
+    const { customerInfo: restoredCustomerInfo } = await Purchases.restorePurchases();
+    applyCustomerInfo(restoredCustomerInfo);
     setEntitlementError(false);
-    return entitlement;
-  }, [isAvailable]);
+    return customerInfoToTransaction(restoredCustomerInfo);
+  }, [applyCustomerInfo, isAvailable, isConfigured]);
+
+  const presentRevenueCatPaywall = useCallback(async (onlyIfNeeded: boolean): Promise<boolean> => {
+    if (!isAvailable || !isConfigured) return false;
+
+    const paywallResult = onlyIfNeeded
+      ? await RevenueCatUI.presentPaywallIfNeeded({
+        requiredEntitlementIdentifier: COSMIQ_PRO_ENTITLEMENT_ID,
+      })
+      : await RevenueCatUI.presentPaywall();
+
+    if (paywallSucceeded(paywallResult.result)) {
+      await refreshEntitlement();
+      return true;
+    }
+
+    if (paywallResult.result === PAYWALL_RESULT.NOT_PRESENTED) {
+      await refreshEntitlement();
+    }
+
+    return false;
+  }, [isAvailable, isConfigured, refreshEntitlement]);
 
   const manageSubscriptionsHandler = useCallback(async () => {
-    if (!isAvailable) return;
-    await StoreKit.manageSubscriptions();
+    if (!isAvailable || !isConfigured) return;
+    await RevenueCatUI.presentCustomerCenter();
     await refreshEntitlement();
-  }, [isAvailable, refreshEntitlement]);
+  }, [isAvailable, isConfigured, refreshEntitlement]);
 
+  const activeEntitlement = activeCosmiqProEntitlement(customerInfo);
   const activePlan = resolvePlanFromProductId(currentEntitlement?.productId);
-  const isPro = Boolean(
-    activePlan &&
-    entitlementIsCurrent(currentEntitlement) &&
-    entitlementBelongsToUser(currentEntitlement, user?.id),
-  );
+  const isPro = Boolean(activeEntitlement?.isActive);
   const expirationDate = isPro && currentEntitlement?.expirationDate
     ? new Date(currentEntitlement.expirationDate)
     : null;
@@ -279,30 +531,36 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     products,
     productsLoading,
     currentEntitlement,
+    customerInfo,
+    offerings,
     entitlementError,
     isPro,
     activePlan,
     expirationDate,
     purchase,
-    purchaseWithPromoOffer,
     redeemOfferCode,
     restorePurchases: restorePurchasesHandler,
     manageSubscriptions: manageSubscriptionsHandler,
+    presentPaywall: () => presentRevenueCatPaywall(false),
+    presentPaywallIfNeeded: () => presentRevenueCatPaywall(true),
+    presentCustomerCenter: manageSubscriptionsHandler,
     refreshEntitlement,
     refreshProducts,
   }), [
     activePlan,
     currentEntitlement,
+    customerInfo,
     entitlementError,
     entitlementLoading,
     expirationDate,
     isAvailable,
     isPro,
     manageSubscriptionsHandler,
+    offerings,
+    presentRevenueCatPaywall,
     products,
     productsLoading,
     purchase,
-    purchaseWithPromoOffer,
     redeemOfferCode,
     refreshEntitlement,
     refreshProducts,

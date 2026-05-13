@@ -25,7 +25,7 @@ import {
   PREMIUM_MONTHLY_PRODUCT_ID,
   PREMIUM_YEARLY_PRODUCT_ID,
 } from "@/utils/appleIAP";
-import type { StoreKitProduct } from "@/plugins/StoreKitPlugin";
+import type { StoreKitProduct } from "@/types/subscription";
 
 const mockProducts: StoreKitProduct[] = [
   {

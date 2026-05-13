@@ -1,5 +1,5 @@
 import type { AccessState } from "@/hooks/useAccessState";
-import type { StoreKitTransaction } from "@/plugins/StoreKitPlugin";
+import type { StoreKitTransaction } from "@/types/subscription";
 import { resolvePlanFromProductId, type IAPPlan } from "@/utils/appleIAP";
 
 const STORAGE_PREFIX = "cosmiq.localSubscriptionAccess.v1";
@@ -127,6 +127,6 @@ export function rememberLocalSubscriptionAccess(
   try {
     storage.setItem(storageKey(userId), JSON.stringify(accessState));
   } catch {
-    // Local persistence is a best-effort backup. StoreKit and the backend remain the sources of truth.
+    // Local persistence is a best-effort backup. RevenueCat and the backend remain the sources of truth.
   }
 }

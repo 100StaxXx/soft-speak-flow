@@ -10,7 +10,12 @@ import { trackPaywallEvent } from "@/utils/paywallTelemetry";
 import { supabase } from "@/integrations/supabase/client";
 import { queryKeys } from "@/lib/queryKeys";
 import { parseFunctionInvokeError, type ParsedFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
-import type { StoreKitTransaction } from "@/plugins/StoreKitPlugin";
+import type { StoreKitTransaction } from "@/types/subscription";
+import {
+  getPurchaseProductIdForPlan,
+  isReferralYearlyProductId,
+  REFERRAL_YEARLY_PRODUCT_ID,
+} from "@/utils/appleIAP";
 import {
   buildLocalSubscriptionAccessState,
   rememberLocalSubscriptionAccess,
@@ -70,6 +75,8 @@ export function useAppleSubscription() {
     redeemOfferCode,
     restorePurchases,
     manageSubscriptions,
+    presentPaywallIfNeeded,
+    presentCustomerCenter,
     refreshProducts,
   } = useStoreKit();
   const [loading, setLoading] = useState(false);
@@ -80,6 +87,7 @@ export function useAppleSubscription() {
   const hasOfferCode = appliedReferralCodeState.is_apple_offer_eligible;
   const hasAppliedReferralCode = Boolean(appliedReferralCodeState.code);
   const appliedReferralCode = appliedReferralCodeState.code;
+  const hasReferralYearlyProduct = products.some((product) => isReferralYearlyProductId(product.identifier));
 
   useEffect(() => {
     if (!hasOfferCode) {
@@ -292,7 +300,11 @@ export function useAppleSubscription() {
     }
 
     const plan = productId.includes("yearly") ? "yearly" : "monthly";
-    const usesOfferCodeDiscount = hasOfferCode && plan === "yearly";
+    const usesReferralYearlyProduct = hasOfferCode && plan === "yearly" && hasReferralYearlyProduct;
+    const purchaseProductId = usesReferralYearlyProduct
+      ? getPurchaseProductIdForPlan("yearly", products, { preferReferral: true })
+      : productId;
+    const usesOfferCodeDiscount = hasOfferCode && plan === "yearly" && !usesReferralYearlyProduct;
 
     setLoading(true);
     setProductError(null);
@@ -342,14 +354,14 @@ export function useAppleSubscription() {
       trackPaywallEvent("purchase_started", {
         surface,
         plan,
-        productId,
+        productId: purchaseProductId,
         hasOfferCode,
       });
 
-      const result = await purchase(productId);
+      const result = await purchase(purchaseProductId);
 
       if (!result) {
-        trackPaywallEvent("purchase_cancelled", { surface, plan, productId, hasOfferCode });
+        trackPaywallEvent("purchase_cancelled", { surface, plan, productId: purchaseProductId, hasOfferCode });
         return false;
       }
 
@@ -357,10 +369,12 @@ export function useAppleSubscription() {
       const verified = await verifyCompletedTransaction(result, surface, plan);
       if (!verified) return false;
 
-      trackPaywallEvent("purchase_completed", { surface, plan, productId, hasOfferCode });
+      trackPaywallEvent("purchase_completed", { surface, plan, productId: purchaseProductId, hasOfferCode });
       toast({
         title: "Premium unlocked",
-        description: "Cosmiq Pro is now active on your account.",
+        description: usesReferralYearlyProduct
+          ? "Your creator-code yearly discount is active on your account."
+          : "Cosmiq Pro is now active on your account.",
       });
       return true;
     } catch (error) {
@@ -368,18 +382,18 @@ export function useAppleSubscription() {
         trackPaywallEvent("offer_code_redemption_failed", {
           surface,
           plan,
-          productId,
+          productId: purchaseProductId,
           hasOfferCode,
           message: getErrorMessage(error),
         });
       }
       if (isCancellationError(error)) {
-        trackPaywallEvent("purchase_cancelled", { surface, plan, productId, hasOfferCode });
+        trackPaywallEvent("purchase_cancelled", { surface, plan, productId: purchaseProductId, hasOfferCode });
         return false;
       }
 
       const message = getErrorMessage(error);
-      trackPaywallEvent("purchase_failed", { surface, plan, productId, hasOfferCode, message });
+      trackPaywallEvent("purchase_failed", { surface, plan, productId: purchaseProductId, hasOfferCode, message });
       setProductError(message);
       toast({
         title: "Purchase failed",
@@ -390,7 +404,17 @@ export function useAppleSubscription() {
     } finally {
       setLoading(false);
     }
-  }, [hasOfferCode, offerCodePurchaseReady, purchase, redeemOfferCode, toast, user?.id, verifyCompletedTransaction]);
+  }, [
+    hasOfferCode,
+    hasReferralYearlyProduct,
+    offerCodePurchaseReady,
+    products,
+    purchase,
+    redeemOfferCode,
+    toast,
+    user?.id,
+    verifyCompletedTransaction,
+  ]);
 
   const handleRestore = useCallback(async (surface: string = "paywall") => {
     if (!isIAPAvailable()) {
@@ -459,10 +483,86 @@ export function useAppleSubscription() {
     }
   }, [manageSubscriptions, toast]);
 
+  const handlePresentRevenueCatPaywall = useCallback(async (surface: string = "revenuecat_paywall") => {
+    if (!isIAPAvailable()) {
+      toast({
+        title: "Not Available",
+        description: "RevenueCat Paywalls are only available in the native iOS app",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    if (!user?.id) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in before purchasing Cosmiq Pro.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    setLoading(true);
+    setProductError(null);
+    try {
+      trackPaywallEvent("paywall_viewed", { surface, hasOfferCode });
+      const purchasedOrRestored = await presentPaywallIfNeeded();
+      await invalidateSubscriptionState();
+
+      if (purchasedOrRestored) {
+        toast({
+          title: "Premium unlocked",
+          description: "Cosmiq Pro is now active on your account.",
+        });
+      }
+
+      return purchasedOrRestored;
+    } catch (error) {
+      const message = getErrorMessage(error);
+      trackPaywallEvent("purchase_failed", { surface, hasOfferCode, message });
+      setProductError(message);
+      toast({
+        title: "Unable to show paywall",
+        description: message,
+        variant: "destructive",
+      });
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [hasOfferCode, invalidateSubscriptionState, presentPaywallIfNeeded, toast, user?.id]);
+
+  const handlePresentCustomerCenter = useCallback(async () => {
+    if (!isIAPAvailable()) {
+      toast({
+        title: "Not Available",
+        description: "Customer Center is only available in the native iOS app",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setManageLoading(true);
+    try {
+      await presentCustomerCenter();
+      await invalidateSubscriptionState();
+    } catch (error) {
+      toast({
+        title: "Unable to open Customer Center",
+        description: getErrorMessage(error),
+        variant: "destructive",
+      });
+    } finally {
+      setManageLoading(false);
+    }
+  }, [invalidateSubscriptionState, presentCustomerCenter, toast]);
+
   return {
     handlePurchase,
     handleRestore,
     handleManageSubscriptions,
+    handlePresentRevenueCatPaywall,
+    handlePresentCustomerCenter,
     loading,
     manageLoading,
     isAvailable,
@@ -475,5 +575,7 @@ export function useAppleSubscription() {
     hasAppliedReferralCode,
     appliedReferralCode,
     offerCodePurchaseReady,
+    referralYearlyProductId: REFERRAL_YEARLY_PRODUCT_ID,
+    hasReferralYearlyProduct,
   };
 }

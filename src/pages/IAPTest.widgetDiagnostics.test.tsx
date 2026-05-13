@@ -38,7 +38,6 @@ vi.mock("@/hooks/useStoreKit", () => ({
   useStoreKit: () => ({
     currentEntitlement: null,
     refreshEntitlement: vi.fn().mockResolvedValue(undefined),
-    purchaseWithPromoOffer: vi.fn().mockResolvedValue(null),
     redeemOfferCode: vi.fn().mockResolvedValue({ status: "presented", entitlement: null }),
     isAvailable: true,
     products: [],

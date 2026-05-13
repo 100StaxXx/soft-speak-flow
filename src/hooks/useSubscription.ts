@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from "react";
+import type { CustomerInfo } from "@revenuecat/purchases-capacitor";
 import { useAccessState } from "./useAccessState";
 import { useStoreKit } from "./useStoreKit";
 
@@ -8,7 +9,7 @@ export interface Subscription {
   trial_ends_at?: string | null;
   current_period_end?: string | null;
   product_identifier?: string | null;
-  billing_provider?: "storekit2";
+  billing_provider?: "revenuecat" | "storekit2";
 }
 
 export function useSubscription() {
@@ -18,6 +19,7 @@ export function useSubscription() {
     activePlan,
     expirationDate,
     isLoading,
+    customerInfo,
     refreshEntitlement,
   } = useStoreKit();
   const {
@@ -34,7 +36,7 @@ export function useSubscription() {
         plan: activePlan,
         current_period_end: currentEntitlement.expirationDate ?? null,
         product_identifier: currentEntitlement.productId,
-        billing_provider: "storekit2",
+        billing_provider: "revenuecat",
         trial_ends_at: null,
       };
     }
@@ -46,7 +48,7 @@ export function useSubscription() {
       plan: accessState.plan === "monthly" || accessState.plan === "yearly" ? accessState.plan : null,
       current_period_end: accessState.subscription_end ?? null,
       product_identifier: currentEntitlement?.productId ?? null,
-      billing_provider: "storekit2",
+      billing_provider: "revenuecat",
       trial_ends_at: accessState.trial_ends_at,
     };
   }, [accessState, activePlan, currentEntitlement, isPro]);
@@ -83,6 +85,6 @@ export function useSubscription() {
     nextBillingDate,
     planPrice,
     plan: subscription?.plan,
-    customerInfo: null,
+    customerInfo: customerInfo as CustomerInfo | null,
   };
 }

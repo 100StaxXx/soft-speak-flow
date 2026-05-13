@@ -69,6 +69,8 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
     hasAppliedReferralCode,
     appliedReferralCode,
     offerCodePurchaseReady,
+    hasReferralYearlyProduct,
+    handlePresentRevenueCatPaywall,
   } = useAppleSubscription();
   const { toast } = useToast();
   const { user, signOut } = useAuth();
@@ -77,10 +79,16 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
   const queryClient = useQueryClient();
 
   const monthlyProduct = useMemo(() => getProductForPlan("monthly", products), [products]);
-  const yearlyProduct = useMemo(() => getProductForPlan("yearly", products), [products]);
+  const preferReferralYearly = hasOfferCode && hasReferralYearlyProduct;
+  const yearlyProduct = useMemo(
+    () => getProductForPlan("yearly", products, { preferReferral: preferReferralYearly }),
+    [preferReferralYearly, products],
+  );
   const selectedProductId = useMemo(
-    () => getPurchaseProductIdForPlan(selectedPlan, products),
-    [selectedPlan, products],
+    () => getPurchaseProductIdForPlan(selectedPlan, products, {
+      preferReferral: selectedPlan === "yearly" && preferReferralYearly,
+    }),
+    [preferReferralYearly, selectedPlan, products],
   );
 
   useEffect(() => {
@@ -99,6 +107,13 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
       hasOfferCode,
     });
     const success = await handlePurchase(selectedProductId, "paywall");
+    if (success) {
+      navigate("/premium/success");
+    }
+  };
+
+  const handleOpenRevenueCatPaywall = async () => {
+    const success = await handlePresentRevenueCatPaywall("paywall_revenuecat_ui");
     if (success) {
       navigate("/premium/success");
     }
@@ -279,7 +294,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
         legalIntro:
           "No charge today. Your Apple ID account will be charged when the free trial ends unless canceled at least 24 hours before the end of the trial.",
       };
-  const ctaLabel = selectedPlan === "yearly" && hasOfferCode
+  const ctaLabel = selectedPlan === "yearly" && hasOfferCode && !hasReferralYearlyProduct
     ? (offerCodePurchaseReady ? "Subscribe Yearly" : "Redeem Discount with Apple")
     : copy.cta;
 
@@ -332,10 +347,12 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {hasOfferCode
-                        ? "Your annual plan is discounted to $69.99/year."
+                        ? hasReferralYearlyProduct
+                          ? "Your discounted annual plan is ready."
+                          : "Your annual plan is discounted to $69.99/year."
                         : "This code is saved to your account, but it does not unlock the Apple creator discount."}
                     </p>
-                    {hasOfferCode && appliedReferralCode ? (
+                    {hasOfferCode && appliedReferralCode && !hasReferralYearlyProduct ? (
                       <p className="text-xs text-muted-foreground">
                         Use <span className="font-mono tracking-[0.18em] text-foreground">{appliedReferralCode}</span> in Apple&apos;s offer-code redemption screen.
                       </p>
@@ -428,6 +445,15 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
         >
           {loading ? "Processing..." : ctaLabel}
           {!loading && <ArrowRight className="ml-2 h-4 w-4" />}
+        </Button>
+
+        <Button
+          variant="outline"
+          onClick={() => { void handleOpenRevenueCatPaywall(); }}
+          disabled={!isAvailable || loading}
+          className="w-full border-white/15 bg-background/45 backdrop-blur-md"
+        >
+          View All Plans
         </Button>
 
         {/* IAP Notice */}

@@ -145,7 +145,6 @@ class AppBridgeViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(WidgetDataPlugin())
         bridge?.registerPluginInstance(AppBadgePlugin())
         bridge?.registerPluginInstance(NativeCalendarPlugin())
-        bridge?.registerPluginInstance(StoreKitPlugin())
         bridge?.registerPluginInstance(WinWinKitPlugin())
     }
 }

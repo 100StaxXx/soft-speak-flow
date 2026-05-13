@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   redeemOfferCode: vi.fn(),
   restorePurchases: vi.fn(),
   manageSubscriptions: vi.fn(),
+  presentPaywallIfNeeded: vi.fn(),
+  presentCustomerCenter: vi.fn(),
   refreshProducts: vi.fn(),
   functionsInvoke: vi.fn(),
   invalidateQueries: vi.fn(),
@@ -91,10 +93,11 @@ vi.mock("@/hooks/useStoreKit", () => ({
     products: mocks.storeKitProducts,
     productsLoading: false,
     purchase: (...args: unknown[]) => mocks.purchase(...args),
-    purchaseWithPromoOffer: vi.fn(),
     redeemOfferCode: (...args: unknown[]) => mocks.redeemOfferCode(...args),
     restorePurchases: (...args: unknown[]) => mocks.restorePurchases(...args),
     manageSubscriptions: (...args: unknown[]) => mocks.manageSubscriptions(...args),
+    presentPaywallIfNeeded: (...args: unknown[]) => mocks.presentPaywallIfNeeded(...args),
+    presentCustomerCenter: (...args: unknown[]) => mocks.presentCustomerCenter(...args),
     refreshProducts: (...args: unknown[]) => mocks.refreshProducts(...args),
   }),
 }));
@@ -148,6 +151,8 @@ describe("useAppleSubscription", () => {
       expirationDate: "2099-01-01T00:00:00.000Z",
       appAccountToken: "11111111-1111-4111-8111-111111111111",
     });
+    mocks.presentPaywallIfNeeded.mockResolvedValue(false);
+    mocks.presentCustomerCenter.mockResolvedValue(undefined);
     mocks.refreshProducts.mockResolvedValue(mocks.storeKitProducts);
     mocks.functionsInvoke.mockResolvedValue({ data: { success: true }, error: null });
   });
@@ -185,6 +190,40 @@ describe("useAppleSubscription", () => {
 
     expect(mocks.redeemOfferCode).toHaveBeenCalledTimes(1);
     expect(mocks.purchase).not.toHaveBeenCalled();
+  });
+
+  it("purchases the referral yearly product directly when RevenueCat returns it", async () => {
+    mocks.appliedReferralCodeState = {
+      ...mocks.appliedReferralCodeState,
+      code: "OFFER123",
+      owner_type: "influencer",
+      affiliate_provider: "winwinkit",
+      is_active: true,
+      apple_offer_code_status: "active",
+      is_apple_offer_eligible: true,
+    };
+    mocks.storeKitProducts = [
+      ...mocks.storeKitProducts,
+      { identifier: "cosmiq_referral_yearly", displayName: "Referral Yearly", description: "", price: 69.99, displayPrice: "$69.99" },
+    ];
+    mocks.purchase.mockResolvedValueOnce({
+      productId: "cosmiq_referral_yearly",
+      transactionId: "tx-referral",
+      expirationDate: "2099-01-01T00:00:00.000Z",
+      appAccountToken: "11111111-1111-4111-8111-111111111111",
+    });
+
+    const { result } = renderHook(() => useAppleSubscription());
+
+    await act(async () => {
+      await result.current.handlePurchase("cosmiq_premium_yearly");
+    });
+
+    expect(mocks.redeemOfferCode).not.toHaveBeenCalled();
+    expect(mocks.purchase).toHaveBeenCalledWith("cosmiq_referral_yearly");
+    expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
+      body: { transactionId: "tx-referral" },
+    });
   });
 
   it("purchases yearly after the offer code redemption step is primed", async () => {

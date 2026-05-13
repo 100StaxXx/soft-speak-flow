@@ -108,6 +108,8 @@
     "@radix-ui/react-toggle-group": "^1.1.10",
     "@radix-ui/react-tooltip": "^1.2.7",
     "@react-three/fiber": "^9.4.2",
+    "@revenuecat/purchases-capacitor": "^10.4.0",
+    "@revenuecat/purchases-capacitor-ui": "^10.4.0",
     "@rive-app/react-canvas": "^4.27.3",
     "@sentry/react": "^8.55.0",
     "@supabase/supabase-js": "^2.81.1",

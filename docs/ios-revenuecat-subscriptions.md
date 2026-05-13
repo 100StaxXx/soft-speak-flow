@@ -1,83 +1,133 @@
-# iOS RevenueCat Subscription Setup
+# RevenueCat Capacitor Subscription Setup
 
 Use `ios/App/App.xcworkspace` in Xcode, not `ios/App/App.xcodeproj`.
 
-## Current product IDs
+Reference docs:
 
-- `cosmiq_premium_monthly` at `$9.99/month`
-- `cosmiq_premium_yearly` at `$99.99/year`
-- Apple offer-code campaign on `cosmiq_premium_yearly` at `$69.99/year`
+- Capacitor SDK installation: https://www.revenuecat.com/docs/getting-started/installation/capacitor
+- Product and entitlement setup: https://www.revenuecat.com/docs/projects/configuring-products
+- Customer info: https://www.revenuecat.com/docs/customers/customer-info
+- Paywalls: https://www.revenuecat.com/docs/tools/paywalls
+- Customer Center: https://www.revenuecat.com/docs/tools/customer-center
 
-## App Store Connect
+## SDK packages
 
-Create or confirm the two subscriptions under the `com.darrylgraham.revolution` app.
+This app is currently on Capacitor 7, so the RevenueCat packages are pinned to the latest Capacitor 7-compatible line:
 
-- Set pricing:
-  - monthly: `$9.99`
-  - yearly: `$99.99`
-- Add an offer-code campaign to `cosmiq_premium_yearly` for new subscribers:
-  - reference name / identifier should match `APPLE_OFFER_CODE_IDENTIFIER`
-  - discounted yearly price: `$69.99`
-  - create custom codes that match your eligible creator codes when you want 1:1 parity between the app code and Apple redemption code
-  - save the offer-code campaign resource ID for backend sync as `APPLE_SUBSCRIPTION_OFFER_CODE_ID`
+```sh
+npm install @revenuecat/purchases-capacitor@10.4.0 @revenuecat/purchases-capacitor-ui@10.4.0
+npx cap sync ios
+```
 
-## RevenueCat
+When the app migrates fully to Capacitor 8, upgrade both RevenueCat packages to the latest major version supported by that Capacitor version.
 
-Import both App Store products into RevenueCat and map them to the `Cosmiq Pro` entitlement.
+## App configuration
 
-Recommended offering/package layout:
+The RevenueCat setup lives behind the existing `StoreKitProvider` compatibility layer so the rest of the app can keep using `useStoreKit()` and `useAppleSubscription()`.
 
-- monthly package -> `cosmiq_premium_monthly`
-- annual package -> `cosmiq_premium_yearly`
+Constants are defined in `src/utils/appleIAP.ts`:
 
-The discounted yearly flow is handled through Apple's offer-code redemption UI on `cosmiq_premium_yearly`, not through a separate referral annual SKU.
+```ts
+export const REVENUECAT_IOS_API_KEY = "test_dnpQRPYilwaMbsjfCuXLepwYhac";
+export const COSMIQ_PRO_ENTITLEMENT_ID = "cosmiq_pro";
+export const COSMIQ_PRO_ENTITLEMENT_NAME = "Cosmiq Pro";
+export const REVENUECAT_PRODUCT_IDS = [
+  "cosmiq_referral_yearly",
+  "cosmiq_premium_yearly",
+  "cosmiq_premium_monthly",
+] as const;
+```
 
-## Tolt and Apple code parity
+The provider configures RevenueCat with the authenticated Supabase user id:
 
-The app now expects the creator discount to be backed by the same code in three places:
+```ts
+await Purchases.configure({
+  apiKey: REVENUECAT_IOS_API_KEY,
+  appUserID: user.id,
+});
+```
 
-- Tolt partner link parameter value
-- local `referral_codes.code`
-- Apple custom offer code under the yearly offer-code campaign
+If a user switches accounts in the same native session, the provider calls `Purchases.logIn({ appUserID: user.id })`.
 
-Tolt partner sync is the trigger that provisions or refreshes the Apple custom code. Only Tolt-linked influencer codes with an active Apple custom-code sync are treated as discount-eligible in the paywall.
+## RevenueCat dashboard setup
 
-Required backend configuration:
+Create an entitlement for Cosmiq Pro. The code checks `cosmiq_pro` first and also accepts `Cosmiq Pro` as a compatibility alias. Prefer `cosmiq_pro` as the dashboard identifier and use `Cosmiq Pro` as the display name.
 
-- `APPLE_SUBSCRIPTION_OFFER_CODE_ID`
-- `APPLE_OFFER_CODE_IDENTIFIER`
-- `APPLE_KEY_ID`
-- `APPLE_ISSUER_ID`
-- `APPLE_PRIVATE_KEY`
+Attach these App Store products to that entitlement:
 
-Optional backend configuration:
+- `cosmiq_premium_monthly`
+- `cosmiq_premium_yearly`
+- `cosmiq_referral_yearly`
 
-- `APPLE_OFFER_CODE_MAX_REDEMPTIONS_PER_CUSTOM_CODE`
-- `APPLE_OFFER_CODE_EXPIRATION_DATE`
+Recommended offering:
 
-## Xcode local testing
+- `monthly` package -> `cosmiq_premium_monthly`
+- `annual` package -> `cosmiq_premium_yearly`
+- custom package `referral_yearly` -> `cosmiq_referral_yearly`
 
-The shared Xcode scheme now points to `ios/App/App/CosmiqProducts.storekit` for simulator StoreKit testing.
+Make the offering current. Then create a RevenueCat Paywall for that current offering. If you want a separate creator-code experience, use RevenueCat targeting or a separate offering/paywall that includes the referral annual product.
 
-In Xcode:
+## Customer info and entitlement checks
 
-1. Open `ios/App/App.xcworkspace`
-2. Select the `App` scheme
-3. Edit Scheme -> Run -> Options
-4. Confirm `CosmiqProducts.storekit` is selected as the StoreKit configuration
+The provider retrieves and listens for `CustomerInfo`:
 
-Use the simulator to verify:
+```ts
+const { customerInfo } = await Purchases.getCustomerInfo();
+const entitlement = customerInfo.entitlements.active[COSMIQ_PRO_ENTITLEMENT_ID];
+const isPro = Boolean(entitlement?.isActive);
+```
 
-- non-referred users purchase `cosmiq_premium_yearly`
-- referred users redeem the Apple offer code, then purchase `cosmiq_premium_yearly`
-- both unlock the same `Cosmiq Pro` entitlement
+The app exposes this through:
 
-## Native project checks
+- `useStoreKit().customerInfo`
+- `useStoreKit().isPro`
+- `useStoreKit().currentEntitlement`
+- `useSubscription().customerInfo`
 
-The repo already has the expected iOS native setup:
+## Purchases and restores
 
-- bundle ID: `com.darrylgraham.revolution`
-- RevenueCat Capacitor pods in `ios/App/Podfile`
-- no extra entitlement changes required for RevenueCat itself
+The provider prefers RevenueCat offering packages when available, then falls back to direct RevenueCat store products:
 
-If pods or Capacitor plugins change, resync the iOS workspace before opening Xcode.
+```ts
+const result = packageToPurchase
+  ? await Purchases.purchasePackage({ aPackage: packageToPurchase })
+  : await Purchases.purchaseStoreProduct({ product });
+```
+
+Restores use:
+
+```ts
+const { customerInfo } = await Purchases.restorePurchases();
+```
+
+After purchases, restores, paywall purchases, or Customer Center returns, the app refreshes CustomerInfo and invalidates the local subscription/access React Query caches.
+
+## Referral yearly product
+
+For users with an eligible creator code, the React purchase flow now buys `cosmiq_referral_yearly` directly when RevenueCat returns that product. If the referral product is not available, the app falls back to the legacy Apple offer-code redemption sheet.
+
+## Paywalls and Customer Center
+
+`useAppleSubscription()` exposes:
+
+```ts
+handlePresentRevenueCatPaywall("paywall_revenuecat_ui");
+handlePresentCustomerCenter();
+```
+
+The main paywall and subscription-management screen both include a "View All Plans" action that calls the RevenueCat-hosted paywall with `presentPaywallIfNeeded({ requiredEntitlementIdentifier: "cosmiq_pro" })`.
+
+Subscription management opens RevenueCat Customer Center through `RevenueCatUI.presentCustomerCenter()`. This makes sense for active or previously subscribed users because it centralizes restore, cancellation, billing, and support flows.
+
+## Local verification
+
+Run:
+
+```sh
+npm run build
+npx cap sync ios
+npm run ios:verify-assets
+npx vitest run src/hooks/useSubscription.test.tsx src/hooks/useAppleSubscription.test.tsx src/components/Paywall.offerCodeEligibility.test.tsx src/components/SubscriptionManagement.test.tsx src/providers/StoreKitProvider.test.tsx
+```
+
+This machine currently does not have CocoaPods installed. After installing CocoaPods, run `cd ios/App && pod install` before opening the workspace in Xcode.
