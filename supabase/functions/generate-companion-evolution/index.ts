@@ -23,9 +23,10 @@ import {
   resolveCompanionSpiritLockProfile,
 } from "../_shared/companionSpiritLock.ts";
 import {
-  buildBoundaryEvolutionEditPrompt,
+  buildBoundaryEvolutionGenerationPrompt,
   buildCompanionGenerationMetadata,
   buildStage1BootstrapPrompt,
+  coerceCompanionVisualAnchors,
   coerceImageLineageMetadata,
   getEvolutionDifferenceFloor,
   getHiddenBoundaryAnchor,
@@ -33,12 +34,11 @@ import {
   synthesizeVisualIdentityProfile,
   updateLineageMetadataAfterBoundaryEvolution,
   updateLineageMetadataAfterReveal,
+  updateLineageMetadataWithVisualAnchors,
 } from "../_shared/companionLineage.ts";
-import {
-  editCompanionImage,
-  generateCompanionImage,
-} from "../_shared/openaiCompanionImageClient.ts";
+import { generateCompanionImage } from "../_shared/openaiCompanionImageClient.ts";
 import { judgeCompanionImage } from "../_shared/companionImageJudge.ts";
+import { extractCompanionVisualAnchors } from "../_shared/companionVisualAnchors.ts";
 import { maybeEnqueueCompanionAnimationJob } from "../_shared/companionAnimationJobs.ts";
 import {
   coerceCompanionElementId,
@@ -69,6 +69,20 @@ const JUDGE_MINIMUMS = {
   continuity: 6,
   anatomy: 6,
 };
+const EVOLUTION_QUALITY_GATE_CODE = "evolution_quality_gate_failed";
+const EVOLUTION_CONTINUITY_UNVERIFIED_CODE = "evolution_continuity_unverified";
+
+class EvolutionQualityGateError extends Error {
+  code: string;
+  status: number;
+
+  constructor(message: string, code = EVOLUTION_QUALITY_GATE_CODE) {
+    super(message);
+    this.name = "EvolutionQualityGateError";
+    this.code = code;
+    this.status = 422;
+  }
+}
 
 const normalizeErrorCode = (value: string) =>
   value
@@ -98,6 +112,12 @@ const resolveServerErrorCode = (message: string) => {
   }
   if (normalized.includes("evolution thresholds not available")) {
     return "evolution_thresholds_unavailable";
+  }
+  if (normalized.includes("quality gate")) {
+    return EVOLUTION_QUALITY_GATE_CODE;
+  }
+  if (normalized.includes("continuity could not be verified")) {
+    return EVOLUTION_CONTINUITY_UNVERIFIED_CODE;
   }
   if (normalized.includes("openai_api_key")) return "openai_api_key_missing";
   return normalizeErrorCode(message);
@@ -251,8 +271,8 @@ export interface GenerateCompanionEvolutionDeps {
   resolveCompanionImageSizeForUser: typeof resolveCompanionImageSizeForUser;
   createCostGuardrailSession: typeof createCostGuardrailSession;
   generateCompanionImage: typeof generateCompanionImage;
-  editCompanionImage: typeof editCompanionImage;
   judgeCompanionImage: typeof judgeCompanionImage;
+  extractCompanionVisualAnchors: typeof extractCompanionVisualAnchors;
   registerUserStorageAsset: typeof registerUserStorageAsset;
   uploadGeneratedImage: typeof uploadGeneratedImage;
   upsertEvolutionRecord: typeof upsertEvolutionRecord;
@@ -268,8 +288,8 @@ const defaultGenerateCompanionEvolutionDeps: GenerateCompanionEvolutionDeps = {
   resolveCompanionImageSizeForUser,
   createCostGuardrailSession,
   generateCompanionImage,
-  editCompanionImage,
   judgeCompanionImage,
+  extractCompanionVisualAnchors,
   registerUserStorageAsset,
   uploadGeneratedImage,
   upsertEvolutionRecord,
@@ -294,8 +314,8 @@ export const handleGenerateCompanionEvolution = async (
     resolveCompanionImageSizeForUser: resolveCompanionImageSizeForUserFn,
     createCostGuardrailSession: createCostGuardrailSessionFn,
     generateCompanionImage: generateCompanionImageFn,
-    editCompanionImage: editCompanionImageFn,
     judgeCompanionImage: judgeCompanionImageFn,
+    extractCompanionVisualAnchors: extractCompanionVisualAnchorsFn,
     registerUserStorageAsset: registerUserStorageAssetFn,
     uploadGeneratedImage: uploadGeneratedImageFn,
     upsertEvolutionRecord: upsertEvolutionRecordFn,
@@ -447,18 +467,26 @@ export const handleGenerateCompanionEvolution = async (
     }
 
     const earnedLevel = resolveProgressionLevelFromXp(currentXP);
-    const nextStage = getNextUnclaimedVisualStageBoundaryLevel(currentStage, earnedLevel);
+    const nextStage = getNextUnclaimedVisualStageBoundaryLevel(
+      currentStage,
+      earnedLevel,
+    );
 
     if (nextStage === null) {
       const nextVisualThresholdData = thresholds.find((threshold) =>
         threshold.stage > currentStage &&
-        getNextUnclaimedVisualStageBoundaryLevel(currentStage, threshold.stage) === threshold.stage
+        getNextUnclaimedVisualStageBoundaryLevel(
+            currentStage,
+            threshold.stage,
+          ) === threshold.stage
       );
 
       return new Response(
         JSON.stringify({
           evolved: false,
-          message: nextVisualThresholdData ? "Not enough XP" : "Max stage reached",
+          message: nextVisualThresholdData
+            ? "Not enough XP"
+            : "Max stage reached",
           current_stage: currentStage,
           earned_level: earnedLevel,
           xp: currentXP,
@@ -802,6 +830,8 @@ export const handleGenerateCompanionEvolution = async (
           revisedPrompt: string | null;
           scores: Awaited<ReturnType<typeof judgeCompanionImage>>;
           retryCount: number;
+          passed: boolean;
+          judgeUnavailable: boolean;
         }
         | null = null;
 
@@ -818,11 +848,19 @@ export const handleGenerateCompanionEvolution = async (
           nextLevel,
         });
 
+        const passed = judgeScoresPass({
+          mode,
+          scores,
+          previousLevel,
+          nextLevel,
+        });
         const attemptResult = {
           imageDataUrl: rendered.imageDataUrl,
           revisedPrompt: rendered.revisedPrompt,
           scores,
           retryCount: attempt,
+          passed,
+          judgeUnavailable: !scores,
         };
 
         if (
@@ -832,7 +870,7 @@ export const handleGenerateCompanionEvolution = async (
           bestAttempt = attemptResult;
         }
 
-        if (judgeScoresPass({ mode, scores, previousLevel, nextLevel })) {
+        if (passed) {
           return attemptResult;
         }
 
@@ -978,10 +1016,58 @@ export const handleGenerateCompanionEvolution = async (
       throw new Error("Companion is missing a portrait to evolve from");
     }
 
-    const evolutionPromptBase = buildBoundaryEvolutionEditPrompt({
+    let previousGenerationMetadata: unknown = null;
+    const { data: previousEvolutionRecord, error: previousEvolutionError } =
+      await supabase
+        .from("companion_evolutions")
+        .select("generation_metadata")
+        .eq("companion_id", companion.id)
+        .eq("stage", currentStage)
+        .maybeSingle();
+
+    if (previousEvolutionError) {
+      infoLog(
+        "[CompanionEvolution] Previous evolution metadata lookup failed",
+        {
+          companionId: companion.id,
+          currentStage,
+          error: previousEvolutionError.message,
+        },
+      );
+    } else {
+      previousGenerationMetadata =
+        previousEvolutionRecord?.generation_metadata ?? null;
+    }
+
+    const extractedVisualAnchors = await extractCompanionVisualAnchorsFn({
+      guardedFetch,
+      openAIApiKey,
+      profile: visualIdentityProfile,
+      imageUrl: previousImageUrl,
+      level: currentStage,
+      priorGenerationMetadata: previousGenerationMetadata,
+    });
+    const normalizedExtractedVisualAnchors = coerceCompanionVisualAnchors(
+      extractedVisualAnchors,
+      currentStage,
+      previousImageUrl,
+    );
+    const previousVisualAnchors = normalizedExtractedVisualAnchors ??
+      imageLineageMetadata.visualAnchorsByLevel[String(currentStage)] ??
+      null;
+    const lineageMetadataWithPreviousAnchors =
+      updateLineageMetadataWithVisualAnchors({
+        existing: imageLineageMetadata,
+        level: currentStage,
+        visualAnchors: previousVisualAnchors,
+      });
+
+    const evolutionPromptBase = buildBoundaryEvolutionGenerationPrompt({
       profile: visualIdentityProfile,
       previousLevel: currentStage,
       nextLevel: nextStage,
+      previousAnchors: previousVisualAnchors,
+      previousGenerationMetadata,
     });
     const evolutionPrompt = spiritLockPromptBlock
       ? `${evolutionPromptBase}\n\nMechanical spirit-lock:\n${spiritLockPromptBlock}`
@@ -994,7 +1080,7 @@ export const handleGenerateCompanionEvolution = async (
       nextLevel: nextStage,
       referenceImageUrl: previousImageUrl,
       render: async (prompt) =>
-        await editCompanionImageFn({
+        await generateCompanionImageFn({
           guardedFetch,
           openAIApiKey,
           prompt,
@@ -1003,13 +1089,23 @@ export const handleGenerateCompanionEvolution = async (
           background: COMPANION_IMAGE_BACKGROUND,
           outputFormat: COMPANION_IMAGE_OUTPUT_FORMAT,
           userId: resolvedUserId,
-          referenceImages: [
-            {
-              imageUrl: previousImageUrl,
-            },
-          ],
         }),
     });
+
+    if (!previousVisualAnchors && evolutionAttempt.judgeUnavailable) {
+      throw new EvolutionQualityGateError(
+        "Companion evolution continuity could not be verified because visual anchors and judge scores were unavailable.",
+        EVOLUTION_CONTINUITY_UNVERIFIED_CODE,
+      );
+    }
+
+    if (!evolutionAttempt.passed && !evolutionAttempt.judgeUnavailable) {
+      throw new EvolutionQualityGateError(
+        `Companion evolution render failed quality gate: ${
+          evolutionAttempt.scores?.notes || "candidate did not pass judge"
+        }`,
+      );
+    }
 
     const { fileName, publicUrl: newImageUrl } = await uploadGeneratedImageFn({
       supabase,
@@ -1027,20 +1123,40 @@ export const handleGenerateCompanionEvolution = async (
 
     const lineageMetadataAfterEvolution =
       updateLineageMetadataAfterBoundaryEvolution({
-        existing: companion.image_lineage_metadata,
+        existing: lineageMetadataWithPreviousAnchors,
         boundaryLevel: nextStage,
         imageUrl: newImageUrl,
         focalX: evolutionFocalX,
         focalY: evolutionFocalY,
       });
-    const generationMetadata = buildCompanionGenerationMetadata({
-      sourceType: "edit",
-      boundaryLevel: nextStage,
-      portraitRegenerated: true,
-      retryCount: evolutionAttempt.retryCount,
-      scores: evolutionAttempt.scores ?? undefined,
-      notes: evolutionAttempt.scores?.notes ?? evolutionAttempt.revisedPrompt,
-    });
+    const generationMetadata = {
+      ...buildCompanionGenerationMetadata({
+        sourceType: "lineage_generation",
+        boundaryLevel: nextStage,
+        portraitRegenerated: true,
+        retryCount: evolutionAttempt.retryCount,
+        scores: evolutionAttempt.scores ?? undefined,
+        notes: evolutionAttempt.scores?.notes ?? evolutionAttempt.revisedPrompt,
+      }),
+      visualAnchorLevel: currentStage,
+      visualAnchorSourceImageUrl: previousVisualAnchors?.sourceImageUrl ??
+        previousImageUrl,
+      visualAnchorExtraction: normalizedExtractedVisualAnchors
+        ? "fresh"
+        : previousVisualAnchors
+        ? "cached"
+        : "unavailable",
+      ...(evolutionAttempt.judgeUnavailable
+        ? {
+          qualityWarning: {
+            code: "JUDGE_UNAVAILABLE",
+            retryCount: evolutionAttempt.retryCount,
+            message:
+              "Saved metadata-first boundary evolution without judge scores.",
+          },
+        }
+        : {}),
+    };
 
     const evolutionRecord = await upsertEvolutionRecordFn({
       supabase,
@@ -1113,14 +1229,19 @@ export const handleGenerateCompanionEvolution = async (
     const errorMessage = error instanceof Error
       ? error.message
       : "Unknown error";
-    const errorCode = resolveServerErrorCode(errorMessage);
+    const errorCode = error instanceof EvolutionQualityGateError
+      ? error.code
+      : resolveServerErrorCode(errorMessage);
+    const status = error instanceof EvolutionQualityGateError
+      ? error.status
+      : 500;
     return new Response(
       JSON.stringify({
         error: errorMessage,
         code: errorCode,
       }),
       {
-        status: 500,
+        status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       },
     );

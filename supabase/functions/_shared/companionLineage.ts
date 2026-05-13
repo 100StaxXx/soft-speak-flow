@@ -1,8 +1,8 @@
 import {
-  PROGRESSION_VISUAL_STAGES,
   getProgressionTierLabelForLevel,
   getVisualStage,
   isTierBoundaryLevel,
+  PROGRESSION_VISUAL_STAGES,
 } from "../../../src/config/progression.ts";
 import { resolveCompanionImageModel } from "./openaiCompanionImageClient.ts";
 
@@ -30,6 +30,25 @@ export interface CompanionLineageAnchor {
   visibility: "hidden_until_reached" | "visible";
 }
 
+export interface CompanionVisualAnchors {
+  schemaVersion: number;
+  level: number;
+  sourceImageUrl: string | null;
+  capturedAt: string;
+  summary: string | null;
+  silhouette: string[];
+  anatomy: string[];
+  face: string[];
+  markings: string[];
+  palette: string[];
+  elementalEffects: string[];
+  poseFraming: string[];
+  artStyle: string[];
+  signatureFeatures: string[];
+  mustPreserve: string[];
+  safeToEvolve: string[];
+}
+
 export interface CompanionImageLineageMetadata {
   schemaVersion: number;
   provider: string;
@@ -37,6 +56,7 @@ export interface CompanionImageLineageMetadata {
   pipeline: string;
   promptVersion: string;
   hiddenBoundaryAnchors: Record<string, CompanionLineageAnchor>;
+  visualAnchorsByLevel: Record<string, CompanionVisualAnchors>;
   eggDerivedFromBoundary: number | null;
   eggImageUrl: string | null;
   lastReachedBoundaryLevel: number;
@@ -48,7 +68,13 @@ export interface CompanionImageLineageMetadata {
 export interface CompanionGenerationMetadata {
   provider: string;
   model: string;
-  sourceType: "generation" | "edit" | "reveal" | "reuse" | "legacy_backfill";
+  sourceType:
+    | "generation"
+    | "edit"
+    | "lineage_generation"
+    | "reveal"
+    | "reuse"
+    | "legacy_backfill";
   promptVersion: string;
   boundaryLevel: number;
   portraitRegenerated: boolean;
@@ -77,7 +103,10 @@ const DEFAULT_IMAGE_LINEAGE_PIPELINE = "stage1_first_bootstrap_v1";
 
 const getDefaultImageLineageModel = (): string => resolveCompanionImageModel();
 
-const normalizeText = (value: string | null | undefined, fallback: string): string => {
+const normalizeText = (
+  value: string | null | undefined,
+  fallback: string,
+): string => {
   if (typeof value !== "string") return fallback;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : fallback;
@@ -92,7 +121,9 @@ const lowerIncludes = (value: string, patterns: string[]): boolean => {
 };
 
 const resolveBodyPlan = (spiritAnimal: string): string => {
-  if (lowerIncludes(spiritAnimal, ["owl", "raven", "phoenix", "eagle", "bird"])) {
+  if (
+    lowerIncludes(spiritAnimal, ["owl", "raven", "phoenix", "eagle", "bird"])
+  ) {
     return "avian with a strong wing silhouette, readable head shape, and balanced ground stance";
   }
   if (lowerIncludes(spiritAnimal, ["dragon", "griffin", "pegasus"])) {
@@ -107,23 +138,48 @@ const resolveBodyPlan = (spiritAnimal: string): string => {
   return "grounded creature silhouette with clear anatomy, readable proportions, and one memorable outline feature";
 };
 
-const resolveSignatureFeatures = (spiritAnimal: string, coreElement: string): string[] => {
+const resolveSignatureFeatures = (
+  spiritAnimal: string,
+  coreElement: string,
+): string[] => {
   const animal = spiritAnimal.toLowerCase();
   const features = [
     `${spiritAnimal} family anatomy must stay recognizable at a glance`,
     `${coreElement} power should feel native to the body rather than pasted on`,
   ];
 
-  if (animal.includes("wolf")) features.push("thick neck ruff, alert ears, and forward-moving predator stance");
-  if (animal.includes("fox") || animal.includes("tanuki")) features.push("large expressive ears and a sweeping tail or tail fan");
-  if (animal.includes("owl") || animal.includes("raven")) features.push("memorable eyes and a strong facial silhouette");
-  if (animal.includes("dragon")) features.push("horn or crown read, long tail, and powerful chest core");
-  if (animal.includes("lion")) features.push("broad paws, proud chest, and mane or sunburst framing");
-  if (animal.includes("phoenix")) features.push("plumage and flame should feel fused into one form");
-  if (animal.includes("griffin")) features.push("beak-led head read with leonine power in the body");
-  if (animal.includes("pegasus")) features.push("feathered wings and noble equine posture");
-  if (animal.includes("bear")) features.push("heavy shoulders, grounded weight, and powerful paw read");
-  if (animal.includes("deer")) features.push("graceful long legs and an antler-ready head silhouette");
+  if (animal.includes("wolf")) {
+    features.push(
+      "thick neck ruff, alert ears, and forward-moving predator stance",
+    );
+  }
+  if (animal.includes("fox") || animal.includes("tanuki")) {
+    features.push("large expressive ears and a sweeping tail or tail fan");
+  }
+  if (animal.includes("owl") || animal.includes("raven")) {
+    features.push("memorable eyes and a strong facial silhouette");
+  }
+  if (animal.includes("dragon")) {
+    features.push("horn or crown read, long tail, and powerful chest core");
+  }
+  if (animal.includes("lion")) {
+    features.push("broad paws, proud chest, and mane or sunburst framing");
+  }
+  if (animal.includes("phoenix")) {
+    features.push("plumage and flame should feel fused into one form");
+  }
+  if (animal.includes("griffin")) {
+    features.push("beak-led head read with leonine power in the body");
+  }
+  if (animal.includes("pegasus")) {
+    features.push("feathered wings and noble equine posture");
+  }
+  if (animal.includes("bear")) {
+    features.push("heavy shoulders, grounded weight, and powerful paw read");
+  }
+  if (animal.includes("deer")) {
+    features.push("graceful long legs and an antler-ready head silhouette");
+  }
 
   return dedupe(features);
 };
@@ -135,14 +191,27 @@ const resolveFaceAnchors = (spiritAnimal: string): string[] => {
     "do not randomize facial markings or the placement of major features",
   ];
 
-  if (animal.includes("wolf") || animal.includes("fox") || animal.includes("tanuki")) {
+  if (
+    animal.includes("wolf") || animal.includes("fox") ||
+    animal.includes("tanuki")
+  ) {
     anchors.push("clear muzzle read with expressive ears");
   }
-  if (animal.includes("owl") || animal.includes("raven") || animal.includes("phoenix")) {
-    anchors.push("the eye area must stay iconic and readable even at thumbnail size");
+  if (
+    animal.includes("owl") || animal.includes("raven") ||
+    animal.includes("phoenix")
+  ) {
+    anchors.push(
+      "the eye area must stay iconic and readable even at thumbnail size",
+    );
   }
-  if (animal.includes("dragon") || animal.includes("griffin") || animal.includes("pegasus")) {
-    anchors.push("head crest, horn, or beak silhouette must stay lineage-consistent");
+  if (
+    animal.includes("dragon") || animal.includes("griffin") ||
+    animal.includes("pegasus")
+  ) {
+    anchors.push(
+      "head crest, horn, or beak silhouette must stay lineage-consistent",
+    );
   }
 
   return dedupe(anchors);
@@ -155,16 +224,38 @@ const resolveSilhouetteAnchors = (spiritAnimal: string): string[] => {
     "every evolution should read larger and stronger without becoming a different species",
   ];
 
-  if (animal.includes("wolf")) anchors.push("lean quadruped silhouette with ruff and bushy tail");
-  if (animal.includes("fox")) anchors.push("large ears and tail fan dominate the silhouette");
-  if (animal.includes("owl")) anchors.push("compact body with commanding eye-and-wing silhouette");
-  if (animal.includes("raven")) anchors.push("sharp beak profile and intelligent bird silhouette");
-  if (animal.includes("dragon")) anchors.push("wings, tail, and horned head must remain part of the main read");
-  if (animal.includes("griffin")) anchors.push("hybrid eagle-lion silhouette must stay clear");
-  if (animal.includes("pegasus")) anchors.push("equine frame with proud wing spread");
-  if (animal.includes("phoenix")) anchors.push("bird silhouette with long elegant trailing flame-feathers");
-  if (animal.includes("bear")) anchors.push("heavy body mass and powerful forelimbs");
-  if (animal.includes("deer")) anchors.push("long-legged grace with head ornament focus");
+  if (animal.includes("wolf")) {
+    anchors.push("lean quadruped silhouette with ruff and bushy tail");
+  }
+  if (animal.includes("fox")) {
+    anchors.push("large ears and tail fan dominate the silhouette");
+  }
+  if (animal.includes("owl")) {
+    anchors.push("compact body with commanding eye-and-wing silhouette");
+  }
+  if (animal.includes("raven")) {
+    anchors.push("sharp beak profile and intelligent bird silhouette");
+  }
+  if (animal.includes("dragon")) {
+    anchors.push(
+      "wings, tail, and horned head must remain part of the main read",
+    );
+  }
+  if (animal.includes("griffin")) {
+    anchors.push("hybrid eagle-lion silhouette must stay clear");
+  }
+  if (animal.includes("pegasus")) {
+    anchors.push("equine frame with proud wing spread");
+  }
+  if (animal.includes("phoenix")) {
+    anchors.push("bird silhouette with long elegant trailing flame-feathers");
+  }
+  if (animal.includes("bear")) {
+    anchors.push("heavy body mass and powerful forelimbs");
+  }
+  if (animal.includes("deer")) {
+    anchors.push("long-legged grace with head ornament focus");
+  }
 
   return dedupe(anchors);
 };
@@ -185,7 +276,9 @@ const resolveTonePersonality = (storyTone: string): string => {
   }
 };
 
-export const buildCompanionFamilyBible = (seed: VisualIdentitySeed): VisualIdentityProfile => {
+export const buildCompanionFamilyBible = (
+  seed: VisualIdentitySeed,
+): VisualIdentityProfile => {
   const spiritAnimal = normalizeText(seed.spiritAnimal, "Dragon");
   const coreElement = normalizeText(seed.coreElement, "fire");
   const favoriteColor = normalizeText(seed.favoriteColor, "#FF6B35");
@@ -233,12 +326,29 @@ export const synthesizeVisualIdentityProfile = (
   const record = existing as Record<string, unknown>;
 
   return {
-    schemaVersion: typeof record.schemaVersion === "number" ? record.schemaVersion : fallback.schemaVersion,
-    spiritAnimal: normalizeText(typeof record.spiritAnimal === "string" ? record.spiritAnimal : null, fallback.spiritAnimal),
-    coreElement: normalizeText(typeof record.coreElement === "string" ? record.coreElement : null, fallback.coreElement),
-    favoriteColor: normalizeText(typeof record.favoriteColor === "string" ? record.favoriteColor : null, fallback.favoriteColor),
-    storyTone: normalizeText(typeof record.storyTone === "string" ? record.storyTone : null, fallback.storyTone),
-    bodyPlan: normalizeText(typeof record.bodyPlan === "string" ? record.bodyPlan : null, fallback.bodyPlan),
+    schemaVersion: typeof record.schemaVersion === "number"
+      ? record.schemaVersion
+      : fallback.schemaVersion,
+    spiritAnimal: normalizeText(
+      typeof record.spiritAnimal === "string" ? record.spiritAnimal : null,
+      fallback.spiritAnimal,
+    ),
+    coreElement: normalizeText(
+      typeof record.coreElement === "string" ? record.coreElement : null,
+      fallback.coreElement,
+    ),
+    favoriteColor: normalizeText(
+      typeof record.favoriteColor === "string" ? record.favoriteColor : null,
+      fallback.favoriteColor,
+    ),
+    storyTone: normalizeText(
+      typeof record.storyTone === "string" ? record.storyTone : null,
+      fallback.storyTone,
+    ),
+    bodyPlan: normalizeText(
+      typeof record.bodyPlan === "string" ? record.bodyPlan : null,
+      fallback.bodyPlan,
+    ),
     silhouetteAnchors: Array.isArray(record.silhouetteAnchors)
       ? dedupe(record.silhouetteAnchors.map((value) => String(value)))
       : fallback.silhouetteAnchors,
@@ -254,7 +364,12 @@ export const synthesizeVisualIdentityProfile = (
     elementManifestation: Array.isArray(record.elementManifestation)
       ? dedupe(record.elementManifestation.map((value) => String(value)))
       : fallback.elementManifestation,
-    personalityRead: normalizeText(typeof record.personalityRead === "string" ? record.personalityRead : null, fallback.personalityRead),
+    personalityRead: normalizeText(
+      typeof record.personalityRead === "string"
+        ? record.personalityRead
+        : null,
+      fallback.personalityRead,
+    ),
     continuityRules: Array.isArray(record.continuityRules)
       ? dedupe(record.continuityRules.map((value) => String(value)))
       : fallback.continuityRules,
@@ -268,7 +383,8 @@ export const getBoundaryStageForLevel = (level: number): number => {
   if (level <= 0) return 0;
 
   const reversedStages = [...PROGRESSION_VISUAL_STAGES].reverse();
-  return reversedStages.find((stage) => level >= stage.levelStart)?.levelStart ?? 0;
+  return reversedStages.find((stage) => level >= stage.levelStart)
+    ?.levelStart ?? 0;
 };
 
 const getTierFantasy = (level: number): string => {
@@ -295,7 +411,10 @@ const getTierFantasy = (level: number): string => {
   }
 };
 
-const getEvolutionDeltaBudget = (previousLevel: number, nextLevel: number): string[] => {
+const getEvolutionDeltaBudget = (
+  previousLevel: number,
+  nextLevel: number,
+): string[] => {
   if (previousLevel <= 0 && nextLevel === 1) {
     return [
       "Biggest emotional payoff in the whole line: egg to full creature reveal",
@@ -379,13 +498,27 @@ const buildContinuityChecklist = (profile: VisualIdentityProfile): string[] => [
 const normalizeNullableNumber = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
 
-const normalizeLineageAnchor = (value: unknown): CompanionLineageAnchor | null => {
+const normalizeAnchorTextArray = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? dedupe(
+      value
+        .map((item) => typeof item === "string" ? item.trim() : "")
+        .filter((item) => item.length > 0),
+    )
+    : [];
+
+const normalizeLineageAnchor = (
+  value: unknown,
+): CompanionLineageAnchor | null => {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
 
   const record = value as Record<string, unknown>;
-  const imageUrl = normalizeText(typeof record.imageUrl === "string" ? record.imageUrl : null, "");
+  const imageUrl = normalizeText(
+    typeof record.imageUrl === "string" ? record.imageUrl : null,
+    "",
+  );
   if (imageUrl.length === 0) {
     return null;
   }
@@ -394,8 +527,87 @@ const normalizeLineageAnchor = (value: unknown): CompanionLineageAnchor | null =
     imageUrl,
     focalX: normalizeNullableNumber(record.focalX),
     focalY: normalizeNullableNumber(record.focalY),
-    sourceType: normalizeText(typeof record.sourceType === "string" ? record.sourceType : null, "generation"),
-    visibility: record.visibility === "visible" ? "visible" : "hidden_until_reached",
+    sourceType: normalizeText(
+      typeof record.sourceType === "string" ? record.sourceType : null,
+      "generation",
+    ),
+    visibility: record.visibility === "visible"
+      ? "visible"
+      : "hidden_until_reached",
+  };
+};
+
+export const coerceCompanionVisualAnchors = (
+  value: unknown,
+  fallbackLevel = 0,
+  fallbackSourceImageUrl: string | null = null,
+): CompanionVisualAnchors | null => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const level =
+    typeof record.level === "number" && Number.isFinite(record.level)
+      ? Math.max(0, Math.floor(record.level))
+      : fallbackLevel;
+  const sourceImageUrl = normalizeText(
+    typeof record.sourceImageUrl === "string" ? record.sourceImageUrl : null,
+    fallbackSourceImageUrl ?? "",
+  ) || null;
+  const summary = normalizeText(
+    typeof record.summary === "string" ? record.summary : null,
+    "",
+  ) || null;
+  const silhouette = normalizeAnchorTextArray(record.silhouette);
+  const anatomy = normalizeAnchorTextArray(record.anatomy);
+  const face = normalizeAnchorTextArray(record.face);
+  const markings = normalizeAnchorTextArray(record.markings);
+  const palette = normalizeAnchorTextArray(record.palette);
+  const elementalEffects = normalizeAnchorTextArray(record.elementalEffects);
+  const poseFraming = normalizeAnchorTextArray(record.poseFraming);
+  const artStyle = normalizeAnchorTextArray(record.artStyle);
+  const signatureFeatures = normalizeAnchorTextArray(record.signatureFeatures);
+  const mustPreserve = normalizeAnchorTextArray(record.mustPreserve);
+  const safeToEvolve = normalizeAnchorTextArray(record.safeToEvolve);
+  const hasIdentityAnchors = [
+    summary,
+    ...silhouette,
+    ...anatomy,
+    ...face,
+    ...markings,
+    ...palette,
+    ...elementalEffects,
+    ...signatureFeatures,
+    ...mustPreserve,
+  ].some((item) => typeof item === "string" && item.length > 0);
+
+  if (!hasIdentityAnchors) {
+    return null;
+  }
+
+  return {
+    schemaVersion: typeof record.schemaVersion === "number"
+      ? record.schemaVersion
+      : 1,
+    level,
+    sourceImageUrl,
+    capturedAt: normalizeText(
+      typeof record.capturedAt === "string" ? record.capturedAt : null,
+      new Date().toISOString(),
+    ),
+    summary,
+    silhouette,
+    anatomy,
+    face,
+    markings,
+    palette,
+    elementalEffects,
+    poseFraming,
+    artStyle,
+    signatureFeatures,
+    mustPreserve,
+    safeToEvolve,
   };
 };
 
@@ -409,6 +621,7 @@ export const coerceImageLineageMetadata = (
     pipeline: DEFAULT_IMAGE_LINEAGE_PIPELINE,
     promptVersion: COMPANION_IMAGE_PROMPT_VERSION,
     hiddenBoundaryAnchors: {},
+    visualAnchorsByLevel: {},
     eggDerivedFromBoundary: null,
     eggImageUrl: null,
     lastReachedBoundaryLevel: 0,
@@ -421,33 +634,83 @@ export const coerceImageLineageMetadata = (
   }
 
   const record = existing as Record<string, unknown>;
-  const hiddenBoundaryAnchors = !record.hiddenBoundaryAnchors || typeof record.hiddenBoundaryAnchors !== "object" || Array.isArray(record.hiddenBoundaryAnchors)
+  const hiddenBoundaryAnchors = !record.hiddenBoundaryAnchors ||
+      typeof record.hiddenBoundaryAnchors !== "object" ||
+      Array.isArray(record.hiddenBoundaryAnchors)
     ? {}
     : Object.fromEntries(
       Object.entries(record.hiddenBoundaryAnchors as Record<string, unknown>)
         .map(([level, anchor]) => [level, normalizeLineageAnchor(anchor)])
-        .filter((entry): entry is [string, CompanionLineageAnchor] => Boolean(entry[1])),
+        .filter((entry): entry is [string, CompanionLineageAnchor] =>
+          Boolean(entry[1])
+        ),
+    );
+  const visualAnchorsByLevel = !record.visualAnchorsByLevel ||
+      typeof record.visualAnchorsByLevel !== "object" ||
+      Array.isArray(record.visualAnchorsByLevel)
+    ? {}
+    : Object.fromEntries(
+      Object.entries(record.visualAnchorsByLevel as Record<string, unknown>)
+        .map(([level, anchors]) => [
+          level,
+          coerceCompanionVisualAnchors(
+            anchors,
+            Number.isFinite(Number(level)) ? Number(level) : 0,
+          ),
+        ])
+        .filter((entry): entry is [string, CompanionVisualAnchors] =>
+          Boolean(entry[1])
+        ),
     );
 
   return {
-    schemaVersion: typeof record.schemaVersion === "number" ? record.schemaVersion : fallback.schemaVersion,
-    provider: normalizeText(typeof record.provider === "string" ? record.provider : null, fallback.provider),
-    model: normalizeText(typeof record.model === "string" ? record.model : null, fallback.model),
-    pipeline: normalizeText(typeof record.pipeline === "string" ? record.pipeline : null, fallback.pipeline),
-    promptVersion: normalizeText(typeof record.promptVersion === "string" ? record.promptVersion : null, fallback.promptVersion),
+    schemaVersion: typeof record.schemaVersion === "number"
+      ? record.schemaVersion
+      : fallback.schemaVersion,
+    provider: normalizeText(
+      typeof record.provider === "string" ? record.provider : null,
+      fallback.provider,
+    ),
+    model: normalizeText(
+      typeof record.model === "string" ? record.model : null,
+      fallback.model,
+    ),
+    pipeline: normalizeText(
+      typeof record.pipeline === "string" ? record.pipeline : null,
+      fallback.pipeline,
+    ),
+    promptVersion: normalizeText(
+      typeof record.promptVersion === "string" ? record.promptVersion : null,
+      fallback.promptVersion,
+    ),
     hiddenBoundaryAnchors,
+    visualAnchorsByLevel,
     eggDerivedFromBoundary: typeof record.eggDerivedFromBoundary === "number"
       ? record.eggDerivedFromBoundary
       : fallback.eggDerivedFromBoundary,
-    eggImageUrl: normalizeText(typeof record.eggImageUrl === "string" ? record.eggImageUrl : null, "") || null,
-    lastReachedBoundaryLevel: typeof record.lastReachedBoundaryLevel === "number"
-      ? record.lastReachedBoundaryLevel
-      : fallback.lastReachedBoundaryLevel,
-    lastReachedBoundaryImageUrl: normalizeText(typeof record.lastReachedBoundaryImageUrl === "string" ? record.lastReachedBoundaryImageUrl : null, "") || null,
-    generationLog: record.generationLog && typeof record.generationLog === "object" && !Array.isArray(record.generationLog)
-      ? record.generationLog as Record<string, unknown>
-      : undefined,
-    updatedAt: normalizeText(typeof record.updatedAt === "string" ? record.updatedAt : null, fallback.updatedAt),
+    eggImageUrl: normalizeText(
+      typeof record.eggImageUrl === "string" ? record.eggImageUrl : null,
+      "",
+    ) || null,
+    lastReachedBoundaryLevel:
+      typeof record.lastReachedBoundaryLevel === "number"
+        ? record.lastReachedBoundaryLevel
+        : fallback.lastReachedBoundaryLevel,
+    lastReachedBoundaryImageUrl: normalizeText(
+      typeof record.lastReachedBoundaryImageUrl === "string"
+        ? record.lastReachedBoundaryImageUrl
+        : null,
+      "",
+    ) || null,
+    generationLog:
+      record.generationLog && typeof record.generationLog === "object" &&
+        !Array.isArray(record.generationLog)
+        ? record.generationLog as Record<string, unknown>
+        : undefined,
+    updatedAt: normalizeText(
+      typeof record.updatedAt === "string" ? record.updatedAt : null,
+      fallback.updatedAt,
+    ),
   };
 };
 
@@ -482,6 +745,7 @@ export const buildInitialImageLineageMetadata = ({
       visibility: "hidden_until_reached",
     },
   },
+  visualAnchorsByLevel: {},
   eggDerivedFromBoundary: 1,
   eggImageUrl,
   lastReachedBoundaryLevel: 0,
@@ -494,7 +758,41 @@ export const getHiddenBoundaryAnchor = (
   existing: unknown,
   level: number,
 ): CompanionLineageAnchor | null =>
-  coerceImageLineageMetadata(existing).hiddenBoundaryAnchors[String(level)] ?? null;
+  coerceImageLineageMetadata(existing).hiddenBoundaryAnchors[String(level)] ??
+    null;
+
+export const updateLineageMetadataWithVisualAnchors = ({
+  existing,
+  level,
+  visualAnchors,
+}: {
+  existing: unknown;
+  level: number;
+  visualAnchors: CompanionVisualAnchors | null | undefined;
+}): CompanionImageLineageMetadata => {
+  const metadata = coerceImageLineageMetadata(existing);
+  const normalizedAnchors = coerceCompanionVisualAnchors(
+    visualAnchors,
+    level,
+    visualAnchors?.sourceImageUrl ?? null,
+  );
+
+  if (!normalizedAnchors) {
+    return metadata;
+  }
+
+  return {
+    ...metadata,
+    visualAnchorsByLevel: {
+      ...metadata.visualAnchorsByLevel,
+      [String(level)]: {
+        ...normalizedAnchors,
+        level,
+      },
+    },
+    updatedAt: new Date().toISOString(),
+  };
+};
 
 export const updateLineageMetadataAfterReveal = ({
   existing,
@@ -519,8 +817,12 @@ export const updateLineageMetadataAfterReveal = ({
       ...metadata.hiddenBoundaryAnchors,
       [levelKey]: {
         imageUrl,
-        focalX: normalizeNullableNumber(focalX ?? existingAnchor?.focalX ?? null),
-        focalY: normalizeNullableNumber(focalY ?? existingAnchor?.focalY ?? null),
+        focalX: normalizeNullableNumber(
+          focalX ?? existingAnchor?.focalX ?? null,
+        ),
+        focalY: normalizeNullableNumber(
+          focalY ?? existingAnchor?.focalY ?? null,
+        ),
         sourceType: existingAnchor?.sourceType ?? "generation",
         visibility: "visible",
       },
@@ -557,7 +859,8 @@ export const updateLineageMetadataAfterBoundaryEvolution = ({
           imageUrl,
           focalX: normalizeNullableNumber(focalX),
           focalY: normalizeNullableNumber(focalY),
-          sourceType: metadata.hiddenBoundaryAnchors["1"]?.sourceType ?? "generation",
+          sourceType: metadata.hiddenBoundaryAnchors["1"]?.sourceType ??
+            "generation",
           visibility: "visible",
         },
       }
@@ -600,7 +903,10 @@ export const buildCompanionGenerationMetadata = ({
   notes,
 });
 
-export const getEvolutionDifferenceFloor = (previousLevel: number, nextLevel: number): number => {
+export const getEvolutionDifferenceFloor = (
+  previousLevel: number,
+  nextLevel: number,
+): number => {
   if (previousLevel <= 0 && nextLevel === 1) return 6;
   if (nextLevel === 5) return 6;
   if (nextLevel === 13) return 6;
@@ -625,7 +931,9 @@ export const buildAiEggPrompt = (profile: VisualIdentityProfile): string => {
     `- Story tone mood: ${profile.storyTone}`,
     `- Body plan: ${profile.bodyPlan}`,
     ...profile.silhouetteAnchors.map((item) => `- Silhouette anchor: ${item}`),
-    ...profile.signatureFeatures.map((item) => `- Signature feature seed: ${item}`),
+    ...profile.signatureFeatures.map((item) =>
+      `- Signature feature seed: ${item}`
+    ),
     "",
     "Tier Fantasy:",
     `- ${getTierFantasy(0)}`,
@@ -646,7 +954,9 @@ export const buildAiEggPrompt = (profile: VisualIdentityProfile): string => {
   ].join("\n");
 };
 
-export const buildStage1BootstrapPrompt = (profile: VisualIdentityProfile): string => {
+export const buildStage1BootstrapPrompt = (
+  profile: VisualIdentityProfile,
+): string => {
   return [
     "STYLIZED FANTASY COMPANION STARTER FORM",
     "",
@@ -682,7 +992,9 @@ export const buildStage1BootstrapPrompt = (profile: VisualIdentityProfile): stri
   ].join("\n");
 };
 
-export const buildEggFromStage1Prompt = (profile: VisualIdentityProfile): string => {
+export const buildEggFromStage1Prompt = (
+  profile: VisualIdentityProfile,
+): string => {
   return [
     "TRANSFORM THIS STARTER FORM INTO ITS SEALED MAGICAL EGG",
     "",
@@ -756,7 +1068,9 @@ export const buildAiEvolutionPrompt = ({
     `- ${getTierFantasy(nextLevel)}`,
     "",
     "Evolution Delta Budget:",
-    ...getEvolutionDeltaBudget(previousLevel, nextLevel).map((item) => `- ${item}`),
+    ...getEvolutionDeltaBudget(previousLevel, nextLevel).map((item) =>
+      `- ${item}`
+    ),
     "",
     "Art Direction:",
     ...buildArtDirection().map((item) => `- ${item}`),
@@ -771,24 +1085,110 @@ export const buildAiEvolutionPrompt = ({
   ].join("\n");
 };
 
-export const buildBoundaryEvolutionEditPrompt = ({
+const formatAnchorSection = (label: string, values: string[]): string[] =>
+  values.length > 0 ? [label, ...values.map((item) => `- ${item}`)] : [];
+
+const describePreviousGenerationMetadata = (metadata: unknown): string[] => {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return [];
+  }
+
+  const record = metadata as Record<string, unknown>;
+  const notes = typeof record.notes === "string" ? record.notes.trim() : "";
+  const sourceType = typeof record.sourceType === "string"
+    ? record.sourceType.trim()
+    : "";
+  const promptVersion = typeof record.promptVersion === "string"
+    ? record.promptVersion.trim()
+    : "";
+  const parts = [
+    sourceType ? `source: ${sourceType}` : "",
+    promptVersion ? `prompt version: ${promptVersion}` : "",
+    notes ? `notes: ${notes}` : "",
+  ].filter(Boolean);
+
+  return parts.length > 0
+    ? ["Previous generation metadata:", ...parts.map((item) => `- ${item}`)]
+    : [];
+};
+
+export const buildBoundaryEvolutionGenerationPrompt = ({
   profile,
   previousLevel,
   nextLevel,
+  previousAnchors,
+  previousGenerationMetadata,
 }: {
   profile: VisualIdentityProfile;
   previousLevel: number;
   nextLevel: number;
-}): string => [
-  buildAiEvolutionPrompt({
+  previousAnchors?: CompanionVisualAnchors | null;
+  previousGenerationMetadata?: unknown;
+}): string => {
+  const basePrompt = buildAiEvolutionPrompt({
     profile,
     previousLevel,
     nextLevel,
-  }),
-  "",
-  "Edit-specific rules:",
-  "- Use the reference image as the same individual and evolve it forward",
-  "- Do not keep the exact same pose, framing, and silhouette unless explicitly required by anatomy",
-  "- The result must be clearly more evolved, not just recolored or given extra glow",
-  "- Preserve lineage anchors while delivering a meaningful visual jump",
-].join("\n");
+  });
+  const previousSummary = previousAnchors?.summary?.trim();
+
+  return [
+    basePrompt,
+    "",
+    "Metadata-first evolution rules:",
+    "- Generate a fresh next-stage portrait from this lineage metadata; do not copy the previous pose or exact silhouette",
+    "- Treat the previous-form anchors below as identity evidence, not as a composition lock",
+    "- Preserve the companion's recognizable family, face logic, markings, palette identity, and signature features",
+    "- Evolve scale, maturity, posture, proportions, ornamentation, and elemental expression enough to read as a new tier",
+    "- The result must look like a direct evolution of the previous companion, not a sibling, variant, or unrelated redesign",
+    "",
+    ...(previousSummary
+      ? ["Previous form summary:", `- ${previousSummary}`, ""]
+      : []),
+    ...formatAnchorSection(
+      "Previous silhouette anchors:",
+      previousAnchors?.silhouette ?? [],
+    ),
+    ...formatAnchorSection(
+      "Previous anatomy anchors:",
+      previousAnchors?.anatomy ?? [],
+    ),
+    ...formatAnchorSection(
+      "Previous face anchors:",
+      previousAnchors?.face ?? [],
+    ),
+    ...formatAnchorSection(
+      "Previous marking anchors:",
+      previousAnchors?.markings ?? [],
+    ),
+    ...formatAnchorSection(
+      "Previous palette anchors:",
+      previousAnchors?.palette ?? [],
+    ),
+    ...formatAnchorSection(
+      "Previous elemental anchors:",
+      previousAnchors?.elementalEffects ?? [],
+    ),
+    ...formatAnchorSection(
+      "Previous pose/framing evidence:",
+      previousAnchors?.poseFraming ?? [],
+    ),
+    ...formatAnchorSection(
+      "Previous art style evidence:",
+      previousAnchors?.artStyle ?? [],
+    ),
+    ...formatAnchorSection(
+      "Previous signature features:",
+      previousAnchors?.signatureFeatures ?? [],
+    ),
+    ...formatAnchorSection(
+      "Must preserve:",
+      previousAnchors?.mustPreserve ?? [],
+    ),
+    ...formatAnchorSection(
+      "Safe to evolve/change:",
+      previousAnchors?.safeToEvolve ?? [],
+    ),
+    ...describePreviousGenerationMetadata(previousGenerationMetadata),
+  ].join("\n");
+};

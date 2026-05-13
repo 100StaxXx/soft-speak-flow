@@ -3,7 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-internal-key",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-internal-key",
 };
 
 const PROCESSING_STALE_MS = 5 * 60 * 1000;
@@ -53,9 +54,12 @@ const TERMINAL_CODES = new Set([
   "already_evolved",
   "companion_not_found",
   "rate_limited",
+  "evolution_quality_gate_failed",
+  "evolution_continuity_unverified",
 ]);
 
-const isRetryableError = (message: string) => RETRYABLE_PATTERNS.some((pattern) => pattern.test(message));
+const isRetryableError = (message: string) =>
+  RETRYABLE_PATTERNS.some((pattern) => pattern.test(message));
 
 const normalizeErrorCode = (input: string | null | undefined) => {
   if (!input) return "evolution_failed";
@@ -66,14 +70,24 @@ const normalizeErrorCode = (input: string | null | undefined) => {
     .slice(0, 64) || "evolution_failed";
 };
 
-const resolveErrorCode = (status: number, payload: Record<string, unknown> | null, fallbackMessage: string) => {
-  const payloadCode = typeof payload?.code === "string" ? normalizeErrorCode(payload.code) : null;
+const resolveErrorCode = (
+  status: number,
+  payload: Record<string, unknown> | null,
+  fallbackMessage: string,
+) => {
+  const payloadCode = typeof payload?.code === "string"
+    ? normalizeErrorCode(payload.code)
+    : null;
   if (payloadCode) return payloadCode;
 
-  const payloadError = typeof payload?.error === "string" ? normalizeErrorCode(payload.error) : null;
+  const payloadError = typeof payload?.error === "string"
+    ? normalizeErrorCode(payload.error)
+    : null;
   if (payloadError) return payloadError;
 
-  const payloadMessage = typeof payload?.message === "string" ? normalizeErrorCode(payload.message) : null;
+  const payloadMessage = typeof payload?.message === "string"
+    ? normalizeErrorCode(payload.message)
+    : null;
   if (payloadMessage) return payloadMessage;
 
   if (status === 429) return "rate_limited";
@@ -104,7 +118,9 @@ const fetchJob = async (
   if (jobId) {
     const { data, error } = await supabase
       .from("companion_evolution_jobs")
-      .select("id, user_id, companion_id, requested_stage, status, retry_count, next_retry_at, error_code, error_message, started_at, requested_at, updated_at")
+      .select(
+        "id, user_id, companion_id, requested_stage, status, retry_count, next_retry_at, error_code, error_message, started_at, requested_at, updated_at",
+      )
       .eq("id", jobId)
       .maybeSingle();
 
@@ -120,7 +136,9 @@ const fetchJob = async (
 
   let query = supabase
     .from("companion_evolution_jobs")
-    .select("id, user_id, companion_id, requested_stage, status, retry_count, next_retry_at, error_code, error_message, started_at, requested_at, updated_at")
+    .select(
+      "id, user_id, companion_id, requested_stage, status, retry_count, next_retry_at, error_code, error_message, started_at, requested_at, updated_at",
+    )
     .in("status", ["queued", "processing"])
     .or(`next_retry_at.is.null,next_retry_at.lte.${nowIso}`)
     .order("requested_at", { ascending: true })
@@ -146,11 +164,15 @@ const claimJob = async (
 
   const now = new Date();
   const nowIso = now.toISOString();
-  const staleCutoffIso = new Date(now.getTime() - PROCESSING_STALE_MS).toISOString();
+  const staleCutoffIso = new Date(now.getTime() - PROCESSING_STALE_MS)
+    .toISOString();
 
   if (job.status === "processing") {
     const updatedAtMs = new Date(job.updated_at).getTime();
-    if (!Number.isFinite(updatedAtMs) || now.getTime() - updatedAtMs < PROCESSING_STALE_MS) {
+    if (
+      !Number.isFinite(updatedAtMs) ||
+      now.getTime() - updatedAtMs < PROCESSING_STALE_MS
+    ) {
       return job;
     }
   }
@@ -168,11 +190,16 @@ const claimJob = async (
   if (job.status === "queued") {
     claimQuery = claimQuery.eq("status", "queued");
   } else {
-    claimQuery = claimQuery.eq("status", "processing").lte("updated_at", staleCutoffIso);
+    claimQuery = claimQuery.eq("status", "processing").lte(
+      "updated_at",
+      staleCutoffIso,
+    );
   }
 
   const { data, error } = await claimQuery
-    .select("id, user_id, companion_id, requested_stage, status, retry_count, next_retry_at, error_code, error_message, started_at, requested_at, updated_at")
+    .select(
+      "id, user_id, companion_id, requested_stage, status, retry_count, next_retry_at, error_code, error_message, started_at, requested_at, updated_at",
+    )
     .maybeSingle();
 
   if (error) {
@@ -184,14 +211,14 @@ const claimJob = async (
 
 type EvolutionPipelineAuthContext =
   | {
-      mode: "internal";
-      internalSecret: string;
-      userId: string;
-    }
+    mode: "internal";
+    internalSecret: string;
+    userId: string;
+  }
   | {
-      mode: "user";
-      authHeader: string;
-    };
+    mode: "user";
+    authHeader: string;
+  };
 
 const runEvolutionPipeline = async (
   supabaseUrl: string,
@@ -209,29 +236,31 @@ const runEvolutionPipeline = async (
     headers.Authorization = authContext.authHeader;
   }
 
-  const response = await fetch(`${supabaseUrl}/functions/v1/generate-companion-evolution`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  });
+  const response = await fetch(
+    `${supabaseUrl}/functions/v1/generate-companion-evolution`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    },
+  );
 
   const payload = await parseJsonSafe<Record<string, unknown>>(response);
 
   if (!response.ok) {
-    const message =
-      (typeof payload?.error === "string" && payload.error) ||
+    const message = (typeof payload?.error === "string" && payload.error) ||
       (typeof payload?.message === "string" && payload.message) ||
       `generate-companion-evolution failed with status ${response.status}`;
 
     const code = resolveErrorCode(response.status, payload, message);
-    const retryable = !TERMINAL_CODES.has(code) && (response.status >= 500 || isRetryableError(message));
+    const retryable = !TERMINAL_CODES.has(code) &&
+      (response.status >= 500 || isRetryableError(message));
     throw new JobProcessingError(message, code, retryable);
   }
 
   const evolved = payload?.evolved === true;
   if (!evolved) {
-    const message =
-      (typeof payload?.message === "string" && payload.message) ||
+    const message = (typeof payload?.message === "string" && payload.message) ||
       "evolution_not_performed";
 
     const code = resolveErrorCode(200, payload, message);
@@ -248,7 +277,9 @@ const ensureEvolutionCards = async (
 ) => {
   const { data: companion } = await supabase
     .from("user_companion")
-    .select("initial_image_url, created_at, spirit_animal, core_element, favorite_color, vitality, wisdom, discipline, resolve, creativity, alignment")
+    .select(
+      "initial_image_url, created_at, spirit_animal, core_element, favorite_color, vitality, wisdom, discipline, resolve, creativity, alignment",
+    )
     .eq("id", companionId)
     .maybeSingle();
 
@@ -259,7 +290,9 @@ const ensureEvolutionCards = async (
     .select("evolution_stage")
     .eq("companion_id", companionId);
 
-  const existingStages = new Set((existingCards ?? []).map((card) => card.evolution_stage));
+  const existingStages = new Set(
+    (existingCards ?? []).map((card) => card.evolution_stage),
+  );
 
   for (let currentStage = 0; currentStage <= stage; currentStage += 1) {
     if (existingStages.has(currentStage)) {
@@ -383,9 +416,12 @@ const sendCompletionPush = async (
   userId: string,
 ) => {
   if (!internalSecret) {
-    console.warn("Skipping evolution completion push because INTERNAL_FUNCTION_SECRET is missing", {
-      userId,
-    });
+    console.warn(
+      "Skipping evolution completion push because INTERNAL_FUNCTION_SECRET is missing",
+      {
+        userId,
+      },
+    );
     return;
   }
 
@@ -441,7 +477,12 @@ const runNonCriticalSideEffects = async (
   }
 
   try {
-    await validateReferralStage3(supabase, job.user_id, previousStage, newStage);
+    await validateReferralStage3(
+      supabase,
+      job.user_id,
+      previousStage,
+      newStage,
+    );
   } catch (error) {
     console.error("Referral validation side effect failed", error);
   }
@@ -472,13 +513,18 @@ serve(async (req) => {
           error: "server_configuration_error",
           code: "server_configuration_error",
         }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
     }
 
     const providedInternalSecret = req.headers.get("x-internal-key");
-    const hasInternalSecret = typeof internalSecret === "string" && internalSecret.length > 0;
-    const isInternal = hasInternalSecret && providedInternalSecret === internalSecret;
+    const hasInternalSecret = typeof internalSecret === "string" &&
+      internalSecret.length > 0;
+    const isInternal = hasInternalSecret &&
+      providedInternalSecret === internalSecret;
 
     if (providedInternalSecret !== null && !hasInternalSecret) {
       return new Response(
@@ -486,7 +532,10 @@ serve(async (req) => {
           error: "server_configuration_error",
           code: "internal_function_secret_missing",
         }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
     }
 
@@ -497,7 +546,10 @@ serve(async (req) => {
       if (!authHeader) {
         return new Response(
           JSON.stringify({ error: "unauthorized" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
         );
       }
 
@@ -517,7 +569,10 @@ serve(async (req) => {
       if (authError || !user) {
         return new Response(
           JSON.stringify({ error: "unauthorized" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
         );
       }
 
@@ -526,7 +581,9 @@ serve(async (req) => {
     }
 
     const requestBody = await req.json().catch(() => ({}));
-    requestedJobId = typeof requestBody?.jobId === "string" ? requestBody.jobId : undefined;
+    requestedJobId = typeof requestBody?.jobId === "string"
+      ? requestBody.jobId
+      : undefined;
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const allowGlobalQueue = isInternal && !requestedJobId && !callerUserId;
@@ -547,7 +604,10 @@ serve(async (req) => {
 
       return new Response(
         JSON.stringify({ error: "job_not_found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
     }
     requestedJobId = job.id;
@@ -577,7 +637,9 @@ serve(async (req) => {
       );
     }
 
-    if (job.status === "processing" && claimedJob.updated_at === job.updated_at) {
+    if (
+      job.status === "processing" && claimedJob.updated_at === job.updated_at
+    ) {
       return new Response(
         JSON.stringify({
           jobId: claimedJob.id,
@@ -618,15 +680,22 @@ serve(async (req) => {
       };
     }
 
-    const evolutionPayload = await runEvolutionPipeline(supabaseUrl, pipelineAuthContext);
+    const evolutionPayload = await runEvolutionPipeline(
+      supabaseUrl,
+      pipelineAuthContext,
+    );
 
     const nowIso = new Date().toISOString();
     const { error: successUpdateError } = await supabase
       .from("companion_evolution_jobs")
       .update({
         status: "succeeded",
-        result_image_url: typeof evolutionPayload.image_url === "string" ? evolutionPayload.image_url : null,
-        result_evolution_id: typeof evolutionPayload.evolution_id === "string" ? evolutionPayload.evolution_id : null,
+        result_image_url: typeof evolutionPayload.image_url === "string"
+          ? evolutionPayload.image_url
+          : null,
+        result_evolution_id: typeof evolutionPayload.evolution_id === "string"
+          ? evolutionPayload.evolution_id
+          : null,
         completed_at: nowIso,
         updated_at: nowIso,
         error_code: null,
@@ -639,10 +708,20 @@ serve(async (req) => {
       throw successUpdateError;
     }
 
-    const previousStage = typeof evolutionPayload.previous_stage === "number" ? evolutionPayload.previous_stage : claimedJob.requested_stage - 1;
-    const newStage = typeof evolutionPayload.new_stage === "number" ? evolutionPayload.new_stage : claimedJob.requested_stage;
+    const previousStage = typeof evolutionPayload.previous_stage === "number"
+      ? evolutionPayload.previous_stage
+      : claimedJob.requested_stage - 1;
+    const newStage = typeof evolutionPayload.new_stage === "number"
+      ? evolutionPayload.new_stage
+      : claimedJob.requested_stage;
 
-    await runNonCriticalSideEffects(supabase, internalSecret ?? null, claimedJob, previousStage, newStage);
+    await runNonCriticalSideEffects(
+      supabase,
+      internalSecret ?? null,
+      claimedJob,
+      previousStage,
+      newStage,
+    );
 
     return new Response(
       JSON.stringify({
@@ -670,7 +749,9 @@ serve(async (req) => {
       if (currentJob?.status === "processing") {
         const now = new Date();
         const retryCount = (currentJob.retry_count ?? 0) + 1;
-        const message = error instanceof Error ? error.message : "Unknown error";
+        const message = error instanceof Error
+          ? error.message
+          : "Unknown error";
 
         let errorCode = "evolution_failed";
         let retryable = isRetryableError(message);
@@ -683,7 +764,9 @@ serve(async (req) => {
         const shouldRetry = retryable && retryCount <= 2;
 
         if (shouldRetry) {
-          const nextRetryAt = new Date(now.getTime() + BASE_RETRY_DELAY_MS * 2 ** (retryCount - 1)).toISOString();
+          const nextRetryAt = new Date(
+            now.getTime() + BASE_RETRY_DELAY_MS * 2 ** (retryCount - 1),
+          ).toISOString();
           await supabase
             .from("companion_evolution_jobs")
             .update({
@@ -741,7 +824,9 @@ serve(async (req) => {
       }
     }
 
-    const fallbackMessage = error instanceof Error ? error.message : "Unknown error";
+    const fallbackMessage = error instanceof Error
+      ? error.message
+      : "Unknown error";
     return new Response(
       JSON.stringify({
         error: fallbackMessage,

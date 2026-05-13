@@ -1,9 +1,13 @@
 import {
   buildAiEvolutionPrompt,
-  buildEggFromStage1Prompt,
+  buildBoundaryEvolutionGenerationPrompt,
   buildCompanionGenerationMetadata,
+  buildEggFromStage1Prompt,
   buildInitialImageLineageMetadata,
   buildStage1BootstrapPrompt,
+  coerceCompanionVisualAnchors,
+  shouldGeneratePortraitForStage,
+  updateLineageMetadataWithVisualAnchors,
   type VisualIdentityProfile,
 } from "./companionLineage.ts";
 
@@ -76,7 +80,7 @@ Deno.test("companion lineage metadata follows OPENAI_COMPANION_IMAGE_MODEL overr
       hiddenStageOneImageUrl: "https://example.com/stage-1.png",
     });
     const generationMetadata = buildCompanionGenerationMetadata({
-      sourceType: "edit",
+      sourceType: "lineage_generation",
       boundaryLevel: 5,
       portraitRegenerated: true,
     });
@@ -135,4 +139,148 @@ Deno.test("future companion image prompts ask for transparent cutout output", ()
       "Expected companion prompt to reject scenic backdrops",
     );
   }
+});
+
+Deno.test("visual anchors persist in lineage metadata by level", () => {
+  const lineageMetadata = buildInitialImageLineageMetadata({
+    eggImageUrl: "https://example.com/egg.png",
+    hiddenStageOneImageUrl: "https://example.com/stage-1.png",
+  });
+
+  const updated = updateLineageMetadataWithVisualAnchors({
+    existing: lineageMetadata,
+    level: 5,
+    visualAnchors: {
+      schemaVersion: 1,
+      level: 5,
+      sourceImageUrl: "https://example.com/stage-5.png",
+      capturedAt: "2026-05-01T00:00:00.000Z",
+      summary: "sleek wolf guardian with blue flame ruff",
+      silhouette: ["sleek wolf guardian"],
+      anatomy: ["quadruped wolf anatomy"],
+      face: ["bright eyes"],
+      markings: ["crescent forehead mark"],
+      palette: ["blue silver palette"],
+      elementalEffects: ["blue flame ruff"],
+      poseFraming: ["centered cutout"],
+      artStyle: ["premium creature art"],
+      signatureFeatures: ["flame ruff"],
+      mustPreserve: ["crescent forehead mark"],
+      safeToEvolve: ["pose", "scale"],
+    },
+  });
+
+  assert(
+    updated.visualAnchorsByLevel["5"]?.summary ===
+      "sleek wolf guardian with blue flame ruff",
+    "Expected visual anchors to persist under the captured level",
+  );
+});
+
+Deno.test("empty visual anchors are rejected before persistence", () => {
+  const emptyAnchors = {
+    schemaVersion: 1,
+    level: 5,
+    sourceImageUrl: "https://example.com/stage-5.png",
+    capturedAt: "2026-05-01T00:00:00.000Z",
+    summary: " ",
+    silhouette: [" "],
+    anatomy: [],
+    face: [],
+    markings: [],
+    palette: [],
+    elementalEffects: [],
+    poseFraming: ["centered cutout"],
+    artStyle: ["transparent fantasy cutout"],
+    signatureFeatures: [],
+    mustPreserve: [],
+    safeToEvolve: ["pose"],
+  };
+
+  assert(
+    coerceCompanionVisualAnchors(emptyAnchors, 5) === null,
+    "Expected non-identity anchor output to be rejected",
+  );
+
+  const lineageMetadata = buildInitialImageLineageMetadata({
+    eggImageUrl: "https://example.com/egg.png",
+    hiddenStageOneImageUrl: "https://example.com/stage-1.png",
+  });
+  const updated = updateLineageMetadataWithVisualAnchors({
+    existing: lineageMetadata,
+    level: 5,
+    visualAnchors: emptyAnchors,
+  });
+
+  assert(
+    updated.visualAnchorsByLevel["5"] === undefined,
+    "Expected empty visual anchors to avoid lineage persistence",
+  );
+});
+
+Deno.test("metadata-first boundary prompt uses anchors without reference-image edit instructions", () => {
+  const profile: VisualIdentityProfile = {
+    schemaVersion: 1,
+    spiritAnimal: "Wolf",
+    coreElement: "Water",
+    favoriteColor: "#00AAFF",
+    storyTone: "epic_adventure",
+    bodyPlan: "grounded quadruped with strong silhouette",
+    silhouetteAnchors: ["alert ears"],
+    faceAnchors: ["bright eyes"],
+    signatureFeatures: ["water ruff"],
+    paletteRules: ["blue anchor"],
+    elementManifestation: ["water around paws"],
+    personalityRead: "brave and loyal",
+    continuityRules: ["keep wolf family readable"],
+  };
+
+  const prompt = buildBoundaryEvolutionGenerationPrompt({
+    profile,
+    previousLevel: 1,
+    nextLevel: 5,
+    previousAnchors: {
+      schemaVersion: 1,
+      level: 1,
+      sourceImageUrl: "https://example.com/stage-1.png",
+      capturedAt: "2026-05-01T00:00:00.000Z",
+      summary: "small wolf hatchling with a water ruff",
+      silhouette: ["small wolf silhouette"],
+      anatomy: ["four legs"],
+      face: ["bright eyes"],
+      markings: ["crescent forehead mark"],
+      palette: ["blue and silver"],
+      elementalEffects: ["water ruff"],
+      poseFraming: ["centered"],
+      artStyle: ["transparent fantasy cutout"],
+      signatureFeatures: ["water ruff"],
+      mustPreserve: ["crescent forehead mark"],
+      safeToEvolve: ["pose", "body scale"],
+    },
+  });
+
+  assert(
+    prompt.includes("Metadata-first evolution rules"),
+    "Expected metadata-first generation instructions",
+  );
+  assert(
+    prompt.includes("small wolf hatchling with a water ruff") &&
+      prompt.includes("crescent forehead mark"),
+    "Expected prompt to include previous visual anchors",
+  );
+  assert(
+    !prompt.includes("Use the reference image"),
+    "Expected metadata-first prompt to avoid image-edit reference instructions",
+  );
+});
+
+Deno.test("non-boundary levels remain non-portrait stages", () => {
+  assert(
+    shouldGeneratePortraitForStage(5),
+    "Expected visual boundary levels to generate portraits",
+  );
+  assert(
+    !shouldGeneratePortraitForStage(6),
+    "Expected non-boundary levels to reuse the current portrait",
+  );
 });
