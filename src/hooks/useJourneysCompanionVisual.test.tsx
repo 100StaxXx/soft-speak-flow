@@ -104,7 +104,7 @@ describe("useJourneysCompanionVisual", () => {
   it("uses fresh transparent AI launcher art for the Journeys FAB when available", () => {
     mocks.companion = baseCompanion({
       launcher_image_url:
-        "https://assets.example.com/user-1/companion_user-1_launcher_transparent_stage3.png",
+        "https://assets.example.com/user-1/companion_user-1_launcher_validated_transparent_stage3.png",
       launcher_image_focal_x: 0.51,
       launcher_image_focal_y: 0.47,
       launcher_image_source_url: "https://assets.example.com/scene.png",
@@ -115,7 +115,7 @@ describe("useJourneysCompanionVisual", () => {
     expect(result.current.isGeneratedCompanion).toBe(true);
     expect(result.current.currentStage).toBe(3);
     expect(result.current.launcherAwayImageUrl).toBe(
-      "https://assets.example.com/user-1/companion_user-1_launcher_transparent_stage3.png",
+      "https://assets.example.com/user-1/companion_user-1_launcher_validated_transparent_stage3.png",
     );
     expect(result.current.launcherAwayFocalX).toBe(0.51);
     expect(result.current.launcherAwayFocalY).toBe(0.47);
@@ -125,9 +125,10 @@ describe("useJourneysCompanionVisual", () => {
     expect(result.current.currentSceneImageUrl).toBe("https://assets.example.com/scene.png");
   });
 
-  it("ignores legacy AI launcher art saved before transparent companion cutouts", () => {
+  it("ignores legacy AI launcher art saved before validated transparent cutouts", () => {
     mocks.companion = baseCompanion({
-      launcher_image_url: "https://assets.example.com/launcher.png",
+      launcher_image_url:
+        "https://assets.example.com/user-1/companion_user-1_launcher_transparent_stage3.png",
       launcher_image_focal_x: 0.51,
       launcher_image_focal_y: 0.47,
       launcher_image_source_url: "https://assets.example.com/scene.png",
@@ -162,7 +163,7 @@ describe("useJourneysCompanionVisual", () => {
       current_image_focal_x: 0.61,
       current_image_focal_y: 0.42,
       launcher_image_url:
-        "https://assets.example.com/user-1/companion_user-1_launcher_transparent_stage3.png",
+        "https://assets.example.com/user-1/companion_user-1_launcher_validated_transparent_stage3.png",
       launcher_image_focal_x: 0.45,
       launcher_image_focal_y: 0.55,
       launcher_image_source_url: "https://assets.example.com/stage-3-scene.png",
@@ -185,7 +186,7 @@ describe("useJourneysCompanionVisual", () => {
     expect(result.current.currentSceneImageUrl).toBe("https://assets.example.com/stage-3-scene.png");
     expect(result.current.currentStage).toBe(3);
     expect(result.current.launcherAwayImageUrl).toBe(
-      "https://assets.example.com/user-1/companion_user-1_launcher_transparent_stage3.png",
+      "https://assets.example.com/user-1/companion_user-1_launcher_validated_transparent_stage3.png",
     );
     expect(result.current.launcherAwayFocalX).toBe(0.45);
     expect(result.current.launcherAwayFocalY).toBe(0.55);
@@ -201,7 +202,7 @@ describe("useJourneysCompanionVisual", () => {
       current_image_focal_x: 0.61,
       current_image_focal_y: 0.42,
       launcher_image_url:
-        "https://assets.example.com/user-1/companion_user-1_launcher_transparent_stage3.png",
+        "https://assets.example.com/user-1/companion_user-1_launcher_validated_transparent_stage3.png",
       launcher_image_source_url: "https://assets.example.com/stage-3-scene.png",
     });
 

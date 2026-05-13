@@ -18,6 +18,27 @@ const { handleGenerateCompanionLauncherImage } = await import("./index.ts");
 const transparentPngDataUrl =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=";
 
+const passingLauncherJudgeScores = {
+  continuity: 8,
+  difference: 10,
+  anatomy: 8,
+  centering: 8,
+  backgroundCutout: 9,
+  overall: 8,
+  subjectCenterX: 0.5,
+  subjectCenterY: 0.5,
+  notes: "Clean transparent launcher cutout.",
+};
+
+const failingLauncherJudgeScores = {
+  ...passingLauncherJudgeScores,
+  backgroundCutout: 3,
+  overall: 5,
+  notes: "Visible sky and rectangular scene backdrop behind the companion.",
+};
+
+const createPassingLauncherJudge = () => async () => passingLauncherJudgeScores;
+
 interface QueryState {
   table: string;
   filters: Record<string, unknown>;
@@ -194,7 +215,7 @@ Deno.test("generate-companion-launcher-image returns a fresh cached launcher", a
   const supabase = createMockSupabase({
     companion: baseCompanion({
       launcher_image_url:
-        "https://assets.example.com/user-1/companion_user-1_launcher_transparent_stage3_cached.png",
+        "https://assets.example.com/user-1/companion_user-1_launcher_validated_transparent_stage3_cached.png",
       launcher_image_focal_x: 0.44,
       launcher_image_focal_y: 0.56,
       launcher_image_source_url: "https://assets.example.com/current-scene.png",
@@ -226,7 +247,7 @@ Deno.test("generate-companion-launcher-image returns a fresh cached launcher", a
   assertEquals(body.cached, true, "Expected cached flag");
   assertEquals(
     body.imageUrl,
-    "https://assets.example.com/user-1/companion_user-1_launcher_transparent_stage3_cached.png",
+    "https://assets.example.com/user-1/companion_user-1_launcher_validated_transparent_stage3_cached.png",
     "Expected cached launcher URL",
   );
   assertEquals(
@@ -236,10 +257,11 @@ Deno.test("generate-companion-launcher-image returns a fresh cached launcher", a
   );
 });
 
-Deno.test("generate-companion-launcher-image regenerates legacy non-transparent launcher art", async () => {
+Deno.test("generate-companion-launcher-image regenerates pre-validation launcher art", async () => {
   const supabase = createMockSupabase({
     companion: baseCompanion({
-      launcher_image_url: "https://assets.example.com/legacy-launcher.png",
+      launcher_image_url:
+        "https://assets.example.com/user-1/companion_user-1_launcher_transparent_stage3_old.png",
       launcher_image_focal_x: 0.44,
       launcher_image_focal_y: 0.56,
       launcher_image_source_url: "https://assets.example.com/current-scene.png",
@@ -264,12 +286,13 @@ Deno.test("generate-companion-launcher-image regenerates legacy non-transparent 
           size: "1024x1024",
         };
       },
+      judgeCompanionImageFn: createPassingLauncherJudge(),
       now: () => 234,
     },
   );
 
   const body = await response.json();
-  assertEquals(response.status, 200, "Expected legacy launcher regeneration");
+  assertEquals(response.status, 200, "Expected pre-validation launcher regeneration");
   assertEquals(body.cached, false, "Expected generated response");
   assertEquals(editCalls.length, 1, "Expected one image edit call");
   assertEquals(
@@ -279,10 +302,119 @@ Deno.test("generate-companion-launcher-image regenerates legacy non-transparent 
   );
   assert(
     String(supabase.uploadLog[0].path).includes(
-      "user-1/companion_user-1_launcher_transparent_stage3_234.png",
+      "user-1/companion_user-1_launcher_validated_transparent_stage3_234.png",
     ),
     "Expected regenerated launcher to use transparent launcher file kind",
   );
+});
+
+Deno.test("generate-companion-launcher-image retries when launcher validation sees a backdrop", async () => {
+  const supabase = createMockSupabase({ companion: baseCompanion() });
+  const editCalls: Array<Record<string, unknown>> = [];
+  const judgeScores = [failingLauncherJudgeScores, passingLauncherJudgeScores];
+
+  const response = await handleGenerateCompanionLauncherImage(
+    new Request("https://example.com", {
+      method: "POST",
+      body: JSON.stringify({ companionId: "companion-1" }),
+    }),
+    {
+      authenticate: async () => ({ userId: "user-1", isInternal: false }),
+      createSupabaseClient: () => supabase,
+      createCostGuardrailSessionFn: createNoopCostGuardrailSession,
+      editCompanionImageFn: async (args: any) => {
+        editCalls.push(args);
+        return {
+          imageDataUrl: transparentPngDataUrl,
+          revisedPrompt: null,
+          size: "1024x1024",
+        };
+      },
+      judgeCompanionImageFn: async () => judgeScores.shift() ?? passingLauncherJudgeScores,
+      now: () => 345,
+    },
+  );
+
+  const body = await response.json();
+  assertEquals(response.status, 200, "Expected validation retry to recover");
+  assertEquals(body.cached, false, "Expected generated response");
+  assertEquals(editCalls.length, 2, "Expected one retry after failed validation");
+  assert(
+    String(editCalls[1].prompt).includes("Retry critique:") &&
+      String(editCalls[1].prompt).includes("Visible sky and rectangular scene backdrop"),
+    "Expected retry prompt to include backdrop critique",
+  );
+  assertEquals(supabase.uploadLog.length, 1, "Expected only passing launcher to upload");
+});
+
+Deno.test("generate-companion-launcher-image blocks persistent backdrop validation failures", async () => {
+  const supabase = createMockSupabase({ companion: baseCompanion() });
+  const editCalls: Array<Record<string, unknown>> = [];
+
+  const response = await handleGenerateCompanionLauncherImage(
+    new Request("https://example.com", {
+      method: "POST",
+      body: JSON.stringify({ companionId: "companion-1" }),
+    }),
+    {
+      authenticate: async () => ({ userId: "user-1", isInternal: false }),
+      createSupabaseClient: () => supabase,
+      createCostGuardrailSessionFn: createNoopCostGuardrailSession,
+      editCompanionImageFn: async (args: any) => {
+        editCalls.push(args);
+        return {
+          imageDataUrl: transparentPngDataUrl,
+          revisedPrompt: null,
+          size: "1024x1024",
+        };
+      },
+      judgeCompanionImageFn: async () => failingLauncherJudgeScores,
+      now: () => 346,
+    },
+  );
+
+  const body = await response.json();
+  assertEquals(response.status, 424, "Expected failed validation status");
+  assertEquals(
+    body.code,
+    "COMPANION_LAUNCHER_VALIDATION_FAILED",
+    "Expected structured validation failure code",
+  );
+  assertEquals(editCalls.length, 2, "Expected validation retry budget to be used");
+  assertEquals(supabase.uploadLog.length, 0, "Expected no upload for failed launcher");
+});
+
+Deno.test("generate-companion-launcher-image does not cache unvalidated launcher art", async () => {
+  const supabase = createMockSupabase({ companion: baseCompanion() });
+
+  const response = await handleGenerateCompanionLauncherImage(
+    new Request("https://example.com", {
+      method: "POST",
+      body: JSON.stringify({ companionId: "companion-1" }),
+    }),
+    {
+      authenticate: async () => ({ userId: "user-1", isInternal: false }),
+      createSupabaseClient: () => supabase,
+      createCostGuardrailSessionFn: createNoopCostGuardrailSession,
+      editCompanionImageFn: async () => ({
+        imageDataUrl: transparentPngDataUrl,
+        revisedPrompt: null,
+        size: "1024x1024",
+      }),
+      judgeCompanionImageFn: async () => null,
+      now: () => 347,
+    },
+  );
+
+  const body = await response.json();
+  assertEquals(response.status, 502, "Expected validation unavailable status");
+  assertEquals(
+    body.code,
+    "COMPANION_LAUNCHER_VALIDATION_UNAVAILABLE",
+    "Expected structured validation unavailable code",
+  );
+  assertEquals(body.retryable, true, "Expected unavailable judge to be retryable");
+  assertEquals(supabase.uploadLog.length, 0, "Expected no upload without validation");
 });
 
 Deno.test("generate-companion-launcher-image skips stale requested source without generating", async () => {
@@ -614,6 +746,7 @@ Deno.test("generate-companion-launcher-image returns structured retryable upload
         revisedPrompt: null,
         size: "1024x1024",
       }),
+      judgeCompanionImageFn: createPassingLauncherJudge(),
       now: () => 456,
     },
   );
@@ -660,6 +793,7 @@ Deno.test("generate-companion-launcher-image returns structured retryable save e
         revisedPrompt: null,
         size: "1024x1024",
       }),
+      judgeCompanionImageFn: createPassingLauncherJudge(),
       now: () => 456,
     },
   );
@@ -712,6 +846,7 @@ Deno.test("generate-companion-launcher-image regenerates stale launcher art and 
           size: "1024x1024",
         };
       },
+      judgeCompanionImageFn: createPassingLauncherJudge(),
       now: () => 456,
     },
   );
@@ -754,7 +889,7 @@ Deno.test("generate-companion-launcher-image regenerates stale launcher art and 
   assertEquals(supabase.uploadLog.length, 1, "Expected generated image upload");
   assert(
     String(supabase.uploadLog[0].path).includes(
-      "user-1/companion_user-1_launcher_transparent_stage3_456.png",
+      "user-1/companion_user-1_launcher_validated_transparent_stage3_456.png",
     ),
     "Expected upload path to follow companion image storage convention",
   );
@@ -806,6 +941,7 @@ Deno.test("generate-companion-launcher-image discards uploads when the source im
         revisedPrompt: null,
         size: "1024x1024",
       }),
+      judgeCompanionImageFn: createPassingLauncherJudge(),
       now: () => 789,
     },
   );

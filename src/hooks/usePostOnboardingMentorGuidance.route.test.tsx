@@ -368,6 +368,42 @@ describe("guided tutorial route restoration", () => {
     });
   });
 
+  it("shows the hatch waiting notice on Companion without restoring routes while hatch is pending", async () => {
+    mocks.guidedTutorial = {
+      ...createFreshTutorial(),
+      completedSteps: ["new_goal"],
+      xpAwardedSteps: ["new_goal"],
+      milestonesCompleted: [
+        "mentor_intro_hello",
+        "start_new_goal",
+        "complete_pathfinder_campaign",
+        "campaign_calendar_handoff",
+        "tap_hatch_companion",
+      ],
+      evolutionInFlight: true,
+      evolutionStartedAt: "2026-05-01T12:00:00.000Z",
+    };
+
+    renderWithProviders("/companion");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("path")).toHaveTextContent("/companion");
+      expect(screen.getByTestId("active")).toHaveTextContent("true");
+      expect(screen.getByTestId("step")).toHaveTextContent("hatch_companion");
+      expect(screen.getByTestId("dialogue")).toHaveTextContent("Your Companion is hatching.");
+      expect(screen.getByTestId("intro-action")).toHaveTextContent("Dismiss");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "go-journeys" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
+      expect(screen.getByTestId("active")).toHaveTextContent("false");
+      expect(screen.getByTestId("step")).toHaveTextContent("");
+      expect(screen.getByTestId("dialogue")).toHaveTextContent("");
+    });
+  });
+
   it("stops restoring tutorial routes after the tutorial was previously dismissed", async () => {
     mocks.guidedTutorial = {
       ...createFreshTutorial(),

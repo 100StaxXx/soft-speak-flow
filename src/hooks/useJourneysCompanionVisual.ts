@@ -14,7 +14,7 @@ import { useCompanionCareSignals } from "./useCompanionCareSignals";
 import { useCompanionHealth } from "./useCompanionHealth";
 
 const COMPANION_PLACEHOLDER = "/placeholder-companion.svg";
-const TRANSPARENT_LAUNCHER_IMAGE_MARKER = "_launcher_transparent_stage";
+const TRANSPARENT_LAUNCHER_IMAGE_MARKER = "_launcher_validated_transparent_stage";
 
 const isTransparentLauncherImageUrl = (value?: string | null): value is string =>
   typeof value === "string" && value.includes(TRANSPARENT_LAUNCHER_IMAGE_MARKER);

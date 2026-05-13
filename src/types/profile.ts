@@ -72,6 +72,7 @@ export interface GuidedTutorialProgress {
   evolutionInFlight?: boolean;
   evolutionStartedAt?: string;
   evolutionCompletedAt?: string;
+  hatchWaitingNoticeDismissedAt?: string;
   hatchReadyTopUpAwardedAt?: string;
   hatchReadyTopUpAmount?: number;
   introEnabled?: boolean;

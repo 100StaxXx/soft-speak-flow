@@ -17,6 +17,8 @@ import {
   editCompanionImage,
   OpenAIImageRequestError,
 } from "../_shared/openaiCompanionImageClient.ts";
+import { judgeCompanionImage } from "../_shared/companionImageJudge.ts";
+import { synthesizeVisualIdentityProfile } from "../_shared/companionLineage.ts";
 import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
 
 const corsHeaders = {
@@ -27,7 +29,14 @@ const corsHeaders = {
 
 const COMPANION_IMAGE_BUCKET = "mentors-avatars";
 const LAUNCHER_IMAGE_SIZE = "1024x1024";
-const LAUNCHER_IMAGE_FILE_KIND = "launcher_transparent";
+const LAUNCHER_IMAGE_FILE_KIND = "launcher_validated_transparent";
+const LAUNCHER_VALIDATION_ATTEMPTS = 2;
+const LAUNCHER_JUDGE_MINIMUMS = {
+  overall: 6,
+  continuity: 5,
+  anatomy: 5,
+  backgroundCutout: 7,
+};
 
 interface CompanionRow {
   id: string;
@@ -38,6 +47,7 @@ interface CompanionRow {
   spirit_animal: string | null;
   core_element: string | null;
   favorite_color: string | null;
+  visual_identity_profile?: unknown;
   current_stage: number | null;
   current_image_url: string | null;
   launcher_image_url: string | null;
@@ -54,6 +64,7 @@ interface GenerateCompanionLauncherImageDeps {
   createSupabaseClient: () => any;
   createCostGuardrailSessionFn: any;
   editCompanionImageFn: typeof editCompanionImage;
+  judgeCompanionImageFn?: typeof judgeCompanionImage;
   now: () => number;
 }
 
@@ -66,6 +77,7 @@ const defaultDeps: GenerateCompanionLauncherImageDeps = {
   },
   createCostGuardrailSessionFn: createCostGuardrailSession,
   editCompanionImageFn: editCompanionImage,
+  judgeCompanionImageFn: judgeCompanionImage,
   now: () => Date.now(),
 };
 
@@ -139,6 +151,43 @@ Change only the presentation:
 
 Output a polished square transparent PNG-style render for a mobile floating action button.`;
 };
+
+const buildLauncherRetryPrompt = (
+  basePrompt: string,
+  notes: string | null | undefined,
+): string => {
+  const critique = typeof notes === "string" && notes.trim().length > 0
+    ? notes.trim()
+    : "The prior launcher image did not pass the transparent cutout quality gate.";
+
+  return `${basePrompt}\n\nRetry critique:\n- ${critique}\n- Regenerate as a true transparent alpha cutout only. Do not include any visible rectangular background, sky, clouds, floor, frame, card, scenery, or shadow plane.`;
+};
+
+const getLauncherBackgroundCutoutScore = (
+  scores: Awaited<ReturnType<typeof judgeCompanionImage>>,
+): number =>
+  scores && typeof scores.backgroundCutout === "number"
+    ? scores.backgroundCutout
+    : 0;
+
+const launcherScoresPass = (
+  scores: Awaited<ReturnType<typeof judgeCompanionImage>>,
+): boolean =>
+  Boolean(
+    scores &&
+      scores.overall >= LAUNCHER_JUDGE_MINIMUMS.overall &&
+      scores.continuity >= LAUNCHER_JUDGE_MINIMUMS.continuity &&
+      scores.anatomy >= LAUNCHER_JUDGE_MINIMUMS.anatomy &&
+      getLauncherBackgroundCutoutScore(scores) >=
+        LAUNCHER_JUDGE_MINIMUMS.backgroundCutout,
+  );
+
+const buildLauncherVisualProfile = (companion: CompanionRow) =>
+  synthesizeVisualIdentityProfile(companion.visual_identity_profile, {
+    spiritAnimal: companion.spirit_animal ?? "companion creature",
+    coreElement: companion.core_element ?? "natural",
+    favoriteColor: companion.favorite_color ?? "#FF6B35",
+  });
 
 const jsonResponse = (
   body: Record<string, unknown>,
@@ -258,10 +307,11 @@ export async function handleGenerateCompanionLauncherImage(
     }
 
     const supabase = deps.createSupabaseClient();
+    const judgeCompanionImageFn = deps.judgeCompanionImageFn ?? judgeCompanionImage;
     const { data, error: companionError } = await supabase
       .from("user_companion")
       .select(
-        "id, user_id, preset_id, companion_name, cached_creature_name, spirit_animal, core_element, favorite_color, current_stage, current_image_url, launcher_image_url, launcher_image_focal_x, launcher_image_focal_y, launcher_image_source_url",
+        "id, user_id, preset_id, companion_name, cached_creature_name, spirit_animal, core_element, favorite_color, visual_identity_profile, current_stage, current_image_url, launcher_image_url, launcher_image_focal_x, launcher_image_focal_y, launcher_image_source_url",
       )
       .eq("id", companionId)
       .eq("user_id", requestAuth.userId)
@@ -361,73 +411,146 @@ export async function handleGenerateCompanionLauncherImage(
     });
     const guardedFetch = costGuardrails.wrapFetch(fetch);
     await costGuardrails.enforceAccess({
-      capabilities: ["image"],
+      capabilities: ["image", "text"],
       providers: ["openai"],
     });
 
-    const generatedImage = await (async () => {
-      try {
-        return await deps.editCompanionImageFn({
-          guardedFetch,
-          openAIApiKey,
-          prompt: buildLauncherPrompt(companion),
-          size: LAUNCHER_IMAGE_SIZE,
-          quality: "high",
-          background: "transparent",
-          outputFormat: "png",
-          userId: companion.user_id,
-          referenceImages: [{ imageUrl: referenceImageUrl }],
-        });
-      } catch (error) {
-        const errorMessage = getErrorMessage(error);
-        const referenceStatus = getReferenceDownloadStatus(errorMessage);
-        const openAIStatus = getOpenAIImageRequestStatus(error, errorMessage);
-
-        if (
-          errorMessage.includes("Companion image model is not configured") ||
-          errorMessage.includes("OPENAI_API_KEY")
-        ) {
-          throw launcherErrorResponse({
-            status: 500,
-            message: "Companion launcher image generation is not configured",
-            code: "COMPANION_LAUNCHER_CONFIG_ERROR",
-            stage: "configure_openai",
-            failureReason: "openai_config_invalid",
-            upstreamError: errorMessage,
-          });
-        }
-
-        if (errorMessage.startsWith("Failed to download reference image:")) {
-          throw launcherErrorResponse({
-            status: referenceStatus && referenceStatus < 500 ? 424 : 502,
-            message: "Companion reference image could not be downloaded",
-            code: "COMPANION_LAUNCHER_REFERENCE_DOWNLOAD_FAILED",
-            stage: "download_reference",
-            failureReason: "reference_download_failed",
-            retryable: !referenceStatus || referenceStatus >= 500 ||
-              referenceStatus === 408,
-            upstreamStatus: referenceStatus,
-            upstreamError: errorMessage,
-          });
-        }
-
-        throw launcherErrorResponse({
-          status: getLauncherStatusForUpstreamFailure(openAIStatus),
-          message: "Companion launcher image edit failed",
-          code: "COMPANION_LAUNCHER_OPENAI_EDIT_FAILED",
-          stage: "edit_image",
-          failureReason: "openai_edit_failed",
-          retryable: isRetryableUpstreamStatus(openAIStatus),
-          upstreamStatus: openAIStatus,
-          upstreamError: errorMessage,
-        });
-      }
-    })();
-
-    const imageBuffer = parseDataUrl(generatedImage.imageDataUrl);
+    const baseLauncherPrompt = buildLauncherPrompt(companion);
+    const visualIdentityProfile = buildLauncherVisualProfile(companion);
     const stage = typeof companion.current_stage === "number"
       ? companion.current_stage
       : 0;
+    let promptForAttempt = baseLauncherPrompt;
+    let generatedImage: Awaited<ReturnType<typeof editCompanionImage>> | null = null;
+    let lastValidationScores: Awaited<ReturnType<typeof judgeCompanionImage>> = null;
+
+    for (let attempt = 0; attempt < LAUNCHER_VALIDATION_ATTEMPTS; attempt += 1) {
+      const candidateImage = await (async () => {
+        try {
+          return await deps.editCompanionImageFn({
+            guardedFetch,
+            openAIApiKey,
+            prompt: promptForAttempt,
+            size: LAUNCHER_IMAGE_SIZE,
+            quality: "high",
+            background: "transparent",
+            outputFormat: "png",
+            userId: companion.user_id,
+            referenceImages: [{ imageUrl: referenceImageUrl }],
+          });
+        } catch (error) {
+          const errorMessage = getErrorMessage(error);
+          const referenceStatus = getReferenceDownloadStatus(errorMessage);
+          const openAIStatus = getOpenAIImageRequestStatus(error, errorMessage);
+
+          if (
+            errorMessage.includes("Companion image model is not configured") ||
+            errorMessage.includes("OPENAI_API_KEY")
+          ) {
+            throw launcherErrorResponse({
+              status: 500,
+              message: "Companion launcher image generation is not configured",
+              code: "COMPANION_LAUNCHER_CONFIG_ERROR",
+              stage: "configure_openai",
+              failureReason: "openai_config_invalid",
+              upstreamError: errorMessage,
+            });
+          }
+
+          if (errorMessage.startsWith("Failed to download reference image:")) {
+            throw launcherErrorResponse({
+              status: referenceStatus && referenceStatus < 500 ? 424 : 502,
+              message: "Companion reference image could not be downloaded",
+              code: "COMPANION_LAUNCHER_REFERENCE_DOWNLOAD_FAILED",
+              stage: "download_reference",
+              failureReason: "reference_download_failed",
+              retryable: !referenceStatus || referenceStatus >= 500 ||
+                referenceStatus === 408,
+              upstreamStatus: referenceStatus,
+              upstreamError: errorMessage,
+            });
+          }
+
+          throw launcherErrorResponse({
+            status: getLauncherStatusForUpstreamFailure(openAIStatus),
+            message: "Companion launcher image edit failed",
+            code: "COMPANION_LAUNCHER_OPENAI_EDIT_FAILED",
+            stage: "edit_image",
+            failureReason: "openai_edit_failed",
+            retryable: isRetryableUpstreamStatus(openAIStatus),
+            upstreamStatus: openAIStatus,
+            upstreamError: errorMessage,
+          });
+        }
+      })();
+
+      const validationScores = await judgeCompanionImageFn({
+        guardedFetch,
+        openAIApiKey,
+        profile: visualIdentityProfile,
+        mode: "launcher",
+        candidateImageUrl: candidateImage.imageDataUrl,
+        referenceImageUrl,
+        previousLevel: stage,
+        nextLevel: stage,
+      });
+
+      lastValidationScores = validationScores;
+
+      if (launcherScoresPass(validationScores)) {
+        generatedImage = candidateImage;
+        break;
+      }
+
+      if (!validationScores) {
+        return launcherErrorResponse({
+          status: 502,
+          message: "Companion launcher image could not be validated",
+          code: "COMPANION_LAUNCHER_VALIDATION_UNAVAILABLE",
+          stage: "validate_image",
+          failureReason: "launcher_validation_unavailable",
+          retryable: true,
+        });
+      }
+
+      if (attempt < LAUNCHER_VALIDATION_ATTEMPTS - 1) {
+        promptForAttempt = buildLauncherRetryPrompt(
+          baseLauncherPrompt,
+          validationScores.notes,
+        );
+      }
+    }
+
+    if (!generatedImage) {
+      const backgroundCutoutFailed = Boolean(
+        lastValidationScores &&
+          getLauncherBackgroundCutoutScore(lastValidationScores) <
+            LAUNCHER_JUDGE_MINIMUMS.backgroundCutout,
+      );
+      const validationFailureReason = backgroundCutoutFailed
+        ? "launcher_background_cutout_failed"
+        : "launcher_quality_gate_failed";
+
+      return launcherErrorResponse({
+        status: 424,
+        message: "Companion launcher image failed transparent cutout validation",
+        code: "COMPANION_LAUNCHER_VALIDATION_FAILED",
+        stage: "validate_image",
+        failureReason: validationFailureReason,
+        retryable: false,
+        upstreamError: lastValidationScores
+          ? JSON.stringify({
+            backgroundCutout: lastValidationScores.backgroundCutout,
+            continuity: lastValidationScores.continuity,
+            anatomy: lastValidationScores.anatomy,
+            overall: lastValidationScores.overall,
+            notes: lastValidationScores.notes,
+          })
+          : null,
+      });
+    }
+
+    const imageBuffer = parseDataUrl(generatedImage.imageDataUrl);
     const filePath =
       `${companion.user_id}/companion_${companion.user_id}_${LAUNCHER_IMAGE_FILE_KIND}_stage${stage}_${deps.now()}.png`;
 

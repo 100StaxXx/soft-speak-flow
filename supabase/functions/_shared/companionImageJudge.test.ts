@@ -17,9 +17,9 @@ function assertEquals<T>(actual: T, expected: T, message: string): void {
 }
 
 Deno.test("companion image judge requires and returns background cutout scoring", async () => {
-  let capturedBody: Record<string, unknown> | null = null;
+  const capturedBodies: Array<Record<string, unknown>> = [];
   const guardedFetch = async (_input: RequestInfo | URL, init?: RequestInit) => {
-    capturedBody = JSON.parse(String(init?.body ?? "{}"));
+    capturedBodies.push(JSON.parse(String(init?.body ?? "{}")));
     return new Response(
       JSON.stringify({
         choices: [
@@ -65,6 +65,7 @@ Deno.test("companion image judge requires and returns background cutout scoring"
   });
 
   assertEquals(scores?.backgroundCutout, 3, "Expected parsed background cutout score");
+  const capturedBody = capturedBodies[0];
   assert(capturedBody, "Expected judge request body to be captured");
 
   const tools = capturedBody.tools as Array<Record<string, any>>;

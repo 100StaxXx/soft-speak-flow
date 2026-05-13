@@ -2,7 +2,7 @@ import type { VisualIdentityProfile } from "./companionLineage.ts";
 
 const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
 
-export type CompanionImageJudgeMode = "bootstrap" | "egg" | "evolution";
+export type CompanionImageJudgeMode = "bootstrap" | "egg" | "evolution" | "launcher";
 
 export interface CompanionImageJudgeScores {
   continuity: number;
@@ -66,6 +66,20 @@ const buildJudgeInstructions = ({
         "Anatomy means: the egg is coherent, readable, and not malformed.",
         "Centering means: the egg is cleanly framed and visually centered.",
         "BackgroundCutout means: 10 for a clean egg-only transparent/empty cutout; 0-4 for any visible sky, clouds, landscape, room, floor, frame, card, rectangular backdrop, or scenic environment.",
+      ].join("\n");
+    case "launcher":
+      return [
+        "You are judging a dedicated mobile launcher cutout derived from an existing companion portrait.",
+        boundaryContext,
+        `Spirit animal lineage: ${profile.spiritAnimal}`,
+        `Core element: ${profile.coreElement}`,
+        `Favorite color anchor: ${profile.favoriteColor}`,
+        "The first image is the current companion reference. The second image is the candidate launcher cutout.",
+        "Continuity means: it is clearly the same companion identity, species, silhouette logic, palette, markings, and maturity.",
+        "Difference should be 10 when the only meaningful change is presentation/framing, not a redesign or evolution.",
+        "Anatomy means: no extra limbs, no broken face logic, and no obvious malformed body plan.",
+        "Centering means: the subject is well framed, full body, and not awkwardly cropped.",
+        "BackgroundCutout means: 10 for a clean companion-only transparent/empty cutout; 0-4 for any visible sky, clouds, landscape, room, floor, frame, card, rectangular backdrop, or scenic environment.",
       ].join("\n");
     case "evolution":
     default:

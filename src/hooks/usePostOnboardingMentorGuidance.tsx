@@ -268,6 +268,10 @@ const TUTORIAL_COMPLETION_TITLE = "You're ready.";
 const TUTORIAL_COMPLETION_BODY =
   "Your Companion is awake, your first path is set, and today has somewhere to go.";
 const TUTORIAL_COMPLETION_CTA_LABEL = "Start my journey";
+const HATCH_WAITING_NOTICE_TITLE = "Your Companion is hatching.";
+const HATCH_WAITING_NOTICE_BODY =
+  "This can take a few minutes. You can come back when the reveal is ready.";
+const HATCH_WAITING_NOTICE_CTA_LABEL = "Dismiss";
 
 const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, MentorDialogueLine>> = {
   sage: {
@@ -431,6 +435,7 @@ interface MigratedGuidedProgress {
   evolutionInFlight: boolean;
   evolutionStartedAt?: string;
   evolutionCompletedAt?: string;
+  hatchWaitingNoticeDismissedAt?: string;
   hatchReadyTopUpAwardedAt?: string;
   hatchReadyTopUpAmount?: number;
   needsMigration: boolean;
@@ -518,6 +523,7 @@ const migrateGuidedTutorialProgress = ({
   evolutionInFlight,
   evolutionStartedAt,
   evolutionCompletedAt,
+  hatchWaitingNoticeDismissedAt,
   hatchReadyTopUpAwardedAt,
   hatchReadyTopUpAmount,
 }: {
@@ -531,6 +537,7 @@ const migrateGuidedTutorialProgress = ({
   evolutionInFlight: boolean;
   evolutionStartedAt?: string;
   evolutionCompletedAt?: string;
+  hatchWaitingNoticeDismissedAt?: string;
   hatchReadyTopUpAwardedAt?: string;
   hatchReadyTopUpAmount?: number;
 }): MigratedGuidedProgress => {
@@ -665,6 +672,7 @@ const migrateGuidedTutorialProgress = ({
     evolutionInFlight,
     evolutionStartedAt,
     evolutionCompletedAt,
+    hatchWaitingNoticeDismissedAt,
     hatchReadyTopUpAwardedAt,
     hatchReadyTopUpAmount,
     needsMigration,
@@ -807,6 +815,13 @@ const getMilestoneDialogue = (
   milestoneId: GuidedMilestoneId,
   mentorSlug: string | undefined,
 ): MentorDialogueLine => {
+  if (milestoneId === "complete_companion_hatch") {
+    return {
+      text: HATCH_WAITING_NOTICE_TITLE,
+      support: HATCH_WAITING_NOTICE_BODY,
+    };
+  }
+
   if (isTutorialDialogueKey(milestoneId)) {
     return getDialogueForMentor(mentorSlug, milestoneId);
   }
@@ -884,6 +899,8 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const [sessionMilestonesCompleted, setSessionMilestonesCompleted] = useState<GuidedMilestoneId[]>([]);
   const [sessionEvolutionInFlight, setSessionEvolutionInFlight] = useState<boolean | null>(null);
   const [sessionEvolutionCompletedAt, setSessionEvolutionCompletedAt] = useState<string | null>(null);
+  const [sessionHatchWaitingNoticeDismissedAt, setSessionHatchWaitingNoticeDismissedAt] =
+    useState<string | null>(null);
   const [sessionHatchReadyTopUp, setSessionHatchReadyTopUp] = useState<{
     awardedAt: string;
     amount: number;
@@ -911,6 +928,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     setSessionMilestonesCompleted([]);
     setSessionEvolutionInFlight(null);
     setSessionEvolutionCompletedAt(null);
+    setSessionHatchWaitingNoticeDismissedAt(null);
     setSessionHatchReadyTopUp(null);
     setSessionDismissed(null);
     setActiveTargetSelector(null);
@@ -952,6 +970,19 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     }
     return undefined;
   }, [localProgress?.hatchReadyTopUpAwardedAt, remoteProgress?.hatchReadyTopUpAwardedAt]);
+
+  const persistedHatchWaitingNoticeDismissedAt = useMemo(() => {
+    if (typeof remoteProgress?.hatchWaitingNoticeDismissedAt === "string") {
+      return remoteProgress.hatchWaitingNoticeDismissedAt;
+    }
+    if (typeof localProgress?.hatchWaitingNoticeDismissedAt === "string") {
+      return localProgress.hatchWaitingNoticeDismissedAt;
+    }
+    return undefined;
+  }, [
+    localProgress?.hatchWaitingNoticeDismissedAt,
+    remoteProgress?.hatchWaitingNoticeDismissedAt,
+  ]);
 
   const persistedHatchReadyTopUpAmount = useMemo(() => {
     const remoteAmount = remoteProgress?.hatchReadyTopUpAmount;
@@ -1015,6 +1046,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
             : typeof localProgress?.evolutionCompletedAt === "string"
               ? localProgress.evolutionCompletedAt
               : undefined,
+        hatchWaitingNoticeDismissedAt: persistedHatchWaitingNoticeDismissedAt,
         hatchReadyTopUpAwardedAt: persistedHatchReadyTopUpAwardedAt,
         hatchReadyTopUpAmount: persistedHatchReadyTopUpAmount,
       }),
@@ -1025,6 +1057,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       localProgress?.evolutionInFlight,
       localProgress?.evolutionStartedAt,
       localProgress?.flowVersion,
+      persistedHatchWaitingNoticeDismissedAt,
       persistedHatchReadyTopUpAmount,
       persistedHatchReadyTopUpAwardedAt,
       mergedCreateQuestProgress,
@@ -1043,6 +1076,8 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const persistedCompleted = migratedProgress.completedSteps;
   const persistedAwarded = migratedProgress.xpAwardedSteps;
   const persistedMilestones = migratedProgress.milestonesCompleted;
+  const hatchWaitingNoticeDismissedAt =
+    sessionHatchWaitingNoticeDismissedAt ?? migratedProgress.hatchWaitingNoticeDismissedAt;
   const hatchReadyTopUpAwardedAt =
     sessionHatchReadyTopUp?.awardedAt ?? migratedProgress.hatchReadyTopUpAwardedAt;
 
@@ -1090,6 +1125,12 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       evolutionInFlight ||
       (milestoneSet.has("tap_hatch_companion") && !evolutionCompletionRecordedAt)
     );
+  const isHatchWaitingNoticeVisible =
+    isHatchRevealPending &&
+    location.pathname === "/companion" &&
+    !hatchWaitingNoticeDismissedAt;
+  const isHatchRevealGuidanceHidden =
+    isHatchRevealPending && !isHatchWaitingNoticeVisible;
   const companionQueryKey = useMemo(() => getCompanionQueryKey(user?.id), [user?.id]);
   const { data: cachedCompanionData, dataUpdatedAt: companionDataUpdatedAt } = useQuery<Companion | null>({
     queryKey: companionQueryKey,
@@ -1203,6 +1244,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       evolutionInFlight: migratedProgress.evolutionInFlight,
       evolutionStartedAt: migratedProgress.evolutionStartedAt,
       evolutionCompletedAt: migratedProgress.evolutionCompletedAt,
+      hatchWaitingNoticeDismissedAt: migratedProgress.hatchWaitingNoticeDismissedAt,
       hatchReadyTopUpAwardedAt: migratedProgress.hatchReadyTopUpAwardedAt,
       hatchReadyTopUpAmount: migratedProgress.hatchReadyTopUpAmount,
     };
@@ -2020,6 +2062,8 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     user?.id,
   ]);
 
+  const supportsHatchWaitingNoticeAction =
+    isHatchWaitingNoticeVisible && currentMilestone === "complete_companion_hatch";
   const supportsDialogueAction =
     currentMilestone === "mentor_intro_hello" ||
     currentMilestone === "campaign_calendar_handoff" ||
@@ -2028,12 +2072,15 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     currentMilestone === "quests_campaigns_intro" ||
     currentMilestone === "companion_tab_intro" ||
     currentMilestone === "post_evolution_companion_intro" ||
-    currentMilestone === "mentor_closeout_message";
+    currentMilestone === "mentor_closeout_message" ||
+    supportsHatchWaitingNoticeAction;
   const dialogueActionLabel = supportsDialogueAction
     ? currentMilestone === "mentor_intro_hello"
       ? "Start Tutorial"
       : currentMilestone === "campaign_calendar_handoff"
       ? "Meet companion"
+      : supportsHatchWaitingNoticeAction
+      ? HATCH_WAITING_NOTICE_CTA_LABEL
       : currentMilestone === "first_plan_closeout_message"
       ? "Finish"
       : currentMilestone === "mentor_closeout_message"
@@ -2057,6 +2104,14 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       completeTutorial();
       return;
     }
+    if (supportsHatchWaitingNoticeAction) {
+      const dismissedAt = new Date().toISOString();
+      setSessionHatchWaitingNoticeDismissedAt(dismissedAt);
+      void persistProgress({
+        hatchWaitingNoticeDismissedAt: dismissedAt,
+      });
+      return;
+    }
     markMilestoneComplete(currentMilestone);
   }, [
     completeTutorial,
@@ -2064,7 +2119,9 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     markMilestoneComplete,
     markStepComplete,
     navigate,
+    persistProgress,
     refreshCompanionForTutorialHandoff,
+    supportsHatchWaitingNoticeAction,
     supportsDialogueAction,
   ]);
 
@@ -2108,7 +2165,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       tutorialSuppressed ||
       isCampaignBuilderTutorialPaused ||
       campaignCreationAnimationPending ||
-      isHatchRevealPending ||
+      isHatchRevealGuidanceHidden ||
       !currentMilestone
     ) {
       currentMilestoneStartedAtRef.current = null;
@@ -2129,7 +2186,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     currentStep?.id,
     campaignCreationAnimationPending,
     isCampaignBuilderTutorialPaused,
-    isHatchRevealPending,
+    isHatchRevealGuidanceHidden,
     location.pathname,
     tutorialSuppressed,
     user?.id,
@@ -2141,7 +2198,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       tutorialSuppressed ||
       isCampaignBuilderTutorialPaused ||
       campaignCreationAnimationPending ||
-      isHatchRevealPending ||
+      isHatchRevealGuidanceHidden ||
       !currentMilestone ||
       isIntroDialogueActive ||
       shouldRestoreRoute ||
@@ -2198,7 +2255,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     isIntroDialogueActive,
     campaignCreationAnimationPending,
     isCampaignBuilderTutorialPaused,
-    isHatchRevealPending,
+    isHatchRevealGuidanceHidden,
     location.pathname,
     shouldRestoreRoute,
     tutorialSuppressed,
@@ -2211,7 +2268,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     !tutorialSuppressed &&
     !isCampaignBuilderTutorialPaused &&
     !campaignCreationAnimationPending &&
-    !isHatchRevealPending &&
+    !isHatchRevealGuidanceHidden &&
     !shouldRestoreRoute &&
     !pathIsHidden(location.pathname) &&
     Boolean(currentStep);
@@ -2333,10 +2390,11 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     tutorialSuppressed ||
     isCampaignBuilderTutorialPaused ||
     campaignCreationAnimationPending ||
-    isHatchRevealPending;
+    isHatchRevealGuidanceHidden;
   const secondaryActionLabel = undefined;
   const onSecondaryAction = undefined;
-  const isPreHatchCompanionStep = !tutorialUnavailable && currentStepId === "hatch_companion";
+  const isPreHatchCompanionStep =
+    !tutorialUnavailable && currentStepId === "hatch_companion" && !isHatchRevealPending;
 
   return {
     isIntroDialogueActive,

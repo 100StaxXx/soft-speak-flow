@@ -72,6 +72,7 @@ const JUDGE_MINIMUMS = {
 };
 const EVOLUTION_QUALITY_GATE_CODE = "evolution_quality_gate_failed";
 const EVOLUTION_CONTINUITY_UNVERIFIED_CODE = "evolution_continuity_unverified";
+const EVOLUTION_VALIDATION_UNAVAILABLE_CODE = "evolution_validation_unavailable";
 
 const getJudgeBackgroundCutoutScore = (
   scores: Awaited<ReturnType<typeof judgeCompanionImage>>,
@@ -82,11 +83,15 @@ class EvolutionQualityGateError extends Error {
   code: string;
   status: number;
 
-  constructor(message: string, code = EVOLUTION_QUALITY_GATE_CODE) {
+  constructor(
+    message: string,
+    code = EVOLUTION_QUALITY_GATE_CODE,
+    status = 422,
+  ) {
     super(message);
     this.name = "EvolutionQualityGateError";
     this.code = code;
-    this.status = 422;
+    this.status = status;
   }
 }
 
@@ -918,6 +923,22 @@ export const handleGenerateCompanionEvolution = async (
           }),
       });
 
+      if (stageOneAttempt.judgeUnavailable) {
+        throw new EvolutionQualityGateError(
+          "Companion stage-1 render could not be validated because judge scores were unavailable.",
+          EVOLUTION_VALIDATION_UNAVAILABLE_CODE,
+          502,
+        );
+      }
+
+      if (!stageOneAttempt.passed && !stageOneAttempt.judgeUnavailable) {
+        throw new EvolutionQualityGateError(
+          `Companion stage-1 render failed quality gate: ${
+            stageOneAttempt.scores?.notes || "candidate did not pass judge"
+          }`,
+        );
+      }
+
       const { fileName, publicUrl: newImageUrl } = await uploadGeneratedImageFn(
         {
           supabase,
@@ -1104,6 +1125,14 @@ export const handleGenerateCompanionEvolution = async (
       throw new EvolutionQualityGateError(
         "Companion evolution continuity could not be verified because visual anchors and judge scores were unavailable.",
         EVOLUTION_CONTINUITY_UNVERIFIED_CODE,
+      );
+    }
+
+    if (evolutionAttempt.judgeUnavailable) {
+      throw new EvolutionQualityGateError(
+        "Companion evolution render could not be validated because judge scores were unavailable.",
+        EVOLUTION_VALIDATION_UNAVAILABLE_CODE,
+        502,
       );
     }
 

@@ -464,6 +464,116 @@ Deno.test("legacy stage-1 backfill generates a fresh starter and marks provenanc
   );
 });
 
+Deno.test("legacy stage-1 backfill rejects generated starters that fail the background gate", async () => {
+  const companion = createCompanion({
+    image_lineage_metadata: null,
+    current_image_url: "https://example.com/legacy-ai-egg.png",
+    initial_image_url: "https://example.com/legacy-ai-egg.png",
+  });
+  const harness = createDeps({
+    companion,
+    thresholds: [
+      { stage: 1, xp_required: 10 },
+      { stage: 2, xp_required: 30 },
+    ],
+    judgeScores: [createBackgroundFailingScores()],
+  });
+
+  const response = await module.handleGenerateCompanionEvolution(
+    createInternalRequest(),
+    harness.deps,
+  );
+  const payload = await response.json();
+
+  assertEquals(
+    response.status,
+    422,
+    "Expected failed stage-1 background gate status",
+  );
+  assertEquals(
+    payload.code,
+    "evolution_quality_gate_failed",
+    "Expected quality gate error code",
+  );
+  assert(
+    String(payload.error).includes("visible sky and cloud backdrop"),
+    "Expected quality gate error to include judge backdrop critique",
+  );
+  assertEquals(
+    harness.generateCalls.length,
+    2,
+    "Expected retry budget to be used before rejection",
+  );
+  assertEquals(
+    harness.uploadCalls.length,
+    0,
+    "Expected no upload for failed background gate",
+  );
+  assertEquals(
+    harness.upsertCalls.length,
+    0,
+    "Expected no evolution record for failed background gate",
+  );
+  assertEquals(
+    harness.updatedCompanions.length,
+    0,
+    "Expected no companion update for failed background gate",
+  );
+});
+
+Deno.test("legacy stage-1 backfill does not persist when the judge is unavailable", async () => {
+  const companion = createCompanion({
+    image_lineage_metadata: null,
+    current_image_url: "https://example.com/legacy-ai-egg.png",
+    initial_image_url: "https://example.com/legacy-ai-egg.png",
+  });
+  const harness = createDeps({
+    companion,
+    thresholds: [
+      { stage: 1, xp_required: 10 },
+      { stage: 2, xp_required: 30 },
+    ],
+    judgeScores: [null],
+  });
+
+  const response = await module.handleGenerateCompanionEvolution(
+    createInternalRequest(),
+    harness.deps,
+  );
+  const payload = await response.json();
+
+  assertEquals(
+    response.status,
+    502,
+    "Expected unavailable judge status",
+  );
+  assertEquals(
+    payload.code,
+    "evolution_validation_unavailable",
+    "Expected retryable validation-unavailable code",
+  );
+  assertEquals(
+    harness.generateCalls.length,
+    1,
+    "Expected generated candidate to be rejected before upload",
+  );
+  assertEquals(
+    harness.uploadCalls.length,
+    0,
+    "Expected no upload when judge is unavailable",
+  );
+  assertEquals(
+    harness.upsertCalls.length,
+    0,
+    "Expected no evolution record when judge is unavailable",
+  );
+  assertEquals(
+    harness.updatedCompanions.length,
+    0,
+    "Expected no companion update when judge is unavailable",
+  );
+});
+
 Deno.test("intermediate earned levels skip directly to the next visual boundary", async () => {
   const companion = createCompanion({
     current_stage: 1,
@@ -787,6 +897,55 @@ Deno.test("boundary evolutions do not persist when anchors and judge are unavail
     harness.updatedCompanions.length,
     0,
     "Expected no companion update when neither anchors nor judge are available",
+  );
+});
+
+Deno.test("boundary evolutions do not persist with anchors when the judge is unavailable", async () => {
+  const companion = createCompanion({
+    current_stage: 4,
+    current_xp: 120,
+    current_image_url: "https://example.com/stage-4.png",
+    initial_image_url: "https://example.com/stage-0.png",
+  });
+  const harness = createDeps({
+    companion,
+    thresholds: [
+      { stage: 5, xp_required: 100 },
+      { stage: 6, xp_required: 240 },
+    ],
+    judgeScores: [null],
+  });
+
+  const response = await module.handleGenerateCompanionEvolution(
+    createInternalRequest(),
+    harness.deps,
+  );
+  const payload = await response.json();
+
+  assertEquals(
+    response.status,
+    502,
+    "Expected unavailable judge status",
+  );
+  assertEquals(
+    payload.code,
+    "evolution_validation_unavailable",
+    "Expected retryable validation-unavailable code",
+  );
+  assertEquals(
+    harness.uploadCalls.length,
+    0,
+    "Expected no upload when judge is unavailable",
+  );
+  assertEquals(
+    harness.upsertCalls.length,
+    0,
+    "Expected no evolution record when judge is unavailable",
+  );
+  assertEquals(
+    harness.updatedCompanions.length,
+    0,
+    "Expected no companion update when judge is unavailable",
   );
 });
 

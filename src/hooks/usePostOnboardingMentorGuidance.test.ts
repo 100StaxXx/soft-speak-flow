@@ -500,6 +500,21 @@ describe("guided tutorial first-value loop", () => {
     });
 
     await waitFor(() => {
+      expect(result.current.isActive).toBe(true);
+      expect(result.current.currentStep).toBe("hatch_companion");
+      expect(result.current.dialogueText).toBe("Your Companion is hatching.");
+      expect(result.current.dialogueSupportText).toBe(
+        "This can take a few minutes. You can come back when the reveal is ready.",
+      );
+      expect(result.current.dialogueActionLabel).toBe("Dismiss");
+    });
+
+    await act(async () => {
+      result.current.onDialogueAction?.();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
       expect(result.current.isActive).toBe(false);
       expect(result.current.currentStep).toBeNull();
       expect(result.current.dialogueText).toBe("");
@@ -543,7 +558,7 @@ describe("guided tutorial first-value loop", () => {
     });
   });
 
-  it("hides the hatch card after tapping Hatch, waits through image updates, then shows mentor closeout after reveal dismissal", async () => {
+  it("dismisses only the hatch waiting notice, then shows mentor closeout after reveal dismissal", async () => {
     mocks.state.guidedTutorial = {
       ...createFreshTutorial(),
       completedSteps: ["new_goal"],
@@ -566,9 +581,44 @@ describe("guided tutorial first-value loop", () => {
     });
 
     await waitFor(() => {
+      expect(result.current.isActive).toBe(true);
+      expect(result.current.currentStep).toBe("hatch_companion");
+      expect(result.current.dialogueText).toBe("Your Companion is hatching.");
+      expect(result.current.dialogueSupportText).toBe(
+        "This can take a few minutes. You can come back when the reveal is ready.",
+      );
+      expect(result.current.dialogueActionLabel).toBe("Dismiss");
+    });
+
+    await act(async () => {
+      result.current.onDialogueAction?.();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
       expect(result.current.isActive).toBe(false);
       expect(result.current.currentStep).toBeNull();
       expect(result.current.dialogueText).toBe("");
+      expect(
+        mocks.state.profileUpdatePayloads.some((payload) => {
+          const guidedTutorial = (
+            payload.onboarding_data as
+              | {
+                  guided_tutorial?: {
+                    hatchWaitingNoticeDismissedAt?: string;
+                    completedSteps?: string[];
+                    milestonesCompleted?: string[];
+                  };
+                }
+              | undefined
+          )?.guided_tutorial;
+          return (
+            typeof guidedTutorial?.hatchWaitingNoticeDismissedAt === "string" &&
+            !guidedTutorial.completedSteps?.includes("hatch_companion") &&
+            !guidedTutorial.milestonesCompleted?.includes("complete_companion_hatch")
+          );
+        }),
+      ).toBe(true);
     });
 
     await act(async () => {

@@ -491,11 +491,54 @@ const JUDGE_MINIMUMS = {
   anatomy: 6,
   backgroundCutout: 7,
 };
+const COMPANION_IMAGE_BACKGROUND_GATE_CODE = "COMPANION_IMAGE_BACKGROUND_GATE_FAILED";
+const COMPANION_IMAGE_VALIDATION_UNAVAILABLE_CODE = "COMPANION_IMAGE_VALIDATION_UNAVAILABLE";
+
+class CompanionImageQualityGateError extends Error {
+  code: string;
+  status: number;
+
+  constructor(
+    message: string,
+    code = COMPANION_IMAGE_BACKGROUND_GATE_CODE,
+    status = 422,
+  ) {
+    super(message);
+    this.name = "CompanionImageQualityGateError";
+    this.code = code;
+    this.status = status;
+  }
+}
 
 const getJudgeBackgroundCutoutScore = (
   scores: Awaited<ReturnType<typeof judgeCompanionImage>>,
 ): number =>
   scores && typeof scores.backgroundCutout === "number" ? scores.backgroundCutout : 0;
+
+const hasJudgeBackgroundCutoutFailure = (
+  scores: Awaited<ReturnType<typeof judgeCompanionImage>>,
+): boolean =>
+  Boolean(scores) &&
+  getJudgeBackgroundCutoutScore(scores) < JUDGE_MINIMUMS.backgroundCutout;
+
+const buildBackgroundCutoutGateError = (
+  phase: string,
+  scores: Awaited<ReturnType<typeof judgeCompanionImage>>,
+): CompanionImageQualityGateError =>
+  new CompanionImageQualityGateError(
+    `Companion ${phase} failed transparent background quality gate: ${
+      scores?.notes || "visible background or non-transparent cutout"
+    }`,
+  );
+
+const buildValidationUnavailableGateError = (
+  phase: string,
+): CompanionImageQualityGateError =>
+  new CompanionImageQualityGateError(
+    `Companion ${phase} could not be validated because judge scores were unavailable.`,
+    COMPANION_IMAGE_VALIDATION_UNAVAILABLE_CODE,
+    502,
+  );
 
 const parseDataUrl = (dataUrl: string): Uint8Array => {
   const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, "");
@@ -1257,6 +1300,13 @@ serve(async (req) => {
           }),
       });
 
+      if (!stageOneAttempt.scores) {
+        throw buildValidationUnavailableGateError("hidden stage-1 bootstrap");
+      }
+      if (hasJudgeBackgroundCutoutFailure(stageOneAttempt.scores)) {
+        throw buildBackgroundCutoutGateError("hidden stage-1 bootstrap", stageOneAttempt.scores);
+      }
+
       const stageOneUploadStartedAt = Date.now();
       const hiddenStageOne = await uploadGeneratedDataUrl({
         supabase,
@@ -1323,6 +1373,13 @@ serve(async (req) => {
           });
         }
 
+        if (!eggAttempt.scores) {
+          throw buildValidationUnavailableGateError("stage-0 egg bootstrap");
+        }
+        if (hasJudgeBackgroundCutoutFailure(eggAttempt.scores)) {
+          throw buildBackgroundCutoutGateError("stage-0 egg bootstrap", eggAttempt.scores);
+        }
+
         const eggUploadStartedAt = Date.now();
         eggUpload = await uploadGeneratedDataUrl({
           supabase,
@@ -1369,8 +1426,8 @@ serve(async (req) => {
           scores: eggAttempt.scores,
         }
         : null;
-      const qualityWarnings: BootstrapQualityWarning[] = [stageOneWarning, eggWarning]
-        .filter((warning): warning is BootstrapQualityWarning => Boolean(warning));
+      const qualityWarnings = [stageOneWarning, eggWarning]
+        .filter(Boolean) as BootstrapQualityWarning[];
       const judgeUnavailable = stageOneAttempt.judgeUnavailable || eggAttempt.judgeUnavailable;
 
       const imageLineageMetadata = buildInitialImageLineageMetadata({
@@ -2130,6 +2187,58 @@ Score each aspect from 0-100 and list any issues.`;
         `No image was generated after all attempts (model=google/gemini-2.5-flash-image-preview, image_size=${imageSize}, attempts=${currentAttempt + 1}, last_upstream_status=${lastUpstreamStatus ?? "n/a"}, final_quality_overall=${qualityScore?.overall ?? "n/a"})`,
       );
     }
+
+    if (!qualityScore && qualityJudgeUnavailable) {
+      return timedResponse(
+        new Response(
+          JSON.stringify({
+            error: "Generated companion image could not be validated.",
+            code: COMPANION_IMAGE_VALIDATION_UNAVAILABLE_CODE,
+            judgeUnavailable: true,
+            qualityWarning: {
+              phase: "legacy_render",
+              code: "JUDGE_UNAVAILABLE",
+              retryCount: currentAttempt,
+              scores: null,
+            },
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 502,
+          },
+        ),
+        "quality_gate_unavailable",
+      );
+    }
+
+    const finalBackgroundIssues = qualityScore?.backgroundIssues ?? [];
+    const finalBackgroundCutoutFailed = Boolean(
+      qualityScore &&
+        ((qualityScore.backgroundCutout ?? 0) < 70 ||
+          finalBackgroundIssues.length > 0),
+    );
+    if (finalBackgroundCutoutFailed) {
+      return timedResponse(
+        new Response(
+          JSON.stringify({
+            error: "Generated companion image failed transparent background validation.",
+            code: "COMPANION_IMAGE_BACKGROUND_GATE_FAILED",
+            qualityScore,
+            qualityWarning: {
+              phase: "legacy_render",
+              code: "QUALITY_NOT_APPROVED",
+              retryCount: currentAttempt,
+              scores: qualityScore,
+            },
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 422,
+          },
+        ),
+        "background_quality_failed",
+      );
+    }
     
     console.log("Uploading to storage...");
     const storageStartedAt = Date.now();
@@ -2185,14 +2294,6 @@ Score each aspect from 0-100 and list any issues.`;
         retryCount: currentAttempt,
         scores: qualityScore,
       };
-    } else if (!qualityScore && qualityJudgeUnavailable) {
-      responseData.judgeUnavailable = true;
-      responseData.qualityWarning = {
-        phase: "legacy_render",
-        code: "JUDGE_UNAVAILABLE",
-        retryCount: currentAttempt,
-        scores: null,
-      };
     }
     
     if (extractedMetadata) {
@@ -2229,6 +2330,18 @@ Score each aspect from 0-100 and list any issues.`;
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 504 },
         ),
         "timed_request_error",
+      );
+    }
+    if (error instanceof CompanionImageQualityGateError) {
+      return timedResponse(
+        new Response(
+          JSON.stringify({ error: error.message, code: error.code }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: error.status,
+          },
+        ),
+        "quality_gate_failed",
       );
     }
     console.error("Error:", error);
