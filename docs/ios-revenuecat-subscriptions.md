@@ -28,7 +28,8 @@ The RevenueCat setup lives behind the existing `StoreKitProvider` compatibility 
 Constants are defined in `src/utils/appleIAP.ts`:
 
 ```ts
-export const REVENUECAT_IOS_API_KEY = "test_dnpQRPYilwaMbsjfCuXLepwYhac";
+export const REVENUECAT_IOS_API_KEY =
+  import.meta.env.VITE_REVENUECAT_IOS_API_KEY?.trim() || "test_dnpQRPYilwaMbsjfCuXLepwYhac";
 export const COSMIQ_PRO_ENTITLEMENT_ID = "cosmiq_pro";
 export const COSMIQ_PRO_ENTITLEMENT_NAME = "Cosmiq Pro";
 export const REVENUECAT_PRODUCT_IDS = [
@@ -37,6 +38,8 @@ export const REVENUECAT_PRODUCT_IDS = [
   "cosmiq_premium_monthly",
 ] as const;
 ```
+
+For App Store sandbox, TestFlight, and production builds, set `VITE_REVENUECAT_IOS_API_KEY` to the RevenueCat Apple/iOS public SDK key for this app. The checked-in `test_` key is only a development fallback for RevenueCat Test Store builds; RevenueCat Test Store requires `@revenuecat/purchases-capacitor` 11.2.6 or newer, while this project is currently pinned to 10.4.0.
 
 The provider configures RevenueCat with the authenticated Supabase user id:
 

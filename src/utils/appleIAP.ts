@@ -18,7 +18,9 @@ export const PREMIUM_MONTHLY_PRODUCT_ID = "cosmiq_premium_monthly";
 export const REFERRAL_YEARLY_PRODUCT_ID = "cosmiq_referral_yearly";
 export const COSMIQ_PRO_ENTITLEMENT_ID = "cosmiq_pro";
 export const COSMIQ_PRO_ENTITLEMENT_NAME = "Cosmiq Pro";
-export const REVENUECAT_IOS_API_KEY = "test_dnpQRPYilwaMbsjfCuXLepwYhac";
+const FALLBACK_REVENUECAT_TEST_STORE_API_KEY = "test_dnpQRPYilwaMbsjfCuXLepwYhac";
+export const REVENUECAT_IOS_API_KEY =
+  import.meta.env.VITE_REVENUECAT_IOS_API_KEY?.trim() || FALLBACK_REVENUECAT_TEST_STORE_API_KEY;
 export const REVENUECAT_PRODUCT_IDS = [
   REFERRAL_YEARLY_PRODUCT_ID,
   PREMIUM_YEARLY_PRODUCT_ID,

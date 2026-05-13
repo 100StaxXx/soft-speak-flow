@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -87,6 +87,8 @@ const Probe = () => {
       <span data-testid="storekit-loading">{String(storeKit.isLoading)}</span>
       <span data-testid="products-loading">{String(storeKit.productsLoading)}</span>
       <span data-testid="entitlement-error">{String(storeKit.entitlementError)}</span>
+      <span data-testid="product-count">{String(storeKit.products.length)}</span>
+      <span data-testid="product-ids">{storeKit.products.map((product) => product.identifier).join(",")}</span>
     </div>
   );
 };
@@ -157,5 +159,34 @@ describe("StoreKitProvider", () => {
     });
 
     expect(screen.getByTestId("products-loading")).toHaveTextContent("false");
+  });
+
+  it("keeps direct products when offerings fail", async () => {
+    vi.useRealTimers();
+    mocks.getOfferings.mockRejectedValue(new Error("No offerings configured"));
+    mocks.getProducts.mockResolvedValue({
+      products: [
+        {
+          identifier: "cosmiq_premium_monthly",
+          title: "Cosmiq Pro Monthly",
+          description: "Monthly access",
+          price: 9.99,
+          priceString: "$9.99",
+          productType: "AUTO_RENEWABLE_SUBSCRIPTION",
+          subscriptionPeriod: "P1M",
+        },
+      ],
+    });
+
+    render(
+      <StoreKitProvider>
+        <Probe />
+      </StoreKitProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("product-count")).toHaveTextContent("1");
+    });
+    expect(screen.getByTestId("product-ids")).toHaveTextContent("cosmiq_premium_monthly");
   });
 });

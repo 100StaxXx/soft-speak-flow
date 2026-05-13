@@ -1670,7 +1670,7 @@ const getLocalComingUpTomorrowSummary = (
   return tomorrowItems.length <= 2 ? "light" : "busy";
 };
 
-const buildLocalComingUpFallbackResponse = (
+const buildLocalComingUpResponse = (
   request: CompanionPlannerRequest,
 ): CompanionPlannerResponse => {
   const tomorrow = addDaysToDateKey(request.currentDate, 1);
@@ -1752,11 +1752,18 @@ const buildLocalComingUpFallbackResponse = (
   };
 };
 
-const shouldUseLocalComingUpFallback = (
+const isLocalComingUpRequest = (
   request: CompanionPlannerRequest | null,
 ): request is CompanionPlannerRequest =>
   request?.plannerContext.starterIntent === "upcoming_start" ||
   isUpcomingScheduleDigestMessage(request?.message ?? "");
+
+const shouldHandleComingUpLocally = (
+  starterIntent: CompanionPlannerContextStarterIntent,
+  message: string,
+): boolean =>
+  starterIntent === "upcoming_start" ||
+  isUpcomingScheduleDigestMessage(message);
 
 const findProposalById = (
   proposals: CompanionPlannerProposal[],
@@ -3092,6 +3099,10 @@ export function useCompanionPlanner({
       normalizeStarterIntentForPlanner(
         options?.starterIntent,
       ) ?? deriveStarterIntentFromMessage(message);
+    const handleComingUpLocally = shouldHandleComingUpLocally(
+      resolvedStarterIntent,
+      message,
+    );
     if (resolvedStarterIntent === "quest_capture" && !options?.skipUserEcho) {
       primeQuestCapture(message, { selectedDate });
       return;
@@ -3131,6 +3142,34 @@ export function useCompanionPlanner({
       newTitle: parsedInput.newTitle,
     });
     let requestBody: CompanionPlannerRequest | null = null;
+    const buildPersistedPlannerRows = (
+      response: CompanionPlannerResponse,
+      assistantMessage: CompanionPlannerMessage,
+      questCaptureSelectedDate: string | null,
+    ): Parameters<typeof persistPlannerThreadRows>[0] => [
+      ...(
+        options?.skipUserEcho ? [] : [{
+          role: "user" as const,
+          content: userMessage.content,
+          createdAt: userMessage.createdAt,
+          inputMode: userMessage.inputMode,
+        }]
+      ),
+      {
+        role: "assistant" as const,
+        content: assistantMessage.content,
+        createdAt: assistantMessage.createdAt,
+        metadata: {
+          structuredResponse: assistantMessage.structuredResponse ?? null,
+          followUpQuestions: response.followUpQuestions,
+          proposals: response.proposals,
+          suggestedReminders: response.suggestedReminders,
+          sessionState: response.sessionState,
+          dayPlan: response.dayPlan ?? null,
+          questCaptureSelectedDate,
+        } as unknown as Json,
+      },
+    ];
 
     try {
       const resolvedBriefingContext = options?.briefingContext ?? null;
@@ -3141,20 +3180,21 @@ export function useCompanionPlanner({
       const requestCurrentDateTime = formatCurrentDateTimeWithOffset(
         new Date(),
       );
-      const classificationPromise = withTimeout(
-        () => classify(message),
-        {
-          timeoutMs: PLANNER_PREFLIGHT_TIMEOUT_MS,
-          operation: "planner intent classification",
-          timeoutCode: "PLANNER_CLASSIFICATION_TIMEOUT",
-        },
-      ).catch((error) => {
-        console.info(
-          "Planner intent classification preflight timed out; falling back to backend classification.",
-        );
-        return null;
-      });
-      const classification = await classificationPromise;
+      const classification = handleComingUpLocally
+        ? null
+        : await withTimeout(
+          () => classify(message),
+          {
+            timeoutMs: PLANNER_PREFLIGHT_TIMEOUT_MS,
+            operation: "planner intent classification",
+            timeoutCode: "PLANNER_CLASSIFICATION_TIMEOUT",
+          },
+        ).catch((error) => {
+          console.info(
+            "Planner intent classification preflight timed out; falling back to backend classification.",
+          );
+          return null;
+        });
       const activePlannerContext = plannerContext;
       const mergedActiveEpicIds = new Set(
         activePlannerContext.activeEpics.map((epic) => epic.id),
@@ -3277,6 +3317,22 @@ export function useCompanionPlanner({
         validationError.name = "PlannerRequestValidationError";
         throw validationError;
       }
+      if (handleComingUpLocally && isLocalComingUpRequest(requestBody)) {
+        const response = buildLocalComingUpResponse(requestBody);
+        const assistantMessage = appendAssistantTurn(response);
+        pendingQuestCaptureSelectedDateRef.current = null;
+        try {
+          await persistPlannerThreadRows(
+            buildPersistedPlannerRows(response, assistantMessage, null),
+          );
+        } catch (persistError) {
+          console.warn(
+            "Failed to persist local coming-up digest:",
+            persistError,
+          );
+        }
+        return;
+      }
       const { data, error } = await supabase.functions.invoke(
         "companion-planner-chat",
         {
@@ -3303,34 +3359,15 @@ export function useCompanionPlanner({
         sessionState: nextSession,
       });
 
-      const persistedRows: Parameters<typeof persistPlannerThreadRows>[0] = [
-        ...(
-          options?.skipUserEcho ? [] : [{
-            role: "user" as const,
-            content: userMessage.content,
-            createdAt: userMessage.createdAt,
-            inputMode: userMessage.inputMode,
-          }]
+      await persistPlannerThreadRows(
+        buildPersistedPlannerRows(
+          response,
+          assistantMessage,
+          nextSession.pendingStarterIntent === "quest_capture"
+            ? selectedDate
+            : null,
         ),
-        {
-          role: "assistant" as const,
-          content: assistantMessage.content,
-          createdAt: assistantMessage.createdAt,
-          metadata: {
-            structuredResponse: assistantMessage.structuredResponse ?? null,
-            followUpQuestions: response.followUpQuestions,
-            proposals: response.proposals,
-            suggestedReminders: response.suggestedReminders,
-            sessionState: response.sessionState,
-            dayPlan: response.dayPlan ?? null,
-            questCaptureSelectedDate:
-              nextSession.pendingStarterIntent === "quest_capture"
-                ? selectedDate
-                : null,
-          } as unknown as Json,
-        },
-      ];
-      await persistPlannerThreadRows(persistedRows);
+      );
 
       const isReadOnlyBriefing = resolvedStarterIntent === "upcoming_start" ||
         response.mode === "schedule_read" ||
@@ -3433,41 +3470,23 @@ export function useCompanionPlanner({
         ? validateCompanionPlannerRequest(requestBody)
         : null;
 
-      if (shouldUseLocalComingUpFallback(requestBody)) {
+      if (isLocalComingUpRequest(requestBody)) {
         console.warn("Companion planner coming-up request failed; using local read-only fallback.", {
           parsedError,
           localValidation,
           requestSummary: summarizePlannerRequestForDebug(requestBody),
         });
-        const fallbackResponse = buildLocalComingUpFallbackResponse(requestBody);
+        const fallbackResponse = buildLocalComingUpResponse(requestBody);
         const assistantMessage = appendAssistantTurn(fallbackResponse);
-        const persistedRows: Parameters<typeof persistPlannerThreadRows>[0] = [
-          ...(
-            options?.skipUserEcho ? [] : [{
-              role: "user" as const,
-              content: userMessage.content,
-              createdAt: userMessage.createdAt,
-              inputMode: userMessage.inputMode,
-            }]
-          ),
-          {
-            role: "assistant" as const,
-            content: assistantMessage.content,
-            createdAt: assistantMessage.createdAt,
-            metadata: {
-              structuredResponse: assistantMessage.structuredResponse ?? null,
-              followUpQuestions: fallbackResponse.followUpQuestions,
-              proposals: fallbackResponse.proposals,
-              suggestedReminders: fallbackResponse.suggestedReminders,
-              sessionState: fallbackResponse.sessionState,
-              dayPlan: fallbackResponse.dayPlan ?? null,
-              questCaptureSelectedDate: null,
-            } as unknown as Json,
-          },
-        ];
 
         try {
-          await persistPlannerThreadRows(persistedRows);
+          await persistPlannerThreadRows(
+            buildPersistedPlannerRows(
+              fallbackResponse,
+              assistantMessage,
+              null,
+            ),
+          );
         } catch (persistError) {
           console.warn(
             "Failed to persist local coming-up fallback:",

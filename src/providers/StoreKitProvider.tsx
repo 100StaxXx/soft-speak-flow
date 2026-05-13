@@ -249,8 +249,8 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
 
     setProductsLoading(true);
     try {
-      const [nextOfferings, productResult] = await withTimeout(
-        () => Promise.all([
+      const [offeringsResult, productsResult] = await withTimeout(
+        () => Promise.allSettled([
           Purchases.getOfferings(),
           Purchases.getProducts({
             productIdentifiers: [...REVENUECAT_PRODUCT_IDS],
@@ -264,12 +264,30 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
         },
       );
 
+      const nextOfferings = offeringsResult.status === "fulfilled" ? offeringsResult.value : null;
+      if (offeringsResult.status === "rejected") {
+        console.warn("[RevenueCat] Failed to load offerings; direct product lookup will still be used", {
+          productIds: REVENUECAT_PRODUCT_IDS,
+          platform: Capacitor.getPlatform(),
+          error: offeringsResult.reason,
+        });
+      }
+
+      if (productsResult.status === "rejected") {
+        console.error("[RevenueCat] Failed to load products", {
+          productIds: REVENUECAT_PRODUCT_IDS,
+          platform: Capacitor.getPlatform(),
+          error: productsResult.reason,
+        });
+      }
+
       setOfferings(nextOfferings);
       const offeringPackages = packagesFromOfferings(nextOfferings);
       packagesRef.current = offeringPackages;
 
       const packageProducts = offeringPackages.map((pkg) => pkg.product);
-      const allProducts = [...packageProducts, ...productResult.products];
+      const directProducts = productsResult.status === "fulfilled" ? productsResult.value.products : [];
+      const allProducts = [...packageProducts, ...directProducts];
       storeProductsRef.current = new Map(allProducts.map((product) => [product.identifier, product]));
 
       const mappedProducts = mergeProducts(allProducts);

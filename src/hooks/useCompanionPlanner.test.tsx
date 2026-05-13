@@ -221,7 +221,29 @@ describe("useCompanionPlanner", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.classify.mockReset();
+    mocks.invoke.mockReset();
     mocks.classify.mockResolvedValue(null);
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "schedule_read",
+        reply: "Planner read.",
+        followUpQuestions: [],
+        proposals: [],
+        suggestedReminders: [],
+        memoryUpdates: {},
+        sessionState: {
+          draft: {},
+          openQuestionIds: [],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          pendingStarterIntent: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
     mocks.user = { id: "user-1" };
     mocks.companion = { id: "companion-1" };
     mocks.upsertPlannerPreferences.mockResolvedValue({ error: null });
@@ -1403,27 +1425,7 @@ describe("useCompanionPlanner", () => {
     ).toBe("briefing_followup");
   });
 
-  it("derives typed coming-up prompts as the upcoming starter", async () => {
-    mocks.invoke.mockResolvedValue({
-      data: {
-        mode: "schedule_read",
-        reply: "Today: nothing scheduled.\nTomorrow: nothing scheduled.",
-        followUpQuestions: [],
-        proposals: [],
-        suggestedReminders: [],
-        memoryUpdates: {},
-        sessionState: {
-          draft: {},
-          openQuestionIds: [],
-          preferredTimeOfDay: null,
-          preferredTimeReason: null,
-          reminderPreference: null,
-          pendingStarterIntent: null,
-          lastClassification: "conversation",
-        },
-      },
-      error: null,
-    });
+  it("answers typed coming-up prompts with the local schedule digest", async () => {
     const { result } = renderHook(() =>
       useCompanionPlanner({ bootstrapGreeting: false })
     );
@@ -1435,12 +1437,11 @@ describe("useCompanionPlanner", () => {
       await result.current.submitMessage("What do I hgave coming up?", "text");
     });
 
-    expect(
-      mocks.invoke.mock.calls[0]?.[1]?.body.plannerContext.starterIntent,
-    ).toBe("upcoming_start");
-    expect(
-      mocks.invoke.mock.calls[1]?.[1]?.body.plannerContext.starterIntent,
-    ).toBe("upcoming_start");
+    expect(mocks.invoke).not.toHaveBeenCalled();
+    expect(mocks.classify).not.toHaveBeenCalled();
+    expect(result.current.messages.at(-1)?.content).toBe(
+      "Today: nothing scheduled.\nTomorrow: nothing scheduled.",
+    );
   });
 
   it("shows a rollout-aware planner error instead of a fake lost-thread message", async () => {
@@ -1792,25 +1793,8 @@ describe("useCompanionPlanner", () => {
       ],
     }];
     mocks.activeEpics = [];
-    mocks.invoke.mockResolvedValue({
-      data: {
-        mode: "schedule_read",
-        reply: "Tomorrow: Mobility reset.",
-        followUpQuestions: [],
-        proposals: [],
-        suggestedReminders: [],
-        memoryUpdates: {},
-        sessionState: {
-          draft: {},
-          openQuestionIds: [],
-          preferredTimeOfDay: null,
-          preferredTimeReason: null,
-          reminderPreference: null,
-          lastClassification: "conversation",
-        },
-      },
-      error: null,
-    });
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-13T14:00:00.000Z"));
 
     const { result } = renderHook(() =>
       useCompanionPlanner({ bootstrapGreeting: false })
@@ -1820,33 +1804,25 @@ describe("useCompanionPlanner", () => {
       await result.current.submitMessage("What do I have coming up?", "text");
     });
 
-    const request = mocks.invoke.mock.calls[0]?.[1];
-    const plannerContext = request?.body.plannerContext;
-    expect(plannerContext.starterIntent).toBe("upcoming_start");
-    expect(plannerContext.activeHabitIds).toEqual([
-      "habit-standalone",
-      "habit-inactive-campaign",
-    ]);
-    expect(plannerContext.rituals).toEqual([
+    expect(mocks.invoke).not.toHaveBeenCalled();
+    expect(result.current.structuredResponse?.comingUp?.remainingToday).toEqual([
       expect.objectContaining({
-        id: "habit-standalone",
-        epicId: "general",
-        epicTitle: "your goals",
+        id: "ritual:habit-standalone:2026-05-13",
         title: "Mobility reset",
-        preferredTime: "08:00",
-        estimatedMinutes: 20,
+        source: "ritual",
       }),
     ]);
-    expect(plannerContext.rituals).not.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: "habit-inactive-campaign" }),
-      ]),
-    );
+    expect(result.current.structuredResponse?.comingUp?.remainingToday).not
+      .toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ title: "Inactive campaign ritual" }),
+        ]),
+      );
   });
 
   it("marks queued campaign ritual creates as pending local habits", async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-04-19T09:30:00.000Z"));
+    vi.setSystemTime(new Date("2026-04-19T14:30:00.000Z"));
     mocks.activeEpics = [{
       id: "epic-active",
       user_id: "user-1",
@@ -1896,26 +1872,6 @@ describe("useCompanionPlanner", () => {
         habit: { id: "habit-pending-ritual" },
       },
     }];
-    mocks.invoke.mockResolvedValue({
-      data: {
-        mode: "schedule_read",
-        reply: "I still see the pending ritual.",
-        followUpQuestions: [],
-        proposals: [],
-        suggestedReminders: [],
-        memoryUpdates: {},
-        sessionState: {
-          draft: {},
-          openQuestionIds: [],
-          preferredTimeOfDay: null,
-          preferredTimeReason: null,
-          reminderPreference: null,
-          lastClassification: "quest",
-        },
-      },
-      error: null,
-    });
-
     const { result } = renderHook(() =>
       useCompanionPlanner({ bootstrapGreeting: false })
     );
@@ -1924,22 +1880,18 @@ describe("useCompanionPlanner", () => {
       await result.current.submitMessage("What do I have coming up?", "text");
     });
 
-    const request = mocks.invoke.mock.calls[0]?.[1];
-    const plannerContext = request?.body.plannerContext;
-    expect(plannerContext.pendingLocalHabitIds).toEqual(["habit-pending-ritual"]);
-    expect(plannerContext.rituals).toEqual(
+    expect(mocks.invoke).not.toHaveBeenCalled();
+    expect(result.current.structuredResponse?.comingUp?.remainingToday).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: "habit-pending-ritual" }),
-      ]),
-    );
-    expect(plannerContext.tasks).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ habitSourceId: "habit-pending-ritual" }),
+        expect.objectContaining({
+          title: "Pending ritual",
+          source: "task",
+        }),
       ]),
     );
   });
 
-  it("falls back to a local read-only coming-up digest when the backend starter fails", async () => {
+  it("uses a local read-only coming-up digest without calling the backend", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-12T20:52:00.000Z"));
     const todayTask = {
@@ -1966,11 +1918,6 @@ describe("useCompanionPlanner", () => {
     };
     mocks.todayTasks = [todayTask];
     mocks.weekTasks = [todayTask, tomorrowTask];
-    mocks.invoke.mockResolvedValue({
-      data: null,
-      error: new Error("Failed to build companion plan"),
-    });
-
     const { result } = renderHook(() =>
       useCompanionPlanner({ bootstrapGreeting: false })
     );
@@ -1980,6 +1927,7 @@ describe("useCompanionPlanner", () => {
     });
 
     expect(mocks.toastError).not.toHaveBeenCalled();
+    expect(mocks.invoke).not.toHaveBeenCalled();
     expect(result.current.messages.at(-1)?.content).toContain("Today:");
     expect(result.current.structuredResponse?.comingUp?.remainingToday).toEqual(
       expect.arrayContaining([
@@ -2010,11 +1958,6 @@ describe("useCompanionPlanner", () => {
     };
     mocks.todayTasks = [];
     mocks.weekTasks = [futureTask];
-    mocks.invoke.mockResolvedValue({
-      data: null,
-      error: new Error("Failed to build companion plan"),
-    });
-
     const { result } = renderHook(() =>
       useCompanionPlanner({ bootstrapGreeting: false })
     );
@@ -2050,11 +1993,6 @@ describe("useCompanionPlanner", () => {
     };
     mocks.todayTasks = [currentTask];
     mocks.weekTasks = [currentTask];
-    mocks.invoke.mockResolvedValue({
-      data: null,
-      error: new Error("Failed to build companion plan"),
-    });
-
     const { result } = renderHook(() =>
       useCompanionPlanner({ bootstrapGreeting: false })
     );
@@ -2115,54 +2053,6 @@ describe("useCompanionPlanner", () => {
   });
 
   it("keeps read-only schedule briefings out of planner memory telemetry", async () => {
-    mocks.invoke.mockResolvedValue({
-      data: {
-        mode: "schedule_read",
-        reply: "Today: therapy at 3 PM.\nTomorrow: open.",
-        plannerContract: {
-          mode: "schedule_read",
-          writePolicy: "read_only",
-          decisionSummary: "Today has one fixed event.",
-          reasonCodes: ["calendar_constraint"],
-          decisionPoint: {
-            label: "No changes needed right now.",
-            action: "none",
-          },
-          clarifyingQuestion: null,
-        },
-        followUpQuestions: [],
-        proposals: [],
-        suggestedReminders: [],
-        structuredResponse: {
-          intent: {
-            intentType: "conversation",
-            timeHorizon: "today",
-            isRecurring: false,
-            shouldCreateQuest: false,
-            shouldPromptCampaign: false,
-          },
-          comingUp: {
-            message: "Today: therapy at 3 PM.\nTomorrow: open.",
-            nextEvent: null,
-            nextBestAction: null,
-            remainingToday: [],
-            tomorrowSummary: "open",
-            missedItems: [],
-          },
-        },
-        memoryUpdates: {},
-        sessionState: {
-          draft: {},
-          openQuestionIds: [],
-          preferredTimeOfDay: null,
-          preferredTimeReason: null,
-          reminderPreference: null,
-          lastClassification: "conversation",
-        },
-      },
-      error: null,
-    });
-
     const { result } = renderHook(() =>
       useCompanionPlanner({ bootstrapGreeting: false })
     );
@@ -2175,8 +2065,9 @@ describe("useCompanionPlanner", () => {
 
     expect(mocks.insertPlannerEvent).not.toHaveBeenCalled();
     expect(mocks.trackInteraction).not.toHaveBeenCalled();
+    expect(mocks.invoke).not.toHaveBeenCalled();
     expect(result.current.messages.at(-1)?.content).toBe(
-      "Today: therapy at 3 PM.\nTomorrow: open.",
+      "Today: nothing scheduled.\nTomorrow: nothing scheduled.",
     );
   });
 
