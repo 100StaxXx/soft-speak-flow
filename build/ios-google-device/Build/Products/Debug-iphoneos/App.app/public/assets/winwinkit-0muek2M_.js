@@ -1,0 +1,1 @@
+const e="https://app.winwinkit.com/projects/a1f39a40-f90d-4aee-99dd-09c7f7cf1b88/affiliates/active";function t(){return typeof navigator>"u"?!1:/jsdom/i.test(navigator.userAgent)}function i(){typeof window>"u"||t()||window.location.replace(e)}export{e as W,i as r};

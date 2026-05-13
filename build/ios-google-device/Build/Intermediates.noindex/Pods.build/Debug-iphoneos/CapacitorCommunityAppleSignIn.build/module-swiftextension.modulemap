@@ -1,0 +1,5 @@
+
+module CapacitorCommunityAppleSignIn.Swift {
+  header "CapacitorCommunityAppleSignIn-Swift.h"
+  requires objc
+}

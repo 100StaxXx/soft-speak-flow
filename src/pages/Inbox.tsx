@@ -18,13 +18,18 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
 import { useQueryClient } from "@tanstack/react-query";
 import { haptics } from "@/utils/haptics";
-import { useQuestCalendarSync } from "@/hooks/useQuestCalendarSync";
+import { getCalendarSendSuccessCopy, useQuestCalendarSync } from "@/hooks/useQuestCalendarSync";
 import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 import { COMPANION_FLOATING_ACTION_BUTTON_ENABLED } from "@/config/companionLauncherFeatureFlags";
 import { SEND_TO_CALENDAR_ENABLED } from "@/utils/calendarFeatureFlags";
 import { isMacDesignedForIPadIOSApp } from "@/utils/platformTargets";
 import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
+import {
+  buildCalendarSendTargetOptions,
+  isCalendarSendTargetAvailable,
+  type CalendarSendTarget,
+} from "@/utils/calendarDestinationOptions";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -55,13 +60,19 @@ const InboxPage = memo(function InboxPage() {
   const { sendTaskToCalendar, syncTaskUpdate, syncTaskDelete, hasLinkedEvent } = useQuestCalendarSync({
     enabled: isTabActive,
   });
-  const { connections: calendarConnections } = useCalendarIntegrations({ enabled: isTabActive });
+  const {
+    connections: calendarConnections,
+    defaultProvider: calendarDefaultProvider,
+  } = useCalendarIntegrations({ enabled: isTabActive });
 
   const handleOpenCalendarPreferences = useCallback(() => {
     navigate("/profile", { state: { openTab: "preferences" } });
   }, [navigate]);
 
-  const handleSendTaskToCalendar = useCallback(async (taskId: string) => {
+  const handleSendTaskToCalendar = useCallback(async (
+    taskId: string,
+    requestedTarget?: CalendarSendTarget | null,
+  ) => {
     const routeToCalendarPreferences = () => {
       toast.error("No calendar connected. Opening Preferences...");
       handleOpenCalendarPreferences();
@@ -72,24 +83,77 @@ const InboxPage = memo(function InboxPage() {
       return;
     }
 
+    const resolveSendTarget = (): CalendarSendTarget | null => {
+      if (requestedTarget && isCalendarSendTargetAvailable(requestedTarget, calendarConnections)) {
+        return requestedTarget;
+      }
+
+      if (calendarConnections.length <= 1) {
+        return calendarConnections[0]?.provider ?? null;
+      }
+
+      const options = buildCalendarSendTargetOptions(calendarConnections, {
+        defaultProvider: calendarDefaultProvider,
+        includeAll: true,
+        scheduledOnly: false,
+      });
+      const promptMessage = [
+        "Send this quest where?",
+        ...options.map((option, index) => `${index + 1}. ${option.label} - ${option.description}`),
+      ].join("\n");
+      const picked = window.prompt(promptMessage, "1");
+      const pickedIndex = picked ? Number.parseInt(picked, 10) - 1 : -1;
+      const option = Number.isInteger(pickedIndex) ? options[pickedIndex] : undefined;
+
+      return option?.target ?? null;
+    };
+
+    const selectedTarget = resolveSendTarget();
+    if (!selectedTarget) {
+      toast.error("Calendar send cancelled. Please choose a destination.");
+      return;
+    }
+
+    const providerTargets = selectedTarget === "all"
+      ? calendarConnections.map((connection) => connection.provider)
+      : [selectedTarget];
+
     let taskDateOverride: string | undefined;
     let scheduledTimeOverride: string | undefined;
 
     const attempt = async () => {
-      await sendTaskToCalendar.mutateAsync({
-        taskId,
-        options: taskDateOverride || scheduledTimeOverride
-          ? {
-              taskDate: taskDateOverride,
-              scheduledTime: scheduledTimeOverride,
-            }
-          : undefined,
+      const results = [];
+      for (const provider of providerTargets) {
+        results.push(await sendTaskToCalendar.mutateAsync({
+          taskId,
+          options: {
+            provider,
+            ...(taskDateOverride ? { taskDate: taskDateOverride } : {}),
+            ...(scheduledTimeOverride ? { scheduledTime: scheduledTimeOverride } : {}),
+          },
+        }));
+      }
+      return results;
+    };
+
+    const showSuccess = (results: Awaited<ReturnType<typeof attempt>>) => {
+      if (results.length === 1) {
+        const copy = getCalendarSendSuccessCopy(results[0], calendarConnections.length);
+        toast.success(copy.title, { description: copy.description });
+        return;
+      }
+
+      const destinations = results
+        .map((result) => `${result.providerLabel} ${result.destinationKind === "todo" ? "To Do" : "Calendar"} -> ${result.destinationName}`)
+        .join("; ");
+      toast.success(`Quest sent to ${results.length} destinations`, {
+        description: `Destinations: ${destinations}.`,
       });
     };
 
     try {
-      await attempt();
-      toast.success("Quest synced to calendar");
+      const results = await attempt();
+      showSuccess(results);
       return;
     } catch (error) {
       let message = error instanceof Error ? error.message : "Failed to send quest to calendar";
@@ -101,10 +165,20 @@ const InboxPage = memo(function InboxPage() {
         routeToCalendarPreferences();
         return;
       }
+      if (message.includes("CALENDAR_DEFAULT_REQUIRED")) {
+        toast.error("Choose a default calendar provider before sending. Opening Preferences...");
+        handleOpenCalendarPreferences();
+        return;
+      }
 
       for (let attemptIndex = 0; attemptIndex < 2; attemptIndex += 1) {
         if (message.includes("NO_CALENDAR_CONNECTION")) {
           routeToCalendarPreferences();
+          return;
+        }
+        if (message.includes("CALENDAR_DEFAULT_REQUIRED")) {
+          toast.error("Choose a default calendar provider before sending. Opening Preferences...");
+          handleOpenCalendarPreferences();
           return;
         }
 
@@ -130,8 +204,8 @@ const InboxPage = memo(function InboxPage() {
         }
 
         try {
-          await attempt();
-          toast.success("Quest synced to calendar");
+          const results = await attempt();
+          showSuccess(results);
           return;
         } catch (retryError) {
           message = retryError instanceof Error ? retryError.message : "Failed to send quest to calendar";
@@ -141,6 +215,11 @@ const InboxPage = memo(function InboxPage() {
           }
           if (message.includes("NO_CALENDAR_CONNECTION")) {
             routeToCalendarPreferences();
+            return;
+          }
+          if (message.includes("CALENDAR_DEFAULT_REQUIRED")) {
+            toast.error("Choose a default calendar provider before sending. Opening Preferences...");
+            handleOpenCalendarPreferences();
             return;
           }
           if (
@@ -166,7 +245,7 @@ const InboxPage = memo(function InboxPage() {
 
       toast.error(message);
     }
-  }, [calendarConnections.length, handleOpenCalendarPreferences, sendTaskToCalendar]);
+  }, [calendarConnections, calendarDefaultProvider, handleOpenCalendarPreferences, sendTaskToCalendar]);
 
   const handleSaveEdit = useCallback(async (taskId: string, updates: any) => {
     const updateResult = await updateTask({ taskId, updates });
@@ -226,7 +305,7 @@ const InboxPage = memo(function InboxPage() {
 
     if (SEND_TO_CALENDAR_ENABLED && data.sendToCalendar && createdTask?.id) {
       const calendarSyncStartedAt = Date.now();
-      void handleSendTaskToCalendar(createdTask.id).finally(() => {
+      void handleSendTaskToCalendar(createdTask.id, data.sendToCalendarTarget).finally(() => {
         trackResilienceEvent("task_create_calendar_sync", {
           taskId: createdTask.id,
           calendarSyncMs: Date.now() - calendarSyncStartedAt,

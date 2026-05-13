@@ -11,6 +11,7 @@ export interface OAuthStatePayload {
   userId: string;
   syncMode: OAuthSyncMode;
   source: OAuthSource;
+  redirectUri?: string;
   exp: number;
   nonce: string;
 }
@@ -80,6 +81,7 @@ export async function createSignedOAuthState(args: {
   userId: string;
   syncMode: OAuthSyncMode;
   source?: OAuthSource;
+  redirectUri?: string;
   secret: string;
   ttlSeconds?: number;
 }): Promise<string> {
@@ -97,6 +99,10 @@ export async function createSignedOAuthState(args: {
     exp: nowSeconds + ttlSeconds,
     nonce: randomNonce(),
   };
+
+  if (args.redirectUri?.trim()) {
+    payload.redirectUri = args.redirectUri.trim();
+  }
 
   const payloadBytes = new TextEncoder().encode(JSON.stringify(payload));
   const key = await importHmacKey(secret);
@@ -136,6 +142,12 @@ function parsePayload(rawPayload: string): OAuthStatePayload {
     throw new Error("Invalid OAuth state");
   }
 
+  const redirectUri = payload.redirectUri === undefined ? undefined : payload.redirectUri;
+  const normalizedRedirectUri = typeof redirectUri === "string" ? redirectUri.trim() : undefined;
+  if (redirectUri !== undefined && (!normalizedRedirectUri || normalizedRedirectUri.length === 0)) {
+    throw new Error("Invalid OAuth state");
+  }
+
   if (typeof payload.exp !== "number" || !Number.isFinite(payload.exp)) {
     throw new Error("Invalid OAuth state");
   }
@@ -150,6 +162,7 @@ function parsePayload(rawPayload: string): OAuthStatePayload {
     userId: payload.userId,
     syncMode: payload.syncMode,
     source,
+    ...(normalizedRedirectUri ? { redirectUri: normalizedRedirectUri } : {}),
     exp: payload.exp,
     nonce: payload.nonce,
   };

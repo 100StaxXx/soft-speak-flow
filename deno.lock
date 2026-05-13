@@ -545,6 +545,7 @@
         "npm:@capacitor-community/apple-sign-in@^7.1.0",
         "npm:@capacitor/android@^7.4.4",
         "npm:@capacitor/app@7",
+        "npm:@capacitor/browser@^7.0.5",
         "npm:@capacitor/camera@^7.0.3",
         "npm:@capacitor/cli@^8.0.2",
         "npm:@capacitor/core@^7.4.4",

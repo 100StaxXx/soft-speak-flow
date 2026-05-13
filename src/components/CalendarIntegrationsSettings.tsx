@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { CalendarDays, Link2, Unlink2, RefreshCcw, EyeOff, Eye } from 'lucide-react';
+import { Browser } from '@capacitor/browser';
+import { CalendarDays, Link2, Unlink2, RefreshCcw, EyeOff, Eye, ChevronDown, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useToast } from '@/hooks/use-toast';
 import {
   useCalendarIntegrations,
@@ -26,6 +28,55 @@ const SYNC_MODE_LABELS: Record<CalendarSyncMode, string> = {
 };
 
 const isNativeIOS = () => Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
+
+const providerLabel = (provider: CalendarProvider): string =>
+  PROVIDERS.find((item) => item.key === provider)?.label ?? provider;
+
+const toCount = (value: unknown): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : 0;
+
+const plural = (count: number, singular: string, pluralLabel = `${singular}s`) =>
+  `${count} ${count === 1 ? singular : pluralLabel}`;
+
+const summarizeSyncResult = (result: unknown): string => {
+  if (!result || typeof result !== 'object') {
+    return 'No linked updates found.';
+  }
+
+  const payload = result as {
+    linkedEvents?: Record<string, unknown> | null;
+    linkedTasks?: Record<string, unknown> | null;
+    plannerWindow?: Record<string, unknown> | null;
+    plannerTasks?: Record<string, unknown> | null;
+  };
+  const responses = [payload.linkedEvents, payload.linkedTasks, payload.plannerTasks]
+    .filter((item): item is Record<string, unknown> => Boolean(item));
+
+  const checked = responses.reduce((total, item) => total + toCount(item.linksChecked), 0);
+  const providerUpdates = responses.reduce((total, item) => total + toCount(item.pulledProviderChanges), 0);
+  const imported = toCount(payload.plannerTasks?.importedCount);
+  const updated = providerUpdates + toCount(payload.plannerTasks?.updatedCount);
+  const removed = responses.reduce(
+    (total, item) =>
+      total
+      + toCount(item.removedCancelled)
+      + toCount(item.removedMissing)
+      + (Array.isArray(item.removedTaskIds) ? item.removedTaskIds.length : 0),
+    0,
+  );
+  const cachedAvailability = toCount(payload.plannerWindow?.cachedCount);
+
+  const parts: string[] = [];
+  if (checked > 0) parts.push(`${plural(checked, 'linked item')} checked`);
+  if (imported > 0) parts.push(`${plural(imported, 'To Do task')} imported`);
+  if (updated > 0) parts.push(`${plural(updated, 'item')} updated`);
+  if (removed > 0) parts.push(`${plural(removed, 'stale item')} removed`);
+  if (parts.length === 0 && cachedAvailability > 0) {
+    parts.push(`${plural(cachedAvailability, 'calendar item')} refreshed`);
+  }
+
+  return parts.length > 0 ? `${parts.join(', ')}.` : 'No linked updates found.';
+};
 
 export function CalendarIntegrationsSettings() {
   const { toast } = useToast();
@@ -59,9 +110,11 @@ export function CalendarIntegrationsSettings() {
     Partial<Record<CalendarProvider, Array<{ id: string; name: string }>>>
   >({});
   const [connectingProvider, setConnectingProvider] = useState<CalendarProvider | null>(null);
+  const [syncingProvider, setSyncingProvider] = useState<Exclude<CalendarProvider, 'apple'> | null>(null);
   const [isAutoLoadingOutlookOptions, setIsAutoLoadingOutlookOptions] = useState(false);
   const [isActivatingOutlookPlanning, setIsActivatingOutlookPlanning] = useState(false);
   const [autoLoadedOutlookConnectionId, setAutoLoadedOutlookConnectionId] = useState<string | null>(null);
+  const [advancedOpenByProvider, setAdvancedOpenByProvider] = useState<Partial<Record<CalendarProvider, boolean>>>({});
 
   const canUseApple = isNativeIOS();
   const hasConnectedProviders = connections.length > 0;
@@ -298,6 +351,10 @@ export function CalendarIntegrationsSettings() {
         syncMode: 'send_only',
         source,
       });
+      if (source === 'native') {
+        await Browser.open({ url });
+        return;
+      }
       window.location.href = url;
     } catch (err) {
       toast({
@@ -325,7 +382,11 @@ export function CalendarIntegrationsSettings() {
 
   const handleLoadCalendars = async (provider: CalendarProvider) => {
     try {
-      await loadCalendarsForProvider(provider);
+      const calendars = await loadCalendarsForProvider(provider);
+      toast({
+        title: 'Calendars loaded',
+        description: `${plural(calendars.length, 'calendar')} available for ${providerLabel(provider)}.`,
+      });
     } catch (err) {
       toast({
         title: `Failed loading ${provider} calendars`,
@@ -337,13 +398,36 @@ export function CalendarIntegrationsSettings() {
 
   const handleLoadTaskLists = async () => {
     try {
-      await loadOutlookTaskLists();
+      const taskLists = await loadOutlookTaskLists();
+      toast({
+        title: 'To Do lists loaded',
+        description: `${plural(taskLists.length, 'list')} available for Outlook.`,
+      });
     } catch (err) {
       toast({
         title: 'Failed loading Outlook task lists',
         description: err instanceof Error ? err.message : 'Unknown error',
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleSyncNow = async (provider: Exclude<CalendarProvider, 'apple'>) => {
+    setSyncingProvider(provider);
+    try {
+      const result = await syncProviderPull.mutateAsync({ provider });
+      toast({
+        title: `${providerLabel(provider)} synced`,
+        description: summarizeSyncResult(result),
+      });
+    } catch (err) {
+      toast({
+        title: `Failed to sync ${providerLabel(provider)}`,
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setSyncingProvider(null);
     }
   };
 
@@ -470,6 +554,26 @@ export function CalendarIntegrationsSettings() {
           const taskLists = provider.key === 'outlook'
             ? taskListOptionsByProvider.outlook || []
             : [];
+          const syncableProvider = provider.key === 'google' || provider.key === 'outlook'
+            ? provider.key
+            : null;
+          const isSyncing = syncableProvider !== null && syncingProvider === syncableProvider;
+          const shouldCollapseDestinationRefresh = provider.key === 'outlook' && isOutlookPlannerReady;
+          const destinationRefreshActions = (
+            <>
+              <Button size="sm" variant="outline" onClick={() => handleLoadCalendars(provider.key)}>
+                <RefreshCcw className="h-4 w-4 mr-2" />
+                Load Calendars
+              </Button>
+
+              {provider.key === 'outlook' && (
+                <Button size="sm" variant="outline" onClick={() => void handleLoadTaskLists()}>
+                  <RefreshCcw className="h-4 w-4 mr-2" />
+                  Load To Do Lists
+                </Button>
+              )}
+            </>
+          );
 
           return (
             <div key={provider.key} className="rounded-lg border border-border/60 p-3 space-y-3">
@@ -591,25 +695,21 @@ export function CalendarIntegrationsSettings() {
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" onClick={() => handleLoadCalendars(provider.key)}>
-                      <RefreshCcw className="h-4 w-4 mr-2" />
-                      Load Calendars
-                    </Button>
+                    {!shouldCollapseDestinationRefresh && destinationRefreshActions}
 
-                    {provider.key === 'outlook' && (
-                      <Button size="sm" variant="outline" onClick={() => void handleLoadTaskLists()}>
-                        <RefreshCcw className="h-4 w-4 mr-2" />
-                        Load To Do Lists
-                      </Button>
-                    )}
-
-                    {provider.key !== 'apple' && (
+                    {syncableProvider && (
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => void syncProviderPull.mutateAsync({ provider: provider.key as 'google' | 'outlook' })}
+                        onClick={() => void handleSyncNow(syncableProvider)}
+                        disabled={isSyncing}
                       >
-                        Pull Linked Updates
+                        {isSyncing ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <RefreshCcw className="h-4 w-4 mr-2" />
+                        )}
+                        {isSyncing ? 'Syncing...' : 'Sync Now'}
                       </Button>
                     )}
 
@@ -617,6 +717,32 @@ export function CalendarIntegrationsSettings() {
                       <Unlink2 className="h-4 w-4 mr-2" />
                       Disconnect
                     </Button>
+
+                    {shouldCollapseDestinationRefresh && (
+                      <Collapsible
+                        open={Boolean(advancedOpenByProvider[provider.key])}
+                        onOpenChange={(open) =>
+                          setAdvancedOpenByProvider((prev) => ({ ...prev, [provider.key]: open }))
+                        }
+                        className="w-full"
+                      >
+                        <CollapsibleTrigger asChild>
+                          <Button size="sm" variant="ghost" className="px-1">
+                            Advanced
+                            <ChevronDown
+                              className={`ml-2 h-4 w-4 transition-transform ${
+                                advancedOpenByProvider[provider.key] ? 'rotate-180' : ''
+                              }`}
+                            />
+                          </Button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="flex flex-wrap gap-2 pt-2">
+                            {destinationRefreshActions}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    )}
                   </div>
 
                   {calendars.length > 0 && (

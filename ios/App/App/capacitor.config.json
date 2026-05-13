@@ -30,6 +30,7 @@
 	"packageClassList": [
 		"SignInWithApple",
 		"AppPlugin",
+		"CAPBrowserPlugin",
 		"CAPCameraPlugin",
 		"FilesystemPlugin",
 		"HapticsPlugin",

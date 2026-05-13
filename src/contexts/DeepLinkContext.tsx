@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { Browser } from '@capacitor/browser';
 import { initializeDeepLinkHandler, DeepLinkData } from '@/utils/deepLinkHandler';
 import { logger } from '@/utils/logger';
 
@@ -11,6 +12,12 @@ const DeepLinkContext = createContext<DeepLinkContextType>({
   pendingTaskId: null,
   clearPendingTask: () => {},
 });
+
+const closeOAuthBrowser = () => {
+  void Browser.close().catch((error) => {
+    logger.log('[DeepLinkProvider] Calendar OAuth browser close skipped:', error);
+  });
+};
 
 export const useDeepLink = () => useContext(DeepLinkContext);
 
@@ -30,6 +37,7 @@ export const DeepLinkProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if (data.type === 'calendar_oauth' && data.provider && data.status) {
+      closeOAuthBrowser();
       const params = new URLSearchParams({
         calendar_oauth_provider: data.provider,
         calendar_oauth_status: data.status,
@@ -46,6 +54,9 @@ export const DeepLinkProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if ((data.type === 'auth_recovery' || data.type === 'calendar_oauth_callback') && data.path) {
+      if (data.type === 'calendar_oauth_callback') {
+        closeOAuthBrowser();
+      }
       window.dispatchEvent(new CustomEvent('deep-link-navigation', {
         detail: { path: data.path },
       }));

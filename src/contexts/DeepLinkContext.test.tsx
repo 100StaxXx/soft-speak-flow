@@ -17,12 +17,19 @@ const mocks = vi.hoisted(() => {
 
   return {
     cleanupMock: vi.fn(),
+    browserCloseMock: vi.fn(),
     setHandler: (handler: typeof deepLinkHandler) => {
       deepLinkHandler = handler;
     },
     getHandler: () => deepLinkHandler,
   };
 });
+
+vi.mock("@capacitor/browser", () => ({
+  Browser: {
+    close: mocks.browserCloseMock,
+  },
+}));
 
 vi.mock("@/utils/deepLinkHandler", () => ({
   initializeDeepLinkHandler: (handler: typeof mocks.getHandler extends () => infer T ? T : never) => {
@@ -45,6 +52,7 @@ describe("DeepLinkProvider", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.browserCloseMock.mockResolvedValue(undefined);
     dispatchSpy = vi.spyOn(window, "dispatchEvent");
   });
 
@@ -106,5 +114,6 @@ describe("DeepLinkProvider", () => {
       path:
         "/calendar/oauth/callback?code=oauth-code&state=signed-state&calendar_callback_origin=https%3A%2F%2Fapp.cosmiq.quest",
     });
+    expect(mocks.browserCloseMock).toHaveBeenCalledTimes(1);
   });
 });

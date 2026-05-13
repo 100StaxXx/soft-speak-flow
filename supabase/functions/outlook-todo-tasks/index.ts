@@ -732,7 +732,7 @@ async function getOutlookConnection(
 }
 
 async function getDefaultTaskListId(accessToken: string): Promise<string | null> {
-  const payload = await outlookApi(accessToken, "/me/todo/lists?$select=id,displayName,wellknownListName", "GET");
+  const payload = await outlookApi(accessToken, "/me/todo/lists", "GET");
   const lists = Array.isArray(payload?.value) ? payload.value : [];
   const defaultList = lists.find((item: Record<string, unknown>) =>
     String(item.wellknownListName || "").toLowerCase() === "defaultlist"

@@ -86,6 +86,25 @@ Deno.test("oauthState creates and verifies signed state payloads", async () => {
   assert(payload.exp > Math.floor(Date.now() / 1000));
 });
 
+Deno.test("oauthState preserves the authorize redirect URI for token exchange", async () => {
+  const state = await createSignedOAuthState({
+    provider: "outlook",
+    userId: "user-redirect",
+    syncMode: "send_only",
+    source: "native",
+    redirectUri: "  https://app.cosmiq.quest/calendar/oauth/callback  ",
+    secret: "test-secret",
+  });
+
+  const payload = await verifySignedOAuthState({
+    state,
+    provider: "outlook",
+    secret: "test-secret",
+  });
+
+  assertEquals(payload.redirectUri, "https://app.cosmiq.quest/calendar/oauth/callback");
+});
+
 Deno.test("oauthState defaults source to web for legacy payloads", async () => {
   const state = await createLegacyStateWithoutSource({
     provider: "google",

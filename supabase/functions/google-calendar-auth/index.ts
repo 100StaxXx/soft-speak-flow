@@ -278,7 +278,7 @@ async function exchangeGoogleConnection(args: {
     supabase,
     req,
     code,
-    redirectUri,
+    redirectUri: requestedRedirectUri,
     state,
     requestedSyncModeFromBody,
     sourceFromBody,
@@ -287,10 +287,11 @@ async function exchangeGoogleConnection(args: {
     googleClientSecret,
   } = args;
 
-  if (!code || !redirectUri) {
+  if (!code) {
     throw new OAuthHttpError("code and redirectUri are required", 400);
   }
 
+  let redirectUri = requestedRedirectUri?.trim();
   let userId = req ? await tryGetAuthedUserId(supabase, req) : null;
   let requestedSyncMode: SyncMode = normalizeSyncMode(requestedSyncModeFromBody);
   let requestedSource: OAuthSource = normalizeOAuthSource(sourceFromBody);
@@ -314,6 +315,7 @@ async function exchangeGoogleConnection(args: {
         requestedSyncMode = verified.syncMode;
       }
       requestedSource = verified.source;
+      redirectUri = verified.redirectUri ?? redirectUri;
     } catch (error) {
       if (error instanceof OAuthHttpError) {
         throw error;
@@ -322,6 +324,10 @@ async function exchangeGoogleConnection(args: {
     }
   } else if (!userId) {
     throw new OAuthHttpError("Invalid or expired OAuth state", 401);
+  }
+
+  if (!redirectUri) {
+    throw new OAuthHttpError("code and redirectUri are required", 400);
   }
 
   const tokenResponse = await fetch(GOOGLE_TOKEN_URL, {
@@ -480,7 +486,8 @@ Deno.serve(async (req) => {
 
     if (action === "getAuthUrl") {
       const userId = await getAuthedUserId(supabase, req);
-      const redirectUri = (body?.redirectUri || body?.redirect_uri) as string | undefined;
+      const rawRedirectUri = (body?.redirectUri || body?.redirect_uri) as string | undefined;
+      const redirectUri = rawRedirectUri?.trim();
       const requestedSyncMode = normalizeSyncMode(body?.syncMode ?? body?.sync_mode);
       const requestedSource = normalizeOAuthSource(body?.source ?? body?.calendar_source);
       if (!redirectUri) {
@@ -496,6 +503,7 @@ Deno.serve(async (req) => {
         userId,
         syncMode: requestedSyncMode,
         source: requestedSource,
+        redirectUri,
         secret: internalFunctionSecret,
       });
 

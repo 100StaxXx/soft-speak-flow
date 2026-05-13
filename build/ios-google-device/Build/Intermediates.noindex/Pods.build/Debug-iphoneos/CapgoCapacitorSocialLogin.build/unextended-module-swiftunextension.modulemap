@@ -1,0 +1,4 @@
+
+module CapgoCapacitorSocialLogin.__Swift {
+  exclude header "CapgoCapacitorSocialLogin-Swift.h"
+}

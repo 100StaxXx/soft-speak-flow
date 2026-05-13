@@ -182,8 +182,12 @@ export const CompanionStructuredResponseCards = memo(
     const styles = variantStyles[variant];
     const planDayCampaignFocus =
       structuredResponse.planDay?.campaignFocus ?? null;
+    const comingUpRemainingToday =
+      structuredResponse.comingUp?.remainingToday ?? [];
     const comingUpTomorrowSchedule =
       structuredResponse.comingUp?.tomorrowSchedule ?? [];
+    const comingUpMissedItems =
+      structuredResponse.comingUp?.missedItems ?? [];
 
     return (
       <div className={cn("space-y-3", className)}>
@@ -601,8 +605,8 @@ export const CompanionStructuredResponseCards = memo(
                 )
                 : null}
               <div className="mt-4 space-y-2">
-                {structuredResponse.comingUp.remainingToday.length > 0
-                  ? structuredResponse.comingUp.remainingToday.map((item) => (
+                {comingUpRemainingToday.length > 0
+                  ? comingUpRemainingToday.map((item) => (
                     <div key={item.id} className={styles.item}>
                       <p className="text-sm font-semibold">{item.title}</p>
                       <p className={cn("mt-1", styles.subtext)}>{item.label}</p>
@@ -634,10 +638,10 @@ export const CompanionStructuredResponseCards = memo(
                   </div>
                 )
                 : null}
-              {structuredResponse.comingUp.missedItems.length > 0
+              {comingUpMissedItems.length > 0
                 ? (
                   <div className="mt-3 space-y-2">
-                    {structuredResponse.comingUp.missedItems.map((item) => (
+                    {comingUpMissedItems.map((item) => (
                       <div key={item.id} className={styles.item}>
                         <p className="text-sm font-semibold">{item.title}</p>
                         <p className={cn("mt-1", styles.subtext)}>

@@ -419,6 +419,7 @@ describe("AddQuestSheet", () => {
       text: "Calendar-ready quest",
       scheduledTime: "09:00",
       sendToCalendar: true,
+      sendToCalendarTarget: "google",
     }));
   });
 

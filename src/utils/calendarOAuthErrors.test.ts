@@ -31,6 +31,18 @@ describe('calendarOAuthErrors', () => {
     );
   });
 
+  it('includes Microsoft credential diagnostic codes in configuration errors', () => {
+    expect(
+      toUserFacingCalendarOAuthError('outlook', {
+        ...baseParsed,
+        details:
+          '{"error":"invalid_client","error_description":"AADSTS7000215: Invalid client secret provided."}',
+      }),
+    ).toBe(
+      'Outlook Calendar is not configured correctly on the server yet (AADSTS7000215). Please contact support.',
+    );
+  });
+
   it('maps reused or expired authorization codes to retry guidance', () => {
     expect(
       toUserFacingCalendarOAuthError('google', {

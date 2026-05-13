@@ -441,13 +441,23 @@ describe("useQuestCalendarSync", () => {
       },
       error: null,
     });
+    mocks.functionsInvokeMock.mockResolvedValueOnce({
+      data: {
+        link: {
+          externalCalendarId: "calendar-2",
+          externalEventId: "event-2",
+        },
+      },
+      error: null,
+    });
 
     const { result } = renderHook(() => useQuestCalendarSync(), {
       wrapper: createWrapper(),
     });
 
+    let sendResult: Awaited<ReturnType<typeof result.current.sendTaskToCalendar.mutateAsync>> | null = null;
     await act(async () => {
-      await result.current.sendTaskToCalendar.mutateAsync({ taskId: "task-6" });
+      sendResult = await result.current.sendTaskToCalendar.mutateAsync({ taskId: "task-6" });
     });
 
     expect(mocks.functionsInvokeMock).toHaveBeenCalledWith("outlook-calendar-events", {
@@ -457,12 +467,67 @@ describe("useQuestCalendarSync", () => {
         syncMode: "send_only",
       },
     });
+    expect(sendResult).toEqual({
+      provider: "outlook",
+      providerLabel: "Outlook",
+      destinationKind: "calendar",
+      destinationName: "Calendar",
+      externalId: "event-2",
+    });
     expect(mocks.functionsInvokeMock).not.toHaveBeenCalledWith(
       "outlook-todo-tasks",
       expect.objectContaining({
         body: expect.objectContaining({ action: "createLinkedTask" }),
       }),
     );
+  });
+
+  it("requires a default provider before sending when multiple providers are connected", async () => {
+    mocks.useCalendarIntegrationsMock.mockReturnValue({
+      connections: [
+        {
+          id: "conn-google",
+          provider: "google",
+          calendar_email: "user@gmail.com",
+          primary_calendar_id: "google-primary",
+          primary_calendar_name: "Google Primary",
+          sync_mode: "send_only",
+          sync_enabled: true,
+          platform: "web",
+          last_synced_at: null,
+        },
+        {
+          id: "conn-outlook",
+          provider: "outlook",
+          calendar_email: "user@outlook.com",
+          primary_calendar_id: "outlook-calendar",
+          primary_calendar_name: "Outlook Calendar",
+          sync_mode: "send_only",
+          sync_enabled: true,
+          platform: "web",
+          last_synced_at: null,
+        },
+      ],
+      defaultProvider: null,
+    });
+
+    const { result } = renderHook(() => useQuestCalendarSync(), {
+      wrapper: createWrapper(),
+    });
+
+    let thrown: unknown;
+    await act(async () => {
+      try {
+        await result.current.sendTaskToCalendar.mutateAsync({ taskId: "task-multi-provider" });
+      } catch (error) {
+        thrown = error;
+      }
+    });
+
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).toContain("CALENDAR_DEFAULT_REQUIRED");
+    expect(mocks.dailyTaskSingleMock).not.toHaveBeenCalled();
+    expect(mocks.functionsInvokeMock).not.toHaveBeenCalled();
   });
 
   it("full sync pull for Outlook invokes both calendar and To Do providers", async () => {
@@ -559,6 +624,78 @@ describe("useQuestCalendarSync", () => {
       body: {
         action: "updateLinkedTask",
         taskId: "task-7",
+        syncMode: "full_sync",
+      },
+    });
+  });
+
+  it("uses current provider full sync mode for older send-only Outlook calendar links", async () => {
+    mocks.useCalendarIntegrationsMock.mockReturnValue({
+      connections: [
+        {
+          id: "conn-outlook-current-full-sync",
+          provider: "outlook",
+          calendar_email: "user@example.com",
+          primary_calendar_id: "calendar-current",
+          primary_calendar_name: "Calendar",
+          sync_mode: "full_sync",
+          sync_enabled: true,
+          platform: "web",
+          last_synced_at: null,
+        },
+      ],
+      defaultProvider: "outlook",
+    });
+    mocks.questLinksEqMock.mockResolvedValue({
+      data: [
+        {
+          id: "qcl-send-only-1",
+          task_id: "task-current-full-sync",
+          user_id: "user-1",
+          connection_id: "conn-outlook-current-full-sync",
+          provider: "outlook",
+          external_calendar_id: "calendar-current",
+          external_event_id: "event-current",
+          sync_mode: "send_only",
+          last_app_sync_at: null,
+          last_provider_sync_at: null,
+        },
+      ],
+      error: null,
+    });
+    mocks.dailyTaskSingleMock.mockResolvedValueOnce({
+      data: {
+        id: "task-current-full-sync",
+        task_text: "Moved linked quest",
+        task_date: "2026-02-12",
+        scheduled_time: "10:00",
+        estimated_duration: 30,
+        recurrence_pattern: null,
+        recurrence_days: [],
+        recurrence_month_days: [],
+        recurrence_custom_period: null,
+        location: null,
+        notes: null,
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useQuestCalendarSync(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.links).toHaveLength(1);
+    });
+
+    await act(async () => {
+      await result.current.syncTaskUpdate.mutateAsync({ taskId: "task-current-full-sync" });
+    });
+
+    expect(mocks.functionsInvokeMock).toHaveBeenCalledWith("outlook-calendar-events", {
+      body: {
+        action: "updateLinkedEvent",
+        taskId: "task-current-full-sync",
         syncMode: "full_sync",
       },
     });

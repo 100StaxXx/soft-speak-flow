@@ -3,6 +3,7 @@
  */
 
 import type { QuestAttachmentInput } from "@/types/questAttachments";
+import type { CalendarSendTarget } from "@/utils/calendarDestinationOptions";
 
 export type QuestDifficulty = "easy" | "medium" | "hard";
 export type QuestCreationSource = "manual" | "inbox" | "voice" | "nlp" | "outlook_sync";
@@ -85,6 +86,7 @@ export interface QuestDraftSnapshot {
   moreInformation: string | null;
   location: string | null;
   sendToCalendar: boolean;
+  sendToCalendarTarget?: CalendarSendTarget | null;
   subtasks: string[];
   attachments: QuestAttachmentInput[];
   creationSource: QuestCreationSource;

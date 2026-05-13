@@ -1,0 +1,11 @@
+framework module CapgoCapacitorSocialLogin {
+  umbrella header "CapgoCapacitorSocialLogin-umbrella.h"
+
+  export *
+  module * { export * }
+}
+
+module CapgoCapacitorSocialLogin.Swift {
+  header "CapgoCapacitorSocialLogin-Swift.h"
+  requires objc
+}

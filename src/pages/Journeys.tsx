@@ -51,8 +51,13 @@ import { QuestsErrorBoundary } from "@/components/SectionErrorBoundary";
 
 import { useTaskCompletionWithInteraction, type InteractionType } from "@/hooks/useTaskCompletionWithInteraction";
 import { InteractionLogModal } from "@/components/tasks/InteractionLogModal";
-import { useQuestCalendarSync } from "@/hooks/useQuestCalendarSync";
+import { getCalendarSendSuccessCopy, useQuestCalendarSync } from "@/hooks/useQuestCalendarSync";
 import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
+import {
+  buildCalendarSendTargetOptions,
+  isCalendarSendTargetAvailable,
+  type CalendarSendTarget,
+} from "@/utils/calendarDestinationOptions";
 import { HourlyViewModal } from "@/components/HourlyViewModal";
 import { JourneysCompanionPlannerModal } from "@/components/journeys/JourneysCompanionPlannerModal";
 import { DraggableFAB } from "@/components/DraggableFAB";
@@ -824,7 +829,10 @@ const Journeys = () => {
   const { sendTaskToCalendar, syncTaskUpdate, syncTaskDelete, syncProviderPull, hasLinkedEvent } = useQuestCalendarSync({
     enabled: isTabActive,
   });
-  const { connections: calendarConnections } = useCalendarIntegrations({ enabled: isTabActive });
+  const {
+    connections: calendarConnections,
+    defaultProvider: calendarDefaultProvider,
+  } = useCalendarIntegrations({ enabled: isTabActive });
   
   // Contact interaction logging
   const {
@@ -1443,7 +1451,10 @@ const Journeys = () => {
     navigate("/profile", { state: { openTab: "preferences" } });
   }, [navigate]);
 
-  const handleSendTaskToCalendar = useCallback(async (taskId: string) => {
+  const handleSendTaskToCalendar = useCallback(async (
+    taskId: string,
+    requestedTarget?: CalendarSendTarget | null,
+  ) => {
     const routeToCalendarPreferences = () => {
       toast.error("No calendar connected. Opening Preferences...");
       handleOpenCalendarPreferences();
@@ -1454,24 +1465,77 @@ const Journeys = () => {
       return;
     }
 
+    const resolveSendTarget = (): CalendarSendTarget | null => {
+      if (requestedTarget && isCalendarSendTargetAvailable(requestedTarget, calendarConnections)) {
+        return requestedTarget;
+      }
+
+      if (calendarConnections.length <= 1) {
+        return calendarConnections[0]?.provider ?? null;
+      }
+
+      const options = buildCalendarSendTargetOptions(calendarConnections, {
+        defaultProvider: calendarDefaultProvider,
+        includeAll: true,
+        scheduledOnly: false,
+      });
+      const promptMessage = [
+        "Send this quest where?",
+        ...options.map((option, index) => `${index + 1}. ${option.label} - ${option.description}`),
+      ].join("\n");
+      const picked = window.prompt(promptMessage, "1");
+      const pickedIndex = picked ? Number.parseInt(picked, 10) - 1 : -1;
+      const option = Number.isInteger(pickedIndex) ? options[pickedIndex] : undefined;
+
+      return option?.target ?? null;
+    };
+
+    const selectedTarget = resolveSendTarget();
+    if (!selectedTarget) {
+      toast.error("Calendar send cancelled. Please choose a destination.");
+      return;
+    }
+
+    const providerTargets = selectedTarget === "all"
+      ? calendarConnections.map((connection) => connection.provider)
+      : [selectedTarget];
+
     let taskDateOverride: string | undefined;
     let scheduledTimeOverride: string | undefined;
 
     const attempt = async () => {
-      await sendTaskToCalendar.mutateAsync({
-        taskId,
-        options: taskDateOverride || scheduledTimeOverride
-          ? {
-              taskDate: taskDateOverride,
-              scheduledTime: scheduledTimeOverride,
-            }
-          : undefined,
+      const results = [];
+      for (const provider of providerTargets) {
+        results.push(await sendTaskToCalendar.mutateAsync({
+          taskId,
+          options: {
+            provider,
+            ...(taskDateOverride ? { taskDate: taskDateOverride } : {}),
+            ...(scheduledTimeOverride ? { scheduledTime: scheduledTimeOverride } : {}),
+          },
+        }));
+      }
+      return results;
+    };
+
+    const showSuccess = (results: Awaited<ReturnType<typeof attempt>>) => {
+      if (results.length === 1) {
+        const copy = getCalendarSendSuccessCopy(results[0], calendarConnections.length);
+        toast.success(copy.title, { description: copy.description });
+        return;
+      }
+
+      const destinations = results
+        .map((result) => `${result.providerLabel} ${result.destinationKind === "todo" ? "To Do" : "Calendar"} -> ${result.destinationName}`)
+        .join("; ");
+      toast.success(`Quest sent to ${results.length} destinations`, {
+        description: `Destinations: ${destinations}.`,
       });
     };
 
     try {
-      await attempt();
-      toast.success("Quest synced to calendar");
+      const results = await attempt();
+      showSuccess(results);
       return;
     } catch (error) {
       let message = error instanceof Error ? error.message : "Failed to send quest to calendar";
@@ -1483,10 +1547,20 @@ const Journeys = () => {
         routeToCalendarPreferences();
         return;
       }
+      if (message.includes("CALENDAR_DEFAULT_REQUIRED")) {
+        toast.error("Choose a default calendar provider before sending. Opening Preferences...");
+        handleOpenCalendarPreferences();
+        return;
+      }
 
       for (let attemptIndex = 0; attemptIndex < 2; attemptIndex += 1) {
         if (message.includes("NO_CALENDAR_CONNECTION")) {
           routeToCalendarPreferences();
+          return;
+        }
+        if (message.includes("CALENDAR_DEFAULT_REQUIRED")) {
+          toast.error("Choose a default calendar provider before sending. Opening Preferences...");
+          handleOpenCalendarPreferences();
           return;
         }
 
@@ -1512,8 +1586,8 @@ const Journeys = () => {
         }
 
         try {
-          await attempt();
-          toast.success("Quest synced to calendar");
+          const results = await attempt();
+          showSuccess(results);
           return;
         } catch (retryError) {
           message = retryError instanceof Error ? retryError.message : "Failed to send quest to calendar";
@@ -1523,6 +1597,11 @@ const Journeys = () => {
           }
           if (message.includes("NO_CALENDAR_CONNECTION")) {
             routeToCalendarPreferences();
+            return;
+          }
+          if (message.includes("CALENDAR_DEFAULT_REQUIRED")) {
+            toast.error("Choose a default calendar provider before sending. Opening Preferences...");
+            handleOpenCalendarPreferences();
             return;
           }
           if (
@@ -1548,7 +1627,7 @@ const Journeys = () => {
 
       toast.error(message);
     }
-  }, [calendarConnections.length, handleOpenCalendarPreferences, selectedDate, sendTaskToCalendar]);
+  }, [calendarConnections, calendarDefaultProvider, handleOpenCalendarPreferences, selectedDate, sendTaskToCalendar]);
 
   const handleAddQuest = useCallback(async (data: AddQuestData) => {
     const taskDate = data.sendToInbox
@@ -1591,7 +1670,7 @@ const Journeys = () => {
 
     if (SEND_TO_CALENDAR_ENABLED && data.sendToCalendar && createdTask?.id) {
       const calendarSyncStartedAt = Date.now();
-      void handleSendTaskToCalendar(createdTask.id).finally(() => {
+      void handleSendTaskToCalendar(createdTask.id, data.sendToCalendarTarget).finally(() => {
         trackResilienceEvent("task_create_calendar_sync", {
           taskId: createdTask.id,
           calendarSyncMs: Date.now() - calendarSyncStartedAt,
@@ -1834,19 +1913,48 @@ const Journeys = () => {
     const nextDay = addDays(taskDate, 1);
     const nextDayStr = format(nextDay, 'yyyy-MM-dd');
 
-    moveTaskToDate({ taskId: task.id, targetDate: nextDayStr });
+    const syncMovedQuest = (movedTaskId: string) => {
+      void syncTaskUpdate.mutateAsync({ taskId: movedTaskId }).catch((error) => {
+        const message = error instanceof Error ? error.message : "";
+        if (message.includes("MULTI_DAY_MONTHLY_UNSUPPORTED")) {
+          toast.error("Calendar sync doesn't support multi-day monthly recurrence yet.");
+          return;
+        }
+        toast.error("Moved quest, but failed to sync linked calendar event");
+      });
+    };
+
+    moveTaskToDate(
+      { taskId: task.id, targetDate: nextDayStr },
+      {
+        onSuccess: (result) => {
+          if (!isQueuedTaskMutationResult(result)) {
+            syncMovedQuest(task.id);
+          }
+        },
+      },
+    );
 
     toast(`Moved to ${format(nextDay, "EEEE, MMM d")}`, {
       duration: QUEST_ACTION_TOAST_DURATION_MS,
       action: {
         label: "Undo",
         onClick: () => {
-          moveTaskToDate({ taskId: task.id, targetDate: task.task_date! });
+          moveTaskToDate(
+            { taskId: task.id, targetDate: task.task_date! },
+            {
+              onSuccess: (result) => {
+                if (!isQueuedTaskMutationResult(result)) {
+                  syncMovedQuest(task.id);
+                }
+              },
+            },
+          );
           toast.success("Move undone");
         },
       },
     });
-  }, [moveTaskToDate]);
+  }, [moveTaskToDate, syncTaskUpdate]);
 
   const handleToggleInboxQuest = useCallback((taskId: string, completed: boolean) => {
     toggleInboxTask({ taskId, completed }, {

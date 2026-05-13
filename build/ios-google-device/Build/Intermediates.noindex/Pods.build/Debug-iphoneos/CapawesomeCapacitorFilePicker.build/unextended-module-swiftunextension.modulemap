@@ -1,0 +1,4 @@
+
+module CapawesomeCapacitorFilePicker.__Swift {
+  exclude header "CapawesomeCapacitorFilePicker-Swift.h"
+}

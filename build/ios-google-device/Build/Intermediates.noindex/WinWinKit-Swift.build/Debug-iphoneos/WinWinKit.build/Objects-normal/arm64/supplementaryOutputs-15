@@ -1,0 +1,128 @@
+{
+  "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/SourcePackages/checkouts/winwinkit-swift/Sources/WinWinKit/Generated/OpenAPI/Public/Models/UserGooglePlayPromoCodeRewardActive.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserGooglePlayPromoCodeRewardActive.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserGooglePlayPromoCodeRewardActive.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserGooglePlayPromoCodeRewardActive.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserGooglePlayPromoCodeRewardActive.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserGooglePlayPromoCodeRewardActive.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/SourcePackages/checkouts/winwinkit-swift/Sources/WinWinKit/Generated/OpenAPI/Public/Models/UserGooglePlayPromoCodeRewardExpired.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserGooglePlayPromoCodeRewardExpired.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserGooglePlayPromoCodeRewardExpired.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserGooglePlayPromoCodeRewardExpired.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserGooglePlayPromoCodeRewardExpired.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserGooglePlayPromoCodeRewardExpired.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/SourcePackages/checkouts/winwinkit-swift/Sources/WinWinKit/Generated/OpenAPI/Public/Models/UserGrantRewardResponseData.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserGrantRewardResponseData.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserGrantRewardResponseData.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserGrantRewardResponseData.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserGrantRewardResponseData.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserGrantRewardResponseData.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/SourcePackages/checkouts/winwinkit-swift/Sources/WinWinKit/Generated/OpenAPI/Public/Models/UserOfferCodeRewardActive.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserOfferCodeRewardActive.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserOfferCodeRewardActive.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserOfferCodeRewardActive.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserOfferCodeRewardActive.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserOfferCodeRewardActive.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/SourcePackages/checkouts/winwinkit-swift/Sources/WinWinKit/Generated/OpenAPI/Public/Models/UserOfferCodeRewardExpired.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserOfferCodeRewardExpired.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserOfferCodeRewardExpired.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserOfferCodeRewardExpired.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserOfferCodeRewardExpired.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserOfferCodeRewardExpired.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/SourcePackages/checkouts/winwinkit-swift/Sources/WinWinKit/Generated/OpenAPI/Public/Models/UserReferredBy.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserReferredBy.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserReferredBy.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserReferredBy.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserReferredBy.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserReferredBy.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/SourcePackages/checkouts/winwinkit-swift/Sources/WinWinKit/Generated/OpenAPI/Public/Models/UserResponseData.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserResponseData.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserResponseData.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserResponseData.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserResponseData.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserResponseData.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/SourcePackages/checkouts/winwinkit-swift/Sources/WinWinKit/Generated/OpenAPI/Public/Models/UserRevenueCatEntitlementRewardActive.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRevenueCatEntitlementRewardActive.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRevenueCatEntitlementRewardActive.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRevenueCatEntitlementRewardActive.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRevenueCatEntitlementRewardActive.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRevenueCatEntitlementRewardActive.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/SourcePackages/checkouts/winwinkit-swift/Sources/WinWinKit/Generated/OpenAPI/Public/Models/UserRevenueCatEntitlementRewardExpired.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRevenueCatEntitlementRewardExpired.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRevenueCatEntitlementRewardExpired.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRevenueCatEntitlementRewardExpired.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRevenueCatEntitlementRewardExpired.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRevenueCatEntitlementRewardExpired.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/SourcePackages/checkouts/winwinkit-swift/Sources/WinWinKit/Generated/OpenAPI/Public/Models/UserRevenueCatOfferingRewardActive.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRevenueCatOfferingRewardActive.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRevenueCatOfferingRewardActive.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRevenueCatOfferingRewardActive.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRevenueCatOfferingRewardActive.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRevenueCatOfferingRewardActive.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/SourcePackages/checkouts/winwinkit-swift/Sources/WinWinKit/Generated/OpenAPI/Public/Models/UserRevenueCatOfferingRewardExpired.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRevenueCatOfferingRewardExpired.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRevenueCatOfferingRewardExpired.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRevenueCatOfferingRewardExpired.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRevenueCatOfferingRewardExpired.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRevenueCatOfferingRewardExpired.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/SourcePackages/checkouts/winwinkit-swift/Sources/WinWinKit/Generated/OpenAPI/Public/Models/UserRewards.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRewards.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRewards.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRewards.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRewards.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRewards.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/SourcePackages/checkouts/winwinkit-swift/Sources/WinWinKit/Generated/OpenAPI/Public/Models/UserRewardsActive.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRewardsActive.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRewardsActive.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRewardsActive.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRewardsActive.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRewardsActive.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/SourcePackages/checkouts/winwinkit-swift/Sources/WinWinKit/Generated/OpenAPI/Public/Models/UserRewardsExpired.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRewardsExpired.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRewardsExpired.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRewardsExpired.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRewardsExpired.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRewardsExpired.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/SourcePackages/checkouts/winwinkit-swift/Sources/WinWinKit/Generated/OpenAPI/Public/Models/UserRewardsGranted.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRewardsGranted.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRewardsGranted.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRewardsGranted.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRewardsGranted.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserRewardsGranted.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/SourcePackages/checkouts/winwinkit-swift/Sources/WinWinKit/Generated/OpenAPI/Public/Models/UserStats.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserStats.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserStats.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserStats.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserStats.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserStats.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/SourcePackages/checkouts/winwinkit-swift/Sources/WinWinKit/Generated/OpenAPI/Public/Models/UserWithdrawCreditsResponseData.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserWithdrawCreditsResponseData.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserWithdrawCreditsResponseData.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserWithdrawCreditsResponseData.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserWithdrawCreditsResponseData.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserWithdrawCreditsResponseData.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/SourcePackages/checkouts/winwinkit-swift/Sources/WinWinKit/Generated/OpenAPI/Public/Models/UserWithdrawCreditsResult.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserWithdrawCreditsResult.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserWithdrawCreditsResult.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserWithdrawCreditsResult.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserWithdrawCreditsResult.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/build/ios-google-device/Build/Intermediates.noindex/WinWinKit-Swift.build/Debug-iphoneos/WinWinKit.build/Objects-normal/arm64/UserWithdrawCreditsResult.swiftdeps"
+  }
+}

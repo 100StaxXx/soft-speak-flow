@@ -77,12 +77,23 @@ function isScopeError(text: string): boolean {
   );
 }
 
+function extractOAuthDiagnosticCode(text: string): string | null {
+  const aadstsMatch = text.match(/\bAADSTS\d+\b/i);
+  if (aadstsMatch?.[0]) {
+    return aadstsMatch[0].toUpperCase();
+  }
+
+  const oauthErrorMatch = text.match(/"error"\s*:\s*"([^"]+)"/i);
+  return oauthErrorMatch?.[1]?.toUpperCase() ?? null;
+}
+
 export function toUserFacingCalendarOAuthError(
   provider: CalendarOAuthProvider,
   parsed: ParsedFunctionInvokeError,
 ): string {
   const text = combinedErrorText(parsed);
   const label = providerLabel(provider);
+  const diagnosticCode = extractOAuthDiagnosticCode(text);
 
   if (text.includes('invalid or expired oauth state')) {
     return 'Calendar connection expired. Please try again.';
@@ -93,7 +104,9 @@ export function toUserFacingCalendarOAuthError(
   }
 
   if (isProviderConfigError(text)) {
-    return `${label} Calendar is not configured correctly on the server yet. Please contact support.`;
+    return diagnosticCode
+      ? `${label} Calendar is not configured correctly on the server yet (${diagnosticCode}). Please contact support.`
+      : `${label} Calendar is not configured correctly on the server yet. Please contact support.`;
   }
 
   if (isRedirectUriError(text)) {

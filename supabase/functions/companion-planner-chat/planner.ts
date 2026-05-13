@@ -891,13 +891,13 @@ const collectPlannerResultProtectedDataText = (
   ) ?? []),
   result.structuredResponse?.comingUp?.nextEvent?.title ?? null,
   result.structuredResponse?.comingUp?.nextBestAction?.title ?? null,
-  ...(result.structuredResponse?.comingUp?.remainingToday.map((item) =>
+  ...(result.structuredResponse?.comingUp?.remainingToday?.map((item) =>
     item.title
   ) ?? []),
   ...(result.structuredResponse?.comingUp?.tomorrowSchedule?.map((item) =>
     item.title
   ) ?? []),
-  ...(result.structuredResponse?.comingUp?.missedItems.map((item) =>
+  ...(result.structuredResponse?.comingUp?.missedItems?.map((item) =>
     item.title
   ) ?? []),
   result.structuredResponse?.campaignMomentum?.campaignTitle ?? null,
@@ -1163,26 +1163,24 @@ export const normalizePlannerBuildResultText = (
               result.structuredResponse.comingUp.nextBestAction,
             )
             : null,
-          remainingToday: result.structuredResponse.comingUp.remainingToday.map(
-            (item) => ({
-              ...item,
-              title: data(item.title),
-              label: data(item.label),
-            }),
-          ),
-          tomorrowSchedule: result.structuredResponse.comingUp.tomorrowSchedule
-            ?.map((item) => ({
+          remainingToday: (result.structuredResponse.comingUp.remainingToday ??
+            []).map((item) => ({
               ...item,
               title: data(item.title),
               label: data(item.label),
             })),
-          missedItems: result.structuredResponse.comingUp.missedItems.map(
-            (item) => ({
+          tomorrowSchedule: (result.structuredResponse.comingUp.tomorrowSchedule ??
+            []).map((item) => ({
               ...item,
               title: data(item.title),
               label: data(item.label),
-            }),
-          ),
+            })),
+          missedItems: (result.structuredResponse.comingUp.missedItems ?? [])
+            .map((item) => ({
+              ...item,
+              title: data(item.title),
+              label: data(item.label),
+            })),
         }
         : result.structuredResponse.comingUp,
       campaignMomentum: result.structuredResponse.campaignMomentum
@@ -7601,7 +7599,7 @@ const derivePlannerReasonCodes = (
   addReasonCode(
     reasonCodes,
     "overdue",
-    Boolean(structured?.comingUp?.missedItems.length),
+    Boolean(structured?.comingUp?.missedItems?.length),
   );
   addReasonCode(reasonCodes, "low_energy_hint", dayAssessment === "low_energy");
   addReasonCode(

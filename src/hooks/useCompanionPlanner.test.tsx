@@ -2061,6 +2061,61 @@ describe("useCompanionPlanner", () => {
     );
   });
 
+  it("falls back to a local read-only coming-up digest when the backend starter fails", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-12T20:52:00.000Z"));
+    const todayTask = {
+      id: "task-late-planning",
+      task_text: "Late planning quest",
+      task_date: "2026-05-12",
+      completed: false,
+      completed_at: null,
+      scheduled_time: "23:00",
+      estimated_duration: 20,
+      recurrence_pattern: null,
+      subtasks: [],
+    };
+    const tomorrowTask = {
+      id: "task-tomorrow-prep",
+      task_text: "Tomorrow prep",
+      task_date: "2026-05-13",
+      completed: false,
+      completed_at: null,
+      scheduled_time: "09:30",
+      estimated_duration: 30,
+      recurrence_pattern: null,
+      subtasks: [],
+    };
+    mocks.todayTasks = [todayTask];
+    mocks.weekTasks = [todayTask, tomorrowTask];
+    mocks.invoke.mockResolvedValue({
+      data: null,
+      error: new Error("Failed to build companion plan"),
+    });
+
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
+
+    await act(async () => {
+      await result.current.submitMessage("What do I have coming up?", "text");
+    });
+
+    expect(mocks.toastError).not.toHaveBeenCalled();
+    expect(result.current.messages.at(-1)?.content).toContain("Today:");
+    expect(result.current.structuredResponse?.comingUp?.remainingToday).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ title: "Late planning quest" }),
+      ]),
+    );
+    expect(result.current.structuredResponse?.comingUp?.tomorrowSchedule)
+      .toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ title: "Tomorrow prep" }),
+        ]),
+      );
+  });
+
   it("falls back to backend classification when client-side classification preflight times out", async () => {
     vi.useFakeTimers();
     mocks.classify.mockImplementation(

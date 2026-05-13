@@ -1,0 +1,4 @@
+
+module CapacitorPushNotifications.__Swift {
+  exclude header "CapacitorPushNotifications-Swift.h"
+}

@@ -1,0 +1,4 @@
+module WinWinKit {
+header "WinWinKit-Swift.h"
+export *
+}

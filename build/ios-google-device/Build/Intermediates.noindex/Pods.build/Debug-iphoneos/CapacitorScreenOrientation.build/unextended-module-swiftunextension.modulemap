@@ -1,0 +1,4 @@
+
+module CapacitorScreenOrientation.__Swift {
+  exclude header "CapacitorScreenOrientation-Swift.h"
+}

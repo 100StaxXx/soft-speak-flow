@@ -1,0 +1,5 @@
+
+module CapacitorScreenOrientation.Swift {
+  header "CapacitorScreenOrientation-Swift.h"
+  requires objc
+}

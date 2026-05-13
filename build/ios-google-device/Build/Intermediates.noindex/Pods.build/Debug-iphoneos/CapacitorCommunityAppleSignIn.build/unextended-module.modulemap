@@ -1,0 +1,10 @@
+framework module CapacitorCommunityAppleSignIn {
+  umbrella header "CapacitorCommunityAppleSignIn-umbrella.h"
+
+  export *
+  module * { export * }
+}
+
+module CapacitorCommunityAppleSignIn.__Swift {
+  exclude header "CapacitorCommunityAppleSignIn-Swift.h"
+}

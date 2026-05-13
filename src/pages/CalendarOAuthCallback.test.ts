@@ -18,11 +18,13 @@ describe("CalendarOAuthCallback helpers", () => {
       source: "native",
       syncMode: "send_only",
       userId: "user-1",
+      redirectUri: "https://app.cosmiq.quest/calendar/oauth/callback",
     });
 
     expect(getCalendarOAuthStateHint(state)).toEqual({
       provider: "outlook",
       source: "native",
+      redirectUri: "https://app.cosmiq.quest/calendar/oauth/callback",
     });
   });
 
@@ -98,6 +100,31 @@ describe("CalendarOAuthCallback helpers", () => {
       }),
     ).toMatchObject({
       provider: "google",
+      source: "native",
+      code: "oauth-code",
+      state,
+      redirectUri: "https://app.cosmiq.quest/calendar/oauth/callback",
+    });
+  });
+
+  it("prefers signed state redirect URIs over WebView callback origins", () => {
+    const state = stateFor({
+      v: 1,
+      provider: "outlook",
+      source: "native",
+      syncMode: "send_only",
+      userId: "user-1",
+      redirectUri: "https://app.cosmiq.quest/calendar/oauth/callback",
+    });
+
+    expect(
+      getCalendarOAuthCallbackContext({
+        search: `?code=oauth-code&state=${encodeURIComponent(state)}`,
+        origin: "capacitor://localhost",
+        pathname: "/calendar/oauth/callback",
+      }),
+    ).toMatchObject({
+      provider: "outlook",
       source: "native",
       code: "oauth-code",
       state,

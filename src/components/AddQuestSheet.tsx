@@ -10,6 +10,7 @@ import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
 import { QuestAttachmentPicker } from "@/components/QuestAttachmentPicker";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { Calendar } from "@/components/ui/calendar";
@@ -32,6 +33,13 @@ import {
 import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
 import { parseScheduledTime } from "@/utils/scheduledTime";
 import { SEND_TO_CALENDAR_ENABLED } from "@/utils/calendarFeatureFlags";
+import {
+  buildCalendarSendTargetOptions,
+  getInitialCalendarSendTarget,
+  isCalendarSendTarget,
+  isCalendarSendTargetAvailable,
+  type CalendarSendTarget,
+} from "@/utils/calendarDestinationOptions";
 import type { QuestAttachmentInput } from "@/types/questAttachments";
 import { hasRecurrencePattern } from "@/utils/recurrenceValidation";
 import { QuestTemplateBrowser } from "@/features/quests/components/QuestTemplateBrowser";
@@ -76,6 +84,7 @@ export interface AddQuestData {
   autoLogInteraction: boolean;
   sendToInbox: boolean;
   sendToCalendar: boolean;
+  sendToCalendarTarget: CalendarSendTarget | null;
   subtasks: string[];
   imageUrl: string | null;
   attachments: QuestAttachmentInput[];
@@ -150,6 +159,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [subtasks, setSubtasks] = useState<string[]>([]);
   const [sendToCalendar, setSendToCalendar] = useState(false);
+  const [calendarSendTarget, setCalendarSendTarget] = useState<CalendarSendTarget | null>(null);
   const [attachments, setAttachments] = useState<QuestAttachmentInput[]>([]);
   const [creationSource, setCreationSource] = useState<QuestCreationSource>("manual");
   const [selectedTemplate, setSelectedTemplate] = useState<QuestTemplatePrefill | null>(null);
@@ -169,21 +179,29 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const { user } = useAuth();
 
   const { defaultProvider, connections } = useCalendarIntegrations();
-  const effectiveProvider = useMemo(() => {
-    const connectedDefaultProvider = defaultProvider
-      ? connections.find((connection) => connection.provider === defaultProvider)?.provider ?? null
-      : null;
-    return connectedDefaultProvider || connections[0]?.provider || null;
-  }, [connections, defaultProvider]);
-  const hasCalendarConnection = Boolean(SEND_TO_CALENDAR_ENABLED && connections.length > 0 && effectiveProvider);
+  const fallbackCalendarSendTarget = useMemo(
+    () => getInitialCalendarSendTarget(connections, defaultProvider),
+    [connections, defaultProvider],
+  );
+  const selectedCalendarSendTarget = isCalendarSendTargetAvailable(calendarSendTarget, connections)
+    ? calendarSendTarget
+    : fallbackCalendarSendTarget;
+  const calendarSendTargetOptions = useMemo(
+    () => buildCalendarSendTargetOptions(connections, {
+      defaultProvider,
+      includeAll: true,
+      scheduledOnly: true,
+    }),
+    [connections, defaultProvider],
+  );
+  const selectedCalendarSendTargetOption = useMemo(
+    () => calendarSendTargetOptions.find((option) => option.target === selectedCalendarSendTarget)
+      ?? calendarSendTargetOptions[0]
+      ?? null,
+    [calendarSendTargetOptions, selectedCalendarSendTarget],
+  );
+  const hasCalendarConnection = Boolean(SEND_TO_CALENDAR_ENABLED && connections.length > 0 && selectedCalendarSendTarget);
   const canShowCalendarSendOption = hasCalendarConnection;
-  const calendarProviderLabel = effectiveProvider === "apple"
-    ? "Apple"
-    : effectiveProvider === "google"
-      ? "Google"
-      : effectiveProvider === "outlook"
-        ? "Outlook"
-        : null;
   const canShowCalendarSection = Boolean(
     SEND_TO_CALENDAR_ENABLED
       && (hasCalendarConnection || onOpenCalendarPreferences),
@@ -216,6 +234,9 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     setLocation(snapshot.location);
     setTaskDate(snapshot.taskDate);
     setSendToCalendar(snapshot.sendToCalendar);
+    setCalendarSendTarget(isCalendarSendTarget(snapshot.sendToCalendarTarget)
+      ? snapshot.sendToCalendarTarget
+      : null);
     setSubtasks([...snapshot.subtasks]);
     setAttachments([...snapshot.attachments]);
     setCreationSource(snapshot.creationSource);
@@ -263,6 +284,19 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     }
   }, [canShowCalendarSendOption, sendToCalendar]);
 
+  useEffect(() => {
+    if (!canShowCalendarSendOption) {
+      if (calendarSendTarget !== null) {
+        setCalendarSendTarget(null);
+      }
+      return;
+    }
+
+    if (!isCalendarSendTargetAvailable(calendarSendTarget, connections)) {
+      setCalendarSendTarget(fallbackCalendarSendTarget);
+    }
+  }, [calendarSendTarget, canShowCalendarSendOption, connections, fallbackCalendarSendTarget]);
+
   // Reset when sheet closes
   useEffect(() => {
     if (!open) {
@@ -286,6 +320,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       setShowDatePicker(false);
       setSubtasks([]);
       setSendToCalendar(false);
+      setCalendarSendTarget(null);
       setAttachments([]);
       setCreationSource("manual");
       setSelectedTemplate(null);
@@ -331,6 +366,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     setSubtasks(prefillDraft.subtasks ?? []);
     setTaskDate(prefillDraft.taskDate ?? format(selectedDate, "yyyy-MM-dd"));
     setCreationSource(prefillDraft.creationSource ?? "manual");
+    setCalendarSendTarget(null);
     setSelectedTemplate(null);
     setShowTemplateUpdatePrompt(false);
     setPendingSubmitIntent(null);
@@ -431,6 +467,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     moreInformation,
     location,
     sendToCalendar,
+    sendToCalendarTarget: calendarSendTarget,
     subtasks,
     attachments,
     creationSource,
@@ -453,6 +490,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     scheduledTime,
     selectedTemplate,
     sendToCalendar,
+    calendarSendTarget,
     subtasks,
     taskDate,
     taskText,
@@ -603,6 +641,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       window.dispatchEvent(new CustomEvent("add-quest-create-attempted"));
     }
 
+    const shouldSendToCalendar = intent === "scheduled" && sendToCalendar && canShowCalendarSendOption;
+
     await onAdd({
       text: taskText,
       taskDate: intent === "inbox" ? null : taskDate,
@@ -621,7 +661,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       contactId: null,
       autoLogInteraction: true,
       sendToInbox: intent === "inbox",
-      sendToCalendar: intent === "scheduled" && sendToCalendar && canShowCalendarSendOption,
+      sendToCalendar: shouldSendToCalendar,
+      sendToCalendarTarget: shouldSendToCalendar ? selectedCalendarSendTarget : null,
       subtasks: subtasks.filter(s => s.trim()),
       imageUrl: attachments.find((attachment) => attachment.isImage)?.fileUrl ?? null,
       attachments,
@@ -629,7 +670,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     });
     clearQuestDraftSnapshot(user?.id);
     onOpenChange(false);
-  }, [taskText, recurrencePattern, creationSource, scheduledTime, onAdd, taskDate, difficulty, estimatedDuration, recurrenceDays, recurrenceMonthDays, recurrenceCustomPeriod, reminderEnabled, reminderMinutesBefore, reminderOffsetsMinutes, moreInformation, location, sendToCalendar, canShowCalendarSendOption, subtasks, attachments, onOpenChange, user?.id]);
+  }, [taskText, recurrencePattern, creationSource, scheduledTime, onAdd, taskDate, difficulty, estimatedDuration, recurrenceDays, recurrenceMonthDays, recurrenceCustomPeriod, reminderEnabled, reminderMinutesBefore, reminderOffsetsMinutes, moreInformation, location, sendToCalendar, canShowCalendarSendOption, selectedCalendarSendTarget, subtasks, attachments, onOpenChange, user?.id]);
 
   const submitWithTemplateHandling = useCallback(async (intent: SubmitIntent) => {
     if (selectedTemplate && hasTemplateCustomizations) {
@@ -1278,13 +1319,17 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                         Calendar
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Send to {calendarProviderLabel} Calendar after create
+                        {selectedCalendarSendTargetOption
+                          ? `Send to ${selectedCalendarSendTargetOption.label} after create`
+                          : "Send to calendar after create"}
                       </p>
                     </div>
                     <Switch
                       checked={sendToCalendar}
                       onCheckedChange={setSendToCalendar}
-                      aria-label={`Send to ${calendarProviderLabel} Calendar after create`}
+                      aria-label={selectedCalendarSendTargetOption
+                        ? `Send to ${selectedCalendarSendTargetOption.label} after create`
+                        : "Send to calendar after create"}
                     />
                   </div>
                 ) : (
@@ -1308,6 +1353,37 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                       >
                         Connect calendar
                       </Button>
+                    )}
+                  </div>
+                )}
+                {hasCalendarConnection && sendToCalendar && calendarSendTargetOptions.length > 1 && (
+                  <div className="mt-3 space-y-1.5">
+                    <Label className="text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                      Destination
+                    </Label>
+                    <Select
+                      value={selectedCalendarSendTarget ?? undefined}
+                      onValueChange={(value) => {
+                        if (isCalendarSendTarget(value)) {
+                          setCalendarSendTarget(value);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-9 rounded-2xl border-white/15 bg-black/20 text-xs">
+                        <SelectValue placeholder="Choose destination" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {calendarSendTargetOptions.map((option) => (
+                          <SelectItem key={option.target} value={option.target}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedCalendarSendTargetOption && (
+                      <p className="text-xs text-muted-foreground">
+                        {selectedCalendarSendTargetOption.description}
+                      </p>
                     )}
                   </div>
                 )}

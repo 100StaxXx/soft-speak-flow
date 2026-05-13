@@ -224,6 +224,7 @@ vi.mock("@/components/AddQuestSheet", () => ({
             autoLogInteraction: false,
             sendToInbox: true,
             sendToCalendar: false,
+            sendToCalendarTarget: null,
             subtasks: [],
             imageUrl: null,
             attachments: [],

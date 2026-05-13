@@ -7,7 +7,7 @@ const MICROSOFT_AUTH_URL = "https://login.microsoftonline.com/common/oauth2/v2.0
 const MICROSOFT_TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
 const MICROSOFT_ME_URL = "https://graph.microsoft.com/v1.0/me";
 const MICROSOFT_CALENDARS_URL = "https://graph.microsoft.com/v1.0/me/calendars?$select=id,name,isDefaultCalendar";
-const MICROSOFT_TASK_LISTS_URL = "https://graph.microsoft.com/v1.0/me/todo/lists?$select=id,displayName,wellknownListName";
+const MICROSOFT_TASK_LISTS_URL = "https://graph.microsoft.com/v1.0/me/todo/lists";
 const NATIVE_CALLBACK_SCHEME_URL = "cosmiq://calendar/oauth/callback";
 
 const SCOPES = ["offline_access", "User.Read", "Calendars.ReadWrite", "Tasks.ReadWrite"].join(" ");
@@ -94,7 +94,9 @@ function toNativeCallbackErrorMessage(error: unknown): string {
     combined.includes("aadsts7000215") ||
     combined.includes("aadsts7000218")
   ) {
-    return "Outlook Calendar is not configured correctly on the server yet. Please verify the client ID and client secret.";
+    return diagnosticCode
+      ? `Outlook Calendar is not configured correctly on the server yet (${diagnosticCode}). Please verify the client ID and client secret.`
+      : "Outlook Calendar is not configured correctly on the server yet. Please verify the client ID and client secret.";
   }
 
   if (combined.includes("invalid_grant")) {
@@ -335,7 +337,7 @@ async function exchangeOutlookConnection(args: {
     supabase,
     req,
     code,
-    redirectUri,
+    redirectUri: requestedRedirectUri,
     state,
     requestedSyncModeFromBody,
     sourceFromBody,
@@ -344,10 +346,11 @@ async function exchangeOutlookConnection(args: {
     clientSecret,
   } = args;
 
-  if (!code || !redirectUri) {
+  if (!code) {
     throw new OAuthHttpError("code and redirectUri are required", 400);
   }
 
+  let redirectUri = requestedRedirectUri?.trim();
   let userId = req ? await tryGetAuthedUserId(supabase, req) : null;
   let requestedSyncMode: SyncMode = normalizeSyncMode(requestedSyncModeFromBody);
   let requestedSource: OAuthSource = normalizeOAuthSource(sourceFromBody);
@@ -371,6 +374,7 @@ async function exchangeOutlookConnection(args: {
         requestedSyncMode = verified.syncMode;
       }
       requestedSource = verified.source;
+      redirectUri = verified.redirectUri ?? redirectUri;
     } catch (error) {
       if (error instanceof OAuthHttpError) {
         throw error;
@@ -379,6 +383,10 @@ async function exchangeOutlookConnection(args: {
     }
   } else if (!userId) {
     throw new OAuthHttpError("Invalid or expired OAuth state", 401);
+  }
+
+  if (!redirectUri) {
+    throw new OAuthHttpError("code and redirectUri are required", 400);
   }
 
   const tokenResponse = await fetch(MICROSOFT_TOKEN_URL, {
@@ -548,7 +556,8 @@ Deno.serve(async (req) => {
 
     if (action === "getAuthUrl") {
       const userId = await getAuthedUserId(supabase, req);
-      const redirectUri = (body?.redirectUri || body?.redirect_uri) as string | undefined;
+      const rawRedirectUri = (body?.redirectUri || body?.redirect_uri) as string | undefined;
+      const redirectUri = rawRedirectUri?.trim();
       const requestedSyncMode = normalizeSyncMode(body?.syncMode ?? body?.sync_mode);
       const requestedSource = normalizeOAuthSource(body?.source ?? body?.calendar_source);
       if (!redirectUri) {
@@ -564,6 +573,7 @@ Deno.serve(async (req) => {
         userId,
         syncMode: requestedSyncMode,
         source: requestedSource,
+        redirectUri,
         secret: internalFunctionSecret,
       });
 

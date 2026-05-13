@@ -233,6 +233,47 @@ Deno.test("normalizes planner prose dash separators while preserving data values
   );
 });
 
+Deno.test("normalizes partial coming-up structured payloads without throwing", () => {
+  const normalized = normalizePlannerBuildResultText({
+    mode: "schedule_read",
+    reply: "Today - nothing scheduled.",
+    followUpQuestions: [],
+    proposals: [],
+    suggestedReminders: [],
+    memoryUpdates: {},
+    sessionState: {
+      draft: {},
+      openQuestionIds: [],
+      preferredTimeOfDay: null,
+      preferredTimeReason: null,
+      reminderPreference: null,
+      pendingStarterIntent: null,
+      lastClassification: null,
+    },
+    structuredResponse: {
+      intent: {
+        intentType: "conversation",
+        timeHorizon: "today",
+        isRecurring: false,
+        shouldCreateQuest: false,
+        shouldPromptCampaign: false,
+      },
+      planDay: null,
+      weeklyPlan: null,
+      comingUp: {
+        message: "Today - nothing scheduled.",
+        nextEvent: null,
+        nextBestAction: null,
+        tomorrowSummary: "open",
+      },
+    } as PlannerBuildResult["structuredResponse"],
+  });
+
+  assertEquals(normalized.structuredResponse?.comingUp?.remainingToday, []);
+  assertEquals(normalized.structuredResponse?.comingUp?.tomorrowSchedule, []);
+  assertEquals(normalized.structuredResponse?.comingUp?.missedItems, []);
+});
+
 const confirmedPlanningConsent = (
   sourceStarterIntent: NonNullable<
     PlannerBuildInput["plannerContext"]["starterIntent"]

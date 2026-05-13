@@ -114,6 +114,7 @@ const PLANNER_PREFLIGHT_TIMEOUT_MS = 3_000;
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const STANDALONE_RITUAL_EPIC_ID = "general";
 const STANDALONE_RITUAL_EPIC_TITLE = "your goals";
+const LOCAL_COMING_UP_DEFAULT_DURATION_MINUTES = 30;
 
 const normalizeSelectedDateKey = (value: string | null | undefined) => {
   const trimmed = value?.trim() ?? "";
@@ -152,6 +153,16 @@ type CompanionPlannerQuestSubtaskPlan = {
   mode: "append" | "replace";
   titles: string[];
 };
+
+type LocalComingUpStructuredOutput = NonNullable<
+  NonNullable<CompanionPlannerResponse["structuredResponse"]>["comingUp"]
+>;
+type LocalComingUpScheduleItem =
+  LocalComingUpStructuredOutput["remainingToday"][number] & {
+    sortMinutes?: number | null;
+  };
+type LocalComingUpMissedItem =
+  LocalComingUpStructuredOutput["missedItems"][number];
 
 const DEFAULT_SESSION_STATE: CompanionPlannerSessionState = {
   draft: {},
@@ -1289,6 +1300,471 @@ const normalizeClassificationHint = (
 
   return normalized;
 };
+
+const parseLocalClockMinutes = (value: string | null | undefined): number | null => {
+  if (!value) return null;
+  const match = value.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+
+  const hour = Number.parseInt(match[1] ?? "", 10);
+  const minute = Number.parseInt(match[2] ?? "", 10);
+  if (
+    !Number.isFinite(hour) ||
+    !Number.isFinite(minute) ||
+    hour < 0 ||
+    hour > 23 ||
+    minute < 0 ||
+    minute > 59
+  ) {
+    return null;
+  }
+
+  return hour * 60 + minute;
+};
+
+const formatLocalClockMinutes = (minutes: number): string => {
+  const hour = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  const period = hour >= 12 ? "pm" : "am";
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${String(minute).padStart(2, "0")} ${period}`;
+};
+
+const formatLocalClock = (value: string | null | undefined): string | null => {
+  const minutes = parseLocalClockMinutes(value);
+  return minutes === null ? null : formatLocalClockMinutes(minutes);
+};
+
+const formatLocalDuration = (minutes: number | null | undefined): string | null => {
+  if (!minutes || minutes <= 0) return null;
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return remainder > 0 ? `${hours}h ${remainder}m` : `${hours}h`;
+};
+
+const formatDateKey = (date: Date): string | null =>
+  Number.isNaN(date.getTime()) ? null : format(date, "yyyy-MM-dd");
+
+const addDaysToDateKey = (dateKey: string, days: number): string => {
+  const date = new Date(`${dateKey}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return dateKey;
+  return format(addDays(date, days), "yyyy-MM-dd");
+};
+
+const getRequestCurrentDateKey = (request: CompanionPlannerRequest): string => {
+  const currentDate = new Date(request.currentDateTime);
+  return formatDateKey(currentDate) ?? request.currentDate;
+};
+
+const getRequestCurrentMinutes = (request: CompanionPlannerRequest): number | null => {
+  const currentDate = new Date(request.currentDateTime);
+  if (Number.isNaN(currentDate.getTime())) return null;
+  return currentDate.getHours() * 60 + currentDate.getMinutes();
+};
+
+const getLocalTaskDuration = (task: PlannerContextTask): number =>
+  Number.isFinite(task.estimatedDuration) && (task.estimatedDuration ?? 0) > 0
+    ? Number(task.estimatedDuration)
+    : LOCAL_COMING_UP_DEFAULT_DURATION_MINUTES;
+
+const getLocalRitualDuration = (ritual: PlannerContextRitual): number =>
+  ritual.actualDurationMinutes ??
+  ritual.estimatedMinutes ??
+  LOCAL_COMING_UP_DEFAULT_DURATION_MINUTES;
+
+const buildLocalTaskDateTime = (
+  taskDate: string | null | undefined,
+  clock: string | null | undefined,
+): string | null => {
+  const minutes = parseLocalClockMinutes(clock);
+  if (!taskDate || minutes === null) return null;
+  const hour = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  return `${taskDate}T${String(hour).padStart(2, "0")}:${
+    String(minute).padStart(2, "0")
+  }:00`;
+};
+
+const addMinutesToLocalDateTime = (
+  startDateTime: string | null,
+  minutes: number,
+): string | null => {
+  if (!startDateTime) return null;
+  const date = new Date(startDateTime);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setMinutes(date.getMinutes() + minutes);
+  return format(date, "yyyy-MM-dd'T'HH:mm:ss");
+};
+
+const buildLocalScheduleLabel = (
+  clock: string | null | undefined,
+  durationMinutes: number | null | undefined,
+): string => {
+  const parts = [
+    formatLocalClock(clock) ?? "Anytime",
+    formatLocalDuration(durationMinutes),
+  ].filter((part): part is string => Boolean(part));
+  return parts.join(", ");
+};
+
+const collectLocalPlannerTasks = (
+  request: CompanionPlannerRequest,
+): PlannerContextTask[] => [
+  ...request.plannerContext.tasks,
+  ...request.plannerContext.inboxTasks,
+];
+
+const eventOverlapsLocalDate = (
+  event: PlannerContextCalendarEvent,
+  dateKey: string,
+): boolean => {
+  const dayStart = new Date(`${dateKey}T00:00:00`);
+  const dayEnd = new Date(`${addDaysToDateKey(dateKey, 1)}T00:00:00`);
+  const eventStart = new Date(event.start);
+  const eventEnd = new Date(event.end);
+  if (
+    Number.isNaN(dayStart.getTime()) ||
+    Number.isNaN(dayEnd.getTime()) ||
+    Number.isNaN(eventStart.getTime()) ||
+    Number.isNaN(eventEnd.getTime())
+  ) {
+    return false;
+  }
+
+  return eventEnd > dayStart && eventStart < dayEnd;
+};
+
+const getLocalEventSortMinutes = (
+  event: PlannerContextCalendarEvent,
+  dateKey: string,
+): number | null => {
+  if (event.isAllDay) return 0;
+  const dayStart = new Date(`${dateKey}T00:00:00`);
+  const eventStart = new Date(event.start);
+  if (Number.isNaN(dayStart.getTime()) || Number.isNaN(eventStart.getTime())) {
+    return null;
+  }
+  const clampedStart = eventStart < dayStart ? dayStart : eventStart;
+  return clampedStart.getHours() * 60 + clampedStart.getMinutes();
+};
+
+const formatLocalEventLabel = (event: PlannerContextCalendarEvent): string => {
+  if (event.isAllDay) return "All day";
+  const start = new Date(event.start);
+  const end = new Date(event.end);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return "Calendar event";
+  }
+  return `${format(start, "h:mm a").toLowerCase()}-${format(end, "h:mm a").toLowerCase()}`;
+};
+
+const normalizeLocalRitualNumberList = (
+  values: number[] | null | undefined,
+): number[] =>
+  values?.length
+    ? [...new Set(values.filter((value) => Number.isFinite(value)))]
+      .sort((left, right) => left - right)
+    : [];
+
+const getPlannerWeekdayIndex = (date: Date): number => {
+  const jsWeekday = date.getDay();
+  return jsWeekday === 0 ? 6 : jsWeekday - 1;
+};
+
+const isLocalRitualScheduledForDate = (
+  ritual: PlannerContextRitual,
+  dateKey: string,
+): boolean => {
+  const date = new Date(`${dateKey}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return false;
+
+  const frequency = ritual.frequency?.toLowerCase();
+  const weekdayIndex = getPlannerWeekdayIndex(date);
+  const customDays = normalizeLocalRitualNumberList(ritual.customDays);
+  const customMonthDays = normalizeLocalRitualNumberList(ritual.customMonthDays);
+  const dayOfMonth = date.getDate();
+
+  switch (frequency) {
+    case "daily":
+      return true;
+    case "weekly":
+      return (customDays[0] ?? 0) === weekdayIndex;
+    case "weekdays":
+    case "5x_week":
+      return weekdayIndex >= 0 && weekdayIndex <= 4;
+    case "weekends":
+      return weekdayIndex === 5 || weekdayIndex === 6;
+    case "3x_week":
+      return (customDays.length > 0 ? customDays : [0, 2, 4])
+        .includes(weekdayIndex);
+    case "monthly":
+      return (customMonthDays.length > 0 ? customMonthDays : [1])
+        .includes(dayOfMonth);
+    case "custom":
+      return ritual.customPeriod === "month"
+        ? (customMonthDays.length > 0 ? customMonthDays : [1])
+          .includes(dayOfMonth)
+        : customDays.includes(weekdayIndex);
+    default:
+      return true;
+  }
+};
+
+const hasLocalMaterializedRitualTask = (
+  request: CompanionPlannerRequest,
+  ritual: PlannerContextRitual,
+  dateKey: string,
+): boolean =>
+  collectLocalPlannerTasks(request).some((task) =>
+    task.taskDate === dateKey && task.habitSourceId === ritual.id
+  );
+
+const isLocalRitualInActiveScope = (
+  request: CompanionPlannerRequest,
+  ritual: PlannerContextRitual,
+): boolean => {
+  const activeHabitIds = request.plannerContext.activeHabitIds
+    ? new Set(request.plannerContext.activeHabitIds)
+    : null;
+  if (activeHabitIds && !activeHabitIds.has(ritual.id)) return false;
+  if (ritual.epicId === STANDALONE_RITUAL_EPIC_ID) return true;
+
+  const activeEpicIds = new Set(
+    request.plannerContext.activeEpics.map((epic) => epic.id),
+  );
+  return activeEpicIds.has(ritual.epicId);
+};
+
+const collectLocalComingUpScheduleItemsForDate = (
+  request: CompanionPlannerRequest,
+  dateKey: string,
+  remainingOnly: boolean,
+): LocalComingUpScheduleItem[] => {
+  const currentDateKey = getRequestCurrentDateKey(request);
+  const currentMinutes = getRequestCurrentMinutes(request);
+  const now = new Date(request.currentDateTime);
+
+  const taskItems = collectLocalPlannerTasks(request)
+    .filter((task) => task.completed !== true && task.taskDate === dateKey)
+    .filter((task) => {
+      if (!remainingOnly || dateKey !== currentDateKey) return true;
+      const scheduledMinutes = parseLocalClockMinutes(task.scheduledTime);
+      if (scheduledMinutes === null || currentMinutes === null) return true;
+      return scheduledMinutes >= currentMinutes;
+    })
+    .map((task): LocalComingUpScheduleItem => {
+      const startsAt = buildLocalTaskDateTime(task.taskDate, task.scheduledTime);
+      return {
+        id: task.id,
+        title: task.title,
+        label: buildLocalScheduleLabel(task.scheduledTime, task.estimatedDuration),
+        startsAt,
+        endsAt: addMinutesToLocalDateTime(startsAt, getLocalTaskDuration(task)),
+        isAllDay: false,
+        source: "task",
+        sortMinutes: parseLocalClockMinutes(task.scheduledTime),
+      };
+    });
+
+  const ritualItems = request.plannerContext.rituals
+    .filter((ritual) => isLocalRitualInActiveScope(request, ritual))
+    .filter((ritual) => isLocalRitualScheduledForDate(ritual, dateKey))
+    .filter((ritual) => !hasLocalMaterializedRitualTask(request, ritual, dateKey))
+    .filter((ritual) => {
+      if (!remainingOnly || dateKey !== currentDateKey) return true;
+      const scheduledMinutes = parseLocalClockMinutes(ritual.preferredTime);
+      if (scheduledMinutes === null || currentMinutes === null) return true;
+      return scheduledMinutes >= currentMinutes;
+    })
+    .map((ritual): LocalComingUpScheduleItem => {
+      const startsAt = buildLocalTaskDateTime(dateKey, ritual.preferredTime);
+      const duration = getLocalRitualDuration(ritual);
+      return {
+        id: `ritual:${ritual.id}:${dateKey}`,
+        title: ritual.title,
+        label: buildLocalScheduleLabel(ritual.preferredTime, duration),
+        startsAt,
+        endsAt: addMinutesToLocalDateTime(startsAt, duration),
+        isAllDay: false,
+        source: "ritual",
+        sortMinutes: parseLocalClockMinutes(ritual.preferredTime),
+      };
+    });
+
+  const eventItems = request.plannerContext.calendarEvents
+    .filter((event) => eventOverlapsLocalDate(event, dateKey))
+    .filter((event) => {
+      if (!remainingOnly || dateKey !== currentDateKey) return true;
+      const end = new Date(event.end);
+      return Number.isNaN(end.getTime()) || end > now;
+    })
+    .map((event): LocalComingUpScheduleItem => ({
+      id: event.id,
+      title: event.title,
+      label: formatLocalEventLabel(event),
+      startsAt: event.start,
+      endsAt: event.end,
+      isAllDay: event.isAllDay,
+      source: "calendar",
+      sortMinutes: getLocalEventSortMinutes(event, dateKey),
+    }));
+
+  return [...taskItems, ...ritualItems, ...eventItems]
+    .sort((left, right) =>
+      (left.sortMinutes ?? 9999) - (right.sortMinutes ?? 9999)
+    );
+};
+
+const collectLocalComingUpMissedItems = (
+  request: CompanionPlannerRequest,
+): LocalComingUpMissedItem[] => {
+  const currentMinutes = getRequestCurrentMinutes(request);
+  if (currentMinutes === null) return [];
+
+  return collectLocalPlannerTasks(request)
+    .filter((task) =>
+      task.completed !== true &&
+      task.taskDate === request.currentDate &&
+      Boolean(task.scheduledTime)
+    )
+    .filter((task) => {
+      const scheduledMinutes = parseLocalClockMinutes(task.scheduledTime);
+      return scheduledMinutes !== null && scheduledMinutes < currentMinutes;
+    })
+    .sort((left, right) =>
+      (parseLocalClockMinutes(left.scheduledTime) ?? 9999) -
+      (parseLocalClockMinutes(right.scheduledTime) ?? 9999)
+    )
+    .map((task) => ({
+      id: task.id,
+      title: task.title,
+      label: buildLocalScheduleLabel(task.scheduledTime, task.estimatedDuration),
+      source: "task",
+    }));
+};
+
+const stripLocalSortMinutes = (
+  items: LocalComingUpScheduleItem[],
+): LocalComingUpStructuredOutput["remainingToday"] =>
+  items.map(({ sortMinutes: _sortMinutes, ...item }) => item);
+
+const formatLocalDigestItem = (item: LocalComingUpScheduleItem): string =>
+  `${item.title} (${item.label})`;
+
+const buildLocalDigestLine = (
+  request: CompanionPlannerRequest,
+  dateKey: string,
+  label: string,
+  remainingOnly = false,
+): string => {
+  const items = collectLocalComingUpScheduleItemsForDate(
+    request,
+    dateKey,
+    remainingOnly,
+  );
+  if (items.length === 0) return `${label}: nothing scheduled.`;
+
+  const visibleItems = items.slice(0, 2).map(formatLocalDigestItem).join("; ");
+  const overflowCount = items.length - 2;
+  const overflowText = overflowCount > 0 ? `; +${overflowCount} more` : "";
+  return `${label}: ${visibleItems}${overflowText}.`;
+};
+
+const getLocalComingUpTomorrowSummary = (
+  tomorrowItems: LocalComingUpScheduleItem[],
+): LocalComingUpStructuredOutput["tomorrowSummary"] => {
+  if (tomorrowItems.length === 0) return "open";
+  return tomorrowItems.length <= 2 ? "light" : "busy";
+};
+
+const buildLocalComingUpFallbackResponse = (
+  request: CompanionPlannerRequest,
+): CompanionPlannerResponse => {
+  const tomorrow = addDaysToDateKey(request.currentDate, 1);
+  const remainingToday = collectLocalComingUpScheduleItemsForDate(
+    request,
+    request.currentDate,
+    true,
+  );
+  const tomorrowSchedule = collectLocalComingUpScheduleItemsForDate(
+    request,
+    tomorrow,
+    false,
+  );
+  const missedItems = collectLocalComingUpMissedItems(request);
+  const reply = [
+    buildLocalDigestLine(request, request.currentDate, "Today", true),
+    buildLocalDigestLine(request, tomorrow, "Tomorrow"),
+  ].join("\n");
+  const plannerContract: NonNullable<CompanionPlannerResponse["plannerContract"]> = {
+    mode: "schedule_read",
+    writePolicy: "read_only",
+    decisionSummary: reply.split("\n")[0] ?? reply,
+    reasonCodes: [
+      ...(remainingToday[0] ? ["calendar_constraint" as const] : []),
+      ...(missedItems.length > 0 ? ["overdue" as const] : []),
+      ...(!remainingToday[0] && missedItems.length === 0
+        ? ["user_preference" as const]
+        : []),
+    ],
+    decisionPoint: {
+      label: "No changes needed right now.",
+      action: "none",
+    },
+    clarifyingQuestion: null,
+  };
+
+  return {
+    mode: "schedule_read",
+    reply,
+    plannerContract,
+    followUpQuestions: [],
+    proposals: [],
+    suggestedReminders: [],
+    structuredResponse: {
+      plannerContract,
+      intent: {
+        intentType: "conversation",
+        timeHorizon: "today",
+        isRecurring: false,
+        shouldCreateQuest: false,
+        shouldPromptCampaign: false,
+      },
+      planDay: null,
+      weeklyPlan: null,
+      priorityOverview: null,
+      reflectionBridge: null,
+      comingUp: {
+        message: reply,
+        nextEvent: stripLocalSortMinutes(remainingToday)[0] ?? null,
+        nextBestAction: null,
+        remainingToday: stripLocalSortMinutes(remainingToday),
+        tomorrowSchedule: stripLocalSortMinutes(tomorrowSchedule),
+        tomorrowSummary: getLocalComingUpTomorrowSummary(tomorrowSchedule),
+        missedItems,
+      },
+      campaignMomentum: null,
+    },
+    dayPlan: null,
+    memoryUpdates: {},
+    sessionState: {
+      ...request.sessionState,
+      draft: {},
+      openQuestionIds: [],
+      pendingStarterIntent: null,
+      lastClassification: request.classificationHint?.type ??
+        request.sessionState.lastClassification ??
+        null,
+    },
+  };
+};
+
+const shouldUseLocalComingUpFallback = (
+  request: CompanionPlannerRequest | null,
+): request is CompanionPlannerRequest =>
+  request?.plannerContext.starterIntent === "upcoming_start" ||
+  isUpcomingScheduleDigestMessage(request?.message ?? "");
 
 const findProposalById = (
   proposals: CompanionPlannerProposal[],
@@ -3087,6 +3563,51 @@ export function useCompanionPlanner({
       const localValidation = requestBody
         ? validateCompanionPlannerRequest(requestBody)
         : null;
+
+      if (shouldUseLocalComingUpFallback(requestBody)) {
+        console.warn("Companion planner coming-up request failed; using local read-only fallback.", {
+          parsedError,
+          localValidation,
+          requestSummary: summarizePlannerRequestForDebug(requestBody),
+        });
+        const fallbackResponse = buildLocalComingUpFallbackResponse(requestBody);
+        const assistantMessage = appendAssistantTurn(fallbackResponse);
+        const persistedRows: Parameters<typeof persistPlannerThreadRows>[0] = [
+          ...(
+            options?.skipUserEcho ? [] : [{
+              role: "user" as const,
+              content: userMessage.content,
+              createdAt: userMessage.createdAt,
+              inputMode: userMessage.inputMode,
+            }]
+          ),
+          {
+            role: "assistant" as const,
+            content: assistantMessage.content,
+            createdAt: assistantMessage.createdAt,
+            metadata: {
+              structuredResponse: assistantMessage.structuredResponse ?? null,
+              followUpQuestions: fallbackResponse.followUpQuestions,
+              proposals: fallbackResponse.proposals,
+              suggestedReminders: fallbackResponse.suggestedReminders,
+              sessionState: fallbackResponse.sessionState,
+              dayPlan: fallbackResponse.dayPlan ?? null,
+              questCaptureSelectedDate: null,
+            } as unknown as Json,
+          },
+        ];
+
+        try {
+          await persistPlannerThreadRows(persistedRows);
+        } catch (persistError) {
+          console.warn(
+            "Failed to persist local coming-up fallback:",
+            persistError,
+          );
+        }
+        return;
+      }
+
       console.error("Failed to submit planner message:", {
         parsedError,
         localValidation,
@@ -3094,11 +3615,12 @@ export function useCompanionPlanner({
           ? summarizePlannerRequestForDebug(requestBody)
           : null,
       });
-      const userMessage = toUserFacingCompanionPlannerError(parsedError);
-      toast.error(userMessage);
+
+      const userFacingError = toUserFacingCompanionPlannerError(parsedError);
+      toast.error(userFacingError);
       setMessages((previous) => [
         ...previous,
-        createMessage("companion", userMessage),
+        createMessage("companion", userFacingError),
       ]);
     } finally {
       setIsSubmitting(false);

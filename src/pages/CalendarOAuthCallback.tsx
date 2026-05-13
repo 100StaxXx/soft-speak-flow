@@ -12,6 +12,7 @@ type OAuthSource = 'web' | 'native';
 interface OAuthStateHint {
   provider: OAuthProvider;
   source: OAuthSource;
+  redirectUri?: string;
 }
 
 const CALLBACK_ORIGIN_PARAM = 'calendar_callback_origin';
@@ -48,6 +49,9 @@ export const getCalendarOAuthStateHint = (state: string | null | undefined): OAu
     return {
       provider,
       source: isOAuthSource(payload.source) ? payload.source : 'web',
+      ...(typeof payload.redirectUri === 'string' && payload.redirectUri.trim()
+        ? { redirectUri: payload.redirectUri.trim() }
+        : {}),
     };
   } catch {
     return null;
@@ -101,7 +105,7 @@ export const getCalendarOAuthCallbackContext = (args: {
   const source = isOAuthSource(legacySource)
     ? legacySource
     : stateHint?.source ?? 'web';
-  const redirectUri = provider && isOAuthProvider(legacyProvider)
+  const fallbackRedirectUri = provider && isOAuthProvider(legacyProvider)
     ? getLegacyRedirectUri({
       provider,
       source,
@@ -109,6 +113,7 @@ export const getCalendarOAuthCallbackContext = (args: {
       pathname: args.pathname,
     })
     : `${redirectOrigin}${args.pathname}`;
+  const redirectUri = stateHint?.redirectUri ?? fallbackRedirectUri;
 
   return {
     provider,

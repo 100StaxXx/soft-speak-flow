@@ -148,6 +148,7 @@ const mocks = vi.hoisted(() => ({
       autoLogInteraction: boolean;
       sendToInbox: boolean;
       sendToCalendar: boolean;
+      sendToCalendarTarget: "apple" | "google" | "outlook" | "all" | null;
       subtasks: string[];
       imageUrl: string | null;
       attachments: [];
@@ -353,6 +354,7 @@ vi.mock("@/components/AddQuestSheet", () => ({
       autoLogInteraction: boolean;
       sendToInbox: boolean;
       sendToCalendar: boolean;
+      sendToCalendarTarget: "apple" | "google" | "outlook" | "all" | null;
       subtasks: string[];
       imageUrl: string | null;
       attachments: [];
@@ -1557,6 +1559,7 @@ describe("Journeys row drag integration", () => {
         autoLogInteraction: false,
         sendToInbox: false,
         sendToCalendar: false,
+        sendToCalendarTarget: null,
         subtasks: ["Reply to founders", "Clear urgent threads"],
         imageUrl: null,
         attachments: [],
