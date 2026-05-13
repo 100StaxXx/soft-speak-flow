@@ -1438,6 +1438,46 @@ const hasLocalMaterializedRitualTask = (
     task.taskDate === dateKey && task.habitSourceId === ritual.id
   );
 
+const normalizeLocalComingUpDedupeText = (
+  value: string | null | undefined,
+): string => (value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+
+const normalizeLocalComingUpDedupeTimestamp = (
+  value: string | null | undefined,
+): string => normalizeLocalComingUpDedupeText(value).slice(0, 16);
+
+const getLocalComingUpSortMinuteKey = (
+  item: LocalComingUpScheduleItem,
+): string | null =>
+  typeof item.sortMinutes === "number" && Number.isFinite(item.sortMinutes)
+    ? `minute:${item.sortMinutes}`
+    : null;
+
+const getLocalComingUpScheduleDedupeKey = (
+  item: LocalComingUpScheduleItem,
+): string => {
+  const title = normalizeLocalComingUpDedupeText(item.title);
+  const sortMinuteKey = getLocalComingUpSortMinuteKey(item);
+  const startsAt = normalizeLocalComingUpDedupeTimestamp(item.startsAt);
+  const endsAt = normalizeLocalComingUpDedupeTimestamp(item.endsAt);
+  const label = normalizeLocalComingUpDedupeText(item.label);
+  const temporalKey = sortMinuteKey ??
+    (startsAt || endsAt ? `${startsAt}|${endsAt}` : label);
+  return `${title}|${temporalKey}|${item.isAllDay ? "all-day" : "timed"}`;
+};
+
+const dedupeLocalComingUpScheduleItems = (
+  items: LocalComingUpScheduleItem[],
+): LocalComingUpScheduleItem[] => {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = getLocalComingUpScheduleDedupeKey(item);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
 const isLocalRitualInActiveScope = (
   request: CompanionPlannerRequest,
   ritual: PlannerContextRitual,
@@ -1528,7 +1568,11 @@ const collectLocalComingUpScheduleItemsForDate = (
       sortMinutes: getLocalEventSortMinutes(event, dateKey),
     }));
 
-  return [...taskItems, ...ritualItems, ...eventItems]
+  return dedupeLocalComingUpScheduleItems([
+    ...taskItems,
+    ...ritualItems,
+    ...eventItems,
+  ])
     .sort((left, right) =>
       (left.sortMinutes ?? 9999) - (right.sortMinutes ?? 9999)
     );
@@ -1537,6 +1581,8 @@ const collectLocalComingUpScheduleItemsForDate = (
 const collectLocalComingUpMissedItems = (
   request: CompanionPlannerRequest,
 ): LocalComingUpMissedItem[] => {
+  if (getRequestCurrentDateKey(request) !== request.currentDate) return [];
+
   const currentMinutes = getRequestCurrentMinutes(request);
   if (currentMinutes === null) return [];
 

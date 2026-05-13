@@ -80,7 +80,7 @@ describe("companionStatFantasyTitles", () => {
     expect(creativeTitle.explanation).toContain("Wisdom");
   });
 
-  it("names the clearest rebalance stat in the explanation", () => {
+  it("writes the explanation like a character bio instead of guidance", () => {
     const title = buildCompanionFantasyTitle({
       analysisDate: "2026-04-18",
       statProfile,
@@ -89,7 +89,9 @@ describe("companionStatFantasyTitles", () => {
     });
 
     expect(getCompanionFantasyTitleRebalanceStat({ statProfile, statNeeds })).toBe("creativity");
-    expect(title.explanation).toContain("Creativity");
-    expect(title.explanation).toContain("gentle support");
+    expect(title.explanation).toContain("Discipline-led wanderer");
+    expect(title.explanation).toContain("small victories");
+    expect(title.explanation).not.toContain("support");
+    expect(title.explanation).not.toContain("evolve toward");
   });
 });

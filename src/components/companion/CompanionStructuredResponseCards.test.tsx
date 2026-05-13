@@ -107,7 +107,37 @@ describe("CompanionStructuredResponseCards", () => {
       .toHaveTextContent("Weekly Meal Prep");
     expect(screen.getByTestId("structured-plan-day-campaign-health"))
       .toHaveTextContent("2 protected today");
-    expect(screen.getByText(/Day status:/)).toHaveTextContent("busy");
+    expect(screen.getByText(/Day status:/)).toHaveTextContent("Busy");
+  });
+
+  it("keeps the plan-day assessment as Day status when daily load is present", () => {
+    const structuredResponse: CompanionStructuredResponse = {
+      intent: baseIntent,
+      planDay: {
+        message: "This day is overloaded. Move lower priority quests.",
+        dayAssessment: "busy",
+        dailyLoad: {
+          label: "overwhelming",
+          score: 24,
+          openTasks: 12,
+          completedTasks: 1,
+          scheduledMinutes: 480,
+          gapMinutes: 30,
+          recommendation:
+            "This day is overloaded. Move lower priority quests before it turns chaotic.",
+        },
+        suggestedQuests: [],
+      },
+    };
+
+    render(
+      <CompanionStructuredResponseCards
+        structuredResponse={structuredResponse}
+        variant="companion"
+      />,
+    );
+
+    expect(screen.getByText(/Day status:/)).toHaveTextContent("Busy");
   });
 
   it("shows pending coming-up proposals as saving", () => {
@@ -191,6 +221,158 @@ describe("CompanionStructuredResponseCards", () => {
       .toHaveTextContent("Tomorrow looks light.");
     expect(screen.getByText("Morning ritual")).toBeInTheDocument();
     expect(screen.getByText("Morning ritual (tomorrow at 8:00 am)"))
+      .toBeInTheDocument();
+  });
+
+  it("dedupes repeated coming-up rows and keeps next separate", () => {
+    const structuredResponse: CompanionStructuredResponse = {
+      intent: baseIntent,
+      comingUp: {
+        message: "Here is the rest of the day.",
+        nextEvent: {
+          id: "task-cardio",
+          title: "Daily Cardio",
+          label: "6:00 am, 30 min",
+          startsAt: "2026-05-13T06:00:00",
+          endsAt: "2026-05-13T06:30:00",
+          isAllDay: false,
+          source: "task",
+        },
+        nextBestAction: null,
+        remainingToday: [
+          {
+            id: "task-cardio",
+            title: "Daily Cardio",
+            label: "6:00 am, 30 min",
+            startsAt: "2026-05-13T06:00:00",
+            endsAt: "2026-05-13T06:30:00",
+            isAllDay: false,
+            source: "task",
+          },
+          {
+            id: "task-cardio-copy",
+            title: "Daily Cardio",
+            label: "6:00 am, 30 min",
+            startsAt: "2026-05-13T06:00:00",
+            endsAt: "2026-05-13T06:30:00",
+            isAllDay: false,
+            source: "task",
+          },
+          {
+            id: "task-strength",
+            title: "Strength Training",
+            label: "7:00 am, 1h 30m",
+            startsAt: "2026-05-13T07:00:00",
+            endsAt: "2026-05-13T08:30:00",
+            isAllDay: false,
+            source: "task",
+          },
+        ],
+        tomorrowSummary: "light",
+        missedItems: [
+          {
+            id: "task-strength",
+            title: "Strength Training",
+            label: "7:00 am, 1h 30m",
+            source: "task",
+          },
+          {
+            id: "task-strength-copy",
+            title: "Strength Training",
+            label: "7:00 am, 1h 30m",
+            source: "task",
+          },
+        ],
+      },
+    };
+
+    render(
+      <CompanionStructuredResponseCards
+        structuredResponse={structuredResponse}
+        variant="journeys"
+      />,
+    );
+
+    expect(screen.getAllByText("Daily Cardio")).toHaveLength(1);
+    expect(screen.getAllByText("Strength Training")).toHaveLength(1);
+  });
+
+  it("dedupes task and calendar mirrors by displayed local start time", () => {
+    const structuredResponse: CompanionStructuredResponse = {
+      intent: baseIntent,
+      comingUp: {
+        message: "Here is the rest of the day.",
+        nextEvent: null,
+        nextBestAction: null,
+        remainingToday: [
+          {
+            id: "task-cardio",
+            title: "Daily Cardio",
+            label: "6:00 am, 30 min",
+            startsAt: "2026-05-13T06:00:00",
+            endsAt: "2026-05-13T06:30:00",
+            isAllDay: false,
+            source: "task",
+          },
+          {
+            id: "event-cardio",
+            title: "Daily Cardio",
+            label: "6:00 am-6:30 am",
+            startsAt: "2026-05-13T13:00:00.000Z",
+            endsAt: "2026-05-13T13:30:00.000Z",
+            isAllDay: false,
+            source: "calendar",
+          },
+        ],
+        tomorrowSummary: "light",
+        missedItems: [],
+      },
+    };
+
+    render(
+      <CompanionStructuredResponseCards
+        structuredResponse={structuredResponse}
+        variant="journeys"
+      />,
+    );
+
+    expect(screen.getAllByText("Daily Cardio")).toHaveLength(1);
+    expect(screen.getByText("6:00 am, 30 min")).toBeInTheDocument();
+    expect(screen.queryByText("6:00 am-6:30 am")).not.toBeInTheDocument();
+  });
+
+  it("adds tomorrow context to repeated morning schedule labels", () => {
+    const structuredResponse: CompanionStructuredResponse = {
+      intent: baseIntent,
+      comingUp: {
+        message: "Tomorrow has familiar anchors.",
+        nextEvent: null,
+        nextBestAction: null,
+        remainingToday: [],
+        tomorrowSummary: "light",
+        tomorrowSchedule: [
+          {
+            id: "task-cardio-tomorrow",
+            title: "Daily Cardio",
+            label: "6:00 am, 30 min",
+            startsAt: "2026-05-14T06:00:00",
+            endsAt: "2026-05-14T06:30:00",
+            isAllDay: false,
+            source: "task",
+          },
+        ],
+        missedItems: [],
+      },
+    };
+
+    render(
+      <CompanionStructuredResponseCards
+        structuredResponse={structuredResponse}
+        variant="journeys"
+      />,
+    );
+
+    expect(screen.getByText("Tomorrow, 6:00 am, 30 min"))
       .toBeInTheDocument();
   });
 

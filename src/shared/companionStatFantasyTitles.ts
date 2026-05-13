@@ -224,31 +224,28 @@ export const getCompanionFantasyTitleRebalanceStat = ({
 const getExplanation = ({
   dominantStat,
   secondaryStat,
-  rebalanceStat,
   momentumState,
 }: {
   dominantStat: CompanionStatAttribute;
   secondaryStat: CompanionStatAttribute;
-  rebalanceStat: CompanionStatAttribute;
   momentumState: CompanionMomentumState;
 }): string => {
   const dominantLabel = COMPANION_ATTRIBUTE_LABELS[dominantStat];
   const secondaryLabel = COMPANION_ATTRIBUTE_LABELS[secondaryStat];
-  const rebalanceLabel = COMPANION_ATTRIBUTE_LABELS[rebalanceStat];
 
   if (momentumState === "locked_in") {
-    return `You're carrying ${dominantLabel} with ${secondaryLabel} close behind, and ${rebalanceLabel} is the place to protect as your next chapter expands.`;
+    return `A ${dominantLabel}-led champion with ${secondaryLabel} close behind, carrying bright momentum like a banner through the next gate.`;
   }
 
   if (momentumState === "rebuilding") {
-    return `You're rebuilding through ${dominantLabel} with ${secondaryLabel} close behind, and ${rebalanceLabel} is the place your next chapter wants gentle support.`;
+    return `A ${dominantLabel}-led wanderer with ${secondaryLabel} close behind, reforging their kit from patience, memory, and small victories.`;
   }
 
   if (momentumState === "slipping") {
-    return `You're still carrying ${dominantLabel} with ${secondaryLabel} close behind, and ${rebalanceLabel} is the place your next chapter wants support before the pressure rises.`;
+    return `A ${dominantLabel}-marked guardian with ${secondaryLabel} still glowing beneath the ash, quiet now but not defeated.`;
   }
 
-  return `You're carrying ${dominantLabel} with ${secondaryLabel} close behind, and ${rebalanceLabel} is the place your next chapter wants support.`;
+  return `A ${dominantLabel}-led adventurer with ${secondaryLabel} close behind, steady enough to guide the party through the ordinary wilds.`;
 };
 
 export const buildCompanionFantasyTitle = ({
@@ -271,7 +268,6 @@ export const buildCompanionFantasyTitle = ({
     explanation: getExplanation({
       dominantStat,
       secondaryStat,
-      rebalanceStat,
       momentumState,
     }),
   };

@@ -5,11 +5,15 @@ import {
 import {
   buildPlannerResponse,
   collectPlannerContextProtectedDataText,
+  evaluatePlanDayDailyLoad,
   normalizePlannerBuildResultText,
   type PlannerBuildResult,
   type PlannerBuildInput,
 } from "./planner.ts";
-import { buildPlanDayToolUserPrompt } from "./planDayTools.ts";
+import {
+  buildPlanDayToolSystemPrompt,
+  buildPlanDayToolUserPrompt,
+} from "./planDayTools.ts";
 
 type PlannerBuildInputOverrides =
   & Partial<
@@ -1700,6 +1704,10 @@ Deno.test("contextual plan_day briefing skips vague choices and returns campaign
   assertStringIncludes(result.reply, "Campaign work to protect");
   assertStringIncludes(result.reply, "Rituals due or linked today");
   assertStringIncludes(result.reply, "Protected priorities");
+  const recommendation =
+    result.structuredResponse?.planDay?.dailyLoad?.recommendation;
+  assertEquals(Boolean(recommendation), true);
+  assertStringIncludes(result.reply, recommendation ?? "");
 });
 
 Deno.test("plan_day no-room copy explains hidden campaign ritual load", () => {
@@ -2043,6 +2051,15 @@ Deno.test("plan_day tool prompt strips stale campaign ritual context", () => {
   assertEquals(protectedData.includes("Gain 10 pounds of muscle"), false);
 });
 
+Deno.test("plan_day tool prompt anchors final copy to the daily load recommendation", () => {
+  const systemPrompt = buildPlanDayToolSystemPrompt("soft");
+
+  assertStringIncludes(
+    systemPrompt,
+    "Start with planDayContext.dailyLoad.recommendation",
+  );
+});
+
 Deno.test("plan_day no-room reply names what is loading the day when no campaign focus dominates", () => {
   const result = buildPlannerResponse(baseInput({
     message: "Focus",
@@ -2212,8 +2229,168 @@ Deno.test("plan_day follow-up stays conversational after a focus answer", () => 
     result.structuredResponse?.planDay?.suggestedQuests.length,
     0,
   );
+  assertEquals(
+    result.structuredResponse?.planDay?.dailyLoad?.label,
+    "barely_anything",
+  );
   assertEquals(result.sessionState.pendingStarterIntent, "plan_day");
   assertStringIncludes(result.reply, "looks open");
+  assertStringIncludes(result.reply, "one meaningful quest");
+});
+
+Deno.test("plan_day daily load marks overloaded scheduled days as overwhelming", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Focus",
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T07:00:00-07:00",
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+      openQuestionIds: ["details"],
+    },
+    parsedInput: {
+      text: "Focus",
+    },
+    plannerContext: {
+      starterIntent: undefined,
+      activeEpics: [],
+      tasks: [
+        plannerTask({
+          id: "all-day-build",
+          title: "Build launch flow",
+          taskDate: "2026-04-18",
+          scheduledTime: "08:00",
+          estimatedDuration: 480,
+        }),
+      ],
+      inboxTasks: [],
+      rituals: [],
+      calendarEvents: [],
+      plannerMemory: {
+        wakeTime: "08:00",
+        windDownTime: "18:00",
+      },
+    },
+  }));
+
+  assertEquals(
+    result.structuredResponse?.planDay?.dailyLoad?.label,
+    "overwhelming",
+  );
+  assertEquals(
+    result.structuredResponse?.planDay?.dailyLoad?.scheduledMinutes,
+    480,
+  );
+  assertStringIncludes(result.reply, "overloaded");
+  assertStringIncludes(result.reply, "Move lower priority quests");
+});
+
+Deno.test("plan_day daily load ignores scheduled times from tasks dated elsewhere", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Focus",
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T07:00:00-07:00",
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+      openQuestionIds: ["details"],
+    },
+    parsedInput: {
+      text: "Focus",
+    },
+    plannerContext: {
+      starterIntent: undefined,
+      activeEpics: [],
+      tasks: [],
+      inboxTasks: [],
+      rituals: [],
+      calendarEvents: [],
+      recentCompletedTasks: [{
+        id: "tomorrow-done-today",
+        title: "Tomorrow block finished early",
+        taskDate: "2026-04-19",
+        scheduledTime: "09:00",
+        estimatedDuration: 120,
+        recurrencePattern: null,
+        completed: true,
+        completedAt: "2026-04-18T15:00:00.000Z",
+      }],
+    },
+  }));
+
+  assertEquals(
+    result.structuredResponse?.planDay?.dailyLoad?.completedTasks,
+    1,
+  );
+  assertEquals(
+    result.structuredResponse?.planDay?.dailyLoad?.scheduledMinutes,
+    0,
+  );
+});
+
+Deno.test("plan_day daily load counts only gaps between scheduled blocks", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Focus",
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T07:00:00-07:00",
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+      openQuestionIds: ["details"],
+    },
+    parsedInput: {
+      text: "Focus",
+    },
+    plannerContext: {
+      starterIntent: undefined,
+      activeEpics: [],
+      tasks: [
+        plannerTask({
+          id: "first-block",
+          title: "First block",
+          taskDate: "2026-04-18",
+          scheduledTime: "08:00",
+          estimatedDuration: 60,
+        }),
+        plannerTask({
+          id: "second-block",
+          title: "Second block",
+          taskDate: "2026-04-18",
+          scheduledTime: "11:00",
+          estimatedDuration: 60,
+        }),
+      ],
+      inboxTasks: [],
+      rituals: [],
+      calendarEvents: [],
+      plannerMemory: {
+        wakeTime: "08:00",
+        windDownTime: "18:00",
+      },
+    },
+  }));
+
+  assertEquals(
+    result.structuredResponse?.planDay?.dailyLoad?.scheduledMinutes,
+    120,
+  );
+  assertEquals(
+    result.structuredResponse?.planDay?.dailyLoad?.gapMinutes,
+    120,
+  );
+  assertEquals(
+    result.structuredResponse?.planDay?.dailyLoad?.label,
+    "light",
+  );
+});
+
+Deno.test("plan_day daily load keeps the v1 score formula objective", () => {
+  const load = evaluatePlanDayDailyLoad({
+    openTasks: 6,
+    completedTasks: 4,
+    scheduledMinutes: 300,
+    gapMinutes: 90,
+  });
+
+  assertEquals(load.score, 17.25);
+  assertEquals(load.label, "busy");
 });
 
 Deno.test("plan_day follow-up preserves unquoted dashed task titles in prose", () => {
@@ -5519,6 +5696,72 @@ Deno.test("upcoming_start accepts database time strings with seconds", () => {
     result.structuredResponse?.comingUp?.nextEvent?.title,
     "Database time quest",
   );
+});
+
+Deno.test("upcoming_start does not mark selected future-date tasks as missed", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What do I have coming up?",
+    currentDate: "2026-05-13",
+    currentDateTime: "2026-05-12T13:52:00-07:00",
+    plannerContext: {
+      tasks: [
+        {
+          id: "task-future-cardio",
+          title: "Daily Cardio",
+          taskDate: "2026-05-13",
+          scheduledTime: "06:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+        },
+      ],
+      starterIntent: "upcoming_start",
+    },
+  }));
+
+  assertEquals(
+    result.structuredResponse?.comingUp?.remainingToday[0]?.title,
+    "Daily Cardio",
+  );
+  assertEquals(result.structuredResponse?.comingUp?.missedItems, []);
+});
+
+Deno.test("upcoming_start dedupes task and calendar mirrors by local start time", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What do I have coming up?",
+    currentDate: "2026-05-13",
+    currentDateTime: "2026-05-13T05:00:00-07:00",
+    plannerContext: {
+      tasks: [
+        {
+          id: "task-cardio",
+          title: "Daily Cardio",
+          taskDate: "2026-05-13",
+          scheduledTime: "06:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+        },
+      ],
+      calendarEvents: [
+        {
+          id: "event-cardio",
+          title: "Daily Cardio",
+          start: "2026-05-13T13:00:00.000Z",
+          end: "2026-05-13T13:30:00.000Z",
+          isAllDay: false,
+          provider: "google",
+          readOnly: true,
+        },
+      ],
+      starterIntent: "upcoming_start",
+    },
+  }));
+
+  const cardioItems = result.structuredResponse?.comingUp?.remainingToday
+    .filter((item) => item.title === "Daily Cardio") ?? [];
+
+  assertEquals(cardioItems.length, 1);
+  assertEquals(cardioItems[0]?.source, "task");
+  assertEquals(result.reply.match(/Daily Cardio/g)?.length ?? 0, 1);
 });
 
 Deno.test("upcoming_start includes due campaign rituals without materialized tasks", () => {

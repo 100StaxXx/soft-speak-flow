@@ -92,6 +92,11 @@ export interface CompanionFantasyTitleAlias {
   explanation: string;
 }
 
+type CompanionCosmiqTitleCharacterBioInput = Pick<
+  CompanionCosmiqTitle,
+  "title" | "momentum" | "dominantStat"
+>;
+
 const RARITY_ORDER: CompanionCosmiqTitleRarity[] = [
   "common",
   "uncommon",
@@ -203,6 +208,77 @@ const SLIPPING_TITLES: Record<CompanionStatAttribute, string> = {
   resolve: "The Sleeping Titan",
   creativity: "The Drifting Star",
   alignment: "The Wandering Seeker",
+};
+
+const TITLE_CHARACTER_BIOS: Record<string, string> = {
+  "The Dimmed Flame":
+    "A weary flamebearer whose ember has not gone out, carrying warmth through long nights and guarding the first light of a comeback.",
+  "The Wandering Seeker":
+    "A lost but watchful wanderer, reading faint signs in the dark until the road remembers their name.",
+  "The Restless Guardian":
+    "A vigilant protector with too many gates to hold, still searching for the rhythm that turns vigilance into peace.",
+  "The Sleeping Titan":
+    "A colossal force at rest beneath the mountain, quiet now but built to rise when the earth begins to shake.",
+  "The Drifting Star":
+    "A maker-light adrift between constellations, gathering stray sparks until a new pattern catches fire.",
+  "The Iron Vanguard":
+    "A front-line guardian whose strength comes from stamina and vows, standing where momentum needs a shield.",
+  "The Storm-Hardened Titan":
+    "A weathered titan who converts strain into endurance, carrying the party through wild crossings.",
+  "The Reality Weaver":
+    "A reality-weaver who reads old maps, then paints a door where no door was marked.",
+  "The Clockwork Sage":
+    "A precise sage who turns knowledge into ritual, making wisdom repeatable when the world grows loud.",
+  "The Unbroken Sentinel":
+    "A battle-tested sentinel who survives by keeping the line, steady enough to make pressure blink first.",
+  "The Soulforged Creator":
+    "A soulforged maker who shapes visions that actually belong, turning inner truth into living craft.",
+  "The Inner Oracle":
+    "An inward oracle who listens for the true signal beneath the noise, guiding choices before the path is visible.",
+  "The Oathbound Pathfinder":
+    "A sworn navigator who binds ritual to purpose, guiding the party along the truest road even when the map goes quiet.",
+};
+
+const ATTRIBUTE_CHARACTER_BIOS: Record<
+  CompanionStatAttribute,
+  Record<CompanionCosmiqTitleMomentum, string>
+> = {
+  vitality: {
+    rising: "A radiant guardian of stamina and renewal, restoring the party's courage whenever the road grows thin.",
+    steady: "A life-bound protector who turns rest, motion, and care into quiet power for the whole party.",
+    recovering: "A renewal warden rebuilding the flame through patient rituals, small repairs, and stubborn hope for dawn.",
+    slipping: TITLE_CHARACTER_BIOS["The Dimmed Flame"],
+  },
+  wisdom: {
+    rising: "A star-eyed seeker who reads hidden patterns, lore, and timing before the next door opens.",
+    steady: "A quiet scholar who gathers clues from every horizon, turning scattered signs into a reliable map.",
+    recovering: "A lantern-bearer piecing the map back together, one honest question and hard-won lesson at a time.",
+    slipping: TITLE_CHARACTER_BIOS["The Wandering Seeker"],
+  },
+  discipline: {
+    rising: "A vowbound sentinel who turns rituals into armor, holding the line when the path gets noisy.",
+    steady: "A steady keeper of order whose repeated vows become armor for the party's long campaign.",
+    recovering: "A ritual warden restoring the old cadence, rebuilding trust in each promise kept.",
+    slipping: TITLE_CHARACTER_BIOS["The Restless Guardian"],
+  },
+  resolve: {
+    rising: "A trial-forged champion who advances through pressure, carrying the party through hard thresholds.",
+    steady: "An ironhearted survivor who keeps walking when storms test the road and the party's nerve.",
+    recovering: "An ember-warden rising after the hit, turning scars into signals that the quest is not over.",
+    slipping: TITLE_CHARACTER_BIOS["The Sleeping Titan"],
+  },
+  creativity: {
+    rising: "A wildlight maker who turns stray sparks into spells, tools, and impossible routes.",
+    steady: "A dreamsmith who gives shape to the unseen, crafting new options when the obvious path runs out.",
+    recovering: "A spark-crafter coaxing color back into the forge, gathering fragments until the next spell catches.",
+    slipping: TITLE_CHARACTER_BIOS["The Drifting Star"],
+  },
+  alignment: {
+    rising: "A compass-bearer who keeps the party tied to purpose when tempting side paths appear.",
+    steady: "A soulpath guide who carries the true north of the quest, steadying choices with quiet conviction.",
+    recovering: "A purpose-lit wayfinder listening for the inner signal again, finding the road beneath the noise.",
+    slipping: TITLE_CHARACTER_BIOS["The Wandering Seeker"],
+  },
 };
 
 const NEED_WEIGHT: Record<CompanionStatNeed["level"], number> = {
@@ -635,12 +711,18 @@ export const buildCompanionCosmiqTitleCardProfileKey = ({
     .replace(/^-|-$/g, "");
 };
 
+export const buildCompanionCosmiqTitleCharacterBio = (
+  cosmiqTitle: CompanionCosmiqTitleCharacterBioInput,
+): string =>
+  TITLE_CHARACTER_BIOS[cosmiqTitle.title]
+  ?? ATTRIBUTE_CHARACTER_BIOS[cosmiqTitle.dominantStat][cosmiqTitle.momentum];
+
 export const buildFantasyTitleAliasFromCosmiqTitle = (
   cosmiqTitle: CompanionCosmiqTitle,
 ): CompanionFantasyTitleAlias => ({
   title: cosmiqTitle.title,
   archetype: `${COMPANION_ATTRIBUTE_LABELS[cosmiqTitle.dominantStat]} / ${COMPANION_ATTRIBUTE_LABELS[cosmiqTitle.secondaryStat]}`,
-  explanation: `${COMPANION_ATTRIBUTE_LABELS[cosmiqTitle.dominantStat]} is leading with ${COMPANION_ATTRIBUTE_LABELS[cosmiqTitle.secondaryStat]} close behind. ${cosmiqTitle.rebalancePath}`,
+  explanation: buildCompanionCosmiqTitleCharacterBio(cosmiqTitle),
 });
 
 export const isCompanionCosmiqTitleRarity = (value: unknown): value is CompanionCosmiqTitleRarity =>

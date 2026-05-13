@@ -34,9 +34,11 @@ import {
 } from "../_shared/assistantScheduleCopy.ts";
 import type {
   CompanionCampaignStatus,
+  CompanionDailyLoadLabel,
   CompanionDayAssessment,
   CompanionIntentMetadata,
   CompanionMissedItem,
+  CompanionPlanDayStructuredOutput,
   CompanionScheduleItem,
   CompanionStructuredResponse,
   CompanionSuggestedQuest,
@@ -4578,11 +4580,82 @@ const buildFreeWindowsForDate = (
   );
 };
 
+type ScheduleSummaryItem = {
+  label: string;
+  sortMinutes: number | null;
+  title: string;
+  isAllDay: boolean;
+};
+
+type StructuredScheduleItemWithSort = CompanionScheduleItem & {
+  sortMinutes: number | null;
+};
+
+const normalizeScheduleDedupeText = (
+  value: string | null | undefined,
+): string => (value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+
+const normalizeScheduleDedupeTimestamp = (
+  value: string | null | undefined,
+): string => normalizeScheduleDedupeText(value).replace(/\.\d{3}z$/i, "z")
+  .slice(0, 16);
+
+const getScheduleSortMinuteKey = (
+  sortMinutes: number | null | undefined,
+): string | null =>
+  typeof sortMinutes === "number" && Number.isFinite(sortMinutes)
+    ? `minute:${sortMinutes}`
+    : null;
+
+const getScheduleSummaryDedupeKey = (item: ScheduleSummaryItem): string => {
+  const title = normalizeScheduleDedupeText(item.title);
+  const label = normalizeScheduleDedupeText(item.label);
+  const temporalKey = getScheduleSortMinuteKey(item.sortMinutes) ?? label;
+  return `${title}|${temporalKey}|${item.isAllDay ? "all-day" : "timed"}`;
+};
+
+const dedupeScheduleSummaryItems = (
+  items: ScheduleSummaryItem[],
+): ScheduleSummaryItem[] => {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = getScheduleSummaryDedupeKey(item);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const getStructuredScheduleDedupeKey = (
+  item: StructuredScheduleItemWithSort,
+): string => {
+  const title = normalizeScheduleDedupeText(item.title);
+  const sortMinuteKey = getScheduleSortMinuteKey(item.sortMinutes);
+  const startsAt = normalizeScheduleDedupeTimestamp(item.startsAt);
+  const endsAt = normalizeScheduleDedupeTimestamp(item.endsAt);
+  const label = normalizeScheduleDedupeText(item.label);
+  const temporalKey = sortMinuteKey ??
+    (startsAt || endsAt ? `${startsAt}|${endsAt}` : label);
+  return `${title}|${temporalKey}|${item.isAllDay ? "all-day" : "timed"}`;
+};
+
+const dedupeStructuredScheduleItems = (
+  items: StructuredScheduleItemWithSort[],
+): StructuredScheduleItemWithSort[] => {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = getStructuredScheduleDedupeKey(item);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
 const collectScheduleItemsForDate = (
   input: PlannerBuildInput,
   date: string,
   remainingOnly: boolean,
-) => {
+): ScheduleSummaryItem[] => {
   const now = new Date(input.currentDateTime);
   const currentDateKey = getLocalDateFromDateTime(input.currentDateTime);
   const currentMinutes = getLocalMinutesFromDateTime(input.currentDateTime);
@@ -4595,6 +4668,7 @@ const collectScheduleItemsForDate = (
       return scheduledMinutes >= currentMinutes;
     })
     .map((task) => ({
+      title: task.title,
       label: buildAssistantTaskScheduleLabel({
         title: task.title,
         taskDate: task.taskDate,
@@ -4604,14 +4678,17 @@ const collectScheduleItemsForDate = (
         currentDateTime: input.currentDateTime,
       }),
       sortMinutes: parseTimeToMinutes(task.scheduledTime),
+      isAllDay: false,
     }));
 
   const rituals = shouldIncludeVirtualRitualScheduleItems(input)
     ? collectRitualScheduleItemsForDate(input, date, remainingOnly).map((
       ritual,
     ) => ({
+      title: ritual.title,
       label: ritual.label,
       sortMinutes: ritual.sortMinutes,
+      isAllDay: ritual.isAllDay,
     }))
     : [];
 
@@ -4631,6 +4708,7 @@ const collectScheduleItemsForDate = (
       return end > now;
     })
     .map((event) => ({
+      title: event.title,
       label: buildAssistantEventScheduleLabel({
         title: event.title,
         start: event.start,
@@ -4644,9 +4722,13 @@ const collectScheduleItemsForDate = (
         event,
         date,
       ),
+      isAllDay: event.isAllDay,
     }));
 
-  return [...tasks, ...rituals, ...events].sort((left, right) => (
+  return dedupeScheduleSummaryItems([...tasks, ...rituals, ...events]).sort((
+    left,
+    right,
+  ) => (
     (left.sortMinutes ?? 9999) - (right.sortMinutes ?? 9999)
   ));
 };
@@ -4748,7 +4830,7 @@ const collectStructuredScheduleItemsForDate = (
       ),
     }));
 
-  return [...tasks, ...rituals, ...events]
+  return dedupeStructuredScheduleItems([...tasks, ...rituals, ...events])
     .sort((left, right) =>
       (left.sortMinutes ?? 9999) - (right.sortMinutes ?? 9999)
     )
@@ -4758,6 +4840,10 @@ const collectStructuredScheduleItemsForDate = (
 const collectMissedTasksForToday = (
   input: PlannerBuildInput,
 ): CompanionMissedItem[] => {
+  if (getLocalDateFromDateTime(input.currentDateTime) !== input.currentDate) {
+    return [];
+  }
+
   const currentMinutes = getLocalMinutesFromDateTime(input.currentDateTime);
 
   return getScopedPlannerTasks(input)
@@ -10163,6 +10249,249 @@ export const buildPlanDayLoadReason = (
   return `${dateLead} already has ${detail}. ${closer}`;
 };
 
+type PlanDayDailyLoad = NonNullable<
+  CompanionPlanDayStructuredOutput["dailyLoad"]
+>;
+
+type PlanDayDailyLoadInput = {
+  openTasks: number;
+  completedTasks: number;
+  scheduledMinutes: number;
+  gapMinutes: number;
+};
+
+const DAILY_LOAD_LABEL_RANK = {
+  barely_anything: 0,
+  light: 1,
+  productive: 2,
+  busy: 3,
+  overwhelming: 4,
+} satisfies Record<CompanionDailyLoadLabel, number>;
+
+const maxDailyLoadLabel = (
+  current: CompanionDailyLoadLabel,
+  minimum: CompanionDailyLoadLabel,
+): CompanionDailyLoadLabel =>
+  DAILY_LOAD_LABEL_RANK[current] >= DAILY_LOAD_LABEL_RANK[minimum]
+    ? current
+    : minimum;
+
+const classifyDailyLoadScore = (score: number): CompanionDailyLoadLabel => {
+  if (score <= 4) return "barely_anything";
+  if (score <= 9) return "light";
+  if (score <= 16) return "productive";
+  if (score <= 23) return "busy";
+  return "overwhelming";
+};
+
+const buildDailyLoadRecommendation = (
+  label: CompanionDailyLoadLabel,
+  facts: PlanDayDailyLoadInput,
+): string => {
+  const scheduledHours = facts.scheduledMinutes / 60;
+  const gapHours = facts.gapMinutes / 60;
+
+  switch (label) {
+    case "barely_anything":
+      return "This day looks open. Pick one meaningful quest to build momentum.";
+    case "light":
+      if (facts.openTasks >= 4 && scheduledHours < 1.5) {
+        return "Light day, but the list is still loose. Pick one priority so the day has a spine.";
+      }
+      return "Light day. Perfect for knocking out one priority without pressure.";
+    case "productive":
+      if (facts.completedTasks >= 3) {
+        return "This is a strong day. You have real momentum, so keep the plan and protect focus.";
+      }
+      return "This is a strong day. Keep the plan and protect your focus blocks.";
+    case "busy":
+      if (scheduledHours >= 6 && gapHours < 1) {
+        return "Busy day. Avoid stacking more and make sure there is a real break somewhere.";
+      }
+      if (facts.openTasks >= 10) {
+        return "Busy day. Cut the list down before adding anything else.";
+      }
+      return "Busy day. Avoid stacking more unless it is urgent.";
+    case "overwhelming":
+      if (scheduledHours >= 8) {
+        return "This day is overloaded. Move lower priority quests before the schedule eats the whole day.";
+      }
+      return "This day is overloaded. Move 2 to 3 lower priority quests before it turns chaotic.";
+  }
+};
+
+export const evaluatePlanDayDailyLoad = (
+  facts: PlanDayDailyLoadInput,
+): PlanDayDailyLoad => {
+  const scheduledHours = facts.scheduledMinutes / 60;
+  const gapHours = facts.gapMinutes / 60;
+  const rawScore =
+    facts.openTasks +
+    facts.completedTasks * 0.5 +
+    scheduledHours * 2 -
+    gapHours * 0.5;
+  const score = Math.max(0, Math.round(rawScore * 100) / 100);
+  let label = classifyDailyLoadScore(score);
+
+  if (facts.openTasks >= 12 || scheduledHours >= 8) {
+    label = "overwhelming";
+  } else if (facts.openTasks >= 10 || (scheduledHours >= 6 && gapHours < 1)) {
+    label = maxDailyLoadLabel(label, "busy");
+  } else if (facts.openTasks >= 6 || scheduledHours >= 3.5) {
+    label = maxDailyLoadLabel(label, "productive");
+  } else if (facts.openTasks >= 4) {
+    label = maxDailyLoadLabel(label, "light");
+  }
+
+  if (
+    facts.openTasks <= 2 &&
+    facts.completedTasks <= 1 &&
+    scheduledHours <= 1.5
+  ) {
+    label = "barely_anything";
+  }
+
+  return {
+    label,
+    score,
+    ...facts,
+    recommendation: buildDailyLoadRecommendation(label, facts),
+  };
+};
+
+const isTaskCompletedOnDate = (
+  task: PlannerContextTask,
+  targetDate: string,
+): boolean =>
+  task.completed === true &&
+  (task.taskDate === targetDate ||
+    task.completedAt?.slice(0, 10) === targetDate);
+
+const uniqueTasksById = (
+  tasks: ReadonlyArray<PlannerContextTask>,
+): PlannerContextTask[] => {
+  const seen = new Set<string>();
+  const unique: PlannerContextTask[] = [];
+  for (const task of tasks) {
+    if (seen.has(task.id)) continue;
+    seen.add(task.id);
+    unique.push(task);
+  }
+  return unique;
+};
+
+const buildTaskDailyLoadIntervalsForDate = (
+  tasks: ReadonlyArray<PlannerContextTask>,
+  targetDate: string,
+): TimelineInterval[] =>
+  tasks
+    .filter((task) =>
+      task.taskDate === targetDate && Boolean(task.scheduledTime)
+    )
+    .map((task): TimelineInterval | null => {
+      const startMinutes = parseTimeToMinutes(task.scheduledTime);
+      if (startMinutes === null) return null;
+
+      return {
+        id: task.id,
+        title: task.title,
+        source: "quest",
+        startMinutes,
+        endMinutes: startMinutes + getTaskDuration(task),
+      };
+    })
+    .filter((interval): interval is TimelineInterval => interval !== null);
+
+const mergeIntervalsWithinDay = (
+  intervals: ReadonlyArray<TimelineInterval>,
+  wakeMinutes: number,
+  windDownMinutes: number,
+): Array<{ startMinutes: number; endMinutes: number }> => {
+  const bounded = intervals
+    .map((interval) => ({
+      startMinutes: Math.max(wakeMinutes, interval.startMinutes),
+      endMinutes: Math.min(windDownMinutes, interval.endMinutes),
+    }))
+    .filter((interval) => interval.endMinutes > interval.startMinutes)
+    .sort((left, right) => left.startMinutes - right.startMinutes);
+
+  const merged: Array<{ startMinutes: number; endMinutes: number }> = [];
+  for (const interval of bounded) {
+    const previous = merged[merged.length - 1];
+    if (!previous || interval.startMinutes > previous.endMinutes) {
+      merged.push({ ...interval });
+      continue;
+    }
+    previous.endMinutes = Math.max(previous.endMinutes, interval.endMinutes);
+  }
+  return merged;
+};
+
+const sumGapMinutesBetweenIntervals = (
+  intervals: ReadonlyArray<{ startMinutes: number; endMinutes: number }>,
+): number => {
+  let gapMinutes = 0;
+
+  for (let index = 1; index < intervals.length; index += 1) {
+    const previous = intervals[index - 1];
+    const current = intervals[index];
+    if (!previous || !current) continue;
+    if (current.startMinutes > previous.endMinutes) {
+      gapMinutes += current.startMinutes - previous.endMinutes;
+    }
+  }
+
+  return Math.max(0, gapMinutes);
+};
+
+export const getPlanDayDailyLoad = (
+  input: PlannerBuildInput,
+  targetDate: string,
+  loadBreakdown: PlanDayLoadBreakdown = getPlanDayLoadBreakdown(
+    input,
+    targetDate,
+  ),
+): PlanDayDailyLoad => {
+  const scoped = getScopedPlannerTaskGroups(input);
+  const allScopedTasks = uniqueTasksById([
+    ...scoped.tasks,
+    ...scoped.inboxTasks,
+    ...scoped.recentCompletedTasks,
+  ]);
+  const completedTasks = allScopedTasks.filter((task) =>
+    isTaskCompletedOnDate(task, targetDate)
+  );
+  const openTasks =
+    loadBreakdown.visibleStandaloneQuests.length +
+    loadBreakdown.campaignLinkedQuests.length +
+    loadBreakdown.surfacedCampaignRituals.length +
+    loadBreakdown.datedInboxItems.length +
+    loadBreakdown.undatedInboxItems.length;
+  const wakeMinutes = getWakeMinutes(input.plannerContext.plannerMemory);
+  const windDownMinutes = getWindDownMinutes(input.plannerContext.plannerMemory);
+  const intervals = mergeIntervalsWithinDay([
+    ...buildTaskDailyLoadIntervalsForDate(allScopedTasks, targetDate),
+    ...buildCalendarIntervalsForDate(
+      input.plannerContext.calendarEvents,
+      targetDate,
+      input.currentDateTime,
+      input.plannerContext.plannerMemory,
+    ),
+  ], wakeMinutes, windDownMinutes);
+  const scheduledMinutes = intervals.reduce(
+    (sum, interval) => sum + interval.endMinutes - interval.startMinutes,
+    0,
+  );
+  const gapMinutes = sumGapMinutesBetweenIntervals(intervals);
+
+  return evaluatePlanDayDailyLoad({
+    openTasks,
+    completedTasks: completedTasks.length,
+    scheduledMinutes,
+    gapMinutes,
+  });
+};
+
 export type PlanDayAtRiskCampaignFact = {
   title: string;
   status: "at_risk" | "stalled";
@@ -10306,6 +10635,11 @@ const buildPlanDayStructuredOutput = (
   planDay: {
     message: reply,
     dayAssessment: derivePlanDayAssessment(
+      input,
+      getPlanDayTargetDate(input),
+      loadBreakdown,
+    ),
+    dailyLoad: getPlanDayDailyLoad(
       input,
       getPlanDayTargetDate(input),
       loadBreakdown,
@@ -11422,11 +11756,13 @@ const buildContextualPlanDayTriageResponse = (
     dateLabel,
     loadBreakdown,
   );
+  const dailyLoad = getPlanDayDailyLoad(input, targetDate, loadBreakdown);
   const atRiskLine = buildPlanDayCampaignGoalsAtRiskLine(input, proposals);
   const readOnlyLine = proposals.length > 0
     ? "Nothing moves automatically; those update_quest suggestions still need confirmation."
     : "No safe automatic move payload surfaced, so this is a read-only triage.";
   const reply = [
+    dailyLoad.recommendation,
     `Plan day triage for ${dateLabel}:`,
     buildPlanDayMissedTriageLine(input, targetDate),
     buildPlanDayMoveTriageLine(input, targetDate, proposals),
@@ -11540,12 +11876,16 @@ const buildPlanDayConversationResponse = (
     ? buildPlanDayCampaignLoadMessage(input, dateLabel, loadBreakdown)
     : null;
   const atRiskLine = buildPlanDayCampaignGoalsAtRiskLine(input);
+  const dailyLoad = getPlanDayDailyLoad(input, targetDate, loadBreakdown);
   const loadLine = existingWorkItems > 0
-    ? campaignLoadMessage ??
-      buildPlanDayLoadReason(input, dateLabel, loadBreakdown)
+    ? [
+      dailyLoad.recommendation,
+      campaignLoadMessage ??
+        buildPlanDayLoadReason(input, dateLabel, loadBreakdown),
+    ].join(" ")
     : hasPlanDayScheduledBlocks(input, targetDate)
-    ? `I see scheduled blocks on ${dateLabel}, so I'd shape around those instead of stacking new quests.`
-    : `${capitalizeScheduleReference(dateLabel)} looks open right now.`;
+    ? `${dailyLoad.recommendation} I see scheduled blocks on ${dateLabel}, so I'd shape around those instead of stacking new quests.`
+    : dailyLoad.recommendation;
   const detectedEnergy = sessionState.planDayEnergy ??
     detectPlanDayEnergyFromMessage(input.message);
   const energyLine = detectedEnergy === "low"

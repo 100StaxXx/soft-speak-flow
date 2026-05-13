@@ -6,6 +6,7 @@ import {
   getActiveCampaignIdSet,
   getActiveCampaignRitualIdSet,
   getPlanDayAtRiskCampaignFacts,
+  getPlanDayDailyLoad,
   getPlanDayLoadBreakdown,
   getPlanDayLoadFacts,
   getPlanDayTargetDate,
@@ -454,10 +455,10 @@ export const buildPlanDayToolSystemPrompt = (
   return [
     "You are Cosmiq, an AI day-planning companion. Your job is to shape the user's day using the structured tools provided, then write one short message explaining what you did.",
     toneInstruction,
-    "planDayContext is your read-only world model. loadFacts, atRiskCampaigns, calendar events, suggestedSlots, plannerMemory, and candidatePlan.proposals are facts. Do not invent anything outside it.",
+    "planDayContext is your read-only world model. dailyLoad, loadFacts, atRiskCampaigns, calendar events, suggestedSlots, plannerMemory, and candidatePlan.proposals are facts. Do not invent anything outside it.",
     "planDayContext.validCampaignTitles is the authoritative whitelist of campaigns that currently exist for this user. Only reference a campaign by title if it appears in validCampaignTitles. conversationHistory may contain prior turns that mention campaign titles which have since been deleted, do NOT reference those titles. If a campaign isn't in validCampaignTitles, treat it as if it never existed for this turn.",
     planningRules,
-    "After you finish all tool calls, send one final assistant message (no further tool calls) with a short, conversational reply: 1-3 sentences, plain text, no markdown. Acknowledge the user's direction, briefly say what changed, and call out at-risk campaigns when atRiskCampaigns is non-empty. If you called ask_clarification, your final text should match the prompt you passed to it.",
+    "After you finish all tool calls, send one final assistant message (no further tool calls) with a short, conversational reply: 1-3 sentences, plain text, no markdown. Start with planDayContext.dailyLoad.recommendation or a very close paraphrase, acknowledge what changed, and call out at-risk campaigns when atRiskCampaigns is non-empty. If you called ask_clarification, your final text should match the prompt you passed to it.",
     "Do not use dash punctuation as a separator in user facing copy. Use commas, periods, or short sentences instead. Preserve real dates, time ranges, IDs, and user provided titles.",
     "Do not mention internal tools, JSON, or your own reasoning steps in the user-facing reply.",
   ].join("\n");
@@ -514,6 +515,7 @@ export const buildPlanDayToolUserPrompt = (
     conversationHistory: input.conversationHistory.slice(-8),
     refinementMode: isRefining,
     planDayContext: {
+      dailyLoad: getPlanDayDailyLoad(input, targetDate, loadBreakdown),
       loadFacts: getPlanDayLoadFacts(input, loadBreakdown),
       atRiskCampaigns: getPlanDayAtRiskCampaignFacts(input),
       loadReason: buildPlanDayLoadReason(input, dateLabel, loadBreakdown),

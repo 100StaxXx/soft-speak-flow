@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildCompanionCosmiqTitle,
   buildCompanionCosmiqTitleCardProfileKey,
+  buildCompanionCosmiqTitleCharacterBio,
+  buildFantasyTitleAliasFromCosmiqTitle,
 } from "./companionStatCosmiqTitles";
 import type {
   CompanionStatAttribute,
@@ -130,6 +132,35 @@ describe("companionStatCosmiqTitles", () => {
     expect(title.rebalanceStat).toBe("creativity");
     expect(title.rebalancePath).toContain("Strengthen Creativity");
     expect(title.titleStability).toBe("new");
+  });
+
+  it("describes the revealed title like a fantasy character instead of level-up advice", () => {
+    const title = buildCompanionCosmiqTitle({
+      statProfile: {
+        scores: {
+          vitality: 420,
+          wisdom: 510,
+          discipline: 560,
+          resolve: 480,
+          creativity: 360,
+          alignment: 530,
+        },
+        dominantStat: "discipline",
+        secondaryStat: "alignment",
+      },
+      statNeeds,
+      momentumState: "coasting",
+    });
+    const bio = buildCompanionCosmiqTitleCharacterBio(title);
+    const alias = buildFantasyTitleAliasFromCosmiqTitle(title);
+
+    expect(title.title).toBe("The Oathbound Pathfinder");
+    expect(bio).toBe(
+      "A sworn navigator who binds ritual to purpose, guiding the party along the truest road even when the map goes quiet.",
+    );
+    expect(alias.explanation).toBe(bio);
+    expect(bio).not.toContain("Strengthen");
+    expect(bio).not.toContain("evolve toward");
   });
 
   it("keeps non-slipping momentum out of title selection", () => {

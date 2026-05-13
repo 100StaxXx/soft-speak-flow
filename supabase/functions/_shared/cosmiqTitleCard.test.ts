@@ -96,7 +96,7 @@ const baseAnalysis: CompanionStatAnalysis = {
     title: "The Oathbound Pathfinder",
     archetype: "Discipline / Alignment",
     explanation:
-      "Discipline is leading with Alignment close behind. Strengthen Creativity to evolve toward The Soulforged Creator.",
+      "A sworn navigator who binds ritual to purpose, guiding the party along the truest road even when the map goes quiet.",
   },
   momentumState: "coasting",
   recentMissInterpretation: "normal_variance",

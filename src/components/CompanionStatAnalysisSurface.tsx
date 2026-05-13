@@ -54,6 +54,7 @@ import {
   buildCompanionStatAnalysisPreludeCardImageUrl,
   COMPANION_STAT_ANALYSIS_PRELUDE_CARDS,
 } from "@/shared/companionStatAnalysisPreludeCards";
+import { buildCompanionCosmiqTitleCharacterBio } from "@/shared/companionStatCosmiqTitles";
 
 interface CompanionStatAnalysisSurfaceProps {
   open: boolean;
@@ -116,6 +117,7 @@ const STAT_MIN = 100;
 const STAT_MAX = 1000;
 const EMPTY_IMAGE_URLS: string[] = [];
 const TITLE_ART_SLIDE_INTERVAL_MS = 1_800;
+const PRELUDE_CARD_SLIDE_INTERVAL_MS = 4_500;
 const TITLE_ART_SLIDES_BEFORE_REVEAL = 2;
 const TITLE_ART_REVEAL_SETTLE_MS = 900;
 
@@ -522,7 +524,7 @@ function LoadingState({
 
     const intervalId = window.setInterval(() => {
       setActivePreludeCardIndex((current) => (current + 1) % COMPANION_STAT_ANALYSIS_PRELUDE_CARDS.length);
-    }, TITLE_ART_SLIDE_INTERVAL_MS);
+    }, PRELUDE_CARD_SLIDE_INTERVAL_MS);
 
     return () => {
       window.clearInterval(intervalId);
@@ -1077,6 +1079,7 @@ function CosmiqTitleRevealCard({
     isTitleArtFallback,
     isRegeneratingTitleCard,
   });
+  const titleCharacterBio = buildCompanionCosmiqTitleCharacterBio(analysis.cosmiqTitle);
   const handleRegenerateTitleArt = () => {
     void onRegenerateTitleCard(analysis).catch(() => undefined);
   };
@@ -1158,7 +1161,7 @@ function CosmiqTitleRevealCard({
 
   return (
     <CosmiqTitleFrontCard
-      description={analysis.cosmiqTitle.rebalancePath}
+      description={titleCharacterBio}
       imageAlt={`${analysis.cosmiqTitle.title} archetype illustration`}
       imageUrl={imageUrl}
       onFlip={onFlip}

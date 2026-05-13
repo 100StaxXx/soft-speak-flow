@@ -82,7 +82,7 @@ const baseResponse = {
     fantasyTitle: {
       title: "The Oathbound Navigator",
       archetype: "Discipline / Alignment",
-      explanation: "You're carrying Discipline with Alignment close behind, and Creativity is the place your next chapter wants support.",
+      explanation: "A Discipline-led adventurer with Alignment close behind, steady enough to guide the party through the ordinary wilds.",
     },
     momentumState: "coasting",
     recentMissInterpretation: "normal_variance",
@@ -157,7 +157,7 @@ describe("companionStatAnalysis", () => {
     expect(validation.data.analysis.fantasyTitle).toEqual({
       title: "The Oathbound Navigator",
       archetype: "Discipline / Alignment",
-      explanation: "You're carrying Discipline with Alignment close behind, and Creativity is the place your next chapter wants support.",
+      explanation: "A Discipline-led adventurer with Alignment close behind, steady enough to guide the party through the ordinary wilds.",
     });
   });
 
@@ -374,7 +374,8 @@ describe("companionStatAnalysis", () => {
 
     expect(validation.data.analysis.fantasyTitle.title.length).toBeGreaterThan(0);
     expect(validation.data.analysis.fantasyTitle.archetype).toBe("Discipline / Alignment");
-    expect(validation.data.analysis.fantasyTitle.explanation).toContain("Creativity");
+    expect(validation.data.analysis.fantasyTitle.explanation).toContain("sworn navigator");
+    expect(validation.data.analysis.fantasyTitle.explanation).not.toContain("evolve toward");
   });
 
   it("client compatibility fills a missing legacy Cosmiq title", () => {

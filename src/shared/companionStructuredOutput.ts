@@ -67,6 +67,23 @@ export type CompanionDayAssessment =
   | "productive"
   | "low_energy";
 
+export type CompanionDailyLoadLabel =
+  | "barely_anything"
+  | "light"
+  | "productive"
+  | "busy"
+  | "overwhelming";
+
+export interface CompanionDailyLoadSummary {
+  label: CompanionDailyLoadLabel;
+  score: number;
+  openTasks: number;
+  completedTasks: number;
+  scheduledMinutes: number;
+  gapMinutes: number;
+  recommendation: string;
+}
+
 export type CompanionSuggestedQuestType = "must" | "should" | "nice";
 
 export type CompanionSuggestedQuestSource =
@@ -89,6 +106,7 @@ export interface CompanionSuggestedQuest {
 export interface CompanionPlanDayStructuredOutput {
   message: string;
   dayAssessment: CompanionDayAssessment;
+  dailyLoad?: CompanionDailyLoadSummary;
   suggestedQuests: CompanionSuggestedQuest[];
   campaignFocus?: {
     campaignTitle: string;

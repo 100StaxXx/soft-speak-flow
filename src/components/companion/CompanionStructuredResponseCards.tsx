@@ -10,6 +10,9 @@ import type {
 } from "@/shared/companionStructuredOutput";
 
 type CompanionStructuredResponseCardsVariant = "journeys" | "companion";
+type ComingUpOutput = NonNullable<CompanionStructuredResponse["comingUp"]>;
+type ComingUpScheduleItem = ComingUpOutput["remainingToday"][number];
+type ComingUpMissedItem = ComingUpOutput["missedItems"][number];
 
 interface CompanionStructuredResponseCardsProps {
   structuredResponse?: CompanionStructuredResponse | null;
@@ -58,6 +61,142 @@ const formatCampaignInterventionLabel = (
     : level === "nudge"
     ? "nudge"
     : "steady";
+
+const formatPlanDayStatusLabel = (
+  value: string | null | undefined,
+): string => {
+  if (!value) return "Open";
+  return value
+    .split("_")
+    .filter(Boolean)
+    .map((part) => `${part[0]?.toUpperCase() ?? ""}${part.slice(1)}`)
+    .join(" ");
+};
+
+const normalizeComingUpKeyPart = (value: string | null | undefined): string =>
+  (value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+
+const normalizeComingUpTimestamp = (
+  value: string | null | undefined,
+): string =>
+  normalizeComingUpKeyPart(value).replace(/\.\d{3}z$/i, "z").slice(0, 16);
+
+const parseComingUpClockMinutes = (
+  value: string | null | undefined,
+): number | null => {
+  if (!value) return null;
+
+  const twelveHourMatch = value.match(
+    /\b(\d{1,2})(?::([0-5]\d))?\s*(a\.?m\.?|p\.?m\.?)\b/i,
+  );
+  if (twelveHourMatch) {
+    const rawHour = Number(twelveHourMatch[1]);
+    const minute = Number(twelveHourMatch[2] ?? "0");
+    if (rawHour >= 1 && rawHour <= 12) {
+      const meridiem = twelveHourMatch[3].toLowerCase();
+      const normalizedHour = rawHour % 12;
+      const hour = meridiem.startsWith("p")
+        ? normalizedHour + 12
+        : normalizedHour;
+      return hour * 60 + minute;
+    }
+  }
+
+  const twentyFourHourMatch = value.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
+  if (!twentyFourHourMatch) return null;
+
+  return Number(twentyFourHourMatch[1]) * 60 +
+    Number(twentyFourHourMatch[2]);
+};
+
+const getComingUpDateClockMinutes = (
+  value: string | null | undefined,
+): number | null => {
+  if (!value) return null;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return date.getHours() * 60 + date.getMinutes();
+};
+
+const getComingUpStartMinutes = (item: ComingUpScheduleItem): number | null =>
+  parseComingUpClockMinutes(item.label) ??
+    getComingUpDateClockMinutes(item.startsAt);
+
+const getScheduleItemDedupeKey = (item: ComingUpScheduleItem): string => {
+  const title = normalizeComingUpKeyPart(item.title);
+  const startMinutes = getComingUpStartMinutes(item);
+  const label = normalizeComingUpKeyPart(item.label);
+  const start = normalizeComingUpTimestamp(item.startsAt);
+  const end = normalizeComingUpTimestamp(item.endsAt);
+  let temporalKey = label;
+  if (startMinutes !== null) {
+    temporalKey = `minute:${startMinutes}`;
+  } else if (start || end) {
+    temporalKey = `${start}|${end}`;
+  }
+
+  return `${title}|${temporalKey}|${item.isAllDay ? "all-day" : "timed"}`;
+};
+
+const dedupeScheduleItems = (
+  items: ComingUpScheduleItem[],
+): ComingUpScheduleItem[] => {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = getScheduleItemDedupeKey(item);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const getMissedItemDedupeKey = (item: ComingUpMissedItem): string =>
+  `${normalizeComingUpKeyPart(item.title)}|${
+    normalizeComingUpKeyPart(item.label)
+  }`;
+
+const dedupeMissedItems = (
+  items: ComingUpMissedItem[],
+): ComingUpMissedItem[] => {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = getMissedItemDedupeKey(item);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const scheduleItemMatchesMissedItem = (
+  scheduleItem: ComingUpScheduleItem,
+  missedItem: ComingUpMissedItem,
+): boolean => {
+  if (scheduleItem.id === missedItem.id) return true;
+
+  return normalizeComingUpKeyPart(scheduleItem.title) ===
+      normalizeComingUpKeyPart(missedItem.title) &&
+    normalizeComingUpKeyPart(scheduleItem.label) ===
+      normalizeComingUpKeyPart(missedItem.label);
+};
+
+const scheduleItemsMatch = (
+  left: ComingUpScheduleItem,
+  right: ComingUpScheduleItem,
+): boolean =>
+  left.id === right.id ||
+  getScheduleItemDedupeKey(left) === getScheduleItemDedupeKey(right);
+
+const formatComingUpScheduleLabel = (
+  item: ComingUpScheduleItem,
+  section: "today" | "tomorrow",
+): string => {
+  const label = item.label.trim();
+  if (section !== "tomorrow") return label;
+  if (/\btomorrow\b/i.test(label)) return label;
+  return `Tomorrow, ${label}`;
+};
 
 const renderCampaignHealthSnapshot = (
   snapshot: CompanionCampaignHealthSnapshot,
@@ -182,12 +321,27 @@ export const CompanionStructuredResponseCards = memo(
     const styles = variantStyles[variant];
     const planDayCampaignFocus =
       structuredResponse.planDay?.campaignFocus ?? null;
-    const comingUpRemainingToday =
-      structuredResponse.comingUp?.remainingToday ?? [];
-    const comingUpTomorrowSchedule =
-      structuredResponse.comingUp?.tomorrowSchedule ?? [];
-    const comingUpMissedItems =
-      structuredResponse.comingUp?.missedItems ?? [];
+    const comingUpMissedItems = dedupeMissedItems(
+      structuredResponse.comingUp?.missedItems ?? [],
+    );
+    const rawComingUpNextEvent = structuredResponse.comingUp?.nextEvent ?? null;
+    const comingUpNextEvent = rawComingUpNextEvent &&
+        !comingUpMissedItems.some((item) =>
+          scheduleItemMatchesMissedItem(rawComingUpNextEvent, item)
+        )
+      ? rawComingUpNextEvent
+      : null;
+    const comingUpRemainingToday = dedupeScheduleItems(
+      structuredResponse.comingUp?.remainingToday ?? [],
+    ).filter((item) =>
+      !comingUpMissedItems.some((missedItem) =>
+        scheduleItemMatchesMissedItem(item, missedItem)
+      ) &&
+      (!comingUpNextEvent || !scheduleItemsMatch(item, comingUpNextEvent))
+    );
+    const comingUpTomorrowSchedule = dedupeScheduleItems(
+      structuredResponse.comingUp?.tomorrowSchedule ?? [],
+    );
 
     return (
       <div className={cn("space-y-3", className)}>
@@ -203,7 +357,9 @@ export const CompanionStructuredResponseCards = memo(
               </p>
               <p className={cn("mt-3 text-sm font-medium", styles.subtext)}>
                 Day status:{" "}
-                {structuredResponse.planDay.dayAssessment.replace(/_/g, " ")}
+                {formatPlanDayStatusLabel(
+                  structuredResponse.planDay.dayAssessment,
+                )}
               </p>
               {planDayCampaignFocus
                 ? (
@@ -571,15 +727,15 @@ export const CompanionStructuredResponseCards = memo(
               <p className={cn("mt-2", styles.body)}>
                 {structuredResponse.comingUp.message}
               </p>
-              {structuredResponse.comingUp.nextEvent
+              {comingUpNextEvent
                 ? (
                   <div className={cn("mt-4", styles.item)}>
                     <p className={styles.title}>Next</p>
                     <p className="mt-1 text-sm font-semibold">
-                      {structuredResponse.comingUp.nextEvent.title}
+                      {comingUpNextEvent.title}
                     </p>
                     <p className={cn("mt-1", styles.subtext)}>
-                      {structuredResponse.comingUp.nextEvent.label}
+                      {comingUpNextEvent.label}
                     </p>
                   </div>
                 )
@@ -609,7 +765,9 @@ export const CompanionStructuredResponseCards = memo(
                   ? comingUpRemainingToday.map((item) => (
                     <div key={item.id} className={styles.item}>
                       <p className="text-sm font-semibold">{item.title}</p>
-                      <p className={cn("mt-1", styles.subtext)}>{item.label}</p>
+                      <p className={cn("mt-1", styles.subtext)}>
+                        {formatComingUpScheduleLabel(item, "today")}
+                      </p>
                     </div>
                   ))
                   : (
@@ -630,7 +788,7 @@ export const CompanionStructuredResponseCards = memo(
                         <div key={item.id} className={styles.item}>
                           <p className="text-sm font-semibold">{item.title}</p>
                           <p className={cn("mt-1", styles.subtext)}>
-                            {item.label}
+                            {formatComingUpScheduleLabel(item, "tomorrow")}
                           </p>
                         </div>
                       ))}
@@ -640,15 +798,18 @@ export const CompanionStructuredResponseCards = memo(
                 : null}
               {comingUpMissedItems.length > 0
                 ? (
-                  <div className="mt-3 space-y-2">
-                    {comingUpMissedItems.map((item) => (
-                      <div key={item.id} className={styles.item}>
-                        <p className="text-sm font-semibold">{item.title}</p>
-                        <p className={cn("mt-1", styles.subtext)}>
-                          {item.label}
-                        </p>
-                      </div>
-                    ))}
+                  <div className="mt-3">
+                    <p className={styles.title}>Earlier Today</p>
+                    <div className="mt-2 space-y-2">
+                      {comingUpMissedItems.map((item) => (
+                        <div key={item.id} className={styles.item}>
+                          <p className="text-sm font-semibold">{item.title}</p>
+                          <p className={cn("mt-1", styles.subtext)}>
+                            {item.label}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )
                 : null}

@@ -1994,6 +1994,46 @@ describe("useCompanionPlanner", () => {
       );
   });
 
+  it("does not mark selected future-date coming-up rows as missed in the local fallback", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-12T20:52:00.000Z"));
+    const futureTask = {
+      id: "task-future-cardio",
+      task_text: "Daily Cardio",
+      task_date: "2026-05-13",
+      completed: false,
+      completed_at: null,
+      scheduled_time: "06:00",
+      estimated_duration: 30,
+      recurrence_pattern: null,
+      subtasks: [],
+    };
+    mocks.todayTasks = [];
+    mocks.weekTasks = [futureTask];
+    mocks.invoke.mockResolvedValue({
+      data: null,
+      error: new Error("Failed to build companion plan"),
+    });
+
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
+
+    await act(async () => {
+      await result.current.submitMessage("What do I have coming up?", "text", {
+        selectedDate: "2026-05-13",
+      });
+    });
+
+    expect(result.current.structuredResponse?.comingUp?.remainingToday)
+      .toEqual([
+        expect.objectContaining({ title: "Daily Cardio" }),
+      ]);
+    expect(result.current.structuredResponse?.comingUp?.missedItems).toEqual(
+      [],
+    );
+  });
+
   it("falls back to backend classification when client-side classification preflight times out", async () => {
     vi.useFakeTimers();
     mocks.classify.mockImplementation(

@@ -113,6 +113,9 @@ vi.mock("recharts", () => ({
 import { CompanionStatAnalysisSurface } from "./CompanionStatAnalysisSurface";
 import { COMPANION_STAT_ANALYSIS_PRELUDE_CARDS } from "@/shared/companionStatAnalysisPreludeCards";
 
+const OATHBOUND_PATHFINDER_BIO =
+  "A sworn navigator who binds ritual to purpose, guiding the party along the truest road even when the map goes quiet.";
+
 const analysis = {
   analysisDate: "2026-04-18",
   timezone: "America/Los_Angeles",
@@ -190,7 +193,7 @@ const analysis = {
   fantasyTitle: {
     title: "The Oathbound Navigator",
     archetype: "Discipline / Alignment",
-    explanation: "You're carrying Discipline with Alignment close behind, and Creativity is the place your next chapter wants support.",
+    explanation: "A Discipline-led adventurer with Alignment close behind, steady enough to guide the party through the ordinary wilds.",
   },
   momentumState: "coasting",
   recentMissInterpretation: "normal_variance",
@@ -317,7 +320,7 @@ describe("CompanionStatAnalysisSurface", () => {
       "https://example.com/cosmiq-card.png",
     );
     expect(screen.getByText("The Oathbound Pathfinder")).toBeInTheDocument();
-    expect(screen.getByText("Strengthen Creativity to evolve toward The Soulforged Creator.")).toBeInTheDocument();
+    expect(screen.getByText(OATHBOUND_PATHFINDER_BIO)).toBeInTheDocument();
     expect(screen.queryByText("New Title Unlocked")).not.toBeInTheDocument();
     expect(screen.queryByText("Vitality")).not.toBeInTheDocument();
     expect(screen.queryByText("560")).not.toBeInTheDocument();
@@ -505,6 +508,54 @@ describe("CompanionStatAnalysisSurface", () => {
     expect(screen.queryByText("The Oathbound Pathfinder")).not.toBeInTheDocument();
     expect(screen.queryByText("Discipline")).not.toBeInTheDocument();
     expect(screen.queryByText("560")).not.toBeInTheDocument();
+  });
+
+  it("lingers on each prelude card before rotating to the next template image", () => {
+    const firstPreludeCard = COMPANION_STAT_ANALYSIS_PRELUDE_CARDS[0];
+    const secondPreludeCard = COMPANION_STAT_ANALYSIS_PRELUDE_CARDS[1];
+    mocks.prefersReducedMotion = false;
+    vi.useFakeTimers();
+    mocks.useCompanionStatAnalysisMock.mockReturnValue({
+      analysis: null,
+      cached: false,
+      error: null,
+      isLoading: true,
+      isRefreshing: false,
+      isRegeneratingTitleCard: false,
+      refreshAnalysis: mocks.refreshAnalysisMock,
+      regenerateTitleCard: mocks.regenerateTitleCardMock,
+    });
+
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="desktop"
+      />,
+    );
+
+    expect(screen.getByTestId("companion-stat-analysis-prelude-card")).toHaveAttribute(
+      "data-card-id",
+      firstPreludeCard.id,
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(1_800);
+    });
+
+    expect(screen.getByTestId("companion-stat-analysis-prelude-card")).toHaveAttribute(
+      "data-card-id",
+      firstPreludeCard.id,
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(2_700);
+    });
+
+    expect(screen.getByTestId("companion-stat-analysis-prelude-card")).toHaveAttribute(
+      "data-card-id",
+      secondPreludeCard.id,
+    );
   });
 
   it("does not auto-rotate prelude cards when reduced motion is preferred", () => {
@@ -777,7 +828,7 @@ describe("CompanionStatAnalysisSurface", () => {
     expect(await screen.findByTestId("companion-cosmiq-title-card")).toBeInTheDocument();
     expect(screen.getByTestId("companion-title-art-placeholder")).toBeInTheDocument();
     expect(screen.getByText("The Oathbound Pathfinder")).toBeInTheDocument();
-    expect(screen.getByText("Strengthen Creativity to evolve toward The Soulforged Creator.")).toBeInTheDocument();
+    expect(screen.getByText(OATHBOUND_PATHFINDER_BIO)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Regenerate title art" })).not.toBeInTheDocument();
     expect(screen.queryByText("Stats analysis is unavailable right now.")).not.toBeInTheDocument();
     expect(screen.queryByAltText("The Oathbound Pathfinder archetype illustration")).not.toBeInTheDocument();
