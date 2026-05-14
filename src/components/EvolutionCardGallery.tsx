@@ -6,6 +6,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { EvolutionCardFlip } from "./EvolutionCardFlip";
+import {
+  normalizeEvolutionCardImageUrl,
+  shouldUseCompanionSceneFramingForEvolutionCardImage,
+} from "@/lib/evolutionCardImageFraming";
 
 interface EvolutionCard {
   id: string;
@@ -19,8 +23,10 @@ interface EvolutionCard {
   story_text: string;
   rarity: string;
   image_url: string | null;
+  evolution_id?: string | null;
   energy_cost?: number | null;
   bond_level?: number | null;
+  image_uses_companion_scene_framing?: boolean;
 }
 
 export const EvolutionCardGallery = memo(() => {
@@ -62,12 +68,18 @@ export const EvolutionCardGallery = memo(() => {
       const cardsWithImages = (data || []).map(card => {
         // Prioritize card's own image_url to prevent display issues
         // Only fallback to evolution lookup if card doesn't have its own image
-        const cardImageUrl = card.image_url;
+        const cardImageUrl = normalizeEvolutionCardImageUrl(card.image_url);
         const evolutionImageUrl = card.evolution_id ? evolutionImageLookup[card.evolution_id] : null;
+        const resolvedImageUrl = cardImageUrl || evolutionImageUrl;
         
         return {
           ...card,
-          image_url: cardImageUrl || evolutionImageUrl
+          image_url: resolvedImageUrl,
+          image_uses_companion_scene_framing: shouldUseCompanionSceneFramingForEvolutionCardImage({
+            cardImageUrl,
+            evolutionImageUrl,
+            evolutionStage: card.evolution_stage,
+          }),
         };
       });
       

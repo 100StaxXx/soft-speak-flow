@@ -23,6 +23,7 @@ interface EvolutionCard {
   species: string;
   energy_cost?: number | null;
   bond_level?: number | null;
+  image_uses_companion_scene_framing?: boolean;
 }
 
 interface Props {
@@ -119,6 +120,11 @@ export function EvolutionCardFlip({ card, equippedFrame }: Props) {
   );
   const energyCost = card.energy_cost ?? fallbackEnergyCost(card.evolution_stage);
   const bondLevel = card.bond_level ?? null;
+  const usesContainedSceneImage = Boolean(card.image_url && card.image_uses_companion_scene_framing);
+  const cardImageClassName = cn(
+    "absolute inset-0 w-full h-full",
+    usesContainedSceneImage ? "object-contain bg-black" : "object-cover",
+  );
 
   const handleCardClick = () => {
     tap();
@@ -179,7 +185,8 @@ export function EvolutionCardFlip({ card, equippedFrame }: Props) {
               <img
                 src={card.image_url}
                 alt={card.creature_name}
-                className="absolute inset-0 w-full h-full object-cover"
+                className={cardImageClassName}
+                data-companion-image-fit={usesContainedSceneImage ? "contain" : "cover"}
                 loading="lazy"
                 decoding="async"
               />
@@ -360,7 +367,8 @@ export function EvolutionCardFlip({ card, equippedFrame }: Props) {
                         <img
                           src={card.image_url}
                           alt={card.creature_name}
-                          className="absolute inset-0 w-full h-full object-cover"
+                          className={cardImageClassName}
+                          data-companion-image-fit={usesContainedSceneImage ? "contain" : "cover"}
                           loading="lazy"
                           decoding="async"
                         />

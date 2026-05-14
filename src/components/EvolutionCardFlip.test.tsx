@@ -78,6 +78,28 @@ describe("EvolutionCardFlip", () => {
     );
   });
 
+  it("contains fallback companion scene art in preview and fullscreen card images", () => {
+    render(
+      <EvolutionCardFlip
+        card={{
+          ...baseCard,
+          image_url: "https://example.com/generated-stage-5.png",
+          image_uses_companion_scene_framing: true,
+        }}
+      />,
+    );
+
+    const previewImage = screen.getByRole("img", { name: "Cyndathia" });
+    expect(previewImage).toHaveAttribute("data-companion-image-fit", "contain");
+    expect(previewImage).toHaveClass("object-contain");
+
+    fireEvent.click(screen.getByRole("button", { name: /open cyndathia companion card/i }));
+
+    const cardImages = screen.getAllByRole("img", { name: "Cyndathia" });
+    expect(cardImages[1]).toHaveAttribute("data-companion-image-fit", "contain");
+    expect(cardImages[1]).toHaveClass("object-contain");
+  });
+
   it("resets flip state when dialog closes and reopens", () => {
     render(<EvolutionCardFlip card={baseCard} />);
 
