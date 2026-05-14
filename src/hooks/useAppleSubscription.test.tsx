@@ -345,6 +345,39 @@ describe("useAppleSubscription", () => {
     );
   });
 
+  it("shows account-linked recovery copy when Apple purchase belongs to another account", async () => {
+    mocks.functionsInvoke.mockResolvedValueOnce({
+      data: null,
+      error: {
+        message: "Edge Function returned a non-2xx status code",
+        status: 403,
+        context: new Response(JSON.stringify({
+          error: "This purchase is already linked to another account.",
+          code: "APPLE_BINDING_CONFLICT",
+        }), { status: 403 }),
+      },
+    });
+
+    const { result } = renderHook(() => useAppleSubscription());
+
+    let success: boolean | undefined;
+    await act(async () => {
+      success = await result.current.handlePurchase("cosmiq_premium_monthly");
+    });
+
+    expect(success).toBe(false);
+    expect(result.current.productError).toBe(
+      "This App Store subscription is already linked to another Cosmiq account. Sign in to that account, or contact support if this is your purchase.",
+    );
+    expect(mocks.toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Subscription already linked",
+        description: "This App Store subscription is already linked to another Cosmiq account. Sign in to that account, or contact support if this is your purchase.",
+        variant: "destructive",
+      }),
+    );
+  });
+
   it("unlocks locally when Apple succeeds but the verification function is unreachable", async () => {
     mocks.functionsInvoke.mockResolvedValueOnce({
       data: null,

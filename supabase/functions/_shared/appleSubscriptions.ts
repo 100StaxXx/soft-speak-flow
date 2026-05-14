@@ -147,6 +147,38 @@ function normalizeUserId(userId: string) {
   return userId.trim().toLowerCase();
 }
 
+function metadataRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function isAdminTransferredBinding(
+  existing: Record<string, unknown>,
+  normalizedUserId: string,
+  normalizedToken: string | null,
+) {
+  if (!normalizedToken || normalizedToken === normalizedUserId) return false;
+
+  const metadata = metadataRecord(existing.metadata);
+  const transfer = metadataRecord(metadata?.apple_binding_admin_transfer);
+  if (!transfer) return false;
+
+  const targetUserId = typeof transfer.target_user_id === "string"
+    ? normalizeUserId(transfer.target_user_id)
+    : null;
+  const previousAppAccountToken = normalizeAppAccountToken(
+    typeof transfer.previous_app_account_token === "string"
+      ? transfer.previous_app_account_token
+      : null,
+  );
+  const previousBoundUserId = typeof transfer.previous_bound_user_id === "string"
+    ? normalizeUserId(transfer.previous_bound_user_id)
+    : null;
+
+  return targetUserId === normalizedUserId &&
+    (previousAppAccountToken === normalizedToken || previousBoundUserId === normalizedToken);
+}
+
 export function buildSubscriptionStatus(
   expiresAt: Date,
   cancelledAt?: Date | null,
@@ -256,20 +288,21 @@ export async function ensureAppleTransactionBinding(
   const normalizedUserId = normalizeUserId(payload.userId);
   const normalizedToken = normalizeAppAccountToken(payload.appAccountToken);
 
-  if (normalizedToken && normalizedToken !== normalizedUserId) {
-    throw new Error(APPLE_BINDING_CONFLICT_ERROR);
-  }
-
   const existing = await fetchAppleTransactionBinding(supabase, originalTransactionId);
   if (existing) {
     const boundUserId = normalizeUserId(existing.bound_user_id);
     const boundToken = normalizeAppAccountToken(existing.app_account_token);
+    const allowsAdminTransfer = isAdminTransferredBinding(existing, normalizedUserId, normalizedToken);
 
     if (boundUserId !== normalizedUserId) {
       throw new Error(APPLE_BINDING_CONFLICT_ERROR);
     }
 
-    if (normalizedToken && boundToken && boundToken !== normalizedToken) {
+    if (normalizedToken && normalizedToken !== normalizedUserId && !allowsAdminTransfer) {
+      throw new Error(APPLE_BINDING_CONFLICT_ERROR);
+    }
+
+    if (normalizedToken && boundToken && boundToken !== normalizedToken && !allowsAdminTransfer) {
       throw new Error(APPLE_BINDING_CONFLICT_ERROR);
     }
 
@@ -292,6 +325,10 @@ export async function ensureAppleTransactionBinding(
 
     if (error) throw error;
     return data;
+  }
+
+  if (normalizedToken && normalizedToken !== normalizedUserId) {
+    throw new Error(APPLE_BINDING_CONFLICT_ERROR);
   }
 
   if (!normalizedToken && !payload.allowCreateWithoutAppAccountToken) {

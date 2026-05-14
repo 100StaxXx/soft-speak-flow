@@ -22,6 +22,10 @@ import {
 } from "@/utils/localSubscriptionAccess";
 
 const DEFERRED_VERIFICATION_RETRY_DELAYS_MS = [5_000, 30_000, 120_000] as const;
+const APPLE_BINDING_CONFLICT_CODE = "APPLE_BINDING_CONFLICT";
+const APP_STORE_SUBSCRIPTION_ALREADY_LINKED_TITLE = "Subscription already linked";
+const APP_STORE_SUBSCRIPTION_ALREADY_LINKED_MESSAGE =
+  "This App Store subscription is already linked to another Cosmiq account. Sign in to that account, or contact support if this is your purchase.";
 
 function isIAPAvailable(): boolean {
   return Capacitor.isNativePlatform() && isNativeIOS();
@@ -47,6 +51,25 @@ class SubscriptionVerificationError extends Error {
     this.name = "SubscriptionVerificationError";
     this.parsed = parsed;
   }
+}
+
+function isAppleBindingConflict(error: unknown): boolean {
+  if (!(error instanceof SubscriptionVerificationError)) return false;
+  return error.parsed?.code === APPLE_BINDING_CONFLICT_CODE;
+}
+
+function getActivationErrorToast(error: unknown): { title: string; description: string } {
+  if (isAppleBindingConflict(error)) {
+    return {
+      title: APP_STORE_SUBSCRIPTION_ALREADY_LINKED_TITLE,
+      description: APP_STORE_SUBSCRIPTION_ALREADY_LINKED_MESSAGE,
+    };
+  }
+
+  return {
+    title: "Subscription activation failed",
+    description: getErrorMessage(error),
+  };
 }
 
 function canDeferServerVerification(error: unknown): boolean {
@@ -124,6 +147,7 @@ export function useAppleSubscription() {
       surface,
       plan,
       productId: transaction.productId,
+      transactionId,
       hasOfferCode,
     });
 
@@ -138,6 +162,7 @@ export function useAppleSubscription() {
         surface,
         plan,
         productId: transaction.productId,
+        transactionId,
         hasOfferCode,
         code: parsed.code,
         status: parsed.status,
@@ -152,6 +177,7 @@ export function useAppleSubscription() {
         surface,
         plan,
         productId: transaction.productId,
+        transactionId,
         hasOfferCode,
         code: verification.code,
         message: verification.error,
@@ -164,6 +190,7 @@ export function useAppleSubscription() {
       surface,
       plan,
       productId: transaction.productId,
+      transactionId,
       hasOfferCode,
     });
   }, [hasOfferCode, invalidateSubscriptionState]);
@@ -245,11 +272,11 @@ export function useAppleSubscription() {
         return true;
       }
 
-      const message = getErrorMessage(error);
-      setProductError(message);
+      const activationToast = getActivationErrorToast(error);
+      setProductError(activationToast.description);
       toast({
-        title: "Subscription activation failed",
-        description: message,
+        title: activationToast.title,
+        description: activationToast.description,
         variant: "destructive",
       });
       return false;

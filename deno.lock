@@ -588,6 +588,8 @@
         "npm:@radix-ui/react-toggle@^1.1.9",
         "npm:@radix-ui/react-tooltip@^1.2.7",
         "npm:@react-three/fiber@^9.4.2",
+        "npm:@revenuecat/purchases-capacitor-ui@^10.4.0",
+        "npm:@revenuecat/purchases-capacitor@^10.4.0",
         "npm:@rive-app/react-canvas@^4.27.3",
         "npm:@sentry/react@^8.55.0",
         "npm:@supabase/supabase-js@^2.81.1",

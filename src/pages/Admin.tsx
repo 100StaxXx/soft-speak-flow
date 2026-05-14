@@ -14,6 +14,7 @@ import { AdminReferralCodes } from "@/components/AdminReferralCodes";
 import { AdminReferralTesting } from "@/components/AdminReferralTesting";
 import { AdminReferralConfig } from "@/components/AdminReferralConfig";
 import { AdminReferralAnalytics } from "@/components/AdminReferralAnalytics";
+import { AdminAppleSubscriptionRecovery } from "@/components/AdminAppleSubscriptionRecovery";
 import { EvolutionCardFlip } from "@/components/EvolutionCardFlip";
 import { AdminCompanionImageTester } from "@/components/AdminCompanionImageTester";
 import { AdminWallpaperCatalog } from "@/components/AdminWallpaperCatalog";
@@ -511,6 +512,8 @@ const Admin = () => {
             
           </div>
         </div>
+
+        <AdminAppleSubscriptionRecovery />
 
         {/* Voice Preview Section */}
         <Card className="p-6 mb-8 rounded-3xl shadow-soft">

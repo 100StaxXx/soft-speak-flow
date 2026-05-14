@@ -125,6 +125,46 @@ Deno.test("ensureAppleTransactionBinding rejects rebinding a purchase to another
   );
 });
 
+Deno.test("ensureAppleTransactionBinding allows an admin-transferred purchase to restore with the original Apple token", async () => {
+  const supabase = createBindingSupabase([
+    {
+      original_transaction_id: "orig-1",
+      bound_user_id: "22222222-2222-4222-8222-222222222222",
+      app_account_token: "11111111-1111-4111-8111-111111111111",
+      latest_transaction_id: "tx-1",
+      product_id: "cosmiq_premium_monthly",
+      environment: null,
+      metadata: {
+        apple_binding_admin_transfer: {
+          previous_bound_user_id: "11111111-1111-4111-8111-111111111111",
+          target_user_id: "22222222-2222-4222-8222-222222222222",
+          previous_app_account_token: "11111111-1111-4111-8111-111111111111",
+          transfer_admin_user_id: "33333333-3333-4333-8333-333333333333",
+          transfer_reason: "Verified duplicate account support transfer",
+          transferred_at: "2026-05-14T00:00:00.000Z",
+        },
+      },
+    },
+  ]);
+
+  const binding = await appleSubscriptionsModule.ensureAppleTransactionBinding(supabase, {
+    userId: "22222222-2222-4222-8222-222222222222",
+    transactionId: "tx-2",
+    originalTransactionId: "orig-1",
+    productId: "cosmiq_premium_monthly",
+    appAccountToken: "11111111-1111-4111-8111-111111111111",
+  });
+
+  assert(
+    binding.bound_user_id === "22222222-2222-4222-8222-222222222222",
+    "Expected transferred binding to remain with the target user",
+  );
+  assert(
+    binding.latest_transaction_id === "tx-2",
+    "Expected transferred binding to accept later restores",
+  );
+});
+
 Deno.test("ensureAppleTransactionBinding rejects new bindings without an app-account token", async () => {
   const supabase = createBindingSupabase();
 
