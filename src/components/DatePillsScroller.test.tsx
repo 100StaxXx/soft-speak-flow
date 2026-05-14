@@ -795,7 +795,7 @@ describe("DatePillsScroller", () => {
     }
   });
 
-  it("resets the rendered range around an already-rendered forced center date", async () => {
+  it("centers an already-rendered forced center date without resetting the range", async () => {
     const onDateSelect = vi.fn();
     const scrollToSpy = vi.fn(function (this: HTMLElement, options?: ScrollToOptions) {
       if (typeof options?.left === "number") {
@@ -849,7 +849,7 @@ describe("DatePillsScroller", () => {
       );
 
       await waitFor(() => {
-        expect(scroller.querySelector("button[data-date-key='2026-02-26']")).toBeNull();
+        expect(scroller.querySelector("button[data-date-key='2026-02-26']")).toBeTruthy();
       });
       await waitFor(() => {
         expect(scroller.scrollLeft).toBe(280);

@@ -400,7 +400,8 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     const runCentering = (remainingAttempts: number) => {
       if (isCancelled) return;
 
-      if (isForcedCenterRequest) {
+      if (isForcedCenterRequest && !getPillElementByDateKey(requestedCenterDateKey)) {
+        ignoreNextForcedScrollEvents();
         if (resetRenderedRangeAroundDateKey(requestedCenterDateKey)) return;
       }
 
@@ -440,6 +441,8 @@ export const DatePillsScroller = memo(function DatePillsScroller({
   }, [
     centerRequestKey,
     centerSelectedDate,
+    getPillElementByDateKey,
+    ignoreNextForcedScrollEvents,
     isActive,
     prefersReducedMotion,
     requestedCenterDateKey,
