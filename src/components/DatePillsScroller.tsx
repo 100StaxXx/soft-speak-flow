@@ -401,8 +401,17 @@ export const DatePillsScroller = memo(function DatePillsScroller({
       if (isCancelled) return;
 
       if (isForcedCenterRequest && !getPillElementByDateKey(requestedCenterDateKey)) {
+        const container = scrollRef.current;
         ignoreNextForcedScrollEvents();
-        if (resetRenderedRangeAroundDateKey(requestedCenterDateKey)) return;
+        if (resetRenderedRangeAroundDateKey(requestedCenterDateKey)) {
+          if (container) {
+            container.scrollLeft = 0;
+          }
+          if (remainingAttempts > 0) {
+            scheduleCentering(remainingAttempts - 1);
+          }
+          return;
+        }
       }
 
       const result = centerSelectedDate({
