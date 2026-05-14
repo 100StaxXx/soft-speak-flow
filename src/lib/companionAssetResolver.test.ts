@@ -150,6 +150,22 @@ describe("companion asset resolver", () => {
     ).toBe(getUniversalEggAssetUrl("nature"));
   });
 
+  it("keeps stage 0 companions on bundled elemental egg art for every visual state", () => {
+    const stageZeroCompanion = {
+      preset_id: null,
+      current_stage: 0,
+      core_element: "void",
+      current_image_url: "https://example.com/generated-stage-zero-egg.png",
+      initial_image_url: "https://example.com/generated-stage-zero-egg.png",
+      dormant_image_url: "https://example.com/generated-dormant-stage-zero-egg.png",
+      neglected_image_url: "https://example.com/generated-neglected-stage-zero-egg.png",
+    };
+
+    expect(resolveCompanionVisualAssetUrl(stageZeroCompanion, "normal")).toBe(getUniversalEggAssetUrl("void"));
+    expect(resolveCompanionVisualAssetUrl(stageZeroCompanion, "dormant")).toBe(getUniversalEggAssetUrl("void"));
+    expect(resolveCompanionVisualAssetUrl(stageZeroCompanion, "neglected")).toBe(getUniversalEggAssetUrl("void"));
+  });
+
   it("exposes transparent stage 0 elemental egg cutouts for launcher art", () => {
     expect(getUniversalEggCutoutAssetUrl("storm")).toBe(
       "/companion-eggs/egg__t0_egg__normal__storm.png",

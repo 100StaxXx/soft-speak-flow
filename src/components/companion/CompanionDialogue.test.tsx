@@ -342,22 +342,61 @@ describe("CompanionDialogue", () => {
     expect(within(dialog).getByText("W")).toBeInTheDocument();
   });
 
-  it("centers generated scene companion art in trigger and modal avatars", () => {
+  it("centers generated scene companion art in trigger and modal avatars", async () => {
+    const restoreImage = installMockImageLoader(() => false);
     mocks.companion.current_image_url = "https://assets.example.com/generated-companion.png";
     mocks.companion.current_image_focal_x = 0.32;
     mocks.companion.current_image_focal_y = 0.68;
 
-    render(<CompanionDialogue />);
+    try {
+      render(<CompanionDialogue />);
 
-    expect(screen.getByRole("img", { name: "Wolf" })).toHaveAttribute(
-      "data-companion-image-fit",
-      "contain",
-    );
+      await waitFor(() => {
+        expect(screen.getByRole("img", { name: "Wolf" })).toHaveAttribute(
+          "data-companion-image-fit",
+          "contain",
+        );
+      });
 
-    fireEvent.click(screen.getByRole("button", { name: /open wolf dialogue/i }));
+      fireEvent.click(screen.getByRole("button", { name: /open wolf dialogue/i }));
 
-    expect(within(screen.getByRole("dialog", { name: "Wolf" })).getByRole("img", { name: "Wolf" }))
-      .toHaveAttribute("data-companion-image-fit", "contain");
+      await waitFor(() => {
+        expect(within(screen.getByRole("dialog", { name: "Wolf" })).getByRole("img", { name: "Wolf" }))
+          .toHaveAttribute("data-companion-image-fit", "contain");
+      });
+    } finally {
+      restoreImage();
+    }
+  });
+
+  it("keeps stage 0 dialogue art on the fixed elemental egg when neglected", async () => {
+    const restoreImage = installMockImageLoader(() => false);
+    mocks.companion.current_stage = 0;
+    mocks.companion.current_image_url = "https://assets.example.com/generated-stage-0-egg.png";
+    mocks.companion.neglected_image_url = "https://assets.example.com/generated-stage-0-neglected.png";
+    mocks.companion.core_element = "light";
+    mocks.health = {
+      ...mocks.health,
+      isNeglected: true,
+      neglectedImageUrl: "https://assets.example.com/live-health-neglected-stage-0.png",
+    };
+
+    try {
+      render(<CompanionDialogue companionName="Light Egg" />);
+
+      await waitFor(() => {
+        expect(screen.getByRole("img", { name: "Light Egg" })).toHaveAttribute(
+          "src",
+          expect.stringContaining("/companion-eggs/v2/egg__t0_egg__normal__light.webp"),
+        );
+      });
+      expect(screen.getByRole("img", { name: "Light Egg" })).not.toHaveAttribute(
+        "src",
+        expect.stringContaining("live-health-neglected-stage-0"),
+      );
+    } finally {
+      restoreImage();
+    }
   });
 
   it("falls back to bundled youth preset art when expressive portraits are not available for the current tier", () => {

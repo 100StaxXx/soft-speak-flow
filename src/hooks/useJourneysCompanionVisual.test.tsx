@@ -239,6 +239,52 @@ describe("useJourneysCompanionVisual", () => {
     expect(result.current.currentSceneImageUrl).toBe("https://assets.example.com/generated-stage-0-egg.png");
   });
 
+  it("keeps stage 0 on fixed elemental egg art when dormant", () => {
+    mocks.companion = baseCompanion({
+      current_stage: 0,
+      current_xp: 0,
+      current_image_url: "https://assets.example.com/generated-stage-0-egg.png",
+      dormant_image_url: "https://assets.example.com/generated-stage-0-dormant.png",
+      core_element: "storm",
+    });
+    mocks.care = {
+      dormancy: {
+        isDormant: true,
+      },
+    };
+
+    const { result } = renderHook(() => useJourneysCompanionVisual());
+
+    expect(result.current.imageUrl).toBe(getUniversalEggAssetUrl("storm"));
+    expect(result.current.launcherAwayImageUrl).toBe(getUniversalEggCutoutAssetUrl("storm"));
+    expect(result.current.launcherAwayHasTransparentBackground).toBe(true);
+    expect(result.current.needsLauncherImage).toBe(false);
+  });
+
+  it("keeps stage 0 on fixed elemental egg art when neglected health has remote art", () => {
+    mocks.companion = baseCompanion({
+      current_stage: 0,
+      current_xp: 0,
+      current_image_url: "https://assets.example.com/generated-stage-0-egg.png",
+      neglected_image_url: "https://assets.example.com/generated-stage-0-neglected.png",
+      core_element: "light",
+    });
+    mocks.health = {
+      ...mocks.health,
+      isNeglected: true,
+      neglectedImageUrl: "https://assets.example.com/live-health-neglected-stage-0.png",
+      neglectedImageFocalX: 0.61,
+      neglectedImageFocalY: 0.39,
+    };
+
+    const { result } = renderHook(() => useJourneysCompanionVisual());
+
+    expect(result.current.imageUrl).toBe(getUniversalEggAssetUrl("light"));
+    expect(result.current.launcherAwayImageUrl).toBe(getUniversalEggCutoutAssetUrl("light"));
+    expect(result.current.launcherAwayHasTransparentBackground).toBe(true);
+    expect(result.current.needsLauncherImage).toBe(false);
+  });
+
   it("exposes the stored companion favorite color for Journeys frosted surfaces", () => {
     mocks.companion = baseCompanion({
       favorite_color: "#9b6bff",

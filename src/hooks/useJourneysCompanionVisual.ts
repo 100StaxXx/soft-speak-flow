@@ -68,7 +68,11 @@ export const useJourneysCompanionVisual = () => {
     if (isDormant) {
       return resolveCompanionVisualAssetUrl(displayCompanion, "dormant") ?? COMPANION_PLACEHOLDER;
     }
-    if (health.isNeglected && health.neglectedImageUrl) {
+    if (
+      health.isNeglected
+      && health.neglectedImageUrl
+      && (typeof displayCompanion.current_stage !== "number" || displayCompanion.current_stage > 0)
+    ) {
       return health.neglectedImageUrl;
     }
     if (health.isNeglected) {

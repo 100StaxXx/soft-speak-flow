@@ -164,7 +164,11 @@ export const CompanionDialogue = memo(({
     if (isDormant) {
       return resolveCompanionVisualAssetUrl(companion, "dormant");
     }
-    if (health.isNeglected && health.neglectedImageUrl) {
+    if (
+      health.isNeglected
+      && health.neglectedImageUrl
+      && (typeof companion.current_stage !== "number" || companion.current_stage > 0)
+    ) {
       return health.neglectedImageUrl;
     }
     if (health.isNeglected) {

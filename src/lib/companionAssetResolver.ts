@@ -256,19 +256,19 @@ export const resolveCompanionVisualAssetUrl = (
 ): string | null => {
   if (!companion) return null;
 
-  const normalizedCurrentImageUrl = normalizeCompanionStoredImageUrl(companion.current_image_url);
-  const normalizedInitialImageUrl = normalizeCompanionStoredImageUrl(companion.initial_image_url);
-  const normalizedDormantImageUrl = normalizeCompanionStoredImageUrl(companion.dormant_image_url);
-  const normalizedNeglectedImageUrl = normalizeCompanionStoredImageUrl(companion.neglected_image_url);
-
   const normalizedElement = companion.core_element ?? "fire";
-  if (state === "normal" && (companion.current_stage ?? 0) <= 0) {
+  if (typeof companion.current_stage === "number" && companion.current_stage <= 0) {
     return getUniversalEggAssetUrl(normalizedElement);
   }
 
   if (state === "normal" && isPresetEggCompanion(companion)) {
     return getUniversalEggAssetUrl(normalizedElement);
   }
+
+  const normalizedCurrentImageUrl = normalizeCompanionStoredImageUrl(companion.current_image_url);
+  const normalizedInitialImageUrl = normalizeCompanionStoredImageUrl(companion.initial_image_url);
+  const normalizedDormantImageUrl = normalizeCompanionStoredImageUrl(companion.dormant_image_url);
+  const normalizedNeglectedImageUrl = normalizeCompanionStoredImageUrl(companion.neglected_image_url);
 
   const presetUrl = companion.preset_id
     ? getPresetCompanionAssetUrl({
