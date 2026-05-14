@@ -1,6 +1,6 @@
 import { cloneElement, isValidElement, type MouseEvent, type ReactElement, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, createEvent, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SHARED_TIMELINE_DRAG_INTERACTION_PROFILE } from "@/components/calendar/dragSnap";
 import { QUEST_LAUNCHER_SCROLL_CLEARANCE_PX } from "@/components/quest-launchers/metrics";
@@ -627,115 +627,6 @@ describe("TodaysAgenda touch toggles", () => {
     expect(onUndoToggle).toHaveBeenCalledTimes(1);
     expect(onUndoToggle).toHaveBeenCalledWith("task-touch-2", 22);
     expect(onToggle).not.toHaveBeenCalled();
-  });
-});
-
-describe("TodaysAgenda pull-to-refresh", () => {
-  const renderPullRefreshAgenda = (options: {
-    onPullRefresh?: () => void;
-    layoutMode?: "mobile" | "desktop";
-  } = {}) => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-    const onPullRefresh = options.onPullRefresh ?? vi.fn();
-
-    render(
-      <TodaysAgenda
-        tasks={[
-          {
-            id: "task-refresh-1",
-            task_text: "Morning focus",
-            completed: false,
-            xp_reward: 20,
-            scheduled_time: "08:00",
-          },
-        ]}
-        selectedDate={new Date("2026-02-13T08:00:00")}
-        layoutMode={options.layoutMode ?? "mobile"}
-        onToggle={vi.fn()}
-        onAddQuest={vi.fn()}
-        completedCount={0}
-        totalCount={1}
-        onPullRefresh={onPullRefresh}
-      />,
-      { wrapper: createWrapper(queryClient) },
-    );
-
-    return {
-      pane: screen.getByTestId("scheduled-timeline-pane"),
-      onPullRefresh,
-    };
-  };
-
-  const pullPane = (pane: HTMLElement, endY: number) => {
-    fireEvent.touchStart(pane, {
-      touches: [{ clientX: 40, clientY: 10 }],
-    });
-    fireEvent.touchMove(pane, {
-      touches: [{ clientX: 42, clientY: endY }],
-    });
-    fireEvent.touchEnd(pane, {
-      changedTouches: [{ clientX: 42, clientY: endY }],
-    });
-  };
-
-  it("calls onPullRefresh after a top-edge pull crosses the threshold", () => {
-    const onPullRefresh = vi.fn();
-    const { pane } = renderPullRefreshAgenda({ onPullRefresh });
-
-    pullPane(pane, 92);
-
-    expect(onPullRefresh).toHaveBeenCalledTimes(1);
-  });
-
-  it("ignores a sub-threshold top-edge pull", () => {
-    const onPullRefresh = vi.fn();
-    const { pane } = renderPullRefreshAgenda({ onPullRefresh });
-
-    pullPane(pane, 58);
-
-    expect(onPullRefresh).not.toHaveBeenCalled();
-  });
-
-  it("prevents native page rubber-banding during a top-edge pull", () => {
-    const onPullRefresh = vi.fn();
-    const { pane } = renderPullRefreshAgenda({ onPullRefresh });
-
-    fireEvent.touchStart(pane, {
-      touches: [{ clientX: 40, clientY: 10 }],
-    });
-    const moveEvent = createEvent.touchMove(pane, {
-      cancelable: true,
-      touches: [{ clientX: 41, clientY: 18 }],
-    });
-    const preventDefaultSpy = vi.spyOn(moveEvent, "preventDefault");
-    fireEvent(pane, moveEvent);
-
-    expect(preventDefaultSpy).toHaveBeenCalled();
-    expect(onPullRefresh).not.toHaveBeenCalled();
-  });
-
-  it("ignores a pull while the quest list pane is scrolled", () => {
-    const onPullRefresh = vi.fn();
-    const { pane } = renderPullRefreshAgenda({ onPullRefresh });
-    pane.scrollTop = 12;
-
-    pullPane(pane, 100);
-
-    expect(onPullRefresh).not.toHaveBeenCalled();
-  });
-
-  it("does not enable pull-to-refresh on desktop layout", () => {
-    const onPullRefresh = vi.fn();
-    const { pane } = renderPullRefreshAgenda({ onPullRefresh, layoutMode: "desktop" });
-
-    pullPane(pane, 100);
-
-    expect(onPullRefresh).not.toHaveBeenCalled();
   });
 });
 

@@ -91,10 +91,6 @@ import {
   type CampaignBuilderDraftSnapshot,
   writeCreationPopupMarker,
 } from "@/utils/creationPopupPersistence";
-import {
-  dispatchPlannerSyncFinished,
-  warmDailyTasksQueryFromRemote,
-} from "@/utils/plannerSync";
 import { getEffectiveMissionDate } from "@/utils/timezone";
 import { createPlanDayCompanionLaunchIntent } from "@/utils/companionPlannerLaunchContext";
 
@@ -354,7 +350,6 @@ const Journeys = () => {
   const [showCreatedAnimation, setShowCreatedAnimation] = useState(false);
   const [createdCampaignData, setCreatedCampaignData] = useState<CreatedCampaignData | null>(null);
   const [isInboxExpanded, setIsInboxExpanded] = useState(false);
-  const [isQuestListPullRefreshing, setIsQuestListPullRefreshing] = useState(false);
   const previousIsJourneysRouteActiveRef = useRef(false);
   const previousJourneysLocationSignatureRef = useRef<string | null>(null);
   const pendingSelectedDateResetRef = useRef(false);
@@ -671,36 +666,6 @@ const Journeys = () => {
     if (!isJourneysRouteActive || hasUserDateInteractionRef.current) return;
     resetSelectedDateToToday({ deferIfAddSheetOpen: true });
   }, [isJourneysRouteActive, resetSelectedDateToToday]);
-
-  const handleQuestListPullRefresh = useCallback(async () => {
-    if (isQuestListPullRefreshing) return;
-
-    setIsQuestListPullRefreshing(true);
-    resetSelectedDateToToday({ deferIfAddSheetOpen: true });
-
-    try {
-      if (user?.id) {
-        await warmDailyTasksQueryFromRemote(queryClient, user.id, effectiveTodayDateKey);
-      }
-
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["calendar-tasks"] }),
-        queryClient.invalidateQueries({ queryKey: ["inbox-tasks"] }),
-        queryClient.invalidateQueries({ queryKey: ["inbox-count"] }),
-        queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] }),
-        queryClient.invalidateQueries({ queryKey: ["habits"] }),
-      ]);
-      dispatchPlannerSyncFinished();
-    } catch (error) {
-      logger.warn("[Journeys] Pull-to-refresh failed:", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      toast.error("Couldn't refresh quests. Pull again in a moment.");
-    } finally {
-      resetSelectedDateToToday({ deferIfAddSheetOpen: true });
-      setIsQuestListPullRefreshing(false);
-    }
-  }, [effectiveTodayDateKey, isQuestListPullRefreshing, queryClient, resetSelectedDateToToday, user?.id]);
 
   useLayoutEffect(() => {
     const shouldResetForRouteEntry =
@@ -2148,8 +2113,6 @@ const Journeys = () => {
                 hasCalendarLink={hasLinkedEvent}
                 onMoveQuestToNextDay={handleSwipeMoveToNextDay}
                 onUpdateScheduledTime={handleTimelineScheduledTimeUpdate}
-                onPullRefresh={handleQuestListPullRefresh}
-                isPullRefreshing={isQuestListPullRefreshing}
                 onDateSelect={handleUserDateSelect}
                 onDesktopPlannerModeChange={setDesktopPlannerMode}
                 onOpenMonthView={() => setShowMonthView(true)}
