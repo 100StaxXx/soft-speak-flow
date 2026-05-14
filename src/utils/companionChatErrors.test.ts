@@ -5,21 +5,6 @@ import {
 } from "./companionChatErrors";
 
 describe("companionChatErrors", () => {
-  it("maps premium gating to the companion-specific premium message", () => {
-    expect(
-      toUserFacingCompanionChatError({
-        category: "auth",
-        isOffline: false,
-        status: 403,
-        backendMessage: "Companion Talk requires Premium access",
-        responsePayload: {
-          code: "PREMIUM_REQUIRED",
-          error: "Companion Talk requires Premium access",
-        },
-      }),
-    ).toBe("Companion Talk is available with Premium.");
-  });
-
   it("maps missing function responses to a rollout-aware message", async () => {
     await expect(
       resolveCompanionChatError({

@@ -591,13 +591,19 @@ describe("Journeys inbox integration", () => {
     renderJourneys();
 
     expect(screen.getByTestId("journeys-inbox-section")).toBeInTheDocument();
-    expect(screen.getByText("Email Alex")).toBeInTheDocument();
+    expect(screen.getByText("Inbox")).toBeInTheDocument();
+    expect(screen.getByText("1")).toBeInTheDocument();
+    expect(screen.queryByText("Email Alex")).not.toBeInTheDocument();
 
     const orderedSections = Array.from(
       document.querySelectorAll('[data-testid="journeys-inbox-section"], [data-testid="todays-agenda"]'),
     ).map((node) => node.getAttribute("data-testid"));
 
     expect(orderedSections).toEqual(["journeys-inbox-section", "todays-agenda"]);
+
+    fireEvent.click(screen.getByRole("button", { name: /expand inbox section/i }));
+
+    expect(screen.getByText("Email Alex")).toBeInTheDocument();
   });
 
   it("shows and focuses the embedded inbox section for legacy inbox links", async () => {

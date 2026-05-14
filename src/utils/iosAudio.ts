@@ -21,6 +21,14 @@ export const isIOS = Capacitor.getPlatform() === 'ios' ||
 let sharedAudioContext: AudioContext | null = null;
 let audioContextResumed = false;
 let userInteractionReceived = false;
+const audioGainPipelines = new WeakMap<
+  HTMLAudioElement,
+  {
+    context: AudioContext;
+    source: MediaElementAudioSourceNode;
+    gainNode: GainNode;
+  }
+>();
 
 /**
  * Get or create the shared AudioContext
@@ -151,6 +159,40 @@ export function createIOSOptimizedAudio(src?: string): HTMLAudioElement {
   return audio;
 }
 
+export function applyAudioElementGain(audio: HTMLAudioElement, gain = 1): void {
+  const normalizedGain = Number.isFinite(gain) ? Math.max(0, Math.min(gain, 2)) : 1;
+  const existingPipeline = audioGainPipelines.get(audio);
+
+  if (normalizedGain === 1 && !existingPipeline) {
+    audio.volume = 1;
+    return;
+  }
+
+  const ctx = getSharedAudioContext();
+  if (!ctx) {
+    audio.volume = Math.min(1, normalizedGain);
+    return;
+  }
+
+  let pipeline = existingPipeline;
+  if (!pipeline || pipeline.context !== ctx) {
+    try {
+      const source = ctx.createMediaElementSource(audio);
+      const gainNode = ctx.createGain();
+      source.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      pipeline = { context: ctx, source, gainNode };
+      audioGainPipelines.set(audio, pipeline);
+    } catch (error) {
+      log.warn("Unable to apply audio gain pipeline", { error });
+      audio.volume = Math.min(1, normalizedGain);
+      return;
+    }
+  }
+
+  pipeline.gainNode.gain.value = normalizedGain;
+}
+
 /**
  * Safe play function that handles iOS autoplay restrictions
  */
@@ -159,6 +201,8 @@ export async function safePlay(audio: HTMLAudioElement): Promise<boolean> {
   
   // Ensure AudioContext is resumed on iOS
   if (isIOS && !isAudioContextReady()) {
+    await resumeAudioContext();
+  } else if (sharedAudioContext?.state === "suspended") {
     await resumeAudioContext();
   }
   

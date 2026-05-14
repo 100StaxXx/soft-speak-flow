@@ -485,18 +485,6 @@ export async function handleGenerateCompanionLauncherImage(
     }
 
     if (
-      typeof companion.preset_id === "string" &&
-      companion.preset_id.trim().length > 0
-    ) {
-      return jsonResponse({
-        success: true,
-        skipped: true,
-        reason: "preset_companion",
-        imageUrl: null,
-      });
-    }
-
-    if (
       companion.launcher_image_url &&
       companion.current_image_url &&
       companion.launcher_image_source_url === companion.current_image_url &&

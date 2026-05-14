@@ -9,10 +9,7 @@ import {
   createCostGuardrailSupabaseClient,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
-import {
-  normalizeCompanionChatSurface,
-  surfaceRequiresPremiumAccess,
-} from "./surfaceAccess.ts";
+import { normalizeCompanionChatSurface } from "./surfaceAccess.ts";
 import { withCompanionChatPersistenceCapability } from "./persistenceCapability.ts";
 import { persistCompanionChatTurn } from "./threadPersistence.ts";
 import { shouldHandoffToPlanner } from "./handoff.ts";
@@ -29,11 +26,6 @@ import {
   formatAssistantTime,
   normalizeAssistantTimeText,
 } from "../_shared/assistantScheduleCopy.ts";
-import {
-  buildAccessStateResponse,
-  fetchAccountEntitlementForUser,
-} from "../_shared/accountEntitlements.ts";
-
 const JourneysTaskSchema = z.object({
   title: z.string(),
   taskDate: z.string().nullable(),
@@ -211,28 +203,6 @@ const chooseBridgeReply = (message: string) => {
 
   return "That sounds like planning work. I’m switching us to Plan so I can shape it into confirmable changes without saving anything automatically.";
 };
-
-async function ensurePremiumAccess(supabase: any, userId: string) {
-  const entitlement = await fetchAccountEntitlementForUser(supabase, userId);
-  const entitlementAccess = buildAccessStateResponse(entitlement);
-  if (entitlementAccess.has_access) {
-    return true;
-  }
-  if (entitlementAccess.access_source === "subscription") {
-    return false;
-  }
-
-  const nowIso = new Date().toISOString();
-  const { count, error } = await supabase
-    .from("subscriptions")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .in("status", ["active", "trialing", "past_due", "cancelled"])
-    .gte("current_period_end", nowIso);
-
-  if (error) throw error;
-  return (count ?? 0) > 0;
-}
 
 async function enforceDailyTurnCap(supabase: any, userId: string) {
   const { count, error } = await supabase
@@ -744,19 +714,6 @@ export const handleCompanionChatRequest = async (req: Request) => {
     const userId = protectedRequest.auth.userId;
     const sessionId = parsed.data.sessionId ?? crypto.randomUUID();
     const surface = normalizeCompanionChatSurface(parsed.data.surface);
-
-    if (surfaceRequiresPremiumAccess(surface)) {
-      const hasPremiumAccess = await ensurePremiumAccess(protectedRequest.supabase, userId);
-
-      if (!hasPremiumAccess) {
-        return createSafeErrorResponse(req, {
-          status: 403,
-          code: "PREMIUM_REQUIRED",
-          error: "Companion Talk requires Premium access",
-          requestId,
-        });
-      }
-    }
 
     const underTurnCap = await enforceDailyTurnCap(protectedRequest.supabase, userId);
     if (!underTurnCap) {

@@ -978,7 +978,7 @@ const Journeys = () => {
     if (hasInitializedInboxVisibilityRef.current) return;
     if (inboxLoading && !isInboxRequested && inboxCount === 0) return;
 
-    setIsInboxExpanded(isInboxRequested || inboxCount > 0);
+    setIsInboxExpanded(isInboxRequested);
     hasInitializedInboxVisibilityRef.current = true;
   }, [inboxCount, inboxLoading, isInboxRequested]);
 
@@ -2069,8 +2069,6 @@ const Journeys = () => {
                 isLoading={inboxLoading}
                 isExpanded={isInboxExpanded}
                 onExpandedChange={setIsInboxExpanded}
-                onAddQuest={() => openAddQuestSheet()}
-                onOpenCompanionPlanner={openCompanionPlanner}
                 onToggleQuest={handleToggleInboxQuest}
                 onEditQuest={handleEditQuest}
                 onDeleteQuest={handleDeleteInboxQuest}

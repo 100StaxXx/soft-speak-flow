@@ -55,6 +55,7 @@ import type { StoryTypeSlug } from '@/types/narrativeTypes';
 import type { ClarifyingQuestion } from '@/hooks/useIntentClassifier';
 import { getDefaultMonthDaysForFrequency, getDefaultWeekdaysForFrequency } from '@/utils/habitSchedule';
 import { CompanionImage, CompanionPortraitShell } from '@/components/CompanionImage';
+import { shouldContainCompanionSceneImage } from '@/lib/companionImageFocal';
 import {
   isValidCampaignMilestonePercent,
   normalizeCampaignMilestonePercentArray,
@@ -204,6 +205,7 @@ export function Pathfinder({
     element,
     usesPortraitShell,
   } = useJourneysCompanionVisual();
+  const usesGeneratedSceneAvatar = shouldContainCompanionSceneImage(imageUrl);
   const { trackInteraction } = useAIInteractionTracker();
   const { schedule, isLoading: isScheduleLoading, generateSchedule, adjustSchedule, toggleMilestone, updateMilestoneDate, reset: resetSchedule, setRituals, hydrateSchedule, postcardCount, maxPostcards } = useJourneySchedule();
   const [originalRituals, setOriginalRituals] = useState<JourneyRitual[]>([]);
@@ -808,7 +810,7 @@ export function Pathfinder({
     suggestions: 'Confirm your rituals and milestones',
     review: 'Review and create your campaign',
   };
-  const headerAvatar = usesPortraitShell ? (
+  const headerAvatar = usesPortraitShell && !usesGeneratedSceneAvatar ? (
     <CompanionPortraitShell
       src={imageUrl}
       element={element}
@@ -825,10 +827,16 @@ export function Pathfinder({
       />
     </CompanionPortraitShell>
   ) : (
-    <div className="h-12 w-12 overflow-hidden rounded-full border border-white/[0.15] bg-white/10 shadow-[0_18px_32px_-26px_rgba(0,0,0,0.95)]">
+    <div
+      className={cn(
+        "h-12 w-12 overflow-hidden rounded-full border border-white/[0.15] shadow-[0_18px_32px_-26px_rgba(0,0,0,0.95)]",
+        usesGeneratedSceneAvatar ? "bg-black" : "bg-white/10",
+      )}
+    >
       <CompanionImage
         src={imageUrl}
         alt={companionLabel}
+        fit={usesGeneratedSceneAvatar ? "contain" : "cover"}
         element={element}
         focalX={focalX}
         focalY={focalY}

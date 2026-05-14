@@ -2,7 +2,10 @@ import { motion } from "framer-motion";
 import { Swords, Skull } from "lucide-react";
 import { Adversary, AdversaryTier } from "@/types/astralEncounters";
 import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
-import { isCompanionSceneImageSource } from "@/lib/companionImageFocal";
+import {
+  isCompanionSceneImageSource,
+  shouldContainCompanionSceneImage,
+} from "@/lib/companionImageFocal";
 
 interface BattleSceneHeaderProps {
   companionImageUrl?: string;
@@ -39,6 +42,9 @@ export const BattleSceneHeader = ({
 }: BattleSceneHeaderProps) => {
   const tierColor = TIER_COLORS[adversary.tier as AdversaryTier] || TIER_COLORS.common;
   const tierBg = TIER_BG[adversary.tier as AdversaryTier] || TIER_BG.common;
+  const usesCompanionContainedScene = shouldContainCompanionSceneImage(companionImageUrl);
+  const usesCompanionPortraitShell =
+    isCompanionSceneImageSource(companionImageUrl) && !usesCompanionContainedScene;
 
   return (
     <div className="relative px-4 pt-4 pb-2">
@@ -69,7 +75,7 @@ export const BattleSceneHeader = ({
             {/* Portrait container - larger size */}
             <div className="relative w-24 h-24 rounded-2xl overflow-hidden border-2 border-primary/50 bg-gradient-to-br from-primary/20 to-accent/20 shadow-lg shadow-primary/20">
               {companionImageUrl ? (
-                isCompanionSceneImageSource(companionImageUrl) ? (
+                usesCompanionPortraitShell ? (
                   <CompanionPortraitShell
                     src={companionImageUrl}
                     className="h-full w-full rounded-2xl"
@@ -87,9 +93,10 @@ export const BattleSceneHeader = ({
                   <CompanionImage
                     src={companionImageUrl}
                     alt={companionName}
+                    fit={usesCompanionContainedScene ? "contain" : "cover"}
                     focalX={companionImageFocalX}
                     focalY={companionImageFocalY}
-                    className="w-full h-full object-cover"
+                    className={`w-full h-full ${usesCompanionContainedScene ? "bg-black" : ""}`}
                   />
                 )
               ) : (

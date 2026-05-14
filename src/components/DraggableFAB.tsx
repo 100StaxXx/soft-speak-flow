@@ -98,6 +98,8 @@ export const DraggableFAB = ({
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const canTriggerTap = !isDragging && !isLongPressing;
+  const shouldUseStrictLauncherArt =
+    isGeneratedCompanion || needsLauncherImage || launcherAwayHasTransparentBackground;
   const launcherTemplates = useMemo(
     () =>
       getJourneysCompanionLauncherTemplates({ userId: user?.id ?? null }).map((template) =>
@@ -277,11 +279,11 @@ export const DraggableFAB = ({
         variant="floating"
         floatingSize="hero"
         faceDirection={isMenuOpen ? "front" : "away"}
-        imageUrlOverride={isGeneratedCompanion ? launcherAwayImageUrl : isMenuOpen ? null : launcherAwayImageUrl}
-        imageFocalXOverride={isGeneratedCompanion ? launcherAwayFocalX : isMenuOpen ? null : launcherAwayFocalX}
-        imageFocalYOverride={isGeneratedCompanion ? launcherAwayFocalY : isMenuOpen ? null : launcherAwayFocalY}
-        usesPortraitShellOverride={isGeneratedCompanion ? launcherAwayUsesPortraitShell : isMenuOpen ? undefined : launcherAwayUsesPortraitShell}
-        allowImageFallback={!isGeneratedCompanion}
+        imageUrlOverride={shouldUseStrictLauncherArt ? launcherAwayImageUrl : isMenuOpen ? null : launcherAwayImageUrl}
+        imageFocalXOverride={shouldUseStrictLauncherArt ? launcherAwayFocalX : isMenuOpen ? null : launcherAwayFocalX}
+        imageFocalYOverride={shouldUseStrictLauncherArt ? launcherAwayFocalY : isMenuOpen ? null : launcherAwayFocalY}
+        usesPortraitShellOverride={shouldUseStrictLauncherArt ? launcherAwayUsesPortraitShell : isMenuOpen ? undefined : launcherAwayUsesPortraitShell}
+        allowImageFallback={!shouldUseStrictLauncherArt}
         requireHeroCutout={isGeneratedCompanion && !launcherAwayHasTransparentBackground}
         aria-label="Open companion quick actions"
         data-tour="add-quest-fab"

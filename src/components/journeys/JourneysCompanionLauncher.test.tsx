@@ -84,6 +84,18 @@ describe("JourneysCompanionLauncher", () => {
     expect(screen.getByRole("img", { name: "Nova" })).toHaveAttribute("data-companion-image-fit", "contain");
   });
 
+  it("uses contain framing for non-preset inline avatar art", () => {
+    render(
+      <JourneysCompanionLauncher
+        variant="inline"
+        imageUrlOverride="https://example.com/custom-companion.png"
+        usesPortraitShellOverride={false}
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "Nova" })).toHaveAttribute("data-companion-image-fit", "contain");
+  });
+
   it("can suppress image fallback and render a neutral placeholder", () => {
     render(
       <JourneysCompanionLauncher

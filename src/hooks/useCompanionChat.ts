@@ -269,7 +269,7 @@ export function useCompanionChat({ enabled = true }: UseCompanionChatOptions = {
     inputMode: CompanionChatInputMode,
   ) => {
     if (!enabled || !companion?.id) {
-      toast.error("Companion Talk is available with Premium.");
+      toast.error("Your companion is still loading. Try again in a moment.");
       return;
     }
 

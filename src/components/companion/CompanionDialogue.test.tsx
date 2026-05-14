@@ -342,6 +342,24 @@ describe("CompanionDialogue", () => {
     expect(within(dialog).getByText("W")).toBeInTheDocument();
   });
 
+  it("centers generated scene companion art in trigger and modal avatars", () => {
+    mocks.companion.current_image_url = "https://assets.example.com/generated-companion.png";
+    mocks.companion.current_image_focal_x = 0.32;
+    mocks.companion.current_image_focal_y = 0.68;
+
+    render(<CompanionDialogue />);
+
+    expect(screen.getByRole("img", { name: "Wolf" })).toHaveAttribute(
+      "data-companion-image-fit",
+      "contain",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /open wolf dialogue/i }));
+
+    expect(within(screen.getByRole("dialog", { name: "Wolf" })).getByRole("img", { name: "Wolf" }))
+      .toHaveAttribute("data-companion-image-fit", "contain");
+  });
+
   it("falls back to bundled youth preset art when expressive portraits are not available for the current tier", () => {
     mocks.companion.current_stage = 21;
     mocks.companion.current_image_url = "/companion-eggs/egg__t0_egg__normal__fire.png";

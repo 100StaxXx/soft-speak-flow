@@ -9,7 +9,10 @@ import { useXPRewards } from "@/hooks/useXPRewards";
 import { useLivingCompanionSafe } from "@/hooks/useLivingCompanion";
 import { useAchievements } from "@/hooks/useAchievements";
 import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
-import { isCompanionSceneImageSource } from "@/lib/companionImageFocal";
+import {
+  isCompanionSceneImageSource,
+  shouldContainCompanionSceneImage,
+} from "@/lib/companionImageFocal";
 
 interface WelcomeBackModalProps {
   isOpen: boolean;
@@ -25,9 +28,11 @@ export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => 
   const [showReunion, setShowReunion] = useState(false);
   const [hasAwarded, setHasAwarded] = useState(false);
   const sadImageUrl = health.neglectedImageUrl || companion?.current_image_url || "";
-  const usesSadPortraitShell = isCompanionSceneImageSource(sadImageUrl);
+  const usesSadContainedScene = shouldContainCompanionSceneImage(sadImageUrl);
+  const usesSadPortraitShell = isCompanionSceneImageSource(sadImageUrl) && !usesSadContainedScene;
   const happyImageUrl = companion?.current_image_url || "";
-  const usesHappyPortraitShell = isCompanionSceneImageSource(happyImageUrl);
+  const usesHappyContainedScene = shouldContainCompanionSceneImage(happyImageUrl);
+  const usesHappyPortraitShell = isCompanionSceneImageSource(happyImageUrl) && !usesHappyContainedScene;
 
   // Calculate stats lost during absence
   const statsLost = Math.min(health.daysInactive * 5, 50); // -5 per day, max 50
@@ -141,9 +146,10 @@ export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => 
                     <CompanionImage
                       src={sadImageUrl}
                       alt="Your sad companion"
+                      fit={usesSadContainedScene ? "contain" : "cover"}
                       focalX={health.neglectedImageFocalX ?? companion.current_image_focal_x ?? null}
                       focalY={health.neglectedImageFocalY ?? companion.current_image_focal_y ?? null}
-                      className="w-48 h-48 rounded-2xl"
+                      className={`w-48 h-48 rounded-2xl ${usesSadContainedScene ? "bg-black" : ""}`}
                       style={{
                         filter: !health.neglectedImageUrl
                           ? "saturate(0.4) brightness(0.8)"
@@ -186,9 +192,10 @@ export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => 
                     <CompanionImage
                       src={happyImageUrl}
                       alt="Your happy companion"
+                      fit={usesHappyContainedScene ? "contain" : "cover"}
                       focalX={companion.current_image_focal_x ?? null}
                       focalY={companion.current_image_focal_y ?? null}
-                      className="w-48 h-48 rounded-2xl ring-4 ring-primary/50"
+                      className={`w-48 h-48 rounded-2xl ring-4 ring-primary/50 ${usesHappyContainedScene ? "bg-black" : ""}`}
                     />
                   )}
                   <motion.div 

@@ -20,10 +20,11 @@ import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 import { useResolvedWallpaper, useWallpaperManifest } from "@/contexts/WallpaperManifestContext";
 import { getEffectiveDailyDate } from "@/utils/timezone";
 import { globalAudio } from "@/utils/globalAudio";
-import { createIOSOptimizedAudio, isIOS, iosAudioManager, safePlay } from "@/utils/iosAudio";
+import { applyAudioElementGain, createIOSOptimizedAudio, isIOS, iosAudioManager, safePlay } from "@/utils/iosAudio";
 import { logger } from "@/utils/logger";
 import { toast } from "@/components/ui/sonner";
 import { useAchievements } from "@/hooks/useAchievements";
+import { getMentorPepTalkPlaybackGain } from "@/config/mentorVoices";
 
 interface CaptionWord {
   word: string;
@@ -254,6 +255,10 @@ export const TodaysPepTalk = memo(() => {
 
   const pepTalk = pepTalkQuery.data?.pepTalk ?? null;
   const mentorSlug = pepTalkQuery.data?.mentorSlug ?? null;
+  const pepTalkPlaybackGain = useMemo(
+    () => getMentorPepTalkPlaybackGain(pepTalk?.mentor_slug ?? mentorSlug),
+    [pepTalk?.mentor_slug, mentorSlug],
+  );
   const isFallback = pepTalkQuery.data?.isFallback ?? false;
   const loading = pepTalkQuery.isPending || (pepTalkQuery.isFetching && !pepTalkQuery.data);
   const error = pepTalkQuery.isError && !pepTalk;
@@ -313,6 +318,7 @@ export const TodaysPepTalk = memo(() => {
     targetAudio.playsInline = optimizedAudio.playsInline ?? true;
     targetAudio["webkit-playsinline"] = optimizedAudio["webkit-playsinline"] ?? true;
     targetAudio.muted = globalAudio.getMuted();
+    applyAudioElementGain(targetAudio, pepTalkPlaybackGain);
 
     if (isIOS) {
       iosAudioManager.registerAudio(targetAudio);
@@ -324,7 +330,7 @@ export const TodaysPepTalk = memo(() => {
         iosAudioManager.unregisterAudio(targetAudio);
       }
     };
-  }, [pepTalk?.audio_url]);
+  }, [pepTalk?.audio_url, pepTalkPlaybackGain]);
 
   useEffect(() => {
     const unsubscribe = globalAudio.subscribe((muted) => {

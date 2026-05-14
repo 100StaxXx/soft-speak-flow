@@ -151,7 +151,7 @@ const mentorAudioModule = await import("./generate-mentor-audio/index.ts");
 
 const EXPECTED_MENTOR_VOICE_IDS = [
   ["sage", "sage", "mcuuWJIofmzgKEGk3EMA"],
-  ["lyra", "lyra", "pq3wL6Xv3fuEM14W6ZCg"],
+  ["lyra", "lyra", "54YYBuRuAG6KJooiOhFI"],
   ["icon", "icon", "GaCzJ7BKVn8XQp1mZYIn"],
   ["charles", "charles", "jRAAK67SEFE9m7ci5DhD"],
   ["princess", "princess", "uIZsnBL0YK1S5j69bAih"],

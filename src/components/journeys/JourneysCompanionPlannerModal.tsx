@@ -62,6 +62,7 @@ import {
 } from "@/hooks/useCompanionAssistant";
 import { usePlannerPathfinderAppearance } from "@/hooks/usePlannerPathfinderAppearance";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
+import { shouldContainCompanionSceneImage } from "@/lib/companionImageFocal";
 import { cn, stripMarkdown } from "@/lib/utils";
 import type { QuestComposerPrefillDraft } from "@/features/quests/types";
 import { buildQuestPrefillFromNaturalLanguage } from "@/features/quests/utils/voiceQuestPrefill";
@@ -1549,7 +1550,8 @@ const JourneysCompanionOverlayBody = memo(
         ? "Archive this chat and start a new one."
         : "Start a fresh chat.");
 
-    const avatar = usesPortraitShell ? (
+    const usesGeneratedSceneAvatar = shouldContainCompanionSceneImage(imageUrl);
+    const avatar = usesPortraitShell && !usesGeneratedSceneAvatar ? (
       <CompanionPortraitShell
         src={imageUrl}
         element={element}
@@ -1566,10 +1568,16 @@ const JourneysCompanionOverlayBody = memo(
         />
       </CompanionPortraitShell>
     ) : (
-      <div className="h-12 w-12 overflow-hidden rounded-full border border-white/[0.15] bg-white/10 shadow-[0_18px_32px_-26px_rgba(0,0,0,0.95)]">
+      <div
+        className={cn(
+          "h-12 w-12 overflow-hidden rounded-full border border-white/[0.15] shadow-[0_18px_32px_-26px_rgba(0,0,0,0.95)]",
+          usesGeneratedSceneAvatar ? "bg-black" : "bg-white/10",
+        )}
+      >
         <CompanionImage
           src={imageUrl}
           alt={companionLabel}
+          fit={usesGeneratedSceneAvatar ? "contain" : "cover"}
           element={element}
           focalX={focalX}
           focalY={focalY}

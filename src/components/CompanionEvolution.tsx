@@ -15,6 +15,7 @@ import type { CompanionMotionEvent } from "@/config/companionMotion";
 import { getCompanionHatchVideoUrl } from "@/config/companionHatchVideos";
 import { globalAudio } from "@/utils/globalAudio";
 import { CompanionImage } from "@/components/CompanionImage";
+import { shouldContainCompanionSceneImage } from "@/lib/companionImageFocal";
 
 interface CompanionEvolutionProps {
   isEvolving: boolean;
@@ -439,7 +440,18 @@ const CompanionEvolutionContent = ({
     !shouldUseGeneratedAnimationVideo || animationVideoReady;
   const shouldStartCinematic =
     artReadiness.ready && animationVideoReadyForCinematic && !animationVideoFailed;
-  const firstHatchImageFit = isFirstEvolution ? "portrait" : "cover";
+  const previousImageUsesContainedScene = shouldContainCompanionSceneImage(previousDisplayImageUrl);
+  const revealImageUsesContainedScene = shouldContainCompanionSceneImage(revealDisplayImageUrl);
+  const previousImageFit = previousImageUsesContainedScene
+    ? "contain"
+    : isFirstEvolution
+      ? "portrait"
+      : "cover";
+  const revealImageFit = revealImageUsesContainedScene
+    ? "contain"
+    : isFirstEvolution
+      ? "portrait"
+      : "cover";
 
   useEffect(() => {
     setDisableHatchVideo(false);
@@ -1220,9 +1232,9 @@ const CompanionEvolutionContent = ({
                     <CompanionImage
                       src={previousDisplayImageUrl}
                       alt={`Companion before evolving at stage ${previousStage}`}
-                      fit={firstHatchImageFit}
+                      fit={previousImageFit}
                       containerAspectRatio={580 / 470}
-                      className="rounded-[2rem] shadow-2xl"
+                      className={`rounded-[2rem] shadow-2xl ${previousImageUsesContainedScene ? "bg-black" : ""}`}
                     />
                   </motion.div>
                 )}
@@ -1313,9 +1325,9 @@ const CompanionEvolutionContent = ({
                     <CompanionImage
                       src={revealDisplayImageUrl}
                       alt={`Companion after evolving at stage ${newStage}`}
-                      fit={firstHatchImageFit}
+                      fit={revealImageFit}
                       containerAspectRatio={580 / 470}
-                      className="rounded-[2rem] shadow-2xl"
+                      className={`rounded-[2rem] shadow-2xl ${revealImageUsesContainedScene ? "bg-black" : ""}`}
                     />
                   </motion.div>
                 ) : (

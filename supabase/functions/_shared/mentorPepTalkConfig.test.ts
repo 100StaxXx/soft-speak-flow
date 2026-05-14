@@ -27,7 +27,7 @@ function assert(condition: boolean, message: string): void {
 
 const EXPECTED_VOICE_IDS: Record<SupportedMentorSlug, string> = {
   sage: "mcuuWJIofmzgKEGk3EMA",
-  lyra: "pq3wL6Xv3fuEM14W6ZCg",
+  lyra: "54YYBuRuAG6KJooiOhFI",
   icon: "GaCzJ7BKVn8XQp1mZYIn",
   charles: "jRAAK67SEFE9m7ci5DhD",
   princess: "uIZsnBL0YK1S5j69bAih",
@@ -144,7 +144,7 @@ Deno.test("mentor pep talk config includes Lyra across backend mentor surfaces",
     "Expected Lyra to have a mentor voice config",
   );
   assert(
-    voiceConfig?.voiceId === "pq3wL6Xv3fuEM14W6ZCg",
+    voiceConfig?.voiceId === "54YYBuRuAG6KJooiOhFI",
     "Expected Lyra to use her dedicated ElevenLabs voice",
   );
   assert(

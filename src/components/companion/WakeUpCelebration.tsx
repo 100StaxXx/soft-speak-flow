@@ -5,7 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Sparkles, Heart, Sun, Star } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { CompanionImage, CompanionPortraitShell } from '@/components/CompanionImage';
-import { isCompanionSceneImageSource } from '@/lib/companionImageFocal';
+import {
+  isCompanionSceneImageSource,
+  shouldContainCompanionSceneImage,
+} from '@/lib/companionImageFocal';
 
 interface WakeUpCelebrationProps {
   isOpen: boolean;
@@ -28,7 +31,8 @@ const WAKE_UP_MESSAGES = [
   "My heart feels warm again. Thank you for believing in me.",
 ];
 
-const usesPortraitShell = (imageUrl?: string | null) => isCompanionSceneImageSource(imageUrl);
+const usesPortraitShell = (imageUrl?: string | null) =>
+  isCompanionSceneImageSource(imageUrl) && !shouldContainCompanionSceneImage(imageUrl);
 
 const BOND_MILESTONE_MESSAGES: Record<number, string> = {
   1: "A bond has been renewed.",
@@ -55,6 +59,8 @@ export const WakeUpCelebration = memo(({
 
   const message = WAKE_UP_MESSAGES[Math.floor(Math.random() * WAKE_UP_MESSAGES.length)];
   const bondMessage = BOND_MILESTONE_MESSAGES[Math.min(5, bondLevel)] || BOND_MILESTONE_MESSAGES[1];
+  const dormantImageUsesContainedScene = shouldContainCompanionSceneImage(dormantImageUrl);
+  const companionImageUsesContainedScene = shouldContainCompanionSceneImage(companionImageUrl);
 
   // Trigger confetti and animation sequence
   useEffect(() => {
@@ -183,9 +189,10 @@ export const WakeUpCelebration = memo(({
                     <CompanionImage
                       src={dormantImageUrl}
                       alt={`Sleeping ${companionName}`}
+                      fit={dormantImageUsesContainedScene ? "contain" : "cover"}
                       focalX={dormantImageFocalX}
                       focalY={dormantImageFocalY}
-                      className="absolute inset-0 w-full h-full rounded-2xl"
+                      className={`absolute inset-0 w-full h-full rounded-2xl ${dormantImageUsesContainedScene ? "bg-black" : ""}`}
                       style={{ filter: 'grayscale(0.5) brightness(0.6)' }}
                     />
                   )}
@@ -233,9 +240,10 @@ export const WakeUpCelebration = memo(({
                 <CompanionImage
                   src={companionImageUrl}
                   alt={`Awakened ${companionName}`}
+                  fit={companionImageUsesContainedScene ? "contain" : "cover"}
                   focalX={companionImageFocalX}
                   focalY={companionImageFocalY}
-                  className="w-full h-full rounded-2xl ring-4 ring-amber-400/50"
+                  className={`w-full h-full rounded-2xl ring-4 ring-amber-400/50 ${companionImageUsesContainedScene ? "bg-black" : ""}`}
                 />
               )}
               

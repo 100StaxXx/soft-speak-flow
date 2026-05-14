@@ -30,6 +30,9 @@ const BUNDLED_COMPANION_PREFIXES = [
   "companion-presets/",
   "companion-launcher-away/",
 ] as const;
+const TRANSPARENT_COMPANION_IMAGE_MARKERS = [
+  "_launcher_validated_transparent_stage",
+] as const;
 const DEFAULT_PRESENTATION: CompanionImagePresentation = {
   style: {},
   focalPoint: null,
@@ -101,6 +104,20 @@ export const isCompanionEggImageSource = (src?: string | null): boolean =>
 
 export const isCompanionSceneImageSource = (src?: string | null): boolean =>
   isCompanionPresetImageSource(src) || isCompanionEggImageSource(src);
+
+const isTransparentCompanionImageSource = (src?: string | null): boolean => {
+  if (!src || typeof src !== "string") return false;
+  return TRANSPARENT_COMPANION_IMAGE_MARKERS.some((marker) => src.includes(marker));
+};
+
+export const shouldContainCompanionSceneImage = (src?: string | null): boolean => {
+  if (!src || typeof src !== "string") return false;
+
+  const trimmed = src.trim();
+  if (!/^https?:\/\//i.test(trimmed)) return false;
+  if (isCompanionSceneImageSource(trimmed)) return false;
+  return !isTransparentCompanionImageSource(trimmed);
+};
 
 export const getBundledCompanionImageFocalEntry = (
   src?: string | null,

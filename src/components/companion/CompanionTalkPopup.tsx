@@ -10,7 +10,10 @@ import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
 import { Progress } from "@/components/ui/progress";
-import { isCompanionSceneImageSource } from "@/lib/companionImageFocal";
+import {
+  isCompanionSceneImageSource,
+  shouldContainCompanionSceneImage,
+} from "@/lib/companionImageFocal";
 import type { CompletionCompanionTone } from "@/types/completionFeedback";
  
  interface CompanionTalkPopupProps {
@@ -28,7 +31,8 @@ import type { CompletionCompanionTone } from "@/types/completionFeedback";
   companionImageFocalY?: number | null;
 }
 
-const usesPortraitAvatar = (imageUrl?: string | null) => isCompanionSceneImageSource(imageUrl);
+const usesPortraitAvatar = (imageUrl?: string | null) =>
+  isCompanionSceneImageSource(imageUrl) && !shouldContainCompanionSceneImage(imageUrl);
 
 // Keep the popup bottom and the toast stacking vars in lockstep so fixed layers do not drift.
 const COMPLETION_FEEDBACK_POPUP_BOTTOM_OFFSET_TERMS = "64px + env(safe-area-inset-bottom, 0px) + 12px";
@@ -76,6 +80,7 @@ export const CompanionTalkPopup = memo(({
   const duration = getAutoDismissDuration(message, mentor?.message);
   const hasCompanionName = companionName.trim().length > 0;
   const resolvedToneClassName = tone ? toneClassName[tone] : toneClassName.proud;
+  const usesGeneratedSceneAvatar = shouldContainCompanionSceneImage(companionImageUrl);
 
   const updateToastStackOffsets = useCallback(() => {
     const popupElement = popupRef.current;
@@ -225,7 +230,12 @@ export const CompanionTalkPopup = memo(({
                    "ring-2 ring-primary/30",
                    "shadow-md shadow-primary/20"
                  )}>
-                   <Avatar className={cn("h-16 w-16 rounded-xl", usesPortraitAvatar(companionImageUrl) && "bg-transparent")}>
+                   <Avatar
+                     className={cn(
+                       "h-16 w-16 rounded-xl",
+                       usesGeneratedSceneAvatar ? "bg-black" : usesPortraitAvatar(companionImageUrl) && "bg-transparent",
+                     )}
+                   >
                      {companionImageUrl ? (
                        usesPortraitAvatar(companionImageUrl) ? (
                          <CompanionPortraitShell
@@ -247,9 +257,10 @@ export const CompanionTalkPopup = memo(({
                            variant="avatar"
                            src={companionImageUrl} 
                            alt={companionName}
+                           fit={usesGeneratedSceneAvatar ? "contain" : "cover"}
                            focalX={companionImageFocalX}
                            focalY={companionImageFocalY}
-                           className="object-cover"
+                           className="rounded-xl"
                          />
                        )
                      ) : null}

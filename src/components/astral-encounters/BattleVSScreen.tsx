@@ -6,7 +6,10 @@ import { Button } from "@/components/ui/button";
 import { getStageName } from "@/config/companionStages";
 import { formatDisplayLabel } from "@/lib/utils";
 import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
-import { isCompanionSceneImageSource } from "@/lib/companionImageFocal";
+import {
+  isCompanionSceneImageSource,
+  shouldContainCompanionSceneImage,
+} from "@/lib/companionImageFocal";
 
 interface BattleVSScreenProps {
   companionImageUrl?: string;
@@ -40,6 +43,9 @@ export const BattleVSScreen = ({
   onPass,
 }: BattleVSScreenProps) => {
   const tierColors = TIER_COLORS[adversary.tier as AdversaryTier] || TIER_COLORS.common;
+  const usesCompanionContainedScene = shouldContainCompanionSceneImage(companionImageUrl);
+  const usesCompanionPortraitShell =
+    isCompanionSceneImageSource(companionImageUrl) && !usesCompanionContainedScene;
 
   // Memoize speed line positions to prevent re-renders
   const speedLines = useMemo(() => 
@@ -172,7 +178,7 @@ export const BattleVSScreen = ({
               {/* Image frame */}
               <div className="relative w-full h-full rounded-2xl overflow-hidden border-2 border-primary/40 shadow-[0_0_30px_hsl(var(--primary)/0.3)]">
                 {companionImageUrl ? (
-                  isCompanionSceneImageSource(companionImageUrl) ? (
+                  usesCompanionPortraitShell ? (
                     <CompanionPortraitShell
                       src={companionImageUrl}
                       className="h-full w-full rounded-2xl"
@@ -190,9 +196,10 @@ export const BattleVSScreen = ({
                     <CompanionImage
                       src={companionImageUrl}
                       alt={companionName}
+                      fit={usesCompanionContainedScene ? "contain" : "cover"}
                       focalX={companionImageFocalX}
                       focalY={companionImageFocalY}
-                      className="w-full h-full object-cover"
+                      className={`w-full h-full ${usesCompanionContainedScene ? "bg-black" : ""}`}
                     />
                   )
                 ) : (

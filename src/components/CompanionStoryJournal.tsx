@@ -35,6 +35,7 @@ import { StoryJournalInfoTooltip } from "./StoryJournalInfoTooltip";
 import { CompanionImage } from "./CompanionImage";
 import { cn } from "@/lib/utils";
 import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
+import { shouldContainCompanionSceneImage } from "@/lib/companionImageFocal";
 
 interface CompanionStoryJournalProps {
   layoutMode?: CompanionLayoutMode;
@@ -95,6 +96,7 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
     gcTime: 30 * 60 * 1000,
     placeholderData: (previousData) => previousData,
   });
+  const chapterImageUsesContainedScene = shouldContainCompanionSceneImage(chapterImage);
 
   const handleGenerate = useCallback(() => {
     if (!companion) {
@@ -259,14 +261,20 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
       <Card className={cn(outerShellCardClassName, isDesktop ? "p-8" : "p-6")}>
         {chapterImage && isLevelUnlocked && (
           <div className="flex justify-center mb-6">
-            <div className="relative w-48 h-48 rounded-2xl overflow-hidden border-2 border-primary/20 shadow-glow">
+            <div
+              className={cn(
+                "relative w-48 h-48 rounded-2xl overflow-hidden border-2 border-primary/20 shadow-glow",
+                chapterImageUsesContainedScene && "bg-black",
+              )}
+            >
               <CompanionImage
                 src={chapterImage}
                 alt={`${companion.spirit_animal} at ${chapterLabel}`}
+                fit={chapterImageUsesContainedScene ? "contain" : "cover"}
                 focalX={chapterImageFocal.x}
                 focalY={chapterImageFocal.y}
                 sourceAspectRatio={chapterImageSourceAspectRatio}
-                className="w-full h-full object-cover"
+                className="w-full h-full"
                 onError={(event) => {
                   setChapterImageSourceAspectRatio(null);
                   event.currentTarget.src = debouncedLevel === 0

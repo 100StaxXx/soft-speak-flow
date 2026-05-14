@@ -408,6 +408,25 @@ Deno.test("generate-companion-launcher-image uses live key in production", async
   );
 });
 
+Deno.test("generate-companion-launcher-image generates cutouts for preset-backed companions with remote current images", async () => {
+  const { calls, fetchFn } = createMockFetch();
+  const supabase = createMockSupabase({
+    companion: baseCompanion({
+      preset_id: "dragon",
+      current_image_url: CURRENT_SCENE_URL,
+    }),
+  });
+
+  const response = await callHandler(buildDeps({ supabase, fetchFn }));
+  const body = await response.json();
+  const photoRoomCall = calls.find((call) => call.url === PHOTOROOM_SEGMENT_URL);
+
+  assertEquals(response.status, 200, "Expected preset-backed remote cutout to save");
+  assertEquals(body.provider, "photoroom:live", "Expected PhotoRoom provider");
+  assert(photoRoomCall, "Expected PhotoRoom fetch for remote preset-backed image");
+  assertEquals(supabase.uploadLog.length, 1, "Expected generated cutout upload");
+});
+
 Deno.test("generate-companion-launcher-image rejects sandbox mode in production", async () => {
   const { calls, fetchFn } = createMockFetch();
   const supabase = createMockSupabase({ companion: baseCompanion() });
@@ -683,7 +702,7 @@ Deno.test("generate-companion-launcher-image discards uploads when the source im
   assertEquals(supabase.upsertLog.length, 0, "Expected no ledger registration");
 });
 
-Deno.test("generate-companion-launcher-image no-ops for preset companions", async () => {
+Deno.test("generate-companion-launcher-image rejects bundled preset asset paths before PhotoRoom", async () => {
   const { calls, fetchFn } = createMockFetch();
   const supabase = createMockSupabase({
     companion: baseCompanion({
@@ -696,9 +715,12 @@ Deno.test("generate-companion-launcher-image no-ops for preset companions", asyn
   const response = await callHandler(buildDeps({ supabase, fetchFn }));
   const body = await response.json();
 
-  assertEquals(response.status, 200, "Expected preset no-op to succeed");
-  assertEquals(body.skipped, true, "Expected preset companion skip");
-  assertEquals(body.reason, "preset_companion", "Expected preset skip reason");
+  assertEquals(response.status, 400, "Expected bundled path rejection");
+  assertEquals(
+    body.code,
+    "COMPANION_LAUNCHER_REFERENCE_UNAVAILABLE",
+    "Expected reference validation code",
+  );
   assertEquals(calls.length, 0, "Expected no fetch for preset companion");
   assertEquals(supabase.uploadLog.length, 0, "Expected no upload");
 });

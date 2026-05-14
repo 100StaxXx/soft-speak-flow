@@ -5,16 +5,17 @@ import { Slider } from "@/components/ui/slider";
 import { GlassCard } from "@/components/ui/glass-card";
 
 import { globalAudio } from "@/utils/globalAudio";
-import { safePlay, createIOSOptimizedAudio, isIOS, iosAudioManager } from "@/utils/iosAudio";
+import { safePlay, createIOSOptimizedAudio, isIOS, iosAudioManager, applyAudioElementGain } from "@/utils/iosAudio";
 import { setupMediaSession, updateMediaSession, clearMediaSession } from "@/utils/mediaSession";
 
 interface AudioPlayerProps {
   audioUrl: string;
   title: string;
+  playbackGain?: number;
   onTimeUpdate?: (currentTime: number) => void;
 }
 
-export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps) => {
+export const AudioPlayer = ({ audioUrl, title, playbackGain = 1, onTimeUpdate }: AudioPlayerProps) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -23,6 +24,7 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
   // Initialize audio element with iOS optimizations
   useEffect(() => {
     const audio = createIOSOptimizedAudio(audioUrl);
+    applyAudioElementGain(audio, playbackGain);
     audioRef.current = audio;
     
     // Register with iOS audio manager for coordinated control
@@ -60,7 +62,7 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
       }
       clearMediaSession();
     };
-  }, [audioUrl, title]);
+  }, [audioUrl, title, playbackGain]);
 
 
   // Listen for global mute changes

@@ -4,6 +4,7 @@ import {
   getBundledCompanionImageFocalPoint,
   isCompanionPresetImageSource,
   resolveCompanionImagePresentation,
+  shouldContainCompanionSceneImage,
 } from "./companionImageFocal";
 
 describe("companionImageFocal", () => {
@@ -169,6 +170,20 @@ describe("companionImageFocal", () => {
       },
     });
     expect(presentation.style.transform).toBeUndefined();
+  });
+
+  it("flags remote generated scene art for contained companion framing", () => {
+    expect(shouldContainCompanionSceneImage("https://example.com/generated-companion.png")).toBe(true);
+    expect(
+      shouldContainCompanionSceneImage(
+        "https://example.supabase.co/storage/v1/object/public/companion-presets/phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__nature.png",
+      ),
+    ).toBe(false);
+    expect(
+      shouldContainCompanionSceneImage(
+        "https://assets.example.com/companion_launcher_validated_transparent_stage5.png",
+      ),
+    ).toBe(false);
   });
 
   it("falls back cleanly for non-bundled images without stored focal metadata", () => {

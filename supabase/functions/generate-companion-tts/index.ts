@@ -9,10 +9,6 @@ import {
   createCostGuardrailSupabaseClient,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
-import {
-  buildAccessStateResponse,
-  fetchAccountEntitlementForUser,
-} from "../_shared/accountEntitlements.ts";
 
 const RequestSchema = z.object({
   text: z.string().min(1).max(5000).trim(),
@@ -27,28 +23,6 @@ const startOfTodayUtc = () => {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
 };
-
-async function ensurePremiumAccess(supabase: any, userId: string) {
-  const entitlement = await fetchAccountEntitlementForUser(supabase, userId);
-  const entitlementAccess = buildAccessStateResponse(entitlement);
-  if (entitlementAccess.has_access) {
-    return true;
-  }
-  if (entitlementAccess.access_source === "subscription") {
-    return false;
-  }
-
-  const nowIso = new Date().toISOString();
-  const { count, error } = await supabase
-    .from("subscriptions")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .in("status", ["active", "trialing", "past_due", "cancelled"])
-    .gte("current_period_end", nowIso);
-
-  if (error) throw error;
-  return (count ?? 0) > 0;
-}
 
 async function enforceDailyTtsCap(supabase: any, userId: string) {
   const { count, error } = await supabase
@@ -137,17 +111,6 @@ serve(async (req) => {
     }
 
     const userId = protectedRequest.auth.userId;
-    const hasPremiumAccess = await ensurePremiumAccess(protectedRequest.supabase, userId);
-
-    if (!hasPremiumAccess) {
-      return createSafeErrorResponse(req, {
-        status: 403,
-        code: "PREMIUM_REQUIRED",
-        error: "Companion voice fallback requires Premium access",
-        requestId,
-      });
-    }
-
     const underDailyLimit = await enforceDailyTtsCap(protectedRequest.supabase, userId);
     if (!underDailyLimit) {
       return createSafeErrorResponse(req, {

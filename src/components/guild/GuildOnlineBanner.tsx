@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { GuildMemberPresence } from "@/hooks/useGuildPresence";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { CompanionImage } from "@/components/CompanionImage";
+import { shouldContainCompanionSceneImage } from "@/lib/companionImageFocal";
 
 interface GuildOnlineBannerProps {
   onlineMembers: GuildMemberPresence[];
@@ -55,27 +56,37 @@ export const GuildOnlineBanner = ({
 
       {/* Stacked avatars */}
       <div className="flex -space-x-2">
-        {displayMembers.map((member, index) => (
-          <motion.div
-            key={member.userId}
-            initial={{ opacity: 0, scale: 0 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: index * 0.1 }}
-          >
-            <Avatar className="h-6 w-6 border-2 border-background">
-              <CompanionImage
-                variant="avatar"
-                src={member.companionImageUrl}
-                alt={member.displayName || "Guild member companion"}
-                focalX={member.companionImageFocalX}
-                focalY={member.companionImageFocalY}
-              />
-              <AvatarFallback className="text-xs bg-green-500/20">
-                {member.displayName?.slice(0, 1).toUpperCase() || '?'}
-              </AvatarFallback>
-            </Avatar>
-          </motion.div>
-        ))}
+        {displayMembers.map((member, index) => {
+          const usesGeneratedSceneAvatar = shouldContainCompanionSceneImage(member.companionImageUrl);
+
+          return (
+            <motion.div
+              key={member.userId}
+              initial={{ opacity: 0, scale: 0 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: index * 0.1 }}
+            >
+              <Avatar
+                className={cn(
+                  "h-6 w-6 border-2 border-background",
+                  usesGeneratedSceneAvatar && "bg-black",
+                )}
+              >
+                <CompanionImage
+                  variant="avatar"
+                  src={member.companionImageUrl}
+                  alt={member.displayName || "Guild member companion"}
+                  fit={usesGeneratedSceneAvatar ? "contain" : "cover"}
+                  focalX={member.companionImageFocalX}
+                  focalY={member.companionImageFocalY}
+                />
+                <AvatarFallback className="text-xs bg-green-500/20">
+                  {member.displayName?.slice(0, 1).toUpperCase() || '?'}
+                </AvatarFallback>
+              </Avatar>
+            </motion.div>
+          );
+        })}
         {extraCount > 0 && (
           <div className="h-6 w-6 rounded-full bg-muted border-2 border-background flex items-center justify-center">
             <span className="text-xs font-medium">+{extraCount}</span>

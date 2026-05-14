@@ -1,11 +1,7 @@
-import { memo, useCallback, useEffect, useMemo, useState, type RefObject } from "react";
-import { JourneysCompanionLauncher } from "@/components/journeys/JourneysCompanionLauncher";
-import { Badge } from "@/components/ui/badge";
+import { memo, useEffect, useMemo, useState, type RefObject } from "react";
 import { Button } from "@/components/ui/button";
 import { QuestLocationLink } from "@/components/QuestLocationLink";
 import { cn } from "@/lib/utils";
-import { createCompanionPlannerLaunchIntentId } from "@/shared/companionPlannerSurfaceActions";
-import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
 import { haptics } from "@/utils/haptics";
 import { Check, ChevronDown, Inbox, Pencil, Trash2 } from "lucide-react";
 
@@ -37,8 +33,6 @@ interface QuestInboxSectionProps {
   isLoading: boolean;
   isExpanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
-  onAddQuest: () => void;
-  onOpenCompanionPlanner?: (intent?: CompanionPlannerLaunchIntent | null) => void;
   onToggleQuest: (taskId: string, completed: boolean) => void;
   onEditQuest: (task: InboxQuestItem) => void | Promise<void>;
   onDeleteQuest: (taskId: string) => void | Promise<void>;
@@ -50,8 +44,6 @@ export const QuestInboxSection = memo(function QuestInboxSection({
   isLoading,
   isExpanded,
   onExpandedChange,
-  onAddQuest,
-  onOpenCompanionPlanner,
   onToggleQuest,
   onEditQuest,
   onDeleteQuest,
@@ -73,35 +65,7 @@ export const QuestInboxSection = memo(function QuestInboxSection({
   }, [showAllTasks, tasks]);
 
   const hiddenTaskCount = Math.max(0, tasks.length - visibleTasks.length);
-  const plannerLauncherAction = useCallback(() => {
-    if (!onOpenCompanionPlanner) {
-      onAddQuest();
-      return;
-    }
-
-    onOpenCompanionPlanner({
-      id: createCompanionPlannerLaunchIntentId(),
-      message: "Help me sort my quest inbox",
-      starterIntent: "make_room",
-      target: "planner",
-      briefingContext: {
-        content: `Inbox snapshot: ${tasks.length} quests do not have an assigned time yet.`,
-        focus: "Turn the inbox into a realistic next step.",
-        actionPrompt:
-          "Help triage these quests. Suggest what to schedule, what to defer, and what can stay in the inbox.",
-        dataSnapshot: {
-          inboxQuestCount: tasks.length,
-          topInboxQuests: tasks.slice(0, 8).map((task) => ({
-            id: task.id,
-            title: task.task_text,
-            estimatedMinutes: task.estimated_duration ?? null,
-            priority: task.difficulty ?? null,
-            category: task.category ?? null,
-          })),
-        },
-      },
-    });
-  }, [onAddQuest, onOpenCompanionPlanner, tasks]);
+  const inboxCountLabel = `${tasks.length} quest${tasks.length === 1 ? "" : "s"}`;
 
   return (
     <section
@@ -109,51 +73,29 @@ export const QuestInboxSection = memo(function QuestInboxSection({
       data-testid="journeys-inbox-section"
       className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,20,38,0.94),rgba(16,13,27,0.9))] p-4 shadow-[0_20px_40px_rgba(0,0,0,0.2)]"
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-celestial-blue/15 text-celestial-blue">
+      <button
+        type="button"
+        aria-expanded={isExpanded}
+        aria-label={`Inbox, ${inboxCountLabel}. ${isExpanded ? "Collapse inbox section" : "Expand inbox section"}`}
+        className="flex w-full items-center justify-between gap-3 rounded-2xl text-left transition-colors hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+        onClick={() => {
+          haptics.light();
+          onExpandedChange(!isExpanded);
+        }}
+      >
+        <span className="flex min-w-0 items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-celestial-blue/15 text-celestial-blue">
             <Inbox className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-lg font-semibold text-foreground">Inbox</h2>
-              <Badge className="border-0 bg-celestial-blue/15 text-celestial-blue">
-                {tasks.length}
-              </Badge>
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Quests without an assigned time yet. Plan them here before they hit your day.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <JourneysCompanionLauncher
-            variant="inline"
-            compact
-            data-tour="add-quest-launcher"
-            text="Plan Inbox"
-            onClick={() => {
-              haptics.light();
-              plannerLauncherAction();
-            }}
-          />
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            aria-expanded={isExpanded}
-            aria-label={isExpanded ? "Collapse inbox section" : "Expand inbox section"}
-            className="rounded-2xl"
-            onClick={() => {
-              haptics.light();
-              onExpandedChange(!isExpanded);
-            }}
-          >
-            <ChevronDown className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-180")} />
-          </Button>
-        </div>
-      </div>
+          </span>
+          <span className="flex min-w-0 flex-wrap items-center gap-2">
+            <span className="text-lg font-semibold text-foreground">Inbox</span>
+            <span className="inline-flex items-center rounded-full border-0 bg-celestial-blue/15 px-2.5 py-0.5 text-xs font-semibold text-celestial-blue">
+              {tasks.length}
+            </span>
+          </span>
+        </span>
+        <ChevronDown className={cn("h-4 w-4 flex-shrink-0 transition-transform", isExpanded && "rotate-180")} />
+      </button>
 
       {isExpanded ? (
         <div className="mt-4 space-y-3">

@@ -11,6 +11,7 @@ import { usePreloadedImageUrl } from "@/hooks/usePreloadedImageUrl";
 import { getJourneyPathCardImageUrl } from "@/utils/journeyPathUrls";
 import { CompanionImage } from "@/components/CompanionImage";
 import { Button } from "@/components/ui/button";
+import { shouldContainCompanionSceneImage } from "@/lib/companionImageFocal";
 
 // Milestone from epic_milestones table
 interface TrailMilestone {
@@ -962,6 +963,7 @@ export const ConstellationTrail = memo(function ConstellationTrail({
   
   const starPositions = useMemo(() => generateStarPositions(sortedMilestones.length), [sortedMilestones.length]);
   const routeModel = useMemo(() => buildTrailRouteModel(starPositions), [starPositions]);
+  const usesContainedCompanionScene = shouldContainCompanionSceneImage(companionImageUrl);
   
   const bgStars = useMemo(() => {
     const seededRandom = (seed: number) => {
@@ -1332,16 +1334,18 @@ export const ConstellationTrail = memo(function ConstellationTrail({
           
           <div 
             className={cn(
-              "w-7 h-7 rounded-full border-2 border-primary overflow-hidden bg-background shadow-lg",
+              "w-7 h-7 rounded-full border-2 border-primary overflow-hidden shadow-lg",
+              usesContainedCompanionScene ? "bg-black" : "bg-background",
               getMoodStyles(companionMood)
             )}
           >
             <CompanionImage 
               src={companionImageUrl} 
               alt="Companion" 
+              fit={usesContainedCompanionScene ? "contain" : "cover"}
               focalX={companionImageFocalX}
               focalY={companionImageFocalY}
-              className="w-full h-full object-cover"
+              className="w-full h-full"
             />
           </div>
         </motion.div>

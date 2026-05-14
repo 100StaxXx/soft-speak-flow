@@ -171,6 +171,18 @@ describe("EvolutionMomentsPanel", () => {
     expect(screen.getByText("Evolutions")).toBeInTheDocument();
   });
 
+  it("contains generated scene art in evolution thumbnails", async () => {
+    renderPanel();
+
+    const momentCard = await screen.findByRole("button", {
+      name: /stage 5 evolution/i,
+    });
+    const thumbnail = momentCard.querySelector("img");
+
+    expect(thumbnail).toHaveAttribute("data-companion-image-fit", "contain");
+    expect(thumbnail).toHaveClass("object-contain");
+  });
+
   it("opens a playable evolution dialog for completed animation rows", async () => {
     renderPanel();
 

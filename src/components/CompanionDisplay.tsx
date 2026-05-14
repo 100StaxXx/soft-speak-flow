@@ -50,6 +50,7 @@ import {
   getCompanionEggImageAssetKey,
   isCompanionEggImageSource,
   isCompanionPresetImageSource,
+  shouldContainCompanionSceneImage,
 } from "@/lib/companionImageFocal";
 import {
   hasCompanionStoredVisual,
@@ -496,8 +497,7 @@ export const CompanionDisplay = memo(({
   const usesEggPortraitShell = isCompanionEggImageSource(effectiveImageUrl);
   const usesSceneEggPortraitShell =
     getCompanionEggImageAssetKey(effectiveImageUrl)?.startsWith("companion-eggs/v2/") ?? false;
-  const usesGeneratedSceneShell =
-    isAiGeneratedCompanion(displayCompanion) && !usesPresetPortraitShell && !usesEggPortraitShell;
+  const usesGeneratedSceneShell = shouldContainCompanionSceneImage(effectiveImageUrl);
   const portraitImageFit = usesGeneratedSceneShell
     ? "contain"
     : (usesPresetPortraitShell || (usesEggPortraitShell && !usesSceneEggPortraitShell))

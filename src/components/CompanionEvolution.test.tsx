@@ -572,7 +572,7 @@ describe("CompanionEvolution", () => {
     expect(screen.getByTestId("evolution-reveal-art")).toBeInTheDocument();
     expect(screen.getByTestId("evolution-reveal-art").querySelector("img")).toHaveAttribute(
       "data-companion-image-fit",
-      "portrait",
+      "contain",
     );
 
     await flushTimers(FULL_SEQUENCE_MS.hold + FULL_SEQUENCE_MS.charge + FULL_SEQUENCE_MS.conceal);
@@ -722,7 +722,7 @@ describe("CompanionEvolution", () => {
     expect(screen.queryByTestId("evolution-hatch-video")).not.toBeInTheDocument();
     expect(screen.getByTestId("evolution-art-stage")).toHaveAttribute("data-strobe-enabled", "true");
     const revealArtImage = screen.getByTestId("evolution-reveal-art").querySelector("img");
-    expect(revealArtImage).toHaveAttribute("data-companion-image-fit", "portrait");
+    expect(revealArtImage).toHaveAttribute("data-companion-image-fit", "contain");
 
     await flushTimers(FULL_SEQUENCE_MS.hold + FULL_SEQUENCE_MS.charge);
     expect(dialog).toHaveAttribute("data-phase", "conceal");

@@ -3,6 +3,7 @@ import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionIm
 import { cn } from "@/lib/utils";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
 import { useCompanionImageBackgroundCutout } from "@/hooks/useCompanionImageBackgroundCutout";
+import { shouldContainCompanionSceneImage } from "@/lib/companionImageFocal";
 
 type JourneysCompanionLauncherVariant = "floating" | "inline";
 type JourneysCompanionLauncherFaceDirection = "front" | "away";
@@ -54,12 +55,14 @@ export function JourneysCompanionLauncher({
   const resolvedFocalX = imageFocalXOverride === undefined ? focalX : imageFocalXOverride;
   const resolvedFocalY = imageFocalYOverride === undefined ? focalY : imageFocalYOverride;
   const resolvedUsesPortraitShell = usesPortraitShellOverride ?? usesPortraitShell;
+  const usesGeneratedSceneAvatar = shouldContainCompanionSceneImage(resolvedImageUrl);
+  const shouldUsePortraitShell = resolvedUsesPortraitShell && !usesGeneratedSceneAvatar;
   const resolvedText = text ?? `Chat with ${companionLabel}`;
   const isFloatingHero = variant === "floating" && floatingSize === "hero";
   const shouldCutOutHeroBackground = isFloatingHero
     && requireHeroCutout
     && Boolean(resolvedImageUrl)
-    && !resolvedUsesPortraitShell;
+    && !shouldUsePortraitShell;
   const {
     cutoutSrc: heroCutoutSrc,
     status: heroCutoutStatus,
@@ -105,7 +108,7 @@ export function JourneysCompanionLauncher({
         <CompanionImage
           src={resolvedHeroImageUrl}
           alt={companionLabel}
-          fit={resolvedUsesPortraitShell ? "portrait" : "contain"}
+          fit={shouldUsePortraitShell ? "portrait" : "contain"}
           element={element}
           focalX={resolvedFocalX}
           focalY={resolvedFocalY}
@@ -120,7 +123,7 @@ export function JourneysCompanionLauncher({
     </div>
   ) : !resolvedImageUrl ? (
     portraitPlaceholder
-  ) : resolvedUsesPortraitShell ? (
+  ) : shouldUsePortraitShell ? (
     <CompanionPortraitShell
       src={resolvedImageUrl}
       element={element}
@@ -137,10 +140,17 @@ export function JourneysCompanionLauncher({
       />
     </CompanionPortraitShell>
   ) : (
-    <div className={cn("overflow-hidden rounded-full bg-white/10", portraitClassName)}>
+    <div
+      className={cn(
+        "overflow-hidden rounded-full",
+        usesGeneratedSceneAvatar ? "bg-black" : "bg-white/10",
+        portraitClassName,
+      )}
+    >
       <CompanionImage
         src={resolvedImageUrl}
         alt={companionLabel}
+        fit={usesGeneratedSceneAvatar ? "contain" : "cover"}
         element={element}
         focalX={resolvedFocalX}
         focalY={resolvedFocalY}

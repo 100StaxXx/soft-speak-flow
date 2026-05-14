@@ -72,7 +72,7 @@ describe("CompanionStoryJournal", () => {
     mocks.generateStory.mutate.mockClear();
   });
 
-  it("centers generated landscape checkpoint art after measuring its natural dimensions", async () => {
+  it("contains generated landscape checkpoint art to match video framing", async () => {
     renderWithQueryClient(<CompanionStoryJournal />);
 
     fireEvent.click(screen.getByRole("button", { name: /next/i }));
@@ -91,7 +91,8 @@ describe("CompanionStoryJournal", () => {
     fireEvent.load(image);
 
     await waitFor(() => {
-      expect(image).toHaveStyle({ objectPosition: "0% 50%" });
+      expect(image).toHaveAttribute("data-companion-image-fit", "contain");
+      expect(image).toHaveStyle({ objectPosition: "center center" });
     });
   });
 });

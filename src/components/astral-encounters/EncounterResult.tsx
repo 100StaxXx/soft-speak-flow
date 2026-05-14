@@ -6,7 +6,10 @@ import { useEffect, useMemo } from 'react';
 import confetti from 'canvas-confetti';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { CompanionImage, CompanionPortraitShell } from '@/components/CompanionImage';
-import { isCompanionSceneImageSource } from '@/lib/companionImageFocal';
+import {
+  isCompanionSceneImageSource,
+  shouldContainCompanionSceneImage,
+} from '@/lib/companionImageFocal';
 
 interface EncounterResultProps {
   adversary: Adversary;
@@ -130,6 +133,9 @@ export const EncounterResultScreen = ({
   const isSuccess = result !== 'fail';
   const statConfig = STAT_CONFIG[adversary.statType as keyof typeof STAT_CONFIG] || STAT_CONFIG.soul;
   const StatIcon = statConfig.icon;
+  const usesCompanionContainedScene = shouldContainCompanionSceneImage(companionImageUrl);
+  const usesCompanionPortraitShell =
+    isCompanionSceneImageSource(companionImageUrl) && !usesCompanionContainedScene;
 
   // Get random defeat message
   const defeatMessage = useMemo(() => 
@@ -272,7 +278,7 @@ export const EncounterResultScreen = ({
           
           {/* Companion image */}
           <div className={`relative w-28 h-28 rounded-full overflow-hidden border-2 ${isSuccess ? 'border-primary/50 shadow-lg shadow-primary/30' : 'border-slate-500/40 shadow-lg shadow-purple-900/30'}`}>
-            {isCompanionSceneImageSource(companionImageUrl) ? (
+            {usesCompanionPortraitShell ? (
               <CompanionPortraitShell
                 src={companionImageUrl}
                 className="h-full w-full rounded-full"
@@ -290,9 +296,10 @@ export const EncounterResultScreen = ({
               <CompanionImage 
                 src={companionImageUrl} 
                 alt={companionName || 'Companion'} 
+                fit={usesCompanionContainedScene ? "contain" : "cover"}
                 focalX={companionImageFocalX}
                 focalY={companionImageFocalY}
-                className={`w-full h-full object-cover ${!isSuccess ? 'saturate-75' : ''}`}
+                className={`w-full h-full ${usesCompanionContainedScene ? 'bg-black' : ''} ${!isSuccess ? 'saturate-75' : ''}`}
               />
             )}
             

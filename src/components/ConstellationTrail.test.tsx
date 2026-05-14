@@ -157,7 +157,10 @@ describe("ConstellationTrail", () => {
       />,
     );
 
-    expect(screen.getByAltText("Companion")).toBeInTheDocument();
+    expect(screen.getByAltText("Companion")).toHaveAttribute(
+      "data-companion-image-fit",
+      "contain",
+    );
     expect(screen.getAllByLabelText(/unlock milestone at/i)).toHaveLength(3);
     expect(screen.getAllByTestId("trail-branch-base-path").length).toBeGreaterThan(0);
   });

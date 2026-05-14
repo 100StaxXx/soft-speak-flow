@@ -32,6 +32,14 @@ const mocks = vi.hoisted(() => ({
   resetSuggestions: vi.fn(),
   writeCampaignBuilderDraftSnapshot: vi.fn(),
   clearCampaignBuilderDraftSnapshot: vi.fn(),
+  journeysCompanionVisual: {
+    companionLabel: "Glacieron",
+    imageUrl: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__ice.png",
+    focalX: null as number | null,
+    focalY: null as number | null,
+    element: "ice",
+    usesPortraitShell: true,
+  },
   activeEpics: [] as Array<{ id: string; status: string }>,
   aiAtEpicLimit: false,
   schedule: null as any,
@@ -119,14 +127,7 @@ vi.mock("@/hooks/useVoiceInput", () => ({
 }));
 
 vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
-  useJourneysCompanionVisual: () => ({
-    companionLabel: "Glacieron",
-    imageUrl: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__ice.png",
-    focalX: null,
-    focalY: null,
-    element: "ice",
-    usesPortraitShell: true,
-  }),
+  useJourneysCompanionVisual: () => mocks.journeysCompanionVisual,
 }));
 
 vi.mock("@/utils/creationPopupPersistence", () => ({
@@ -187,6 +188,14 @@ describe("Pathfinder", () => {
     mocks.onCreateEpic.mockResolvedValue(undefined);
     mocks.activeEpics = [];
     mocks.aiAtEpicLimit = false;
+    mocks.journeysCompanionVisual = {
+      companionLabel: "Glacieron",
+      imageUrl: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__ice.png",
+      focalX: null,
+      focalY: null,
+      element: "ice",
+      usesPortraitShell: true,
+    };
     mocks.schedule = {
       feasibilityAssessment: null,
       phases: [],
@@ -285,6 +294,32 @@ describe("Pathfinder", () => {
     expect(screen.getByTestId("pathfinder-progress")).toBeInTheDocument();
     expect(screen.getByTestId("pathfinder-footer")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Build My Plan/i })).toBeInTheDocument();
+  });
+
+  it("centers generated scene art in the header avatar", () => {
+    mocks.journeysCompanionVisual = {
+      companionLabel: "Glacieron",
+      imageUrl: "https://assets.example.com/generated-companion.png",
+      focalX: 0.4,
+      focalY: 0.6,
+      element: "ice",
+      usesPortraitShell: false,
+    };
+
+    render(
+      <Pathfinder
+        open
+        userId="user-1"
+        onOpenChange={vi.fn()}
+        onCreateEpic={(...args) => mocks.onCreateEpic(...args)}
+        isCreating={false}
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "Glacieron" })).toHaveAttribute(
+      "data-companion-image-fit",
+      "contain",
+    );
   });
 
   it("auto-scrolls the goal panel when generated clarification questions appear", async () => {

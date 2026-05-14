@@ -21,6 +21,7 @@ import { isNearEvolution } from "@/lib/companionEvolutionSignals";
 import {
   getBundledCompanionImageFocalPoint,
   isCompanionSceneImageSource,
+  shouldContainCompanionSceneImage,
 } from "@/lib/companionImageFocal";
 import {
   resolveCompanionExpressiveAssetUrl,
@@ -210,7 +211,9 @@ export const CompanionDialogue = memo(({
     : health.isNeglected
       ? health.neglectedImageFocalY ?? companion?.neglected_image_focal_y ?? companion?.current_image_focal_y ?? null
       : bundledCompanionImageFocal?.y ?? companion?.current_image_focal_y ?? null;
-  const usesPortraitAvatar = isCompanionSceneImageSource(companionImageUrl);
+  const usesGeneratedSceneAvatar = shouldContainCompanionSceneImage(companionImageUrl);
+  const usesPortraitAvatar =
+    isCompanionSceneImageSource(companionImageUrl) && !usesGeneratedSceneAvatar;
   const customCompanionName = normalizeCompanionName(companion?.companion_name);
   const cachedCompanionName =
     !customCompanionName && companion && companion.current_stage > 0
@@ -332,7 +335,12 @@ export const CompanionDialogue = memo(({
               "flex-shrink-0 rounded-lg overflow-hidden",
               "ring-2", avatarRingClass
             )}>
-              <Avatar className={cn("h-10 w-10 rounded-lg", usesPortraitAvatar && "bg-transparent")}>
+              <Avatar
+                className={cn(
+                  "h-10 w-10 rounded-lg",
+                  usesGeneratedSceneAvatar ? "bg-black" : usesPortraitAvatar && "bg-transparent",
+                )}
+              >
                 {companionImageUrl ? (
                   usesPortraitAvatar ? (
                     <CompanionPortraitShell
@@ -362,9 +370,10 @@ export const CompanionDialogue = memo(({
                       variant="avatar"
                       src={companionImageUrl}
                       alt={resolvedCompanionName}
+                      fit={usesGeneratedSceneAvatar ? "contain" : "cover"}
                       focalX={companionImageFocalX}
                       focalY={companionImageFocalY}
-                      className="object-cover"
+                      className="rounded-lg"
                       onLoadingStatusChange={handleCompanionImageLoadingStatusChange}
                       onError={() => {
                         if (!fallbackToDefaultPortrait && expressiveCompanionImageUrl) {
@@ -426,7 +435,13 @@ export const CompanionDialogue = memo(({
           <div className="relative space-y-4">
           <DialogHeader className="text-left">
             <div className="flex items-center gap-3">
-              <Avatar className={cn("h-12 w-12 rounded-lg ring-2", config.ringColor, usesPortraitAvatar && "bg-transparent")}>
+              <Avatar
+                className={cn(
+                  "h-12 w-12 rounded-lg ring-2",
+                  config.ringColor,
+                  usesGeneratedSceneAvatar ? "bg-black" : usesPortraitAvatar && "bg-transparent",
+                )}
+              >
                 {companionImageUrl ? (
                   usesPortraitAvatar ? (
                     <CompanionPortraitShell
@@ -456,9 +471,10 @@ export const CompanionDialogue = memo(({
                       variant="avatar"
                       src={companionImageUrl}
                       alt={resolvedCompanionName}
+                      fit={usesGeneratedSceneAvatar ? "contain" : "cover"}
                       focalX={companionImageFocalX}
                       focalY={companionImageFocalY}
-                      className="object-cover"
+                      className="rounded-lg"
                       onLoadingStatusChange={handleCompanionImageLoadingStatusChange}
                       onError={() => {
                         if (!fallbackToDefaultPortrait && expressiveCompanionImageUrl) {

@@ -28,7 +28,7 @@ export const ELEVENLABS_MENTOR_VOICES: Record<
     use_speaker_boost: true,
   },
   lyra: {
-    voiceId: "pq3wL6Xv3fuEM14W6ZCg",
+    voiceId: "54YYBuRuAG6KJooiOhFI",
     stability: 0.74,
     similarity_boost: 0.84,
     style_exaggeration: 0.22,

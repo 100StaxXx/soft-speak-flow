@@ -76,6 +76,23 @@ describe("CompanionTalkPopup", () => {
     expect(screen.getByRole("dialog")).toHaveAttribute("aria-label", "Nova says: Hello, friend.");
   });
 
+  it("centers generated scene companion art in the popup avatar", () => {
+    render(
+      <CompanionTalkPopup
+        isVisible
+        onDismiss={vi.fn()}
+        message="Hello, friend."
+        companionName="Nova"
+        companionImageUrl="https://assets.example.com/generated-companion.png"
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "Nova" })).toHaveAttribute(
+      "data-companion-image-fit",
+      "contain",
+    );
+  });
+
   it("hides byline and keeps accessible label meaningful when name is empty", () => {
     render(
       <CompanionTalkPopup

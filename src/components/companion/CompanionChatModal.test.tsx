@@ -219,6 +219,10 @@ describe("CompanionChatModal", () => {
     renderOpenModal();
 
     expectOpenChatWithFallbackInitial();
+    expect(screen.getByRole("img", { name: "Nova" })).toHaveAttribute(
+      "data-companion-image-fit",
+      "contain",
+    );
   });
 
   it("renders the companion initial fallback when there is no image", () => {

@@ -137,14 +137,19 @@ export const useJourneysCompanionVisual = () => {
   const element = displayCompanion?.core_element ?? null;
   const currentSceneImageUrl = displayCompanion?.current_image_url ?? null;
   const isGeneratedCompanion = isAiGeneratedCompanion(displayCompanion);
+  const hasRemoteCurrentSceneImage = isRemoteImageUrl(currentSceneImageUrl);
   const storedLauncherImageUrl = displayCompanion?.launcher_image_url ?? null;
   const storedLauncherImageSourceUrl = displayCompanion?.launcher_image_source_url ?? null;
-  const generatedLauncherImageUrl = isGeneratedCompanion
+  const generatedLauncherImageUrl = hasRemoteCurrentSceneImage
     && isTransparentLauncherImageUrl(storedLauncherImageUrl)
     && storedLauncherImageSourceUrl === currentSceneImageUrl
     ? storedLauncherImageUrl
     : null;
   const launcherAwayImageUrl = useMemo(() => {
+    if (generatedLauncherImageUrl) {
+      return generatedLauncherImageUrl;
+    }
+
     const bundledLauncherUrl = resolveJourneysCompanionLauncherAwayAssetUrl({
       presetId,
       element,
@@ -164,8 +169,7 @@ export const useJourneysCompanionVisual = () => {
     [launcherAwayImageUrl],
   );
   const launcherAwayHasTransparentBackground = Boolean(
-    isGeneratedCompanion
-    && generatedLauncherImageUrl
+    generatedLauncherImageUrl
     && launcherAwayImageUrl === generatedLauncherImageUrl,
   );
 
@@ -193,8 +197,8 @@ export const useJourneysCompanionVisual = () => {
     launcherAwayUsesPortraitShell,
     launcherAwayHasTransparentBackground,
     needsLauncherImage:
-      isGeneratedCompanion
+      hasRemoteCurrentSceneImage
       && !launcherAwayHasTransparentBackground
-      && isRemoteImageUrl(currentSceneImageUrl),
+      && Boolean(currentSceneImageUrl),
   };
 };

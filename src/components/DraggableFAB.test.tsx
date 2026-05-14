@@ -251,6 +251,49 @@ describe("DraggableFAB", () => {
     expect(screen.queryByRole("img", { name: "Nova" })).not.toBeInTheDocument();
   });
 
+  it("keeps preset-backed remote companions on cached cutout art when the menu opens", () => {
+    mocks.visual = {
+      companionId: "companion-preset-remote",
+      companionLabel: "Nova",
+      presetId: "dragon",
+      imageUrl: "https://assets.example.com/scenic-companion.png",
+      focalX: 0.4,
+      focalY: 0.58,
+      element: "fire",
+      usesPortraitShell: false,
+      isGeneratedCompanion: false,
+      currentSceneImageUrl: "https://assets.example.com/scenic-companion.png",
+      launcherAwayImageUrl:
+        "https://assets.example.com/companion_user-1_launcher_validated_transparent_stage3.png",
+      launcherAwayFocalX: 0.5,
+      launcherAwayFocalY: 0.5,
+      launcherAwayUsesPortraitShell: false,
+      launcherAwayHasTransparentBackground: true,
+      needsLauncherImage: false,
+      currentStage: 3,
+    };
+
+    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
+
+    const launcher = screen.getByTestId("journeys-companion-launcher-floating");
+    expect(screen.getByRole("img", { name: "Nova" })).toHaveAttribute(
+      "src",
+      "https://assets.example.com/companion_user-1_launcher_validated_transparent_stage3.png",
+    );
+
+    fireEvent.click(launcher);
+
+    expect(screen.getByTestId("journeys-companion-launcher-popup")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Nova" })).toHaveAttribute(
+      "src",
+      "https://assets.example.com/companion_user-1_launcher_validated_transparent_stage3.png",
+    );
+    expect(screen.getByRole("img", { name: "Nova" })).not.toHaveAttribute(
+      "src",
+      "https://assets.example.com/scenic-companion.png",
+    );
+  });
+
   it("suppresses popup open after a completed long-press drag interaction", async () => {
     vi.useFakeTimers();
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);

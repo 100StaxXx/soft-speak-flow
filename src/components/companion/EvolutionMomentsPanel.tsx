@@ -18,6 +18,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
 import { isSupabaseMissingRelationError } from "@/utils/supabaseSchemaErrors";
+import { shouldContainCompanionSceneImage } from "@/lib/companionImageFocal";
+import { cn } from "@/lib/utils";
 
 type EvolutionMomentStatus = "queued" | "processing" | "succeeded";
 
@@ -439,6 +441,7 @@ const EvolutionMomentCard = ({
   const canPlay =
     moment.animation_status === "succeeded" &&
     Boolean(moment.animation_video_url);
+  const usesContainedSceneImage = shouldContainCompanionSceneImage(moment.image_url);
 
   return (
     <button
@@ -456,12 +459,21 @@ const EvolutionMomentCard = ({
           : `Stage ${moment.stage} evolution generating`
       }
     >
-      <div className="relative aspect-[4/3] overflow-hidden bg-secondary/40">
+      <div
+        className={cn(
+          "relative aspect-[4/3] overflow-hidden",
+          usesContainedSceneImage ? "bg-black" : "bg-secondary/40",
+        )}
+      >
         {moment.image_url ? (
           <img
             src={moment.image_url}
             alt=""
-            className="h-full w-full object-cover"
+            className={cn(
+              "h-full w-full",
+              usesContainedSceneImage ? "object-contain" : "object-cover",
+            )}
+            data-companion-image-fit={usesContainedSceneImage ? "contain" : "cover"}
             loading="lazy"
             decoding="async"
           />

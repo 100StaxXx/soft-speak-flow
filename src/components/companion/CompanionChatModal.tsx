@@ -51,7 +51,10 @@ import {
 import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
 import { usePlannerPathfinderAppearance } from "@/hooks/usePlannerPathfinderAppearance";
-import { isCompanionSceneImageSource } from "@/lib/companionImageFocal";
+import {
+  isCompanionSceneImageSource,
+  shouldContainCompanionSceneImage,
+} from "@/lib/companionImageFocal";
 import { cn, stripMarkdown } from "@/lib/utils";
 
 interface CompanionChatModalProps {
@@ -157,8 +160,9 @@ export const CompanionChatModal = memo(function CompanionChatModal({
         : assistant.isSpeaking
           ? "Speaking"
           : "Companion chat";
+  const usesGeneratedSceneAvatar = shouldContainCompanionSceneImage(imageUrl);
   const canUsePortraitShell =
-    usesPortraitShell || isCompanionSceneImageSource(imageUrl);
+    !usesGeneratedSceneAvatar && (usesPortraitShell || isCompanionSceneImageSource(imageUrl));
 
   useEffect(() => {
     if (isDesktop || !open) return;
@@ -225,7 +229,12 @@ export const CompanionChatModal = memo(function CompanionChatModal({
   }, [assistant]);
 
   const avatar = (
-    <Avatar className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full border border-white/[0.15] bg-white/10 shadow-[0_18px_32px_-26px_rgba(0,0,0,0.95)]">
+    <Avatar
+      className={cn(
+        "relative h-12 w-12 shrink-0 overflow-hidden rounded-full border border-white/[0.15] shadow-[0_18px_32px_-26px_rgba(0,0,0,0.95)]",
+        usesGeneratedSceneAvatar ? "bg-black" : "bg-white/10",
+      )}
+    >
       {imageUrl ? (
         canUsePortraitShell ? (
           <CompanionPortraitShell
@@ -249,10 +258,11 @@ export const CompanionChatModal = memo(function CompanionChatModal({
             variant="avatar"
             src={imageUrl}
             alt={companionLabel}
+            fit={usesGeneratedSceneAvatar ? "contain" : "cover"}
             element={element}
             focalX={focalX}
             focalY={focalY}
-            className="rounded-full object-cover"
+            className="rounded-full"
           />
         )
       ) : null}

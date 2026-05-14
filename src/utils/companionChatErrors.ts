@@ -42,17 +42,6 @@ export function toUserFacingCompanionChatError(
   parsed: ParsedFunctionInvokeError,
   opts?: { action?: string },
 ): string {
-  const code = getCompanionChatErrorCode(parsed);
-  const source = getCompanionChatErrorSource(parsed);
-
-  if (
-    code === "premium_required"
-    || source.includes("companion talk requires premium")
-    || source.includes("premium access")
-  ) {
-    return "Companion Talk is available with Premium.";
-  }
-
   if (isMissingEdgeFunctionError(parsed)) {
     return "Companion Talk isn't live in this environment yet. Please try again after the backend is updated.";
   }

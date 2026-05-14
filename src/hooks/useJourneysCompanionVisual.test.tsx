@@ -248,4 +248,42 @@ describe("useJourneysCompanionVisual", () => {
     expect(result.current.launcherAwayUsesPortraitShell).toBe(true);
     expect(result.current.needsLauncherImage).toBe(false);
   });
+
+  it("requests cutout art for preset-backed companions once they have a remote generated scene", () => {
+    mocks.companion = baseCompanion({
+      preset_id: "dragon",
+      core_element: "ice",
+      current_image_url: "https://assets.example.com/dragon-evolved-scene.png",
+      launcher_image_url: null,
+      launcher_image_source_url: null,
+    });
+
+    const { result } = renderHook(() => useJourneysCompanionVisual());
+
+    expect(result.current.isGeneratedCompanion).toBe(false);
+    expect(result.current.launcherAwayImageUrl).toBe("/companion-launcher-away/dragon/dragon__launcher-away__ice.png");
+    expect(result.current.launcherAwayUsesPortraitShell).toBe(true);
+    expect(result.current.needsLauncherImage).toBe(true);
+    expect(result.current.currentSceneImageUrl).toBe("https://assets.example.com/dragon-evolved-scene.png");
+  });
+
+  it("prefers validated cutout art over bundled launcher art for preset-backed remote scenes", () => {
+    mocks.companion = baseCompanion({
+      preset_id: "dragon",
+      core_element: "ice",
+      current_image_url: "https://assets.example.com/dragon-evolved-scene.png",
+      launcher_image_url:
+        "https://assets.example.com/user-1/companion_user-1_launcher_validated_transparent_stage3.png",
+      launcher_image_source_url: "https://assets.example.com/dragon-evolved-scene.png",
+    });
+
+    const { result } = renderHook(() => useJourneysCompanionVisual());
+
+    expect(result.current.launcherAwayImageUrl).toBe(
+      "https://assets.example.com/user-1/companion_user-1_launcher_validated_transparent_stage3.png",
+    );
+    expect(result.current.launcherAwayUsesPortraitShell).toBe(false);
+    expect(result.current.launcherAwayHasTransparentBackground).toBe(true);
+    expect(result.current.needsLauncherImage).toBe(false);
+  });
 });

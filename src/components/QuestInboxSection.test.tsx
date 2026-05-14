@@ -5,20 +5,6 @@ import { QuestInboxSection } from "@/components/QuestInboxSection";
 
 const openQuestLocationMock = vi.fn();
 
-vi.mock("@/components/journeys/JourneysCompanionLauncher", () => ({
-  JourneysCompanionLauncher: ({
-    onClick,
-    text,
-  }: {
-    onClick?: () => void;
-    text?: string;
-  }) => (
-    <button type="button" onClick={onClick}>
-      {text ?? "Companion"}
-    </button>
-  ),
-}));
-
 vi.mock("@/utils/questLocationLinks", async () => {
   const actual = await vi.importActual<typeof import("@/utils/questLocationLinks")>("@/utils/questLocationLinks");
   return {
@@ -30,6 +16,52 @@ vi.mock("@/utils/questLocationLinks", async () => {
 describe("QuestInboxSection", () => {
   beforeEach(() => {
     openQuestLocationMock.mockClear();
+  });
+
+  it("renders as a compact dropdown until the header is expanded", () => {
+    const onExpandedChange = vi.fn();
+    const quest = {
+      id: "inbox-1",
+      task_text: "Email Alex",
+      completed: false,
+    };
+
+    const { rerender } = render(
+      <QuestInboxSection
+        tasks={[quest]}
+        isLoading={false}
+        isExpanded={false}
+        onExpandedChange={onExpandedChange}
+        onToggleQuest={vi.fn()}
+        onEditQuest={vi.fn()}
+        onDeleteQuest={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Inbox")).toBeInTheDocument();
+    expect(screen.getByText("1")).toBeInTheDocument();
+    expect(screen.queryByText("Plan Inbox")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Quests without an assigned time yet/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("Email Alex")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /expand inbox section/i }));
+
+    expect(onExpandedChange).toHaveBeenCalledWith(true);
+
+    rerender(
+      <QuestInboxSection
+        tasks={[quest]}
+        isLoading={false}
+        isExpanded
+        onExpandedChange={onExpandedChange}
+        onToggleQuest={vi.fn()}
+        onEditQuest={vi.fn()}
+        onDeleteQuest={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Email Alex")).toBeInTheDocument();
+    expect(screen.getByText("No time assigned yet")).toBeInTheDocument();
   });
 
   it("opens inbox quest map actions without bubbling to parent controls", () => {
@@ -52,7 +84,6 @@ describe("QuestInboxSection", () => {
           isLoading={false}
           isExpanded
           onExpandedChange={vi.fn()}
-          onAddQuest={vi.fn()}
           onToggleQuest={onToggleQuest}
           onEditQuest={onEditQuest}
           onDeleteQuest={onDeleteQuest}
