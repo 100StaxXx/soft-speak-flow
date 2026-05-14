@@ -47,7 +47,7 @@ export const SuggestionCard = memo(function SuggestionCard({
       onClick={() => onToggle(suggestion.id)}
       className={cn(
         'w-full p-4 rounded-xl border text-left transition-all duration-200',
-        'hover:shadow-[0_14px_32px_-28px_rgba(28,87,135,0.44)] hover:scale-[1.02] active:scale-[0.98]',
+        'hover:shadow-[0_14px_32px_-28px_rgba(var(--primary-rgb),0.44)] hover:scale-[1.02] active:scale-[0.98]',
         suggestion.selected
           ? 'border-[hsl(var(--celestial-blue)_/_0.42)] bg-[linear-gradient(180deg,#ffffff_0%,hsl(var(--celestial-blue)_/_0.16)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]'
           : 'border-[hsl(var(--celestial-blue)_/_0.24)] bg-card/70 hover:border-[hsl(var(--celestial-blue)_/_0.42)]'

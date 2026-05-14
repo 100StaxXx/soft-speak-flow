@@ -5,10 +5,7 @@ import {
 import type { PendingEvolutionReveal } from "@/contexts/EvolutionContext";
 import type { Companion } from "@/hooks/useCompanion";
 import { getUniversalEggAssetUrl } from "@/lib/companionAssetResolver";
-import {
-  getBundledCompanionImageFocalPoint,
-  isCompanionEggImageSource,
-} from "@/lib/companionImageFocal";
+import { getBundledCompanionImageFocalPoint } from "@/lib/companionImageFocal";
 
 export interface CompanionDisplayStateInput {
   companion: Companion | null | undefined;
@@ -33,15 +30,8 @@ const LEVEL_ONE_THRESHOLD = getProgressionThreshold(1) ?? 10;
 
 const clampPercent = (value: number) => Math.max(0, Math.min(100, value));
 
-const resolvePreHatchEggImageUrl = (companion: Companion): string => {
-  const storedInitialImageUrl = companion.initial_image_url?.trim();
-
-  if (storedInitialImageUrl && !isCompanionEggImageSource(storedInitialImageUrl)) {
-    return storedInitialImageUrl;
-  }
-
-  return getUniversalEggAssetUrl(companion.core_element || "fire");
-};
+const resolvePreHatchEggImageUrl = (companion: Companion): string =>
+  getUniversalEggAssetUrl(companion.core_element || "fire");
 
 const buildPreHatchCompanionSnapshot = (companion: Companion): Companion => {
   const eggImageUrl = resolvePreHatchEggImageUrl(companion);

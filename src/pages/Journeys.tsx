@@ -67,7 +67,9 @@ import { isOnboardingCleanupEligible } from "@/pages/journeysCleanupEligibility"
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 import { SEND_TO_CALENDAR_ENABLED } from "@/utils/calendarFeatureFlags";
 import { COMPANION_FLOATING_ACTION_BUTTON_ENABLED } from "@/config/companionLauncherFeatureFlags";
+import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
 import { useJourneysLayoutMode } from "@/hooks/useJourneysLayoutMode";
+import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
 import { isMacDesignedForIPadIOSApp, isMacSession } from "@/utils/platformTargets";
 import { QuestInboxSection } from "@/components/QuestInboxSection";
 import { QUEST_ACTION_TOAST_DURATION_MS } from "@/constants/questToast";
@@ -318,6 +320,11 @@ const Journeys = () => {
   const isDesktopLayout = journeysLayoutMode === "desktop";
   const isMacHostedIOSApp = useMemo(() => isMacDesignedForIPadIOSApp(), []);
   const isMacDesktopSession = useMemo(() => isMacSession(), []);
+  const { favoriteColor: companionFavoriteColor } = useJourneysCompanionVisual();
+  const companionFrostedThemeStyle = useMemo(
+    () => getCompanionFrostedThemeStyle(companionFavoriteColor),
+    [companionFavoriteColor],
+  );
   const macTimedTaskDurationFallbackMinutes = isMacDesktopSession
     ? MAC_TIMED_TASK_DURATION_FALLBACK_MINUTES
     : undefined;
@@ -1996,6 +2003,8 @@ const Journeys = () => {
           "min-h-screen pb-nav-safe pt-safe px-4 relative z-10",
           isDesktopLayout && "px-6",
         )}
+        style={companionFrostedThemeStyle}
+        data-testid="journeys-theme-scope"
       >
         <div className="mx-auto w-full max-w-[1360px]">
           {/* Hero Header */}
@@ -2106,6 +2115,7 @@ const Journeys = () => {
                 onSendToCalendar={SEND_TO_CALENDAR_ENABLED ? handleSendTaskToCalendar : undefined}
                 hasCalendarLink={hasLinkedEvent}
                 onMoveQuestToNextDay={handleMoveQuestToNextDayFromWeekPlanner}
+                companionFrostedThemeStyle={companionFrostedThemeStyle}
               />
             ) : (
               <TodaysAgenda
@@ -2145,6 +2155,7 @@ const Journeys = () => {
                 onDateSelect={handleUserDateSelect}
                 onDesktopPlannerModeChange={setDesktopPlannerMode}
                 onOpenMonthView={() => setShowMonthView(true)}
+                companionFrostedThemeStyle={companionFrostedThemeStyle}
                 onTimeSlotLongPress={(date, time) => {
                   openAddQuestSheet({ date, time });
                 }}
@@ -2196,6 +2207,7 @@ const Journeys = () => {
           autoRestoreDraftOnOpen={autoRestoreQuestDraftOnOpen}
           persistenceRoute="/journeys"
           onCreateCampaign={() => openCampaignBuilder()}
+          companionFrostedThemeStyle={companionFrostedThemeStyle}
         />
         
         {/* Edit Quest Dialog (for regular quests) */}
@@ -2212,6 +2224,7 @@ const Journeys = () => {
           isDeleting={isDeleting}
           presentation={isMacHostedIOSApp ? "desktop-panel" : "mobile-sheet"}
           plannerSubtaskDraft={plannerQuestEditSession?.editor === "update" ? plannerQuestEditSession.localSubtasks : null}
+          companionFrostedThemeStyle={companionFrostedThemeStyle}
         />
         
         {/* Edit Ritual Sheet (for habits/rituals with two-way sync) */}
@@ -2220,6 +2233,7 @@ const Journeys = () => {
           open={!!editingRitual}
           onOpenChange={(open) => !open && closeEditingRitual()}
           onDelete={handleDeleteRitual}
+          companionFrostedThemeStyle={companionFrostedThemeStyle}
         />
 
         <HourlyViewModal
@@ -2288,6 +2302,7 @@ const Journeys = () => {
           persistenceRoute="/journeys"
           userId={user?.id}
           showTemplatesFirst={false}
+          companionFrostedThemeStyle={companionFrostedThemeStyle}
         />
 
         {/* Campaign Created Celebration */}

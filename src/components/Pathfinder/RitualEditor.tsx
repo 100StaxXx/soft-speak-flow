@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, type CSSProperties } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Clock, RotateCcw, Sparkles } from 'lucide-react';
 import { plannerPathfinderTheme } from '@/components/companion/plannerPathfinderTheme';
@@ -15,13 +15,15 @@ interface RitualEditorProps {
   originalRituals: JourneyRitual[];
   onRitualsChange: (rituals: JourneyRitual[]) => void;
   className?: string;
+  companionFrostedThemeStyle?: CSSProperties;
 }
 
 export function RitualEditor({ 
   rituals, 
   originalRituals, 
   onRitualsChange,
-  className 
+  className,
+  companionFrostedThemeStyle,
 }: RitualEditorProps) {
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [newRitualTitle, setNewRitualTitle] = useState('');
@@ -118,6 +120,7 @@ export function RitualEditor({
                   ritual={ritual}
                   onUpdate={handleUpdateRitual}
                   onDelete={handleDeleteRitual}
+                  companionFrostedThemeStyle={companionFrostedThemeStyle}
                 />
               </motion.div>
             ))}

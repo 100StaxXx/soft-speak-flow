@@ -114,7 +114,7 @@ export function getSchedulingFieldStyles(variant: SchedulingFieldVariant) {
       triggerRow: "flex gap-2",
       triggerIcon: "h-4 w-4",
       panel: "space-y-2",
-      input: "h-11 rounded-[20px] border-[2px] border-[hsl(var(--celestial-blue)_/_0.52)] bg-card/[0.88] text-base text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_2px_rgba(58,121,158,0.08)] focus-visible:border-[hsl(var(--celestial-blue)_/_0.78)] focus-visible:ring-celestial-blue/25",
+      input: "h-11 rounded-[20px] border-[2px] border-[hsl(var(--celestial-blue)_/_0.52)] bg-card/[0.88] text-base text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_2px_rgba(var(--primary-rgb),0.08)] focus-visible:border-[hsl(var(--celestial-blue)_/_0.78)] focus-visible:ring-celestial-blue/25",
       wheel: QUEST_FORM_STYLES.timeWheel,
       wheelFadeTop: QUEST_FORM_STYLES.timeWheelFadeTop,
       wheelFadeBottom: QUEST_FORM_STYLES.timeWheelFadeBottom,

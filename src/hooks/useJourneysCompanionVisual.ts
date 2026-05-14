@@ -1,5 +1,8 @@
 import { useMemo } from "react";
-import { resolveCompanionVisualAssetUrl } from "@/lib/companionAssetResolver";
+import {
+  getUniversalEggCutoutAssetUrl,
+  resolveCompanionVisualAssetUrl,
+} from "@/lib/companionAssetResolver";
 import { deriveCompanionDisplayState } from "@/lib/companionDisplayState";
 import {
   getBundledCompanionImageAssetKey,
@@ -135,17 +138,28 @@ export const useJourneysCompanionVisual = () => {
 
   const presetId = displayCompanion?.preset_id ?? null;
   const element = displayCompanion?.core_element ?? null;
+  const currentStage = displayCompanion?.current_stage ?? companion?.current_stage ?? null;
   const currentSceneImageUrl = displayCompanion?.current_image_url ?? null;
   const isGeneratedCompanion = isAiGeneratedCompanion(displayCompanion);
+  const isStageZeroCompanion = typeof currentStage === "number" && currentStage <= 0;
+  const stageZeroEggLauncherImageUrl =
+    isStageZeroCompanion
+      ? getUniversalEggCutoutAssetUrl(element ?? "fire")
+      : null;
   const hasRemoteCurrentSceneImage = isRemoteImageUrl(currentSceneImageUrl);
   const storedLauncherImageUrl = displayCompanion?.launcher_image_url ?? null;
   const storedLauncherImageSourceUrl = displayCompanion?.launcher_image_source_url ?? null;
-  const generatedLauncherImageUrl = hasRemoteCurrentSceneImage
+  const generatedLauncherImageUrl = !isStageZeroCompanion
+    && hasRemoteCurrentSceneImage
     && isTransparentLauncherImageUrl(storedLauncherImageUrl)
     && storedLauncherImageSourceUrl === currentSceneImageUrl
     ? storedLauncherImageUrl
     : null;
   const launcherAwayImageUrl = useMemo(() => {
+    if (stageZeroEggLauncherImageUrl) {
+      return stageZeroEggLauncherImageUrl;
+    }
+
     if (generatedLauncherImageUrl) {
       return generatedLauncherImageUrl;
     }
@@ -159,9 +173,8 @@ export const useJourneysCompanionVisual = () => {
     if (bundledLauncherUrl) {
       return bundledLauncherUrl;
     }
-
-    return generatedLauncherImageUrl;
-  }, [element, generatedLauncherImageUrl, presetId]);
+    return null;
+  }, [element, generatedLauncherImageUrl, presetId, stageZeroEggLauncherImageUrl]);
   const launcherAwayUsesPortraitShell = useMemo(
     () => (
       getBundledCompanionImageAssetKey(launcherAwayImageUrl) !== null
@@ -169,14 +182,15 @@ export const useJourneysCompanionVisual = () => {
     [launcherAwayImageUrl],
   );
   const launcherAwayHasTransparentBackground = Boolean(
-    generatedLauncherImageUrl
-    && launcherAwayImageUrl === generatedLauncherImageUrl,
+    (stageZeroEggLauncherImageUrl && launcherAwayImageUrl === stageZeroEggLauncherImageUrl)
+    || (generatedLauncherImageUrl && launcherAwayImageUrl === generatedLauncherImageUrl),
   );
 
   return {
     companionId: companion?.id ?? null,
     companionLabel,
-    currentStage: displayCompanion?.current_stage ?? companion?.current_stage ?? null,
+    favoriteColor: displayCompanion?.favorite_color ?? companion?.favorite_color ?? null,
+    currentStage,
     presetId,
     imageUrl,
     focalX: focalPoint.x,
@@ -197,7 +211,8 @@ export const useJourneysCompanionVisual = () => {
     launcherAwayUsesPortraitShell,
     launcherAwayHasTransparentBackground,
     needsLauncherImage:
-      hasRemoteCurrentSceneImage
+      !isStageZeroCompanion
+      && hasRemoteCurrentSceneImage
       && !launcherAwayHasTransparentBackground
       && Boolean(currentSceneImageUrl),
   };

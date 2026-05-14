@@ -4,6 +4,7 @@ import { AddQuestSheet, type AddQuestData } from "./AddQuestSheet";
 import type { QuestAttachmentInput } from "@/types/questAttachments";
 import type { PersonalQuestTemplate, QuestComposerPrefillDraft } from "@/features/quests/types";
 import { DIFFICULTY_COLORS } from "@/components/quest-shared";
+import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
 import { getQuestDraftStorageKey } from "@/utils/accountLocalState";
 
 const mocks = vi.hoisted(() => ({
@@ -14,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   refreshPersonalTemplates: vi.fn(),
   saveTemplateMock: vi.fn(),
   toastMock: vi.fn(),
+  companionFavoriteColor: "#52b7ff",
   storage: new Map<string, string>(),
   safeLocalStorage: {
     getItem: (key: string) => mocks.storage.get(key) ?? null,
@@ -35,6 +37,12 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
     user: { id: "user-1" },
+  }),
+}));
+
+vi.mock("@/hooks/useCompanion", () => ({
+  useCompanion: () => ({
+    companion: { favorite_color: mocks.companionFavoriteColor },
   }),
 }));
 
@@ -171,6 +179,7 @@ describe("AddQuestSheet", () => {
     mocks.defaultProvider = null;
     mocks.connections = [];
     mocks.personalTemplates = [];
+    mocks.companionFavoriteColor = "#52b7ff";
     mocks.saveTemplateMock.mockResolvedValue(buildPersonalTemplate({
       id: "explicit-template-1",
       title: "Deep work sprint",
@@ -234,6 +243,42 @@ describe("AddQuestSheet", () => {
     expect(screen.queryByTestId("add-quest-mobile-sheet")).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText("Quest Title")).toBeInTheDocument();
     expect(screen.getByText(/Name your quest.*Select a time.*Thu, Jan 15/i)).toBeInTheDocument();
+  });
+
+  it("applies supplied companion frosted variables to the sheet portal", () => {
+    const companionFrostedThemeStyle = getCompanionFrostedThemeStyle("#9b6bff");
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+        companionFrostedThemeStyle={companionFrostedThemeStyle}
+      />,
+    );
+
+    expect(screen.getByTestId("add-quest-mobile-sheet").style.getPropertyValue("--companion-frosted-primary")).toBe(
+      companionFrostedThemeStyle["--companion-frosted-primary"],
+    );
+  });
+
+  it("falls back to the stored companion color when no theme style is supplied", () => {
+    mocks.companionFavoriteColor = "#58d68d";
+    const companionFrostedThemeStyle = getCompanionFrostedThemeStyle(mocks.companionFavoriteColor);
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    expect(screen.getByTestId("add-quest-mobile-sheet").style.getPropertyValue("--companion-frosted-primary")).toBe(
+      companionFrostedThemeStyle["--companion-frosted-primary"],
+    );
   });
 
   it("renders Advanced Settings below Photo / Files", () => {
@@ -840,6 +885,12 @@ describe("AddQuestSheet", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
 
     expect(await screen.findByText("Save these changes to My Templates?")).toBeInTheDocument();
+    const prompt = screen.getByTestId("add-quest-template-prompt-dialog");
+    const companionFrostedThemeStyle = getCompanionFrostedThemeStyle(mocks.companionFavoriteColor);
+    expect(prompt).toHaveClass("companion-frosted-quest-light");
+    expect(prompt.style.getPropertyValue("--companion-frosted-primary")).toBe(
+      companionFrostedThemeStyle["--companion-frosted-primary"],
+    );
     expect(screen.getByRole("button", { name: "Save to My Templates" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Just this time" })).toBeInTheDocument();
   });
@@ -1713,6 +1764,12 @@ describe("AddQuestSheet", () => {
     );
 
     expect(await screen.findByText("Restore saved quest draft?")).toBeInTheDocument();
+    const prompt = screen.getByTestId("add-quest-draft-restore-dialog");
+    const companionFrostedThemeStyle = getCompanionFrostedThemeStyle(mocks.companionFavoriteColor);
+    expect(prompt).toHaveClass("companion-frosted-quest-light");
+    expect(prompt.style.getPropertyValue("--companion-frosted-primary")).toBe(
+      companionFrostedThemeStyle["--companion-frosted-primary"],
+    );
     fireEvent.click(screen.getByRole("button", { name: "Restore draft" }));
 
     expect(screen.getByPlaceholderText("Quest Title")).toHaveValue("Persistent quest");

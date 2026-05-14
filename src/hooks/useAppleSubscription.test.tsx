@@ -192,7 +192,7 @@ describe("useAppleSubscription", () => {
     expect(mocks.purchase).not.toHaveBeenCalled();
   });
 
-  it("purchases the referral yearly product directly when RevenueCat returns it", async () => {
+  it("uses Apple offer-code redemption even if a stale referral yearly product is returned", async () => {
     mocks.appliedReferralCodeState = {
       ...mocks.appliedReferralCodeState,
       code: "OFFER123",
@@ -206,12 +206,6 @@ describe("useAppleSubscription", () => {
       ...mocks.storeKitProducts,
       { identifier: "cosmiq_referral_yearly", displayName: "Referral Yearly", description: "", price: 69.99, displayPrice: "$69.99" },
     ];
-    mocks.purchase.mockResolvedValueOnce({
-      productId: "cosmiq_referral_yearly",
-      transactionId: "tx-referral",
-      expirationDate: "2099-01-01T00:00:00.000Z",
-      appAccountToken: "11111111-1111-4111-8111-111111111111",
-    });
 
     const { result } = renderHook(() => useAppleSubscription());
 
@@ -219,11 +213,9 @@ describe("useAppleSubscription", () => {
       await result.current.handlePurchase("cosmiq_premium_yearly");
     });
 
-    expect(mocks.redeemOfferCode).not.toHaveBeenCalled();
-    expect(mocks.purchase).toHaveBeenCalledWith("cosmiq_referral_yearly");
-    expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
-      body: { transactionId: "tx-referral" },
-    });
+    expect(mocks.redeemOfferCode).toHaveBeenCalledTimes(1);
+    expect(mocks.purchase).not.toHaveBeenCalled();
+    expect(mocks.functionsInvoke).not.toHaveBeenCalled();
   });
 
   it("purchases yearly after the offer code redemption step is primed", async () => {

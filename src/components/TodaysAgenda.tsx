@@ -59,6 +59,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { QuestLocationLink } from "@/components/QuestLocationLink";
 import { cn, formatDisplayLabel, stripMarkdown } from "@/lib/utils";
+import {
+  COMPANION_FROSTED_PLANNER_DARK_CLASS,
+  COMPANION_FROSTED_THEME_SCOPE_CLASS,
+} from "@/lib/companionFrostedTheme";
 import { supabase } from "@/integrations/supabase/client";
 import { MAIN_QUEST_XP_MULTIPLIER } from "@/config/xpRewards";
 
@@ -116,7 +120,7 @@ const safeFormat = (date: Date, fmt: string, fallback = "") => {
 
 const TOUCH_CLICK_SUPPRESSION_RESET_MS = 750;
 const JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME =
-  "journeys-quest-card-shell overflow-hidden border transition-colors";
+  `${COMPANION_FROSTED_THEME_SCOPE_CLASS} journeys-quest-card-shell overflow-hidden border transition-colors`;
 const JOURNEYS_QUEST_CARD_SHELL_STANDARD_TONE_CLASS_NAME =
   "border-white/10 bg-white/[0.04] shadow-[0_12px_22px_rgba(0,0,0,0.14)]";
 const JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME = "journeys-quest-card-shell--active";
@@ -271,6 +275,7 @@ interface TodaysAgendaProps {
   timedTaskDurationFallbackMinutes?: number;
   useMacDurationSizedDesktopTimelineRows?: boolean;
   centerNowRequestKey?: string | number;
+  companionFrostedThemeStyle?: CSSProperties;
 }
 
 type ActiveEpic = NonNullable<TodaysAgendaProps["activeEpics"]>[number];
@@ -535,6 +540,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   hasCalendarLink,
   onOpenMonthView,
   centerNowRequestKey,
+  companionFrostedThemeStyle,
 }: TodaysAgendaProps) {
   const { user } = useAuth();
   const questCaptureDateLabel = isSameDay(selectedDate, new Date())
@@ -2047,6 +2053,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             onToggleSubtask={(taskId, subtaskId, completed) => {
               toggleSubtask.mutate({ taskId, subtaskId, completed });
             }}
+            companionFrostedThemeStyle={companionFrostedThemeStyle}
             anchor={(
               <button
                 type="button"
@@ -2280,7 +2287,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                         <MoreHorizontal className="w-4 h-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-44">
+                    <DropdownMenuContent
+                      align="end"
+                      className={cn(COMPANION_FROSTED_PLANNER_DARK_CLASS, "w-44")}
+                      data-testid={`quest-action-menu-${task.id}`}
+                      style={companionFrostedThemeStyle}
+                    >
                       {onEditQuest && (
                         <DropdownMenuItem
                           onClick={(e) => {
@@ -2739,9 +2751,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   return (
     <div
       className={cn(
+        COMPANION_FROSTED_PLANNER_DARK_CLASS,
         "relative",
         isDesktopLayout && "grid grid-cols-[minmax(0,1fr)_340px] items-start gap-6",
       )}
+      data-testid="todays-agenda"
+      style={companionFrostedThemeStyle}
     >
       <div
         className={cn(
@@ -2961,7 +2976,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       <ArrowUpDown className="w-3 h-3" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-28">
+                  <DropdownMenuContent
+                    align="start"
+                    className={cn(COMPANION_FROSTED_PLANNER_DARK_CLASS, "w-28")}
+                    data-testid="quest-sort-menu"
+                    style={companionFrostedThemeStyle}
+                  >
                     <DropdownMenuItem
                       onClick={() => setSortBy('custom')}
                       className={cn("text-xs", sortBy === 'custom' && 'bg-accent/10')}
@@ -3011,7 +3031,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       </Badge>
                     </Button>
                   </DrawerTrigger>
-                  <DrawerContent data-testid="untimed-quests-drawer">
+                  <DrawerContent
+                    className={COMPANION_FROSTED_PLANNER_DARK_CLASS}
+                    data-testid="untimed-quests-drawer"
+                    style={companionFrostedThemeStyle}
+                  >
                     <DrawerHeader>
                       <DrawerTitle>Untimed quests</DrawerTitle>
                       <DrawerDescription>

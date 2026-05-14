@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { requireAdminRequest } from "../_shared/admin.ts";
+import { syncAppleOfferCodeForReferralCode } from "../_shared/referralState.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -78,6 +79,47 @@ serve(async (req) => {
 
       return new Response(JSON.stringify({ success: true }), {
         status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "resync_apple_offer_codes") {
+      const codeFilter = typeof body?.code === "string" ? body.code.trim().toUpperCase() : null;
+      let query = supabase
+        .from("referral_codes")
+        .select("id, code, apple_offer_code_id, apple_offer_campaign_identifier")
+        .eq("owner_type", "influencer")
+        .eq("is_active", true)
+        .order("created_at", { ascending: true });
+
+      if (codeFilter) {
+        query = query.eq("code", codeFilter);
+      }
+
+      const { data: codes, error } = await query;
+      if (error) throw error;
+
+      const results = [];
+      for (const code of codes ?? []) {
+        results.push(await syncAppleOfferCodeForReferralCode(supabase, {
+          id: code.id,
+          code: code.code,
+          apple_offer_code_id: code.apple_offer_code_id ?? null,
+          apple_offer_campaign_identifier: code.apple_offer_campaign_identifier ?? null,
+        }));
+      }
+
+      const synced = results.filter((result) => result.status === "active").length;
+      const failed = results.filter((result) => result.status === "failed").length;
+
+      return new Response(JSON.stringify({
+        success: failed === 0,
+        total: results.length,
+        synced,
+        failed,
+        results,
+      }), {
+        status: failed === 0 ? 200 : 207,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

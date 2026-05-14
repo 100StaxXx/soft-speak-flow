@@ -1,4 +1,4 @@
-import { useState, useEffect, memo } from "react";
+import { useState, useEffect, memo, type CSSProperties } from "react";
 import { Repeat, Loader2, Brain, Dumbbell, Flame, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,6 +76,7 @@ interface EditRitualSheetProps {
   onSaveComplete?: () => void;
   onDelete?: (habitId: string) => Promise<void>;
   isDeleting?: boolean;
+  companionFrostedThemeStyle?: CSSProperties;
 }
 
 const categoryConfig: Record<HabitCategory, { icon: typeof Brain; label: string }> = {
@@ -91,6 +92,7 @@ export const EditRitualSheet = memo(function EditRitualSheet({
   onSaveComplete,
   onDelete,
   isDeleting,
+  companionFrostedThemeStyle,
 }: EditRitualSheetProps) {
   const { saveRitual } = useRitualUpdate();
   const { themeModeClassName } = usePlannerPathfinderAppearance();
@@ -238,6 +240,7 @@ export const EditRitualSheet = memo(function EditRitualSheet({
           plannerPathfinderTheme.shell,
           "fixed flex h-[88dvh] max-h-[88dvh] flex-col overflow-hidden rounded-t-[2.25rem] px-0 pb-0 pt-0",
         )}
+        style={companionFrostedThemeStyle}
       >
         <div className={plannerPathfinderTheme.shellGloss} />
         <div className={plannerPathfinderTheme.shellGlow} />
@@ -423,6 +426,7 @@ export const EditRitualSheet = memo(function EditRitualSheet({
                       hideMoreInformation
                       visualStyle="quest-soft"
                       portalClassName={cn(themeModeClassName, plannerPathfinderTheme.portalSurface)}
+                      portalStyle={companionFrostedThemeStyle}
                     />
                   ) : (
                     <p className={QUEST_FORM_STYLES.helperText}>

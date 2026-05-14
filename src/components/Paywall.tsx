@@ -1,8 +1,20 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type PointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type PointerEvent, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, CheckCircle2, Crown, Gift, Lock, MessageCircle, RefreshCw, Sparkles } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowRight,
+  CalendarDays,
+  CheckCircle2,
+  Crown,
+  Gift,
+  MessageCircle,
+  RefreshCw,
+  Sparkles,
+  Target,
+  Trophy,
+  type LucideIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { useAppleSubscription } from "@/hooks/useAppleSubscription";
 import { getProductForPlan, getPurchaseProductIdForPlan } from "@/utils/appleIAP";
 import { cn } from "@/lib/utils";
@@ -27,9 +39,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
-import paywallPrimaryBackground from "@/assets/backgrounds/paywall-primary.webp";
+import { StaticBackgroundImage } from "@/components/StaticBackgroundImage";
+import type { StaticBackgroundAsset } from "@/assets/backgrounds";
 import { trackPaywallEvent } from "@/utils/paywallTelemetry";
-import { PREMIUM_BENEFITS, PREMIUM_BENEFITS_SUMMARY, PREMIUM_PLAN_NOTE } from "@/config/premiumBenefits";
+import { PREMIUM_PLAN_NOTE } from "@/config/premiumBenefits";
 
 type PlanType = "monthly" | "yearly";
 export type PaywallVariant = "pre_trial_signup" | "trial_expired";
@@ -37,6 +50,109 @@ export type PaywallVariant = "pre_trial_signup" | "trial_expired";
 interface PaywallProps {
   variant?: PaywallVariant;
 }
+
+interface PaywallStorySection {
+  id: string;
+  eyebrow: string;
+  title: string;
+  body: string;
+  background: StaticBackgroundAsset;
+  icon: LucideIcon;
+  imagePosition: string;
+}
+
+interface PaywallBenefit {
+  icon: LucideIcon;
+  title: string;
+  text: string;
+}
+
+interface PaywallLandscapeSectionProps {
+  id: string;
+  background: StaticBackgroundAsset;
+  imagePosition?: string;
+  loading?: "eager" | "lazy";
+  className?: string;
+  contentClassName?: string;
+  children: ReactNode;
+}
+
+const PAYWALL_CHECKOUT_ID = "cosmiq-pro-plans";
+
+const createPaywallBackdrop = (src: string, src2x = src): StaticBackgroundAsset => ({
+  src,
+  src2x,
+});
+
+const paywallBackdrops = {
+  quests: createPaywallBackdrop("/landing-backdrops/quests.webp", "/landing-backdrops/quests@2x.webp"),
+  guide: createPaywallBackdrop("/landing-backdrops/guide.webp", "/landing-backdrops/guide@2x.webp"),
+  campaigns: createPaywallBackdrop("/landing-backdrops/campaigns.webp", "/landing-backdrops/campaigns@2x.webp"),
+  companion: createPaywallBackdrop("/landing-backdrops/companion.webp", "/landing-backdrops/companion@2x.webp"),
+  profile: createPaywallBackdrop("/landing-backdrops/profile.webp", "/landing-backdrops/profile@2x.webp"),
+};
+
+const paywallStorySections: PaywallStorySection[] = [
+  {
+    id: "paywall-quests",
+    eyebrow: "The daily loop",
+    title: "An AI companion that turns your goals into daily quests.",
+    body: "Start with what matters, shape the day, follow through, and let your progress become part of a world that keeps calling you back.",
+    background: paywallBackdrops.quests,
+    icon: Target,
+    imagePosition: "50% 42%",
+  },
+  {
+    id: "paywall-guide",
+    eyebrow: "Guidance with a pulse",
+    title: "Check in, get briefed, and find the next clear move.",
+    body: "Your guide helps you turn mood, intention, pep talks, and reflection into practical momentum instead of another blank planning screen.",
+    background: paywallBackdrops.guide,
+    icon: MessageCircle,
+    imagePosition: "50% 44%",
+  },
+  {
+    id: "paywall-campaigns",
+    eyebrow: "Goals become systems",
+    title: "Big goals become campaigns, rituals, milestones, and a planned day.",
+    body: "Cosmiq Pro keeps the long arc visible while your companion helps translate ambition into something you can actually do today.",
+    background: paywallBackdrops.campaigns,
+    icon: CalendarDays,
+    imagePosition: "50% 48%",
+  },
+  {
+    id: "paywall-companion",
+    eyebrow: "Built for return",
+    title: "Your companion grows when you follow through.",
+    body: "XP, daily missions, evolution stages, stories, collection, and memories turn ordinary consistency into a world worth returning to.",
+    background: paywallBackdrops.companion,
+    icon: Sparkles,
+    imagePosition: "50% 48%",
+  },
+];
+
+const paywallBenefits: PaywallBenefit[] = [
+  {
+    icon: MessageCircle,
+    title: "Unlimited guide chat",
+    text: "Ask for planning help, motivation, reflection, and calmer next steps whenever the day gets noisy.",
+  },
+  {
+    icon: Target,
+    title: "Unlimited quests and campaigns",
+    text: "Turn daily responsibilities and bigger goals into quests, rituals, milestones, and day plans.",
+  },
+  {
+    icon: Sparkles,
+    title: "All 15 evolution stages",
+    text: "Keep the full companion arc open, including missions, stories, collection, and growth rewards.",
+  },
+  {
+    icon: Crown,
+    title: "Offline downloaded content",
+    text: "Keep downloaded guidance and content close when focus matters and connection is not guaranteed.",
+  },
+];
 
 const blurActiveElement = () => {
   if (typeof document === "undefined") return;
@@ -46,6 +162,38 @@ const blurActiveElement = () => {
   }
 };
 
+const PaywallLandscapeSection = ({
+  id,
+  background,
+  imagePosition = "50% 50%",
+  loading = "lazy",
+  className,
+  contentClassName,
+  children,
+}: PaywallLandscapeSectionProps) => (
+  <section
+    id={id}
+    className={cn("relative isolate min-h-[100svh] snap-start snap-always overflow-hidden", className)}
+  >
+    <StaticBackgroundImage
+      background={background}
+      className="absolute inset-0 -z-20 h-full w-full object-cover pointer-events-none select-none"
+      objectPosition={imagePosition}
+      loading={loading}
+    />
+    <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(3,7,12,0.66)_0%,rgba(3,7,12,0.28)_40%,rgba(3,7,12,0.93)_100%),linear-gradient(90deg,rgba(3,7,12,0.84)_0%,rgba(3,7,12,0.3)_54%,rgba(3,7,12,0.72)_100%)]" />
+    <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_18%,rgba(255,255,255,0.13),transparent_34%)]" />
+    <div
+      className={cn(
+        "relative z-10 mx-auto flex min-h-[100svh] w-full max-w-6xl px-5",
+        contentClassName,
+      )}
+    >
+      {children}
+    </div>
+  </section>
+);
+
 export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
   const [selectedPlan, setSelectedPlan] = useState<PlanType>("yearly");
   const [offerCode, setOfferCode] = useState("");
@@ -53,8 +201,6 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const deleteConfirmationInputRef = useRef<HTMLInputElement | null>(null);
-  const deleteSubmitButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const {
     handlePurchase,
@@ -69,7 +215,6 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
     hasAppliedReferralCode,
     appliedReferralCode,
     offerCodePurchaseReady,
-    hasReferralYearlyProduct,
     handlePresentRevenueCatPaywall,
   } = useAppleSubscription();
   const { toast } = useToast();
@@ -79,16 +224,13 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
   const queryClient = useQueryClient();
 
   const monthlyProduct = useMemo(() => getProductForPlan("monthly", products), [products]);
-  const preferReferralYearly = hasOfferCode && hasReferralYearlyProduct;
   const yearlyProduct = useMemo(
-    () => getProductForPlan("yearly", products, { preferReferral: preferReferralYearly }),
-    [preferReferralYearly, products],
+    () => getProductForPlan("yearly", products),
+    [products],
   );
   const selectedProductId = useMemo(
-    () => getPurchaseProductIdForPlan(selectedPlan, products, {
-      preferReferral: selectedPlan === "yearly" && preferReferralYearly,
-    }),
-    [preferReferralYearly, selectedPlan, products],
+    () => getPurchaseProductIdForPlan(selectedPlan, products),
+    [selectedPlan, products],
   );
 
   useEffect(() => {
@@ -138,7 +280,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
       setOfferCode("");
       toast({
         title: "Creator code applied",
-        description: "Your yearly plan is now discounted to $69.99/year.",
+        description: "Your yearly plan is now discounted to $69.99 for the first year.",
       });
     } catch (error) {
       trackPaywallEvent("offer_code_failed", {
@@ -253,9 +395,11 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
     if (nextValue !== "DELETE") return;
 
     window.setTimeout(() => {
-      if (document.activeElement !== deleteConfirmationInputRef.current) return;
-      deleteConfirmationInputRef.current?.blur();
-      deleteSubmitButtonRef.current?.focus();
+      const deleteConfirmationInput = document.getElementById("paywall-delete-confirmation-input");
+      const deleteSubmitButton = document.getElementById("paywall-delete-submit-button");
+      if (document.activeElement !== deleteConfirmationInput) return;
+      deleteConfirmationInput?.blur();
+      deleteSubmitButton?.focus();
     }, 0);
   }, []);
 
@@ -266,6 +410,13 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
       setDeleteConfirmText("");
     }
   }, [isDeleting]);
+
+  const scrollToCheckout = useCallback(() => {
+    document.getElementById(PAYWALL_CHECKOUT_ID)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, []);
 
   const plans = {
     monthly: {
@@ -279,270 +430,361 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
       savings: hasOfferCode ? "Code applied" : "Best value",
     },
   };
+  const hasSelectedCreatorYearlyOffer = hasOfferCode && selectedPlan === "yearly";
+  const getPlanDisplayPrice = (plan: PlanType) => {
+    if (plan === "yearly" && hasOfferCode) return plans.yearly.fallbackPrice;
+    return (plan === "yearly" ? yearlyProduct?.displayPrice : monthlyProduct?.displayPrice)
+      ?? plans[plan].fallbackPrice;
+  };
 
   const copy = variant === "trial_expired"
     ? {
-        title: "Your Free Trial Has Ended",
-        subtitle: `Subscribe to keep ${PREMIUM_BENEFITS_SUMMARY.toLowerCase()}`,
+        checkoutEyebrow: "Keep the world open",
+        title: "Your journey is ready to continue.",
+        subtitle: "Subscribe to keep your AI companion, unlimited quests, campaigns, guide chat, and the full evolution path active.",
         cta: `Subscribe ${selectedPlan === "yearly" ? "Yearly" : "Monthly"}`,
-        legalIntro: "Payment will be charged to your Apple ID account at confirmation of purchase.",
+        legalIntro: hasSelectedCreatorYearlyOffer
+          ? "Your creator code unlocks $69.99 for the first year. After the first year, this plan renews at the standard yearly price unless canceled."
+          : "Payment will be charged to your Apple ID account at confirmation of purchase.",
+        heroBadge: "Continue with Pro",
+        shortcutLabel: "Plans",
       }
     : {
-        title: "Keep Your Journey Going",
-        subtitle: `Start your free trial to get ${PREMIUM_BENEFITS_SUMMARY.toLowerCase()}`,
-        cta: "Start 7-Day Free Trial",
-        legalIntro:
-          "No charge today. Your Apple ID account will be charged when the free trial ends unless canceled at least 24 hours before the end of the trial.",
+        checkoutEyebrow: "Start Cosmiq Pro",
+        title: "Start the trial. Keep the story moving.",
+        subtitle: "Unlock the full daily loop: plan with your AI companion, follow your quests, and watch the world grow from real progress.",
+        cta: hasSelectedCreatorYearlyOffer ? "Redeem Discount with Apple" : "Start 3-Day Free Trial",
+        legalIntro: hasSelectedCreatorYearlyOffer
+          ? "Your creator code unlocks $69.99 for the first year. After the first year, this plan renews at the standard yearly price unless canceled."
+          : "No charge today. Your Apple ID account will be charged when the free trial ends unless canceled at least 24 hours before the end of the trial.",
+        heroBadge: "3-day free trial",
+        shortcutLabel: "Start trial",
       };
-  const ctaLabel = selectedPlan === "yearly" && hasOfferCode && !hasReferralYearlyProduct
+  const ctaLabel = hasSelectedCreatorYearlyOffer
     ? (offerCodePurchaseReady ? "Subscribe Yearly" : "Redeem Discount with Apple")
     : copy.cta;
 
   return (
-    <div className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-start px-6 pt-safe pb-[var(--bottom-nav-runtime-offset,var(--bottom-nav-safe-offset))] overflow-y-auto">
-      <div
-        className="fixed inset-0 -z-10 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: `url(${paywallPrimaryBackground})` }}
-        aria-hidden="true"
-      />
-      <div className="fixed inset-0 -z-10 bg-gradient-to-b from-background/30 via-background/55 to-background/95" aria-hidden="true" />
-      <div className="fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_38%)]" aria-hidden="true" />
+    <div data-testid="paywall-overlay" className="fixed inset-0 z-[120] overflow-hidden bg-[#05080d] text-white">
+      <button
+        type="button"
+        onClick={scrollToCheckout}
+        className="fixed right-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] z-[130] inline-flex h-10 items-center gap-2 border border-white/18 bg-black/32 px-4 text-xs font-semibold uppercase tracking-[0.18em] text-white/84 backdrop-blur-xl transition hover:border-white/36 hover:bg-white/12 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-100"
+        aria-label="View Cosmiq Pro plans"
+      >
+        {copy.shortcutLabel}
+        <ArrowDown className="h-3.5 w-3.5" />
+      </button>
 
-      <div className="w-full max-w-md space-y-6 relative z-10">
-        {/* Header */}
-        <div className="text-center space-y-4">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-primary/90 to-accent/90 shadow-glow backdrop-blur-sm">
-            <Crown className="h-10 w-10 text-primary-foreground" />
-          </div>
-          <h1 className="font-display text-3xl text-foreground">
-            {copy.title}
-          </h1>
-          <p className="text-muted-foreground">
-            {copy.subtitle}
-          </p>
-        </div>
+      <main className="h-full snap-y snap-mandatory overflow-y-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {paywallStorySections.map((section, index) => {
+          const Icon = section.icon;
 
-        {/* Offer Code Section */}
-        <Card className="border-white/15 bg-background/60 backdrop-blur-md shadow-2xl">
-          <CardContent className="p-5 space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 rounded-full bg-primary/15 p-2">
-                <Gift className="h-5 w-5 text-primary" />
-              </div>
-              <div className="space-y-1">
-                <h2 className="text-lg font-semibold text-foreground">Have a creator code?</h2>
-                <p className="text-sm text-muted-foreground">
-                  Enter it here to unlock the discounted annual price.
+          return (
+            <PaywallLandscapeSection
+              key={section.id}
+              id={section.id}
+              background={section.background}
+              imagePosition={section.imagePosition}
+              loading={index === 0 ? "eager" : "lazy"}
+              contentClassName={cn(
+                "flex-col justify-end pb-[calc(env(safe-area-inset-bottom,0px)+4.5rem)] pt-[calc(env(safe-area-inset-top,0px)+4.75rem)]",
+                index === 0 ? "items-center text-center sm:items-start sm:text-left" : "items-start text-left",
+              )}
+            >
+              <div className={cn("w-full", index === 0 ? "max-w-3xl" : "max-w-2xl")}>
+                <div className="mb-5 inline-flex items-center gap-2 border border-white/18 bg-black/24 px-3 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-100 backdrop-blur-md">
+                  <Icon className="h-4 w-4" />
+                  {section.eyebrow}
+                </div>
+                <h1 className={cn(
+                  "font-display font-semibold leading-[0.96] tracking-normal text-white",
+                  index === 0 ? "text-5xl sm:text-7xl lg:text-8xl" : "text-4xl sm:text-6xl lg:text-7xl",
+                )}>
+                  {section.title}
+                </h1>
+                <p className="mt-6 max-w-2xl text-lg leading-7 text-white/82 sm:text-2xl sm:leading-8">
+                  {section.body}
                 </p>
+                {index === 0 ? (
+                  <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={scrollToCheckout}
+                      className="inline-flex h-14 items-center justify-center gap-2 border border-cyan-100/70 bg-cyan-100 px-6 text-sm font-semibold uppercase tracking-[0.18em] text-slate-950 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-100 sm:min-w-[15rem]"
+                    >
+                      See plans
+                      <ArrowDown className="h-4 w-4" />
+                    </button>
+                    <div className="inline-flex h-14 items-center justify-center border border-white/18 bg-black/20 px-5 text-xs font-semibold uppercase tracking-[0.18em] text-white/72 backdrop-blur-md">
+                      {copy.heroBadge}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </PaywallLandscapeSection>
+          );
+        })}
+
+        <PaywallLandscapeSection
+          id={PAYWALL_CHECKOUT_ID}
+          background={paywallBackdrops.profile}
+          imagePosition="50% 55%"
+          contentClassName="items-start py-[calc(env(safe-area-inset-top,0px)+4.5rem)] pb-[calc(env(safe-area-inset-bottom,0px)+3rem)]"
+        >
+          <div className="grid w-full gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(360px,440px)] lg:items-center">
+            <div className="space-y-6">
+              <div>
+                <div className="mb-4 inline-flex items-center gap-2 border border-white/18 bg-black/24 px-3 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-100 backdrop-blur-md">
+                  <Crown className="h-4 w-4" />
+                  {copy.checkoutEyebrow}
+                </div>
+                <h2 className="max-w-3xl font-display text-4xl font-semibold leading-[0.98] tracking-normal text-white sm:text-6xl lg:text-7xl">
+                  {copy.title}
+                </h2>
+                <p className="mt-5 max-w-2xl text-lg leading-7 text-white/82 sm:text-xl sm:leading-8">
+                  {copy.subtitle}
+                </p>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                {paywallBenefits.map((benefit) => {
+                  const Icon = benefit.icon;
+
+                  return (
+                    <div
+                      key={benefit.title}
+                      className="border border-white/14 bg-black/24 p-4 backdrop-blur-md"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-9 w-9 items-center justify-center border border-cyan-100/22 bg-cyan-100/10 text-cyan-100">
+                          <Icon className="h-4 w-4" />
+                        </span>
+                        <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-white">
+                          {benefit.title}
+                        </h3>
+                      </div>
+                      <p className="mt-3 text-sm leading-6 text-white/72">
+                        {benefit.text}
+                      </p>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            {hasAppliedReferralCode ? (
-              <div className="rounded-2xl border border-primary/30 bg-primary/10 p-4">
-                <div className="flex items-start gap-3">
-                  <CheckCircle2 className="mt-0.5 h-5 w-5 text-primary" />
-                  <div className="space-y-1">
-                    <p className="font-medium text-foreground">
-                      {hasOfferCode ? "Creator code applied" : "Referral code applied"}
+            <div className="border border-white/16 bg-black/42 p-4 shadow-[0_28px_80px_rgba(0,0,0,0.38)] backdrop-blur-2xl sm:p-5">
+              <div className="space-y-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-100">
+                      Cosmiq Pro
                     </p>
-                    <p className="text-sm text-muted-foreground">
-                      {hasOfferCode
-                        ? hasReferralYearlyProduct
-                          ? "Your discounted annual plan is ready."
-                          : "Your annual plan is discounted to $69.99/year."
-                        : "This code is saved to your account, but it does not unlock the Apple creator discount."}
-                    </p>
-                    {hasOfferCode && appliedReferralCode && !hasReferralYearlyProduct ? (
-                      <p className="text-xs text-muted-foreground">
-                        Use <span className="font-mono tracking-[0.18em] text-foreground">{appliedReferralCode}</span> in Apple&apos;s offer-code redemption screen.
+                    <h3 className="mt-2 text-2xl font-semibold text-white">
+                      Choose your path
+                    </h3>
+                  </div>
+                  <div className="flex h-12 w-12 items-center justify-center border border-white/16 bg-white/10">
+                    <Trophy className="h-5 w-5 text-stardust-gold" />
+                  </div>
+                </div>
+
+                <div className="space-y-3 border border-white/12 bg-white/[0.04] p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 bg-cyan-100/12 p-2 text-cyan-100">
+                      <Gift className="h-5 w-5" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-base font-semibold text-white">Have a creator code?</h4>
+                      <p className="text-sm text-white/68">
+                        Enter it here to unlock the discounted annual price.
                       </p>
-                    ) : null}
+                    </div>
+                  </div>
+
+                  {hasAppliedReferralCode ? (
+                    <div className="border border-cyan-100/26 bg-cyan-100/10 p-3">
+                      <div className="flex items-start gap-3">
+                        <CheckCircle2 className="mt-0.5 h-5 w-5 text-cyan-100" />
+                        <div className="space-y-1">
+                          <p className="font-medium text-white">
+                            {hasOfferCode ? "Creator code applied" : "Referral code applied"}
+                          </p>
+                          <p className="text-sm text-white/70">
+                            {hasOfferCode
+                              ? "Your annual plan is discounted to $69.99 for the first year."
+                              : "This code is saved to your account, but it does not unlock the Apple creator discount."}
+                          </p>
+                          {hasOfferCode && appliedReferralCode ? (
+                            <p className="text-xs text-white/64">
+                              Use <span className="font-mono tracking-[0.18em] text-white">{appliedReferralCode}</span> in Apple&apos;s offer-code redemption screen.
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <form className="space-y-3" onSubmit={handleApplyOfferCode}>
+                      <Input
+                        placeholder="ENTER CREATOR CODE"
+                        value={offerCode}
+                        onChange={(event) => setOfferCode(event.target.value.toUpperCase())}
+                        maxLength={24}
+                        className="h-12 border-white/15 bg-black/40 text-center text-base uppercase tracking-[0.2em] text-white placeholder:text-white/36"
+                      />
+                      <Button
+                        type="submit"
+                        disabled={applyReferralCode.isPending || !offerCode.trim()}
+                        className="w-full"
+                      >
+                        {applyReferralCode.isPending ? "Applying..." : "Apply Creator Code"}
+                      </Button>
+                      <p className="text-center text-xs text-white/54">
+                        Entering a valid code unlocks discounted annual pricing.
+                      </p>
+                    </form>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {(["monthly", "yearly"] as PlanType[]).map((plan) => (
+                    <button
+                      key={plan}
+                      type="button"
+                      onClick={() => setSelectedPlan(plan)}
+                      className={cn(
+                        "relative min-h-[124px] border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-100",
+                        selectedPlan === plan
+                          ? "border-cyan-100 bg-cyan-100/12 shadow-[0_0_34px_rgba(165,243,252,0.16)]"
+                          : "border-white/14 bg-white/[0.04] hover:border-white/32",
+                      )}
+                    >
+                      {plans[plan].savings && (
+                        <span className="absolute right-2 top-2 bg-cyan-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-950">
+                          {plans[plan].savings}
+                        </span>
+                      )}
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/58">
+                        {plan}
+                      </p>
+                      <p className="mt-5 text-2xl font-bold text-white">
+                        {getPlanDisplayPrice(plan)}
+                      </p>
+                      <p className="text-xs text-white/58">
+                        {plans[plan].period}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+
+                <Button
+                  onClick={() => { void handleSubscribe(); }}
+                  disabled={!isAvailable || loading || productsLoading}
+                  className="h-14 w-full bg-cyan-100 text-sm font-semibold uppercase tracking-[0.16em] text-slate-950 shadow-[0_18px_44px_rgba(165,243,252,0.18)] hover:bg-white"
+                >
+                  {loading ? "Processing..." : ctaLabel}
+                  {!loading && <ArrowRight className="ml-2 h-4 w-4" />}
+                </Button>
+
+                {!hasOfferCode && (
+                  <Button
+                    variant="outline"
+                    onClick={() => { void handleOpenRevenueCatPaywall(); }}
+                    disabled={!isAvailable || loading}
+                    className="w-full border-white/18 bg-white/[0.04] text-white hover:bg-white/10 hover:text-white"
+                  >
+                    View All Plans
+                  </Button>
+                )}
+
+                {!isAvailable && (
+                  <div className="bg-white/[0.06] p-4">
+                    <p className="text-center text-sm text-white/68">
+                      In-App Purchases are only available on iOS devices
+                    </p>
+                  </div>
+                )}
+
+                {productsLoading && (
+                  <div className="flex items-center gap-2 border border-dashed border-white/22 px-3 py-2 text-sm text-white/64">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-transparent" />
+                    Contacting the App Store...
+                  </div>
+                )}
+
+                {productError && (
+                  <div className="flex flex-col gap-2 border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                    <span>{productError}</span>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" onClick={() => { void reloadProducts(); }}>
+                        Try Again
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => toast({
+                          title: "Need help?",
+                          description: "Please ensure you're signed in to the App Store and retry.",
+                        })}
+                      >
+                        Contact support
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <Button
+                  variant="ghost"
+                  onClick={() => { void handleRestore("paywall"); }}
+                  disabled={loading}
+                  className="w-full text-white/64 hover:bg-white/8 hover:text-white"
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Restore Purchases
+                </Button>
+
+                <div className="space-y-2 border-t border-white/12 pt-4">
+                  <p className="text-center text-xs leading-relaxed text-white/54">
+                    {PREMIUM_PLAN_NOTE}
+                  </p>
+                  <p className="text-center text-xs leading-relaxed text-white/54">
+                    {copy.legalIntro}
+                  </p>
+                  <div className="flex justify-center gap-4 text-xs">
+                    <a href="/privacy" className="text-white/58 underline hover:text-white">Privacy Policy</a>
+                    <a href="/terms" className="text-white/58 underline hover:text-white">Terms of Use</a>
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-center">
+                  <p className="text-xs text-white/46">Need another account?</p>
+                  <div className="flex items-center justify-center gap-3">
+                    <Button
+                      variant="link"
+                      size="sm"
+                      onClick={handleSignOut}
+                      disabled={isSigningOut}
+                      className="h-auto p-0 text-xs text-white/58 hover:text-white"
+                    >
+                      {isSigningOut ? "Signing out..." : "Sign out"}
+                    </Button>
+                    <span className="text-xs text-white/28">•</span>
+                    <Button
+                      variant="link"
+                      size="sm"
+                      onClick={() => setShowDeleteDialog(true)}
+                      className="h-auto p-0 text-xs text-white/58 hover:text-destructive"
+                    >
+                      Delete account
+                    </Button>
                   </div>
                 </div>
               </div>
-            ) : (
-              <form className="space-y-3" onSubmit={handleApplyOfferCode}>
-                <Input
-                  placeholder="ENTER CREATOR CODE"
-                  value={offerCode}
-                  onChange={(event) => setOfferCode(event.target.value.toUpperCase())}
-                  maxLength={24}
-                  className="h-12 border-white/15 bg-background/70 text-center text-base tracking-[0.2em] uppercase"
-                />
-                <Button
-                  type="submit"
-                  disabled={applyReferralCode.isPending || !offerCode.trim()}
-                  className="w-full"
-                >
-                  {applyReferralCode.isPending ? "Applying..." : "Apply Creator Code"}
-                </Button>
-                <p className="text-center text-xs text-muted-foreground">
-                  Entering a valid code unlocks discounted annual pricing.
-                </p>
-              </form>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Plan Selection */}
-        <div className="flex gap-3">
-          {(["monthly", "yearly"] as PlanType[]).map((plan) => (
-            <Card
-              key={plan}
-              onClick={() => setSelectedPlan(plan)}
-              className={cn(
-                "flex-1 cursor-pointer transition-all relative overflow-hidden border-white/10 bg-background/55 backdrop-blur-md",
-                selectedPlan === plan
-                  ? "border-2 border-primary bg-primary/10 shadow-glow"
-                  : "border hover:border-primary/50"
-              )}
-            >
-              {plans[plan].savings && (
-                <div className="absolute top-0 right-0 bg-accent text-accent-foreground text-xs font-bold px-2 py-1 rounded-bl-lg">
-                  {plans[plan].savings}
-                </div>
-              )}
-              <CardContent className="p-4 text-center">
-                <p className="text-sm font-medium text-muted-foreground capitalize mb-1">
-                  {plan}
-                </p>
-                <p className="text-2xl font-bold text-foreground">
-                  {(plan === "yearly" ? yearlyProduct?.displayPrice : monthlyProduct?.displayPrice) ?? plans[plan].fallbackPrice}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {plans[plan].period}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Features */}
-        <Card className="border-white/10 bg-background/50 backdrop-blur-md">
-          <CardContent className="p-5 space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Every plan includes:
-            </p>
-            {[
-              { icon: MessageCircle, text: PREMIUM_BENEFITS[0] },
-              { icon: Sparkles, text: PREMIUM_BENEFITS[1] },
-              { icon: Lock, text: PREMIUM_BENEFITS[2] },
-              { icon: Crown, text: PREMIUM_BENEFITS[3] },
-            ].map((feature, idx) => (
-              <div key={idx} className="flex items-center gap-3 text-sm">
-                <feature.icon className="h-5 w-5 text-primary flex-shrink-0" />
-                <span className="text-foreground">{feature.text}</span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* Subscribe Button */}
-        <Button
-          onClick={() => { void handleSubscribe(); }}
-          disabled={!isAvailable || loading || productsLoading}
-          className="w-full py-6 text-base font-semibold bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground shadow-glow"
-        >
-          {loading ? "Processing..." : ctaLabel}
-          {!loading && <ArrowRight className="ml-2 h-4 w-4" />}
-        </Button>
-
-        <Button
-          variant="outline"
-          onClick={() => { void handleOpenRevenueCatPaywall(); }}
-          disabled={!isAvailable || loading}
-          className="w-full border-white/15 bg-background/45 backdrop-blur-md"
-        >
-          View All Plans
-        </Button>
-
-        {/* IAP Notice */}
-        {!isAvailable && (
-          <div className="bg-muted/30 rounded-lg p-4">
-            <p className="text-sm text-muted-foreground text-center">
-              In-App Purchases are only available on iOS devices
-            </p>
-          </div>
-        )}
-
-        {productsLoading && (
-          <div className="flex items-center gap-2 rounded-lg border border-dashed border-muted-foreground/30 px-3 py-2 text-sm text-muted-foreground">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-muted-foreground" />
-            Contacting the App Store...
-          </div>
-        )}
-
-        {productError && (
-          <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive flex flex-col gap-2">
-            <span>{productError}</span>
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" onClick={() => { void reloadProducts(); }}>
-                Try Again
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => toast({
-                  title: "Need help?",
-                  description: "Please ensure you're signed in to the App Store and retry.",
-                })}
-              >
-                Contact support
-              </Button>
             </div>
           </div>
-        )}
+        </PaywallLandscapeSection>
+      </main>
 
-        <div className="grid gap-3">
-          <Button
-            variant="ghost"
-            onClick={() => { void handleRestore("paywall"); }}
-            disabled={loading}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Restore Purchases
-          </Button>
-        </div>
-
-        <p className="text-xs text-center text-muted-foreground leading-relaxed">
-          {PREMIUM_PLAN_NOTE}
-        </p>
-        <p className="text-xs text-center text-muted-foreground leading-relaxed">
-          {copy.legalIntro}
-        </p>
-        <div className="flex justify-center gap-4 text-xs">
-          <a href="/privacy" className="text-muted-foreground underline hover:text-foreground">Privacy Policy</a>
-          <a href="/terms" className="text-muted-foreground underline hover:text-foreground">Terms of Use</a>
-        </div>
-
-        {/* Account options */}
-        <div className="pt-1 text-center space-y-2">
-          <p className="text-xs text-muted-foreground">Need another account?</p>
-          <div className="flex items-center justify-center gap-3">
-            <Button
-              variant="link"
-              size="sm"
-              onClick={handleSignOut}
-              disabled={isSigningOut}
-              className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
-            >
-              {isSigningOut ? "Signing out..." : "Sign out"}
-            </Button>
-            <span className="text-xs text-muted-foreground/60">•</span>
-            <Button
-              variant="link"
-              size="sm"
-              onClick={() => setShowDeleteDialog(true)}
-              className="h-auto p-0 text-xs text-muted-foreground hover:text-destructive"
-            >
-              Delete account
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Delete Account Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={handleDeleteDialogOpenChange}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -564,7 +806,6 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
             <Input
               id="paywall-delete-confirmation-input"
               aria-label="Type DELETE to confirm"
-              ref={deleteConfirmationInputRef}
               value={deleteConfirmText}
               onChange={handleDeleteConfirmationChange}
               placeholder="Type DELETE"
@@ -581,7 +822,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                 Cancel
               </AlertDialogCancel>
               <Button
-                ref={deleteSubmitButtonRef}
+                id="paywall-delete-submit-button"
                 type="submit"
                 variant="destructive"
                 onPointerDown={handleDeleteButtonPointerDown}
@@ -589,7 +830,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
               >
                 {isDeleting ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2" />
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-current" />
                     Deleting...
                   </>
                 ) : (

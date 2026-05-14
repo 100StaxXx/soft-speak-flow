@@ -257,6 +257,42 @@ Deno.test("ensureAppleTransactionBinding creates the first binding when appAccou
   );
 });
 
+Deno.test("getPriceCents defaults creator yearly offer-code receipts to $69.99", () => {
+  Deno.env.delete("APPLE_OFFER_CODE_YEARLY_PRICE_CENTS");
+  Deno.env.delete("APPLE_OFFER_CODE_IDENTIFIER");
+
+  const amountCents = appleSubscriptionsModule.getPriceCents("yearly", {
+    offerIdentifier: "Referrals",
+    offerType: null,
+  });
+
+  assert(amountCents === 6999, `Expected 6999 cents, got ${amountCents}`);
+});
+
+Deno.test("getPriceCents does not discount mismatched yearly offer-code receipts", () => {
+  Deno.env.delete("APPLE_YEARLY_PRICE_CENTS");
+  Deno.env.delete("APPLE_OFFER_CODE_YEARLY_PRICE_CENTS");
+  Deno.env.delete("APPLE_OFFER_CODE_IDENTIFIER");
+
+  const amountCents = appleSubscriptionsModule.getPriceCents("yearly", {
+    offerIdentifier: "Cosmiq_OfferCode_yearly",
+    offerType: 3,
+  });
+
+  assert(amountCents === 9999, `Expected 9999 cents, got ${amountCents}`);
+});
+
+Deno.test("getPriceCents keeps standard yearly receipts at $99.99", () => {
+  Deno.env.delete("APPLE_YEARLY_PRICE_CENTS");
+
+  const amountCents = appleSubscriptionsModule.getPriceCents("yearly", {
+    offerIdentifier: null,
+    offerType: null,
+  });
+
+  assert(amountCents === 9999, `Expected 9999 cents, got ${amountCents}`);
+});
+
 Deno.test("ensureAppleTransactionBinding rejects rebinding a purchase to another user", async () => {
   const supabase = createBindingSupabase([
     {

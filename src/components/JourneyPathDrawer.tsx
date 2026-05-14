@@ -17,8 +17,11 @@ import { useJourneyPathImage } from "@/hooks/useJourneyPathImage";
 import { usePreloadedImageUrl } from "@/hooks/usePreloadedImageUrl";
 import { useMilestones } from "@/hooks/useMilestones";
 import { useCompanion } from "@/hooks/useCompanion";
+import { usePlannerPathfinderAppearance } from "@/hooks/usePlannerPathfinderAppearance";
+import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
 import { getJourneyPathDrawerImageUrl } from "@/utils/journeyPathUrls";
 import { getEpicDaysRemaining, resolveEpicEndDate } from "@/utils/epicDates";
+import { cn } from "@/lib/utils";
 
 interface EpicHabit {
   habit_id: string;
@@ -62,6 +65,11 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
   const { resolvedImageUrl: loadedDrawerImageUrl } = usePreloadedImageUrl(drawerImageUrl);
   const { milestones, totalCount } = useMilestones(epic.id);
   const { companion } = useCompanion();
+  const { themeModeClassName } = usePlannerPathfinderAppearance();
+  const companionFrostedThemeStyle = useMemo(
+    () => getCompanionFrostedThemeStyle(companion?.favorite_color),
+    [companion?.favorite_color],
+  );
   const resolvedEndDate = useMemo(() => resolveEpicEndDate(epic), [epic]);
 
   const daysRemaining = useMemo(() => {
@@ -131,7 +139,11 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
       <DrawerTrigger asChild>
         {children}
       </DrawerTrigger>
-      <DrawerContent className="max-h-[85vh]">
+      <DrawerContent
+        className={cn(themeModeClassName, "max-h-[85vh]")}
+        style={companionFrostedThemeStyle}
+        data-testid="journey-path-drawer-content"
+      >
         <DrawerHeader className="pb-2">
           <div className="flex items-start justify-between gap-3">
             <DrawerTitle className="flex items-center gap-2">
@@ -275,6 +287,7 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
               epicTitle={epic.title}
               epicGoal={epic.description}
               currentDeadline={resolvedEndDate ?? undefined}
+              companionFrostedThemeStyle={companionFrostedThemeStyle}
             >
               <Button variant="outline" className="gap-2">
                 <Map className="w-4 h-4" />
@@ -294,6 +307,7 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
           }
         }}
         startWithAddRitual={editStartsWithAddRitual}
+        companionFrostedThemeStyle={companionFrostedThemeStyle}
         onDeleted={() => {
           setEditOpen(false);
           setOpen(false);

@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import {
   Drawer,
   DrawerContent,
@@ -26,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { Milestone } from "@/hooks/useMilestones";
 import { CompanionPostcard } from "@/hooks/useCompanionPostcards";
 import { MILESTONE_XP_REWARDS } from "@/config/xpRewards";
+import { usePlannerPathfinderAppearance } from "@/hooks/usePlannerPathfinderAppearance";
 
 interface MilestoneDetailDrawerProps {
   milestone: Milestone | null;
@@ -36,6 +38,7 @@ interface MilestoneDetailDrawerProps {
   isCompleting: boolean;
   status: "completed" | "overdue" | "pending";
   postcard?: CompanionPostcard;
+  companionFrostedThemeStyle?: CSSProperties;
 }
 
 export const MilestoneDetailDrawer = ({
@@ -47,7 +50,10 @@ export const MilestoneDetailDrawer = ({
   isCompleting,
   status,
   postcard,
+  companionFrostedThemeStyle,
 }: MilestoneDetailDrawerProps) => {
+  const { themeModeClassName } = usePlannerPathfinderAppearance();
+
   if (!milestone) return null;
 
   const isCompleted = status === "completed";
@@ -75,7 +81,11 @@ export const MilestoneDetailDrawer = ({
 
   return (
     <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()} handleOnly={true} shouldScaleBackground={false} modal={false}>
-      <DrawerContent className="max-h-[90vh]">
+      <DrawerContent
+        className={cn(themeModeClassName, "max-h-[90vh]")}
+        style={companionFrostedThemeStyle}
+        data-testid="milestone-detail-drawer-content"
+      >
         <DrawerHeader className="pb-2 border-b border-border/50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">

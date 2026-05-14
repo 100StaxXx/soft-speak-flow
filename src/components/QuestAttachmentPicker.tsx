@@ -37,7 +37,7 @@ export function QuestAttachmentPicker({
   const addButtonClassName = cn(
     "gap-2",
     isQuestSoft
-      ? "rounded-[16px] border-[2px] border-[hsl(var(--celestial-blue)_/_0.42)] bg-card/[0.76] text-foreground shadow-[0_10px_22px_-20px_rgba(92,157,198,0.34),inset_0_1px_0_rgba(255,255,255,0.76)] hover:border-[hsl(var(--stardust-gold)_/_0.48)] hover:bg-card hover:text-foreground"
+      ? "rounded-[16px] border-[2px] border-[hsl(var(--celestial-blue)_/_0.42)] bg-card/[0.76] text-foreground shadow-[0_10px_22px_-20px_rgba(var(--primary-rgb),0.34),inset_0_1px_0_rgba(255,255,255,0.76)] hover:border-[hsl(var(--stardust-gold)_/_0.48)] hover:bg-card hover:text-foreground"
       : "",
   );
 
@@ -138,7 +138,7 @@ export function QuestAttachmentPicker({
               className={cn(
                 "relative p-2",
                 isQuestSoft
-                  ? "rounded-[16px] border-[2px] border-[hsl(var(--celestial-blue)_/_0.38)] bg-card/[0.64] shadow-[0_10px_22px_-20px_rgba(92,157,198,0.32),inset_0_1px_0_rgba(255,255,255,0.72)]"
+                  ? "rounded-[16px] border-[2px] border-[hsl(var(--celestial-blue)_/_0.38)] bg-card/[0.64] shadow-[0_10px_22px_-20px_rgba(var(--primary-rgb),0.32),inset_0_1px_0_rgba(255,255,255,0.72)]"
                   : "rounded-lg border border-border/60 bg-card",
               )}
             >

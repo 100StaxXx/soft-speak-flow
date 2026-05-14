@@ -129,6 +129,7 @@ vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
     focalY: null,
     element: "fire",
     usesPortraitShell: false,
+    favoriteColor: "#9b6bff",
   }),
 }));
 

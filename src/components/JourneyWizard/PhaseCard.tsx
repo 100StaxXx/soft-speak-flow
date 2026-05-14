@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { plannerPathfinderTheme } from '@/components/companion/plannerPathfinderTheme';
 import { 
@@ -24,6 +24,7 @@ interface PhaseCardProps {
   onMilestoneDateChange?: (milestoneId: string, newDate: string) => void;
   postcardCount?: number;
   maxPostcards?: number;
+  companionFrostedThemeStyle?: CSSProperties;
 }
 
 export function PhaseCard({ 
@@ -35,6 +36,7 @@ export function PhaseCard({
   onMilestoneDateChange,
   postcardCount = 0,
   maxPostcards = 7,
+  companionFrostedThemeStyle,
 }: PhaseCardProps) {
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
   const [expandedMilestones, setExpandedMilestones] = useState<Set<string>>(new Set());
@@ -73,7 +75,7 @@ export function PhaseCard({
       )}
       
       <div className={cn(
-        'rounded-[1.7rem] border p-4 shadow-[0_14px_32px_-28px_rgba(28,87,135,0.44),inset_0_1px_0_rgba(255,255,255,0.58)]',
+        'rounded-[1.7rem] border p-4 shadow-[0_14px_32px_-28px_rgba(var(--primary-rgb),0.44),inset_0_1px_0_rgba(255,255,255,0.58)]',
         colorClass
       )}>
         {/* Phase Header */}
@@ -179,6 +181,7 @@ export function PhaseCard({
                     <PopoverContent
                       className={cn(themeModeClassName, plannerPathfinderTheme.portalSurface, "w-auto p-0")}
                       align="end"
+                      style={companionFrostedThemeStyle}
                     >
                       <CalendarComponent
                         mode="single"

@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useState, type CSSProperties } from 'react';
 import { motion } from 'framer-motion';
 import { 
   GripVertical, 
@@ -32,6 +32,7 @@ interface RitualCardProps {
   onUpdate: (ritual: JourneyRitual) => void;
   onDelete: (ritualId: string) => void;
   isEditing?: boolean;
+  companionFrostedThemeStyle?: CSSProperties;
 }
 
 const difficultyColors = {
@@ -40,7 +41,13 @@ const difficultyColors = {
   hard: 'bg-category-body/10 text-category-body border-category-body/30',
 };
 
-export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete, isEditing: initialEditing = false }: RitualCardProps) {
+export const RitualCard = memo(function RitualCard({
+  ritual,
+  onUpdate,
+  onDelete,
+  isEditing: initialEditing = false,
+  companionFrostedThemeStyle,
+}: RitualCardProps) {
   const [isEditing, setIsEditing] = useState(initialEditing);
   const [editedRitual, setEditedRitual] = useState(ritual);
   const { themeModeClassName } = usePlannerPathfinderAppearance();
@@ -163,7 +170,10 @@ export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete,
               <SelectTrigger className={cn(plannerPathfinderTheme.textField, "h-10 text-xs")}>
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className={cn(themeModeClassName, plannerPathfinderTheme.portalSurface)}>
+              <SelectContent
+                className={cn(themeModeClassName, plannerPathfinderTheme.portalSurface)}
+                style={companionFrostedThemeStyle}
+              >
                 <SelectItem value="easy">Easy</SelectItem>
                 <SelectItem value="medium">Medium</SelectItem>
                 <SelectItem value="hard">Hard</SelectItem>

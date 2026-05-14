@@ -51,6 +51,12 @@ vi.mock("@/hooks/useAuth", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
+  useJourneysCompanionVisual: () => ({
+    favoriteColor: "#9b6bff",
+  }),
+}));
+
 vi.mock("@/hooks/useEpics", () => ({
   useEpics: () => ({
     activeEpics: [],
@@ -76,6 +82,10 @@ describe("Campaigns background", () => {
     expect(screen.queryByTestId("campaigns-stat-active")).not.toBeInTheDocument();
     expect(screen.queryByTestId("campaigns-stat-completed")).not.toBeInTheDocument();
     expect(screen.queryByTestId("campaigns-stat-completion")).not.toBeInTheDocument();
+    expect(screen.getByTestId("campaigns-theme-scope")).not.toHaveClass("companion-frosted-theme-scope");
+    expect(screen.getByTestId("campaigns-theme-scope").style.getPropertyValue("--companion-frosted-primary")).toBe(
+      "259 78% 70%",
+    );
     expect(screen.getByTestId("campaigns-empty-state-panel")).toHaveClass("border-celestial-blue/18");
     expect(screen.getByTestId("campaigns-empty-state-panel")).toHaveClass("border-dashed");
     expect(screen.getByTestId("campaigns-empty-state-panel").className).toContain("bg-transparent");

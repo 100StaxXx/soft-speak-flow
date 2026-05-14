@@ -1,6 +1,5 @@
 const APP_STORE_CONNECT_API_BASE_URL = "https://api.appstoreconnect.apple.com/v1";
-const DEFAULT_CUSTOM_CODE_REDEMPTION_LIMIT = 1000000;
-const DEFAULT_CODE_LIFETIME_DAYS = 180;
+export const DEFAULT_CUSTOM_CODE_REDEMPTION_LIMIT = 25000;
 
 type JsonApiData<T> = {
   id: string;
@@ -146,7 +145,7 @@ const normalizeCustomCodeRecord = (
 const getOfferCodeCampaignId = () => getRequiredEnv("APPLE_SUBSCRIPTION_OFFER_CODE_ID");
 export const getOfferCodeCampaignIdentifier = () => getRequiredEnv("APPLE_OFFER_CODE_IDENTIFIER");
 
-const getCustomCodeRedemptionLimit = () => {
+export const getCustomCodeRedemptionLimit = () => {
   const rawValue = Deno.env.get("APPLE_OFFER_CODE_MAX_REDEMPTIONS_PER_CUSTOM_CODE");
   const parsedValue = rawValue ? Number(rawValue) : NaN;
   return Number.isFinite(parsedValue) && parsedValue > 0
@@ -154,17 +153,42 @@ const getCustomCodeRedemptionLimit = () => {
     : DEFAULT_CUSTOM_CODE_REDEMPTION_LIMIT;
 };
 
-const toDateString = (value: Date) => value.toISOString().slice(0, 10);
-
-export const getOfferCodeExpiryDate = (now = new Date()) => {
+export const getOfferCodeExpiryDate = () => {
   const configuredDate = Deno.env.get("APPLE_OFFER_CODE_EXPIRATION_DATE")?.trim();
   if (configuredDate) {
     return configuredDate;
   }
 
-  const expiry = new Date(now);
-  expiry.setUTCDate(expiry.getUTCDate() + DEFAULT_CODE_LIFETIME_DAYS);
-  return toDateString(expiry);
+  return null;
+};
+
+export const buildAppleCustomOfferCodeCreateAttributes = (customCode: string) => {
+  const expirationDate = getOfferCodeExpiryDate();
+  const attributes: SubscriptionOfferCodeCustomCodeAttributes = {
+    active: true,
+    customCode,
+    numberOfCodes: getCustomCodeRedemptionLimit(),
+  };
+
+  if (expirationDate) {
+    attributes.expirationDate = expirationDate;
+  }
+
+  return attributes;
+};
+
+export const buildAppleCustomOfferCodeUpdateAttributes = () => {
+  const expirationDate = getOfferCodeExpiryDate();
+  const attributes: Partial<SubscriptionOfferCodeCustomCodeAttributes> = {
+    active: true,
+    numberOfCodes: getCustomCodeRedemptionLimit(),
+  };
+
+  if (expirationDate) {
+    attributes.expirationDate = expirationDate;
+  }
+
+  return attributes;
 };
 
 export async function findAppleCustomOfferCodeByValue(customCode: string) {
@@ -184,8 +208,6 @@ export async function findAppleCustomOfferCodeByValue(customCode: string) {
 
 export async function createAppleCustomOfferCode(customCode: string) {
   const offerCodeId = getOfferCodeCampaignId();
-  const expirationDate = getOfferCodeExpiryDate();
-  const numberOfCodes = getCustomCodeRedemptionLimit();
 
   const response = await appStoreConnectRequest<SubscriptionOfferCodeCustomCodeAttributes>(
     "/subscriptionOfferCodeCustomCodes",
@@ -194,12 +216,7 @@ export async function createAppleCustomOfferCode(customCode: string) {
       body: JSON.stringify({
         data: {
           type: "subscriptionOfferCodeCustomCodes",
-          attributes: {
-            active: true,
-            customCode,
-            expirationDate,
-            numberOfCodes,
-          },
+          attributes: buildAppleCustomOfferCodeCreateAttributes(customCode),
           relationships: {
             offerCode: {
               data: {
@@ -247,23 +264,79 @@ export async function updateAppleCustomOfferCode(
   return normalizeCustomCodeRecord(updatedRecord);
 }
 
+type AppleOfferCodeClient = {
+  findByValue(customCode: string): Promise<AppleCustomOfferCodeRecord | null>;
+  create(customCode: string): Promise<AppleCustomOfferCodeRecord>;
+  update(
+    customCodeId: string,
+    attributes: Partial<SubscriptionOfferCodeCustomCodeAttributes>,
+  ): Promise<AppleCustomOfferCodeRecord>;
+  deactivate(customCodeId: string): Promise<AppleCustomOfferCodeRecord | null>;
+};
+
+const defaultAppleOfferCodeClient: AppleOfferCodeClient = {
+  findByValue: findAppleCustomOfferCodeByValue,
+  create: createAppleCustomOfferCode,
+  update: updateAppleCustomOfferCode,
+  deactivate: deactivateAppleCustomOfferCode,
+};
+
+const sameOfferCampaignIdentifier = (
+  left: string | null,
+  right: string,
+) => left?.toLowerCase() === right.toLowerCase();
+
 export async function ensureAppleCustomOfferCode(params: {
   customCode: string;
   existingCustomCodeId?: string | null;
-}) {
-  const desiredExpirationDate = getOfferCodeExpiryDate();
-  const desiredRedemptionLimit = getCustomCodeRedemptionLimit();
+  existingCampaignIdentifier?: string | null;
+}, client: AppleOfferCodeClient = defaultAppleOfferCodeClient) {
+  const targetCampaignIdentifier = getOfferCodeCampaignIdentifier();
+  const existingCustomCodeId = params.existingCustomCodeId?.trim() || null;
+  const existingCampaignIdentifier = params.existingCampaignIdentifier?.trim() || null;
+  const shouldReplaceExistingCampaign = Boolean(
+    existingCustomCodeId &&
+      existingCampaignIdentifier &&
+      !sameOfferCampaignIdentifier(existingCampaignIdentifier, targetCampaignIdentifier),
+  );
+  const desiredUpdateAttributes = buildAppleCustomOfferCodeUpdateAttributes();
 
   let existingRecord: AppleCustomOfferCodeRecord | null = null;
 
-  if (params.existingCustomCodeId) {
+  if (existingCustomCodeId && shouldReplaceExistingCampaign) {
     try {
-      existingRecord = await updateAppleCustomOfferCode(params.existingCustomCodeId, {
-        active: true,
-        expirationDate: desiredExpirationDate,
-        numberOfCodes: desiredRedemptionLimit,
-      });
-      return existingRecord;
+      await client.deactivate(existingCustomCodeId);
+    } catch (error) {
+      if (!(error instanceof AppStoreConnectApiError) || error.status !== 404) {
+        throw error;
+      }
+    }
+
+    try {
+      return await client.create(params.customCode);
+    } catch (error) {
+      if (error instanceof AppStoreConnectApiError && error.status === 409) {
+        const conflictedRecord = await client.findByValue(params.customCode);
+        if (conflictedRecord?.id && conflictedRecord.id !== existingCustomCodeId) {
+          return await client.update(conflictedRecord.id, desiredUpdateAttributes);
+        }
+      }
+      throw error;
+    }
+  } else if (existingCustomCodeId) {
+    try {
+      existingRecord = await client.findByValue(params.customCode);
+      if (existingRecord?.id) {
+        return existingRecord;
+      }
+    } catch (error) {
+      if (!(error instanceof AppStoreConnectApiError) || error.status !== 404) {
+        throw error;
+      }
+    }
+
+    try {
+      return await client.update(existingCustomCodeId, desiredUpdateAttributes);
     } catch (error) {
       if (!(error instanceof AppStoreConnectApiError) || error.status !== 404) {
         throw error;
@@ -272,30 +345,22 @@ export async function ensureAppleCustomOfferCode(params: {
   }
 
   try {
-    existingRecord = await findAppleCustomOfferCodeByValue(params.customCode);
+    existingRecord = await client.findByValue(params.customCode);
   } catch (error) {
     console.warn("Unable to look up Apple custom offer code before create:", error);
   }
 
   if (existingRecord?.id) {
-    return await updateAppleCustomOfferCode(existingRecord.id, {
-      active: true,
-      expirationDate: desiredExpirationDate,
-      numberOfCodes: desiredRedemptionLimit,
-    });
+    return await client.update(existingRecord.id, desiredUpdateAttributes);
   }
 
   try {
-    return await createAppleCustomOfferCode(params.customCode);
+    return await client.create(params.customCode);
   } catch (error) {
     if (error instanceof AppStoreConnectApiError && error.status === 409) {
-      const conflictedRecord = await findAppleCustomOfferCodeByValue(params.customCode);
+      const conflictedRecord = await client.findByValue(params.customCode);
       if (conflictedRecord?.id) {
-        return await updateAppleCustomOfferCode(conflictedRecord.id, {
-          active: true,
-          expirationDate: desiredExpirationDate,
-          numberOfCodes: desiredRedemptionLimit,
-        });
+        return await client.update(conflictedRecord.id, desiredUpdateAttributes);
       }
     }
     throw error;

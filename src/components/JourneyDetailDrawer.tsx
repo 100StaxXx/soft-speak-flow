@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, type CSSProperties } from "react";
 import {
   Drawer,
   DrawerContent,
@@ -26,6 +26,8 @@ import { useCompanionPostcards } from "@/hooks/useCompanionPostcards";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { useJourneyPathImage } from "@/hooks/useJourneyPathImage";
+import { usePlannerPathfinderAppearance } from "@/hooks/usePlannerPathfinderAppearance";
+import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
 import { RescheduleDrawer } from "./RescheduleDrawer";
 import { PostcardUnlockCelebration } from "./PostcardUnlockCelebration";
 import { MilestoneDetailDrawer } from "./journey/MilestoneDetailDrawer";
@@ -36,6 +38,7 @@ interface JourneyDetailDrawerProps {
   epicGoal?: string;
   currentDeadline?: string;
   children?: React.ReactNode;
+  companionFrostedThemeStyle?: CSSProperties;
 }
 
 export const JourneyDetailDrawer = ({ 
@@ -43,7 +46,8 @@ export const JourneyDetailDrawer = ({
   epicTitle,
   epicGoal,
   currentDeadline,
-  children 
+  children,
+  companionFrostedThemeStyle,
 }: JourneyDetailDrawerProps) => {
   const [open, setOpen] = useState(false);
   
@@ -64,8 +68,13 @@ export const JourneyDetailDrawer = ({
 
   const { postcards, checkMilestoneForPostcard, postcardJustUnlocked, clearPostcardUnlocked } = useCompanionPostcards();
   const { companion } = useCompanion();
+  const { themeModeClassName } = usePlannerPathfinderAppearance();
   const { awardMilestoneComplete, awardPhaseComplete, awardEpicComplete } = useXPRewards();
   const { regeneratePathForMilestone } = useJourneyPathImage(epicId);
+  const resolvedCompanionFrostedThemeStyle = useMemo(
+    () => companionFrostedThemeStyle ?? getCompanionFrostedThemeStyle(companion?.favorite_color),
+    [companionFrostedThemeStyle, companion?.favorite_color],
+  );
 
   const currentPhase = getCurrentPhase();
   // Get postcards for this epic
@@ -173,7 +182,11 @@ export const JourneyDetailDrawer = ({
           </Button>
         )}
       </DrawerTrigger>
-      <DrawerContent className="max-h-[85vh]">
+      <DrawerContent
+        className={cn(themeModeClassName, "max-h-[85vh]")}
+        style={resolvedCompanionFrostedThemeStyle}
+        data-testid="journey-detail-drawer-content"
+      >
         <DrawerHeader className="pb-2">
           <DrawerTitle className="flex items-center gap-2">
             <Map className="w-5 h-5 text-primary" />
@@ -196,6 +209,8 @@ export const JourneyDetailDrawer = ({
                 epicTitle={epicTitle}
                 epicGoal={epicGoal}
                 currentDeadline={currentDeadline}
+                visualStyle="planner"
+                companionFrostedThemeStyle={resolvedCompanionFrostedThemeStyle}
               >
                 <Button variant="ghost" size="sm" className="gap-1.5 text-xs h-7">
                   <Wand2 className="w-3.5 h-3.5" />
@@ -299,6 +314,7 @@ export const JourneyDetailDrawer = ({
       isCompleting={isCompleting}
       status={selectedMilestone ? getMilestoneStatus(selectedMilestone) : "pending"}
       postcard={selectedMilestone ? getPostcardForMilestone(selectedMilestone) : undefined}
+      companionFrostedThemeStyle={resolvedCompanionFrostedThemeStyle}
     />
     </>
   );

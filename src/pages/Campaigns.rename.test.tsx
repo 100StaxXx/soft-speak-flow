@@ -48,6 +48,18 @@ vi.mock("@/contexts/MainTabVisibilityContext", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
+  useJourneysCompanionVisual: () => ({
+    favoriteColor: "#f5b942",
+  }),
+}));
+
+vi.mock("@/hooks/useAuth", () => ({
+  useAuth: () => ({
+    user: { id: "user-1" },
+  }),
+}));
+
 vi.mock("@/hooks/useEpics", () => ({
   useEpics: () => ({
     activeEpics: [

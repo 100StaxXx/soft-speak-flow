@@ -2,11 +2,13 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EditQuestDialog } from "./EditQuestDialog";
 import { DIFFICULTY_COLORS } from "@/components/quest-shared";
+import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
 
 const mocks = vi.hoisted(() => ({
   addSubtask: vi.fn(),
   toggleSubtask: vi.fn(),
   deleteSubtask: vi.fn(),
+  companionFavoriteColor: "#52b7ff",
 }));
 
 const expectElementToIncludeClasses = (element: HTMLElement, classes: string) => {
@@ -31,6 +33,12 @@ vi.mock("@/features/tasks/hooks/useSubtasks", () => ({
     toggleSubtask: mocks.toggleSubtask,
     deleteSubtask: mocks.deleteSubtask,
     isAdding: false,
+  }),
+}));
+
+vi.mock("@/hooks/useCompanion", () => ({
+  useCompanion: () => ({
+    companion: { favorite_color: mocks.companionFavoriteColor },
   }),
 }));
 
@@ -66,6 +74,7 @@ vi.mock("@/components/QuestAttachmentPicker", () => ({
 describe("EditQuestDialog", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.companionFavoriteColor = "#52b7ff";
   });
 
   const legacyTask = {
@@ -129,6 +138,72 @@ describe("EditQuestDialog", () => {
 
     expect(screen.getByDisplayValue("Legacy quest")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save Changes" })).toBeEnabled();
+  });
+
+  it("applies supplied companion frosted variables to the edit quest sheet", () => {
+    const companionFrostedThemeStyle = getCompanionFrostedThemeStyle("#9b6bff");
+
+    render(
+      <EditQuestDialog
+        task={legacyTask}
+        open
+        onOpenChange={vi.fn()}
+        onSave={vi.fn().mockResolvedValue(undefined)}
+        isSaving={false}
+        companionFrostedThemeStyle={companionFrostedThemeStyle}
+      />,
+    );
+
+    const sheet = screen.getByTestId("edit-quest-mobile-sheet");
+    expect(sheet.style.getPropertyValue("--companion-frosted-primary")).toBe(
+      companionFrostedThemeStyle["--companion-frosted-primary"],
+    );
+    expect(sheet.style.getPropertyValue("--companion-frosted-primary-rgb")).toBe(
+      companionFrostedThemeStyle["--companion-frosted-primary-rgb"],
+    );
+  });
+
+  it("falls back to the stored companion color when no theme style is supplied", () => {
+    mocks.companionFavoriteColor = "#58d68d";
+    const companionFrostedThemeStyle = getCompanionFrostedThemeStyle(mocks.companionFavoriteColor);
+
+    render(
+      <EditQuestDialog
+        task={legacyTask}
+        open
+        onOpenChange={vi.fn()}
+        onSave={vi.fn().mockResolvedValue(undefined)}
+        isSaving={false}
+      />,
+    );
+
+    expect(screen.getByTestId("edit-quest-mobile-sheet").style.getPropertyValue("--companion-frosted-primary")).toBe(
+      companionFrostedThemeStyle["--companion-frosted-primary"],
+    );
+  });
+
+  it("themes the delete confirmation portal with the resolved companion color", () => {
+    const companionFrostedThemeStyle = getCompanionFrostedThemeStyle("#9b6bff");
+
+    render(
+      <EditQuestDialog
+        task={legacyTask}
+        open
+        onOpenChange={vi.fn()}
+        onSave={vi.fn().mockResolvedValue(undefined)}
+        isSaving={false}
+        onDelete={vi.fn().mockResolvedValue(undefined)}
+        companionFrostedThemeStyle={companionFrostedThemeStyle}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    const dialog = screen.getByTestId("edit-quest-delete-dialog");
+    expect(dialog).toHaveClass("companion-frosted-quest-light");
+    expect(dialog.style.getPropertyValue("--companion-frosted-primary")).toBe(
+      companionFrostedThemeStyle["--companion-frosted-primary"],
+    );
   });
 
   it("uses the companion primary CTA style when easy is selected", () => {

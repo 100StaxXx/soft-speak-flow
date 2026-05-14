@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EditRitualSheet, type RitualData } from "./EditRitualSheet";
+import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
 
 const mocks = vi.hoisted(() => ({
   getSuggestedSlots: vi.fn(),
@@ -152,7 +153,7 @@ describe("EditRitualSheet", () => {
       />,
     );
 
-    expect(screen.getByTestId("edit-ritual-sheet-shell").className).toContain("border-[hsl(var(--celestial-blue)_/_0.38)]");
+    expect(screen.getByTestId("edit-ritual-sheet-shell").className).toContain("border-[hsl(var(--celestial-blue)_/_0.58)]");
     expect(screen.getByText("Edit Ritual")).toBeInTheDocument();
     expect(screen.getByText("Changes sync to all instances of this ritual.")).toBeInTheDocument();
     expect(screen.getByTestId("natural-language-editor")).toHaveAttribute("data-visual-style", "quest-soft");
@@ -165,6 +166,23 @@ describe("EditRitualSheet", () => {
     expect(screen.getByRole("button", { name: "Save Changes" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Delete Ritual" })).toBeEnabled();
+  });
+
+  it("applies supplied companion frosted variables to the ritual sheet portal", () => {
+    const companionFrostedThemeStyle = getCompanionFrostedThemeStyle("#f5b942");
+
+    render(
+      <EditRitualSheet
+        ritual={ritualFixture}
+        open
+        onOpenChange={vi.fn()}
+        companionFrostedThemeStyle={companionFrostedThemeStyle}
+      />,
+    );
+
+    expect(screen.getByTestId("edit-ritual-sheet-shell").style.getPropertyValue("--companion-frosted-primary")).toBe(
+      companionFrostedThemeStyle["--companion-frosted-primary"],
+    );
   });
 
   it("uses the shared time and duration controls", () => {

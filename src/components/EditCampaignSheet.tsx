@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import {
   EditCampaignSheetFrame,
   type EditCampaignSheetEpic,
@@ -10,6 +11,7 @@ interface EditCampaignSheetProps {
   onOpenChange: (open: boolean) => void;
   onDeleted?: () => void;
   startWithAddRitual?: boolean;
+  companionFrostedThemeStyle?: CSSProperties;
 }
 
 export function EditCampaignSheet({
@@ -18,6 +20,7 @@ export function EditCampaignSheet({
   onOpenChange,
   onDeleted,
   startWithAddRitual = false,
+  companionFrostedThemeStyle,
 }: EditCampaignSheetProps) {
   const {
     activeEpics,
@@ -40,6 +43,7 @@ export function EditCampaignSheet({
       onOpenChange={onOpenChange}
       onDeleted={onDeleted}
       startWithAddRitual={startWithAddRitual}
+      companionFrostedThemeStyle={companionFrostedThemeStyle}
       dependencies={{
         activeEpics,
         updateEpic,

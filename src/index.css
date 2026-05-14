@@ -2,6 +2,110 @@
 @tailwind components;
 @tailwind utilities;
 
+.companion-frosted-theme-scope {
+  --background: var(--companion-frosted-background, 202 100% 98%);
+  --card: var(--companion-frosted-card, 0 0% 100%);
+  --secondary: var(--companion-frosted-secondary, 203 78% 96%);
+  --muted: var(--companion-frosted-muted, 205 68% 94%);
+  --border: var(--companion-frosted-border, 201 100% 86%);
+  --input: var(--companion-frosted-input, 202 100% 94%);
+  --popover: var(--companion-frosted-popover, 0 0% 100%);
+  --primary: var(--companion-frosted-primary, 202 68% 68%);
+  --accent: var(--companion-frosted-accent, 204 100% 91%);
+  --ring: var(--companion-frosted-ring, 202 82% 73%);
+  --celestial-blue: var(--companion-frosted-celestial-blue, 202 92% 76%);
+  --primary-rgb: var(--companion-frosted-primary-rgb, 82, 183, 255);
+  --shadow-glow: var(--companion-frosted-shadow-glow, 0 0 30px hsl(202 68% 68% / 0.32));
+  --shadow-glow-lg: var(
+    --companion-frosted-shadow-glow-lg,
+    0 0 40px hsl(202 68% 68% / 0.38),
+    0 0 80px hsl(202 68% 68% / 0.22)
+  );
+}
+
+.companion-frosted-quest-light,
+.companion-frosted-planner-light {
+  --background: var(--companion-frosted-background, 202 100% 98%);
+  --foreground: 224 44% 14%;
+  --card: var(--companion-frosted-card, 0 0% 100%);
+  --card-foreground: 224 44% 14%;
+  --secondary: var(--companion-frosted-secondary, 203 78% 96%);
+  --secondary-foreground: 224 44% 14%;
+  --muted: var(--companion-frosted-muted, 205 68% 94%);
+  --muted-foreground: 219 16% 45%;
+  --border: var(--companion-frosted-border, 201 100% 86%);
+  --input: var(--companion-frosted-input, 202 100% 94%);
+  --popover: var(--companion-frosted-popover, 0 0% 100%);
+  --popover-foreground: 224 44% 14%;
+  --primary: var(--companion-frosted-primary, 202 68% 68%);
+  --primary-foreground: 224 44% 14%;
+  --accent: var(--companion-frosted-accent, 204 100% 91%);
+  --accent-foreground: 224 44% 14%;
+  --ring: var(--companion-frosted-ring, 202 82% 73%);
+  --celestial-blue: var(--companion-frosted-celestial-blue, 202 92% 76%);
+  --deep-space: 224 44% 14%;
+  --primary-rgb: var(--companion-frosted-primary-rgb, 82, 183, 255);
+  --shadow-glow: var(--companion-frosted-shadow-glow, 0 0 30px hsl(202 68% 68% / 0.32));
+  --shadow-glow-lg: var(
+    --companion-frosted-shadow-glow-lg,
+    0 0 40px hsl(202 68% 68% / 0.38),
+    0 0 80px hsl(202 68% 68% / 0.22)
+  );
+}
+
+.companion-frosted-quest-light {
+  --stardust-gold: 263 64% 68%;
+  --nebula-pink: 269 60% 64%;
+  --category-soul: 203 82% 64%;
+  --epic-nature: 202 76% 66%;
+  --category-body: 219 52% 66%;
+  --epic-warrior: 263 64% 70%;
+  --stage-tier-2: 205 36% 74%;
+}
+
+.companion-frosted-planner-light {
+  --stardust-gold: 263 64% 68%;
+  --nebula-pink: 269 60% 64%;
+  --category-soul: 203 82% 64%;
+  --epic-nature: 155 62% 44%;
+  --category-body: 219 52% 66%;
+  --epic-warrior: 263 64% 70%;
+  --stage-tier-2: 205 36% 74%;
+}
+
+.companion-frosted-planner-dark {
+  --background: var(--companion-frosted-background-dark, 224 42% 10%);
+  --foreground: 210 40% 96%;
+  --card: var(--companion-frosted-card-dark, 226 32% 16%);
+  --card-foreground: 210 40% 96%;
+  --secondary: var(--companion-frosted-secondary-dark, 224 28% 21%);
+  --secondary-foreground: 210 40% 96%;
+  --muted: var(--companion-frosted-muted-dark, 224 24% 23%);
+  --muted-foreground: 217 17% 72%;
+  --border: var(--companion-frosted-border-dark, 214 32% 29%);
+  --input: var(--companion-frosted-input-dark, 224 28% 21%);
+  --popover: var(--companion-frosted-popover-dark, 226 32% 16%);
+  --popover-foreground: 210 40% 96%;
+  --primary: var(--companion-frosted-primary-dark, 201 92% 58%);
+  --primary-foreground: 222 42% 12%;
+  --accent: var(--companion-frosted-accent-dark, 202 70% 24%);
+  --accent-foreground: 210 40% 96%;
+  --ring: var(--companion-frosted-ring-dark, 201 92% 58%);
+  --celestial-blue: var(--companion-frosted-celestial-blue-dark, 202 88% 58%);
+  --stardust-gold: 43 92% 64%;
+  --nebula-pink: 334 70% 62%;
+  --category-soul: 192 78% 56%;
+  --epic-nature: 151 66% 48%;
+  --deep-space: 224 42% 9%;
+  --primary-rgb: var(--companion-frosted-primary-rgb, 82, 183, 255);
+  --shadow-glow: var(--companion-frosted-shadow-glow, 0 0 30px hsl(201 92% 58% / 0.32));
+  --shadow-glow-lg: var(
+    --companion-frosted-shadow-glow-lg,
+    0 0 40px hsl(201 92% 58% / 0.38),
+    0 0 80px hsl(201 92% 58% / 0.22)
+  );
+}
+
 /* ===== COMPANION CARE-BASED ANIMATIONS ===== */
 /* These animations reflect hidden care signals - users see behavior, not numbers */
 

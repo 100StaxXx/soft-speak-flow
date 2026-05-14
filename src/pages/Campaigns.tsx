@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Plus, Sparkles, Target, Trophy } from "lucide-react";
 import { PageTransition } from "@/components/PageTransition";
@@ -13,8 +13,10 @@ import { clearShellCardClassName } from "@/components/ui/card";
 import { ACTIVE_CAMPAIGN_LIMIT_MESSAGE, hasReachedActiveCampaignLimit } from "@/features/epics/constants";
 import { useEpics } from "@/hooks/useEpics";
 import { useAuth } from "@/hooks/useAuth";
+import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 import { cn } from "@/lib/utils";
+import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
 import {
   clearCampaignBuilderDraftSnapshot,
   clearCreationPopupMarker,
@@ -49,6 +51,11 @@ const Campaigns = () => {
     updateEpicStatus,
   } = useEpics({ enabled: isTabActive });
   const { user } = useAuth();
+  const { favoriteColor: companionFavoriteColor } = useJourneysCompanionVisual();
+  const companionFrostedThemeStyle = useMemo(
+    () => getCompanionFrostedThemeStyle(companionFavoriteColor),
+    [companionFavoriteColor],
+  );
   const [showPathfinder, setShowPathfinder] = useState(false);
   const [pathfinderResumeDraft, setPathfinderResumeDraft] = useState<CampaignBuilderDraftSnapshot | null>(null);
   const [pathfinderResumeDraftKey, setPathfinderResumeDraftKey] = useState<string | null>(null);
@@ -126,7 +133,11 @@ const Campaigns = () => {
   return (
     <PageTransition mode="instant">
       <CinematicPageBackground preset="campaigns" />
-      <div className="min-h-screen pb-nav-safe pt-safe px-4 relative z-10">
+      <div
+        className="min-h-screen pb-nav-safe pt-safe px-4 relative z-10"
+        style={companionFrostedThemeStyle}
+        data-testid="campaigns-theme-scope"
+      >
         <div className="mx-auto w-full max-w-[1120px]">
           <motion.div
             initial={prefersReducedMotion ? false : { opacity: 0, y: -14 }}
@@ -275,6 +286,7 @@ const Campaigns = () => {
             persistenceRoute="/campaigns"
             userId={user?.id}
             showTemplatesFirst={false}
+            companionFrostedThemeStyle={companionFrostedThemeStyle}
           />
 
           <CampaignCreatedAnimation

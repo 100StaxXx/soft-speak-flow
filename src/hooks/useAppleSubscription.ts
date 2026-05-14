@@ -12,11 +12,6 @@ import { queryKeys } from "@/lib/queryKeys";
 import { parseFunctionInvokeError, type ParsedFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
 import type { StoreKitTransaction } from "@/types/subscription";
 import {
-  getPurchaseProductIdForPlan,
-  isReferralYearlyProductId,
-  REFERRAL_YEARLY_PRODUCT_ID,
-} from "@/utils/appleIAP";
-import {
   buildLocalSubscriptionAccessState,
   rememberLocalSubscriptionAccess,
 } from "@/utils/localSubscriptionAccess";
@@ -110,7 +105,6 @@ export function useAppleSubscription() {
   const hasOfferCode = appliedReferralCodeState.is_apple_offer_eligible;
   const hasAppliedReferralCode = Boolean(appliedReferralCodeState.code);
   const appliedReferralCode = appliedReferralCodeState.code;
-  const hasReferralYearlyProduct = products.some((product) => isReferralYearlyProductId(product.identifier));
 
   useEffect(() => {
     if (!hasOfferCode) {
@@ -327,11 +321,8 @@ export function useAppleSubscription() {
     }
 
     const plan = productId.includes("yearly") ? "yearly" : "monthly";
-    const usesReferralYearlyProduct = hasOfferCode && plan === "yearly" && hasReferralYearlyProduct;
-    const purchaseProductId = usesReferralYearlyProduct
-      ? getPurchaseProductIdForPlan("yearly", products, { preferReferral: true })
-      : productId;
-    const usesOfferCodeDiscount = hasOfferCode && plan === "yearly" && !usesReferralYearlyProduct;
+    const purchaseProductId = productId;
+    const usesOfferCodeDiscount = hasOfferCode && plan === "yearly";
 
     setLoading(true);
     setProductError(null);
@@ -399,7 +390,7 @@ export function useAppleSubscription() {
       trackPaywallEvent("purchase_completed", { surface, plan, productId: purchaseProductId, hasOfferCode });
       toast({
         title: "Premium unlocked",
-        description: usesReferralYearlyProduct
+        description: usesOfferCodeDiscount
           ? "Your creator-code yearly discount is active on your account."
           : "Cosmiq Pro is now active on your account.",
       });
@@ -433,9 +424,7 @@ export function useAppleSubscription() {
     }
   }, [
     hasOfferCode,
-    hasReferralYearlyProduct,
     offerCodePurchaseReady,
-    products,
     purchase,
     redeemOfferCode,
     toast,
@@ -602,7 +591,5 @@ export function useAppleSubscription() {
     hasAppliedReferralCode,
     appliedReferralCode,
     offerCodePurchaseReady,
-    referralYearlyProductId: REFERRAL_YEARLY_PRODUCT_ID,
-    hasReferralYearlyProduct,
   };
 }

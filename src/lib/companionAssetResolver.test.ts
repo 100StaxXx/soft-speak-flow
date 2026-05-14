@@ -21,6 +21,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 import {
   getPresetCompanionExpressiveAssetUrl,
   getPresetCompanionAssetUrl,
+  getUniversalEggCutoutAssetUrl,
   getUniversalEggAssetUrl,
   normalizeCompanionStoredImageUrl,
   resolveCompanionExpressiveAssetUrl,
@@ -132,6 +133,27 @@ describe("companion asset resolver", () => {
         "normal",
       ),
     ).toBe(getUniversalEggAssetUrl("storm"));
+  });
+
+  it("keeps AI generated companions on bundled elemental egg art at stage 0", () => {
+    expect(
+      resolveCompanionVisualAssetUrl(
+        {
+          preset_id: null,
+          current_stage: 0,
+          core_element: "nature",
+          current_image_url: "https://example.com/generated-stage-zero-egg.png",
+          initial_image_url: "https://example.com/generated-stage-zero-egg.png",
+        },
+        "normal",
+      ),
+    ).toBe(getUniversalEggAssetUrl("nature"));
+  });
+
+  it("exposes transparent stage 0 elemental egg cutouts for launcher art", () => {
+    expect(getUniversalEggCutoutAssetUrl("storm")).toBe(
+      "/companion-eggs/egg__t0_egg__normal__storm.png",
+    );
   });
 
   it("keeps full-coverage presets on the shared egg art before hatch", () => {

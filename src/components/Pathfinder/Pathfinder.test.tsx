@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ACTIVE_CAMPAIGN_LIMIT_WARNING } from "@/features/epics/constants";
+import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
 import type { CampaignBuilderDraftSnapshot } from "@/utils/creationPopupPersistence";
 import { Pathfinder } from "./Pathfinder";
 
@@ -39,6 +40,7 @@ const mocks = vi.hoisted(() => ({
     focalY: null as number | null,
     element: "ice",
     usesPortraitShell: true,
+    favoriteColor: "#52b7ff",
   },
   activeEpics: [] as Array<{ id: string; status: string }>,
   aiAtEpicLimit: false,
@@ -195,6 +197,7 @@ describe("Pathfinder", () => {
       focalY: null,
       element: "ice",
       usesPortraitShell: true,
+      favoriteColor: "#52b7ff",
     };
     mocks.schedule = {
       feasibilityAssessment: null,
@@ -292,8 +295,48 @@ describe("Pathfinder", () => {
     );
     expect(screen.getByTestId("pathfinder-header")).toBeInTheDocument();
     expect(screen.getByTestId("pathfinder-progress")).toBeInTheDocument();
+    expect(screen.getByTestId("pathfinder-progress").innerHTML).toContain("rgba(var(--primary-rgb),0.58)");
+    expect(screen.getByTestId("pathfinder-progress").innerHTML).not.toContain("rgba(28,117,177");
     expect(screen.getByTestId("pathfinder-footer")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Build My Plan/i })).toBeInTheDocument();
+  });
+
+  it("applies supplied companion frosted variables to the pathfinder shell", () => {
+    const companionFrostedThemeStyle = getCompanionFrostedThemeStyle("#58d68d");
+
+    render(
+      <Pathfinder
+        open
+        userId="user-1"
+        onOpenChange={vi.fn()}
+        onCreateEpic={(...args) => mocks.onCreateEpic(...args)}
+        isCreating={false}
+        companionFrostedThemeStyle={companionFrostedThemeStyle}
+      />,
+    );
+
+    expect(screen.getByTestId("pathfinder-shell").style.getPropertyValue("--companion-frosted-primary")).toBe(
+      companionFrostedThemeStyle["--companion-frosted-primary"],
+    );
+  });
+
+  it("falls back to the companion visual favorite color when no theme style is supplied", () => {
+    mocks.journeysCompanionVisual.favoriteColor = "#f5b942";
+    const companionFrostedThemeStyle = getCompanionFrostedThemeStyle("#f5b942");
+
+    render(
+      <Pathfinder
+        open
+        userId="user-1"
+        onOpenChange={vi.fn()}
+        onCreateEpic={(...args) => mocks.onCreateEpic(...args)}
+        isCreating={false}
+      />,
+    );
+
+    expect(screen.getByTestId("pathfinder-shell").style.getPropertyValue("--companion-frosted-primary")).toBe(
+      companionFrostedThemeStyle["--companion-frosted-primary"],
+    );
   });
 
   it("centers generated scene art in the header avatar", () => {
@@ -304,6 +347,7 @@ describe("Pathfinder", () => {
       focalY: 0.6,
       element: "ice",
       usesPortraitShell: false,
+      favoriteColor: "#52b7ff",
     };
 
     render(

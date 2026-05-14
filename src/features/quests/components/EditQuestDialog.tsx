@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, type CSSProperties } from "react";
 import { format, isToday, addMinutes } from "date-fns";
 import { X, ArrowLeft, Trash2, Sliders, CalendarIcon, Zap, Flame, Mountain, CalendarPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useCompanion } from "@/hooks/useCompanion";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
@@ -47,6 +48,7 @@ import {
   normalizeQuestReminderOffsets,
   resolveQuestReminderOffsets,
 } from "@/utils/questReminders";
+import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
 
 interface Task {
   id: string;
@@ -102,6 +104,7 @@ interface EditQuestDialogProps {
   isSendingToCalendar?: boolean;
   presentation?: QuestComposerPresentation;
   plannerSubtaskDraft?: string[] | null;
+  companionFrostedThemeStyle?: CSSProperties;
 }
 
 export function EditQuestDialog({
@@ -117,6 +120,7 @@ export function EditQuestDialog({
   isSendingToCalendar = false,
   presentation = "mobile-sheet",
   plannerSubtaskDraft = null,
+  companionFrostedThemeStyle,
 }: EditQuestDialogProps) {
   const [taskText, setTaskText] = useState("");
   const [taskDate, setTaskDate] = useState<string | null>(null);
@@ -139,6 +143,11 @@ export function EditQuestDialog({
   const [localPlannerSubtasks, setLocalPlannerSubtasks] = useState<string[]>([]);
 
   const { subtasks, addSubtask, toggleSubtask, deleteSubtask } = useSubtasks(task?.id ?? null);
+  const { companion } = useCompanion();
+  const resolvedCompanionFrostedThemeStyle = useMemo(
+    () => companionFrostedThemeStyle ?? getCompanionFrostedThemeStyle(companion?.favorite_color),
+    [companionFrostedThemeStyle, companion?.favorite_color],
+  );
   const hasPlannerSubtaskDraft = Array.isArray(plannerSubtaskDraft);
 
   useEffect(() => {
@@ -370,6 +379,7 @@ export function EditQuestDialog({
             : "h-[92vh] rounded-t-[34px] flex flex-col p-0 gap-0 overflow-hidden",
           isDesktopPanel ? QUEST_FORM_STYLES.desktopPanelShell : QUEST_FORM_STYLES.sheet,
         )}
+        style={resolvedCompanionFrostedThemeStyle}
       >
         <SheetTitle className="sr-only">Edit Quest</SheetTitle>
         <SheetDescription className="sr-only">
@@ -487,7 +497,11 @@ export function EditQuestDialog({
                     {taskDate ? format(dateObj, "MMM d") : "Date"}
                   </button>
                 </PopoverTrigger>
-                <PopoverContent className={cn("w-auto p-1 z-[100]", QUEST_FORM_STYLES.popover)} align="start">
+                <PopoverContent
+                  className={cn("w-auto p-1 z-[100]", QUEST_FORM_STYLES.popover)}
+                  align="start"
+                  style={resolvedCompanionFrostedThemeStyle}
+                >
                   <Calendar
                     mode="single"
                     selected={dateObj}
@@ -549,6 +563,7 @@ export function EditQuestDialog({
                 hideLocation
                 requireScheduledTimeForRecurrence
                 visualStyle="quest-soft"
+                portalStyle={resolvedCompanionFrostedThemeStyle}
               />
             )}
 
@@ -675,6 +690,7 @@ export function EditQuestDialog({
                     hideReminder
                     requireScheduledTimeForRecurrence
                     visualStyle="quest-soft"
+                    portalStyle={resolvedCompanionFrostedThemeStyle}
                   />
                   {hasRecurrenceWithoutTime && (
                     <p className={cn("mt-2", QUEST_FORM_STYLES.helperText)}>
@@ -735,7 +751,11 @@ export function EditQuestDialog({
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <AlertDialogContent>
+        <AlertDialogContent
+          className={QUEST_FORM_STYLES.sectionCard}
+          data-testid="edit-quest-delete-dialog"
+          style={resolvedCompanionFrostedThemeStyle}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this quest?</AlertDialogTitle>
             <AlertDialogDescription>

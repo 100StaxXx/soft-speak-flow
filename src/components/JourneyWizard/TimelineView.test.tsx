@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { getCompanionFrostedThemeStyle } from '@/lib/companionFrostedTheme';
 import { TimelineView } from './TimelineView';
 
 const feasibilityAssessment = {
@@ -65,5 +66,28 @@ describe('JourneyWizard TimelineView', () => {
     ).toBeInTheDocument();
     expect(screen.queryByText(/overlap_early/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/parallelizable/i)).not.toBeInTheDocument();
+  });
+
+  it('applies supplied companion frosted variables to standalone timeline chrome', () => {
+    const companionFrostedThemeStyle = getCompanionFrostedThemeStyle('#58d68d');
+    const { container } = render(
+      <TimelineView
+        feasibilityAssessment={feasibilityAssessment}
+        phases={phases}
+        milestones={milestones}
+        rituals={rituals}
+        weeklyHoursEstimate={8}
+        deadline="2026-04-28"
+        companionFrostedThemeStyle={companionFrostedThemeStyle}
+      />,
+    );
+
+    const root = container.firstElementChild as HTMLElement;
+    expect(root).toHaveClass('companion-frosted-planner-light');
+    expect(root.style.getPropertyValue('--companion-frosted-primary')).toBe(
+      companionFrostedThemeStyle['--companion-frosted-primary'],
+    );
+    expect(container.innerHTML).toContain('rgba(var(--primary-rgb),0.44)');
+    expect(container.innerHTML).not.toContain('rgba(28,87,135');
   });
 });

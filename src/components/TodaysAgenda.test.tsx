@@ -1,4 +1,4 @@
-import { cloneElement, isValidElement, type MouseEvent, type ReactElement, type ReactNode } from "react";
+import { cloneElement, isValidElement, type CSSProperties, type MouseEvent, type ReactElement, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -489,6 +489,45 @@ describe("TodaysAgenda subtasks", () => {
 });
 
 describe("TodaysAgenda quest completion styling", () => {
+  it("scopes companion frosted aliases to quest card shells", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    const companionFrostedThemeStyle = {
+      "--companion-frosted-primary": "282 68% 62%",
+    } as CSSProperties;
+
+    const { container } = render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-theme-1",
+            task_text: "Tinted quest",
+            completed: false,
+            xp_reward: 16,
+            scheduled_time: "10:00",
+          },
+        ]}
+        selectedDate={new Date("2026-03-27T10:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+        companionFrostedThemeStyle={companionFrostedThemeStyle}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(screen.getByTestId("todays-agenda")).toHaveClass("companion-frosted-planner-dark");
+    expect(screen.getByTestId("todays-agenda")).toHaveStyle({
+      "--companion-frosted-primary": "282 68% 62%",
+    });
+    expect(getQuestCardShell(container)).toHaveClass("companion-frosted-theme-scope");
+  });
+
   it("keeps completed quest text struck through after the completion animation ends", () => {
     vi.useFakeTimers();
 
@@ -1447,14 +1486,12 @@ describe("TodaysAgenda combo feedback", () => {
 
     fireEvent.click(screen.getAllByRole("checkbox", { name: /mark task as incomplete/i })[0]);
 
-    await waitFor(() => {
-      const comboBanner = screen.queryByTestId("combo-banner");
-      if (comboBanner) {
-        expect(comboBanner).toHaveStyle({ opacity: "0" });
-      } else {
-        expect(comboBanner).not.toBeInTheDocument();
-      }
-    });
+    await waitFor(
+      () => {
+        expect(screen.queryByTestId("combo-banner")).not.toBeInTheDocument();
+      },
+      { timeout: 1200 },
+    );
 
     fireEvent.click(screen.getAllByRole("checkbox", { name: /mark task as complete/i })[0]);
     const comboBanner = screen.queryByTestId("combo-banner");
@@ -3502,6 +3539,9 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
         mutations: { retry: false },
       },
     });
+    const companionFrostedThemeStyle = {
+      "--companion-frosted-primary": "155 64% 55%",
+    } as CSSProperties;
 
     render(
       <TodaysAgenda
@@ -3527,6 +3567,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
         completedCount={0}
         totalCount={2}
         onDeleteQuest={vi.fn()}
+        companionFrostedThemeStyle={companionFrostedThemeStyle}
       />,
       { wrapper: createWrapper(queryClient) },
     );
@@ -3536,6 +3577,10 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     await waitFor(() => {
       expect(screen.getAllByText("Delete quest")).toHaveLength(1);
     });
+    expect(screen.getByTestId("quest-action-menu-task-scheduled-1")).toHaveClass("companion-frosted-planner-dark");
+    expect(screen.getByTestId("quest-action-menu-task-scheduled-1")).toHaveStyle({
+      "--companion-frosted-primary": "155 64% 55%",
+    });
 
     openDropdownMenu(screen.getByLabelText("Sort tasks"));
 
@@ -3543,6 +3588,10 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       expect(screen.getByText("Custom")).toBeInTheDocument();
     });
 
+    expect(screen.getByTestId("quest-sort-menu")).toHaveClass("companion-frosted-planner-dark");
+    expect(screen.getByTestId("quest-sort-menu")).toHaveStyle({
+      "--companion-frosted-primary": "155 64% 55%",
+    });
     expect(screen.getByText("Time")).toBeInTheDocument();
     expect(screen.getByText("Priority")).toBeInTheDocument();
     expect(screen.getByText("XP")).toBeInTheDocument();
@@ -3590,6 +3639,9 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       },
     });
     const onEditQuest = vi.fn();
+    const companionFrostedThemeStyle = {
+      "--companion-frosted-primary": "42 74% 58%",
+    } as CSSProperties;
 
     render(
       <TodaysAgenda
@@ -3609,6 +3661,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
         completedCount={0}
         totalCount={1}
         onEditQuest={onEditQuest}
+        companionFrostedThemeStyle={companionFrostedThemeStyle}
       />,
       { wrapper: createWrapper(queryClient) },
     );
@@ -3617,6 +3670,12 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("desktop-quest-popover-task-scheduled-1")).toBeInTheDocument();
+    });
+
+    const popoverContent = screen.getByTestId("desktop-quest-popover-content-task-scheduled-1");
+    expect(popoverContent).toHaveClass("companion-frosted-theme-scope");
+    expect(popoverContent).toHaveStyle({
+      "--companion-frosted-primary": "42 74% 58%",
     });
 
     expect(
@@ -4002,6 +4061,9 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
         mutations: { retry: false },
       },
     });
+    const companionFrostedThemeStyle = {
+      "--companion-frosted-primary": "42 74% 58%",
+    } as CSSProperties;
 
     render(
       <TodaysAgenda
@@ -4026,6 +4088,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
         onAddQuest={vi.fn()}
         completedCount={0}
         totalCount={2}
+        companionFrostedThemeStyle={companionFrostedThemeStyle}
       />,
       { wrapper: createWrapper(queryClient) },
     );
@@ -4039,7 +4102,12 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
 
     fireEvent.click(trigger);
 
-    expect(await screen.findByTestId("untimed-quests-drawer")).toBeInTheDocument();
+    const drawer = await screen.findByTestId("untimed-quests-drawer");
+    expect(drawer).toBeInTheDocument();
+    expect(drawer).toHaveClass("companion-frosted-planner-dark");
+    expect(drawer).toHaveStyle({
+      "--companion-frosted-primary": "42 74% 58%",
+    });
     expect(screen.getByTestId("untimed-quest-task-unscheduled-1")).toHaveTextContent("Anytime focus");
   });
 

@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useMemo, useState, type CSSProperties } from "react";
 import {
   Drawer,
   DrawerContent,
@@ -28,6 +28,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn, formatDisplayLabel, stripMarkdown } from "@/lib/utils";
 import { useAdjustEpicPlan, type AdjustmentSuggestion } from "@/hooks/useAdjustEpicPlan";
 import { SmartRitualAdvisor } from "@/components/journey/SmartRitualAdvisor";
+import { useCompanion } from "@/hooks/useCompanion";
+import {
+  COMPANION_FROSTED_PLANNER_DARK_CLASS,
+  getCompanionFrostedThemeStyle,
+} from "@/lib/companionFrostedTheme";
 
 interface SmartAdjustPlanDrawerProps {
   open: boolean;
@@ -45,6 +50,7 @@ interface SmartAdjustPlanDrawerProps {
     habit_id: string;
     completed_at: string;
   }>;
+  companionFrostedThemeStyle?: CSSProperties;
 }
 
 export const SmartAdjustPlanDrawer = memo(function SmartAdjustPlanDrawer({ 
@@ -54,6 +60,7 @@ export const SmartAdjustPlanDrawer = memo(function SmartAdjustPlanDrawer({
   epicTitle,
   habits = [],
   completionData = [],
+  companionFrostedThemeStyle,
 }: SmartAdjustPlanDrawerProps) {
   const [step, setStep] = useState<'input' | 'preview' | 'saving'>('input');
   const [adjustmentText, setAdjustmentText] = useState('');
@@ -71,6 +78,11 @@ export const SmartAdjustPlanDrawer = memo(function SmartAdjustPlanDrawer({
     applyAdjustments,
     reset,
   } = useAdjustEpicPlan();
+  const { companion } = useCompanion();
+  const resolvedCompanionFrostedThemeStyle = useMemo(
+    () => companionFrostedThemeStyle ?? getCompanionFrostedThemeStyle(companion?.favorite_color),
+    [companionFrostedThemeStyle, companion?.favorite_color],
+  );
 
   const handleSmartAdjustment = (text: string) => {
     setAdjustmentText(text);
@@ -127,7 +139,11 @@ export const SmartAdjustPlanDrawer = memo(function SmartAdjustPlanDrawer({
       shouldScaleBackground={false}
       repositionInputs={false}
     >
-      <DrawerContent className="max-h-[90vh]">
+      <DrawerContent
+        className={cn(COMPANION_FROSTED_PLANNER_DARK_CLASS, "max-h-[90vh]")}
+        data-testid="smart-adjust-plan-drawer-content"
+        style={resolvedCompanionFrostedThemeStyle}
+      >
         <DrawerHeader className="pb-2">
           <div className="flex items-center justify-between">
             <DrawerTitle className="flex items-center gap-2">

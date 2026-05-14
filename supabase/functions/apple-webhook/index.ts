@@ -719,7 +719,7 @@ async function createReferralPayout(
   const { data: codeData } = await supabase
     .from("referral_codes")
     .select(
-      "id, owner_type, owner_user_id, affiliate_provider, is_active, apple_offer_code_status, apple_offer_code_expires_at",
+      "id, owner_type, owner_user_id, affiliate_provider, is_active, apple_offer_code_status, apple_offer_campaign_identifier, apple_offer_code_expires_at",
     )
     .eq("code", referralCode)
     .single();
@@ -733,6 +733,8 @@ async function createReferralPayout(
   const isAppleOfferCodeEligible = Boolean(
     codeData.is_active &&
       codeData.apple_offer_code_status === "active" &&
+      codeData.apple_offer_campaign_identifier?.toLowerCase() ===
+        getDiscountedYearlyOfferId().toLowerCase() &&
       (!codeData.apple_offer_code_expires_at ||
         codeData.apple_offer_code_expires_at >=
           new Date().toISOString().slice(0, 10)),

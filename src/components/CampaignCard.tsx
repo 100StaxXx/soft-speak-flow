@@ -1,4 +1,4 @@
-import { memo, useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { memo, useState, useMemo, useCallback, useEffect, useRef, type CSSProperties } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,9 +30,15 @@ import { SmartAdjustPlanDrawer } from "./SmartAdjustPlanDrawer";
 import { JourneyDetailDrawer } from "./JourneyDetailDrawer";
 import { MilestonePostcardPreview } from "./journey/MilestonePostcardPreview";
 import { cn } from "@/lib/utils";
+import {
+  COMPANION_FROSTED_PLANNER_DARK_CLASS,
+  COMPANION_FROSTED_THEME_SCOPE_CLASS,
+  getCompanionFrostedThemeStyle,
+} from "@/lib/companionFrostedTheme";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useMilestones } from "@/hooks/useMilestones";
+import { plannerPathfinderTheme } from "@/components/companion/plannerPathfinderTheme";
 import { getEpicDaysRemaining, resolveEpicEndDate } from "@/utils/epicDates";
 import { safeClipboardWrite, getClipboardErrorMessage } from "@/utils/clipboard";
 import { buildEpicInviteLink, buildEpicInviteShareText } from "@/utils/epicInviteShare";
@@ -76,9 +82,16 @@ interface CampaignCardProps {
   onRename?: (nextTitle: string) => Promise<void> | void;
   onComplete?: () => void;
   onAbandon?: () => void;
+  companionFrostedThemeStyle?: CSSProperties;
 }
 
-export const CampaignCard = memo(function CampaignCard({ campaign, onRename, onComplete, onAbandon }: CampaignCardProps) {
+export const CampaignCard = memo(function CampaignCard({
+  campaign,
+  onRename,
+  onComplete,
+  onAbandon,
+  companionFrostedThemeStyle,
+}: CampaignCardProps) {
   const [copied, setCopied] = useState(false);
   const [showAbandonDialog, setShowAbandonDialog] = useState(false);
   const [showAdjustDialog, setShowAdjustDialog] = useState(false);
@@ -88,6 +101,10 @@ export const CampaignCard = memo(function CampaignCard({ campaign, onRename, onC
   
   const { companion } = useCompanion();
   const { health } = useCompanionHealth();
+  const resolvedCompanionFrostedThemeStyle = useMemo(
+    () => companionFrostedThemeStyle ?? getCompanionFrostedThemeStyle(companion?.favorite_color),
+    [companionFrostedThemeStyle, companion?.favorite_color],
+  );
   const { 
     milestones,
     isLoading: milestonesLoading,
@@ -226,7 +243,12 @@ export const CampaignCard = memo(function CampaignCard({ campaign, onRename, onC
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="bg-card/30 backdrop-blur-sm border border-border/30 rounded-2xl p-4"
+        data-testid="campaign-card-shell"
+        className={cn(
+          COMPANION_FROSTED_THEME_SCOPE_CLASS,
+          "bg-card/30 backdrop-blur-sm border border-border/30 rounded-2xl p-4",
+        )}
+        style={resolvedCompanionFrostedThemeStyle}
       >
         <div className="space-y-4">
           <div className="flex items-start justify-between mb-3">
@@ -365,6 +387,7 @@ export const CampaignCard = memo(function CampaignCard({ campaign, onRename, onC
             epicTitle={campaign.title}
             epicGoal={campaign.description}
             currentDeadline={resolvedEndDate ?? undefined}
+            companionFrostedThemeStyle={resolvedCompanionFrostedThemeStyle}
           >
             <motion.button 
               className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl
@@ -406,6 +429,7 @@ export const CampaignCard = memo(function CampaignCard({ campaign, onRename, onC
               isActive={isActive}
               showAdjustPlan={isActive}
               onAdjustPlan={() => setShowAdjustDialog(true)}
+              companionFrostedThemeStyle={resolvedCompanionFrostedThemeStyle}
               renderTrigger={(todayCount) => (
                 <motion.button 
                   className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl
@@ -444,7 +468,11 @@ export const CampaignCard = memo(function CampaignCard({ campaign, onRename, onC
 
           {/* Abandon Dialog */}
           <AlertDialog open={showAbandonDialog} onOpenChange={setShowAbandonDialog}>
-            <AlertDialogContent>
+            <AlertDialogContent
+              className={cn(COMPANION_FROSTED_PLANNER_DARK_CLASS, plannerPathfinderTheme.portalSurface)}
+              data-testid="campaign-abandon-dialog"
+              style={resolvedCompanionFrostedThemeStyle}
+            >
               <AlertDialogHeader>
                 <AlertDialogTitle>Abandon this campaign?</AlertDialogTitle>
                 <AlertDialogDescription>
@@ -481,6 +509,7 @@ export const CampaignCard = memo(function CampaignCard({ campaign, onRename, onC
                 frequency: eh.habits?.frequency,
                 estimated_minutes: eh.habits?.estimated_minutes,
               })) || []}
+            companionFrostedThemeStyle={resolvedCompanionFrostedThemeStyle}
           />
         </div>
       </motion.div>
@@ -493,7 +522,12 @@ export const CampaignCard = memo(function CampaignCard({ campaign, onRename, onC
           }
         }}
       >
-        <DialogContent className="sm:max-w-md" hideCloseButton={isRenaming}>
+        <DialogContent
+          className={cn(COMPANION_FROSTED_PLANNER_DARK_CLASS, plannerPathfinderTheme.portalSurface, "sm:max-w-md")}
+          data-testid="campaign-rename-dialog"
+          hideCloseButton={isRenaming}
+          style={resolvedCompanionFrostedThemeStyle}
+        >
           <DialogHeader>
             <DialogTitle>Rename campaign</DialogTitle>
             <DialogDescription>

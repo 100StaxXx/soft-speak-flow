@@ -13,6 +13,9 @@ type AppleReceiptInfo = {
   original_purchase_date_ms?: string;
   cancellation_date_ms?: string | null;
   cancellation_reason?: string | null;
+  promotional_offer_id?: string | null;
+  offer_code_ref_name?: string | null;
+  offer_type?: string | number | null;
 };
 
 type AppleVerifyResponse = {
@@ -51,9 +54,8 @@ const SANDBOX_VERIFY_URL = "https://sandbox.itunes.apple.com/verifyReceipt";
 
 const DEFAULT_MONTHLY_PRICE_CENTS = 999; // $9.99
 const DEFAULT_YEARLY_PRICE_CENTS = 9999; // $99.99 standard pricing
-const DEFAULT_DISCOUNTED_YEARLY_PRICE_CENTS = 6999; // $69.99 offer-code pricing
-const DEFAULT_DISCOUNTED_YEARLY_OFFER_ID = "Cosmiq_OfferCode_yearly";
-const APPLE_OFFER_TYPE_CODE = 3;
+const DEFAULT_DISCOUNTED_YEARLY_PRICE_CENTS = 6999; // $69.99 existing referral offer-code pricing
+const DEFAULT_DISCOUNTED_YEARLY_OFFER_ID = "referrals";
 
 export const APPLE_BINDING_CONFLICT_ERROR =
   "This purchase is already linked to another account.";
@@ -74,14 +76,10 @@ export function getDiscountedYearlyOfferId() {
 export function isDiscountedYearlyOffer(
   options?: { offerIdentifier?: string | null; offerType?: number | null },
 ) {
-  const normalizedOfferIdentifier = options?.offerIdentifier?.trim();
-  if (
-    normalizedOfferIdentifier &&
-    normalizedOfferIdentifier === getDiscountedYearlyOfferId()
-  ) {
-    return true;
-  }
-  return options?.offerType === APPLE_OFFER_TYPE_CODE;
+  const normalizedOfferIdentifier = options?.offerIdentifier?.trim().toLowerCase();
+  const configuredOfferIdentifier = getDiscountedYearlyOfferId().toLowerCase();
+  return Boolean(normalizedOfferIdentifier) &&
+    normalizedOfferIdentifier === configuredOfferIdentifier;
 }
 
 export function getPriceCents(
@@ -145,6 +143,17 @@ function parseAppleDate(value?: string | null) {
   const asNumber = Number(value);
   if (!Number.isFinite(asNumber)) return null;
   return new Date(asNumber);
+}
+
+function parseAppleOfferType(value?: string | number | null) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
 }
 
 function normalizeOriginalTransactionId(
@@ -287,6 +296,9 @@ export function extractLatestTransaction(verifyResult: AppleVerifyResponse) {
     expiresAt,
     purchaseDate,
     cancellationDate: parseAppleDate(latest.cancellation_date_ms ?? undefined),
+    offerIdentifier: latest.promotional_offer_id ?? latest.offer_code_ref_name ??
+      null,
+    offerType: parseAppleOfferType(latest.offer_type),
   };
 }
 

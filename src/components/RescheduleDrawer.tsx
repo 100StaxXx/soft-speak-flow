@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import {
   Drawer,
   DrawerContent,
@@ -46,6 +46,7 @@ interface RescheduleDrawerProps {
   currentDeadline: string;
   children?: React.ReactNode;
   visualStyle?: "default" | "planner";
+  companionFrostedThemeStyle?: CSSProperties;
 }
 
 // Legacy quick adjustments kept as fallback
@@ -64,6 +65,7 @@ export const RescheduleDrawer = ({
   currentDeadline,
   children,
   visualStyle = "default",
+  companionFrostedThemeStyle,
 }: RescheduleDrawerProps) => {
   const [open, setOpen] = useState(false);
   const [adjustmentText, setAdjustmentText] = useState("");
@@ -238,9 +240,10 @@ export const RescheduleDrawer = ({
           isPlannerStyle &&
             cn(
               themeModeClassName,
-              "rounded-t-[2.25rem] border-2 border-[hsl(var(--celestial-blue)_/_0.34)] bg-[linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--card))_52%,hsl(var(--secondary))_100%)] text-foreground shadow-[0_-18px_56px_-36px_rgba(28,87,135,0.58),inset_0_1px_0_rgba(255,255,255,0.72)]",
+              "rounded-t-[2.25rem] border-2 border-[hsl(var(--celestial-blue)_/_0.34)] bg-[linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--card))_52%,hsl(var(--secondary))_100%)] text-foreground shadow-[0_-18px_56px_-36px_rgba(var(--primary-rgb),0.58),inset_0_1px_0_rgba(255,255,255,0.72)]",
             ),
         )}
+        style={companionFrostedThemeStyle}
       >
         <DrawerHeader className="pb-2">
           <div className="flex items-center justify-between">
@@ -346,6 +349,7 @@ export const RescheduleDrawer = ({
                     <PopoverContent
                       className={cn(isPlannerStyle && plannerPortalClassName, "w-auto p-0")}
                       align="start"
+                      style={companionFrostedThemeStyle}
                     >
                       <Calendar
                         mode="single"

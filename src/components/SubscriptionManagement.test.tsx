@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SubscriptionManagement } from "./SubscriptionManagement";
 
 vi.mock("@/hooks/useSubscription", () => ({
@@ -18,7 +18,9 @@ const appleSubscriptionMocks = vi.hoisted(() => ({
   handlePurchase: vi.fn(),
   handleRestore: vi.fn(),
   handleManageSubscriptions: vi.fn(),
+  handlePresentRevenueCatPaywall: vi.fn(),
   reloadProducts: vi.fn(),
+  hasOfferCode: false,
 }));
 
 vi.mock("@/hooks/useAppleSubscription", () => ({
@@ -33,10 +35,17 @@ vi.mock("@/hooks/useAppleSubscription", () => ({
     productsLoading: false,
     productError: null,
     reloadProducts: appleSubscriptionMocks.reloadProducts,
+    hasOfferCode: appleSubscriptionMocks.hasOfferCode,
+    handlePresentRevenueCatPaywall: appleSubscriptionMocks.handlePresentRevenueCatPaywall,
   }),
 }));
 
 describe("SubscriptionManagement", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    appleSubscriptionMocks.hasOfferCode = false;
+  });
+
   it("shows concrete subscription benefits while keeping the unlock CTA enabled on native iOS", () => {
     render(<SubscriptionManagement />);
 
@@ -49,5 +58,16 @@ describe("SubscriptionManagement", () => {
       screen.getByText("Both monthly and yearly plans include the same Cosmiq Pro features and renew automatically until canceled."),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /unlock with yearly/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "View All Plans" })).toBeInTheDocument();
+  });
+
+  it("hides the RevenueCat paywall bypass when a creator Apple offer code is active", () => {
+    appleSubscriptionMocks.hasOfferCode = true;
+
+    render(<SubscriptionManagement />);
+
+    expect(screen.getByText("$69.99")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /unlock with yearly/i })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "View All Plans" })).not.toBeInTheDocument();
   });
 });

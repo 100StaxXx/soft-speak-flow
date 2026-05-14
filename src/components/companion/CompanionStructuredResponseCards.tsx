@@ -43,7 +43,7 @@ const variantStyles = {
     body: "text-sm leading-6 text-foreground",
     subtext: "text-sm text-muted-foreground",
     item:
-      "rounded-[1.35rem] border border-[hsl(var(--celestial-blue)_/_0.36)] bg-card/[0.82] px-4 py-3 text-foreground shadow-[0_12px_30px_-28px_rgba(92,157,198,0.34),inset_0_1px_0_rgba(255,255,255,0.7)]",
+      "rounded-[1.35rem] border border-[hsl(var(--celestial-blue)_/_0.36)] bg-card/[0.82] px-4 py-3 text-foreground shadow-[0_12px_30px_-28px_rgba(var(--primary-rgb),0.34),inset_0_1px_0_rgba(255,255,255,0.7)]",
     accent:
       "rounded-full border border-[hsl(var(--celestial-blue)_/_0.38)] bg-card/[0.78] px-2 py-1 text-[0.62rem] font-black uppercase tracking-[0.18em] text-foreground",
   },
@@ -307,7 +307,7 @@ const renderQuestRow = (
                 "h-8 rounded-full px-3 text-[0.68rem] font-black uppercase tracking-[0.16em]",
                 variant === "journeys"
                   ? "border-[#6d3518] bg-white/70 text-[#6d3518] hover:bg-white"
-                  : "border-[hsl(var(--celestial-blue)_/_0.48)] bg-card/[0.82] text-foreground shadow-[0_10px_24px_-22px_rgba(92,157,198,0.38),inset_0_1px_0_rgba(255,255,255,0.76)] hover:bg-card",
+                  : "border-[hsl(var(--celestial-blue)_/_0.48)] bg-card/[0.82] text-foreground shadow-[0_10px_24px_-22px_rgba(var(--primary-rgb),0.38),inset_0_1px_0_rgba(255,255,255,0.76)] hover:bg-card",
               )}
               onClick={() => {
                 void options.onConfirmSuggestion?.(quest.proposalId!);

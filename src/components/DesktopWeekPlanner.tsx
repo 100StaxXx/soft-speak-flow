@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { addDays, addWeeks, format, isSameDay, isToday, startOfWeek, subWeeks } from "date-fns";
 import {
   CalendarDays,
@@ -19,6 +19,10 @@ import { ProgressRing } from "@/features/tasks/components/ProgressRing";
 import type { DailyTask } from "@/services/dailyTasksRemote";
 import { MAIN_QUEST_XP_MULTIPLIER } from "@/config/xpRewards";
 import { cn } from "@/lib/utils";
+import {
+  COMPANION_FROSTED_PLANNER_DARK_CLASS,
+  COMPANION_FROSTED_THEME_SCOPE_CLASS,
+} from "@/lib/companionFrostedTheme";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { durationMinutesToPixels } from "@/utils/taskDurationLayout";
@@ -88,6 +92,7 @@ interface DesktopWeekPlannerProps {
   onSendToCalendar?: (taskId: string) => void;
   hasCalendarLink?: (taskId: string) => boolean;
   onOpenCampaigns?: () => void;
+  companionFrostedThemeStyle?: CSSProperties;
 }
 
 interface DayStats {
@@ -114,6 +119,7 @@ interface WeekPlannerTaskCardProps {
   onMoveQuestToNextDay?: (task: DailyTask) => void;
   onSendToCalendar?: (taskId: string) => void;
   hasCalendarLink?: (taskId: string) => boolean;
+  companionFrostedThemeStyle?: CSSProperties;
 }
 
 const DEFAULT_TIMELINE_START_HOUR = 6;
@@ -123,7 +129,7 @@ const MIN_TASK_HEIGHT_PX = 28;
 const TASK_PAD_PX = 4;
 const WEEK_GRID_TEMPLATE_COLUMNS = "72px repeat(7, minmax(0, 1fr))";
 const JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME =
-  "journeys-quest-card-shell overflow-hidden border transition-colors";
+  `${COMPANION_FROSTED_THEME_SCOPE_CLASS} journeys-quest-card-shell overflow-hidden border transition-colors`;
 const JOURNEYS_QUEST_CARD_SHELL_STANDARD_TONE_CLASS_NAME =
   "border-white/10 bg-white/[0.04] shadow-[0_12px_22px_rgba(0,0,0,0.14)]";
 const JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME = "journeys-quest-card-shell--active";
@@ -267,6 +273,7 @@ function WeekPlannerTaskCard({
   onMoveQuestToNextDay,
   onSendToCalendar,
   hasCalendarLink,
+  companionFrostedThemeStyle,
 }: WeekPlannerTaskCardProps) {
   const effectiveTaskXP = getEffectiveTaskXP(task);
   const isComplete = !!task.completed;
@@ -334,6 +341,7 @@ function WeekPlannerTaskCard({
           onDelete={onDeleteQuest}
           onMoveQuestToNextDay={!task.habit_source_id ? onMoveQuestToNextDay : undefined}
           onSendToCalendar={onSendToCalendar}
+          companionFrostedThemeStyle={companionFrostedThemeStyle}
           anchor={(
             <button
               type="button"
@@ -402,6 +410,7 @@ export function DesktopWeekPlanner({
   onSendToCalendar,
   hasCalendarLink,
   onOpenCampaigns,
+  companionFrostedThemeStyle,
 }: DesktopWeekPlannerProps) {
   const dayHeaderRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const lastCenterDateRequestKeyRef = useRef(centerDateRequestKey);
@@ -666,8 +675,10 @@ export function DesktopWeekPlanner({
       onMoveQuestToNextDay={onMoveQuestToNextDay}
       onSendToCalendar={onSendToCalendar}
       hasCalendarLink={hasCalendarLink}
+      companionFrostedThemeStyle={companionFrostedThemeStyle}
     />
   ), [
+    companionFrostedThemeStyle,
     hasCalendarLink,
     onDeleteQuest,
     onEditQuest,
@@ -681,8 +692,9 @@ export function DesktopWeekPlanner({
 
   return (
     <div
-      className="grid grid-cols-[minmax(0,1fr)_320px] items-start gap-5"
+      className={cn(COMPANION_FROSTED_PLANNER_DARK_CLASS, "grid grid-cols-[minmax(0,1fr)_320px] items-start gap-5")}
       data-testid="desktop-week-planner"
+      style={companionFrostedThemeStyle}
     >
       <div className="journeys-desktop-shell flex min-h-0 flex-col rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,21,39,0.95),rgba(13,11,23,0.92))] px-4 py-4 shadow-[0_28px_54px_rgba(0,0,0,0.24)]">
         <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
@@ -846,7 +858,7 @@ export function DesktopWeekPlanner({
                               className={cn(
                                 "text-[11px] font-semibold uppercase tracking-[0.18em]",
                                 isSelected
-                                  ? "text-primary-foreground/78"
+                                  ? "text-primary"
                                   : dayIsToday
                                   ? "text-celestial-blue"
                                   : "text-muted-foreground/75",

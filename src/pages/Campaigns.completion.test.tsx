@@ -103,6 +103,12 @@ vi.mock("@/hooks/useAuth", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
+  useJourneysCompanionVisual: () => ({
+    favoriteColor: "#58d68d",
+  }),
+}));
+
 vi.mock("@/utils/creationPopupPersistence", () => ({
   readCreationPopupMarker: () => mocks.creationMarker,
   readCampaignBuilderDraftSnapshot: () => mocks.campaignDraft,
@@ -143,6 +149,10 @@ describe("Campaigns populated layout", () => {
 
     render(<Campaigns />);
 
+    expect(screen.getByTestId("campaigns-theme-scope")).not.toHaveClass("companion-frosted-theme-scope");
+    expect(screen.getByTestId("campaigns-theme-scope").style.getPropertyValue("--companion-frosted-primary")).toBe(
+      "145 61% 59%",
+    );
     const existingSection = screen.getByTestId("campaigns-existing-section");
     const createButton = within(existingSection).getByTestId("campaigns-create-button");
     const firstCampaignCard = within(existingSection).getAllByTestId("campaign-card")[0];

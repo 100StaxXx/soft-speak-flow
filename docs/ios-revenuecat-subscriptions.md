@@ -33,7 +33,6 @@ export const REVENUECAT_IOS_API_KEY =
 export const COSMIQ_PRO_ENTITLEMENT_ID = "cosmiq_pro";
 export const COSMIQ_PRO_ENTITLEMENT_NAME = "Cosmiq Pro";
 export const REVENUECAT_PRODUCT_IDS = [
-  "cosmiq_referral_yearly",
   "cosmiq_premium_yearly",
   "cosmiq_premium_monthly",
 ] as const;
@@ -60,15 +59,13 @@ Attach these App Store products to that entitlement:
 
 - `cosmiq_premium_monthly`
 - `cosmiq_premium_yearly`
-- `cosmiq_referral_yearly`
 
 Recommended offering:
 
 - `monthly` package -> `cosmiq_premium_monthly`
 - `annual` package -> `cosmiq_premium_yearly`
-- custom package `referral_yearly` -> `cosmiq_referral_yearly`
 
-Make the offering current. Then create a RevenueCat Paywall for that current offering. If you want a separate creator-code experience, use RevenueCat targeting or a separate offering/paywall that includes the referral annual product.
+Make the offering current. Then create a RevenueCat Paywall for that current offering. Creator-code discounts are handled through Apple custom offer codes on `cosmiq_premium_yearly`, not through a separate RevenueCat product.
 
 ## Customer info and entitlement checks
 
@@ -107,7 +104,7 @@ After purchases, restores, paywall purchases, or Customer Center returns, the ap
 
 ## Referral yearly product
 
-For users with an eligible creator code, the React purchase flow now buys `cosmiq_referral_yearly` directly when RevenueCat returns that product. If the referral product is not available, the app falls back to the legacy Apple offer-code redemption sheet.
+For users with an eligible creator code, the React purchase flow presents Apple's offer-code redemption sheet and then completes the purchase on `cosmiq_premium_yearly`. The existing `referrals` App Store Connect campaign remains the active referral offer: `$69.99` for the first year, then standard yearly renewal.
 
 ## Paywalls and Customer Center
 

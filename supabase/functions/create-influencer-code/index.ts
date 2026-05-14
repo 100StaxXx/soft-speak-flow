@@ -5,6 +5,7 @@ import { applyAbuseProtection, createSafeErrorResponse, getClientIpAddress } fro
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { hasUserRole, requireRequestAuth } from "../_shared/auth.ts";
 import { createCreatorAccessToken } from "../_shared/influencerAuth.ts";
+import { syncAppleOfferCodeForReferralCode } from "../_shared/referralState.ts";
 import { verifyTurnstileToken } from "../_shared/turnstile.ts";
 
 /**
@@ -281,7 +282,7 @@ serve(async (req) => {
     // Check if influencer already has a code
     const { data: existingCode } = await supabaseClient
       .from("referral_codes")
-      .select("code")
+      .select("id, code, apple_offer_code_id, apple_offer_campaign_identifier")
       .eq("influencer_email", email)
       .eq("owner_type", "influencer")
       .maybeSingle();
@@ -289,6 +290,12 @@ serve(async (req) => {
     if (existingCode) {
       // Return existing code instead of creating duplicate
       const appLink = `${appUrl}/?ref=${existingCode.code}`;
+      const appleOfferSync = await syncAppleOfferCodeForReferralCode(supabaseClient, {
+        id: existingCode.id,
+        code: existingCode.code,
+        apple_offer_code_id: existingCode.apple_offer_code_id ?? null,
+        apple_offer_campaign_identifier: existingCode.apple_offer_campaign_identifier ?? null,
+      });
       let reminderEmailSent = false;
 
       const emailProtection = await applyAbuseProtection(req, supabaseClient as any, {
@@ -315,6 +322,7 @@ serve(async (req) => {
           code: existingCode.code,
           link: appLink,
           email_sent: reminderEmailSent,
+          apple_offer_code_status: appleOfferSync.status,
           message: reminderEmailSent
             ? "You already have a referral code. We emailed you a fresh secure dashboard link."
             : "You already have a referral code. Dashboard access is only sent by email.",
@@ -372,6 +380,13 @@ serve(async (req) => {
       );
     }
 
+    const appleOfferSync = await syncAppleOfferCodeForReferralCode(supabaseClient, {
+      id: newCode.id,
+      code,
+      apple_offer_code_id: newCode.apple_offer_code_id ?? null,
+      apple_offer_campaign_identifier: newCode.apple_offer_campaign_identifier ?? null,
+    });
+
     const appLink = `${appUrl}/?ref=${code}`;
 
     let confirmationEmailSent = false;
@@ -401,6 +416,7 @@ serve(async (req) => {
         code,
         link: appLink,
         email_sent: confirmationEmailSent,
+        apple_offer_code_status: appleOfferSync.status,
         message: confirmationEmailSent
           ? "Your referral code is ready. Check your email for a secure creator dashboard link."
           : "Your referral code is ready. Dashboard access is only sent by email.",

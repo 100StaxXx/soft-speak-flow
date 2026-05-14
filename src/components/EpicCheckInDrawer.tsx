@@ -1,4 +1,4 @@
-import { memo, useState, useMemo, useRef } from "react";
+import { memo, useState, useMemo, useRef, type CSSProperties } from "react";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,11 @@ import { playStrikethrough } from "@/utils/soundEffects";
 import { useHabitSurfacing } from "@/hooks/useHabitSurfacing";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
 import { useEpics } from "@/hooks/useEpics";
+import { useCompanion } from "@/hooks/useCompanion";
+import {
+  COMPANION_FROSTED_PLANNER_DARK_CLASS,
+  getCompanionFrostedThemeStyle,
+} from "@/lib/companionFrostedTheme";
 import { getClampedMonthDays, isHabitScheduledForDate } from "@/utils/habitSchedule";
 interface Habit {
   id: string;
@@ -94,10 +99,20 @@ interface EpicCheckInDrawerProps {
   onAdjustPlan?: () => void;
   showAdjustPlan?: boolean;
   renderTrigger?: (todayCount: number) => React.ReactNode;
+  companionFrostedThemeStyle?: CSSProperties;
 }
 
-export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habits, isActive, onAdjustPlan, showAdjustPlan, renderTrigger }: EpicCheckInDrawerProps) {
+export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({
+  epicId,
+  habits,
+  isActive,
+  onAdjustPlan,
+  showAdjustPlan,
+  renderTrigger,
+  companionFrostedThemeStyle,
+}: EpicCheckInDrawerProps) {
   const { user } = useAuth();
+  const { companion } = useCompanion();
   const queryClient = useQueryClient();
   const { createCampaignRitual } = useEpics({ enabled: false });
   const [open, setOpen] = useState(false);
@@ -122,6 +137,10 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
   const taskDate = format(new Date(), 'yyyy-MM-dd');
   const { surfacedHabits, surfaceHabit } = useHabitSurfacing();
   const { toggleTask } = useTaskMutations(taskDate);
+  const resolvedCompanionFrostedThemeStyle = useMemo(
+    () => companionFrostedThemeStyle ?? getCompanionFrostedThemeStyle(companion?.favorite_color),
+    [companionFrostedThemeStyle, companion?.favorite_color],
+  );
    
    // Helper to check if this is the first ritual completion today
    const checkIsFirstRitualToday = (): boolean => {
@@ -335,7 +354,11 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
         )}
       </DrawerTrigger>
       
-      <DrawerContent className="bg-background border-t border-primary/20">
+      <DrawerContent
+        className={cn(COMPANION_FROSTED_PLANNER_DARK_CLASS, "bg-background border-t border-primary/20")}
+        data-testid="epic-check-in-drawer-content"
+        style={resolvedCompanionFrostedThemeStyle}
+      >
         <div className="mx-auto w-full max-w-lg p-6">
           <DrawerHeader className="px-0 pb-4">
             <DrawerTitle className="flex items-center gap-2 text-xl">
@@ -913,6 +936,7 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
           onOpenChange={(open) => !open && setEditingRitual(null)}
           onDelete={handleDeleteRitual}
           isDeleting={isDeleting}
+          companionFrostedThemeStyle={resolvedCompanionFrostedThemeStyle}
         />
       </DrawerContent>
     </Drawer>

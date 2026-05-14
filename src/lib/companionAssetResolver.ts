@@ -18,12 +18,10 @@ import {
   type CompanionVisualState,
 } from "@/config/companionCatalog";
 import { getCompanionPresetImageAssetKey } from "@/lib/companionImageFocal";
-import {
-  isAiGeneratedCompanion,
-  isPresetEggCompanion,
-} from "@/lib/companionPredicates";
+import { isPresetEggCompanion } from "@/lib/companionPredicates";
 
 const UNIVERSAL_EGG_ASSET_DIR = "companion-eggs/v2";
+const UNIVERSAL_EGG_CUTOUT_ASSET_DIR = "companion-eggs";
 const COMPANION_PRESET_PUBLIC_PATH_SEGMENT = `/storage/v1/object/public/${COMPANION_PRESET_BUCKET}/`;
 
 interface CompanionAssetSource {
@@ -47,6 +45,18 @@ export const resolveUniversalEggAssetPath = ({
 
 export const getUniversalEggAssetUrl = (element: string): string =>
   `/${resolveUniversalEggAssetPath({ element })}`;
+
+export const resolveUniversalEggCutoutAssetPath = ({
+  element,
+}: {
+  element: string;
+}): string => {
+  const normalizedElement = coerceCompanionElementId(element);
+  return `${UNIVERSAL_EGG_CUTOUT_ASSET_DIR}/egg__t0_egg__normal__${normalizedElement}.png`;
+};
+
+export const getUniversalEggCutoutAssetUrl = (element: string): string =>
+  `/${resolveUniversalEggCutoutAssetPath({ element })}`;
 
 const isBundledYouthPresetAssetPath = (storagePath: string): boolean => {
   const [presetSegment, storageTier, variantSegment] = storagePath.split("/");
@@ -252,12 +262,12 @@ export const resolveCompanionVisualAssetUrl = (
   const normalizedNeglectedImageUrl = normalizeCompanionStoredImageUrl(companion.neglected_image_url);
 
   const normalizedElement = companion.core_element ?? "fire";
-  if (state === "normal" && isPresetEggCompanion(companion)) {
+  if (state === "normal" && (companion.current_stage ?? 0) <= 0) {
     return getUniversalEggAssetUrl(normalizedElement);
   }
 
-  if (state === "normal" && isAiGeneratedCompanion(companion) && (companion.current_stage ?? 0) <= 0) {
-    return normalizedCurrentImageUrl ?? normalizedInitialImageUrl ?? getUniversalEggAssetUrl(normalizedElement);
+  if (state === "normal" && isPresetEggCompanion(companion)) {
+    return getUniversalEggAssetUrl(normalizedElement);
   }
 
   const presetUrl = companion.preset_id

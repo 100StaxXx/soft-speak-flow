@@ -152,11 +152,18 @@ describe("DraggableFAB", () => {
     document.documentElement.style.setProperty("--bottom-nav-safe-offset", "96px");
   });
 
-  it("hides the floating launcher during tutorial when the companion is still an egg", () => {
+  it("keeps the floating launcher during tutorial when the companion is still an egg", () => {
     mocks.visual = {
       ...mocks.visual,
+      companionId: "companion-egg",
+      currentSceneImageUrl: "https://assets.example.com/generated-egg.png",
+      imageUrl: "/companion-eggs/v2/egg__t0_egg__normal__fire.webp",
+      isGeneratedCompanion: true,
+      launcherAwayImageUrl: "/companion-eggs/egg__t0_egg__normal__fire.png",
+      launcherAwayUsesPortraitShell: true,
+      launcherAwayHasTransparentBackground: true,
       currentStage: 0,
-      needsLauncherImage: true,
+      needsLauncherImage: false,
     };
     mocks.guidance = {
       currentStep: "new_goal",
@@ -165,8 +172,14 @@ describe("DraggableFAB", () => {
 
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
 
-    expect(screen.queryByTestId("journeys-companion-launcher-floating")).not.toBeInTheDocument();
+    expect(screen.getByTestId("journeys-companion-launcher-floating")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Nova" })).toHaveAttribute(
+      "src",
+      "/companion-eggs/egg__t0_egg__normal__fire.png",
+    );
     expect(mocks.launcherImageCalls).toContainEqual(expect.objectContaining({
+      companionId: "companion-egg",
+      sourceImageUrl: "https://assets.example.com/generated-egg.png",
       enabled: false,
     }));
   });
@@ -182,10 +195,11 @@ describe("DraggableFAB", () => {
     expect(screen.getByTestId("journeys-companion-launcher-floating")).toBeInTheDocument();
   });
 
-  it("hides the floating launcher placeholder during the pre-hatch tutorial state", () => {
+  it("keeps the floating launcher visible during the pre-hatch tutorial state", () => {
     mocks.visual = {
       ...mocks.visual,
       currentStage: 1,
+      currentSceneImageUrl: "https://assets.example.com/pre-hatch.png",
       needsLauncherImage: true,
     };
     mocks.guidance = {
@@ -195,10 +209,10 @@ describe("DraggableFAB", () => {
 
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
 
-    expect(screen.queryByTestId("journeys-companion-launcher-floating")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("journeys-companion-launcher-placeholder")).not.toBeInTheDocument();
+    expect(screen.getByTestId("journeys-companion-launcher-floating")).toBeInTheDocument();
     expect(mocks.launcherImageCalls).toContainEqual(expect.objectContaining({
-      enabled: false,
+      sourceImageUrl: "https://assets.example.com/pre-hatch.png",
+      enabled: true,
     }));
   });
 

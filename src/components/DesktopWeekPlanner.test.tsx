@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { format } from "date-fns";
 import { describe, expect, it, vi } from "vitest";
@@ -78,6 +78,9 @@ const baseTask = (overrides: Partial<DailyTask> = {}): DailyTask => ({
 describe("DesktopWeekPlanner", () => {
   it("renders all seven days plus compact desktop header controls", () => {
     const onPlannerModeChange = vi.fn();
+    const companionFrostedThemeStyle = {
+      "--companion-frosted-primary": "155 64% 55%",
+    } as CSSProperties;
 
     render(
       <DesktopWeekPlanner
@@ -89,9 +92,14 @@ describe("DesktopWeekPlanner", () => {
         onToggle={vi.fn()}
         onAddQuest={vi.fn()}
         onOpenMonthView={vi.fn()}
+        companionFrostedThemeStyle={companionFrostedThemeStyle}
       />,
     );
 
+    expect(screen.getByTestId("desktop-week-planner")).toHaveClass("companion-frosted-planner-dark");
+    expect(screen.getByTestId("desktop-week-planner")).toHaveStyle({
+      "--companion-frosted-primary": "155 64% 55%",
+    });
     expect(screen.getByTestId("desktop-week-day-2026-03-29")).toBeInTheDocument();
     expect(screen.getByTestId("desktop-week-day-2026-04-04")).toBeInTheDocument();
     expect(screen.getByTestId("desktop-week-planner-grid")).toHaveClass("min-w-0");
@@ -230,7 +238,10 @@ describe("DesktopWeekPlanner", () => {
     const timedCard = screen.getByTestId("desktop-week-task-timed-task");
     expect(timedCard).toBeInTheDocument();
     expect(timedCard).toHaveAttribute("data-quest-card-shell", "true");
-    expect(timedCard).toHaveClass("journeys-quest-card-shell");
+    expect(timedCard).toHaveClass(
+      "companion-frosted-theme-scope",
+      "journeys-quest-card-shell",
+    );
     expect(timedCard).not.toHaveClass("journeys-quest-card-shell--readable");
     expect(within(screen.getByTestId("desktop-week-anytime-2026-03-31")).getByText("Loose planning")).toBeInTheDocument();
     expect(screen.getByText("Wednesday review")).toBeInTheDocument();
@@ -491,6 +502,9 @@ describe("DesktopWeekPlanner", () => {
     const onDeleteQuest = vi.fn();
     const onMoveQuestToNextDay = vi.fn();
     const onSendToCalendar = vi.fn();
+    const companionFrostedThemeStyle = {
+      "--companion-frosted-primary": "282 68% 62%",
+    } as CSSProperties;
 
     const completedTask = baseTask({
       id: "completed-task",
@@ -517,6 +531,7 @@ describe("DesktopWeekPlanner", () => {
         onMoveQuestToNextDay={onMoveQuestToNextDay}
         onSendToCalendar={onSendToCalendar}
         hasCalendarLink={(taskId) => taskId === "editable-task"}
+        companionFrostedThemeStyle={companionFrostedThemeStyle}
       />,
     );
 
@@ -531,6 +546,13 @@ describe("DesktopWeekPlanner", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("desktop-quest-popover-editable-task")).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("desktop-quest-popover-content-editable-task")).toHaveClass(
+      "companion-frosted-theme-scope",
+    );
+    expect(screen.getByTestId("desktop-quest-popover-content-editable-task")).toHaveStyle({
+      "--companion-frosted-primary": "282 68% 62%",
     });
 
     expect(screen.getByTestId("desktop-week-task-editable-task")).toHaveClass(

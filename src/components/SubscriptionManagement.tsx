@@ -52,15 +52,11 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
     productError,
     reloadProducts,
     hasOfferCode,
-    hasReferralYearlyProduct,
     handlePresentRevenueCatPaywall,
   } = useAppleSubscription();
 
   const [selectedPlan, setSelectedPlan] = useState<IAPPlan>("yearly");
-  const preferReferralYearly = hasOfferCode && hasReferralYearlyProduct;
-  const selectedProductId = getPurchaseProductIdForPlan(selectedPlan, products, {
-    preferReferral: selectedPlan === "yearly" && preferReferralYearly,
-  });
+  const selectedProductId = getPurchaseProductIdForPlan(selectedPlan, products);
 
   const subscriptionStatusText = subscription
     ? `You have Cosmiq Pro (${plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : "Active"})`
@@ -84,12 +80,12 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
 
   const priceByPlan = useMemo(() => {
     return PLAN_OPTIONS.reduce<Record<string, string>>((acc, option) => {
-      acc[option.id] = getProductForPlan(option.id, products, {
-        preferReferral: option.id === "yearly" && preferReferralYearly,
-      })?.displayPrice ?? option.fallbackPrice;
+      acc[option.id] = option.id === "yearly" && hasOfferCode
+        ? "$69.99"
+        : getProductForPlan(option.id, products)?.displayPrice ?? option.fallbackPrice;
       return acc;
     }, {});
-  }, [preferReferralYearly, products]);
+  }, [hasOfferCode, products]);
 
   if (isLoading) {
     return (
@@ -196,14 +192,16 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
             )}
           </Button>
 
-          <Button
-            variant="outline"
-            onClick={() => { void handlePresentRevenueCatPaywall("subscription_management_revenuecat_ui"); }}
-            disabled={!isAvailable || purchasing}
-            className="w-full"
-          >
-            View All Plans
-          </Button>
+          {!hasOfferCode && (
+            <Button
+              variant="outline"
+              onClick={() => { void handlePresentRevenueCatPaywall("subscription_management_revenuecat_ui"); }}
+              disabled={!isAvailable || purchasing}
+              className="w-full"
+            >
+              View All Plans
+            </Button>
+          )}
 
           <p className="text-xs text-center text-muted-foreground">
             {PREMIUM_PLAN_NOTE}

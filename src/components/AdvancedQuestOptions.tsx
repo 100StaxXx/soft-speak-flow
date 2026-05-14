@@ -1,4 +1,4 @@
-import { KeyboardEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { KeyboardEvent, useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
@@ -68,6 +68,7 @@ interface AdvancedQuestOptionsProps {
   requireScheduledTimeForRecurrence?: boolean;
   visualStyle?: "default" | "quest-soft";
   portalClassName?: string;
+  portalStyle?: CSSProperties;
 }
 
 // Helper to format 24h time to 12h
@@ -219,7 +220,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
     )
     : "w-full px-3 py-2 text-sm text-left border rounded-lg transition-colors flex items-center justify-between bg-muted text-muted-foreground cursor-not-allowed opacity-70";
   const inputClassName = isQuestSoft
-    ? "border-[2px] border-[hsl(var(--celestial-blue)_/_0.52)] bg-card/[0.88] text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_2px_rgba(58,121,158,0.08)] focus-visible:border-[hsl(var(--celestial-blue)_/_0.78)] focus-visible:ring-celestial-blue/25"
+    ? "border-[2px] border-[hsl(var(--celestial-blue)_/_0.52)] bg-card/[0.88] text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_2px_rgba(var(--primary-rgb),0.08)] focus-visible:border-[hsl(var(--celestial-blue)_/_0.78)] focus-visible:ring-celestial-blue/25"
     : "";
   const popoverClassName = isQuestSoft
     ? cn("w-[min(24rem,var(--radix-popover-trigger-width))] p-2", QUEST_FORM_STYLES.popover, props.portalClassName)
@@ -234,7 +235,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
       : "w-full rounded-md px-3 py-2 text-sm text-left hover:bg-accent transition-colors",
     isQuestSoft
       ? selected
-        ? cn(toneColors.pill, "shadow-[0_10px_22px_-18px_rgba(92,157,198,0.38),inset_0_1px_0_rgba(255,255,255,0.88)]")
+        ? cn(toneColors.pill, "shadow-[0_10px_22px_-18px_rgba(var(--primary-rgb),0.38),inset_0_1px_0_rgba(255,255,255,0.88)]")
         : "text-muted-foreground hover:bg-card/70 hover:text-foreground"
       : selected
         ? "bg-accent"
@@ -562,7 +563,11 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                   )}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className={cn(isQuestSoft ? popoverClassName : "w-64 p-2", !isQuestSoft && "")} align="end">
+              <PopoverContent
+                className={cn(isQuestSoft ? popoverClassName : "w-64 p-2", !isQuestSoft && "")}
+                align="end"
+                style={props.portalStyle}
+              >
                 <div className="space-y-1">
                   <p className={cn("px-2 py-1 text-xs font-medium", isQuestSoft ? "text-muted-foreground" : "text-muted-foreground")}>
                     Suggested Times
@@ -653,6 +658,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
               side="bottom"
               sideOffset={6}
               className={reminderPopoverClassName}
+              style={props.portalStyle}
             >
               <div
                 data-testid="early-reminder-options-scroll"
@@ -825,6 +831,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
               side="bottom"
               sideOffset={6}
               className={popoverClassName}
+              style={props.portalStyle}
             >
               <div className={cn(isQuestSoft && "max-h-60 overflow-y-auto")}>
                 {recurrenceOptions.map((option) => (
@@ -894,7 +901,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                       "h-8 rounded-md text-xs font-medium border transition-colors",
                       isQuestSoft
                         ? props.recurrenceMonthDays.includes(dayOfMonth)
-                          ? cn(toneColors.pill, "shadow-[0_10px_22px_-18px_rgba(92,157,198,0.38),inset_0_1px_0_rgba(255,255,255,0.88)]")
+                          ? cn(toneColors.pill, "shadow-[0_10px_22px_-18px_rgba(var(--primary-rgb),0.38),inset_0_1px_0_rgba(255,255,255,0.88)]")
                           : "border-[hsl(var(--border)_/_0.72)] bg-card/[0.64] text-muted-foreground hover:bg-card hover:text-foreground"
                         : props.recurrenceMonthDays.includes(dayOfMonth)
                           ? "bg-primary border-primary text-primary-foreground"
@@ -943,7 +950,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
           className={cn(
             "min-h-[100px] resize-none",
             isQuestSoft
-              ? "border-[2px] border-[hsl(var(--celestial-blue)_/_0.52)] bg-card/[0.88] text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_2px_rgba(58,121,158,0.08)] focus-visible:border-[hsl(var(--celestial-blue)_/_0.78)] focus-visible:ring-celestial-blue/25"
+              ? "border-[2px] border-[hsl(var(--celestial-blue)_/_0.52)] bg-card/[0.88] text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_2px_rgba(var(--primary-rgb),0.08)] focus-visible:border-[hsl(var(--celestial-blue)_/_0.78)] focus-visible:ring-celestial-blue/25"
               : "bg-muted/30 border-border/50",
           )}
           style={{ touchAction: 'pan-y', WebkitTapHighlightColor: 'transparent' }}

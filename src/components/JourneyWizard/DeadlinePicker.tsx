@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { format, addDays, addWeeks, addMonths, addYears, differenceInDays } from 'date-fns';
 import { Calendar as CalendarIcon, Clock, Zap } from 'lucide-react';
 import { plannerPathfinderTheme } from '@/components/companion/plannerPathfinderTheme';
@@ -12,6 +12,7 @@ interface DeadlinePickerProps {
   value: Date | undefined;
   onChange: (date: Date | undefined) => void;
   minDate?: Date;
+  companionFrostedThemeStyle?: CSSProperties;
 }
 
 const quickOptions = [
@@ -22,7 +23,7 @@ const quickOptions = [
   { label: '1 year', getValue: () => addYears(new Date(), 1) },
 ];
 
-export function DeadlinePicker({ value, onChange, minDate }: DeadlinePickerProps) {
+export function DeadlinePicker({ value, onChange, minDate, companionFrostedThemeStyle }: DeadlinePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const { themeModeClassName } = usePlannerPathfinderAppearance();
   
@@ -93,6 +94,7 @@ export function DeadlinePicker({ value, onChange, minDate }: DeadlinePickerProps
           )}
           align="start"
           onOpenAutoFocus={(e) => e.preventDefault()}
+          style={companionFrostedThemeStyle}
         >
           <Calendar
             mode="single"

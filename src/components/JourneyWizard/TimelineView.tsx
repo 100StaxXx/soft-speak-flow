@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type CSSProperties } from 'react';
 import { motion } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
 import { plannerPathfinderTheme } from '@/components/companion/plannerPathfinderTheme';
@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 
 import { cn, formatDisplayLabel } from '@/lib/utils';
 import type { JourneyPhase, JourneyMilestone, JourneyRitual, FeasibilityAssessment, JourneyExecutionModel } from '@/hooks/useJourneySchedule';
+import { usePlannerPathfinderAppearance } from '@/hooks/usePlannerPathfinderAppearance';
 import { PhaseCard } from './PhaseCard';
 
 interface TimelineViewProps {
@@ -27,6 +28,7 @@ interface TimelineViewProps {
   postcardCount?: number;
   maxPostcards?: number;
   executionModel?: JourneyExecutionModel;
+  companionFrostedThemeStyle?: CSSProperties;
 }
 
 export function TimelineView({
@@ -41,7 +43,9 @@ export function TimelineView({
   postcardCount = 0,
   maxPostcards = 7,
   executionModel = 'sequential',
+  companionFrostedThemeStyle,
 }: TimelineViewProps) {
+  const { themeModeClassName } = usePlannerPathfinderAppearance();
   const sortedPhases = useMemo(() => 
     [...phases].sort((a, b) => a.phaseOrder - b.phaseOrder),
     [phases]
@@ -82,7 +86,7 @@ export function TimelineView({
   const colors = feasibilityColors[feasibilityAssessment.feasibility] || feasibilityColors.achievable;
 
   return (
-    <div className="space-y-4">
+    <div className={cn(themeModeClassName, "space-y-4")} style={companionFrostedThemeStyle}>
       {/* Feasibility Assessment Header */}
       <div className={cn(plannerPathfinderTheme.raisedPanel, 'p-4')}>
         <div className="flex items-start gap-3">
@@ -141,6 +145,7 @@ export function TimelineView({
               onMilestoneDateChange={onMilestoneDateChange}
               postcardCount={postcardCount}
               maxPostcards={maxPostcards}
+              companionFrostedThemeStyle={companionFrostedThemeStyle}
             />
           </motion.div>
         ))}

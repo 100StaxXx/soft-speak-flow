@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type ReactElement } from "react";
+import { useCallback, useEffect, useRef, type CSSProperties, type ReactElement } from "react";
 import {
   Brain,
   CalendarArrowUp,
@@ -24,6 +24,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { QuestLocationLink } from "@/components/QuestLocationLink";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { cn, formatDisplayLabel, stripMarkdown } from "@/lib/utils";
+import { COMPANION_FROSTED_THEME_SCOPE_CLASS } from "@/lib/companionFrostedTheme";
 import type { TaskAttachment } from "@/types/questAttachments";
 
 export interface DesktopQuestSubtask {
@@ -65,6 +66,7 @@ interface DesktopQuestDetailsPopoverProps<T extends DesktopQuestDetailsTask> {
   onMoveQuestToNextDay?: (task: T) => void;
   onDelete?: (task: T) => void;
   onToggleSubtask?: (taskId: string, subtaskId: string, completed: boolean) => void;
+  companionFrostedThemeStyle?: CSSProperties;
 }
 
 const FALLBACK_ATTACHMENT_NAME = "Photo attachment";
@@ -184,6 +186,7 @@ export function DesktopQuestDetailsPopover<T extends DesktopQuestDetailsTask>({
   onMoveQuestToNextDay,
   onDelete,
   onToggleSubtask,
+  companionFrostedThemeStyle,
 }: DesktopQuestDetailsPopoverProps<T>) {
   const attachments = normalizeDisplayAttachments(task);
   const duration = formatDuration(task.estimated_duration);
@@ -197,7 +200,12 @@ export function DesktopQuestDetailsPopover<T extends DesktopQuestDetailsTask>({
       <PopoverContent
         align="start"
         sideOffset={10}
-        className="z-[80] w-[360px] rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,20,38,0.98),rgba(15,13,26,0.96))] p-4 text-white shadow-[0_28px_60px_rgba(0,0,0,0.34)]"
+        className={cn(
+          COMPANION_FROSTED_THEME_SCOPE_CLASS,
+          "z-[80] w-[360px] rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,20,38,0.98),rgba(15,13,26,0.96))] p-4 text-white shadow-[0_28px_60px_rgba(0,0,0,0.34)]",
+        )}
+        data-testid={`desktop-quest-popover-content-${task.id}`}
+        style={companionFrostedThemeStyle}
       >
         <div
           className="space-y-4"

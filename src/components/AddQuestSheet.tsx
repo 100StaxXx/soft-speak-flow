@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, memo, useMemo, type FocusEvent, type KeyboardEvent } from "react";
+import { useState, useRef, useEffect, useCallback, memo, useMemo, type CSSProperties, type FocusEvent, type KeyboardEvent } from "react";
 import { format, isToday, addMinutes } from "date-fns";
 import { Sliders, CalendarIcon, Inbox, Map, X, Zap, Flame, Mountain, Trash2, Sparkles, History } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useCompanion } from "@/hooks/useCompanion";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
@@ -64,6 +65,7 @@ import {
   normalizeQuestReminderOffsets,
   resolveQuestReminderOffsets,
 } from "@/utils/questReminders";
+import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
 
 export interface AddQuestData {
   text: string;
@@ -107,6 +109,7 @@ interface AddQuestSheetProps {
   onPreventedCloseAttempt?: () => void;
   autoRestoreDraftOnOpen?: boolean;
   persistenceRoute?: CreationPopupRoute;
+  companionFrostedThemeStyle?: CSSProperties;
 }
 
 import {
@@ -136,6 +139,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   onPreventedCloseAttempt,
   autoRestoreDraftOnOpen = false,
   persistenceRoute: _persistenceRoute = "/journeys",
+  companionFrostedThemeStyle,
 }: AddQuestSheetProps) {
   const [sheetView, setSheetView] = useState<"editor" | "templates">("editor");
   const [templateBrowserInitialTab, setTemplateBrowserInitialTab] = useState<QuestTemplateBrowserTab>("common");
@@ -175,6 +179,11 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   } = usePersonalQuestTemplates({ enabled: open });
   const { toast } = useToast();
   const { user } = useAuth();
+  const { companion } = useCompanion();
+  const resolvedCompanionFrostedThemeStyle = useMemo(
+    () => companionFrostedThemeStyle ?? getCompanionFrostedThemeStyle(companion?.favorite_color),
+    [companionFrostedThemeStyle, companion?.favorite_color],
+  );
 
   const { defaultProvider, connections } = useCalendarIntegrations();
   const fallbackCalendarSendTarget = useMemo(
@@ -829,6 +838,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
             : "h-[92vh] rounded-t-[34px] flex flex-col p-0 gap-0 overflow-hidden",
           isDesktopPanel ? QUEST_FORM_STYLES.desktopPanelShell : QUEST_FORM_STYLES.sheet,
         )}
+        style={resolvedCompanionFrostedThemeStyle}
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <SheetTitle className="sr-only">Add Quest</SheetTitle>
@@ -1039,7 +1049,11 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                       {taskDate ? format(dateObj, "MMM d") : "Date"}
                     </button>
                   </PopoverTrigger>
-                  <PopoverContent className={cn("w-auto p-1 z-[100]", QUEST_FORM_STYLES.popover)} align="start">
+                  <PopoverContent
+                    className={cn("w-auto p-1 z-[100]", QUEST_FORM_STYLES.popover)}
+                    align="start"
+                    style={resolvedCompanionFrostedThemeStyle}
+                  >
                     <Calendar
                       mode="single"
                       selected={dateObj}
@@ -1124,6 +1138,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   hideLocation
                   requireScheduledTimeForRecurrence
                   visualStyle="quest-soft"
+                  portalStyle={resolvedCompanionFrostedThemeStyle}
                 />
               )}
 
@@ -1208,6 +1223,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   hideLocation
                   requireScheduledTimeForRecurrence
                   visualStyle="quest-soft"
+                  portalStyle={resolvedCompanionFrostedThemeStyle}
                 />
               </div>
 
@@ -1270,6 +1286,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                       hideRecurrence
                       requireScheduledTimeForRecurrence
                       visualStyle="quest-soft"
+                      portalStyle={resolvedCompanionFrostedThemeStyle}
                     />
                     {canShowCalendarSendOption && (
                       <div
@@ -1311,7 +1328,10 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                               <SelectTrigger className="h-10 rounded-2xl border-[hsl(var(--celestial-blue)_/_0.52)] bg-card/[0.88] text-xs">
                                 <SelectValue placeholder="Choose destination" />
                               </SelectTrigger>
-                              <SelectContent>
+                              <SelectContent
+                                className={QUEST_FORM_STYLES.popover}
+                                style={resolvedCompanionFrostedThemeStyle}
+                              >
                                 {calendarSendTargetOptions.map((option) => (
                                   <SelectItem key={option.target} value={option.target}>
                                     {option.label}
@@ -1412,7 +1432,11 @@ export const AddQuestSheet = memo(function AddQuestSheet({
           setShowDraftRestorePrompt(true);
         }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent
+          className={QUEST_FORM_STYLES.sectionCard}
+          data-testid="add-quest-draft-restore-dialog"
+          style={resolvedCompanionFrostedThemeStyle}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>Restore saved quest draft?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -1446,7 +1470,11 @@ export const AddQuestSheet = memo(function AddQuestSheet({
           }
         }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent
+          className={QUEST_FORM_STYLES.sectionCard}
+          data-testid="add-quest-template-prompt-dialog"
+          style={resolvedCompanionFrostedThemeStyle}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>{templatePromptConfig?.title ?? "Save template changes?"}</AlertDialogTitle>
             <AlertDialogDescription>

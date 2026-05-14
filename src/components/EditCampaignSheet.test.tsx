@@ -60,6 +60,7 @@ vi.mock("@/components/ui/sonner", () => ({
 
 import { EditCampaignSheet } from "./EditCampaignSheet";
 import { DIFFICULTY_COLORS } from "./quest-shared";
+import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
 
 const expectElementToIncludeClasses = (element: HTMLElement, classes: string) => {
   for (const token of classes.split(" ").filter(Boolean)) {
@@ -137,9 +138,19 @@ describe("EditCampaignSheet", () => {
     expect(screen.getByLabelText("Description")).toHaveValue("A focused campaign");
     expectElementToIncludeClasses(
       screen.getByTestId("edit-campaign-sheet-shell"),
-      "fixed border-[hsl(var(--celestial-blue)_/_0.38)] text-foreground",
+      "fixed border-[hsl(var(--celestial-blue)_/_0.58)] text-foreground",
     );
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+  });
+
+  it("applies supplied companion frosted variables to the campaign sheet portal", () => {
+    const companionFrostedThemeStyle = getCompanionFrostedThemeStyle("#d6dee8");
+
+    renderSheet({ companionFrostedThemeStyle });
+
+    expect(screen.getByTestId("edit-campaign-sheet-shell").style.getPropertyValue("--companion-frosted-primary")).toBe(
+      companionFrostedThemeStyle["--companion-frosted-primary"],
+    );
   });
 
   it("saves title and description changes through updateEpic", async () => {
@@ -179,6 +190,7 @@ describe("EditCampaignSheet", () => {
         habitId: "habit-1",
         title: "Morning focus",
       }),
+      companionFrostedThemeStyle: undefined,
     }));
   });
 

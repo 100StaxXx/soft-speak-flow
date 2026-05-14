@@ -132,7 +132,7 @@ export async function ensureAffiliateReferralCodeRecord(
   const now = new Date().toISOString();
   const { data: existing, error: lookupError } = await supabase
     .from("referral_codes")
-    .select("id, apple_offer_code_id, apple_offer_code_status, apple_offer_code_last_error")
+    .select("id, code, apple_offer_code_id, apple_offer_campaign_identifier, apple_offer_code_status, apple_offer_code_last_error")
     .eq("code", normalizedCode)
     .maybeSingle();
 
@@ -142,6 +142,7 @@ export async function ensureAffiliateReferralCodeRecord(
 
   let referralCodeId = existing?.id as string | undefined;
   let appleOfferCodeId = existing?.apple_offer_code_id as string | null | undefined;
+  let appleOfferCampaignIdentifier = existing?.apple_offer_campaign_identifier as string | null | undefined;
 
   if (!referralCodeId) {
     const { data: inserted, error: insertError } = await supabase
@@ -156,7 +157,7 @@ export async function ensureAffiliateReferralCodeRecord(
         provider_synced_at: now,
         apple_offer_code_status: "pending",
       })
-      .select("id, apple_offer_code_id")
+      .select("id, code, apple_offer_code_id, apple_offer_campaign_identifier")
       .single();
 
     if (insertError) {
@@ -165,6 +166,7 @@ export async function ensureAffiliateReferralCodeRecord(
 
     referralCodeId = inserted.id;
     appleOfferCodeId = inserted.apple_offer_code_id ?? null;
+    appleOfferCampaignIdentifier = inserted.apple_offer_campaign_identifier ?? null;
   } else {
     const { error: updateError } = await supabase
       .from("referral_codes")
@@ -183,10 +185,41 @@ export async function ensureAffiliateReferralCodeRecord(
     }
   }
 
+  if (!referralCodeId) {
+    throw new Error("Failed to persist affiliate referral code");
+  }
+
+  await syncAppleOfferCodeForReferralCode(supabase, {
+    id: referralCodeId,
+    code: normalizedCode,
+    apple_offer_code_id: appleOfferCodeId ?? null,
+    apple_offer_campaign_identifier: appleOfferCampaignIdentifier ?? null,
+  });
+
+  return referralCodeId;
+}
+
+export async function syncAppleOfferCodeForReferralCode(
+  supabase: SupabaseClientLike,
+  referralCode: {
+    id: string;
+    code: string;
+    apple_offer_code_id?: string | null;
+    apple_offer_campaign_identifier?: string | null;
+  },
+) {
+  const normalizedCode = normalizeWinWinKitCode(referralCode.code);
+  if (!normalizedCode) {
+    throw new Error("Missing referral code");
+  }
+
+  const now = new Date().toISOString();
+
   try {
     const customCode = await ensureAppleCustomOfferCode({
       customCode: normalizedCode,
-      existingCustomCodeId: appleOfferCodeId ?? null,
+      existingCustomCodeId: referralCode.apple_offer_code_id ?? null,
+      existingCampaignIdentifier: referralCode.apple_offer_campaign_identifier ?? null,
     });
 
     const { error: appleUpdateError } = await supabase
@@ -199,11 +232,19 @@ export async function ensureAffiliateReferralCodeRecord(
         apple_offer_code_last_error: null,
         apple_offer_code_expires_at: customCode.expirationDate ?? null,
       })
-      .eq("id", referralCodeId);
+      .eq("id", referralCode.id);
 
     if (appleUpdateError) {
       throw appleUpdateError;
     }
+
+    return {
+      code: normalizedCode,
+      status: customCode.active === false ? "inactive" : "active",
+      apple_offer_code_id: customCode.id,
+      apple_offer_code_expires_at: customCode.expirationDate ?? null,
+      error: null,
+    };
   } catch (error) {
     const errorMessage = error instanceof AppStoreConnectApiError
       ? error.details || error.message
@@ -219,18 +260,20 @@ export async function ensureAffiliateReferralCodeRecord(
         apple_offer_campaign_identifier: Deno.env.get("APPLE_OFFER_CODE_IDENTIFIER")?.trim() ?? null,
         apple_offer_code_last_error: errorMessage,
       })
-      .eq("id", referralCodeId);
+      .eq("id", referralCode.id);
 
     if (appleFailureUpdateError) {
       throw appleFailureUpdateError;
     }
-  }
 
-  if (!referralCodeId) {
-    throw new Error("Failed to persist affiliate referral code");
+    return {
+      code: normalizedCode,
+      status: "failed",
+      apple_offer_code_id: referralCode.apple_offer_code_id ?? null,
+      apple_offer_code_expires_at: null,
+      error: errorMessage,
+    };
   }
-
-  return referralCodeId;
 }
 
 export async function finalizeClaimedReferralCode(params: {

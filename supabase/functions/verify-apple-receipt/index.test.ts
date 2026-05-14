@@ -102,6 +102,8 @@ Deno.test("verify-apple-receipt falls back to receipt verification when a receip
         expiresAt: new Date("2026-05-01T00:00:00.000Z"),
         purchaseDate: new Date("2026-04-01T00:00:00.000Z"),
         cancellationDate: null,
+        offerIdentifier: null,
+        offerType: null,
       }),
       upsertSubscriptionImpl: async () => ({
         id: "subscription-1",
@@ -177,6 +179,8 @@ Deno.test("verify-apple-receipt allows sandbox transactions without app-account 
   const upsertPayloads: Array<{
     allowCreateWithoutAppAccountToken?: boolean;
     appAccountToken?: string | null;
+    offerIdentifier?: string | null;
+    offerType?: number | null;
   }> = [];
 
   const response = await verifyAppleReceiptModule.handleVerifyAppleReceipt(
@@ -199,6 +203,8 @@ Deno.test("verify-apple-receipt allows sandbox transactions without app-account 
           expiresDate: Date.parse("2026-06-01T00:00:00.000Z"),
           type: "Auto-Renewable Subscription",
           environment: "Sandbox",
+          offerIdentifier: "Referrals",
+          offerType: 3,
         },
         environment: "Sandbox",
         isValid: true,
@@ -227,6 +233,14 @@ Deno.test("verify-apple-receipt allows sandbox transactions without app-account 
   assert(
     upsertPayload?.allowCreateWithoutAppAccountToken === true,
     "Expected sandbox payload to allow binding creation without appAccountToken",
+  );
+  assert(
+    upsertPayload?.offerIdentifier === "Referrals",
+    "Expected Apple offer identifier to be passed to subscription upsert",
+  );
+  assert(
+    upsertPayload?.offerType === 3,
+    "Expected Apple offer type to be passed to subscription upsert",
   );
 });
 

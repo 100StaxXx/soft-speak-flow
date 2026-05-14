@@ -67,7 +67,7 @@ export const FrequencyPicker = ({
               selectedDays.includes(index)
                 ? cn(
                   isQuestSoft
-                    ? "border-transparent shadow-[0_10px_22px_-18px_rgba(92,157,198,0.38),inset_0_1px_0_rgba(255,255,255,0.88)]"
+                    ? "border-transparent shadow-[0_10px_22px_-18px_rgba(var(--primary-rgb),0.38),inset_0_1px_0_rgba(255,255,255,0.88)]"
                     : "bg-primary border-primary text-primary-foreground shadow-glow",
                   isQuestSoft && activeTone ? activeTone : "",
                 )

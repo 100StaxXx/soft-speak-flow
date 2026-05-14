@@ -313,6 +313,7 @@ vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
     launcherAwayFocalX: null,
     launcherAwayFocalY: null,
     launcherAwayUsesPortraitShell: false,
+    favoriteColor: "#9b6bff",
   }),
 }));
 
@@ -575,6 +576,10 @@ describe("Journeys inbox integration", () => {
     renderJourneys();
 
     expect(screen.getByTestId("cinematic-background")).toHaveAttribute("data-preset", "quests");
+    expect(screen.getByTestId("journeys-theme-scope")).not.toHaveClass("companion-frosted-theme-scope");
+    expect(screen.getByTestId("journeys-theme-scope").style.getPropertyValue("--companion-frosted-primary")).toBe(
+      "259 78% 70%",
+    );
   });
 
   it("renders the inbox section above the agenda when unscheduled quests exist", async () => {

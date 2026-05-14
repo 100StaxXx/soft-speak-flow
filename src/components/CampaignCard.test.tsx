@@ -1,6 +1,13 @@
-import type { HTMLAttributes, ReactNode } from "react";
+import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
+
+const mocks = vi.hoisted(() => ({
+  companion: null as { favorite_color: string } | null,
+  lastEpicCheckInProps: null as null | { companionFrostedThemeStyle?: CSSProperties },
+  lastSmartAdjustProps: null as null | { companionFrostedThemeStyle?: CSSProperties },
+}));
 
 vi.mock("framer-motion", () => ({
   motion: {
@@ -29,7 +36,11 @@ vi.mock("framer-motion", () => ({
 
 vi.mock("@/components/ui/dialog", () => ({
   Dialog: ({ open, children }: { open: boolean; children: ReactNode }) => (open ? <div>{children}</div> : null),
-  DialogContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DialogContent: ({
+    children,
+    hideCloseButton: _hideCloseButton,
+    ...props
+  }: HTMLAttributes<HTMLDivElement> & { hideCloseButton?: boolean }) => <div {...props}>{children}</div>,
   DialogDescription: ({ children }: { children: ReactNode }) => <p>{children}</p>,
   DialogFooter: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   DialogHeader: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -37,10 +48,10 @@ vi.mock("@/components/ui/dialog", () => ({
 }));
 
 vi.mock("@/components/ui/alert-dialog", () => ({
-  AlertDialog: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  AlertDialog: ({ open, children }: { open?: boolean; children: ReactNode }) => (open ? <div>{children}</div> : null),
   AlertDialogAction: ({ children, ...props }: HTMLAttributes<HTMLButtonElement>) => <button {...props}>{children}</button>,
   AlertDialogCancel: ({ children, ...props }: HTMLAttributes<HTMLButtonElement>) => <button {...props}>{children}</button>,
-  AlertDialogContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  AlertDialogContent: ({ children, ...props }: HTMLAttributes<HTMLDivElement>) => <div {...props}>{children}</div>,
   AlertDialogDescription: ({ children }: { children: ReactNode }) => <p>{children}</p>,
   AlertDialogFooter: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   AlertDialogHeader: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -52,11 +63,17 @@ vi.mock("@/components/ConstellationTrail", () => ({
 }));
 
 vi.mock("@/components/EpicCheckInDrawer", () => ({
-  EpicCheckInDrawer: () => <div data-testid="epic-check-in-drawer" />,
+  EpicCheckInDrawer: (props: { companionFrostedThemeStyle?: CSSProperties }) => {
+    mocks.lastEpicCheckInProps = props;
+    return <div data-testid="epic-check-in-drawer" />;
+  },
 }));
 
 vi.mock("@/components/SmartAdjustPlanDrawer", () => ({
-  SmartAdjustPlanDrawer: () => null,
+  SmartAdjustPlanDrawer: (props: { companionFrostedThemeStyle?: CSSProperties }) => {
+    mocks.lastSmartAdjustProps = props;
+    return <div data-testid="smart-adjust-plan-drawer" />;
+  },
 }));
 
 vi.mock("@/components/JourneyDetailDrawer", () => ({
@@ -69,7 +86,7 @@ vi.mock("@/components/journey/MilestonePostcardPreview", () => ({
 
 vi.mock("@/hooks/useCompanion", () => ({
   useCompanion: () => ({
-    companion: null,
+    companion: mocks.companion,
   }),
 }));
 
@@ -109,11 +126,92 @@ const baseJourney = {
 };
 
 afterEach(() => {
+  mocks.companion = null;
+  mocks.lastEpicCheckInProps = null;
+  mocks.lastSmartAdjustProps = null;
   vi.restoreAllMocks();
   Reflect.deleteProperty(navigator, "share");
 });
 
 describe("CampaignCard rename", () => {
+  it("scopes companion frosted aliases to the campaign card shell", () => {
+    render(<CampaignCard campaign={baseJourney} />);
+
+    expect(screen.getByTestId("campaign-card-shell")).toHaveClass("companion-frosted-theme-scope");
+  });
+
+  it("falls back to the stored companion color when no theme style is supplied", () => {
+    mocks.companion = { favorite_color: "#58d68d" };
+    const companionFrostedThemeStyle = getCompanionFrostedThemeStyle("#58d68d");
+
+    render(<CampaignCard campaign={baseJourney} />);
+
+    expect(screen.getByTestId("campaign-card-shell").style.getPropertyValue("--companion-frosted-primary")).toBe(
+      companionFrostedThemeStyle["--companion-frosted-primary"],
+    );
+  });
+
+  it("lets a supplied companion frosted style override the stored companion color", () => {
+    mocks.companion = { favorite_color: "#58d68d" };
+    const companionFrostedThemeStyle = getCompanionFrostedThemeStyle("#9b6bff");
+
+    render(<CampaignCard campaign={baseJourney} companionFrostedThemeStyle={companionFrostedThemeStyle} />);
+
+    expect(screen.getByTestId("campaign-card-shell").style.getPropertyValue("--companion-frosted-primary")).toBe(
+      companionFrostedThemeStyle["--companion-frosted-primary"],
+    );
+  });
+
+  it("passes the resolved companion tint to campaign action portals", () => {
+    const companionFrostedThemeStyle = getCompanionFrostedThemeStyle("#9b6bff");
+
+    render(
+      <CampaignCard
+        campaign={{
+          ...baseJourney,
+          epic_habits: [{
+            habit_id: "habit-1",
+            habits: {
+              id: "habit-1",
+              title: "Morning ritual",
+              difficulty: "medium",
+              frequency: "daily",
+            },
+          }],
+        }}
+        companionFrostedThemeStyle={companionFrostedThemeStyle}
+      />,
+    );
+
+    expect(mocks.lastEpicCheckInProps?.companionFrostedThemeStyle).toBe(companionFrostedThemeStyle);
+    expect(mocks.lastSmartAdjustProps?.companionFrostedThemeStyle).toBe(companionFrostedThemeStyle);
+  });
+
+  it("themes the campaign abandon and rename portal dialogs", () => {
+    const companionFrostedThemeStyle = getCompanionFrostedThemeStyle("#9b6bff");
+
+    render(
+      <CampaignCard
+        campaign={baseJourney}
+        onAbandon={vi.fn()}
+        onRename={vi.fn()}
+        companionFrostedThemeStyle={companionFrostedThemeStyle}
+      />,
+    );
+
+    fireEvent.click(screen.getByTitle("Abandon campaign"));
+    expect(screen.getByTestId("campaign-abandon-dialog")).toHaveClass("companion-frosted-planner-dark");
+    expect(screen.getByTestId("campaign-abandon-dialog").style.getPropertyValue("--companion-frosted-primary")).toBe(
+      companionFrostedThemeStyle["--companion-frosted-primary"],
+    );
+
+    fireEvent.click(screen.getByLabelText("Rename campaign"));
+    expect(screen.getByTestId("campaign-rename-dialog")).toHaveClass("companion-frosted-planner-dark");
+    expect(screen.getByTestId("campaign-rename-dialog").style.getPropertyValue("--companion-frosted-primary")).toBe(
+      companionFrostedThemeStyle["--companion-frosted-primary"],
+    );
+  });
+
   it("renders the rename affordance for active campaigns when onRename is provided", () => {
     render(<CampaignCard campaign={baseJourney} onRename={vi.fn()} />);
 

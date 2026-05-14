@@ -209,6 +209,8 @@ export async function handleVerifyAppleReceipt(
           originalTransactionId: transactionInfo.originalTransactionId ||
             transactionInfo.transactionId,
           productId: transactionInfo.productId,
+          offerIdentifier: transactionInfo.offerIdentifier ?? null,
+          offerType: transactionInfo.offerType ?? null,
           appAccountToken: transactionInfo.appAccountToken ?? null,
           allowCreateWithoutAppAccountToken: isSandboxEnvironment(environment),
           plan,
@@ -271,6 +273,8 @@ export async function handleVerifyAppleReceipt(
         transactionId: latestTransaction.transactionId,
         originalTransactionId: latestTransaction.originalTransactionId,
         productId: latestTransaction.productId,
+        offerIdentifier: latestTransaction.offerIdentifier ?? null,
+        offerType: latestTransaction.offerType ?? null,
         plan,
         allowCreateWithoutAppAccountToken: isSandboxEnvironment(environment),
         expiresAt: latestTransaction.expiresAt,

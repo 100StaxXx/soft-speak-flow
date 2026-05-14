@@ -1,6 +1,6 @@
 // Internal presentation frame shared by the production edit campaign sheet and
 // the /test-scroll visual QA preview; keep production imports on EditCampaignSheet.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Calendar, Flame, Loader2, Mountain, Pencil, Plus, Repeat, Target, Trash2, Wand2, Zap } from "lucide-react";
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -80,6 +80,7 @@ export interface EditCampaignSheetFrameProps {
   startWithAddRitual?: boolean;
   dependencies: EditCampaignSheetDependencies;
   visualPreview?: boolean;
+  companionFrostedThemeStyle?: CSSProperties;
 }
 
 const DEFAULT_RITUAL_DAYS = [0, 1, 2, 3, 4, 5, 6];
@@ -180,6 +181,7 @@ export function EditCampaignSheetFrame({
   startWithAddRitual = false,
   dependencies,
   visualPreview = false,
+  companionFrostedThemeStyle,
 }: EditCampaignSheetFrameProps) {
   const { themeModeClassName } = usePlannerPathfinderAppearance();
   const currentEpic = useMemo(
@@ -336,6 +338,7 @@ export function EditCampaignSheetFrame({
             "fixed flex h-[88dvh] max-h-[88dvh] flex-col overflow-hidden rounded-t-[2.25rem] px-0 pb-0",
           )}
           data-testid="edit-campaign-sheet-shell"
+          style={companionFrostedThemeStyle}
         >
           <div className={plannerPathfinderTheme.shellGloss} />
           <div className={plannerPathfinderTheme.shellGlow} />
@@ -405,6 +408,7 @@ export function EditCampaignSheetFrame({
                       epicGoal={currentEpic.description ?? undefined}
                       currentDeadline={resolvedEndDate}
                       visualStyle="planner"
+                      companionFrostedThemeStyle={companionFrostedThemeStyle}
                     >
                       <Button type="button" variant="outline" className={cn(plannerPathfinderTheme.outlineButton, "gap-2")}>
                         <Wand2 className="h-4 w-4" />
@@ -602,6 +606,7 @@ export function EditCampaignSheetFrame({
           }}
           onDelete={handleDeleteRitual}
           isDeleting={isDeletingRitual}
+          companionFrostedThemeStyle={companionFrostedThemeStyle}
         />
       ) : null}
 

@@ -1,4 +1,4 @@
-import type { HTMLAttributes, ReactNode } from "react";
+import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -25,7 +25,7 @@ vi.mock("framer-motion", () => ({
 
 vi.mock("@/components/ui/drawer", () => ({
   Drawer: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  DrawerContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DrawerContent: ({ children, ...props }: HTMLAttributes<HTMLDivElement>) => <div {...props}>{children}</div>,
   DrawerHeader: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   DrawerTitle: ({ children }: { children: ReactNode }) => <h2>{children}</h2>,
   DrawerTrigger: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -47,7 +47,20 @@ vi.mock("@/components/ConstellationTrail", () => ({
 }));
 
 vi.mock("@/components/JourneyDetailDrawer", () => ({
-  JourneyDetailDrawer: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  JourneyDetailDrawer: ({
+    children,
+    companionFrostedThemeStyle,
+  }: {
+    children: ReactNode;
+    companionFrostedThemeStyle?: CSSProperties;
+  }) => (
+    <div
+      data-testid="mock-journey-detail-drawer"
+      style={companionFrostedThemeStyle}
+    >
+      {children}
+    </div>
+  ),
 }));
 
 vi.mock("@/components/EditCampaignSheet", () => ({
@@ -197,6 +210,35 @@ describe("JourneyPathDrawer", () => {
       epic: expect.objectContaining({ id: "epic-1", title: "Campaign Aurora" }),
       open: true,
       startWithAddRitual: false,
+    }));
+  });
+
+  it("applies companion frosted variables to portaled drawer surfaces", () => {
+    mocks.useCompanionMock.mockReturnValue({
+      companion: {
+        favorite_color: "#9b6bff",
+      },
+    });
+
+    render(
+      <JourneyPathDrawer epic={baseEpic}>
+        <button type="button">Open</button>
+      </JourneyPathDrawer>,
+    );
+
+    const drawerContent = screen.getByTestId("journey-path-drawer-content");
+    expect(drawerContent).toHaveClass("companion-frosted-planner-light");
+    expect(drawerContent.style.getPropertyValue("--companion-frosted-primary")).toBe("259 78% 70%");
+    expect(screen.getByTestId("mock-journey-detail-drawer").style.getPropertyValue("--companion-frosted-primary")).toBe(
+      "259 78% 70%",
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Edit" })[0]);
+
+    expect(mocks.editCampaignSheetMock).toHaveBeenLastCalledWith(expect.objectContaining({
+      companionFrostedThemeStyle: expect.objectContaining({
+        "--companion-frosted-primary": "259 78% 70%",
+      }),
     }));
   });
 

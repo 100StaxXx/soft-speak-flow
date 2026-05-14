@@ -62,6 +62,7 @@ import {
 } from "@/hooks/useCompanionAssistant";
 import { usePlannerPathfinderAppearance } from "@/hooks/usePlannerPathfinderAppearance";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
+import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
 import { shouldContainCompanionSceneImage } from "@/lib/companionImageFocal";
 import { cn, stripMarkdown } from "@/lib/utils";
 import type { QuestComposerPrefillDraft } from "@/features/quests/types";
@@ -975,10 +976,16 @@ const JourneysCompanionThreadPicker = memo(
     onResumeThread,
   }: JourneysCompanionThreadPickerProps) {
     const { themeModeClassName } = usePlannerPathfinderAppearance();
+    const { favoriteColor } = useJourneysCompanionVisual();
+    const companionFrostedThemeStyle = useMemo(
+      () => getCompanionFrostedThemeStyle(favoriteColor),
+      [favoriteColor],
+    );
     const body = (
       <div
         className={cn(themeModeClassName, plannerPathfinderTheme.threadPickerShell)}
         data-testid="journeys-companion-thread-picker"
+        style={companionFrostedThemeStyle}
       >
         <div className="mb-4 space-y-1">
           <p className="text-sm font-semibold text-foreground">Thread history</p>
@@ -1008,7 +1015,7 @@ const JourneysCompanionThreadPicker = memo(
                   key={thread.sessionId}
                   type="button"
                   className={cn(
-                    "flex w-full items-start justify-between gap-3 rounded-[1.5rem] border px-4 py-4 text-left transition-colors shadow-[0_12px_30px_-26px_rgba(28,87,135,0.36),inset_0_1px_0_rgba(255,255,255,0.58)]",
+                    "flex w-full items-start justify-between gap-3 rounded-[1.5rem] border px-4 py-4 text-left transition-colors shadow-[0_12px_30px_-26px_rgba(var(--primary-rgb),0.36),inset_0_1px_0_rgba(255,255,255,0.58)]",
                     canResumeThreads
                       ? "border-[hsl(var(--celestial-blue)_/_0.24)] bg-card/[0.72] hover:bg-card"
                       : "cursor-not-allowed border-[hsl(var(--celestial-blue)_/_0.16)] bg-card/40 opacity-70",
@@ -1105,6 +1112,7 @@ const JourneysCompanionOverlayBody = memo(
       focalY,
       element,
       usesPortraitShell,
+      favoriteColor,
     } = useJourneysCompanionVisual();
     const assistant = useCompanionAssistant({
       surface: "journeys",
@@ -1595,11 +1603,16 @@ const JourneysCompanionOverlayBody = memo(
       isDrawerPresentation && drawerLayout
         ? { height: `${drawerLayout.shellHeight}px` }
         : undefined;
+    const companionFrostedThemeStyle = useMemo(
+      () => getCompanionFrostedThemeStyle(favoriteColor),
+      [favoriteColor],
+    );
 
     return (
       <div
         className={cn(themeModeClassName, plannerPathfinderTheme.shell)}
         data-testid="journeys-companion-planner-modal"
+        style={companionFrostedThemeStyle}
       >
         <div className={plannerPathfinderTheme.shellGloss} />
         <div className={plannerPathfinderTheme.shellGlow} />
@@ -1728,7 +1741,7 @@ const JourneysCompanionOverlayBody = memo(
                   >
                     <div
                       className={cn(
-                        "max-w-[85%] rounded-[1.7rem] border px-4 py-3 shadow-[0_14px_32px_-28px_rgba(28,87,135,0.44),inset_0_1px_0_rgba(255,255,255,0.6)] sm:max-w-[78%]",
+                        "max-w-[85%] rounded-[1.7rem] border px-4 py-3 shadow-[0_14px_32px_-28px_rgba(var(--primary-rgb),0.44),inset_0_1px_0_rgba(255,255,255,0.6)] sm:max-w-[78%]",
                         entry.role === "assistant"
                           ? plannerPathfinderTheme.assistantBubble
                           : plannerPathfinderTheme.userBubble,

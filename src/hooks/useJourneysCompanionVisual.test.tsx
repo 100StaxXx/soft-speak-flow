@@ -1,5 +1,9 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  getUniversalEggAssetUrl,
+  getUniversalEggCutoutAssetUrl,
+} from "@/lib/companionAssetResolver";
 import { useJourneysCompanionVisual } from "./useJourneysCompanionVisual";
 import type { Companion } from "./useCompanion";
 
@@ -147,6 +151,7 @@ describe("useJourneysCompanionVisual", () => {
 
     const { result } = renderHook(() => useJourneysCompanionVisual());
 
+    expect(result.current.favoriteColor).toBe("#f8c14a");
     expect(result.current.launcherAwayImageUrl).toBeNull();
     expect(result.current.launcherAwayFocalX).toBeNull();
     expect(result.current.launcherAwayFocalY).toBeNull();
@@ -154,6 +159,94 @@ describe("useJourneysCompanionVisual", () => {
     expect(result.current.launcherAwayHasTransparentBackground).toBe(false);
     expect(result.current.needsLauncherImage).toBe(true);
     expect(result.current.currentSceneImageUrl).toBe("https://assets.example.com/scene.png");
+  });
+
+  it("uses bundled egg art for a stage 0 AI launcher before deferred remote egg art lands", () => {
+    mocks.companion = baseCompanion({
+      current_stage: 0,
+      current_xp: 0,
+      current_image_url: getUniversalEggAssetUrl("storm"),
+      current_image_focal_x: 0.5,
+      current_image_focal_y: 0.5,
+      initial_image_url: getUniversalEggAssetUrl("storm"),
+      initial_image_focal_x: 0.5,
+      initial_image_focal_y: 0.5,
+      core_element: "storm",
+    });
+
+    const { result } = renderHook(() => useJourneysCompanionVisual());
+
+    expect(result.current.isGeneratedCompanion).toBe(true);
+    expect(result.current.currentStage).toBe(0);
+    expect(result.current.imageUrl).toBe(getUniversalEggAssetUrl("storm"));
+    expect(result.current.launcherAwayImageUrl).toBe(getUniversalEggCutoutAssetUrl("storm"));
+    expect(result.current.launcherAwayUsesPortraitShell).toBe(true);
+    expect(result.current.launcherAwayHasTransparentBackground).toBe(true);
+    expect(result.current.needsLauncherImage).toBe(false);
+    expect(result.current.currentSceneImageUrl).toBe(getUniversalEggAssetUrl("storm"));
+  });
+
+  it("keeps stage 0 on fixed elemental egg art when a deferred remote egg arrives", () => {
+    mocks.companion = baseCompanion({
+      current_stage: 0,
+      current_xp: 0,
+      current_image_url: "https://assets.example.com/generated-stage-0-egg.png",
+      current_image_focal_x: 0.42,
+      current_image_focal_y: 0.55,
+      initial_image_url: "https://assets.example.com/generated-stage-0-egg.png",
+      initial_image_focal_x: 0.42,
+      initial_image_focal_y: 0.55,
+      core_element: "nature",
+    });
+
+    const { result } = renderHook(() => useJourneysCompanionVisual());
+
+    expect(result.current.isGeneratedCompanion).toBe(true);
+    expect(result.current.currentStage).toBe(0);
+    expect(result.current.imageUrl).toBe(getUniversalEggAssetUrl("nature"));
+    expect(result.current.currentSceneImageUrl).toBe("https://assets.example.com/generated-stage-0-egg.png");
+    expect(result.current.launcherAwayImageUrl).toBe(getUniversalEggCutoutAssetUrl("nature"));
+    expect(result.current.launcherAwayFocalX).toBeNull();
+    expect(result.current.launcherAwayFocalY).toBeNull();
+    expect(result.current.launcherAwayUsesPortraitShell).toBe(true);
+    expect(result.current.launcherAwayHasTransparentBackground).toBe(true);
+    expect(result.current.needsLauncherImage).toBe(false);
+  });
+
+  it("ignores stored launcher cutouts for stage 0 AI eggs", () => {
+    mocks.companion = baseCompanion({
+      current_stage: 0,
+      current_xp: 0,
+      current_image_url: "https://assets.example.com/generated-stage-0-egg.png",
+      initial_image_url: "https://assets.example.com/generated-stage-0-egg.png",
+      core_element: "void",
+      launcher_image_url:
+        "https://assets.example.com/user-1/companion_user-1_launcher_validated_transparent_stage0.png",
+      launcher_image_focal_x: 0.49,
+      launcher_image_focal_y: 0.53,
+      launcher_image_source_url: "https://assets.example.com/generated-stage-0-egg.png",
+    });
+
+    const { result } = renderHook(() => useJourneysCompanionVisual());
+
+    expect(result.current.imageUrl).toBe(getUniversalEggAssetUrl("void"));
+    expect(result.current.launcherAwayImageUrl).toBe(getUniversalEggCutoutAssetUrl("void"));
+    expect(result.current.launcherAwayFocalX).toBeNull();
+    expect(result.current.launcherAwayFocalY).toBeNull();
+    expect(result.current.launcherAwayUsesPortraitShell).toBe(true);
+    expect(result.current.launcherAwayHasTransparentBackground).toBe(true);
+    expect(result.current.needsLauncherImage).toBe(false);
+    expect(result.current.currentSceneImageUrl).toBe("https://assets.example.com/generated-stage-0-egg.png");
+  });
+
+  it("exposes the stored companion favorite color for Journeys frosted surfaces", () => {
+    mocks.companion = baseCompanion({
+      favorite_color: "#9b6bff",
+    });
+
+    const { result } = renderHook(() => useJourneysCompanionVisual());
+
+    expect(result.current.favoriteColor).toBe("#9b6bff");
   });
 
   it("keeps the previous companion art while an evolution reveal is pending", () => {
@@ -246,6 +339,28 @@ describe("useJourneysCompanionVisual", () => {
     expect(result.current.isGeneratedCompanion).toBe(false);
     expect(result.current.launcherAwayImageUrl).toBe("/companion-launcher-away/dragon/dragon__launcher-away__ice.png");
     expect(result.current.launcherAwayUsesPortraitShell).toBe(true);
+    expect(result.current.needsLauncherImage).toBe(false);
+  });
+
+  it("keeps preset-backed stage 0 companions on fixed egg launcher art", () => {
+    mocks.companion = baseCompanion({
+      preset_id: "dragon",
+      core_element: "ice",
+      current_stage: 0,
+      current_xp: 0,
+      current_image_url: "https://assets.example.com/dragon-stage-0-egg.png",
+      launcher_image_url:
+        "https://assets.example.com/user-1/companion_user-1_launcher_validated_transparent_stage0.png",
+      launcher_image_source_url: "https://assets.example.com/dragon-stage-0-egg.png",
+    });
+
+    const { result } = renderHook(() => useJourneysCompanionVisual());
+
+    expect(result.current.isGeneratedCompanion).toBe(false);
+    expect(result.current.imageUrl).toBe(getUniversalEggAssetUrl("ice"));
+    expect(result.current.launcherAwayImageUrl).toBe(getUniversalEggCutoutAssetUrl("ice"));
+    expect(result.current.launcherAwayUsesPortraitShell).toBe(true);
+    expect(result.current.launcherAwayHasTransparentBackground).toBe(true);
     expect(result.current.needsLauncherImage).toBe(false);
   });
 

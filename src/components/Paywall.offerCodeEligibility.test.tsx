@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
     hasAppliedReferralCode: false,
     appliedReferralCode: null as string | null,
     offerCodePurchaseReady: false,
+    handlePresentRevenueCatPaywall: vi.fn(),
   },
   toast: vi.fn(),
   signOut: vi.fn(),
@@ -90,6 +91,7 @@ describe("Paywall creator offer-code eligibility", () => {
       hasAppliedReferralCode: false,
       appliedReferralCode: null,
       offerCodePurchaseReady: false,
+      handlePresentRevenueCatPaywall: vi.fn(),
     };
   });
 
@@ -105,7 +107,7 @@ describe("Paywall creator offer-code eligibility", () => {
     );
 
     expect(screen.getByText("Creator code applied")).toBeInTheDocument();
-    expect(screen.getByText("Your annual plan is discounted to $69.99/year.")).toBeInTheDocument();
+    expect(screen.getByText("Your annual plan is discounted to $69.99 for the first year.")).toBeInTheDocument();
     expect(
       screen.getByText((content) =>
         content.includes("Use") && content.includes("Apple") && content.includes("redemption screen"),
@@ -113,6 +115,7 @@ describe("Paywall creator offer-code eligibility", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("CREATOR123")).toBeInTheDocument();
     expect(screen.getByText("Redeem Discount with Apple")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "View All Plans" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Redeem Promo Code" })).not.toBeInTheDocument();
   });
 
@@ -132,30 +135,51 @@ describe("Paywall creator offer-code eligibility", () => {
       screen.getByText("This code is saved to your account, but it does not unlock the Apple creator discount."),
     ).toBeInTheDocument();
     expect(screen.getByText("$99.99")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "View All Plans" })).toBeInTheDocument();
     expect(screen.queryByText("Redeem Discount with Apple")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Redeem Promo Code" })).not.toBeInTheDocument();
   });
 
-  it("describes the subscription benefits clearly across the paywall", () => {
+  it("presents the cinematic Cosmiq Pro positioning across the paywall", () => {
     render(
       <MemoryRouter>
         <Paywall />
       </MemoryRouter>,
     );
 
+    expect(screen.getByTestId("paywall-overlay")).toHaveClass("z-[120]");
+    expect(screen.getByText("An AI companion that turns your goals into daily quests.")).toBeInTheDocument();
     expect(
-      screen.getByText(
-        "Start your free trial to get unlimited guide chat, all 15 evolution stages, unlimited quests & epics, and offline access to downloaded content.",
-      ),
+      screen.getByText("Big goals become campaigns, rituals, milestones, and a planned day."),
     ).toBeInTheDocument();
-    expect(screen.getByText("Every plan includes:")).toBeInTheDocument();
+    expect(screen.getByText("Your companion grows when you follow through.")).toBeInTheDocument();
+    expect(screen.getByText("Start the trial. Keep the story moving.")).toBeInTheDocument();
+    expect(screen.getByText("3-day free trial")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /start 3-day free trial/i })).toBeInTheDocument();
     expect(screen.getByText("Unlimited guide chat")).toBeInTheDocument();
+    expect(screen.getByText("Unlimited quests and campaigns")).toBeInTheDocument();
     expect(screen.getByText("All 15 evolution stages")).toBeInTheDocument();
-    expect(screen.getByText("Unlimited Quests & Epics")).toBeInTheDocument();
-    expect(screen.getByText("Offline access to downloaded content")).toBeInTheDocument();
     expect(
       screen.getByText("Both monthly and yearly plans include the same Cosmiq Pro features and renew automatically until canceled."),
     ).toBeInTheDocument();
     expect(screen.queryByText("All premium features")).not.toBeInTheDocument();
+  });
+
+  it("uses continuation copy after a trial has expired", () => {
+    render(
+      <MemoryRouter>
+        <Paywall variant="trial_expired" />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("Your journey is ready to continue.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Subscribe to keep your AI companion, unlimited quests, campaigns, guide chat, and the full evolution path active."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /subscribe yearly/i })).toBeInTheDocument();
+    expect(screen.getByText("Continue with Pro")).toBeInTheDocument();
+    expect(screen.queryByText("3-day free trial")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /start 3-day free trial/i })).not.toBeInTheDocument();
+    expect(screen.queryByText("Start the trial. Keep the story moving.")).not.toBeInTheDocument();
   });
 });
