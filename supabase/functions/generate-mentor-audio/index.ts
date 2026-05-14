@@ -223,12 +223,14 @@ async function generateMentorAudioBytes({
   script,
   voiceConfig,
   voiceSettings,
+  requirePrimaryVoice,
 }: {
   fetchImpl: typeof fetch;
   mentorSlug: string;
   script: string;
   voiceConfig: MentorVoiceConfig;
   voiceSettings: Record<string, unknown>;
+  requirePrimaryVoice: boolean;
 }): Promise<AudioGenerationResult> {
   const elevenLabsApiKey = Deno.env.get("ELEVENLABS_API_KEY");
   const openAiApiKey = Deno.env.get("OPENAI_API_KEY");
@@ -285,6 +287,10 @@ async function generateMentorAudioBytes({
           allowOpenAiFallback = isRetriableElevenLabsError(retryFailure);
         }
       } else {
+        throw primaryError;
+      }
+
+      if (requirePrimaryVoice) {
         throw primaryError;
       }
 
@@ -359,7 +365,7 @@ export async function handleGenerateMentorAudio(
       providers: ["elevenlabs"],
     });
 
-    const { mentorSlug, script } = await req.json();
+    const { mentorSlug, script, requirePrimaryVoice } = await req.json();
     if (!mentorSlug || !script) {
       return errorResponse(
         400,
@@ -441,6 +447,7 @@ export async function handleGenerateMentorAudio(
       script,
       voiceConfig,
       voiceSettings,
+      requirePrimaryVoice: requirePrimaryVoice === true,
     });
     const timestamp = deps.now();
     const filePath = `${resolvedMentorSlug}_${timestamp}.mp3`;

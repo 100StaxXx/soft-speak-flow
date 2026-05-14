@@ -144,6 +144,11 @@ Deno.test("mentor audio retries ElevenLabs before falling back to OpenAI and nev
     "Expected logs to distinguish primary retry from last-resort fallback",
   );
   assert(
+    audioSource.includes("requirePrimaryVoice") &&
+      fullAudioSource.includes("requirePrimaryVoice: true"),
+    "Expected pep talk audio generation to require the configured mentor voice",
+  );
+  assert(
     audioSource.includes("status === 429"),
     "Expected ElevenLabs rate limits to retry and fall back through the same transient path",
   );

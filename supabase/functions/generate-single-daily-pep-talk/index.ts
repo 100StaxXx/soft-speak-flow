@@ -315,9 +315,12 @@ serve(async (req) => {
     }
 
     let mentorSlugInput: string | null = null;
+    let forceRegenerate = false;
     try {
       const body = await req.json();
       mentorSlugInput = body && typeof body.mentorSlug === "string" ? body.mentorSlug : null;
+      forceRegenerate = body && typeof body === "object" && !Array.isArray(body) &&
+        (body as Record<string, unknown>).forceRegenerate === true;
     } catch {
       return buildErrorResponse(400, "Invalid request payload", { code: "INVALID_JSON" });
     }
@@ -358,8 +361,8 @@ serve(async (req) => {
       return buildErrorResponse(500, "Failed to check existing pep talk", { code: "DB_CHECK_FAILED" });
     }
 
-    // If already exists, return it
-    if (existing) {
+    // If already exists, return it unless the caller explicitly asked for fresh audio.
+    if (existing && !forceRegenerate) {
       console.log(`Pep talk already exists for ${resolvedMentorSlug} on ${todayDate}, returning existing`);
       return new Response(
         JSON.stringify({ pepTalk: existing, status: 'existing' }),
@@ -421,7 +424,9 @@ serve(async (req) => {
         { status, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
 
-    const requestKey = buildPepTalkRequestKey(resolvedMentorSlug, todayDate);
+    const requestKey = forceRegenerate
+      ? `${buildPepTalkRequestKey(resolvedMentorSlug, todayDate)}:force:${crypto.randomUUID()}`
+      : buildPepTalkRequestKey(resolvedMentorSlug, todayDate);
     let idempotencyState = await beginPepTalkGenerationRequest({
       supabase,
       requestKey,
@@ -528,6 +533,9 @@ serve(async (req) => {
       : typeof generatedData.storagePath === "string"
         ? generatedData.storagePath
         : null;
+    const audioProvider = typeof generatedData.audioProvider === "string"
+      ? generatedData.audioProvider
+      : null;
     
     if (!script || !audioUrl) {
       return await failGeneration(
@@ -544,28 +552,40 @@ serve(async (req) => {
 
     console.log(`Generated content for ${resolvedMentorSlug}: ${title}`);
 
-    // Insert into daily_pep_talks
-    const { data: dailyPepTalk, error: dailyInsertError } = await supabase
-      .from('daily_pep_talks')
-      .insert({
-        mentor_slug: resolvedMentorSlug,
-        topic_category: theme.topic_category,
-        emotional_triggers: theme.triggers,
-        intensity: theme.intensity,
-        title,
-        summary,
-        script,
-        audio_url: audioUrl,
-        for_date: todayDate,
-        transcript_status: TRANSCRIPT_STATUS_PENDING,
-        transcript_attempt_count: 0,
-        transcript_next_retry_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
+    const dailyPepTalkPayload = {
+      mentor_slug: resolvedMentorSlug,
+      topic_category: theme.topic_category,
+      emotional_triggers: theme.triggers,
+      intensity: theme.intensity,
+      title,
+      summary,
+      script,
+      audio_url: audioUrl,
+      for_date: todayDate,
+      transcript: [],
+      transcript_status: TRANSCRIPT_STATUS_PENDING,
+      transcript_attempt_count: 0,
+      transcript_next_retry_at: new Date().toISOString(),
+    };
+
+    const dailyPepTalkWrite = existing && forceRegenerate
+      ? await supabase
+        .from('daily_pep_talks')
+        .update(dailyPepTalkPayload)
+        .eq('id', existing.id)
+        .select()
+        .single()
+      : await supabase
+        .from('daily_pep_talks')
+        .insert(dailyPepTalkPayload)
+        .select()
+        .single();
+
+    const dailyPepTalk = dailyPepTalkWrite.data;
+    const dailyInsertError = dailyPepTalkWrite.error;
 
     if (dailyInsertError) {
-      console.error('Error inserting daily pep talk:', dailyInsertError);
+      console.error('Error writing daily pep talk:', dailyInsertError);
 
       if (isUniqueViolation(dailyInsertError)) {
         const { data: existingAfterConflict, error: conflictFetchError } = await supabase
@@ -595,8 +615,9 @@ serve(async (req) => {
 
     const generationResponsePayload = {
       pepTalk: dailyPepTalk,
-      status: 'generated',
+      status: existing && forceRegenerate ? 'regenerated' : 'generated',
       audioStoragePath,
+      audioProvider,
     };
 
     await completePepTalkGenerationRequestBestEffort({

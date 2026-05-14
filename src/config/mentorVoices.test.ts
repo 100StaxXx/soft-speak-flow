@@ -6,11 +6,7 @@ import {
   LEGACY_ONLY_MENTOR_SLUGS,
 } from "@/lib/mentorRoster";
 import { ELEVENLABS_MENTOR_VOICES } from "../../supabase/functions/_shared/mentorVoiceConfig.ts";
-import {
-  getMentorPepTalkPlaybackGain,
-  getMentorVoiceConfig,
-  mentorVoices,
-} from "./mentorVoices";
+import { getMentorVoiceConfig, mentorVoices } from "./mentorVoices";
 
 describe("mentorVoices", () => {
   it("matches backend voice IDs for every active and legacy supported mentor", () => {
@@ -37,9 +33,4 @@ describe("mentorVoices", () => {
     }
   });
 
-  it("boosts Lyra pep talk playback while leaving other mentors neutral", () => {
-    expect(getMentorPepTalkPlaybackGain("lyra")).toBe(1.35);
-    expect(getMentorPepTalkPlaybackGain("sage")).toBe(1);
-    expect(getMentorPepTalkPlaybackGain(null)).toBe(1);
-  });
 });

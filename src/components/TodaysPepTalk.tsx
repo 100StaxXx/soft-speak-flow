@@ -20,11 +20,10 @@ import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 import { useResolvedWallpaper, useWallpaperManifest } from "@/contexts/WallpaperManifestContext";
 import { getEffectiveDailyDate } from "@/utils/timezone";
 import { globalAudio } from "@/utils/globalAudio";
-import { applyAudioElementGain, createIOSOptimizedAudio, isIOS, iosAudioManager, safePlay } from "@/utils/iosAudio";
+import { createIOSOptimizedAudio, isIOS, iosAudioManager, safePlay } from "@/utils/iosAudio";
 import { logger } from "@/utils/logger";
 import { toast } from "@/components/ui/sonner";
 import { useAchievements } from "@/hooks/useAchievements";
-import { getMentorPepTalkPlaybackGain } from "@/config/mentorVoices";
 
 interface CaptionWord {
   word: string;
@@ -255,10 +254,6 @@ export const TodaysPepTalk = memo(() => {
 
   const pepTalk = pepTalkQuery.data?.pepTalk ?? null;
   const mentorSlug = pepTalkQuery.data?.mentorSlug ?? null;
-  const pepTalkPlaybackGain = useMemo(
-    () => getMentorPepTalkPlaybackGain(pepTalk?.mentor_slug ?? mentorSlug),
-    [pepTalk?.mentor_slug, mentorSlug],
-  );
   const isFallback = pepTalkQuery.data?.isFallback ?? false;
   const loading = pepTalkQuery.isPending || (pepTalkQuery.isFetching && !pepTalkQuery.data);
   const error = pepTalkQuery.isError && !pepTalk;
@@ -318,7 +313,6 @@ export const TodaysPepTalk = memo(() => {
     targetAudio.playsInline = optimizedAudio.playsInline ?? true;
     targetAudio["webkit-playsinline"] = optimizedAudio["webkit-playsinline"] ?? true;
     targetAudio.muted = globalAudio.getMuted();
-    applyAudioElementGain(targetAudio, pepTalkPlaybackGain);
 
     if (isIOS) {
       iosAudioManager.registerAudio(targetAudio);
@@ -330,7 +324,7 @@ export const TodaysPepTalk = memo(() => {
         iosAudioManager.unregisterAudio(targetAudio);
       }
     };
-  }, [pepTalk?.audio_url, pepTalkPlaybackGain]);
+  }, [pepTalk?.audio_url]);
 
   useEffect(() => {
     const unsubscribe = globalAudio.subscribe((muted) => {
@@ -421,14 +415,7 @@ export const TodaysPepTalk = memo(() => {
     retry: false,
     mutationFn: async (nextMentorSlug: string) => {
       setGenerationStage("loading");
-      const refreshedPepTalk = await refetchPepTalk();
-      if (
-        refreshedPepTalk.data?.pepTalk &&
-        !refreshedPepTalk.data.isFallback &&
-        refreshedPepTalk.data.mentorSlug === nextMentorSlug
-      ) {
-        return refreshedPepTalk.data;
-      }
+      await refetchPepTalk();
 
       setGenerationStage("script");
       let audioStageTimer: number | null = window.setTimeout(() => {
@@ -438,7 +425,7 @@ export const TodaysPepTalk = memo(() => {
       try {
         const { data, error: generationError } = await supabase.functions.invoke(
           "generate-single-daily-pep-talk",
-          { body: { mentorSlug: nextMentorSlug } },
+          { body: { mentorSlug: nextMentorSlug, forceRegenerate: true } },
         );
 
         if (generationError) {

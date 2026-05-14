@@ -85,7 +85,6 @@ const mocks = vi.hoisted(() => {
   const toastError = vi.fn();
   const toastSuccess = vi.fn();
   const safePlayMock = vi.fn(async () => true);
-  const applyAudioElementGainMock = vi.fn();
   const registerAudioMock = vi.fn();
   const unregisterAudioMock = vi.fn();
   const reportWallpaperRenderError = vi.fn();
@@ -144,7 +143,6 @@ const mocks = vi.hoisted(() => {
     toastError,
     toastSuccess,
     safePlayMock,
-    applyAudioElementGainMock,
     registerAudioMock,
     unregisterAudioMock,
     reportWallpaperRenderError,
@@ -253,7 +251,6 @@ vi.mock("@/utils/globalAudio", () => ({
 
 vi.mock("@/utils/iosAudio", () => ({
   isIOS: false,
-  applyAudioElementGain: mocks.applyAudioElementGainMock,
   createIOSOptimizedAudio: (src?: string) => {
     const audio = document.createElement("audio");
     if (src) {
@@ -341,7 +338,6 @@ describe("TodaysPepTalk transcript expand behavior", () => {
     mocks.toastError.mockClear();
     mocks.toastSuccess.mockClear();
     mocks.safePlayMock.mockClear();
-    mocks.applyAudioElementGainMock.mockClear();
     mocks.registerAudioMock.mockClear();
     mocks.unregisterAudioMock.mockClear();
     mocks.reportWallpaperRenderError.mockClear();
@@ -735,7 +731,7 @@ describe("TodaysPepTalk transcript expand behavior", () => {
 
     await waitFor(() => {
       expect(mocks.supabase.functions.invoke).toHaveBeenCalledWith("generate-single-daily-pep-talk", {
-        body: { mentorSlug: "carmen" },
+        body: { mentorSlug: "carmen", forceRegenerate: true },
       });
     });
 
@@ -793,7 +789,7 @@ describe("TodaysPepTalk transcript expand behavior", () => {
     expect(await screen.findByRole("button", { name: /refresh today's/i })).toBeEnabled();
   });
 
-  it("uses a freshly available daily pep talk before invoking generation", async () => {
+  it("forces generation when refreshing from a fallback even if today's pep talk appears", async () => {
     const oldFallback = makePepTalk({
       id: "pep-talk-old-fallback",
       for_date: "2026-04-25",
@@ -807,6 +803,10 @@ describe("TodaysPepTalk transcript expand behavior", () => {
 
     mocks.state.todayPepTalk = null;
     mocks.state.fallbackPepTalk = oldFallback;
+    mocks.state.generationResponse = Promise.resolve({
+      data: { pepTalk: freshToday },
+      error: null,
+    });
 
     renderComponent();
 
@@ -820,24 +820,12 @@ describe("TodaysPepTalk transcript expand behavior", () => {
     const generationCalls = mocks.supabase.functions.invoke.mock.calls.filter(
       ([functionName]) => functionName === "generate-single-daily-pep-talk",
     );
-    expect(generationCalls).toHaveLength(0);
-  });
-
-  it("applies Lyra's pep talk playback gain to the audio element", async () => {
-    mocks.state.mentor = { slug: "lyra", name: "Lyra" };
-    mocks.state.todayPepTalk = makePepTalk({
-      mentor_slug: "lyra",
-      title: "Find the Signal",
-    });
-
-    renderComponent();
-
-    expect(await screen.findByText("Find the Signal")).toBeInTheDocument();
-    const audio = screen.getByTestId("pep-talk-audio") as HTMLAudioElement;
-
-    await waitFor(() => {
-      expect(mocks.applyAudioElementGainMock).toHaveBeenCalledWith(audio, 1.35);
-    });
+    expect(generationCalls).toEqual([
+      [
+        "generate-single-daily-pep-talk",
+        { body: { mentorSlug: "carmen", forceRegenerate: true } },
+      ],
+    ]);
   });
 
   it("refetches when the mentor tab becomes active again", async () => {

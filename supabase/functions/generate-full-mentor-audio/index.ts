@@ -169,6 +169,7 @@ serve(async (req) => {
       {
         mentorSlug,
         script,
+        requirePrimaryVoice: true,
       },
     );
 
@@ -205,6 +206,9 @@ serve(async (req) => {
     const storagePath = typeof audioPayload.storagePath === "string"
       ? audioPayload.storagePath
       : null;
+    const provider = typeof audioPayload.provider === "string"
+      ? audioPayload.provider
+      : null;
     if (!audioUrl) {
       return buildErrorResponse(
         502,
@@ -221,6 +225,7 @@ serve(async (req) => {
         script,
         audioUrl,
         audioStoragePath: storagePath,
+        audioProvider: provider,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

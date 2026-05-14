@@ -907,6 +907,60 @@ Deno.test("generate-mentor-audio falls back to OpenAI TTS when ElevenLabs fails"
   );
 });
 
+Deno.test("generate-mentor-audio fails instead of using OpenAI when primary voice is required", async () => {
+  const fetchedUrls: string[] = [];
+  Deno.env.set("ELEVENLABS_API_KEY", "test-elevenlabs-key");
+  Deno.env.set("OPENAI_API_KEY", "test-openai-key");
+
+  const response = await mentorAudioModule.handleGenerateMentorAudio(
+    new Request("https://example.com", {
+      method: "POST",
+      body: JSON.stringify({
+        mentorSlug: "rival",
+        script: "Keep going.",
+        requirePrimaryVoice: true,
+      }),
+    }),
+    {
+      authorize: async () => ({ userId: "user-1", isInternal: false }),
+      createSupabaseClient: () => createMockSupabase({}),
+      fetchImpl: async (input) => {
+        const url = String(input);
+        fetchedUrls.push(url);
+        if (url.includes("elevenlabs.io")) {
+          return new Response(JSON.stringify({ error: "provider down" }), {
+            status: 500,
+          });
+        }
+        return new Response(new Uint8Array([4, 5, 6]), { status: 200 });
+      },
+      checkRateLimitFn: async () => ({
+        allowed: true,
+        available: true,
+        remaining: 14,
+        limit: 15,
+        resetAt: new Date("2026-03-29T00:00:00.000Z"),
+      }),
+      now: () => 1000,
+    },
+  );
+
+  const body = await response.json();
+  assertEquals(response.status, 500);
+  assert(
+    String(body.error).includes("ElevenLabs primary failed after retry"),
+    "Expected ElevenLabs failure to be surfaced",
+  );
+  assert(
+    fetchedUrls.some((url) => url.includes("elevenlabs.io")),
+    "Expected ElevenLabs to be tried",
+  );
+  assert(
+    !fetchedUrls.some((url) => url.includes("api.openai.com/v1/audio/speech")),
+    "Expected OpenAI fallback to be skipped when the primary voice is required",
+  );
+});
+
 Deno.test("generate-mentor-audio falls back to OpenAI TTS when ElevenLabs is rate limited", async () => {
   const fetchedUrls: string[] = [];
   Deno.env.set("ELEVENLABS_API_KEY", "test-elevenlabs-key");

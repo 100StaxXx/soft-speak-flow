@@ -11,7 +11,6 @@ import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getMentorPepTalkPlaybackGain } from "@/config/mentorVoices";
 
 interface CaptionWord {
   word: string;
@@ -26,7 +25,6 @@ interface PepTalk {
   quote: string;
   description: string;
   audio_url: string;
-  mentor_slug?: string | null;
   is_featured: boolean;
   created_at: string;
   transcript: CaptionWord[];
@@ -197,7 +195,6 @@ const PepTalkDetail = () => {
               <AudioPlayer 
                 audioUrl={pepTalk.audio_url} 
                 title={pepTalk.title}
-                playbackGain={getMentorPepTalkPlaybackGain(pepTalk.mentor_slug)}
                 onTimeUpdate={setCurrentTime}
               />
             </motion.div>

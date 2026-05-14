@@ -5,7 +5,6 @@ export interface MentorVoiceConfig {
   mentorName: string;
   voiceName: string;
   voiceId: string;
-  pepTalkPlaybackGain?: number;
   defaultIntensity: string;
   categories: string[];
   voiceSettings: {
@@ -38,7 +37,6 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
     mentorName: "Lyra",
     voiceName: "Lyra",
     voiceId: "54YYBuRuAG6KJooiOhFI",
-    pepTalkPlaybackGain: 1.35,
     defaultIntensity: "gentle",
     categories: ["clarity", "signal", "insight"],
     voiceSettings: {
@@ -144,9 +142,4 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
 export const getMentorVoiceConfig = (mentorSlug: string): MentorVoiceConfig | null => {
   const resolvedSlug = resolveMentorSlugAlias(mentorSlug);
   return resolvedSlug ? mentorVoices[resolvedSlug] ?? null : null;
-};
-
-export const getMentorPepTalkPlaybackGain = (mentorSlug?: string | null): number => {
-  if (!mentorSlug) return 1;
-  return getMentorVoiceConfig(mentorSlug)?.pepTalkPlaybackGain ?? 1;
 };
