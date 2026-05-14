@@ -66,9 +66,13 @@ export const DraggableFAB = ({
     launcherAwayHasTransparentBackground,
     needsLauncherImage,
   } = useJourneysCompanionVisual();
-  const { currentStep: tutorialStep } = usePostOnboardingMentorGuidance();
+  const {
+    currentStep: tutorialStep,
+    isPreHatchCompanionStep,
+  } = usePostOnboardingMentorGuidance();
   const shouldHideTutorialEggFab =
-    Boolean(tutorialStep) && typeof currentStage === "number" && currentStage <= 0;
+    isPreHatchCompanionStep ||
+    (Boolean(tutorialStep) && typeof currentStage === "number" && currentStage <= 0);
   useCompanionLauncherImage({
     companionId,
     sourceImageUrl: currentSceneImageUrl,

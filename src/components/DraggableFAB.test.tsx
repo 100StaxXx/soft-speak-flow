@@ -55,6 +55,7 @@ const mocks = vi.hoisted(() => ({
   } as Record<string, unknown>,
   guidance: {
     currentStep: null as string | null,
+    isPreHatchCompanionStep: false,
   },
 }));
 
@@ -142,6 +143,7 @@ describe("DraggableFAB", () => {
     };
     mocks.guidance = {
       currentStep: null,
+      isPreHatchCompanionStep: false,
     };
     vi.useRealTimers();
     setViewport({ width: 400, height: 800 });
@@ -158,6 +160,7 @@ describe("DraggableFAB", () => {
     };
     mocks.guidance = {
       currentStep: "new_goal",
+      isPreHatchCompanionStep: false,
     };
 
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
@@ -179,6 +182,26 @@ describe("DraggableFAB", () => {
     expect(screen.getByTestId("journeys-companion-launcher-floating")).toBeInTheDocument();
   });
 
+  it("hides the floating launcher placeholder during the pre-hatch tutorial state", () => {
+    mocks.visual = {
+      ...mocks.visual,
+      currentStage: 1,
+      needsLauncherImage: true,
+    };
+    mocks.guidance = {
+      currentStep: "hatch_companion",
+      isPreHatchCompanionStep: true,
+    };
+
+    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
+
+    expect(screen.queryByTestId("journeys-companion-launcher-floating")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("journeys-companion-launcher-placeholder")).not.toBeInTheDocument();
+    expect(mocks.launcherImageCalls).toContainEqual(expect.objectContaining({
+      enabled: false,
+    }));
+  });
+
   it("keeps the launcher visible during tutorial after the egg hatches", () => {
     mocks.visual = {
       ...mocks.visual,
@@ -186,6 +209,7 @@ describe("DraggableFAB", () => {
     };
     mocks.guidance = {
       currentStep: "hatch_companion",
+      isPreHatchCompanionStep: false,
     };
 
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
