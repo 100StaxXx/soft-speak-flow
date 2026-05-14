@@ -120,8 +120,9 @@ function hasNetworkPattern(text?: string): boolean {
 function inferUpstreamStatusFromMessage(message?: string): number | undefined {
   if (!message) return undefined;
   const match =
-    message.match(/\b(?:OpenAI|AI)\s+API\s+error:\s*([45]\d{2})\b/i) ??
-    message.match(/\bOpenAI image request failed\s*\(([45]\d{2})\):/i);
+    message.match(/\b(?:OpenAI|PhotoRoom|AI)\s+API\s+error:\s*([45]\d{2})\b/i) ??
+    message.match(/\bOpenAI image request failed\s*\(([45]\d{2})\):/i) ??
+    message.match(/\bPhotoRoom .* failed\s*\(([45]\d{2})\):/i);
   if (!match) return undefined;
   const parsed = Number(match[1]);
   return Number.isFinite(parsed) ? parsed : undefined;

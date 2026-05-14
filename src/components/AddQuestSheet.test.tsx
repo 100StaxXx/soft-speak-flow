@@ -365,31 +365,27 @@ describe("AddQuestSheet", () => {
     expect(screen.queryByText(/Name your quest.*Select a time/i)).not.toBeInTheDocument();
     expect(screen.queryByText("Or create a Campaign")).not.toBeInTheDocument();
     expect(screen.queryByText("Max 2 active")).not.toBeInTheDocument();
-    expect(screen.getByText("Send to Google Calendar after create")).toBeInTheDocument();
+    expect(screen.queryByTestId("add-quest-calendar-section")).not.toBeInTheDocument();
+    expect(screen.queryByText("Send to Google Calendar after create.")).not.toBeInTheDocument();
   });
 
-  it("shows a mobile calendar connect action when no provider is connected", () => {
-    const onOpenCalendarPreferences = vi.fn();
-
+  it("keeps calendar connection prompts out of the mobile sheet when no provider is connected", () => {
     render(
       <AddQuestSheet
         open
         onOpenChange={vi.fn()}
         selectedDate={selectedDate}
         onAdd={vi.fn().mockResolvedValue(undefined)}
-        onOpenCalendarPreferences={onOpenCalendarPreferences}
       />
     );
 
-    expect(screen.getByTestId("add-quest-calendar-section")).toBeInTheDocument();
-    expect(screen.getByText("Connect Google, Outlook, or Apple Calendar to send this quest.")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Connect calendar" }));
-
-    expect(onOpenCalendarPreferences).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("add-quest-calendar-section")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("add-quest-external-calendar-section")).not.toBeInTheDocument();
+    expect(screen.queryByText("Connect Google, Outlook, or Apple Calendar to send this quest.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Connect calendar" })).not.toBeInTheDocument();
   });
 
-  it("submits a mobile scheduled quest with sendToCalendar when toggled", async () => {
+  it("submits a mobile scheduled quest with sendToCalendar when toggled from Advanced Settings", async () => {
     const onAdd = vi.fn<(data: AddQuestData) => Promise<void>>()
       .mockResolvedValue(undefined);
     mocks.defaultProvider = "google";
@@ -408,7 +404,14 @@ describe("AddQuestSheet", () => {
     fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
       target: { value: "Calendar-ready quest" },
     });
-    fireEvent.click(screen.getByRole("switch", { name: "Send to Google Calendar after create" }));
+    expect(screen.queryByText("Send to Google Calendar after create.")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Advanced Settings/i }));
+
+    expect(screen.getByTestId("add-quest-external-calendar-section")).toBeInTheDocument();
+    expect(screen.getByText("Send to Google Calendar after create.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("switch", { name: "Send to external calendar after create" }));
     fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
 
     await waitFor(() => {
@@ -1478,7 +1481,7 @@ describe("AddQuestSheet", () => {
     }));
   });
 
-  it("hides send-to-calendar option when default provider is stale and no providers are connected", () => {
+  it("hides advanced send-to-calendar option when default provider is stale and no providers are connected", () => {
     mocks.integrationVisible = true;
     mocks.defaultProvider = "google";
     mocks.connections = [];
@@ -1492,10 +1495,13 @@ describe("AddQuestSheet", () => {
       />
     );
 
+    fireEvent.click(screen.getByRole("button", { name: /Advanced Settings/i }));
+
+    expect(screen.queryByTestId("add-quest-external-calendar-section")).not.toBeInTheDocument();
     expect(screen.queryByText(/Send to .* Calendar after create/i)).not.toBeInTheDocument();
   });
 
-  it("falls back to the first connected provider when the default provider is stale", () => {
+  it("falls back to the first connected provider in Advanced Settings when the default provider is stale", () => {
     mocks.integrationVisible = false;
     mocks.defaultProvider = "outlook";
     mocks.connections = [{ provider: "google" }];
@@ -1509,8 +1515,11 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    expect(screen.getByText("Send to Google Calendar after create")).toBeInTheDocument();
-    expect(screen.getByRole("switch", { name: "Send to Google Calendar after create" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Advanced Settings/i }));
+
+    expect(screen.getByTestId("add-quest-external-calendar-section")).toBeInTheDocument();
+    expect(screen.getByText("Send to Google Calendar after create.")).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Send to external calendar after create" })).toBeInTheDocument();
   });
 
   it("blocks close requests when preventClose is enabled", () => {

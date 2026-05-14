@@ -10,7 +10,12 @@ export type CostCapability =
   | "transcription"
   | "video";
 
-export type CostProvider = "openai" | "elevenlabs" | "fal" | "unknown";
+export type CostProvider =
+  | "openai"
+  | "elevenlabs"
+  | "fal"
+  | "photoroom"
+  | "unknown";
 export type CostScopeType = "provider" | "feature" | "endpoint";
 export type CostEventStatus = "success" | "error" | "blocked";
 export type CostAlertType = "threshold" | "anomaly";
@@ -609,6 +614,19 @@ async function resolveProviderRequestContext(
     };
   }
 
+  if (
+    hostname === "sdk.photoroom.com" &&
+    pathname.includes("/v1/segment")
+  ) {
+    return {
+      provider: "photoroom",
+      capability: "image",
+      url: url.toString(),
+      model: "remove-background-basic",
+      requestBody,
+    };
+  }
+
   return null;
 }
 
@@ -788,6 +806,10 @@ function estimateFalCost(
   return roundUsd(Math.max(1, durationSeconds) * 0.1);
 }
 
+function estimatePhotoRoomCost(capability: CostCapability): number {
+  return capability === "image" ? 0.02 : 0;
+}
+
 function estimateProviderRequestCost(
   providerContext: ProviderRequestContext,
   metrics: ProviderResponseMetrics,
@@ -817,6 +839,10 @@ function estimateProviderRequestCost(
       providerContext.capability,
       providerContext.requestBody,
     );
+  }
+
+  if (providerContext.provider === "photoroom") {
+    return estimatePhotoRoomCost(providerContext.capability);
   }
 
   return 0;

@@ -103,7 +103,6 @@ interface AddQuestSheetProps {
   onAdd: (data: AddQuestData) => Promise<void>;
   isAdding?: boolean;
   onCreateCampaign?: () => void;
-  onOpenCalendarPreferences?: () => void;
   preventClose?: boolean;
   onPreventedCloseAttempt?: () => void;
   autoRestoreDraftOnOpen?: boolean;
@@ -133,7 +132,6 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   onAdd,
   isAdding = false,
   onCreateCampaign,
-  onOpenCalendarPreferences,
   preventClose = false,
   onPreventedCloseAttempt,
   autoRestoreDraftOnOpen = false,
@@ -202,10 +200,6 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   );
   const hasCalendarConnection = Boolean(SEND_TO_CALENDAR_ENABLED && connections.length > 0 && selectedCalendarSendTarget);
   const canShowCalendarSendOption = hasCalendarConnection;
-  const canShowCalendarSection = Boolean(
-    SEND_TO_CALENDAR_ENABLED
-      && (hasCalendarConnection || onOpenCalendarPreferences),
-  );
 
   const subtaskInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const hasEmittedTitleEnteredRef = useRef(false);
@@ -1277,6 +1271,63 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                       requireScheduledTimeForRecurrence
                       visualStyle="quest-soft"
                     />
+                    {canShowCalendarSendOption && (
+                      <div
+                        data-testid="add-quest-external-calendar-section"
+                        className={cn(QUEST_FORM_STYLES.sectionCard, "space-y-3 p-4")}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0 text-left">
+                            <p className={cn("flex items-center gap-2 text-sm font-semibold", QUEST_FORM_STYLES.label)}>
+                              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                              External Calendar
+                            </p>
+                            <p className={cn("mt-1", QUEST_FORM_STYLES.helperText)}>
+                              {selectedCalendarSendTargetOption
+                                ? `Send to ${selectedCalendarSendTargetOption.label} after create.`
+                                : "Send to your external calendar after create."}
+                            </p>
+                          </div>
+                          <Switch
+                            checked={sendToCalendar}
+                            onCheckedChange={setSendToCalendar}
+                            aria-label="Send to external calendar after create"
+                          />
+                        </div>
+
+                        {sendToCalendar && calendarSendTargetOptions.length > 1 && (
+                          <div className="space-y-1.5">
+                            <Label className="text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                              Destination
+                            </Label>
+                            <Select
+                              value={selectedCalendarSendTarget ?? undefined}
+                              onValueChange={(value) => {
+                                if (isCalendarSendTarget(value)) {
+                                  setCalendarSendTarget(value);
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="h-10 rounded-2xl border-[hsl(var(--celestial-blue)_/_0.52)] bg-card/[0.88] text-xs">
+                                <SelectValue placeholder="Choose destination" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {calendarSendTargetOptions.map((option) => (
+                                  <SelectItem key={option.target} value={option.target}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {selectedCalendarSendTargetOption && (
+                              <p className={cn("text-xs", QUEST_FORM_STYLES.helperText)}>
+                                {selectedCalendarSendTargetOption.description}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </CollapsibleContent>
               </Collapsible>
@@ -1304,98 +1355,6 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 <p className="text-xs text-foreground">
                   {reviewTitle} · {reviewTimeLabel} · {reviewDateLabel}
                 </p>
-              </div>
-            )}
-            {canShowCalendarSection && (
-              <div
-                data-testid="add-quest-calendar-section"
-                className={cn(QUEST_FORM_STYLES.sectionCardSoft, "px-4 py-3")}
-              >
-                {hasCalendarConnection ? (
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0 text-left">
-                      <p className="flex items-center gap-2 text-xs font-semibold text-foreground">
-                        <CalendarIcon className="h-3.5 w-3.5" />
-                        Calendar
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {selectedCalendarSendTargetOption
-                          ? `Send to ${selectedCalendarSendTargetOption.label} after create`
-                          : "Send to calendar after create"}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={sendToCalendar}
-                      onCheckedChange={setSendToCalendar}
-                      aria-label={selectedCalendarSendTargetOption
-                        ? `Send to ${selectedCalendarSendTargetOption.label} after create`
-                        : "Send to calendar after create"}
-                    />
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0 text-left">
-                      <p className="flex items-center gap-2 text-xs font-semibold text-foreground">
-                        <CalendarIcon className="h-3.5 w-3.5" />
-                        Calendar
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Connect Google, Outlook, or Apple Calendar to send this quest.
-                      </p>
-                    </div>
-                    {onOpenCalendarPreferences && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={onOpenCalendarPreferences}
-                        className="h-8 shrink-0 rounded-full px-3 text-xs"
-                      >
-                        Connect calendar
-                      </Button>
-                    )}
-                  </div>
-                )}
-                {hasCalendarConnection && sendToCalendar && calendarSendTargetOptions.length > 1 && (
-                  <div className="mt-3 space-y-1.5">
-                    <Label className="text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                      Destination
-                    </Label>
-                    <Select
-                      value={selectedCalendarSendTarget ?? undefined}
-                      onValueChange={(value) => {
-                        if (isCalendarSendTarget(value)) {
-                          setCalendarSendTarget(value);
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="h-9 rounded-2xl border-white/15 bg-black/20 text-xs">
-                        <SelectValue placeholder="Choose destination" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {calendarSendTargetOptions.map((option) => (
-                          <SelectItem key={option.target} value={option.target}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {selectedCalendarSendTargetOption && (
-                      <p className="text-xs text-muted-foreground">
-                        {selectedCalendarSendTargetOption.description}
-                      </p>
-                    )}
-                  </div>
-                )}
-                {hasCalendarConnection && onOpenCalendarPreferences && (
-                  <button
-                    type="button"
-                    onClick={onOpenCalendarPreferences}
-                    className="mt-2 text-xs font-semibold text-[hsl(var(--stardust-gold))] transition-colors hover:text-foreground"
-                  >
-                    Manage calendar
-                  </button>
-                )}
               </div>
             )}
             <Button

@@ -405,7 +405,6 @@ const InboxPage = memo(function InboxPage() {
           selectedDate={new Date()}
           onAdd={handleAddQuest}
           presentation={isMacHostedIOSApp ? "desktop-panel" : "mobile-sheet"}
-          onOpenCalendarPreferences={handleOpenCalendarPreferences}
         />
 
         <EditQuestDialog

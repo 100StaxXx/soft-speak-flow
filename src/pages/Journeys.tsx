@@ -2206,7 +2206,6 @@ const Journeys = () => {
           autoRestoreDraftOnOpen={autoRestoreQuestDraftOnOpen}
           persistenceRoute="/journeys"
           onCreateCampaign={() => openCampaignBuilder()}
-          onOpenCalendarPreferences={handleOpenCalendarPreferences}
         />
         
         {/* Edit Quest Dialog (for regular quests) */}

@@ -149,10 +149,10 @@ describe("useCompanionLauncherImage", () => {
     const transientError = createFunctionError({
       status: 503,
       payload: {
-        code: "COMPANION_LAUNCHER_OPENAI_EDIT_FAILED",
-        failureReason: "openai_edit_failed",
-        stage: "edit_image",
-        message: "Companion launcher image edit failed",
+        code: "COMPANION_LAUNCHER_PHOTOROOM_FAILED",
+        failureReason: "photoroom_cutout_failed",
+        stage: "remove_background",
+        message: "Companion launcher cutout provider failed",
       },
     });
     mocks.invoke
@@ -233,8 +233,8 @@ describe("useCompanionLauncherImage", () => {
       status: 500,
       payload: {
         code: "COMPANION_LAUNCHER_CONFIG_ERROR",
-        failureReason: "openai_config_missing",
-        stage: "configure_openai",
+        failureReason: "photoroom_live_key_missing",
+        stage: "configure_photoroom",
         message: "Companion launcher image generation is not configured",
         retryable: false,
       },
@@ -263,7 +263,7 @@ describe("useCompanionLauncherImage", () => {
           sourceImageUrl: "https://assets.example.com/source-a.png",
           status: 500,
           code: "COMPANION_LAUNCHER_CONFIG_ERROR",
-          reason: "openai_config_missing",
+          reason: "photoroom_live_key_missing",
           category: "http",
           requestId: "request-1",
         }),
@@ -271,11 +271,11 @@ describe("useCompanionLauncherImage", () => {
     });
   });
 
-  it("does not retry legacy 500 responses that wrap a permanent AI API 400", async () => {
+  it("does not retry legacy 500 responses that wrap a permanent PhotoRoom API 400", async () => {
     const legacyError = createFunctionError({
       status: 500,
       payload: {
-        message: "AI API error: 400",
+        message: "PhotoRoom API error: 400",
       },
     });
     mocks.invoke.mockResolvedValue({
@@ -301,7 +301,7 @@ describe("useCompanionLauncherImage", () => {
           companionId: "companion-1",
           sourceImageUrl: "https://assets.example.com/source-a.png",
           status: 500,
-          reason: "AI API error: 400",
+          reason: "PhotoRoom API error: 400",
           category: "http",
           requestId: "request-1",
           upstreamStatus: 400,

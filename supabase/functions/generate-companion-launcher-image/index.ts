@@ -1,6 +1,3 @@
-import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
-installOpenAICompatibilityShim();
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
@@ -14,11 +11,10 @@ import {
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
 import {
-  editCompanionImage,
-  OpenAIImageRequestError,
-} from "../_shared/openaiCompanionImageClient.ts";
-import { judgeCompanionImage } from "../_shared/companionImageJudge.ts";
-import { synthesizeVisualIdentityProfile } from "../_shared/companionLineage.ts";
+  CompanionLauncherCutoutValidationError,
+  validateAndNormalizeCompanionLauncherCutout,
+  type CompanionLauncherAlphaStats,
+} from "../_shared/companionLauncherCutout.ts";
 import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
 
 const corsHeaders = {
@@ -28,26 +24,16 @@ const corsHeaders = {
 };
 
 const COMPANION_IMAGE_BUCKET = "mentors-avatars";
-const LAUNCHER_IMAGE_SIZE = "1024x1024";
 const LAUNCHER_IMAGE_FILE_KIND = "launcher_validated_transparent";
-const LAUNCHER_VALIDATION_ATTEMPTS = 2;
-const LAUNCHER_JUDGE_MINIMUMS = {
-  overall: 6,
-  continuity: 5,
-  anatomy: 5,
-  backgroundCutout: 7,
-};
+const PHOTOROOM_SEGMENT_URL = "https://sdk.photoroom.com/v1/segment";
+
+type PhotoRoomMode = "sandbox" | "live";
+type PhotoRoomProvider = `photoroom:${PhotoRoomMode}`;
 
 interface CompanionRow {
   id: string;
   user_id: string;
   preset_id: string | null;
-  companion_name: string | null;
-  cached_creature_name: string | null;
-  spirit_animal: string | null;
-  core_element: string | null;
-  favorite_color: string | null;
-  visual_identity_profile?: unknown;
   current_stage: number | null;
   current_image_url: string | null;
   launcher_image_url: string | null;
@@ -63,8 +49,8 @@ interface GenerateCompanionLauncherImageDeps {
   ) => Promise<UserRequestAuth | Response>;
   createSupabaseClient: () => any;
   createCostGuardrailSessionFn: any;
-  editCompanionImageFn: typeof editCompanionImage;
-  judgeCompanionImageFn?: typeof judgeCompanionImage;
+  fetchFn: typeof fetch;
+  getEnv: (name: string) => string | undefined;
   now: () => number;
 }
 
@@ -76,8 +62,8 @@ const defaultDeps: GenerateCompanionLauncherImageDeps = {
     return createClient(supabaseUrl, supabaseServiceKey);
   },
   createCostGuardrailSessionFn: createCostGuardrailSession,
-  editCompanionImageFn: editCompanionImage,
-  judgeCompanionImageFn: judgeCompanionImage,
+  fetchFn: fetch,
+  getEnv: (name: string) => Deno.env.get(name) ?? undefined,
   now: () => Date.now(),
 };
 
@@ -91,11 +77,6 @@ const isTransparentLauncherImageUrl = (
 ): value is string =>
   typeof value === "string" &&
   value.includes(`_${LAUNCHER_IMAGE_FILE_KIND}_stage`);
-
-const parseDataUrl = (dataUrl: string): Uint8Array => {
-  const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, "");
-  return Uint8Array.from(atob(base64Data), (char) => char.charCodeAt(0));
-};
 
 const deleteUploadedLauncherAssetBestEffort = async ({
   supabase,
@@ -127,68 +108,6 @@ const deleteUploadedLauncherAssetBestEffort = async ({
   }
 };
 
-const buildLauncherPrompt = (companion: CompanionRow): string => {
-  const species = companion.spirit_animal?.trim() || "companion creature";
-  const element = companion.core_element?.trim() || "natural";
-  const color = companion.favorite_color?.trim() || "its existing";
-  const name = companion.cached_creature_name?.trim() ||
-    companion.companion_name?.trim() || "the companion";
-
-  return `Create a dedicated floating launcher render of ${name}, based on the reference image.
-
-Preserve the exact companion identity:
-- Same species/body type: ${species}
-- Same markings, colors, glow, eyes, silhouette, and personality
-- Same elemental cues, especially ${element}, and preserve ${color} color accents
-- Do not redesign, mature, simplify, anthropomorphize, or change the companion
-
-Change only the presentation:
-- Show only the companion, full body, centered, with ears/wings/tail fully inside the frame
-- Use a clean readable silhouette with 12-18% padding on all sides
-- Use a true transparent background / alpha canvas so only the companion remains visible
-- Remove any reference-image scenery completely; do not preserve sky, clouds, horizon, landscape, forest, room, starscape, floor, frame, card, UI, props, text, watermark, border, solid rectangle, or decorative backdrop
-- No cast shadow, contact shadow, backdrop glow, floor plane, or sticker rectangle
-
-Output a polished square transparent PNG-style render for a mobile floating action button.`;
-};
-
-const buildLauncherRetryPrompt = (
-  basePrompt: string,
-  notes: string | null | undefined,
-): string => {
-  const critique = typeof notes === "string" && notes.trim().length > 0
-    ? notes.trim()
-    : "The prior launcher image did not pass the transparent cutout quality gate.";
-
-  return `${basePrompt}\n\nRetry critique:\n- ${critique}\n- Regenerate as a true transparent alpha cutout only. Do not include any visible rectangular background, sky, clouds, floor, frame, card, scenery, or shadow plane.`;
-};
-
-const getLauncherBackgroundCutoutScore = (
-  scores: Awaited<ReturnType<typeof judgeCompanionImage>>,
-): number =>
-  scores && typeof scores.backgroundCutout === "number"
-    ? scores.backgroundCutout
-    : 0;
-
-const launcherScoresPass = (
-  scores: Awaited<ReturnType<typeof judgeCompanionImage>>,
-): boolean =>
-  Boolean(
-    scores &&
-      scores.overall >= LAUNCHER_JUDGE_MINIMUMS.overall &&
-      scores.continuity >= LAUNCHER_JUDGE_MINIMUMS.continuity &&
-      scores.anatomy >= LAUNCHER_JUDGE_MINIMUMS.anatomy &&
-      getLauncherBackgroundCutoutScore(scores) >=
-        LAUNCHER_JUDGE_MINIMUMS.backgroundCutout,
-  );
-
-const buildLauncherVisualProfile = (companion: CompanionRow) =>
-  synthesizeVisualIdentityProfile(companion.visual_identity_profile, {
-    spiritAnimal: companion.spirit_animal ?? "companion creature",
-    coreElement: companion.core_element ?? "natural",
-    favoriteColor: companion.favorite_color ?? "#FF6B35",
-  });
-
 const jsonResponse = (
   body: Record<string, unknown>,
   init: ResponseInit = {},
@@ -203,29 +122,6 @@ const truncateDiagnostic = (value: string, maxLength = 800): string =>
 
 const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
-
-const getReferenceDownloadStatus = (message: string): number | null => {
-  const match = message.match(/Failed to download reference image:\s*(\d{3})/i);
-  if (!match) return null;
-  const status = Number.parseInt(match[1], 10);
-  return Number.isFinite(status) ? status : null;
-};
-
-const getOpenAIImageRequestStatus = (
-  error: unknown,
-  message: string,
-): number | null => {
-  if (error instanceof OpenAIImageRequestError) {
-    return error.status;
-  }
-
-  const match = message.match(/OpenAI image request failed\s*\((\d{3})\):/i);
-  const genericMatch = match ??
-    message.match(/\b(?:OpenAI|AI)\s+API\s+error:\s*(\d{3})\b/i);
-  if (!genericMatch) return null;
-  const status = Number.parseInt(genericMatch[1], 10);
-  return Number.isFinite(status) ? status : null;
-};
 
 const isRetryableUpstreamStatus = (status: number | null): boolean =>
   status === null || status === 408 || status === 429 || status >= 500;
@@ -268,6 +164,243 @@ const launcherErrorResponse = ({
       : {}),
   }, { status });
 
+interface PhotoRoomConfig {
+  apiKey: string;
+  mode: PhotoRoomMode;
+  provider: PhotoRoomProvider;
+}
+
+interface DownloadedReferenceImage {
+  bytes: Uint8Array;
+  contentType: string;
+}
+
+interface PhotoRoomLauncherCutout {
+  pngBytes: Uint8Array;
+  provider: PhotoRoomProvider;
+  alphaStats: CompanionLauncherAlphaStats;
+}
+
+const normalizeEnvValue = (value: string | undefined): string =>
+  typeof value === "string" ? value.trim().toLowerCase() : "";
+
+const isProductionEnvironment = (
+  getEnv: GenerateCompanionLauncherImageDeps["getEnv"],
+): boolean => normalizeEnvValue(getEnv("ENVIRONMENT")) === "production";
+
+const isExplicitSandboxEnvironment = (
+  getEnv: GenerateCompanionLauncherImageDeps["getEnv"],
+): boolean => {
+  const environment = normalizeEnvValue(getEnv("ENVIRONMENT"));
+  return environment === "development" ||
+    environment === "local" ||
+    environment === "test";
+};
+
+const resolvePhotoRoomConfig = (
+  getEnv: GenerateCompanionLauncherImageDeps["getEnv"],
+): PhotoRoomConfig | Response => {
+  const production = isProductionEnvironment(getEnv);
+  const rawMode = normalizeEnvValue(getEnv("PHOTOROOM_MODE"));
+  const mode = rawMode === "live" || rawMode === "sandbox" ? rawMode : null;
+
+  if (!mode) {
+    return launcherErrorResponse({
+      status: 500,
+      message: "Companion launcher cutout provider is not configured",
+      code: "COMPANION_LAUNCHER_CONFIG_ERROR",
+      stage: "configure_photoroom",
+      failureReason: "photoroom_mode_missing",
+    });
+  }
+
+  if (production && mode !== "live") {
+    return launcherErrorResponse({
+      status: 500,
+      message: "Companion launcher cutout provider is not configured for production",
+      code: "COMPANION_LAUNCHER_CONFIG_ERROR",
+      stage: "configure_photoroom",
+      failureReason: "photoroom_live_mode_required",
+    });
+  }
+
+  if (mode === "sandbox" && !isExplicitSandboxEnvironment(getEnv)) {
+    return launcherErrorResponse({
+      status: 500,
+      message: "Companion launcher cutout sandbox mode requires a non-production environment",
+      code: "COMPANION_LAUNCHER_CONFIG_ERROR",
+      stage: "configure_photoroom",
+      failureReason: "photoroom_sandbox_environment_required",
+    });
+  }
+
+  const apiKeyName = mode === "live"
+    ? "PHOTOROOM_API_KEY_LIVE"
+    : "PHOTOROOM_API_KEY_SANDBOX";
+  const apiKey = getEnv(apiKeyName)?.trim() ?? "";
+
+  if (!apiKey) {
+    return launcherErrorResponse({
+      status: 500,
+      message: "Companion launcher cutout provider is not configured",
+      code: "COMPANION_LAUNCHER_CONFIG_ERROR",
+      stage: "configure_photoroom",
+      failureReason: mode === "live"
+        ? "photoroom_live_key_missing"
+        : "photoroom_sandbox_key_missing",
+    });
+  }
+
+  if (mode === "sandbox" && !apiKey.startsWith("sandbox_")) {
+    return launcherErrorResponse({
+      status: 500,
+      message: "Companion launcher cutout sandbox key is invalid",
+      code: "COMPANION_LAUNCHER_CONFIG_ERROR",
+      stage: "configure_photoroom",
+      failureReason: "photoroom_sandbox_key_invalid",
+    });
+  }
+
+  if (mode === "live" && apiKey.startsWith("sandbox_")) {
+    return launcherErrorResponse({
+      status: 500,
+      message: "Companion launcher cutout live key is invalid",
+      code: "COMPANION_LAUNCHER_CONFIG_ERROR",
+      stage: "configure_photoroom",
+      failureReason: "photoroom_live_key_invalid",
+    });
+  }
+
+  return {
+    apiKey,
+    mode,
+    provider: `photoroom:${mode}`,
+  };
+};
+
+const downloadReferenceImage = async ({
+  fetchFn,
+  referenceImageUrl,
+}: {
+  fetchFn: typeof fetch;
+  referenceImageUrl: string;
+}): Promise<DownloadedReferenceImage> => {
+  let response: Response;
+  try {
+    response = await fetchFn(referenceImageUrl);
+  } catch (error) {
+    throw launcherErrorResponse({
+      status: 502,
+      message: "Companion reference image could not be downloaded",
+      code: "COMPANION_LAUNCHER_REFERENCE_DOWNLOAD_FAILED",
+      stage: "download_reference",
+      failureReason: "reference_download_failed",
+      retryable: true,
+      upstreamError: getErrorMessage(error),
+    });
+  }
+
+  if (!response.ok) {
+    throw launcherErrorResponse({
+      status: getLauncherStatusForUpstreamFailure(response.status),
+      message: "Companion reference image could not be downloaded",
+      code: "COMPANION_LAUNCHER_REFERENCE_DOWNLOAD_FAILED",
+      stage: "download_reference",
+      failureReason: "reference_download_failed",
+      retryable: isRetryableUpstreamStatus(response.status),
+      upstreamStatus: response.status,
+      upstreamError: await response.text().catch(() => response.statusText),
+    });
+  }
+
+  return {
+    bytes: new Uint8Array(await response.arrayBuffer()),
+    contentType: response.headers.get("Content-Type") ?? "image/png",
+  };
+};
+
+const createPhotoRoomLauncherCutout = async ({
+  fetchFn,
+  config,
+  referenceImage,
+}: {
+  fetchFn: typeof fetch;
+  config: PhotoRoomConfig;
+  referenceImage: DownloadedReferenceImage;
+}): Promise<PhotoRoomLauncherCutout> => {
+  const formData = new FormData();
+  formData.append(
+    "image_file",
+    new Blob([referenceImage.bytes], { type: referenceImage.contentType }),
+    "companion.png",
+  );
+  formData.append("format", "png");
+
+  let response: Response;
+  try {
+    response = await fetchFn(PHOTOROOM_SEGMENT_URL, {
+      method: "POST",
+      headers: {
+        "x-api-key": config.apiKey,
+      },
+      body: formData,
+    });
+  } catch (error) {
+    throw launcherErrorResponse({
+      status: 502,
+      message: "Companion launcher cutout provider failed",
+      code: "COMPANION_LAUNCHER_PHOTOROOM_FAILED",
+      stage: "remove_background",
+      failureReason: "photoroom_cutout_failed",
+      retryable: true,
+      upstreamError: getErrorMessage(error),
+    });
+  }
+
+  if (!response.ok) {
+    throw launcherErrorResponse({
+      status: getLauncherStatusForUpstreamFailure(response.status),
+      message: "Companion launcher cutout provider failed",
+      code: "COMPANION_LAUNCHER_PHOTOROOM_FAILED",
+      stage: "remove_background",
+      failureReason: "photoroom_cutout_failed",
+      retryable: isRetryableUpstreamStatus(response.status),
+      upstreamStatus: response.status,
+      upstreamError: await response.text().catch(() => response.statusText),
+    });
+  }
+
+  const rawPngBytes = new Uint8Array(await response.arrayBuffer());
+  try {
+    const normalized = await validateAndNormalizeCompanionLauncherCutout(
+      rawPngBytes,
+    );
+    return {
+      pngBytes: normalized.pngBytes,
+      alphaStats: normalized.alphaStats,
+      provider: config.provider,
+    };
+  } catch (error) {
+    const validationError = error instanceof CompanionLauncherCutoutValidationError
+      ? error
+      : new CompanionLauncherCutoutValidationError(
+        "invalid_alpha",
+        getErrorMessage(error),
+      );
+    throw launcherErrorResponse({
+      status: 424,
+      message: "Companion launcher cutout failed transparent alpha validation",
+      code: "COMPANION_LAUNCHER_VALIDATION_FAILED",
+      stage: "validate_image",
+      failureReason: validationError.reason,
+      retryable: false,
+      upstreamError: validationError.alphaStats
+        ? JSON.stringify(validationError.alphaStats)
+        : validationError.message,
+    });
+  }
+};
+
 export async function handleGenerateCompanionLauncherImage(
   req: Request,
   deps: GenerateCompanionLauncherImageDeps = defaultDeps,
@@ -307,11 +440,10 @@ export async function handleGenerateCompanionLauncherImage(
     }
 
     const supabase = deps.createSupabaseClient();
-    const judgeCompanionImageFn = deps.judgeCompanionImageFn ?? judgeCompanionImage;
     const { data, error: companionError } = await supabase
       .from("user_companion")
       .select(
-        "id, user_id, preset_id, companion_name, cached_creature_name, spirit_animal, core_element, favorite_color, visual_identity_profile, current_stage, current_image_url, launcher_image_url, launcher_image_focal_x, launcher_image_focal_y, launcher_image_source_url",
+        "id, user_id, preset_id, current_stage, current_image_url, launcher_image_url, launcher_image_focal_x, launcher_image_focal_y, launcher_image_source_url",
       )
       .eq("id", companionId)
       .eq("user_id", requestAuth.userId)
@@ -392,15 +524,9 @@ export async function handleGenerateCompanionLauncherImage(
       });
     }
 
-    const openAIApiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!openAIApiKey) {
-      return launcherErrorResponse({
-        status: 500,
-        message: "Companion launcher image generation is not configured",
-        code: "COMPANION_LAUNCHER_CONFIG_ERROR",
-        stage: "configure_openai",
-        failureReason: "openai_config_missing",
-      });
+    const photoRoomConfig = resolvePhotoRoomConfig(deps.getEnv);
+    if (photoRoomConfig instanceof Response) {
+      return photoRoomConfig;
     }
 
     const costGuardrails = deps.createCostGuardrailSessionFn({
@@ -409,148 +535,26 @@ export async function handleGenerateCompanionLauncherImage(
       featureKey: "ai_companion_images",
       userId: companion.user_id,
     });
-    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    const guardedFetch = costGuardrails.wrapFetch(deps.fetchFn);
     await costGuardrails.enforceAccess({
-      capabilities: ["image", "text"],
-      providers: ["openai"],
+      capabilities: ["image"],
+      providers: ["photoroom"],
+      metadata: { provider: photoRoomConfig.provider },
     });
 
-    const baseLauncherPrompt = buildLauncherPrompt(companion);
-    const visualIdentityProfile = buildLauncherVisualProfile(companion);
     const stage = typeof companion.current_stage === "number"
       ? companion.current_stage
       : 0;
-    let promptForAttempt = baseLauncherPrompt;
-    let generatedImage: Awaited<ReturnType<typeof editCompanionImage>> | null = null;
-    let lastValidationScores: Awaited<ReturnType<typeof judgeCompanionImage>> = null;
-
-    for (let attempt = 0; attempt < LAUNCHER_VALIDATION_ATTEMPTS; attempt += 1) {
-      const candidateImage = await (async () => {
-        try {
-          return await deps.editCompanionImageFn({
-            guardedFetch,
-            openAIApiKey,
-            prompt: promptForAttempt,
-            size: LAUNCHER_IMAGE_SIZE,
-            quality: "high",
-            background: "transparent",
-            outputFormat: "png",
-            userId: companion.user_id,
-            referenceImages: [{ imageUrl: referenceImageUrl }],
-          });
-        } catch (error) {
-          const errorMessage = getErrorMessage(error);
-          const referenceStatus = getReferenceDownloadStatus(errorMessage);
-          const openAIStatus = getOpenAIImageRequestStatus(error, errorMessage);
-
-          if (
-            errorMessage.includes("Companion image model is not configured") ||
-            errorMessage.includes("OPENAI_API_KEY")
-          ) {
-            throw launcherErrorResponse({
-              status: 500,
-              message: "Companion launcher image generation is not configured",
-              code: "COMPANION_LAUNCHER_CONFIG_ERROR",
-              stage: "configure_openai",
-              failureReason: "openai_config_invalid",
-              upstreamError: errorMessage,
-            });
-          }
-
-          if (errorMessage.startsWith("Failed to download reference image:")) {
-            throw launcherErrorResponse({
-              status: referenceStatus && referenceStatus < 500 ? 424 : 502,
-              message: "Companion reference image could not be downloaded",
-              code: "COMPANION_LAUNCHER_REFERENCE_DOWNLOAD_FAILED",
-              stage: "download_reference",
-              failureReason: "reference_download_failed",
-              retryable: !referenceStatus || referenceStatus >= 500 ||
-                referenceStatus === 408,
-              upstreamStatus: referenceStatus,
-              upstreamError: errorMessage,
-            });
-          }
-
-          throw launcherErrorResponse({
-            status: getLauncherStatusForUpstreamFailure(openAIStatus),
-            message: "Companion launcher image edit failed",
-            code: "COMPANION_LAUNCHER_OPENAI_EDIT_FAILED",
-            stage: "edit_image",
-            failureReason: "openai_edit_failed",
-            retryable: isRetryableUpstreamStatus(openAIStatus),
-            upstreamStatus: openAIStatus,
-            upstreamError: errorMessage,
-          });
-        }
-      })();
-
-      const validationScores = await judgeCompanionImageFn({
-        guardedFetch,
-        openAIApiKey,
-        profile: visualIdentityProfile,
-        mode: "launcher",
-        candidateImageUrl: candidateImage.imageDataUrl,
-        referenceImageUrl,
-        previousLevel: stage,
-        nextLevel: stage,
-      });
-
-      lastValidationScores = validationScores;
-
-      if (launcherScoresPass(validationScores)) {
-        generatedImage = candidateImage;
-        break;
-      }
-
-      if (!validationScores) {
-        return launcherErrorResponse({
-          status: 502,
-          message: "Companion launcher image could not be validated",
-          code: "COMPANION_LAUNCHER_VALIDATION_UNAVAILABLE",
-          stage: "validate_image",
-          failureReason: "launcher_validation_unavailable",
-          retryable: true,
-        });
-      }
-
-      if (attempt < LAUNCHER_VALIDATION_ATTEMPTS - 1) {
-        promptForAttempt = buildLauncherRetryPrompt(
-          baseLauncherPrompt,
-          validationScores.notes,
-        );
-      }
-    }
-
-    if (!generatedImage) {
-      const backgroundCutoutFailed = Boolean(
-        lastValidationScores &&
-          getLauncherBackgroundCutoutScore(lastValidationScores) <
-            LAUNCHER_JUDGE_MINIMUMS.backgroundCutout,
-      );
-      const validationFailureReason = backgroundCutoutFailed
-        ? "launcher_background_cutout_failed"
-        : "launcher_quality_gate_failed";
-
-      return launcherErrorResponse({
-        status: 424,
-        message: "Companion launcher image failed transparent cutout validation",
-        code: "COMPANION_LAUNCHER_VALIDATION_FAILED",
-        stage: "validate_image",
-        failureReason: validationFailureReason,
-        retryable: false,
-        upstreamError: lastValidationScores
-          ? JSON.stringify({
-            backgroundCutout: lastValidationScores.backgroundCutout,
-            continuity: lastValidationScores.continuity,
-            anatomy: lastValidationScores.anatomy,
-            overall: lastValidationScores.overall,
-            notes: lastValidationScores.notes,
-          })
-          : null,
-      });
-    }
-
-    const imageBuffer = parseDataUrl(generatedImage.imageDataUrl);
+    const referenceImage = await downloadReferenceImage({
+      fetchFn: deps.fetchFn,
+      referenceImageUrl,
+    });
+    const cutout = await createPhotoRoomLauncherCutout({
+      fetchFn: guardedFetch,
+      config: photoRoomConfig,
+      referenceImage,
+    });
+    const imageBuffer = cutout.pngBytes;
     const filePath =
       `${companion.user_id}/companion_${companion.user_id}_${LAUNCHER_IMAGE_FILE_KIND}_stage${stage}_${deps.now()}.png`;
 
@@ -663,8 +667,8 @@ export async function handleGenerateCompanionLauncherImage(
       imageFocalX: 0.5,
       imageFocalY: 0.5,
       sourceImageUrl: referenceImageUrl,
-      imageSize: generatedImage.size,
-      revisedPrompt: generatedImage.revisedPrompt,
+      provider: cutout.provider,
+      alphaStats: cutout.alphaStats,
     });
   } catch (error) {
     if (error instanceof Response) {
