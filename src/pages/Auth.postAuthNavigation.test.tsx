@@ -254,6 +254,43 @@ describe("Auth post-auth navigation", () => {
     expect(screen.getByRole("button", { name: /^sign in$/i })).toBeInTheDocument();
   });
 
+  it("lets account creation users reveal and hide password fields", async () => {
+    mocks.getSessionMock.mockResolvedValue({
+      data: {
+        session: null,
+      },
+    });
+
+    renderAuth();
+    await flushMicrotasks();
+
+    expect(screen.queryByRole("button", { name: /^show confirm password$/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+
+    const passwordInput = screen.getByLabelText(/^password$/i);
+    const confirmPasswordInput = screen.getByLabelText(/^confirm password$/i);
+    const showPasswordButton = screen.getByRole("button", { name: /^show password$/i });
+    const showConfirmPasswordButton = screen.getByRole("button", { name: /^show confirm password$/i });
+
+    expect(passwordInput).toHaveAttribute("type", "password");
+    expect(confirmPasswordInput).toHaveAttribute("type", "password");
+
+    fireEvent.click(showPasswordButton);
+    expect(passwordInput).toHaveAttribute("type", "text");
+    expect(screen.getByRole("button", { name: /^hide password$/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^hide password$/i }));
+    expect(passwordInput).toHaveAttribute("type", "password");
+
+    fireEvent.click(showConfirmPasswordButton);
+    expect(confirmPasswordInput).toHaveAttribute("type", "text");
+    expect(screen.getByRole("button", { name: /^hide confirm password$/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^hide confirm password$/i }));
+    expect(confirmPasswordInput).toHaveAttribute("type", "password");
+  });
+
   it("renders an inline error card when password sign-in fails", async () => {
     mocks.getSessionMock.mockResolvedValue({
       data: {
@@ -355,7 +392,7 @@ describe("Auth post-auth navigation", () => {
     fireEvent.change(screen.getByLabelText(/^password$/i), {
       target: { value: "Password123" },
     });
-    fireEvent.change(screen.getByLabelText(/confirm password/i), {
+    fireEvent.change(screen.getByLabelText(/^confirm password$/i), {
       target: { value: "Password123" },
     });
     fireEvent.click(screen.getByRole("button", { name: /^get started$/i }));
@@ -409,7 +446,7 @@ describe("Auth post-auth navigation", () => {
     fireEvent.change(screen.getByLabelText(/^password$/i), {
       target: { value: "Password123" },
     });
-    fireEvent.change(screen.getByLabelText(/confirm password/i), {
+    fireEvent.change(screen.getByLabelText(/^confirm password$/i), {
       target: { value: "Password123" },
     });
     fireEvent.click(screen.getByRole("button", { name: /^get started$/i }));
@@ -447,7 +484,7 @@ describe("Auth post-auth navigation", () => {
     fireEvent.change(screen.getByLabelText(/^password$/i), {
       target: { value: "Password123" },
     });
-    fireEvent.change(screen.getByLabelText(/confirm password/i), {
+    fireEvent.change(screen.getByLabelText(/^confirm password$/i), {
       target: { value: "Password123" },
     });
     fireEvent.click(screen.getByRole("button", { name: /^get started$/i }));
@@ -495,7 +532,7 @@ describe("Auth post-auth navigation", () => {
     fireEvent.change(screen.getByLabelText(/^password$/i), {
       target: { value: "Password123" },
     });
-    fireEvent.change(screen.getByLabelText(/confirm password/i), {
+    fireEvent.change(screen.getByLabelText(/^confirm password$/i), {
       target: { value: "Password123" },
     });
     fireEvent.click(screen.getByRole("button", { name: /^get started$/i }));
@@ -544,7 +581,7 @@ describe("Auth post-auth navigation", () => {
     fireEvent.change(screen.getByLabelText(/^password$/i), {
       target: { value: "Password123" },
     });
-    fireEvent.change(screen.getByLabelText(/confirm password/i), {
+    fireEvent.change(screen.getByLabelText(/^confirm password$/i), {
       target: { value: "Password123" },
     });
     fireEvent.click(screen.getByRole("button", { name: /^get started$/i }));

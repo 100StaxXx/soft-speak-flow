@@ -22,7 +22,12 @@ type AppleVerifyResponse = {
   receipt?: { [key: string]: unknown };
 };
 
-type SubscriptionStatus = "active" | "trialing" | "cancelled" | "past_due" | "expired";
+type SubscriptionStatus =
+  | "active"
+  | "trialing"
+  | "cancelled"
+  | "past_due"
+  | "expired";
 
 type SubscriptionUpsert = {
   userId: string;
@@ -66,9 +71,14 @@ export function getDiscountedYearlyOfferId() {
   );
 }
 
-export function isDiscountedYearlyOffer(options?: { offerIdentifier?: string | null; offerType?: number | null }) {
+export function isDiscountedYearlyOffer(
+  options?: { offerIdentifier?: string | null; offerType?: number | null },
+) {
   const normalizedOfferIdentifier = options?.offerIdentifier?.trim();
-  if (normalizedOfferIdentifier && normalizedOfferIdentifier === getDiscountedYearlyOfferId()) {
+  if (
+    normalizedOfferIdentifier &&
+    normalizedOfferIdentifier === getDiscountedYearlyOfferId()
+  ) {
     return true;
   }
   return options?.offerType === APPLE_OFFER_TYPE_CODE;
@@ -78,19 +88,22 @@ export function getPriceCents(
   plan: "monthly" | "yearly",
   options?: { offerIdentifier?: string | null; offerType?: number | null },
 ) {
-  const isDiscountedYearly = plan === "yearly" && isDiscountedYearlyOffer(options);
+  const isDiscountedYearly = plan === "yearly" &&
+    isDiscountedYearlyOffer(options);
 
   const envValue = Deno.env.get(
     plan === "monthly"
       ? "APPLE_MONTHLY_PRICE_CENTS"
       : isDiscountedYearly
-        ? "APPLE_OFFER_CODE_YEARLY_PRICE_CENTS"
-        : "APPLE_YEARLY_PRICE_CENTS",
+      ? "APPLE_OFFER_CODE_YEARLY_PRICE_CENTS"
+      : "APPLE_YEARLY_PRICE_CENTS",
   );
   const parsed = envValue ? Number(envValue) : NaN;
   if (!Number.isFinite(parsed)) {
     if (plan === "monthly") return DEFAULT_MONTHLY_PRICE_CENTS;
-    return isDiscountedYearly ? DEFAULT_DISCOUNTED_YEARLY_PRICE_CENTS : DEFAULT_YEARLY_PRICE_CENTS;
+    return isDiscountedYearly
+      ? DEFAULT_DISCOUNTED_YEARLY_PRICE_CENTS
+      : DEFAULT_YEARLY_PRICE_CENTS;
   }
   return parsed;
 }
@@ -113,7 +126,9 @@ const yearlyProductIds = normalizeProductIds("APPLE_YEARLY_PRODUCT_IDS", [
   "com.darrylgraham.revolution.yearly",
 ]);
 
-export function resolvePlanFromProduct(productId: string | undefined): "monthly" | "yearly" {
+export function resolvePlanFromProduct(
+  productId: string | undefined,
+): "monthly" | "yearly" {
   const normalized = (productId ?? "").toLowerCase();
   if (yearlyProductIds.some((id) => normalized === id.toLowerCase())) {
     return "yearly";
@@ -136,7 +151,8 @@ function normalizeOriginalTransactionId(
   originalTransactionId: string | null | undefined,
   fallbackTransactionId: string,
 ) {
-  const normalized = originalTransactionId?.trim() || fallbackTransactionId.trim();
+  const normalized = originalTransactionId?.trim() ||
+    fallbackTransactionId.trim();
   if (!normalized) {
     throw new Error("Missing original transaction identifier");
   }
@@ -171,12 +187,14 @@ function isAdminTransferredBinding(
       ? transfer.previous_app_account_token
       : null,
   );
-  const previousBoundUserId = typeof transfer.previous_bound_user_id === "string"
-    ? normalizeUserId(transfer.previous_bound_user_id)
-    : null;
+  const previousBoundUserId =
+    typeof transfer.previous_bound_user_id === "string"
+      ? normalizeUserId(transfer.previous_bound_user_id)
+      : null;
 
   return targetUserId === normalizedUserId &&
-    (previousAppAccountToken === normalizedToken || previousBoundUserId === normalizedToken);
+    (previousAppAccountToken === normalizedToken ||
+      previousBoundUserId === normalizedToken);
 }
 
 export function buildSubscriptionStatus(
@@ -188,7 +206,9 @@ export function buildSubscriptionStatus(
   return "active";
 }
 
-function selectLatestReceipt(receiptInfo: AppleReceiptInfo[]): AppleReceiptInfo | null {
+function selectLatestReceipt(
+  receiptInfo: AppleReceiptInfo[],
+): AppleReceiptInfo | null {
   if (!Array.isArray(receiptInfo) || receiptInfo.length === 0) return null;
   return [...receiptInfo].sort((a, b) => {
     const aTime = Number(a.expires_date_ms ?? a.purchase_date_ms ?? 0);
@@ -197,7 +217,10 @@ function selectLatestReceipt(receiptInfo: AppleReceiptInfo[]): AppleReceiptInfo 
   })[0];
 }
 
-async function callAppleVerification(receipt: string, url: string): Promise<AppleVerifyResponse> {
+async function callAppleVerification(
+  receipt: string,
+  url: string,
+): Promise<AppleVerifyResponse> {
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -218,13 +241,22 @@ export async function verifyReceiptWithApple(receipt: string) {
 
   const prodResult = await callAppleVerification(receipt, PROD_VERIFY_URL);
   if (prodResult.status === 0) {
-    return { result: prodResult, environment: prodResult.environment ?? "Production" };
+    return {
+      result: prodResult,
+      environment: prodResult.environment ?? "Production",
+    };
   }
 
   if (prodResult.status === 21007) {
-    const sandboxResult = await callAppleVerification(receipt, SANDBOX_VERIFY_URL);
+    const sandboxResult = await callAppleVerification(
+      receipt,
+      SANDBOX_VERIFY_URL,
+    );
     if (sandboxResult.status === 0) {
-      return { result: sandboxResult, environment: sandboxResult.environment ?? "Sandbox" };
+      return {
+        result: sandboxResult,
+        environment: sandboxResult.environment ?? "Sandbox",
+      };
     }
     throw new Error(`Sandbox verification failed: ${sandboxResult.status}`);
   }
@@ -238,7 +270,9 @@ export function extractLatestTransaction(verifyResult: AppleVerifyResponse) {
   if (!latest) return null;
 
   const expiresAt = parseAppleDate(latest.expires_date_ms);
-  const purchaseDate = parseAppleDate(latest.purchase_date_ms ?? latest.original_purchase_date_ms);
+  const purchaseDate = parseAppleDate(
+    latest.purchase_date_ms ?? latest.original_purchase_date_ms,
+  );
 
   if (!expiresAt || !purchaseDate) {
     return null;
@@ -246,8 +280,10 @@ export function extractLatestTransaction(verifyResult: AppleVerifyResponse) {
 
   return {
     productId: latest.product_id ?? "",
-    transactionId: latest.transaction_id ?? latest.original_transaction_id ?? "",
-    originalTransactionId: latest.original_transaction_id ?? latest.transaction_id ?? "",
+    transactionId: latest.transaction_id ?? latest.original_transaction_id ??
+      "",
+    originalTransactionId: latest.original_transaction_id ??
+      latest.transaction_id ?? "",
     expiresAt,
     purchaseDate,
     cancellationDate: parseAppleDate(latest.cancellation_date_ms ?? undefined),
@@ -288,23 +324,44 @@ export async function ensureAppleTransactionBinding(
   const normalizedUserId = normalizeUserId(payload.userId);
   const normalizedToken = normalizeAppAccountToken(payload.appAccountToken);
 
-  const existing = await fetchAppleTransactionBinding(supabase, originalTransactionId);
+  const existing = await fetchAppleTransactionBinding(
+    supabase,
+    originalTransactionId,
+  );
   if (existing) {
     const boundUserId = normalizeUserId(existing.bound_user_id);
     const boundToken = normalizeAppAccountToken(existing.app_account_token);
-    const allowsAdminTransfer = isAdminTransferredBinding(existing, normalizedUserId, normalizedToken);
+    const allowsAdminTransfer = isAdminTransferredBinding(
+      existing,
+      normalizedUserId,
+      normalizedToken,
+    );
 
     if (boundUserId !== normalizedUserId) {
       throw new Error(APPLE_BINDING_CONFLICT_ERROR);
     }
 
-    if (normalizedToken && normalizedToken !== normalizedUserId && !allowsAdminTransfer) {
+    if (
+      normalizedToken && normalizedToken !== normalizedUserId &&
+      !allowsAdminTransfer
+    ) {
       throw new Error(APPLE_BINDING_CONFLICT_ERROR);
     }
 
-    if (normalizedToken && boundToken && boundToken !== normalizedToken && !allowsAdminTransfer) {
+    if (
+      normalizedToken &&
+      boundToken &&
+      boundToken !== normalizedToken &&
+      normalizedToken !== normalizedUserId &&
+      !allowsAdminTransfer
+    ) {
       throw new Error(APPLE_BINDING_CONFLICT_ERROR);
     }
+
+    const nextAppAccountToken =
+      normalizedToken && normalizedToken === normalizedUserId
+        ? normalizedToken
+        : boundToken ?? normalizedToken;
 
     const { data, error } = await supabase
       .from("apple_transaction_bindings")
@@ -316,7 +373,7 @@ export async function ensureAppleTransactionBinding(
           ...(existing.metadata ?? {}),
           ...(payload.metadata ?? {}),
         },
-        app_account_token: boundToken ?? normalizedToken,
+        app_account_token: nextAppAccountToken,
         last_verified_at: new Date().toISOString(),
       })
       .eq("original_transaction_id", originalTransactionId)
@@ -353,8 +410,14 @@ export async function ensureAppleTransactionBinding(
     .single();
 
   if (error) {
-    const concurrentBinding = await fetchAppleTransactionBinding(supabase, originalTransactionId);
-    if (concurrentBinding && normalizeUserId(concurrentBinding.bound_user_id) === normalizedUserId) {
+    const concurrentBinding = await fetchAppleTransactionBinding(
+      supabase,
+      originalTransactionId,
+    );
+    if (
+      concurrentBinding &&
+      normalizeUserId(concurrentBinding.bound_user_id) === normalizedUserId
+    ) {
       return concurrentBinding;
     }
     throw new Error(APPLE_BINDING_CONFLICT_ERROR);
@@ -379,24 +442,39 @@ export async function upsertSubscription(
     productId: payload.productId,
     environment: payload.environment,
     appAccountToken: payload.appAccountToken,
-    allowCreateWithoutAppAccountToken: payload.allowCreateWithoutAppAccountToken,
+    allowCreateWithoutAppAccountToken:
+      payload.allowCreateWithoutAppAccountToken,
     metadata: {
       source: payload.source,
     },
   });
 
-  const status = buildSubscriptionStatus(payload.expiresAt, payload.cancellationDate);
+  const status = buildSubscriptionStatus(
+    payload.expiresAt,
+    payload.cancellationDate,
+  );
   const now = new Date().toISOString();
   const amountCents = getPriceCents(payload.plan, {
     offerIdentifier: payload.offerIdentifier,
     offerType: payload.offerType,
   });
+  const paymentMetadata = {
+    billing_provider: "storekit2",
+    billing_source_of_truth: "storekit2_transaction",
+    purchase_amount_cents: amountCents,
+    product_id: payload.productId,
+    offer_identifier: payload.offerIdentifier ?? null,
+    offer_type: payload.offerType ?? null,
+    original_transaction_id: originalTransactionId,
+    environment: payload.environment ?? "unknown",
+  };
   const isActive = payload.expiresAt > new Date() &&
-    (status === "active" || status === "trialing" || status === "past_due" || status === "cancelled");
+    (status === "active" || status === "trialing" || status === "past_due" ||
+      status === "cancelled");
 
   const { data: existingPayment } = await supabase
     .from("payment_history")
-    .select("id")
+    .select("id, metadata")
     .eq("stripe_payment_intent_id", payload.transactionId)
     .maybeSingle();
 
@@ -411,7 +489,9 @@ export async function upsertSubscription(
         status,
         current_period_start: payload.purchaseDate.toISOString(),
         current_period_end: payload.expiresAt.toISOString(),
-        cancel_at: payload.cancellationDate ? payload.expiresAt.toISOString() : null,
+        cancel_at: payload.cancellationDate
+          ? payload.expiresAt.toISOString()
+          : null,
         cancelled_at: payload.cancellationDate?.toISOString() ?? null,
         updated_at: now,
         environment: payload.environment ?? null,
@@ -432,51 +512,54 @@ export async function upsertSubscription(
     is_active: isActive,
     started_at: payload.purchaseDate.toISOString(),
     ends_at: payload.expiresAt.toISOString(),
-    trial_started_at: status === "trialing" ? payload.purchaseDate.toISOString() : null,
-    trial_ends_at: status === "trialing" ? payload.expiresAt.toISOString() : null,
+    trial_started_at: status === "trialing"
+      ? payload.purchaseDate.toISOString()
+      : null,
+    trial_ends_at: status === "trialing"
+      ? payload.expiresAt.toISOString()
+      : null,
     billing_customer_id: originalTransactionId,
     billing_subscription_id: originalTransactionId,
-      metadata: {
-        billing_provider: "storekit2",
-        billing_source_of_truth: "storekit2_transaction",
-        purchase_amount_cents: amountCents,
-        product_id: payload.productId,
-        offer_identifier: payload.offerIdentifier ?? null,
-        offer_type: payload.offerType ?? null,
-        original_transaction_id: originalTransactionId,
-        environment: payload.environment ?? "unknown",
-        source: payload.source,
+    metadata: {
+      ...paymentMetadata,
+      source: payload.source,
     },
   });
 
-  if (!existingPayment) {
+  if (existingPayment) {
+    await supabase.from("payment_history").update({
+      user_id: payload.userId,
+      subscription_id: subscription?.id,
+      apple_original_transaction_id: originalTransactionId,
+      metadata: {
+        ...metadataRecord(existingPayment.metadata),
+        ...paymentMetadata,
+      },
+      updated_at: now,
+    }).eq("id", existingPayment.id);
+  } else {
     await supabase.from("payment_history").insert({
       user_id: payload.userId,
       subscription_id: subscription?.id,
       stripe_payment_intent_id: payload.transactionId,
       stripe_invoice_id: payload.transactionId,
+      apple_original_transaction_id: originalTransactionId,
       amount: amountCents,
       currency: "usd",
       status: status === "active" ? "succeeded" : "pending",
       created_at: payload.purchaseDate.toISOString(),
       updated_at: now,
-      metadata: {
-        billing_provider: "storekit2",
-        billing_source_of_truth: "storekit2_transaction",
-        purchase_amount_cents: amountCents,
-        product_id: payload.productId,
-        offer_identifier: payload.offerIdentifier ?? null,
-        offer_type: payload.offerType ?? null,
-        original_transaction_id: originalTransactionId,
-        environment: payload.environment ?? "unknown",
-      },
+      metadata: paymentMetadata,
     });
   }
 
   return subscription;
 }
 
-export async function fetchSubscriptionForUser(supabase: SupabaseClient, userId: string) {
+export async function fetchSubscriptionForUser(
+  supabase: SupabaseClient,
+  userId: string,
+) {
   const { data, error } = await supabase
     .from("subscriptions")
     .select("*")
@@ -487,7 +570,10 @@ export async function fetchSubscriptionForUser(supabase: SupabaseClient, userId:
   return data;
 }
 
-export async function fetchActivePromoAccessForUser(supabase: SupabaseClient, userId: string) {
+export async function fetchActivePromoAccessForUser(
+  supabase: SupabaseClient,
+  userId: string,
+) {
   const { data, error } = await supabase
     .from("promo_code_redemptions")
     .select("granted_until")
@@ -510,7 +596,9 @@ export function buildSubscriptionResponse(subscription: any) {
       subscribed: false,
     };
   }
-  const expiresAt = subscription.current_period_end ? new Date(subscription.current_period_end) : null;
+  const expiresAt = subscription.current_period_end
+    ? new Date(subscription.current_period_end)
+    : null;
   const isActive = !!(
     expiresAt &&
     expiresAt > new Date() &&
@@ -532,7 +620,9 @@ export function buildSubscriptionResponse(subscription: any) {
 }
 
 export function buildPromoSubscriptionResponse(grantedUntil: string | Date) {
-  const expiresAt = grantedUntil instanceof Date ? grantedUntil.toISOString() : grantedUntil;
+  const expiresAt = grantedUntil instanceof Date
+    ? grantedUntil.toISOString()
+    : grantedUntil;
 
   return {
     has_access: true,
@@ -546,7 +636,11 @@ export function buildPromoSubscriptionResponse(grantedUntil: string | Date) {
   };
 }
 
-export function buildErrorResponse(req: Request, message: string, status = 400) {
+export function buildErrorResponse(
+  req: Request,
+  message: string,
+  status = 400,
+) {
   return new Response(JSON.stringify({ error: message }), {
     status,
     headers: {

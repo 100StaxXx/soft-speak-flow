@@ -2215,6 +2215,7 @@ describe("Journeys row drag integration", () => {
       staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
     });
+    const centerKeyBeforeResetRequest = Number(screen.getByTestId("center-request-key").textContent);
 
     act(() => {
       window.dispatchEvent(new Event(JOURNEYS_RESET_TO_TODAY_EVENT));
@@ -2224,6 +2225,8 @@ describe("Journeys row drag integration", () => {
       const refreshedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       expect(refreshedDateIso).not.toBe(staleSelectedDateIso);
       expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
+      expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeResetRequest);
+      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
     });
   });
 

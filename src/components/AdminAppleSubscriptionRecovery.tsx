@@ -54,6 +54,8 @@ export function AdminAppleSubscriptionRecovery() {
   const [targetUserId, setTargetUserId] = useState("");
   const [reason, setReason] = useState("");
   const [lookupResult, setLookupResult] = useState<LookupResult | null>(null);
+  const [lookedUpOriginalTransactionId, setLookedUpOriginalTransactionId] = useState("");
+  const [lookedUpTargetUserId, setLookedUpTargetUserId] = useState("");
   const [isLookingUp, setIsLookingUp] = useState(false);
   const [isReassigning, setIsReassigning] = useState(false);
 
@@ -76,6 +78,8 @@ export function AdminAppleSubscriptionRecovery() {
 
       if (error) throw error;
       setLookupResult(data as LookupResult);
+      setLookedUpOriginalTransactionId(normalizedOriginalTransactionId);
+      setLookedUpTargetUserId(targetUserId.trim());
       if (!data?.binding) {
         toast.warning("No binding found for that transaction");
       }
@@ -99,6 +103,15 @@ export function AdminAppleSubscriptionRecovery() {
 
     if (normalizedReason.length < 8) {
       toast.error("Add a short support reason before reassigning");
+      return;
+    }
+
+    if (
+      !binding ||
+      normalizedOriginalTransactionId !== lookedUpOriginalTransactionId ||
+      normalizedTargetUserId !== lookedUpTargetUserId
+    ) {
+      toast.error("Lookup the current transaction and target user before reassigning");
       return;
     }
 
@@ -132,6 +145,11 @@ export function AdminAppleSubscriptionRecovery() {
 
   const binding = lookupResult?.binding;
   const subscription = lookupResult?.subscription;
+  const lookupMatchesInputs = Boolean(
+    binding &&
+      originalTransactionId.trim() === lookedUpOriginalTransactionId &&
+      targetUserId.trim() === lookedUpTargetUserId,
+  );
 
   return (
     <Card className="mb-8 rounded-3xl shadow-soft">
@@ -213,6 +231,12 @@ export function AdminAppleSubscriptionRecovery() {
           </div>
         )}
 
+        {binding && !lookupMatchesInputs && (
+          <p className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900">
+            The transaction or target user has changed since lookup. Run lookup again before reassigning.
+          </p>
+        )}
+
         <div className="space-y-2">
           <Label htmlFor="apple-transfer-reason">Support reason</Label>
           <Textarea
@@ -226,7 +250,7 @@ export function AdminAppleSubscriptionRecovery() {
 
         <Button
           onClick={reassignBinding}
-          disabled={isReassigning || !binding}
+          disabled={isReassigning || !lookupMatchesInputs}
           className="w-full md:w-auto"
         >
           {isReassigning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

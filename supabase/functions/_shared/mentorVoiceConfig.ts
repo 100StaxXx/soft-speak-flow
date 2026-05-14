@@ -36,7 +36,7 @@ export const ELEVENLABS_MENTOR_VOICES: Record<
     use_speaker_boost: true,
   },
   icon: {
-    voiceId: "GaCzJ7BKVn8XQp1mZYIn",
+    voiceId: "6p0P6gezgvY1v6xbLzmU",
     stability: 0.7,
     similarity_boost: 0.84,
     style_exaggeration: 0.64,

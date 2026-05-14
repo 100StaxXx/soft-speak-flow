@@ -23,6 +23,7 @@ import {
   readCompanionThreadReceiptProposalId,
   setCompanionChatThreadArchived,
 } from "@/services/companionChatThreads";
+import { hasActiveSupabaseFunctionSession } from "@/services/supabaseFunctionSession";
 import {
   type CompanionSpeechProvider,
   speakCompanionReply,
@@ -875,7 +876,7 @@ export function useCompanionAssistant({
   onLaunchIntentConsumed,
   onOpenCampaignBuilder,
 }: UseCompanionAssistantOptions) {
-  const { user } = useAuth();
+  const { user, refreshSession } = useAuth();
   const { companion } = useCompanion();
   const { greeting, voiceStyle } = useCompanionDialogue();
   const { trackInteraction } = useAIInteractionTracker();
@@ -923,6 +924,7 @@ export function useCompanionAssistant({
   const [interimText, setInterimText] = useState("");
   const [isOpeningThread, setIsOpeningThread] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [authSessionUnavailable, setAuthSessionUnavailable] = useState(false);
   const [isResolvingAction, setIsResolvingAction] = useState(false);
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
@@ -949,6 +951,7 @@ export function useCompanionAssistant({
   const pendingQuestCaptureSelectedDateRef = useRef<string | null>(null);
   const pendingLegacyFallbackReplayRef =
     useRef<PendingLegacyFallbackReplay | null>(null);
+  const submitInFlightRef = useRef(false);
   const [legacyFallbackReplayKey, setLegacyFallbackReplayKey] = useState(0);
 
   const scopeKey = `${surface}:${user?.id ?? "anon"}:${
@@ -970,6 +973,20 @@ export function useCompanionAssistant({
       : surface === "journeys"
         ? `Talk to ${companionLabel}`
         : `Talk to ${companionLabel} naturally.`;
+  const ensureFunctionSession = useCallback(async () => {
+    const hasSession = await hasActiveSupabaseFunctionSession(refreshSession);
+
+    if (!hasSession) {
+      setAuthSessionUnavailable(true);
+      toast.error(
+        "Your session has expired. Please sign in again and try to talk with your companion.",
+      );
+      return false;
+    }
+
+    setAuthSessionUnavailable(false);
+    return true;
+  }, [refreshSession]);
 
   const threadsQuery = useQuery({
     queryKey: getCompanionChatThreadsQueryKey(user?.id, companion?.id, surface),

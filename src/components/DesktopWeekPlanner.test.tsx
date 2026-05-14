@@ -108,6 +108,66 @@ describe("DesktopWeekPlanner", () => {
     expect(onPlannerModeChange).toHaveBeenCalledWith("day");
   }, 15000);
 
+  it("centers the requested day column when the desktop center request changes", async () => {
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    const scrollIntoViewSpy = vi.fn(function (this: HTMLElement) {
+      return this;
+    });
+
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoViewSpy,
+    });
+
+    try {
+      const { rerender } = render(
+        <DesktopWeekPlanner
+          selectedDate={selectedDate}
+          tasks={[]}
+          plannerMode="week"
+          centerDateRequestKey={0}
+          centerDateRequestDateKey="2026-04-01"
+          onDateSelect={vi.fn()}
+          onToggle={vi.fn()}
+          onAddQuest={vi.fn()}
+        />,
+      );
+
+      expect(scrollIntoViewSpy).not.toHaveBeenCalled();
+
+      rerender(
+        <DesktopWeekPlanner
+          selectedDate={selectedDate}
+          tasks={[]}
+          plannerMode="week"
+          centerDateRequestKey={1}
+          centerDateRequestDateKey="2026-04-01"
+          onDateSelect={vi.fn()}
+          onToggle={vi.fn()}
+          onAddQuest={vi.fn()}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(scrollIntoViewSpy).toHaveBeenCalledWith({
+          behavior: "auto",
+          block: "nearest",
+          inline: "center",
+        });
+      });
+      expect(scrollIntoViewSpy.mock.contexts.at(-1)?.getAttribute("data-testid")).toBe("desktop-week-day-2026-04-01");
+    } finally {
+      if (originalScrollIntoView) {
+        Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+          configurable: true,
+          value: originalScrollIntoView,
+        });
+      } else {
+        delete (HTMLElement.prototype as HTMLElement & { scrollIntoView?: unknown }).scrollIntoView;
+      }
+    }
+  });
+
   it("routes the desktop quick capture controls through the add and voice callbacks", () => {
     const onAddQuest = vi.fn();
     const onVoiceAddQuest = vi.fn();

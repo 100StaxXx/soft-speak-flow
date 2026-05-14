@@ -216,7 +216,7 @@ describe("Auth social auth intent guard", () => {
     renderAuth("/auth?mode=signup");
     await flushMicrotasks();
 
-    expect(screen.getByLabelText(/confirm password/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^confirm password$/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^get started$/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /already have an account\? sign in/i })).toBeInTheDocument();
   });

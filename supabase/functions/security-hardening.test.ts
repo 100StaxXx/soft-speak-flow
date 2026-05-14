@@ -152,7 +152,7 @@ const mentorAudioModule = await import("./generate-mentor-audio/index.ts");
 const EXPECTED_MENTOR_VOICE_IDS = [
   ["sage", "sage", "mcuuWJIofmzgKEGk3EMA"],
   ["lyra", "lyra", "54YYBuRuAG6KJooiOhFI"],
-  ["icon", "icon", "GaCzJ7BKVn8XQp1mZYIn"],
+  ["icon", "icon", "6p0P6gezgvY1v6xbLzmU"],
   ["charles", "charles", "jRAAK67SEFE9m7ci5DhD"],
   ["princess", "princess", "uIZsnBL0YK1S5j69bAih"],
   ["operator", "operator", "pNInz6obpgDQGcFmaJgB"],
@@ -162,7 +162,7 @@ const EXPECTED_MENTOR_VOICE_IDS = [
 
 const EXPECTED_ALIAS_VOICE_IDS = [
   ["atlas", "sage", "mcuuWJIofmzgKEGk3EMA"],
-  ["carmen", "icon", "GaCzJ7BKVn8XQp1mZYIn"],
+  ["carmen", "icon", "6p0P6gezgvY1v6xbLzmU"],
   ["solace", "charles", "jRAAK67SEFE9m7ci5DhD"],
   ["elizabeth", "charles", "jRAAK67SEFE9m7ci5DhD"],
   ["sienna", "princess", "uIZsnBL0YK1S5j69bAih"],

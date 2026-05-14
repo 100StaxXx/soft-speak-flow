@@ -353,8 +353,10 @@ const Journeys = () => {
   const previousIsJourneysRouteActiveRef = useRef(false);
   const previousJourneysLocationSignatureRef = useRef<string | null>(null);
   const pendingSelectedDateResetRef = useRef(false);
+  const pendingCurrentDateCenterRequestRef = useRef(false);
   const hasUserDateInteractionRef = useRef(false);
   const previousEffectiveTodayDateKeyRef = useRef<string | null>(null);
+  const selectedDateRef = useRef(selectedDate);
   const showAddSheetRef = useRef(showAddSheet);
   const showPathfinderRef = useRef(showPathfinder);
   const scheduledTimeUpdateQueueRef = useRef<Map<string, Promise<void>>>(new Map());
@@ -616,6 +618,17 @@ const Journeys = () => {
     showPathfinderRef.current = showPathfinder;
   }, [showPathfinder]);
 
+  useLayoutEffect(() => {
+    selectedDateRef.current = selectedDate;
+  }, [selectedDate]);
+
+  const requestCurrentDateCentering = useCallback(() => {
+    pendingCurrentDateCenterRequestRef.current = false;
+    setDatePillCenterRequestDateKey(effectiveTodayDateKey);
+    setDatePillCenterRequestKey((currentKey) => currentKey + 1);
+    setAgendaCenterNowRequestKey((currentKey) => currentKey + 1);
+  }, [effectiveTodayDateKey]);
+
   const resetSelectedDateToToday = useCallback((options?: { deferIfAddSheetOpen?: boolean }) => {
     if (showAddSheetRef.current || showPathfinderRef.current) {
       if (options?.deferIfAddSheetOpen) {
@@ -631,10 +644,23 @@ const Journeys = () => {
     pendingSelectedDateResetRef.current = false;
     hasUserDateInteractionRef.current = false;
     setDatePillCenterRequestDateKey(effectiveTodayDateKey);
-    setDatePillCenterRequestKey((currentKey) => currentKey + 1);
-    setAgendaCenterNowRequestKey((currentKey) => currentKey + 1);
+
+    if (isSameDay(selectedDateRef.current, effectiveTodayDate)) {
+      requestCurrentDateCentering();
+    } else {
+      pendingCurrentDateCenterRequestRef.current = true;
+    }
+
     setSelectedDate((current) => (isSameDay(current, effectiveTodayDate) ? current : effectiveTodayDate));
-  }, [effectiveTodayDate, effectiveTodayDateKey]);
+  }, [effectiveTodayDate, effectiveTodayDateKey, requestCurrentDateCentering]);
+
+  useLayoutEffect(() => {
+    if (!pendingCurrentDateCenterRequestRef.current) return;
+    if (!isJourneysRouteActive) return;
+    if (!isSameDay(selectedDate, effectiveTodayDate)) return;
+
+    requestCurrentDateCentering();
+  }, [effectiveTodayDate, isJourneysRouteActive, requestCurrentDateCentering, selectedDate]);
 
   useEffect(() => {
     const previousEffectiveTodayDateKey = previousEffectiveTodayDateKeyRef.current;
@@ -2061,6 +2087,8 @@ const Journeys = () => {
                 plannerMode={desktopPlannerMode}
                 timedTaskDurationFallbackMinutes={macTimedTaskDurationFallbackMinutes}
                 desktopInteractionResetKey={desktopInteractionResetKey}
+                centerDateRequestKey={datePillCenterRequestKey}
+                centerDateRequestDateKey={datePillCenterRequestDateKey}
                 onDateSelect={handleUserDateSelect}
                 onPlannerModeChange={setDesktopPlannerMode}
                 onToggle={handleToggleTask}

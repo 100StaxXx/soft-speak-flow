@@ -51,7 +51,7 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
     mentorSlug: "icon",
     mentorName: "The Icon",
     voiceName: "The Icon",
-    voiceId: "GaCzJ7BKVn8XQp1mZYIn",
+    voiceId: "6p0P6gezgvY1v6xbLzmU",
     defaultIntensity: "medium",
     categories: ["standards", "identity", "boundaries"],
     voiceSettings: {

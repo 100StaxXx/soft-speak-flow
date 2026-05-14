@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { addDays, addWeeks, format, isSameDay, isToday, startOfWeek, subWeeks } from "date-fns";
 import {
   CalendarDays,
@@ -69,6 +69,8 @@ interface DesktopWeekPlannerProps {
   plannerMode?: "week" | "day";
   timedTaskDurationFallbackMinutes?: number;
   desktopInteractionResetKey?: string | number;
+  centerDateRequestKey?: string | number;
+  centerDateRequestDateKey?: string;
   onDateSelect: (date: Date) => void;
   onPlannerModeChange?: (mode: "week" | "day") => void;
   onToggle: (taskId: string, completed: boolean, xpReward: number) => void;
@@ -381,6 +383,8 @@ export function DesktopWeekPlanner({
   plannerMode = "week",
   timedTaskDurationFallbackMinutes = 60,
   desktopInteractionResetKey,
+  centerDateRequestKey,
+  centerDateRequestDateKey,
   onDateSelect,
   onPlannerModeChange,
   onToggle,
@@ -399,6 +403,8 @@ export function DesktopWeekPlanner({
   hasCalendarLink,
   onOpenCampaigns,
 }: DesktopWeekPlannerProps) {
+  const dayHeaderRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const lastCenterDateRequestKeyRef = useRef(centerDateRequestKey);
   const hasCompanionPlannerShortcut = Boolean(onOpenCompanionPlanner);
   const planDayLauncherLabel = isToday(selectedDate) ? "Plan Today" : "Plan Day";
   const openPlanDayThread = useCallback(() => {
@@ -467,6 +473,22 @@ export function DesktopWeekPlanner({
   useEffect(() => {
     setOpenDetailsTaskId(null);
   }, [desktopInteractionResetKey]);
+
+  useLayoutEffect(() => {
+    if (centerDateRequestKey === undefined) return;
+    if (centerDateRequestKey === lastCenterDateRequestKeyRef.current) return;
+
+    lastCenterDateRequestKeyRef.current = centerDateRequestKey;
+    const targetDateKey = centerDateRequestDateKey ?? format(selectedDate, "yyyy-MM-dd");
+    const target = dayHeaderRefs.current[targetDateKey];
+    if (typeof target?.scrollIntoView !== "function") return;
+
+    target.scrollIntoView({
+      behavior: "auto",
+      block: "nearest",
+      inline: "center",
+    });
+  }, [centerDateRequestDateKey, centerDateRequestKey, selectedDate]);
 
   useEffect(() => {
     if (openDetailsTaskId && !tasks.some((task) => task.id === openDetailsTaskId)) {
@@ -800,6 +822,9 @@ export function DesktopWeekPlanner({
                   return (
                     <div
                       key={dateKey}
+                      ref={(node) => {
+                        dayHeaderRefs.current[dateKey] = node;
+                      }}
                       data-testid={`desktop-week-day-${dateKey}`}
                       className={cn(
                         "min-w-0 border-b border-r border-white/8 px-3 py-3 backdrop-blur-xl",

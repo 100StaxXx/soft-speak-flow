@@ -5592,38 +5592,47 @@ export type Database = {
       payment_history: {
         Row: {
           amount: number
+          apple_original_transaction_id: string | null
           created_at: string | null
           currency: string | null
           failure_reason: string | null
           id: string
+          metadata: Json
           status: string
           stripe_invoice_id: string | null
           stripe_payment_intent_id: string | null
           subscription_id: string | null
+          updated_at: string | null
           user_id: string
         }
         Insert: {
           amount: number
+          apple_original_transaction_id?: string | null
           created_at?: string | null
           currency?: string | null
           failure_reason?: string | null
           id?: string
+          metadata?: Json
           status: string
           stripe_invoice_id?: string | null
           stripe_payment_intent_id?: string | null
           subscription_id?: string | null
+          updated_at?: string | null
           user_id: string
         }
         Update: {
           amount?: number
+          apple_original_transaction_id?: string | null
           created_at?: string | null
           currency?: string | null
           failure_reason?: string | null
           id?: string
+          metadata?: Json
           status?: string
           stripe_invoice_id?: string | null
           stripe_payment_intent_id?: string | null
           subscription_id?: string | null
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: [

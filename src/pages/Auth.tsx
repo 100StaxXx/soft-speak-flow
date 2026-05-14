@@ -30,6 +30,7 @@ import {
   type PendingSocialAuthAttempt,
   type SocialAuthIntent,
 } from "@/utils/socialAuth";
+import { Eye, EyeOff } from "lucide-react";
 
 const POST_AUTH_NAVIGATION_TIMEOUT_MS = 5000;
 const POST_AUTH_DEFAULT_PATH = '/onboarding';
@@ -309,6 +310,8 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const [showSignupConfirmPassword, setShowSignupConfirmPassword] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'apple' | null>(null);
@@ -581,6 +584,13 @@ const Auth = () => {
       setIsLogin(false);
     }
   }, [requestedAuthMode]);
+
+  useEffect(() => {
+    if (isLogin || isForgotPassword) {
+      setShowSignupPassword(false);
+      setShowSignupConfirmPassword(false);
+    }
+  }, [isLogin, isForgotPassword]);
 
   useEffect(() => {
     if (initializationComplete.current) return;
@@ -1079,6 +1089,9 @@ const Auth = () => {
   const fieldLabelClassName = "text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-white/[0.5]";
   const fieldInputClassName =
     "h-[3.35rem] rounded-[1.15rem] border border-[#2a1a49] bg-[#12091f] px-5 text-[0.98rem] font-medium text-white shadow-[0_0_0_1px_rgba(255,255,255,0.01),0_10px_28px_rgba(5,2,16,0.45),inset_0_1px_0_rgba(255,255,255,0.03)] placeholder:text-white/[0.34] focus-visible:border-[#4b2c7e] focus-visible:ring-[3px] focus-visible:ring-[#b86dff]/15 focus-visible:ring-offset-0";
+  const passwordToggleButtonClassName =
+    "absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-white/[0.58] transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b86dff]/35";
+  const passwordInputClassName = isLogin ? fieldInputClassName : `${fieldInputClassName} pr-14`;
   const switchMode = () => {
     setInlineError(null);
     if (isForgotPassword) {
@@ -1089,6 +1102,8 @@ const Auth = () => {
 
     setIsLogin(!isLogin);
     setConfirmPassword("");
+    setShowSignupPassword(false);
+    setShowSignupConfirmPassword(false);
   };
 
   return (
@@ -1162,19 +1177,36 @@ const Auth = () => {
                 </div>
                 <div className="space-y-3">
                   <Label htmlFor="password" className={fieldLabelClassName}>Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => {
-                      setInlineError(null);
-                      setPassword(e.target.value);
-                    }}
-                    autoComplete={isLogin ? "current-password" : "new-password"}
-                    required
-                    className={fieldInputClassName}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={!isLogin && showSignupPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => {
+                        setInlineError(null);
+                        setPassword(e.target.value);
+                      }}
+                      autoComplete={isLogin ? "current-password" : "new-password"}
+                      required
+                      className={passwordInputClassName}
+                    />
+                    {!isLogin && (
+                      <button
+                        type="button"
+                        aria-label={showSignupPassword ? "Hide password" : "Show password"}
+                        aria-pressed={showSignupPassword}
+                        onClick={() => setShowSignupPassword((isVisible) => !isVisible)}
+                        className={passwordToggleButtonClassName}
+                      >
+                        {showSignupPassword ? (
+                          <EyeOff aria-hidden="true" className="h-5 w-5" />
+                        ) : (
+                          <Eye aria-hidden="true" className="h-5 w-5" />
+                        )}
+                      </button>
+                    )}
+                  </div>
                   {isLogin && (
                     <button
                       type="button"
@@ -1191,19 +1223,34 @@ const Auth = () => {
                 {!isLogin && (
                   <div className="space-y-3">
                     <Label htmlFor="confirmPassword" className={fieldLabelClassName}>Confirm Password</Label>
-                    <Input
-                      id="confirmPassword"
-                      type="password"
-                      placeholder="••••••••"
-                      value={confirmPassword}
-                      onChange={(e) => {
-                        setInlineError(null);
-                        setConfirmPassword(e.target.value);
-                      }}
-                      autoComplete="new-password"
-                      required
-                      className={fieldInputClassName}
-                    />
+                    <div className="relative">
+                      <Input
+                        id="confirmPassword"
+                        type={showSignupConfirmPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        value={confirmPassword}
+                        onChange={(e) => {
+                          setInlineError(null);
+                          setConfirmPassword(e.target.value);
+                        }}
+                        autoComplete="new-password"
+                        required
+                        className={`${fieldInputClassName} pr-14`}
+                      />
+                      <button
+                        type="button"
+                        aria-label={showSignupConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                        aria-pressed={showSignupConfirmPassword}
+                        onClick={() => setShowSignupConfirmPassword((isVisible) => !isVisible)}
+                        className={passwordToggleButtonClassName}
+                      >
+                        {showSignupConfirmPassword ? (
+                          <EyeOff aria-hidden="true" className="h-5 w-5" />
+                        ) : (
+                          <Eye aria-hidden="true" className="h-5 w-5" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                 )}
                 <Button
