@@ -2037,6 +2037,7 @@ const Journeys = () => {
               className="mb-4"
             >
               <DatePillsScroller
+                key={`date-pills-scroller-${datePillCenterRequestDateKey}-${datePillCenterRequestKey}`}
                 selectedDate={selectedDate}
                 onDateSelect={handleDatePillClick}
                 onUserDateInteraction={handleUserDateInteraction}

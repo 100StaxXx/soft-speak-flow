@@ -231,83 +231,93 @@ vi.mock("@/components/BottomNav", () => ({
   BottomNav: () => null,
 }));
 
-vi.mock("@/components/DatePillsScroller", () => ({
-  DatePillsScroller: ({
-    selectedDate,
-    onDateSelect,
-    centerRequestKey,
-    centerRequestDateKey,
-    onUserDateInteraction,
-  }: {
-    selectedDate: Date;
-    onDateSelect: (date: Date) => void;
-    centerRequestKey?: number;
-    centerRequestDateKey?: string;
-    onUserDateInteraction?: () => void;
-  }) => {
-    mocks.lastDatePillSelectedDate = selectedDate;
-    mocks.lastDatePillCenterRequestKey = centerRequestKey ?? 0;
-    mocks.lastDatePillCenterRequestDateKey = centerRequestDateKey ?? null;
-    return (
-      <div data-testid="date-pills">
-        <span data-testid="selected-date-iso">{selectedDate.toISOString()}</span>
-        <span data-testid="center-request-key">{centerRequestKey ?? 0}</span>
-        <span data-testid="center-request-date-key">{centerRequestDateKey ?? ""}</span>
-        <button
-          type="button"
-          onClick={() => {
-            const nextDate = new Date();
-            const nextHour = nextDate.getHours() === 0 ? 1 : 0;
-            nextDate.setHours(nextHour, 0, 0, 0);
-            onDateSelect(nextDate);
-          }}
-        >
-          set-same-day-non-current
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            const staleDate = new Date();
-            staleDate.setDate(staleDate.getDate() - 3);
-            staleDate.setHours(12, 0, 0, 0);
-            onDateSelect(staleDate);
-          }}
-        >
-          set-stale-day
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            onUserDateInteraction?.();
-            const staleDate = new Date();
-            staleDate.setDate(staleDate.getDate() - 3);
-            staleDate.setHours(12, 0, 0, 0);
-            onDateSelect(staleDate);
-          }}
-        >
-          user-set-stale-day
-        </button>
-        <button
-          type="button"
-          onClick={() => onUserDateInteraction?.()}
-        >
-          user-slide-date-pills
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            const futureDate = new Date();
-            futureDate.setDate(futureDate.getDate() + 3);
-            futureDate.setHours(12, 0, 0, 0);
-            onDateSelect(futureDate);
-          }}
-        >
-          set-future-day
-        </button>
-      </div>
-    );
-  },
-}));
+vi.mock("@/components/DatePillsScroller", async () => {
+  const React = await import("react");
+  let nextMountId = 0;
+
+  return {
+    DatePillsScroller: ({
+      selectedDate,
+      onDateSelect,
+      centerRequestKey,
+      centerRequestDateKey,
+      onUserDateInteraction,
+    }: {
+      selectedDate: Date;
+      onDateSelect: (date: Date) => void;
+      centerRequestKey?: number;
+      centerRequestDateKey?: string;
+      onUserDateInteraction?: () => void;
+    }) => {
+      const [mountId] = React.useState(() => {
+        nextMountId += 1;
+        return nextMountId;
+      });
+      mocks.lastDatePillSelectedDate = selectedDate;
+      mocks.lastDatePillCenterRequestKey = centerRequestKey ?? 0;
+      mocks.lastDatePillCenterRequestDateKey = centerRequestDateKey ?? null;
+      return (
+        <div data-testid="date-pills">
+          <span data-testid="date-pills-mount-id">{mountId}</span>
+          <span data-testid="selected-date-iso">{selectedDate.toISOString()}</span>
+          <span data-testid="center-request-key">{centerRequestKey ?? 0}</span>
+          <span data-testid="center-request-date-key">{centerRequestDateKey ?? ""}</span>
+          <button
+            type="button"
+            onClick={() => {
+              const nextDate = new Date();
+              const nextHour = nextDate.getHours() === 0 ? 1 : 0;
+              nextDate.setHours(nextHour, 0, 0, 0);
+              onDateSelect(nextDate);
+            }}
+          >
+            set-same-day-non-current
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const staleDate = new Date();
+              staleDate.setDate(staleDate.getDate() - 3);
+              staleDate.setHours(12, 0, 0, 0);
+              onDateSelect(staleDate);
+            }}
+          >
+            set-stale-day
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onUserDateInteraction?.();
+              const staleDate = new Date();
+              staleDate.setDate(staleDate.getDate() - 3);
+              staleDate.setHours(12, 0, 0, 0);
+              onDateSelect(staleDate);
+            }}
+          >
+            user-set-stale-day
+          </button>
+          <button
+            type="button"
+            onClick={() => onUserDateInteraction?.()}
+          >
+            user-slide-date-pills
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const futureDate = new Date();
+              futureDate.setDate(futureDate.getDate() + 3);
+              futureDate.setHours(12, 0, 0, 0);
+              onDateSelect(futureDate);
+            }}
+          >
+            set-future-day
+          </button>
+        </div>
+      );
+    },
+  };
+});
 
 vi.mock("@/components/AddQuestSheet", () => ({
   AddQuestSheet: (props: {
@@ -2216,6 +2226,7 @@ describe("Journeys row drag integration", () => {
       expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
     });
     const centerKeyBeforeResetRequest = Number(screen.getByTestId("center-request-key").textContent);
+    const scrollerMountIdBeforeResetRequest = screen.getByTestId("date-pills-mount-id").textContent;
 
     act(() => {
       window.dispatchEvent(new Event(JOURNEYS_RESET_TO_TODAY_EVENT));
@@ -2227,6 +2238,7 @@ describe("Journeys row drag integration", () => {
       expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
       expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeResetRequest);
       expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
+      expect(screen.getByTestId("date-pills-mount-id").textContent).not.toBe(scrollerMountIdBeforeResetRequest);
     });
   });
 
