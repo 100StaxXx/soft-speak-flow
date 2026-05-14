@@ -495,10 +495,13 @@ export const CompanionDisplay = memo(({
   const usesEggPortraitShell = isCompanionEggImageSource(effectiveImageUrl);
   const usesSceneEggPortraitShell =
     getCompanionEggImageAssetKey(effectiveImageUrl)?.startsWith("companion-eggs/v2/") ?? false;
-  const portraitImageFit = usesPresetPortraitShell
-    || (usesEggPortraitShell && !usesSceneEggPortraitShell)
-    ? "portrait"
-    : "cover";
+  const usesGeneratedSceneShell =
+    isAiGeneratedCompanion(displayCompanion) && !usesPresetPortraitShell && !usesEggPortraitShell;
+  const portraitImageFit = usesGeneratedSceneShell
+    ? "contain"
+    : (usesPresetPortraitShell || (usesEggPortraitShell && !usesSceneEggPortraitShell))
+      ? "portrait"
+      : "cover";
   const portraitSceneContentClassName = cn(
     "flex items-center justify-center",
     usesEggPortraitShell && !usesSceneEggPortraitShell && "p-2.5 sm:p-3",
@@ -953,6 +956,7 @@ export const CompanionDisplay = memo(({
                       className={cn(
                         "relative h-full w-full overflow-hidden rounded-2xl ring-4 shadow-2xl transition-all duration-500 group-hover:scale-105",
                         imageLoaded ? "opacity-100" : "opacity-0 absolute inset-0",
+                        usesGeneratedSceneShell && "bg-black",
                         health.isNeglected ? "ring-destructive/50" : "ring-primary/30",
                         activePortraitAnimationClass,
                       )}

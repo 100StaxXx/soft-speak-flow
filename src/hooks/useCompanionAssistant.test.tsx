@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { COMPANION_CHAT_OPENING_LINES } from "@/shared/companionChatOpeners";
 import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
 
 const PERSONALIZED_QUEST_CAPTURE_OPENING =
@@ -1000,13 +1001,13 @@ describe("useCompanionAssistant", () => {
     );
 
     await waitFor(() => {
-      expect(result.current.messages[0]?.content).toBe(
-        "I'm here. What's the move?",
+      expect(COMPANION_CHAT_OPENING_LINES).toContain(
+        result.current.messages[0]?.content,
       );
     });
 
-    expect(result.current.messages[0]?.content).toBe(
-      "I'm here. What's the move?",
+    expect(COMPANION_CHAT_OPENING_LINES).toContain(
+      result.current.messages[0]?.content,
     );
     expect(mocks.toastError).not.toHaveBeenCalled();
     expect(result.current.canSubmitMessage).toBe(true);

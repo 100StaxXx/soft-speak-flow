@@ -1,0 +1,91 @@
+export const COMPANION_CHAT_OPENING_LINES = [
+  "what's gucci fam",
+  "yo what's good",
+  "what's the word",
+  "what's the vibe",
+  "how we livin",
+  "sup fam",
+  "yo, how's it going",
+  "what's crackin",
+  "what's happening",
+  "how's life treating you",
+  "what's new with you",
+  "yo yo",
+  "how are we doing",
+  "what's the motion",
+  "what's poppin",
+  "how's your day going",
+  "what's been going on",
+  "hey hey",
+  "how we feeling",
+  "what's good",
+  "what are we on",
+  "what's the move",
+  "yo, talk to me",
+  "how's everything been",
+  "what's the energy like",
+  "sup, what's going on",
+  "what's up gang",
+  "welcome back fam",
+  "what's the play",
+  "yo stranger",
+  "how's the universe treating you",
+  "what we getting into",
+  "what's the latest",
+  "yo, how've you been",
+  "how's everything on your side",
+  "what's the deal",
+  "we vibin today or what",
+  "what's the vibe",
+  "how are we feeling",
+  "what's the energy looking like",
+  "we chillin today or locked in",
+  "what kind of day is it",
+  "what's the mood rn",
+  "how's the atmosphere over there",
+  "what's today feeling like",
+  "what type of timing are we on",
+  "what's the vibe",
+  "what's the move",
+  "what kind of vibes are we bringing",
+  "you feeling productive or just existing",
+  "what's the current mood",
+  "what's the tempo",
+  "how we coming",
+  "what's the vibe",
+  "what's the energy level",
+  "what kind of mindset are we on",
+  "what's the emotional weather looking like",
+  "we taking it easy or nah",
+  "what's the wave",
+  "how's your headspace",
+  "what's today's soundtrack looking like",
+  "what are the vibes saying",
+  "how's the universe treating you",
+  "what kind of energy are we working with",
+  "you in a calm mood or a go mode mood",
+  "what's the atmosphere",
+  "how's your social battery looking",
+  "what's the frequency",
+  "you feeling focused or just vibing",
+  "what's the state of the union",
+  "How are you feeling",
+  "how's the weather",
+  "what's the overall vibe rn",
+] as const;
+
+export type CompanionChatOpeningLine =
+  (typeof COMPANION_CHAT_OPENING_LINES)[number];
+
+export const getRandomCompanionChatOpeningLine = (
+  random: () => number = Math.random,
+): CompanionChatOpeningLine => {
+  const rawValue = random();
+  const clampedValue = Number.isFinite(rawValue)
+    ? Math.max(0, Math.min(rawValue, 0.999999999999))
+    : 0;
+  const index = Math.floor(clampedValue * COMPANION_CHAT_OPENING_LINES.length);
+
+  return COMPANION_CHAT_OPENING_LINES[index] ??
+    COMPANION_CHAT_OPENING_LINES[0];
+};

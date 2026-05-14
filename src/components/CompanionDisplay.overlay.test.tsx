@@ -432,7 +432,7 @@ describe("CompanionDisplay overlay stack", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders the current companion page image instead of launcher-only FAB art", async () => {
+  it("renders generated companion page art with the same contained media framing as evolution replays", async () => {
     mocks.isDormant = false;
     mocks.isRegenerating = false;
     mocks.companion = {
@@ -457,14 +457,14 @@ describe("CompanionDisplay overlay stack", () => {
     expect(image).not.toHaveAttribute("src", "https://assets.example.com/launcher-cutout-source.png");
     const imageFrame = screen.getByTestId("companion-primary-image-frame");
     expect(imageFrame.style.backgroundImage).toBe("");
-    expect(image).toHaveAttribute("data-companion-image-fit", "cover");
-    Object.defineProperty(image, "naturalWidth", { configurable: true, value: 1536 });
-    Object.defineProperty(image, "naturalHeight", { configurable: true, value: 1024 });
+    expect(imageFrame).toHaveClass("bg-black");
+    expect(image).toHaveAttribute("data-companion-image-fit", "contain");
+    expect(image).toHaveClass("object-contain");
 
     fireEvent.load(image);
 
     await waitFor(() => {
-      expect(image).toHaveStyle({ objectPosition: "0% 50%" });
+      expect(image).toHaveStyle({ objectPosition: "center center" });
     });
     expect(image.style.transform).toBe("");
   });

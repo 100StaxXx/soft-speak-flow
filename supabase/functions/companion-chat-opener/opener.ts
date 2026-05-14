@@ -10,12 +10,12 @@ import {
 } from "../companion-agent/agent.ts";
 import type { LoadedCompanionAgentContext } from "../companion-agent/types.ts";
 import { buildSystemPrompt } from "../companion-planner-chat/orchestrator.ts";
+import { getRandomCompanionChatOpeningLine } from "../../../src/shared/companionChatOpeners.ts";
 
 type GuardedFetch = typeof fetch;
 
 const OPENAI_CONVERSATIONS_URL = "https://api.openai.com/v1/conversations";
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
-const FALLBACK_OPENER = "I'm here. What's the move?";
 const MAX_OPENER_WORDS = 45;
 const MAX_FACTS_PER_SIGNAL = 4;
 const UNSAFE_OPENER_TONE_PATTERN =
@@ -399,12 +399,15 @@ export function hasUnsafeCompanionOpenerTone(value: string): boolean {
 
 export function normalizeCompanionOpenerReply(
   value: string | null | undefined,
+  options: { fallbackReply?: string } = {},
 ): string {
   const raw = (value ?? "").trim();
+  const fallbackReply = options.fallbackReply?.trim() ||
+    getRandomCompanionChatOpeningLine();
   const parsedPlannerReply = parsePlannerStyleReply(raw);
   const stripped = (parsedPlannerReply ?? raw)
     .replace(/```[\s\S]*?```/g, " ")
-    .replace(/[*_#>`\[\]]/g, "")
+    .replace(/[*_#>`[\]]/g, "")
     .replace(/\s+/g, " ")
     .trim()
     .replace(/^["']|["']$/g, "")
@@ -412,7 +415,7 @@ export function normalizeCompanionOpenerReply(
 
   const source = stripped && !hasUnsafeCompanionOpenerTone(stripped)
     ? stripped
-    : FALLBACK_OPENER;
+    : fallbackReply;
   const words = source.split(/\s+/);
   return words.length <= MAX_OPENER_WORDS
     ? source
@@ -493,8 +496,11 @@ export const buildCompanionOpenerUserPrompt = (
 
 export function buildFallbackCompanionOpener(
   snapshot: CompanionOpenerSnapshot,
+  options: { openingLine?: string } = {},
 ): GeneratedCompanionOpener {
   const firstFact = snapshot.primarySignal.facts[0] ?? null;
+  const openingLine = options.openingLine?.trim() ||
+    getRandomCompanionChatOpeningLine();
   const reply = normalizeCompanionOpenerReply(
     snapshot.primarySignal.type === "missed_task"
       ? `Looks like ${
@@ -510,7 +516,8 @@ export function buildFallbackCompanionOpener(
       } has real momentum. Want to protect it with one simple next move?`
       : snapshot.primarySignal.type === "campaign_drift"
       ? "This campaign could use a clean little push. Want to choose the next move before it gets fuzzy?"
-      : FALLBACK_OPENER,
+      : openingLine,
+    { fallbackReply: openingLine },
   );
 
   return {

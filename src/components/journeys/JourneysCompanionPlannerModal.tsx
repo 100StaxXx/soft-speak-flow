@@ -149,8 +149,10 @@ const getPlannerBriefingMetrics = (
 
 const PlannerBriefingContextPanel = memo(function PlannerBriefingContextPanel({
   briefing,
+  companionLabel,
 }: {
   briefing: PlannerBriefingContext;
+  companionLabel: string;
 }) {
   const snapshot = asRecord(briefing.dataSnapshot);
   const metrics = getPlannerBriefingMetrics(snapshot);
@@ -196,9 +198,12 @@ const PlannerBriefingContextPanel = memo(function PlannerBriefingContextPanel({
           </div>
         ) : null}
         {insightStatement ? (
-          <p className="mt-3 text-xs leading-5 text-muted-foreground">
-            {insightStatement}
-          </p>
+          <figure className="mt-3 border-l-2 border-[hsl(var(--celestial-blue)_/_0.45)] pl-3 text-xs leading-5 text-muted-foreground">
+            <blockquote>&quot;{insightStatement}&quot;</blockquote>
+            <figcaption className="mt-1 text-[11px] font-medium text-muted-foreground/80">
+              - {companionLabel}
+            </figcaption>
+          </figure>
         ) : null}
       </div>
     </div>
@@ -1138,6 +1143,9 @@ const JourneysCompanionOverlayBody = memo(
     const lastAutoScrolledThreadSessionIdRef = useRef<
       string | null | undefined
     >(undefined);
+    const lastSeenComingUpResponseRef = useRef<
+      CompanionStructuredResponse["comingUp"] | null | undefined
+    >(undefined);
     const activeThreadSessionId = assistant.activeThread?.sessionId ?? null;
     const displayMessages = useMemo(() => {
       const structuredResponseBubbleMessageId =
@@ -1252,6 +1260,17 @@ const JourneysCompanionOverlayBody = memo(
     useEffect(() => {
       const activeThreadChanged =
         lastAutoScrolledThreadSessionIdRef.current !== activeThreadSessionId;
+      const comingUpResponse = assistant.structuredResponse?.comingUp ?? null;
+      const comingUpResponseChanged =
+        Boolean(comingUpResponse) &&
+        lastSeenComingUpResponseRef.current !== comingUpResponse;
+      lastSeenComingUpResponseRef.current = comingUpResponse;
+
+      if (comingUpResponseChanged) {
+        lastAutoScrolledThreadSessionIdRef.current = activeThreadSessionId;
+        transcriptPinnedToBottomRef.current = false;
+        return;
+      }
 
       if (activeThreadChanged) {
         lastAutoScrolledThreadSessionIdRef.current = activeThreadSessionId;
@@ -1683,7 +1702,10 @@ const JourneysCompanionOverlayBody = memo(
                 data-testid="journeys-companion-planner-transcript"
               >
                 {plannerBriefing ? (
-                  <PlannerBriefingContextPanel briefing={plannerBriefing} />
+                  <PlannerBriefingContextPanel
+                    briefing={plannerBriefing}
+                    companionLabel={companionLabel}
+                  />
                 ) : null}
 
                 {displayMessages.map((entry) => (

@@ -4,6 +4,7 @@ import {
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import type { LoadedCompanionAgentContext } from "../companion-agent/types.ts";
 import type { UserCompanionRow } from "../companion-agent/agent.ts";
+import { COMPANION_CHAT_OPENING_LINES } from "../../../src/shared/companionChatOpeners.ts";
 import {
   buildCompanionOpenerInstructions,
   buildCompanionOpenerSnapshot,
@@ -214,10 +215,11 @@ Deno.test("normalizeCompanionOpenerReply accepts planner-style JSON replies", ()
 Deno.test("normalizeCompanionOpenerReply rejects hostile opener phrasing", () => {
   const reply = normalizeCompanionOpenerReply(
     "Reality check one clean action would shut down half this amateur nonsense immediately.",
+    { fallbackReply: "what's the move" },
   );
 
   assertEquals(hasUnsafeCompanionOpenerTone(reply), false);
-  assertEquals(reply, "I'm here. What's the move?");
+  assertEquals(reply, "what's the move");
 });
 
 Deno.test("buildCompanionOpenerUserPrompt shapes opener context for the planner prompt", () => {
@@ -269,13 +271,35 @@ Deno.test("buildFallbackCompanionOpener keeps fresh-thread opens server-side whe
     }),
   });
 
-  const opener = buildFallbackCompanionOpener(snapshot);
+  const opener = buildFallbackCompanionOpener(snapshot, {
+    openingLine: "what's the word",
+  });
 
   assertEquals(opener.signal.type, "busy_day");
   assertEquals(opener.openaiConversationId, null);
   assertEquals(opener.lastOpenAIResponseId, null);
   assert(opener.reply.length > 0);
   assert(opener.reply.split(/\s+/).length <= 45);
+});
+
+Deno.test("buildFallbackCompanionOpener chooses open-context replies from the casual bucket", () => {
+  const snapshot = buildCompanionOpenerSnapshot({
+    companion,
+    currentDateTime: "2026-05-10T09:55:00-07:00",
+    context: createContext(),
+  });
+
+  const opener = buildFallbackCompanionOpener(snapshot, {
+    openingLine: "what's the word",
+  });
+
+  assertEquals(opener.signal.type, "open_context");
+  assertEquals(opener.reply, "what's the word");
+  assert(
+    COMPANION_CHAT_OPENING_LINES.includes(
+      opener.reply as (typeof COMPANION_CHAT_OPENING_LINES)[number],
+    ),
+  );
 });
 
 Deno.test("persistCompanionOpenerTurn writes the new opener before archiving older active threads", async () => {
@@ -444,7 +468,7 @@ Deno.test("persistCompanionOpenerTurnBestEffort reports persistence failure with
     userId: "user-1",
     companionId: "companion-1",
     sessionId: "session-new",
-    reply: "I'm here. What's the move?",
+    reply: "what's the move",
     signal: { type: "open_context", facts: [] },
     currentDateTime: "2026-05-10T09:55:00-07:00",
     createdAt: "2026-05-10T16:55:00.000Z",
@@ -504,7 +528,7 @@ Deno.test("persistCompanionOpenerTurnBestEffort keeps opener ready when archive 
     userId: "user-1",
     companionId: "companion-1",
     sessionId: "session-new",
-    reply: "I'm here. What's the move?",
+    reply: "what's the move",
     signal: { type: "open_context", facts: [] },
     currentDateTime: "2026-05-10T09:55:00-07:00",
     createdAt: "2026-05-10T16:55:00.000Z",

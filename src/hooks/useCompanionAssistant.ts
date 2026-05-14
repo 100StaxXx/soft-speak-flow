@@ -30,6 +30,7 @@ import {
 } from "@/services/companionSpeech";
 import { COMPANION_PLANNER_QUEST_CAPTURE_OPENING } from "@/shared/companionPlannerSurfaceActions";
 import { getCompanionPlannerOpener } from "@/shared/companionPlannerCopy";
+import { getRandomCompanionChatOpeningLine } from "@/shared/companionChatOpeners";
 import {
   analyzeSchedulingIntent,
   isUpcomingScheduleDigestMessage,
@@ -1356,7 +1357,7 @@ export function useCompanionAssistant({
   const startGeneratedCompanionOpener = useCallback(async () => {
     if (surface !== "companion") return null;
 
-    const fallbackOpening = "I'm here. What's the move?";
+    const fallbackOpening = getRandomCompanionChatOpeningLine();
 
     if (!user?.id || !companion?.id) {
       return openFreshThread({

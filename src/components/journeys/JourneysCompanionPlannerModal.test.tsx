@@ -327,6 +327,41 @@ const createBaseStructuredResponse = (): CompanionStructuredResponse => ({
   },
 });
 
+const createComingUpStructuredResponse = (): CompanionStructuredResponse => ({
+  intent: {
+    intentType: "conversation",
+    timeHorizon: "today",
+    isRecurring: false,
+    shouldCreateQuest: false,
+    shouldPromptCampaign: false,
+  },
+  comingUp: {
+    message: "You have one useful move before your next event.",
+    nextEvent: {
+      id: "event-1",
+      title: "Client call",
+      label: "2:00 PM",
+      startsAt: "2026-04-25T21:00:00.000Z",
+      endsAt: "2026-04-25T21:30:00.000Z",
+      isAllDay: false,
+      source: "calendar",
+    },
+    nextBestAction: {
+      suggestionId: "coming-up-1",
+      proposalId: "proposal-coming-up-1",
+      title: "Adjust Course launch",
+      type: "must",
+      estimatedDuration: "30 min",
+      estimatedDurationMinutes: 30,
+      source: "campaign",
+      reason: "This fits before the call and reduces the most pressure.",
+    },
+    remainingToday: [],
+    tomorrowSummary: "light",
+    missedItems: [],
+  },
+});
+
 const getTranscriptViewport = () => {
   const transcript = screen.getByTestId(
     "journeys-companion-planner-transcript",
@@ -748,7 +783,10 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(within(briefing).getByText("Planning with")).toBeInTheDocument();
     expect(within(briefing).getByText("Open")).toBeInTheDocument();
     expect(within(briefing).getByText("3")).toBeInTheDocument();
-    expect(briefing).toHaveTextContent("The day is workable");
+    expect(briefing).toHaveTextContent(
+      '"The day is workable. Choose the next important quest, then keep the rest in a simple order."',
+    );
+    expect(briefing).toHaveTextContent("- Nova");
     expect(briefing).not.toHaveTextContent("Preserve timed quests");
   });
 
@@ -884,6 +922,67 @@ describe("JourneysCompanionPlannerModal", () => {
       behavior: "smooth",
     });
     expect(viewport.scrollTop).toBe(900);
+  });
+
+  it("keeps the transcript in place when a coming-up card arrives", () => {
+    const { rerender } = render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        onOpenCampaignBuilder={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+    const viewport = getTranscriptViewport();
+    const scrollTo = installTranscriptScrollTo(viewport);
+
+    setTranscriptViewportMetrics(viewport, {
+      scrollHeight: 900,
+      clientHeight: 300,
+      scrollTop: 600,
+    });
+    fireEvent.scroll(viewport);
+    scrollTo.mockClear();
+
+    const structuredResponse = createComingUpStructuredResponse();
+    mocks.state.pendingAction = null;
+    mocks.state.structuredResponse = structuredResponse;
+    mocks.state.messages = [
+      ...mocks.state.messages,
+      {
+        id: "m2",
+        role: "user" as const,
+        content: "What do I have coming up?",
+        createdAt: "2026-04-18T08:02:00.000Z",
+        source: "agent" as const,
+      },
+      {
+        id: "m3",
+        role: "assistant" as const,
+        content: structuredResponse.comingUp?.message ?? "",
+        createdAt: "2026-04-18T08:03:00.000Z",
+        source: "agent" as const,
+        structuredResponse,
+      },
+    ];
+    setTranscriptViewportMetrics(viewport, {
+      scrollHeight: 1200,
+      clientHeight: 300,
+      scrollTop: 600,
+    });
+
+    rerender(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        onOpenCampaignBuilder={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    expect(screen.getByTestId("structured-coming-up")).toBeInTheDocument();
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(viewport.scrollTop).toBe(600);
   });
 
   it("does not scroll the transcript when the composer receives focus", () => {
