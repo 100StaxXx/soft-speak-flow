@@ -456,15 +456,23 @@ describe("CompanionDisplay overlay stack", () => {
     expect(image).toHaveAttribute("src", "https://assets.example.com/scene-backed-companion.png");
     expect(image).not.toHaveAttribute("src", "https://assets.example.com/launcher-cutout-source.png");
     const imageFrame = screen.getByTestId("companion-primary-image-frame");
+    const shell = screen.getByTestId("companion-image-shell");
+    expect(shell).toHaveAttribute("data-companion-frame-mode", "generated-scene");
+    expect(shell).toHaveStyle({ aspectRatio: "1.5" });
+    expect(shell).toHaveClass("w-64");
+    expect(shell).not.toHaveClass("h-64");
     expect(imageFrame.style.backgroundImage).toBe("");
     expect(imageFrame).toHaveClass("bg-black");
     expect(image).toHaveAttribute("data-companion-image-fit", "contain");
     expect(image).toHaveClass("object-contain");
 
+    Object.defineProperty(image, "naturalWidth", { configurable: true, value: 1600 });
+    Object.defineProperty(image, "naturalHeight", { configurable: true, value: 900 });
     fireEvent.load(image);
 
     await waitFor(() => {
       expect(image).toHaveStyle({ objectPosition: "center center" });
+      expect(shell).toHaveStyle({ aspectRatio: `${1600 / 900}` });
     });
     expect(image.style.transform).toBe("");
   });

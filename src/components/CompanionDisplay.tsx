@@ -73,6 +73,7 @@ import {
   type TouchEvent as ReactTouchEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type SyntheticEvent as ReactSyntheticEvent,
+  type CSSProperties,
 } from "react";
 import {
   MAX_COMPANION_STAGE,
@@ -99,6 +100,7 @@ interface CompanionDisplayProps {
 const LONG_PRESS_DURATION_MS = 800;
 const MOVE_CANCEL_THRESHOLD_PX = 12;
 const COMPANION_PLACEHOLDER = "/placeholder-companion.svg";
+const DEFAULT_GENERATED_SCENE_ASPECT_RATIO = 3 / 2;
 
 interface InlineEvolutionReplayState {
   videoUrl: string;
@@ -219,7 +221,6 @@ export const CompanionDisplay = memo(({
   const [companionChatOpen, setCompanionChatOpen] = useState(false);
   const [inlineEvolutionReplay, setInlineEvolutionReplay] = useState<InlineEvolutionReplayState | null>(null);
   const isDesktop = layoutMode === "desktop";
-  const imageSizeClass = isDesktop ? "h-72 w-72" : "h-64 w-64";
   const { profile, signals } = useMotionProfile();
   const { activeEvent } = useCompanionMotionSafe();
   const prefersReducedMotion = profile === "reduced" || signals.prefersReducedMotion;
@@ -502,6 +503,15 @@ export const CompanionDisplay = memo(({
     : (usesPresetPortraitShell || (usesEggPortraitShell && !usesSceneEggPortraitShell))
       ? "portrait"
       : "cover";
+  const portraitFrameAspectRatio = usesGeneratedSceneShell
+    ? portraitSourceAspectRatio ?? DEFAULT_GENERATED_SCENE_ASPECT_RATIO
+    : 1;
+  const portraitFrameStyle: CSSProperties | undefined = usesGeneratedSceneShell
+    ? { aspectRatio: `${portraitFrameAspectRatio}` }
+    : undefined;
+  const portraitFrameSizeClass = isDesktop
+    ? (usesGeneratedSceneShell ? "w-72 max-w-full" : "h-72 w-72")
+    : (usesGeneratedSceneShell ? "w-64 max-w-full" : "h-64 w-64");
   const portraitSceneContentClassName = cn(
     "flex items-center justify-center",
     usesEggPortraitShell && !usesSceneEggPortraitShell && "p-2.5 sm:p-3",
@@ -897,11 +907,13 @@ export const CompanionDisplay = memo(({
               <div
                 className={cn(
                   "relative overflow-hidden rounded-2xl",
-                  imageSizeClass,
+                  portraitFrameSizeClass,
                   shouldAnimateIdleDrift && "animate-companion-idle-drift",
                 )}
+                style={portraitFrameStyle}
                 data-testid="companion-image-shell"
                 data-companion-idle-motion={shouldAnimateIdleDrift ? "active" : "inactive"}
+                data-companion-frame-mode={usesGeneratedSceneShell ? "generated-scene" : "square"}
                 data-companion-expression-mood={expressionState.mood}
                 data-companion-expression-variant={expressionState.variant}
                 data-companion-expression-reason={expressionState.reason}
