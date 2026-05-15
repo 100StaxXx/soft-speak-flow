@@ -295,6 +295,15 @@ const formatTime = (time: string) => {
   return `${displayHour}:${minutes} ${ampm}`;
 };
 
+const getCategoryIcon = (category: string | null | undefined) => {
+  switch (category) {
+    case 'mind': return Brain;
+    case 'body': return Dumbbell;
+    case 'soul': return Heart;
+    default: return null;
+  }
+};
+
 const COMBO_WINDOW_MS = 8000;
 const DESKTOP_LAYOUT_MIN_WIDTH = 1280;
 const LANE_OFFSET_STEP_PX = 10;
@@ -718,6 +727,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [openDesktopDetailTaskId, setOpenDesktopDetailTaskId] = useState<string | null>(null);
+  const [mobileDetailTaskId, setMobileDetailTaskId] = useState<string | null>(null);
   const [openActionMenuTaskId, setOpenActionMenuTaskId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'custom' | 'time' | 'priority' | 'xp'>('custom');
   const [untimedDrawerOpen, setUntimedDrawerOpen] = useState(false);
@@ -728,6 +738,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const lastComboAtRef = useRef<number | null>(null);
   const comboResetTimerRef = useRef<number | null>(null);
   const comboFxTimerRef = useRef<number | null>(null);
+  const mobileDetailTask = useMemo(
+    () => mobileDetailTaskId
+      ? tasks.find((task) => task.id === mobileDetailTaskId) ?? null
+      : null,
+    [mobileDetailTaskId, tasks],
+  );
 
   // Track touch start position to distinguish taps from scrolls
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -807,6 +823,18 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       setOpenDesktopDetailTaskId(null);
     }
   }, [openDesktopDetailTaskId, tasks]);
+
+  useEffect(() => {
+    if (mobileDetailTaskId && !tasks.some((task) => task.id === mobileDetailTaskId)) {
+      setMobileDetailTaskId(null);
+    }
+  }, [mobileDetailTaskId, tasks]);
+
+  useEffect(() => {
+    if (isDesktopLayout && mobileDetailTaskId) {
+      setMobileDetailTaskId(null);
+    }
+  }, [isDesktopLayout, mobileDetailTaskId]);
 
   useEffect(() => {
     setOptimisticCompleted(prev => {
@@ -1899,18 +1927,231 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     });
   }, []);
 
-  const getCategoryIcon = (category: string | null | undefined) => {
-    switch (category) {
-      case 'mind': return Brain;
-      case 'body': return Dumbbell;
-      case 'soul': return Heart;
-      default: return null;
-    }
-  };
-
   const suppressNativeContextMenu = useCallback((event: ReactMouseEvent<HTMLElement>) => {
     event.preventDefault();
   }, []);
+
+  const renderQuestDetailSections = useCallback((
+    task: Task,
+    options: {
+      variant?: "inline" | "drawer";
+      className?: string;
+    } = {},
+  ) => {
+    const variant = options.variant ?? "inline";
+    const isDrawer = variant === "drawer";
+    const isRitual = !!task.habit_source_id;
+    const CategoryIcon = getCategoryIcon(task.category);
+    const subtasks = task.subtasks ?? [];
+    const displayAttachments = normalizeDisplayAttachments(task);
+    const completedSubtaskCount = subtasks.filter(subtask => !!subtask.completed).length;
+    const ritualDescription = isRitual && task.habit_source_id
+      ? habitDescriptionById.get(task.habit_source_id) ?? null
+      : null;
+    const normalizedRitualDescription = normalizeDetailText(ritualDescription);
+    const normalizedTaskNotes = normalizeDetailText(task.notes);
+    const shouldRenderRitualDescription = normalizedRitualDescription.length > 0;
+    const shouldRenderNotes = normalizedTaskNotes.length > 0 && normalizedTaskNotes !== normalizedRitualDescription;
+    const hasDetailBadges = !!(
+      (CategoryIcon && task.category) ||
+      task.difficulty ||
+      task.priority ||
+      task.estimated_duration ||
+      (task.is_recurring && task.recurrence_pattern)
+    );
+    const detailPanelClassName = isDrawer
+      ? "space-y-2 rounded-[18px] border border-white/10 bg-white/[0.04] p-3"
+      : "space-y-1.5 rounded-md border border-border/40 bg-muted/20 p-2";
+    const detailLabelClassName = isDrawer
+      ? "text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/80"
+      : "text-[11px] font-medium uppercase tracking-wide text-muted-foreground";
+    const subtaskRowClassName = isDrawer
+      ? "flex items-center gap-2 rounded-xl bg-black/10 px-2 py-1.5 text-sm"
+      : "flex items-center gap-2 rounded-sm px-1 py-1 text-xs";
+    const subtaskTextClassName = isDrawer ? "text-sm" : "text-xs";
+    const attachmentLinkClassName = isDrawer
+      ? "flex items-center gap-2 rounded-xl bg-black/10 px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
+      : "flex items-center gap-2 rounded-sm px-1 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground";
+
+    return (
+      <div className={cn("space-y-2", isDrawer && "space-y-3", options.className)}>
+        {subtasks.length > 0 && (
+          <div className={detailPanelClassName}>
+            <div className="flex items-center justify-between">
+              <p className={detailLabelClassName}>
+                Subtasks
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {completedSubtaskCount}/{subtasks.length}
+              </p>
+            </div>
+            <div className={cn("space-y-1", isDrawer && "space-y-2")}>
+              {subtasks.map((subtask) => (
+                <label
+                  key={subtask.id}
+                  className={subtaskRowClassName}
+                >
+                  <Checkbox
+                    checked={!!subtask.completed}
+                    onCheckedChange={(checked) => {
+                      toggleSubtask.mutate({
+                        taskId: task.id,
+                        subtaskId: subtask.id,
+                        completed: !!checked,
+                      });
+                    }}
+                    onClick={(event) => event.stopPropagation()}
+                    className={isDrawer ? "h-4 w-4" : "h-3.5 w-3.5"}
+                  />
+                  <span
+                    className={cn(
+                      subtaskTextClassName,
+                      subtask.completed && "text-muted-foreground line-through"
+                    )}
+                  >
+                    {subtask.title}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {displayAttachments.length > 0 && (
+          <div className={detailPanelClassName}>
+            <div className="flex items-center justify-between">
+              <p className={detailLabelClassName}>
+                Attachments
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {displayAttachments.length}
+              </p>
+            </div>
+            <div className={cn("space-y-1", isDrawer && "space-y-2")}>
+              {displayAttachments.map((attachment, index) => (
+                <a
+                  key={`${attachment.fileUrl}-${index}`}
+                  href={attachment.fileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={attachmentLinkClassName}
+                >
+                  {attachment.isImage ? (
+                    <FileImage className="h-3.5 w-3.5 flex-shrink-0" />
+                  ) : (
+                    <Paperclip className="h-3.5 w-3.5 flex-shrink-0" />
+                  )}
+                  <span className="truncate">{attachment.fileName}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {shouldRenderRitualDescription && (
+          useLiteAnimations ? (
+            <p className={cn(
+              "leading-relaxed whitespace-pre-line text-celestial-blue/80",
+              isDrawer ? "text-sm" : "text-sm",
+            )}>
+              {stripMarkdown(ritualDescription)}
+            </p>
+          ) : (
+            <motion.p className={cn(
+              "leading-relaxed whitespace-pre-line text-celestial-blue/80",
+              isDrawer ? "text-sm" : "text-sm",
+            )}>
+              {stripMarkdown(ritualDescription)}
+            </motion.p>
+          )
+        )}
+
+        {shouldRenderNotes && (
+          useLiteAnimations ? (
+            <div className="flex items-start gap-2 text-sm text-muted-foreground">
+              <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <p className={cn("leading-relaxed whitespace-pre-line", isDrawer ? "text-sm" : "text-xs")}>
+                {stripMarkdown(task.notes)}
+              </p>
+            </div>
+          ) : (
+            <motion.div className="flex items-start gap-2 text-sm text-muted-foreground">
+              <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <p className={cn("leading-relaxed whitespace-pre-line", isDrawer ? "text-sm" : "text-xs")}>
+                {stripMarkdown(task.notes)}
+              </p>
+            </motion.div>
+          )
+        )}
+
+        {task.location ? (
+          <QuestLocationLink
+            location={task.location}
+            label="Address"
+            className={cn(
+              "rounded-md border-border/40 bg-muted/20 p-2",
+              isDrawer && "rounded-[18px] border-white/10 bg-white/[0.04] p-3",
+            )}
+            textClassName={cn(isDrawer ? "text-sm text-muted-foreground" : "text-xs text-muted-foreground")}
+            actionsClassName="mt-2"
+          />
+        ) : null}
+
+        {hasDetailBadges && (
+          <div className="flex flex-wrap gap-1.5">
+            {CategoryIcon && task.category && (
+              <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 border-muted-foreground/30">
+                <CategoryIcon className="w-3 h-3" />
+                {task.category}
+              </Badge>
+            )}
+
+            {task.difficulty && (
+              <Badge
+                variant="outline"
+                className={cn(
+                  "text-xs px-1.5 py-0.5 h-5",
+                  task.difficulty === 'easy' && "bg-green-500/10 text-green-500 border-green-500/30",
+                  task.difficulty === 'medium' && "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
+                  task.difficulty === 'hard' && "bg-red-500/10 text-red-500 border-red-500/30"
+                )}
+              >
+                {task.difficulty}
+              </Badge>
+            )}
+
+            {task.priority && (
+              <Badge
+                variant="outline"
+                className={cn(
+                  "text-xs px-1.5 py-0.5 h-5",
+                  task.priority === 'high' && "bg-red-500/10 text-red-500 border-red-500/30",
+                  task.priority === 'medium' && "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
+                  task.priority === 'low' && "bg-blue-500/10 text-blue-500 border-blue-500/30"
+                )}
+              >
+                {task.priority} priority
+              </Badge>
+            )}
+
+            {task.estimated_duration && (
+              <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 border-muted-foreground/30">
+                <Timer className="w-3 h-3" />
+                {task.estimated_duration}m
+              </Badge>
+            )}
+
+            {task.is_recurring && task.recurrence_pattern && (
+              <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 bg-accent/10 text-accent border-accent/30">
+                <Repeat className="w-3 h-3" />
+                {formatDisplayLabel(task.recurrence_pattern)}
+              </Badge>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }, [habitDescriptionById, toggleSubtask, useLiteAnimations]);
 
   const renderTaskItem = useCallback((
     task: Task,

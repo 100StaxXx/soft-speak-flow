@@ -41,15 +41,22 @@ declare global {
 const GOOGLE_MAPS_PLACES_SCRIPT_ID = "google-maps-places-js";
 const GOOGLE_MAPS_PLACES_DIAGNOSTIC_PREFIX = "[Google Maps Places]";
 const GOOGLE_MAPS_AUTH_ALERT_MESSAGE = "This page can't load Google Maps correctly";
+const GOOGLE_MAPS_API_KEY_PLACEHOLDER = ["your", "google", "maps", "browser", "key"].join("-");
+const GOOGLE_MAPS_AUTH_ALERT_SUPPRESSION_MS = 30_000;
 
 let googleMapsPlacesPromise: Promise<GoogleMapsPlacesLibrary | null> | null = null;
+let googleMapsPlacesAuthFailed = false;
+let googleMapsAuthAlertRestore: (() => void) | null = null;
+let googleMapsAuthAlertRestoreTimer: number | null = null;
 
 export const getGoogleMapsApiKey = (): string | null => {
   const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY?.trim();
+  if (key === GOOGLE_MAPS_API_KEY_PLACEHOLDER) return null;
   return key ? key : null;
 };
 
-export const isGooglePlacesAutocompleteConfigured = (): boolean => Boolean(getGoogleMapsApiKey());
+export const isGooglePlacesAutocompleteConfigured = (): boolean =>
+  Boolean(getGoogleMapsApiKey()) && !googleMapsPlacesAuthFailed;
 
 export const getLoadedGoogleMapsPlacesLibrary = (): GoogleMapsPlacesLibrary | null =>
   typeof window !== "undefined" && window.google?.maps?.places?.Autocomplete ? window.google.maps.places : null;
@@ -89,7 +96,13 @@ const resetFailedGoogleMapsPlacesLoad = (script: HTMLScriptElement | null): void
   script?.remove();
 };
 
-const installGoogleMapsAuthAlertSuppressor = (): (() => void) => {
+const installGoogleMapsAuthAlertSuppressor = (): void => {
+  if (googleMapsAuthAlertRestoreTimer !== null) {
+    window.clearTimeout(googleMapsAuthAlertRestoreTimer);
+    googleMapsAuthAlertRestoreTimer = null;
+  }
+  if (googleMapsAuthAlertRestore) return;
+
   const previousAlert = window.alert;
   const wrappedAlert: typeof window.alert = (message) => {
     if (typeof message === "string" && message.includes(GOOGLE_MAPS_AUTH_ALERT_MESSAGE)) {
@@ -104,11 +117,28 @@ const installGoogleMapsAuthAlertSuppressor = (): (() => void) => {
 
   window.alert = wrappedAlert;
 
-  return () => {
+  googleMapsAuthAlertRestore = () => {
     if (window.alert === wrappedAlert) {
       window.alert = previousAlert;
     }
+    googleMapsAuthAlertRestore = null;
+    if (googleMapsAuthAlertRestoreTimer !== null) {
+      window.clearTimeout(googleMapsAuthAlertRestoreTimer);
+      googleMapsAuthAlertRestoreTimer = null;
+    }
   };
+};
+
+const scheduleGoogleMapsAuthAlertRestore = (): void => {
+  if (!googleMapsAuthAlertRestore) return;
+
+  if (googleMapsAuthAlertRestoreTimer !== null) {
+    window.clearTimeout(googleMapsAuthAlertRestoreTimer);
+  }
+
+  googleMapsAuthAlertRestoreTimer = window.setTimeout(() => {
+    googleMapsAuthAlertRestore?.();
+  }, GOOGLE_MAPS_AUTH_ALERT_SUPPRESSION_MS);
 };
 
 const resolveLoadedGoogleMapsPlaces = (script: HTMLScriptElement | null): GoogleMapsPlacesLibrary | null => {
@@ -126,9 +156,10 @@ const resolveLoadedGoogleMapsPlaces = (script: HTMLScriptElement | null): Google
 
 export const loadGoogleMapsPlacesLibrary = (): Promise<GoogleMapsPlacesLibrary | null> => {
   const apiKey = getGoogleMapsApiKey();
-  if (!apiKey || typeof window === "undefined" || typeof document === "undefined") {
+  if (!apiKey || googleMapsPlacesAuthFailed || typeof window === "undefined" || typeof document === "undefined") {
     logGoogleMapsPlacesDiagnostic("Autocomplete disabled before script load.", {
       hasApiKey: Boolean(apiKey),
+      authFailed: googleMapsPlacesAuthFailed,
       hasDocument: typeof document !== "undefined",
     });
     return Promise.resolve(null);
@@ -145,30 +176,54 @@ export const loadGoogleMapsPlacesLibrary = (): Promise<GoogleMapsPlacesLibrary |
   googleMapsPlacesPromise = new Promise((resolve) => {
     const existingScript = document.getElementById(GOOGLE_MAPS_PLACES_SCRIPT_ID) as HTMLScriptElement | null;
     const previousAuthFailure = window.gm_authFailure;
-    const restoreAuthAlert = installGoogleMapsAuthAlertSuppressor();
+    let authFailureRestoreTimer: number | null = null;
     let isSettled = false;
+    let isAuthFailureHandlerRestored = false;
+    const restoreAuthFailureHandler = () => {
+      if (isAuthFailureHandlerRestored) return;
+      isAuthFailureHandlerRestored = true;
+      if (authFailureRestoreTimer !== null) {
+        window.clearTimeout(authFailureRestoreTimer);
+        authFailureRestoreTimer = null;
+      }
+      if (window.gm_authFailure === handleAuthFailure) {
+        window.gm_authFailure = previousAuthFailure;
+      }
+    };
+    const scheduleAuthFailureHandlerRestore = () => {
+      if (authFailureRestoreTimer !== null) {
+        window.clearTimeout(authFailureRestoreTimer);
+      }
+      authFailureRestoreTimer = window.setTimeout(restoreAuthFailureHandler, GOOGLE_MAPS_AUTH_ALERT_SUPPRESSION_MS);
+    };
     const settle = (places: GoogleMapsPlacesLibrary | null) => {
       if (isSettled) return;
       isSettled = true;
-      window.gm_authFailure = previousAuthFailure;
-      window.setTimeout(restoreAuthAlert, 0);
+      scheduleAuthFailureHandlerRestore();
+      scheduleGoogleMapsAuthAlertRestore();
       resolve(places);
     };
-    const handleAuthFailure = (script: HTMLScriptElement | null) => {
+    const handleAuthFailure = () => {
       previousAuthFailure?.();
+      googleMapsPlacesAuthFailed = true;
       logGoogleMapsPlacesDiagnostic("Maps JavaScript authentication failed.", {
         hasApiKey: true,
       });
-      resetFailedGoogleMapsPlacesLoad(script);
+      resetFailedGoogleMapsPlacesLoad(
+        document.getElementById(GOOGLE_MAPS_PLACES_SCRIPT_ID) as HTMLScriptElement | null,
+      );
+      scheduleAuthFailureHandlerRestore();
+      scheduleGoogleMapsAuthAlertRestore();
       settle(null);
     };
+    installGoogleMapsAuthAlertSuppressor();
 
     if (existingScript) {
       if (existingScript.dataset.loaded === "true") {
         settle(resolveLoadedGoogleMapsPlaces(existingScript));
         return;
       }
-      window.gm_authFailure = () => handleAuthFailure(existingScript);
+      window.gm_authFailure = handleAuthFailure;
       existingScript.addEventListener("load", () => {
         logGoogleMapsPlacesDiagnostic("Existing Maps JavaScript script loaded.", { hasApiKey: true });
         settle(resolveLoadedGoogleMapsPlaces(existingScript));
@@ -188,7 +243,7 @@ export const loadGoogleMapsPlacesLibrary = (): Promise<GoogleMapsPlacesLibrary |
     script.async = true;
     script.defer = true;
     script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places&v=weekly&loading=async`;
-    window.gm_authFailure = () => handleAuthFailure(script);
+    window.gm_authFailure = handleAuthFailure;
     script.addEventListener("load", () => {
       script.dataset.loaded = "true";
       logGoogleMapsPlacesDiagnostic("Maps JavaScript script loaded.", { hasApiKey: true });

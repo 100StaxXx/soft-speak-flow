@@ -6,6 +6,7 @@ describe("googleMapsPlaces", () => {
   let consoleInfoSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.resetModules();
     vi.stubEnv("VITE_GOOGLE_MAPS_API_KEY", "maps-key");
     document.head.innerHTML = "";
@@ -14,6 +15,8 @@ describe("googleMapsPlaces", () => {
   });
 
   afterEach(() => {
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
     consoleInfoSpy.mockRestore();
     vi.unstubAllEnvs();
     document.head.innerHTML = "";
@@ -35,6 +38,20 @@ describe("googleMapsPlaces", () => {
       }),
     );
     expect(JSON.stringify(consoleInfoSpy.mock.calls)).not.toContain("maps-key");
+  });
+
+  it("treats the example placeholder as unconfigured", async () => {
+    vi.stubEnv("VITE_GOOGLE_MAPS_API_KEY", "your-google-maps-browser-key");
+    const {
+      getGoogleMapsApiKey,
+      isGooglePlacesAutocompleteConfigured,
+      loadGoogleMapsPlacesLibrary,
+    } = await import("@/utils/googleMapsPlaces");
+
+    expect(getGoogleMapsApiKey()).toBeNull();
+    expect(isGooglePlacesAutocompleteConfigured()).toBe(false);
+    await expect(loadGoogleMapsPlacesLibrary()).resolves.toBeNull();
+    expect(document.getElementById(GOOGLE_MAPS_PLACES_SCRIPT_ID)).toBeNull();
   });
 
   it("removes a failed script load so autocomplete can retry", async () => {
@@ -126,7 +143,10 @@ describe("googleMapsPlaces", () => {
   });
 
   it("resets and logs Google Maps authentication failures without exposing the key", async () => {
-    const { loadGoogleMapsPlacesLibrary } = await import("@/utils/googleMapsPlaces");
+    const {
+      isGooglePlacesAutocompleteConfigured,
+      loadGoogleMapsPlacesLibrary,
+    } = await import("@/utils/googleMapsPlaces");
 
     const load = loadGoogleMapsPlacesLibrary();
     const script = document.getElementById(GOOGLE_MAPS_PLACES_SCRIPT_ID);
@@ -145,9 +165,48 @@ describe("googleMapsPlaces", () => {
       }),
     );
     expect(JSON.stringify(consoleInfoSpy.mock.calls)).not.toContain("maps-key");
+    expect(isGooglePlacesAutocompleteConfigured()).toBe(false);
+
+    await expect(loadGoogleMapsPlacesLibrary()).resolves.toBeNull();
+    expect(document.getElementById(GOOGLE_MAPS_PLACES_SCRIPT_ID)).toBeNull();
   });
 
-  it("suppresses Google Maps auth alerts during script load and restores alerts afterward", async () => {
+  it("keeps the auth failure handler alive briefly after Maps reports loaded", async () => {
+    const {
+      isGooglePlacesAutocompleteConfigured,
+      loadGoogleMapsPlacesLibrary,
+    } = await import("@/utils/googleMapsPlaces");
+    const placesLibrary = {
+      Autocomplete: class {
+        constructor(_input: HTMLInputElement, _options?: { fields?: string[] }) {
+          void _input;
+          void _options;
+        }
+        addListener() {
+          return { remove: vi.fn() };
+        }
+        getPlace() {
+          return {};
+        }
+      },
+    };
+
+    const load = loadGoogleMapsPlacesLibrary();
+    const script = document.getElementById(GOOGLE_MAPS_PLACES_SCRIPT_ID);
+    expect(script).toBeInstanceOf(HTMLScriptElement);
+
+    window.google = { maps: { places: placesLibrary } };
+    script?.dispatchEvent(new Event("load"));
+
+    await expect(load).resolves.toBe(placesLibrary);
+
+    window.gm_authFailure?.();
+
+    expect(isGooglePlacesAutocompleteConfigured()).toBe(false);
+    expect(document.getElementById(GOOGLE_MAPS_PLACES_SCRIPT_ID)).toBeNull();
+  });
+
+  it("suppresses delayed Google Maps auth alerts and restores alerts afterward", async () => {
     const originalAlert = window.alert;
     const alertSpy = vi.fn();
     window.alert = alertSpy;
@@ -170,10 +229,13 @@ describe("googleMapsPlaces", () => {
       window.gm_authFailure?.();
 
       await expect(load).resolves.toBeNull();
-      await new Promise((resolve) => window.setTimeout(resolve, 0));
 
       window.alert("Other alert");
       expect(alertSpy).toHaveBeenCalledWith("Other alert");
+
+      vi.advanceTimersByTime(30_000);
+      window.alert("This page can't load Google Maps correctly. Do you own this website?");
+      expect(alertSpy).toHaveBeenCalledWith("This page can't load Google Maps correctly. Do you own this website?");
     } finally {
       window.alert = originalAlert;
     }
