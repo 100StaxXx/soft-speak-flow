@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { User, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Trash2, Sparkles, HelpCircle, ChevronRight, ExternalLink, MessageSquare, type LucideIcon } from "lucide-react";
+import { User, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Trash2, Sparkles, HelpCircle, ChevronRight, ExternalLink, MessageCircle, MessageSquare, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -34,6 +34,7 @@ import { CinematicPageBackground } from "@/components/CinematicPageBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { MentorAvatar } from "@/components/MentorAvatar";
+import { DISCORD_INVITE_URL } from "@/constants/community";
 import { applyMentorChange } from "@/pages/profileMentorChange";
 import { getMentorDisplaySortIndex } from "@/lib/mentorRoster";
 import {
@@ -532,6 +533,35 @@ const Profile = () => {
                     className="w-full"
                   >
                     Send Feedback
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Community */}
+              <Card className="border-border/50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <MessageCircle className="h-4 w-4 text-primary" />
+                    Community
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Join the Discord for updates, ideas, and support.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    asChild
+                  >
+                    <a
+                      href={DISCORD_INVITE_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2 text-muted-foreground" />
+                      Join Discord
+                    </a>
                   </Button>
                 </CardContent>
               </Card>

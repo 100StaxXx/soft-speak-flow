@@ -43,6 +43,7 @@ import { StaticBackgroundImage } from "@/components/StaticBackgroundImage";
 import type { StaticBackgroundAsset } from "@/assets/backgrounds";
 import { trackPaywallEvent } from "@/utils/paywallTelemetry";
 import { PREMIUM_PLAN_NOTE } from "@/config/premiumBenefits";
+import { DISCORD_INVITE_URL } from "@/constants/community";
 
 type PlanType = "monthly" | "yearly";
 export type PaywallVariant = "pre_trial_signup" | "trial_expired";
@@ -703,7 +704,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                   className="w-full border-cyan-100/34 bg-cyan-100/10 text-cyan-50 hover:bg-cyan-100/18 hover:text-white"
                 >
                   <a
-                    href="https://discord.gg/rreaAn7JWn"
+                    href={DISCORD_INVITE_URL}
                     target="_blank"
                     rel="noreferrer"
                   >

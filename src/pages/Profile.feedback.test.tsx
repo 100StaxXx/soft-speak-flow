@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { DISCORD_INVITE_URL } from "@/constants/community";
 
 const mocks = vi.hoisted(() => ({
   user: {
@@ -189,5 +190,16 @@ describe("Profile feedback entry", () => {
     expect(mocks.navigate).toHaveBeenCalledWith("/support/report", {
       state: { defaultCategory: "feedback" },
     });
+  });
+
+  it("renders a Discord community link from settings", () => {
+    renderProfile();
+
+    const discordLink = screen.getByRole("link", { name: /join discord/i });
+
+    expect(screen.getByText("Community")).toBeInTheDocument();
+    expect(discordLink).toHaveAttribute("href", DISCORD_INVITE_URL);
+    expect(discordLink).toHaveAttribute("target", "_blank");
+    expect(discordLink).toHaveAttribute("rel", "noopener noreferrer");
   });
 });
