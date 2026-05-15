@@ -9,6 +9,11 @@ import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
 import { COMPANION_LAUNCHER_IMAGE_GENERATION_ENABLED } from "@/config/companionLauncherFeatureFlags";
 import { cn } from "@/lib/utils";
 import {
+  type CompanionLatencyTimer,
+  finishCompanionLatencyTimer,
+  startCompanionLatencyTimer,
+} from "@/utils/companionLatencyMetrics";
+import {
   createCompanionPlannerLaunchIntentId,
   createCompanionPlannerQuestCaptureLaunchIntent,
 } from "@/shared/companionPlannerSurfaceActions";
@@ -52,6 +57,7 @@ export const DraggableFAB = ({
   const { user } = useAuth();
   const suppressTapRef = useRef(false);
   const suppressTapResetRef = useRef<number | null>(null);
+  const popupOpenTimerRef = useRef<CompanionLatencyTimer | null>(null);
   const {
     companionId,
     companionLabel,
@@ -104,8 +110,20 @@ export const DraggableFAB = ({
       ),
     [planDayLabel, user?.id],
   );
+  const launcherImageUrlOverride = shouldUseStrictLauncherArt
+    ? launcherAwayImageUrl ?? currentSceneImageUrl
+    : isMenuOpen ? null : launcherAwayImageUrl;
+  const launcherFocalXOverride = shouldUseStrictLauncherArt
+    ? launcherAwayImageUrl ? launcherAwayFocalX : undefined
+    : isMenuOpen ? null : launcherAwayFocalX;
+  const launcherFocalYOverride = shouldUseStrictLauncherArt
+    ? launcherAwayImageUrl ? launcherAwayFocalY : undefined
+    : isMenuOpen ? null : launcherAwayFocalY;
+  const launcherUsesPortraitShellOverride = shouldUseStrictLauncherArt
+    ? launcherAwayImageUrl ? launcherAwayUsesPortraitShell : undefined
+    : isMenuOpen ? undefined : launcherAwayUsesPortraitShell;
 
-  const popupPlacement = (() => {
+  const popupPlacement = useMemo(() => {
     if (typeof window === "undefined") {
       return {
         popupStyle: undefined,
@@ -141,7 +159,7 @@ export const DraggableFAB = ({
         left: `${tailLeft}px`,
       },
     };
-  })();
+  }, [popupAlignment.horizontal, position.x]);
 
   const closeMenu = useCallback(() => {
     setIsMenuOpen(false);
@@ -151,6 +169,15 @@ export const DraggableFAB = ({
     if (!isDragging && !isLongPressing) return;
     setIsMenuOpen(false);
   }, [isDragging, isLongPressing]);
+
+  useEffect(() => {
+    if (!isMenuOpen || !popupOpenTimerRef.current) return;
+
+    finishCompanionLatencyTimer(popupOpenTimerRef.current, {
+      surface: "journeys",
+    });
+    popupOpenTimerRef.current = null;
+  }, [isMenuOpen]);
 
   useEffect(() => {
     return () => {
@@ -270,10 +297,10 @@ export const DraggableFAB = ({
         variant="floating"
         floatingSize="hero"
         faceDirection={isMenuOpen ? "front" : "away"}
-        imageUrlOverride={shouldUseStrictLauncherArt ? launcherAwayImageUrl : isMenuOpen ? null : launcherAwayImageUrl}
-        imageFocalXOverride={shouldUseStrictLauncherArt ? launcherAwayFocalX : isMenuOpen ? null : launcherAwayFocalX}
-        imageFocalYOverride={shouldUseStrictLauncherArt ? launcherAwayFocalY : isMenuOpen ? null : launcherAwayFocalY}
-        usesPortraitShellOverride={shouldUseStrictLauncherArt ? launcherAwayUsesPortraitShell : isMenuOpen ? undefined : launcherAwayUsesPortraitShell}
+        imageUrlOverride={launcherImageUrlOverride}
+        imageFocalXOverride={launcherFocalXOverride}
+        imageFocalYOverride={launcherFocalYOverride}
+        usesPortraitShellOverride={launcherUsesPortraitShellOverride}
         allowImageFallback={!shouldUseStrictLauncherArt}
         requireHeroCutout={isGeneratedCompanion && !launcherAwayHasTransparentBackground}
         aria-label="Open companion quick actions"
@@ -291,6 +318,14 @@ export const DraggableFAB = ({
             return;
           }
           if (canTriggerTap) {
+            if (!isMenuOpen) {
+              popupOpenTimerRef.current = startCompanionLatencyTimer(
+                "companion_fab_popup_visible",
+                {
+                  surface: "journeys",
+                },
+              );
+            }
             setIsMenuOpen((previous) => !previous);
           }
         }}

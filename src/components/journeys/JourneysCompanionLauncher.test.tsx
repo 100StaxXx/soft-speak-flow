@@ -111,7 +111,7 @@ describe("JourneysCompanionLauncher", () => {
     expect(screen.queryByRole("img", { name: "Nova" })).not.toBeInTheDocument();
   });
 
-  it("shows a placeholder instead of original art when a required hero cutout fails", () => {
+  it("shows original hero art while a required hero cutout is unavailable", () => {
     mocks.useCompanionImageBackgroundCutout.mockReturnValue({
       cutoutSrc: null,
       status: "failed",
@@ -128,7 +128,12 @@ describe("JourneysCompanionLauncher", () => {
       />,
     );
 
-    expect(screen.getByTestId("journeys-companion-launcher-placeholder")).toBeInTheDocument();
-    expect(screen.queryByRole("img", { name: "Nova" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("journeys-companion-launcher-placeholder"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Nova" })).toHaveAttribute(
+      "src",
+      "https://example.com/launcher-with-light-bg.png",
+    );
   });
 });

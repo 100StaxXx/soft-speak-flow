@@ -93,7 +93,7 @@ export function JourneysCompanionLauncherPopup({
           initial={{ opacity: 0, scale: 0.92, y: alignment.vertical === "bottom" ? 10 : -10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.94, y: alignment.vertical === "bottom" ? 6 : -6 }}
-          transition={{ duration: 0.18, ease: "easeOut" }}
+          transition={{ duration: 0.1, ease: "easeOut" }}
           className={cn(
             "absolute z-[70] w-[min(19rem,calc(100vw-2rem))]",
             POPUP_VERTICAL_CLASSNAME[alignment.vertical],
@@ -146,9 +146,9 @@ export function JourneysCompanionLauncherPopup({
                   <motion.button
                     key={option.id}
                     type="button"
-                    initial={{ opacity: 0, y: 6 }}
+                    initial={{ opacity: 0, y: 3 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.025 * index, duration: 0.16 }}
+                    transition={{ delay: 0.01 * index, duration: 0.1 }}
                     className={cn(
                       "flex min-h-[4.25rem] flex-col items-start justify-between gap-2 rounded-[1.1rem] border-[3px] px-3 py-2.5 text-left shadow-[0_5px_0_rgba(95,50,18,0.72),0_10px_18px_rgba(74,31,8,0.18)] transition-transform hover:-translate-y-0.5 hover:shadow-[0_7px_0_rgba(95,50,18,0.76),0_13px_20px_rgba(74,31,8,0.2)]",
                       option.id === "free-talk" && "col-span-2 min-h-[3.5rem] flex-row items-center justify-start",

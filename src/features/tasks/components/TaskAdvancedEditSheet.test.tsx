@@ -56,7 +56,13 @@ describe('TaskAdvancedEditSheet reminders', () => {
     fireEvent.click(screen.getByRole('button', { name: '15 minutes before' }));
     fireEvent.click(screen.getByRole('button', { name: 'Custom' }));
     expect(screen.getByText('Custom reminder date')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Custom reminder time'), { target: { value: '07:30' } });
+    expect(screen.getByText('Custom reminder time')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Custom reminder time' })).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('task-custom-reminder-date-trigger'));
+    expect(screen.getByTestId('task-custom-reminder-date-picker')).toHaveClass('z-[90]');
+    const customReminderTimeButton = screen.getByRole('button', { name: '7:30 AM' });
+    fireEvent.click(customReminderTimeButton);
+    expect(customReminderTimeButton).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
 

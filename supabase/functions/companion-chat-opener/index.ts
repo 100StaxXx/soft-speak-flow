@@ -28,6 +28,8 @@ import {
 const RequestSchema = z.object({
   companionId: z.string().uuid(),
   surface: z.literal("companion").default("companion"),
+  sessionId: z.string().min(1).max(200).optional(),
+  skipIfSessionHasUserMessage: z.boolean().optional().default(false),
   currentDateTime: z.string().datetime({ offset: true }),
 });
 
@@ -132,7 +134,7 @@ serve(async (req) => {
       });
     }
 
-    const sessionId = crypto.randomUUID();
+    const sessionId = parsed.data.sessionId ?? crypto.randomUUID();
     const createdAt = new Date().toISOString();
     const companion = await loadCompanionForOpener(
       protectedRequest.supabase,
@@ -199,6 +201,7 @@ serve(async (req) => {
       openaiConversationId: opener.openaiConversationId,
       lastOpenAIResponseId: opener.lastOpenAIResponseId,
       requestId,
+      skipIfSessionHasUserMessage: parsed.data.skipIfSessionHasUserMessage,
     });
 
     return new Response(

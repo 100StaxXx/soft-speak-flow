@@ -145,7 +145,7 @@ const Profile = () => {
   const [activeTab, setActiveTab] = useState("account");
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isChangingMentor, setIsChangingMentor] = useState(false);
-  const [viewingLegalDoc, setViewingLegalDoc] = useState<"terms" | "privacy" | null>(null);
+  const [viewingLegalDoc, setViewingLegalDoc] = useState<"terms" | "privacy" | "openSourceLicenses" | null>(null);
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -560,6 +560,14 @@ const Profile = () => {
                   >
                     <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
                     Privacy Policy
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start h-9 text-sm"
+                    onClick={() => setViewingLegalDoc("openSourceLicenses")}
+                  >
+                    <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
+                    Open Source Licenses
                   </Button>
                   <Button
                     variant="ghost"

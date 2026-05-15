@@ -40,6 +40,7 @@ PODS:
     - Alamofire (~> 5.10.2)
     - Capacitor
     - GoogleSignIn (~> 9.0.0)
+  - GooglePlaces (10.13.0)
   - GoogleSignIn (9.0.0):
     - AppAuth (~> 2.0)
     - AppCheckCore (~> 11.0)
@@ -90,6 +91,7 @@ DEPENDENCIES:
   - "CapacitorSplashScreen (from `../../node_modules/@capacitor/splash-screen`)"
   - "CapawesomeCapacitorFilePicker (from `../../node_modules/@capawesome/capacitor-file-picker`)"
   - "CapgoCapacitorSocialLogin (from `../../node_modules/@capgo/capacitor-social-login`)"
+  - GooglePlaces
   - IONFilesystemLib (from `../IONFilesystemLib`)
   - "RevenuecatPurchasesCapacitor (from `../../node_modules/@revenuecat/purchases-capacitor`)"
   - "RevenuecatPurchasesCapacitorUi (from `../../node_modules/@revenuecat/purchases-capacitor-ui`)"
@@ -99,6 +101,7 @@ SPEC REPOS:
     - Alamofire
     - AppAuth
     - AppCheckCore
+    - GooglePlaces
     - GoogleSignIn
     - GoogleUtilities
     - GTMAppAuth
@@ -163,6 +166,7 @@ SPEC CHECKSUMS:
   CapacitorSplashScreen: e388b8e0ed0e982a9d3a40417f478e7a018a8763
   CapawesomeCapacitorFilePicker: 0f4a913a00e39dd77213449f0d917e92f35a5ca9
   CapgoCapacitorSocialLogin: 27bccb5e6c6f8aaa54af8189dcc9d9fb56073c29
+  GooglePlaces: be954445dc2c2d4270f57d8ddd5405a7f35e483f
   GoogleSignIn: c7f09cfbc85a1abf69187be091997c317cc33b77
   GoogleUtilities: 00c88b9a86066ef77f0da2fab05f65d7768ed8e1
   GTMAppAuth: 217a876b249c3c585a54fd6f73e6b58c4f5c4238
@@ -176,6 +180,6 @@ SPEC CHECKSUMS:
   RevenuecatPurchasesCapacitorUi: f9fad7dd89db00bf293ca0cd826127ec7bd51cda
   RevenueCatUI: 61ddba6f94803f9b79c470ffe1e8b81d807c11ce
 
-PODFILE CHECKSUM: 29e48360b8b8cd6403b1bbce9d3290d5544ab23d
+PODFILE CHECKSUM: 42b614a4c218bdeca6320e6ae89bfc0e9a320782
 
 COCOAPODS: 1.16.2

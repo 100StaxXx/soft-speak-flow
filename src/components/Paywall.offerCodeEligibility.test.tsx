@@ -140,7 +140,7 @@ describe("Paywall creator offer-code eligibility", () => {
     expect(screen.queryByRole("button", { name: "Redeem Promo Code" })).not.toBeInTheDocument();
   });
 
-  it("presents the cinematic Cosmiq Pro positioning across the paywall", () => {
+  it("presents the cinematic Cosmiq positioning across the paywall", () => {
     render(
       <MemoryRouter>
         <Paywall />
@@ -148,20 +148,26 @@ describe("Paywall creator offer-code eligibility", () => {
     );
 
     expect(screen.getByTestId("paywall-overlay")).toHaveClass("z-[120]");
-    expect(screen.getByText("An AI companion that turns your goals into daily quests.")).toBeInTheDocument();
+    expect(screen.getByText("Daily quests")).toBeInTheDocument();
+    expect(screen.getByText("A companion that turns your goals into daily quests.")).toBeInTheDocument();
     expect(
       screen.getByText("Big goals become campaigns, rituals, milestones, and a planned day."),
     ).toBeInTheDocument();
+    expect(screen.getByText("Built for growth")).toBeInTheDocument();
     expect(screen.getByText("Your companion grows when you follow through.")).toBeInTheDocument();
     expect(screen.getByText("Start the trial. Keep the story moving.")).toBeInTheDocument();
     expect(screen.getByText("3-day free trial")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /start 3-day free trial/i })).toBeInTheDocument();
-    expect(screen.getByText("Unlimited guide chat")).toBeInTheDocument();
+    expect(screen.getByText("Unlimited companion chat")).toBeInTheDocument();
     expect(screen.getByText("Unlimited quests and campaigns")).toBeInTheDocument();
-    expect(screen.getByText("All 15 evolution stages")).toBeInTheDocument();
+    expect(screen.getByText("100+ levels and 12+ evolutions")).toBeInTheDocument();
     expect(
-      screen.getByText("Both monthly and yearly plans include the same Cosmiq Pro features and renew automatically until canceled."),
+      screen.getByText("Both monthly and yearly plans include the same Cosmiq features and renew automatically until canceled."),
     ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /join our discord/i })).toHaveAttribute(
+      "href",
+      "https://discord.gg/rreaAn7JWn",
+    );
     expect(screen.queryByText("All premium features")).not.toBeInTheDocument();
   });
 
@@ -174,10 +180,10 @@ describe("Paywall creator offer-code eligibility", () => {
 
     expect(screen.getByText("Your journey is ready to continue.")).toBeInTheDocument();
     expect(
-      screen.getByText("Subscribe to keep your AI companion, unlimited quests, campaigns, guide chat, and the full evolution path active."),
+      screen.getByText("Subscribe to keep your companion, unlimited quests, campaigns, companion chat, and the full growth path active."),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /subscribe yearly/i })).toBeInTheDocument();
-    expect(screen.getByText("Continue with Pro")).toBeInTheDocument();
+    expect(screen.getByText("Continue with Cosmiq")).toBeInTheDocument();
     expect(screen.queryByText("3-day free trial")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /start 3-day free trial/i })).not.toBeInTheDocument();
     expect(screen.queryByText("Start the trial. Keep the story moving.")).not.toBeInTheDocument();

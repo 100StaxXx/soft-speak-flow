@@ -203,6 +203,17 @@ const createWrapper = () => {
   };
 };
 
+const createDeferred = <T,>() => {
+  let resolve: (value: T) => void = () => undefined;
+  let reject: (reason?: unknown) => void = () => undefined;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+
+  return { promise, resolve, reject };
+};
+
 describe("useCompanionAssistant", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -792,6 +803,47 @@ describe("useCompanionAssistant", () => {
     );
   });
 
+  it("clears submit state after the assistant bubble is appended without waiting for tracking", async () => {
+    const tracking = createDeferred<void>();
+    mocks.trackInteraction.mockImplementationOnce(() => tracking.promise);
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "companion" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.messages[0]?.content).toBe(
+        "Fresh read: today has a little shape to it.",
+      );
+    });
+
+    await act(async () => {
+      const submitted = await result.current.submitMessage(
+        "Not much. How are you?",
+        "text",
+      );
+      expect(submitted).toBe(true);
+    });
+
+    expect(result.current.isSubmitting).toBe(false);
+    expect(result.current.messages.at(-1)).toEqual(
+      expect.objectContaining({
+        content: "Direct chat reply.",
+        role: "assistant",
+        source: "chat",
+      }),
+    );
+    expect(mocks.trackInteraction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        interactionType: "companion_chat",
+        inputText: "Not much. How are you?",
+      }),
+    );
+
+    tracking.resolve();
+  });
+
   it("keeps external info questions with date language in direct Companion chat", async () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(
@@ -1003,6 +1055,136 @@ describe("useCompanionAssistant", () => {
     ).toHaveLength(2);
   });
 
+  it("keeps the local opener when a generated opener resolves after the user sends", async () => {
+    const opener = createDeferred<{
+      data: {
+        sessionId: string;
+        reply: string;
+        speechText: string;
+        createdAt: string;
+        persistenceReady: boolean;
+        thread: {
+          sessionId: string;
+          companionId: string;
+          surface: "companion";
+          title: string;
+          previewText: string;
+          createdAt: string;
+          lastMessageAt: string;
+          archivedAt: null;
+          messageCount: number;
+        };
+      };
+      error: null;
+    }>();
+
+    mocks.supabaseInvoke.mockImplementation((functionName, options) => {
+      if (functionName === "companion-chat-opener") {
+        return opener.promise;
+      }
+
+      if (functionName === "companion-chat") {
+        return Promise.resolve({
+          data: {
+            reply: "Direct chat reply.",
+            speechText: "Direct chat reply.",
+            handoffToPlanner: false,
+            memoryUpdateApplied: false,
+            persistenceReady: true,
+            sessionId: options?.body?.sessionId ?? "fresh-session",
+          },
+          error: null,
+        });
+      }
+
+      return Promise.resolve({
+        data: {
+          reply: "Reply",
+          mode: "conversation",
+          intent: "unknown",
+          confidence: 0.9,
+          threadState: {
+            threadId: options?.body?.sessionId ?? "fresh-session",
+            sessionId: options?.body?.sessionId ?? "fresh-session",
+            openaiConversationId: "conv_123",
+            lastOpenAIResponseId: "resp_123",
+            hasPendingAction: false,
+          },
+        },
+        error: null,
+      });
+    });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "companion" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(COMPANION_CHAT_OPENING_LINES).toContain(
+        result.current.messages[0]?.content,
+      );
+    });
+    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+      "companion-chat-opener",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          sessionId: "fresh-session",
+          skipIfSessionHasUserMessage: true,
+        }),
+      }),
+    );
+    expect(result.current.canSubmitMessage).toBe(true);
+
+    await act(async () => {
+      const submitted = await result.current.submitMessage("Can we talk?");
+      expect(submitted).toBe(true);
+    });
+
+    expect(result.current.activeThread?.sessionId).toBe("fresh-session");
+    expect(result.current.messages.map((message) => message.content)).toEqual(
+      expect.arrayContaining(["Can we talk?", "Direct chat reply."]),
+    );
+
+    opener.resolve({
+      data: {
+        sessionId: "generated-session",
+        reply: "Late generated opener",
+        speechText: "Late generated opener",
+        createdAt: "2026-04-18T08:04:00.000Z",
+        persistenceReady: true,
+        thread: {
+          sessionId: "generated-session",
+          companionId: "companion-1",
+          surface: "companion",
+          title: "Late generated opener",
+          previewText: "Late generated opener",
+          createdAt: "2026-04-18T08:04:00.000Z",
+          lastMessageAt: "2026-04-18T08:04:00.000Z",
+          archivedAt: null,
+          messageCount: 1,
+        },
+      },
+      error: null,
+    });
+
+    await act(async () => {
+      await opener.promise;
+      await Promise.resolve();
+    });
+
+    expect(result.current.activeThread?.sessionId).toBe("fresh-session");
+    expect(result.current.messages.map((message) => message.content)).toEqual(
+      expect.arrayContaining(["Can we talk?", "Direct chat reply."]),
+    );
+    expect(
+      result.current.messages.some(
+        (message) => message.content === "Late generated opener",
+      ),
+    ).toBe(false);
+  });
+
   it("uses the generated opener path when starting a new companion chat", async () => {
     let openerCount = 0;
     mocks.supabaseInvoke.mockImplementation(async (functionName) => {
@@ -1111,10 +1293,12 @@ describe("useCompanionAssistant", () => {
     expect(mocks.toastError).not.toHaveBeenCalled();
     expect(result.current.canSubmitMessage).toBe(true);
     expect(consoleErrorSpy).not.toHaveBeenCalled();
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
-      "Generated companion opener unavailable; using local opener.",
-      expect.objectContaining({ name: "Error" }),
-    );
+    await waitFor(() => {
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        "Generated companion opener unavailable; using local opener.",
+        expect.objectContaining({ name: "Error" }),
+      );
+    });
 
     await act(async () => {
       const submitted = await result.current.submitMessage("Can we talk?");

@@ -305,7 +305,7 @@ export function useAppleSubscription() {
     if (!user?.id) {
       toast({
         title: "Sign in required",
-        description: "Please sign in before purchasing Cosmiq Pro.",
+        description: "Please sign in before purchasing Cosmiq.",
         variant: "destructive",
       });
       return false;
@@ -351,7 +351,7 @@ export function useAppleSubscription() {
           if (!verified) return false;
 
           toast({
-            title: "Premium unlocked",
+            title: "Cosmiq unlocked",
             description: "Your discounted yearly access is now active.",
           });
           setOfferCodePurchaseReady(false);
@@ -389,10 +389,10 @@ export function useAppleSubscription() {
 
       trackPaywallEvent("purchase_completed", { surface, plan, productId: purchaseProductId, hasOfferCode });
       toast({
-        title: "Premium unlocked",
+        title: "Cosmiq unlocked",
         description: usesOfferCodeDiscount
           ? "Your creator-code yearly discount is active on your account."
-          : "Cosmiq Pro is now active on your account.",
+          : "Cosmiq is now active on your account.",
       });
       return true;
     } catch (error) {
@@ -512,7 +512,7 @@ export function useAppleSubscription() {
     if (!user?.id) {
       toast({
         title: "Sign in required",
-        description: "Please sign in before purchasing Cosmiq Pro.",
+        description: "Please sign in before purchasing Cosmiq.",
         variant: "destructive",
       });
       return false;
@@ -527,8 +527,8 @@ export function useAppleSubscription() {
 
       if (purchasedOrRestored) {
         toast({
-          title: "Premium unlocked",
-          description: "Cosmiq Pro is now active on your account.",
+          title: "Cosmiq unlocked",
+          description: "Cosmiq is now active on your account.",
         });
       }
 

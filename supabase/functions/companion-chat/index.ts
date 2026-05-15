@@ -12,6 +12,7 @@ import {
 import { normalizeCompanionChatSurface } from "./surfaceAccess.ts";
 import { withCompanionChatPersistenceCapability } from "./persistenceCapability.ts";
 import { persistCompanionChatTurn } from "./threadPersistence.ts";
+import { scheduleCompanionChatPostResponseWork } from "./backgroundTasks.ts";
 import { shouldHandoffToPlanner } from "./handoff.ts";
 import {
   buildCompanionChatCompletionBody,
@@ -760,20 +761,11 @@ export const handleCompanionChatRequest = async (req: Request) => {
       });
     }
 
-    const memoryExtractionPromise = maybeExtractConversationMemory({
-      guardedFetch,
-      message: parsed.data.message,
-      existingProfile,
-    });
-
     let reply = planningIntent
       ? surface === "journeys"
         ? "Switching into planning for that."
         : chooseBridgeReply(parsed.data.message)
       : "";
-    let profileUpdated = false;
-    let memorableMoment: string | null = null;
-    let shouldRemember = false;
 
     if (!planningIntent) {
       reply = await generateCompanionReply({
@@ -791,36 +783,58 @@ export const handleCompanionChatRequest = async (req: Request) => {
       });
     }
 
-    const memoryExtraction = await memoryExtractionPromise;
-    profileUpdated = memoryExtraction.updated;
-    memorableMoment = memoryExtraction.memorableMoment;
-    shouldRemember = memoryExtraction.shouldRemember
-      || /remember this|don't forget/i.test(parsed.data.message.toLowerCase());
+    const postResponseWorkStatus = scheduleCompanionChatPostResponseWork(
+      async () => {
+        let memoryExtraction = {
+          profile: existingProfile,
+          memorableMoment: null as string | null,
+          shouldRemember: false,
+          updated: false,
+        };
 
-    const persistenceReady = await withCompanionChatPersistenceCapability(() => (
-      persistConversation({
-        supabase: protectedRequest.supabase,
-        userId,
-        companionId: parsed.data.companionId,
-        sessionId,
-        surface,
-        message: parsed.data.message,
-        reply,
-        inputMode: parsed.data.inputMode,
-        conversationProfile: memoryExtraction.profile,
-        profileUpdated,
-        memorableMoment,
-        shouldRemember,
-      })
-    ));
+        try {
+          memoryExtraction = await maybeExtractConversationMemory({
+            guardedFetch,
+            message: parsed.data.message,
+            existingProfile,
+          });
+        } catch (error) {
+          console.warn(
+            "[companion-chat] background memory extraction failed",
+            error,
+          );
+        }
+
+        const shouldRemember = memoryExtraction.shouldRemember ||
+          /remember this|don't forget/i.test(parsed.data.message.toLowerCase());
+
+        await withCompanionChatPersistenceCapability(() => (
+          persistConversation({
+            supabase: protectedRequest.supabase,
+            userId,
+            companionId: parsed.data.companionId,
+            sessionId,
+            surface,
+            message: parsed.data.message,
+            reply,
+            inputMode: parsed.data.inputMode,
+            conversationProfile: memoryExtraction.profile,
+            profileUpdated: memoryExtraction.updated,
+            memorableMoment: memoryExtraction.memorableMoment,
+            shouldRemember,
+          })
+        ));
+      },
+    );
 
     return new Response(
       JSON.stringify({
         reply,
         speechText: reply,
         handoffToPlanner: planningIntent,
-        memoryUpdateApplied: profileUpdated || Boolean(memorableMoment && shouldRemember),
-        persistenceReady,
+        memoryUpdateApplied: false,
+        persistenceReady: postResponseWorkStatus !== "skipped",
+        postResponseWorkStatus,
         sessionId,
       }),
       {

@@ -23,7 +23,7 @@ const PLAN_OPTIONS: PlanOption[] = [
     id: "monthly",
     label: "Monthly",
     description: PREMIUM_BENEFITS_SUMMARY,
-    hint: "Full Cosmiq Pro access billed monthly.",
+    hint: "Full Cosmiq access billed monthly.",
     fallbackPrice: "$9.99",
     billingPeriodLabel: "/month",
   },
@@ -31,7 +31,7 @@ const PLAN_OPTIONS: PlanOption[] = [
     id: "yearly",
     label: "Yearly",
     description: PREMIUM_BENEFITS_SUMMARY,
-    hint: "Full Cosmiq Pro access billed yearly with the best recurring value.",
+    hint: "Full Cosmiq access billed yearly with the best recurring value.",
     fallbackPrice: "$99.99",
     billingPeriodLabel: "/year",
     badge: "Most popular",
@@ -59,7 +59,7 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
   const selectedProductId = getPurchaseProductIdForPlan(selectedPlan, products);
 
   const subscriptionStatusText = subscription
-    ? `You have Cosmiq Pro (${plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : "Active"})`
+    ? `You have Cosmiq (${plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : "Active"})`
     : "You're on the free plan";
 
   const statusLabel = subscription
@@ -103,7 +103,7 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Crown className="h-5 w-5 text-primary" />
-            Unlock unlimited guide chat, quests, and offline access
+            Unlock unlimited companion chat, quests, and offline access
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">

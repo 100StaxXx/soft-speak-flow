@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import GooglePlaces
 import UserNotifications
 
 @UIApplicationMain
@@ -10,6 +11,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Disable iOS "Shake to Undo" so menu screens do not surface "Undo Typing".
         application.applicationSupportsShakeToEdit = false
+        configureGooglePlaces()
         logNotificationSettings(context: "didFinishLaunching")
         return true
     }
@@ -96,12 +98,30 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         }
     }
 
+    private func configureGooglePlaces() {
+        guard let rawKey = Bundle.main.object(forInfoDictionaryKey: "GooglePlacesAPIKey") as? String else {
+            print("[GooglePlaces] GooglePlacesAPIKey is not configured.")
+            return
+        }
+
+        let key = rawKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty,
+              !key.hasPrefix("$("),
+              key != "your-ios-google-places-api-key" else {
+            print("[GooglePlaces] GooglePlacesAPIKey is empty or still using a placeholder.")
+            return
+        }
+
+        GMSPlacesClient.provideAPIKey(key)
+    }
+
     private func string(from status: UNAuthorizationStatus) -> String {
         switch status {
         case .notDetermined: return "notDetermined"
         case .denied: return "denied"
         case .authorized: return "authorized"
         case .provisional: return "provisional"
+        case .ephemeral: return "ephemeral"
         @unknown default: return "unknown"
         }
     }
@@ -145,6 +165,7 @@ class AppBridgeViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(WidgetDataPlugin())
         bridge?.registerPluginInstance(AppBadgePlugin())
         bridge?.registerPluginInstance(NativeCalendarPlugin())
+        bridge?.registerPluginInstance(NativePlacesAutocompletePlugin())
         bridge?.registerPluginInstance(WinWinKitPlugin())
     }
 }

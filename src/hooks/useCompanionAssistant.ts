@@ -73,6 +73,11 @@ import {
   toUserFacingFunctionError,
 } from "@/utils/supabaseFunctionErrors";
 import { resolveCompanionChatError } from "@/utils/companionChatErrors";
+import {
+  type CompanionLatencyTimer,
+  finishCompanionLatencyTimer,
+  startCompanionLatencyTimer,
+} from "@/utils/companionLatencyMetrics";
 
 export type CompanionAssistantSurface = "companion" | "journeys";
 
@@ -964,6 +969,7 @@ export function useCompanionAssistant({
   const pendingLegacyFallbackReplayRef =
     useRef<PendingLegacyFallbackReplay | null>(null);
   const submitInFlightRef = useRef(false);
+  const submitLatencyTimerRef = useRef<CompanionLatencyTimer | null>(null);
   const [legacyFallbackReplayKey, setLegacyFallbackReplayKey] = useState(0);
 
   const scopeKey = `${surface}:${user?.id ?? "anon"}:${
@@ -1392,33 +1398,20 @@ export function useCompanionAssistant({
     if (surface !== "companion") return null;
 
     const fallbackOpening = getRandomCompanionChatOpeningLine();
-
-    if (!user?.id || !companion?.id) {
-      return openFreshThread({
-        greetingText: fallbackOpening,
-        markBootstrapped: true,
-        visibleAssistantOpening: true,
-      });
-    }
-
-    openFreshThread({
+    const localSessionId = openFreshThread({
+      greetingText: fallbackOpening,
       markBootstrapped: true,
+      visibleAssistantOpening: true,
     });
     const openerMutationVersion = threadMutationVersionRef.current;
-    setIsOpeningThread(true);
+
+    if (!user?.id || !companion?.id) {
+      return localSessionId;
+    }
 
     try {
       if (!(await ensureFunctionSession({ silent: true }))) {
-        if (threadMutationVersionRef.current !== openerMutationVersion) {
-          return null;
-        }
-
-        setIsOpeningThread(false);
-        return openFreshThread({
-          greetingText: fallbackOpening,
-          markBootstrapped: true,
-          visibleAssistantOpening: true,
-        });
+        return localSessionId;
       }
 
       const { data, error } = await supabase.functions.invoke(
@@ -1427,6 +1420,8 @@ export function useCompanionAssistant({
           body: {
             companionId: companion.id,
             surface: "companion",
+            sessionId: localSessionId,
+            skipIfSessionHasUserMessage: true,
             currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
           },
         },
@@ -1434,7 +1429,7 @@ export function useCompanionAssistant({
 
       if (error) throw error;
       if (threadMutationVersionRef.current !== openerMutationVersion) {
-        return null;
+        return localSessionId;
       }
 
       const response = data as CompanionChatOpenerResponse;
@@ -1473,27 +1468,17 @@ export function useCompanionAssistant({
       return response.sessionId;
     } catch (error) {
       if (threadMutationVersionRef.current !== openerMutationVersion) {
-        return null;
+        return localSessionId;
       }
       console.warn("Generated companion opener unavailable; using local opener.", {
         name: error instanceof Error ? error.name : null,
         message: error instanceof Error ? error.message : null,
       });
-      setIsOpeningThread(false);
       void invalidateThreads();
-      return openFreshThread({
-        greetingText: fallbackOpening,
-        markBootstrapped: true,
-        visibleAssistantOpening: true,
-      });
-    } finally {
-      if (threadMutationVersionRef.current === openerMutationVersion) {
-        setIsOpeningThread(false);
-      }
+      return localSessionId;
     }
   }, [
     applyActiveSessionId,
-    baseGreeting,
     companion?.id,
     ensureFunctionSession,
     invalidateThreads,
@@ -1708,6 +1693,8 @@ export function useCompanionAssistant({
         options?.turnOrigin === "launcher" &&
         !options?.selectedProposedAction;
 
+      threadMutationVersionRef.current += 1;
+
       if (useLegacyFallback) {
         if (shouldStartFreshLauncherThread) {
           legacyAssistant.startTemplateThread?.({ greetingText: null });
@@ -1780,7 +1767,18 @@ export function useCompanionAssistant({
         return false;
       }
 
+      submitLatencyTimerRef.current = startCompanionLatencyTimer(
+        "companion_send_assistant_bubble",
+        {
+          surface,
+          inputMode,
+          turnOrigin: options?.turnOrigin ?? null,
+          starterIntent: starterIntent ?? null,
+        },
+      );
+
       if (!(await ensureFunctionSession())) {
+        submitLatencyTimerRef.current = null;
         return false;
       }
 
@@ -1852,6 +1850,15 @@ export function useCompanionAssistant({
               source: "chat",
             }),
           ]);
+          const assistantBubbleLatencyMs = finishCompanionLatencyTimer(
+            submitLatencyTimerRef.current,
+            {
+              surface,
+              path: "companion-chat",
+              handoffToPlanner: response.handoffToPlanner,
+            },
+          );
+          submitLatencyTimerRef.current = null;
           setStructuredResponse(null);
           setActiveFollowUp(null);
           setUnderstandingState(null);
@@ -1861,7 +1868,7 @@ export function useCompanionAssistant({
           setPendingSuggestionProposalId(null);
           pendingQuestCaptureSelectedDateRef.current = null;
 
-          await trackInteraction({
+          void trackInteraction({
             interactionType:
               surface === "journeys"
                 ? "journeys_companion_chat"
@@ -1876,8 +1883,13 @@ export function useCompanionAssistant({
               memoryUpdateApplied: response.memoryUpdateApplied,
               handoffToPlanner: response.handoffToPlanner,
               surface,
+              clientLatencyMs: assistantBubbleLatencyMs,
             },
             userAction: "accepted",
+            modifications: {
+              surface,
+              clientLatencyMs: assistantBubbleLatencyMs,
+            },
           });
 
           if (
@@ -1926,6 +1938,15 @@ export function useCompanionAssistant({
         const response = data as CompanionAgentResponse;
         applyActiveSessionId(response.threadState.sessionId);
         appendAssistantResponse(response);
+        const assistantBubbleLatencyMs = finishCompanionLatencyTimer(
+          submitLatencyTimerRef.current,
+          {
+            surface,
+            path: "companion-agent",
+            mode: response.mode,
+          },
+        );
+        submitLatencyTimerRef.current = null;
         void requestDraftOpportunitySidecar({
           message,
           inputMode,
@@ -1939,7 +1960,7 @@ export function useCompanionAssistant({
         const nextQuestCaptureSelectedDate =
           readFollowUpSelectedDate(response.followUp ?? null) ??
           (response.followUp && selectedDate ? selectedDate : null);
-        await trackInteraction({
+        void trackInteraction({
           interactionType: "companion_agent",
           inputText: message,
           detectedIntent: response.intent,
@@ -1954,6 +1975,7 @@ export function useCompanionAssistant({
             understandingState: response.understandingState ?? null,
             hasFollowUp: Boolean(response.followUp),
             proposedActionCount: response.proposedActions?.length ?? 0,
+            clientLatencyMs: assistantBubbleLatencyMs,
           },
           userAction: "accepted",
           modifications: {
@@ -1966,6 +1988,7 @@ export function useCompanionAssistant({
               ? (options.selectedProposedActionIntent ?? "draft")
               : null,
             proposalId: response.pendingAction?.proposalId ?? null,
+            clientLatencyMs: assistantBubbleLatencyMs,
           },
         });
         if (shouldEmitPlanDayAiAnswered) {
@@ -2044,6 +2067,7 @@ export function useCompanionAssistant({
         toast.error(toUserFacingCompanionAgentError(parsed));
         return false;
       } finally {
+        submitLatencyTimerRef.current = null;
         setIsSubmitting(false);
       }
     },

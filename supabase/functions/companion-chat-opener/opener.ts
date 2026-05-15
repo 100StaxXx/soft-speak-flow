@@ -77,6 +77,11 @@ export interface PersistCompanionOpenerTurnParams {
   lastOpenAIResponseId?: string | null;
 }
 
+interface BestEffortCompanionOpenerPersistenceOptions {
+  requestId?: string | null;
+  skipIfSessionHasUserMessage?: boolean;
+}
+
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -670,6 +675,24 @@ export async function archiveActiveCompanionThreads(params: {
   if (error) throw error;
 }
 
+async function hasUserMessageInOpenerSession(
+  params: PersistCompanionOpenerTurnParams,
+) {
+  const { data, error } = await params.supabase
+    .from("companion_chats")
+    .select("id")
+    .eq("user_id", params.userId)
+    .eq("companion_id", params.companionId)
+    .eq("session_id", params.sessionId)
+    .eq("surface", "companion")
+    .eq("role", "user")
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return Boolean(data);
+}
+
 async function insertCompanionOpenerMessage(
   params: PersistCompanionOpenerTurnParams,
 ) {
@@ -744,9 +767,18 @@ export async function persistCompanionOpenerTurn(
 }
 
 export async function persistCompanionOpenerTurnBestEffort(
-  params: PersistCompanionOpenerTurnParams & { requestId?: string | null },
+  params:
+    & PersistCompanionOpenerTurnParams
+    & BestEffortCompanionOpenerPersistenceOptions,
 ) {
   try {
+    if (
+      params.skipIfSessionHasUserMessage &&
+      await hasUserMessageInOpenerSession(params)
+    ) {
+      return false;
+    }
+
     await insertCompanionOpenerMessage(params);
     await ensureCompanionOpenerThread(params);
   } catch (error) {

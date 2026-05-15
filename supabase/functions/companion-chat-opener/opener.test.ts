@@ -487,6 +487,94 @@ Deno.test("persistCompanionOpenerTurnBestEffort reports persistence failure with
   );
 });
 
+Deno.test("persistCompanionOpenerTurnBestEffort skips stale opener persistence after the user starts the local session", async () => {
+  const calls: Array<
+    { table: string; action: string; payload?: unknown; filters?: unknown[] }
+  > = [];
+  const supabase = {
+    from(table: string) {
+      const filters: unknown[] = [];
+      const builder = {
+        update(payload: unknown) {
+          calls.push({ table, action: "update", payload, filters });
+          return builder;
+        },
+        insert(payload: unknown) {
+          calls.push({ table, action: "insert", payload, filters });
+          return Promise.resolve({ error: null });
+        },
+        select(_columns: string) {
+          calls.push({ table, action: "select", filters });
+          return builder;
+        },
+        eq(column: string, value: unknown) {
+          filters.push(["eq", column, value]);
+          return builder;
+        },
+        neq(column: string, value: unknown) {
+          filters.push(["neq", column, value]);
+          return builder;
+        },
+        is(column: string, value: unknown) {
+          filters.push(["is", column, value]);
+          return Promise.resolve({ error: null });
+        },
+        limit(value: number) {
+          filters.push(["limit", value]);
+          return builder;
+        },
+        maybeSingle() {
+          return Promise.resolve({
+            data: { id: "user-message-1" },
+            error: null,
+          });
+        },
+      };
+      return builder;
+    },
+  };
+
+  const ready = await persistCompanionOpenerTurnBestEffort({
+    supabase,
+    userId: "user-1",
+    companionId: "companion-1",
+    sessionId: "session-new",
+    reply: "what's the move",
+    signal: { type: "open_context", facts: [] },
+    currentDateTime: "2026-05-10T09:55:00-07:00",
+    createdAt: "2026-05-10T16:55:00.000Z",
+    requestId: "request-1",
+    skipIfSessionHasUserMessage: true,
+  });
+
+  assertEquals(ready, false);
+  assertEquals(
+    calls.some((call) =>
+      call.table === "companion_chats" && call.action === "insert"
+    ),
+    false,
+  );
+  assertEquals(
+    calls.some((call) =>
+      call.table === "companion_chat_threads" && call.action === "update"
+    ),
+    false,
+  );
+  assertEquals(
+    calls.find((call) =>
+      call.table === "companion_chats" && call.action === "select"
+    )?.filters,
+    [
+      ["eq", "user_id", "user-1"],
+      ["eq", "companion_id", "companion-1"],
+      ["eq", "session_id", "session-new"],
+      ["eq", "surface", "companion"],
+      ["eq", "role", "user"],
+      ["limit", 1],
+    ],
+  );
+});
+
 Deno.test("persistCompanionOpenerTurnBestEffort keeps opener ready when archive cleanup fails", async () => {
   const calls: Array<{ table: string; action: string; payload?: unknown }> = [];
   const supabase = {

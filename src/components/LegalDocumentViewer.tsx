@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback, memo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+import { NativePlacesAutocomplete } from "@/plugins/NativePlacesAutocompletePlugin";
 import { FileText, X } from "lucide-react";
 
 interface LegalDocumentViewerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  documentType: "terms" | "privacy";
+  documentType: "terms" | "privacy" | "openSourceLicenses";
 }
 
 export const LegalDocumentViewer = memo(({ open, onOpenChange, documentType }: LegalDocumentViewerProps) => {
@@ -17,6 +18,12 @@ export const LegalDocumentViewer = memo(({ open, onOpenChange, documentType }: L
   const loadDocument = useCallback(async () => {
     setLoading(true);
     try {
+      if (documentType === "openSourceLicenses") {
+        const { licenseInfo } = await NativePlacesAutocomplete.getOpenSourceLicenseInfo();
+        setContent(licenseInfo.trim() || "No native open source license information is available for this build.");
+        return;
+      }
+
       const filename = documentType === "terms" ? "TERMS_OF_SERVICE.md" : "PRIVACY_POLICY.md";
       const response = await fetch(`/${filename}`);
       const text = await response.text();
@@ -35,7 +42,11 @@ export const LegalDocumentViewer = memo(({ open, onOpenChange, documentType }: L
     }
   }, [open, loadDocument]);
 
-  const title = documentType === "terms" ? "Terms of Service" : "Privacy Policy";
+  const title = documentType === "terms"
+    ? "Terms of Service"
+    : documentType === "privacy"
+      ? "Privacy Policy"
+      : "Open Source Licenses";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

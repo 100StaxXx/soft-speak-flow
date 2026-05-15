@@ -65,6 +65,11 @@ import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
 import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
 import { shouldContainCompanionSceneImage } from "@/lib/companionImageFocal";
 import { cn, stripMarkdown } from "@/lib/utils";
+import {
+  type CompanionLatencyTimer,
+  finishCompanionLatencyTimer,
+  startCompanionLatencyTimer,
+} from "@/utils/companionLatencyMetrics";
 import type { QuestComposerPrefillDraft } from "@/features/quests/types";
 import { buildQuestPrefillFromNaturalLanguage } from "@/features/quests/utils/voiceQuestPrefill";
 import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
@@ -1088,6 +1093,7 @@ const JourneysCompanionThreadPicker = memo(
 const JourneysCompanionOverlayBody = memo(
   ({
     presentation,
+    open,
     selectedDate,
     launchIntent,
     onLaunchIntentConsumed,
@@ -1096,6 +1102,7 @@ const JourneysCompanionOverlayBody = memo(
     drawerLayout,
   }: {
     presentation: JourneysCompanionPlannerModalPresentation;
+    open: boolean;
     selectedDate?: Date | null;
     launchIntent?: CompanionPlannerLaunchIntent | null;
     onLaunchIntentConsumed?: (intentId: string) => void;
@@ -1146,6 +1153,7 @@ const JourneysCompanionOverlayBody = memo(
     >(null);
 
     const composerRef = useRef<HTMLTextAreaElement | null>(null);
+    const chatOpenTimerRef = useRef<CompanionLatencyTimer | null>(null);
     const transcriptScrollAreaRef = useRef<HTMLDivElement | null>(null);
     const transcriptInnerRef = useRef<HTMLDivElement | null>(null);
     const transcriptPinnedToBottomRef = useRef(true);
@@ -1172,6 +1180,31 @@ const JourneysCompanionOverlayBody = memo(
       () => getFollowUpKey(assistant.activeFollowUp),
       [assistant.activeFollowUp],
     );
+
+    useEffect(() => {
+      if (open) {
+        chatOpenTimerRef.current = startCompanionLatencyTimer(
+          "companion_chat_composer_ready",
+          {
+            surface: "journeys",
+            presentation,
+          },
+        );
+        return;
+      }
+
+      chatOpenTimerRef.current = null;
+    }, [open, presentation]);
+
+    useEffect(() => {
+      if (!open || !composerRef.current || !chatOpenTimerRef.current) return;
+
+      finishCompanionLatencyTimer(chatOpenTimerRef.current, {
+        surface: "journeys",
+        presentation,
+      });
+      chatOpenTimerRef.current = null;
+    });
 
     useEffect(() => {
       if (launchIntent?.briefingContext) {
@@ -2246,6 +2279,7 @@ export const JourneysCompanionPlannerModal = memo(
     const body = (
       <JourneysCompanionOverlayBody
         presentation={presentation}
+        open={open}
         selectedDate={selectedDate}
         launchIntent={launchIntent}
         onLaunchIntentConsumed={onLaunchIntentConsumed}

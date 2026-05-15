@@ -95,8 +95,8 @@ const paywallBackdrops = {
 const paywallStorySections: PaywallStorySection[] = [
   {
     id: "paywall-quests",
-    eyebrow: "The daily loop",
-    title: "An AI companion that turns your goals into daily quests.",
+    eyebrow: "Daily quests",
+    title: "A companion that turns your goals into daily quests.",
     body: "Start with what matters, shape the day, follow through, and let your progress become part of a world that keeps calling you back.",
     background: paywallBackdrops.quests,
     icon: Target,
@@ -115,16 +115,16 @@ const paywallStorySections: PaywallStorySection[] = [
     id: "paywall-campaigns",
     eyebrow: "Goals become systems",
     title: "Big goals become campaigns, rituals, milestones, and a planned day.",
-    body: "Cosmiq Pro keeps the long arc visible while your companion helps translate ambition into something you can actually do today.",
+    body: "Cosmiq keeps the long arc visible while your companion helps translate ambition into something you can actually do today.",
     background: paywallBackdrops.campaigns,
     icon: CalendarDays,
     imagePosition: "50% 48%",
   },
   {
     id: "paywall-companion",
-    eyebrow: "Built for return",
+    eyebrow: "Built for growth",
     title: "Your companion grows when you follow through.",
-    body: "XP, daily missions, evolution stages, stories, collection, and memories turn ordinary consistency into a world worth returning to.",
+    body: "XP, daily missions, evolutions, stories, collection, and memories turn ordinary consistency into a world worth returning to.",
     background: paywallBackdrops.companion,
     icon: Sparkles,
     imagePosition: "50% 48%",
@@ -134,8 +134,8 @@ const paywallStorySections: PaywallStorySection[] = [
 const paywallBenefits: PaywallBenefit[] = [
   {
     icon: MessageCircle,
-    title: "Unlimited guide chat",
-    text: "Ask for planning help, motivation, reflection, and calmer next steps whenever the day gets noisy.",
+    title: "Unlimited companion chat",
+    text: "Ask your companion for planning help, motivation, reflection, and calmer next steps whenever the day gets noisy.",
   },
   {
     icon: Target,
@@ -144,8 +144,8 @@ const paywallBenefits: PaywallBenefit[] = [
   },
   {
     icon: Sparkles,
-    title: "All 15 evolution stages",
-    text: "Keep the full companion arc open, including missions, stories, collection, and growth rewards.",
+    title: "100+ levels and 12+ evolutions",
+    text: "Keep the full companion growth arc open, including missions, stories, collection, and growth rewards.",
   },
   {
     icon: Crown,
@@ -441,18 +441,18 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
     ? {
         checkoutEyebrow: "Keep the world open",
         title: "Your journey is ready to continue.",
-        subtitle: "Subscribe to keep your AI companion, unlimited quests, campaigns, guide chat, and the full evolution path active.",
+        subtitle: "Subscribe to keep your companion, unlimited quests, campaigns, companion chat, and the full growth path active.",
         cta: `Subscribe ${selectedPlan === "yearly" ? "Yearly" : "Monthly"}`,
         legalIntro: hasSelectedCreatorYearlyOffer
           ? "Your creator code unlocks $69.99 for the first year. After the first year, this plan renews at the standard yearly price unless canceled."
           : "Payment will be charged to your Apple ID account at confirmation of purchase.",
-        heroBadge: "Continue with Pro",
+        heroBadge: "Continue with Cosmiq",
         shortcutLabel: "Plans",
       }
     : {
-        checkoutEyebrow: "Start Cosmiq Pro",
+        checkoutEyebrow: "Start Cosmiq",
         title: "Start the trial. Keep the story moving.",
-        subtitle: "Unlock the full daily loop: plan with your AI companion, follow your quests, and watch the world grow from real progress.",
+        subtitle: "Unlock the full experience: plan with your companion, follow your quests, and watch the world grow from real progress.",
         cta: hasSelectedCreatorYearlyOffer ? "Redeem Discount with Apple" : "Start 3-Day Free Trial",
         legalIntro: hasSelectedCreatorYearlyOffer
           ? "Your creator code unlocks $69.99 for the first year. After the first year, this plan renews at the standard yearly price unless canceled."
@@ -470,7 +470,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
         type="button"
         onClick={scrollToCheckout}
         className="fixed right-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] z-[130] inline-flex h-10 items-center gap-2 border border-white/18 bg-black/32 px-4 text-xs font-semibold uppercase tracking-[0.18em] text-white/84 backdrop-blur-xl transition hover:border-white/36 hover:bg-white/12 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-100"
-        aria-label="View Cosmiq Pro plans"
+        aria-label="View Cosmiq plans"
       >
         {copy.shortcutLabel}
         <ArrowDown className="h-3.5 w-3.5" />
@@ -578,7 +578,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-100">
-                      Cosmiq Pro
+                      Cosmiq
                     </p>
                     <h3 className="mt-2 text-2xl font-semibold text-white">
                       Choose your path
@@ -696,6 +696,21 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                     View All Plans
                   </Button>
                 )}
+
+                <Button
+                  asChild
+                  variant="outline"
+                  className="w-full border-cyan-100/34 bg-cyan-100/10 text-cyan-50 hover:bg-cyan-100/18 hover:text-white"
+                >
+                  <a
+                    href="https://discord.gg/rreaAn7JWn"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    Join our Discord
+                  </a>
+                </Button>
 
                 {!isAvailable && (
                   <div className="bg-white/[0.06] p-4">

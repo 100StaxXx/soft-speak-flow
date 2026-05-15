@@ -76,6 +76,7 @@ export interface CompanionChatResponse {
   handoffToPlanner: boolean;
   memoryUpdateApplied: boolean;
   persistenceReady: boolean;
+  postResponseWorkStatus?: "scheduled" | "completed" | "skipped";
   sessionId?: string;
 }
 

@@ -475,11 +475,16 @@ describe("AdvancedQuestOptions reminder picker", () => {
     fireEvent.click(customButton);
 
     expect(screen.getByText("Custom reminder date")).toBeInTheDocument();
-    expect(screen.getByLabelText("Custom reminder time")).toBeInTheDocument();
+    expect(screen.getByText("Custom reminder time")).toBeInTheDocument();
     const activeCustomButton = screen.getByRole("button", { name: "Custom" });
     expect(activeCustomButton).toHaveAttribute("aria-pressed", "true");
     expect(activeCustomButton.className).toContain("bg-accent");
-    fireEvent.change(screen.getByLabelText("Custom reminder time"), { target: { value: "08:00" } });
+    expect(screen.getByRole("group", { name: "Custom reminder time" })).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("custom-reminder-date-trigger"));
+    expect(screen.getByTestId("custom-reminder-date-picker")).toHaveClass("z-[90]");
+    const customReminderTimeButton = screen.getByRole("button", { name: "8:00 AM" });
+    fireEvent.click(customReminderTimeButton);
+    expect(customReminderTimeButton).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(screen.getByRole("button", { name: "Apply" }));
 
     await waitFor(() => {
@@ -505,7 +510,7 @@ describe("AdvancedQuestOptions reminder picker", () => {
 
     fireEvent.click(getReminderSection().getByRole("button", { name: "None" }));
     fireEvent.click(screen.getByRole("button", { name: "Custom" }));
-    fireEvent.change(screen.getByLabelText("Custom reminder time"), { target: { value: "10:00" } });
+    fireEvent.click(screen.getByRole("button", { name: "10:00 AM" }));
 
     expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
     expect(screen.getByTestId("reminder-offsets-state")).toHaveTextContent("none");
@@ -523,7 +528,7 @@ describe("AdvancedQuestOptions reminder picker", () => {
     fireEvent.click(screen.getByRole("button", { name: "Custom" }));
 
     expect(screen.getByText("Custom reminder date")).toBeInTheDocument();
-    expect(screen.getByLabelText("Custom reminder time")).toBeInTheDocument();
+    expect(screen.getByText("Custom reminder time")).toBeInTheDocument();
     expect(screen.getByText("Choose a future quest time before adding a custom reminder.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
   });
@@ -541,7 +546,7 @@ describe("AdvancedQuestOptions reminder picker", () => {
 
     fireEvent.click(getReminderSection().getByRole("button", { name: "None" }));
     fireEvent.click(screen.getByRole("button", { name: "Custom" }));
-    fireEvent.change(screen.getByLabelText("Custom reminder time"), { target: { value: "11:00" } });
+    fireEvent.click(screen.getByRole("button", { name: "11:00 AM" }));
 
     expect(screen.getByText("Choose a reminder time in the future.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();

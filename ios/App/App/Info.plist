@@ -94,6 +94,8 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>GooglePlacesAPIKey</key>
+	<string>$(GOOGLE_PLACES_IOS_API_KEY)</string>
 	<key>WinWinKitAPIKey</key>
 	<string>$(WINWINKIT_IOS_API_KEY)</string>
 </dict>

@@ -59,7 +59,7 @@ export default function PremiumSuccess() {
         <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
 
         <h1 className="font-display text-4xl text-foreground mb-3">
-          Welcome to Premium!
+          Welcome to Cosmiq!
         </h1>
 
         <p className="text-muted-foreground mb-6 text-lg">

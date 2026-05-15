@@ -68,6 +68,7 @@ end
 target 'App' do
   pod 'IONFilesystemLib', :path => '../IONFilesystemLib'
   capacitor_pods
+  pod 'GooglePlaces'
   # Add your Pods here
 end
 

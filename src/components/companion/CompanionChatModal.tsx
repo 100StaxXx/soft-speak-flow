@@ -56,6 +56,11 @@ import {
   shouldContainCompanionSceneImage,
 } from "@/lib/companionImageFocal";
 import { cn, stripMarkdown } from "@/lib/utils";
+import {
+  type CompanionLatencyTimer,
+  finishCompanionLatencyTimer,
+  startCompanionLatencyTimer,
+} from "@/utils/companionLatencyMetrics";
 
 interface CompanionChatModalProps {
   open: boolean;
@@ -122,6 +127,8 @@ export const CompanionChatModal = memo(function CompanionChatModal({
 }: CompanionChatModalProps) {
   const isDesktop = layoutMode === "desktop";
   const transcriptRef = useRef<HTMLDivElement | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const chatOpenTimerRef = useRef<CompanionLatencyTimer | null>(null);
   const [drawerLayout, setDrawerLayout] =
     useState<CompanionChatDrawerLayout>(() => getCompanionChatDrawerLayout());
   const { themeModeClassName } = usePlannerPathfinderAppearance();
@@ -163,6 +170,31 @@ export const CompanionChatModal = memo(function CompanionChatModal({
   const usesGeneratedSceneAvatar = shouldContainCompanionSceneImage(imageUrl);
   const canUsePortraitShell =
     !usesGeneratedSceneAvatar && (usesPortraitShell || isCompanionSceneImageSource(imageUrl));
+
+  useEffect(() => {
+    if (open) {
+      chatOpenTimerRef.current = startCompanionLatencyTimer(
+        "companion_chat_composer_ready",
+        {
+          surface: "companion",
+          presentation: isDesktop ? "dialog" : "drawer",
+        },
+      );
+      return;
+    }
+
+    chatOpenTimerRef.current = null;
+  }, [isDesktop, open]);
+
+  useEffect(() => {
+    if (!open || !composerRef.current || !chatOpenTimerRef.current) return;
+
+    finishCompanionLatencyTimer(chatOpenTimerRef.current, {
+      surface: "companion",
+      presentation: isDesktop ? "dialog" : "drawer",
+    });
+    chatOpenTimerRef.current = null;
+  });
 
   useEffect(() => {
     if (isDesktop || !open) return;
@@ -253,6 +285,16 @@ export const CompanionChatModal = memo(function CompanionChatModal({
               className="rounded-full"
             />
           </CompanionPortraitShell>
+        ) : usesGeneratedSceneAvatar ? (
+          <CompanionImage
+            src={imageUrl}
+            alt={companionLabel}
+            fit="contain"
+            element={element}
+            focalX={focalX}
+            focalY={focalY}
+            className="absolute inset-0 z-10 rounded-full"
+          />
         ) : (
           <CompanionImage
             variant="avatar"
@@ -266,7 +308,12 @@ export const CompanionChatModal = memo(function CompanionChatModal({
           />
         )
       ) : null}
-      <AvatarFallback className="rounded-full bg-card/80 text-sm font-semibold text-foreground">
+      <AvatarFallback
+        className={cn(
+          "rounded-full bg-card/80 text-sm font-semibold text-foreground",
+          imageUrl && usesGeneratedSceneAvatar && "absolute inset-0 z-0",
+        )}
+      >
         {companionLabel.charAt(0).toUpperCase()}
       </AvatarFallback>
     </Avatar>
@@ -526,6 +573,7 @@ export const CompanionChatModal = memo(function CompanionChatModal({
                 Message your companion
               </label>
               <Textarea
+                ref={composerRef}
                 id="companion-chat-input"
                 rows={2}
                 value={assistant.draftInput}

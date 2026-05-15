@@ -17,7 +17,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { DIFFICULTY_COLORS, QUEST_FORM_STYLES, getQuestOptionPillClasses } from "@/components/quest-shared";
-import { DurationPickerField, TimePickerField } from "@/components/scheduling";
+import { DurationPickerField, TimePickerField, TimeWheelPicker } from "@/components/scheduling";
 import {
   MAX_QUEST_REMINDER_MINUTES,
   MAX_QUEST_REMINDER_OFFSETS,
@@ -95,6 +95,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
   const [customReminderTime, setCustomReminderTime] = useState("");
   const [customReminderError, setCustomReminderError] = useState<string | null>(null);
   const [isEditingCustomReminder, setIsEditingCustomReminder] = useState(false);
+  const [showCustomReminderDatePicker, setShowCustomReminderDatePicker] = useState(false);
 
   const durationOptions = [
     { value: 15, label: "15m" },
@@ -275,6 +276,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
   useEffect(() => {
     if (!showReminderOptions) {
       setIsEditingCustomReminder(false);
+      setShowCustomReminderDatePicker(false);
       setCustomReminderError(null);
       return;
     }
@@ -708,32 +710,62 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                     <div className={cn("space-y-2 border-t pt-3 px-2 pb-2", isQuestSoft ? "border-border/50" : "border-border/60")}>
                       {usesCustomReminderDateTime ? (
                         <div className="space-y-3">
-                          <Label className={cn("text-xs font-medium", isQuestSoft ? "text-muted-foreground" : "text-muted-foreground")}>
-                            Custom reminder date
-                          </Label>
-                          <CalendarPicker
-                            mode="single"
-                            selected={customReminderDate}
-                            onSelect={(date) => {
-                              setCustomReminderDate(date);
-                              setCustomReminderError(null);
-                            }}
-                            className="pointer-events-auto rounded-md border"
-                          />
                           <div className="space-y-1.5">
-                            <Label htmlFor="custom-reminder-time" className={cn("text-xs font-medium", isQuestSoft ? "text-muted-foreground" : "text-muted-foreground")}>
+                            <Label className={cn("text-xs font-medium", isQuestSoft ? "text-muted-foreground" : "text-muted-foreground")}>
+                              Custom reminder date
+                            </Label>
+                            <Popover open={showCustomReminderDatePicker} onOpenChange={setShowCustomReminderDatePicker}>
+                              <PopoverTrigger asChild>
+                                <button
+                                  type="button"
+                                  data-testid="custom-reminder-date-trigger"
+                                  className={cn(
+                                    "flex min-h-10 w-full items-center justify-between gap-2 rounded-[16px] px-3 py-2 text-left text-sm font-semibold",
+                                    isQuestSoft ? QUEST_FORM_STYLES.selectorChip : "border bg-background hover:bg-accent",
+                                  )}
+                                >
+                                  <span>{customReminderDate ? format(customReminderDate, "MMM d") : "Choose date"}</span>
+                                  <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent
+                                data-testid="custom-reminder-date-picker"
+                                align="start"
+                                side="bottom"
+                                sideOffset={6}
+                                className={cn("z-[90] w-auto p-1", isQuestSoft ? QUEST_FORM_STYLES.popover : "rounded-md border bg-popover shadow-md")}
+                                style={props.portalStyle}
+                              >
+                                <CalendarPicker
+                                  mode="single"
+                                  selected={customReminderDate}
+                                  onSelect={(date) => {
+                                    setCustomReminderDate(date);
+                                    setCustomReminderError(null);
+                                    if (date) {
+                                      setShowCustomReminderDatePicker(false);
+                                    }
+                                  }}
+                                  className="pointer-events-auto"
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className={cn("text-xs font-medium", isQuestSoft ? "text-muted-foreground" : "text-muted-foreground")}>
                               Custom reminder time
                             </Label>
-                            <Input
-                              id="custom-reminder-time"
-                              type="time"
+                            <TimeWheelPicker
                               value={customReminderTime}
-                              onChange={(event) => {
-                                setCustomReminderTime(event.target.value);
+                              onChange={(time) => {
+                                setCustomReminderTime(time);
                                 setCustomReminderError(null);
                               }}
-                              onKeyDown={handleCustomReminderKeyDown}
-                              className={cn("h-10 text-sm", inputClassName)}
+                              ariaLabel="Custom reminder time"
+                              variant={schedulingVariant}
+                              tone={tone}
+                              stepMinutes={5}
+                              className="h-[150px]"
                             />
                           </div>
                           {displayedCustomReminderError ? (

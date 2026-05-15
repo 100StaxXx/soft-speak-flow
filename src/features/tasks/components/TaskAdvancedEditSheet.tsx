@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { ParsedTask } from '../hooks/useNaturalLanguageParser';
 import { format, parseISO } from 'date-fns';
 import { QuestAttachmentPicker } from '@/components/QuestAttachmentPicker';
-import { DurationPickerField, TimePickerField } from '@/components/scheduling';
+import { DurationPickerField, TimePickerField, TimeWheelPicker } from '@/components/scheduling';
 import {
   Select,
   SelectContent,
@@ -75,6 +75,8 @@ const durationOptions = [
 const WEEKDAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MONTH_DAYS = Array.from({ length: 31 }, (_, index) => index + 1);
 const REMINDER_PRESET_VALUES = new Set(QUEST_REMINDER_PRESET_OPTIONS.map((option) => option.value));
+const CUSTOM_REMINDER_PAST_START_MESSAGE = 'Choose a future quest time before adding a custom reminder.';
+const CUSTOM_REMINDER_PAST_TIME_MESSAGE = 'Choose a reminder time in the future.';
 
 function toAppDayIndex(jsDay: number): number {
   return jsDay === 0 ? 6 : jsDay - 1;
@@ -116,6 +118,7 @@ export function TaskAdvancedEditSheet({
   const [customReminderTime, setCustomReminderTime] = useState('');
   const [customReminderError, setCustomReminderError] = useState<string | null>(null);
   const [showCustomReminderInput, setShowCustomReminderInput] = useState(false);
+  const [showCustomReminderDatePicker, setShowCustomReminderDatePicker] = useState(false);
   const [recurrencePattern, setRecurrencePattern] = useState(parsed.recurrencePattern || '');
   const [recurrenceDays, setRecurrenceDays] = useState<number[]>(() => {
     const parsedDays = parsed.recurrenceDays ?? parsed.customDays ?? [];
@@ -167,8 +170,18 @@ export function TaskAdvancedEditSheet({
     : formatQuestReminderOffset(activeReminderOffsets[0] ?? reminderMinutes);
   const selectedReminderOffsets = new Set(activeReminderOffsets);
   const hasCustomReminderOffset = activeReminderOffsets.some((offset) => !REMINDER_PRESET_VALUES.has(offset));
+  const customReminderOffsets = activeReminderOffsets.filter((offset) => !REMINDER_PRESET_VALUES.has(offset));
   const customReminderQuestStart = parseQuestReminderDateTime(scheduledDate, scheduledTime);
   const usesCustomReminderDateTime = Boolean(customReminderQuestStart);
+  const customReminderAt = usesCustomReminderDateTime
+    ? parseQuestReminderDateTime(customReminderDate, customReminderTime)
+    : null;
+  const isCustomReminderQuestStartPast = Boolean(
+    customReminderQuestStart && customReminderQuestStart.getTime() <= Date.now(),
+  );
+  const isCustomReminderTimePast = Boolean(
+    customReminderAt && customReminderAt.getTime() <= Date.now(),
+  );
   const customReminderOffsetCandidate = usesCustomReminderDateTime
     ? resolveCustomQuestReminderOffset({
       questDate: scheduledDate,
@@ -179,11 +192,18 @@ export function TaskAdvancedEditSheet({
     : null;
   const parsedCustomReminderInput = Number.parseInt(customReminderInput, 10);
   const customReminderApplyDisabled = usesCustomReminderDateTime
-    ? !customReminderOffsetCandidate
+    ? isCustomReminderQuestStartPast
+      || isCustomReminderTimePast
+      || !customReminderOffsetCandidate
     : !customReminderInput.trim()
       || !Number.isFinite(parsedCustomReminderInput)
       || parsedCustomReminderInput <= 0
       || parsedCustomReminderInput > MAX_QUEST_REMINDER_MINUTES;
+  const displayedCustomReminderError = isCustomReminderQuestStartPast
+    ? CUSTOM_REMINDER_PAST_START_MESSAGE
+    : isCustomReminderTimePast
+      ? CUSTOM_REMINDER_PAST_TIME_MESSAGE
+      : customReminderError;
 
   const getReferenceDate = () => {
     if (scheduledDate) {
@@ -279,6 +299,7 @@ export function TaskAdvancedEditSheet({
       setReminderEnabled(false);
       setShowReminderPicker(false);
       setShowCustomReminderInput(false);
+      setShowCustomReminderDatePicker(false);
       setCustomReminderError(null);
       return;
     }
@@ -290,12 +311,18 @@ export function TaskAdvancedEditSheet({
     applyReminderOffsets([minutes]);
     setShowReminderPicker(false);
     setShowCustomReminderInput(false);
+    setShowCustomReminderDatePicker(false);
     setCustomReminderError(null);
   };
 
   const seedCustomReminderDateTime = () => {
     if (!customReminderQuestStart) return;
-    const reminderAt = new Date(customReminderQuestStart.getTime() - 60 * 60_000);
+    const minutesBefore = customReminderOffsets[0] ?? 60;
+    const boundedMinutes = Math.min(
+      MAX_QUEST_REMINDER_MINUTES,
+      Math.max(1, Math.trunc(minutesBefore)),
+    );
+    const reminderAt = new Date(customReminderQuestStart.getTime() - boundedMinutes * 60_000);
     setCustomReminderDate(reminderAt);
     setCustomReminderTime(format(reminderAt, 'HH:mm'));
     setCustomReminderError(null);
@@ -303,6 +330,14 @@ export function TaskAdvancedEditSheet({
 
   const applyCustomReminder = () => {
     if (usesCustomReminderDateTime) {
+      if (isCustomReminderQuestStartPast) {
+        setCustomReminderError(CUSTOM_REMINDER_PAST_START_MESSAGE);
+        return;
+      }
+      if (isCustomReminderTimePast) {
+        setCustomReminderError(CUSTOM_REMINDER_PAST_TIME_MESSAGE);
+        return;
+      }
       if (!customReminderOffsetCandidate) {
         setCustomReminderError('Choose a reminder before the quest starts, up to 1 week before.');
         return;
@@ -312,6 +347,7 @@ export function TaskAdvancedEditSheet({
       setCustomReminderError(null);
       setShowReminderPicker(false);
       setShowCustomReminderInput(false);
+      setShowCustomReminderDatePicker(false);
       return;
     }
 
@@ -322,6 +358,7 @@ export function TaskAdvancedEditSheet({
     setCustomReminderInput('');
     setShowReminderPicker(false);
     setShowCustomReminderInput(false);
+    setShowCustomReminderDatePicker(false);
   };
 
   const handleSave = () => {
@@ -535,6 +572,7 @@ export function TaskAdvancedEditSheet({
                           }
                           if (!next) {
                             setCustomReminderError(null);
+                            setShowCustomReminderDatePicker(false);
                           }
                           return next;
                         })}
@@ -560,41 +598,60 @@ export function TaskAdvancedEditSheet({
                         <div className="space-y-2 border-t border-border/60 px-2 py-3">
                           {usesCustomReminderDateTime ? (
                             <div className="space-y-3">
-                              <Label className="text-xs text-muted-foreground">
-                                Custom reminder date
-                              </Label>
-                              <Calendar
-                                mode="single"
-                                selected={customReminderDate}
-                                onSelect={(date) => {
-                                  setCustomReminderDate(date);
-                                  setCustomReminderError(null);
-                                }}
-                                className="pointer-events-auto rounded-md border"
-                              />
                               <div className="space-y-1.5">
-                                <Label htmlFor="task-custom-reminder-time" className="text-xs text-muted-foreground">
+                                <Label className="text-xs text-muted-foreground">
+                                  Custom reminder date
+                                </Label>
+                                <Popover open={showCustomReminderDatePicker} onOpenChange={setShowCustomReminderDatePicker}>
+                                  <PopoverTrigger asChild>
+                                    <button
+                                      type="button"
+                                      data-testid="task-custom-reminder-date-trigger"
+                                      className="flex min-h-9 w-full items-center justify-between gap-2 rounded-md border bg-background px-3 py-2 text-left text-sm hover:bg-accent"
+                                    >
+                                      <span>{customReminderDate ? format(customReminderDate, 'MMM d') : 'Choose date'}</span>
+                                      <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent
+                                    data-testid="task-custom-reminder-date-picker"
+                                    className="z-[90] w-auto p-1"
+                                    align="start"
+                                    side="bottom"
+                                    sideOffset={6}
+                                  >
+                                    <Calendar
+                                      mode="single"
+                                      selected={customReminderDate}
+                                      onSelect={(date) => {
+                                        setCustomReminderDate(date);
+                                        setCustomReminderError(null);
+                                        if (date) {
+                                          setShowCustomReminderDatePicker(false);
+                                        }
+                                      }}
+                                      className="pointer-events-auto"
+                                    />
+                                  </PopoverContent>
+                                </Popover>
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label className="text-xs text-muted-foreground">
                                   Custom reminder time
                                 </Label>
-                                <Input
-                                  id="task-custom-reminder-time"
-                                  type="time"
+                                <TimeWheelPicker
                                   value={customReminderTime}
-                                  onChange={(event) => {
-                                    setCustomReminderTime(event.target.value);
+                                  onChange={(time) => {
+                                    setCustomReminderTime(time);
                                     setCustomReminderError(null);
                                   }}
-                                  onKeyDown={(event) => {
-                                    if (event.key === 'Enter') {
-                                      event.preventDefault();
-                                      applyCustomReminder();
-                                    }
-                                  }}
-                                  className="h-9 text-sm"
+                                  ariaLabel="Custom reminder time"
+                                  stepMinutes={5}
+                                  className="h-[150px]"
                                 />
                               </div>
-                              {customReminderError ? (
-                                <p className="text-xs text-destructive">{customReminderError}</p>
+                              {displayedCustomReminderError ? (
+                                <p className="text-xs text-destructive">{displayedCustomReminderError}</p>
                               ) : (
                                 <p className="text-xs text-muted-foreground">
                                   Pick a time before the quest starts.

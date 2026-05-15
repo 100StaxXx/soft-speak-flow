@@ -69,15 +69,8 @@ export function JourneysCompanionLauncher({
   } = useCompanionImageBackgroundCutout(resolvedImageUrl, {
     enabled: shouldCutOutHeroBackground,
   });
-  const resolvedHeroImageUrl = heroCutoutSrc ?? (
-    requireHeroCutout && shouldCutOutHeroBackground ? null : resolvedImageUrl
-  );
-  const isWaitingForHeroCutout = shouldCutOutHeroBackground
-    && (heroCutoutStatus === "idle" || heroCutoutStatus === "processing");
-  const shouldShowHeroPlaceholder = isFloatingHero && (
-    !resolvedHeroImageUrl
-    || (requireHeroCutout && shouldCutOutHeroBackground && heroCutoutStatus !== "ready")
-  );
+  const resolvedHeroImageUrl = heroCutoutSrc ?? resolvedImageUrl;
+  const shouldShowHeroPlaceholder = isFloatingHero && !resolvedHeroImageUrl;
   const portraitClassName = variant === "floating"
     ? isFloatingHero
       ? "h-[7.75rem] w-[7.75rem]"
@@ -112,10 +105,7 @@ export function JourneysCompanionLauncher({
           element={element}
           focalX={resolvedFocalX}
           focalY={resolvedFocalY}
-          className={cn(
-            "pointer-events-none select-none transition-opacity duration-150",
-            isWaitingForHeroCutout && "opacity-0",
-          )}
+          className="pointer-events-none select-none transition-opacity duration-150"
           draggable={false}
           data-companion-background-cutout={shouldCutOutHeroBackground ? heroCutoutStatus : undefined}
         />
