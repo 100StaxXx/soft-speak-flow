@@ -66,6 +66,26 @@ const setCenteringMetrics = (
   });
 };
 
+const setBoundingRect = (
+  element: HTMLElement,
+  { left, width, height = 64 }: { left: number; width: number; height?: number },
+) => {
+  Object.defineProperty(element, "getBoundingClientRect", {
+    configurable: true,
+    value: vi.fn(() => ({
+      x: left,
+      y: 0,
+      top: 0,
+      left,
+      right: left + width,
+      bottom: height,
+      width,
+      height,
+      toJSON: () => ({}),
+    })),
+  });
+};
+
 describe("DatePillsScroller", () => {
   it("extends the range when scrolled near the right edge", async () => {
     const onDateSelect = vi.fn();
@@ -724,6 +744,65 @@ describe("DatePillsScroller", () => {
       });
       const lastOptions = scrollToSpy.mock.calls.at(-1)?.[0] as ScrollToOptions;
       expect(lastOptions.behavior).toBe("auto");
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+        configurable: true,
+        value: originalScrollTo,
+      });
+    }
+  });
+
+  it("centers from the pill rect when offsetLeft is relative to another ancestor", async () => {
+    const onDateSelect = vi.fn();
+    const scrollToSpy = vi.fn(function (this: HTMLElement, options?: ScrollToOptions) {
+      if (typeof options?.left === "number") {
+        this.scrollLeft = options.left;
+      }
+    });
+    const originalScrollTo = HTMLElement.prototype.scrollTo;
+
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true,
+      value: scrollToSpy,
+    });
+
+    try {
+      const selectedDate = new Date("2026-02-13T12:00:00.000Z");
+      const { rerender, container } = render(
+        <DatePillsScroller
+          selectedDate={selectedDate}
+          onDateSelect={onDateSelect}
+          isActive={false}
+        />,
+      );
+
+      const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
+      const selectedButton = scroller.querySelector("button.bg-gradient-to-br") as HTMLButtonElement;
+
+      setCenteringMetrics(scroller, selectedButton, {
+        scrollLeft: 40,
+        scrollWidth: 1200,
+        containerWidth: 220,
+        selectedLeft: 360,
+        selectedWidth: 60,
+      });
+      setBoundingRect(scroller, { left: 24, width: 220 });
+      setBoundingRect(selectedButton, { left: 224, width: 60 });
+
+      scrollToSpy.mockClear();
+      rerender(
+        <DatePillsScroller
+          selectedDate={selectedDate}
+          onDateSelect={onDateSelect}
+          isActive
+        />,
+      );
+
+      await waitFor(() => {
+        expect(scroller.scrollLeft).toBe(160);
+      });
+      const lastOptions = scrollToSpy.mock.calls.at(-1)?.[0] as ScrollToOptions;
+      expect(lastOptions.left).toBe(160);
     } finally {
       Object.defineProperty(HTMLElement.prototype, "scrollTo", {
         configurable: true,

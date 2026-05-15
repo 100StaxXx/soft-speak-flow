@@ -48,6 +48,17 @@ const triggerHaptic = async (style: ImpactStyle) => {
   }
 };
 
+const getPillLeftWithinScroller = (container: HTMLDivElement, pill: HTMLButtonElement) => {
+  const containerRect = container.getBoundingClientRect();
+  const pillRect = pill.getBoundingClientRect();
+
+  if (containerRect.width > 0 && pillRect.width > 0) {
+    return pillRect.left - containerRect.left + container.scrollLeft;
+  }
+
+  return pill.offsetLeft;
+};
+
 const getInitialRange = (selectedDate: Date, daysToShow: number) => {
   const normalizedSpan = Math.max(7, daysToShow);
   const centerDate = startOfDay(selectedDate);
@@ -339,7 +350,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
       return "retry";
     }
 
-    const selectedLeft = selected.offsetLeft;
+    const selectedLeft = getPillLeftWithinScroller(container, selected);
     const targetLeft = selectedLeft - containerWidth / 2 + selectedWidth / 2;
     const maxScrollLeft = Math.max(0, container.scrollWidth - containerWidth);
     const clampedLeft = Math.min(Math.max(targetLeft, 0), maxScrollLeft);
