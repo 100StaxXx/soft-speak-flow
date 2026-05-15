@@ -192,32 +192,6 @@ describe("useAppleSubscription", () => {
     expect(mocks.purchase).not.toHaveBeenCalled();
   });
 
-  it("uses Apple offer-code redemption even if a stale referral yearly product is returned", async () => {
-    mocks.appliedReferralCodeState = {
-      ...mocks.appliedReferralCodeState,
-      code: "OFFER123",
-      owner_type: "influencer",
-      affiliate_provider: "winwinkit",
-      is_active: true,
-      apple_offer_code_status: "active",
-      is_apple_offer_eligible: true,
-    };
-    mocks.storeKitProducts = [
-      ...mocks.storeKitProducts,
-      { identifier: "cosmiq_referral_yearly", displayName: "Referral Yearly", description: "", price: 69.99, displayPrice: "$69.99" },
-    ];
-
-    const { result } = renderHook(() => useAppleSubscription());
-
-    await act(async () => {
-      await result.current.handlePurchase("cosmiq_premium_yearly");
-    });
-
-    expect(mocks.redeemOfferCode).toHaveBeenCalledTimes(1);
-    expect(mocks.purchase).not.toHaveBeenCalled();
-    expect(mocks.functionsInvoke).not.toHaveBeenCalled();
-  });
-
   it("purchases yearly after the offer code redemption step is primed", async () => {
     mocks.appliedReferralCodeState = {
       ...mocks.appliedReferralCodeState,

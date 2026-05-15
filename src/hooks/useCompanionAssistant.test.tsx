@@ -20,6 +20,8 @@ const mocks = vi.hoisted(() => ({
   toggleRecording: vi.fn(),
   requestPermission: vi.fn().mockResolvedValue("granted"),
   supabaseInvoke: vi.fn(),
+  getSession: vi.fn(),
+  refreshSession: vi.fn().mockResolvedValue(undefined),
   invalidateQueries: vi.fn(),
   parseFunctionInvokeError: vi.fn().mockResolvedValue({
     status: 500,
@@ -31,17 +33,6 @@ const mocks = vi.hoisted(() => ({
     .fn()
     .mockReturnValue("Unable to send your message. Please try again."),
   trackInteraction: vi.fn().mockResolvedValue(undefined),
-  legacySubmitMessage: vi.fn().mockResolvedValue(undefined),
-  legacyConfirmPendingAction: vi.fn().mockResolvedValue(undefined),
-  legacyCancelPendingAction: vi.fn().mockResolvedValue(undefined),
-  legacyConfirmSuggestedQuest: vi.fn().mockResolvedValue(undefined),
-  legacyConfirmAllPendingActions: vi.fn().mockResolvedValue(undefined),
-  legacyStartTemplateThread: vi.fn(),
-  legacyStartQuestCaptureThread: vi.fn(),
-  legacyHydrateFromUnifiedState: vi.fn(),
-  legacyAdapterOptions: [] as Array<{ enabled?: boolean; surface?: string }>,
-  legacySavedSuggestionProposalIds: [] as string[],
-  legacyPendingSuggestionProposalId: null as string | null,
 }));
 
 vi.mock("@/components/ui/sonner", () => ({
@@ -53,6 +44,7 @@ vi.mock("@/components/ui/sonner", () => ({
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
     user: { id: "user-1" },
+    refreshSession: mocks.refreshSession,
   }),
 }));
 
@@ -90,54 +82,6 @@ vi.mock("@/hooks/useCompanionVoiceSettings", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useLegacyCompanionAssistantAdapter", () => ({
-  useLegacyCompanionAssistantAdapter: (options: {
-    enabled?: boolean;
-    surface?: string;
-  }) => {
-    mocks.legacyAdapterOptions.push(options);
-    return {
-      todayLabel: "Saturday, April 18",
-      placeholder: "Talk to Nova",
-      messages: [],
-      structuredResponse: null,
-      pendingAction: null,
-      savedSuggestionProposalIds: mocks.legacySavedSuggestionProposalIds,
-      pendingSuggestionProposalId: mocks.legacyPendingSuggestionProposalId,
-      pendingActionCount: 0,
-      readyPendingActionCount: 0,
-      isOpeningThread: false,
-      isSubmitting: false,
-      isResolvingAction: false,
-      submitMessage: mocks.legacySubmitMessage,
-      confirmPendingAction: mocks.legacyConfirmPendingAction,
-      cancelPendingAction: mocks.legacyCancelPendingAction,
-      confirmSuggestedQuest: mocks.legacyConfirmSuggestedQuest,
-      confirmAllPendingActions: mocks.legacyConfirmAllPendingActions,
-      startTemplateThread: mocks.legacyStartTemplateThread,
-      startQuestCaptureThread: mocks.legacyStartQuestCaptureThread,
-      hydrateFromUnifiedState: mocks.legacyHydrateFromUnifiedState,
-      isSpeaking: false,
-      speechProvider: "none" as const,
-      stopSpeaking: vi.fn(),
-      activeThread: null,
-      historyThreads: [],
-      isLoadingThreads: false,
-      hasPersistedActiveThread: false,
-      canOpenThreadPicker: false,
-      threadHistoryEmptyStateMessage:
-        "Past chats will show up here after at least one real exchange.",
-      resumeThread: vi.fn(),
-      archiveCurrentThread: vi.fn(),
-      canArchiveThread: false,
-      archiveDisabledReason: null,
-      startNewChat: vi.fn(),
-      canStartNewChat: false,
-      newChatDisabledReason: null,
-    };
-  },
-}));
-
 vi.mock("@/hooks/useVoiceInput", () => ({
   useVoiceInput: () => ({
     isRecording: false,
@@ -170,6 +114,9 @@ vi.mock("@/services/companionChatThreads", () => ({
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
+    auth: {
+      getSession: mocks.getSession,
+    },
     functions: {
       invoke: mocks.supabaseInvoke,
     },
@@ -203,9 +150,25 @@ const createWrapper = () => {
 describe("useCompanionAssistant", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.legacyAdapterOptions = [];
-    mocks.legacySavedSuggestionProposalIds = [];
-    mocks.legacyPendingSuggestionProposalId = null;
+    mocks.refreshSession.mockResolvedValue(undefined);
+    mocks.getSession.mockResolvedValue({
+      data: {
+        session: {
+          access_token: "access-token",
+          user: { id: "user-1" },
+        },
+      },
+      error: null,
+    });
+    mocks.parseFunctionInvokeError.mockResolvedValue({
+      status: 500,
+      backendMessage: null,
+      isOffline: false,
+      category: "http",
+    });
+    mocks.toUserFacingFunctionError.mockReturnValue(
+      "Unable to send your message. Please try again.",
+    );
     mocks.generateThreadSessionId.mockReturnValue("fresh-session");
     mocks.listThreads.mockResolvedValue([
       {
@@ -462,7 +425,6 @@ describe("useCompanionAssistant", () => {
     );
     expect(invokedFunctionNames).not.toContain("companion-agent");
     expect(invokedFunctionNames).not.toContain("companion-planner-chat");
-    expect(mocks.legacySubmitMessage).not.toHaveBeenCalled();
     expect(mocks.trackInteraction).toHaveBeenCalledWith(
       expect.objectContaining({
         interactionType: "journeys_companion_chat",
@@ -471,6 +433,78 @@ describe("useCompanionAssistant", () => {
         userAction: "accepted",
       }),
     );
+  });
+
+  it("refreshes the session before submitting companion-chat turns", async () => {
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("persisted-session");
+    });
+
+    await act(async () => {
+      await result.current.submitMessage("Plan my day", "text");
+    });
+
+    const chatInvokeIndex = mocks.supabaseInvoke.mock.calls.findIndex(
+      ([functionName]) => functionName === "companion-chat",
+    );
+    expect(chatInvokeIndex).toBeGreaterThanOrEqual(0);
+
+    const chatInvokeOrder =
+      mocks.supabaseInvoke.mock.invocationCallOrder[chatInvokeIndex];
+    expect(mocks.refreshSession).toHaveBeenCalledTimes(1);
+    expect(mocks.getSession).toHaveBeenCalledTimes(1);
+    expect(mocks.refreshSession.mock.invocationCallOrder[0]).toBeLessThan(
+      chatInvokeOrder,
+    );
+    expect(mocks.getSession.mock.invocationCallOrder[0]).toBeLessThan(
+      chatInvokeOrder,
+    );
+  });
+
+  it("does not submit or append the user turn when session refresh cannot recover a token", async () => {
+    mocks.getSession.mockResolvedValue({
+      data: { session: null },
+      error: null,
+    });
+    mocks.parseFunctionInvokeError.mockResolvedValueOnce({
+      status: 401,
+      backendMessage: null,
+      isOffline: false,
+      category: "auth",
+    });
+    mocks.toUserFacingFunctionError.mockReturnValueOnce(
+      "Your session has expired. Please sign in again and try to talk with your companion.",
+    );
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("persisted-session");
+    });
+
+    let submitted: boolean | undefined;
+    await act(async () => {
+      submitted = await result.current.submitMessage("Plan my day", "text");
+    });
+
+    expect(submitted).toBe(false);
+    expect(mocks.supabaseInvoke).not.toHaveBeenCalled();
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      "Your session has expired. Please sign in again and try to talk with your companion.",
+    );
+    expect(
+      result.current.messages.some((message) => message.content === "Plan my day"),
+    ).toBe(false);
   });
 
   it("routes casual unified chat through companion-chat instead of companion-agent", async () => {
@@ -596,7 +630,6 @@ describe("useCompanionAssistant", () => {
     expect(invokedFunctionNames).not.toContain("companion-agent");
     expect(invokedFunctionNames).not.toContain("companion-planner-chat");
     expect(invokedFunctionNames).toContain("companion-chat-opener");
-    expect(mocks.legacySubmitMessage).not.toHaveBeenCalled();
   });
 
   it("starts a generated companion opener on every closed-to-open cycle", async () => {
@@ -753,6 +786,36 @@ describe("useCompanionAssistant", () => {
     ).toHaveLength(2);
   });
 
+  it("refreshes the session before invoking the generated companion opener", async () => {
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "companion" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.messages[0]?.content).toBe(
+        "Fresh read: today has a little shape to it.",
+      );
+    });
+
+    const openerInvokeIndex = mocks.supabaseInvoke.mock.calls.findIndex(
+      ([functionName]) => functionName === "companion-chat-opener",
+    );
+    expect(openerInvokeIndex).toBeGreaterThanOrEqual(0);
+
+    const openerInvokeOrder =
+      mocks.supabaseInvoke.mock.invocationCallOrder[openerInvokeIndex];
+    expect(mocks.refreshSession).toHaveBeenCalledTimes(1);
+    expect(mocks.getSession).toHaveBeenCalledTimes(1);
+    expect(mocks.refreshSession.mock.invocationCallOrder[0]).toBeLessThan(
+      openerInvokeOrder,
+    );
+    expect(mocks.getSession.mock.invocationCallOrder[0]).toBeLessThan(
+      openerInvokeOrder,
+    );
+  });
+
   it("falls back to a local companion opener without surfacing opener internals", async () => {
     mocks.supabaseInvoke.mockImplementation(async (functionName) => {
       if (functionName === "companion-chat-opener") {
@@ -813,6 +876,31 @@ describe("useCompanionAssistant", () => {
         ([functionName]) => functionName === "companion-agent",
       ),
     ).toBe(false);
+  });
+
+  it("falls back quietly to a local companion opener when session refresh cannot recover a token", async () => {
+    mocks.getSession.mockResolvedValue({
+      data: { session: null },
+      error: null,
+    });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "companion" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(COMPANION_CHAT_OPENING_LINES).toContain(
+        result.current.messages[0]?.content,
+      );
+    });
+
+    expect(mocks.refreshSession).toHaveBeenCalledTimes(1);
+    expect(mocks.getSession).toHaveBeenCalledTimes(1);
+    expect(mocks.supabaseInvoke).not.toHaveBeenCalled();
+    expect(mocks.toastError).not.toHaveBeenCalled();
+    expect(result.current.canSubmitMessage).toBe(true);
   });
 
   it("keeps the generated opener usable when opener persistence is not ready", async () => {
@@ -939,7 +1027,6 @@ describe("useCompanionAssistant", () => {
     });
 
     expect(submitted).toBe(false);
-    expect(mocks.legacySubmitMessage).not.toHaveBeenCalled();
     expect(mocks.toUserFacingFunctionError).toHaveBeenCalledWith(
       expect.objectContaining({ category: "network" }),
       { action: "talk with your companion" },

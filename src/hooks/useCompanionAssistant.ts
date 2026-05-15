@@ -18,6 +18,7 @@ import {
   loadCompanionChatThreadMessages,
   setCompanionChatThreadArchived,
 } from "@/services/companionChatThreads";
+import { hasActiveSupabaseFunctionSession } from "@/services/supabaseFunctionSession";
 import {
   type CompanionSpeechProvider,
   speakCompanionReply,
@@ -144,6 +145,11 @@ const getTodayLabel = () =>
     day: "numeric",
   }).format(new Date());
 
+const createMissingFunctionSessionError = () =>
+  Object.assign(new Error("Missing active Supabase session."), {
+    status: 401,
+  });
+
 export function useCompanionAssistant({
   surface,
   conversationEnabled = true,
@@ -151,7 +157,7 @@ export function useCompanionAssistant({
   onLaunchIntentConsumed,
   onOpenCampaignBuilder,
 }: UseCompanionAssistantOptions) {
-  const { user } = useAuth();
+  const { user, refreshSession } = useAuth();
   const { companion } = useCompanion();
   const { greeting, voiceStyle } = useCompanionDialogue();
   const { trackInteraction } = useAIInteractionTracker();
@@ -530,6 +536,23 @@ export function useCompanionAssistant({
     setIsOpeningThread(true);
 
     try {
+      const hasActiveSession = await hasActiveSupabaseFunctionSession(
+        refreshSession,
+      );
+
+      if (!hasActiveSession) {
+        if (threadMutationVersionRef.current !== openerMutationVersion) {
+          return null;
+        }
+
+        setIsOpeningThread(false);
+        return openFreshThread({
+          greetingText: fallbackOpening,
+          markBootstrapped: true,
+          visibleAssistantOpening: true,
+        });
+      }
+
       const { data, error } = await supabase.functions.invoke(
         "companion-chat-opener",
         {
@@ -590,10 +613,10 @@ export function useCompanionAssistant({
     }
   }, [
     applyActiveSessionId,
-    baseGreeting,
     companion?.id,
     invalidateThreads,
     openFreshThread,
+    refreshSession,
     surface,
     user?.id,
   ]);
@@ -644,17 +667,29 @@ export function useCompanionAssistant({
       }
 
       setIsSubmitting(true);
-      setDraftInput("");
-      setInterimText("");
-
-      const directChatHistory = buildDirectChatHistory(messages);
-      const optimisticUserMessage = createMessage("user", message, {
-        inputMode,
-        source: "chat",
-      });
-      setMessages((previous) => [...previous, optimisticUserMessage]);
 
       try {
+        const hasActiveSession = await hasActiveSupabaseFunctionSession(
+          refreshSession,
+        );
+
+        if (!hasActiveSession) {
+          toast.error(
+            await resolveCompanionChatError(createMissingFunctionSessionError()),
+          );
+          return false;
+        }
+
+        setDraftInput("");
+        setInterimText("");
+
+        const directChatHistory = buildDirectChatHistory(messages);
+        const optimisticUserMessage = createMessage("user", message, {
+          inputMode,
+          source: "chat",
+        });
+        setMessages((previous) => [...previous, optimisticUserMessage]);
+
         lastStarterIntentRef.current = starterIntent ?? null;
         const currentDateTime = formatCurrentDateTimeWithOffset(new Date());
 
@@ -740,6 +775,7 @@ export function useCompanionAssistant({
       isOpeningThread,
       isSubmitting,
       messages,
+      refreshSession,
       speakAssistantReply,
       trackInteraction,
       surface,

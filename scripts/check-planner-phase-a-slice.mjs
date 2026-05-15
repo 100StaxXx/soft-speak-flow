@@ -4,8 +4,6 @@ const patterns = [
   "src/services/companionChatThreads",
   "src/hooks/useCompanionAssistant",
   "src/hooks/useCompanionPlanner",
-  "src/hooks/useLegacyCompanionAssistantAdapter",
-  "src/components/companion/CompanionStructuredResponseCards",
   "src/components/journeys/JourneysCompanionPlannerModal",
 ];
 
