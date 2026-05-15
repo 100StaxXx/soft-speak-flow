@@ -928,7 +928,7 @@ describe("TodaysAgenda campaign visibility", () => {
     expect(mocks.journeyPathDrawerOpenMock).toHaveBeenCalledWith("epic-2");
   });
 
-  it("keeps scheduled campaign ritual details out of the inline timeline row", () => {
+  it("keeps scheduled campaign ritual details out of the inline timeline row until the chevron opens the drawer", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -986,8 +986,17 @@ describe("TodaysAgenda campaign visibility", () => {
     expect(ritualCard).toBeTruthy();
 
     expect(ritualCard).toHaveAttribute("data-scheduled-timeline-card", "true");
-    expect(within(ritualCard as HTMLElement).queryByRole("button")).not.toBeInTheDocument();
+    const detailToggle = within(ritualCard as HTMLElement).getByRole("button", {
+      name: "Show quest details for Morning journal",
+    });
+    expect(detailToggle).toHaveAttribute("data-interactive", "true");
+    expect(detailToggle).toHaveAttribute("data-tap-control", "true");
     expect(screen.queryByText("Capture wins, friction, and tomorrow's focus.")).not.toBeInTheDocument();
+
+    fireEvent.click(detailToggle);
+
+    const drawer = await screen.findByTestId("mobile-scheduled-quest-detail-drawer-ritual-1");
+    expect(within(drawer).getByText("Capture wins, friction, and tomorrow's focus.")).toBeInTheDocument();
   });
 
   it("renders newly added campaign rituals directly as normal scheduled rows", () => {
@@ -2154,9 +2163,97 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(marquee).toHaveClass("min-w-0", "w-full", "flex-1");
     expect(actions).toHaveClass("min-w-max", "gap-1.5");
     expect(within(actions).getByRole("button", { name: "Quest actions" })).toBeInTheDocument();
+    expect(within(actions).getByRole("button", { name: `Show quest details for ${longTitle}` })).toBeInTheDocument();
     expect(within(actions).getByText("+14")).toBeInTheDocument();
-    expect(within(actions).getAllByRole("button")).toHaveLength(1);
+    expect(within(actions).getAllByRole("button")).toHaveLength(2);
     expect(within(titleRegion).getByText("Campaign Ritual - Master UGC content creation")).toBeInTheDocument();
+  });
+
+  it("opens full scheduled quest details from the mobile chevron", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-detail-1",
+            task_text: "Daily Wealth Learning",
+            completed: false,
+            xp_reward: 20,
+            scheduled_time: "09:00",
+            estimated_duration: 45,
+            is_main_quest: true,
+            category: "mind",
+            difficulty: "hard",
+            priority: "high",
+            is_recurring: true,
+            recurrence_pattern: "daily",
+            notes: "Read chapter one and capture three takeaways.",
+            location: "123 Cosmic Way",
+            attachments: [
+              {
+                id: "att-detail-1",
+                taskId: "task-detail-1",
+                fileUrl: "https://example.com/lesson.pdf",
+                filePath: "users/u1/lesson.pdf",
+                fileName: "Lesson Plan.pdf",
+                mimeType: "application/pdf",
+                fileSizeBytes: 4096,
+                isImage: false,
+                sortOrder: 0,
+                createdAt: "2026-02-13T10:00:00.000Z",
+              },
+            ],
+            subtasks: [
+              {
+                id: "subtask-detail-1",
+                title: "Write three takeaways",
+                completed: false,
+                sort_order: 0,
+              },
+            ],
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const row = screen.getByTestId("timeline-row-task-detail-1");
+    const toggle = within(row).getByTestId("mobile-quest-detail-toggle-task-detail-1");
+    expect(toggle).toHaveAttribute("data-interactive", "true");
+    expect(toggle).toHaveAttribute("data-tap-control", "true");
+
+    fireEvent.click(toggle);
+
+    const drawer = await screen.findByTestId("mobile-scheduled-quest-detail-drawer-task-detail-1");
+    expect(within(drawer).getByText("Daily Wealth Learning")).toBeInTheDocument();
+    expect(within(drawer).getByText("Quest details")).toBeInTheDocument();
+    expect(within(drawer).getByText("9:00 AM")).toBeInTheDocument();
+    expect(within(drawer).getByText("45 min")).toBeInTheDocument();
+    expect(within(drawer).getByText("+30 XP")).toBeInTheDocument();
+    expect(within(drawer).getByText("Main quest")).toBeInTheDocument();
+    expect(within(drawer).getByText("Read chapter one and capture three takeaways.")).toBeInTheDocument();
+    expect(within(drawer).getByText("Write three takeaways")).toBeInTheDocument();
+    expect(within(drawer).getByRole("link", { name: "Lesson Plan.pdf" })).toHaveAttribute(
+      "href",
+      "https://example.com/lesson.pdf",
+    );
+    expect(within(drawer).getByText("123 Cosmic Way")).toBeInTheDocument();
+    expect(within(drawer).getByText("mind")).toBeInTheDocument();
+    expect(within(drawer).getByText("hard")).toBeInTheDocument();
+    expect(within(drawer).getByText("high priority")).toBeInTheDocument();
+    expect(within(drawer).getByText("45m")).toBeInTheDocument();
+    expect(within(drawer).getByText("Daily")).toBeInTheDocument();
   });
 
   it("uses row drag wiring for scheduled quests", () => {
@@ -3876,7 +3973,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(wrapper).toHaveStyle({ top: "156px", height: "104px" });
   });
 
-  it("clips 30-minute scheduled quest cards to one grid slot", () => {
+  it("clips 30-minute scheduled quest cards while opening details in a drawer", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -3922,7 +4019,16 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(row).toHaveStyle({ overflow: "hidden" });
     expect(row).toHaveAttribute("data-timeline-compact", "true");
     expect(shell).toHaveAttribute("data-compact-timeline-card", "true");
-    expect(row.querySelector("svg.lucide-chevron-down")).toBeNull();
+    const detailToggle = within(row).getByTestId("mobile-quest-detail-toggle-task-scheduled-1");
+    expect(detailToggle).toHaveAttribute("data-interactive", "true");
+    expect(detailToggle).toHaveAttribute("data-tap-control", "true");
+
+    fireEvent.click(detailToggle);
+
+    expect(await screen.findByTestId("mobile-scheduled-quest-detail-drawer-task-scheduled-1")).toBeInTheDocument();
+    expect(screen.getByText("Do not expand inside the grid")).toBeInTheDocument();
+    expect(wrapper).toHaveStyle({ height: "52px" });
+    expect(row).toHaveStyle({ overflow: "hidden" });
   });
 
   it("keeps compact 30-minute ritual rows dense while retaining essentials", () => {

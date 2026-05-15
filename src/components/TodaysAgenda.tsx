@@ -295,6 +295,15 @@ const formatTime = (time: string) => {
   return `${displayHour}:${minutes} ${ampm}`;
 };
 
+const formatDurationLabel = (minutes: number | null | undefined) => {
+  if (!minutes) return null;
+  if (minutes === 1440) return "All day";
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return remainder > 0 ? `${hours}h ${remainder}m` : `${hours}h`;
+};
+
 const getCategoryIcon = (category: string | null | undefined) => {
   switch (category) {
     case 'mind': return Brain;
@@ -816,6 +825,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   useEffect(() => {
     setOpenDesktopDetailTaskId(null);
+    setMobileDetailTaskId(null);
   }, [desktopInteractionResetKey]);
 
   useEffect(() => {
@@ -1972,9 +1982,23 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     const attachmentLinkClassName = isDrawer
       ? "flex items-center gap-2 rounded-xl bg-black/10 px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
       : "flex items-center gap-2 rounded-sm px-1 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground";
+    const hasAnyDetailContent = !!(
+      subtasks.length > 0 ||
+      displayAttachments.length > 0 ||
+      shouldRenderRitualDescription ||
+      shouldRenderNotes ||
+      task.location ||
+      hasDetailBadges
+    );
 
     return (
       <div className={cn("space-y-2", isDrawer && "space-y-3", options.className)}>
+        {!hasAnyDetailContent && isDrawer ? (
+          <p className="rounded-[18px] border border-white/10 bg-white/[0.04] p-3 text-sm text-muted-foreground">
+            No extra notes or checklist yet.
+          </p>
+        ) : null}
+
         {subtasks.length > 0 && (
           <div className={detailPanelClassName}>
             <div className="flex items-center justify-between">
@@ -2176,24 +2200,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     const canRenderInlineDetails = !isScheduledTimelineItem;
     const isInlineExpanded = canRenderInlineDetails && isExpanded;
     const hasDetails = hasExpandableDetails(task);
-    const CategoryIcon = getCategoryIcon(task.category);
-    const subtasks = task.subtasks ?? [];
-    const displayAttachments = normalizeDisplayAttachments(task);
-    const completedSubtaskCount = subtasks.filter(subtask => !!subtask.completed).length;
-    const ritualDescription = isRitual && task.habit_source_id
-      ? habitDescriptionById.get(task.habit_source_id) ?? null
-      : null;
-    const normalizedRitualDescription = normalizeDetailText(ritualDescription);
-    const normalizedTaskNotes = normalizeDetailText(task.notes);
-    const shouldRenderRitualDescription = normalizedRitualDescription.length > 0;
-    const shouldRenderNotes = normalizedTaskNotes.length > 0 && normalizedTaskNotes !== normalizedRitualDescription;
-    const hasDetailBadges = !!(
-      (CategoryIcon && task.category) ||
-      task.difficulty ||
-      task.priority ||
-      task.estimated_duration ||
-      (task.is_recurring && task.recurrence_pattern)
-    );
+    const canOpenQuestDetails = isScheduledTimelineItem || hasDetails;
+    const isMobileDetailOpen = isScheduledTimelineItem && mobileDetailTaskId === task.id;
     const handleCheckboxClick = (e: React.MouseEvent) => {
       e.stopPropagation();
       // Don't allow clicks while dragging or during long press
@@ -2335,7 +2343,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       );
     }
 
-    const isMobileQuestShellActive = isInlineExpanded || (isActivated && !isDragging);
+    const isMobileQuestShellActive = isInlineExpanded || isMobileDetailOpen || (isActivated && !isDragging);
     const taskContent = (
       <Collapsible
         open={isInlineExpanded}
@@ -2593,19 +2601,32 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 )}
                 <span className="text-sm font-bold text-stardust-gold/80">+{effectiveTaskXP}</span>
 
-                {/* Chevron for expandable details - only shown if task has details */}
-                {hasDetails && canRenderInlineDetails && (
+                {/* Chevron for expandable details - scheduled rows open a drawer to avoid changing timeline height */}
+                {canOpenQuestDetails && (
                   <Button
                     data-interactive="true"
                     data-tap-control="true"
+                    aria-label={isScheduledTimelineItem
+                      ? `Show quest details for ${task.task_text}`
+                      : isExpanded
+                        ? `Hide quest details for ${task.task_text}`
+                        : `Show quest details for ${task.task_text}`}
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7 -m-1 flex-shrink-0"
-                    onClick={(e) => toggleTaskExpanded(task.id, e)}
+                    data-testid={`mobile-quest-detail-toggle-${task.id}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isScheduledTimelineItem) {
+                        setMobileDetailTaskId(task.id);
+                        return;
+                      }
+                      toggleTaskExpanded(task.id, e);
+                    }}
                   >
                     <ChevronDown className={cn(
                       "w-4 h-4 text-muted-foreground transition-transform duration-200",
-                      isExpanded && "rotate-180"
+                      (isScheduledTimelineItem ? isMobileDetailOpen : isExpanded) && "rotate-180"
                     )} />
                   </Button>
                 )}
@@ -2615,177 +2636,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
           {canRenderInlineDetails ? (
             <CollapsibleContent>
-              <div className="pl-8 pr-2 pb-2 space-y-2">
-                {/* Subtasks */}
-                {subtasks.length > 0 && (
-                  <div className="space-y-1.5 rounded-md border border-border/40 bg-muted/20 p-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                        Subtasks
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {completedSubtaskCount}/{subtasks.length}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      {subtasks.map((subtask) => (
-                        <label
-                          key={subtask.id}
-                          className="flex items-center gap-2 rounded-sm px-1 py-1 text-xs"
-                        >
-                          <Checkbox
-                            checked={!!subtask.completed}
-                            onCheckedChange={(checked) => {
-                              toggleSubtask.mutate({
-                                taskId: task.id,
-                                subtaskId: subtask.id,
-                                completed: !!checked,
-                              });
-                            }}
-                            onClick={(event) => event.stopPropagation()}
-                            className="h-3.5 w-3.5"
-                          />
-                          <span
-                            className={cn(
-                              "text-xs",
-                              subtask.completed && "text-muted-foreground line-through"
-                            )}
-                          >
-                            {subtask.title}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {displayAttachments.length > 0 && (
-                  <div className="space-y-1.5 rounded-md border border-border/40 bg-muted/20 p-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                        Attachments
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {displayAttachments.length}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      {displayAttachments.map((attachment, index) => (
-                        <a
-                          key={`${attachment.fileUrl}-${index}`}
-                          href={attachment.fileUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center gap-2 rounded-sm px-1 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
-                        >
-                          {attachment.isImage ? (
-                            <FileImage className="h-3.5 w-3.5 flex-shrink-0" />
-                          ) : (
-                            <Paperclip className="h-3.5 w-3.5 flex-shrink-0" />
-                          )}
-                          <span className="truncate">{attachment.fileName}</span>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {shouldRenderRitualDescription && (
-                  useLiteAnimations ? (
-                    <p className="text-sm leading-relaxed whitespace-pre-line text-celestial-blue/80">
-                      {stripMarkdown(ritualDescription)}
-                    </p>
-                  ) : (
-                    <motion.p className="text-sm leading-relaxed whitespace-pre-line text-celestial-blue/80">
-                      {stripMarkdown(ritualDescription)}
-                    </motion.p>
-                  )
-                )}
-
-                {/* Notes */}
-                {shouldRenderNotes && (
-                  useLiteAnimations ? (
-                    <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                      <p className="text-xs leading-relaxed whitespace-pre-line">{stripMarkdown(task.notes)}</p>
-                    </div>
-                  ) : (
-                    <motion.div className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                      <p className="text-xs leading-relaxed whitespace-pre-line">{stripMarkdown(task.notes)}</p>
-                    </motion.div>
-                  )
-                )}
-
-                {task.location ? (
-                  <QuestLocationLink
-                    location={task.location}
-                    label="Address"
-                    className="rounded-md border-border/40 bg-muted/20 p-2"
-                    textClassName="text-xs text-muted-foreground"
-                    actionsClassName="mt-2"
-                  />
-                ) : null}
-
-                {/* Badges row */}
-                {hasDetailBadges && (
-                  <div className="flex flex-wrap gap-1.5">
-                  {/* Category */}
-                  {CategoryIcon && task.category && (
-                    <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 border-muted-foreground/30">
-                      <CategoryIcon className="w-3 h-3" />
-                      {task.category}
-                    </Badge>
-                  )}
-
-                  {/* Difficulty */}
-                  {task.difficulty && (
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "text-xs px-1.5 py-0.5 h-5",
-                        task.difficulty === 'easy' && "bg-green-500/10 text-green-500 border-green-500/30",
-                        task.difficulty === 'medium' && "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
-                        task.difficulty === 'hard' && "bg-red-500/10 text-red-500 border-red-500/30"
-                      )}
-                    >
-                      {task.difficulty}
-                    </Badge>
-                  )}
-
-                  {/* Priority */}
-                  {task.priority && (
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "text-xs px-1.5 py-0.5 h-5",
-                        task.priority === 'high' && "bg-red-500/10 text-red-500 border-red-500/30",
-                        task.priority === 'medium' && "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
-                        task.priority === 'low' && "bg-blue-500/10 text-blue-500 border-blue-500/30"
-                      )}
-                    >
-                      {task.priority} priority
-                    </Badge>
-                  )}
-
-                  {/* Duration */}
-                  {task.estimated_duration && (
-                    <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 border-muted-foreground/30">
-                      <Timer className="w-3 h-3" />
-                      {task.estimated_duration}m
-                    </Badge>
-                  )}
-
-                  {/* Recurrence */}
-                  {task.is_recurring && task.recurrence_pattern && (
-                    <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 bg-accent/10 text-accent border-accent/30">
-                      <Repeat className="w-3 h-3" />
-                      {formatDisplayLabel(task.recurrence_pattern)}
-                    </Badge>
-                  )}
-                  </div>
-                )}
-              </div>
+              {renderQuestDetailSections(task, { variant: "inline", className: "pl-8 pr-2 pb-2" })}
             </CollapsibleContent>
           ) : null}
         </div>
@@ -2803,7 +2654,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     onMoveQuestToNextDay,
     expandedTasks,
     hasExpandableDetails,
-    habitDescriptionById,
+    mobileDetailTaskId,
+    renderQuestDetailSections,
     toggleTaskExpanded,
     justCompletedTasks,
     optimisticCompleted,
@@ -2988,6 +2840,14 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const scheduledTimelineContentStyle: CSSProperties | undefined = isDesktopLayout
     ? undefined
     : { paddingBottom: mobileFabScrollClearance };
+  const mobileDetailTaskXP = mobileDetailTask
+    ? mobileDetailTask.is_main_quest
+      ? Math.round(mobileDetailTask.xp_reward * MAIN_QUEST_XP_MULTIPLIER)
+      : mobileDetailTask.xp_reward
+    : 0;
+  const mobileDetailDurationLabel = mobileDetailTask
+    ? formatDurationLabel(mobileDetailTask.estimated_duration)
+    : null;
 
   return (
     <div
@@ -3551,6 +3411,65 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       </div>
 
       {desktopRail}
+
+      {!isDesktopLayout && mobileDetailTask ? (
+        <Drawer
+          open
+          onOpenChange={(open) => {
+            if (!open) setMobileDetailTaskId(null);
+          }}
+          shouldScaleBackground={false}
+        >
+          <DrawerContent
+            className={COMPANION_FROSTED_PLANNER_DARK_CLASS}
+            data-testid={`mobile-scheduled-quest-detail-drawer-${mobileDetailTask.id}`}
+            style={companionFrostedThemeStyle}
+          >
+            <DrawerHeader className="px-4 pb-3 pt-4 text-left">
+              <DrawerTitle className="text-left text-xl leading-tight">
+                {mobileDetailTask.task_text}
+              </DrawerTitle>
+              <DrawerDescription>
+                Quest details
+              </DrawerDescription>
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                {mobileDetailTask.scheduled_time ? (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.05] px-2 py-1">
+                    <Clock className="h-3 w-3" />
+                    {formatTime(mobileDetailTask.scheduled_time)}
+                  </span>
+                ) : null}
+                {mobileDetailDurationLabel ? (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.05] px-2 py-1">
+                    <Timer className="h-3 w-3" />
+                    {mobileDetailDurationLabel}
+                  </span>
+                ) : null}
+                <span className="rounded-full border border-stardust-gold/25 bg-stardust-gold/10 px-2 py-1 font-semibold text-stardust-gold">
+                  +{mobileDetailTaskXP} XP
+                </span>
+                {mobileDetailTask.is_main_quest ? (
+                  <Badge variant="outline" className="border-primary/35 bg-primary/10 text-primary">
+                    Main quest
+                  </Badge>
+                ) : null}
+                {mobileDetailTask.habit_source_id ? (
+                  <Badge variant="outline" className="border-accent/35 bg-accent/10 text-accent">
+                    <Repeat className="mr-1 h-3 w-3" />
+                    Ritual
+                  </Badge>
+                ) : null}
+              </div>
+            </DrawerHeader>
+            <div
+              className="overflow-y-auto px-4 pb-6"
+              data-testid={`mobile-scheduled-quest-detail-content-${mobileDetailTask.id}`}
+            >
+              {renderQuestDetailSections(mobileDetailTask, { variant: "drawer" })}
+            </div>
+          </DrawerContent>
+        </Drawer>
+      ) : null}
 
       {shouldRenderDragOverlay && draggedScheduledTask && dragOverlaySnapshot && typeof document !== "undefined"
         ? createPortal(
