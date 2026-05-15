@@ -1,21 +1,5 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-} from "react";
-import {
-  addDays,
-  addWeeks,
-  format,
-  isSameDay,
-  isToday,
-  startOfWeek,
-  subWeeks,
-} from "date-fns";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { addDays, addWeeks, format, isSameDay, isToday, startOfWeek, subWeeks } from "date-fns";
 import {
   CalendarDays,
   Check,
@@ -54,7 +38,7 @@ import {
   isCampaignRitualTask,
 } from "@/utils/campaignRitualStyle";
 import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
-import { createJourneysCompanionChatLaunchIntent } from "@/shared/companionChatLaunchIntent";
+import { createPlanDayCompanionLaunchIntent } from "@/utils/companionPlannerLaunchContext";
 
 interface ActiveEpic {
   id: string;
@@ -95,9 +79,7 @@ interface DesktopWeekPlannerProps {
   onPlannerModeChange?: (mode: "week" | "day") => void;
   onToggle: (taskId: string, completed: boolean, xpReward: number) => void;
   onAddQuest: () => void;
-  onOpenCompanionPlanner?: (
-    intent?: CompanionPlannerLaunchIntent | null,
-  ) => void;
+  onOpenCompanionPlanner?: (intent?: CompanionPlannerLaunchIntent | null) => void;
   onVoiceAddQuest?: () => void;
   isVoiceAddRecording?: boolean;
   isVoiceAddSupported?: boolean;
@@ -146,16 +128,14 @@ const HOUR_HEIGHT_PX = 84;
 const MIN_TASK_HEIGHT_PX = 28;
 const TASK_PAD_PX = 4;
 const WEEK_GRID_TEMPLATE_COLUMNS = "72px repeat(7, minmax(0, 1fr))";
-const JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME = `${COMPANION_FROSTED_THEME_SCOPE_CLASS} journeys-quest-card-shell overflow-hidden border transition-colors`;
+const JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME =
+  `${COMPANION_FROSTED_THEME_SCOPE_CLASS} journeys-quest-card-shell overflow-hidden border transition-colors`;
 const JOURNEYS_QUEST_CARD_SHELL_STANDARD_TONE_CLASS_NAME =
   "border-white/10 bg-white/[0.04] shadow-[0_12px_22px_rgba(0,0,0,0.14)]";
-const JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME =
-  "journeys-quest-card-shell--active";
-const JOURNEYS_QUEST_CARD_SHELL_READABLE_CLASS_NAME =
-  "journeys-quest-card-shell--readable";
+const JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME = "journeys-quest-card-shell--active";
+const JOURNEYS_QUEST_CARD_SHELL_READABLE_CLASS_NAME = "journeys-quest-card-shell--readable";
 
-const formatHourLabel = (hour: number) =>
-  format(new Date(2000, 0, 1, hour, 0), "h a");
+const formatHourLabel = (hour: number) => format(new Date(2000, 0, 1, hour, 0), "h a");
 
 const parseHour = (time: string | null | undefined) => {
   if (!time) return null;
@@ -169,27 +149,21 @@ const parseMinute = (time: string | null | undefined) => {
   const [hours, minutes] = time.split(":");
   const parsedHours = Number.parseInt(hours, 10);
   const parsedMinutes = Number.parseInt(minutes ?? "0", 10);
-  if (!Number.isFinite(parsedHours) || !Number.isFinite(parsedMinutes))
-    return null;
-  return parsedHours * 60 + parsedMinutes;
+  if (!Number.isFinite(parsedHours) || !Number.isFinite(parsedMinutes)) return null;
+  return (parsedHours * 60) + parsedMinutes;
 };
 
-const getEffectiveTaskXP = (
-  task: Pick<DailyTask, "xp_reward" | "is_main_quest">,
-) =>
+const getEffectiveTaskXP = (task: Pick<DailyTask, "xp_reward" | "is_main_quest">) => (
   task.is_main_quest
     ? Math.round(task.xp_reward * MAIN_QUEST_XP_MULTIPLIER)
-    : task.xp_reward;
+    : task.xp_reward
+);
 
 const sortWeekTasks = (left: DailyTask, right: DailyTask) => {
   const leftHasTime = !!left.scheduled_time;
   const rightHasTime = !!right.scheduled_time;
 
-  if (
-    leftHasTime &&
-    rightHasTime &&
-    left.scheduled_time !== right.scheduled_time
-  ) {
+  if (leftHasTime && rightHasTime && left.scheduled_time !== right.scheduled_time) {
     return left.scheduled_time!.localeCompare(right.scheduled_time!);
   }
 
@@ -214,10 +188,7 @@ interface PositionedTask {
   totalColumns: number;
 }
 
-const calculateTaskTop = (
-  scheduledTime: string | null | undefined,
-  firstHour: number,
-): number => {
+const calculateTaskTop = (scheduledTime: string | null | undefined, firstHour: number): number => {
   const totalMinutes = parseMinute(scheduledTime);
   if (totalMinutes === null) return 0;
   return ((totalMinutes - firstHour * 60) / 60) * HOUR_HEIGHT_PX;
@@ -226,12 +197,13 @@ const calculateTaskTop = (
 const calculateWeekTaskHeight = (
   duration: number | null | undefined,
   fallbackMinutes: number,
-): number =>
+): number => (
   durationMinutesToPixels(duration, {
     fallbackMinutes,
     pxPerMinute: HOUR_HEIGHT_PX / 60,
     minHeightPx: MIN_TASK_HEIGHT_PX,
-  });
+  })
+);
 
 const computeOverlapColumns = (
   dayTasks: DailyTask[],
@@ -243,10 +215,7 @@ const computeOverlapColumns = (
     .map((task) => ({
       task,
       topPx: calculateTaskTop(task.scheduled_time, firstHour),
-      heightPx: calculateWeekTaskHeight(
-        task.estimated_duration,
-        timedTaskDurationFallbackMinutes,
-      ),
+      heightPx: calculateWeekTaskHeight(task.estimated_duration, timedTaskDurationFallbackMinutes),
       column: 0,
       totalColumns: 1,
     }))
@@ -308,18 +277,15 @@ function WeekPlannerTaskCard({
 }: WeekPlannerTaskCardProps) {
   const effectiveTaskXP = getEffectiveTaskXP(task);
   const isComplete = !!task.completed;
-  const { handleClick, handleDoubleClick } = useDesktopQuestCardClickHandlers(
-    task,
-    {
-      onSingleClick: (clickedTask) => onOpenChange(clickedTask.id === task.id),
-      onDoubleClick: onEditQuest
-        ? (clickedTask) => {
-            onOpenChange(false);
-            onEditQuest(clickedTask);
-          }
-        : undefined,
-    },
-  );
+  const { handleClick, handleDoubleClick } = useDesktopQuestCardClickHandlers(task, {
+    onSingleClick: (clickedTask) => onOpenChange(clickedTask.id === task.id),
+    onDoubleClick: onEditQuest
+      ? (clickedTask) => {
+          onOpenChange(false);
+          onEditQuest(clickedTask);
+        }
+      : undefined,
+  });
   const isCampaignRitual = isCampaignRitualTask(task);
   const campaignTitle = task.epic_title?.trim() || "Campaign";
 
@@ -333,15 +299,14 @@ function WeekPlannerTaskCard({
         readableQuestCardsEnabled
           ? JOURNEYS_QUEST_CARD_SHELL_READABLE_CLASS_NAME
           : JOURNEYS_QUEST_CARD_SHELL_STANDARD_TONE_CLASS_NAME,
-        isCampaignRitual &&
-          (readableQuestCardsEnabled
+        isCampaignRitual && (
+          readableQuestCardsEnabled
             ? CAMPAIGN_RITUAL_CARD_CLASS_NAME
-            : CAMPAIGN_RITUAL_CARD_CLASSES),
+            : CAMPAIGN_RITUAL_CARD_CLASSES
+        ),
         compact && "rounded-[16px]",
         isOpen && JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME,
-        isOpen &&
-          !readableQuestCardsEnabled &&
-          "border-primary/40 bg-primary/[0.08]",
+        isOpen && !readableQuestCardsEnabled && "border-primary/40 bg-primary/[0.08]",
         isComplete && "opacity-70",
       )}
     >
@@ -362,9 +327,7 @@ function WeekPlannerTaskCard({
               ? "border-primary bg-primary text-primary-foreground"
               : "border-white/25 text-transparent hover:border-primary/70",
           )}
-          aria-label={
-            isComplete ? "Mark task as incomplete" : "Mark task as complete"
-          }
+          aria-label={isComplete ? "Mark task as incomplete" : "Mark task as complete"}
         >
           <Check className="h-3 w-3" />
         </button>
@@ -376,12 +339,10 @@ function WeekPlannerTaskCard({
           hasCalendarLink={hasCalendarLink?.(task.id)}
           onEdit={onEditQuest}
           onDelete={onDeleteQuest}
-          onMoveQuestToNextDay={
-            !task.habit_source_id ? onMoveQuestToNextDay : undefined
-          }
+          onMoveQuestToNextDay={!task.habit_source_id ? onMoveQuestToNextDay : undefined}
           onSendToCalendar={onSendToCalendar}
           companionFrostedThemeStyle={companionFrostedThemeStyle}
-          anchor={
+          anchor={(
             <button
               type="button"
               onClick={handleClick}
@@ -394,9 +355,7 @@ function WeekPlannerTaskCard({
             >
               <div className="min-w-0">
                 <div className="flex min-w-0 items-center gap-1.5">
-                  {isCampaignRitual ? (
-                    <Repeat className="h-3.5 w-3.5 flex-shrink-0 text-primary" />
-                  ) : null}
+                  {isCampaignRitual ? <Repeat className="h-3.5 w-3.5 flex-shrink-0 text-primary" /> : null}
                   <p
                     className={cn(
                       compact ? "text-xs" : "text-sm",
@@ -414,7 +373,7 @@ function WeekPlannerTaskCard({
                 ) : null}
               </div>
             </button>
-          }
+          )}
         />
       </div>
     </div>
@@ -456,14 +415,16 @@ export function DesktopWeekPlanner({
   const dayHeaderRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const lastCenterDateRequestKeyRef = useRef(centerDateRequestKey);
   const hasCompanionPlannerShortcut = Boolean(onOpenCompanionPlanner);
-  const companionChatLauncherLabel = "Companion Chat";
-  const openCompanionChatThread = useCallback(() => {
+  const planDayLauncherLabel = isToday(selectedDate) ? "Plan Today" : "Plan Day";
+  const openPlanDayThread = useCallback(() => {
     if (!onOpenCompanionPlanner) return;
-    onOpenCompanionPlanner(createJourneysCompanionChatLaunchIntent());
-  }, [onOpenCompanionPlanner]);
-  const voiceAddButtonLabel = isVoiceAddRecording
-    ? "Stop voice capture"
-    : "Start voice capture";
+    onOpenCompanionPlanner(createPlanDayCompanionLaunchIntent({
+      selectedDate,
+      tasks,
+      activeEpics,
+    }));
+  }, [activeEpics, onOpenCompanionPlanner, selectedDate, tasks]);
+  const voiceAddButtonLabel = isVoiceAddRecording ? "Stop voice capture" : "Start voice capture";
   const campaignSectionLabel = onOpenCampaigns ? (
     <button
       type="button"
@@ -483,9 +444,7 @@ export function DesktopWeekPlanner({
   const quickCaptureControls = (
     <div
       className="flex items-center gap-2"
-      data-has-companion-planner-shortcut={
-        hasCompanionPlannerShortcut ? "true" : "false"
-      }
+      data-has-companion-planner-shortcut={hasCompanionPlannerShortcut ? "true" : "false"}
     >
       <Button
         variant="outline"
@@ -502,29 +461,19 @@ export function DesktopWeekPlanner({
         size="icon"
         className={cn(
           "h-9 w-9 rounded-[18px] border-white/10 bg-white/5 hover:bg-white/10",
-          isVoiceAddRecording &&
-            "border-primary/40 bg-primary/15 text-primary hover:bg-primary/20",
+          isVoiceAddRecording && "border-primary/40 bg-primary/15 text-primary hover:bg-primary/20",
         )}
         onClick={onVoiceAddQuest}
         aria-label={voiceAddButtonLabel}
         disabled={!onVoiceAddQuest || !isVoiceAddSupported}
         data-testid="desktop-week-voice-add-button"
       >
-        {isVoiceAddRecording ? (
-          <MicOff className="h-4 w-4" />
-        ) : (
-          <Mic className="h-4 w-4" />
-        )}
+        {isVoiceAddRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
       </Button>
     </div>
   );
-  const [openDetailsTaskId, setOpenDetailsTaskId] = useState<string | null>(
-    null,
-  );
-  const weekStart = useMemo(
-    () => startOfWeek(selectedDate, { weekStartsOn: 0 }),
-    [selectedDate],
-  );
+  const [openDetailsTaskId, setOpenDetailsTaskId] = useState<string | null>(null);
+  const weekStart = useMemo(() => startOfWeek(selectedDate, { weekStartsOn: 0 }), [selectedDate]);
   const weekDays = useMemo(
     () => Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)),
     [weekStart],
@@ -539,8 +488,7 @@ export function DesktopWeekPlanner({
     if (centerDateRequestKey === lastCenterDateRequestKeyRef.current) return;
 
     lastCenterDateRequestKeyRef.current = centerDateRequestKey;
-    const targetDateKey =
-      centerDateRequestDateKey ?? format(selectedDate, "yyyy-MM-dd");
+    const targetDateKey = centerDateRequestDateKey ?? format(selectedDate, "yyyy-MM-dd");
     const target = dayHeaderRefs.current[targetDateKey];
     if (typeof target?.scrollIntoView !== "function") return;
 
@@ -552,10 +500,7 @@ export function DesktopWeekPlanner({
   }, [centerDateRequestDateKey, centerDateRequestKey, selectedDate]);
 
   useEffect(() => {
-    if (
-      openDetailsTaskId &&
-      !tasks.some((task) => task.id === openDetailsTaskId)
-    ) {
+    if (openDetailsTaskId && !tasks.some((task) => task.id === openDetailsTaskId)) {
       setOpenDetailsTaskId(null);
     }
   }, [openDetailsTaskId, tasks]);
@@ -646,24 +591,14 @@ export function DesktopWeekPlanner({
     const latestHour = tasks.reduce((latest, task) => {
       const startMinute = parseMinute(task.scheduled_time);
       if (startMinute === null) return latest;
-      const endMinute =
-        startMinute + Math.max(task.estimated_duration ?? 30, 30) - 1;
+      const endMinute = startMinute + Math.max(task.estimated_duration ?? 30, 30) - 1;
       return Math.max(latest, Math.floor(endMinute / 60));
     }, DEFAULT_TIMELINE_END_HOUR);
 
-    const startHour = Math.max(
-      0,
-      Math.min(DEFAULT_TIMELINE_START_HOUR, earliestHour),
-    );
-    const endHour = Math.min(
-      23,
-      Math.max(DEFAULT_TIMELINE_END_HOUR, latestHour),
-    );
+    const startHour = Math.max(0, Math.min(DEFAULT_TIMELINE_START_HOUR, earliestHour));
+    const endHour = Math.min(23, Math.max(DEFAULT_TIMELINE_END_HOUR, latestHour));
 
-    return Array.from(
-      { length: endHour - startHour + 1 },
-      (_, index) => startHour + index,
-    );
+    return Array.from({ length: endHour - startHour + 1 }, (_, index) => startHour + index);
   }, [tasks]);
 
   const positionedTasksByDate = useMemo(() => {
@@ -674,11 +609,7 @@ export function DesktopWeekPlanner({
       const timed = dayTasks.filter((t) => t.scheduled_time);
       result.set(
         dateKey,
-        computeOverlapColumns(
-          timed,
-          firstHour,
-          timedTaskDurationFallbackMinutes,
-        ),
+        computeOverlapColumns(timed, firstHour, timedTaskDurationFallbackMinutes),
       );
     });
 
@@ -689,37 +620,24 @@ export function DesktopWeekPlanner({
     () => tasks.filter((task) => !!task.habit_source_id),
     [tasks],
   );
-  const standaloneRitualCount = ritualTasks.filter(
-    (task) => !task.epic_id,
-  ).length;
+  const standaloneRitualCount = ritualTasks.filter((task) => !task.epic_id).length;
 
   const weekCompletedCount = tasks.filter((task) => !!task.completed).length;
   const weekTotalCount = tasks.length;
-  const weekScheduledCount = tasks.filter(
-    (task) => !!task.scheduled_time,
-  ).length;
-  const weekActiveDays = new Set(
-    tasks.map((task) => task.task_date).filter(Boolean),
-  ).size;
+  const weekScheduledCount = tasks.filter((task) => !!task.scheduled_time).length;
+  const weekActiveDays = new Set(tasks.map((task) => task.task_date).filter(Boolean)).size;
   const weekXP = tasks.reduce((sum, task) => {
     if (!task.completed) return sum;
     return sum + getEffectiveTaskXP(task);
   }, 0);
-  const progressPercent =
-    weekTotalCount > 0 ? (weekCompletedCount / weekTotalCount) * 100 : 0;
+  const progressPercent = weekTotalCount > 0 ? (weekCompletedCount / weekTotalCount) * 100 : 0;
 
   const epicProgress = useMemo(() => {
-    const ritualCountsByEpic = new Map<
-      string,
-      { total: number; completed: number }
-    >();
+    const ritualCountsByEpic = new Map<string, { total: number; completed: number }>();
 
     ritualTasks.forEach((task) => {
       if (!task.epic_id) return;
-      const current = ritualCountsByEpic.get(task.epic_id) ?? {
-        total: 0,
-        completed: 0,
-      };
+      const current = ritualCountsByEpic.get(task.epic_id) ?? { total: 0, completed: 0 };
       current.total += 1;
       if (task.completed) {
         current.completed += 1;
@@ -728,10 +646,7 @@ export function DesktopWeekPlanner({
     });
 
     return activeEpics.map((epic) => {
-      const ritualCounts = ritualCountsByEpic.get(epic.id) ?? {
-        total: 0,
-        completed: 0,
-      };
+      const ritualCounts = ritualCountsByEpic.get(epic.id) ?? { total: 0, completed: 0 };
       return {
         epic,
         ritualCounts,
@@ -743,47 +658,41 @@ export function DesktopWeekPlanner({
   const desktopRailCardClass =
     "journeys-desktop-rail-card rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,20,38,0.94),rgba(16,13,27,0.9))] p-5 shadow-[0_20px_40px_rgba(0,0,0,0.2)]";
 
-  const renderTaskCard = useCallback(
-    (task: DailyTask, compact = false) => (
-      <WeekPlannerTaskCard
-        key={task.id}
-        task={task}
-        compact={compact}
-        readableQuestCardsEnabled={readableQuestCardsEnabled}
-        isOpen={openDetailsTaskId === task.id}
-        onOpenChange={(open) => {
-          setOpenDetailsTaskId(open ? task.id : null);
-        }}
-        onToggle={onToggle}
-        onUndoToggle={onUndoToggle}
-        onEditQuest={onEditQuest}
-        onDeleteQuest={onDeleteQuest}
-        onMoveQuestToNextDay={onMoveQuestToNextDay}
-        onSendToCalendar={onSendToCalendar}
-        hasCalendarLink={hasCalendarLink}
-        companionFrostedThemeStyle={companionFrostedThemeStyle}
-      />
-    ),
-    [
-      companionFrostedThemeStyle,
-      hasCalendarLink,
-      onDeleteQuest,
-      onEditQuest,
-      onMoveQuestToNextDay,
-      onSendToCalendar,
-      onToggle,
-      onUndoToggle,
-      openDetailsTaskId,
-      readableQuestCardsEnabled,
-    ],
-  );
+  const renderTaskCard = useCallback((task: DailyTask, compact = false) => (
+    <WeekPlannerTaskCard
+      key={task.id}
+      task={task}
+      compact={compact}
+      readableQuestCardsEnabled={readableQuestCardsEnabled}
+      isOpen={openDetailsTaskId === task.id}
+      onOpenChange={(open) => {
+        setOpenDetailsTaskId(open ? task.id : null);
+      }}
+      onToggle={onToggle}
+      onUndoToggle={onUndoToggle}
+      onEditQuest={onEditQuest}
+      onDeleteQuest={onDeleteQuest}
+      onMoveQuestToNextDay={onMoveQuestToNextDay}
+      onSendToCalendar={onSendToCalendar}
+      hasCalendarLink={hasCalendarLink}
+      companionFrostedThemeStyle={companionFrostedThemeStyle}
+    />
+  ), [
+    companionFrostedThemeStyle,
+    hasCalendarLink,
+    onDeleteQuest,
+    onEditQuest,
+    onMoveQuestToNextDay,
+    onSendToCalendar,
+    onToggle,
+    onUndoToggle,
+    openDetailsTaskId,
+    readableQuestCardsEnabled,
+  ]);
 
   return (
     <div
-      className={cn(
-        COMPANION_FROSTED_PLANNER_DARK_CLASS,
-        "grid grid-cols-[minmax(0,1fr)_320px] items-start gap-5",
-      )}
+      className={cn(COMPANION_FROSTED_PLANNER_DARK_CLASS, "grid grid-cols-[minmax(0,1fr)_320px] items-start gap-5")}
       data-testid="desktop-week-planner"
       style={companionFrostedThemeStyle}
     >
@@ -794,8 +703,7 @@ export function DesktopWeekPlanner({
               Week Planner
             </p>
             <h2 className="mt-2 text-[1.65rem] font-semibold tracking-tight text-foreground">
-              {format(weekStart, "MMMM d")} -{" "}
-              {format(addDays(weekStart, 6), "MMMM d")}
+              {format(weekStart, "MMMM d")} - {format(addDays(weekStart, 6), "MMMM d")}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Cleaner desktop week planning with click-to-inspect quests.
@@ -884,9 +792,9 @@ export function DesktopWeekPlanner({
                 variant="inline"
                 compact
                 data-tour="add-quest-launcher"
-                text={companionChatLauncherLabel}
+                text={planDayLauncherLabel}
                 className="shadow-[0_14px_28px_rgba(122,61,255,0.2)]"
-                onClick={openCompanionChatThread}
+                onClick={openPlanDayThread}
               />
             ) : null}
             {quickCaptureControls}
@@ -894,11 +802,11 @@ export function DesktopWeekPlanner({
         </div>
 
         <div className="overflow-hidden rounded-[28px] border border-white/8 bg-black/10">
-          <div
-            className="overflow-auto"
-            style={{ maxHeight: "min(72vh, 820px)" }}
-          >
-            <div className="min-w-0" data-testid="desktop-week-planner-grid">
+          <div className="overflow-auto" style={{ maxHeight: "min(72vh, 820px)" }}>
+            <div
+              className="min-w-0"
+              data-testid="desktop-week-planner-grid"
+            >
               {/* Header row */}
               <div
                 className="sticky top-0 z-40 grid"
@@ -913,21 +821,15 @@ export function DesktopWeekPlanner({
 
                 {weekDays.map((day) => {
                   const dateKey = format(day, "yyyy-MM-dd");
-                  const dayStats = dayStatsByDate.get(dateKey) ?? {
-                    total: 0,
-                    completed: 0,
-                    timed: 0,
-                  };
+                  const dayStats = dayStatsByDate.get(dateKey) ?? { total: 0, completed: 0, timed: 0 };
                   const isSelected = isSameDay(day, selectedDate);
                   const dayIsToday = isToday(day);
-                  const progressLabel =
-                    dayStats.total === 0
-                      ? "Open day"
-                      : `${dayStats.completed}/${dayStats.total} done`;
-                  const compactProgressLabel =
-                    dayStats.total === 0
-                      ? "Open"
-                      : `${dayStats.completed}/${dayStats.total}`;
+                  const progressLabel = dayStats.total === 0
+                    ? "Open day"
+                    : `${dayStats.completed}/${dayStats.total} done`;
+                  const compactProgressLabel = dayStats.total === 0
+                    ? "Open"
+                    : `${dayStats.completed}/${dayStats.total}`;
 
                   return (
                     <div
@@ -941,8 +843,8 @@ export function DesktopWeekPlanner({
                         isSelected
                           ? "bg-primary/[0.12]"
                           : dayIsToday
-                            ? "bg-celestial-blue/[0.1]"
-                            : "bg-[rgba(24,21,38,0.98)]",
+                          ? "bg-celestial-blue/[0.1]"
+                          : "bg-[rgba(24,21,38,0.98)]",
                       )}
                     >
                       <button
@@ -958,8 +860,8 @@ export function DesktopWeekPlanner({
                                 isSelected
                                   ? "text-primary"
                                   : dayIsToday
-                                    ? "text-celestial-blue"
-                                    : "text-muted-foreground/75",
+                                  ? "text-celestial-blue"
+                                  : "text-muted-foreground/75",
                               )}
                             >
                               {format(day, "EEE")}
@@ -968,21 +870,15 @@ export function DesktopWeekPlanner({
                               {format(day, "d")}
                             </h3>
                             <p className="mt-1 truncate text-xs text-muted-foreground">
-                              <span className="hidden 2xl:inline">
-                                {format(day, "MMMM d")}
-                              </span>
-                              <span className="2xl:hidden">
-                                {format(day, "MMM d")}
-                              </span>
+                              <span className="hidden 2xl:inline">{format(day, "MMMM d")}</span>
+                              <span className="2xl:hidden">{format(day, "MMM d")}</span>
                             </p>
                           </div>
                           {dayIsToday ? (
                             <span
                               className={cn(
                                 "hidden rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide 2xl:inline-flex",
-                                isSelected
-                                  ? "bg-white/14 text-white"
-                                  : "bg-celestial-blue/15 text-celestial-blue",
+                                isSelected ? "bg-white/14 text-white" : "bg-celestial-blue/15 text-celestial-blue",
                               )}
                             >
                               Today
@@ -992,16 +888,10 @@ export function DesktopWeekPlanner({
 
                         <div className="mt-2 flex min-w-0 items-center justify-between gap-2 text-[11px] text-muted-foreground">
                           <span className="min-w-0 truncate">
-                            <span className="hidden 2xl:inline">
-                              {progressLabel}
-                            </span>
-                            <span className="2xl:hidden">
-                              {compactProgressLabel}
-                            </span>
+                            <span className="hidden 2xl:inline">{progressLabel}</span>
+                            <span className="2xl:hidden">{compactProgressLabel}</span>
                           </span>
-                          <span className="shrink-0">
-                            {dayStats.timed} timed
-                          </span>
+                          <span className="shrink-0">{dayStats.timed} timed</span>
                         </div>
                       </button>
                     </div>
@@ -1023,10 +913,7 @@ export function DesktopWeekPlanner({
 
                   {weekDays.map((day) => {
                     const dateKey = format(day, "yyyy-MM-dd");
-                    const buckets = dayBucketsByDate.get(dateKey) ?? {
-                      anytime: [],
-                      timedByHour: new Map<number, DailyTask[]>(),
-                    };
+                    const buckets = dayBucketsByDate.get(dateKey) ?? { anytime: [], timedByHour: new Map<number, DailyTask[]>() };
                     const isSelected = isSameDay(day, selectedDate);
                     const dayIsToday = isToday(day);
 
@@ -1039,15 +926,13 @@ export function DesktopWeekPlanner({
                           isSelected
                             ? "bg-primary/[0.05]"
                             : dayIsToday
-                              ? "bg-celestial-blue/[0.04]"
-                              : "bg-white/[0.01]",
+                            ? "bg-celestial-blue/[0.04]"
+                            : "bg-white/[0.01]",
                         )}
                       >
                         {buckets.anytime.length > 0 ? (
                           <div className="space-y-2">
-                            {buckets.anytime.map((task) =>
-                              renderTaskCard(task, true),
-                            )}
+                            {buckets.anytime.map((task) => renderTaskCard(task, true))}
                           </div>
                         ) : (
                           <div className="flex min-h-[72px] items-center justify-center rounded-[18px] border border-dashed border-white/8 bg-white/[0.02] px-3 text-center text-[11px] text-muted-foreground">
@@ -1100,35 +985,33 @@ export function DesktopWeekPlanner({
                             isSelected
                               ? "bg-primary/[0.04]"
                               : dayIsToday
-                                ? "bg-celestial-blue/[0.03]"
-                                : "bg-transparent",
+                              ? "bg-celestial-blue/[0.03]"
+                              : "bg-transparent",
                           )}
                           style={{ height: `${HOUR_HEIGHT_PX}px` }}
                         />
                       ))}
 
                       {/* Absolutely positioned task cards */}
-                      {positioned.map(
-                        ({ task, topPx, heightPx, column, totalColumns }) => {
-                          const widthPercent = 100 / totalColumns;
-                          const leftPercent = column * widthPercent;
+                      {positioned.map(({ task, topPx, heightPx, column, totalColumns }) => {
+                        const widthPercent = 100 / totalColumns;
+                        const leftPercent = column * widthPercent;
 
-                          return (
-                            <div
-                              key={task.id}
-                              className="absolute z-10 px-1"
-                              style={{
-                                top: `${topPx}px`,
-                                height: `${heightPx}px`,
-                                left: `calc(${leftPercent}% + ${TASK_PAD_PX}px)`,
-                                width: `calc(${widthPercent}% - ${TASK_PAD_PX * 2}px)`,
-                              }}
-                            >
-                              {renderTaskCard(task, heightPx < 50)}
-                            </div>
-                          );
-                        },
-                      )}
+                        return (
+                          <div
+                            key={task.id}
+                            className="absolute z-10 px-1"
+                            style={{
+                              top: `${topPx}px`,
+                              height: `${heightPx}px`,
+                              left: `calc(${leftPercent}% + ${TASK_PAD_PX}px)`,
+                              width: `calc(${widthPercent}% - ${TASK_PAD_PX * 2}px)`,
+                            }}
+                          >
+                            {renderTaskCard(task, heightPx < 50)}
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })}
@@ -1149,25 +1032,18 @@ export function DesktopWeekPlanner({
                 {weekCompletedCount}/{weekTotalCount || 0}
               </p>
               <p className="text-sm text-muted-foreground">
-                quests completed across {weekActiveDays || 0} active day
-                {weekActiveDays === 1 ? "" : "s"}
+                quests completed across {weekActiveDays || 0} active day{weekActiveDays === 1 ? "" : "s"}
               </p>
             </div>
 
             <div className="rounded-[22px] border border-white/10 bg-white/[0.04] px-3 py-2">
               <div className="flex items-center gap-3">
-                <ProgressRing
-                  percent={progressPercent}
-                  size={40}
-                  strokeWidth={3.5}
-                />
+                <ProgressRing percent={progressPercent} size={40} strokeWidth={3.5} />
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">
                     XP banked
                   </p>
-                  <p className="text-sm font-semibold text-stardust-gold">
-                    {weekXP}
-                  </p>
+                  <p className="text-sm font-semibold text-stardust-gold">{weekXP}</p>
                 </div>
               </div>
             </div>
@@ -1175,25 +1051,15 @@ export function DesktopWeekPlanner({
 
           <div className="mt-4 grid grid-cols-3 gap-3">
             <div className="rounded-[20px] border border-white/8 bg-white/[0.03] p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">
-                Active
-              </p>
-              <p className="mt-2 text-xl font-semibold text-foreground">
-                {weekActiveDays}
-              </p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Active</p>
+              <p className="mt-2 text-xl font-semibold text-foreground">{weekActiveDays}</p>
             </div>
             <div className="rounded-[20px] border border-white/8 bg-white/[0.03] p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">
-                Timed
-              </p>
-              <p className="mt-2 text-xl font-semibold text-foreground">
-                {weekScheduledCount}
-              </p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Timed</p>
+              <p className="mt-2 text-xl font-semibold text-foreground">{weekScheduledCount}</p>
             </div>
             <div className="rounded-[20px] border border-white/8 bg-white/[0.03] p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">
-                Streak
-              </p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Streak</p>
               <p className="mt-2 flex items-center gap-1 text-xl font-semibold text-foreground">
                 <Flame className="h-4 w-4 text-stardust-gold/80" />
                 {currentStreak}
@@ -1208,8 +1074,7 @@ export function DesktopWeekPlanner({
             />
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Week mode keeps every day visible with a fixed hour gutter so
-            planning feels closer to desktop calendar tools.
+            Week mode keeps every day visible with a fixed hour gutter so planning feels closer to desktop calendar tools.
           </p>
         </section>
 
@@ -1239,25 +1104,18 @@ export function DesktopWeekPlanner({
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-foreground">
-                          {epic.title}
-                        </p>
+                        <p className="truncate text-sm font-semibold text-foreground">{epic.title}</p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          {ritualCounts.completed}/{ritualCounts.total} rituals
-                          completed this week
+                          {ritualCounts.completed}/{ritualCounts.total} rituals completed this week
                         </p>
                       </div>
-                      <Badge
-                        variant="outline"
-                        className="h-5 border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px]"
-                      >
+                      <Badge variant="outline" className="h-5 border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px]">
                         {Math.round(epic.progress_percentage ?? 0)}%
                       </Badge>
                     </div>
                     {daysRemaining !== null ? (
                       <p className="mt-2 text-[11px] text-muted-foreground">
-                        {daysRemaining} day{daysRemaining === 1 ? "" : "s"}{" "}
-                        remaining
+                        {daysRemaining} day{daysRemaining === 1 ? "" : "s"} remaining
                       </p>
                     ) : null}
                   </button>
@@ -1280,16 +1138,12 @@ export function DesktopWeekPlanner({
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">
                   Rituals this week
                 </p>
-                <p className="mt-2 text-xl font-semibold text-foreground">
-                  {ritualTasks.length}
-                </p>
+                <p className="mt-2 text-xl font-semibold text-foreground">{ritualTasks.length}</p>
               </div>
               <Trophy className="h-5 w-5 text-stardust-gold/75" />
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
-              {standaloneRitualCount} standalone ritual
-              {standaloneRitualCount === 1 ? "" : "s"} surfaced outside
-              campaigns.
+              {standaloneRitualCount} standalone ritual{standaloneRitualCount === 1 ? "" : "s"} surfaced outside campaigns.
             </p>
           </div>
         </section>

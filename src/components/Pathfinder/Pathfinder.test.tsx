@@ -419,7 +419,7 @@ describe("Pathfinder", () => {
         target: { value: "Pass the bar exam" },
       });
       expect(scrollToSpy.mock.calls.some(([options]) => (
-        (options as ScrollToOptions | null)?.behavior === "smooth"
+        typeof options === "object" && options?.behavior === "smooth"
       ))).toBe(false);
 
       fireEvent.click(screen.getByText("Pick Deadline"));
@@ -431,14 +431,15 @@ describe("Pathfinder", () => {
       await waitFor(() => {
         const didScrollToClarification = scrollToSpy.mock.calls.some(([options], index) => (
           scrollToSpy.mock.contexts[index] === scrollContainer
-          && (options as ScrollToOptions | null)?.top === 484
-          && (options as ScrollToOptions | null)?.behavior === "smooth"
+          && typeof options === "object"
+          && options?.top === 484
+          && options?.behavior === "smooth"
         ));
         expect(didScrollToClarification).toBe(true);
       });
 
       const smoothScrollCount = scrollToSpy.mock.calls.filter(([options]) => (
-        (options as ScrollToOptions | null)?.behavior === "smooth"
+        typeof options === "object" && options?.behavior === "smooth"
       )).length;
 
       fireEvent.change(goalInput, {
@@ -449,7 +450,7 @@ describe("Pathfinder", () => {
       });
 
       expect(scrollToSpy.mock.calls.filter(([options]) => (
-        (options as ScrollToOptions | null)?.behavior === "smooth"
+        typeof options === "object" && options?.behavior === "smooth"
       ))).toHaveLength(smoothScrollCount);
     } finally {
       scrollToSpy.mockRestore();

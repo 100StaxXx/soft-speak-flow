@@ -203,8 +203,33 @@ export const analyzeSchedulingIntent = (
   };
 };
 
-export const shouldRouteMessageToPlanner = (_params: {
+export const shouldRouteMessageToPlanner = ({
+  surface,
+  analysis,
+  hasOpenPlannerThread = false,
+}: {
   surface: SchedulingIntentSurface;
   analysis: SchedulingIntentAnalysis;
   hasOpenPlannerThread?: boolean;
-}): boolean => false;
+}): boolean => {
+  const isJourneysChatFirst = analysis.disposition === 'read_only';
+
+  if (hasOpenPlannerThread) {
+    if (surface !== 'journeys') return true;
+    if (!isJourneysChatFirst) return true;
+  }
+
+  if (surface === 'journeys') {
+    return analysis.disposition === 'schedule_action'
+      || analysis.isAggressiveBundle
+      || analysis.isOpportunisticSingle;
+  }
+
+  if (analysis.disposition === 'schedule_action') {
+    return analysis.hasExplicitPlannerAction ||
+      analysis.isAggressiveBundle ||
+      analysis.isOpportunisticSingle;
+  }
+  if (analysis.isScheduleRead || analysis.isDirectDayPlanning) return true;
+  return false;
+};

@@ -266,20 +266,16 @@ const AppContent = memo(() => {
       if (!detail) return;
 
       if (detail.queueId) {
-        void Promise.resolve(
-          supabase.rpc("mark_push_notification_opened", {
-            p_queue_id: detail.queueId,
-          }),
-        )
-          .then(({ error }) => {
-            if (error) {
-              logger.warn("Failed to mark native push notification opened", { error: error.message });
-            }
-          })
-          .finally(() => {
-            void queryClient.invalidateQueries({ queryKey: [PUSH_NOTIFICATIONS_INBOX_QUERY_KEY] });
-            void queryClient.invalidateQueries({ queryKey: [PUSH_NOTIFICATIONS_UNREAD_COUNT_QUERY_KEY] });
-          });
+        void supabase.rpc("mark_push_notification_opened", {
+          p_queue_id: detail.queueId,
+        }).then(({ error }) => {
+          if (error) {
+            logger.warn("Failed to mark native push notification opened", { error: error.message });
+          }
+        }).finally(() => {
+          void queryClient.invalidateQueries({ queryKey: [PUSH_NOTIFICATIONS_INBOX_QUERY_KEY] });
+          void queryClient.invalidateQueries({ queryKey: [PUSH_NOTIFICATIONS_UNREAD_COUNT_QUERY_KEY] });
+        });
       }
 
       navigate(detail.url);

@@ -11,11 +11,6 @@ const mocks = vi.hoisted(() => ({
     element: "fire" as string | null,
     usesPortraitShell: false,
   },
-  state: {
-    structuredResponse: null as unknown,
-    activeFollowUp: null as unknown,
-    pendingAction: null as unknown,
-  },
   assistant: {
     submitTypedMessage: vi.fn(),
     submitMessage: vi.fn(),
@@ -48,9 +43,9 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
         source: "agent",
       },
     ],
-    structuredResponse: mocks.state.structuredResponse,
-    activeFollowUp: mocks.state.activeFollowUp,
-    pendingAction: mocks.state.pendingAction,
+    structuredResponse: null,
+    activeFollowUp: null,
+    pendingAction: null,
     savedSuggestionProposalIds: [],
     pendingSuggestionProposalId: null,
     isSubmitting: false,
@@ -143,6 +138,10 @@ vi.mock("@/components/AudioReactiveWaveform", () => ({
   AudioReactiveWaveform: () => <div data-testid="audio-waveform" />,
 }));
 
+vi.mock("@/components/companion/CompanionStructuredResponseCards", () => ({
+  CompanionStructuredResponseCards: () => <div data-testid="structured-response-cards" />,
+}));
+
 vi.mock("@/components/PermissionRequestDialog", () => ({
   PermissionRequestDialog: () => null,
 }));
@@ -174,9 +173,6 @@ describe("CompanionChatModal", () => {
     mocks.visual.focalY = null;
     mocks.visual.element = "fire";
     mocks.visual.usesPortraitShell = false;
-    mocks.state.structuredResponse = null;
-    mocks.state.activeFollowUp = null;
-    mocks.state.pendingAction = null;
 
     Object.defineProperty(window, "innerHeight", {
       configurable: true,
@@ -223,6 +219,10 @@ describe("CompanionChatModal", () => {
     renderOpenModal();
 
     expectOpenChatWithFallbackInitial();
+    expect(screen.getByRole("img", { name: "Nova" })).toHaveAttribute(
+      "data-companion-image-fit",
+      "contain",
+    );
   });
 
   it("renders the companion initial fallback when there is no image", () => {
@@ -240,32 +240,6 @@ describe("CompanionChatModal", () => {
 
     expect(modal.className).toContain("[--background:202_100%_98%]");
     expect(modal.className).toContain("border-[hsl(var(--celestial-blue)_/_0.58)]");
-  });
-
-  it("does not render stale planner cards, follow-ups, or pending confirmations", () => {
-    mocks.state.structuredResponse = {
-      planDay: {
-        message: "I drafted a plan.",
-      },
-    };
-    mocks.state.activeFollowUp = {
-      question: "Do you want to draft this?",
-      options: ["Yes"],
-    };
-    mocks.state.pendingAction = {
-      summary: "Create a quest",
-      confirmationMessage: "Ready to save.",
-    };
-
-    renderOpenModal();
-
-    expect(screen.queryByTestId("structured-response-cards")).toBeNull();
-    expect(screen.queryByTestId("companion-chat-follow-up")).toBeNull();
-    expect(screen.queryByTestId("companion-chat-pending-action")).toBeNull();
-    expect(screen.queryByText("I drafted a plan.")).toBeNull();
-    expect(screen.queryByText("Do you want to draft this?")).toBeNull();
-    expect(screen.queryByText("Create a quest")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Confirm" })).toBeNull();
   });
 
   it("disables Vaul input repositioning for the mobile drawer", () => {

@@ -7140,7 +7140,7 @@ const buildAdvanceCampaignResponse = (
   if (adjustmentProposal && adjustmentSuggestion) {
     const reply = `${selectedCampaign.epic.title} looks ${
       selectedCampaign.status.replace(/_/g, " ")
-    }. ${selectedCampaign.statusReason} ${interventionLead} I can talk through the campaign adjustment first.`;
+    }. ${selectedCampaign.statusReason} ${interventionLead} I drafted the campaign adjustment first.`;
 
     return {
       mode: "proposal",
@@ -7228,7 +7228,7 @@ const buildAdvanceCampaignResponse = (
   );
   const reply = `${selectedCampaign.epic.title} looks ${
     selectedCampaign.status.replace(/_/g, " ")
-  }. ${selectedCampaign.statusReason} ${interventionLead} I can talk through the cleanest ${interventionLabel} move without overthinking it.`;
+  }. ${selectedCampaign.statusReason} ${interventionLead} I drafted the cleanest ${interventionLabel} move so you can confirm it without overthinking it.`;
 
   return {
     mode: "proposal",
@@ -8317,7 +8317,7 @@ const buildRelationshipTouchResponse = (
     mode: "proposal",
     reply: [
       interpretationLead,
-      `${targetContact.name} is the clearest relationship touch right now. I can talk through a small follow-through step without overthinking it.`,
+      `${targetContact.name} is the clearest relationship touch right now. I drafted a confirmable quest so you can follow through without overthinking it.`,
     ].filter(Boolean).join(" "),
     followUpQuestions: [],
     proposals: [proposal],
@@ -8403,7 +8403,7 @@ const buildFreeUpAfterResponse = (
 
   return {
     mode: "proposal",
-    reply: `I found ${proposals.length} quest move${
+    reply: `I drafted ${proposals.length} quest move${
       proposals.length === 1 ? "" : "s"
     } to clear your schedule after ${cutoff}. Review them and confirm if that lineup works.`,
     followUpQuestions: [],
@@ -8469,8 +8469,8 @@ const composeReply = (
   tonePack: PlannerTonePack,
   kind: PlannerProposalKind,
   readyToConfirm: boolean,
-  _draft: PlannerDraftState,
-  _questCaptureAssumption: QuestCaptureAssumption | null,
+  draft: PlannerDraftState,
+  questCaptureAssumption: QuestCaptureAssumption | null,
 ): string => {
   const baseLabel = ({
     create_quest: "quest",
@@ -8491,17 +8491,38 @@ const composeReply = (
   const memoryLead = preferredTimeOfDay
     ? `You usually land work like this in the ${preferredTimeOfDay}. `
     : "";
-  const plannerDraftDisabledLead = readyToConfirm
-    ? kind === "create_quest"
-      ? "I can talk this through with you, but I won't create or schedule a quest from this chat. "
-      : `I can talk this through with you, but I won't create or schedule a ${baseLabel} from this chat. `
+  const explicitQuestCaptureTime = preferredTime(draft);
+  const explicitQuestCaptureTimeLabel = explicitQuestCaptureTime
+    ? formatAssistantTime(explicitQuestCaptureTime) ?? explicitQuestCaptureTime
+    : null;
+  const explicitQuestCaptureDate = defaultQuestDate(input, draft);
+  const explicitQuestCaptureDateLabel =
+    explicitQuestCaptureDate === input.currentDate
+      ? "today"
+      : explicitQuestCaptureDate === addDaysToDateKey(input.currentDate, 1)
+      ? "tomorrow"
+      : explicitQuestCaptureDate
+      ? formatReadableDate(explicitQuestCaptureDate)
+      : null;
+  const questCaptureReplyLead = readyToConfirm && kind === "create_quest"
+    ? questCaptureAssumption?.kind === "inbox"
+      ? "I captured this as a quest in Inbox so you can schedule it later. "
+      : questCaptureAssumption?.kind === "slot"
+      ? `I drafted this as a quest, assuming ${questCaptureAssumption.date} at ${questCaptureAssumption.time} based on your open slot. `
+      : questCaptureAssumption?.kind === "preferred_time"
+      ? `I drafted this as a quest, assuming ${questCaptureAssumption.date} at ${questCaptureAssumption.time} based on your usual ${questCaptureAssumption.timeOfDay} pattern. `
+      : explicitQuestCaptureTiming && explicitQuestCaptureTimeLabel
+      ? explicitQuestCaptureDateLabel
+        ? `I drafted this as a quest for ${explicitQuestCaptureDateLabel} at ${explicitQuestCaptureTimeLabel}. `
+        : `I drafted this as a quest for ${explicitQuestCaptureTimeLabel}. `
+      : ""
     : "";
 
   if (isWittySassyTone(tonePack)) {
     if (readyToConfirm) {
       return `${interpretationLead ? `${interpretationLead} ` : ""}${
-        plannerDraftDisabledLead || `I can help think through this as a ${baseLabel}. `
-      }Tell me what you want to compare or refine.`;
+        questCaptureReplyLead || `I drafted this as a ${baseLabel}. `
+      }Review it, confirm it if it holds up, and we can skip the extra ceremony.`;
     }
 
     return `${
@@ -8511,8 +8532,8 @@ const composeReply = (
 
   if (readyToConfirm) {
     return `${interpretationLead ? `${interpretationLead} ` : ""}${
-      plannerDraftDisabledLead || `I can help think through this as a ${baseLabel}. `
-    }Tell me what you want to compare or refine.`;
+      questCaptureReplyLead || `I drafted this as a ${baseLabel}. `
+    }Take a look, and confirm it if it fits.`;
   }
 
   return `${
@@ -10023,10 +10044,10 @@ const buildOptimizerReply = (
   );
   const body = [
     usesPlannerMoves
-      ? `I found ${proposals.length} planner move${
+      ? `I drafted ${proposals.length} planner move${
         proposals.length === 1 ? "" : "s"
       } for ${dateLabel}.`
-      : `I found ${proposals.length} quest${
+      : `I drafted ${proposals.length} quest${
         proposals.length === 1 ? "" : "s"
       } for ${dateLabel}.`,
     "Review them and confirm what fits.",

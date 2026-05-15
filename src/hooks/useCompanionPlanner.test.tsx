@@ -2278,7 +2278,7 @@ describe("useCompanionPlanner", () => {
       data: {
         mode: "proposal",
         reply:
-          "I can talk this through with you, but I won't create or schedule a quest from this chat. Tell me what you want to compare or refine.",
+          "I drafted this as a quest for today at 5:00 pm. Take a look, and confirm it if it fits.",
         followUpQuestions: [],
         proposals: [
           {

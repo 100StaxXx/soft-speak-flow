@@ -1,7 +1,19 @@
+import {
+  COMPANION_PLANNER_SURFACE_ACTIONS,
+  type CompanionPlannerSurfaceAction,
+} from "@/shared/companionPlannerSurfaceActions";
 import type { CompanionPlannerLaunchTarget, CompanionPlannerStarterIntent } from "@/types/companionPlanner";
 
+type JourneysCompanionLauncherSurfaceActionId =
+  | "plan-day"
+  | "upcoming"
+  | "quest"
+  | "goal";
+
 export interface JourneysCompanionLauncherTemplate {
-  id: "free-talk";
+  id:
+    | "free-talk"
+    | JourneysCompanionLauncherSurfaceActionId;
   label: string;
   message: string;
   target: CompanionPlannerLaunchTarget;
@@ -46,6 +58,22 @@ const getStableIndex = (seed: string, length: number) => {
   return Math.abs(hash) % length;
 };
 
+const JOURNEYS_LAUNCHER_ACTION_IDS = [
+  "plan-day",
+  "upcoming",
+  "quest",
+  "goal",
+] as const satisfies readonly JourneysCompanionLauncherSurfaceActionId[];
+
+const JOURNEYS_LAUNCHER_ACTION_ID_SET = new Set<CompanionPlannerSurfaceAction["id"]>(
+  JOURNEYS_LAUNCHER_ACTION_IDS,
+);
+
+const isJourneysCompanionLauncherAction = (
+  action: CompanionPlannerSurfaceAction,
+): action is CompanionPlannerSurfaceAction & { id: JourneysCompanionLauncherSurfaceActionId } =>
+  JOURNEYS_LAUNCHER_ACTION_ID_SET.has(action.id);
+
 export const getJourneysCompanionLauncherGreeting = ({
   date = new Date(),
   userId = null,
@@ -74,5 +102,6 @@ export const getJourneysCompanionLauncherTemplates = ({
       target: "conversation",
       starterIntent: "free_talk_start",
     },
+    ...COMPANION_PLANNER_SURFACE_ACTIONS.filter(isJourneysCompanionLauncherAction),
   ];
 };

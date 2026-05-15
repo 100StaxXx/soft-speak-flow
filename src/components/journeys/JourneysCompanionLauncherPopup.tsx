@@ -2,7 +2,11 @@ import type { CSSProperties } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Archive,
+  CalendarCheck,
+  Clock3,
   MessageCircle,
+  Plus,
+  Sparkles,
 } from "lucide-react";
 import type { FABPopupAlignment } from "@/hooks/useDraggableFAB";
 import { cn } from "@/lib/utils";
@@ -46,6 +50,28 @@ const OPTION_META: Record<
   "free-talk": {
     Icon: MessageCircle,
     className: "border-[#6b3416] bg-[linear-gradient(180deg,#fffdf7_0%,#fff1cb_100%)] text-[#3c1f10]",
+    iconClassName: "bg-[#fff7dc] text-[#b04b12]",
+  },
+  "plan-day": {
+    Icon: CalendarCheck,
+    className: "border-[#6b3416] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#3c1f10]",
+    iconClassName: "bg-[#fff7dc] text-[#b04b12]",
+  },
+  upcoming: {
+    label: "Coming up",
+    Icon: Clock3,
+    className: "border-[#315114] bg-[linear-gradient(180deg,#d7ff86_0%,#9fda3f_100%)] text-[#183304]",
+    iconClassName: "bg-white/55 text-[#183304]",
+  },
+  quest: {
+    Icon: Sparkles,
+    className: "border-[#6b3416] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#3c1f10]",
+    iconClassName: "bg-[#fff7dc] text-[#b04b12]",
+  },
+  goal: {
+    label: "New goal",
+    Icon: Plus,
+    className: "border-[#6b3416] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#3c1f10]",
     iconClassName: "bg-[#fff7dc] text-[#b04b12]",
   },
 };
@@ -96,7 +122,7 @@ export function JourneysCompanionLauncherPopup({
                   {companionLabel}
                 </p>
                 <p className="text-xs font-semibold text-[#6b3416]/75">
-                  Start a chat
+                  Pick a planner starter
                 </p>
               </div>
               <button
@@ -110,7 +136,7 @@ export function JourneysCompanionLauncherPopup({
               </button>
             </div>
 
-            <div className="mt-3 grid grid-cols-1 gap-2">
+            <div className="mt-3 grid grid-cols-2 gap-2">
               {options.map((option, index) => {
                 const meta = OPTION_META[option.id];
                 const Icon = meta.Icon;
@@ -125,7 +151,7 @@ export function JourneysCompanionLauncherPopup({
                     transition={{ delay: 0.025 * index, duration: 0.16 }}
                     className={cn(
                       "flex min-h-[4.25rem] flex-col items-start justify-between gap-2 rounded-[1.1rem] border-[3px] px-3 py-2.5 text-left shadow-[0_5px_0_rgba(95,50,18,0.72),0_10px_18px_rgba(74,31,8,0.18)] transition-transform hover:-translate-y-0.5 hover:shadow-[0_7px_0_rgba(95,50,18,0.76),0_13px_20px_rgba(74,31,8,0.2)]",
-                      "min-h-[3.5rem] flex-row items-center justify-start",
+                      option.id === "free-talk" && "col-span-2 min-h-[3.5rem] flex-row items-center justify-start",
                       meta.className,
                     )}
                     onClick={() => onSelect(option)}

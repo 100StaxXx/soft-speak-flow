@@ -362,7 +362,9 @@ export function useAppleSubscription() {
         toast({
           title: "Finish redeeming with Apple",
           description:
-            "Use the same code in Apple's redemption screen, then tap Subscribe Yearly to finish.",
+            redemption.status === "opened_url"
+              ? "Complete the Apple offer-code redemption, then return and tap Subscribe Yearly."
+              : "Use the same code in Apple's redemption screen, then tap Subscribe Yearly to finish.",
         });
         return false;
       }

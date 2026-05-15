@@ -8,15 +8,18 @@ import { useCompanionLauncherImage } from "@/hooks/useCompanionLauncherImage";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
 import { COMPANION_LAUNCHER_IMAGE_GENERATION_ENABLED } from "@/config/companionLauncherFeatureFlags";
 import { cn } from "@/lib/utils";
-import { createCompanionChatLaunchIntentId } from "@/shared/companionChatLaunchIntent";
+import {
+  createCompanionPlannerLaunchIntentId,
+  createCompanionPlannerQuestCaptureLaunchIntent,
+} from "@/shared/companionPlannerSurfaceActions";
 import { getJourneysCompanionLauncherTemplates } from "@/shared/journeysCompanionLauncherTemplates";
 import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
 
 interface DraggableFABProps {
-  onOpenCompanionPlanner?: (
-    intent?: CompanionPlannerLaunchIntent | null,
-  ) => void;
+  onOpenCompanionPlanner?: (intent?: CompanionPlannerLaunchIntent | null) => void;
   onCreateQuest?: () => void;
+  createPlanDayLaunchIntent?: () => CompanionPlannerLaunchIntent;
+  planDayLabel?: string;
   onTap?: () => void;
 }
 
@@ -25,8 +28,7 @@ const POPUP_VIEWPORT_GUTTER_PX = 16;
 const POPUP_TAIL_SIZE_PX = 24;
 const POPUP_TAIL_EDGE_INSET_PX = 28;
 
-const clamp = (value: number, min: number, max: number) =>
-  Math.min(Math.max(value, min), max);
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
 const getPopupWidthPx = () => {
   if (typeof window === "undefined" || typeof document === "undefined") {
@@ -36,19 +38,15 @@ const getPopupWidthPx = () => {
   const rootFontSize = Number.parseFloat(
     window.getComputedStyle(document.documentElement).fontSize || "16",
   );
-  const safeRootFontSize =
-    Number.isFinite(rootFontSize) && rootFontSize > 0 ? rootFontSize : 16;
-  return Math.max(
-    0,
-    Math.min(
-      19 * safeRootFontSize,
-      window.innerWidth - POPUP_VIEWPORT_GUTTER_PX * 2,
-    ),
-  );
+  const safeRootFontSize = Number.isFinite(rootFontSize) && rootFontSize > 0 ? rootFontSize : 16;
+  return Math.max(0, Math.min(19 * safeRootFontSize, window.innerWidth - (POPUP_VIEWPORT_GUTTER_PX * 2)));
 };
 
 export const DraggableFAB = ({
   onOpenCompanionPlanner,
+  onCreateQuest,
+  createPlanDayLaunchIntent,
+  planDayLabel,
   onTap,
 }: DraggableFABProps) => {
   const { user } = useAuth();
@@ -96,12 +94,15 @@ export const DraggableFAB = ({
 
   const canTriggerTap = !isDragging && !isLongPressing;
   const shouldUseStrictLauncherArt =
-    isGeneratedCompanion ||
-    needsLauncherImage ||
-    launcherAwayHasTransparentBackground;
+    isGeneratedCompanion || needsLauncherImage || launcherAwayHasTransparentBackground;
   const launcherTemplates = useMemo(
-    () => getJourneysCompanionLauncherTemplates({ userId: user?.id ?? null }),
-    [user?.id],
+    () =>
+      getJourneysCompanionLauncherTemplates({ userId: user?.id ?? null }).map((template) =>
+        template.id === "plan-day" && planDayLabel
+          ? { ...template, label: planDayLabel }
+          : template
+      ),
+    [planDayLabel, user?.id],
   );
 
   const popupPlacement = (() => {
@@ -114,22 +115,20 @@ export const DraggableFAB = ({
 
     const popupWidth = getPopupWidthPx();
     const minLeft = POPUP_VIEWPORT_GUTTER_PX - position.x;
-    const maxLeft =
-      window.innerWidth - POPUP_VIEWPORT_GUTTER_PX - popupWidth - position.x;
-    const idealLeft =
-      popupAlignment.horizontal === "left"
-        ? 0
-        : FLOATING_LAUNCHER_SIZE_PX - popupWidth;
+    const maxLeft = window.innerWidth - POPUP_VIEWPORT_GUTTER_PX - popupWidth - position.x;
+    const idealLeft = popupAlignment.horizontal === "left"
+      ? 0
+      : FLOATING_LAUNCHER_SIZE_PX - popupWidth;
     const offsetLeft = clamp(idealLeft, minLeft, maxLeft);
     const popupViewportLeft = position.x + offsetLeft;
-    const launcherCenterX = position.x + FLOATING_LAUNCHER_SIZE_PX / 2;
+    const launcherCenterX = position.x + (FLOATING_LAUNCHER_SIZE_PX / 2);
     const minTailOffset = POPUP_TAIL_EDGE_INSET_PX;
     const maxTailOffset = Math.max(
       minTailOffset,
       popupWidth - POPUP_TAIL_EDGE_INSET_PX - POPUP_TAIL_SIZE_PX,
     );
     const tailLeft = clamp(
-      launcherCenterX - popupViewportLeft - POPUP_TAIL_SIZE_PX / 2,
+      launcherCenterX - popupViewportLeft - (POPUP_TAIL_SIZE_PX / 2),
       minTailOffset,
       maxTailOffset,
     );
@@ -184,24 +183,46 @@ export const DraggableFAB = ({
     };
   }, [closeMenu, isMenuOpen]);
 
-  const handleOptionSelect = useCallback(
-    (template: (typeof launcherTemplates)[number]) => {
-      if (!onOpenCompanionPlanner) {
-        closeMenu();
+  const handleOptionSelect = useCallback((template: (typeof launcherTemplates)[number]) => {
+    if (!onOpenCompanionPlanner) {
+      closeMenu();
+      return;
+    }
+    closeMenu();
+    if (template.id === "goal" && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("companion-new-goal-started"));
+    }
+    if (template.id === "quest") {
+      if (onCreateQuest) {
+        onCreateQuest();
         return;
       }
-      closeMenu();
-      const launchIntent: CompanionPlannerLaunchIntent = {
-        id: createCompanionChatLaunchIntentId(),
-        message: template.message,
-        starterIntent: template.starterIntent,
-        target: template.target,
-        briefingContext: null,
-      };
-      onOpenCompanionPlanner(launchIntent);
-    },
-    [closeMenu, launcherTemplates, onOpenCompanionPlanner],
-  );
+      onOpenCompanionPlanner(createCompanionPlannerQuestCaptureLaunchIntent({
+        source: "companion_planner",
+        companionLabel,
+      }));
+      return;
+    }
+    if (template.id === "plan-day" && createPlanDayLaunchIntent) {
+      onOpenCompanionPlanner(createPlanDayLaunchIntent());
+      return;
+    }
+    const launchIntent: CompanionPlannerLaunchIntent = {
+      id: createCompanionPlannerLaunchIntentId(),
+      message: template.message,
+      starterIntent: template.starterIntent,
+      target: template.target,
+      briefingContext: null,
+    };
+    onOpenCompanionPlanner(launchIntent);
+  }, [
+    closeMenu,
+    companionLabel,
+    createPlanDayLaunchIntent,
+    launcherTemplates,
+    onCreateQuest,
+    onOpenCompanionPlanner,
+  ]);
 
   const handleOpenHistory = useCallback(() => {
     if (!onOpenCompanionPlanner) {
@@ -210,10 +231,10 @@ export const DraggableFAB = ({
     }
     closeMenu();
     const launchIntent: CompanionPlannerLaunchIntent = {
-      id: createCompanionChatLaunchIntentId(),
+      id: createCompanionPlannerLaunchIntentId(),
       message: "",
       starterIntent: "thread_history",
-      target: "conversation",
+      target: "planner",
       briefingContext: null,
     };
     onOpenCompanionPlanner(launchIntent);
@@ -249,38 +270,12 @@ export const DraggableFAB = ({
         variant="floating"
         floatingSize="hero"
         faceDirection={isMenuOpen ? "front" : "away"}
-        imageUrlOverride={
-          shouldUseStrictLauncherArt
-            ? launcherAwayImageUrl
-            : isMenuOpen
-              ? null
-              : launcherAwayImageUrl
-        }
-        imageFocalXOverride={
-          shouldUseStrictLauncherArt
-            ? launcherAwayFocalX
-            : isMenuOpen
-              ? null
-              : launcherAwayFocalX
-        }
-        imageFocalYOverride={
-          shouldUseStrictLauncherArt
-            ? launcherAwayFocalY
-            : isMenuOpen
-              ? null
-              : launcherAwayFocalY
-        }
-        usesPortraitShellOverride={
-          shouldUseStrictLauncherArt
-            ? launcherAwayUsesPortraitShell
-            : isMenuOpen
-              ? undefined
-              : launcherAwayUsesPortraitShell
-        }
+        imageUrlOverride={shouldUseStrictLauncherArt ? launcherAwayImageUrl : isMenuOpen ? null : launcherAwayImageUrl}
+        imageFocalXOverride={shouldUseStrictLauncherArt ? launcherAwayFocalX : isMenuOpen ? null : launcherAwayFocalX}
+        imageFocalYOverride={shouldUseStrictLauncherArt ? launcherAwayFocalY : isMenuOpen ? null : launcherAwayFocalY}
+        usesPortraitShellOverride={shouldUseStrictLauncherArt ? launcherAwayUsesPortraitShell : isMenuOpen ? undefined : launcherAwayUsesPortraitShell}
         allowImageFallback={!shouldUseStrictLauncherArt}
-        requireHeroCutout={
-          isGeneratedCompanion && !launcherAwayHasTransparentBackground
-        }
+        requireHeroCutout={isGeneratedCompanion && !launcherAwayHasTransparentBackground}
         aria-label="Open companion quick actions"
         data-tour="add-quest-fab"
         data-planner-tour="companion-quick-actions"

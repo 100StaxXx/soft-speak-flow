@@ -34,10 +34,10 @@ describe("schedulingIntent", () => {
     ).toBe(false);
     expect(
       shouldRouteMessageToPlanner({ surface: "journeys", analysis }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it("keeps explicit reminder requests out of chatbot planner routing", () => {
+  it("routes explicit reminder requests from Companion chat", () => {
     const analysis = analyze("Remind me to check the weather this weekend");
 
     expect(analysis.disposition).toBe("schedule_action");
@@ -45,6 +45,6 @@ describe("schedulingIntent", () => {
     expect(analysis.isExternalInfoQuestion).toBe(false);
     expect(
       shouldRouteMessageToPlanner({ surface: "companion", analysis }),
-    ).toBe(false);
+    ).toBe(true);
   });
 });

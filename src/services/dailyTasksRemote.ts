@@ -32,7 +32,6 @@ export interface DailyTask {
   reminder_offsets_minutes?: number[] | null;
   reminder_sent_offsets_minutes?: number[] | null;
   reminder_sent: boolean | null;
-  excluded_from_planner_at?: string | null;
   parent_template_id: string | null;
   category: string | null;
   is_bonus: boolean | null;

@@ -65,14 +65,13 @@ const normalizeEntityType = (
 const normalizeDeletedPlannerEntity = (
   entity: DeletedPlannerEntity | Record<string, unknown>,
 ): DeletedPlannerEntity | null => {
-  const record = entity as Record<string, unknown>;
   const entityType = normalizeEntityType(
-    "entityType" in entity ? entity.entityType : record.entity_type,
+    "entityType" in entity ? entity.entityType : entity.entity_type,
   );
   if (!entityType) return null;
 
   const entityId = normalizeEntityId(
-    ("entityId" in entity ? entity.entityId : record.entity_id) as
+    ("entityId" in entity ? entity.entityId : entity.entity_id) as
       | string
       | null
       | undefined,
@@ -81,7 +80,7 @@ const normalizeDeletedPlannerEntity = (
   if (!entityId && !title) return null;
 
   const deletedAt = normalizeTitle(
-    ("deletedAt" in entity ? entity.deletedAt : record.deleted_at) as
+    ("deletedAt" in entity ? entity.deletedAt : entity.deleted_at) as
       | string
       | null
       | undefined,

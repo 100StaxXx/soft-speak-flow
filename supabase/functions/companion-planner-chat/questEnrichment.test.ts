@@ -221,7 +221,7 @@ Deno.test("preserves planner calendar conflict notes when enrichment rewrites th
     baseResult: {
       ...baseResult(proposal, input.sessionState),
       reply:
-        'I can talk this through with you, but I won\'t create or schedule a quest from this chat. Tell me what you want to compare or refine.\n\nHeads up: this overlaps with your saved calendar event "Dinner Reservation" on Thursday, April 23 from 6:15 pm-7:00 pm.',
+        'I drafted this as a quest for Thursday, April 23 at 6:00 pm. Take a look, and confirm it if it fits.\n\nHeads up: this overlaps with your saved calendar event "Dinner Reservation" on Thursday, April 23 from 6:15 pm-7:00 pm.',
     },
   });
 

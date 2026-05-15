@@ -49,15 +49,12 @@ const answerCurrentQuestion = (answerName: RegExp | string) => {
   clickContinue();
 };
 
-const getOptionButtonByText = (answerText: RegExp | string) =>
-  screen.getByText(answerText).closest("button") as HTMLButtonElement;
-
 describe("StoryQuestionnaire", () => {
   it("disables back, answer buttons, and continue while submitting", () => {
     const { onComplete } = renderQuestionnaire(true);
 
     const backButton = screen.getByRole("button", { name: /back/i });
-    const firstOption = getOptionButtonByText("Male");
+    const firstOption = screen.getByRole("button", { name: /a male/i });
     const continueButton = screen.getByRole("button", { name: /continue/i });
 
     expect(backButton).toBeDisabled();
@@ -77,7 +74,7 @@ describe("StoryQuestionnaire", () => {
     expect(firstOption).toHaveAttribute("aria-pressed", "false");
     expect(continueButton).toBeDisabled();
 
-    fireEvent.click(firstOption);
+    fireEvent.touchStart(firstOption);
 
     expect(screen.getByRole("button", { name: /female/i })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: /continue/i })).not.toBeDisabled();
@@ -86,21 +83,6 @@ describe("StoryQuestionnaire", () => {
     fireEvent.touchStart(screen.getByRole("button", { name: /continue/i }));
 
     expect(screen.getByText(/would you prefer your guide to be a man or a woman/i)).toBeInTheDocument();
-  });
-
-  it("does not select an answer from the touch start of a scroll gesture", () => {
-    renderQuestionnaire();
-
-    const firstOption = screen.getByRole("button", { name: /female/i });
-    const scrollStartOption = getOptionButtonByText("Male");
-
-    fireEvent.click(firstOption);
-    expect(screen.getByRole("button", { name: /female/i })).toHaveAttribute("aria-pressed", "true");
-
-    fireEvent.touchStart(scrollStartOption);
-
-    expect(screen.getByRole("button", { name: /female/i })).toHaveAttribute("aria-pressed", "true");
-    expect(getOptionButtonByText("Male")).toHaveAttribute("aria-pressed", "false");
   });
 
   it("ignores a delayed press from the previous question after advancing", () => {

@@ -315,7 +315,7 @@ function createModelQuestDraftAttemptFetch(params: {
             name: "submit_companion_result",
             arguments: JSON.stringify({
               reply: params.reply ??
-                "I can talk this through, but I won't create or schedule a quest from this chat.",
+                "I drafted this as a quest. Review it and confirm if it fits.",
               mode: params.mode ?? "pending_confirmation",
               intent: params.intent ?? "schedule_task",
               confidence: params.confidence ?? 0.9,
@@ -613,8 +613,8 @@ Deno.test("runCompanionAgent blocks non-explicit Companion reflections from ques
   assertEquals(result.intent, "unknown");
   assertEquals(result.understandingState, "enough_to_discuss");
   assert(
-    result.reply.includes("won't create or schedule a quest from this chat"),
-    "expected the reply to stay explicit that chat will not create or schedule quests",
+    result.reply.includes("without turning it into a quest"),
+    "expected draft wording to be replaced with conversational fallback",
   );
   assertEquals(result.proposedActions, []);
   assertEquals(result.pendingAction, undefined);

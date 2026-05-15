@@ -177,10 +177,9 @@ describe("native push registration", () => {
         }),
       );
 
-      const firstToastCall = sonnerMocks.toast.mock.calls[0] as unknown as
-        | [unknown, { action?: { onClick?: () => void } }]
+      const options = sonnerMocks.toast.mock.calls[0]?.[1] as
+        | { action?: { onClick?: () => void } }
         | undefined;
-      const options = firstToastCall?.[1];
       options?.action?.onClick?.();
 
       expect(navigationEvents).toEqual([{ url: "/companion", queueId: "queue-2" }]);

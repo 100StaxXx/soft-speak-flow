@@ -445,14 +445,14 @@ export const StoryQuestionnaire = ({
                       aria-pressed={isSelected}
                       data-selected={isSelected ? "true" : "false"}
                       className={cn(
-                        "w-full flex items-center text-left gap-4 sm:gap-5 min-h-[88px] py-5 px-5 text-white rounded-2xl backdrop-blur-xl transition-all select-none shadow-[0_10px_40px_rgba(0,0,0,0.35)]",
+                        "w-full flex items-center text-left gap-4 sm:gap-5 min-h-[88px] py-5 px-5 text-white rounded-2xl backdrop-blur-xl transition-all touch-manipulation shadow-[0_10px_40px_rgba(0,0,0,0.35)]",
                         isSelected
                           ? "border-white/50 bg-white/10"
                           : "border-white/15 bg-black/30 hover:border-white/40 hover:bg-black/40",
                       )}
                       style={{
                         ["--hover-bg" as string]: `${factionColor}20`,
-                        touchAction: "pan-y",
+                        touchAction: "manipulation",
                         WebkitTapHighlightColor: "transparent",
                         boxShadow: isSelected
                           ? `0 0 0 1px ${factionColor}55, 0 16px 36px rgba(0, 0, 0, 0.34)`
@@ -463,9 +463,11 @@ export const StoryQuestionnaire = ({
                           : undefined,
                       }}
                       onContextMenu={(event) => event.preventDefault()}
-                      onClick={() => {
-                        handleSelectOption(option, "click", currentQuestion.id);
-                      }}
+                      {...createPressHandlers(
+                        `questionnaire-option-${currentQuestion.id}-${option.optionId}`,
+                        (source) => handleSelectOption(option, source, currentQuestion.id),
+                        controlsLocked,
+                      )}
                     >
                       <span
                         className={cn(

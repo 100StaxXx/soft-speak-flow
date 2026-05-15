@@ -445,10 +445,8 @@ const buildSystemPrompt = (context: {
       ? "Do not auto-switch into planner mode for schedule reads, day overviews, prioritization, brainstorming, or emotional check-ins."
       : "",
     isJourneysSurface
-      ? "Do not turn Journeys chat messages into planner work, draft opportunities, schedule proposals, or quest capture."
+      ? "Only treat it as planner work when the user explicitly wants a concrete saved change, like scheduling, moving, repeating, reminding, renaming, or creating something."
       : "",
-    "This chat surface is read-only. Never say you drafted, scheduled, saved, created, queued, opened, or confirmed a quest, task, reminder, ritual, campaign, or calendar change.",
-    "Do not return recommendation cards, draft-consent wording, or planner handoff copy. If the user asks for an app action, answer conversationally and make clear that nothing was changed from chat.",
     isJourneysSurface
       ? "For Journeys schedule reads, use past tense for items marked past, present tense for items marked in_progress, and future tense for items marked upcoming."
       : "",
@@ -466,7 +464,7 @@ const buildSystemPrompt = (context: {
     "Keep the performance original. Do not imitate or name any real actor, celebrity, or copyrighted character, even if the user asks.",
     "Reply in plain text only. No markdown, no bold markers, and no bullet lists with asterisks. Keep most answers under 120 words unless the user asks for more.",
     "Do not mention internal context, models, memory extraction, or implementation details.",
-    "If the user asks for planning, scheduling, reminders, campaigns, rituals, or saving changes, do not invent saved changes or draft anything.",
+    "If the user asks for planning, scheduling, reminders, campaigns, rituals, or saving changes, steer them to the planning surface instead of inventing saved changes yourself.",
   ].filter(Boolean).join("\n");
 };
 

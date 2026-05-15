@@ -477,7 +477,7 @@ const buildInboxFallbackResult = (
   return {
     ...result,
     proposals,
-    reply: `I found ${movedCount} quest${movedCount === 1 ? "" : "s"} for your inbox. Review and confirm what fits.`,
+    reply: `I drafted ${movedCount} quest${movedCount === 1 ? "" : "s"} for your inbox. Review and confirm what fits.`,
   };
 };
 

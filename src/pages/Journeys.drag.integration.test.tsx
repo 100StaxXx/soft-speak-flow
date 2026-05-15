@@ -1,16 +1,11 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { format, isSameDay } from "date-fns";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { JOURNEYS_RESET_TO_TODAY_EVENT } from "@/pages/journeysDateSync";
+import { COMPANION_PLANNER_QUEST_CAPTURE_OPENING } from "@/shared/companionPlannerSurfaceActions";
 import {
   getCampaignBuilderDraftStorageKey,
   getCreationPopupMarkerStorageKey,
@@ -23,9 +18,7 @@ if (!HTMLElement.prototype.scrollTo) {
     writable: true,
   });
 }
-const elementScrollToSpy = vi
-  .spyOn(HTMLElement.prototype, "scrollTo")
-  .mockImplementation(() => undefined);
+const elementScrollToSpy = vi.spyOn(HTMLElement.prototype, "scrollTo").mockImplementation(() => undefined);
 
 vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
   useJourneysCompanionVisual: () => ({
@@ -55,8 +48,7 @@ Object.defineProperty(globalThis, "localStorage", {
     clear: () => {
       localStorageState.store.clear();
     },
-    key: (index: number) =>
-      Array.from(localStorageState.store.keys())[index] ?? null,
+    key: (index: number) => Array.from(localStorageState.store.keys())[index] ?? null,
     get length() {
       return localStorageState.store.size;
     },
@@ -181,14 +173,11 @@ const mocks = vi.hoisted(() => ({
       scheduled_time?: string | null;
     } | null;
     plannerSubtaskDraft?: string[] | null;
-    onSave?: (
-      taskId: string,
-      updates: Record<string, unknown>,
-    ) => Promise<void>;
+    onSave?: (taskId: string, updates: Record<string, unknown>) => Promise<void>;
   },
-  lastDraggableFabOnOpenCompanionPlanner: null as
-    | null
-    | ((intent?: unknown) => void),
+  lastDraggableFabOnOpenCompanionPlanner: null as null | ((intent?: unknown) => void),
+  lastDraggableFabCreatePlanDayLaunchIntent: null as null | (() => unknown),
+  lastDraggableFabPlanDayLabel: null as string | null,
   lastPathfinderProps: null as null | {
     open?: boolean;
     initialGoal?: string;
@@ -270,13 +259,9 @@ vi.mock("@/components/DatePillsScroller", async () => {
       return (
         <div data-testid="date-pills">
           <span data-testid="date-pills-mount-id">{mountId}</span>
-          <span data-testid="selected-date-iso">
-            {selectedDate.toISOString()}
-          </span>
+          <span data-testid="selected-date-iso">{selectedDate.toISOString()}</span>
           <span data-testid="center-request-key">{centerRequestKey ?? 0}</span>
-          <span data-testid="center-request-date-key">
-            {centerRequestDateKey ?? ""}
-          </span>
+          <span data-testid="center-request-date-key">{centerRequestDateKey ?? ""}</span>
           <button
             type="button"
             onClick={() => {
@@ -311,7 +296,10 @@ vi.mock("@/components/DatePillsScroller", async () => {
           >
             user-set-stale-day
           </button>
-          <button type="button" onClick={() => onUserDateInteraction?.()}>
+          <button
+            type="button"
+            onClick={() => onUserDateInteraction?.()}
+          >
             user-slide-date-pills
           </button>
           <button
@@ -451,10 +439,7 @@ vi.mock("@/features/quests/components/EditQuestDialog", () => ({
       scheduled_time?: string | null;
     } | null;
     plannerSubtaskDraft?: string[] | null;
-    onSave?: (
-      taskId: string,
-      updates: Record<string, unknown>,
-    ) => Promise<void>;
+    onSave?: (taskId: string, updates: Record<string, unknown>) => Promise<void>;
   }) => {
     mocks.lastEditQuestDialogProps = props;
     return null;
@@ -487,12 +472,17 @@ vi.mock("@/components/CampaignCreatedAnimation", () => ({
 vi.mock("@/components/DraggableFAB", () => ({
   DraggableFAB: ({
     onOpenCompanionPlanner,
+    createPlanDayLaunchIntent,
+    planDayLabel,
   }: {
     onOpenCompanionPlanner?: (intent?: unknown) => void;
+    createPlanDayLaunchIntent?: () => unknown;
+    planDayLabel?: string;
   }) => {
     mocks.draggableFabRenderCount += 1;
-    mocks.lastDraggableFabOnOpenCompanionPlanner =
-      onOpenCompanionPlanner ?? null;
+    mocks.lastDraggableFabOnOpenCompanionPlanner = onOpenCompanionPlanner ?? null;
+    mocks.lastDraggableFabCreatePlanDayLaunchIntent = createPlanDayLaunchIntent ?? null;
+    mocks.lastDraggableFabPlanDayLabel = planDayLabel ?? null;
     return (
       <div data-testid="draggable-fab">
         <button
@@ -514,9 +504,7 @@ vi.mock("@/components/tasks/InteractionLogModal", () => ({
 }));
 
 vi.mock("@/components/SectionErrorBoundary", () => ({
-  QuestsErrorBoundary: ({ children }: { children: ReactNode }) => (
-    <>{children}</>
-  ),
+  QuestsErrorBoundary: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
 vi.mock("@/components/HourlyViewModal", () => ({
@@ -749,10 +737,7 @@ const dispatchTouchMove = (
   clientY: number,
   target: EventTarget = typeof document !== "undefined" ? document : window,
 ) => {
-  const event = new Event("touchmove", {
-    bubbles: true,
-    cancelable: true,
-  }) as TouchEvent;
+  const event = new Event("touchmove", { bubbles: true, cancelable: true }) as TouchEvent;
   Object.defineProperty(event, "touches", { value: [{ clientX: 0, clientY }] });
   target.dispatchEvent(event);
   return event;
@@ -761,33 +746,21 @@ const dispatchTouchMove = (
 const dispatchTouchEnd = (
   target: EventTarget = typeof document !== "undefined" ? document : window,
 ) => {
-  const event = new Event("touchend", {
-    bubbles: true,
-    cancelable: true,
-  }) as TouchEvent;
-  Object.defineProperty(event, "changedTouches", {
-    value: [{ clientX: 0, clientY: 0 }],
-  });
+  const event = new Event("touchend", { bubbles: true, cancelable: true }) as TouchEvent;
+  Object.defineProperty(event, "changedTouches", { value: [{ clientX: 0, clientY: 0 }] });
   target.dispatchEvent(event);
   return event;
 };
 
 const createPointerDownEvent = (clientY: number) => {
-  const event = new Event("pointerdown", {
-    bubbles: true,
-    cancelable: true,
-  }) as PointerEvent;
+  const event = new Event("pointerdown", { bubbles: true, cancelable: true }) as PointerEvent;
   Object.defineProperty(event, "pointerType", { value: "mouse" });
   Object.defineProperty(event, "button", { value: 0 });
   Object.defineProperty(event, "clientY", { value: clientY });
   return event;
 };
 
-const performTouchTimelineDrag = (
-  row: HTMLElement,
-  moveY: number,
-  startY = 100,
-) => {
+const performTouchTimelineDrag = (row: HTMLElement, moveY: number, startY = 100) => {
   vi.useFakeTimers();
   act(() => {
     fireEvent.touchStart(row, { touches: [{ clientX: 0, clientY: startY }] });
@@ -824,6 +797,8 @@ describe("Journeys row drag integration", () => {
     mocks.lastCompanionPlannerModalProps = null;
     mocks.lastEditQuestDialogProps = null;
     mocks.lastDraggableFabOnOpenCompanionPlanner = null;
+    mocks.lastDraggableFabCreatePlanDayLaunchIntent = null;
+    mocks.lastDraggableFabPlanDayLabel = null;
     mocks.lastPathfinderProps = null;
     mocks.tutorialGuidance = {
       isActive: false,
@@ -941,13 +916,8 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       expect(mocks.lastPathfinderProps?.open).toBe(true);
     });
-    expect(
-      (mocks.lastPathfinderProps?.resumeDraft as { goalInput?: string } | null)
-        ?.goalInput,
-    ).toBe("Recovered campaign");
-    expect(mocks.lastPathfinderProps?.resumeDraftKey).toBe(
-      "resume-2026-05-01T12:00:00.000Z",
-    );
+    expect((mocks.lastPathfinderProps?.resumeDraft as { goalInput?: string } | null)?.goalInput).toBe("Recovered campaign");
+    expect(mocks.lastPathfinderProps?.resumeDraftKey).toBe("resume-2026-05-01T12:00:00.000Z");
     expect(mocks.lastPathfinderProps?.persistenceRoute).toBe("/journeys");
     expect(mocks.lastPathfinderProps?.userId).toBe("user-1");
   });
@@ -1025,9 +995,7 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    const launcher = await screen.findByRole("button", {
-      name: /Companion Chat/i,
-    });
+    const launcher = await screen.findByRole("button", { name: /Plan (Today|Day)/i });
     expect(launcher).toBeInTheDocument();
     expect(launcher).toHaveAttribute("data-tour", "add-quest-launcher");
     expect(screen.queryByTestId("draggable-fab")).not.toBeInTheDocument();
@@ -1052,11 +1020,116 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    expect(await screen.findByLabelText("Add quest")).toHaveAttribute(
-      "data-tour",
-      "add-quest-fab",
-    );
+    expect(await screen.findByLabelText("Add quest")).toHaveAttribute("data-tour", "add-quest-fab");
     expect(mocks.draggableFabRenderCount).toBeGreaterThan(0);
+  });
+
+  it("builds the FAB Plan Today intent from the visible journeys context", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-05-12T12:00:00"));
+    mocks.dailyTasks = [
+      {
+        id: "ritual-task",
+        task_text: "Morning ritual",
+        completed: false,
+        xp_reward: 10,
+        task_date: "2026-05-12",
+        scheduled_time: "07:30",
+        difficulty: "easy",
+        is_main_quest: false,
+        habit_source_id: "habit-1",
+        epic_id: "epic-1",
+        epic_title: "Launch Planner",
+      },
+      {
+        id: "campaign-task",
+        task_text: "Draft launch notes",
+        completed: false,
+        xp_reward: 20,
+        task_date: "2026-05-12",
+        scheduled_time: null,
+        difficulty: "medium",
+        is_main_quest: true,
+        epic_id: "epic-1",
+        epic_title: "Launch Planner",
+      },
+    ];
+    mocks.epics = [{
+      id: "epic-1",
+      title: "Launch Planner",
+      status: "active",
+      progress_percentage: 40,
+      target_days: 30,
+      start_date: "2026-05-01",
+      end_date: null,
+    }];
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(mocks.lastDraggableFabCreatePlanDayLaunchIntent).not.toBeNull();
+    });
+
+    const launchIntent =
+      mocks.lastDraggableFabCreatePlanDayLaunchIntent?.() as {
+        starterIntent?: string;
+        selectedDate?: string | null;
+        briefingContext?: {
+          content?: string;
+          dataSnapshot?: Record<string, unknown> | null;
+        } | null;
+      };
+
+    expect(mocks.lastDraggableFabPlanDayLabel).toBe("Plan Today");
+    expect(launchIntent).toEqual(expect.objectContaining({
+      starterIntent: "plan_day",
+      selectedDate: "2026-05-12",
+    }));
+    expect(launchIntent.briefingContext?.content).toContain("2 open quests");
+    expect(launchIntent.briefingContext?.dataSnapshot).toEqual(expect.objectContaining({
+      selectedDate: "2026-05-12",
+      ritualQuestCount: 1,
+      activeCampaignTitles: ["Launch Planner"],
+      activeCampaigns: [expect.objectContaining({
+        id: "epic-1",
+        title: "Launch Planner",
+      })],
+      topOpenQuests: expect.arrayContaining([
+        expect.stringContaining("Morning ritual"),
+        expect.stringContaining("campaign: Launch Planner"),
+      ]),
+      visibleQuests: expect.arrayContaining([
+        expect.objectContaining({
+          id: "ritual-task",
+          habit_source_id: "habit-1",
+          epic_id: "epic-1",
+          epic_title: "Launch Planner",
+        }),
+        expect.objectContaining({
+          id: "campaign-task",
+          epic_id: "epic-1",
+          epic_title: "Launch Planner",
+        }),
+      ]),
+    }));
+
+    act(() => {
+      mocks.lastDraggableFabOnOpenCompanionPlanner?.(launchIntent);
+    });
+
+    expect(mocks.lastCompanionPlannerModalProps?.launchIntent).toEqual(launchIntent);
   });
 
   it("opens the companion planner modal from the desktop journeys launcher", async () => {
@@ -1082,26 +1155,24 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    const launcher = await screen.findByRole("button", {
-      name: /Companion Chat/i,
-    });
+    const launcher = await screen.findByRole("button", { name: /Plan (Today|Day)/i });
     fireEvent.click(launcher);
 
     await waitFor(() => {
       expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
     });
-    expect(
-      screen.getByTestId("journeys-companion-planner-modal"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("journeys-companion-planner-modal")).toBeInTheDocument();
   });
 
-  it("opens companion chat from the desktop journeys launcher without a selected date handoff", async () => {
+  it("passes the selected journeys date into the companion planner modal", async () => {
     mocks.isMacHostedIOSApp = true;
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
       writable: true,
       value: 1100,
     });
+    const expectedDateKey = format(new Date(), "yyyy-MM-dd");
+
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1117,22 +1188,15 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    const launcher = await screen.findByRole("button", {
-      name: /Companion Chat/i,
-    });
+    const launcher = await screen.findByRole("button", { name: /Plan (Today|Day)/i });
     fireEvent.click(launcher);
 
     await waitFor(() => {
       expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
     });
-    expect(mocks.lastCompanionPlannerModalProps?.selectedDate).toBeUndefined();
-    expect(mocks.lastCompanionPlannerModalProps?.launchIntent).toEqual(
-      expect.objectContaining({
-        message: "What's the vibe",
-        starterIntent: "free_talk_start",
-        target: "conversation",
-      }),
-    );
+    expect(
+      mocks.lastCompanionPlannerModalProps?.selectedDate?.toISOString().slice(0, 10),
+    ).toBe(expectedDateKey);
   });
 
   it("keeps the planner closed on first load even when an old pinned preference exists", async () => {
@@ -1157,12 +1221,10 @@ describe("Journeys row drag integration", () => {
       expect(mocks.lastCompanionPlannerModalProps).not.toBeNull();
     });
     expect(mocks.lastCompanionPlannerModalProps?.open).toBe(false);
-    expect(
-      screen.queryByTestId("journeys-companion-planner-modal"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("journeys-companion-planner-modal")).not.toBeInTheDocument();
   });
 
-  it("opens companion chat when journeys receives a route launch intent", async () => {
+  it("opens the planner when journeys receives a route launch intent", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1172,22 +1234,18 @@ describe("Journeys row drag integration", () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter
-          initialEntries={[
-            {
-              pathname: "/journeys",
-              state: {
-                companionPlannerLaunchIntent: {
-                  id: "launch-intent-1",
-                  message: "What's the vibe",
-                  starterIntent: "free_talk_start",
-                  target: "conversation",
-                  briefingContext: null,
-                },
-              },
+        <MemoryRouter initialEntries={[{
+          pathname: "/journeys",
+          state: {
+            companionPlannerLaunchIntent: {
+              id: "launch-intent-1",
+              message: "Help me plan my afternoon.",
+              starterIntent: "plan_my_day",
+              target: "planner",
+              briefingContext: null,
             },
-          ]}
-        >
+          },
+        }]}>
           <Journeys />
         </MemoryRouter>
       </QueryClientProvider>,
@@ -1196,15 +1254,11 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
     });
-    expect(mocks.lastCompanionPlannerModalProps?.launchIntent).toEqual(
-      expect.objectContaining({
-        id: "launch-intent-1",
-        message: "What's the vibe",
-      }),
-    );
-    expect(
-      screen.getByTestId("journeys-companion-planner-modal"),
-    ).toBeInTheDocument();
+    expect(mocks.lastCompanionPlannerModalProps?.launchIntent).toEqual(expect.objectContaining({
+      id: "launch-intent-1",
+      message: "Help me plan my afternoon.",
+    }));
+    expect(screen.getByTestId("journeys-companion-planner-modal")).toBeInTheDocument();
   });
 
   it("closes the planner when the guided tutorial leaves Plan My Day", async () => {
@@ -1253,9 +1307,7 @@ describe("Journeys row drag integration", () => {
       expect(mocks.lastCompanionPlannerModalProps?.open).toBe(false);
     });
     expect(mocks.lastCompanionPlannerModalProps?.launchIntent).toBeNull();
-    expect(
-      screen.queryByTestId("journeys-companion-planner-modal"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("journeys-companion-planner-modal")).not.toBeInTheDocument();
   });
 
   it("closes stale blocking overlays when the guided tutorial changes steps", async () => {
@@ -1319,6 +1371,50 @@ describe("Journeys row drag integration", () => {
     expect(mocks.lastPathfinderProps?.open).toBe(true);
   });
 
+  it("opens the companion planner with New Quest without local quest-capture handoff", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-04-09T12:00:00"));
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={[{
+          pathname: "/journeys",
+          state: {
+            companionPlannerLaunchIntent: {
+              id: "quest-capture-route-1",
+              message: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
+              starterIntent: "quest_capture",
+              target: "planner",
+              briefingContext: null,
+            },
+          },
+        }]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
+    });
+
+    expect(mocks.lastCompanionPlannerModalProps?.launchIntent).toEqual(
+      expect.objectContaining({
+        id: "quest-capture-route-1",
+        message: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
+        starterIntent: "quest_capture",
+      }),
+    );
+    expect(mocks.lastAddQuestSheetProps?.open).not.toBe(true);
+  });
+
   it("opens create quest from the floating fab route request without opening the companion planner", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -1329,25 +1425,21 @@ describe("Journeys row drag integration", () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter
-          initialEntries={[
-            {
-              pathname: "/journeys",
-              state: {
-                companionPlannerLaunchIntent: {
-                  id: "stale-chat-intent-1",
-                  message: "What's the vibe",
-                  starterIntent: "free_talk_start",
-                  target: "conversation",
-                  briefingContext: null,
-                },
-                journeysCreateQuestRequest: {
-                  id: "create-quest-fab-1",
-                },
-              },
+        <MemoryRouter initialEntries={[{
+          pathname: "/journeys",
+          state: {
+            companionPlannerLaunchIntent: {
+              id: "stale-planner-intent-1",
+              message: "Plan my day",
+              starterIntent: "plan_day",
+              target: "planner",
+              briefingContext: null,
             },
-          ]}
-        >
+            journeysCreateQuestRequest: {
+              id: "create-quest-fab-1",
+            },
+          },
+        }]}>
           <Journeys />
         </MemoryRouter>
       </QueryClientProvider>,
@@ -1361,6 +1453,112 @@ describe("Journeys row drag integration", () => {
     expect(mocks.lastAddQuestSheetProps?.prefillDraft).toBeNull();
   });
 
+  it("keeps the planner open while a planner quest edit handoff is active and resolves back after save", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={[{
+          pathname: "/journeys",
+          state: {
+            companionPlannerLaunchIntent: {
+              id: "planner-handoff-1",
+              message: "Help me plan my afternoon.",
+              starterIntent: "plan_day",
+              target: "planner",
+              briefingContext: null,
+            },
+          },
+        }]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
+    });
+
+    let handoffPromise:
+      | Promise<{ saved: boolean; savedTitle?: string | null }>
+      | undefined;
+
+    await act(async () => {
+      handoffPromise = mocks.lastCompanionPlannerModalProps?.onQuestProposalEditHandoff?.({
+        id: "proposal-create-1",
+        kind: "create_quest",
+        title: "Respond to emails",
+        summary: "Carve out a short inbox block first thing.",
+        payload: {
+          taskText: "Respond to emails",
+          taskDate: "2026-02-13",
+          scheduledTime: "09:00",
+          estimatedDuration: 30,
+          notes: "Start with urgent threads.",
+          location: "Desk",
+          subtasks: ["Reply to founders", "Clear urgent threads"],
+        },
+        status: "pending",
+        readyToConfirm: true,
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.lastAddQuestSheetProps?.open).toBe(true);
+    });
+    expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
+    expect(mocks.lastAddQuestSheetProps?.prefillDraft).toEqual(expect.objectContaining({
+      text: "Respond to emails",
+      taskDate: "2026-02-13",
+      scheduledTime: "09:00",
+      estimatedDuration: 30,
+      moreInformation: "Start with urgent threads.",
+      location: "Desk",
+      subtasks: ["Reply to founders", "Clear urgent threads"],
+    }));
+
+    await act(async () => {
+      await mocks.lastAddQuestSheetProps?.onAdd?.({
+        text: "Respond to emails",
+        taskDate: "2026-02-13",
+        difficulty: "medium",
+        scheduledTime: "09:00",
+        estimatedDuration: 30,
+        recurrencePattern: null,
+        recurrenceDays: [],
+        recurrenceMonthDays: [],
+        recurrenceCustomPeriod: null,
+        reminderEnabled: false,
+        reminderMinutesBefore: 15,
+        moreInformation: "Start with urgent threads.",
+        location: "Desk",
+        contactId: null,
+        autoLogInteraction: false,
+        sendToInbox: false,
+        sendToCalendar: false,
+        sendToCalendarTarget: null,
+        subtasks: ["Reply to founders", "Clear urgent threads"],
+        imageUrl: null,
+        attachments: [],
+        creationSource: "nlp",
+      });
+    });
+
+    await expect(handoffPromise).resolves.toEqual({
+      saved: true,
+      savedTitle: "Respond to emails",
+    });
+    await waitFor(() => {
+      expect(mocks.lastAddQuestSheetProps?.open).toBe(false);
+    });
+    expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
+  });
+
   it("opens Pathfinder immediately for campaign-builder launcher intents without opening companion chat", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -1371,22 +1569,18 @@ describe("Journeys row drag integration", () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter
-          initialEntries={[
-            {
-              pathname: "/journeys",
-              state: {
-                companionPlannerLaunchIntent: {
-                  id: "launch-goal",
-                  message: "Let's lock in a new goal",
-                  starterIntent: "goal_breakdown_start",
-                  target: "campaign_builder",
-                  briefingContext: null,
-                },
-              },
+        <MemoryRouter initialEntries={[{
+          pathname: "/journeys",
+          state: {
+            companionPlannerLaunchIntent: {
+              id: "launch-goal",
+              message: "Let's lock in a new goal",
+              starterIntent: "goal_breakdown_start",
+              target: "campaign_builder",
+              briefingContext: null,
             },
-          ]}
-        >
+          },
+        }]}>
           <Journeys />
         </MemoryRouter>
       </QueryClientProvider>,
@@ -1487,9 +1681,7 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    expect(
-      screen.getByText("Plan your quests for the week ahead."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Plan your quests for the week ahead.")).toBeInTheDocument();
     const row = await screen.findByTestId("timeline-row-task-1");
 
     act(() => {
@@ -1499,9 +1691,7 @@ describe("Journeys row drag integration", () => {
     });
 
     expect(mocks.updateTask).not.toHaveBeenCalled();
-    expect(
-      screen.getByText("Plan your quests for the week ahead."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Plan your quests for the week ahead.")).toBeInTheDocument();
   });
 
   it("does not reschedule a quest from a sub-threshold timeline row wiggle on /journeys", async () => {
@@ -1749,9 +1939,7 @@ describe("Journeys row drag integration", () => {
     );
 
     await waitFor(() => {
-      expect(
-        screen.getByText("Plan your quests for the week ahead."),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Plan your quests for the week ahead.")).toBeInTheDocument();
     });
 
     expect(mocks.surfaceAllEpicHabits).not.toHaveBeenCalled();
@@ -1857,23 +2045,18 @@ describe("Journeys row drag integration", () => {
       expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
     });
 
-    const initialSelectedDateIso = screen.getByTestId("selected-date-iso")
-      .textContent as string;
+    const initialSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     const initialSelectedDate = new Date(initialSelectedDateIso);
     expect(isSameDay(initialSelectedDate, new Date())).toBe(true);
 
     fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
 
-    let staleSelectedDateIso = screen.getByTestId("selected-date-iso")
-      .textContent as string;
+    let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     let staleSelectedDate = new Date(staleSelectedDateIso);
     await waitFor(() => {
-      staleSelectedDateIso = screen.getByTestId("selected-date-iso")
-        .textContent as string;
+      staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       staleSelectedDate = new Date(staleSelectedDateIso);
-      expect(staleSelectedDate.getTime()).not.toBe(
-        initialSelectedDate.getTime(),
-      );
+      expect(staleSelectedDate.getTime()).not.toBe(initialSelectedDate.getTime());
       expect(isSameDay(staleSelectedDate, new Date())).toBe(false);
     });
 
@@ -1888,8 +2071,7 @@ describe("Journeys row drag integration", () => {
     });
 
     await waitFor(() => {
-      const reenteredDateIso = screen.getByTestId("selected-date-iso")
-        .textContent as string;
+      const reenteredDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       const reenteredDate = new Date(reenteredDateIso);
       expect(reenteredDateIso).not.toBe(staleSelectedDateIso);
       expect(isSameDay(reenteredDate, new Date())).toBe(true);
@@ -1942,9 +2124,7 @@ describe("Journeys row drag integration", () => {
       expect(screen.getByTestId("route-path").textContent).toBe("/journeys");
     });
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Open campaigns page" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Open campaigns page" }));
 
     await waitFor(() => {
       expect(screen.getByTestId("route-path").textContent).toBe("/campaigns");
@@ -1990,22 +2170,14 @@ describe("Journeys row drag integration", () => {
       expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
     });
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "set-same-day-non-current" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "set-same-day-non-current" }));
 
-    let sameDaySelectedDateIso = screen.getByTestId("selected-date-iso")
-      .textContent as string;
+    let sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
-      sameDaySelectedDateIso = screen.getByTestId("selected-date-iso")
-        .textContent as string;
-      expect(isSameDay(new Date(sameDaySelectedDateIso), new Date())).toBe(
-        true,
-      );
+      sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      expect(isSameDay(new Date(sameDaySelectedDateIso), new Date())).toBe(true);
     });
-    const centerKeyBeforeReentry = Number(
-      screen.getByTestId("center-request-key").textContent,
-    );
+    const centerKeyBeforeReentry = Number(screen.getByTestId("center-request-key").textContent);
     elementScrollToSpy.mockClear();
 
     fireEvent.click(screen.getByRole("button", { name: "go-inbox" }));
@@ -2019,15 +2191,9 @@ describe("Journeys row drag integration", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId("selected-date-iso").textContent).toBe(
-        sameDaySelectedDateIso,
-      );
-      expect(
-        Number(screen.getByTestId("center-request-key").textContent),
-      ).toBeGreaterThan(centerKeyBeforeReentry);
-      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(
-        format(new Date(), "yyyy-MM-dd"),
-      );
+      expect(screen.getByTestId("selected-date-iso").textContent).toBe(sameDaySelectedDateIso);
+      expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeReentry);
+      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
       expect(elementScrollToSpy).toHaveBeenCalled();
     });
   });
@@ -2054,38 +2220,25 @@ describe("Journeys row drag integration", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
 
-    let staleSelectedDateIso = screen.getByTestId("selected-date-iso")
-      .textContent as string;
+    let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
-      staleSelectedDateIso = screen.getByTestId("selected-date-iso")
-        .textContent as string;
+      staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
     });
-    const centerKeyBeforeResetRequest = Number(
-      screen.getByTestId("center-request-key").textContent,
-    );
-    const scrollerMountIdBeforeResetRequest = screen.getByTestId(
-      "date-pills-mount-id",
-    ).textContent;
+    const centerKeyBeforeResetRequest = Number(screen.getByTestId("center-request-key").textContent);
+    const scrollerMountIdBeforeResetRequest = screen.getByTestId("date-pills-mount-id").textContent;
 
     act(() => {
       window.dispatchEvent(new Event(JOURNEYS_RESET_TO_TODAY_EVENT));
     });
 
     await waitFor(() => {
-      const refreshedDateIso = screen.getByTestId("selected-date-iso")
-        .textContent as string;
+      const refreshedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       expect(refreshedDateIso).not.toBe(staleSelectedDateIso);
       expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
-      expect(
-        Number(screen.getByTestId("center-request-key").textContent),
-      ).toBeGreaterThan(centerKeyBeforeResetRequest);
-      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(
-        format(new Date(), "yyyy-MM-dd"),
-      );
-      expect(screen.getByTestId("date-pills-mount-id").textContent).toBe(
-        scrollerMountIdBeforeResetRequest,
-      );
+      expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeResetRequest);
+      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
+      expect(screen.getByTestId("date-pills-mount-id").textContent).not.toBe(scrollerMountIdBeforeResetRequest);
     });
   });
 
@@ -2110,21 +2263,15 @@ describe("Journeys row drag integration", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("selected-date-iso").textContent).toContain(
-        "2026-05-11",
-      );
-      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(
-        "2026-05-11",
-      );
+      expect(screen.getByTestId("selected-date-iso").textContent).toContain("2026-05-11");
+      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent("2026-05-11");
     });
 
     fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
 
-    let staleSelectedDateIso = screen.getByTestId("selected-date-iso")
-      .textContent as string;
+    let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
-      staleSelectedDateIso = screen.getByTestId("selected-date-iso")
-        .textContent as string;
+      staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       expect(staleSelectedDateIso).not.toContain("2026-05-11");
     });
 
@@ -2133,15 +2280,9 @@ describe("Journeys row drag integration", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId("selected-date-iso").textContent).toContain(
-        "2026-05-11",
-      );
-      expect(screen.getByTestId("selected-date-iso").textContent).not.toBe(
-        staleSelectedDateIso,
-      );
-      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(
-        "2026-05-11",
-      );
+      expect(screen.getByTestId("selected-date-iso").textContent).toContain("2026-05-11");
+      expect(screen.getByTestId("selected-date-iso").textContent).not.toBe(staleSelectedDateIso);
+      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent("2026-05-11");
     });
   });
 
@@ -2165,22 +2306,14 @@ describe("Journeys row drag integration", () => {
       expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
     });
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "set-same-day-non-current" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "set-same-day-non-current" }));
 
-    let sameDaySelectedDateIso = screen.getByTestId("selected-date-iso")
-      .textContent as string;
+    let sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
-      sameDaySelectedDateIso = screen.getByTestId("selected-date-iso")
-        .textContent as string;
-      expect(isSameDay(new Date(sameDaySelectedDateIso), new Date())).toBe(
-        true,
-      );
+      sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      expect(isSameDay(new Date(sameDaySelectedDateIso), new Date())).toBe(true);
     });
-    const centerKeyBeforeResetRequest = Number(
-      screen.getByTestId("center-request-key").textContent,
-    );
+    const centerKeyBeforeResetRequest = Number(screen.getByTestId("center-request-key").textContent);
     elementScrollToSpy.mockClear();
 
     act(() => {
@@ -2188,38 +2321,24 @@ describe("Journeys row drag integration", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId("selected-date-iso").textContent).toBe(
-        sameDaySelectedDateIso,
-      );
-      expect(
-        Number(screen.getByTestId("center-request-key").textContent),
-      ).toBeGreaterThan(centerKeyBeforeResetRequest);
-      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(
-        format(new Date(), "yyyy-MM-dd"),
-      );
+      expect(screen.getByTestId("selected-date-iso").textContent).toBe(sameDaySelectedDateIso);
+      expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeResetRequest);
+      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
       expect(elementScrollToSpy).toHaveBeenCalled();
     });
   });
 
   it("snaps back to today after completing a task when the date has not been manually adjusted", async () => {
-    mocks.toggleTask.mockImplementation(
-      (
-        payload: { taskId: string; completed: boolean },
-        options?: {
-          onSuccess?: (result: {
-            completed: boolean;
-            contact: null;
-            autoLogInteraction: boolean;
-          }) => void;
-        },
-      ) => {
-        options?.onSuccess?.({
-          completed: payload.completed,
-          contact: null,
-          autoLogInteraction: false,
-        });
-      },
-    );
+    mocks.toggleTask.mockImplementation((
+      payload: { taskId: string; completed: boolean },
+      options?: { onSuccess?: (result: { completed: boolean; contact: null; autoLogInteraction: boolean }) => void },
+    ) => {
+      options?.onSuccess?.({
+        completed: payload.completed,
+        contact: null,
+        autoLogInteraction: false,
+      });
+    });
 
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -2242,20 +2361,14 @@ describe("Journeys row drag integration", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
 
-    let staleSelectedDateIso = screen.getByTestId("selected-date-iso")
-      .textContent as string;
+    let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
-      staleSelectedDateIso = screen.getByTestId("selected-date-iso")
-        .textContent as string;
+      staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
     });
-    const centerKeyBeforeTaskCompletion = Number(
-      screen.getByTestId("center-request-key").textContent,
-    );
+    const centerKeyBeforeTaskCompletion = Number(screen.getByTestId("center-request-key").textContent);
 
-    const completeCheckbox = (
-      await screen.findAllByRole("checkbox", { name: /mark task as complete/i })
-    )[0];
+    const completeCheckbox = (await screen.findAllByRole("checkbox", { name: /mark task as complete/i }))[0];
     fireEvent.click(completeCheckbox);
 
     await waitFor(() => {
@@ -2263,35 +2376,24 @@ describe("Journeys row drag integration", () => {
         expect.objectContaining({ taskId: "task-1", completed: true }),
         expect.any(Object),
       );
-      const refreshedDateIso = screen.getByTestId("selected-date-iso")
-        .textContent as string;
+      const refreshedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       expect(refreshedDateIso).not.toBe(staleSelectedDateIso);
       expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
-      expect(
-        Number(screen.getByTestId("center-request-key").textContent),
-      ).toBeGreaterThan(centerKeyBeforeTaskCompletion);
+      expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeTaskCompletion);
     });
   });
 
   it("does not snap back after completing a task when the user manually adjusted the date pills", async () => {
-    mocks.toggleTask.mockImplementation(
-      (
-        payload: { taskId: string; completed: boolean },
-        options?: {
-          onSuccess?: (result: {
-            completed: boolean;
-            contact: null;
-            autoLogInteraction: boolean;
-          }) => void;
-        },
-      ) => {
-        options?.onSuccess?.({
-          completed: payload.completed,
-          contact: null,
-          autoLogInteraction: false,
-        });
-      },
-    );
+    mocks.toggleTask.mockImplementation((
+      payload: { taskId: string; completed: boolean },
+      options?: { onSuccess?: (result: { completed: boolean; contact: null; autoLogInteraction: boolean }) => void },
+    ) => {
+      options?.onSuccess?.({
+        completed: payload.completed,
+        contact: null,
+        autoLogInteraction: false,
+      });
+    });
 
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -2314,20 +2416,14 @@ describe("Journeys row drag integration", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "user-set-stale-day" }));
 
-    let staleSelectedDateIso = screen.getByTestId("selected-date-iso")
-      .textContent as string;
+    let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
-      staleSelectedDateIso = screen.getByTestId("selected-date-iso")
-        .textContent as string;
+      staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
     });
-    const centerKeyBeforeTaskCompletion = Number(
-      screen.getByTestId("center-request-key").textContent,
-    );
+    const centerKeyBeforeTaskCompletion = Number(screen.getByTestId("center-request-key").textContent);
 
-    const completeCheckbox = (
-      await screen.findAllByRole("checkbox", { name: /mark task as complete/i })
-    )[0];
+    const completeCheckbox = (await screen.findAllByRole("checkbox", { name: /mark task as complete/i }))[0];
     fireEvent.click(completeCheckbox);
 
     await waitFor(() => {
@@ -2337,12 +2433,8 @@ describe("Journeys row drag integration", () => {
       );
     });
 
-    expect(screen.getByTestId("selected-date-iso").textContent).toBe(
-      staleSelectedDateIso,
-    );
-    expect(Number(screen.getByTestId("center-request-key").textContent)).toBe(
-      centerKeyBeforeTaskCompletion,
-    );
+    expect(screen.getByTestId("selected-date-iso").textContent).toBe(staleSelectedDateIso);
+    expect(Number(screen.getByTestId("center-request-key").textContent)).toBe(centerKeyBeforeTaskCompletion);
   });
 
   it("resets stale selected date on journeys query page changes", async () => {
@@ -2361,10 +2453,7 @@ describe("Journeys row drag integration", () => {
         <>
           <div data-testid="route-path">{location.pathname}</div>
           <div data-testid="route-search">{location.search}</div>
-          <button
-            type="button"
-            onClick={() => navigate("/journeys?section=inbox")}
-          >
+          <button type="button" onClick={() => navigate("/journeys?section=inbox")}>
             go-inbox-section
           </button>
           <Journeys />
@@ -2387,24 +2476,19 @@ describe("Journeys row drag integration", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
 
-    let staleSelectedDateIso = screen.getByTestId("selected-date-iso")
-      .textContent as string;
+    let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
-      staleSelectedDateIso = screen.getByTestId("selected-date-iso")
-        .textContent as string;
+      staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
     });
 
     fireEvent.click(screen.getByRole("button", { name: "go-inbox-section" }));
     await waitFor(() => {
-      expect(screen.getByTestId("route-search").textContent).toBe(
-        "?section=inbox",
-      );
+      expect(screen.getByTestId("route-search").textContent).toBe("?section=inbox");
     });
 
     await waitFor(() => {
-      const refreshedDateIso = screen.getByTestId("selected-date-iso")
-        .textContent as string;
+      const refreshedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       expect(refreshedDateIso).not.toBe(staleSelectedDateIso);
       expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
     });
@@ -2426,10 +2510,7 @@ describe("Journeys row drag integration", () => {
         <>
           <div data-testid="route-path">{location.pathname}</div>
           <div data-testid="route-search">{location.search}</div>
-          <button
-            type="button"
-            onClick={() => navigate("/journeys?section=inbox")}
-          >
+          <button type="button" onClick={() => navigate("/journeys?section=inbox")}>
             go-inbox-section
           </button>
           <Journeys />
@@ -2452,11 +2533,9 @@ describe("Journeys row drag integration", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
 
-    let staleSelectedDateIso = screen.getByTestId("selected-date-iso")
-      .textContent as string;
+    let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
-      staleSelectedDateIso = screen.getByTestId("selected-date-iso")
-        .textContent as string;
+      staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
     });
 
@@ -2469,22 +2548,17 @@ describe("Journeys row drag integration", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "go-inbox-section" }));
     await waitFor(() => {
-      expect(screen.getByTestId("route-search").textContent).toBe(
-        "?section=inbox",
-      );
+      expect(screen.getByTestId("route-search").textContent).toBe("?section=inbox");
     });
 
-    expect(screen.getByTestId("selected-date-iso").textContent).toBe(
-      staleSelectedDateIso,
-    );
+    expect(screen.getByTestId("selected-date-iso").textContent).toBe(staleSelectedDateIso);
 
     act(() => {
       mocks.lastAddQuestSheetProps?.onOpenChange?.(false);
     });
 
     await waitFor(() => {
-      const refreshedDateIso = screen.getByTestId("selected-date-iso")
-        .textContent as string;
+      const refreshedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       expect(refreshedDateIso).not.toBe(staleSelectedDateIso);
       expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
     });
@@ -2512,12 +2586,10 @@ describe("Journeys row drag integration", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
 
-    let staleSelectedDateIso = screen.getByTestId("selected-date-iso")
-      .textContent as string;
+    let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     let staleSelectedDate = new Date(staleSelectedDateIso);
     await waitFor(() => {
-      staleSelectedDateIso = screen.getByTestId("selected-date-iso")
-        .textContent as string;
+      staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       staleSelectedDate = new Date(staleSelectedDateIso);
       expect(isSameDay(staleSelectedDate, new Date())).toBe(false);
     });
@@ -2541,8 +2613,7 @@ describe("Journeys row drag integration", () => {
     );
 
     await waitFor(() => {
-      const activeDateIso = screen.getByTestId("selected-date-iso")
-        .textContent as string;
+      const activeDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       const activeDate = new Date(activeDateIso);
       expect(activeDateIso).not.toBe(staleSelectedDateIso);
       expect(isSameDay(activeDate, new Date())).toBe(true);
@@ -2572,9 +2643,7 @@ describe("Journeys row drag integration", () => {
     fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
 
     await waitFor(() => {
-      const staleDate = new Date(
-        screen.getByTestId("selected-date-iso").textContent as string,
-      );
+      const staleDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
       expect(isSameDay(staleDate, new Date())).toBe(false);
     });
 
@@ -2583,9 +2652,7 @@ describe("Journeys row drag integration", () => {
     });
 
     await waitFor(() => {
-      const refreshedDate = new Date(
-        screen.getByTestId("selected-date-iso").textContent as string,
-      );
+      const refreshedDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
       expect(isSameDay(refreshedDate, new Date())).toBe(true);
     });
   });
@@ -2613,9 +2680,7 @@ describe("Journeys row drag integration", () => {
     fireEvent.click(screen.getByRole("button", { name: "user-set-stale-day" }));
 
     await waitFor(() => {
-      const staleDate = new Date(
-        screen.getByTestId("selected-date-iso").textContent as string,
-      );
+      const staleDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
       expect(isSameDay(staleDate, new Date())).toBe(false);
     });
 
@@ -2624,9 +2689,7 @@ describe("Journeys row drag integration", () => {
     });
 
     await waitFor(() => {
-      const refreshedDate = new Date(
-        screen.getByTestId("selected-date-iso").textContent as string,
-      );
+      const refreshedDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
       expect(isSameDay(refreshedDate, new Date())).toBe(true);
     });
   });
@@ -2649,42 +2712,26 @@ describe("Journeys row drag integration", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
-      expect(
-        Number(screen.getByTestId("center-request-key").textContent),
-      ).toBeGreaterThan(0);
+      expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(0);
     });
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "set-same-day-non-current" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "set-same-day-non-current" }));
 
-    let sameDaySelectedDateIso = screen.getByTestId("selected-date-iso")
-      .textContent as string;
+    let sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
-      sameDaySelectedDateIso = screen.getByTestId("selected-date-iso")
-        .textContent as string;
-      expect(isSameDay(new Date(sameDaySelectedDateIso), new Date())).toBe(
-        true,
-      );
+      sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      expect(isSameDay(new Date(sameDaySelectedDateIso), new Date())).toBe(true);
     });
-    const centerKeyBeforeFocus = Number(
-      screen.getByTestId("center-request-key").textContent,
-    );
+    const centerKeyBeforeFocus = Number(screen.getByTestId("center-request-key").textContent);
 
     act(() => {
       window.dispatchEvent(new Event("focus"));
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId("selected-date-iso").textContent).toBe(
-        sameDaySelectedDateIso,
-      );
-      expect(
-        Number(screen.getByTestId("center-request-key").textContent),
-      ).toBeGreaterThan(centerKeyBeforeFocus);
-      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(
-        format(new Date(), "yyyy-MM-dd"),
-      );
+      expect(screen.getByTestId("selected-date-iso").textContent).toBe(sameDaySelectedDateIso);
+      expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeFocus);
+      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
     });
   });
 
@@ -2711,8 +2758,7 @@ describe("Journeys row drag integration", () => {
     fireEvent.click(screen.getByRole("button", { name: "set-future-day" }));
 
     await waitFor(() => {
-      const futureDateIso = screen.getByTestId("selected-date-iso")
-        .textContent as string;
+      const futureDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       const futureDate = new Date(futureDateIso);
       expect(futureDate.getTime()).toBeGreaterThan(Date.now());
       expect(isSameDay(futureDate, new Date())).toBe(false);
@@ -2723,9 +2769,7 @@ describe("Journeys row drag integration", () => {
     });
 
     await waitFor(() => {
-      const refreshedDate = new Date(
-        screen.getByTestId("selected-date-iso").textContent as string,
-      );
+      const refreshedDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
       expect(isSameDay(refreshedDate, new Date())).toBe(true);
     });
   });

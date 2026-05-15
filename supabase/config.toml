@@ -217,6 +217,9 @@ verify_jwt = true
 [functions.companion-agent]
 verify_jwt = true
 
+[functions.companion-draft-opportunity]
+verify_jwt = true
+
 [functions.companion-agent-action]
 verify_jwt = true
 

@@ -9,11 +9,13 @@ import {
 } from "react";
 import {
   Archive,
+  Check,
   Loader2,
   Mic,
   Plus,
   Send,
   Waves,
+  X,
 } from "lucide-react";
 
 import { AudioReactiveWaveform } from "@/components/AudioReactiveWaveform";
@@ -22,7 +24,9 @@ import {
   CompanionPortraitShell,
 } from "@/components/CompanionImage";
 import { plannerPathfinderTheme } from "@/components/companion/plannerPathfinderTheme";
+import { CompanionStructuredResponseCards } from "@/components/companion/CompanionStructuredResponseCards";
 import { PermissionRequestDialog } from "@/components/PermissionRequestDialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -138,15 +142,20 @@ export const CompanionChatModal = memo(function CompanionChatModal({
     () => getVisibleMessages(assistant.messages),
     [assistant.messages],
   );
+  const followUpOptions = assistant.activeFollowUp?.options ?? [];
   const actionDisabled =
-    assistant.isOpeningThread || assistant.isSubmitting;
+    assistant.isOpeningThread ||
+    assistant.isSubmitting ||
+    assistant.isResolvingAction;
   const sendDisabled =
     !assistant.canSubmitMessage || !assistant.draftInput.trim();
   const statusText = assistant.isOpeningThread
     ? "Starting"
     : assistant.isSubmitting
     ? "Thinking"
-    : assistant.isRecording
+    : assistant.isResolvingAction
+      ? "Updating"
+      : assistant.isRecording
         ? "Listening"
         : assistant.isSpeaking
           ? "Speaking"
@@ -180,7 +189,10 @@ export const CompanionChatModal = memo(function CompanionChatModal({
     if (!transcript) return;
     transcript.scrollTop = transcript.scrollHeight;
   }, [
+    assistant.activeFollowUp,
     assistant.isSubmitting,
+    assistant.pendingAction,
+    assistant.structuredResponse,
     open,
     visibleMessages.length,
   ]);
@@ -197,6 +209,15 @@ export const CompanionChatModal = memo(function CompanionChatModal({
       submitComposer();
     },
     [submitComposer],
+  );
+
+  const handleFollowUpOption = useCallback(
+    (option: string) => {
+      void assistant.submitMessage(option, "text", {
+        turnOrigin: "follow_up_option",
+      });
+    },
+    [assistant],
   );
 
   const handleNewChat = useCallback(() => {
@@ -352,6 +373,96 @@ export const CompanionChatModal = memo(function CompanionChatModal({
                   </div>
                 </div>
               ))}
+
+              <CompanionStructuredResponseCards
+                structuredResponse={assistant.structuredResponse}
+                variant="companion"
+                onConfirmSuggestion={assistant.confirmSuggestedQuest}
+                savedProposalIds={assistant.savedSuggestionProposalIds}
+                pendingProposalId={assistant.pendingSuggestionProposalId}
+                actionDisabled={actionDisabled || Boolean(assistant.pendingAction)}
+              />
+
+              {assistant.activeFollowUp ? (
+                <div
+                  className={cn(plannerPathfinderTheme.raisedPanel, "max-w-[88%] p-4")}
+                  data-testid="companion-chat-follow-up"
+                >
+                  <Badge variant="outline" className={plannerPathfinderTheme.chip}>
+                    Follow-up
+                  </Badge>
+                  <p className="mt-3 text-sm font-semibold text-foreground">
+                    {assistant.activeFollowUp.question}
+                  </p>
+                  {assistant.activeFollowUp.reason ? (
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {assistant.activeFollowUp.reason}
+                    </p>
+                  ) : null}
+                  {followUpOptions.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {followUpOptions.map((option) => (
+                        <Button
+                          key={option}
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className={cn(
+                            plannerPathfinderTheme.outlineButton,
+                            "h-auto min-h-9 max-w-full whitespace-normal text-left leading-tight",
+                          )}
+                          onClick={() => handleFollowUpOption(option)}
+                          disabled={actionDisabled}
+                        >
+                          {option}
+                        </Button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {assistant.pendingAction ? (
+                <div
+                  className={cn(plannerPathfinderTheme.raisedPanel, "max-w-[88%] p-4")}
+                  data-testid="companion-chat-pending-action"
+                >
+                  <Badge variant="outline" className={plannerPathfinderTheme.chip}>
+                    Pending confirmation
+                  </Badge>
+                  <p className="mt-3 text-sm font-semibold text-foreground">
+                    {assistant.pendingAction.summary}
+                  </p>
+                  {assistant.pendingAction.confirmationMessage ? (
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {assistant.pendingAction.confirmationMessage}
+                    </p>
+                  ) : null}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      className={plannerPathfinderTheme.primaryButton}
+                      onClick={assistant.confirmPendingAction}
+                      disabled={actionDisabled}
+                    >
+                      <Check className="mr-2 h-4 w-4" />
+                      Confirm
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className={plannerPathfinderTheme.outlineButton}
+                      onClick={assistant.cancelPendingAction}
+                      disabled={actionDisabled}
+                    >
+                      <X className="mr-2 h-4 w-4" />
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
 

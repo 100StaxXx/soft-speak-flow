@@ -123,7 +123,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
   );
 
   const reminderPresetValues = useMemo(
-    () => QUEST_REMINDER_PRESET_OPTIONS.map((option) => option.value) as number[],
+    () => QUEST_REMINDER_PRESET_OPTIONS.map((option) => option.value),
     [],
   );
   const reminderOffsets = useMemo(
