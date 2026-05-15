@@ -1438,9 +1438,9 @@ export const AddQuestSheet = memo(function AddQuestSheet({
           style={resolvedCompanionFrostedThemeStyle}
         >
           <AlertDialogHeader>
-            <AlertDialogTitle>Restore saved quest draft?</AlertDialogTitle>
+            <AlertDialogTitle>Restore unfinished quest?</AlertDialogTitle>
             <AlertDialogDescription>
-              You have an unfinished quest draft saved on this device. Restore it, or discard it and start fresh.
+              You have an unfinished quest saved on this device. Restore it, or discard it and start fresh.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -74,7 +74,9 @@ const durationOptions = [
 
 const WEEKDAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MONTH_DAYS = Array.from({ length: 31 }, (_, index) => index + 1);
-const REMINDER_PRESET_VALUES = new Set(QUEST_REMINDER_PRESET_OPTIONS.map((option) => option.value));
+const REMINDER_PRESET_VALUES: ReadonlySet<number> = new Set(
+  QUEST_REMINDER_PRESET_OPTIONS.map((option) => option.value),
+);
 
 function toAppDayIndex(jsDay: number): number {
   return jsDay === 0 ? 6 : jsDay - 1;

@@ -1,5 +1,5 @@
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion, type Variants } from "framer-motion";
 import {
   BarChart3,
   Brain,
@@ -136,7 +136,7 @@ const rankClassName = (rank: string) =>
     C: "border-muted-foreground/30 bg-muted/30 text-muted-foreground",
   })[rank] ?? "border-border bg-background text-foreground";
 
-const revealContainerVariants = {
+const revealContainerVariants: Variants = {
   hidden: { opacity: 0, y: 12 },
   visible: {
     opacity: 1,
@@ -149,7 +149,7 @@ const revealContainerVariants = {
   },
 };
 
-const revealItemVariants = {
+const revealItemVariants: Variants = {
   hidden: { opacity: 0, y: 10 },
   visible: {
     opacity: 1,

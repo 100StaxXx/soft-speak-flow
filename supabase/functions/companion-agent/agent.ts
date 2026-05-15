@@ -2533,7 +2533,7 @@ function buildInstructions(params: {
       ? "Do not include proposed_actions on this turn. The separate sidecar owns suggestion cards."
       : companionChatOnlyTurn
       ? "Do not include proposed_actions on this turn. Companion chat is read-only until the user explicitly asks for an app action."
-      : "If you are ready to draft but do not use a prepare tool, include a supported proposed_actions item with enough normalizedPayload for the app to validate and create a pending confirmation.",
+      : "If you are ready to suggest an app action but do not use a prepare tool, include a supported proposed_actions item with enough normalizedPayload for the app to validate and create an explicit approval request.",
     "Always finish by calling submit_companion_result. Do not end with a plain assistant message.",
     `Surface: ${params.surface}.`,
     `Current local datetime from the app: ${params.currentDateTime}.`,
@@ -2628,7 +2628,7 @@ const looksLikeDraftOrConfirmationReply = (reply: string): boolean => {
     .test(normalized) ||
     /\b(?:i can|i could|would you like me to|want me to)\s+(?:draft|prepare|create|add|schedule|save|log)\b/
       .test(normalized) ||
-    /\b(?:review it|confirm it|pending confirmation|quest draft|drafted this|prepared this)\b/
+    /\b(?:review it|confirm it)\b/
       .test(normalized);
 };
 
@@ -3049,7 +3049,7 @@ export function buildToolDefinitions() {
     ),
     functionTool(
       "get_active_pending_action",
-      "Return the currently active pending confirmation, if one exists.",
+      "Return the currently active approval request, if one exists.",
       {
         type: "object",
         additionalProperties: false,
@@ -4349,9 +4349,9 @@ const runDraftOpportunitySidecar = async (params: {
     {
       role: "system" as const,
       content: [
-        "You are Cosmiq's backend draft-opportunity decider.",
+        "You are Cosmiq's backend suggestion-card decider.",
         "The user-facing assistant already replied. Decide whether the backend should show one draft suggestion card, show one campaign-start suggestion card, or do nothing.",
-        "Return JSON only. Never execute writes or pending confirmations.",
+        "Return JSON only. Never execute writes or approval requests.",
         'Return shape: {"decision":"none|prepare_action|open_campaign_builder","action_type":null|string,"reason":null|string,"title":null|string,"summary":null|string,"normalized_payload":object|null,"confidence":number|null}.',
         "Use decision none for casual chat, reflection, schedule reads, unsupported actions, vague intent, or when the assistant reply is already enough.",
         "Use none when required details are missing. Do not ask a follow-up question; the user can keep chatting with the assistant.",
@@ -4609,7 +4609,7 @@ export async function runCompanionDraftOpportunity(params: {
     });
   }
 
-  console.log("[companion-draft-opportunity] turn", {
+  console.log("[companion-suggestion-card] turn", {
     sessionId: params.request.sessionId,
     userId: params.userId,
     decision: agentResult.result.draftOpportunity?.decision ?? "none",

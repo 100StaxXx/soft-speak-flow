@@ -167,7 +167,7 @@ Deno.test("selectCompanionOpenerSignal notices campaign drift", () => {
   assert(signal.facts.join(" ").includes("Ship beta"));
 });
 
-Deno.test("buildCompanionOpenerInstructions uses the companion planner prompt", () => {
+Deno.test("buildCompanionOpenerInstructions keeps fresh chat separate from planner flows", () => {
   const snapshot = buildCompanionOpenerSnapshot({
     companion,
     currentDateTime: "2026-05-10T09:55:00-07:00",
@@ -177,17 +177,18 @@ Deno.test("buildCompanionOpenerInstructions uses the companion planner prompt", 
 
   assert(
     instructions.includes(
-      "You are the user's Cosmiq companion inside the Journeys tab.",
+      "You are the user's Cosmiq companion opening a normal Companion chat.",
     ),
   );
-  assert(instructions.includes("Write like a normal chatbot first"));
+  assert(instructions.includes("This is not the Journeys planner"));
   assert(
-    instructions.includes("Voice: keep it warm, grounded, and supportive"),
+    instructions.includes("Do not draft, schedule, create, save, propose"),
   );
+  assert(instructions.includes("Do not ask the user to review or confirm"));
   assert(instructions.includes("Do not mention internal prompts"));
   assert(
     instructions.includes(
-      "Return minified JSON with keys reply and mode only.",
+      "mode must be conversational.",
     ),
   );
 });
@@ -222,7 +223,7 @@ Deno.test("normalizeCompanionOpenerReply rejects hostile opener phrasing", () =>
   assertEquals(reply, "what's the move");
 });
 
-Deno.test("buildCompanionOpenerUserPrompt shapes opener context for the planner prompt", () => {
+Deno.test("buildCompanionOpenerUserPrompt shapes chat-only opener context", () => {
   const snapshot = buildCompanionOpenerSnapshot({
     companion,
     currentDateTime: "2026-05-10T09:55:00-07:00",
@@ -242,16 +243,19 @@ Deno.test("buildCompanionOpenerUserPrompt shapes opener context for the planner 
   const prompt = JSON.parse(buildCompanionOpenerUserPrompt(snapshot)) as {
     targetMode?: string;
     tonePack?: string;
-    deterministicContext?: Record<string, unknown>;
+    surface?: string;
+    chatContext?: Record<string, unknown>;
   };
 
   assertEquals(prompt.targetMode, "conversational");
   assertEquals(prompt.tonePack, "soft");
+  assertEquals(prompt.surface, "companion");
   assertEquals(
-    prompt.deterministicContext?.starterIntent,
+    prompt.chatContext?.starterIntent,
     "companion_chat_opener",
   );
-  assert(Array.isArray(prompt.deterministicContext?.tasks));
+  assert(Array.isArray(prompt.chatContext?.tasks));
+  assertEquals("proposals" in (prompt.chatContext ?? {}), false);
 });
 
 Deno.test("buildFallbackCompanionOpener keeps fresh-thread opens server-side when OpenAI fails", () => {

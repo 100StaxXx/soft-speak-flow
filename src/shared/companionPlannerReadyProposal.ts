@@ -45,22 +45,22 @@ export const isQuestionLikePlannerReply = (reply: string): boolean => {
 export const buildConfirmReadyPlannerReply = (kind: string): string => {
   switch (kind) {
     case "create_quest":
-      return "I drafted this quest for you. Review it and confirm if it fits.";
+      return "I can talk this through with you, but I won't create or schedule a quest from this chat.";
     case "update_quest":
-      return "I drafted this quest update for you. Review it and confirm if it fits.";
+      return "I can talk this through with you, but I won't create or schedule a quest edit from this chat.";
     case "create_campaign":
-      return "I drafted this campaign for you. Review it and confirm if it fits.";
+      return "I can talk this through with you, but I won't create or schedule a campaign from this chat.";
     case "update_campaign":
-      return "I drafted this campaign update for you. Review it and confirm if it fits.";
+      return "I can talk this through with you, but I won't create or schedule a campaign edit from this chat.";
     case "adjust_campaign_plan":
-      return "I drafted this campaign adjustment for you. Review it and confirm if it fits.";
+      return "I can talk this through with you, but I won't create or schedule a campaign adjustment from this chat.";
     case "create_ritual":
-      return "I drafted this ritual for you. Review it and confirm if it fits.";
+      return "I can talk this through with you, but I won't create or schedule a ritual from this chat.";
     case "update_ritual":
-      return "I drafted this ritual update for you. Review it and confirm if it fits.";
+      return "I can talk this through with you, but I won't create or schedule a ritual edit from this chat.";
     case "suggest_reminder":
-      return "I drafted this reminder change for you. Review it and confirm if it fits.";
+      return "I can talk this through with you, but I won't create or schedule a reminder change from this chat.";
     default:
-      return "I drafted this for you. Review it and confirm if it fits.";
+      return "I can talk this through with you, but I won't create or schedule planner changes from this chat.";
   }
 };

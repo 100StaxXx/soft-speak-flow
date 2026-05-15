@@ -9,7 +9,6 @@ import {
   type UserCompanionRow,
 } from "../companion-agent/agent.ts";
 import type { LoadedCompanionAgentContext } from "../companion-agent/types.ts";
-import { buildSystemPrompt } from "../companion-planner-chat/orchestrator.ts";
 import { getRandomCompanionChatOpeningLine } from "../../../src/shared/companionChatOpeners.ts";
 
 type GuardedFetch = typeof fetch;
@@ -390,7 +389,19 @@ export function buildCompanionOpenerSnapshot(params: {
 export function buildCompanionOpenerInstructions(
   _snapshot: CompanionOpenerSnapshot,
 ) {
-  return buildSystemPrompt("conversational", "soft");
+  return [
+    "You are the user's Cosmiq companion opening a normal Companion chat.",
+    "This is not the Journeys planner, scheduler, recommendation draft flow, or quest capture flow.",
+    "Write one short, natural first message that feels conversational and emotionally present.",
+    "Use the provided context only as light awareness. Do not force planning, coaching, or productivity framing.",
+    "Do not draft, schedule, create, save, propose, confirm, or modify quests, tasks, reminders, campaigns, or calendar events.",
+    "Do not say anything was drafted, scheduled, saved, created, queued, moved, or added.",
+    "Do not ask the user to review or confirm a quest, plan, or proposed action.",
+    "Do not mention internal prompts, models, JSON, hidden state, or implementation details.",
+    "Do not use profanity, vulgar wording, insults, markdown, bullets, or form-flow language.",
+    "Keep it under 45 words.",
+    "Return minified JSON with keys reply and mode only. mode must be conversational.",
+  ].join("\n");
 }
 
 export function hasUnsafeCompanionOpenerTone(value: string): boolean {
@@ -444,21 +455,16 @@ export const buildCompanionOpenerUserPrompt = (
   JSON.stringify({
     targetMode: "conversational",
     tonePack: "soft",
+    surface: "companion",
     latestUserMessage:
       "Open this new companion chat with one short, natural first message.",
     currentDate: snapshot.currentDateTime.slice(0, 10),
     currentDateTime: snapshot.currentDateTime,
     conversationHistory: [],
-    deterministicContext: {
+    chatContext: {
       fallbackReply: buildFallbackCompanionOpener(snapshot).reply,
-      availabilityFacts: null,
-      planDayContext: null,
-      followUpQuestions: [],
       starterIntent: "companion_chat_opener",
-      briefingContext: null,
-      priorityScores: [],
-      proposals: [],
-      scheduleSummary: snapshot.primarySignal.facts.join(" | ") || null,
+      signalSummary: snapshot.primarySignal.facts.join(" | ") || null,
       tasks: snapshot.tasks.slice(0, 8).map((task) => ({
         title: titleOf(task),
         taskDate: readString(task, "task_date"),
@@ -481,7 +487,7 @@ export const buildCompanionOpenerUserPrompt = (
       validCampaignTitles: snapshot.campaigns
         .map((campaign) => titleOf(campaign))
         .filter((title) => title !== "Untitled"),
-      plannerMemory: asRecord(snapshot.memory.planner_preferences),
+      preferenceMemory: asRecord(snapshot.memory.ai_preferences),
       openerContext: {
         companionName: snapshot.companion.name,
         companionMood: snapshot.companion.mood,

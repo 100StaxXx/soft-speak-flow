@@ -8,18 +8,15 @@ import {
   useRef,
   useState,
 } from "react";
-import { format, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import {
   Archive,
-  Check,
   ChevronRight,
   Loader2,
-  MessageSquare,
   Mic,
   Plus,
   Send,
   Waves,
-  X,
 } from "lucide-react";
 
 import { AudioReactiveWaveform } from "@/components/AudioReactiveWaveform";
@@ -27,13 +24,9 @@ import {
   CompanionImage,
   CompanionPortraitShell,
 } from "@/components/CompanionImage";
-import { CompanionStructuredResponseCards } from "@/components/companion/CompanionStructuredResponseCards";
-import { DayPlanCard } from "@/components/companion/DayPlanCard";
 import { PermissionRequestDialog } from "@/components/PermissionRequestDialog";
 import { plannerPathfinderTheme } from "@/components/companion/plannerPathfinderTheme";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/components/ui/sonner";
 import {
   Dialog,
   DialogContent,
@@ -56,28 +49,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  type CompanionAssistantMessage,
-  useCompanionAssistant,
-} from "@/hooks/useCompanionAssistant";
+import { useCompanionAssistant } from "@/hooks/useCompanionAssistant";
 import { usePlannerPathfinderAppearance } from "@/hooks/usePlannerPathfinderAppearance";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
 import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
 import { shouldContainCompanionSceneImage } from "@/lib/companionImageFocal";
 import { cn, stripMarkdown } from "@/lib/utils";
-import type { QuestComposerPrefillDraft } from "@/features/quests/types";
-import { buildQuestPrefillFromNaturalLanguage } from "@/features/quests/utils/voiceQuestPrefill";
-import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
 import type { CompanionChatThreadSummary } from "@/types/companionConversation";
-import type {
-  CompanionAgentFollowUp,
-  CompanionAgentProposedAction,
-} from "@/types/companionAgent";
-import type {
-  CompanionPlannerLaunchIntent,
-  CompanionPlannerProposal,
-  PlannerBriefingContext,
-} from "@/types/companionPlanner";
+import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
 
 type JourneysCompanionPlannerModalPresentation = "dialog" | "drawer";
 
@@ -85,13 +64,9 @@ interface JourneysCompanionPlannerModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   presentation: JourneysCompanionPlannerModalPresentation;
-  selectedDate?: Date | null;
   launchIntent?: CompanionPlannerLaunchIntent | null;
   onLaunchIntentConsumed?: (intentId: string) => void;
   onOpenCampaignBuilder?: (message: string) => void;
-  onQuestProposalEditHandoff?: (
-    proposal: CompanionPlannerProposal,
-  ) => Promise<{ saved: boolean; savedTitle?: string | null }>;
 }
 
 type JourneysCompanionDrawerLayout = {
@@ -104,802 +79,6 @@ const MOBILE_DRAWER_HEIGHT_MAX_PX = 736;
 const MOBILE_DRAWER_HANDLE_SPACE_PX = 22;
 const MOBILE_DRAWER_VIEWPORT_OFFSET_PX = 24;
 const TRANSCRIPT_BOTTOM_THRESHOLD_PX = 96;
-
-const formatProposedActionType = (type: string) =>
-  type.trim().replace(/[._-]+/g, " ") || "suggestion";
-
-const normalizeProposedActionType = (type: string) =>
-  type
-    .trim()
-    .toLowerCase()
-    .replace(/[.\s-]+/g, "_");
-
-const asRecord = (value: unknown): Record<string, unknown> | null =>
-  value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-
-const readSnapshotValue = (
-  snapshot: Record<string, unknown> | null,
-  key: string,
-) => {
-  const value = snapshot?.[key];
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string" && value.trim().length > 0) return value.trim();
-  return null;
-};
-
-const getPlannerBriefingMetrics = (
-  snapshot: Record<string, unknown> | null,
-) =>
-  [
-    ["openQuestCount", "Open"],
-    ["scheduledQuestCount", "Timed"],
-    ["anytimeQuestCount", "Anytime"],
-    ["ritualQuestCount", "Rituals"],
-    ["activeCampaignCount", "Campaigns"],
-    ["estimatedLoadLabel", "Load"],
-  ]
-    .map(([key, label]) => {
-      const value = readSnapshotValue(snapshot, key);
-      return value === null ? null : { key, label, value };
-    })
-    .filter(
-      (metric): metric is { key: string; label: string; value: string | number } =>
-        Boolean(metric),
-    );
-
-const PlannerBriefingContextPanel = memo(function PlannerBriefingContextPanel({
-  briefing,
-  companionLabel,
-}: {
-  briefing: PlannerBriefingContext;
-  companionLabel: string;
-}) {
-  const snapshot = asRecord(briefing.dataSnapshot);
-  const metrics = getPlannerBriefingMetrics(snapshot);
-  const insightStatement =
-    typeof snapshot?.plannerInsightStatement === "string"
-      ? snapshot.plannerInsightStatement.trim()
-      : null;
-
-  return (
-    <div
-      className="flex w-full justify-start"
-      data-testid="journeys-companion-planner-briefing"
-    >
-      <div className={cn(plannerPathfinderTheme.raisedPanel, "max-w-[92%] p-4")}>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline" className={plannerPathfinderTheme.chip}>
-            Planning with
-          </Badge>
-          {snapshot?.loadSignal ? (
-            <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium capitalize text-muted-foreground">
-              {String(snapshot.loadSignal)} load
-            </span>
-          ) : null}
-        </div>
-        <p className="mt-3 text-sm leading-6 text-foreground">
-          {briefing.content}
-        </p>
-        {metrics.length > 0 ? (
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {metrics.map((metric) => (
-              <div
-                key={metric.key}
-                className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2"
-              >
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/75">
-                  {metric.label}
-                </p>
-                <p className="mt-1 text-sm font-semibold text-foreground">
-                  {metric.value}
-                </p>
-              </div>
-            ))}
-          </div>
-        ) : null}
-        {insightStatement ? (
-          <figure className="mt-3 border-l-2 border-[hsl(var(--celestial-blue)_/_0.45)] pl-3 text-xs leading-5 text-muted-foreground">
-            <blockquote>&quot;{insightStatement}&quot;</blockquote>
-            <figcaption className="mt-1 text-[11px] font-medium text-muted-foreground/80">
-              - {companionLabel}
-            </figcaption>
-          </figure>
-        ) : null}
-      </div>
-    </div>
-  );
-});
-
-const stripUndefinedValues = (value: Record<string, unknown>) =>
-  Object.fromEntries(
-    Object.entries(value).filter(([, entry]) => entry !== undefined),
-  );
-
-const getProposedActionPayloadSource = (
-  action: CompanionAgentProposedAction,
-) => ({
-  ...action,
-  ...(asRecord(action.normalizedPayload) ?? {}),
-});
-
-const readFirstString = (
-  source: Record<string, unknown>,
-  keys: string[],
-): string | undefined => {
-  for (const key of keys) {
-    const value = source[key];
-    if (typeof value === "string" && value.trim().length > 0) {
-      return value.trim();
-    }
-  }
-  return undefined;
-};
-
-const readFirstNullableString = (
-  source: Record<string, unknown>,
-  keys: string[],
-): string | null | undefined => {
-  for (const key of keys) {
-    if (!(key in source)) continue;
-    const value = source[key];
-    if (value === null) return null;
-    if (typeof value === "string") return value.trim() || undefined;
-  }
-  return undefined;
-};
-
-const readFirstNumber = (
-  source: Record<string, unknown>,
-  keys: string[],
-): number | undefined => {
-  for (const key of keys) {
-    const value = source[key];
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value === "string") {
-      const trimmed = value.trim();
-      const durationMatch = trimmed.match(
-        /^(\d+(?:\.\d+)?)\s*(?:m|min|minutes)?$/i,
-      );
-      const parsed = durationMatch ? Number(durationMatch[1]) : Number(trimmed);
-      if (Number.isFinite(parsed)) return parsed;
-    }
-  }
-  return undefined;
-};
-
-const readFirstNullableNumber = (
-  source: Record<string, unknown>,
-  keys: string[],
-): number | null | undefined => {
-  for (const key of keys) {
-    if (!(key in source)) continue;
-    const value = source[key];
-    if (value === null) return null;
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value === "string") {
-      const parsed = readFirstNumber(source, [key]);
-      if (parsed !== undefined) return parsed;
-    }
-  }
-  return undefined;
-};
-
-const readFirstBoolean = (
-  source: Record<string, unknown>,
-  keys: string[],
-): boolean | undefined => {
-  for (const key of keys) {
-    const value = source[key];
-    if (typeof value === "boolean") return value;
-    if (typeof value === "string") {
-      const normalized = value.trim().toLowerCase();
-      if (normalized === "true") return true;
-      if (normalized === "false") return false;
-    }
-  }
-  return undefined;
-};
-
-const readStringList = (value: unknown): string[] => {
-  if (!Array.isArray(value)) return [];
-
-  return value
-    .map((entry) => {
-      if (typeof entry === "string") return entry.trim();
-      const record = asRecord(entry);
-      if (!record) return "";
-      return (
-        readFirstString(record, ["title", "task_text", "name", "text"]) ?? ""
-      );
-    })
-    .filter((entry) => entry.length > 0);
-};
-
-const readFirstStringList = (
-  source: Record<string, unknown>,
-  keys: string[],
-): string[] => {
-  for (const key of keys) {
-    const entries = readStringList(source[key]);
-    if (entries.length > 0) return entries;
-  }
-  return [];
-};
-
-const normalizeProposedQuestTitle = (value: string) => {
-  let next = value
-    .trim()
-    .replace(/^["'“”]+|["'“”]+$/g, "")
-    .trim();
-
-  for (let index = 0; index < 4; index += 1) {
-    const unwrapped = next
-      .replace(
-        /^create\s+(?:a\s+)?(?:quest|task)\s+for\s+["'“”]?(.+?)["'“”]?$/i,
-        "$1",
-      )
-      .trim()
-      .replace(/^["'“”]+|["'“”]+$/g, "")
-      .trim();
-    if (unwrapped === next) break;
-    next = unwrapped;
-  }
-
-  return next;
-};
-
-const getProposedActionPayloadTitle = (
-  action: CompanionAgentProposedAction,
-) => {
-  const actionType = normalizeProposedActionType(action.type);
-  if (
-    ![
-      "quest_create",
-      "task_create",
-      "quest_update",
-      "task_update",
-      "quest_move",
-      "task_move",
-      "reminder_create",
-      "campaign_start",
-    ].includes(actionType)
-  ) {
-    return null;
-  }
-
-  const title = readFirstString(asRecord(action.normalizedPayload) ?? {}, [
-    "initialGoal",
-    "initial_goal",
-    "goal",
-    "title",
-    "task_text",
-    "name",
-    "text",
-  ]);
-  return title ? normalizeProposedQuestTitle(title) : null;
-};
-
-const isCreateQuestProposedActionType = (actionType: string) =>
-  actionType === "quest_create" || actionType === "task_create";
-
-const isCampaignStartProposedAction = (action: CompanionAgentProposedAction) =>
-  normalizeProposedActionType(action.type) === "campaign_start";
-
-const isDraftableProposedAction = (action: CompanionAgentProposedAction) =>
-  [
-    "quest_create",
-    "task_create",
-    "quest_update",
-    "task_update",
-    "quest_move",
-    "task_move",
-    "ritual_create",
-    "habit_create",
-    "reminder_create",
-    "campaign_update",
-    "goal_update",
-    "campaign_adjust",
-    "goal_adjust",
-    "journal_entry",
-    "reflection_create",
-    "campaign_start",
-  ].includes(normalizeProposedActionType(action.type));
-
-const getProposedActionTitle = (action: CompanionAgentProposedAction) => {
-  const actionType = normalizeProposedActionType(action.type);
-  const payloadTitle = getProposedActionPayloadTitle(action);
-  const actionTitle = action.title
-    ? normalizeProposedQuestTitle(action.title)
-    : null;
-
-  return (
-    (isCreateQuestProposedActionType(actionType)
-      ? payloadTitle || actionTitle
-      : actionTitle || payloadTitle) ||
-    action.summary?.trim() ||
-    formatProposedActionType(action.type)
-  );
-};
-
-const getProposedActionSummary = (action: CompanionAgentProposedAction) => {
-  const title = getProposedActionTitle(action);
-  const summary = action.summary?.trim();
-  return summary && summary !== title ? summary : null;
-};
-
-const getProposedActionKey = (action: CompanionAgentProposedAction) =>
-  [
-    normalizeProposedActionType(action.type),
-    getProposedActionTitle(action),
-    getProposedActionSummary(action) ?? "",
-    action.reason?.trim() ?? "",
-  ].join("::");
-
-const getProposedActionProposalId = (action: CompanionAgentProposedAction) => {
-  const source = getProposedActionPayloadSource(action);
-  return readFirstString(source, ["proposalId", "proposal_id"]);
-};
-
-const getCampaignStartInitialGoal = (action: CompanionAgentProposedAction) => {
-  const source = getProposedActionPayloadSource(action);
-  return (
-    readFirstString(source, [
-      "initialGoal",
-      "initial_goal",
-      "goal",
-      "title",
-      "description",
-      "summary",
-      "message",
-    ]) ?? getProposedActionTitle(action)
-  );
-};
-
-const PLAN_DAY_QUEST_CONSENT_QUESTION_ID = "plan_day_quest_consent";
-
-const getFollowUpMetadataString = (
-  followUp: CompanionAgentFollowUp | null | undefined,
-  key: string,
-) => {
-  const value = followUp?.metadata?.[key];
-  return typeof value === "string" ? value : null;
-};
-
-const getFollowUpKey = (
-  followUp: CompanionAgentFollowUp | null | undefined,
-) => {
-  if (!followUp) return null;
-
-  return [
-    followUp.question.trim().toLowerCase(),
-    getFollowUpMetadataString(followUp, "questionId") ?? "",
-    getFollowUpMetadataString(followUp, "sourceStarterIntent") ?? "",
-    getFollowUpMetadataString(followUp, "consentKind") ?? "",
-    getFollowUpMetadataString(followUp, "sourceMessage") ?? "",
-  ].join("::");
-};
-
-const isPlanDayQuestConsentFollowUp = (
-  followUp: CompanionAgentFollowUp | null | undefined,
-) => {
-  if (!followUp) return false;
-
-  const questionId = getFollowUpMetadataString(followUp, "questionId");
-  const consentKind = getFollowUpMetadataString(followUp, "consentKind");
-  const sourceStarterIntent = getFollowUpMetadataString(
-    followUp,
-    "sourceStarterIntent",
-  );
-
-  if (questionId === PLAN_DAY_QUEST_CONSENT_QUESTION_ID) {
-    return consentKind === null || consentKind === "quest";
-  }
-
-  return (
-    followUp.metadata?.planningLauncherConsent === true &&
-    consentKind === "quest" &&
-    sourceStarterIntent === "plan_day"
-  );
-};
-
-const isAffirmativeFollowUpOption = (option: string) =>
-  /^(yes|yep|yeah|sure|ok|okay|please)\b/i.test(option.trim());
-
-const isConfirmationOnlyMessage = (content: string) =>
-  /^(yes|yep|yeah|sure|ok|okay|please|no|nope|nah)\b[.!?]*$/i.test(
-    content.trim(),
-  );
-
-const resolveQuestConsentSourceText = (
-  followUp: CompanionAgentFollowUp,
-  messages: CompanionAssistantMessage[],
-) => {
-  const metadataSource = getFollowUpMetadataString(
-    followUp,
-    "sourceMessage",
-  )?.trim();
-  if (metadataSource) return stripMarkdown(metadataSource).trim();
-
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
-    if (message?.role !== "user") continue;
-
-    const content = stripMarkdown(message.content).trim();
-    if (!content || isConfirmationOnlyMessage(content)) continue;
-    return content;
-  }
-
-  return "";
-};
-
-const buildCreateQuestProposalFromDraft = (
-  draft: QuestComposerPrefillDraft,
-): CompanionPlannerProposal => {
-  const taskText = draft.text?.trim() ?? "";
-  const proposalId = `plan-day-quest-handoff-${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2, 8)}`;
-
-  return {
-    id: proposalId,
-    kind: "create_quest",
-    title: taskText || "New quest",
-    summary: taskText
-      ? `Review "${taskText}" before saving.`
-      : "Review this quest before saving.",
-    payload: {
-      taskText,
-      taskDate: draft.taskDate ?? null,
-      difficulty: draft.difficulty ?? "medium",
-      scheduledTime: draft.scheduledTime ?? null,
-      estimatedDuration: draft.estimatedDuration ?? 30,
-      recurrencePattern: draft.recurrencePattern ?? null,
-      recurrenceDays: draft.recurrenceDays ?? [],
-      recurrenceMonthDays: draft.recurrenceMonthDays ?? [],
-      recurrenceCustomPeriod: draft.recurrenceCustomPeriod ?? null,
-      reminderEnabled: draft.reminderEnabled ?? false,
-      reminderMinutesBefore: draft.reminderMinutesBefore ?? 15,
-      notes: draft.moreInformation ?? null,
-      location: draft.location ?? null,
-      subtasks: draft.subtasks ?? [],
-    },
-    status: "pending",
-    readyToConfirm: true,
-  };
-};
-
-const buildQuestConsentCreateProposal = (sourceText: string) => {
-  const cleanedSourceText = sourceText.trim();
-  const prefillDraft = cleanedSourceText
-    ? buildQuestPrefillFromNaturalLanguage(cleanedSourceText, "nlp")
-    : ({ creationSource: "nlp" } satisfies QuestComposerPrefillDraft);
-
-  return buildCreateQuestProposalFromDraft(prefillDraft);
-};
-
-type ProposedActionQuestProposalResult =
-  | { status: "ready"; proposal: CompanionPlannerProposal }
-  | { status: "invalid"; message: string }
-  | { status: "unsupported" };
-
-const createProposedActionProposalId = (
-  actionType: string,
-  action: CompanionAgentProposedAction,
-) =>
-  `proposed-${actionType}-${getProposedActionKey(action)}-${Date.now()}`
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 120);
-
-const getProposedActionSubtasks = (source: Record<string, unknown>) => {
-  const directSubtasks = readFirstStringList(source, [
-    "subtasks",
-    "subtaskTitles",
-    "subtask_titles",
-  ]);
-  if (directSubtasks.length > 0) return directSubtasks;
-
-  const subtaskPlan =
-    asRecord(source.subtaskPlan) ?? asRecord(source.subtask_plan);
-  return readFirstStringList(subtaskPlan ?? {}, ["titles", "subtasks"]);
-};
-
-const buildCreateQuestProposalFromProposedAction = (
-  action: CompanionAgentProposedAction,
-  actionType: string,
-): ProposedActionQuestProposalResult => {
-  const source = getProposedActionPayloadSource(action);
-  const title = getProposedActionTitle(action);
-  const taskText = title.trim();
-
-  if (!taskText) {
-    return {
-      status: "invalid",
-      message: "Couldn't open that quest draft right now.",
-    };
-  }
-
-  return {
-    status: "ready",
-    proposal: {
-      id: createProposedActionProposalId(actionType, action),
-      kind: "create_quest",
-      title: taskText,
-      summary: action.summary?.trim() || `Review "${taskText}" before saving.`,
-      reasoning: action.reason?.trim() || null,
-      payload: {
-        taskText,
-        taskDate:
-          readFirstNullableString(source, ["taskDate", "task_date", "date"]) ??
-          null,
-        difficulty: readFirstString(source, ["difficulty"]) ?? "medium",
-        scheduledTime:
-          readFirstNullableString(source, [
-            "scheduledTime",
-            "scheduled_time",
-            "startTime",
-            "time",
-          ]) ?? null,
-        estimatedDuration:
-          readFirstNumber(source, [
-            "estimatedDuration",
-            "estimated_duration",
-            "durationMinutes",
-            "duration_minutes",
-            "duration",
-          ]) ?? 30,
-        recurrencePattern:
-          readFirstNullableString(source, [
-            "recurrencePattern",
-            "recurrence_pattern",
-          ]) ?? null,
-        recurrenceDays: source.recurrenceDays ?? source.recurrence_days ?? [],
-        recurrenceMonthDays:
-          source.recurrenceMonthDays ?? source.recurrence_month_days ?? [],
-        recurrenceCustomPeriod:
-          readFirstNullableString(source, [
-            "recurrenceCustomPeriod",
-            "recurrence_custom_period",
-          ]) ?? null,
-        reminderEnabled:
-          readFirstBoolean(source, ["reminderEnabled", "reminder_enabled"]) ??
-          false,
-        reminderMinutesBefore:
-          readFirstNumber(source, [
-            "reminderMinutesBefore",
-            "reminder_minutes_before",
-          ]) ?? 15,
-        notes:
-          readFirstNullableString(source, ["notes", "note", "description"]) ??
-          null,
-        location: readFirstNullableString(source, ["location"]) ?? null,
-        subtasks: getProposedActionSubtasks(source),
-      },
-      status: "pending",
-      readyToConfirm: true,
-    },
-  };
-};
-
-const buildUpdateQuestProposalFromProposedAction = (
-  action: CompanionAgentProposedAction,
-  actionType: string,
-): ProposedActionQuestProposalResult => {
-  const payloadSource = asRecord(action.normalizedPayload) ?? {};
-  const source = getProposedActionPayloadSource(action);
-  const taskId = readFirstString(source, ["taskId", "task_id", "id"]);
-
-  if (!taskId) {
-    return {
-      status: "invalid",
-      message: "Couldn't find the quest tied to that edit.",
-    };
-  }
-
-  const updates = stripUndefinedValues({
-    task_text:
-      readFirstNullableString(payloadSource, [
-        "task_text",
-        "title",
-        "name",
-        "text",
-      ]) ?? readFirstNullableString(source, ["task_text", "name", "text"]),
-    task_date: readFirstNullableString(source, [
-      "task_date",
-      "taskDate",
-      "date",
-    ]),
-    difficulty: readFirstNullableString(source, ["difficulty"]),
-    scheduled_time: readFirstNullableString(source, [
-      "scheduled_time",
-      "scheduledTime",
-      "startTime",
-      "time",
-    ]),
-    estimated_duration: readFirstNullableNumber(source, [
-      "estimated_duration",
-      "estimatedDuration",
-      "durationMinutes",
-      "duration_minutes",
-      "duration",
-    ]),
-    recurrence_pattern: readFirstNullableString(source, [
-      "recurrence_pattern",
-      "recurrencePattern",
-    ]),
-    recurrence_days: source.recurrence_days ?? source.recurrenceDays,
-    recurrence_month_days:
-      source.recurrence_month_days ?? source.recurrenceMonthDays,
-    recurrence_custom_period: readFirstNullableString(source, [
-      "recurrence_custom_period",
-      "recurrenceCustomPeriod",
-    ]),
-    reminder_enabled: readFirstBoolean(source, [
-      "reminder_enabled",
-      "reminderEnabled",
-    ]),
-    reminder_minutes_before: readFirstNullableNumber(source, [
-      "reminder_minutes_before",
-      "reminderMinutesBefore",
-    ]),
-    category: readFirstNullableString(source, ["category"]),
-    notes: readFirstNullableString(source, ["notes", "note", "description"]),
-    image_url: readFirstNullableString(source, ["image_url", "imageUrl"]),
-    location: readFirstNullableString(source, ["location"]),
-  });
-  const subtaskTitles = getProposedActionSubtasks(source);
-  const rawSubtaskPlan =
-    asRecord(source.subtaskPlan) ?? asRecord(source.subtask_plan);
-  const rawMode = readFirstString(rawSubtaskPlan ?? source, [
-    "mode",
-    "subtaskPlanMode",
-    "subtask_plan_mode",
-  ]);
-  const subtaskPlanMode = rawMode === "replace" ? "replace" : "append";
-
-  return {
-    status: "ready",
-    proposal: {
-      id: createProposedActionProposalId(actionType, action),
-      kind: "update_quest",
-      title: getProposedActionTitle(action),
-      summary: action.summary?.trim() || "Review this quest edit.",
-      reasoning: action.reason?.trim() || null,
-      payload: stripUndefinedValues({
-        taskId,
-        updates,
-        subtaskPlan:
-          subtaskTitles.length > 0
-            ? {
-                mode: subtaskPlanMode,
-                titles: subtaskTitles,
-              }
-            : undefined,
-      }),
-      status: "pending",
-      readyToConfirm: true,
-    },
-  };
-};
-
-const isQuestReminderTargetType = (value: string | undefined) => {
-  if (!value) return false;
-  return ["quest", "task", "daily_task", "daily-task"].includes(
-    value.trim().toLowerCase(),
-  );
-};
-
-const buildReminderQuestProposalFromProposedAction = (
-  action: CompanionAgentProposedAction,
-  actionType: string,
-): ProposedActionQuestProposalResult => {
-  const source = getProposedActionPayloadSource(action);
-  const targetType = readFirstString(source, ["targetType", "target_type"]);
-  const taskId = readFirstString(source, [
-    "taskId",
-    "task_id",
-    "targetId",
-    "target_id",
-    "id",
-  ]);
-
-  if (targetType && !isQuestReminderTargetType(targetType)) {
-    return { status: "unsupported" };
-  }
-
-  if (!taskId) {
-    return {
-      status: "invalid",
-      message: "Couldn't find the quest tied to that reminder.",
-    };
-  }
-
-  return {
-    status: "ready",
-    proposal: {
-      id: createProposedActionProposalId(actionType, action),
-      kind: "suggest_reminder",
-      title: getProposedActionTitle(action),
-      summary: action.summary?.trim() || "Review this quest reminder.",
-      reasoning: action.reason?.trim() || null,
-      payload: {
-        taskId,
-        updates: stripUndefinedValues({
-          reminder_enabled:
-            readFirstBoolean(source, ["reminder_enabled", "reminderEnabled"]) ??
-            true,
-          reminder_minutes_before:
-            readFirstNullableNumber(source, [
-              "reminder_minutes_before",
-              "reminderMinutesBefore",
-            ]) ?? 15,
-        }),
-      },
-      status: "pending",
-      readyToConfirm: true,
-    },
-  };
-};
-
-const buildQuestProposalFromProposedAction = (
-  action: CompanionAgentProposedAction,
-): ProposedActionQuestProposalResult => {
-  const actionType = normalizeProposedActionType(action.type);
-
-  if (actionType === "quest_create" || actionType === "task_create") {
-    return buildCreateQuestProposalFromProposedAction(action, actionType);
-  }
-
-  if (
-    actionType === "quest_update" ||
-    actionType === "task_update" ||
-    actionType === "quest_move" ||
-    actionType === "task_move"
-  ) {
-    return buildUpdateQuestProposalFromProposedAction(action, actionType);
-  }
-
-  if (actionType === "reminder_create") {
-    return buildReminderQuestProposalFromProposedAction(action, actionType);
-  }
-
-  return { status: "unsupported" };
-};
-
-const hasRichStructuredResponse = (
-  structuredResponse: CompanionStructuredResponse | null | undefined,
-) =>
-  Boolean(
-    structuredResponse?.planDay ||
-    structuredResponse?.weeklyPlan ||
-    structuredResponse?.priorityOverview ||
-    structuredResponse?.reflectionBridge ||
-    structuredResponse?.comingUp ||
-    structuredResponse?.campaignMomentum,
-  );
-
-const findStructuredResponseBubbleMessageId = (
-  messages: CompanionAssistantMessage[],
-  structuredResponse: CompanionStructuredResponse | null | undefined,
-) => {
-  if (!hasRichStructuredResponse(structuredResponse)) return null;
-
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
-    if (
-      message.role === "assistant" &&
-      !message.receipt &&
-      hasRichStructuredResponse(message.structuredResponse)
-    ) {
-      return message.id;
-    }
-  }
-
-  return null;
-};
 
 const getReducedMotionPreference = () =>
   typeof window !== "undefined" &&
@@ -1088,21 +267,15 @@ const JourneysCompanionThreadPicker = memo(
 const JourneysCompanionOverlayBody = memo(
   ({
     presentation,
-    selectedDate,
     launchIntent,
     onLaunchIntentConsumed,
     onOpenCampaignBuilder,
-    onQuestProposalEditHandoff,
     drawerLayout,
   }: {
     presentation: JourneysCompanionPlannerModalPresentation;
-    selectedDate?: Date | null;
     launchIntent?: CompanionPlannerLaunchIntent | null;
     onLaunchIntentConsumed?: (intentId: string) => void;
     onOpenCampaignBuilder?: (message: string) => void;
-    onQuestProposalEditHandoff?: (
-      proposal: CompanionPlannerProposal,
-    ) => Promise<{ saved: boolean; savedTitle?: string | null }>;
     drawerLayout?: JourneysCompanionDrawerLayout;
   }) => {
     const {
@@ -1117,15 +290,10 @@ const JourneysCompanionOverlayBody = memo(
     const assistant = useCompanionAssistant({
       surface: "journeys",
       conversationEnabled: true,
-      defaultSelectedDate: selectedDate ? format(selectedDate, "yyyy-MM-dd") : null,
       launchIntent: launchIntent ?? null,
       onLaunchIntentConsumed,
       onOpenCampaignBuilder,
     });
-    const [plannerBriefing, setPlannerBriefing] =
-      useState<PlannerBriefingContext | null>(() =>
-        launchIntent?.briefingContext ?? null,
-      );
     const { themeModeClassName } = usePlannerPathfinderAppearance();
     const visibleMessages = useMemo(
       () => assistant.messages.filter((entry) => !entry.isSeed),
@@ -1135,15 +303,6 @@ const JourneysCompanionOverlayBody = memo(
     const isDrawerPresentation = presentation === "drawer";
 
     const [isThreadPickerOpen, setIsThreadPickerOpen] = useState(false);
-    const [pendingFollowUpOption, setPendingFollowUpOption] = useState<
-      string | null
-    >(null);
-    const [pendingProposedActionKey, setPendingProposedActionKey] = useState<
-      string | null
-    >(null);
-    const [handledLocalFollowUpKey, setHandledLocalFollowUpKey] = useState<
-      string | null
-    >(null);
 
     const composerRef = useRef<HTMLTextAreaElement | null>(null);
     const transcriptScrollAreaRef = useRef<HTMLDivElement | null>(null);
@@ -1152,38 +311,8 @@ const JourneysCompanionOverlayBody = memo(
     const lastAutoScrolledThreadSessionIdRef = useRef<
       string | null | undefined
     >(undefined);
-    const lastSeenComingUpResponseRef = useRef<
-      CompanionStructuredResponse["comingUp"] | null | undefined
-    >(undefined);
     const activeThreadSessionId = assistant.activeThread?.sessionId ?? null;
-    const displayMessages = useMemo(() => {
-      const structuredResponseBubbleMessageId =
-        findStructuredResponseBubbleMessageId(
-          visibleMessages,
-          assistant.structuredResponse,
-        );
-      if (!structuredResponseBubbleMessageId) return visibleMessages;
-
-      return visibleMessages.filter(
-        (message) => message.id !== structuredResponseBubbleMessageId,
-      );
-    }, [assistant.structuredResponse, visibleMessages]);
-    const activeFollowUpKey = useMemo(
-      () => getFollowUpKey(assistant.activeFollowUp),
-      [assistant.activeFollowUp],
-    );
-
-    useEffect(() => {
-      if (launchIntent?.briefingContext) {
-        setPlannerBriefing(launchIntent.briefingContext);
-      }
-    }, [launchIntent?.briefingContext, launchIntent?.id]);
-
-    useEffect(() => {
-      if (!open) {
-        setPlannerBriefing(null);
-      }
-    }, [open]);
+    const displayMessages = visibleMessages;
 
     useEffect(() => {
       if (
@@ -1195,12 +324,6 @@ const JourneysCompanionOverlayBody = memo(
       setIsThreadPickerOpen(true);
       onLaunchIntentConsumed?.(launchIntent.id);
     }, [launchIntent, onLaunchIntentConsumed]);
-
-    useEffect(() => {
-      if (!activeFollowUpKey) {
-        setHandledLocalFollowUpKey(null);
-      }
-    }, [activeFollowUpKey]);
 
     const getTranscriptViewport = useCallback(
       () =>
@@ -1269,17 +392,6 @@ const JourneysCompanionOverlayBody = memo(
     useEffect(() => {
       const activeThreadChanged =
         lastAutoScrolledThreadSessionIdRef.current !== activeThreadSessionId;
-      const comingUpResponse = assistant.structuredResponse?.comingUp ?? null;
-      const comingUpResponseChanged =
-        Boolean(comingUpResponse) &&
-        lastSeenComingUpResponseRef.current !== comingUpResponse;
-      lastSeenComingUpResponseRef.current = comingUpResponse;
-
-      if (comingUpResponseChanged) {
-        lastAutoScrolledThreadSessionIdRef.current = activeThreadSessionId;
-        transcriptPinnedToBottomRef.current = false;
-        return;
-      }
 
       if (activeThreadChanged) {
         lastAutoScrolledThreadSessionIdRef.current = activeThreadSessionId;
@@ -1293,11 +405,6 @@ const JourneysCompanionOverlayBody = memo(
       }
     }, [
       activeThreadSessionId,
-      assistant.activeFollowUp,
-      assistant.dayPlan,
-      assistant.pendingAction,
-      assistant.proposedActions,
-      assistant.structuredResponse,
       drawerLayout?.bottomInset,
       drawerLayout?.shellHeight,
       displayMessages,
@@ -1376,179 +483,9 @@ const JourneysCompanionOverlayBody = memo(
       await assistant.startNewChat();
     }, [assistant]);
 
-    const localActionPending = Boolean(
-      pendingFollowUpOption || pendingProposedActionKey,
-    );
-
-    const handleFollowUpOption = useCallback(
-      async (option: string) => {
-        if (localActionPending) return;
-
-        const activeFollowUp = assistant.activeFollowUp;
-        if (
-          activeFollowUp &&
-          onQuestProposalEditHandoff &&
-          isPlanDayQuestConsentFollowUp(activeFollowUp) &&
-          isAffirmativeFollowUpOption(option)
-        ) {
-          const followUpKey = activeFollowUpKey;
-          const sourceText = resolveQuestConsentSourceText(
-            activeFollowUp,
-            displayMessages,
-          );
-          const proposal = buildQuestConsentCreateProposal(sourceText);
-
-          setPendingFollowUpOption(option);
-          if (followUpKey) {
-            setHandledLocalFollowUpKey(followUpKey);
-          }
-          try {
-            await onQuestProposalEditHandoff(proposal);
-          } finally {
-            setPendingFollowUpOption(null);
-          }
-          return;
-        }
-
-        setPendingFollowUpOption(option);
-        try {
-          await assistant.submitMessage(option, "text", {
-            turnOrigin: "follow_up_option",
-          });
-        } finally {
-          setPendingFollowUpOption(null);
-        }
-      },
-      [
-        activeFollowUpKey,
-        assistant,
-        displayMessages,
-        localActionPending,
-        onQuestProposalEditHandoff,
-      ],
-    );
-
-    const handleProposedActionDraft = useCallback(
-      (action: CompanionAgentProposedAction) => {
-        if (localActionPending) return;
-
-        const actionKey = getProposedActionKey(action);
-        if (isCampaignStartProposedAction(action) && onOpenCampaignBuilder) {
-          setPendingProposedActionKey(actionKey);
-          try {
-            onOpenCampaignBuilder(getCampaignStartInitialGoal(action));
-          } finally {
-            setPendingProposedActionKey(null);
-          }
-          return;
-        }
-
-        const localQuestProposal = onQuestProposalEditHandoff
-          ? buildQuestProposalFromProposedAction(action)
-          : ({
-              status: "unsupported",
-            } satisfies ProposedActionQuestProposalResult);
-
-        if (localQuestProposal.status === "invalid") {
-          toast.error(localQuestProposal.message);
-          return;
-        }
-
-        setPendingProposedActionKey(actionKey);
-        if (localQuestProposal.status === "ready") {
-          void onQuestProposalEditHandoff?.(
-            localQuestProposal.proposal,
-          ).finally(() => {
-            setPendingProposedActionKey(null);
-          });
-          return;
-        }
-
-        void assistant
-          .submitMessage(
-            `Draft this: ${getProposedActionTitle(action)}`,
-            "text",
-            {
-              turnOrigin: "proposed_action",
-              selectedProposedAction: action,
-              selectedProposedActionIntent: "draft",
-            },
-          )
-          .finally(() => {
-            setPendingProposedActionKey(null);
-          });
-      },
-      [
-        assistant,
-        localActionPending,
-        onOpenCampaignBuilder,
-        onQuestProposalEditHandoff,
-      ],
-    );
-
-    const handleProposedActionDiscuss = useCallback(
-      (action: CompanionAgentProposedAction) => {
-        if (localActionPending) return;
-
-        setPendingProposedActionKey(getProposedActionKey(action));
-        void assistant
-          .submitMessage(
-            `Tell me more about: ${getProposedActionTitle(action)}`,
-            "text",
-            {
-              turnOrigin: "proposed_action",
-              selectedProposedAction: action,
-              selectedProposedActionIntent: "discuss",
-            },
-          )
-          .finally(() => {
-            setPendingProposedActionKey(null);
-          });
-      },
-      [assistant, localActionPending],
-    );
-
-    const handleStructuredSuggestionConfirm = useCallback(
-      (proposalId: string) => {
-        const proposedAction = assistant.proposedActions.find((action) =>
-          getProposedActionProposalId(action) === proposalId
-        );
-        if (proposedAction) {
-          handleProposedActionDraft(proposedAction);
-          return;
-        }
-
-        void assistant.confirmSuggestedQuest(proposalId);
-      },
-      [assistant, handleProposedActionDraft],
-    );
-
-    const assistantActionDisabled =
-      assistant.isSubmitting ||
-      assistant.isResolvingAction ||
-      localActionPending;
+    const assistantActionDisabled = assistant.isSubmitting;
     const sendDisabled =
       assistantActionDisabled || !assistant.draftInput.trim();
-    const followUpOptions =
-      assistant.activeFollowUp?.options?.filter(
-        (option) => option.trim().length > 0,
-      ) ?? [];
-    const hasFollowUpPanel = Boolean(
-      assistant.activeFollowUp &&
-      !assistant.pendingAction &&
-      activeFollowUpKey !== handledLocalFollowUpKey,
-    );
-    const visibleProposedActions = hasRichStructuredResponse(
-      assistant.structuredResponse,
-    )
-      ? []
-      : assistant.proposedActions
-          .filter((action) => getProposedActionTitle(action).trim().length > 0)
-          .slice(0, 3);
-    const hasProposedActionsPanel =
-      !hasFollowUpPanel &&
-      !assistant.pendingAction &&
-      visibleProposedActions.length > 0;
     const micButtonLabel = assistant.isRecording
       ? "Stop voice reply"
       : "Start voice reply";
@@ -1596,7 +533,7 @@ const JourneysCompanionOverlayBody = memo(
 
     const statusText = assistant.isRecording
       ? "Listening..."
-      : assistant.isSubmitting || assistant.isResolvingAction
+      : assistant.isSubmitting
         ? "Working..."
         : assistant.todayLabel;
     const plannerShellStyle =
@@ -1629,7 +566,7 @@ const JourneysCompanionOverlayBody = memo(
         >
           <div
             className={plannerPathfinderTheme.headerBar}
-            data-testid="journeys-companion-planner-chat-header"
+            data-testid="journeys-companion-chat-header"
           >
             <div className="relative shrink-0">
               {avatar}
@@ -1722,13 +659,6 @@ const JourneysCompanionOverlayBody = memo(
                 }}
                 data-testid="journeys-companion-planner-transcript"
               >
-                {plannerBriefing ? (
-                  <PlannerBriefingContextPanel
-                    briefing={plannerBriefing}
-                    companionLabel={companionLabel}
-                  />
-                ) : null}
-
                 {displayMessages.map((entry) => (
                   <div
                     key={entry.id}
@@ -1753,296 +683,6 @@ const JourneysCompanionOverlayBody = memo(
                     </div>
                   </div>
                 ))}
-
-                {assistant.dayPlan ? (
-                  <DayPlanCard
-                    dayPlan={assistant.dayPlan}
-                    committed={Boolean(assistant.committedDayPlanId)}
-                    committing={assistant.committingDayPlan}
-                    onCommit={() => {
-                      void assistant.commitDayPlan();
-                    }}
-                  />
-                ) : null}
-
-                {!assistant.dayPlan ? (
-                  <CompanionStructuredResponseCards
-                    structuredResponse={assistant.structuredResponse}
-                    variant="journeys"
-                    onConfirmSuggestion={handleStructuredSuggestionConfirm}
-                    savedProposalIds={assistant.savedSuggestionProposalIds}
-                    pendingProposalId={assistant.pendingSuggestionProposalId}
-                    actionDisabled={
-                      assistantActionDisabled ||
-                      Boolean(assistant.pendingAction)
-                    }
-                  />
-                ) : null}
-
-                {hasFollowUpPanel && assistant.activeFollowUp ? (
-                  <div
-                    className="flex w-full justify-start"
-                    data-testid="journeys-companion-follow-up"
-                    data-tutorial-avoid="true"
-                  >
-                    <div
-                      className={cn(
-                        plannerPathfinderTheme.raisedPanel,
-                        "max-w-[88%] p-4",
-                      )}
-                    >
-                      <Badge
-                        variant="outline"
-                        className={plannerPathfinderTheme.chip}
-                      >
-                        Follow-up
-                      </Badge>
-                      <p className="mt-3 text-sm font-semibold text-foreground">
-                        {assistant.activeFollowUp.question}
-                      </p>
-                      {assistant.activeFollowUp.reason ? (
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {assistant.activeFollowUp.reason}
-                        </p>
-                      ) : null}
-                      {followUpOptions.length > 0 ? (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {followUpOptions.map((option) => (
-                            <Button
-                              key={option}
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className={cn(
-                                plannerPathfinderTheme.outlineButton,
-                                "h-auto min-h-9 max-w-full whitespace-normal text-left leading-tight",
-                              )}
-                              onClick={() => handleFollowUpOption(option)}
-                              disabled={assistantActionDisabled}
-                              data-tour="companion-plan-day-follow-up-option"
-                              data-tour-shape="rounded-rect"
-                            >
-                              {pendingFollowUpOption === option ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              ) : null}
-                              {option}
-                            </Button>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                ) : null}
-
-                {hasProposedActionsPanel ? (
-                  <div
-                    className="flex w-full justify-start"
-                    data-testid="journeys-companion-proposed-actions"
-                  >
-                    <div
-                      className={cn(
-                        plannerPathfinderTheme.raisedPanel,
-                        "max-w-[88%] p-4",
-                      )}
-                    >
-                      <Badge
-                        variant="outline"
-                        className={plannerPathfinderTheme.chip}
-                      >
-                        Suggestions
-                      </Badge>
-                      <div className="mt-3 space-y-3">
-                        {visibleProposedActions.map((action, index) => {
-                          const title = getProposedActionTitle(action);
-                          const summary = getProposedActionSummary(action);
-                          const isDraftable = isDraftableProposedAction(action);
-                          const isCampaignStart =
-                            isCampaignStartProposedAction(action);
-                          const actionKey = getProposedActionKey(action);
-                          const isActionPending =
-                            pendingProposedActionKey === actionKey;
-                          const readyActionLabel = isCampaignStart
-                            ? "Start Campaign"
-                            : "Draft";
-                          const pendingActionLabel = isCampaignStart
-                            ? "Opening Builder"
-                            : "Drafting";
-                          return (
-                            <div
-                              key={`${actionKey}-${index}`}
-                              className="border-t border-celestial-blue/20 pt-3 first:border-t-0 first:pt-0"
-                            >
-                              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                <div className="min-w-0">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <p className="text-sm font-semibold text-foreground">
-                                      {title}
-                                    </p>
-                                    <Badge
-                                      variant="outline"
-                                      className={plannerPathfinderTheme.chip}
-                                    >
-                                      {formatProposedActionType(action.type)}
-                                    </Badge>
-                                  </div>
-                                  {summary ? (
-                                    <p className="mt-1 text-sm text-muted-foreground">
-                                      {summary}
-                                    </p>
-                                  ) : null}
-                                  {action.reason ? (
-                                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                                      {action.reason}
-                                    </p>
-                                  ) : null}
-                                </div>
-                                {isDraftable ? (
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    className={cn(
-                                      plannerPathfinderTheme.primaryButton,
-                                      "h-auto min-h-9 shrink-0 whitespace-normal leading-tight",
-                                    )}
-                                    onClick={() =>
-                                      handleProposedActionDraft(action)
-                                    }
-                                    disabled={assistantActionDisabled}
-                                  >
-                                    {isActionPending ? (
-                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <Plus className="mr-2 h-4 w-4" />
-                                    )}
-                                    {isActionPending
-                                      ? pendingActionLabel
-                                      : readyActionLabel}
-                                  </Button>
-                                ) : (
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    className={cn(
-                                      plannerPathfinderTheme.outlineButton,
-                                      "h-auto min-h-9 shrink-0 whitespace-normal leading-tight",
-                                    )}
-                                    onClick={() =>
-                                      handleProposedActionDiscuss(action)
-                                    }
-                                    disabled={assistantActionDisabled}
-                                  >
-                                    {isActionPending ? (
-                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <MessageSquare className="mr-2 h-4 w-4" />
-                                    )}
-                                    {isActionPending ? "Discussing" : "Discuss"}
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-
-                {assistant.pendingAction ? (
-                  <div
-                    className="flex w-full justify-start"
-                    data-testid="journeys-companion-pending-action"
-                    data-tutorial-avoid="true"
-                  >
-                    <div
-                      className={cn(
-                        plannerPathfinderTheme.raisedPanel,
-                        "max-w-[88%] p-4",
-                      )}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant="outline"
-                          className={plannerPathfinderTheme.chip}
-                        >
-                          Pending confirmation
-                        </Badge>
-                        {assistant.readyPendingActionCount > 1 ? (
-                          <Badge
-                            variant="outline"
-                            className={plannerPathfinderTheme.chip}
-                          >
-                            {assistant.readyPendingActionCount} ready
-                          </Badge>
-                        ) : null}
-                        <Badge
-                          variant="outline"
-                          className={plannerPathfinderTheme.chip}
-                        >
-                          {assistant.pendingAction.actionType.replace(
-                            /_/g,
-                            " ",
-                          )}
-                        </Badge>
-                      </div>
-                      <p className="mt-3 text-sm font-semibold text-foreground">
-                        {assistant.pendingAction.summary}
-                      </p>
-                      {assistant.pendingAction.confirmationMessage ? (
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {assistant.pendingAction.confirmationMessage}
-                        </p>
-                      ) : null}
-                      {assistant.readyPendingActionCount > 1 ? (
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          {assistant.readyPendingActionCount} planner actions
-                          are ready. Confirm all to save the batch, or confirm
-                          them one at a time.
-                        </p>
-                      ) : null}
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {assistant.readyPendingActionCount > 1 ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className={plannerPathfinderTheme.outlineButton}
-                            onClick={assistant.confirmAllPendingActions}
-                            disabled={assistantActionDisabled}
-                            data-tour="companion-plan-day-pending-confirm-all"
-                            data-tour-shape="rounded-rect"
-                          >
-                            Confirm All ({assistant.readyPendingActionCount})
-                          </Button>
-                        ) : null}
-                        <Button
-                          type="button"
-                          size="sm"
-                          className={plannerPathfinderTheme.primaryButton}
-                          onClick={assistant.confirmPendingAction}
-                          disabled={assistantActionDisabled}
-                          data-tour="companion-plan-day-pending-confirm"
-                          data-tour-shape="rounded-rect"
-                        >
-                          <Check className="mr-2 h-4 w-4" />
-                          Confirm
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className={plannerPathfinderTheme.outlineButton}
-                          onClick={assistant.cancelPendingAction}
-                          disabled={assistantActionDisabled}
-                        >
-                          <X className="mr-2 h-4 w-4" />
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
               </div>
             </ScrollArea>
 
@@ -2167,7 +807,7 @@ const JourneysCompanionOverlayBody = memo(
                     data-tour-shape="rounded-rect"
                     data-testid="journeys-companion-planner-send-button"
                   >
-                    {assistant.isSubmitting || assistant.isResolvingAction ? (
+                    {assistant.isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Thinking
@@ -2215,11 +855,9 @@ export const JourneysCompanionPlannerModal = memo(
     open,
     onOpenChange,
     presentation,
-    selectedDate,
     launchIntent,
     onLaunchIntentConsumed,
     onOpenCampaignBuilder,
-    onQuestProposalEditHandoff,
   }: JourneysCompanionPlannerModalProps) {
     const [drawerLayout, setDrawerLayout] =
       useState<JourneysCompanionDrawerLayout>(() => getDrawerLayout());
@@ -2246,11 +884,9 @@ export const JourneysCompanionPlannerModal = memo(
     const body = (
       <JourneysCompanionOverlayBody
         presentation={presentation}
-        selectedDate={selectedDate}
         launchIntent={launchIntent}
         onLaunchIntentConsumed={onLaunchIntentConsumed}
         onOpenCampaignBuilder={onOpenCampaignBuilder}
-        onQuestProposalEditHandoff={onQuestProposalEditHandoff}
         drawerLayout={presentation === "drawer" ? drawerLayout : undefined}
       />
     );

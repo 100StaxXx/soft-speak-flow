@@ -230,7 +230,7 @@ Deno.test("remote optimizer failure falls back to inbox", async () => {
   });
 
   assertEquals(result.mode, "proposal");
-  assertEquals(result.reply, "I drafted 1 quest for your inbox. Review and confirm what fits.");
+  assertEquals(result.reply, "I found 1 quest for your inbox. Review and confirm what fits.");
   assertEquals(result.proposals.length, 1);
   const payload = result.proposals[0]?.payload as Record<string, unknown>;
   assertEquals(payload.taskDate, null);
@@ -254,7 +254,7 @@ Deno.test("remote optimizer thrown fetch errors fall back to inbox", async () =>
   });
 
   assertEquals(result.mode, "proposal");
-  assertEquals(result.reply, "I drafted 1 quest for your inbox. Review and confirm what fits.");
+  assertEquals(result.reply, "I found 1 quest for your inbox. Review and confirm what fits.");
   assertEquals(result.proposals.length, 1);
   const payload = result.proposals[0]?.payload as Record<string, unknown>;
   assertEquals(payload.questSource, "inbox");

@@ -4,7 +4,6 @@ import {
   getJourneysCompanionLauncherGreeting,
   getJourneysCompanionLauncherTemplates,
 } from "@/shared/journeysCompanionLauncherTemplates";
-import { COMPANION_PLANNER_QUEST_CAPTURE_OPENING } from "@/shared/companionPlannerSurfaceActions";
 
 describe("journeys companion launcher greetings", () => {
   it("keeps the free-talk greeting pool mostly English with only a little multilingual flavor", () => {
@@ -61,46 +60,6 @@ describe("journeys companion launcher greetings", () => {
     });
     expect(templates[0]?.label).toBe(templates[0]?.message);
 
-    expect(templates.find((template) => template.id === "plan-day")).toMatchObject({
-      id: "plan-day",
-      label: "Plan my day",
-      message: "Plan my day",
-      target: "planner",
-      starterIntent: "plan_day",
-    });
-
-    expect(templates.find((template) => template.id === "upcoming")).toMatchObject({
-      id: "upcoming",
-      label: "What do I have coming up?",
-      message: "What do I have coming up?",
-      target: "planner",
-      starterIntent: "upcoming_start",
-    });
-
-    const questTemplate = templates.find((template) => template.id === "quest");
-    expect(questTemplate).toMatchObject({
-      id: "quest",
-      label: "Quest?",
-      message: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
-      target: "planner",
-      starterIntent: "quest_capture",
-    });
-    expect(questTemplate?.message).not.toBe(questTemplate?.label);
-
-    expect(templates.find((template) => template.id === "goal")).toMatchObject({
-      id: "goal",
-      label: "Let's lock in a new goal",
-      message: "Let's lock in a new goal",
-      target: "campaign_builder",
-      starterIntent: "goal_breakdown_start",
-    });
-
-    expect(templates.map((template) => template.id)).toEqual([
-      "free-talk",
-      "plan-day",
-      "upcoming",
-      "quest",
-      "goal",
-    ]);
+    expect(templates.map((template) => template.id)).toEqual(["free-talk"]);
   });
 });

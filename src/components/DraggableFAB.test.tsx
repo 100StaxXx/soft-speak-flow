@@ -396,7 +396,7 @@ describe("DraggableFAB", () => {
     expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
       message: "",
       starterIntent: "thread_history",
-      target: "planner",
+      target: "conversation",
     }));
 
     await waitFor(() => {
@@ -424,115 +424,16 @@ describe("DraggableFAB", () => {
     });
   });
 
-  it("routes the goal option straight to the campaign builder target and emits the tutorial event", () => {
-    const newGoalStarted = vi.fn();
-    window.addEventListener("companion-new-goal-started", newGoalStarted);
-    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
-
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-goal"));
-
-    expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
-      target: "campaign_builder",
-      starterIntent: "goal_breakdown_start",
-      message: "Let's lock in a new goal",
-    }));
-    expect(newGoalStarted).toHaveBeenCalledTimes(1);
-    window.removeEventListener("companion-new-goal-started", newGoalStarted);
-  });
-
-  it("routes planner actions through the planner target", () => {
-    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
-
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
-    const upcomingButton = screen.getByTestId("journeys-companion-launcher-option-upcoming");
-    expect(upcomingButton.className).toContain("border-[#315114]");
-    fireEvent.click(upcomingButton);
-
-    expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
-      target: "planner",
-      starterIntent: "upcoming_start",
-      message: "What do I have coming up?",
-    }));
-  });
-
-  it("routes the plan-day option through the contextual launch intent when provided", () => {
-    const newGoalStarted = vi.fn();
-    const contextualIntent = {
-      id: "contextual-plan-day",
-      target: "planner" as const,
-      starterIntent: "plan_day" as const,
-      message: "Plan my day",
-      selectedDate: "2026-05-12",
-      briefingContext: {
-        content: "Planning snapshot for Tuesday, May 12: 3 open quests",
-        dataSnapshot: {
-          selectedDate: "2026-05-12",
-          activeCampaignTitles: ["Ship the planner"],
-          ritualQuestCount: 1,
-        },
-      },
-    };
-    const createPlanDayLaunchIntent = vi.fn(() => contextualIntent);
-    window.addEventListener("companion-new-goal-started", newGoalStarted);
-    render(
-      <DraggableFAB
-        onOpenCompanionPlanner={mocks.onOpenCompanionPlanner}
-        createPlanDayLaunchIntent={createPlanDayLaunchIntent}
-        planDayLabel="Plan Today"
-      />,
-    );
-
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
-    const planDayButton = screen.getByTestId("journeys-companion-launcher-option-plan-day");
-
-    expect(planDayButton).toHaveTextContent("Plan Today");
-    fireEvent.click(planDayButton);
-
-    expect(createPlanDayLaunchIntent).toHaveBeenCalledTimes(1);
-    expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(contextualIntent);
-    expect(newGoalStarted).not.toHaveBeenCalled();
-    window.removeEventListener("companion-new-goal-started", newGoalStarted);
-  });
-
-  it("omits planner options that are not on the journeys launcher", () => {
+  it("omits planner options from the chat launcher", () => {
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
 
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
 
+    expect(screen.queryByTestId("journeys-companion-launcher-option-plan-day")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("journeys-companion-launcher-option-upcoming")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("journeys-companion-launcher-option-quest")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("journeys-companion-launcher-option-goal")).not.toBeInTheDocument();
     expect(screen.queryByTestId("journeys-companion-launcher-option-low-energy")).not.toBeInTheDocument();
-  });
-
-  it("opens create quest from the quest option when a create quest callback is available", async () => {
-    render(
-      <DraggableFAB
-        onOpenCompanionPlanner={mocks.onOpenCompanionPlanner}
-        onCreateQuest={mocks.onCreateQuest}
-      />,
-    );
-
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-quest"));
-
-    expect(mocks.onCreateQuest).toHaveBeenCalledTimes(1);
-    expect(mocks.onOpenCompanionPlanner).not.toHaveBeenCalled();
-    await waitFor(() => {
-      expect(screen.getByTestId("journeys-companion-launcher-popup")).toHaveStyle("opacity: 0");
-    });
-  });
-
-  it("falls back to the planner quest-capture starter when no create quest callback is available", () => {
-    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
-
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-quest"));
-
-    expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
-      target: "planner",
-      starterIntent: "quest_capture",
-      message: "Nova's ready. What quest are we capturing?",
-      briefingContext: null,
-    }));
   });
 
   it("reports top-left popup placement when the launcher sits in the upper-left half", () => {

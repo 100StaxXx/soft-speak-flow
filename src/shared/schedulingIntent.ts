@@ -17,6 +17,7 @@ export interface SchedulingIntentAnalysis {
   isDirectDayPlanning: boolean;
   isChatFirstCoaching: boolean;
   isChatEscape: boolean;
+  isExternalInfoQuestion: boolean;
   hasExplicitPlannerAction: boolean;
   hasConcreteSchedulingPayload: boolean;
   hasMeaningfulTitle: boolean;
@@ -41,6 +42,12 @@ const CHAT_FIRST_COACHING_REGEX =
 
 const CHAT_ESCAPE_REGEX =
   /\b(talk to me|help me think|i feel|i'm feeling|how do i|can we just chat|just chat|pep talk|talk it through)\b/i;
+
+const QUESTION_LEAD_REGEX =
+  /^\s*(?:what(?:'s| is| will| would| does| do)?|how(?:'s| is| will| would| does| do)?|when|where|who|why)\b/i;
+
+const EXTERNAL_INFO_TOPIC_REGEX =
+  /\b(weather|forecast|temperature|temp|rain|snow|storm|sunny|cloudy|wind|windy|humidity|humid|air quality|uv index)\b/i;
 
 const PLANNER_ACTION_REGEX =
   /\b(schedule|reschedule|move|shift|push|pull|adjust|edit|update|rename|repeat|remind(?: me)?|create|add|set up|put|place|slot|book|fit|squeeze|lock in|turn .+ into|make .+ repeat)\b/i;
@@ -134,11 +141,15 @@ export const analyzeSchedulingIntent = (
     hasMeaningfulTitle ||
     /turn .+ into/i.test(message)
   );
+  const isExternalInfoQuestion = !hasExplicitPlannerAction &&
+    QUESTION_LEAD_REGEX.test(message) &&
+    EXTERNAL_INFO_TOPIC_REGEX.test(message);
 
   const isReadOnly = isScheduleRead ||
     isDirectDayPlanning ||
     isChatFirstCoaching ||
-    isChatEscape;
+    isChatEscape ||
+    isExternalInfoQuestion;
 
   if (isReadOnly) {
     return {
@@ -147,6 +158,7 @@ export const analyzeSchedulingIntent = (
       isDirectDayPlanning,
       isChatFirstCoaching,
       isChatEscape,
+      isExternalInfoQuestion,
       hasExplicitPlannerAction,
       hasConcreteSchedulingPayload,
       hasMeaningfulTitle,
@@ -167,6 +179,7 @@ export const analyzeSchedulingIntent = (
       isDirectDayPlanning,
       isChatFirstCoaching,
       isChatEscape,
+      isExternalInfoQuestion,
       hasExplicitPlannerAction,
       hasConcreteSchedulingPayload,
       hasMeaningfulTitle,
@@ -181,6 +194,7 @@ export const analyzeSchedulingIntent = (
     isDirectDayPlanning,
     isChatFirstCoaching,
     isChatEscape,
+    isExternalInfoQuestion,
     hasExplicitPlannerAction,
     hasConcreteSchedulingPayload,
     hasMeaningfulTitle,
@@ -189,29 +203,8 @@ export const analyzeSchedulingIntent = (
   };
 };
 
-export const shouldRouteMessageToPlanner = ({
-  surface,
-  analysis,
-  hasOpenPlannerThread = false,
-}: {
+export const shouldRouteMessageToPlanner = (_params: {
   surface: SchedulingIntentSurface;
   analysis: SchedulingIntentAnalysis;
   hasOpenPlannerThread?: boolean;
-}): boolean => {
-  const isJourneysChatFirst = analysis.disposition === 'read_only';
-
-  if (hasOpenPlannerThread) {
-    if (surface !== 'journeys') return true;
-    if (!isJourneysChatFirst) return true;
-  }
-
-  if (surface === 'journeys') {
-    return analysis.disposition === 'schedule_action'
-      || analysis.isAggressiveBundle
-      || analysis.isOpportunisticSingle;
-  }
-
-  if (analysis.disposition === 'schedule_action') return true;
-  if (analysis.isScheduleRead || analysis.isDirectDayPlanning) return true;
-  return false;
-};
+}): boolean => false;

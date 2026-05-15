@@ -191,7 +191,7 @@ Deno.test("skips orchestration for confirm-ready proposal responses", async () =
     baseResult: {
       ...baseResult("proposal"),
       reply:
-        "I drafted this as a quest update. Review it and confirm when it looks right.",
+        "I can talk this through with you, but I won't create or schedule a quest edit from this chat.",
       proposals: [{
         id: "proposal-1",
         kind: "update_quest",
@@ -212,7 +212,7 @@ Deno.test("skips orchestration for confirm-ready proposal responses", async () =
   assertEquals(fetchCalled, false);
   assertEquals(
     response.reply,
-    "I drafted this as a quest update. Review it and confirm when it looks right.",
+    "I can talk this through with you, but I won't create or schedule a quest edit from this chat.",
   );
 });
 
@@ -295,7 +295,8 @@ Deno.test("skips orchestration when a ready quest proposal is present in a mixed
     input: baseInput(),
     baseResult: {
       ...baseResult("proposal"),
-      reply: "I drafted this quest for you. Review it and confirm if it fits.",
+      reply:
+        "I can talk this through with you, but I won't create or schedule a quest from this chat.",
       followUpQuestions: [{
         id: "time_reason",
         prompt: "What makes this timing the right fit today?",
@@ -338,7 +339,7 @@ Deno.test("skips orchestration when a ready quest proposal is present in a mixed
   assertEquals(response.sessionState.openQuestionIds, []);
   assertEquals(
     response.reply,
-    "I drafted this quest for you. Review it and confirm if it fits.",
+    "I can talk this through with you, but I won't create or schedule a quest from this chat.",
   );
 });
 
@@ -369,7 +370,7 @@ Deno.test("skips orchestration for advance-campaign starter responses", async ()
     baseResult: {
       ...baseResult("proposal"),
       reply:
-        "Launch prep looks stalled. I drafted the cleanest next step so you can confirm it without overthinking it.",
+        "Launch prep looks stalled. I can talk through the cleanest next step without overthinking it.",
       proposals: [{
         id: "proposal-1",
         kind: "create_quest",
@@ -392,7 +393,7 @@ Deno.test("skips orchestration for advance-campaign starter responses", async ()
         comingUp: null,
         campaignMomentum: {
           message:
-            "Launch prep looks stalled. I drafted the cleanest next step so you can confirm it without overthinking it.",
+            "Launch prep looks stalled. I can talk through the cleanest next step without overthinking it.",
           campaignId: "epic-1",
           campaignTitle: "Launch prep",
           status: "stalled",
@@ -415,7 +416,7 @@ Deno.test("skips orchestration for advance-campaign starter responses", async ()
   assertEquals(fetchCalled, false);
   assertEquals(
     response.reply,
-    "Launch prep looks stalled. I drafted the cleanest next step so you can confirm it without overthinking it.",
+    "Launch prep looks stalled. I can talk through the cleanest next step without overthinking it.",
   );
 });
 
@@ -449,7 +450,7 @@ Deno.test("sanitizes leaked follow-up state when a ready quest proposal already 
   assertEquals(response.sessionState.openQuestionIds, []);
   assertEquals(
     response.reply,
-    "I drafted this quest for you. Review it and confirm if it fits.",
+    "I can talk this through with you, but I won't create or schedule a quest from this chat.",
   );
 });
 
@@ -538,7 +539,7 @@ Deno.test("preserves calendar conflict notes when sanitizing ready quest proposa
   assertEquals(
     response.reply,
     [
-      "I drafted this quest for you. Review it and confirm if it fits.",
+      "I can talk this through with you, but I won't create or schedule a quest from this chat.",
       'Heads up: this overlaps with your saved calendar event "Dinner Reservation" on Thursday from 6:15 pm-7:00 pm.',
     ].join("\n\n"),
   );
@@ -789,7 +790,7 @@ Deno.test("does not rewrite deterministic plan-day starter proposals", async () 
     baseResult: {
       ...baseResult("proposal"),
       reply:
-        "Today still has room around your fixed commitments. I drafted 3 quests for today to build the day out without crowding your fixed blocks. Review them and confirm what fits.",
+        "Today still has room around your fixed commitments. I found 3 quests for today to build the day out without crowding your fixed blocks. Review them and confirm what fits.",
       proposals: [{
         id: "proposal-1",
         kind: "create_quest",
@@ -814,7 +815,7 @@ Deno.test("does not rewrite deterministic plan-day starter proposals", async () 
   });
 
   assertEquals(response.mode, "proposal");
-  assertStringIncludes(response.reply, "I drafted 3 quests for today");
+  assertStringIncludes(response.reply, "I found 3 quests for today");
   assertEquals(captured.called, false);
 });
 

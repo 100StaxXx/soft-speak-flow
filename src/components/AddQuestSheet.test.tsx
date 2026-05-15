@@ -1763,7 +1763,7 @@ describe("AddQuestSheet", () => {
       />,
     );
 
-    expect(await screen.findByText("Restore saved quest draft?")).toBeInTheDocument();
+    expect(await screen.findByText("Restore unfinished quest?")).toBeInTheDocument();
     const prompt = screen.getByTestId("add-quest-draft-restore-dialog");
     const companionFrostedThemeStyle = getCompanionFrostedThemeStyle(mocks.companionFavoriteColor);
     expect(prompt).toHaveClass("companion-frosted-quest-light");
@@ -1814,7 +1814,7 @@ describe("AddQuestSheet", () => {
     await waitFor(() => {
       expect(screen.getByPlaceholderText("Quest Title")).toHaveValue("Recovered quest");
     });
-    expect(screen.queryByText("Restore saved quest draft?")).not.toBeInTheDocument();
+    expect(screen.queryByText("Restore unfinished quest?")).not.toBeInTheDocument();
   });
 
   it("discards a saved quest draft when requested", async () => {
@@ -1852,7 +1852,7 @@ describe("AddQuestSheet", () => {
       />,
     );
 
-    expect(await screen.findByText("Restore saved quest draft?")).toBeInTheDocument();
+    expect(await screen.findByText("Restore unfinished quest?")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Discard draft" }));
 
     await waitFor(() => {
@@ -1928,7 +1928,7 @@ describe("AddQuestSheet", () => {
       />,
     );
 
-    expect(screen.queryByText("Restore saved quest draft?")).not.toBeInTheDocument();
+    expect(screen.queryByText("Restore unfinished quest?")).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText("Quest Title")).toHaveValue("Voice wins");
   });
 });

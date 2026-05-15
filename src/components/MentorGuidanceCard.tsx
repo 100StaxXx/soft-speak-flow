@@ -354,7 +354,7 @@ export const resolveMentorGuidancePlacement = ({
     Math.max(0, viewportWidth - PANEL_SIDE_MARGIN_PX * 2),
   );
   const compactHeight = Math.min(panelRect.height, COMPACT_PANEL_HEIGHT_PX);
-  const compactCandidates: PanelPlacement[] = [
+  const compactCandidateInputs: PanelPlacement[] = [
     {
       anchor: "floating",
       topPx: resolvedMinTopPx,
@@ -387,7 +387,8 @@ export const resolveMentorGuidancePlacement = ({
       heightPx: compactHeight,
       compact: true,
     },
-  ].map(normalizePlacement);
+  ];
+  const compactCandidates = compactCandidateInputs.map(normalizePlacement);
 
   const clearCompact = compactCandidates.find((candidate) =>
     rectIsClear(getRectForPlacement(panelRect, candidate, viewportHeight, viewportTopPx))

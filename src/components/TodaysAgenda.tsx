@@ -1,14 +1,31 @@
-import { useMemo, useRef, useState, useEffect, useLayoutEffect, useCallback, memo, type CSSProperties, type MouseEvent as ReactMouseEvent, type TouchEvent as ReactTouchEvent } from "react";
+import {
+  useMemo,
+  useRef,
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  memo,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+  type TouchEvent as ReactTouchEvent,
+} from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTimelineDrag } from "@/hooks/useTimelineDrag";
 import { addDays, format, isSameDay } from "date-fns";
-import { AnimatePresence, motion, useMotionValue, useReducedMotion, type MotionValue } from "framer-motion";
-import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import {
+  AnimatePresence,
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  type MotionValue,
+} from "framer-motion";
+import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { toast } from "@/components/ui/sonner";
-import { 
-  Flame, 
-  Trophy, 
+import {
+  Flame,
+  Trophy,
   Check,
   Circle,
   Clock,
@@ -78,7 +95,10 @@ import { TimelineTaskRow } from "@/components/TimelineTaskRow";
 import { ProgressRing } from "@/features/tasks/components/ProgressRing";
 import { useMotionProfile } from "@/hooks/useMotionProfile";
 import type { JourneysLayoutMode } from "@/hooks/useJourneysLayoutMode";
-import { buildTaskConflictMap, getTaskConflictSetForTask } from "@/utils/taskTimeConflicts";
+import {
+  buildTaskConflictMap,
+  getTaskConflictSetForTask,
+} from "@/utils/taskTimeConflicts";
 import { buildTaskTimelineFlow } from "@/utils/taskTimelineFlow";
 import {
   SHARED_TIMELINE_DRAG_INTERACTION_PROFILE,
@@ -91,18 +111,19 @@ import {
   CAMPAIGN_RITUAL_CARD_CLASSES,
   isCampaignRitualTask,
 } from "@/utils/campaignRitualStyle";
-import {
-  DesktopQuestDetailsPopover,
-} from "@/components/DesktopQuestDetailsPopover";
+import { DesktopQuestDetailsPopover } from "@/components/DesktopQuestDetailsPopover";
 import { QUEST_LAUNCHER_SCROLL_CLEARANCE_PX } from "@/components/quest-launchers/metrics";
-import { createCompanionPlannerQuestCaptureLaunchIntent } from "@/shared/companionPlannerSurfaceActions";
 import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
-import { createPlanDayCompanionLaunchIntent } from "@/utils/companionPlannerLaunchContext";
+import { createJourneysCompanionChatLaunchIntent } from "@/shared/companionChatLaunchIntent";
 import type { Habit } from "@/features/habits/types";
 import { durationMinutesToPixels } from "@/utils/taskDurationLayout";
 
 // Helper to calculate days remaining
-const getDaysLeft = (epic: { start_date: string; target_days: number; end_date?: string | null }) =>
+const getDaysLeft = (epic: {
+  start_date: string;
+  target_days: number;
+  end_date?: string | null;
+}) =>
   getEpicDaysRemaining({
     start_date: epic.start_date,
     target_days: epic.target_days,
@@ -119,12 +140,13 @@ const safeFormat = (date: Date, fmt: string, fallback = "") => {
 };
 
 const TOUCH_CLICK_SUPPRESSION_RESET_MS = 750;
-const JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME =
-  `${COMPANION_FROSTED_THEME_SCOPE_CLASS} journeys-quest-card-shell overflow-hidden border transition-colors`;
+const JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME = `${COMPANION_FROSTED_THEME_SCOPE_CLASS} journeys-quest-card-shell overflow-hidden border transition-colors`;
 const JOURNEYS_QUEST_CARD_SHELL_STANDARD_TONE_CLASS_NAME =
   "border-white/10 bg-white/[0.04] shadow-[0_12px_22px_rgba(0,0,0,0.14)]";
-const JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME = "journeys-quest-card-shell--active";
-const JOURNEYS_QUEST_CARD_SHELL_READABLE_CLASS_NAME = "journeys-quest-card-shell--readable";
+const JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME =
+  "journeys-quest-card-shell--active";
+const JOURNEYS_QUEST_CARD_SHELL_READABLE_CLASS_NAME =
+  "journeys-quest-card-shell--readable";
 
 interface Task {
   id: string;
@@ -176,7 +198,11 @@ const normalizeDetailText = (text: string | null | undefined): string =>
 
 const normalizeDisplayAttachments = (task: Task): DisplayAttachment[] => {
   const normalized = (task.attachments ?? [])
-    .filter((attachment) => typeof attachment.fileUrl === "string" && attachment.fileUrl.trim().length > 0)
+    .filter(
+      (attachment) =>
+        typeof attachment.fileUrl === "string" &&
+        attachment.fileUrl.trim().length > 0,
+    )
     .map((attachment) => ({
       fileUrl: attachment.fileUrl,
       fileName: attachment.fileName?.trim() || FALLBACK_ATTACHMENT_NAME,
@@ -198,11 +224,13 @@ const normalizeDisplayAttachments = (task: Task): DisplayAttachment[] => {
   return [];
 };
 
-const patchSubtaskCompletionInTaskList = <T extends { id: string; subtasks?: TaskSubtask[] }>(
+const patchSubtaskCompletionInTaskList = <
+  T extends { id: string; subtasks?: TaskSubtask[] },
+>(
   tasks: T[] | undefined,
   taskId: string,
   subtaskId: string,
-  completed: boolean
+  completed: boolean,
 ): T[] | undefined => {
   if (!tasks) return tasks;
 
@@ -211,7 +239,7 @@ const patchSubtaskCompletionInTaskList = <T extends { id: string; subtasks?: Tas
     return {
       ...task,
       subtasks: task.subtasks.map((subtask) =>
-        subtask.id === subtaskId ? { ...subtask, completed } : subtask
+        subtask.id === subtaskId ? { ...subtask, completed } : subtask,
       ),
     };
   });
@@ -229,7 +257,9 @@ interface TodaysAgendaProps {
   desktopInteractionResetKey?: string | number;
   onToggle: (taskId: string, completed: boolean, xpReward: number) => void;
   onAddQuest: () => void;
-  onOpenCompanionPlanner?: (intent?: CompanionPlannerLaunchIntent | null) => void;
+  onOpenCompanionPlanner?: (
+    intent?: CompanionPlannerLaunchIntent | null,
+  ) => void;
   onVoiceAddQuest?: () => void;
   isVoiceAddRecording?: boolean;
   isVoiceAddSupported?: boolean;
@@ -288,9 +318,9 @@ interface TimelineTaskRenderContext {
 
 // Helper to format time in 12-hour format
 const formatTime = (time: string) => {
-  const [hours, minutes] = time.split(':');
+  const [hours, minutes] = time.split(":");
   const hour = parseInt(hours);
-  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const ampm = hour >= 12 ? "PM" : "AM";
   const displayHour = hour % 12 || 12;
   return `${displayHour}:${minutes} ${ampm}`;
 };
@@ -303,8 +333,10 @@ const FULL_DAY_END_MINUTE = 24 * 60;
 const FULL_DAY_SLOT_INTERVAL_MINUTES = 30;
 const OUTLOOK_TIMELINE_HOUR_HEIGHT_PX = 104;
 const OUTLOOK_TIMELINE_PX_PER_MINUTE = OUTLOOK_TIMELINE_HOUR_HEIGHT_PX / 60;
-const OUTLOOK_TIMELINE_SLOT_HEIGHT_PX = OUTLOOK_TIMELINE_PX_PER_MINUTE * FULL_DAY_SLOT_INTERVAL_MINUTES;
-const OUTLOOK_TIMELINE_HEIGHT_PX = FULL_DAY_END_MINUTE * OUTLOOK_TIMELINE_PX_PER_MINUTE;
+const OUTLOOK_TIMELINE_SLOT_HEIGHT_PX =
+  OUTLOOK_TIMELINE_PX_PER_MINUTE * FULL_DAY_SLOT_INTERVAL_MINUTES;
+const OUTLOOK_TIMELINE_HEIGHT_PX =
+  FULL_DAY_END_MINUTE * OUTLOOK_TIMELINE_PX_PER_MINUTE;
 const OUTLOOK_TIMELINE_GUTTER_WIDTH_PX = 52;
 const OUTLOOK_TIMELINE_EVENT_GAP_PX = 4;
 const OUTLOOK_TIMELINE_MIN_EVENT_HEIGHT_PX = 52;
@@ -345,8 +377,13 @@ interface EdgeHoldProfile {
   stepMultiplier: number;
 }
 
-const resolveEdgeHoldProfile = (overshootPx: number): EdgeHoldProfile | null => {
-  if (!Number.isFinite(overshootPx) || overshootPx <= EDGE_HOLD_PIN_THRESHOLD_PX) {
+const resolveEdgeHoldProfile = (
+  overshootPx: number,
+): EdgeHoldProfile | null => {
+  if (
+    !Number.isFinite(overshootPx) ||
+    overshootPx <= EDGE_HOLD_PIN_THRESHOLD_PX
+  ) {
     return null;
   }
   if (overshootPx <= EDGE_HOLD_NEAR_MAX_OVERSHOOT_PX) {
@@ -406,12 +443,16 @@ const getBottomNavObstructionPx = () => {
   }
 
   const rootStyles = window.getComputedStyle(document.documentElement);
-  const runtimeOffset = parsePixelValue(rootStyles.getPropertyValue("--bottom-nav-runtime-offset"));
+  const runtimeOffset = parsePixelValue(
+    rootStyles.getPropertyValue("--bottom-nav-runtime-offset"),
+  );
   if (runtimeOffset !== null) {
     return runtimeOffset;
   }
 
-  const safeOffset = parsePixelValue(rootStyles.getPropertyValue("--bottom-nav-safe-offset"));
+  const safeOffset = parsePixelValue(
+    rootStyles.getPropertyValue("--bottom-nav-safe-offset"),
+  );
   if (safeOffset !== null) {
     return safeOffset;
   }
@@ -422,7 +463,8 @@ const getBottomNavObstructionPx = () => {
   probe.style.pointerEvents = "none";
   probe.style.top = "0";
   probe.style.left = "0";
-  probe.style.height = "var(--bottom-nav-runtime-offset, var(--bottom-nav-safe-offset))";
+  probe.style.height =
+    "var(--bottom-nav-runtime-offset, var(--bottom-nav-safe-offset))";
   document.body.appendChild(probe);
   const measured = probe.getBoundingClientRect().height;
   probe.remove();
@@ -434,7 +476,8 @@ const getBottomNavObstructionPx = () => {
   const rootFontSize = Number.parseFloat(
     window.getComputedStyle(document.documentElement).fontSize || "16",
   );
-  const safeFontSize = Number.isFinite(rootFontSize) && rootFontSize > 0 ? rootFontSize : 16;
+  const safeFontSize =
+    Number.isFinite(rootFontSize) && rootFontSize > 0 ? rootFontSize : 16;
   return safeFontSize * 6.5;
 };
 
@@ -442,27 +485,37 @@ const parseTimeToMinute = (time: string | null | undefined): number | null => {
   if (!time) return null;
   const [hour, minute] = time.split(":").map(Number);
   if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
-  return (hour * 60) + minute;
+  return hour * 60 + minute;
 };
 
 const minuteToTime = (minute: number) => {
-  const clamped = Math.max(0, Math.min((24 * 60) - 1, Math.round(minute)));
+  const clamped = Math.max(0, Math.min(24 * 60 - 1, Math.round(minute)));
   const hour = Math.floor(clamped / 60);
   const mins = clamped % 60;
   return `${String(hour).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
 };
 
-const minuteToMarkerToken = (minute: number) => minuteToTime(minute).replace(":", "");
+const minuteToMarkerToken = (minute: number) =>
+  minuteToTime(minute).replace(":", "");
 
 const formatGridTimeLabel = (minute: number) => {
-  const clamped = Math.max(FULL_DAY_START_MINUTE, Math.min(FULL_DAY_END_MINUTE - 1, Math.round(minute)));
+  const clamped = Math.max(
+    FULL_DAY_START_MINUTE,
+    Math.min(FULL_DAY_END_MINUTE - 1, Math.round(minute)),
+  );
   const hour = Math.floor(clamped / 60);
   const mins = clamped % 60;
-  return format(new Date(2000, 0, 1, hour, mins), mins === 0 ? "h a" : "h:mm a");
+  return format(
+    new Date(2000, 0, 1, hour, mins),
+    mins === 0 ? "h a" : "h:mm a",
+  );
 };
 
 const formatCurrentTimeLabel = (minute: number) => {
-  const clamped = Math.max(FULL_DAY_START_MINUTE, Math.min(FULL_DAY_END_MINUTE - 1, Math.round(minute)));
+  const clamped = Math.max(
+    FULL_DAY_START_MINUTE,
+    Math.min(FULL_DAY_END_MINUTE - 1, Math.round(minute)),
+  );
   const hour = Math.floor(clamped / 60);
   const mins = clamped % 60;
   return format(new Date(2000, 0, 1, hour, mins), "h:mm a");
@@ -470,32 +523,40 @@ const formatCurrentTimeLabel = (minute: number) => {
 
 const buildFullDaySlotMinutes = () => {
   const slots: number[] = [];
-  for (let minute = FULL_DAY_START_MINUTE; minute < FULL_DAY_END_MINUTE; minute += FULL_DAY_SLOT_INTERVAL_MINUTES) {
+  for (
+    let minute = FULL_DAY_START_MINUTE;
+    minute < FULL_DAY_END_MINUTE;
+    minute += FULL_DAY_SLOT_INTERVAL_MINUTES
+  ) {
     slots.push(minute);
   }
   return slots;
 };
 
-const getTimelineTopPx = (minute: number) => (
-  Math.max(FULL_DAY_START_MINUTE, Math.min(FULL_DAY_END_MINUTE, minute)) * OUTLOOK_TIMELINE_PX_PER_MINUTE
-);
+const getTimelineTopPx = (minute: number) =>
+  Math.max(FULL_DAY_START_MINUTE, Math.min(FULL_DAY_END_MINUTE, minute)) *
+  OUTLOOK_TIMELINE_PX_PER_MINUTE;
 
 const isTimeSlotInteractiveTarget = (target: EventTarget | null): boolean => {
   if (typeof HTMLElement === "undefined" || !(target instanceof HTMLElement)) {
     return false;
   }
 
-  return Boolean(target.closest([
-    "button",
-    "a",
-    "input",
-    "textarea",
-    "select",
-    '[role="button"]',
-    '[data-interactive="true"]',
-    '[data-tap-control="true"]',
-    '[contenteditable="true"]',
-  ].join(",")));
+  return Boolean(
+    target.closest(
+      [
+        "button",
+        "a",
+        "input",
+        "textarea",
+        "select",
+        '[role="button"]',
+        '[data-interactive="true"]',
+        '[data-tap-control="true"]',
+        '[contenteditable="true"]',
+      ].join(","),
+    ),
+  );
 };
 
 const getLaneOffsetPx = (laneIndex: number, overlapCount: number) => {
@@ -543,37 +604,24 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   companionFrostedThemeStyle,
 }: TodaysAgendaProps) {
   const { user } = useAuth();
-  const questCaptureDateLabel = isSameDay(selectedDate, new Date())
-    ? "today"
-    : safeFormat(selectedDate, "EEEE, MMMM d", "that day");
-  const questCaptureSelectedDate = safeFormat(selectedDate, "yyyy-MM-dd");
-  const planDayLauncherLabel = isSameDay(selectedDate, new Date()) ? "Plan Today" : "Plan Day";
-  const openPlanDayThread = useCallback(() => {
+  const companionChatLauncherLabel = "Companion Chat";
+  const openCompanionChatThread = useCallback(() => {
     if (!onOpenCompanionPlanner) return;
-    onOpenCompanionPlanner(createPlanDayCompanionLaunchIntent({
-      selectedDate,
-      tasks,
-      activeEpics,
-      assumeTasksAreForSelectedDate: true,
-    }));
-  }, [activeEpics, onOpenCompanionPlanner, selectedDate, tasks]);
-  const plannerLauncherAction = onOpenCompanionPlanner ? openPlanDayThread : onVoiceAddQuest ?? onAddQuest;
+    onOpenCompanionPlanner(createJourneysCompanionChatLaunchIntent());
+  }, [onOpenCompanionPlanner]);
+  const plannerLauncherAction = onOpenCompanionPlanner
+    ? openCompanionChatThread
+    : (onVoiceAddQuest ?? onAddQuest);
   const openQuestCaptureThread = useCallback(() => {
-    if (onOpenCompanionPlanner) {
-      onOpenCompanionPlanner(createCompanionPlannerQuestCaptureLaunchIntent({
-        source: "empty_journeys",
-        dateLabel: questCaptureDateLabel,
-        selectedDate: questCaptureSelectedDate,
-      }));
-      return;
-    }
     if (onVoiceAddQuest) {
       onVoiceAddQuest();
       return;
     }
     onAddQuest();
-  }, [onAddQuest, onOpenCompanionPlanner, onVoiceAddQuest, questCaptureDateLabel, questCaptureSelectedDate]);
-  const voiceAddButtonLabel = isVoiceAddRecording ? "Stop voice capture" : "Start voice capture";
+  }, [onAddQuest, onVoiceAddQuest]);
+  const voiceAddButtonLabel = isVoiceAddRecording
+    ? "Stop voice capture"
+    : "Start voice capture";
   const quickCaptureControls = (
     <div className="flex items-center gap-2">
       <Button
@@ -593,14 +641,19 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         size="icon"
         className={cn(
           "h-9 w-9 rounded-[18px] border-white/10 bg-white/5 hover:bg-white/10",
-          isVoiceAddRecording && "border-primary/40 bg-primary/15 text-primary hover:bg-primary/20",
+          isVoiceAddRecording &&
+            "border-primary/40 bg-primary/15 text-primary hover:bg-primary/20",
         )}
         onClick={onVoiceAddQuest}
         aria-label={voiceAddButtonLabel}
         disabled={!onVoiceAddQuest || !isVoiceAddSupported}
         data-testid="journeys-voice-add-button"
       >
-        {isVoiceAddRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+        {isVoiceAddRecording ? (
+          <MicOff className="h-4 w-4" />
+        ) : (
+          <Mic className="h-4 w-4" />
+        )}
       </Button>
     </div>
   );
@@ -613,15 +666,28 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   });
   const isNativeIOS = useMemo(() => {
     if (typeof window === "undefined") return false;
-    const capacitor = (window as Window & {
-      Capacitor?: { isNativePlatform?: () => boolean; getPlatform?: () => string };
-    }).Capacitor;
-    return Boolean(capacitor?.isNativePlatform?.() && capacitor?.getPlatform?.() === "ios");
+    const capacitor = (
+      window as Window & {
+        Capacitor?: {
+          isNativePlatform?: () => boolean;
+          getPlatform?: () => string;
+        };
+      }
+    ).Capacitor;
+    return Boolean(
+      capacitor?.isNativePlatform?.() && capacitor?.getPlatform?.() === "ios",
+    );
   }, []);
-  const useLiteAnimations = isNativeIOS || Boolean(prefersReducedMotion) || !capabilities.allowBackgroundAnimation;
+  const useLiteAnimations =
+    isNativeIOS ||
+    Boolean(prefersReducedMotion) ||
+    !capabilities.allowBackgroundAnimation;
   const isTimelineDragEnabled = !disableTimelineDrag;
-  const isDesktopTimelineDragEnabled = isTimelineDragEnabled && !isDesktopLayout;
-  const mobileFabScrollClearance = isDesktopLayout ? undefined : `${MOBILE_FAB_SCROLL_CLEARANCE_PX}px`;
+  const isDesktopTimelineDragEnabled =
+    isTimelineDragEnabled && !isDesktopLayout;
+  const mobileFabScrollClearance = isDesktopLayout
+    ? undefined
+    : `${MOBILE_FAB_SCROLL_CLEARANCE_PX}px`;
   const { profile } = useProfile();
   const queryClient = useQueryClient();
   const habitsQuery = useQuery({
@@ -691,7 +757,13 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
       queryClient.setQueriesData<Task[]>(
         { queryKey: ["daily-tasks"] },
-        (currentTasks) => patchSubtaskCompletionInTaskList(currentTasks, taskId, subtaskId, completed)
+        (currentTasks) =>
+          patchSubtaskCompletionInTaskList(
+            currentTasks,
+            taskId,
+            subtaskId,
+            completed,
+          ),
       );
 
       return { previousDailyTasks };
@@ -710,25 +782,37 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   // Timeline drag-to-reschedule
   const timelineDragContainerRef = useRef<HTMLDivElement>(null);
   const scheduledPaneRef = useRef<HTMLDivElement | null>(null);
-  const [timelineBodyHeightPx, setTimelineBodyHeightPx] = useState<number | null>(null);
+  const [timelineBodyHeightPx, setTimelineBodyHeightPx] = useState<
+    number | null
+  >(null);
   const setScheduledPaneNode = useCallback((node: HTMLDivElement | null) => {
     scheduledPaneRef.current = node;
     timelineDragContainerRef.current = node;
   }, []);
-  
+
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
-  const [openDesktopDetailTaskId, setOpenDesktopDetailTaskId] = useState<string | null>(null);
-  const [openActionMenuTaskId, setOpenActionMenuTaskId] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<'custom' | 'time' | 'priority' | 'xp'>('custom');
+  const [openDesktopDetailTaskId, setOpenDesktopDetailTaskId] = useState<
+    string | null
+  >(null);
+  const [openActionMenuTaskId, setOpenActionMenuTaskId] = useState<
+    string | null
+  >(null);
+  const [sortBy, setSortBy] = useState<"custom" | "time" | "priority" | "xp">(
+    "custom",
+  );
   const [untimedDrawerOpen, setUntimedDrawerOpen] = useState(false);
-  const [justCompletedTasks, setJustCompletedTasks] = useState<Set<string>>(new Set());
-  const [optimisticCompleted, setOptimisticCompleted] = useState<Set<string>>(new Set());
+  const [justCompletedTasks, setJustCompletedTasks] = useState<Set<string>>(
+    new Set(),
+  );
+  const [optimisticCompleted, setOptimisticCompleted] = useState<Set<string>>(
+    new Set(),
+  );
   const [comboCount, setComboCount] = useState(0);
   const [showComboFx, setShowComboFx] = useState(false);
   const lastComboAtRef = useRef<number | null>(null);
   const comboResetTimerRef = useRef<number | null>(null);
   const comboFxTimerRef = useRef<number | null>(null);
-  
+
   // Track touch start position to distinguish taps from scrolls
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const suppressNextCheckboxClickRef = useRef(false);
@@ -755,21 +839,27 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   useEffect(() => clearDesktopTaskClickIntent, [clearDesktopTaskClickIntent]);
 
-  const scheduleDesktopTaskSingleClick = useCallback((task: Task) => {
-    clearDesktopTaskClickIntent(task.id);
-    const timeoutId = window.setTimeout(() => {
-      setOpenDesktopDetailTaskId(task.id);
-      desktopTaskClickTimersRef.current.delete(task.id);
-    }, 200);
-    desktopTaskClickTimersRef.current.set(task.id, timeoutId);
-  }, [clearDesktopTaskClickIntent]);
+  const scheduleDesktopTaskSingleClick = useCallback(
+    (task: Task) => {
+      clearDesktopTaskClickIntent(task.id);
+      const timeoutId = window.setTimeout(() => {
+        setOpenDesktopDetailTaskId(task.id);
+        desktopTaskClickTimersRef.current.delete(task.id);
+      }, 200);
+      desktopTaskClickTimersRef.current.set(task.id, timeoutId);
+    },
+    [clearDesktopTaskClickIntent],
+  );
 
-  const handleDesktopTaskDoubleClick = useCallback((task: Task) => {
-    clearDesktopTaskClickIntent(task.id);
-    setOpenDesktopDetailTaskId(null);
-    onEditQuest?.(task);
-  }, [clearDesktopTaskClickIntent, onEditQuest]);
-  
+  const handleDesktopTaskDoubleClick = useCallback(
+    (task: Task) => {
+      clearDesktopTaskClickIntent(task.id);
+      setOpenDesktopDetailTaskId(null);
+      onEditQuest?.(task);
+    },
+    [clearDesktopTaskClickIntent, onEditQuest],
+  );
+
   // Clean up optimistic state when server confirms completion
   useEffect(() => {
     if (layoutMode) {
@@ -777,9 +867,15 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       return;
     }
 
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    if (
+      typeof window === "undefined" ||
+      typeof window.matchMedia !== "function"
+    )
+      return;
 
-    const mediaQuery = window.matchMedia(`(min-width: ${DESKTOP_LAYOUT_MIN_WIDTH}px)`);
+    const mediaQuery = window.matchMedia(
+      `(min-width: ${DESKTOP_LAYOUT_MIN_WIDTH}px)`,
+    );
     const handleDesktopLayoutChange = () => {
       setIsDesktopLayout(window.innerWidth >= DESKTOP_LAYOUT_MIN_WIDTH);
     };
@@ -803,16 +899,19 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   }, [desktopInteractionResetKey]);
 
   useEffect(() => {
-    if (openDesktopDetailTaskId && !tasks.some((task) => task.id === openDesktopDetailTaskId)) {
+    if (
+      openDesktopDetailTaskId &&
+      !tasks.some((task) => task.id === openDesktopDetailTaskId)
+    ) {
       setOpenDesktopDetailTaskId(null);
     }
   }, [openDesktopDetailTaskId, tasks]);
 
   useEffect(() => {
-    setOptimisticCompleted(prev => {
-      const confirmedIds = tasks.filter(t => t.completed).map(t => t.id);
+    setOptimisticCompleted((prev) => {
+      const confirmedIds = tasks.filter((t) => t.completed).map((t) => t.id);
       const next = new Set(prev);
-      confirmedIds.forEach(id => next.delete(id));
+      confirmedIds.forEach((id) => next.delete(id));
       return next.size !== prev.size ? next : prev;
     });
   }, [tasks]);
@@ -820,7 +919,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   useEffect(() => {
     if (openActionMenuTaskId === null) return;
 
-    const hasActiveTask = tasks.some((task) => task.id === openActionMenuTaskId);
+    const hasActiveTask = tasks.some(
+      (task) => task.id === openActionMenuTaskId,
+    );
     if (!hasActiveTask) {
       setOpenActionMenuTaskId(null);
     }
@@ -856,37 +957,46 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     }
   }, []);
 
-  const handleTimeSlotTouchStart = useCallback((slotMinute: number, event: ReactTouchEvent<HTMLDivElement>) => {
-    if (!onTimeSlotLongPress) return;
-    if (event.touches.length !== 1) return;
-    if (isTimeSlotInteractiveTarget(event.target)) return;
+  const handleTimeSlotTouchStart = useCallback(
+    (slotMinute: number, event: ReactTouchEvent<HTMLDivElement>) => {
+      if (!onTimeSlotLongPress) return;
+      if (event.touches.length !== 1) return;
+      if (isTimeSlotInteractiveTarget(event.target)) return;
 
-    clearTimeSlotLongPress();
-    const touch = event.touches[0];
-    const timerId = window.setTimeout(() => {
-      timeSlotLongPressRef.current = null;
-      triggerHaptic(ImpactStyle.Light);
-      onTimeSlotLongPress(selectedDate, minuteToTime(slotMinute));
-    }, TIME_SLOT_LONG_PRESS_MS);
-
-    timeSlotLongPressRef.current = {
-      timerId,
-      startX: touch.clientX,
-      startY: touch.clientY,
-    };
-  }, [clearTimeSlotLongPress, onTimeSlotLongPress, selectedDate]);
-
-  const handleTimeSlotTouchMove = useCallback((event: ReactTouchEvent<HTMLDivElement>) => {
-    const state = timeSlotLongPressRef.current;
-    if (!state || event.touches.length !== 1) return;
-
-    const touch = event.touches[0];
-    const deltaX = Math.abs(touch.clientX - state.startX);
-    const deltaY = Math.abs(touch.clientY - state.startY);
-    if (deltaX > TIME_SLOT_LONG_PRESS_MOVE_SLOP_PX || deltaY > TIME_SLOT_LONG_PRESS_MOVE_SLOP_PX) {
       clearTimeSlotLongPress();
-    }
-  }, [clearTimeSlotLongPress]);
+      const touch = event.touches[0];
+      const timerId = window.setTimeout(() => {
+        timeSlotLongPressRef.current = null;
+        triggerHaptic(ImpactStyle.Light);
+        onTimeSlotLongPress(selectedDate, minuteToTime(slotMinute));
+      }, TIME_SLOT_LONG_PRESS_MS);
+
+      timeSlotLongPressRef.current = {
+        timerId,
+        startX: touch.clientX,
+        startY: touch.clientY,
+      };
+    },
+    [clearTimeSlotLongPress, onTimeSlotLongPress, selectedDate],
+  );
+
+  const handleTimeSlotTouchMove = useCallback(
+    (event: ReactTouchEvent<HTMLDivElement>) => {
+      const state = timeSlotLongPressRef.current;
+      if (!state || event.touches.length !== 1) return;
+
+      const touch = event.touches[0];
+      const deltaX = Math.abs(touch.clientX - state.startX);
+      const deltaY = Math.abs(touch.clientY - state.startY);
+      if (
+        deltaX > TIME_SLOT_LONG_PRESS_MOVE_SLOP_PX ||
+        deltaY > TIME_SLOT_LONG_PRESS_MOVE_SLOP_PX
+      ) {
+        clearTimeSlotLongPress();
+      }
+    },
+    [clearTimeSlotLongPress],
+  );
 
   useEffect(() => {
     return () => {
@@ -909,7 +1019,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   const registerCompletionCombo = useCallback(() => {
     const now = Date.now();
-    const canChain = lastComboAtRef.current !== null && now - lastComboAtRef.current <= COMBO_WINDOW_MS;
+    const canChain =
+      lastComboAtRef.current !== null &&
+      now - lastComboAtRef.current <= COMBO_WINDOW_MS;
     const nextCombo = canChain ? comboCount + 1 : 1;
 
     setComboCount(nextCombo);
@@ -921,10 +1033,13 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         window.clearTimeout(comboFxTimerRef.current);
       }
       setShowComboFx(true);
-      comboFxTimerRef.current = window.setTimeout(() => {
-        setShowComboFx(false);
-        comboFxTimerRef.current = null;
-      }, useLiteAnimations ? 600 : 1000);
+      comboFxTimerRef.current = window.setTimeout(
+        () => {
+          setShowComboFx(false);
+          comboFxTimerRef.current = null;
+        },
+        useLiteAnimations ? 600 : 1000,
+      );
     }
   }, [comboCount, scheduleComboReset, useLiteAnimations]);
 
@@ -956,39 +1071,44 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   useEffect(() => {
     resetCombo();
   }, [selectedDate, resetCombo]);
-  
 
   // Priority weight for sorting
   const getPriorityWeight = (priority: string | null | undefined) => {
     switch (priority) {
-      case 'high': return 0;
-      case 'medium': return 1;
-      case 'low': return 2;
-      default: return 3;
+      case "high":
+        return 0;
+      case "medium":
+        return 1;
+      case "low":
+        return 2;
+      default:
+        return 3;
     }
   };
 
   // Separate ritual tasks (from campaigns) and regular quests
   const { ritualTasks, questTasks } = useMemo(() => {
-    const rituals = tasks.filter(t => !!t.habit_source_id);
-    const quests = tasks.filter(t => !t.habit_source_id);
-    
+    const rituals = tasks.filter((t) => !!t.habit_source_id);
+    const quests = tasks.filter((t) => !t.habit_source_id);
+
     // Sort based on selected sort option
     const sortGroup = (group: Task[]) => {
       let sorted = [...group].sort((a, b) => {
         switch (sortBy) {
-          case 'time':
+          case "time":
             if (a.scheduled_time && b.scheduled_time) {
               return a.scheduled_time.localeCompare(b.scheduled_time);
             }
             if (a.scheduled_time) return -1;
             if (b.scheduled_time) return 1;
             return 0;
-          case 'priority':
-            return getPriorityWeight(a.priority) - getPriorityWeight(b.priority);
-          case 'xp':
+          case "priority":
+            return (
+              getPriorityWeight(a.priority) - getPriorityWeight(b.priority)
+            );
+          case "xp":
             return b.xp_reward - a.xp_reward;
-          case 'custom':
+          case "custom":
           default: {
             const orderA = a.sort_order ?? 9999;
             const orderB = b.sort_order ?? 9999;
@@ -1002,16 +1122,16 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           }
         }
       });
-      
+
       if (!keepInPlace) {
-        const incomplete = sorted.filter(t => !t.completed);
-        const complete = sorted.filter(t => t.completed);
+        const incomplete = sorted.filter((t) => !t.completed);
+        const complete = sorted.filter((t) => t.completed);
         sorted = [...incomplete, ...complete];
       }
-      
+
       return sorted;
     };
-    
+
     return {
       ritualTasks: sortGroup(rituals),
       questTasks: sortGroup(quests),
@@ -1024,9 +1144,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   );
 
   const scheduledItems = useMemo(
-    () => schedulerItems
-      .filter((task) => !!task.scheduled_time)
-      .sort((a, b) => (a.scheduled_time || "").localeCompare(b.scheduled_time || "")),
+    () =>
+      schedulerItems
+        .filter((task) => !!task.scheduled_time)
+        .sort((a, b) =>
+          (a.scheduled_time || "").localeCompare(b.scheduled_time || ""),
+        ),
     [schedulerItems],
   );
   const anytimeItems = useMemo(
@@ -1053,23 +1176,41 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
     ...SHARED_TIMELINE_DRAG_INTERACTION_PROFILE,
     onDrop: (taskId, newTime) => {
-      const overlapCount = getTaskConflictSetForTask(taskId, draggableTimelineItems, { [taskId]: newTime }).size;
+      const overlapCount = getTaskConflictSetForTask(
+        taskId,
+        draggableTimelineItems,
+        { [taskId]: newTime },
+      ).size;
       onUpdateScheduledTime?.(taskId, newTime);
       if (overlapCount > 0) {
         toast(`Overlap: ${overlapCount} quest${overlapCount === 1 ? "" : "s"}`);
       }
     },
   });
-  const dragVisualOffsetY = (timelineDrag.dragVisualOffsetY ?? timelineDrag.dragOffsetY) as MotionValue<number>;
-  const dragEdgeOffsetY = (timelineDrag.dragEdgeOffsetY ?? dragVisualOffsetY) as MotionValue<number>;
-  const timelineIsDragging = isDesktopTimelineDragEnabled && timelineDrag.isDragging;
-  const timelineDraggingTaskId = isDesktopTimelineDragEnabled ? timelineDrag.draggingTaskId : null;
-  const timelineLongPressTaskId = isDesktopTimelineDragEnabled ? timelineDrag.longPressTaskId : null;
-  const timelineJustDroppedId = isDesktopTimelineDragEnabled ? timelineDrag.justDroppedId : null;
-  const timelinePreviewTime = isDesktopTimelineDragEnabled ? timelineDrag.previewTime : undefined;
-  const timelineZoomRail = isDesktopTimelineDragEnabled ? timelineDrag.zoomRail : null;
+  const dragVisualOffsetY = (timelineDrag.dragVisualOffsetY ??
+    timelineDrag.dragOffsetY) as MotionValue<number>;
+  const dragEdgeOffsetY = (timelineDrag.dragEdgeOffsetY ??
+    dragVisualOffsetY) as MotionValue<number>;
+  const timelineIsDragging =
+    isDesktopTimelineDragEnabled && timelineDrag.isDragging;
+  const timelineDraggingTaskId = isDesktopTimelineDragEnabled
+    ? timelineDrag.draggingTaskId
+    : null;
+  const timelineLongPressTaskId = isDesktopTimelineDragEnabled
+    ? timelineDrag.longPressTaskId
+    : null;
+  const timelineJustDroppedId = isDesktopTimelineDragEnabled
+    ? timelineDrag.justDroppedId
+    : null;
+  const timelinePreviewTime = isDesktopTimelineDragEnabled
+    ? timelineDrag.previewTime
+    : undefined;
+  const timelineZoomRail = isDesktopTimelineDragEnabled
+    ? timelineDrag.zoomRail
+    : null;
   const timelineRowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const [dragOverlaySnapshot, setDragOverlaySnapshot] = useState<DragOverlaySnapshot | null>(null);
+  const [dragOverlaySnapshot, setDragOverlaySnapshot] =
+    useState<DragOverlaySnapshot | null>(null);
   const seededDragOverlaySnapshotRef = useRef<DragOverlaySnapshot | null>(null);
   const dragOverlayOffsetY = useMotionValue(0);
   const dragOverlayBottomInsetRef = useRef(DEFAULT_BOTTOM_NAV_SAFE_OFFSET_PX);
@@ -1080,7 +1221,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const edgeHoldRepeatIntervalRef = useRef<number | null>(null);
   const edgeHoldIsActiveRef = useRef(false);
 
-  const [nowMarkerMinute, setNowMarkerMinute] = useState(() => parseTimeToMinute(format(new Date(), "HH:mm")) ?? 0);
+  const [nowMarkerMinute, setNowMarkerMinute] = useState(
+    () => parseTimeToMinute(format(new Date(), "HH:mm")) ?? 0,
+  );
   const isTodaySelected = isSameDay(selectedDate, new Date());
   nowMarkerMinuteRef.current = nowMarkerMinute;
   const nowMarkerRowRef = useRef<HTMLDivElement | null>(null);
@@ -1089,28 +1232,41 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const hadNowMarkerRef = useRef(false);
   const lastCenterNowRequestKeyRef = useRef(centerNowRequestKey);
 
-  const captureDragOverlaySnapshotForTask = useCallback((taskId: string): DragOverlaySnapshot | null => {
-    const rowNode = timelineRowRefs.current.get(taskId);
-    if (!rowNode) return null;
+  const captureDragOverlaySnapshotForTask = useCallback(
+    (taskId: string): DragOverlaySnapshot | null => {
+      const rowNode = timelineRowRefs.current.get(taskId);
+      if (!rowNode) return null;
 
-    const rect = rowNode.getBoundingClientRect();
-    const width = rect.width > 0 ? rect.width : rowNode.clientWidth || rowNode.offsetWidth || 1;
-    const height = rect.height > 0 ? rect.height : rowNode.clientHeight || rowNode.offsetHeight || 1;
-    return {
-      taskId,
-      top: rect.top,
-      left: rect.left,
-      width,
-      height,
-    };
-  }, []);
+      const rect = rowNode.getBoundingClientRect();
+      const width =
+        rect.width > 0
+          ? rect.width
+          : rowNode.clientWidth || rowNode.offsetWidth || 1;
+      const height =
+        rect.height > 0
+          ? rect.height
+          : rowNode.clientHeight || rowNode.offsetHeight || 1;
+      return {
+        taskId,
+        top: rect.top,
+        left: rect.left,
+        width,
+        height,
+      };
+    },
+    [],
+  );
 
-  const seedDragOverlaySnapshotForTask = useCallback((taskId: string) => {
-    seededDragOverlaySnapshotRef.current = captureDragOverlaySnapshotForTask(taskId);
-    if (seededDragOverlaySnapshotRef.current) {
-      dragOverlayBottomInsetRef.current = getBottomNavObstructionPx();
-    }
-  }, [captureDragOverlaySnapshotForTask]);
+  const seedDragOverlaySnapshotForTask = useCallback(
+    (taskId: string) => {
+      seededDragOverlaySnapshotRef.current =
+        captureDragOverlaySnapshotForTask(taskId);
+      if (seededDragOverlaySnapshotRef.current) {
+        dragOverlayBottomInsetRef.current = getBottomNavObstructionPx();
+      }
+    },
+    [captureDragOverlaySnapshotForTask],
+  );
 
   const clearEdgeHoldActivationTimer = useCallback(() => {
     if (edgeHoldActivationTimeoutRef.current !== null) {
@@ -1147,7 +1303,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           return;
         }
 
-        const activeStepMultiplier = Math.max(1, edgeHoldStepMultiplierRef.current);
+        const activeStepMultiplier = Math.max(
+          1,
+          edgeHoldStepMultiplierRef.current,
+        );
         for (let step = 0; step < activeStepMultiplier; step += 1) {
           const nudged = timelineDrag.nudgeByFineStep(direction);
           if (!nudged) {
@@ -1158,7 +1317,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         }
       }, repeatMs);
     },
-    [clearEdgeHoldRepeatTimer, timelineDrag.nudgeByFineStep, timelineIsDragging],
+    [
+      clearEdgeHoldRepeatTimer,
+      timelineDrag.nudgeByFineStep,
+      timelineIsDragging,
+    ],
   );
 
   const syncEdgeHoldState = useCallback(
@@ -1175,7 +1338,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       const previousStepMultiplier = edgeHoldStepMultiplierRef.current;
       const directionChanged = previousDirection !== nextDirection;
       const repeatChanged = previousRepeatMs !== nextRepeatMs;
-      const stepMultiplierChanged = previousStepMultiplier !== nextStepMultiplier;
+      const stepMultiplierChanged =
+        previousStepMultiplier !== nextStepMultiplier;
 
       edgeHoldDirectionRef.current = nextDirection;
       edgeHoldRepeatMsRef.current = nextRepeatMs;
@@ -1188,7 +1352,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
         edgeHoldActivationTimeoutRef.current = window.setTimeout(() => {
           edgeHoldActivationTimeoutRef.current = null;
-          if (!timelineIsDragging || edgeHoldDirectionRef.current !== nextDirection) {
+          if (
+            !timelineIsDragging ||
+            edgeHoldDirectionRef.current !== nextDirection
+          ) {
             return;
           }
 
@@ -1197,8 +1364,15 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             stopEdgeHold();
             return;
           }
-          const activeStepMultiplier = Math.max(1, edgeHoldStepMultiplierRef.current);
-          startEdgeHoldInterval(nextDirection, activeRepeatMs, activeStepMultiplier);
+          const activeStepMultiplier = Math.max(
+            1,
+            edgeHoldStepMultiplierRef.current,
+          );
+          startEdgeHoldInterval(
+            nextDirection,
+            activeRepeatMs,
+            activeStepMultiplier,
+          );
         }, EDGE_HOLD_ACTIVATION_MS);
         return;
       }
@@ -1258,7 +1432,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         window.cancelAnimationFrame(frameId);
       }
     };
-  }, [captureDragOverlaySnapshotForTask, dragOverlayOffsetY, timelineDraggingTaskId]);
+  }, [
+    captureDragOverlaySnapshotForTask,
+    dragOverlayOffsetY,
+    timelineDraggingTaskId,
+  ]);
 
   useEffect(() => {
     if (!timelineIsDragging || !dragOverlaySnapshot) {
@@ -1267,7 +1445,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       return;
     }
 
-    const clampDragOffset = (rawVisualOffsetY: number, rawEdgeOffsetY: number) => {
+    const clampDragOffset = (
+      rawVisualOffsetY: number,
+      rawEdgeOffsetY: number,
+    ) => {
       const viewport = window.visualViewport;
       const viewportHeight = viewport?.height ?? window.innerHeight;
       const viewportTopInset = viewport?.offsetTop ?? 0;
@@ -1277,74 +1458,100 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         .querySelector('nav[aria-label="Main navigation"]')
         ?.getBoundingClientRect();
 
-      const hasMeasurablePaneBounds = !!paneRect
-        && Number.isFinite(paneRect.top)
-        && Number.isFinite(paneRect.bottom)
-        && paneRect.bottom > (paneRect.top + 1);
-      const hasMeasurableNavBounds = !!navRect
-        && Number.isFinite(navRect.top)
-        && Number.isFinite(navRect.bottom)
-        && navRect.bottom > navRect.top;
-      const timelineTopBound = hasMeasurablePaneBounds ? paneRect.top : viewportTopInset;
-      const timelineBottomBound = hasMeasurablePaneBounds ? paneRect.bottom : viewportBottom;
-      const viewportSafeMaxTop = viewportBottom - dragOverlayBottomInsetRef.current - dragOverlaySnapshot.height;
-      const paneBoundMaxTop = timelineBottomBound - dragOverlaySnapshot.height - DRAG_OVERLAY_BOTTOM_PADDING_PX;
+      const hasMeasurablePaneBounds =
+        !!paneRect &&
+        Number.isFinite(paneRect.top) &&
+        Number.isFinite(paneRect.bottom) &&
+        paneRect.bottom > paneRect.top + 1;
+      const hasMeasurableNavBounds =
+        !!navRect &&
+        Number.isFinite(navRect.top) &&
+        Number.isFinite(navRect.bottom) &&
+        navRect.bottom > navRect.top;
+      const timelineTopBound = hasMeasurablePaneBounds
+        ? paneRect.top
+        : viewportTopInset;
+      const timelineBottomBound = hasMeasurablePaneBounds
+        ? paneRect.bottom
+        : viewportBottom;
+      const viewportSafeMaxTop =
+        viewportBottom -
+        dragOverlayBottomInsetRef.current -
+        dragOverlaySnapshot.height;
+      const paneBoundMaxTop =
+        timelineBottomBound -
+        dragOverlaySnapshot.height -
+        DRAG_OVERLAY_BOTTOM_PADDING_PX;
       const navBoundMaxTop = hasMeasurableNavBounds
         ? navRect.top - dragOverlaySnapshot.height - DRAG_OVERLAY_NAV_GAP_PX
         : null;
 
-      const minTop = Math.max(viewportTopInset, timelineTopBound) + DRAG_OVERLAY_TOP_PADDING_PX;
-      const maxTop = navBoundMaxTop !== null
-        ? Math.min(navBoundMaxTop, viewportSafeMaxTop)
-        : hasMeasurablePaneBounds
-          ? paneBoundMaxTop
-          : viewportSafeMaxTop;
+      const minTop =
+        Math.max(viewportTopInset, timelineTopBound) +
+        DRAG_OVERLAY_TOP_PADDING_PX;
+      const maxTop =
+        navBoundMaxTop !== null
+          ? Math.min(navBoundMaxTop, viewportSafeMaxTop)
+          : hasMeasurablePaneBounds
+            ? paneBoundMaxTop
+            : viewportSafeMaxTop;
       const safeMaxTop = Math.max(minTop, maxTop);
 
       const minOffset = minTop - dragOverlaySnapshot.top;
       const maxOffset = safeMaxTop - dragOverlaySnapshot.top;
-      const clampedVisualOffset = Math.max(minOffset, Math.min(maxOffset, rawVisualOffsetY));
+      const clampedVisualOffset = Math.max(
+        minOffset,
+        Math.min(maxOffset, rawVisualOffsetY),
+      );
       dragOverlayOffsetY.set(clampedVisualOffset);
 
-      const clampedEdgeOffset = Math.max(minOffset, Math.min(maxOffset, rawEdgeOffsetY));
+      const clampedEdgeOffset = Math.max(
+        minOffset,
+        Math.min(maxOffset, rawEdgeOffsetY),
+      );
       const clampDeltaEdge = rawEdgeOffsetY - clampedEdgeOffset;
-      const topPinActivationOvershootPx = EDGE_HOLD_PIN_THRESHOLD_PX + EDGE_HOLD_TOP_NEUTRAL_OVERSHOOT_PX;
-      const bottomOvershootPx = clampDeltaEdge > EDGE_HOLD_PIN_THRESHOLD_PX
-        ? clampDeltaEdge
-        : 0;
-      const topOvershootPx = clampDeltaEdge < -topPinActivationOvershootPx
-        ? Math.abs(clampDeltaEdge) - EDGE_HOLD_TOP_NEUTRAL_OVERSHOOT_PX
-        : 0;
-      const pinnedDirection: -1 | 0 | 1 = bottomOvershootPx > 0
-        ? 1
-        : topOvershootPx > 0
-          ? -1
+      const topPinActivationOvershootPx =
+        EDGE_HOLD_PIN_THRESHOLD_PX + EDGE_HOLD_TOP_NEUTRAL_OVERSHOOT_PX;
+      const bottomOvershootPx =
+        clampDeltaEdge > EDGE_HOLD_PIN_THRESHOLD_PX ? clampDeltaEdge : 0;
+      const topOvershootPx =
+        clampDeltaEdge < -topPinActivationOvershootPx
+          ? Math.abs(clampDeltaEdge) - EDGE_HOLD_TOP_NEUTRAL_OVERSHOOT_PX
           : 0;
-      const effectiveOvershootPx = pinnedDirection === 1
-        ? bottomOvershootPx
-        : pinnedDirection === -1
-          ? topOvershootPx
-          : 0;
+      const pinnedDirection: -1 | 0 | 1 =
+        bottomOvershootPx > 0 ? 1 : topOvershootPx > 0 ? -1 : 0;
+      const effectiveOvershootPx =
+        pinnedDirection === 1
+          ? bottomOvershootPx
+          : pinnedDirection === -1
+            ? topOvershootPx
+            : 0;
       const edgeHoldProfile = resolveEdgeHoldProfile(effectiveOvershootPx);
       syncEdgeHoldState(pinnedDirection, edgeHoldProfile);
     };
 
     clampDragOffset(dragVisualOffsetY.get(), dragEdgeOffsetY.get());
-    const unsubscribeVisualOffset = dragVisualOffsetY.on("change", (nextVisualOffset) => {
-      clampDragOffset(nextVisualOffset, dragEdgeOffsetY.get());
-    });
-    const unsubscribeEdgeOffset = dragEdgeOffsetY === dragVisualOffsetY
-      ? null
-      : dragEdgeOffsetY.on("change", (nextEdgeOffset) => {
-          clampDragOffset(dragVisualOffsetY.get(), nextEdgeOffset);
-        });
-    const handleViewportChange = () => clampDragOffset(dragVisualOffsetY.get(), dragEdgeOffsetY.get());
+    const unsubscribeVisualOffset = dragVisualOffsetY.on(
+      "change",
+      (nextVisualOffset) => {
+        clampDragOffset(nextVisualOffset, dragEdgeOffsetY.get());
+      },
+    );
+    const unsubscribeEdgeOffset =
+      dragEdgeOffsetY === dragVisualOffsetY
+        ? null
+        : dragEdgeOffsetY.on("change", (nextEdgeOffset) => {
+            clampDragOffset(dragVisualOffsetY.get(), nextEdgeOffset);
+          });
+    const handleViewportChange = () =>
+      clampDragOffset(dragVisualOffsetY.get(), dragEdgeOffsetY.get());
 
     window.addEventListener("resize", handleViewportChange);
     const viewport = window.visualViewport;
-    const canListenToViewport = !!viewport
-      && typeof viewport.addEventListener === "function"
-      && typeof viewport.removeEventListener === "function";
+    const canListenToViewport =
+      !!viewport &&
+      typeof viewport.addEventListener === "function" &&
+      typeof viewport.removeEventListener === "function";
     if (canListenToViewport) {
       viewport.addEventListener("resize", handleViewportChange);
       viewport.addEventListener("scroll", handleViewportChange);
@@ -1360,7 +1567,15 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         viewport.removeEventListener("scroll", handleViewportChange);
       }
     };
-  }, [dragEdgeOffsetY, dragOverlayOffsetY, dragOverlaySnapshot, dragVisualOffsetY, stopEdgeHold, syncEdgeHoldState, timelineIsDragging]);
+  }, [
+    dragEdgeOffsetY,
+    dragOverlayOffsetY,
+    dragOverlaySnapshot,
+    dragVisualOffsetY,
+    stopEdgeHold,
+    syncEdgeHoldState,
+    timelineIsDragging,
+  ]);
 
   useEffect(() => {
     if (timelineIsDragging) return;
@@ -1412,47 +1627,61 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   const fullDaySlotMinutes = useMemo(() => buildFullDaySlotMinutes(), []);
 
-  const positionedTimelineTasks = useMemo(() => (
-    flowOrderedScheduledItems
-      .map((task) => {
-        const flow = scheduledFlow.byTaskId.get(task.id);
-        const startMinute = flow?.startMinute ?? parseTimeToMinute(task.scheduled_time);
-        if (startMinute === null) return null;
+  const positionedTimelineTasks = useMemo(
+    () =>
+      flowOrderedScheduledItems
+        .map((task) => {
+          const flow = scheduledFlow.byTaskId.get(task.id);
+          const startMinute =
+            flow?.startMinute ?? parseTimeToMinute(task.scheduled_time);
+          if (startMinute === null) return null;
 
-        const laneCount = Math.max(1, flow?.laneCount ?? 1);
-        const laneIndex = Math.min(laneCount - 1, Math.max(0, flow?.laneIndex ?? 0));
-        const widthPercent = 100 / laneCount;
-        const leftPercent = laneIndex * widthPercent;
-        const heightPx = durationMinutesToPixels(task.estimated_duration, {
-          fallbackMinutes: timedTaskDurationFallbackMinutes,
-          minHeightPx: OUTLOOK_TIMELINE_MIN_EVENT_HEIGHT_PX,
-          pxPerMinute: OUTLOOK_TIMELINE_PX_PER_MINUTE,
-        });
+          const laneCount = Math.max(1, flow?.laneCount ?? 1);
+          const laneIndex = Math.min(
+            laneCount - 1,
+            Math.max(0, flow?.laneIndex ?? 0),
+          );
+          const widthPercent = 100 / laneCount;
+          const leftPercent = laneIndex * widthPercent;
+          const heightPx = durationMinutesToPixels(task.estimated_duration, {
+            fallbackMinutes: timedTaskDurationFallbackMinutes,
+            minHeightPx: OUTLOOK_TIMELINE_MIN_EVENT_HEIGHT_PX,
+            pxPerMinute: OUTLOOK_TIMELINE_PX_PER_MINUTE,
+          });
 
-        return {
-          task,
-          startMinute,
-          topPx: getTimelineTopPx(startMinute),
-          heightPx,
-          laneIndex,
-          laneCount,
-          overlapCount: flow?.overlapCount ?? 0,
-          leftPercent,
-          widthPercent,
-        };
-      })
-      .filter((entry): entry is {
-        task: Task;
-        startMinute: number;
-        topPx: number;
-        heightPx: number;
-        laneIndex: number;
-        laneCount: number;
-        overlapCount: number;
-        leftPercent: number;
-        widthPercent: number;
-      } => entry !== null)
-  ), [flowOrderedScheduledItems, scheduledFlow.byTaskId, timedTaskDurationFallbackMinutes]);
+          return {
+            task,
+            startMinute,
+            topPx: getTimelineTopPx(startMinute),
+            heightPx,
+            laneIndex,
+            laneCount,
+            overlapCount: flow?.overlapCount ?? 0,
+            leftPercent,
+            widthPercent,
+          };
+        })
+        .filter(
+          (
+            entry,
+          ): entry is {
+            task: Task;
+            startMinute: number;
+            topPx: number;
+            heightPx: number;
+            laneIndex: number;
+            laneCount: number;
+            overlapCount: number;
+            leftPercent: number;
+            widthPercent: number;
+          } => entry !== null,
+        ),
+    [
+      flowOrderedScheduledItems,
+      scheduledFlow.byTaskId,
+      timedTaskDurationFallbackMinutes,
+    ],
+  );
 
   const hasRenderableNowMarker = isTodaySelected;
 
@@ -1461,15 +1690,19 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
     const updateScheduledPaneBounds = () => {
       const pane = scheduledPaneRef.current;
-      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      const viewportHeight =
+        window.visualViewport?.height ?? window.innerHeight;
       if (!pane) {
         setTimelineBodyHeightPx(null);
         return;
       }
 
-      const viewportBottom = (window.visualViewport?.offsetTop ?? 0) + viewportHeight;
+      const viewportBottom =
+        (window.visualViewport?.offsetTop ?? 0) + viewportHeight;
       const bottomOffset = getBottomNavObstructionPx();
-      const available = Math.floor(viewportBottom - pane.getBoundingClientRect().top - bottomOffset);
+      const available = Math.floor(
+        viewportBottom - pane.getBoundingClientRect().top - bottomOffset,
+      );
       if (!Number.isFinite(available)) return;
       setTimelineBodyHeightPx(Math.max(120, available));
     };
@@ -1478,9 +1711,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     updateScheduledPaneBounds();
     window.addEventListener("resize", updateScheduledPaneBounds);
     const viewport = window.visualViewport;
-    const canListenToViewport = !!viewport
-      && typeof viewport.addEventListener === "function"
-      && typeof viewport.removeEventListener === "function";
+    const canListenToViewport =
+      !!viewport &&
+      typeof viewport.addEventListener === "function" &&
+      typeof viewport.removeEventListener === "function";
     if (canListenToViewport) {
       viewport.addEventListener("resize", updateScheduledPaneBounds);
       viewport.addEventListener("scroll", updateScheduledPaneBounds);
@@ -1494,14 +1728,22 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         viewport.removeEventListener("scroll", updateScheduledPaneBounds);
       }
     };
-  }, [comboCount, hasRenderableNowMarker, isDesktopLayout, isTodaySelected, positionedTimelineTasks.length, tasks.length]);
+  }, [
+    comboCount,
+    hasRenderableNowMarker,
+    isDesktopLayout,
+    isTodaySelected,
+    positionedTimelineTasks.length,
+    tasks.length,
+  ]);
 
   useEffect(() => {
     const isToday = isTodaySelected;
     const becameVisible = isVisible && !wasVisibleRef.current;
     const becameToday = isToday && !wasTodayRef.current;
     const gainedNowMarker = hasRenderableNowMarker && !hadNowMarkerRef.current;
-    const centerRequestChanged = centerNowRequestKey !== lastCenterNowRequestKeyRef.current;
+    const centerRequestChanged =
+      centerNowRequestKey !== lastCenterNowRequestKeyRef.current;
     const shouldCenter =
       isVisible &&
       isToday &&
@@ -1512,20 +1754,29 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     if (shouldCenter && typeof window !== "undefined") {
       const pane = scheduledPaneRef.current;
       if (pane) {
-        const paneHeight = pane.clientHeight || timelineBodyHeightPx || (window.visualViewport?.height ?? window.innerHeight);
+        const paneHeight =
+          pane.clientHeight ||
+          timelineBodyHeightPx ||
+          (window.visualViewport?.height ?? window.innerHeight);
         const markerTop = getTimelineTopPx(nowMarkerMinuteRef.current);
-        const targetPaneScrollTop = markerTop - (paneHeight * NOW_MARKER_VIEWPORT_TARGET);
-        const maxPaneScrollTop = Math.max(0, pane.scrollHeight - pane.clientHeight);
+        const targetPaneScrollTop =
+          markerTop - paneHeight * NOW_MARKER_VIEWPORT_TARGET;
+        const maxPaneScrollTop = Math.max(
+          0,
+          pane.scrollHeight - pane.clientHeight,
+        );
         pane.scrollTo({
           top: Math.max(0, Math.min(maxPaneScrollTop, targetPaneScrollTop)),
           behavior: "smooth",
         });
       } else if (nowMarkerRowRef.current) {
         const markerRect = nowMarkerRowRef.current.getBoundingClientRect();
-        const markerMidpoint = markerRect.top + (markerRect.height / 2);
+        const markerMidpoint = markerRect.top + markerRect.height / 2;
         const targetScrollTop = Math.max(
           0,
-          window.scrollY + markerMidpoint - (window.innerHeight * NOW_MARKER_VIEWPORT_TARGET),
+          window.scrollY +
+            markerMidpoint -
+            window.innerHeight * NOW_MARKER_VIEWPORT_TARGET,
         );
         window.scrollTo({ top: targetScrollTop, behavior: "smooth" });
       }
@@ -1535,7 +1786,14 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     wasTodayRef.current = isToday;
     hadNowMarkerRef.current = hasRenderableNowMarker;
     lastCenterNowRequestKeyRef.current = centerNowRequestKey;
-  }, [centerNowRequestKey, hasRenderableNowMarker, isTodaySelected, isVisible, timelineBodyHeightPx, timelineIsDragging]);
+  }, [
+    centerNowRequestKey,
+    hasRenderableNowMarker,
+    isTodaySelected,
+    isVisible,
+    timelineBodyHeightPx,
+    timelineIsDragging,
+  ]);
 
   const baseTimelineConflictMap = useMemo(
     () => buildTaskConflictMap(draggableTimelineItems),
@@ -1553,15 +1811,18 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   }, [draggedScheduledTask, scheduledFlow.byTaskId]);
   const shouldRenderDragOverlay = Boolean(
     timelineIsDragging &&
-      dragOverlaySnapshot &&
-      draggedScheduledTask &&
-      dragOverlaySnapshot.taskId === draggedScheduledTask.id,
+    dragOverlaySnapshot &&
+    draggedScheduledTask &&
+    dragOverlaySnapshot.taskId === draggedScheduledTask.id,
   );
   const draggedLaneOffsetPx = draggedScheduledFlow
-    ? getLaneOffsetPx(draggedScheduledFlow.laneIndex, draggedScheduledFlow.overlapCount)
+    ? getLaneOffsetPx(
+        draggedScheduledFlow.laneIndex,
+        draggedScheduledFlow.overlapCount,
+      )
     : 0;
   const draggedOverlapCount = draggedScheduledTask
-    ? timelineConflictMap.get(draggedScheduledTask.id)?.size ?? 0
+    ? (timelineConflictMap.get(draggedScheduledTask.id)?.size ?? 0)
     : 0;
 
   const activeEpicsById = useMemo(() => {
@@ -1584,7 +1845,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       const existingGroup = ritualsByEpic.get(epicId);
       if (existingGroup) {
         existingGroup.rituals.push(task);
-        if (existingGroup.title === "Campaign" && fallbackTitle !== "Campaign") {
+        if (
+          existingGroup.title === "Campaign" &&
+          fallbackTitle !== "Campaign"
+        ) {
           existingGroup.title = fallbackTitle;
         }
         continue;
@@ -1604,7 +1868,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         progress: epic ? Math.round(epic.progress_percentage ?? 0) : null,
         daysLeft: epic ? getDaysLeft(epic) : null,
         rituals: group.rituals,
-        completedCount: group.rituals.filter((ritual) => !!ritual.completed).length,
+        completedCount: group.rituals.filter((ritual) => !!ritual.completed)
+          .length,
         epic,
         isHydrated: !!epic,
       };
@@ -1622,7 +1887,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   );
 
   const renderCampaignSectionLabel = (label: string) => {
-    const className = "flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground";
+    const className =
+      "flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground";
     const contents = (
       <>
         <Target className="h-3 w-3" />
@@ -1643,13 +1909,13 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         {contents}
       </button>
     ) : (
-      <div className={className}>
-        {contents}
-      </div>
+      <div className={className}>{contents}</div>
     );
   };
 
-  const renderCampaignSection = ({ inDesktopRail = false }: { inDesktopRail?: boolean } = {}) => {
+  const renderCampaignSection = ({
+    inDesktopRail = false,
+  }: { inDesktopRail?: boolean } = {}) => {
     const sectionLabel = inDesktopRail ? "Campaigns & rituals" : "Campaigns";
     const campaignSectionHeader = (
       <div className="flex items-center gap-2 mb-3">
@@ -1661,26 +1927,36 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
     return (
       <>
-      {/* Campaign quick-view launchers; ritual tasks render in the normal scheduler timeline. */}
-      {campaignRitualGroups.length > 0 && (
-        <div className={cn(inDesktopRail ? "space-y-3" : "mt-6 pt-4 border-t border-border/30")}>
-          {campaignSectionHeader}
+        {/* Campaign quick-view launchers; ritual tasks render in the normal scheduler timeline. */}
+        {campaignRitualGroups.length > 0 && (
+          <div
+            className={cn(
+              inDesktopRail
+                ? "space-y-3"
+                : "mt-6 pt-4 border-t border-border/30",
+            )}
+          >
+            {campaignSectionHeader}
 
-          <div className="space-y-2">
-            {campaignRitualGroups.map((group) => {
-              const resolvedEndDate = group.epic ? resolveEpicEndDate(group.epic) : null;
-              return (
-                group.epic && group.isHydrated ? (
-                  <JourneyPathDrawer key={group.epicId} epic={{
-                    id: group.epic.id,
-                    title: group.epic.title,
-                    description: group.epic.description ?? undefined,
-                    progress_percentage: group.epic.progress_percentage ?? 0,
-                    target_days: group.epic.target_days,
-                    start_date: group.epic.start_date,
-                    end_date: resolvedEndDate,
-                    epic_habits: group.epic.epic_habits,
-                  }}>
+            <div className="space-y-2">
+              {campaignRitualGroups.map((group) => {
+                const resolvedEndDate = group.epic
+                  ? resolveEpicEndDate(group.epic)
+                  : null;
+                return group.epic && group.isHydrated ? (
+                  <JourneyPathDrawer
+                    key={group.epicId}
+                    epic={{
+                      id: group.epic.id,
+                      title: group.epic.title,
+                      description: group.epic.description ?? undefined,
+                      progress_percentage: group.epic.progress_percentage ?? 0,
+                      target_days: group.epic.target_days,
+                      start_date: group.epic.start_date,
+                      end_date: resolvedEndDate,
+                      epic_habits: group.epic.epic_habits,
+                    }}
+                  >
                     <button
                       type="button"
                       aria-label={`Open campaign ${group.title}`}
@@ -1688,16 +1964,25 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     >
                       <span className="flex min-w-0 items-center gap-2">
                         <Target className="w-4 h-4 text-primary shrink-0" />
-                        <span className="text-sm font-medium truncate">{group.title}</span>
+                        <span className="text-sm font-medium truncate">
+                          {group.title}
+                        </span>
                       </span>
                       <span className="flex items-center gap-2 shrink-0">
                         {group.progress !== null && (
-                          <span className="text-primary font-bold text-xs">{group.progress}%</span>
+                          <span className="text-primary font-bold text-xs">
+                            {group.progress}%
+                          </span>
                         )}
                         {group.daysLeft !== null && (
-                          <span className="text-muted-foreground text-xs">{group.daysLeft}d</span>
+                          <span className="text-muted-foreground text-xs">
+                            {group.daysLeft}d
+                          </span>
                         )}
-                        <Badge variant="secondary" className="text-xs h-5 px-1.5">
+                        <Badge
+                          variant="secondary"
+                          className="text-xs h-5 px-1.5"
+                        >
                           {group.completedCount}/{group.rituals.length}
                         </Badge>
                       </span>
@@ -1710,116 +1995,150 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   >
                     <span className="flex min-w-0 items-center gap-2">
                       <Target className="w-4 h-4 text-primary shrink-0" />
-                      <span className="text-sm font-medium truncate">{group.title}</span>
+                      <span className="text-sm font-medium truncate">
+                        {group.title}
+                      </span>
                     </span>
                     <Badge variant="secondary" className="text-xs h-5 px-1.5">
                       {group.completedCount}/{group.rituals.length}
                     </Badge>
                   </div>
-                )
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {activeEpicsWithoutRitualGroup.length > 0 && campaignRitualGroups.length > 0 && (
-        <div className={cn(inDesktopRail ? "mt-3 space-y-2" : "mt-3 space-y-2")}>
-          {activeEpicsWithoutRitualGroup.map((epic) => {
-            const progress = Math.round(epic.progress_percentage ?? 0);
-            const daysLeft = getDaysLeft(epic);
-            const resolvedEndDate = resolveEpicEndDate(epic);
-            return (
-              <JourneyPathDrawer key={epic.id} epic={{
-                id: epic.id,
-                title: epic.title,
-                description: epic.description ?? undefined,
-                progress_percentage: epic.progress_percentage ?? 0,
-                target_days: epic.target_days,
-                start_date: epic.start_date,
-                end_date: resolvedEndDate,
-                epic_habits: epic.epic_habits,
-              }}>
-                <button
-                  type="button"
-                  aria-label={`Open campaign ${epic.title}`}
-                  className="flex w-full items-center justify-between gap-2 rounded-xl border border-border/30 bg-card/30 px-3 py-2 text-left hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <Target className="w-4 h-4 text-primary shrink-0" />
-                    <span className="text-sm font-medium truncate max-w-[140px]">{epic.title}</span>
-                  </span>
-                  <span className="flex shrink-0 items-center gap-2">
-                    <span className="text-primary font-bold text-xs">{progress}%</span>
-                    {daysLeft !== null && (
-                      <span className="text-muted-foreground text-xs">{daysLeft}d</span>
-                    )}
-                  </span>
-                </button>
-              </JourneyPathDrawer>
-            );
-          })}
-        </div>
-      )}
-
-      {isCampaignsLoading && campaignRitualGroups.length === 0 && (
-        <div className={cn(inDesktopRail ? "rounded-[24px] border border-white/8 bg-white/[0.03] p-4" : "mt-4 pt-3 border-t border-border/20")}>
-          <p className="text-xs text-muted-foreground">Loading campaigns...</p>
-        </div>
-      )}
-
-      {/* Campaign Strip (for epics with no rituals today) */}
-      {activeEpics.length > 0 && campaignRitualGroups.length === 0 && (
-        <div className={cn(inDesktopRail ? "space-y-3" : "mt-4 pt-3 border-t border-border/20")}>
-          {campaignSectionHeader}
-
-          <div className="space-y-2">
-            {activeEpics.map((epic) => {
-              const progress = Math.round(epic.progress_percentage ?? 0);
-              const daysLeft = getDaysLeft(epic);
-              const resolvedEndDate = resolveEpicEndDate(epic);
-              return (
-                <JourneyPathDrawer key={epic.id} epic={{
-                  id: epic.id,
-                  title: epic.title,
-                  description: epic.description ?? undefined,
-                  progress_percentage: epic.progress_percentage ?? 0,
-                  target_days: epic.target_days,
-                  start_date: epic.start_date,
-                  end_date: resolvedEndDate,
-                  epic_habits: epic.epic_habits,
-                }}>
-                  <button
-                    type="button"
-                    aria-label={`Open campaign ${epic.title}`}
-                    className="w-full rounded-xl border border-border/30 bg-card/30 px-3 py-2 text-left hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+        {activeEpicsWithoutRitualGroup.length > 0 &&
+          campaignRitualGroups.length > 0 && (
+            <div
+              className={cn(
+                inDesktopRail ? "mt-3 space-y-2" : "mt-3 space-y-2",
+              )}
+            >
+              {activeEpicsWithoutRitualGroup.map((epic) => {
+                const progress = Math.round(epic.progress_percentage ?? 0);
+                const daysLeft = getDaysLeft(epic);
+                const resolvedEndDate = resolveEpicEndDate(epic);
+                return (
+                  <JourneyPathDrawer
+                    key={epic.id}
+                    epic={{
+                      id: epic.id,
+                      title: epic.title,
+                      description: epic.description ?? undefined,
+                      progress_percentage: epic.progress_percentage ?? 0,
+                      target_days: epic.target_days,
+                      start_date: epic.start_date,
+                      end_date: resolvedEndDate,
+                      epic_habits: epic.epic_habits,
+                    }}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex min-w-0 items-center gap-2">
+                    <button
+                      type="button"
+                      aria-label={`Open campaign ${epic.title}`}
+                      className="flex w-full items-center justify-between gap-2 rounded-xl border border-border/30 bg-card/30 px-3 py-2 text-left hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
                         <Target className="w-4 h-4 text-primary shrink-0" />
-                        <span className="text-sm font-medium truncate max-w-[140px]">{epic.title}</span>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <span className="text-primary font-bold text-xs shrink-0">{progress}%</span>
+                        <span className="text-sm font-medium truncate max-w-[140px]">
+                          {epic.title}
+                        </span>
+                      </span>
+                      <span className="flex shrink-0 items-center gap-2">
+                        <span className="text-primary font-bold text-xs">
+                          {progress}%
+                        </span>
                         {daysLeft !== null && (
-                          <span className="text-muted-foreground text-xs shrink-0">{daysLeft}d</span>
+                          <span className="text-muted-foreground text-xs">
+                            {daysLeft}d
+                          </span>
                         )}
-                      </div>
-                    </div>
-                  </button>
-                </JourneyPathDrawer>
-              );
-            })}
+                      </span>
+                    </button>
+                  </JourneyPathDrawer>
+                );
+              })}
+            </div>
+          )}
+
+        {isCampaignsLoading && campaignRitualGroups.length === 0 && (
+          <div
+            className={cn(
+              inDesktopRail
+                ? "rounded-[24px] border border-white/8 bg-white/[0.03] p-4"
+                : "mt-4 pt-3 border-t border-border/20",
+            )}
+          >
+            <p className="text-xs text-muted-foreground">
+              Loading campaigns...
+            </p>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Campaign Strip (for epics with no rituals today) */}
+        {activeEpics.length > 0 && campaignRitualGroups.length === 0 && (
+          <div
+            className={cn(
+              inDesktopRail
+                ? "space-y-3"
+                : "mt-4 pt-3 border-t border-border/20",
+            )}
+          >
+            {campaignSectionHeader}
+
+            <div className="space-y-2">
+              {activeEpics.map((epic) => {
+                const progress = Math.round(epic.progress_percentage ?? 0);
+                const daysLeft = getDaysLeft(epic);
+                const resolvedEndDate = resolveEpicEndDate(epic);
+                return (
+                  <JourneyPathDrawer
+                    key={epic.id}
+                    epic={{
+                      id: epic.id,
+                      title: epic.title,
+                      description: epic.description ?? undefined,
+                      progress_percentage: epic.progress_percentage ?? 0,
+                      target_days: epic.target_days,
+                      start_date: epic.start_date,
+                      end_date: resolvedEndDate,
+                      epic_habits: epic.epic_habits,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      aria-label={`Open campaign ${epic.title}`}
+                      className="w-full rounded-xl border border-border/30 bg-card/30 px-3 py-2 text-left hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <Target className="w-4 h-4 text-primary shrink-0" />
+                          <span className="text-sm font-medium truncate max-w-[140px]">
+                            {epic.title}
+                          </span>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <span className="text-primary font-bold text-xs shrink-0">
+                            {progress}%
+                          </span>
+                          {daysLeft !== null && (
+                            <span className="text-muted-foreground text-xs shrink-0">
+                              {daysLeft}d
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  </JourneyPathDrawer>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </>
     );
   };
-
-
-
-  
 
   const totalXP = tasks.reduce((sum, task) => {
     if (!task.completed) return sum;
@@ -1828,11 +2147,14 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       : task.xp_reward;
     return sum + taskXP;
   }, 0);
-  const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+  const progressPercent =
+    totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
   const allComplete = totalCount > 0 && completedCount === totalCount;
   const weekCompletedCount = weekTasks.filter((task) => task.completed).length;
   const weekTotalCount = weekTasks.length;
-  const weekScheduledCount = weekTasks.filter((task) => !!task.scheduled_time).length;
+  const weekScheduledCount = weekTasks.filter(
+    (task) => !!task.scheduled_time,
+  ).length;
   const weekActiveDays = new Set(weekTasks.map((task) => task.task_date)).size;
   const weekXP = weekTasks.reduce((sum, task) => {
     if (!task.completed) return sum;
@@ -1845,17 +2167,21 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const selectedAnytimeCount = anytimeItems.length;
   const selectedRitualCount = ritualTasks.length;
   const selectedOpenCount = totalCount - completedCount;
-  const nextFocusTask = baseTimelineItems.find((task) => !task.completed) ?? null;
+  const nextFocusTask =
+    baseTimelineItems.find((task) => !task.completed) ?? null;
   const selectedDateHeading = safeFormat(selectedDate, "EEEE", "Day plan");
   const selectedDateSubheading = safeFormat(selectedDate, "MMMM d, yyyy", "");
   const isSelectedToday = isSameDay(selectedDate, new Date());
-  const desktopTimelineDurationLayout = isDesktopLayout && useMacDurationSizedDesktopTimelineRows
-    ? {
-        fallbackMinutes: timedTaskDurationFallbackMinutes,
-        minHeightPx: DESKTOP_TIMELINE_DURATION_BASE_HEIGHT_PX,
-        pxPerMinute: DESKTOP_TIMELINE_DURATION_BASE_HEIGHT_PX / DESKTOP_TIMELINE_DURATION_BASE_MINUTES,
-      }
-    : null;
+  const desktopTimelineDurationLayout =
+    isDesktopLayout && useMacDurationSizedDesktopTimelineRows
+      ? {
+          fallbackMinutes: timedTaskDurationFallbackMinutes,
+          minHeightPx: DESKTOP_TIMELINE_DURATION_BASE_HEIGHT_PX,
+          pxPerMinute:
+            DESKTOP_TIMELINE_DURATION_BASE_HEIGHT_PX /
+            DESKTOP_TIMELINE_DURATION_BASE_MINUTES,
+        }
+      : null;
 
   const triggerHaptic = async (style: ImpactStyle) => {
     try {
@@ -1866,721 +2192,821 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   };
 
   // Check if a task has expandable details
-  const hasExpandableDetails = useCallback((task: Task) => {
-    const displayAttachments = normalizeDisplayAttachments(task);
-    const ritualDescription = task.habit_source_id
-      ? habitDescriptionById.get(task.habit_source_id) ?? null
-      : null;
-    return !!(
-      (task.subtasks && task.subtasks.length > 0) ||
-      displayAttachments.length > 0 ||
-      normalizeDetailText(ritualDescription) ||
-      task.location ||
-      task.notes || 
-      task.priority || 
-      task.estimated_duration || 
-      (task.is_recurring && task.recurrence_pattern) || 
-      task.difficulty ||
-      task.category
-    );
-  }, [habitDescriptionById]);
+  const hasExpandableDetails = useCallback(
+    (task: Task) => {
+      const displayAttachments = normalizeDisplayAttachments(task);
+      const ritualDescription = task.habit_source_id
+        ? (habitDescriptionById.get(task.habit_source_id) ?? null)
+        : null;
+      return !!(
+        (task.subtasks && task.subtasks.length > 0) ||
+        displayAttachments.length > 0 ||
+        normalizeDetailText(ritualDescription) ||
+        task.location ||
+        task.notes ||
+        task.priority ||
+        task.estimated_duration ||
+        (task.is_recurring && task.recurrence_pattern) ||
+        task.difficulty ||
+        task.category
+      );
+    },
+    [habitDescriptionById],
+  );
 
-  const toggleTaskExpanded = useCallback((taskId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const toggleTaskExpanded = useCallback(
+    (taskId: string, e: React.MouseEvent) => {
+      e.stopPropagation();
 
-    setExpandedTasks(prev => {
-      const next = new Set(prev);
-      if (next.has(taskId)) {
-        next.delete(taskId);
-      } else {
-        next.add(taskId);
-      }
-      return next;
-    });
-  }, []);
+      setExpandedTasks((prev) => {
+        const next = new Set(prev);
+        if (next.has(taskId)) {
+          next.delete(taskId);
+        } else {
+          next.add(taskId);
+        }
+        return next;
+      });
+    },
+    [],
+  );
 
   const getCategoryIcon = (category: string | null | undefined) => {
     switch (category) {
-      case 'mind': return Brain;
-      case 'body': return Dumbbell;
-      case 'soul': return Heart;
-      default: return null;
+      case "mind":
+        return Brain;
+      case "body":
+        return Dumbbell;
+      case "soul":
+        return Heart;
+      default:
+        return null;
     }
   };
 
-  const suppressNativeContextMenu = useCallback((event: ReactMouseEvent<HTMLElement>) => {
-    event.preventDefault();
-  }, []);
+  const suppressNativeContextMenu = useCallback(
+    (event: ReactMouseEvent<HTMLElement>) => {
+      event.preventDefault();
+    },
+    [],
+  );
 
-  const renderTaskItem = useCallback((
-    task: Task,
-    dragProps?: ListDragHandleProps,
-    overlapCount = 0,
-    timelineContext?: TimelineTaskRenderContext,
-  ) => {
-    const isComplete = !!task.completed || optimisticCompleted.has(task.id);
-    const isRitual = !!task.habit_source_id;
-    const isCampaignRitual = isCampaignRitualTask(task);
-    const campaignTitle = task.epic_title?.trim() || "Campaign";
-    const effectiveTaskXP = task.is_main_quest
-      ? Math.round(task.xp_reward * MAIN_QUEST_XP_MULTIPLIER)
-      : task.xp_reward;
-    const isDragging = dragProps?.isDragging ?? false;
-    const isPressed = dragProps?.isPressed ?? false;
-    const isActivated = dragProps?.isActivated ?? false;
-    const isActionMenuOpen = openActionMenuTaskId === task.id;
-    const isExpanded = expandedTasks.has(task.id);
-    const isScheduledTimelineItem = timelineContext?.isScheduledTimeline === true;
-    const isCompactTimelineItem = isScheduledTimelineItem && timelineContext?.isCompact === true;
-    const canRenderInlineDetails = !isScheduledTimelineItem;
-    const isInlineExpanded = canRenderInlineDetails && isExpanded;
-    const hasDetails = hasExpandableDetails(task);
-    const CategoryIcon = getCategoryIcon(task.category);
-    const subtasks = task.subtasks ?? [];
-    const displayAttachments = normalizeDisplayAttachments(task);
-    const completedSubtaskCount = subtasks.filter(subtask => !!subtask.completed).length;
-    const ritualDescription = isRitual && task.habit_source_id
-      ? habitDescriptionById.get(task.habit_source_id) ?? null
-      : null;
-    const normalizedRitualDescription = normalizeDetailText(ritualDescription);
-    const normalizedTaskNotes = normalizeDetailText(task.notes);
-    const shouldRenderRitualDescription = normalizedRitualDescription.length > 0;
-    const shouldRenderNotes = normalizedTaskNotes.length > 0 && normalizedTaskNotes !== normalizedRitualDescription;
-    const hasDetailBadges = !!(
-      (CategoryIcon && task.category) ||
-      task.difficulty ||
-      task.priority ||
-      task.estimated_duration ||
-      (task.is_recurring && task.recurrence_pattern)
-    );
-    const handleCheckboxClick = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      // Don't allow clicks while dragging or during long press
-      if (isDragging || isActivated || isPressed) {
-        e.preventDefault();
-        return;
-      }
-      
-      if (isComplete && onUndoToggle) {
-        // Undo: remove from optimistic set
-        setOptimisticCompleted(prev => {
-          const next = new Set(prev);
-          next.delete(task.id);
-          return next;
-        });
-        resetCombo();
-        triggerHaptic(ImpactStyle.Light);
-        onUndoToggle(task.id, effectiveTaskXP);
-      } else {
-        // Complete: add to optimistic set immediately for instant strikethrough
-        setOptimisticCompleted(prev => new Set(prev).add(task.id));
-        registerCompletionCombo();
-        triggerHaptic(ImpactStyle.Medium);
-        playStrikethrough();
-        // Track for strikethrough animation
-        setJustCompletedTasks(prev => new Set(prev).add(task.id));
-        setTimeout(() => {
-          setJustCompletedTasks(prev => {
+  const renderTaskItem = useCallback(
+    (
+      task: Task,
+      dragProps?: ListDragHandleProps,
+      overlapCount = 0,
+      timelineContext?: TimelineTaskRenderContext,
+    ) => {
+      const isComplete = !!task.completed || optimisticCompleted.has(task.id);
+      const isRitual = !!task.habit_source_id;
+      const isCampaignRitual = isCampaignRitualTask(task);
+      const campaignTitle = task.epic_title?.trim() || "Campaign";
+      const effectiveTaskXP = task.is_main_quest
+        ? Math.round(task.xp_reward * MAIN_QUEST_XP_MULTIPLIER)
+        : task.xp_reward;
+      const isDragging = dragProps?.isDragging ?? false;
+      const isPressed = dragProps?.isPressed ?? false;
+      const isActivated = dragProps?.isActivated ?? false;
+      const isActionMenuOpen = openActionMenuTaskId === task.id;
+      const isExpanded = expandedTasks.has(task.id);
+      const isScheduledTimelineItem =
+        timelineContext?.isScheduledTimeline === true;
+      const isCompactTimelineItem =
+        isScheduledTimelineItem && timelineContext?.isCompact === true;
+      const canRenderInlineDetails = !isScheduledTimelineItem;
+      const isInlineExpanded = canRenderInlineDetails && isExpanded;
+      const hasDetails = hasExpandableDetails(task);
+      const CategoryIcon = getCategoryIcon(task.category);
+      const subtasks = task.subtasks ?? [];
+      const displayAttachments = normalizeDisplayAttachments(task);
+      const completedSubtaskCount = subtasks.filter(
+        (subtask) => !!subtask.completed,
+      ).length;
+      const ritualDescription =
+        isRitual && task.habit_source_id
+          ? (habitDescriptionById.get(task.habit_source_id) ?? null)
+          : null;
+      const normalizedRitualDescription =
+        normalizeDetailText(ritualDescription);
+      const normalizedTaskNotes = normalizeDetailText(task.notes);
+      const shouldRenderRitualDescription =
+        normalizedRitualDescription.length > 0;
+      const shouldRenderNotes =
+        normalizedTaskNotes.length > 0 &&
+        normalizedTaskNotes !== normalizedRitualDescription;
+      const hasDetailBadges = !!(
+        (CategoryIcon && task.category) ||
+        task.difficulty ||
+        task.priority ||
+        task.estimated_duration ||
+        (task.is_recurring && task.recurrence_pattern)
+      );
+      const handleCheckboxClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        // Don't allow clicks while dragging or during long press
+        if (isDragging || isActivated || isPressed) {
+          e.preventDefault();
+          return;
+        }
+
+        if (isComplete && onUndoToggle) {
+          // Undo: remove from optimistic set
+          setOptimisticCompleted((prev) => {
             const next = new Set(prev);
             next.delete(task.id);
             return next;
           });
-        }, 600);
+          resetCombo();
+          triggerHaptic(ImpactStyle.Light);
+          onUndoToggle(task.id, effectiveTaskXP);
+        } else {
+          // Complete: add to optimistic set immediately for instant strikethrough
+          setOptimisticCompleted((prev) => new Set(prev).add(task.id));
+          registerCompletionCombo();
+          triggerHaptic(ImpactStyle.Medium);
+          playStrikethrough();
+          // Track for strikethrough animation
+          setJustCompletedTasks((prev) => new Set(prev).add(task.id));
+          setTimeout(() => {
+            setJustCompletedTasks((prev) => {
+              const next = new Set(prev);
+              next.delete(task.id);
+              return next;
+            });
+          }, 600);
 
-        onToggle(task.id, !isComplete, effectiveTaskXP);
-      }
-    };
+          onToggle(task.id, !isComplete, effectiveTaskXP);
+        }
+      };
 
-    if (isDesktopLayout) {
-      const isDesktopDetailOpen = openDesktopDetailTaskId === task.id;
+      if (isDesktopLayout) {
+        const isDesktopDetailOpen = openDesktopDetailTaskId === task.id;
 
-      return (
-        <div
-          data-quest-card-shell="true"
-          className={cn(
-            JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME,
-            "group flex h-full items-stretch gap-2 rounded-[18px] p-2",
-            readableQuestCardsEnabled
-              ? JOURNEYS_QUEST_CARD_SHELL_READABLE_CLASS_NAME
-              : JOURNEYS_QUEST_CARD_SHELL_STANDARD_TONE_CLASS_NAME,
-            isCampaignRitual && (
-              readableQuestCardsEnabled
-                ? CAMPAIGN_RITUAL_CARD_CLASS_NAME
-                : CAMPAIGN_RITUAL_CARD_CLASSES
-            ),
-            isDesktopDetailOpen && JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME,
-            isDesktopDetailOpen && !readableQuestCardsEnabled && "border-primary/40 bg-primary/[0.08]",
-            isComplete && "opacity-70",
-          )}
-          onContextMenu={suppressNativeContextMenu}
-        >
-          <button
-            type="button"
-            data-interactive="true"
-            onClick={handleCheckboxClick}
-            className={cn(
-              "flex h-5 w-5 flex-shrink-0 self-center items-center justify-center rounded-full border-2 transition-colors",
-              isComplete
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-white/25 text-transparent hover:border-primary/70",
-            )}
-            aria-label={
-              isComplete
-                ? "Mark task as incomplete"
-                : "Mark task as complete"
-            }
-            role="checkbox"
-            aria-checked={isComplete}
-          >
-            <Check className="h-3 w-3" />
-          </button>
-
-          <DesktopQuestDetailsPopover
-            task={task}
-            open={isDesktopDetailOpen}
-            onOpenChange={(open) => {
-              setOpenDesktopDetailTaskId(open ? task.id : null);
-            }}
-            hasCalendarLink={hasCalendarLink?.(task.id)}
-            onEdit={onEditQuest}
-            onDelete={onDeleteQuest ? (currentTask) => onDeleteQuest(currentTask.id) : undefined}
-            onMoveQuestToNextDay={
-              onMoveQuestToNextDay && !isRitual
-                ? (currentTask) => onMoveQuestToNextDay(currentTask.id)
-                : undefined
-            }
-            onSendToCalendar={onSendToCalendar}
-            onToggleSubtask={(taskId, subtaskId, completed) => {
-              toggleSubtask.mutate({ taskId, subtaskId, completed });
-            }}
-            companionFrostedThemeStyle={companionFrostedThemeStyle}
-            anchor={(
-              <button
-                type="button"
-                onClick={() => scheduleDesktopTaskSingleClick(task)}
-                onDoubleClick={() => handleDesktopTaskDoubleClick(task)}
-                className="flex h-full min-w-0 flex-1 items-center rounded-[14px] px-2 py-1.5 text-left transition-colors hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-                data-testid={`desktop-timeline-task-button-${task.id}`}
-              >
-                <div className="min-w-0">
-                  <div className="flex min-w-0 items-center gap-2">
-                    {isRitual ? (
-                      <Repeat
-                        className={cn(
-                          "h-3.5 w-3.5 flex-shrink-0",
-                          isCampaignRitual ? "text-primary" : "text-accent",
-                        )}
-                      />
-                    ) : null}
-                    <p
-                      className={cn(
-                        "truncate text-sm font-medium text-foreground",
-                        isComplete && "text-muted-foreground line-through",
-                      )}
-                    >
-                      {task.task_text}
-                    </p>
-                  </div>
-                  {isCampaignRitual ? (
-                    <p className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-wide text-primary/80">
-                      Campaign Ritual - {campaignTitle}
-                    </p>
-                  ) : null}
-                </div>
-              </button>
-            )}
-          />
-        </div>
-      );
-    }
-
-    const isMobileQuestShellActive = isInlineExpanded || (isActivated && !isDragging);
-    const taskContent = (
-      <Collapsible
-        open={isInlineExpanded}
-        onOpenChange={() => {}}
-        className={cn(isCompactTimelineItem && "h-full min-h-0")}
-      >
-        <div
-          data-quest-card-shell="true"
-          data-scheduled-timeline-card={isScheduledTimelineItem ? "true" : undefined}
-          data-compact-timeline-card={isCompactTimelineItem ? "true" : undefined}
-          data-timeline-card-height-px={timelineContext?.heightPx ?? undefined}
-          className={cn(
-            JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME,
-            "rounded-[22px] px-2",
-            isCompactTimelineItem && "h-full min-h-0 rounded-[18px]",
-            readableQuestCardsEnabled
-              ? JOURNEYS_QUEST_CARD_SHELL_READABLE_CLASS_NAME
-              : JOURNEYS_QUEST_CARD_SHELL_STANDARD_TONE_CLASS_NAME,
-            isCampaignRitual && (
-              readableQuestCardsEnabled
-                ? CAMPAIGN_RITUAL_CARD_CLASS_NAME
-                : CAMPAIGN_RITUAL_CARD_CLASSES
-            ),
-            isMobileQuestShellActive && JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME,
-            isMobileQuestShellActive && !readableQuestCardsEnabled && "border-primary/35 bg-primary/[0.06]",
-            isComplete && "opacity-70",
-          )}
-        >
+        return (
           <div
+            data-quest-card-shell="true"
             className={cn(
-              "flex items-center gap-3 transition-all relative group",
-              "no-text-select select-none",
-              isCompactTimelineItem
-                ? "h-full min-h-0 gap-2 py-0.5"
-                : "min-h-[46px]",
-              !isCompactTimelineItem && (isRitual ? "py-3" : "py-2"),
-              isDragging && "cursor-grabbing",
+              JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME,
+              "group flex h-full items-stretch gap-2 rounded-[18px] p-2",
+              readableQuestCardsEnabled
+                ? JOURNEYS_QUEST_CARD_SHELL_READABLE_CLASS_NAME
+                : JOURNEYS_QUEST_CARD_SHELL_STANDARD_TONE_CLASS_NAME,
+              isCampaignRitual &&
+                (readableQuestCardsEnabled
+                  ? CAMPAIGN_RITUAL_CARD_CLASS_NAME
+                  : CAMPAIGN_RITUAL_CARD_CLASSES),
+              isDesktopDetailOpen &&
+                JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME,
+              isDesktopDetailOpen &&
+                !readableQuestCardsEnabled &&
+                "border-primary/40 bg-primary/[0.08]",
+              isComplete && "opacity-70",
             )}
             onContextMenu={suppressNativeContextMenu}
           >
-            {/* Checkbox - only this toggles completion */}
-            <div className="relative ml-1 flex flex-col items-center self-start pt-0.5 gap-0">
-              <button
-                data-interactive="true"
-                data-tap-control="true"
-                onClick={(e) => {
-                  if (suppressNextCheckboxClickRef.current) {
+            <button
+              type="button"
+              data-interactive="true"
+              onClick={handleCheckboxClick}
+              className={cn(
+                "flex h-5 w-5 flex-shrink-0 self-center items-center justify-center rounded-full border-2 transition-colors",
+                isComplete
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-white/25 text-transparent hover:border-primary/70",
+              )}
+              aria-label={
+                isComplete ? "Mark task as incomplete" : "Mark task as complete"
+              }
+              role="checkbox"
+              aria-checked={isComplete}
+            >
+              <Check className="h-3 w-3" />
+            </button>
+
+            <DesktopQuestDetailsPopover
+              task={task}
+              open={isDesktopDetailOpen}
+              onOpenChange={(open) => {
+                setOpenDesktopDetailTaskId(open ? task.id : null);
+              }}
+              hasCalendarLink={hasCalendarLink?.(task.id)}
+              onEdit={onEditQuest}
+              onDelete={
+                onDeleteQuest
+                  ? (currentTask) => onDeleteQuest(currentTask.id)
+                  : undefined
+              }
+              onMoveQuestToNextDay={
+                onMoveQuestToNextDay && !isRitual
+                  ? (currentTask) => onMoveQuestToNextDay(currentTask.id)
+                  : undefined
+              }
+              onSendToCalendar={onSendToCalendar}
+              onToggleSubtask={(taskId, subtaskId, completed) => {
+                toggleSubtask.mutate({ taskId, subtaskId, completed });
+              }}
+              companionFrostedThemeStyle={companionFrostedThemeStyle}
+              anchor={
+                <button
+                  type="button"
+                  onClick={() => scheduleDesktopTaskSingleClick(task)}
+                  onDoubleClick={() => handleDesktopTaskDoubleClick(task)}
+                  className="flex h-full min-w-0 flex-1 items-center rounded-[14px] px-2 py-1.5 text-left transition-colors hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                  data-testid={`desktop-timeline-task-button-${task.id}`}
+                >
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
+                      {isRitual ? (
+                        <Repeat
+                          className={cn(
+                            "h-3.5 w-3.5 flex-shrink-0",
+                            isCampaignRitual ? "text-primary" : "text-accent",
+                          )}
+                        />
+                      ) : null}
+                      <p
+                        className={cn(
+                          "truncate text-sm font-medium text-foreground",
+                          isComplete && "text-muted-foreground line-through",
+                        )}
+                      >
+                        {task.task_text}
+                      </p>
+                    </div>
+                    {isCampaignRitual ? (
+                      <p className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-wide text-primary/80">
+                        Campaign Ritual - {campaignTitle}
+                      </p>
+                    ) : null}
+                  </div>
+                </button>
+              }
+            />
+          </div>
+        );
+      }
+
+      const isMobileQuestShellActive =
+        isInlineExpanded || (isActivated && !isDragging);
+      const taskContent = (
+        <Collapsible
+          open={isInlineExpanded}
+          onOpenChange={() => {}}
+          className={cn(isCompactTimelineItem && "h-full min-h-0")}
+        >
+          <div
+            data-quest-card-shell="true"
+            data-scheduled-timeline-card={
+              isScheduledTimelineItem ? "true" : undefined
+            }
+            data-compact-timeline-card={
+              isCompactTimelineItem ? "true" : undefined
+            }
+            data-timeline-card-height-px={
+              timelineContext?.heightPx ?? undefined
+            }
+            className={cn(
+              JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME,
+              "rounded-[22px] px-2",
+              isCompactTimelineItem && "h-full min-h-0 rounded-[18px]",
+              readableQuestCardsEnabled
+                ? JOURNEYS_QUEST_CARD_SHELL_READABLE_CLASS_NAME
+                : JOURNEYS_QUEST_CARD_SHELL_STANDARD_TONE_CLASS_NAME,
+              isCampaignRitual &&
+                (readableQuestCardsEnabled
+                  ? CAMPAIGN_RITUAL_CARD_CLASS_NAME
+                  : CAMPAIGN_RITUAL_CARD_CLASSES),
+              isMobileQuestShellActive &&
+                JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME,
+              isMobileQuestShellActive &&
+                !readableQuestCardsEnabled &&
+                "border-primary/35 bg-primary/[0.06]",
+              isComplete && "opacity-70",
+            )}
+          >
+            <div
+              className={cn(
+                "flex items-center gap-3 transition-all relative group",
+                "no-text-select select-none",
+                isCompactTimelineItem
+                  ? "h-full min-h-0 gap-2 py-0.5"
+                  : "min-h-[46px]",
+                !isCompactTimelineItem && (isRitual ? "py-3" : "py-2"),
+                isDragging && "cursor-grabbing",
+              )}
+              onContextMenu={suppressNativeContextMenu}
+            >
+              {/* Checkbox - only this toggles completion */}
+              <div className="relative ml-1 flex flex-col items-center self-start pt-0.5 gap-0">
+                <button
+                  data-interactive="true"
+                  data-tap-control="true"
+                  onClick={(e) => {
+                    if (suppressNextCheckboxClickRef.current) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      clearTouchCheckboxClickSuppression();
+                      return;
+                    }
+                    handleCheckboxClick(e);
+                  }}
+                  onTouchStart={(e) => {
+                    touchStartRef.current = {
+                      x: e.touches[0].clientX,
+                      y: e.touches[0].clientY,
+                    };
+                  }}
+                  onTouchEnd={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    clearTouchCheckboxClickSuppression();
-                    return;
-                  }
-                  handleCheckboxClick(e);
-                }}
-                onTouchStart={(e) => {
-                  touchStartRef.current = {
-                    x: e.touches[0].clientX,
-                    y: e.touches[0].clientY
-                  };
-                }}
-                onTouchEnd={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  armTouchCheckboxClickSuppression();
-                  // Only trigger if finger moved less than 5px (not scrolling)
-                  if (touchStartRef.current) {
-                    const dx = Math.abs(e.changedTouches[0].clientX - touchStartRef.current.x);
-                    const dy = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
-                    if (dx < 5 && dy < 5) {
-                      handleCheckboxClick(e as unknown as React.MouseEvent);
+                    armTouchCheckboxClickSuppression();
+                    // Only trigger if finger moved less than 5px (not scrolling)
+                    if (touchStartRef.current) {
+                      const dx = Math.abs(
+                        e.changedTouches[0].clientX - touchStartRef.current.x,
+                      );
+                      const dy = Math.abs(
+                        e.changedTouches[0].clientY - touchStartRef.current.y,
+                      );
+                      if (dx < 5 && dy < 5) {
+                        handleCheckboxClick(e as unknown as React.MouseEvent);
+                      }
                     }
+                    touchStartRef.current = null;
+                  }}
+                  className={cn(
+                    "relative flex items-center justify-center w-11 h-11 touch-manipulation transition-transform select-none",
+                    "active:scale-95",
+                  )}
+                  style={{
+                    WebkitTapHighlightColor: "transparent",
+                    touchAction: "manipulation",
+                  }}
+                  aria-label={
+                    isComplete
+                      ? "Mark task as incomplete"
+                      : "Mark task as complete"
                   }
-                  touchStartRef.current = null;
-                }}
-                className={cn(
-                  "relative flex items-center justify-center w-11 h-11 touch-manipulation transition-transform select-none",
-                  "active:scale-95"
-                )}
-                style={{
-                  WebkitTapHighlightColor: 'transparent',
-                  touchAction: 'manipulation',
-                }}
-                aria-label={
-                  isComplete
-                    ? "Mark task as incomplete"
-                    : "Mark task as complete"
-                }
-                role="checkbox"
-                aria-checked={isComplete}
-              >
-                {useLiteAnimations ? (
-                  <div
-                    className={cn(
-                      "flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
-                      isComplete
-                        ? "bg-primary border-primary"
-                        : "border-muted-foreground/40 hover:border-primary"
-                    )}
-                  >
-                    {isComplete && (
-                      <Check className="w-4 h-4 text-primary-foreground" />
-                    )}
-                  </div>
-                ) : (
-                  <motion.div
-                    className={cn(
-                      "flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
-                      isComplete
-                        ? "bg-primary border-primary"
-                        : "border-muted-foreground/40 hover:border-primary"
-                    )}
-                    whileTap={!isDragging && !isPressed ? { scale: 0.85 } : {}}
-                  >
-                    {isComplete && (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: "spring", stiffness: 500, damping: 25 }}
-                      >
-                        <Check className="w-4 h-4 text-primary-foreground" />
-                      </motion.div>
-                    )}
-                  </motion.div>
-                )}
-              </button>
-            </div>
-
-            <div className="grid flex-1 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-1.5">
-              <div className="min-w-0" data-testid={`mobile-quest-title-region-${task.id}`}>
-                <div
-                  className="flex min-w-0 w-full items-center gap-2"
-                  data-testid={`mobile-quest-title-row-${task.id}`}
+                  role="checkbox"
+                  aria-checked={isComplete}
                 >
-                  {isRitual && (
-                    <Repeat className={cn("w-4 h-4 flex-shrink-0", isCampaignRitual ? "text-primary" : "text-accent")} />
+                  {useLiteAnimations ? (
+                    <div
+                      className={cn(
+                        "flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
+                        isComplete
+                          ? "bg-primary border-primary"
+                          : "border-muted-foreground/40 hover:border-primary",
+                      )}
+                    >
+                      {isComplete && (
+                        <Check className="w-4 h-4 text-primary-foreground" />
+                      )}
+                    </div>
+                  ) : (
+                    <motion.div
+                      className={cn(
+                        "flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
+                        isComplete
+                          ? "bg-primary border-primary"
+                          : "border-muted-foreground/40 hover:border-primary",
+                      )}
+                      whileTap={
+                        !isDragging && !isPressed ? { scale: 0.85 } : {}
+                      }
+                    >
+                      {isComplete && (
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{
+                            type: "spring",
+                            stiffness: 500,
+                            damping: 25,
+                          }}
+                        >
+                          <Check className="w-4 h-4 text-primary-foreground" />
+                        </motion.div>
+                      )}
+                    </motion.div>
                   )}
-                  <MarqueeText
-                    text={task.task_text}
-                    className="min-w-0 w-full flex-1"
-                    textClassName={cn(
-                      "text-sm",
-                      isComplete && "text-muted-foreground",
-                      isComplete && (justCompletedTasks.has(task.id) ? "animate-strikethrough" : "line-through")
-                    )}
-                  />
-                </div>
-                {isCampaignRitual && !isCompactTimelineItem && (
-                  <span className="mt-1 inline-flex max-w-full items-center rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                    <span className="truncate">Campaign Ritual - {campaignTitle}</span>
-                  </span>
-                )}
-                {task.scheduled_time && (
-                  <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                    <Clock className="w-3 h-3" />
-                    {formatTime(task.scheduled_time)}
-                  </span>
-                )}
-                {overlapCount > 0 && !isCompactTimelineItem && (
-                  <span className="mt-1 inline-flex items-center rounded-full border border-primary/35 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                    Overlaps: {overlapCount}
-                  </span>
-                )}
+                </button>
               </div>
 
-              <div
-                className="flex min-w-max items-center justify-end gap-1.5"
-                data-testid={`mobile-quest-actions-${task.id}`}
-              >
-                {/* Quest action menu */}
-                {!isComplete && !isDragging && !isActivated && (onEditQuest || onSendToCalendar || onDeleteQuest || onMoveQuestToNextDay) && (
-                  <DropdownMenu
-                    open={isActionMenuOpen}
-                    onOpenChange={(open) => {
-                      setOpenActionMenuTaskId((current) => {
-                        if (open) return task.id;
-                        return current === task.id ? null : current;
-                      });
-                    }}
+              <div className="grid flex-1 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-1.5">
+                <div
+                  className="min-w-0"
+                  data-testid={`mobile-quest-title-region-${task.id}`}
+                >
+                  <div
+                    className="flex min-w-0 w-full items-center gap-2"
+                    data-testid={`mobile-quest-title-row-${task.id}`}
                   >
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        data-interactive="true"
-                        data-tap-control="true"
-                        aria-label="Quest actions"
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 -m-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 md:focus-visible:opacity-100 transition-opacity touch-manipulation"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <MoreHorizontal className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="end"
-                      className={cn(COMPANION_FROSTED_PLANNER_DARK_CLASS, "w-44")}
-                      data-testid={`quest-action-menu-${task.id}`}
-                      style={companionFrostedThemeStyle}
-                    >
-                      {onEditQuest && (
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpenActionMenuTaskId(null);
-                            onEditQuest(task);
-                          }}
-                        >
-                          <Pencil className="w-4 h-4 mr-2" />
-                          Edit quest
-                        </DropdownMenuItem>
+                    {isRitual && (
+                      <Repeat
+                        className={cn(
+                          "w-4 h-4 flex-shrink-0",
+                          isCampaignRitual ? "text-primary" : "text-accent",
+                        )}
+                      />
+                    )}
+                    <MarqueeText
+                      text={task.task_text}
+                      className="min-w-0 w-full flex-1"
+                      textClassName={cn(
+                        "text-sm",
+                        isComplete && "text-muted-foreground",
+                        isComplete &&
+                          (justCompletedTasks.has(task.id)
+                            ? "animate-strikethrough"
+                            : "line-through"),
                       )}
-                      {onSendToCalendar && (
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpenActionMenuTaskId(null);
-                            onSendToCalendar(task.id);
-                          }}
-                        >
-                          <CalendarPlus className="w-4 h-4 mr-2" />
-                          {hasCalendarLink?.(task.id) ? "Re-send to calendar" : "Send to calendar"}
-                        </DropdownMenuItem>
-                      )}
-                      {onMoveQuestToNextDay && !isRitual && (
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpenActionMenuTaskId(null);
-                            onMoveQuestToNextDay(task.id);
-                          }}
-                        >
-                          <CalendarArrowUp className="w-4 h-4 mr-2" />
-                          Move to tomorrow
-                        </DropdownMenuItem>
-                      )}
-                      {onDeleteQuest && (
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpenActionMenuTaskId(null);
-                            onDeleteQuest(task.id);
-                          }}
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Delete quest
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-                {task.is_main_quest && (
-                  <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 bg-primary/10 border-primary/30">
-                    Main
-                  </Badge>
-                )}
-                <span className="text-sm font-bold text-stardust-gold/80">+{effectiveTaskXP}</span>
+                    />
+                  </div>
+                  {isCampaignRitual && !isCompactTimelineItem && (
+                    <span className="mt-1 inline-flex max-w-full items-center rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                      <span className="truncate">
+                        Campaign Ritual - {campaignTitle}
+                      </span>
+                    </span>
+                  )}
+                  {task.scheduled_time && (
+                    <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                      <Clock className="w-3 h-3" />
+                      {formatTime(task.scheduled_time)}
+                    </span>
+                  )}
+                  {overlapCount > 0 && !isCompactTimelineItem && (
+                    <span className="mt-1 inline-flex items-center rounded-full border border-primary/35 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                      Overlaps: {overlapCount}
+                    </span>
+                  )}
+                </div>
 
-                {/* Chevron for expandable details - only shown if task has details */}
-                {hasDetails && canRenderInlineDetails && (
-                  <Button
-                    data-interactive="true"
-                    data-tap-control="true"
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 -m-1 flex-shrink-0"
-                    onClick={(e) => toggleTaskExpanded(task.id, e)}
-                  >
-                    <ChevronDown className={cn(
-                      "w-4 h-4 text-muted-foreground transition-transform duration-200",
-                      isExpanded && "rotate-180"
-                    )} />
-                  </Button>
-                )}
+                <div
+                  className="flex min-w-max items-center justify-end gap-1.5"
+                  data-testid={`mobile-quest-actions-${task.id}`}
+                >
+                  {/* Quest action menu */}
+                  {!isComplete &&
+                    !isDragging &&
+                    !isActivated &&
+                    (onEditQuest ||
+                      onSendToCalendar ||
+                      onDeleteQuest ||
+                      onMoveQuestToNextDay) && (
+                      <DropdownMenu
+                        open={isActionMenuOpen}
+                        onOpenChange={(open) => {
+                          setOpenActionMenuTaskId((current) => {
+                            if (open) return task.id;
+                            return current === task.id ? null : current;
+                          });
+                        }}
+                      >
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            data-interactive="true"
+                            data-tap-control="true"
+                            aria-label="Quest actions"
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 -m-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 md:focus-visible:opacity-100 transition-opacity touch-manipulation"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                          align="end"
+                          className={cn(
+                            COMPANION_FROSTED_PLANNER_DARK_CLASS,
+                            "w-44",
+                          )}
+                          data-testid={`quest-action-menu-${task.id}`}
+                          style={companionFrostedThemeStyle}
+                        >
+                          {onEditQuest && (
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenActionMenuTaskId(null);
+                                onEditQuest(task);
+                              }}
+                            >
+                              <Pencil className="w-4 h-4 mr-2" />
+                              Edit quest
+                            </DropdownMenuItem>
+                          )}
+                          {onSendToCalendar && (
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenActionMenuTaskId(null);
+                                onSendToCalendar(task.id);
+                              }}
+                            >
+                              <CalendarPlus className="w-4 h-4 mr-2" />
+                              {hasCalendarLink?.(task.id)
+                                ? "Re-send to calendar"
+                                : "Send to calendar"}
+                            </DropdownMenuItem>
+                          )}
+                          {onMoveQuestToNextDay && !isRitual && (
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenActionMenuTaskId(null);
+                                onMoveQuestToNextDay(task.id);
+                              }}
+                            >
+                              <CalendarArrowUp className="w-4 h-4 mr-2" />
+                              Move to tomorrow
+                            </DropdownMenuItem>
+                          )}
+                          {onDeleteQuest && (
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenActionMenuTaskId(null);
+                                onDeleteQuest(task.id);
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete quest
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  {task.is_main_quest && (
+                    <Badge
+                      variant="outline"
+                      className="text-xs px-1.5 py-0.5 h-5 bg-primary/10 border-primary/30"
+                    >
+                      Main
+                    </Badge>
+                  )}
+                  <span className="text-sm font-bold text-stardust-gold/80">
+                    +{effectiveTaskXP}
+                  </span>
+
+                  {/* Chevron for expandable details - only shown if task has details */}
+                  {hasDetails && canRenderInlineDetails && (
+                    <Button
+                      data-interactive="true"
+                      data-tap-control="true"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 -m-1 flex-shrink-0"
+                      onClick={(e) => toggleTaskExpanded(task.id, e)}
+                    >
+                      <ChevronDown
+                        className={cn(
+                          "w-4 h-4 text-muted-foreground transition-transform duration-200",
+                          isExpanded && "rotate-180",
+                        )}
+                      />
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
 
-          {canRenderInlineDetails ? (
-            <CollapsibleContent>
-              <div className="pl-8 pr-2 pb-2 space-y-2">
-                {/* Subtasks */}
-                {subtasks.length > 0 && (
-                  <div className="space-y-1.5 rounded-md border border-border/40 bg-muted/20 p-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                        Subtasks
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {completedSubtaskCount}/{subtasks.length}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      {subtasks.map((subtask) => (
-                        <label
-                          key={subtask.id}
-                          className="flex items-center gap-2 rounded-sm px-1 py-1 text-xs"
-                        >
-                          <Checkbox
-                            checked={!!subtask.completed}
-                            onCheckedChange={(checked) => {
-                              toggleSubtask.mutate({
-                                taskId: task.id,
-                                subtaskId: subtask.id,
-                                completed: !!checked,
-                              });
-                            }}
-                            onClick={(event) => event.stopPropagation()}
-                            className="h-3.5 w-3.5"
-                          />
-                          <span
-                            className={cn(
-                              "text-xs",
-                              subtask.completed && "text-muted-foreground line-through"
-                            )}
+            {canRenderInlineDetails ? (
+              <CollapsibleContent>
+                <div className="pl-8 pr-2 pb-2 space-y-2">
+                  {/* Subtasks */}
+                  {subtasks.length > 0 && (
+                    <div className="space-y-1.5 rounded-md border border-border/40 bg-muted/20 p-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                          Subtasks
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {completedSubtaskCount}/{subtasks.length}
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        {subtasks.map((subtask) => (
+                          <label
+                            key={subtask.id}
+                            className="flex items-center gap-2 rounded-sm px-1 py-1 text-xs"
                           >
-                            {subtask.title}
-                          </span>
-                        </label>
-                      ))}
+                            <Checkbox
+                              checked={!!subtask.completed}
+                              onCheckedChange={(checked) => {
+                                toggleSubtask.mutate({
+                                  taskId: task.id,
+                                  subtaskId: subtask.id,
+                                  completed: !!checked,
+                                });
+                              }}
+                              onClick={(event) => event.stopPropagation()}
+                              className="h-3.5 w-3.5"
+                            />
+                            <span
+                              className={cn(
+                                "text-xs",
+                                subtask.completed &&
+                                  "text-muted-foreground line-through",
+                              )}
+                            >
+                              {subtask.title}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {displayAttachments.length > 0 && (
-                  <div className="space-y-1.5 rounded-md border border-border/40 bg-muted/20 p-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                        Attachments
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {displayAttachments.length}
-                      </p>
+                  {displayAttachments.length > 0 && (
+                    <div className="space-y-1.5 rounded-md border border-border/40 bg-muted/20 p-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                          Attachments
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {displayAttachments.length}
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        {displayAttachments.map((attachment, index) => (
+                          <a
+                            key={`${attachment.fileUrl}-${index}`}
+                            href={attachment.fileUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center gap-2 rounded-sm px-1 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+                          >
+                            {attachment.isImage ? (
+                              <FileImage className="h-3.5 w-3.5 flex-shrink-0" />
+                            ) : (
+                              <Paperclip className="h-3.5 w-3.5 flex-shrink-0" />
+                            )}
+                            <span className="truncate">
+                              {attachment.fileName}
+                            </span>
+                          </a>
+                        ))}
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      {displayAttachments.map((attachment, index) => (
-                        <a
-                          key={`${attachment.fileUrl}-${index}`}
-                          href={attachment.fileUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center gap-2 rounded-sm px-1 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+                  )}
+
+                  {shouldRenderRitualDescription &&
+                    (useLiteAnimations ? (
+                      <p className="text-sm leading-relaxed whitespace-pre-line text-celestial-blue/80">
+                        {stripMarkdown(ritualDescription)}
+                      </p>
+                    ) : (
+                      <motion.p className="text-sm leading-relaxed whitespace-pre-line text-celestial-blue/80">
+                        {stripMarkdown(ritualDescription)}
+                      </motion.p>
+                    ))}
+
+                  {/* Notes */}
+                  {shouldRenderNotes &&
+                    (useLiteAnimations ? (
+                      <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                        <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                        <p className="text-xs leading-relaxed whitespace-pre-line">
+                          {stripMarkdown(task.notes)}
+                        </p>
+                      </div>
+                    ) : (
+                      <motion.div className="flex items-start gap-2 text-sm text-muted-foreground">
+                        <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                        <p className="text-xs leading-relaxed whitespace-pre-line">
+                          {stripMarkdown(task.notes)}
+                        </p>
+                      </motion.div>
+                    ))}
+
+                  {task.location ? (
+                    <QuestLocationLink
+                      location={task.location}
+                      label="Address"
+                      className="rounded-md border-border/40 bg-muted/20 p-2"
+                      textClassName="text-xs text-muted-foreground"
+                      actionsClassName="mt-2"
+                    />
+                  ) : null}
+
+                  {/* Badges row */}
+                  {hasDetailBadges && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {/* Category */}
+                      {CategoryIcon && task.category && (
+                        <Badge
+                          variant="outline"
+                          className="text-xs px-1.5 py-0.5 h-5 gap-1 border-muted-foreground/30"
                         >
-                          {attachment.isImage ? (
-                            <FileImage className="h-3.5 w-3.5 flex-shrink-0" />
-                          ) : (
-                            <Paperclip className="h-3.5 w-3.5 flex-shrink-0" />
+                          <CategoryIcon className="w-3 h-3" />
+                          {task.category}
+                        </Badge>
+                      )}
+
+                      {/* Difficulty */}
+                      {task.difficulty && (
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-xs px-1.5 py-0.5 h-5",
+                            task.difficulty === "easy" &&
+                              "bg-green-500/10 text-green-500 border-green-500/30",
+                            task.difficulty === "medium" &&
+                              "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
+                            task.difficulty === "hard" &&
+                              "bg-red-500/10 text-red-500 border-red-500/30",
                           )}
-                          <span className="truncate">{attachment.fileName}</span>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {shouldRenderRitualDescription && (
-                  useLiteAnimations ? (
-                    <p className="text-sm leading-relaxed whitespace-pre-line text-celestial-blue/80">
-                      {stripMarkdown(ritualDescription)}
-                    </p>
-                  ) : (
-                    <motion.p className="text-sm leading-relaxed whitespace-pre-line text-celestial-blue/80">
-                      {stripMarkdown(ritualDescription)}
-                    </motion.p>
-                  )
-                )}
-
-                {/* Notes */}
-                {shouldRenderNotes && (
-                  useLiteAnimations ? (
-                    <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                      <p className="text-xs leading-relaxed whitespace-pre-line">{stripMarkdown(task.notes)}</p>
-                    </div>
-                  ) : (
-                    <motion.div className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                      <p className="text-xs leading-relaxed whitespace-pre-line">{stripMarkdown(task.notes)}</p>
-                    </motion.div>
-                  )
-                )}
-
-                {task.location ? (
-                  <QuestLocationLink
-                    location={task.location}
-                    label="Address"
-                    className="rounded-md border-border/40 bg-muted/20 p-2"
-                    textClassName="text-xs text-muted-foreground"
-                    actionsClassName="mt-2"
-                  />
-                ) : null}
-
-                {/* Badges row */}
-                {hasDetailBadges && (
-                  <div className="flex flex-wrap gap-1.5">
-                  {/* Category */}
-                  {CategoryIcon && task.category && (
-                    <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 border-muted-foreground/30">
-                      <CategoryIcon className="w-3 h-3" />
-                      {task.category}
-                    </Badge>
-                  )}
-
-                  {/* Difficulty */}
-                  {task.difficulty && (
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "text-xs px-1.5 py-0.5 h-5",
-                        task.difficulty === 'easy' && "bg-green-500/10 text-green-500 border-green-500/30",
-                        task.difficulty === 'medium' && "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
-                        task.difficulty === 'hard' && "bg-red-500/10 text-red-500 border-red-500/30"
+                        >
+                          {task.difficulty}
+                        </Badge>
                       )}
-                    >
-                      {task.difficulty}
-                    </Badge>
-                  )}
 
-                  {/* Priority */}
-                  {task.priority && (
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "text-xs px-1.5 py-0.5 h-5",
-                        task.priority === 'high' && "bg-red-500/10 text-red-500 border-red-500/30",
-                        task.priority === 'medium' && "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
-                        task.priority === 'low' && "bg-blue-500/10 text-blue-500 border-blue-500/30"
+                      {/* Priority */}
+                      {task.priority && (
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-xs px-1.5 py-0.5 h-5",
+                            task.priority === "high" &&
+                              "bg-red-500/10 text-red-500 border-red-500/30",
+                            task.priority === "medium" &&
+                              "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
+                            task.priority === "low" &&
+                              "bg-blue-500/10 text-blue-500 border-blue-500/30",
+                          )}
+                        >
+                          {task.priority} priority
+                        </Badge>
                       )}
-                    >
-                      {task.priority} priority
-                    </Badge>
+
+                      {/* Duration */}
+                      {task.estimated_duration && (
+                        <Badge
+                          variant="outline"
+                          className="text-xs px-1.5 py-0.5 h-5 gap-1 border-muted-foreground/30"
+                        >
+                          <Timer className="w-3 h-3" />
+                          {task.estimated_duration}m
+                        </Badge>
+                      )}
+
+                      {/* Recurrence */}
+                      {task.is_recurring && task.recurrence_pattern && (
+                        <Badge
+                          variant="outline"
+                          className="text-xs px-1.5 py-0.5 h-5 gap-1 bg-accent/10 text-accent border-accent/30"
+                        >
+                          <Repeat className="w-3 h-3" />
+                          {formatDisplayLabel(task.recurrence_pattern)}
+                        </Badge>
+                      )}
+                    </div>
                   )}
+                </div>
+              </CollapsibleContent>
+            ) : null}
+          </div>
+        </Collapsible>
+      );
 
-                  {/* Duration */}
-                  {task.estimated_duration && (
-                    <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 border-muted-foreground/30">
-                      <Timer className="w-3 h-3" />
-                      {task.estimated_duration}m
-                    </Badge>
-                  )}
+      return taskContent;
+    },
+    [
+      onToggle,
+      onUndoToggle,
+      onEditQuest,
+      onSendToCalendar,
+      hasCalendarLink,
+      onDeleteQuest,
+      onMoveQuestToNextDay,
+      expandedTasks,
+      hasExpandableDetails,
+      habitDescriptionById,
+      toggleTaskExpanded,
+      justCompletedTasks,
+      optimisticCompleted,
+      toggleSubtask,
+      useLiteAnimations,
+      registerCompletionCombo,
+      resetCombo,
+      armTouchCheckboxClickSuppression,
+      clearTouchCheckboxClickSuppression,
+      suppressNativeContextMenu,
+      openActionMenuTaskId,
+      isDesktopLayout,
+      openDesktopDetailTaskId,
+      scheduleDesktopTaskSingleClick,
+      handleDesktopTaskDoubleClick,
+    ],
+  );
 
-                  {/* Recurrence */}
-                  {task.is_recurring && task.recurrence_pattern && (
-                    <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 bg-accent/10 text-accent border-accent/30">
-                      <Repeat className="w-3 h-3" />
-                      {formatDisplayLabel(task.recurrence_pattern)}
-                    </Badge>
-                  )}
-                  </div>
-                )}
-              </div>
-            </CollapsibleContent>
-          ) : null}
-        </div>
-      </Collapsible>
-    );
-
-    return taskContent;
-  }, [
-    onToggle,
-    onUndoToggle,
-    onEditQuest,
-    onSendToCalendar,
-    hasCalendarLink,
-    onDeleteQuest,
-    onMoveQuestToNextDay,
-    expandedTasks,
-    hasExpandableDetails,
-    habitDescriptionById,
-    toggleTaskExpanded,
-    justCompletedTasks,
-    optimisticCompleted,
-    toggleSubtask,
-    useLiteAnimations,
-    registerCompletionCombo,
-    resetCombo,
-    armTouchCheckboxClickSuppression,
-    clearTouchCheckboxClickSuppression,
-    suppressNativeContextMenu,
-    openActionMenuTaskId,
-    isDesktopLayout,
-    openDesktopDetailTaskId,
-    scheduleDesktopTaskSingleClick,
-    handleDesktopTaskDoubleClick,
-  ]);
-
-  const desktopRailCardClass = "journeys-desktop-rail-card rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,20,38,0.94),rgba(16,13,27,0.9))] p-5 shadow-[0_20px_40px_rgba(0,0,0,0.2)]";
+  const desktopRailCardClass =
+    "journeys-desktop-rail-card rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,20,38,0.94),rgba(16,13,27,0.9))] p-5 shadow-[0_20px_40px_rgba(0,0,0,0.2)]";
   const desktopRail = isDesktopLayout ? (
     <aside className="flex flex-col gap-4">
       <section className={desktopRailCardClass}>
@@ -2606,7 +3032,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
           <div className="rounded-[22px] border border-white/10 bg-white/[0.04] px-3 py-2">
             <div className="flex items-center gap-3">
-              <ProgressRing percent={progressPercent} size={40} strokeWidth={3.5} />
+              <ProgressRing
+                percent={progressPercent}
+                size={40}
+                strokeWidth={3.5}
+              />
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">
                   Progress
@@ -2621,20 +3051,36 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
         <div className="mt-4 grid grid-cols-2 gap-3">
           <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Open</p>
-            <p className="mt-2 text-2xl font-semibold text-foreground">{selectedOpenCount}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">
+              Open
+            </p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">
+              {selectedOpenCount}
+            </p>
           </div>
           <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Timed</p>
-            <p className="mt-2 text-2xl font-semibold text-foreground">{selectedScheduledCount}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">
+              Timed
+            </p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">
+              {selectedScheduledCount}
+            </p>
           </div>
           <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Anytime</p>
-            <p className="mt-2 text-2xl font-semibold text-foreground">{selectedAnytimeCount}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">
+              Anytime
+            </p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">
+              {selectedAnytimeCount}
+            </p>
           </div>
           <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Rituals</p>
-            <p className="mt-2 text-2xl font-semibold text-foreground">{selectedRitualCount}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">
+              Rituals
+            </p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">
+              {selectedRitualCount}
+            </p>
           </div>
         </div>
 
@@ -2644,9 +3090,13 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           </p>
           {nextFocusTask ? (
             <>
-              <p className="mt-2 text-sm font-semibold text-foreground">{nextFocusTask.task_text}</p>
+              <p className="mt-2 text-sm font-semibold text-foreground">
+                {nextFocusTask.task_text}
+              </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {nextFocusTask.scheduled_time ? formatTime(nextFocusTask.scheduled_time) : "No time locked yet"}
+                {nextFocusTask.scheduled_time
+                  ? formatTime(nextFocusTask.scheduled_time)
+                  : "No time locked yet"}
               </p>
             </>
           ) : (
@@ -2659,7 +3109,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               <JourneysCompanionLauncher
                 variant="inline"
                 data-tour="add-quest-launcher"
-                text={planDayLauncherLabel}
+                text={companionChatLauncherLabel}
                 className="w-full"
                 onClick={plannerLauncherAction}
               />
@@ -2678,7 +3128,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               {weekCompletedCount}/{weekTotalCount || 0}
             </p>
             <p className="text-sm text-muted-foreground">
-              quests completed across {weekActiveDays || 0} active day{weekActiveDays === 1 ? "" : "s"}
+              quests completed across {weekActiveDays || 0} active day
+              {weekActiveDays === 1 ? "" : "s"}
             </p>
           </div>
 
@@ -2686,29 +3137,45 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">
               XP banked
             </p>
-            <p className="mt-2 text-xl font-semibold text-stardust-gold">{weekXP}</p>
+            <p className="mt-2 text-xl font-semibold text-stardust-gold">
+              {weekXP}
+            </p>
           </div>
         </div>
 
         <div className="mt-4 grid grid-cols-3 gap-3">
           <div className="rounded-[20px] border border-white/8 bg-white/[0.03] p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Active</p>
-            <p className="mt-2 text-xl font-semibold text-foreground">{weekActiveDays}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">
+              Active
+            </p>
+            <p className="mt-2 text-xl font-semibold text-foreground">
+              {weekActiveDays}
+            </p>
           </div>
           <div className="rounded-[20px] border border-white/8 bg-white/[0.03] p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Timed</p>
-            <p className="mt-2 text-xl font-semibold text-foreground">{weekScheduledCount}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">
+              Timed
+            </p>
+            <p className="mt-2 text-xl font-semibold text-foreground">
+              {weekScheduledCount}
+            </p>
           </div>
           <div className="rounded-[20px] border border-white/8 bg-white/[0.03] p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Streak</p>
-            <p className="mt-2 text-xl font-semibold text-foreground">{currentStreak}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">
+              Streak
+            </p>
+            <p className="mt-2 text-xl font-semibold text-foreground">
+              {currentStreak}
+            </p>
           </div>
         </div>
 
         <div className="mt-4 h-2 rounded-full bg-white/[0.06]">
           <div
             className="h-full rounded-full bg-primary/85"
-            style={{ width: `${weekTotalCount > 0 ? (weekCompletedCount / weekTotalCount) * 100 : 0}%` }}
+            style={{
+              width: `${weekTotalCount > 0 ? (weekCompletedCount / weekTotalCount) * 100 : 0}%`,
+            }}
           />
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
@@ -2719,7 +3186,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       </section>
 
       <section className={desktopRailCardClass}>
-        {campaignRitualGroups.length > 0 || activeEpics.length > 0 || isCampaignsLoading ? (
+        {campaignRitualGroups.length > 0 ||
+        activeEpics.length > 0 ||
+        isCampaignsLoading ? (
           renderCampaignSection({ inDesktopRail: true })
         ) : (
           <>
@@ -2744,16 +3213,16 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       ? { scrollPaddingBottom: mobileFabScrollClearance }
       : undefined;
 
-  const scheduledTimelineContentStyle: CSSProperties | undefined = isDesktopLayout
-    ? undefined
-    : { paddingBottom: mobileFabScrollClearance };
+  const scheduledTimelineContentStyle: CSSProperties | undefined =
+    isDesktopLayout ? undefined : { paddingBottom: mobileFabScrollClearance };
 
   return (
     <div
       className={cn(
         COMPANION_FROSTED_PLANNER_DARK_CLASS,
         "relative",
-        isDesktopLayout && "grid grid-cols-[minmax(0,1fr)_340px] items-start gap-6",
+        isDesktopLayout &&
+          "grid grid-cols-[minmax(0,1fr)_340px] items-start gap-6",
       )}
       data-testid="todays-agenda"
       style={companionFrostedThemeStyle}
@@ -2761,37 +3230,60 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       <div
         className={cn(
           "relative px-2 py-2 overflow-visible",
-          isDesktopLayout && "journeys-desktop-shell flex min-h-0 flex-col rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,21,39,0.95),rgba(13,11,23,0.92))] px-5 py-5 shadow-[0_28px_54px_rgba(0,0,0,0.24)]",
+          isDesktopLayout &&
+            "journeys-desktop-shell flex min-h-0 flex-col rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,21,39,0.95),rgba(13,11,23,0.92))] px-5 py-5 shadow-[0_28px_54px_rgba(0,0,0,0.24)]",
         )}
       >
         {/* Compact Header: Date + Progress Ring + XP */}
-        <div className={cn("mb-3 flex items-center justify-between gap-3", isDesktopLayout && "mb-5")}>
-          <div className={cn("flex items-center gap-2", isDesktopLayout && "gap-3")}>
-            <button 
+        <div
+          className={cn(
+            "mb-3 flex items-center justify-between gap-3",
+            isDesktopLayout && "mb-5",
+          )}
+        >
+          <div
+            className={cn(
+              "flex items-center gap-2",
+              isDesktopLayout && "gap-3",
+            )}
+          >
+            <button
               type="button"
               onClick={() => onOpenMonthView?.()}
               className="flex items-center gap-1.5 rounded-2xl transition-opacity hover:opacity-80"
             >
-              <span className={cn("text-lg font-bold", isDesktopLayout && "text-[1.8rem] tracking-tight")}>
+              <span
+                className={cn(
+                  "text-lg font-bold",
+                  isDesktopLayout && "text-[1.8rem] tracking-tight",
+                )}
+              >
                 {safeFormat(selectedDate, "MMM d, yyyy", "Invalid date")}
               </span>
             </button>
             {currentStreak > 0 && (
-              <div className={cn(
-                "flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
-                currentStreak >= 30 
-                  ? "bg-stardust-gold/20 text-stardust-gold" 
-                  : currentStreak >= 14 
-                    ? "bg-celestial-blue/20 text-celestial-blue" 
-                    : "bg-orange-500/10 text-orange-400"
-              )}>
+              <div
+                className={cn(
+                  "flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+                  currentStreak >= 30
+                    ? "bg-stardust-gold/20 text-stardust-gold"
+                    : currentStreak >= 14
+                      ? "bg-celestial-blue/20 text-celestial-blue"
+                      : "bg-orange-500/10 text-orange-400",
+                )}
+              >
                 <Flame className="h-3.5 w-3.5" />
                 {currentStreak}
               </div>
             )}
           </div>
 
-          <div className={cn("flex items-center gap-2", isDesktopLayout && "gap-3")}>
+          <div
+            className={cn(
+              "flex items-center gap-2",
+              isDesktopLayout && "gap-3",
+            )}
+          >
             {/* Compact progress ring */}
             {totalCount > 0 && (
               <div
@@ -2800,7 +3292,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   isDesktopLayout && "px-3 py-2",
                 )}
               >
-                <ProgressRing percent={progressPercent} size={24} strokeWidth={2.5} />
+                <ProgressRing
+                  percent={progressPercent}
+                  size={24}
+                  strokeWidth={2.5}
+                />
                 <span className="text-xs font-medium text-muted-foreground">
                   {completedCount}/{totalCount}
                 </span>
@@ -2812,11 +3308,15 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 isDesktopLayout && "px-3 py-2",
               )}
             >
-              <Trophy className={cn(
-                "h-4 w-4",
-                allComplete ? "text-stardust-gold" : "text-stardust-gold/70"
-              )} />
-              <span className="font-semibold text-stardust-gold">{totalXP}</span>
+              <Trophy
+                className={cn(
+                  "h-4 w-4",
+                  allComplete ? "text-stardust-gold" : "text-stardust-gold/70",
+                )}
+              />
+              <span className="font-semibold text-stardust-gold">
+                {totalXP}
+              </span>
             </div>
             {quickCaptureControls}
           </div>
@@ -2832,7 +3332,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               >
                 <Button
                   type="button"
-                  variant={desktopPlannerMode === "week" ? "secondary" : "ghost"}
+                  variant={
+                    desktopPlannerMode === "week" ? "secondary" : "ghost"
+                  }
                   size="sm"
                   className={cn(
                     "h-8 rounded-[14px] px-3 text-xs",
@@ -2861,7 +3363,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   Day
                 </Button>
               </div>
-            ) : <div />}
+            ) : (
+              <div />
+            )}
 
             <div className="flex flex-wrap items-center justify-end gap-2">
               {onDateSelect ? (
@@ -2914,9 +3418,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   variant="inline"
                   compact
                   data-tour="add-quest-launcher"
-                  text={planDayLauncherLabel}
+                  text={companionChatLauncherLabel}
                   className="shadow-[0_14px_28px_rgba(122,61,255,0.2)]"
-                  onClick={openPlanDayThread}
+                  onClick={openCompanionChatThread}
                 />
               ) : null}
               {quickCaptureControls}
@@ -2928,9 +3432,17 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           {comboCount > 1 && (
             <motion.div
               key="combo-banner"
-              initial={useLiteAnimations ? { opacity: 1 } : { opacity: 0, y: 8, scale: 0.96 }}
+              initial={
+                useLiteAnimations
+                  ? { opacity: 1 }
+                  : { opacity: 0, y: 8, scale: 0.96 }
+              }
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={useLiteAnimations ? { opacity: 0 } : { opacity: 0, y: -6, scale: 0.98 }}
+              exit={
+                useLiteAnimations
+                  ? { opacity: 0 }
+                  : { opacity: 0, y: -6, scale: 0.98 }
+              }
               transition={{ duration: useLiteAnimations ? 0.1 : 0.24 }}
               className={cn(
                 "mb-3 relative overflow-hidden rounded-xl border px-3 py-2",
@@ -2964,7 +3476,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
         {/* Timeline Content */}
         <div className={cn(isDesktopLayout && "flex min-h-0 flex-1 flex-col")}>
-          <div className={cn("mb-2 flex flex-wrap items-center justify-between gap-2", isDesktopLayout && "mb-3")}>
+          <div
+            className={cn(
+              "mb-2 flex flex-wrap items-center justify-between gap-2",
+              isDesktopLayout && "mb-3",
+            )}
+          >
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               {tasks.length > 0 && (
                 <DropdownMenu>
@@ -2983,26 +3500,38 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     style={companionFrostedThemeStyle}
                   >
                     <DropdownMenuItem
-                      onClick={() => setSortBy('custom')}
-                      className={cn("text-xs", sortBy === 'custom' && 'bg-accent/10')}
+                      onClick={() => setSortBy("custom")}
+                      className={cn(
+                        "text-xs",
+                        sortBy === "custom" && "bg-accent/10",
+                      )}
                     >
                       Custom
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={() => setSortBy('time')}
-                      className={cn("text-xs", sortBy === 'time' && 'bg-accent/10')}
+                      onClick={() => setSortBy("time")}
+                      className={cn(
+                        "text-xs",
+                        sortBy === "time" && "bg-accent/10",
+                      )}
                     >
                       Time
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={() => setSortBy('priority')}
-                      className={cn("text-xs", sortBy === 'priority' && 'bg-accent/10')}
+                      onClick={() => setSortBy("priority")}
+                      className={cn(
+                        "text-xs",
+                        sortBy === "priority" && "bg-accent/10",
+                      )}
                     >
                       Priority
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={() => setSortBy('xp')}
-                      className={cn("text-xs", sortBy === 'xp' && 'bg-accent/10')}
+                      onClick={() => setSortBy("xp")}
+                      className={cn(
+                        "text-xs",
+                        sortBy === "xp" && "bg-accent/10",
+                      )}
                     >
                       XP
                     </DropdownMenuItem>
@@ -3026,7 +3555,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     >
                       <Inbox className="h-3.5 w-3.5" />
                       Untimed
-                      <Badge variant="secondary" className="h-5 rounded-full px-1.5 text-[10px]">
+                      <Badge
+                        variant="secondary"
+                        className="h-5 rounded-full px-1.5 text-[10px]"
+                      >
                         {anytimeItems.length}
                       </Badge>
                     </Button>
@@ -3039,7 +3571,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     <DrawerHeader>
                       <DrawerTitle>Untimed quests</DrawerTitle>
                       <DrawerDescription>
-                        {anytimeItems.length} quest{anytimeItems.length === 1 ? "" : "s"} waiting for a time.
+                        {anytimeItems.length} quest
+                        {anytimeItems.length === 1 ? "" : "s"} waiting for a
+                        time.
                       </DrawerDescription>
                     </DrawerHeader>
                     <div
@@ -3050,7 +3584,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                         {anytimeItems.map((task) => (
                           <div
                             key={task.id}
-                            className={cn("min-h-[58px]", isDesktopLayout && "rounded-[18px]")}
+                            className={cn(
+                              "min-h-[58px]",
+                              isDesktopLayout && "rounded-[18px]",
+                            )}
                             data-testid={`untimed-quest-${task.id}`}
                           >
                             {renderTaskItem(task, undefined, 0)}
@@ -3070,14 +3607,23 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 "mb-3 rounded-[28px] border border-dashed border-white/10 bg-white/[0.03] px-6 py-8 text-center",
                 isDesktopLayout && "px-8",
               )}
-              style={isDesktopLayout && timelineBodyHeightPx ? { minHeight: `${timelineBodyHeightPx}px` } : undefined}
+              style={
+                isDesktopLayout && timelineBodyHeightPx
+                  ? { minHeight: `${timelineBodyHeightPx}px` }
+                  : undefined
+              }
               data-testid="empty-state-pane"
             >
               <Circle className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />
               <p className="mb-2 text-sm font-medium text-foreground">
                 No tasks for this day
               </p>
-              <p className={cn("mx-auto max-w-sm text-xs text-muted-foreground/70", isDesktopLayout && "text-sm")}>
+              <p
+                className={cn(
+                  "mx-auto max-w-sm text-xs text-muted-foreground/70",
+                  isDesktopLayout && "text-sm",
+                )}
+              >
                 {isSelectedToday
                   ? "Your day is still open. Add a quest to give the planner some shape."
                   : `Nothing is planned for ${selectedDateHeading} yet. Add a quest to anchor the day.`}
@@ -3095,7 +3641,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             </div>
           ) : null}
 
-          <div className={cn(isDesktopLayout && "flex min-h-0 flex-1 flex-col")}>
+          <div
+            className={cn(isDesktopLayout && "flex min-h-0 flex-1 flex-col")}
+          >
             <div
               ref={setScheduledPaneNode}
               className={cn(
@@ -3122,7 +3670,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                         key={slotMinute}
                         className={cn(
                           "absolute left-0 right-0 flex border-b border-white/[0.07]",
-                          isHour ? "border-t border-white/[0.10]" : "border-t border-dashed border-white/[0.06]",
+                          isHour
+                            ? "border-t border-white/[0.10]"
+                            : "border-t border-dashed border-white/[0.06]",
                           onTimeSlotLongPress && "touch-manipulation",
                         )}
                         data-testid={`journeys-day-grid-slot-${slotToken}`}
@@ -3131,14 +3681,18 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                           top: `${getTimelineTopPx(slotMinute)}px`,
                           height: `${OUTLOOK_TIMELINE_SLOT_HEIGHT_PX}px`,
                         }}
-                        onTouchStart={(event) => handleTimeSlotTouchStart(slotMinute, event)}
+                        onTouchStart={(event) =>
+                          handleTimeSlotTouchStart(slotMinute, event)
+                        }
                         onTouchMove={handleTimeSlotTouchMove}
                         onTouchEnd={clearTimeSlotLongPress}
                         onTouchCancel={clearTimeSlotLongPress}
                       >
                         <div
                           className="flex-shrink-0 px-1.5 pt-1.5 text-right text-[10px] font-medium text-muted-foreground/80"
-                          style={{ width: `${OUTLOOK_TIMELINE_GUTTER_WIDTH_PX}px` }}
+                          style={{
+                            width: `${OUTLOOK_TIMELINE_GUTTER_WIDTH_PX}px`,
+                          }}
                         >
                           {isHour ? formatGridTimeLabel(slotMinute) : null}
                         </div>
@@ -3157,10 +3711,17 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     >
                       <div
                         className="pr-1 text-right text-[10px] font-semibold text-stardust-gold"
-                        style={{ width: `${OUTLOOK_TIMELINE_GUTTER_WIDTH_PX}px` }}
+                        style={{
+                          width: `${OUTLOOK_TIMELINE_GUTTER_WIDTH_PX}px`,
+                        }}
                       >
-                        <span aria-hidden="true">{formatCurrentTimeLabel(nowMarkerMinute)}</span>
-                        <span className="sr-only" data-testid="timeline-row-time">
+                        <span aria-hidden="true">
+                          {formatCurrentTimeLabel(nowMarkerMinute)}
+                        </span>
+                        <span
+                          className="sr-only"
+                          data-testid="timeline-row-time"
+                        >
                           {minuteToTime(nowMarkerMinute)}
                         </span>
                       </div>
@@ -3176,55 +3737,88 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     {positionedTimelineTasks.map((entry) => {
                       const task = entry.task;
                       const isThisDragging = timelineDraggingTaskId === task.id;
-                      const isThisLongPressed = timelineLongPressTaskId === task.id;
+                      const isThisLongPressed =
+                        timelineLongPressTaskId === task.id;
                       const isThisEngaged = isThisDragging || isThisLongPressed;
                       const isAnyDragging = timelineIsDragging;
                       const isJustDropped = timelineJustDroppedId === task.id;
-                      const usesOverlayPlaceholder = isThisDragging && shouldRenderDragOverlay;
-                      const laneOffsetPx = entry.laneIndex > 0 ? OUTLOOK_TIMELINE_EVENT_GAP_PX : 0;
-                      const baseTimelineRowDragProps = isDesktopTimelineDragEnabled && task.scheduled_time && !task.completed
-                        ? timelineDrag.getRowDragProps(task.id, task.scheduled_time)
-                        : undefined;
+                      const usesOverlayPlaceholder =
+                        isThisDragging && shouldRenderDragOverlay;
+                      const laneOffsetPx =
+                        entry.laneIndex > 0 ? OUTLOOK_TIMELINE_EVENT_GAP_PX : 0;
+                      const baseTimelineRowDragProps =
+                        isDesktopTimelineDragEnabled &&
+                        task.scheduled_time &&
+                        !task.completed
+                          ? timelineDrag.getRowDragProps(
+                              task.id,
+                              task.scheduled_time,
+                            )
+                          : undefined;
                       const timelineRowDragProps = baseTimelineRowDragProps
                         ? {
                             // Keep touch hold-to-reschedule, but skip pointer row drag so
                             // clicks/trackpad drags do not hijack normal quest interactions.
                             onTouchStartCapture: (
-                              event: Parameters<NonNullable<typeof baseTimelineRowDragProps.onTouchStartCapture>>[0],
+                              event: Parameters<
+                                NonNullable<
+                                  typeof baseTimelineRowDragProps.onTouchStartCapture
+                                >
+                              >[0],
                             ) => {
                               seedDragOverlaySnapshotForTask(task.id);
-                              baseTimelineRowDragProps.onTouchStartCapture?.(event);
+                              baseTimelineRowDragProps.onTouchStartCapture?.(
+                                event,
+                              );
                             },
                             onTouchStart: baseTimelineRowDragProps.onTouchStart,
                             onTouchMove: baseTimelineRowDragProps.onTouchMove,
                             onTouchEnd: baseTimelineRowDragProps.onTouchEnd,
-                            onTouchCancel: baseTimelineRowDragProps.onTouchCancel,
+                            onTouchCancel:
+                              baseTimelineRowDragProps.onTouchCancel,
                           }
                         : undefined;
-                      const overlapCount = timelineConflictMap.get(task.id)?.size ?? 0;
-                      const isCompactTimelineRow = !isDesktopLayout && entry.heightPx <= COMPACT_TIMELINE_ROW_MAX_HEIGHT_PX;
+                      const overlapCount =
+                        timelineConflictMap.get(task.id)?.size ?? 0;
+                      const isCompactTimelineRow =
+                        !isDesktopLayout &&
+                        entry.heightPx <= COMPACT_TIMELINE_ROW_MAX_HEIGHT_PX;
 
                       const rowStyle: CSSProperties = {
                         WebkitUserSelect: "none",
                         userSelect: "none",
                         WebkitTouchCallout: "none",
                         touchAction: isThisEngaged ? "none" : "pan-y",
-                        pointerEvents: isAnyDragging && !isThisDragging ? "none" : "auto",
-                        opacity: usesOverlayPlaceholder ? 0 : isAnyDragging && !isThisDragging ? 0.7 : 1,
-                        boxShadow: isThisEngaged && !usesOverlayPlaceholder
-                          ? "0 15px 30px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -4px rgba(0, 0, 0, 0.15)"
-                          : "none",
-                        backgroundColor: isThisEngaged && !usesOverlayPlaceholder ? "hsl(var(--background))" : "transparent",
-                        borderRadius: isThisEngaged && !usesOverlayPlaceholder ? 12 : 0,
+                        pointerEvents:
+                          isAnyDragging && !isThisDragging ? "none" : "auto",
+                        opacity: usesOverlayPlaceholder
+                          ? 0
+                          : isAnyDragging && !isThisDragging
+                            ? 0.7
+                            : 1,
+                        boxShadow:
+                          isThisEngaged && !usesOverlayPlaceholder
+                            ? "0 15px 30px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -4px rgba(0, 0, 0, 0.15)"
+                            : "none",
+                        backgroundColor:
+                          isThisEngaged && !usesOverlayPlaceholder
+                            ? "hsl(var(--background))"
+                            : "transparent",
+                        borderRadius:
+                          isThisEngaged && !usesOverlayPlaceholder ? 12 : 0,
                         transition: "none",
-                        willChange: isThisDragging && !usesOverlayPlaceholder ? "transform" : undefined,
+                        willChange:
+                          isThisDragging && !usesOverlayPlaceholder
+                            ? "transform"
+                            : undefined,
                       };
-                      const bounceAnimation = !useLiteAnimations && isJustDropped && !isThisDragging
-                        ? {
-                            scale: [1, 1.02, 0.98, 1],
-                            y: [0, -2, 1, 0],
-                          }
-                        : undefined;
+                      const bounceAnimation =
+                        !useLiteAnimations && isJustDropped && !isThisDragging
+                          ? {
+                              scale: [1, 1.02, 0.98, 1],
+                              y: [0, -2, 1, 0],
+                            }
+                          : undefined;
 
                       return (
                         <motion.div
@@ -3242,13 +3836,27 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                           )}
                           layout={!isThisDragging || usesOverlayPlaceholder}
                           animate={bounceAnimation}
-                          transition={bounceAnimation ? {
-                            duration: 0.25,
-                            ease: [0.25, 0.1, 0.25, 1],
-                            layout: { type: "spring", stiffness: 420, damping: 34, mass: 0.7 },
-                          } : {
-                            layout: { type: "spring", stiffness: 420, damping: 34, mass: 0.7 },
-                          }}
+                          transition={
+                            bounceAnimation
+                              ? {
+                                  duration: 0.25,
+                                  ease: [0.25, 0.1, 0.25, 1],
+                                  layout: {
+                                    type: "spring",
+                                    stiffness: 420,
+                                    damping: 34,
+                                    mass: 0.7,
+                                  },
+                                }
+                              : {
+                                  layout: {
+                                    type: "spring",
+                                    stiffness: 420,
+                                    damping: 34,
+                                    mass: 0.7,
+                                  },
+                                }
+                          }
                           data-timeline-lane={entry.laneIndex}
                           data-timeline-lane-count={entry.laneCount}
                           data-timeline-overlap={entry.overlapCount}
@@ -3264,30 +3872,50 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                             left: `calc(${entry.leftPercent}% + ${OUTLOOK_TIMELINE_EVENT_GAP_PX}px)`,
                             width: `calc(${entry.widthPercent}% - ${OUTLOOK_TIMELINE_EVENT_GAP_PX * 2}px)`,
                             height: `${entry.heightPx}px`,
-                            maxWidth: laneOffsetPx > 0 ? `calc(100% - ${laneOffsetPx}px)` : undefined,
-                            y: isThisDragging && !usesOverlayPlaceholder ? dragVisualOffsetY : 0,
+                            maxWidth:
+                              laneOffsetPx > 0
+                                ? `calc(100% - ${laneOffsetPx}px)`
+                                : undefined,
+                            y:
+                              isThisDragging && !usesOverlayPlaceholder
+                                ? dragVisualOffsetY
+                                : 0,
                           }}
                         >
                           <div
-                            className={cn("h-full min-w-0", isCompactTimelineRow && "overflow-hidden")}
+                            className={cn(
+                              "h-full min-w-0",
+                              isCompactTimelineRow && "overflow-hidden",
+                            )}
                             data-testid={`timeline-row-${task.id}`}
                             data-timeline-lane={entry.laneIndex}
                             data-timeline-lane-count={entry.laneCount}
                             data-timeline-overlap={entry.overlapCount}
-                            data-timeline-compact={isCompactTimelineRow ? "true" : undefined}
+                            data-timeline-compact={
+                              isCompactTimelineRow ? "true" : undefined
+                            }
                             data-start-minute={entry.startMinute}
                             data-top-px={entry.topPx}
-                            data-duration-minutes={task.estimated_duration ?? undefined}
+                            data-duration-minutes={
+                              task.estimated_duration ?? undefined
+                            }
                             data-duration-height-px={entry.heightPx}
                             style={{
-                              overflow: isCompactTimelineRow ? "hidden" : undefined,
+                              overflow: isCompactTimelineRow
+                                ? "hidden"
+                                : undefined,
                               minHeight: desktopTimelineDurationLayout
                                 ? `${durationMinutesToPixels(task.estimated_duration, desktopTimelineDurationLayout)}px`
                                 : undefined,
                             }}
                           >
-                            <span className="sr-only" data-testid="timeline-row-time">
-                              {isThisDragging ? timelinePreviewTime ?? task.scheduled_time : task.scheduled_time}
+                            <span
+                              className="sr-only"
+                              data-testid="timeline-row-time"
+                            >
+                              {isThisDragging
+                                ? (timelinePreviewTime ?? task.scheduled_time)
+                                : task.scheduled_time}
                             </span>
                             {renderTaskItem(task, undefined, overlapCount, {
                               isScheduledTimeline: true,
@@ -3311,7 +3939,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
       {desktopRail}
 
-      {shouldRenderDragOverlay && draggedScheduledTask && dragOverlaySnapshot && typeof document !== "undefined"
+      {shouldRenderDragOverlay &&
+      draggedScheduledTask &&
+      dragOverlaySnapshot &&
+      typeof document !== "undefined"
         ? createPortal(
             <motion.div
               data-testid="timeline-drag-overlay"
@@ -3337,7 +3968,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 className="cursor-grabbing"
                 data-testid={`timeline-drag-overlay-row-${draggedScheduledTask.id}`}
               >
-                {renderTaskItem(draggedScheduledTask, undefined, draggedOverlapCount)}
+                {renderTaskItem(
+                  draggedScheduledTask,
+                  undefined,
+                  draggedOverlapCount,
+                )}
               </TimelineTaskRow>
             </motion.div>,
             document.body,

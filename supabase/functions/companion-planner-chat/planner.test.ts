@@ -2804,7 +2804,7 @@ Deno.test("drafts one proposal per extracted action in aggressive bundle mode", 
     result.proposals.every((proposal) => proposal.kind === "create_quest"),
     true,
   );
-  assertStringIncludes(result.reply, "I drafted 3 quests");
+  assertStringIncludes(result.reply, "I found 3 quests");
   assertEquals(
     result.proposals.map((proposal) => proposal.title),
     [
@@ -4362,7 +4362,10 @@ Deno.test("uses the answer to the intent-first question to resume the normal pro
   assertEquals(result.proposals[0].kind, "create_quest");
   assertEquals(result.followUpQuestions.length, 0);
   assertEquals(result.proposals[0].readyToConfirm, true);
-  assertStringIncludes(result.reply, "I drafted this as a quest");
+  assertStringIncludes(
+    result.reply,
+    "I won't create or schedule a quest from this chat",
+  );
 });
 
 Deno.test("does not jump straight to timing questions for broad day-planning asks", () => {
@@ -4422,7 +4425,10 @@ Deno.test("does not jump straight to timing questions for broad day-planning ask
 
   assertEquals(result.followUpQuestions.length, 0);
   assertEquals(result.proposals[0].readyToConfirm, true);
-  assertStringIncludes(result.reply, "I drafted this as a quest");
+  assertStringIncludes(
+    result.reply,
+    "I won't create or schedule a quest from this chat",
+  );
 });
 
 Deno.test("keeps overloaded-day guidance in the reply without blocking confirmation", () => {
@@ -4488,7 +4494,10 @@ Deno.test("keeps overloaded-day guidance in the reply without blocking confirmat
 
   assertEquals(result.proposals[0].readyToConfirm, true);
   assertEquals(result.followUpQuestions.length, 0);
-  assertStringIncludes(result.reply, "I drafted this as a quest");
+  assertStringIncludes(
+    result.reply,
+    "I won't create or schedule a quest from this chat",
+  );
 });
 
 Deno.test("answers schedule questions with quests and connected calendar events without creating proposals", () => {
@@ -5049,7 +5058,10 @@ Deno.test("quest_capture gives explicit follow-up timing precedence over schedul
     result.proposals[0].summary,
     'Create a quest for "Workout" at 5:00 pm.',
   );
-  assertStringIncludes(result.reply, "today at 5:00 pm");
+  assertStringIncludes(
+    result.reply,
+    "I won't create or schedule a quest from this chat",
+  );
   assertEquals(result.reply.includes("1:00 pm"), false);
   assertEquals(result.reply.includes("usual afternoon rhythm"), false);
   assertEquals(result.reply.includes("assuming"), false);
@@ -5376,7 +5388,7 @@ Deno.test("quest_capture uses a matching suggested slot for date-only replies", 
   );
   assertStringIncludes(
     result.reply,
-    "assuming 2026-04-19 at 6:00 pm based on your open slot",
+    "I won't create or schedule a quest from this chat",
   );
   assertEquals(
     (result.proposals[0].payload as {
@@ -5462,7 +5474,7 @@ Deno.test("quest_capture uses planner memory when a date-only reply has no match
   );
   assertStringIncludes(
     result.reply,
-    "assuming 2026-04-19 at 6:00 pm based on your usual evening pattern",
+    "I won't create or schedule a quest from this chat",
   );
   assertEquals(
     (result.proposals[0].payload as {
@@ -9051,7 +9063,10 @@ Deno.test("uses witty_sassy voice for proposal replies without implying the draf
 
   assertEquals(result.mode, "proposal");
   assertEquals(result.proposals[0].readyToConfirm, true);
-  assertStringIncludes(result.reply, "skip the extra ceremony");
+  assertStringIncludes(
+    result.reply,
+    "I won't create or schedule a quest from this chat",
+  );
   assertEquals(result.reply.includes("already saved"), false);
 });
 
