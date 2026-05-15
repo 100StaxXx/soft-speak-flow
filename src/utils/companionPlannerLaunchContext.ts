@@ -35,7 +35,7 @@ interface CreatePlanDayLaunchIntentOptions {
   assumeTasksAreForSelectedDate?: boolean;
 }
 
-type PlannerInsightCategory =
+export type PlannerInsightCategory =
   | "finish_scheduled"
   | "needs_schedule"
   | "campaign_opening"
@@ -44,135 +44,152 @@ type PlannerInsightCategory =
   | "empty_day"
   | "steady_progress";
 
-const PLANNER_INSIGHT_STATEMENTS: Record<PlannerInsightCategory, string[]> = {
+export type PlannerQuoteTimeBucket =
+  | "late_night"
+  | "early_morning"
+  | "morning"
+  | "noon"
+  | "evening"
+  | "night";
+
+export const PLANNER_QUOTE_TIME_BUCKETS: readonly PlannerQuoteTimeBucket[] = [
+  "late_night",
+  "early_morning",
+  "morning",
+  "noon",
+  "evening",
+  "night",
+] as const;
+
+export const PLANNER_INSIGHT_STATEMENTS: Record<PlannerInsightCategory, string[]> = {
   finish_scheduled: [
     "Most of the day already has a time. Finish the scheduled quests before adding anything new.",
     "The structure is already there. Protect the timed quests first, then decide if anything else deserves space.",
     "You have enough on the calendar to start. Work through the scheduled list before reshuffling.",
-    "The schedule has already done the first hard part. Follow the timed path before inventing a side quest.",
+    "The schedule has already done the first hard part. Follow the timed path before adding more.",
     "Your calendar is holding the shape of the day. Let the timed quests lead and keep extra ideas in the waiting room.",
-    "This is a good follow-the-map day. Start with what already has a time and save the remix for later.",
+    "This is a good follow-the-schedule day. Start with what already has a time and review changes later.",
     "Timed quests are the spine of this plan. Walk that line first, then see what still wants attention.",
-    "The day is not asking for clever, just steady. Honor the timed blocks before opening another tab in your brain.",
+    "The day is not asking for clever, just steady. Honor the timed blocks before adding more decisions.",
     "Your plan already has rails. Ride those first, then decide if anything else earns a seat.",
-    "The important pieces have appointments. Keep them protected and let optional work audition afterward.",
-    "Do not negotiate with the schedule yet. Complete the timed quests, then review the leftovers with a cooler head.",
-    "The calendar is doing useful adult supervision here. Let it boss the day around for a little while.",
-    "The timed work is already standing in line. Start at the front and let the optional pieces wait.",
+    "The important pieces have appointments. Keep them protected and review optional work afterward.",
+    "Do not revise the schedule yet. Complete the timed quests, then review what remains.",
+    "The calendar is providing useful structure here. Let the timed work lead for a while.",
+    "The timed work already has an order. Start at the front and let optional pieces wait.",
     "This schedule has a clear first move. Take the timed quests seriously before adding new weight.",
-    "The calendar made a useful promise for you. Keep it before chasing the extra possibilities.",
+    "The calendar marks a useful commitment. Keep it before adding extra possibilities.",
     "You already have an appointment with progress. Show up for it before expanding the list.",
-    "The timed blocks are doing quiet architecture. Follow them and let the rest stay simple.",
+    "The timed blocks give the day a clear structure. Follow them and let the rest stay simple.",
     "Today needs execution more than rearranging. Trust the schedule and move through it in order.",
     "The plan is not empty, it is assigned. Honor each timed quest before asking for more.",
     "Let the calendar be the decision maker for now. Finish what has a time, then reassess.",
     "The scheduled pieces are the cleanest path through the day. Walk that path first.",
-    "Your optional quests can wait in the lobby. The timed work gets the first handshake.",
+    "Optional quests can wait. Timed work gets the first pass.",
     "This is a follow-through day. Keep the schedule visible and let completion choose the next move.",
-    "The day already knows where to begin. Start with the timed block and keep the promise small.",
+    "The day already has a place to begin. Start with the timed block and keep the scope small.",
   ],
   needs_schedule: [
     "The list needs a little shape. Give one important quest a real time so the day has an anchor.",
     "Nothing is really protected yet. Pick the next useful quest and put it somewhere specific.",
     "Start by scheduling the piece that would make the biggest difference for a bigger goal.",
     "This plan wants one anchor, not a motivational speech. Choose the quest that matters and give it a time.",
-    "The day is currently a pile of good intentions. Put the sharpest one on the calendar.",
+    "The day needs one clear anchor. Put the highest-value quest on the calendar.",
     "Pick one quest to stop floating. A real time will turn the list from fog into a route.",
-    "Choose the task you would be relieved to have finished, then give it a slot before the day gets ideas.",
+    "Choose the task with the clearest payoff, then give it a specific slot.",
     "The list is asking for a first domino. Schedule one useful quest and let the rest line up behind it.",
-    "Start with one clear appointment for progress. The rest of the plan can stop pretending it is abstract art.",
+    "Start with one clear appointment for progress. The rest of the plan can stay simple.",
     "Give the day a handle. One timed quest is enough to make the whole list easier to lift.",
-    "The best move is not more planning, it is one protected block. Put the next important quest somewhere real.",
-    "Your quests are hovering politely. Invite one of them onto the calendar before they form a committee.",
+    "The best move is one protected block. Put the next important quest somewhere real.",
+    "The quests need a landing place. Put one of them on the calendar.",
     "The list needs a landing place. Give one quest a time and let the day stop drifting.",
     "A single anchor will help more than another scan of the list. Schedule the next useful block.",
     "Pick the quest with the most leverage and give it a protected slot.",
     "The day needs one appointment with progress. Put the best next task on the calendar.",
     "Turn one floating quest into a timed commitment before the list starts spreading out.",
-    "Choose the thing that keeps returning to your mind, then schedule it somewhere honest.",
-    "One block is enough to make the whole plan less slippery. Place it and begin there.",
-    "Give the list a backbone. A scheduled quest will make the rest easier to sort.",
-    "The next move wants a clock, not a debate. Choose one quest and assign the time.",
+    "Choose the task with the strongest priority signal, then schedule it somewhere realistic.",
+    "One block is enough to make the plan easier to follow. Place it and begin there.",
+    "Give the list a clear structure. A scheduled quest will make the rest easier to sort.",
+    "The next move needs a time. Choose one quest and assign the slot.",
     "Create one protected pocket for the task that matters most.",
     "Let the day begin with a real slot. One scheduled quest beats a dozen almost-plans.",
     "Your plan needs a first stake in the ground. Put one quest on the calendar.",
   ],
   campaign_opening: [
     "The day has room. Use one clear block to move an active campaign forward before the space disappears.",
-    "You have a light runway today. Choose one campaign touchpoint and make it concrete.",
-    "This is a good day to get ahead on an active campaign: schedule one campaign step now.",
-    "There is enough oxygen here for a campaign step. Pick the smallest useful move and give it a time.",
-    "The day is leaving a door open. Walk one active campaign through it before the calendar changes its mind.",
-    "Use this light day for one campaign nudge. Nothing epic, just one honest brick in the wall.",
-    "A campaign can benefit from this quiet patch. Choose one touchpoint that future-you will notice.",
-    "This is a good opening for strategic mischief: advance one campaign while the day is still uncluttered.",
+    "The load is light today. Choose one campaign touchpoint and make it concrete.",
+    "This is a good day to support an active campaign: schedule one campaign step now.",
+    "There is enough room here for a campaign step. Pick the smallest useful move and give it a time.",
+    "The day has an opening. Use it for one active campaign step before adding anything else.",
+    "Use this light day for one campaign nudge. Keep it small and concrete.",
+    "A campaign can benefit from this quiet patch. Choose one visible touchpoint and keep it contained.",
+    "This is a good opening for focused progress: advance one campaign while the day is still uncluttered.",
     "The load is light enough to think bigger. Put one active campaign step on the board.",
-    "An active campaign is waving from the wings. Give it one focused block so it does not have to shout later.",
-    "The day has spare room, which is rare and suspiciously useful. Spend a little of it on an active campaign.",
+    "An active campaign has room for attention. Give it one focused block.",
+    "The day has spare room. Spend a little of it on an active campaign.",
     "Turn the open space into momentum. One campaign step is enough to make the day feel intentional.",
     "There is room for one campaign move today. Keep it small enough to actually land.",
-    "A light plan is a quiet invitation. Spend one block on the campaign that matters most.",
+    "A light plan can support one focused campaign block.",
     "This is a good opening for campaign maintenance: one clear touch, then back to the day.",
-    "Use the space before it evaporates. Give one active campaign a concrete next step.",
-    "The campaign does not need a parade today. It needs one useful block with a finish line.",
-    "Pick the campaign step that future-you will thank you for, then make it real.",
-    "There is enough daylight here for one campaign push. Choose the smallest move with teeth.",
-    "Let one campaign borrow the open room, but do not let it take over the house.",
+    "Use the available space for one concrete campaign step.",
+    "The campaign needs one useful block with a finish line.",
+    "Pick one clear campaign step, then make it real.",
+    "There is enough room here for one campaign push. Choose the smallest concrete move.",
+    "Let one campaign use the open room, but keep the scope contained.",
     "This is a tidy chance to advance a campaign without crowding the rest of the plan.",
-    "Put one campaign touchpoint on the calendar while the day still has elbow room.",
-    "The open space can become drift or campaign progress. Choose progress with a small scope.",
+    "Put one campaign touchpoint on the calendar while the day still has room.",
+    "The open space can stay open or support campaign progress. Choose a small scope.",
     "One campaign step today is plenty. Make it specific, visible, and done.",
   ],
   reschedule_overload: [
-    "This is more than one day can comfortably hold. Keep the fixed commitments and move the least important work before it piles up.",
+    "This is more than one day can comfortably hold. Keep the fixed commitments and move the least important work.",
     "The load is heavy and progress is thin. Reschedule the day around what truly has to happen.",
     "Treat this as a triage day: protect the timed essentials, then push or shrink the rest.",
-    "This plan is trying to wear too many hats. Keep the fixed pieces, shrink the flexible ones, and move what can wait.",
-    "The day is overloaded, not morally failing. Cut it down to essentials before the schedule starts charging rent.",
-    "Do the emergency edit: fixed commitments stay, low-impact work moves, oversized quests get smaller.",
-    "This is a calendar traffic jam. Clear a lane for the must-do work and reroute the rest.",
-    "Protect the quests that truly matter and give the extras a later landing spot. Heroics are not the plan.",
+    "This plan has too many active pieces. Keep the fixed pieces, shrink the flexible ones, and move what can wait.",
+    "The day is overloaded. Cut it down to essentials before the schedule gets harder to follow.",
+    "Do a quick edit: fixed commitments stay, low-impact work moves, oversized quests get smaller.",
+    "This calendar is crowded. Clear space for the must-do work and reroute the rest.",
+    "Protect the quests that truly matter and give the extras a later landing spot.",
     "The load needs pruning. Keep what is fixed, trim what is vague, and let tomorrow absorb the nonessential.",
     "This is a triage board, not a productivity contest. Save the day by making it smaller.",
-    "The schedule is waving a tiny red flag. Move or shrink the least important quests before momentum gets buried.",
-    "Heavy days need fewer promises. Pick the essentials, reschedule the soft commitments, and call that wisdom.",
-    "The day is asking for a smaller promise. Move the soft work and keep only the essentials.",
-    "This load needs triage before it needs willpower. Protect the fixed pieces and shrink the rest.",
-    "Heavy does not mean heroic. Reschedule what can wait and make the remaining work clean.",
-    "The plan is over capacity. Move the lowest-impact quests before they steal the whole day.",
+    "The schedule is showing pressure. Move or shrink the least important quests before momentum gets buried.",
+    "Heavy days need fewer commitments. Pick the essentials and reschedule the flexible work.",
+    "The day needs a smaller scope. Move the flexible work and keep only the essentials.",
+    "This load needs triage before more effort. Protect the fixed pieces and shrink the rest.",
+    "Heavy does not need to stay heavy. Reschedule what can wait and make the remaining work clean.",
+    "The plan is over capacity. Move the lowest-impact quests before they crowd the whole day.",
     "Treat the fixed commitments as anchors and reroute everything that does not truly belong today.",
     "This is not a day to carry extras. Keep essentials, shrink oversized work, and send the rest later.",
-    "The red flag is useful information. Reschedule early so the day has a chance to breathe.",
+    "The pressure is useful information. Reschedule early so the day has more room.",
     "Too much is trying to happen at once. Make the plan smaller before the work starts pushing back.",
-    "Heavy days reward subtraction. Move one thing, shrink one thing, then start with the fixed piece.",
+    "Heavy days work better with subtraction. Move one thing, shrink one thing, then start with the fixed piece.",
     "The calendar needs relief. Reroute the flexible quests and keep the must-do work visible.",
-    "This is triage, not defeat. Save the essentials and give the extras a better landing.",
-    "The day is crowded enough. Reschedule the soft promises before they become noise.",
+    "This is triage. Save the essentials and give the extras a better landing.",
+    "The day is crowded enough. Reschedule flexible commitments before they become noise.",
   ],
   light_structured: [
     "You have a manageable list and the important pieces are timed. Follow the schedule before adding more.",
     "This is already a clean little plan. Stay with the timed quests and let the day stay light.",
     "The day has enough structure to move without overthinking it. Complete the scheduled pieces first.",
     "This plan is pleasantly unchaotic. Keep it that way by trusting the timed quests.",
-    "The day is light and already wearing matching socks. Follow the schedule and resist adding sparkle chores.",
+    "The day is light and already organized. Follow the schedule and avoid adding extra work.",
     "Nothing needs a grand redesign here. Work the timed list and let the extra space stay breathable.",
-    "This is a tidy little runway. Take off with the scheduled quests, then enjoy the unused airspace.",
-    "The plan has enough structure and not too much noise. That is a rare flavor, protect it.",
+    "This is a tidy plan. Start with the scheduled quests, then leave the extra space open.",
+    "The plan has enough structure and not too much noise. Protect that simplicity.",
     "Stay simple today. The timed quests are enough to create momentum without crowding the room.",
-    "This is the kind of plan that works because it does not flex in the mirror. Follow it.",
-    "Keep the day light on purpose. Finish the scheduled pieces before inviting more quests to the party.",
-    "The calendar is being kind. Accept the kindness, follow the timed quests, and do not overpack the bag.",
-    "This light plan already has a spine. Follow the timed pieces and keep the rest airy.",
+    "This is the kind of plan that works because it stays simple. Follow it.",
+    "Keep the day light on purpose. Finish the scheduled pieces before adding more quests.",
+    "The calendar is light. Follow the timed quests and avoid overpacking the day.",
+    "This light plan already has structure. Follow the timed pieces and keep the rest open.",
     "The schedule is doing just enough. Trust it and avoid turning a clean day into a packed one.",
     "You have structure without heaviness. Let the timed quests carry the momentum.",
     "This is a good simple plan. Work the schedule and leave the spare room unclaimed.",
-    "The calendar has handed you a gentle route. Follow it without adding scenic detours.",
-    "A light day can still count. Complete the scheduled pieces and let that be solid.",
+    "The calendar has a gentle route. Follow it without adding extra detours.",
+    "A light day can still count. Complete the scheduled pieces and keep the plan solid.",
     "The plan is balanced because it is not crowded. Keep it that way.",
-    "There is enough structure here to begin, and enough space to stay human.",
+    "There is enough structure here to begin, and enough space to keep the plan realistic.",
     "The timed quests are the useful shape of the day. Let them set the pace.",
     "This schedule is small in the best way. Protect the simplicity and move through it.",
-    "The day has a clean rhythm. Finish the timed work before inviting extra noise.",
+    "The day has a clean rhythm. Finish the timed work before adding extra work.",
     "Light structure is still structure. Use it, then enjoy what stays open.",
   ],
   empty_day: [
@@ -181,53 +198,145 @@ const PLANNER_INSIGHT_STATEMENTS: Record<PlannerInsightCategory, string[]> = {
     "There is room to decide what matters. Schedule one small anchor if you want the day to have direction.",
     "The page is blank in a useful way. Add one small anchor so the day has a handle.",
     "This open day does not need a full itinerary. One meaningful quest is enough to give it a pulse.",
-    "You have clean open space. Put one tiny stake in the ground before random errands discover it.",
-    "Nothing is demanding a slot yet. Choose one gentle win if you want the day to point somewhere.",
+    "There is clean open space. Put one small anchor on the calendar if direction would help.",
+    "Nothing is demanding a slot yet. Choose one small win if the day needs direction.",
     "The calendar is quiet. Add one clear quest, or deliberately protect the quiet if rest is the point.",
-    "A blank day is powerful and slightly slippery. Give it one anchor if momentum matters today.",
+    "A blank day is useful but easy to overfill. Give it one anchor if momentum matters today.",
     "This is open terrain. One useful quest can turn it from empty to intentional.",
     "No schedule pressure here. If you want direction, pick one small quest and let that be enough.",
-    "The day is a fresh blank sheet. Draw one line on it, not a maze.",
+    "The day is open. Add one clear line, not a full itinerary.",
     "The calendar is open. Choose one anchor if you want the day to point somewhere.",
     "Nothing is claiming the day yet. Add one small quest or protect the quiet on purpose.",
-    "This blank space can be rest or momentum. Decide which one you actually need.",
+    "This blank space can be rest or momentum. Choose the version that best fits the day.",
     "An empty plan is not a problem. It is a place to choose one honest next step.",
-    "The day is quiet enough to hear a priority. Give one useful quest a soft landing.",
+    "The day is quiet enough for one priority. Give one useful quest a clear slot.",
     "Open space works best with one intention. Pick a small anchor and stop there.",
     "Nothing is scheduled, which means the day can stay spacious or gain one clear line.",
     "A blank calendar is permission to be deliberate. One quest is enough if direction matters.",
-    "This open day does not need to prove anything. Add one anchor only if it helps.",
-    "The quiet is useful. Keep it, or place one small quest where it will not crowd the day.",
-    "No schedule is calling the shots yet. Choose one anchor before the day chooses for you.",
+    "This open day does not need a full plan. Add one anchor only if it helps.",
+    "The quiet is useful. Keep it open, or place one small quest where it will not crowd the day.",
+    "No schedule is setting the shape yet. Choose one anchor if direction would help.",
     "The page is empty in a workable way. One clean mark will do.",
   ],
   steady_progress: [
     "The day is workable. Choose the next important quest, then keep the rest in a simple order.",
     "There is enough here to need a plan, but not a total rebuild. Protect the timed work and pick one clear next step.",
-    "You have a steady load. Keep the order simple and avoid adding work until the current list moves.",
-    "This is a normal-sized quest stack. Pick the next best move and do not let the list become a philosophy seminar.",
-    "The day has weight, but it is carrying weight. Keep the timed work protected and move through one quest at a time.",
+    "The load is steady. Keep the order simple and avoid adding work until the current list moves.",
+    "This is a normal-sized quest stack. Pick the next best move and keep the list practical.",
+    "The day has weight, but it is still workable. Keep the timed work protected and move through one quest at a time.",
     "This plan wants sequence more than drama. Start with the most useful next quest and keep the line moving.",
-    "There is enough to do, but not enough to panic about. Give the day a clean order and follow it.",
-    "The load is steady. Choose the quest that unlocks the most relief, then let the rest wait its turn.",
-    "You do not need a master plan, just a sane queue. Timed work first, then the next important piece.",
-    "This is manageable if it stays linear. Pick the next quest and resist turning the day into a puzzle box.",
-    "The plan has momentum potential. Keep the order plain, protect what is timed, and avoid bonus quests for sport.",
-    "A steady day rewards boring clarity. Choose the next best action and let completion do the talking.",
+    "There is enough to do, but not enough to require a rebuild. Give the day a clean order and follow it.",
+    "The load is steady. Choose the quest that reduces the most pressure, then let the rest wait its turn.",
+    "This does not need a master plan, just a clear queue. Timed work first, then the next important piece.",
+    "This is manageable if it stays linear. Pick the next quest and keep the sequence clear.",
+    "The plan has momentum potential. Keep the order plain, protect what is timed, and avoid bonus work.",
+    "A steady day rewards clarity. Choose the next best action and keep moving.",
     "The plan is steady enough to move. Put the timed work first and keep the queue plain.",
     "This is a progress day, not a reinvention day. Choose the next quest and continue.",
-    "The load is manageable if you keep the order honest. One quest, then the next.",
-    "A simple queue will beat a complicated theory today. Start with the clearest next task.",
+    "The load is manageable if the order stays clear. One quest, then the next.",
+    "A simple queue will beat a complicated plan today. Start with the clearest next task.",
     "The day has enough shape to trust. Protect timed work, then follow the next useful thread.",
-    "Steady work wants fewer decisions. Choose an order and let completion lower the noise.",
-    "This plan can move if you do not keep reopening it. Pick the next quest and go.",
-    "Progress is available here, but it likes a clean line. Keep the sequence simple.",
-    "The queue is real but not wild. Work it in order and avoid adding bonus weight.",
+    "Steady work needs fewer decisions. Choose an order and reduce the noise.",
+    "This plan can move without another revision. Pick the next quest and go.",
+    "Progress is available here. Keep the sequence simple.",
+    "The queue is real but manageable. Work it in order and avoid adding bonus weight.",
     "A manageable day still needs a lead task. Choose one and let the rest follow.",
-    "The plan has enough friction to need focus, not enough to need panic. Keep the order plain.",
+    "The plan has enough friction to need focus, not a full rebuild. Keep the order plain.",
     "Steady progress comes from closing loops. Start with the quest that clears the most space.",
   ],
 };
+
+export const PLANNER_TIME_BUCKET_QUOTES: Record<PlannerQuoteTimeBucket, string[]> = {
+  late_night: [
+    "Keep the move tiny or park the next step for tomorrow.",
+    "Name the next step, then let the plan get quiet.",
+    "A short closeout is enough for this hour.",
+  ],
+  early_morning: [
+    "Use the quiet start for one small anchor.",
+    "Let the first move be simple and specific.",
+    "The day can start with one clean step.",
+  ],
+  morning: [
+    "Use the morning for the clearest priority.",
+    "Give one important quest a real slot while the day is open.",
+    "Start with the move that makes the rest easier.",
+  ],
+  noon: [
+    "Use this midpoint to choose the next realistic step.",
+    "Keep the afternoon honest with one clear priority.",
+    "This is a checkpoint: protect what matters and skip the extras.",
+  ],
+  evening: [
+    "Keep the evening scope small and finishable.",
+    "Choose one clean closeout before adding more.",
+    "Protect energy and shrink anything too large.",
+  ],
+  night: [
+    "Keep tonight gentle: close one loop or schedule tomorrow.",
+    "The useful move now is small, clear, and done.",
+    "Let the larger work wait for a better block.",
+  ],
+};
+
+export const NEUTRAL_PLANNER_MICRO_LINES = [
+  "Keep it simple.",
+  "One useful move is enough.",
+  "Protect the momentum.",
+] as const;
+
+const NIGHT_UNSAFE_STATEMENT_PATTERN =
+  /\b(daylight|runway|before the space disappears|before it evaporates|elbow room|get ahead|while the day is still|day has room|light day|spare room)\b/i;
+
+const getStableHash = (seed: string) =>
+  Array.from(seed).reduce(
+    (total, char) => ((total << 5) - total + char.charCodeAt(0)) | 0,
+    0,
+  );
+
+const getStableIndex = (seed: string, length: number) =>
+  length <= 0 ? 0 : Math.abs(getStableHash(seed)) % length;
+
+const getDeterministicItem = (
+  items: readonly string[],
+  seed: string,
+) => items[getStableIndex(seed, items.length)] ?? items[0] ?? "";
+
+export const getPlannerQuoteTimeBucket = (date: Date): PlannerQuoteTimeBucket => {
+  const hour = date.getHours();
+
+  if (hour < 4) return "late_night";
+  if (hour < 8) return "early_morning";
+  if (hour < 12) return "morning";
+  if (hour < 16) return "noon";
+  if (hour < 21) return "evening";
+  return "night";
+};
+
+export const buildCompanionPlannerQuote = ({
+  baseQuote,
+  timeQuote,
+  microLine,
+}: {
+  baseQuote: string;
+  timeQuote?: string | null;
+  microLine?: string | null;
+}) =>
+  [baseQuote, timeQuote, microLine]
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part))
+    .join(" ");
+
+const shouldUseNeutralMicroLine = (seed: string) =>
+  getStableIndex(`${seed}:micro-line`, 100) < 20;
+
+const getPlannerTimeBucketQuote = (
+  timeBucket: PlannerQuoteTimeBucket,
+  seed: string,
+) => getDeterministicItem(PLANNER_TIME_BUCKET_QUOTES[timeBucket], `${seed}:time`);
+
+const getNeutralPlannerMicroLine = (seed: string) =>
+  getDeterministicItem(NEUTRAL_PLANNER_MICRO_LINES, `${seed}:micro`);
 
 const safeFormat = (date: Date, formatString: string, fallback: string) => {
   if (Number.isNaN(date.getTime())) return fallback;
@@ -319,13 +428,21 @@ const choosePlannerInsightCategory = ({
 const getDeterministicStatement = (
   category: PlannerInsightCategory,
   seed: string,
+  timeBucket: PlannerQuoteTimeBucket | null,
 ) => {
   const statements = PLANNER_INSIGHT_STATEMENTS[category];
-  const hash = Array.from(seed).reduce(
-    (total, char) => total + char.charCodeAt(0),
-    0,
+  const filteredStatements =
+    timeBucket === "night" || timeBucket === "late_night"
+      ? statements.filter((statement) => !NIGHT_UNSAFE_STATEMENT_PATTERN.test(statement))
+      : statements;
+  const availableStatements = filteredStatements.length > 0
+    ? filteredStatements
+    : statements;
+
+  return getDeterministicItem(
+    availableStatements,
+    timeBucket ? `${seed}:${timeBucket}` : seed,
   );
-  return statements[hash % statements.length] ?? statements[0] ?? "";
 };
 
 const summarizeTask = (task: CompanionPlannerLaunchTask) => {
@@ -373,6 +490,10 @@ export const createPlanDayBriefingContext = ({
       : openTasks.length <= 2 && estimatedMinutes <= 90
         ? "light"
         : "steady";
+  const isSelectedDateToday = isSameDay(selectedDate, currentTime);
+  const plannerTimeBucket = isSelectedDateToday
+    ? getPlannerQuoteTimeBucket(currentTime)
+    : null;
 
   const insightCategory = choosePlannerInsightCategory({
     openQuestCount: openTasks.length,
@@ -393,7 +514,19 @@ export const createPlanDayBriefingContext = ({
   const plannerInsightStatement = getDeterministicStatement(
     insightCategory,
     statementSeed,
+    plannerTimeBucket,
   );
+  const timeQuote = plannerTimeBucket
+    ? getPlannerTimeBucketQuote(plannerTimeBucket, statementSeed)
+    : null;
+  const microLine = plannerTimeBucket && shouldUseNeutralMicroLine(statementSeed)
+    ? getNeutralPlannerMicroLine(statementSeed)
+    : null;
+  const plannerQuote = buildCompanionPlannerQuote({
+    baseQuote: plannerInsightStatement,
+    timeQuote,
+    microLine,
+  });
   const estimatePhrase = estimatedMinutes > 0
     ? `with about ${formatMinutes(estimatedMinutes)} planned`
     : "with no time estimate yet";
@@ -412,7 +545,7 @@ export const createPlanDayBriefingContext = ({
     progressSentence,
   ].join(" ");
 
-  const todayGuardrail = isSameDay(selectedDate, currentTime)
+  const todayGuardrail = isSelectedDateToday
     ? " Because this is today, avoid proposing times that have already passed."
     : "";
 
@@ -439,7 +572,10 @@ export const createPlanDayBriefingContext = ({
       estimatedLoadLabel: formatMinutes(estimatedMinutes),
       loadSignal,
       plannerInsightCategory: insightCategory,
-      plannerInsightStatement,
+      plannerInsightStatement: plannerQuote,
+      plannerInsightBaseStatement: plannerInsightStatement,
+      plannerTimeBucket,
+      isSelectedDateToday,
       activeCampaignCount: activeEpics.length,
       activeCampaignTitles,
       activeCampaigns: activeEpics.slice(0, 8).map((epic) => ({

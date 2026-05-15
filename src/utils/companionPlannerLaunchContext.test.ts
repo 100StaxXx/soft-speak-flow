@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildCompanionPlannerQuote,
   createPlanDayBriefingContext,
+  getPlannerQuoteTimeBucket,
+  NEUTRAL_PLANNER_MICRO_LINES,
+  PLANNER_INSIGHT_STATEMENTS,
+  PLANNER_QUOTE_TIME_BUCKETS,
+  PLANNER_TIME_BUCKET_QUOTES,
   type CompanionPlannerLaunchTask,
 } from "./companionPlannerLaunchContext";
 
@@ -136,7 +142,75 @@ const INSIGHT_RELEVANCE_PATTERNS: Record<PlannerInsightCategory, RegExp> = {
   steady_progress: /\b(steady|order|timed|quest|plan|queue|manageable|progress)\b/i,
 };
 
+const UNSUPPORTED_USER_ASSUMPTION_PATTERN =
+  /\b(usually|normally|tend(?:s)? to|lately|you['’]ve (?:been|handled|survived)|future-you|completion rate|your mornings)\b/i;
+const BORDERLINE_PLANNER_COPY_PATTERN =
+  /\b(adult supervision|audition|side quest|abstract art|committee|slippery|matching socks|flex in the mirror|mischief|morally|heroics?|red flag|caffeine|feral|cursed|quiet architecture|philosophy seminar|puzzle box|willpower|prove anything|steal the whole day|wear too many hats|cooler head|remix|debate|defeat|good intentions|raccoon|goblin)\b/i;
+
+const activePlannerQuoteLines = () => [
+  ...Object.values(PLANNER_INSIGHT_STATEMENTS).flat(),
+  ...Object.values(PLANNER_TIME_BUCKET_QUOTES).flat(),
+  ...NEUTRAL_PLANNER_MICRO_LINES,
+];
+
 describe("createPlanDayBriefingContext", () => {
+  it("keeps the approved quote time buckets explicit", () => {
+    expect(PLANNER_QUOTE_TIME_BUCKETS).toEqual([
+      "late_night",
+      "early_morning",
+      "morning",
+      "noon",
+      "evening",
+      "night",
+    ]);
+  });
+
+  it.each([
+    ["late_night", "2026-05-15T00:00:00"],
+    ["late_night", "2026-05-15T03:59:00"],
+    ["early_morning", "2026-05-15T04:00:00"],
+    ["early_morning", "2026-05-15T07:59:00"],
+    ["morning", "2026-05-15T08:00:00"],
+    ["morning", "2026-05-15T11:59:00"],
+    ["noon", "2026-05-15T12:00:00"],
+    ["noon", "2026-05-15T15:59:00"],
+    ["evening", "2026-05-15T16:00:00"],
+    ["evening", "2026-05-15T20:59:00"],
+    ["night", "2026-05-15T21:00:00"],
+    ["night", "2026-05-15T23:59:00"],
+  ])("maps %s boundaries from %s", (bucket, dateTime) => {
+    expect(getPlannerQuoteTimeBucket(new Date(dateTime))).toBe(bucket);
+  });
+
+  it("combines only base, time, and micro quote parts", () => {
+    expect(
+      buildCompanionPlannerQuote({
+        baseQuote: "Base.",
+        timeQuote: "Time.",
+        microLine: "Micro.",
+      }),
+    ).toBe("Base. Time. Micro.");
+    expect(
+      buildCompanionPlannerQuote({
+        baseQuote: " Base. ",
+        timeQuote: null,
+        microLine: " ",
+      }),
+    ).toBe("Base.");
+  });
+
+  it("keeps active planner quote pools free of unsupported user assumptions", () => {
+    for (const line of activePlannerQuoteLines()) {
+      expect(line).not.toMatch(UNSUPPORTED_USER_ASSUMPTION_PATTERN);
+    }
+  });
+
+  it("keeps active planner quote pools aligned with the calmer planner tone", () => {
+    for (const line of activePlannerQuoteLines()) {
+      expect(line).not.toMatch(BORDERLINE_PLANNER_COPY_PATTERN);
+    }
+  });
+
   it.each(INSIGHT_CATEGORIES)(
     "selects at least ten distinct relevant statements for %s",
     (category) => {
@@ -269,5 +343,60 @@ describe("createPlanDayBriefingContext", () => {
     expect(snapshot.plannerInsightCategory).toBe("empty_day");
     expect(snapshot.plannerInsightStatement).toMatch(/day|scheduled|quest/i);
     expect(snapshot.plannerInsightStatement).not.toMatch(/next important quest/i);
+  });
+
+  it("uses night-safe campaign copy when planning today at night", () => {
+    const briefing = createPlanDayBriefingContext({
+      selectedDate: new Date("2026-05-14T12:00:00"),
+      currentTime: new Date("2026-05-14T23:27:00"),
+      tasks: [
+        {
+          id: "campaign-task",
+          task_text: "Draft launch notes",
+          task_date: "2026-05-14",
+          completed: false,
+          scheduled_time: null,
+          estimated_duration: 30,
+          epic_id: "epic-1",
+          epic_title: "Launch Planner",
+        },
+      ],
+      activeEpics: [{ id: "epic-1", title: "Launch Planner" }],
+    });
+    const snapshot = briefing.dataSnapshot as Record<string, unknown>;
+
+    expect(snapshot.plannerInsightCategory).toBe("campaign_opening");
+    expect(snapshot.plannerTimeBucket).toBe("night");
+    expect(snapshot.plannerInsightStatement).toEqual(expect.any(String));
+    expect(String(snapshot.plannerInsightStatement)).not.toMatch(
+      /\b(daylight|runway|before the space disappears|before it evaporates|elbow room)\b/i,
+    );
+    expect(String(snapshot.plannerInsightStatement)).toMatch(
+      /\b(tonight|tomorrow|small|block|campaign|loop|clear|done)\b/i,
+    );
+  });
+
+  it("does not apply today's time bucket to future selected dates", () => {
+    const briefing = createPlanDayBriefingContext({
+      selectedDate: new Date("2026-05-15T12:00:00"),
+      currentTime: new Date("2026-05-14T23:27:00"),
+      tasks: [
+        {
+          id: "campaign-task",
+          task_text: "Draft launch notes",
+          task_date: "2026-05-15",
+          completed: false,
+          scheduled_time: null,
+          estimated_duration: 30,
+          epic_id: "epic-1",
+          epic_title: "Launch Planner",
+        },
+      ],
+      activeEpics: [{ id: "epic-1", title: "Launch Planner" }],
+    });
+    const snapshot = briefing.dataSnapshot as Record<string, unknown>;
+
+    expect(snapshot.plannerTimeBucket).toBeNull();
+    expect(snapshot.isSelectedDateToday).toBe(false);
   });
 });

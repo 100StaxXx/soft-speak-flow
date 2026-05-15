@@ -1475,7 +1475,10 @@ export function useCompanionAssistant({
       if (threadMutationVersionRef.current !== openerMutationVersion) {
         return null;
       }
-      console.error("Failed to start companion opener thread:", error);
+      console.warn("Generated companion opener unavailable; using local opener.", {
+        name: error instanceof Error ? error.name : null,
+        message: error instanceof Error ? error.message : null,
+      });
       setIsOpeningThread(false);
       void invalidateThreads();
       return openFreshThread({

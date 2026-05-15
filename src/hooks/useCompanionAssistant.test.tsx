@@ -1061,6 +1061,12 @@ describe("useCompanionAssistant", () => {
   });
 
   it("falls back to a local companion opener without surfacing opener internals", async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const consoleWarnSpy = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
     mocks.supabaseInvoke.mockImplementation(async (functionName) => {
       if (functionName === "companion-chat-opener") {
         return {
@@ -1104,6 +1110,11 @@ describe("useCompanionAssistant", () => {
     );
     expect(mocks.toastError).not.toHaveBeenCalled();
     expect(result.current.canSubmitMessage).toBe(true);
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      "Generated companion opener unavailable; using local opener.",
+      expect.objectContaining({ name: "Error" }),
+    );
 
     await act(async () => {
       const submitted = await result.current.submitMessage("Can we talk?");
@@ -1120,6 +1131,8 @@ describe("useCompanionAssistant", () => {
         ([functionName]) => functionName === "companion-agent",
       ),
     ).toBe(false);
+    consoleErrorSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
   });
 
   it("keeps the generated opener usable when opener persistence is not ready", async () => {
