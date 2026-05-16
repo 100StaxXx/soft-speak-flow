@@ -15,16 +15,15 @@ public class NativePlacesAutocompletePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "getOpenSourceLicenseInfo", returnType: CAPPluginReturnPromise)
     ]
 
-    private let placesClient = GMSPlacesClient.shared()
     private let sessionQueue = DispatchQueue(label: "com.cosmiq.nativePlacesAutocomplete.sessions")
     private var sessionTokens: [String: GMSAutocompleteSessionToken] = [:]
 
     @objc public func isAvailable(_ call: CAPPluginCall) {
-        call.resolve(["available": Self.configuredAPIKey() != nil])
+        call.resolve(["available": GooglePlacesConfiguration.configuredAPIKey() != nil])
     }
 
     @objc public func beginSession(_ call: CAPPluginCall) {
-        guard Self.configuredAPIKey() != nil else {
+        guard GooglePlacesConfiguration.provideAPIKeyIfAvailable() != nil else {
             call.reject("Google Places iOS API key is not configured")
             return
         }
@@ -39,7 +38,7 @@ public class NativePlacesAutocompletePlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc public func fetchSuggestions(_ call: CAPPluginCall) {
-        guard Self.configuredAPIKey() != nil else {
+        guard let placesClient = Self.placesClient() else {
             call.reject("Google Places iOS API key is not configured")
             return
         }
@@ -97,7 +96,7 @@ public class NativePlacesAutocompletePlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc public func resolveSuggestion(_ call: CAPPluginCall) {
-        guard Self.configuredAPIKey() != nil else {
+        guard let placesClient = Self.placesClient() else {
             call.reject("Google Places iOS API key is not configured")
             return
         }
@@ -158,6 +157,10 @@ public class NativePlacesAutocompletePlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc public func getOpenSourceLicenseInfo(_ call: CAPPluginCall) {
+        guard GooglePlacesConfiguration.provideAPIKeyIfAvailable() != nil else {
+            call.resolve(["licenseInfo": ""])
+            return
+        }
         call.resolve(["licenseInfo": GMSPlacesClient.openSourceLicenseInfo()])
     }
 
@@ -167,17 +170,10 @@ public class NativePlacesAutocompletePlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    private static func configuredAPIKey() -> String? {
-        guard let value = Bundle.main.object(forInfoDictionaryKey: "GooglePlacesAPIKey") as? String else {
+    private static func placesClient() -> GMSPlacesClient? {
+        guard GooglePlacesConfiguration.provideAPIKeyIfAvailable() != nil else {
             return nil
         }
-
-        let key = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !key.isEmpty,
-              !key.hasPrefix("$("),
-              key != "your-ios-google-places-api-key" else {
-            return nil
-        }
-        return key
+        return GMSPlacesClient.shared()
     }
 }

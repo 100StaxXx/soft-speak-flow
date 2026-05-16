@@ -99,20 +99,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     private func configureGooglePlaces() {
-        guard let rawKey = Bundle.main.object(forInfoDictionaryKey: "GooglePlacesAPIKey") as? String else {
-            print("[GooglePlaces] GooglePlacesAPIKey is not configured.")
-            return
-        }
-
-        let key = rawKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !key.isEmpty,
-              !key.hasPrefix("$("),
-              key != "your-ios-google-places-api-key" else {
-            print("[GooglePlaces] GooglePlacesAPIKey is empty or still using a placeholder.")
-            return
-        }
-
-        GMSPlacesClient.provideAPIKey(key)
+        GooglePlacesConfiguration.provideAPIKeyIfAvailable(logIfMissing: true)
     }
 
     private func string(from status: UNAuthorizationStatus) -> String {
@@ -153,6 +140,48 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         }
     }
 
+}
+
+enum GooglePlacesConfiguration {
+    private static let lock = NSLock()
+    private static var didProvideAPIKey = false
+
+    static func configuredAPIKey(logIfMissing: Bool = false) -> String? {
+        guard let rawKey = Bundle.main.object(forInfoDictionaryKey: "GooglePlacesAPIKey") as? String else {
+            if logIfMissing {
+                print("[GooglePlaces] GooglePlacesAPIKey is not configured.")
+            }
+            return nil
+        }
+
+        let key = rawKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty,
+              !key.hasPrefix("$("),
+              key != "your-ios-google-places-api-key" else {
+            if logIfMissing {
+                print("[GooglePlaces] GooglePlacesAPIKey is empty or still using a placeholder.")
+            }
+            return nil
+        }
+        return key
+    }
+
+    @discardableResult
+    static func provideAPIKeyIfAvailable(logIfMissing: Bool = false) -> String? {
+        guard let key = configuredAPIKey(logIfMissing: logIfMissing) else {
+            return nil
+        }
+
+        lock.lock()
+        defer { lock.unlock() }
+
+        if !didProvideAPIKey {
+            GMSPlacesClient.provideAPIKey(key)
+            didProvideAPIKey = true
+        }
+
+        return key
+    }
 }
 
 /// Bridge VC used by Main.storyboard to register local plugins at runtime.
