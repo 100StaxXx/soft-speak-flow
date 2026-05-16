@@ -12,6 +12,7 @@ type JourneysCompanionLauncherSurfaceActionId =
 export interface JourneysCompanionLauncherTemplate {
   id:
     | "free-talk"
+    | "quest"
     | JourneysCompanionLauncherSurfaceActionId;
   label: string;
   message: string;
@@ -67,6 +68,14 @@ const JOURNEYS_LAUNCHER_ACTION_ID_SET = new Set<CompanionPlannerSurfaceAction["i
   JOURNEYS_LAUNCHER_ACTION_IDS,
 );
 
+const QUEST_LAUNCHER_TEMPLATE: JourneysCompanionLauncherTemplate = {
+  id: "quest",
+  label: "Quest?",
+  message: "New Quest",
+  target: "auto",
+  starterIntent: "general",
+};
+
 const isJourneysCompanionLauncherAction = (
   action: CompanionPlannerSurfaceAction,
 ): action is CompanionPlannerSurfaceAction & { id: JourneysCompanionLauncherSurfaceActionId } =>
@@ -91,6 +100,11 @@ export const getJourneysCompanionLauncherTemplates = ({
   userId?: string | null;
 } = {}): JourneysCompanionLauncherTemplate[] => {
   const greeting = getJourneysCompanionLauncherGreeting({ date, userId });
+  const launcherActions = COMPANION_PLANNER_SURFACE_ACTIONS.filter(
+    isJourneysCompanionLauncherAction,
+  );
+  const goalAction = launcherActions.find((action) => action.id === "goal");
+  const primaryActions = launcherActions.filter((action) => action.id !== "goal");
 
   return [
     {
@@ -100,6 +114,8 @@ export const getJourneysCompanionLauncherTemplates = ({
       target: "conversation",
       starterIntent: "free_talk_start",
     },
-    ...COMPANION_PLANNER_SURFACE_ACTIONS.filter(isJourneysCompanionLauncherAction),
+    ...primaryActions,
+    QUEST_LAUNCHER_TEMPLATE,
+    ...(goalAction ? [goalAction] : []),
   ];
 };

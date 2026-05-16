@@ -76,7 +76,13 @@ describe("journeys companion launcher greetings", () => {
       starterIntent: "upcoming_start",
     });
 
-    expect(templates.find((template) => template.id === "quest")).toBeUndefined();
+    expect(templates.find((template) => template.id === "quest")).toMatchObject({
+      id: "quest",
+      label: "Quest?",
+      message: "New Quest",
+      target: "auto",
+      starterIntent: "general",
+    });
 
     expect(templates.find((template) => template.id === "goal")).toMatchObject({
       id: "goal",
@@ -90,6 +96,7 @@ describe("journeys companion launcher greetings", () => {
       "free-talk",
       "plan-day",
       "upcoming",
+      "quest",
       "goal",
     ]);
   });

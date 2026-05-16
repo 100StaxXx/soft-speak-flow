@@ -48,6 +48,7 @@ const getPopupWidthPx = () => {
 
 export const DraggableFAB = ({
   onOpenCompanionPlanner,
+  onCreateQuest,
   createPlanDayLaunchIntent,
   planDayLabel,
   onTap,
@@ -101,12 +102,14 @@ export const DraggableFAB = ({
     isGeneratedCompanion || needsLauncherImage || launcherAwayHasTransparentBackground;
   const launcherTemplates = useMemo(
     () =>
-      getJourneysCompanionLauncherTemplates({ userId: user?.id ?? null }).map((template) =>
-        template.id === "plan-day" && planDayLabel
-          ? { ...template, label: planDayLabel }
-          : template
-      ),
-    [planDayLabel, user?.id],
+      getJourneysCompanionLauncherTemplates({ userId: user?.id ?? null })
+        .filter((template) => template.id !== "quest" || Boolean(onCreateQuest))
+        .map((template) =>
+          template.id === "plan-day" && planDayLabel
+            ? { ...template, label: planDayLabel }
+            : template
+        ),
+    [onCreateQuest, planDayLabel, user?.id],
   );
   const launcherImageUrlOverride = shouldUseStrictLauncherArt
     ? launcherAwayImageUrl ?? currentSceneImageUrl
@@ -217,6 +220,10 @@ export const DraggableFAB = ({
     if (template.id === "goal" && typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("companion-new-goal-started"));
     }
+    if (template.id === "quest") {
+      onCreateQuest?.();
+      return;
+    }
     if (template.id === "plan-day" && createPlanDayLaunchIntent) {
       onOpenCompanionPlanner(createPlanDayLaunchIntent());
       return;
@@ -233,6 +240,7 @@ export const DraggableFAB = ({
     closeMenu,
     createPlanDayLaunchIntent,
     launcherTemplates,
+    onCreateQuest,
     onOpenCompanionPlanner,
   ]);
 

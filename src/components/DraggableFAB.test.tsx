@@ -508,7 +508,7 @@ describe("DraggableFAB", () => {
     expect(screen.queryByTestId("journeys-companion-launcher-option-low-energy")).not.toBeInTheDocument();
   });
 
-  it("does not render a quest-draft launcher option", () => {
+  it("opens create quest from the quest option when a create quest callback is available", async () => {
     render(
       <DraggableFAB
         onOpenCompanionPlanner={mocks.onOpenCompanionPlanner}
@@ -517,10 +517,21 @@ describe("DraggableFAB", () => {
     );
 
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
+    fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-quest"));
+
+    expect(mocks.onCreateQuest).toHaveBeenCalledTimes(1);
+    expect(mocks.onOpenCompanionPlanner).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.getByTestId("journeys-companion-launcher-popup")).toHaveStyle("opacity: 0");
+    });
+  });
+
+  it("hides the quest option when create quest is unavailable", () => {
+    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
+
+    fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
 
     expect(screen.queryByTestId("journeys-companion-launcher-option-quest")).not.toBeInTheDocument();
-    expect(mocks.onCreateQuest).not.toHaveBeenCalled();
-    expect(mocks.onOpenCompanionPlanner).not.toHaveBeenCalled();
   });
 
   it("reports top-left popup placement when the launcher sits in the upper-left half", () => {
