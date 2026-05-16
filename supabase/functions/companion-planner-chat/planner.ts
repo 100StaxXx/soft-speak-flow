@@ -1,7 +1,6 @@
 import { parseNaturalLanguage } from "../../../src/shared/naturalLanguageTaskParser.ts";
 import {
   extractActionBundleCandidates,
-  type ExtractedActionBundleCandidate,
   hasDayShapingLanguage,
 } from "../../../src/shared/actionBundleScheduling.ts";
 import type {
@@ -77,7 +76,6 @@ export type PlannerStarterIntent =
   | "goal_breakdown"
   | "free_talk_start"
   | "upcoming_start"
-  | "quest_capture"
   | "goal_breakdown_start";
 
 export interface PlannerQuestion {
@@ -132,7 +130,6 @@ export interface PlannerDraftState {
 
 export type PlanDayEnergyLevel = "low" | "medium" | "high";
 export type PlanningLauncherConsentKind =
-  | "quest"
   | "schedule_changes"
   | "campaign_adjustment"
   | "planner_changes";
@@ -1234,26 +1231,6 @@ type ResolvedCadence = {
   habitCustomMonthDays: number[] | null;
 };
 
-type QuestCaptureAssumption =
-  | {
-    kind: "inbox";
-  }
-  | {
-    kind: "date_only";
-    date: string;
-  }
-  | {
-    kind: "slot";
-    date: string;
-    time: string;
-  }
-  | {
-    kind: "preferred_time";
-    date: string;
-    time: string;
-    timeOfDay: NonNullable<PlannerMemoryProfile["preferredTimeOfDay"]>;
-  };
-
 type TimelineInterval = {
   id: string;
   title: string;
@@ -2106,11 +2083,6 @@ const inferPlannerStarterIntentFromMessage = (
   const normalizedMessage = message.trim().toLowerCase();
 
   if (
-    normalizedMessage === "quest?"
-  ) {
-    return "quest_capture";
-  }
-  if (
     /\b(advance my campaign|move my campaign forward|progress my campaign|unstick my campaign|help me progress (?:this|my) campaign)\b/
       .test(normalizedMessage)
   ) {
@@ -2755,167 +2727,6 @@ const resolveTimeReasonFromSources = (input: {
 const preferredTime = (draft: PlannerDraftState): string | null =>
   draft.scheduledTime ?? timeOfDayToClock(draft.timeOfDay);
 
-const isQuestCaptureCreateQuest = (
-  input: PlannerBuildInput,
-  kind: PlannerProposalKind,
-): boolean =>
-  kind === "create_quest" &&
-  input.sessionState.pendingStarterIntent === "quest_capture";
-
-const hasExplicitQuestCaptureTiming = (
-  input: PlannerBuildInput,
-  kind: PlannerProposalKind,
-): boolean =>
-  isQuestCaptureCreateQuest(input, kind) &&
-  Boolean(input.parsedInput?.scheduledTime);
-
-const getPreferredQuestCaptureTimeOfDay = (
-  input: PlannerBuildInput,
-): NonNullable<PlannerMemoryProfile["preferredTimeOfDay"]> | null => {
-  const preferredTimeOfDay = input.plannerContext.plannerMemory
-    ?.preferredTimeOfDay ?? input.sessionState.preferredTimeOfDay ?? null;
-
-  return preferredTimeOfDay === "morning" ||
-      preferredTimeOfDay === "afternoon" ||
-      preferredTimeOfDay === "evening" ||
-      preferredTimeOfDay === "night"
-    ? preferredTimeOfDay
-    : null;
-};
-
-const getSuggestedSlotForDate = (
-  input: PlannerBuildInput,
-  date: string,
-): PlannerOpenSlot | null =>
-  input.plannerContext.scheduleInsights?.suggestedSlots?.find((slot) =>
-    slot.date === date
-  ) ?? null;
-
-const getQuestCaptureTargetDate = (input: PlannerBuildInput): string =>
-  input.plannerContext.scheduleInsights?.selectedDate ?? input.currentDate;
-
-const resolveQuestCaptureDraft = (
-  input: PlannerBuildInput,
-  kind: PlannerProposalKind,
-  draft: PlannerDraftState,
-): { draft: PlannerDraftState; assumption: QuestCaptureAssumption | null } => {
-  if (!isQuestCaptureCreateQuest(input, kind)) {
-    return {
-      draft,
-      assumption: null,
-    };
-  }
-
-  if (input.parsedInput?.scheduledTime) {
-    return {
-      draft,
-      assumption: null,
-    };
-  }
-
-  if (input.parsedInput?.scheduledDate) {
-    const explicitDate = input.parsedInput.scheduledDate;
-    const suggestedSlot = getSuggestedSlotForDate(input, explicitDate);
-    if (suggestedSlot) {
-      return {
-        draft: {
-          ...draft,
-          scheduledDate: explicitDate,
-          scheduledTime: suggestedSlot.time,
-          timeOfDay: parseTimeOfDayFromClock(suggestedSlot.time),
-        },
-        assumption: {
-          kind: "slot",
-          date: explicitDate,
-          time: suggestedSlot.time,
-        },
-      };
-    }
-
-    const preferredTimeOfDay = getPreferredQuestCaptureTimeOfDay(input);
-    const preferredTime = timeOfDayToClock(preferredTimeOfDay);
-    if (preferredTimeOfDay && preferredTime) {
-      return {
-        draft: {
-          ...draft,
-          scheduledDate: explicitDate,
-          scheduledTime: preferredTime,
-          timeOfDay: preferredTimeOfDay,
-        },
-        assumption: {
-          kind: "preferred_time",
-          date: explicitDate,
-          time: preferredTime,
-          timeOfDay: preferredTimeOfDay,
-        },
-      };
-    }
-
-    return {
-      draft: {
-        ...draft,
-        scheduledDate: explicitDate,
-        scheduledTime: null,
-        timeOfDay: null,
-      },
-      assumption: {
-        kind: "date_only",
-        date: explicitDate,
-      },
-    };
-  }
-
-  const targetDate = getQuestCaptureTargetDate(input);
-  const suggestedSlot = getSuggestedSlotForDate(input, targetDate);
-  if (suggestedSlot) {
-    return {
-      draft: {
-        ...draft,
-        scheduledDate: targetDate,
-        scheduledTime: suggestedSlot.time,
-        timeOfDay: parseTimeOfDayFromClock(suggestedSlot.time),
-      },
-      assumption: {
-        kind: "slot",
-        date: targetDate,
-        time: suggestedSlot.time,
-      },
-    };
-  }
-
-  const preferredTimeOfDay = getPreferredQuestCaptureTimeOfDay(input);
-  const preferredTime = timeOfDayToClock(preferredTimeOfDay);
-  if (preferredTimeOfDay && preferredTime) {
-    return {
-      draft: {
-        ...draft,
-        scheduledDate: targetDate,
-        scheduledTime: preferredTime,
-        timeOfDay: preferredTimeOfDay,
-      },
-      assumption: {
-        kind: "preferred_time",
-        date: targetDate,
-        time: preferredTime,
-        timeOfDay: preferredTimeOfDay,
-      },
-    };
-  }
-
-  return {
-    draft: {
-      ...draft,
-      scheduledDate: null,
-      scheduledTime: null,
-      timeOfDay: null,
-      timeReason: null,
-    },
-    assumption: {
-      kind: "inbox",
-    },
-  };
-};
-
 const findMatchedEntities = (
   message: string,
   context: PlannerBuildInput["plannerContext"],
@@ -3155,11 +2966,7 @@ const mergeDraft = (
   const cadence = resolveCadence(input.message, parsed).label ?? base.cadence ??
     null;
 
-  const parsedTitle =
-    input.sessionState.pendingStarterIntent === "quest_capture" &&
-      isTimingOnlyReply(input.message, parsed)
-      ? null
-      : sanitizeProposalTitle(parsed?.text);
+  const parsedTitle = sanitizeProposalTitle(parsed?.text);
   const carriedTitle = sanitizeProposalTitle(base.title);
   const renameTitle = parsed?.newTitle?.trim() ||
     parseRenameTitle(input.message) || null;
@@ -3265,7 +3072,7 @@ const resolveKind = (
   draft: PlannerDraftState,
   matched: MatchedEntities,
   repeated: boolean,
-): PlannerProposalKind => {
+): PlannerProposalKind | null => {
   const editIntent = isEditIntent(input.message);
   const renameTitle = input.parsedInput?.newTitle ??
     parseRenameTitle(input.message);
@@ -3275,13 +3082,6 @@ const resolveKind = (
     draft,
     repeated,
   );
-
-  if (
-    input.sessionState.pendingStarterIntent === "quest_capture" ||
-    input.plannerContext.starterIntent === "quest_capture"
-  ) {
-    return "create_quest";
-  }
 
   if (matched.ritual && reminderOnlyIntent) return "update_ritual";
   if (matched.task && reminderOnlyIntent) return "suggest_reminder";
@@ -3300,9 +3100,9 @@ const resolveKind = (
   ) {
     return "create_ritual";
   }
-  if (repeated) return "create_quest";
+  if (repeated) return null;
 
-  if (concreteOneOffScheduling) return "create_quest";
+  if (concreteOneOffScheduling) return null;
 
   if (input.classificationHint?.type === "epic") return "create_campaign";
   if (
@@ -3311,9 +3111,9 @@ const resolveKind = (
   ) {
     return "create_ritual";
   }
-  if (input.classificationHint?.type === "habit") return "create_quest";
+  if (input.classificationHint?.type === "habit") return null;
 
-  return "create_quest";
+  return null;
 };
 
 const defaultQuestDate = (
@@ -3506,18 +3306,13 @@ const missingFieldsForKind = (
   kind: PlannerProposalKind,
   draft: PlannerDraftState,
   cadence: ResolvedCadence,
-  questCaptureAssumption: QuestCaptureAssumption | null,
 ): string[] => {
   if (kind === "suggest_reminder") return [];
 
   const missing = new Set<string>();
   const effectiveTime = preferredTime(draft);
   const keepCreateQuestConfirmable = kind === "create_quest";
-  const bypassQuestCaptureTimingQuestions =
-    isQuestCaptureCreateQuest(input, kind) &&
-    questCaptureAssumption !== null;
-  const askTimingQuestions = !bypassQuestCaptureTimingQuestions &&
-    shouldAskTimingQuestions(input, kind);
+  const askTimingQuestions = shouldAskTimingQuestions(input, kind);
 
   if (!keepCreateQuestConfirmable && askTimingQuestions) {
     if (!effectiveTime) missing.add("time of day");
@@ -3570,7 +3365,6 @@ const question = (
   metadata: input.metadata,
 });
 
-const PLAN_DAY_QUEST_CONSENT_QUESTION_ID = "plan_day_quest_consent";
 const PLANNING_LAUNCHER_CONSENT_QUESTION_ID = "planning_launcher_consent";
 
 const CONSENT_FIRST_PLANNING_STARTER_INTENTS = new Set<PlannerStarterIntent>([
@@ -3732,7 +3526,6 @@ const buildFollowUpQuestions = (
   kind: PlannerProposalKind,
   draft: PlannerDraftState,
   cadence: ResolvedCadence,
-  questCaptureAssumption: QuestCaptureAssumption | null,
 ): PlannerQuestion[] => {
   if (kind === "suggest_reminder") return [];
 
@@ -3746,11 +3539,7 @@ const buildFollowUpQuestions = (
   );
   const shouldConfirmLearnedTime = !carryForwardAnswer &&
     !input.parsedInput?.scheduledTime && !explicitTimeOfDay;
-  const bypassQuestCaptureTimingQuestions =
-    isQuestCaptureCreateQuest(input, kind) &&
-    questCaptureAssumption !== null;
-  const askTimingQuestions = !bypassQuestCaptureTimingQuestions &&
-    shouldAskTimingQuestions(input, kind);
+  const askTimingQuestions = shouldAskTimingQuestions(input, kind);
   const titleQuestion = buildTitleClarificationQuestion(kind);
 
   if (titleQuestion && !sanitizeProposalTitle(draft.title)) {
@@ -3829,8 +3618,7 @@ const buildFollowUpQuestions = (
     }));
   }
 
-  const balanceQuestion = keepCreateQuestConfirmable ||
-      isQuestCaptureCreateQuest(input, kind)
+  const balanceQuestion = keepCreateQuestConfirmable
     ? null
     : buildBalanceQuestion(input);
   if (
@@ -3894,7 +3682,6 @@ const buildQuestProposal = (
   cadence: ResolvedCadence,
   kind: "create_quest" | "update_quest",
   matchedTask: PlannerContextTask | null,
-  questCaptureAssumption: QuestCaptureAssumption | null,
 ): PlannerProposal => {
   const scheduledTime = preferredTime(draft);
   const reminderMinutesBefore = inferReminderMinutes(
@@ -3911,9 +3698,7 @@ const buildQuestProposal = (
       !cadence.recurrencePattern
     ? formatGeneratedTaskTitle(rawTitle)
     : rawTitle;
-  const taskDate = questCaptureAssumption?.kind === "inbox"
-    ? null
-    : defaultQuestDate(input, draft);
+  const taskDate = defaultQuestDate(input, draft);
   const summarySchedule = input.parsedInput?.scheduledDate && scheduledTime
     ? ` on ${input.parsedInput.scheduledDate} at ${scheduledTime}`
     : input.parsedInput?.scheduledDate
@@ -3973,13 +3758,7 @@ const buildQuestProposal = (
     kind,
     title: title ? `Create ${title}` : "Create quest",
     summary: title
-      ? questCaptureAssumption?.kind === "inbox"
-        ? `Capture "${title}" in Inbox so you can schedule it later.`
-        : questCaptureAssumption?.kind === "slot"
-        ? `Create a quest for "${title}" on ${questCaptureAssumption.date} at ${questCaptureAssumption.time}, assuming that slot based on your open window.`
-        : questCaptureAssumption?.kind === "preferred_time"
-        ? `Create a quest for "${title}" on ${questCaptureAssumption.date} at ${questCaptureAssumption.time}, assuming your usual ${questCaptureAssumption.timeOfDay} pattern.`
-        : cadence.recurrencePattern
+      ? cadence.recurrencePattern
         ? `Create a recurring quest for "${title}"${
           draft.endDate ? ` until ${draft.endDate}` : ""
         }.`
@@ -4006,7 +3785,7 @@ const buildQuestProposal = (
       reminderMinutesBefore: reminderMinutesBefore ?? 15,
       category: input.parsedInput?.category ?? undefined,
       notes: input.parsedInput?.notes ?? undefined,
-      source: questCaptureAssumption?.kind === "inbox" ? "inbox" : "manual",
+      source: "manual",
     },
     status: "pending",
     readyToConfirm: false,
@@ -5226,26 +5005,22 @@ const buildCampaignWindowNextBestAction = (
         };
       }
 
-      const followUpProposal = buildCampaignNextStepProposal(
-        input,
-        campaignMomentum,
-        {
-          targetDate: windowedSuggestedSlot?.date ?? input.currentDate,
-          scheduledTime: windowedSuggestedSlot?.time ?? null,
-          estimatedDuration: suggestionDuration,
-        },
-      );
       const reason = options.context === "coming_up" && nextEvent
         ? `This turns the recent progress on ${epic.title} into a concrete follow-up before ${nextEvent.title}.`
         : `${campaignMomentum.statusReason} Defining the next step is the cleanest way to keep that momentum alive right now.`;
 
       return {
-        suggestion: buildSuggestedQuestFromProposal(
+        suggestion: buildCampaignNextStepSuggestion(
           input,
-          followUpProposal,
-          reason,
+          campaignMomentum,
+          {
+            targetDate: windowedSuggestedSlot?.date ?? input.currentDate,
+            scheduledTime: windowedSuggestedSlot?.time ?? null,
+            estimatedDuration: suggestionDuration,
+            reason,
+          },
         ),
-        proposal: followUpProposal,
+        proposal: null,
         priorityScore: score.score,
       };
     }
@@ -5419,14 +5194,6 @@ const getCampaignInterventionSuggestedType = (
     ? elevateSuggestedQuestType(fallbackType, "should")
     : fallbackType;
 
-const mapDraftPriorityToSuggestedQuestType = (
-  priority: number | null | undefined,
-): CompanionSuggestedQuest["type"] => {
-  if ((priority ?? 0) >= 5) return "must";
-  if ((priority ?? 0) >= 3) return "should";
-  return "nice";
-};
-
 const inferSuggestedQuestSourceFromTask = (
   task: PlannerContextTask | null | undefined,
 ): CompanionSuggestedQuestSource => {
@@ -5537,6 +5304,14 @@ const buildSuggestedQuestFromTask = (
   source: inferSuggestedQuestSourceFromTask(task),
   reason,
 });
+
+const mapDraftPriorityToSuggestedQuestType = (
+  priority: number | null | undefined,
+): CompanionSuggestedQuest["type"] => {
+  if ((priority ?? 0) >= 5) return "must";
+  if ((priority ?? 0) >= 3) return "should";
+  return "nice";
+};
 
 const buildSuggestedQuestFromProposal = (
   input: PlannerBuildInput,
@@ -6329,6 +6104,83 @@ const buildCampaignNextStepProposal = (
     status: "pending",
     readyToConfirm: true,
     missingFields: [],
+  };
+};
+
+const buildCampaignNextStepSuggestion = (
+  input: PlannerBuildInput,
+  candidate: CampaignMomentumCandidate,
+  options?: {
+    targetDate?: string;
+    scheduledTime?: string | null;
+    estimatedDuration?: number;
+    reason?: string | null;
+    suggestionIdPrefix?: string;
+  },
+): CompanionSuggestedQuest => {
+  const targetDate = options?.targetDate ?? input.currentDate;
+  const explicitScheduledTime = options?.scheduledTime ?? null;
+  const suggestedSlot = findSuggestedSlot(
+    input,
+    targetDate,
+    explicitScheduledTime,
+  ) ??
+    (targetDate === input.currentDate
+      ? input.plannerContext.scheduleInsights?.suggestedSlots[0] ?? null
+      : null);
+  const needsFollowUpDefinition = campaignNeedsFollowUpDefinition(candidate);
+  const title = candidate.oversizedTask
+    ? `Break down ${candidate.oversizedTask.title}`
+    : candidate.status === "stalled" || needsFollowUpDefinition
+    ? `Define next step for ${candidate.epic.title}`
+    : `Progress ${candidate.epic.title}`;
+  const defaultEstimatedDuration = candidate.oversizedTask
+    ? 20
+    : needsFollowUpDefinition
+    ? 20
+    : candidate.status === "at_risk"
+    ? 45
+    : 30;
+  const baseEstimatedDuration = getHistoricalActivityDurationMinutes(
+    input,
+    title,
+    "quest",
+  ) ?? defaultEstimatedDuration;
+  const estimatedDuration = options?.estimatedDuration ??
+    fitPlannerDurationBucketWithin(
+      Math.min(
+        getOpenSlotDurationMinutes(suggestedSlot) ?? baseEstimatedDuration,
+        baseEstimatedDuration,
+      ),
+    ) ?? baseEstimatedDuration;
+  const scheduledTime = explicitScheduledTime ?? suggestedSlot?.time ?? null;
+
+  return {
+    suggestionId: `${options?.suggestionIdPrefix ?? "campaign-next"}:${
+      candidate.epic.id
+    }`,
+    proposalId: null,
+    title,
+    type: getCampaignInterventionSuggestedType(
+      candidate,
+      candidate.status === "at_risk"
+        ? "must"
+        : candidate.status === "stalled" || needsFollowUpDefinition
+        ? "should"
+        : "nice",
+    ),
+    estimatedDuration: formatEstimatedDurationLabel(estimatedDuration),
+    estimatedDurationMinutes: estimatedDuration,
+    source: "campaign",
+    reason: options?.reason ?? (candidate.oversizedTask
+      ? "The remaining campaign work is too large to start cleanly, so make the first move smaller."
+      : candidate.status === "stalled"
+      ? "There is no clean next step attached to this campaign, so define the smallest meaningful move."
+      : needsFollowUpDefinition
+      ? "You made progress here recently, but there is no linked follow-up step yet."
+      : `This campaign needs one protected action to keep momentum from drifting.${
+        scheduledTime ? ` A clean slot looks like ${scheduledTime}.` : ""
+      }`),
   };
 };
 
@@ -8313,12 +8165,14 @@ const buildRelationshipTouchResponse = (
     missingFields: [],
   };
 
+  const reply = [
+    interpretationLead,
+    `${targetContact.name} is the clearest relationship touch right now. I drafted a confirmable quest so you can follow through without overthinking it.`,
+  ].filter(Boolean).join(" ");
+
   return {
     mode: "proposal",
-    reply: [
-      interpretationLead,
-      `${targetContact.name} is the clearest relationship touch right now. I drafted a confirmable quest so you can follow through without overthinking it.`,
-    ].filter(Boolean).join(" "),
+    reply,
     followUpQuestions: [],
     proposals: [proposal],
     suggestedReminders: [],
@@ -8469,8 +8323,6 @@ const composeReply = (
   tonePack: PlannerTonePack,
   kind: PlannerProposalKind,
   readyToConfirm: boolean,
-  draft: PlannerDraftState,
-  questCaptureAssumption: QuestCaptureAssumption | null,
 ): string => {
   const baseLabel = ({
     create_quest: "quest",
@@ -8482,47 +8334,19 @@ const composeReply = (
     update_ritual: "ritual edit",
     suggest_reminder: "reminder tweak",
   })[kind];
-  const explicitQuestCaptureTiming = hasExplicitQuestCaptureTiming(input, kind);
   const interpretationLead = getCompanionInterpretationLead(input);
-  const preferredTimeOfDay = shouldSuppressLearnedTimingLanguage(input) ||
-      explicitQuestCaptureTiming
+  const preferredTimeOfDay = shouldSuppressLearnedTimingLanguage(input)
     ? null
     : input.plannerContext.plannerMemory?.preferredTimeOfDay;
   const memoryLead = preferredTimeOfDay
     ? `You usually land work like this in the ${preferredTimeOfDay}. `
     : "";
-  const explicitQuestCaptureTime = preferredTime(draft);
-  const explicitQuestCaptureTimeLabel = explicitQuestCaptureTime
-    ? formatAssistantTime(explicitQuestCaptureTime) ?? explicitQuestCaptureTime
-    : null;
-  const explicitQuestCaptureDate = defaultQuestDate(input, draft);
-  const explicitQuestCaptureDateLabel =
-    explicitQuestCaptureDate === input.currentDate
-      ? "today"
-      : explicitQuestCaptureDate === addDaysToDateKey(input.currentDate, 1)
-      ? "tomorrow"
-      : explicitQuestCaptureDate
-      ? formatReadableDate(explicitQuestCaptureDate)
-      : null;
-  const questCaptureReplyLead = readyToConfirm && kind === "create_quest"
-    ? questCaptureAssumption?.kind === "inbox"
-      ? "I captured this as a quest in Inbox so you can schedule it later. "
-      : questCaptureAssumption?.kind === "slot"
-      ? `I drafted this as a quest, assuming ${questCaptureAssumption.date} at ${questCaptureAssumption.time} based on your open slot. `
-      : questCaptureAssumption?.kind === "preferred_time"
-      ? `I drafted this as a quest, assuming ${questCaptureAssumption.date} at ${questCaptureAssumption.time} based on your usual ${questCaptureAssumption.timeOfDay} pattern. `
-      : explicitQuestCaptureTiming && explicitQuestCaptureTimeLabel
-      ? explicitQuestCaptureDateLabel
-        ? `I drafted this as a quest for ${explicitQuestCaptureDateLabel} at ${explicitQuestCaptureTimeLabel}. `
-        : `I drafted this as a quest for ${explicitQuestCaptureTimeLabel}. `
-      : ""
-    : "";
 
   if (isWittySassyTone(tonePack)) {
     if (readyToConfirm) {
       return `${interpretationLead ? `${interpretationLead} ` : ""}${
-        questCaptureReplyLead || `I drafted this as a ${baseLabel}. `
-      }Review it, confirm it if it holds up, and we can skip the extra ceremony.`;
+        `I prepared this ${baseLabel}. `
+      }Take a look and tell me if it holds up.`;
     }
 
     return `${
@@ -8532,7 +8356,7 @@ const composeReply = (
 
   if (readyToConfirm) {
     return `${interpretationLead ? `${interpretationLead} ` : ""}${
-      questCaptureReplyLead || `I drafted this as a ${baseLabel}. `
+      `I prepared this ${baseLabel}. `
     }Take a look, and confirm it if it fits.`;
   }
 
@@ -8549,8 +8373,8 @@ const buildConversationalResponse = (
   return {
     mode: "conversational",
     reply: isWittySassyTone(input.tonePack)
-      ? "I'm here. Say what's on your mind, and we can talk it through or turn it into a quest or campaign when you're ready."
-      : "I'm here with you. Say what's on your mind, and we can talk it through or shape it into a quest or campaign when you're ready.",
+      ? "I'm here. Say what's on your mind, and we can talk it through without turning it into app paperwork."
+      : "I'm here with you. Say what's on your mind, and we can talk it through without turning it into an app action.",
     followUpQuestions: [],
     proposals: [],
     suggestedReminders: [],
@@ -9326,23 +9150,6 @@ const buildPlanDayClarificationResponse = (
   };
 };
 
-const buildPlanDayQuestConsentQuestion = (): PlannerQuestion =>
-  question({
-    id: PLAN_DAY_QUEST_CONSENT_QUESTION_ID,
-    field: "details",
-    prompt: "Would you like to form a quest?",
-    reason:
-      "Plan my day stays conversational unless you explicitly want this to become a quest.",
-    required: true,
-    options: ["Yes", "No"],
-    metadata: {
-      questionId: PLAN_DAY_QUEST_CONSENT_QUESTION_ID,
-      planningLauncherConsent: true,
-      consentKind: "quest",
-      sourceStarterIntent: "plan_day",
-    },
-  });
-
 const detectPlanDayEnergyFromMessage = (
   message: string,
 ): PlanDayEnergyLevel | null => {
@@ -9381,101 +9188,6 @@ const isNegativeReply = (message: string): boolean => {
   return /^(no|nope|nah)(\b|$)/.test(normalized) ||
     /^(not now|not right now|no thanks|skip|skip it|don t|do not|keep it conversational)(\b|$)/
       .test(normalized);
-};
-
-const buildPlanDayQuestConsentAnswerResponse = (
-  input: PlannerBuildInput,
-  sessionState: PlannerSessionState,
-  classificationHint: ClassificationHint,
-): PlannerBuildResult => {
-  const memoryUpdates = {
-    preferredTimeOfDay: sessionState.preferredTimeOfDay ??
-      input.plannerContext.plannerMemory?.preferredTimeOfDay ?? null,
-    preferredTimeReason: sessionState.preferredTimeReason ??
-      input.plannerContext.plannerMemory?.preferredTimeReason ?? null,
-    reminderPreference: sessionState.reminderPreference ??
-      (input.plannerContext.plannerMemory?.reminderMinutesBefore
-        ? `${input.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
-        : null),
-  };
-
-  if (isNegativeReply(input.message)) {
-    const reply =
-      "No problem. We'll keep this as planning context, not a quest.";
-    return {
-      mode: "conversational",
-      reply,
-      followUpQuestions: [],
-      proposals: [],
-      suggestedReminders: [],
-      structuredResponse: buildPlanDayStructuredOutput(
-        input,
-        reply,
-        classificationHint,
-        [],
-      ),
-      memoryUpdates,
-      sessionState: {
-        ...sessionState,
-        draft: {},
-        openQuestionIds: [],
-        pendingStarterIntent: null,
-        planDayEnergy: null,
-        planningConsent: null,
-        lastClassification: classificationHint.type,
-      },
-    };
-  }
-
-  if (isAffirmativeReply(input.message)) {
-    const namingQuestion = question({
-      id: "details",
-      field: "details",
-      prompt: "Okay, what should the quest be called?",
-      reason:
-        "Naming it after you opt in keeps quest creation deliberate instead of automatic.",
-      required: true,
-    });
-    return {
-      mode: "conversational",
-      reply: namingQuestion.prompt,
-      followUpQuestions: [namingQuestion],
-      proposals: [],
-      suggestedReminders: [],
-      structuredResponse: null,
-      memoryUpdates,
-      sessionState: {
-        ...sessionState,
-        draft: {
-          draftKind: "create_quest",
-        },
-        openQuestionIds: [namingQuestion.id],
-        pendingStarterIntent: "quest_capture",
-        planDayEnergy: null,
-        planningConsent: null,
-        lastClassification: classificationHint.type,
-      },
-    };
-  }
-
-  const consentQuestion = buildPlanDayQuestConsentQuestion();
-  return {
-    mode: "conversational",
-    reply: consentQuestion.prompt,
-    followUpQuestions: [consentQuestion],
-    proposals: [],
-    suggestedReminders: [],
-    structuredResponse: null,
-    memoryUpdates,
-    sessionState: {
-      ...sessionState,
-      draft: {},
-      openQuestionIds: [consentQuestion.id],
-      pendingStarterIntent: null,
-      planningConsent: null,
-      lastClassification: classificationHint.type,
-    },
-  };
 };
 
 const isGenericPlanDayStarterRequest = (input: PlannerBuildInput): boolean => {
@@ -9680,7 +9392,6 @@ const buildPlanDayConcreteCandidate = (
     scheduledDate,
     scheduledTime: input.parsedInput?.scheduledTime ?? suggestedSlot?.time ??
       null,
-    // Duration precedence: explicit user duration, learned history, then inferred estimates.
     estimatedDuration: getExplicitParsedActivityDuration(input) ??
       getHistoricalActivityDurationMinutes(input, title, "quest", {
         category: input.parsedInput?.category ?? null,
@@ -11079,28 +10790,13 @@ const buildPlanWeekStarterResponse = (
   const weeklyProposal = weeklyAdjustmentProposal ?? weeklyFollowUpProposal;
   let weeklyProposalApplied = false;
   let topPriorities = buildWeeklyPrioritySuggestions(input).map((quest) => {
-    if (
-      weeklyAdjustmentProposal &&
-      selectedCampaign &&
-      quest.title === `Adjust ${selectedCampaign.epic.title}`
-    ) {
+    if (weeklyProposal && selectedCampaign &&
+      (quest.title === `Adjust ${selectedCampaign.epic.title}` ||
+        quest.title === `Define next step for ${selectedCampaign.epic.title}`)) {
       weeklyProposalApplied = true;
       return buildSuggestedQuestFromProposal(
         input,
-        weeklyAdjustmentProposal,
-        quest.reason,
-      );
-    }
-
-    if (
-      weeklyFollowUpProposal &&
-      selectedCampaign &&
-      quest.title === `Define next step for ${selectedCampaign.epic.title}`
-    ) {
-      weeklyProposalApplied = true;
-      return buildSuggestedQuestFromProposal(
-        input,
-        weeklyFollowUpProposal,
+        weeklyProposal,
         quest.reason,
       );
     }
@@ -11888,17 +11584,15 @@ const buildPlanDayConversationResponse = (
         : null),
   };
   const concreteTitle = getPlanDayConcreteCandidateTitle(input);
-  if (concreteTitle) {
-    const consentQuestion = buildPlanDayQuestConsentQuestion();
-    const reply = [
-      acknowledgement ?? "Got it. We can keep talking through that.",
-      "I won't turn that into a quest automatically from Plan my day.",
-      consentQuestion.prompt,
-    ].filter(Boolean).join(" ");
+	  if (concreteTitle) {
+	    const reply = [
+	      acknowledgement ?? "Got it. We can keep talking through that.",
+	      "We can keep it as planning context and talk through where it fits.",
+	    ].filter(Boolean).join(" ");
     return {
       mode: "conversational",
       reply,
-      followUpQuestions: [consentQuestion],
+      followUpQuestions: [],
       proposals: [],
       suggestedReminders: [],
       structuredResponse: buildPlanDayStructuredOutput(
@@ -11912,7 +11606,7 @@ const buildPlanDayConversationResponse = (
       sessionState: {
         ...sessionState,
         draft: {},
-        openQuestionIds: [consentQuestion.id],
+        openQuestionIds: [],
         pendingStarterIntent: null,
         planDayEnergy: null,
         planningConsent: null,
@@ -12004,9 +11698,6 @@ const buildActionBundleDraftResponse = (
     isConsentFirstPlanningStarterIntent(getResolvedStarterIntent(input)) ||
     input.sessionState.openQuestionIds.includes(
       PLANNING_LAUNCHER_CONSENT_QUESTION_ID,
-    ) ||
-    input.sessionState.openQuestionIds.includes(
-      PLAN_DAY_QUEST_CONSENT_QUESTION_ID,
     )
   ) {
     return null;
@@ -12125,71 +11816,6 @@ const buildUpcomingStarterResponse = (
     buildUpcomingDigestReply(input),
   );
 
-const QUEST_CAPTURE_STARTER_REPLY = "Sure. What quest do you want to capture?";
-
-const isQuestCaptureStarterMessage = (message: string): boolean => {
-  const normalized = normalizeText(message);
-  if (
-    normalized === "quest" ||
-    normalized === "new quest" ||
-    normalized === "what quest do you want to capture" ||
-    normalized === "sure what quest do you want to capture"
-  ) {
-    return true;
-  }
-
-  return (
-    /^(.+\s)?ready what quest are we capturing$/.test(normalized) ||
-    /^clean slate( for .+)? what quest should we add$/.test(normalized)
-  );
-};
-
-const seedQuestCaptureSessionState = (
-  input: PlannerBuildInput,
-): PlannerBuildInput => ({
-  ...input,
-  sessionState: {
-    ...input.sessionState,
-    draft: {
-      ...input.sessionState.draft,
-      draftKind: "create_quest",
-    },
-    openQuestionIds: [],
-    pendingStarterIntent: "quest_capture",
-  },
-});
-
-const buildQuestCaptureStarterResponse = (
-  input: PlannerBuildInput,
-  sessionState: PlannerSessionState,
-  classificationHint: ClassificationHint,
-): PlannerBuildResult => ({
-  mode: "conversational",
-  reply: QUEST_CAPTURE_STARTER_REPLY,
-  followUpQuestions: [],
-  proposals: [],
-  suggestedReminders: [],
-  memoryUpdates: {
-    preferredTimeOfDay: sessionState.preferredTimeOfDay ??
-      input.plannerContext.plannerMemory?.preferredTimeOfDay ?? null,
-    preferredTimeReason: sessionState.preferredTimeReason ??
-      input.plannerContext.plannerMemory?.preferredTimeReason ?? null,
-    reminderPreference: sessionState.reminderPreference ??
-      (input.plannerContext.plannerMemory?.reminderMinutesBefore
-        ? `${input.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
-        : null),
-  },
-  sessionState: {
-    ...sessionState,
-    draft: {
-      draftKind: "create_quest",
-    },
-    openQuestionIds: [],
-    pendingStarterIntent: "quest_capture",
-    lastClassification: classificationHint.type,
-  },
-});
-
 const buildIntentFirstResponse = (
   input: PlannerBuildInput,
   sessionState: PlannerSessionState,
@@ -12246,9 +11872,6 @@ const buildPlanDayFollowUpResponse = (
 const getPlanningConsentKind = (
   proposals: PlannerProposal[],
 ): PlanningLauncherConsentKind => {
-  if (proposals.some((proposal) => proposal.kind === "create_quest")) {
-    return "quest";
-  }
   if (proposals.some((proposal) => proposal.kind === "adjust_campaign_plan")) {
     return "campaign_adjustment";
   }
@@ -12262,8 +11885,6 @@ const getPlanningConsentPrompt = (
   kind: PlanningLauncherConsentKind,
 ): string => {
   switch (kind) {
-    case "quest":
-      return "Would you like to form a quest?";
     case "schedule_changes":
       return "Would you like me to draft those schedule changes?";
     case "campaign_adjustment":
@@ -12279,8 +11900,6 @@ const buildPlanningLauncherConsentLead = (
 ): string => {
   const proposalCount = result.proposals.length;
   switch (kind) {
-    case "quest":
-      return "I see a possible quest here, but I won't name or prepare it from this planning lane unless you say yes first.";
     case "schedule_changes":
       return proposalCount === 1
         ? "I found a schedule change that could help, but I won't prepare it unless you say yes first."
@@ -12527,36 +12146,6 @@ const buildPlanningLauncherConsentAnswerResponse = (
     };
   }
 
-  if (consent.kind === "quest") {
-    const namingQuestion = question({
-      id: "details",
-      field: "details",
-      prompt: "Okay, what should the quest be called?",
-      reason:
-        "Naming it after you opt in keeps quest creation deliberate instead of automatic.",
-      required: true,
-    });
-    return {
-      mode: "conversational",
-      reply: namingQuestion.prompt,
-      followUpQuestions: [namingQuestion],
-      proposals: [],
-      suggestedReminders: [],
-      structuredResponse: null,
-      memoryUpdates,
-      sessionState: {
-        ...sessionState,
-        draft: {
-          draftKind: "create_quest",
-        },
-        openQuestionIds: [namingQuestion.id],
-        pendingStarterIntent: "quest_capture",
-        planningConsent: null,
-        lastClassification: classificationHint.type,
-      },
-    };
-  }
-
   const confirmedSessionState: PlannerSessionState = {
     ...sessionState,
     draft: {},
@@ -12663,18 +12252,6 @@ export function buildPlannerResponse(
 
     if (
       resolvedInput.sessionState.openQuestionIds.includes(
-        PLAN_DAY_QUEST_CONSENT_QUESTION_ID,
-      )
-    ) {
-      return buildPlanDayQuestConsentAnswerResponse(
-        resolvedInput,
-        resolvedInput.sessionState,
-        classificationHint,
-      );
-    }
-
-    if (
-      resolvedInput.sessionState.openQuestionIds.includes(
         PLANNING_LAUNCHER_CONSENT_QUESTION_ID,
       )
     ) {
@@ -12757,18 +12334,6 @@ export function buildPlannerResponse(
         resolvedInput.sessionState,
         classificationHint,
       );
-    }
-
-    if (starterIntent === "quest_capture") {
-      if (isQuestCaptureStarterMessage(resolvedInput.message)) {
-        return buildQuestCaptureStarterResponse(
-          resolvedInput,
-          resolvedInput.sessionState,
-          classificationHint,
-        );
-      }
-
-      resolvedInput = seedQuestCaptureSessionState(resolvedInput);
     }
 
     if (starterIntent === "goal_breakdown_start") {
@@ -13052,14 +12617,16 @@ export function buildPlannerResponse(
       matched,
       repeated,
     );
+    if (!kind) {
+      return buildConversationalResponse(
+        resolvedInput,
+        resolvedInput.sessionState,
+        classificationHint,
+      );
+    }
     draft.draftKind = kind;
-    const questCaptureResolution = resolveQuestCaptureDraft(
-      { ...resolvedInput, classificationHint },
-      kind,
-      draft,
-    );
     const resolvedDraft = {
-      ...questCaptureResolution.draft,
+      ...draft,
       draftKind: kind,
     };
 
@@ -13091,28 +12658,34 @@ export function buildPlannerResponse(
         kind,
         matched.ritual,
       )
-      : buildQuestProposal(
+      : kind === "create_quest" || (kind === "update_quest" && matched.task)
+      ? buildQuestProposal(
         { ...resolvedInput, classificationHint },
         resolvedDraft,
         cadence,
         kind as "create_quest" | "update_quest",
         matched.task,
-        questCaptureResolution.assumption,
+      )
+      : null;
+    if (!proposal) {
+      return buildConversationalResponse(
+        resolvedInput,
+        resolvedInput.sessionState,
+        classificationHint,
       );
+    }
 
     const followUpQuestions = buildFollowUpQuestions(
       { ...resolvedInput, classificationHint },
       kind,
       resolvedDraft,
       cadence,
-      questCaptureResolution.assumption,
     );
     const missingFields = missingFieldsForKind(
       resolvedInput,
       kind,
       resolvedDraft,
       cadence,
-      questCaptureResolution.assumption,
     );
     proposal.readyToConfirm = followUpQuestions.length === 0 &&
       missingFields.length === 0;
@@ -13175,8 +12748,6 @@ export function buildPlannerResponse(
           resolvedInput.tonePack,
           proposal.kind,
           proposal.readyToConfirm,
-          resolvedDraft,
-          questCaptureResolution.assumption,
         ),
         calendarConflictNote,
       ].filter(Boolean).join("\n\n"),

@@ -5,7 +5,6 @@ import { format, isSameDay } from "date-fns";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { JOURNEYS_RESET_TO_TODAY_EVENT } from "@/pages/journeysDateSync";
-import { COMPANION_PLANNER_QUEST_CAPTURE_OPENING } from "@/shared/companionPlannerSurfaceActions";
 import {
   getCampaignBuilderDraftStorageKey,
   getCreationPopupMarkerStorageKey,
@@ -1371,7 +1370,7 @@ describe("Journeys row drag integration", () => {
     expect(mocks.lastPathfinderProps?.open).toBe(true);
   });
 
-  it("opens the companion planner with New Quest without local quest-capture handoff", async () => {
+  it("opens the companion planner from a route launch intent", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date("2026-04-09T12:00:00"));
 
@@ -1388,9 +1387,9 @@ describe("Journeys row drag integration", () => {
           pathname: "/journeys",
           state: {
             companionPlannerLaunchIntent: {
-              id: "quest-capture-route-1",
-              message: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
-              starterIntent: "quest_capture",
+              id: "planner-route-1",
+              message: "Plan my day",
+              starterIntent: "plan_day",
               target: "planner",
               briefingContext: null,
             },
@@ -1407,9 +1406,9 @@ describe("Journeys row drag integration", () => {
 
     expect(mocks.lastCompanionPlannerModalProps?.launchIntent).toEqual(
       expect.objectContaining({
-        id: "quest-capture-route-1",
-        message: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
-        starterIntent: "quest_capture",
+        id: "planner-route-1",
+        message: "Plan my day",
+        starterIntent: "plan_day",
       }),
     );
     expect(mocks.lastAddQuestSheetProps?.open).not.toBe(true);

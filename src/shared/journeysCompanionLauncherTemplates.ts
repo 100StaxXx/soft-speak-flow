@@ -7,7 +7,6 @@ import type { CompanionPlannerLaunchTarget, CompanionPlannerStarterIntent } from
 type JourneysCompanionLauncherSurfaceActionId =
   | "plan-day"
   | "upcoming"
-  | "quest"
   | "goal";
 
 export interface JourneysCompanionLauncherTemplate {
@@ -61,7 +60,6 @@ const getStableIndex = (seed: string, length: number) => {
 const JOURNEYS_LAUNCHER_ACTION_IDS = [
   "plan-day",
   "upcoming",
-  "quest",
   "goal",
 ] as const satisfies readonly JourneysCompanionLauncherSurfaceActionId[];
 

@@ -509,12 +509,6 @@ const readPersistedPlannerSessionState = (
   return sanitizePlannerSessionState(value as CompanionPlannerSessionState);
 };
 
-const readPersistedQuestCaptureSelectedDate = (metadata: unknown) => {
-  const record = asUnknownRecord(metadata);
-  const value = record?.questCaptureSelectedDate;
-  return typeof value === "string" ? normalizeSelectedDateKey(value) : null;
-};
-
 const readPersistedDayPlan = (
   metadata: unknown,
 ): NonNullable<CompanionPlannerResponse["dayPlan"]> | null => {
@@ -631,9 +625,6 @@ const deriveStarterIntentFromMessage = (
 ): CompanionPlannerContextStarterIntent => {
   const normalizedMessage = message.trim().toLowerCase();
 
-  if (normalizedMessage === "quest?") {
-    return "quest_capture";
-  }
   if (isUpcomingScheduleDigestMessage(normalizedMessage)) {
     return "upcoming_start";
   }
@@ -1898,7 +1889,6 @@ export function useCompanionPlanner({
     starterIntent: null,
     briefingContext: null,
   });
-  const pendingQuestCaptureSelectedDateRef = useRef<string | null>(null);
 
   const plannerMemoryQuery = useQuery({
     queryKey: ["companion-planner-memory", user?.id],
@@ -2859,63 +2849,6 @@ export function useCompanionPlanner({
     [],
   );
 
-  const primeQuestCapture = useCallback((
-    prompt = "Quest?",
-    options?: { selectedDate?: string | null },
-  ) => {
-    if (!enabled) return;
-    const trimmedPrompt = stripMarkdown(prompt).trim();
-    if (!trimmedPrompt) return;
-    const questCaptureSelectedDate = normalizeSelectedDateKey(
-      options?.selectedDate,
-    );
-    pendingQuestCaptureSelectedDateRef.current = questCaptureSelectedDate;
-
-    const questCaptureMessage = createMessage("companion", trimmedPrompt, {
-      questions: [],
-      proposalIds: [],
-      structuredResponse: null,
-    });
-    const nextSessionState = {
-      ...sessionState,
-      draft: {
-        draftKind: "create_quest" as const,
-      },
-      openQuestionIds: [],
-      pendingStarterIntent: "quest_capture" as const,
-    };
-
-    setMessages((previous) => [
-      ...previous,
-      questCaptureMessage,
-    ]);
-    setStructuredResponse(null);
-    setDayPlan(null);
-    setCommittedDayPlanId(null);
-    setProposals([]);
-    setQuestions([]);
-    setSessionState(nextSessionState);
-    setDraftInput("");
-    setInterimText("");
-    setIsSubmitting(false);
-
-    void persistPlannerThreadRows([
-      {
-        role: "assistant",
-        content: questCaptureMessage.content,
-        createdAt: questCaptureMessage.createdAt,
-        metadata: {
-          structuredResponse: null,
-          followUpQuestions: [],
-          proposals: [],
-          suggestedReminders: [],
-          sessionState: nextSessionState,
-          questCaptureSelectedDate,
-        } as unknown as Json,
-      },
-    ]);
-  }, [enabled, persistPlannerThreadRows, sessionState]);
-
   const persistPlannerMemory = useCallback(async (
     proposal: CompanionPlannerProposal,
     nextSessionState: CompanionPlannerSessionState,
@@ -3089,10 +3022,7 @@ export function useCompanionPlanner({
     if (!enabled) return;
     const message = rawMessage.trim();
     if (!message || isSubmitting) return;
-    const selectedDate = normalizeSelectedDateKey(options?.selectedDate) ??
-      (sessionState.pendingStarterIntent === "quest_capture"
-        ? pendingQuestCaptureSelectedDateRef.current
-        : null);
+    const selectedDate = normalizeSelectedDateKey(options?.selectedDate);
     const requestDate = selectedDate ?? todayIso;
 
     const resolvedStarterIntent: CompanionPlannerContextStarterIntent =
@@ -3103,10 +3033,6 @@ export function useCompanionPlanner({
       resolvedStarterIntent,
       message,
     );
-    if (resolvedStarterIntent === "quest_capture" && !options?.skipUserEcho) {
-      primeQuestCapture(message, { selectedDate });
-      return;
-    }
 
     setIsSubmitting(true);
     setDraftInput("");
@@ -3320,7 +3246,6 @@ export function useCompanionPlanner({
       if (handleComingUpLocally && isLocalComingUpRequest(requestBody)) {
         const response = buildLocalComingUpResponse(requestBody);
         const assistantMessage = appendAssistantTurn(response);
-        pendingQuestCaptureSelectedDateRef.current = null;
         try {
           await persistPlannerThreadRows(
             buildPersistedPlannerRows(response, assistantMessage, null),
@@ -3349,11 +3274,6 @@ export function useCompanionPlanner({
         response.sessionState,
         response.memoryUpdates,
       );
-      if (nextSession.pendingStarterIntent === "quest_capture") {
-        pendingQuestCaptureSelectedDateRef.current = selectedDate;
-      } else {
-        pendingQuestCaptureSelectedDateRef.current = null;
-      }
       const assistantMessage = appendAssistantTurn({
         ...response,
         sessionState: nextSession,
@@ -3363,9 +3283,7 @@ export function useCompanionPlanner({
         buildPersistedPlannerRows(
           response,
           assistantMessage,
-          nextSession.pendingStarterIntent === "quest_capture"
-            ? selectedDate
-            : null,
+          null,
         ),
       );
 
@@ -4057,7 +3975,6 @@ export function useCompanionPlanner({
         .map((block) => block.proposalId ?? null)
         .filter((id): id is string => typeof id === "string"),
     );
-
     setCommittingDayPlan(true);
     try {
       const draftRpc = supabase.rpc as unknown as (
@@ -4235,7 +4152,6 @@ export function useCompanionPlanner({
 
   const resetThread = useCallback((options?: { sessionId?: string }) => {
     bootstrappedGreetingRef.current = true;
-    pendingQuestCaptureSelectedDateRef.current = null;
     sessionIdRef.current = options?.sessionId ??
       generateCompanionThreadSessionId();
     setMessages(
@@ -4268,7 +4184,6 @@ export function useCompanionPlanner({
     messages: CompanionChatThreadMessage[];
   }) => {
     bootstrappedGreetingRef.current = true;
-    pendingQuestCaptureSelectedDateRef.current = null;
     sessionIdRef.current = options.sessionId;
     const nextMessages: CompanionPlannerMessage[] = options.messages.map((
       message,
@@ -4299,10 +4214,6 @@ export function useCompanionPlanner({
     const nextSessionState = readPersistedPlannerSessionState(
       latestPlannerSnapshot?.metadata.sessionState,
     ) ?? createInitialSessionState(storedPreferences);
-    pendingQuestCaptureSelectedDateRef.current =
-      nextSessionState.pendingStarterIntent === "quest_capture"
-        ? readPersistedQuestCaptureSelectedDate(latestPlannerSnapshot?.metadata)
-        : null;
     const nextProposals = [
       ...readPersistedPlannerProposals(
         latestPlannerSnapshot?.metadata.proposals,
@@ -4377,7 +4288,6 @@ export function useCompanionPlanner({
     isRequestingPermission,
     submitTypedMessage: () => submitMessage(draftInput, "text"),
     submitMessage,
-    primeQuestCapture,
     resetThread,
     hydrateThread,
     toggleRecording,

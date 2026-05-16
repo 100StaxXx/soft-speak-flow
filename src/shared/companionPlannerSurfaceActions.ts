@@ -1,5 +1,4 @@
 import type {
-  CompanionPlannerLaunchIntent,
   CompanionPlannerLaunchTarget,
   CompanionPlannerStarterIntent,
 } from "@/types/companionPlanner";
@@ -13,7 +12,6 @@ export interface CompanionPlannerSurfaceAction {
     | "low-energy"
     | "what-matters"
     | "upcoming"
-    | "quest"
     | "goal";
   label: string;
   message: string;
@@ -21,57 +19,10 @@ export interface CompanionPlannerSurfaceAction {
   starterIntent: CompanionPlannerStarterIntent;
 }
 
-export const COMPANION_PLANNER_QUEST_CAPTURE_OPENING = "New Quest";
-
-export type CompanionPlannerQuestCaptureLaunchSource =
-  | "companion_planner"
-  | "empty_journeys";
-
-export interface CompanionPlannerQuestCaptureLaunchIntentOptions {
-  source?: CompanionPlannerQuestCaptureLaunchSource;
-  companionLabel?: string | null;
-  dateLabel?: string | null;
-  selectedDate?: string | null;
-}
-
 export const createCompanionPlannerLaunchIntentId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-
-const normalizeOpeningLabel = (value: string | null | undefined) =>
-  value?.trim().replace(/\s+/g, " ") ?? "";
-
-const toPossessiveName = (value: string | null | undefined) => {
-  const label = normalizeOpeningLabel(value);
-  if (!label) return "I'm";
-  return `${label}${label.endsWith("s") ? "'" : "'s"}`;
-};
-
-export const createCompanionPlannerQuestCaptureOpening = (
-  options: CompanionPlannerQuestCaptureLaunchIntentOptions = {},
-) => {
-  if (options.source === "empty_journeys") {
-    const dateLabel = normalizeOpeningLabel(options.dateLabel);
-    return dateLabel
-      ? `Clean slate for ${dateLabel}. What quest should we add?`
-      : "Clean slate. What quest should we add?";
-  }
-
-  return `${toPossessiveName(options.companionLabel)} ready. What quest are we capturing?`;
-};
-
-export const createCompanionPlannerQuestCaptureLaunchIntent =
-  (
-    options: CompanionPlannerQuestCaptureLaunchIntentOptions = {},
-  ): CompanionPlannerLaunchIntent => ({
-    id: createCompanionPlannerLaunchIntentId(),
-    message: createCompanionPlannerQuestCaptureOpening(options),
-    starterIntent: "quest_capture",
-    target: "planner",
-    briefingContext: null,
-    ...(options.selectedDate ? { selectedDate: options.selectedDate } : {}),
-  });
 
 export const COMPANION_PLANNER_SURFACE_ACTIONS: CompanionPlannerSurfaceAction[] =
   [
@@ -123,13 +74,6 @@ export const COMPANION_PLANNER_SURFACE_ACTIONS: CompanionPlannerSurfaceAction[] 
       message: "What do I have coming up?",
       target: "planner",
       starterIntent: "upcoming_start",
-    },
-    {
-      id: "quest",
-      label: "Quest?",
-      message: COMPANION_PLANNER_QUEST_CAPTURE_OPENING,
-      target: "planner",
-      starterIntent: "quest_capture",
     },
     {
       id: "goal",

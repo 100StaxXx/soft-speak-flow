@@ -1,7 +1,6 @@
 import { memo } from "react";
 
 import { plannerPathfinderTheme } from "@/components/companion/plannerPathfinderTheme";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type {
   CompanionCampaignHealthSnapshot,
@@ -18,10 +17,6 @@ interface CompanionStructuredResponseCardsProps {
   structuredResponse?: CompanionStructuredResponse | null;
   variant: CompanionStructuredResponseCardsVariant;
   className?: string;
-  onConfirmSuggestion?: (proposalId: string) => void | Promise<void>;
-  actionDisabled?: boolean;
-  savedProposalIds?: string[];
-  pendingProposalId?: string | null;
 }
 
 const variantStyles = {
@@ -259,25 +254,8 @@ const renderCampaignHealthSnapshot = (
 
 const renderQuestRow = (
   quest: CompanionSuggestedQuest,
-  variant: CompanionStructuredResponseCardsVariant,
   styles: (typeof variantStyles)[CompanionStructuredResponseCardsVariant],
-  options?: {
-    onConfirmSuggestion?: (proposalId: string) => void | Promise<void>;
-    actionDisabled?: boolean;
-    savedProposalIds?: string[];
-    pendingProposalId?: string | null;
-  },
 ) => {
-  const isSaved = Boolean(
-    quest.proposalId && options?.savedProposalIds?.includes(quest.proposalId),
-  );
-  const isPending = Boolean(
-    quest.proposalId &&
-      options?.pendingProposalId &&
-      quest.proposalId === options.pendingProposalId,
-  );
-  const actionLabel = isSaved ? "Saved" : isPending ? "Saving" : "Save";
-
   return (
     <div key={quest.suggestionId} className={styles.item}>
       <div className="flex items-start justify-between gap-3">
@@ -297,30 +275,6 @@ const renderQuestRow = (
           <span>{quest.estimatedDuration}</span>
           <span>{quest.source.replace(/_/g, " ")}</span>
         </div>
-        {quest.proposalId && options?.onConfirmSuggestion
-          ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className={cn(
-                "h-8 rounded-full px-3 text-[0.68rem] font-black uppercase tracking-[0.16em]",
-                variant === "journeys"
-                  ? "border-[#6d3518] bg-white/70 text-[#6d3518] hover:bg-white"
-                  : "border-[hsl(var(--celestial-blue)_/_0.48)] bg-card/[0.82] text-foreground shadow-[0_10px_24px_-22px_rgba(var(--primary-rgb),0.38),inset_0_1px_0_rgba(255,255,255,0.76)] hover:bg-card",
-              )}
-              onClick={() => {
-                void options.onConfirmSuggestion?.(quest.proposalId!);
-              }}
-              disabled={options.actionDisabled || isSaved || isPending}
-              data-tour="companion-plan-day-suggestion-save"
-              data-tour-shape="pill"
-              data-testid={`structured-suggestion-confirm-${quest.suggestionId}`}
-            >
-              {actionLabel}
-            </Button>
-          )
-          : null}
       </div>
     </div>
   );
@@ -331,10 +285,6 @@ export const CompanionStructuredResponseCards = memo(
     structuredResponse,
     variant,
     className,
-    onConfirmSuggestion,
-    actionDisabled = false,
-    savedProposalIds = [],
-    pendingProposalId = null,
   }: CompanionStructuredResponseCardsProps) {
     if (!structuredResponse) return null;
 
@@ -443,12 +393,7 @@ export const CompanionStructuredResponseCards = memo(
               <div className="mt-4 space-y-3">
                 {structuredResponse.planDay.suggestedQuests.length > 0
                   ? structuredResponse.planDay.suggestedQuests.map((quest) =>
-                    renderQuestRow(quest, variant, styles, {
-                      onConfirmSuggestion,
-                      actionDisabled,
-                      savedProposalIds,
-                      pendingProposalId,
-                    })
+                    renderQuestRow(quest, styles)
                   )
                   : (
                     <p className={styles.subtext}>
@@ -531,12 +476,7 @@ export const CompanionStructuredResponseCards = memo(
                 <div className="mt-2 space-y-3">
                   {structuredResponse.weeklyPlan.topPriorities.length > 0
                     ? structuredResponse.weeklyPlan.topPriorities.map((quest) =>
-                      renderQuestRow(quest, variant, styles, {
-                        onConfirmSuggestion,
-                        actionDisabled,
-                        savedProposalIds,
-                        pendingProposalId,
-                      })
+                      renderQuestRow(quest, styles)
                     )
                     : (
                       <p className={styles.subtext}>
@@ -649,12 +589,7 @@ export const CompanionStructuredResponseCards = memo(
                   {structuredResponse.priorityOverview.topPriorities.length > 0
                     ? structuredResponse.priorityOverview.topPriorities.map(
                       (quest) =>
-                        renderQuestRow(quest, variant, styles, {
-                          onConfirmSuggestion,
-                          actionDisabled,
-                          savedProposalIds,
-                          pendingProposalId,
-                        })
+                        renderQuestRow(quest, styles)
                     )
                     : (
                       <p className={styles.subtext}>
@@ -699,14 +634,7 @@ export const CompanionStructuredResponseCards = memo(
                     <div className="mt-2">
                       {renderQuestRow(
                         structuredResponse.reflectionBridge.firstAction,
-                        variant,
                         styles,
-                        {
-                          onConfirmSuggestion,
-                          actionDisabled,
-                          savedProposalIds,
-                          pendingProposalId,
-                        },
                       )}
                     </div>
                   </div>
@@ -767,14 +695,7 @@ export const CompanionStructuredResponseCards = memo(
                     <div className="mt-2">
                       {renderQuestRow(
                         structuredResponse.comingUp.nextBestAction,
-                        variant,
                         styles,
-                        {
-                          onConfirmSuggestion,
-                          actionDisabled,
-                          savedProposalIds,
-                          pendingProposalId,
-                        },
                       )}
                     </div>
                   </div>
@@ -915,14 +836,7 @@ export const CompanionStructuredResponseCards = memo(
                     <div className="mt-2">
                       {renderQuestRow(
                         structuredResponse.campaignMomentum.nextStep,
-                        variant,
                         styles,
-                        {
-                          onConfirmSuggestion,
-                          actionDisabled,
-                          savedProposalIds,
-                          pendingProposalId,
-                        },
                       )}
                     </div>
                   </div>
@@ -934,12 +848,7 @@ export const CompanionStructuredResponseCards = memo(
                   {structuredResponse.campaignMomentum.supportActions.length > 0
                     ? structuredResponse.campaignMomentum.supportActions.map(
                       (quest) =>
-                        renderQuestRow(quest, variant, styles, {
-                          onConfirmSuggestion,
-                          actionDisabled,
-                          savedProposalIds,
-                          pendingProposalId,
-                        })
+                        renderQuestRow(quest, styles)
                     )
                     : (
                       <p className={styles.subtext}>

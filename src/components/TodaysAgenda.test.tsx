@@ -1729,7 +1729,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(screen.queryByRole("button", { name: /drag to reschedule/i })).not.toBeInTheDocument();
   });
 
-  it("routes the empty-state add quest CTA through the planner entry callback", () => {
+  it("routes the empty-state add quest CTA through the normal quest sheet", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1737,13 +1737,14 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       },
     });
     const onOpenCompanionPlanner = vi.fn();
+    const onAddQuest = vi.fn();
 
     render(
       <TodaysAgenda
         tasks={[]}
         selectedDate={new Date("2026-02-13T09:00:00.000Z")}
         onToggle={vi.fn()}
-        onAddQuest={vi.fn()}
+        onAddQuest={onAddQuest}
         onOpenCompanionPlanner={onOpenCompanionPlanner}
         completedCount={0}
         totalCount={0}
@@ -1754,14 +1755,8 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     const launcher = within(screen.getByTestId("empty-state-pane")).getByRole("button", { name: /Add Quest/i });
     fireEvent.click(launcher);
 
-    expect(onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
-      message:
-        "Clean slate for Friday, February 13. What quest should we add?",
-      starterIntent: "quest_capture",
-      target: "planner",
-      briefingContext: null,
-      selectedDate: "2026-02-13",
-    }));
+    expect(onAddQuest).toHaveBeenCalledTimes(1);
+    expect(onOpenCompanionPlanner).not.toHaveBeenCalled();
     expect(launcher).toHaveAttribute("data-tour", "add-quest-launcher");
     expect(screen.getByText("New quest")).toBeInTheDocument();
   });

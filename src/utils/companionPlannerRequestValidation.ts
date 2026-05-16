@@ -17,7 +17,6 @@ const PLANNER_STARTER_INTENTS = [
   "goal_breakdown",
   "free_talk_start",
   "upcoming_start",
-  "quest_capture",
   "goal_breakdown_start",
 ] as const;
 const PLANNER_TONE_PACKS = ["soft", "playful", "witty_sassy"] as const;
@@ -167,7 +166,6 @@ const CompanionPlannerRequestValidationSchema = z.object({
     planDayEnergy: z.enum(["low", "medium", "high"]).nullable().optional(),
     planningConsent: z.object({
       kind: z.enum([
-        "quest",
         "schedule_changes",
         "campaign_adjustment",
         "planner_changes",

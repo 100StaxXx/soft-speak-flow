@@ -68,7 +68,6 @@ serve(async (req) => {
         confidence: 1,
         understandingState: "enough_to_discuss",
         followUp: null,
-        proposedActions: [],
         assumptions: [],
         evidenceIds: [],
         receipt: result.receipt,

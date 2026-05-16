@@ -15,7 +15,6 @@ import {
 } from "@/utils/companionLatencyMetrics";
 import {
   createCompanionPlannerLaunchIntentId,
-  createCompanionPlannerQuestCaptureLaunchIntent,
 } from "@/shared/companionPlannerSurfaceActions";
 import { getJourneysCompanionLauncherTemplates } from "@/shared/journeysCompanionLauncherTemplates";
 import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
@@ -49,7 +48,6 @@ const getPopupWidthPx = () => {
 
 export const DraggableFAB = ({
   onOpenCompanionPlanner,
-  onCreateQuest,
   createPlanDayLaunchIntent,
   planDayLabel,
   onTap,
@@ -219,17 +217,6 @@ export const DraggableFAB = ({
     if (template.id === "goal" && typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("companion-new-goal-started"));
     }
-    if (template.id === "quest") {
-      if (onCreateQuest) {
-        onCreateQuest();
-        return;
-      }
-      onOpenCompanionPlanner(createCompanionPlannerQuestCaptureLaunchIntent({
-        source: "companion_planner",
-        companionLabel,
-      }));
-      return;
-    }
     if (template.id === "plan-day" && createPlanDayLaunchIntent) {
       onOpenCompanionPlanner(createPlanDayLaunchIntent());
       return;
@@ -244,10 +231,8 @@ export const DraggableFAB = ({
     onOpenCompanionPlanner(launchIntent);
   }, [
     closeMenu,
-    companionLabel,
     createPlanDayLaunchIntent,
     launcherTemplates,
-    onCreateQuest,
     onOpenCompanionPlanner,
   ]);
 

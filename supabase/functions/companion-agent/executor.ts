@@ -9,20 +9,6 @@ import {
   type PendingActionRow,
 } from "./types.ts";
 
-const readSelectedProposalId = (metadata: PendingActionRow["metadata"]) => {
-  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
-    return null;
-  }
-
-  const selectedProposalId = "selectedProposalId" in metadata
-    ? metadata.selectedProposalId
-    : null;
-
-  return typeof selectedProposalId === "string" && selectedProposalId.length > 0
-    ? selectedProposalId
-    : null;
-};
-
 function buildReceipt(params: {
   action: PendingActionRow;
   status: "cancelled" | "failed" | "executed";
@@ -33,7 +19,7 @@ function buildReceipt(params: {
   return {
     actionId: params.action.id,
     status: params.status,
-    proposalId: readSelectedProposalId(params.action.metadata),
+    proposalId: null,
     message: params.message,
     summary: params.action.summary,
     createdAt: new Date().toISOString(),
@@ -71,13 +57,6 @@ async function resolveActivePendingAction(params: {
   return active;
 }
 
-function taskScheduleLabel(task: Record<string, unknown>) {
-  const taskDate = typeof task.task_date === "string" ? task.task_date : null;
-  const scheduledTime = typeof task.scheduled_time === "string" ? task.scheduled_time : null;
-  if (taskDate && scheduledTime) return `${taskDate} at ${scheduledTime}`;
-  return taskDate ?? "your schedule";
-}
-
 function readCampaignLifecycleStatus(value: unknown) {
   if (value === undefined || value === null) return undefined;
   if (isCompanionCampaignLifecycleStatus(value)) return value;
@@ -92,42 +71,6 @@ async function executeAction(params: {
   const payload = params.action.normalized_payload;
 
   switch (params.action.action_type) {
-    case "task_create": {
-      const insertPayload = {
-        user_id: params.userId,
-        task_text: String(payload.title ?? "New task"),
-        task_date: typeof payload.task_date === "string" ? payload.task_date : null,
-        scheduled_time: typeof payload.scheduled_time === "string" ? payload.scheduled_time : null,
-        estimated_duration: typeof payload.estimated_duration === "number"
-          ? payload.estimated_duration
-          : null,
-        notes: typeof payload.notes === "string" ? payload.notes : null,
-        location: typeof payload.location === "string" ? payload.location : null,
-        epic_id: typeof payload.epic_id === "string" ? payload.epic_id : null,
-        priority: typeof payload.priority === "string" ? payload.priority : null,
-        reminder_enabled: payload.reminder_enabled === true,
-        reminder_minutes_before: typeof payload.reminder_minutes_before === "number"
-          ? payload.reminder_minutes_before
-          : null,
-        source: "companion_agent",
-      };
-
-      const { data, error } = await params.supabase
-        .from("daily_tasks")
-        .insert(insertPayload)
-        .select("id, task_text, task_date, scheduled_time")
-        .single();
-
-      if (error) throw error;
-
-      return {
-        receiptMessage: `Got it. "${data.task_text}" added for ${taskScheduleLabel(data as Record<string, unknown>)}.`,
-        executionResult: {
-          task_id: data.id,
-          task: data,
-        },
-      };
-    }
     case "task_update": {
       const taskId = String(payload.task_id ?? "");
       const patch = Object.fromEntries(

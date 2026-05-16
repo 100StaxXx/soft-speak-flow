@@ -30,7 +30,6 @@ import type {
 } from "@/types/companionConversation";
 import type {
   CompanionPlannerLaunchIntent,
-  CompanionPlannerProposal,
   CompanionPlannerSessionState,
   CompanionPlannerStarterIntent,
 } from "@/types/companionPlanner";
@@ -77,8 +76,6 @@ type LegacyFallbackHydrationMessage = {
 type LegacyFallbackHydrationInput = {
   sessionId: string;
   messages: LegacyFallbackHydrationMessage[];
-  savedSuggestionProposalIds?: string[];
-  pendingSuggestionProposalId?: string | null;
 };
 
 const emitPlanDayAiAnsweredEvent = () => {
@@ -154,9 +151,6 @@ const shouldRouteToLegacyPlanner = (
   });
 };
 
-const isExactQuestCaptureStarterMessage = (message: string): boolean =>
-  message.trim().toLowerCase() === "quest?";
-
 const isExactPlanDayStarterMessage = (message: string): boolean =>
   message.trim().toLowerCase() === "plan my day";
 
@@ -176,10 +170,9 @@ const mapLegacyProposalToPendingAction = (
   } | null,
 ): PendingActionView | null => {
   if (!proposal) return null;
+  if (proposal.kind === "create_quest") return null;
 
-  const actionType = proposal.kind === "create_quest"
-    ? "task_create"
-    : proposal.kind === "update_quest"
+  const actionType = proposal.kind === "update_quest"
     ? "task_update"
     : proposal.kind === "create_ritual"
     ? "ritual_create"
@@ -188,9 +181,8 @@ const mapLegacyProposalToPendingAction = (
     : proposal.kind === "adjust_campaign_plan"
     ? "campaign_adjust"
     : "campaign_update";
-  const intent = proposal.kind === "create_quest"
-    ? "schedule_task"
-    : proposal.kind === "update_quest" || proposal.kind === "suggest_reminder"
+  const intent = proposal.kind === "update_quest" ||
+      proposal.kind === "suggest_reminder"
     ? "update_existing_plan"
     : "goal_setting";
 
@@ -290,67 +282,6 @@ const inferPlannerStarterIntentFromStructuredResponse = (
   return null;
 };
 
-const collectFallbackStructuredSuggestions = (
-  response: CompanionStructuredResponse | null | undefined,
-) => {
-  const suggestions: Array<{
-    proposalId: string;
-    title: string;
-    estimatedDurationMinutes: number | null;
-    reason: string;
-    source: string;
-  }> = [];
-  const collectSuggestion = (suggestion: {
-    proposalId?: string | null;
-    title: string;
-    estimatedDurationMinutes?: number | null;
-    reason: string;
-    source: string;
-  } | null | undefined) => {
-    if (!suggestion?.proposalId) return;
-    suggestions.push({
-      proposalId: suggestion.proposalId,
-      title: suggestion.title,
-      estimatedDurationMinutes: suggestion.estimatedDurationMinutes ?? null,
-      reason: suggestion.reason,
-      source: suggestion.source,
-    });
-  };
-
-  response?.planDay?.suggestedQuests.forEach(collectSuggestion);
-  collectSuggestion(response?.comingUp?.nextBestAction);
-  collectSuggestion(response?.campaignMomentum?.nextStep);
-  response?.campaignMomentum?.supportActions.forEach(collectSuggestion);
-
-  return suggestions;
-};
-
-const buildFallbackPlannerProposals = (input: {
-  response: CompanionStructuredResponse | null | undefined;
-  savedSuggestionProposalIds?: string[];
-  pendingSuggestionProposalId?: string | null;
-}): CompanionPlannerProposal[] =>
-  collectFallbackStructuredSuggestions(input.response).map((suggestion) => ({
-    id: suggestion.proposalId,
-    kind: "create_quest",
-    title: suggestion.title,
-    summary: suggestion.reason,
-    reasoning: suggestion.reason,
-    payload: {
-      taskText: suggestion.title,
-      estimatedDuration: suggestion.estimatedDurationMinutes,
-      notes: suggestion.reason,
-      questSource: suggestion.source,
-      taskDate: null,
-      scheduledTime: null,
-    },
-    status: input.savedSuggestionProposalIds?.includes(suggestion.proposalId)
-      ? "confirmed"
-      : "pending",
-    readyToConfirm: true,
-    missingFields: [],
-  }));
-
 const mapUnifiedMessagesToLegacyChatMessages = (
   messages: LegacyFallbackHydrationMessage[],
 ): CompanionChatMessage[] =>
@@ -388,11 +319,6 @@ const mapUnifiedMessagesToLegacyPlannerMessages = (
       )
     )
     .map((message) => {
-      const fallbackProposals = buildFallbackPlannerProposals({
-        response: message.structuredResponse,
-        savedSuggestionProposalIds: input.savedSuggestionProposalIds,
-        pendingSuggestionProposalId: input.pendingSuggestionProposalId,
-      });
       const fallbackSessionState = {
         ...DEFAULT_FALLBACK_PLANNER_SESSION_STATE,
         pendingStarterIntent: inferPlannerStarterIntentFromStructuredResponse(
@@ -439,7 +365,7 @@ const mapUnifiedMessagesToLegacyPlannerMessages = (
         metadata: {
           structuredResponse: message.structuredResponse ?? null,
           followUpQuestions: [],
-          proposals: fallbackProposals,
+          proposals: [],
           suggestedReminders: [],
           sessionState: fallbackSessionState,
           ...(proposalDecision ? { proposalDecision } : {}),
@@ -488,10 +414,14 @@ export function useLegacyCompanionAssistantAdapter({
     ])
   ), [conversation.messages, planner.messages]);
 
+  const actionablePendingProposals = useMemo(
+    () => planner.pendingProposals.filter((proposal) =>
+      proposal.status === "pending" && proposal.kind !== "create_quest"
+    ),
+    [planner.pendingProposals],
+  );
   const hasOpenPlannerThread = planner.questions.length > 0 ||
-    planner.pendingProposals.some((proposal) =>
-      proposal.status === "pending"
-    ) ||
+    actionablePendingProposals.length > 0 ||
     Boolean(planner.sessionState.pendingStarterIntent);
 
   const journeysThreads = useJourneysCompanionThreads({
@@ -518,29 +448,18 @@ export function useLegacyCompanionAssistantAdapter({
   });
 
   const activePendingProposal = useMemo(
-    () =>
-      planner.pendingProposals.find((proposal) =>
-        proposal.status === "pending"
-      ) ?? null,
-    [planner.pendingProposals],
+    () => actionablePendingProposals[0] ?? null,
+    [actionablePendingProposals],
   );
   const plannerSuggestionsReadOnly = plannerFallbackMode === "read_only";
-  const pendingActionCount = planner.pendingProposals.length;
-  const readyPendingActionCount = planner.readyProposalCount;
+  const pendingActionCount = actionablePendingProposals.length;
+  const readyPendingActionCount = actionablePendingProposals.filter(
+    (proposal) => proposal.readyToConfirm,
+  ).length;
   const pendingAction = useMemo(
     () => mapLegacyProposalToPendingAction(activePendingProposal),
     [activePendingProposal],
   );
-  const savedSuggestionProposalIds = useMemo(
-    () =>
-      planner.proposals
-        .filter((proposal) =>
-          proposal.status === "confirmed" || proposal.status === "modified"
-        )
-        .map((proposal) => proposal.id),
-    [planner.proposals],
-  );
-  const pendingSuggestionProposalId = activePendingProposal?.id ?? null;
   const structuredResponse = plannerSuggestionsReadOnly
     ? buildReadOnlyStructuredResponse(planner.structuredResponse)
     : planner.structuredResponse;
@@ -653,13 +572,6 @@ export function useLegacyCompanionAssistantAdapter({
       return;
     }
 
-    if (isExactQuestCaptureStarterMessage(message)) {
-      planner.primeQuestCapture(message, {
-        selectedDate: options?.selectedDate ?? null,
-      });
-      return;
-    }
-
     if (isExactPlanDayStarterMessage(message)) {
       await planner.submitMessage(message, inputMode, {
         selectedDate: options?.selectedDate ?? null,
@@ -740,26 +652,6 @@ export function useLegacyCompanionAssistantAdapter({
     return nextSessionId;
   }, [journeysConversation, journeysThreads, surface]);
 
-  const startQuestCaptureThread = useCallback((
-    greetingText: string,
-    options?: { selectedDate?: string | null },
-  ) => {
-    if (surface !== "journeys") return "";
-
-    const nextSessionId = journeysThreads.startTemplateThread({
-      greetingText: null,
-    });
-    const trimmedGreetingText = greetingText.trim();
-
-    if (trimmedGreetingText) {
-      planner.primeQuestCapture(trimmedGreetingText, {
-        selectedDate: options?.selectedDate ?? null,
-      });
-    }
-
-    return nextSessionId;
-  }, [journeysThreads, planner, surface]);
-
   return {
     greeting: surface === "journeys"
       ? journeysConversation.greeting
@@ -771,8 +663,6 @@ export function useLegacyCompanionAssistantAdapter({
     committedDayPlanId,
     commitDayPlan,
     pendingAction: plannerSuggestionsReadOnly ? null : pendingAction,
-    savedSuggestionProposalIds,
-    pendingSuggestionProposalId,
     pendingActionCount: plannerSuggestionsReadOnly ? 0 : pendingActionCount,
     readyPendingActionCount: plannerSuggestionsReadOnly
       ? 0
@@ -796,18 +686,18 @@ export function useLegacyCompanionAssistantAdapter({
       : activePendingProposal
       ? () => planner.rejectProposal(activePendingProposal.id)
       : async () => undefined,
-    confirmSuggestedQuest: plannerSuggestionsReadOnly
-      ? async () => {
-        toastPlannerFallbackReadOnly();
-      }
-      : (proposalId: string) =>
-        planner.confirmProposal(proposalId),
     confirmAllPendingActions: plannerSuggestionsReadOnly
       ? async () => {
         toastPlannerFallbackReadOnly();
       }
       : readyPendingActionCount > 0
-      ? planner.confirmAll
+      ? async () => {
+        await Promise.all(
+          actionablePendingProposals
+            .filter((proposal) => proposal.readyToConfirm)
+            .map((proposal) => planner.confirmProposal(proposal.id)),
+        );
+      }
       : async () => undefined,
     isSpeaking: companionChat.isSpeaking,
     speechProvider: companionChat.speechProvider,
@@ -851,9 +741,6 @@ export function useLegacyCompanionAssistantAdapter({
       : null,
     startTemplateThread: surface === "journeys"
       ? startTemplateThread
-      : () => "",
-    startQuestCaptureThread: surface === "journeys"
-      ? startQuestCaptureThread
       : () => "",
     hydrateFromUnifiedState,
   };

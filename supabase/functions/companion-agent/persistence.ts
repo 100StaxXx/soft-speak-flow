@@ -416,7 +416,6 @@ export async function persistActionReceipt(params: {
           agentDecision: {
             understandingState: "enough_to_discuss",
             followUp: null,
-            proposedActions: [],
             assumptions: [],
             evidenceIds: [],
           },

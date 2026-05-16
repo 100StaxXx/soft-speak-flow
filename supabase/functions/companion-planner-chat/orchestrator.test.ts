@@ -191,7 +191,7 @@ Deno.test("skips orchestration for confirm-ready proposal responses", async () =
     baseResult: {
       ...baseResult("proposal"),
       reply:
-        "I drafted this as a quest update. Review it and confirm when it looks right.",
+        "I prepared this quest update. Review it and confirm when it looks right.",
       proposals: [{
         id: "proposal-1",
         kind: "update_quest",
@@ -212,7 +212,7 @@ Deno.test("skips orchestration for confirm-ready proposal responses", async () =
   assertEquals(fetchCalled, false);
   assertEquals(
     response.reply,
-    "I drafted this as a quest update. Review it and confirm when it looks right.",
+    "I prepared this quest update. Review it and confirm when it looks right.",
   );
 });
 
@@ -730,44 +730,6 @@ Deno.test("keeps upcoming-digest orchestration scoped to today and tomorrow", as
   assertEquals(captured.body, null);
 });
 
-Deno.test("does not rewrite the quest-capture starter prompt", async () => {
-  const captured = {
-    called: false,
-  };
-
-  const response = await buildOrchestratedPlannerResponse({
-    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) => {
-      captured.called = true;
-      return new Response("unexpected");
-    },
-    input: {
-      ...baseInput(),
-      message: "Quest?",
-      plannerContext: {
-        ...baseInput().plannerContext,
-        starterIntent: "quest_capture",
-      },
-    },
-    baseResult: {
-      ...baseResult("conversational"),
-      reply: "Sure. What quest do you want to capture?",
-      sessionState: {
-        ...baseResult("conversational").sessionState,
-        draft: {
-          draftKind: "create_quest",
-        },
-        pendingStarterIntent: "quest_capture",
-      },
-    },
-    openAIApiKey: "test-openai-key",
-    model: "test-model",
-  });
-
-  assertEquals(response.mode, "conversational");
-  assertEquals(response.reply, "Sure. What quest do you want to capture?");
-  assertEquals(captured.called, false);
-});
-
 Deno.test("does not rewrite deterministic plan-day starter proposals", async () => {
   const captured = {
     called: false,
@@ -896,53 +858,6 @@ Deno.test("does not rewrite inferred plan-day clarification turns", async () => 
 
   assertEquals(response.mode, "conversational");
   assertEquals(response.reply, "What kind of day are we making?");
-  assertEquals(response.followUpQuestions.length, 1);
-  assertEquals(called, false);
-});
-
-Deno.test("does not rewrite planning launcher consent follow-up turns", async () => {
-  let called = false;
-
-  const response = await buildOrchestratedPlannerResponse({
-    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) => {
-      called = true;
-      return new Response("unexpected");
-    },
-    input: {
-      ...baseInput(),
-      message: "Yes please",
-      sessionState: {
-        ...baseInput().sessionState,
-        openQuestionIds: ["planning_launcher_consent"],
-        planningConsent: {
-          kind: "quest",
-          sourceStarterIntent: "relationship_touch",
-          sourceMessage: "Relationship touch",
-        },
-      },
-    },
-    baseResult: {
-      ...baseResult("conversational"),
-      reply: "Okay, what should the quest be called?",
-      followUpQuestions: [{
-        id: "details",
-        prompt: "Okay, what should the quest be called?",
-        required: true,
-        field: "details",
-      }],
-      sessionState: {
-        ...baseResult("conversational").sessionState,
-        draft: { draftKind: "create_quest" },
-        openQuestionIds: ["details"],
-        pendingStarterIntent: "quest_capture",
-      },
-    },
-    openAIApiKey: "test-openai-key",
-    model: "test-model",
-  });
-
-  assertEquals(response.mode, "conversational");
-  assertEquals(response.reply, "Okay, what should the quest be called?");
   assertEquals(response.followUpQuestions.length, 1);
   assertEquals(called, false);
 });

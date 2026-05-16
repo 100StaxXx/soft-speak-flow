@@ -113,7 +113,6 @@ const isPlannerStarterIntent = (
   "goal_breakdown",
   "free_talk_start",
   "upcoming_start",
-  "quest_capture",
   "goal_breakdown_start",
 ].includes(String(value));
 
@@ -141,7 +140,6 @@ const isClassificationType = (
 const isPlanningLauncherConsentKind = (
   value: unknown,
 ): value is NonNullable<PlannerSessionState["planningConsent"]>["kind"] =>
-  value === "quest" ||
   value === "schedule_changes" ||
   value === "campaign_adjustment" ||
   value === "planner_changes";

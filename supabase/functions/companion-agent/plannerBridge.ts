@@ -15,7 +15,6 @@ import {
   type PlannerMemoryProfile,
   type PlannerMoveSuggestion,
   type PlannerOpenSlot,
-  type PlannerProposal,
   type PlannerQuestion,
   type PlannerScheduleConflict,
   type PlannerScheduleInsights,
@@ -26,8 +25,6 @@ import {
 import type { CompanionStructuredResponse } from "../../../src/shared/companionStructuredOutput.ts";
 import type {
   CompanionAgentFollowUp,
-  CompanionAgentIntent,
-  CompanionPendingActionType,
   LoadedCompanionAgentContext,
 } from "./types.ts";
 
@@ -132,21 +129,10 @@ type PreferredWindow = {
   sourceCount: number;
 };
 
-type PlannerActionHint = {
-  proposalId: string;
-  title: string;
-  summary: string;
-  actionType: CompanionPendingActionType | null;
-  intent: CompanionAgentIntent;
-  normalizedPayload: Record<string, unknown> | null;
-  unsupportedReason?: string;
-};
-
 export interface PlannerAssistResult {
   mode: "conversational" | "schedule_read" | "proposal";
   reply: string;
   questions: PlannerQuestion[];
-  actionHints: PlannerActionHint[];
   scheduleInsights: PlannerScheduleInsights;
   structuredResponse: CompanionStructuredResponse | null;
 }
@@ -173,8 +159,6 @@ const asNumberArray = (value: unknown): number[] =>
       typeof entry === "number" && Number.isFinite(entry)
     )
     : [];
-
-const isReminderEnabled = (value: unknown) => value === true;
 
 const parseTimeToMinutes = (
   value: string | null | undefined,
@@ -316,29 +300,6 @@ const normalizeScheduleReadMessage = (message: string): string => {
   }
 
   return `what do i have ${match[1]}`;
-};
-
-const normalizeQuestCaptureStarterText = (value: string): string =>
-  value.trim().toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(
-    /\s+/g,
-    " ",
-  ).trim();
-
-const isQuestCaptureStarterText = (message: string): boolean => {
-  const normalized = normalizeQuestCaptureStarterText(message);
-  if (
-    normalized === "quest" ||
-    normalized === "new quest" ||
-    normalized === "what quest do you want to capture" ||
-    normalized === "sure what quest do you want to capture"
-  ) {
-    return true;
-  }
-
-  return (
-    /^(.+\s)?ready what quest are we capturing$/.test(normalized) ||
-    /^clean slate( for .+)? what quest should we add$/.test(normalized)
-  );
 };
 
 const buildTaskIntervals = (tasks: PlannerContextTask[]): TimelineInterval[] =>
@@ -907,148 +868,6 @@ const buildPlannerMemory = (
   };
 };
 
-const mapPlannerProposal = (
-  proposal: PlannerProposal,
-): PlannerActionHint => {
-  const payload = asRecord(proposal.payload) ?? {};
-
-  switch (proposal.kind) {
-    case "create_quest":
-      return {
-        proposalId: proposal.id,
-        title: proposal.title,
-        summary: proposal.summary,
-        actionType: "task_create",
-        intent: "schedule_task",
-        normalizedPayload: {
-          title: asString(payload.taskText) ??
-            proposal.title.replace(/^Create\s+/i, ""),
-          task_date: asString(payload.taskDate),
-          scheduled_time: asString(payload.scheduledTime),
-          estimated_duration: asNumber(payload.estimatedDuration),
-          notes: asString(payload.notes),
-          priority: asString(payload.priority),
-          reminder_enabled: isReminderEnabled(payload.reminderEnabled),
-          reminder_minutes_before: asNumber(payload.reminderMinutesBefore),
-          epic_id: asString(payload.epicId),
-        },
-      };
-    case "update_quest": {
-      const updates = asRecord(payload.updates) ?? {};
-      return {
-        proposalId: proposal.id,
-        title: proposal.title,
-        summary: proposal.summary,
-        actionType: "task_update",
-        intent: "update_existing_plan",
-        normalizedPayload: {
-          task_id: asString(payload.taskId),
-          title: asString(updates.task_text),
-          task_date: asString(updates.task_date),
-          scheduled_time: asString(updates.scheduled_time),
-          estimated_duration: asNumber(updates.estimated_duration),
-          notes: asString(updates.notes),
-          priority: asString(updates.priority),
-          completed: updates.completed === true
-            ? true
-            : updates.completed === false
-            ? false
-            : undefined,
-          reminder_enabled: updates.reminder_enabled === true
-            ? true
-            : updates.reminder_enabled === false
-            ? false
-            : undefined,
-          reminder_minutes_before: asNumber(updates.reminder_minutes_before),
-        },
-      };
-    }
-    case "create_ritual":
-      return {
-        proposalId: proposal.id,
-        title: proposal.title,
-        summary: proposal.summary,
-        actionType: "ritual_create",
-        intent: "goal_setting",
-        normalizedPayload: {
-          title: asString(payload.title) ??
-            proposal.title.replace(/^Add\s+/i, ""),
-          frequency: asString(payload.frequency) ?? "daily",
-          preferred_time: asString(payload.preferredTime),
-          estimated_minutes: asNumber(payload.estimatedMinutes),
-          description: asString(payload.description),
-          category: asString(payload.category),
-          reminder_enabled: isReminderEnabled(payload.reminderEnabled),
-          reminder_minutes_before: asNumber(payload.reminderMinutesBefore),
-        },
-      };
-    case "suggest_reminder": {
-      const updates = asRecord(payload.updates) ?? {};
-      return {
-        proposalId: proposal.id,
-        title: proposal.title,
-        summary: proposal.summary,
-        actionType: "reminder_create",
-        intent: "update_existing_plan",
-        normalizedPayload: {
-          target_type: "task",
-          target_id: asString(payload.taskId),
-          reminder_enabled: updates.reminder_enabled !== false,
-          reminder_minutes_before: asNumber(updates.reminder_minutes_before),
-        },
-      };
-    }
-    case "update_campaign":
-      return {
-        proposalId: proposal.id,
-        title: proposal.title,
-        summary: proposal.summary,
-        actionType: "campaign_update",
-        intent: "goal_setting",
-        normalizedPayload: {
-          campaign_id: asString(payload.epicId),
-          title: asString(payload.title),
-        },
-      };
-    case "adjust_campaign_plan":
-      return {
-        proposalId: proposal.id,
-        title: proposal.title,
-        summary: proposal.summary,
-        actionType: "campaign_adjust",
-        intent: "goal_setting",
-        normalizedPayload: {
-          campaign_id: asString(payload.epicId),
-          adjustment_type: asString(payload.adjustmentType) ?? "custom",
-          description: asString(payload.reason) ??
-            asString(payload.requestedSummary),
-          requested_summary: asString(payload.requestedSummary),
-        },
-      };
-    case "create_campaign":
-      return {
-        proposalId: proposal.id,
-        title: proposal.title,
-        summary: proposal.summary,
-        actionType: null,
-        intent: "goal_setting",
-        normalizedPayload: null,
-        unsupportedReason: "Campaign creation stays conversational in v1.",
-      };
-    case "update_ritual":
-      return {
-        proposalId: proposal.id,
-        title: proposal.title,
-        summary: proposal.summary,
-        actionType: null,
-        intent: "update_existing_plan",
-        normalizedPayload: null,
-        unsupportedReason:
-          "Ritual updates are not exposed as direct writes in v1.",
-      };
-  }
-};
-
 const normalizePlannerStarterIntent = (
   starterIntent: string | null | undefined,
 ): PlannerStarterIntent | null => {
@@ -1065,7 +884,6 @@ const normalizePlannerStarterIntent = (
     case "goal_breakdown":
     case "free_talk_start":
     case "upcoming_start":
-    case "quest_capture":
     case "goal_breakdown_start":
       return starterIntent;
     default:
@@ -1077,7 +895,6 @@ const normalizePlanningConsentKind = (
   value: unknown,
 ): PlanningLauncherConsentKind | null => {
   switch (value) {
-    case "quest":
     case "schedule_changes":
     case "campaign_adjustment":
     case "planner_changes":
@@ -1256,18 +1073,12 @@ export function consultPlannerForAgent(params: {
   const planningConsent = buildPlanningConsentFromFollowUp(
     params.activeFollowUp,
   );
-  const isConcreteQuestCaptureTurn = plannerStarterIntent === "quest_capture" &&
-    !isQuestCaptureStarterText(normalizedMessage);
   const isPlanDayQuestConsentAnswer =
     activeQuestionId === "plan_day_quest_consent";
   const isPlanningLauncherConsentAnswer =
     activeQuestionId === "planning_launcher_consent" && planningConsent;
   const sessionState: PlannerSessionState = {
-    draft: isConcreteQuestCaptureTurn
-      ? {
-        draftKind: "create_quest",
-      }
-      : {},
+    draft: {},
     openQuestionIds: isPlanDayQuestConsentAnswer
       ? ["plan_day_quest_consent"]
       : isPlanningLauncherConsentAnswer
@@ -1280,9 +1091,7 @@ export function consultPlannerForAgent(params: {
     reminderPreference: asNumber(plannerMemory?.reminderMinutesBefore)
       ? `${plannerMemory?.reminderMinutesBefore} minutes`
       : null,
-    pendingStarterIntent: isConcreteQuestCaptureTurn
-      ? "quest_capture"
-      : pendingPlanDayClarification
+    pendingStarterIntent: pendingPlanDayClarification
       ? "plan_day"
       : null,
     lastClassification: null,
@@ -1369,7 +1178,6 @@ export function consultPlannerForAgent(params: {
     mode: plannerResult.mode,
     reply: plannerResult.reply,
     questions: plannerResult.followUpQuestions,
-    actionHints: plannerResult.proposals.map(mapPlannerProposal),
     scheduleInsights,
     structuredResponse: plannerResult.structuredResponse ?? null,
   };

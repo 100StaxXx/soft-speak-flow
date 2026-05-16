@@ -32,7 +32,6 @@ export type CompanionPlannerStarterIntent =
   | "goal_breakdown"
   | "free_talk_start"
   | "upcoming_start"
-  | "quest_capture"
   | "goal_breakdown_start"
   | "thread_history";
 
@@ -127,7 +126,6 @@ export interface CompanionPlannerDraftState {
 
 export type CompanionPlanDayEnergyLevel = "low" | "medium" | "high";
 export type CompanionPlanningLauncherConsentKind =
-  | "quest"
   | "schedule_changes"
   | "campaign_adjustment"
   | "planner_changes";

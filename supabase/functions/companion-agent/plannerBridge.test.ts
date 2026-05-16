@@ -1,6 +1,5 @@
 import {
   assertEquals,
-  assertGreater,
   assertMatch,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
 
@@ -64,7 +63,6 @@ Deno.test("consultPlannerForAgent returns a schedule read for schedule questions
   });
 
   assertEquals(result.mode, "schedule_read");
-  assertEquals(result.actionHints.length, 0);
   assertMatch(result.reply, /tomorrow/i);
 });
 
@@ -186,7 +184,7 @@ Deno.test("consultPlannerForAgent uses selected date for coming up schedule read
   assertEquals(result.reply.includes("Tuesday campaign ritual"), true);
 });
 
-Deno.test("consultPlannerForAgent converts planner proposals into v1 task action hints", () => {
+Deno.test("consultPlannerForAgent keeps update proposals in proposal mode", () => {
   const result = consultPlannerForAgent({
     message: "Move my workout to tomorrow at 7am",
     currentDateTime: "2026-04-18T08:00:00-07:00",
@@ -207,89 +205,9 @@ Deno.test("consultPlannerForAgent converts planner proposals into v1 task action
   });
 
   assertEquals(result.mode, "proposal");
-  assertGreater(result.actionHints.length, 0);
-  assertEquals(result.actionHints[0]?.actionType, "task_update");
 });
 
-Deno.test("consultPlannerForAgent drafts concrete quest-capture starter text immediately", () => {
-  const result = consultPlannerForAgent({
-    message: "Pilates tomorrow at 8am",
-    currentDateTime: "2026-04-18T08:00:00-07:00",
-    surface: "journeys",
-    horizon: "week",
-    starterIntent: "quest_capture",
-    context: buildContext(),
-  });
-
-  assertEquals(result.mode, "proposal");
-  assertEquals(result.reply.includes("Quest?"), false);
-  assertEquals(result.actionHints[0]?.actionType, "task_create");
-  assertEquals(result.actionHints[0]?.normalizedPayload?.title, "Pilates");
-});
-
-Deno.test("consultPlannerForAgent drafts Gym at 6 from quest capture", () => {
-  const result = consultPlannerForAgent({
-    message: "Gym at 6",
-    currentDateTime: "2026-05-03T21:08:00-07:00",
-    surface: "journeys",
-    horizon: "day",
-    starterIntent: "quest_capture",
-    context: buildContext({
-      visibleDateStart: "2026-05-03",
-      visibleDateEnd: "2026-05-09",
-      currentDateTime: "2026-05-03T21:08:00-07:00",
-    }),
-  });
-
-  assertEquals(result.mode, "proposal");
-  assertEquals(result.actionHints[0]?.actionType, "task_create");
-  assertEquals(result.actionHints[0]?.normalizedPayload?.title, "Gym");
-  assertEquals(
-    result.actionHints[0]?.normalizedPayload?.scheduled_time,
-    "18:00",
-  );
-});
-
-Deno.test("consultPlannerForAgent preserves selected date for quest-capture replies", () => {
-  const consultSelectedDatePlanner = (message: string) =>
-    consultPlannerForAgent({
-      message,
-      currentDateTime: "2026-04-18T08:00:00-07:00",
-      selectedDate: "2026-04-21",
-      surface: "journeys",
-      horizon: "day",
-      starterIntent: "quest_capture",
-      context: buildContext(),
-    });
-
-  const result = consultSelectedDatePlanner("Pilates at 8am");
-  assertEquals(result.mode, "proposal");
-  assertEquals(result.scheduleInsights.selectedDate, "2026-04-21");
-  assertEquals(result.actionHints[0]?.actionType, "task_create");
-  assertEquals(result.actionHints[0]?.normalizedPayload?.title, "Pilates");
-  assertEquals(
-    result.actionHints[0]?.normalizedPayload?.task_date,
-    "2026-04-21",
-  );
-  assertEquals(
-    result.actionHints[0]?.normalizedPayload?.scheduled_time,
-    "08:00",
-  );
-
-  const tomorrowResult = consultSelectedDatePlanner("Pilates tomorrow at 8am");
-  assertEquals(
-    tomorrowResult.actionHints[0]?.normalizedPayload?.task_date,
-    "2026-04-22",
-  );
-
-  const todayResult = consultSelectedDatePlanner("Pilates today at 8am");
-  assertEquals(
-    todayResult.actionHints[0]?.normalizedPayload?.task_date,
-    "2026-04-21",
-  );
-});
-
-Deno.test("consultPlannerForAgent uses actual completed time for learned quest duration", () => {
+Deno.test("consultPlannerForAgent does not surface create-quest hints", () => {
   const result = consultPlannerForAgent({
     message: "Workout tomorrow",
     currentDateTime: "2026-04-18T08:00:00-07:00",
@@ -313,12 +231,7 @@ Deno.test("consultPlannerForAgent uses actual completed time for learned quest d
     }),
   });
 
-  assertEquals(result.mode, "proposal");
-  assertEquals(result.actionHints[0]?.actionType, "task_create");
-  assertEquals(
-    result.actionHints[0]?.normalizedPayload?.estimated_duration,
-    60,
-  );
+  assertEquals(result.mode, "conversational");
 });
 
 Deno.test("consultPlannerForAgent applies onboarding schedule defaults to primary planning", () => {
@@ -355,7 +268,6 @@ Deno.test("consultPlannerForAgent asks a clarifying plan-day question with no an
   });
 
   assertEquals(result.mode, "conversational");
-  assertEquals(result.actionHints.length, 0);
   assertEquals(result.questions.length, 1);
   assertMatch(result.reply, /what kind of day/i);
 });
@@ -500,7 +412,7 @@ Deno.test("consultPlannerForAgent ignores abandoned campaigns with null complete
   assertEquals(result.reply.includes("campaign drawer"), false);
 });
 
-Deno.test("consultPlannerForAgent treats a concrete plan-day reply as quest consent, not a draft", () => {
+Deno.test("consultPlannerForAgent keeps a concrete plan-day reply read-only", () => {
   const result = consultPlannerForAgent({
     message: "Work on my app",
     currentDateTime: "2026-04-18T08:00:00-07:00",
@@ -534,10 +446,8 @@ Deno.test("consultPlannerForAgent treats a concrete plan-day reply as quest cons
   });
 
   assertEquals(result.mode, "conversational");
-  assertEquals(result.actionHints.length, 0);
-  assertEquals(result.questions.length, 1);
-  assertEquals(result.questions[0]?.id, "plan_day_quest_consent");
-  assertMatch(result.reply, /form a quest/i);
+  assertEquals(result.questions.length, 0);
+  assertEquals(result.structuredResponse?.planDay?.suggestedQuests.length, 0);
 });
 
 Deno.test("consultPlannerForAgent keeps clean room read-only after plan-day clarification", () => {
@@ -574,9 +484,8 @@ Deno.test("consultPlannerForAgent keeps clean room read-only after plan-day clar
   });
 
   assertEquals(result.mode, "conversational");
-  assertEquals(result.actionHints.length, 0);
-  assertEquals(result.questions.length, 1);
-  assertEquals(result.questions[0]?.id, "plan_day_quest_consent");
+  assertEquals(result.questions.length, 0);
+  assertEquals(result.structuredResponse?.planDay?.suggestedQuests.length, 0);
   assertMatch(result.reply, /Clean Room/i);
 });
 
@@ -632,16 +541,12 @@ Deno.test("consultPlannerForAgent converts at-risk campaign adjustments into cam
       reason: initial.questions[0]?.reason ?? null,
       expectedAnswerType: "confirmation",
       options: ["Yes", "No"],
-      blocksDrafting: true,
       metadata: initial.questions[0]?.metadata,
     },
     context,
   });
 
   assertEquals(initial.mode, "conversational");
-  assertEquals(initial.actionHints.length, 0);
   assertEquals(initial.questions[0]?.id, "planning_launcher_consent");
   assertEquals(result.mode, "proposal");
-  assertGreater(result.actionHints.length, 0);
-  assertEquals(result.actionHints[0]?.actionType, "campaign_adjust");
 });

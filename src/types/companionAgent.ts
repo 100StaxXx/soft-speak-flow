@@ -40,13 +40,10 @@ export type CompanionAgentUnderstandingState =
   | "ready_to_propose"
   | "ready_to_draft";
 
-export type CompanionAgentSelectedProposedActionIntent = "draft" | "discuss";
-
 export type CompanionAgentTurnOrigin =
   | "launcher"
   | "composer"
-  | "follow_up_option"
-  | "proposed_action";
+  | "follow_up_option";
 
 export interface CompanionAgentFollowUp {
   question: string;
@@ -58,22 +55,10 @@ export interface CompanionAgentFollowUp {
     | "priority"
     | "confirmation";
   options?: string[];
-  blocksDrafting: boolean;
   metadata?: Record<string, Json | undefined>;
 }
 
-export interface CompanionAgentProposedAction {
-  type: string;
-  title?: string | null;
-  summary?: string | null;
-  reason?: string | null;
-  normalizedPayload?: Json;
-  confidence?: number;
-  [key: string]: Json | undefined;
-}
-
 export type CompanionPendingActionType =
-  | "task_create"
   | "task_update"
   | "ritual_create"
   | "reminder_create"
@@ -133,15 +118,11 @@ export interface CompanionAgentRequest {
   currentDateTime: string;
   turnOrigin?: CompanionAgentTurnOrigin;
   starterIntent?: CompanionPlannerStarterIntent;
-  selectedProposalId?: string;
   visibleDateStart?: string;
   visibleDateEnd?: string;
   horizonDays?: number;
   selectedEntityIds?: CompanionAgentSelectedEntityIds;
   activeFollowUp?: CompanionAgentFollowUp | null;
-  activeProposedActions?: CompanionAgentProposedAction[];
-  selectedProposedAction?: CompanionAgentProposedAction;
-  selectedProposedActionIntent?: CompanionAgentSelectedProposedActionIntent;
 }
 
 export interface CompanionAgentResponse {
@@ -151,23 +132,12 @@ export interface CompanionAgentResponse {
   confidence: number;
   understandingState?: CompanionAgentUnderstandingState;
   followUp?: CompanionAgentFollowUp | null;
-  proposedActions?: CompanionAgentProposedAction[];
   assumptions?: string[];
   evidenceIds?: string[];
   structuredResponse?: CompanionStructuredResponse | null;
   pendingAction?: PendingActionView;
   receipt?: ActionReceiptView;
   threadState: CompanionAgentThreadState;
-}
-
-export interface CompanionDraftOpportunityResponse {
-  companionId?: string;
-  intent?: CompanionAgentIntent;
-  understandingState?: CompanionAgentUnderstandingState;
-  followUp?: null;
-  proposedActions?: CompanionAgentProposedAction[];
-  draftOpportunity?: Json | null;
-  threadState?: CompanionAgentThreadState;
 }
 
 export interface CompanionAgentActionRequest {
@@ -187,7 +157,6 @@ export interface CompanionAgentMessage {
   intent?: CompanionAgentIntent;
   understandingState?: CompanionAgentUnderstandingState;
   followUp?: CompanionAgentFollowUp | null;
-  proposedActions?: CompanionAgentProposedAction[];
   assumptions?: string[];
   evidenceIds?: string[];
   structuredResponse?: CompanionStructuredResponse | null;

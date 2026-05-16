@@ -42,7 +42,6 @@ const mocks = vi.hoisted(() => ({
     isSubmitting: false,
     isClassifying: false,
     submitMessage: vi.fn(),
-    primeQuestCapture: vi.fn(),
     confirmProposal: vi.fn(),
     rejectProposal: vi.fn(),
     confirmAll: vi.fn(),
@@ -223,7 +222,6 @@ describe("useLegacyCompanionAssistantAdapter", () => {
             },
           },
         ],
-        savedSuggestionProposalIds: ["proposal-1"],
       });
     });
 
@@ -283,34 +281,8 @@ describe("useLegacyCompanionAssistantAdapter", () => {
     expect(mocks.journeysConversation.submitMessage).not.toHaveBeenCalled();
   });
 
-  it("starts quest-capture template threads by priming the planner", () => {
-    const { result } = renderHook(() =>
-      useLegacyCompanionAssistantAdapter({
-        enabled: true,
-        surface: "journeys",
-      })
-    );
-
-    act(() => {
-      result.current.startQuestCaptureThread("New Quest", {
-        selectedDate: "2026-02-13",
-      });
-    });
-
-    expect(mocks.journeysThreads.startTemplateThread).toHaveBeenCalledWith({
-      greetingText: null,
-    });
-    expect(mocks.planner.primeQuestCapture).toHaveBeenCalledWith(
-      "New Quest",
-      { selectedDate: "2026-02-13" },
-    );
-    expect(mocks.journeysConversation.injectAssistantOpening)
-      .not.toHaveBeenCalled();
-  });
-
-  it("passes selected dates into legacy planner quest-capture replies", async () => {
+  it("passes selected dates into legacy planner replies", async () => {
     mocks.routeMessageToPlanner = true;
-    mocks.planner.sessionState = { pendingStarterIntent: "quest_capture" };
 
     const { result } = renderHook(() =>
       useLegacyCompanionAssistantAdapter({
@@ -386,10 +358,6 @@ describe("useLegacyCompanionAssistantAdapter", () => {
     expect(result.current.pendingAction).toBeNull();
     expect(result.current.pendingActionCount).toBe(0);
     expect(result.current.readyPendingActionCount).toBe(0);
-
-    await act(async () => {
-      await result.current.confirmSuggestedQuest("proposal-1");
-    });
 
     expect(mocks.planner.confirmProposal).not.toHaveBeenCalled();
   });

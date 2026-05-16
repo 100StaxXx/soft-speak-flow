@@ -424,10 +424,6 @@ export const CompanionChatModal = memo(function CompanionChatModal({
               <CompanionStructuredResponseCards
                 structuredResponse={assistant.structuredResponse}
                 variant="companion"
-                onConfirmSuggestion={assistant.confirmSuggestedQuest}
-                savedProposalIds={assistant.savedSuggestionProposalIds}
-                pendingProposalId={assistant.pendingSuggestionProposalId}
-                actionDisabled={actionDisabled || Boolean(assistant.pendingAction)}
               />
 
               {assistant.activeFollowUp ? (

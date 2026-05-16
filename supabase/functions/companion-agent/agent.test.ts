@@ -9,7 +9,6 @@ import {
   isCompanionScheduleReadFastPathRequest,
   resolveCompanionAgentModel,
   runCompanionAgent,
-  runCompanionDraftOpportunity,
 } from "./agent.ts";
 
 type QueryResult = {
@@ -268,28 +267,14 @@ function createInstructionCaptureFetch(reply = "I’m here.") {
   return { guardedFetch, responseBodies };
 }
 
-function createModelQuestDraftAttemptFetch(params: {
+function createModelQuestActionAttemptFetch(params: {
   reply?: string;
   mode?: string;
   intent?: string;
   understandingState?: string;
   confidence?: number;
-  proposedActions?: unknown[];
 } = {}) {
   const responseBodies: Array<Record<string, unknown>> = [];
-  const proposedActions = params.proposedActions ?? [
-    {
-      type: "quest.create",
-      title: "Think About The Future",
-      summary: "Add Think About The Future for tomorrow.",
-      normalizedPayload: {
-        title: "Think About The Future",
-        date: "2026-04-19",
-        durationMinutes: 30,
-      },
-      confidence: 0.86,
-    },
-  ];
   const guardedFetch = (async (
     input: string | URL | Request,
     init?: RequestInit,
@@ -315,13 +300,12 @@ function createModelQuestDraftAttemptFetch(params: {
             name: "submit_companion_result",
             arguments: JSON.stringify({
               reply: params.reply ??
-                "I drafted this as a quest. Review it and confirm if it fits.",
+                "I prepared a response for us to talk through.",
               mode: params.mode ?? "pending_confirmation",
               intent: params.intent ?? "schedule_task",
               confidence: params.confidence ?? 0.9,
               understanding_state: params.understandingState ??
                 "ready_to_draft",
-              proposed_actions: proposedActions,
             }),
           },
         ],
@@ -332,70 +316,6 @@ function createModelQuestDraftAttemptFetch(params: {
   }) as typeof fetch;
 
   return { guardedFetch, responseBodies };
-}
-
-function createInstructionAndDraftOpportunityFetch(params: {
-  reply: string;
-  decision: Record<string, unknown>;
-}) {
-  const responseBodies: Array<Record<string, unknown>> = [];
-  const draftOpportunityBodies: Array<Record<string, unknown>> = [];
-  const guardedFetch = (async (
-    input: string | URL | Request,
-    init?: RequestInit,
-  ) => {
-    const url = String(input);
-    if (url.endsWith("/conversations")) {
-      return jsonResponse({ id: `conv_${responseBodies.length + 1}` });
-    }
-
-    if (url.endsWith("/responses")) {
-      const body = JSON.parse(String(init?.body ?? "{}")) as Record<
-        string,
-        unknown
-      >;
-      responseBodies.push(body);
-      return jsonResponse({
-        id: `resp_${responseBodies.length}`,
-        conversation: { id: `conv_${responseBodies.length}` },
-        output: [
-          {
-            type: "function_call",
-            call_id: "call_submit",
-            name: "submit_companion_result",
-            arguments: JSON.stringify({
-              reply: params.reply,
-              mode: "conversation",
-              intent: "unknown",
-              confidence: 0.9,
-              understanding_state: "enough_to_discuss",
-            }),
-          },
-        ],
-      });
-    }
-
-    if (url.endsWith("/chat/completions")) {
-      const body = JSON.parse(String(init?.body ?? "{}")) as Record<
-        string,
-        unknown
-      >;
-      draftOpportunityBodies.push(body);
-      return jsonResponse({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify(params.decision),
-            },
-          },
-        ],
-      });
-    }
-
-    throw new Error(`Unexpected fetch: ${url}`);
-  }) as typeof fetch;
-
-  return { guardedFetch, responseBodies, draftOpportunityBodies };
 }
 
 function createOutputTextCaptureFetch(outputText = "I’m here.") {
@@ -585,7 +505,7 @@ Deno.test("runCompanionAgent keeps composer conversation chat-only when model do
 
 Deno.test("runCompanionAgent blocks non-explicit Companion reflections from quest drafts", async () => {
   const supabase = createMockSupabase();
-  const { guardedFetch, responseBodies } = createModelQuestDraftAttemptFetch();
+  const { guardedFetch, responseBodies } = createModelQuestActionAttemptFetch();
 
   const result = await runCompanionAgent({
     guardedFetch,
@@ -616,7 +536,6 @@ Deno.test("runCompanionAgent blocks non-explicit Companion reflections from ques
     result.reply.includes("without turning it into a quest"),
     "expected draft wording to be replaced with conversational fallback",
   );
-  assertEquals(result.proposedActions, []);
   assertEquals(result.pendingAction, undefined);
   assertEquals(result.threadState.hasPendingAction, false);
   assertEquals(
@@ -646,7 +565,7 @@ Deno.test("runCompanionAgent keeps conversational write verbs chat-only without 
   for (const testCase of cases) {
     const supabase = createMockSupabase();
     const { guardedFetch, responseBodies } =
-      createModelQuestDraftAttemptFetch();
+      createModelQuestActionAttemptFetch();
 
     const result = await runCompanionAgent({
       guardedFetch,
@@ -684,9 +603,9 @@ Deno.test("runCompanionAgent keeps conversational write verbs chat-only without 
   }
 });
 
-Deno.test("runCompanionAgent allows explicit Companion quest creation requests to draft", async () => {
+Deno.test("runCompanionAgent does not draft new quests from Companion chat", async () => {
   const supabase = createMockSupabase();
-  const { guardedFetch, responseBodies } = createModelQuestDraftAttemptFetch({
+  const { guardedFetch, responseBodies } = createModelQuestActionAttemptFetch({
     reply:
       "I drafted this quest for tomorrow. Review it and confirm if it fits.",
   });
@@ -706,214 +625,23 @@ Deno.test("runCompanionAgent allows explicit Companion quest creation requests t
     },
   });
 
-  const instructions = String(responseBodies[0]?.instructions ?? "");
-  assert(
-    !instructions.includes(
-      "This Companion tab turn has no explicit write request.",
-    ),
-    "explicit Companion write requests should not use chat-only instructions",
-  );
-  assertEquals(result.mode, "pending_confirmation");
-  assertEquals(result.intent, "schedule_task");
-  assertEquals(result.understandingState, "ready_to_draft");
-  assertEquals(result.pendingAction?.actionType, "task_create");
+  assertEquals(result.pendingAction, undefined);
+  assertEquals(result.threadState.hasPendingAction, false);
   assertEquals(
-    result.pendingAction?.normalizedPayload.title,
-    "Think About The Future",
-  );
-  assertEquals(result.threadState.hasPendingAction, true);
-});
-
-Deno.test("runCompanionAgent allows targeted Companion create requests to draft", async () => {
-  const supabase = createMockSupabase();
-  const { guardedFetch, responseBodies } = createModelQuestDraftAttemptFetch({
-    reply:
-      "I drafted this quest for tomorrow. Review it and confirm if it fits.",
-  });
-
-  const result = await runCompanionAgent({
-    guardedFetch,
-    supabase: supabase.client,
-    userId: "00000000-0000-4000-8000-000000000001",
-    openAIApiKey: "test-openai-key",
-    request: {
-      surface: "companion",
-      sessionId: "session-companion-targeted-create-draft",
-      message: "Can you create a quest to think about my future tomorrow?",
-      inputMode: "text",
-      currentDateTime: "2026-04-18T08:00:00-07:00",
-      turnOrigin: "composer",
-    },
-  });
-
-  const instructions = String(responseBodies[0]?.instructions ?? "");
-  assert(
-    !instructions.includes(
-      "This Companion tab turn has no explicit write request.",
+    supabase.inserts.some((entry) =>
+      entry.table === "companion_pending_actions"
     ),
-    "targeted create requests should not use chat-only instructions",
+    false,
   );
-  assertEquals(result.mode, "pending_confirmation");
-  assertEquals(result.intent, "schedule_task");
-  assertEquals(result.pendingAction?.actionType, "task_create");
-});
-
-Deno.test("runCompanionAgent allows explicit Companion schedule requests without time anchors", async () => {
-  const supabase = createMockSupabase();
-  const { guardedFetch, responseBodies } = createModelQuestDraftAttemptFetch({
-    reply: "I drafted this quest. Review it and confirm if it fits.",
-    proposedActions: [
-      {
-        type: "quest.create",
-        title: "Dentist Appointment",
-        summary: "Add Dentist Appointment.",
-        normalizedPayload: {
-          title: "Dentist Appointment",
-        },
-        confidence: 0.86,
-      },
-    ],
-  });
-
-  const result = await runCompanionAgent({
-    guardedFetch,
-    supabase: supabase.client,
-    userId: "00000000-0000-4000-8000-000000000001",
-    openAIApiKey: "test-openai-key",
-    request: {
-      surface: "companion",
-      sessionId: "session-companion-explicit-schedule-no-anchor",
-      message: "Schedule a dentist appointment",
-      inputMode: "text",
-      currentDateTime: "2026-04-18T08:00:00-07:00",
-      turnOrigin: "composer",
-    },
-  });
-
-  const instructions = String(responseBodies[0]?.instructions ?? "");
-  assert(
-    !instructions.includes(
-      "This Companion tab turn has no explicit write request.",
-    ),
-    "schedule commands should not use chat-only instructions",
-  );
-  assertEquals(result.mode, "pending_confirmation");
-  assertEquals(result.intent, "schedule_task");
-  assertEquals(result.pendingAction?.actionType, "task_create");
-  assertEquals(
-    result.pendingAction?.normalizedPayload.title,
-    "Dentist Appointment",
-  );
-});
-
-Deno.test("runCompanionAgent allows explicit Companion move requests to draft updates", async () => {
-  const supabase = createMockSupabase();
-  const { guardedFetch, responseBodies } = createModelQuestDraftAttemptFetch({
-    reply: "I prepared this move. Review it and confirm if it fits.",
-    intent: "update_existing_plan",
-    proposedActions: [
-      {
-        type: "task.update",
-        title: "Move Gym",
-        summary: "Move Gym to tomorrow at 3:00 PM.",
-        normalizedPayload: {
-          task_id: "11111111-1111-4111-8111-111111111111",
-          title: "Gym",
-          date: "2026-04-19",
-          startTime: "15:00",
-        },
-        confidence: 0.86,
-      },
-    ],
-  });
-
-  const result = await runCompanionAgent({
-    guardedFetch,
-    supabase: supabase.client,
-    userId: "00000000-0000-4000-8000-000000000001",
-    openAIApiKey: "test-openai-key",
-    request: {
-      surface: "companion",
-      sessionId: "session-companion-explicit-move",
-      message: "Move Gym to tomorrow at 3",
-      inputMode: "text",
-      currentDateTime: "2026-04-18T08:00:00-07:00",
-      turnOrigin: "composer",
-    },
-  });
-
-  const instructions = String(responseBodies[0]?.instructions ?? "");
-  assert(
-    !instructions.includes(
-      "This Companion tab turn has no explicit write request.",
-    ),
-    "move commands should not use chat-only instructions",
-  );
-  assertEquals(result.mode, "pending_confirmation");
-  assertEquals(result.intent, "update_existing_plan");
-  assertEquals(result.pendingAction?.actionType, "task_update");
-  assertEquals(
-    result.pendingAction?.normalizedPayload.task_id,
-    "11111111-1111-4111-8111-111111111111",
-  );
-});
-
-Deno.test("runCompanionAgent allows explicit Companion extended update verbs to draft", async () => {
-  const supabase = createMockSupabase();
-  const { guardedFetch, responseBodies } = createModelQuestDraftAttemptFetch({
-    reply: "I prepared this shift. Review it and confirm if it fits.",
-    intent: "update_existing_plan",
-    proposedActions: [
-      {
-        type: "task.update",
-        title: "Shift Gym",
-        summary: "Shift Gym to tomorrow at 3:00 PM.",
-        normalizedPayload: {
-          task_id: "11111111-1111-4111-8111-111111111111",
-          title: "Gym",
-          date: "2026-04-19",
-          startTime: "15:00",
-        },
-        confidence: 0.86,
-      },
-    ],
-  });
-
-  const result = await runCompanionAgent({
-    guardedFetch,
-    supabase: supabase.client,
-    userId: "00000000-0000-4000-8000-000000000001",
-    openAIApiKey: "test-openai-key",
-    request: {
-      surface: "companion",
-      sessionId: "session-companion-explicit-shift",
-      message: "Shift Gym to tomorrow at 3",
-      inputMode: "text",
-      currentDateTime: "2026-04-18T08:00:00-07:00",
-      turnOrigin: "composer",
-    },
-  });
-
-  const instructions = String(responseBodies[0]?.instructions ?? "");
-  assert(
-    !instructions.includes(
-      "This Companion tab turn has no explicit write request.",
-    ),
-    "shift commands should not use chat-only instructions",
-  );
-  assertEquals(result.mode, "pending_confirmation");
-  assertEquals(result.intent, "update_existing_plan");
-  assertEquals(result.pendingAction?.actionType, "task_update");
 });
 
 Deno.test("runCompanionAgent downgrades non-explicit Companion ready-to-propose states", async () => {
   const supabase = createMockSupabase();
-  const { guardedFetch } = createModelQuestDraftAttemptFetch({
+  const { guardedFetch } = createModelQuestActionAttemptFetch({
     reply: "That sounds like a tender thing to think through.",
     mode: "conversation",
     intent: "plan_day",
     understandingState: "ready_to_propose",
-    proposedActions: [],
   });
 
   const result = await runCompanionAgent({
@@ -936,205 +664,6 @@ Deno.test("runCompanionAgent downgrades non-explicit Companion ready-to-propose 
   assertEquals(result.understandingState, "enough_to_discuss");
   assertEquals(result.pendingAction, undefined);
   assertEquals(result.threadState.hasPendingAction, false);
-});
-
-Deno.test("runCompanionAgent allows selected Companion proposed actions to draft", async () => {
-  const supabase = createMockSupabase();
-  const { guardedFetch } = createModelQuestDraftAttemptFetch({
-    reply: "I pulled that suggestion into a quest draft.",
-    proposedActions: [],
-  });
-
-  const result = await runCompanionAgent({
-    guardedFetch,
-    supabase: supabase.client,
-    userId: "00000000-0000-4000-8000-000000000001",
-    openAIApiKey: "test-openai-key",
-    request: {
-      surface: "companion",
-      sessionId: "session-companion-selected-draft",
-      message: "Draft it",
-      inputMode: "text",
-      currentDateTime: "2026-04-18T08:00:00-07:00",
-      turnOrigin: "proposed_action",
-      selectedProposedActionIntent: "draft",
-      selectedProposedAction: {
-        type: "quest.create",
-        title: "Think About The Future",
-        summary: "Add Think About The Future for tomorrow.",
-        normalizedPayload: {
-          title: "Think About The Future",
-          date: "2026-04-19",
-          durationMinutes: 30,
-        },
-      },
-    },
-  });
-
-  assertEquals(result.mode, "pending_confirmation");
-  assertEquals(result.intent, "schedule_task");
-  assertEquals(result.pendingAction?.actionType, "task_create");
-  assertEquals(
-    result.pendingAction?.normalizedPayload.title,
-    "Think About The Future",
-  );
-});
-
-Deno.test("runCompanionDraftOpportunity surfaces a concrete quest sidecar draft as a suggestion card", async () => {
-  const supabase = createMockSupabase();
-  const { guardedFetch, draftOpportunityBodies } =
-    createInstructionAndDraftOpportunityFetch({
-      reply: "That sounds like a clean thing to put on the board.",
-      decision: {
-        decision: "prepare_action",
-        action_type: "task_create",
-        title: "Review launch notes",
-        summary: "Add Review launch notes for tomorrow morning.",
-        reason: "The user gave a concrete quest and time.",
-        normalized_payload: {
-          title: "Review launch notes",
-          task_date: "2026-04-19",
-          scheduled_time: "09:00",
-          estimated_duration: 30,
-        },
-        confidence: 0.87,
-      },
-    });
-
-  const result = await runCompanionDraftOpportunity({
-    guardedFetch,
-    supabase: supabase.client,
-    userId: "00000000-0000-4000-8000-000000000001",
-    openAIApiKey: "test-openai-key",
-    request: {
-      surface: "journeys",
-      sessionId: "session-draft-sidecar-task",
-      message: "Review launch notes tomorrow at 9",
-      inputMode: "text",
-      currentDateTime: "2026-04-18T08:00:00-07:00",
-      turnOrigin: "composer",
-      assistantReply: "That sounds like a clean thing to put on the board.",
-      assistantMode: "conversation",
-      assistantIntent: "unknown",
-      assistantConfidence: 0.9,
-      assistantUnderstandingState: "enough_to_discuss",
-    },
-  });
-
-  assertEquals(draftOpportunityBodies.length, 1);
-  assertEquals(draftOpportunityBodies[0]?.reasoning_effort, "none");
-  assertEquals(
-    (draftOpportunityBodies[0]?.messages as Array<{ role?: string }>)[0]?.role,
-    "developer",
-  );
-  assertEquals(result.understandingState, "ready_to_propose");
-  assertEquals(result.proposedActions[0]?.type, "task_create");
-  assertEquals(
-    result.proposedActions[0]?.normalizedPayload?.title,
-    "Review launch notes",
-  );
-  assertEquals(
-    supabase.inserts.some((entry) =>
-      entry.table === "companion_pending_actions"
-    ),
-    false,
-  );
-
-  assertEquals(result.draftOpportunity?.source, "draft_opportunity");
-});
-
-Deno.test("runCompanionDraftOpportunity surfaces sidecar campaign starts as builder suggestions", async () => {
-  const supabase = createMockSupabase();
-  const { guardedFetch, draftOpportunityBodies } =
-    createInstructionAndDraftOpportunityFetch({
-      reply: "That sounds bigger than a single quest.",
-      decision: {
-        decision: "open_campaign_builder",
-        action_type: "campaign_start",
-        title: "Launch the course",
-        summary: "Open the campaign builder with this goal.",
-        reason: "The user described a broad goal.",
-        normalized_payload: {
-          initialGoal: "Launch the course",
-        },
-        confidence: 0.82,
-      },
-    });
-
-  const result = await runCompanionDraftOpportunity({
-    guardedFetch,
-    supabase: supabase.client,
-    userId: "00000000-0000-4000-8000-000000000001",
-    openAIApiKey: "test-openai-key",
-    request: {
-      surface: "journeys",
-      sessionId: "session-draft-sidecar-campaign-start",
-      message: "I want to launch my course by the end of next month",
-      inputMode: "text",
-      currentDateTime: "2026-04-18T08:00:00-07:00",
-      turnOrigin: "composer",
-      assistantReply: "That sounds bigger than a single quest.",
-      assistantMode: "conversation",
-      assistantIntent: "unknown",
-      assistantConfidence: 0.9,
-      assistantUnderstandingState: "enough_to_discuss",
-    },
-  });
-
-  assertEquals(draftOpportunityBodies.length, 1);
-  assertEquals(result.intent, "goal_setting");
-  assertEquals(result.understandingState, "ready_to_propose");
-  assertEquals(result.proposedActions[0]?.type, "campaign_start");
-  assertEquals(
-    result.proposedActions[0]?.normalizedPayload?.initialGoal,
-    "Launch the course",
-  );
-  assertEquals(
-    supabase.inserts.some((entry) =>
-      entry.table === "companion_pending_actions"
-    ),
-    false,
-  );
-});
-
-Deno.test("runCompanionDraftOpportunity ignores sidecar follow-up decisions", async () => {
-  const supabase = createMockSupabase();
-  const { guardedFetch, draftOpportunityBodies } =
-    createInstructionAndDraftOpportunityFetch({
-      reply: "We can shape that together.",
-      decision: {
-        decision: "ask_user",
-        action_type: "task_create",
-        question: "Should I draft a quest?",
-        options: ["Yes", "No"],
-        confidence: 0.77,
-      },
-    });
-
-  const result = await runCompanionDraftOpportunity({
-    guardedFetch,
-    supabase: supabase.client,
-    userId: "00000000-0000-4000-8000-000000000001",
-    openAIApiKey: "test-openai-key",
-    request: {
-      surface: "journeys",
-      sessionId: "session-draft-sidecar-ask-user",
-      message: "Maybe I should call my parents",
-      inputMode: "text",
-      currentDateTime: "2026-04-18T08:00:00-07:00",
-      turnOrigin: "composer",
-      assistantReply: "We can shape that together.",
-      assistantMode: "conversation",
-      assistantIntent: "unknown",
-      assistantConfidence: 0.9,
-      assistantUnderstandingState: "enough_to_discuss",
-    },
-  });
-
-  assertEquals(draftOpportunityBodies.length, 1);
-  assertEquals(result.followUp, null);
-  assertEquals(result.proposedActions, []);
-  assertEquals(result.draftOpportunity, null);
 });
 
 Deno.test("runCompanionAgent uses bare starter follow-up when OpenAI is not configured", async () => {
@@ -1203,7 +732,6 @@ Deno.test("runCompanionAgent asks a follow-up instead of proposing quests for ba
   assertEquals(result.mode, "clarify");
   assertEquals(result.intent, "plan_day");
   assertEquals(result.understandingState, "needs_followup");
-  assertEquals(result.proposedActions, []);
   assertEquals(result.structuredResponse, null);
   assertEquals(result.pendingAction, undefined);
   assertEquals(result.threadState.hasPendingAction, false);
@@ -1576,15 +1104,7 @@ Deno.test("runCompanionAgent answers upcoming reads even with stale UI follow-up
           "That choice changes whether I protect deep work, lighten the load, or triage overdue items.",
         expectedAnswerType: "choice",
         options: ["Focus", "Recovery", "Catch up"],
-        blocksDrafting: true,
       },
-      activeProposedActions: [
-        {
-          type: "task_create",
-          summary: "Stale previous suggestion",
-          normalizedPayload: { title: "Stale previous suggestion" },
-        },
-      ],
     },
   });
 
@@ -1596,7 +1116,6 @@ Deno.test("runCompanionAgent answers upcoming reads even with stale UI follow-up
     "Today: nothing scheduled.\nTomorrow: nothing scheduled.",
   );
   assertEquals(result.followUp, null);
-  assertEquals(result.proposedActions, []);
   assertEquals(result.pendingAction, undefined);
 });
 
@@ -1637,7 +1156,6 @@ Deno.test("runCompanionAgent answers launcher upcoming schedule reads without Op
   );
   assertEquals(result.structuredResponse?.comingUp?.tomorrowSummary, "open");
   assertEquals(result.followUp, null);
-  assertEquals(result.proposedActions, []);
   assertEquals(result.pendingAction, undefined);
 });
 
@@ -1698,22 +1216,6 @@ Deno.test("isCompanionScheduleReadFastPathRequest excludes proposal action turns
       starterIntent: "upcoming_start",
     }),
     true,
-  );
-  assertEquals(
-    isCompanionScheduleReadFastPathRequest({
-      surface: "journeys",
-      sessionId: "session-selected-action",
-      message: "What do I have coming up?",
-      inputMode: "text",
-      currentDateTime: "2026-04-18T20:32:00-07:00",
-      starterIntent: "upcoming_start",
-      selectedProposedAction: {
-        type: "task_create",
-        title: "Draft launch email",
-        normalizedPayload: { title: "Draft launch email" },
-      },
-    }),
-    false,
   );
 });
 
@@ -1988,15 +1490,7 @@ Deno.test("runCompanionAgent routes plan-day follow-up answers through the plann
           "That choice changes whether I protect deep work, lighten the load, or triage overdue items.",
         expectedAnswerType: "choice",
         options: ["Focus", "Recovery", "Catch up"],
-        blocksDrafting: true,
       },
-      activeProposedActions: [
-        {
-          type: "quest.create",
-          title: "Stale previous suggestion",
-          normalizedPayload: { title: "Stale previous suggestion" },
-        },
-      ],
     },
   });
 
@@ -2005,7 +1499,6 @@ Deno.test("runCompanionAgent routes plan-day follow-up answers through the plann
   assertEquals(result.intent, "plan_day");
   assertEquals(result.understandingState, "enough_to_discuss");
   assertEquals(result.followUp, null);
-  assertEquals(result.proposedActions, []);
   assertEquals(result.structuredResponse?.planDay?.suggestedQuests.length, 0);
   assertEquals(result.pendingAction, undefined);
   assert(result.reply !== "I'm here.");
@@ -2036,7 +1529,6 @@ Deno.test("runCompanionAgent lets composer text pivot from a plan-day follow-up 
           "That choice changes whether I protect deep work, lighten the load, or triage overdue items.",
         expectedAnswerType: "choice",
         options: ["Focus", "Recovery", "Catch up"],
-        blocksDrafting: true,
       },
     },
   });
@@ -2062,7 +1554,7 @@ Deno.test("runCompanionAgent lets composer text pivot from a plan-day follow-up 
   assertEquals(contextPacket.latestUserMessageAnswersFollowUp, false);
 });
 
-Deno.test("runCompanionAgent asks consent before turning a concrete plan-day reply into a quest", async () => {
+Deno.test("runCompanionAgent keeps concrete plan-day replies conversational", async () => {
   const supabase = createMockSupabase();
   let guardedFetchCalled = false;
   const guardedFetch = (async (input: string | URL | Request) => {
@@ -2089,21 +1581,16 @@ Deno.test("runCompanionAgent asks consent before turning a concrete plan-day rep
           "That choice changes whether I protect deep work, lighten the load, or triage overdue items.",
         expectedAnswerType: "choice",
         options: ["Focus", "Recovery", "Catch up"],
-        blocksDrafting: true,
       },
     },
   });
 
   assertEquals(guardedFetchCalled, false);
-  assertEquals(result.mode, "clarify");
+  assertEquals(result.mode, "conversation");
   assertEquals(result.intent, "plan_day");
-  assertEquals(result.understandingState, "needs_followup");
-  assertEquals(result.proposedActions, []);
+  assertEquals(result.understandingState, "enough_to_discuss");
   assertEquals(result.pendingAction, undefined);
-  assertEquals(result.followUp?.expectedAnswerType, "confirmation");
-  assertEquals(result.followUp?.options, ["Yes", "No"]);
-  assertEquals(result.followUp?.question, "Would you like to form a quest?");
-  assert(result.reply.includes("I won't turn that into a quest automatically"));
+  assertEquals(result.followUp, null);
 });
 
 Deno.test("runCompanionAgent keeps plan-day energy answers out of the generic agent path", async () => {
@@ -2136,7 +1623,6 @@ Deno.test("runCompanionAgent keeps plan-day energy answers out of the generic ag
           "Medium — balanced",
           "High — bring it on",
         ],
-        blocksDrafting: true,
       },
     },
   });
@@ -2145,114 +1631,6 @@ Deno.test("runCompanionAgent keeps plan-day energy answers out of the generic ag
   assertEquals(result.intent, "plan_day");
   assert(result.reply !== "I'm here.");
   assert(result.reply.length > 10);
-});
-
-Deno.test("runCompanionAgent keeps typed quest text conversational for the sidecar card flow", async () => {
-  const launchSupabase = createMockSupabase();
-  let launchFetchCalled = false;
-
-  const launchResult = await runCompanionAgent({
-    guardedFetch: (async () => {
-      launchFetchCalled = true;
-      throw new Error("Quest launcher should use the deterministic opener");
-    }) as typeof fetch,
-    supabase: launchSupabase.client,
-    userId: "00000000-0000-4000-8000-000000000001",
-    openAIApiKey: "test-openai-key",
-    request: {
-      surface: "journeys",
-      sessionId: "session-quest-chat",
-      message: "Quest?",
-      inputMode: "text",
-      currentDateTime: "2026-04-18T08:00:00-07:00",
-      starterIntent: "quest_capture",
-      turnOrigin: "launcher",
-    },
-  });
-
-  assertEquals(launchFetchCalled, false);
-  assertEquals(launchResult.mode, "clarify");
-  assertEquals(launchResult.intent, "schedule_task");
-  assertEquals(
-    launchResult.followUp?.question,
-    "What quest do you want to capture?",
-  );
-
-  const supabase = createMockSupabase();
-  const responseBodies: unknown[] = [];
-  const guardedFetch =
-    (async (input: string | URL | Request, init?: RequestInit) => {
-      const url = String(input);
-      if (url.endsWith("/conversations")) {
-        return jsonResponse({ id: "conv_quest_chat" });
-      }
-
-      if (url.endsWith("/responses")) {
-        responseBodies.push(JSON.parse(String(init?.body ?? "{}")));
-        return jsonResponse({
-          id: "resp_quest_chat",
-          conversation: { id: "conv_quest_chat" },
-          output: [
-            {
-              type: "function_call",
-              call_id: "call_submit",
-              name: "submit_companion_result",
-              arguments: JSON.stringify({
-                reply: "I can draft that as a quest for tomorrow morning.",
-                mode: "pending_confirmation",
-                intent: "schedule_task",
-                confidence: 0.9,
-                understanding_state: "ready_to_draft",
-                proposed_actions: [
-                  {
-                    type: "quest.create",
-                    title: "Pilates",
-                    summary: "Add Pilates tomorrow at 8am.",
-                    normalizedPayload: {
-                      title: "Pilates",
-                      date: "2026-04-19",
-                      startTime: "08:00",
-                      durationMinutes: 30,
-                    },
-                    confidence: 0.88,
-                  },
-                ],
-              }),
-            },
-          ],
-        });
-      }
-
-      throw new Error(`Unexpected fetch: ${url}`);
-    }) as typeof fetch;
-
-  const result = await runCompanionAgent({
-    guardedFetch,
-    supabase: supabase.client,
-    userId: "00000000-0000-4000-8000-000000000001",
-    openAIApiKey: "test-openai-key",
-    request: {
-      surface: "journeys",
-      sessionId: "session-quest-chat",
-      message: "Pilates tomorrow at 8am",
-      inputMode: "text",
-      currentDateTime: "2026-04-18T08:00:00-07:00",
-      turnOrigin: "composer",
-      activeFollowUp: launchResult.followUp,
-    },
-  });
-
-  assertEquals(responseBodies.length, 1);
-  assertEquals(result.mode, "conversation");
-  assertEquals(result.understandingState, "enough_to_discuss");
-  assertEquals(result.pendingAction, undefined);
-  assertEquals(result.proposedActions, []);
-  assertEquals(
-    supabase.inserts.some((entry) =>
-      entry.table === "companion_pending_actions"
-    ),
-    false,
-  );
 });
 
 Deno.test("runCompanionAgent does not create a composer draft from deterministic fallback", async () => {
@@ -2289,102 +1667,6 @@ Deno.test("runCompanionAgent does not create a composer draft from deterministic
   );
 });
 
-Deno.test("runCompanionAgent keeps Quest? parser fallback conversational for the sidecar", async () => {
-  const supabase = createMockSupabase();
-  const { guardedFetch } = createRawMessageTextCaptureFetch("");
-
-  const result = await runCompanionAgent({
-    guardedFetch,
-    supabase: supabase.client,
-    userId: "00000000-0000-4000-8000-000000000001",
-    openAIApiKey: "test-openai-key",
-    request: {
-      surface: "journeys",
-      sessionId: "session-quest-gym-no-tools",
-      message: "Gym at 6",
-      inputMode: "text",
-      currentDateTime: "2026-05-03T21:08:00-07:00",
-      starterIntent: "quest_capture",
-      turnOrigin: "composer",
-    },
-  });
-
-  assertEquals(result.mode, "conversation");
-  assertEquals(result.understandingState, "enough_to_discuss");
-  assertEquals(result.pendingAction, undefined);
-  assertEquals(result.proposedActions, []);
-  assertEquals(
-    supabase.inserts.some((entry) =>
-      entry.table === "companion_pending_actions"
-    ),
-    false,
-  );
-});
-
-Deno.test("runCompanionAgent keeps concrete quest-capture fallback conversational", async () => {
-  const supabase = createMockSupabase();
-  let fetchCalled = false;
-
-  const result = await runCompanionAgent({
-    guardedFetch: (async () => {
-      fetchCalled = true;
-      throw new Error("server error");
-    }) as typeof fetch,
-    supabase: supabase.client,
-    userId: "00000000-0000-4000-8000-000000000001",
-    openAIApiKey: "test-openai-key",
-    request: {
-      surface: "journeys",
-      sessionId: "session-quest-fallback",
-      message: "Pilates tomorrow at 8am",
-      inputMode: "text",
-      currentDateTime: "2026-04-18T08:00:00-07:00",
-      starterIntent: "quest_capture",
-      turnOrigin: "composer",
-    },
-  });
-
-  assertEquals(fetchCalled, true);
-  assertEquals(result.mode, "conversation");
-  assertEquals(result.pendingAction, undefined);
-  assertEquals(result.reply.includes("Quest?"), false);
-  assertEquals(result.proposedActions, []);
-  const pendingActionInsert = supabase.inserts.find((entry) =>
-    entry.table === "companion_pending_actions"
-  );
-  assertEquals(pendingActionInsert, undefined);
-});
-
-Deno.test("runCompanionAgent carries selected date on quest-capture follow-ups", async () => {
-  const supabase = createMockSupabase();
-
-  const result = await runCompanionAgent({
-    guardedFetch: (async () => {
-      throw new Error("server error");
-    }) as typeof fetch,
-    supabase: supabase.client,
-    userId: "00000000-0000-4000-8000-000000000001",
-    openAIApiKey: "test-openai-key",
-    request: {
-      surface: "journeys",
-      sessionId: "session-quest-selected-date-follow-up",
-      message: "tomorrow at 8am",
-      inputMode: "text",
-      currentDateTime: "2026-04-18T08:00:00-07:00",
-      selectedDate: "2026-04-21",
-      starterIntent: "quest_capture",
-      turnOrigin: "composer",
-    },
-  });
-
-  assertEquals(result.mode, "clarify");
-  assertEquals(result.followUp?.metadata?.selectedDate, "2026-04-21");
-  assertEquals(
-    result.followUp?.metadata?.sourceStarterIntent,
-    "quest_capture",
-  );
-});
-
 Deno.test("runCompanionAgent recovers persisted plan-day follow-up context when request state is stale", async () => {
   const followUp = {
     question: "Should today lean focus, recovery, or catching up?",
@@ -2392,7 +1674,6 @@ Deno.test("runCompanionAgent recovers persisted plan-day follow-up context when 
       "That choice changes whether I protect deep work, lighten the load, or triage overdue items.",
     expectedAnswerType: "choice",
     options: ["Focus", "Recovery", "Catch up"],
-    blocksDrafting: true,
   };
   const supabase = createMockSupabase({
     messages: [
@@ -2447,7 +1728,6 @@ Deno.test("runCompanionAgent recovers persisted plan-day follow-up context when 
   assertEquals(result.intent, "plan_day");
   assertEquals(result.mode, "conversation");
   assertEquals(result.followUp, null);
-  assertEquals(result.proposedActions, []);
   assert(result.reply !== "I'm here.");
   assert(result.reply.length > 10);
 });
@@ -2459,7 +1739,6 @@ Deno.test("runCompanionAgent does not resurrect cleared persisted follow-ups", a
       "That choice changes whether I protect deep work, lighten the load, or triage overdue items.",
     expectedAnswerType: "choice",
     options: ["Focus", "Recovery", "Catch up"],
-    blocksDrafting: true,
   };
   const supabase = createMockSupabase({
     messages: [
@@ -2652,7 +1931,6 @@ Deno.test("runCompanionAgent keeps malformed free-talk tool replies out of plann
     result.reply,
     "I'm doing well. What do you want to get into?",
   );
-  assertEquals(result.proposedActions, []);
   assertEquals(result.pendingAction, undefined);
 });
 
@@ -2842,7 +2120,6 @@ Deno.test("runCompanionAgent asks a follow-up for bare plan-day variants without
   assertEquals(result.intent, "plan_day");
   assertEquals(result.understandingState, "needs_followup");
   assert(result.followUp?.question.includes("focus"));
-  assertEquals(result.proposedActions, []);
   assertEquals(result.structuredResponse, null);
 });
 
@@ -2853,7 +2130,6 @@ Deno.test("runCompanionAgent preserves active follow-up when the model submits a
     reason: "The next step depends on what should move.",
     expectedAnswerType: "choice" as const,
     options: ["Focus work", "Recovery", "Specific commitment"],
-    blocksDrafting: true,
   };
   const supabase = createMockSupabase();
   const { guardedFetch } = createInstructionCaptureFetch("I'm here.");
@@ -2878,7 +2154,6 @@ Deno.test("runCompanionAgent preserves active follow-up when the model submits a
   assertEquals(result.followUp?.question, followUp.question);
   assert(result.reply !== "I'm here.");
   assert(result.reply.includes(followUp.question));
-  assertEquals(result.proposedActions, []);
   assertEquals(result.structuredResponse, null);
   assertEquals(result.pendingAction, undefined);
 });
@@ -2890,7 +2165,6 @@ Deno.test("runCompanionAgent preserves active follow-up when OpenAI returns only
     reason: "The next step depends on what should move.",
     expectedAnswerType: "choice" as const,
     options: ["Focus work", "Recovery", "Specific commitment"],
-    blocksDrafting: true,
   };
   const supabase = createMockSupabase();
   const { guardedFetch } = createOutputTextCaptureFetch("I'm here.");
@@ -2915,7 +2189,6 @@ Deno.test("runCompanionAgent preserves active follow-up when OpenAI returns only
   assertEquals(result.followUp?.question, followUp.question);
   assert(result.reply !== "I'm here.");
   assert(result.reply.includes(followUp.question));
-  assertEquals(result.proposedActions, []);
   assertEquals(result.structuredResponse, null);
   assertEquals(result.pendingAction, undefined);
 });
@@ -2927,7 +2200,6 @@ Deno.test("runCompanionAgent treats the need-more fallback as a thin reply", asy
     reason: "The next step depends on what should move.",
     expectedAnswerType: "choice" as const,
     options: ["Focus work", "Recovery", "Specific commitment"],
-    blocksDrafting: true,
   };
   const supabase = createMockSupabase();
   const { guardedFetch } = createOutputTextCaptureFetch(
@@ -2953,7 +2225,6 @@ Deno.test("runCompanionAgent treats the need-more fallback as a thin reply", asy
   assertEquals(result.understandingState, "needs_followup");
   assertEquals(result.followUp?.question, followUp.question);
   assert(result.reply.includes(followUp.question));
-  assertEquals(result.proposedActions, []);
   assertEquals(result.structuredResponse, null);
   assertEquals(result.pendingAction, undefined);
 });
@@ -3098,500 +2369,4 @@ Deno.test("runCompanionAgent synthesizes a proper companion name instead of spec
       );
     }
   }
-});
-
-Deno.test({
-  name:
-    "runCompanionAgent drafts a pending action from a model-authored proposed action",
-  fn: async () => {
-    const supabase = createMockSupabase();
-    const responseBodies: unknown[] = [];
-    const guardedFetch =
-      (async (input: string | URL | Request, init?: RequestInit) => {
-        const url = String(input);
-        if (url.endsWith("/conversations")) {
-          return jsonResponse({ id: "conv_1" });
-        }
-
-        if (url.endsWith("/responses")) {
-          responseBodies.push(JSON.parse(String(init?.body ?? "{}")));
-          return jsonResponse({
-            id: "resp_1",
-            conversation: { id: "conv_1" },
-            output: [
-              {
-                type: "function_call",
-                call_id: "call_submit",
-                name: "submit_companion_result",
-                arguments: JSON.stringify({
-                  reply: "I’d protect one launch block this morning.",
-                  mode: "schedule_read",
-                  intent: "plan_day",
-                  confidence: 0.91,
-                  understanding_state: "ready_to_draft",
-                  proposed_actions: [
-                    {
-                      type: "quest.create",
-                      title: "Draft launch email",
-                      reason: "Best fit before the afternoon calendar blocks.",
-                      normalizedPayload: {
-                        title: "Draft launch email",
-                        date: "2026-04-18",
-                        startTime: "10:00",
-                        durationMinutes: 45,
-                        priority: "high",
-                      },
-                      confidence: 0.88,
-                    },
-                  ],
-                }),
-              },
-            ],
-          });
-        }
-
-        throw new Error(`Unexpected fetch: ${url}`);
-      }) as typeof fetch;
-
-    const result = await runCompanionAgent({
-      guardedFetch,
-      supabase: supabase.client,
-      userId: "00000000-0000-4000-8000-000000000001",
-      openAIApiKey: "test-openai-key",
-      request: {
-        surface: "journeys",
-        sessionId: "session-2",
-        message: "Plan my day",
-        inputMode: "text",
-        currentDateTime: "2026-04-18T08:00:00-07:00",
-        starterIntent: "plan_day",
-        activeFollowUp: {
-          question: "Do you want today to lean progress or recovery?",
-          reason: "The calendar has room for either shape.",
-          expectedAnswerType: "choice",
-          options: ["Progress", "Recovery"],
-          blocksDrafting: true,
-        },
-        selectedProposedAction: {
-          type: "quest.create",
-          title: "Draft launch email",
-          reason: "Best fit before the afternoon calendar blocks.",
-          normalizedPayload: {
-            title: "Draft launch email",
-            date: "2026-04-18",
-            startTime: "10:00",
-            durationMinutes: 45,
-          },
-        },
-        activeProposedActions: [
-          {
-            type: "quest.create",
-            title: "Draft launch email",
-            reason: "Best fit before the afternoon calendar blocks.",
-            normalizedPayload: {
-              title: "Draft launch email",
-              date: "2026-04-18",
-              startTime: "10:00",
-              durationMinutes: 45,
-            },
-          },
-          {
-            type: "calendar.event.update",
-            title: "Move dentist appointment",
-            reason: "External calendar events are read-only.",
-          },
-        ],
-      },
-    });
-
-    assertEquals(result.mode, "pending_confirmation");
-    assertEquals(result.intent, "schedule_task");
-    assertEquals(result.understandingState, "ready_to_draft");
-    assertEquals(result.pendingAction?.actionType, "task_create");
-    assertEquals(
-      result.pendingAction?.normalizedPayload.title,
-      "Draft launch email",
-    );
-    assertEquals(
-      result.pendingAction?.normalizedPayload.task_date,
-      "2026-04-18",
-    );
-    assertEquals(
-      result.pendingAction?.normalizedPayload.scheduled_time,
-      "10:00",
-    );
-    assertEquals(
-      result.pendingAction?.normalizedPayload.estimated_duration,
-      45,
-    );
-    assertEquals(result.pendingAction?.normalizedPayload.priority, "high");
-    assert(
-      supabase.inserts.some((entry) =>
-        entry.table === "companion_pending_actions"
-      ),
-      "expected model-authored action to become a pending action",
-    );
-    assert(
-      JSON.stringify(responseBodies[0]).includes("APP_CONTEXT_PACKET"),
-      "expected model call to receive app context packet",
-    );
-    const contextInput =
-      (responseBodies[0] as { input: Array<{ content?: string }> })
-        .input.find((entry) => entry.content?.startsWith("APP_CONTEXT_PACKET"));
-    assert(contextInput?.content, "expected context packet input");
-    const contextPacket = JSON.parse(
-      contextInput.content.replace("APP_CONTEXT_PACKET\n", ""),
-    );
-    assertEquals(
-      contextPacket.activeFollowUp.question,
-      "Do you want today to lean progress or recovery?",
-    );
-    assertEquals(contextPacket.latestUserMessageAnswersFollowUp, true);
-    assertEquals(
-      contextPacket.selectedProposedAction.title,
-      "Draft launch email",
-    );
-    assertEquals(contextPacket.selectedProposedActionIntent, "draft");
-    assertEquals(
-      contextPacket.latestUserMessageSelectedProposedActionForDraft,
-      true,
-    );
-    assertEquals(
-      contextPacket.latestUserMessageSelectedProposedActionForDiscussion,
-      false,
-    );
-    assertEquals(contextPacket.activeProposedActions.length, 2);
-    assertEquals(
-      contextPacket.activeProposedActions[1].title,
-      "Move dentist appointment",
-    );
-    assertEquals(contextPacket.latestUserMessageSelectedProposedAction, true);
-  },
-});
-
-Deno.test({
-  name:
-    "runCompanionAgent downgrades ready_to_draft when a model-authored proposal is not draftable",
-  fn: async () => {
-    const supabase = createMockSupabase();
-    const guardedFetch = (async (input: string | URL | Request) => {
-      const url = String(input);
-      if (url.endsWith("/conversations")) {
-        return jsonResponse({ id: "conv_1_unsupported" });
-      }
-
-      if (url.endsWith("/responses")) {
-        return jsonResponse({
-          id: "resp_1_unsupported",
-          conversation: { id: "conv_1_unsupported" },
-          output: [
-            {
-              type: "function_call",
-              call_id: "call_submit",
-              name: "submit_companion_result",
-              arguments: JSON.stringify({
-                reply:
-                  "I can walk through the calendar move, but I can’t directly edit that external event here.",
-                mode: "schedule_read",
-                intent: "check_calendar",
-                confidence: 0.91,
-                understanding_state: "ready_to_draft",
-                proposed_actions: [
-                  {
-                    type: "calendar.event.update",
-                    title: "Move dentist appointment",
-                    reason: "External calendar events are read-only.",
-                    normalizedPayload: {
-                      eventId: "event-1",
-                      date: "2026-04-23",
-                      startTime: "15:00",
-                    },
-                  },
-                ],
-              }),
-            },
-          ],
-        });
-      }
-
-      throw new Error(`Unexpected fetch: ${url}`);
-    }) as typeof fetch;
-
-    const result = await runCompanionAgent({
-      guardedFetch,
-      supabase: supabase.client,
-      userId: "00000000-0000-4000-8000-000000000001",
-      openAIApiKey: "test-openai-key",
-      request: {
-        surface: "journeys",
-        sessionId: "session-2-unsupported",
-        message: "Move my dentist appointment",
-        inputMode: "text",
-        currentDateTime: "2026-04-18T08:00:00-07:00",
-      },
-    });
-
-    assertEquals(result.mode, "conversation");
-    assertEquals(result.intent, "check_calendar");
-    assertEquals(result.understandingState, "enough_to_discuss");
-    assertEquals(result.pendingAction, undefined);
-    assertEquals(result.threadState.hasPendingAction, false);
-    assert(
-      supabase.inserts.every((entry) =>
-        entry.table !== "companion_pending_actions"
-      ),
-      "unsupported model-authored proposal should stay conversational",
-    );
-  },
-});
-
-Deno.test({
-  name:
-    "runCompanionAgent drafts from the selected proposed action when the model approves it",
-  fn: async () => {
-    const supabase = createMockSupabase();
-    const guardedFetch = (async (input: string | URL | Request) => {
-      const url = String(input);
-      if (url.endsWith("/conversations")) {
-        return jsonResponse({ id: "conv_2" });
-      }
-
-      if (url.endsWith("/responses")) {
-        return jsonResponse({
-          id: "resp_2",
-          conversation: { id: "conv_2" },
-          output: [
-            {
-              type: "function_call",
-              call_id: "call_submit",
-              name: "submit_companion_result",
-              arguments: JSON.stringify({
-                reply: "Yes, that launch block is ready to draft.",
-                mode: "schedule_read",
-                intent: "plan_day",
-                confidence: 0.9,
-                understanding_state: "ready_to_draft",
-              }),
-            },
-          ],
-        });
-      }
-
-      throw new Error(`Unexpected fetch: ${url}`);
-    }) as typeof fetch;
-
-    const result = await runCompanionAgent({
-      guardedFetch,
-      supabase: supabase.client,
-      userId: "00000000-0000-4000-8000-000000000001",
-      openAIApiKey: "test-openai-key",
-      request: {
-        surface: "journeys",
-        sessionId: "session-3",
-        message: "Draft this: Draft launch email",
-        inputMode: "text",
-        currentDateTime: "2026-04-18T08:00:00-07:00",
-        selectedProposedAction: {
-          type: "quest.create",
-          title: "Draft launch email",
-          summary: "Protect one launch block before the afternoon fills.",
-          reason: "It fits the cleanest open window.",
-          normalizedPayload: {
-            title: "Draft launch email",
-            date: "2026-04-18",
-            startTime: "10:00",
-            durationMinutes: 45,
-            priority: "high",
-          },
-        },
-        selectedProposedActionIntent: "draft",
-      },
-    });
-
-    assertEquals(result.mode, "pending_confirmation");
-    assertEquals(result.intent, "schedule_task");
-    assertEquals(result.pendingAction?.actionType, "task_create");
-    assertEquals(
-      result.pendingAction?.normalizedPayload.title,
-      "Draft launch email",
-    );
-    assertEquals(
-      result.pendingAction?.normalizedPayload.task_date,
-      "2026-04-18",
-    );
-    assertEquals(
-      result.pendingAction?.normalizedPayload.scheduled_time,
-      "10:00",
-    );
-    assertEquals(
-      result.pendingAction?.normalizedPayload.estimated_duration,
-      45,
-    );
-
-    const pendingActionInsert = supabase.inserts.find((entry) =>
-      entry.table === "companion_pending_actions"
-    );
-    assert(pendingActionInsert, "expected selected proposal to become pending");
-    assertEquals(
-      (pendingActionInsert.value as Record<string, unknown>).metadata,
-      {
-        source: "companion-agent-selected-proposed-action",
-        visibleDateStart: "2026-04-18",
-        visibleDateEnd: "2026-04-24",
-      },
-    );
-  },
-});
-
-Deno.test({
-  name:
-    "runCompanionAgent keeps draftable selected proposed actions conversational when selected for discussion",
-  fn: async () => {
-    const supabase = createMockSupabase();
-    const guardedFetch = (async (input: string | URL | Request) => {
-      const url = String(input);
-      if (url.endsWith("/conversations")) {
-        return jsonResponse({ id: "conv_3_discuss" });
-      }
-
-      if (url.endsWith("/responses")) {
-        return jsonResponse({
-          id: "resp_3_discuss",
-          conversation: { id: "conv_3_discuss" },
-          output: [
-            {
-              type: "function_call",
-              call_id: "call_submit",
-              name: "submit_companion_result",
-              arguments: JSON.stringify({
-                reply:
-                  "The cleanest version is a 45-minute launch block before lunch.",
-                mode: "schedule_read",
-                intent: "schedule_task",
-                confidence: 0.88,
-                understanding_state: "ready_to_draft",
-              }),
-            },
-          ],
-        });
-      }
-
-      throw new Error(`Unexpected fetch: ${url}`);
-    }) as typeof fetch;
-
-    const result = await runCompanionAgent({
-      guardedFetch,
-      supabase: supabase.client,
-      userId: "00000000-0000-4000-8000-000000000001",
-      openAIApiKey: "test-openai-key",
-      request: {
-        surface: "journeys",
-        sessionId: "session-3-discuss",
-        message: "Tell me more about: Draft launch email",
-        inputMode: "text",
-        currentDateTime: "2026-04-18T08:00:00-07:00",
-        selectedProposedAction: {
-          type: "quest.create",
-          title: "Draft launch email",
-          summary: "Protect one launch block before the afternoon fills.",
-          reason: "It fits the cleanest open window.",
-          normalizedPayload: {
-            title: "Draft launch email",
-            date: "2026-04-18",
-            startTime: "10:00",
-            durationMinutes: 45,
-            priority: "high",
-          },
-        },
-        selectedProposedActionIntent: "discuss",
-      },
-    });
-
-    assertEquals(result.mode, "conversation");
-    assertEquals(result.intent, "schedule_task");
-    assertEquals(result.understandingState, "enough_to_discuss");
-    assertEquals(result.pendingAction, undefined);
-    assertEquals(result.threadState.hasPendingAction, false);
-    assert(
-      supabase.inserts.every((entry) =>
-        entry.table !== "companion_pending_actions"
-      ),
-      "discussion-selected proposal should not become pending",
-    );
-  },
-});
-
-Deno.test({
-  name:
-    "runCompanionAgent ignores unsupported selected proposed actions even when the model approves drafting",
-  fn: async () => {
-    const supabase = createMockSupabase();
-    const guardedFetch = (async (input: string | URL | Request) => {
-      const url = String(input);
-      if (url.endsWith("/conversations")) {
-        return jsonResponse({ id: "conv_3" });
-      }
-
-      if (url.endsWith("/responses")) {
-        return jsonResponse({
-          id: "resp_3",
-          conversation: { id: "conv_3" },
-          output: [
-            {
-              type: "function_call",
-              call_id: "call_submit",
-              name: "submit_companion_result",
-              arguments: JSON.stringify({
-                reply: "I can talk through that calendar change first.",
-                mode: "schedule_read",
-                intent: "check_calendar",
-                confidence: 0.87,
-                understanding_state: "ready_to_draft",
-              }),
-            },
-          ],
-        });
-      }
-
-      throw new Error(`Unexpected fetch: ${url}`);
-    }) as typeof fetch;
-
-    const result = await runCompanionAgent({
-      guardedFetch,
-      supabase: supabase.client,
-      userId: "00000000-0000-4000-8000-000000000001",
-      openAIApiKey: "test-openai-key",
-      request: {
-        surface: "journeys",
-        sessionId: "session-4",
-        message: "Draft this: Move my dentist appointment",
-        inputMode: "text",
-        currentDateTime: "2026-04-18T08:00:00-07:00",
-        selectedProposedAction: {
-          type: "calendar.event.update",
-          title: "Move my dentist appointment",
-          summary: "Reschedule the appointment to Thursday afternoon.",
-          reason:
-            "The app cannot safely draft direct calendar event edits yet.",
-          normalizedPayload: {
-            eventId: "event-1",
-            startTime: "15:00",
-            date: "2026-04-23",
-          },
-        },
-      },
-    });
-
-    assertEquals(result.mode, "schedule_read");
-    assertEquals(result.intent, "check_calendar");
-    assertEquals(result.understandingState, "ready_to_propose");
-    assertEquals(result.pendingAction, undefined);
-    assertEquals(result.threadState.hasPendingAction, false);
-    assert(
-      supabase.inserts.every((entry) =>
-        entry.table !== "companion_pending_actions"
-      ),
-      "unsupported selected proposal should stay conversational",
-    );
-  },
 });

@@ -34,7 +34,6 @@ export const COMPANION_AGENT_STARTER_INTENTS = [
   "goal_breakdown",
   "free_talk_start",
   "upcoming_start",
-  "quest_capture",
   "goal_breakdown_start",
 ] as const;
 
@@ -45,7 +44,6 @@ export const COMPANION_CAMPAIGN_LIFECYCLE_STATUSES = [
 ] as const;
 
 export const COMPANION_PENDING_ACTION_TYPES = [
-  "task_create",
   "task_update",
   "ritual_create",
   "reminder_create",
@@ -70,16 +68,10 @@ export const COMPANION_AGENT_UNDERSTANDING_STATES = [
   "ready_to_draft",
 ] as const;
 
-export const COMPANION_AGENT_SELECTED_PROPOSED_ACTION_INTENTS = [
-  "draft",
-  "discuss",
-] as const;
-
 export const COMPANION_AGENT_TURN_ORIGINS = [
   "launcher",
   "composer",
   "follow_up_option",
-  "proposed_action",
 ] as const;
 
 const CompanionIntentMetadataSchema = z.object({
@@ -232,9 +224,6 @@ export const PendingActionStatusSchema = z.enum(
 export const UnderstandingStateSchema = z.enum(
   COMPANION_AGENT_UNDERSTANDING_STATES,
 );
-export const SelectedProposedActionIntentSchema = z.enum(
-  COMPANION_AGENT_SELECTED_PROPOSED_ACTION_INTENTS,
-);
 export const TurnOriginSchema = z.enum(COMPANION_AGENT_TURN_ORIGINS);
 export const CampaignLifecycleStatusSchema = z.enum(
   COMPANION_CAMPAIGN_LIFECYCLE_STATUSES,
@@ -251,18 +240,8 @@ export const CompanionAgentFollowUpSchema = z.object({
     "confirmation",
   ]).default("free_text"),
   options: z.array(z.string().min(1).max(120)).max(6).optional(),
-  blocksDrafting: z.boolean().default(true),
   metadata: z.record(z.unknown()).optional(),
 });
-
-export const CompanionAgentProposedActionSchema = z.object({
-  type: z.string().min(1).max(80),
-  title: z.string().min(1).max(200).optional().nullable(),
-  summary: z.string().min(1).max(1000).optional().nullable(),
-  reason: z.string().min(1).max(2000).optional().nullable(),
-  normalizedPayload: z.record(z.unknown()).optional(),
-  confidence: z.number().min(0).max(1).optional(),
-}).passthrough();
 
 export const SelectedEntityIdsSchema = z.object({
   taskIds: z.array(z.string().uuid()).max(12).optional(),
@@ -289,32 +268,13 @@ export const CompanionAgentRequestSchema = z.object({
   selectedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   turnOrigin: TurnOriginSchema.optional(),
   starterIntent: StarterIntentSchema.optional(),
-  selectedProposalId: z.string().min(1).max(200).optional(),
   visibleDateStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   visibleDateEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   horizonDays: z.number().int().min(1).max(31).optional(),
   selectedEntityIds: SelectedEntityIdsSchema,
   briefingContext: PlannerBriefingContextSchema.nullable().optional(),
   activeFollowUp: CompanionAgentFollowUpSchema.nullable().optional(),
-  activeProposedActions: z.array(CompanionAgentProposedActionSchema).max(8)
-    .optional(),
-  selectedProposedAction: CompanionAgentProposedActionSchema.optional(),
-  selectedProposedActionIntent: SelectedProposedActionIntentSchema.optional(),
 });
-
-export const CompanionDraftOpportunityRequestSchema =
-  CompanionAgentRequestSchema.extend({
-    assistantReply: z.string().min(1).max(4000),
-    assistantMode: ModeSchema,
-    assistantIntent: IntentSchema,
-    assistantConfidence: z.number().min(0).max(1).optional(),
-    assistantUnderstandingState: UnderstandingStateSchema.optional(),
-    assistantFollowUp: CompanionAgentFollowUpSchema.nullable().optional(),
-    assistantProposedActions: z.array(CompanionAgentProposedActionSchema).max(8)
-      .optional(),
-    assistantStructuredResponse: CompanionStructuredResponseSchema.nullable()
-      .optional(),
-  });
 
 export const CompanionAgentActionRequestSchema = z.object({
   sessionId: z.string().min(1).max(200),
@@ -329,8 +289,6 @@ export const SubmitCompanionResultSchema = z.object({
   confidence: z.number().min(0).max(1),
   understanding_state: UnderstandingStateSchema.optional(),
   follow_up: CompanionAgentFollowUpSchema.nullable().optional(),
-  proposed_actions: z.array(CompanionAgentProposedActionSchema).max(8)
-    .optional(),
   assumptions: z.array(z.string().min(1).max(500)).max(8).optional(),
   evidence_ids: z.array(z.string().min(1).max(200)).max(24).optional(),
   structured_response: CompanionStructuredResponseSchema.nullable().optional(),
@@ -338,9 +296,6 @@ export const SubmitCompanionResultSchema = z.object({
 });
 
 export type CompanionAgentRequest = z.infer<typeof CompanionAgentRequestSchema>;
-export type CompanionDraftOpportunityRequest = z.infer<
-  typeof CompanionDraftOpportunityRequestSchema
->;
 export type CompanionAgentActionRequest = z.infer<
   typeof CompanionAgentActionRequestSchema
 >;
@@ -355,15 +310,9 @@ export type CompanionPendingActionStatus = z.infer<
 export type CompanionAgentUnderstandingState = z.infer<
   typeof UnderstandingStateSchema
 >;
-export type CompanionAgentSelectedProposedActionIntent = z.infer<
-  typeof SelectedProposedActionIntentSchema
->;
 export type CompanionAgentTurnOrigin = z.infer<typeof TurnOriginSchema>;
 export type CompanionAgentFollowUp = z.infer<
   typeof CompanionAgentFollowUpSchema
->;
-export type CompanionAgentProposedAction = z.infer<
-  typeof CompanionAgentProposedActionSchema
 >;
 export type CompanionCampaignLifecycleStatus = z.infer<
   typeof CampaignLifecycleStatusSchema

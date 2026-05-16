@@ -95,7 +95,6 @@ import {
   DesktopQuestDetailsPopover,
 } from "@/components/DesktopQuestDetailsPopover";
 import { QUEST_LAUNCHER_SCROLL_CLEARANCE_PX } from "@/components/quest-launchers/metrics";
-import { createCompanionPlannerQuestCaptureLaunchIntent } from "@/shared/companionPlannerSurfaceActions";
 import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
 import { createPlanDayCompanionLaunchIntent } from "@/utils/companionPlannerLaunchContext";
 import type { Habit } from "@/features/habits/types";
@@ -561,10 +560,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   companionFrostedThemeStyle,
 }: TodaysAgendaProps) {
   const { user } = useAuth();
-  const questCaptureDateLabel = isSameDay(selectedDate, new Date())
-    ? "today"
-    : safeFormat(selectedDate, "EEEE, MMMM d", "that day");
-  const questCaptureSelectedDate = safeFormat(selectedDate, "yyyy-MM-dd");
   const planDayLauncherLabel = isSameDay(selectedDate, new Date()) ? "Plan Today" : "Plan Day";
   const openPlanDayThread = useCallback(() => {
     if (!onOpenCompanionPlanner) return;
@@ -577,20 +572,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   }, [activeEpics, onOpenCompanionPlanner, selectedDate, tasks]);
   const plannerLauncherAction = onOpenCompanionPlanner ? openPlanDayThread : onVoiceAddQuest ?? onAddQuest;
   const openQuestCaptureThread = useCallback(() => {
-    if (onOpenCompanionPlanner) {
-      onOpenCompanionPlanner(createCompanionPlannerQuestCaptureLaunchIntent({
-        source: "empty_journeys",
-        dateLabel: questCaptureDateLabel,
-        selectedDate: questCaptureSelectedDate,
-      }));
-      return;
-    }
     if (onVoiceAddQuest) {
       onVoiceAddQuest();
       return;
     }
     onAddQuest();
-  }, [onAddQuest, onOpenCompanionPlanner, onVoiceAddQuest, questCaptureDateLabel, questCaptureSelectedDate]);
+  }, [onAddQuest, onVoiceAddQuest]);
   const voiceAddButtonLabel = isVoiceAddRecording ? "Stop voice capture" : "Start voice capture";
   const quickCaptureControls = (
     <div className="flex items-center gap-2">

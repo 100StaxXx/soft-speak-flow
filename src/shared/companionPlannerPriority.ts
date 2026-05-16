@@ -18,7 +18,6 @@ export type PlannerPriorityStarterIntent =
   | "goal_breakdown"
   | "free_talk_start"
   | "upcoming_start"
-  | "quest_capture"
   | "goal_breakdown_start";
 
 export interface PlannerPriorityTaskInput {

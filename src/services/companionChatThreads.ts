@@ -57,22 +57,6 @@ const isJsonValue = (value: unknown): value is CompanionChatRow["metadata"] => {
   return false;
 };
 
-const readSelectedProposalId = (
-  metadata: CompanionPendingActionRow["metadata"],
-) => {
-  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
-    return null;
-  }
-
-  const selectedProposalId = "selectedProposalId" in metadata
-    ? metadata.selectedProposalId
-    : null;
-
-  return typeof selectedProposalId === "string" && selectedProposalId.length > 0
-    ? selectedProposalId
-    : null;
-};
-
 const THREAD_TITLE_MAX_LENGTH = 72;
 const THREAD_PREVIEW_MAX_LENGTH = 160;
 
@@ -220,7 +204,7 @@ const mapPendingAction = (
   status: row.status as PendingActionView["status"],
   intent: row.intent as PendingActionView["intent"],
   actionType: row.action_type as PendingActionView["actionType"],
-  proposalId: readSelectedProposalId(row.metadata),
+  proposalId: null,
   summary: row.summary,
   confirmationMessage: row.confirmation_message,
   normalizedPayload: row.normalized_payload,

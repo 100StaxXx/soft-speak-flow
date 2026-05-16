@@ -508,7 +508,7 @@ describe("DraggableFAB", () => {
     expect(screen.queryByTestId("journeys-companion-launcher-option-low-energy")).not.toBeInTheDocument();
   });
 
-  it("opens create quest from the quest option when a create quest callback is available", async () => {
+  it("does not render a quest-draft launcher option", () => {
     render(
       <DraggableFAB
         onOpenCompanionPlanner={mocks.onOpenCompanionPlanner}
@@ -517,27 +517,10 @@ describe("DraggableFAB", () => {
     );
 
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-quest"));
 
-    expect(mocks.onCreateQuest).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("journeys-companion-launcher-option-quest")).not.toBeInTheDocument();
+    expect(mocks.onCreateQuest).not.toHaveBeenCalled();
     expect(mocks.onOpenCompanionPlanner).not.toHaveBeenCalled();
-    await waitFor(() => {
-      expect(screen.getByTestId("journeys-companion-launcher-popup")).toHaveStyle("opacity: 0");
-    });
-  });
-
-  it("falls back to the planner quest-capture starter when no create quest callback is available", () => {
-    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
-
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-quest"));
-
-    expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
-      target: "planner",
-      starterIntent: "quest_capture",
-      message: "Nova's ready. What quest are we capturing?",
-      briefingContext: null,
-    }));
   });
 
   it("reports top-left popup placement when the launcher sits in the upper-left half", () => {

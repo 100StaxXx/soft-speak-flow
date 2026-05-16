@@ -120,7 +120,7 @@ describe("companionChatThreads service", () => {
     expect(messages[0]?.receipt?.executionError).toBeNull();
   });
 
-  it("maps selected proposal ids from pending-action metadata", async () => {
+  it("leaves pending actions without proposal ids when none are stored", async () => {
     const maybeSingle = vi.fn().mockResolvedValue({
       data: {
         id: "pending-1",
@@ -134,9 +134,7 @@ describe("companionChatThreads service", () => {
         affected_entities: [{ epicId: "epic-1" }],
         expires_at: "2026-04-24T12:00:00.000Z",
         created_at: "2026-04-24T10:00:00.000Z",
-        metadata: {
-          selectedProposalId: "proposal-reset-1",
-        },
+        metadata: {},
       },
       error: null,
     });
@@ -151,7 +149,7 @@ describe("companionChatThreads service", () => {
 
     const pendingAction = await loadCompanionPendingAction("session-1");
 
-    expect(pendingAction?.proposalId).toBe("proposal-reset-1");
+    expect(pendingAction?.proposalId).toBeNull();
     expect(pendingAction?.actionType).toBe("campaign_update");
   });
 

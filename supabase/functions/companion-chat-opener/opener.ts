@@ -723,7 +723,6 @@ async function insertCompanionOpenerMessage(
         agentDecision: {
           understandingState: "enough_to_discuss",
           followUp: null,
-          proposedActions: [],
           assumptions: [],
           evidenceIds: [],
         },

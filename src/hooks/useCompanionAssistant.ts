@@ -20,7 +20,6 @@ import {
   listCompanionChatThreads,
   loadCompanionChatThreadMessages,
   loadCompanionPendingAction,
-  readCompanionThreadReceiptProposalId,
   setCompanionChatThreadArchived,
 } from "@/services/companionChatThreads";
 import { hasActiveSupabaseFunctionSession } from "@/services/supabaseFunctionSession";
@@ -29,7 +28,6 @@ import {
   speakCompanionReply,
   stopCompanionSpeech,
 } from "@/services/companionSpeech";
-import { COMPANION_PLANNER_QUEST_CAPTURE_OPENING } from "@/shared/companionPlannerSurfaceActions";
 import { getCompanionPlannerOpener } from "@/shared/companionPlannerCopy";
 import { getRandomCompanionChatOpeningLine } from "@/shared/companionChatOpeners";
 import {
@@ -43,18 +41,14 @@ import {
 import type {
   ActionReceiptView,
   CompanionAgentFollowUp,
-  CompanionAgentProposedAction,
   CompanionAgentResponse,
-  CompanionAgentSelectedProposedActionIntent,
   CompanionAgentTurnOrigin,
   CompanionAgentUnderstandingState,
-  CompanionDraftOpportunityResponse,
   PendingActionView,
 } from "@/types/companionAgent";
 import type {
   CompanionChatRequest,
   CompanionChatInputMode,
-  CompanionChatOpenerResponse,
   CompanionChatResponse,
   CompanionChatSource,
   CompanionChatSurface,
@@ -91,7 +85,6 @@ export interface CompanionAssistantMessage {
   isSeed?: boolean;
   understandingState?: CompanionAgentUnderstandingState;
   followUp?: CompanionAgentFollowUp | null;
-  proposedActions?: CompanionAgentProposedAction[];
   assumptions?: string[];
   evidenceIds?: string[];
   structuredResponse?: CompanionAgentResponse["structuredResponse"];
@@ -113,8 +106,6 @@ interface CachedCompanionThreadUiState {
   structuredResponse: CompanionAgentResponse["structuredResponse"];
   activeFollowUp: CompanionAgentFollowUp | null;
   understandingState: CompanionAgentUnderstandingState | null;
-  proposedActions: CompanionAgentProposedAction[];
-  savedSuggestionProposalIds: string[];
   lastStarterIntent: CompanionPlannerLaunchIntent["starterIntent"] | null;
   lastReplayablePlannerMessage: string | null;
 }
@@ -124,7 +115,6 @@ type ThreadsQueryResult = {
   setupUnavailable: boolean;
 };
 
-const MAX_ACTIVE_PROPOSED_ACTIONS = 8;
 const MAX_DIRECT_CHAT_HISTORY_MESSAGES = 8;
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -172,8 +162,6 @@ type CompanionAgentSubmitOptions = {
   turnOrigin?: CompanionAgentTurnOrigin;
   selectedDate?: string | null;
   briefingContext?: CompanionPlannerLaunchIntent["briefingContext"];
-  selectedProposedAction?: CompanionAgentProposedAction | null;
-  selectedProposedActionIntent?: CompanionAgentSelectedProposedActionIntent;
 };
 
 type CompanionTemplateThreadOptions = {
@@ -212,40 +200,7 @@ const shouldApplyDefaultSelectedDateToStarterIntent = (
 ) =>
   Boolean(starterIntent) &&
   starterIntent !== "free_talk_start" &&
-  starterIntent !== "thread_history" &&
-  starterIntent !== "quest_capture";
-
-const parseDraftOpportunityActions = (
-  response: CompanionDraftOpportunityResponse,
-): CompanionAgentProposedAction[] =>
-  Array.isArray(response.proposedActions)
-    ? response.proposedActions.filter(
-        (action): action is CompanionAgentProposedAction =>
-          Boolean(action) &&
-          typeof action === "object" &&
-          !Array.isArray(action) &&
-          typeof (action as Record<string, unknown>).type === "string",
-      )
-    : [];
-
-const shouldRequestDraftOpportunitySidecar = (params: {
-  surface: CompanionAssistantSurface;
-  response: CompanionAgentResponse;
-  selectedProposedAction?: CompanionAgentProposedAction | null;
-}) => {
-  const { surface, response, selectedProposedAction } = params;
-  if (surface !== "journeys") return false;
-  if (selectedProposedAction) return false;
-  if (response.pendingAction) return false;
-  if (response.followUp) return false;
-  if ((response.proposedActions?.length ?? 0) > 0) return false;
-  if (response.structuredResponse) return false;
-  if (response.mode === "pending_confirmation") return false;
-  if (response.mode === "schedule_read") return false;
-  if (response.intent === "check_calendar") return false;
-  if (response.understandingState === "ready_to_draft") return false;
-  return true;
-};
+  starterIntent !== "thread_history";
 
 const shouldUseDirectCompanionChat = (params: {
   surface: CompanionAssistantSurface;
@@ -253,20 +208,13 @@ const shouldUseDirectCompanionChat = (params: {
   starterIntent?: CompanionPlannerLaunchIntent["starterIntent"] | null;
   turnOrigin?: CompanionAgentTurnOrigin;
   selectedDate?: string | null;
-  selectedProposedAction?: CompanionAgentProposedAction | null;
   activeFollowUp?: CompanionAgentFollowUp | null;
   pendingAction?: PendingActionView | null;
-  proposedActions: CompanionAgentProposedAction[];
 }) => {
-  if (params.selectedProposedAction) return false;
   if (params.activeFollowUp) return false;
   if (params.pendingAction) return false;
-  if (params.proposedActions.length > 0) return false;
   if (params.selectedDate) return false;
-  if (
-    params.turnOrigin === "follow_up_option" ||
-    params.turnOrigin === "proposed_action"
-  ) {
+  if (params.turnOrigin === "follow_up_option") {
     return false;
   }
   if (params.starterIntent && params.starterIntent !== "free_talk_start") {
@@ -485,10 +433,6 @@ const mapLoadedMessage = (
             (option): option is string => typeof option === "string",
           )
         : undefined,
-      blocksDrafting:
-        typeof followUp.blocksDrafting === "boolean"
-          ? followUp.blocksDrafting
-          : true,
       metadata:
         isJsonValue(followUp.metadata) &&
         typeof followUp.metadata === "object" &&
@@ -497,19 +441,6 @@ const mapLoadedMessage = (
           : undefined,
     };
   };
-
-  const parseProposedActions = (
-    value: unknown,
-  ): CompanionAgentProposedAction[] =>
-    Array.isArray(value)
-      ? value.filter(
-          (entry): entry is CompanionAgentProposedAction =>
-            Boolean(entry) &&
-            typeof entry === "object" &&
-            !Array.isArray(entry) &&
-            typeof (entry as Record<string, unknown>).type === "string",
-        )
-      : [];
 
   const parseStringArray = (value: unknown): string[] =>
     Array.isArray(value)
@@ -523,7 +454,6 @@ const mapLoadedMessage = (
     !Array.isArray(metadata.agentDecision)
       ? (metadata.agentDecision as Record<string, unknown>)
       : null;
-
   const structuredResponse =
     metadata && "structuredResponse" in metadata
       ? ((metadata.structuredResponse as CompanionAgentResponse["structuredResponse"]) ??
@@ -541,7 +471,6 @@ const mapLoadedMessage = (
       agentDecision?.understandingState,
     ),
     followUp: parseFollowUp(agentDecision?.followUp),
-    proposedActions: parseProposedActions(agentDecision?.proposedActions),
     assumptions: parseStringArray(agentDecision?.assumptions),
     evidenceIds: parseStringArray(agentDecision?.evidenceIds),
     structuredResponse,
@@ -556,22 +485,6 @@ const getTodayLabel = () =>
     month: "short",
     day: "numeric",
   }).format(new Date());
-
-const inferStarterIntentFromStructuredResponse = (
-  response: CompanionAgentResponse["structuredResponse"],
-): CompanionPlannerLaunchIntent["starterIntent"] | null => {
-  if (response?.planDay) return "plan_day";
-  if (response?.weeklyPlan) return "plan_week";
-  if (response?.priorityOverview) {
-    return response.priorityOverview.title.toLowerCase().includes("make room")
-      ? "make_room"
-      : "what_matters";
-  }
-  if (response?.reflectionBridge) return "briefing_followup";
-  if (response?.campaignMomentum) return "advance_campaign_start";
-  if (response?.comingUp) return "upcoming_start";
-  return null;
-};
 
 const isPlanDayStarterMessage = (value: string): boolean =>
   /\b(plan my day|help me plan(?: my day| today)|plan today)\b/i.test(value);
@@ -597,42 +510,6 @@ const collectStructuredResponseSectionKeys = (
     response.comingUp ? "comingUp" : null,
     response.campaignMomentum ? "campaignMomentum" : null,
   ].filter((section): section is string => Boolean(section));
-};
-
-const collectProposalIdsFromStructuredResponse = (
-  response: CompanionAgentResponse["structuredResponse"],
-) => {
-  const proposalIds = new Set<string>();
-  const collectQuest = (quest: { proposalId?: string | null }) => {
-    if (typeof quest.proposalId === "string" && quest.proposalId.length > 0) {
-      proposalIds.add(quest.proposalId);
-    }
-  };
-
-  response?.planDay?.suggestedQuests.forEach(collectQuest);
-  response?.weeklyPlan?.topPriorities.forEach(collectQuest);
-  response?.priorityOverview?.topPriorities.forEach(collectQuest);
-  if (response?.reflectionBridge?.firstAction) {
-    collectQuest(response.reflectionBridge.firstAction);
-  }
-  if (response?.comingUp?.nextBestAction) {
-    collectQuest(response.comingUp.nextBestAction);
-  }
-  if (response?.campaignMomentum?.nextStep) {
-    collectQuest(response.campaignMomentum.nextStep);
-  }
-  response?.campaignMomentum?.supportActions.forEach(collectQuest);
-
-  return proposalIds;
-};
-
-const pruneProposalIdsToStructuredResponse = (
-  proposalIds: string[],
-  response: CompanionAgentResponse["structuredResponse"],
-) => {
-  if (!response) return [];
-  const visibleProposalIds = collectProposalIdsFromStructuredResponse(response);
-  return proposalIds.filter((proposalId) => visibleProposalIds.has(proposalId));
 };
 
 const deriveStructuredResponseFromMessages = (
@@ -661,50 +538,25 @@ const deriveLatestAgentDecisionFromMessages = (
   let current: {
     activeFollowUp: CompanionAgentFollowUp | null;
     understandingState: CompanionAgentUnderstandingState | null;
-    proposedActions: CompanionAgentProposedAction[];
   } = {
     activeFollowUp: null,
     understandingState: null,
-    proposedActions: [],
   };
 
   for (const message of messages) {
     if (message.role !== "assistant") continue;
     const hasDecision =
       message.understandingState !== undefined ||
-      message.followUp !== undefined ||
-      message.proposedActions !== undefined;
+      message.followUp !== undefined;
     if (!hasDecision) continue;
 
     current = {
       activeFollowUp: message.followUp ?? null,
       understandingState: message.understandingState ?? null,
-      proposedActions: message.proposedActions ?? [],
     };
   }
 
   return current;
-};
-
-const collectSavedProposalIdsFromMessages = (
-  messages: CompanionAssistantMessage[],
-) => {
-  const proposalIds = new Set<string>();
-
-  for (const message of messages) {
-    if (message.role !== "assistant") continue;
-    const proposalId = readCompanionThreadReceiptProposalId(message.receipt);
-    if (!proposalId) continue;
-    if (message.receipt?.status !== "executed") continue;
-    proposalIds.add(proposalId);
-  }
-
-  return [...proposalIds];
-};
-
-const isSyntheticResolutionMessage = (message: string) => {
-  const normalized = message.trim().toLowerCase();
-  return normalized === "confirm" || normalized === "cancel";
 };
 
 const getParsedFunctionCode = (parsed: ParsedFunctionInvokeError) =>
@@ -926,17 +778,9 @@ export function useCompanionAssistant({
     useState<CompanionAgentFollowUp | null>(null);
   const [understandingState, setUnderstandingState] =
     useState<CompanionAgentUnderstandingState | null>(null);
-  const [proposedActions, setProposedActions] = useState<
-    CompanionAgentProposedAction[]
-  >([]);
   const [pendingAction, setPendingAction] = useState<PendingActionView | null>(
     null,
   );
-  const [savedSuggestionProposalIds, setSavedSuggestionProposalIds] = useState<
-    string[]
-  >([]);
-  const [pendingSuggestionProposalId, setPendingSuggestionProposalId] =
-    useState<string | null>(null);
   const [draftInput, setDraftInput] = useState("");
   const [interimText, setInterimText] = useState("");
   const [isOpeningThread, setIsOpeningThread] = useState(false);
@@ -965,7 +809,6 @@ export function useCompanionAssistant({
   const pendingStarterIntentRef = useRef<
     CompanionPlannerLaunchIntent["starterIntent"] | null
   >(null);
-  const pendingQuestCaptureSelectedDateRef = useRef<string | null>(null);
   const pendingLegacyFallbackReplayRef =
     useRef<PendingLegacyFallbackReplay | null>(null);
   const submitInFlightRef = useRef(false);
@@ -1059,14 +902,10 @@ export function useCompanionAssistant({
       setStructuredResponse(null);
       setActiveFollowUp(null);
       setUnderstandingState(null);
-      setProposedActions([]);
       setPendingAction(null);
-      setSavedSuggestionProposalIds([]);
-      setPendingSuggestionProposalId(null);
       lastStarterIntentRef.current = null;
       lastReplayablePlannerMessageRef.current = null;
       pendingStarterIntentRef.current = null;
-      pendingQuestCaptureSelectedDateRef.current = null;
       setMessages(
         greetingText
           ? [
@@ -1095,16 +934,12 @@ export function useCompanionAssistant({
       structuredResponse,
       activeFollowUp,
       understandingState,
-      proposedActions,
-      savedSuggestionProposalIds,
       lastStarterIntent: lastStarterIntentRef.current,
       lastReplayablePlannerMessage: lastReplayablePlannerMessageRef.current,
     });
   }, [
     messages,
     activeFollowUp,
-    proposedActions,
-    savedSuggestionProposalIds,
     structuredResponse,
     understandingState,
   ]);
@@ -1139,13 +974,8 @@ export function useCompanionAssistant({
         ? {
             activeFollowUp: cachedThreadUiState.activeFollowUp,
             understandingState: cachedThreadUiState.understandingState,
-            proposedActions: cachedThreadUiState.proposedActions,
           }
         : deriveLatestAgentDecisionFromMessages(mappedThreadMessages);
-      const restoredSavedProposalIds =
-        cachedThreadUiState?.savedSuggestionProposalIds ??
-        collectSavedProposalIdsFromMessages(mappedThreadMessages);
-
       localThreadCreatedAtRef.current =
         threadMessages[0]?.createdAt ?? new Date().toISOString();
       applyActiveSessionId(sessionId);
@@ -1153,15 +983,7 @@ export function useCompanionAssistant({
       setStructuredResponse(restoredStructuredResponse);
       setActiveFollowUp(restoredDecision.activeFollowUp);
       setUnderstandingState(restoredDecision.understandingState);
-      setProposedActions(restoredDecision.proposedActions);
       setPendingAction(loadedPendingAction);
-      setSavedSuggestionProposalIds(
-        pruneProposalIdsToStructuredResponse(
-          restoredSavedProposalIds,
-          restoredStructuredResponse,
-        ),
-      );
-      setPendingSuggestionProposalId(loadedPendingAction?.proposalId ?? null);
       setDraftInput("");
       setInterimText("");
       lastStarterIntentRef.current =
@@ -1169,7 +991,6 @@ export function useCompanionAssistant({
       lastReplayablePlannerMessageRef.current =
         cachedThreadUiState?.lastReplayablePlannerMessage ?? null;
       pendingStarterIntentRef.current = null;
-      pendingQuestCaptureSelectedDateRef.current = null;
       return true;
     },
     [applyActiveSessionId, surface],
@@ -1212,7 +1033,6 @@ export function useCompanionAssistant({
           pendingStarterIntentRef.current === replay.pendingStarterIntent
         ) {
           pendingStarterIntentRef.current = null;
-          pendingQuestCaptureSelectedDateRef.current = null;
         }
       } catch (error) {
         console.error(
@@ -1394,98 +1214,16 @@ export function useCompanionAssistant({
     });
   }, [companion?.id, queryClient, surface, user?.id]);
 
-  const startGeneratedCompanionOpener = useCallback(async () => {
+  const startLocalCompanionOpener = useCallback(async () => {
     if (surface !== "companion") return null;
 
     const fallbackOpening = getRandomCompanionChatOpeningLine();
-    const localSessionId = openFreshThread({
+    return openFreshThread({
       greetingText: fallbackOpening,
       markBootstrapped: true,
       visibleAssistantOpening: true,
     });
-    const openerMutationVersion = threadMutationVersionRef.current;
-
-    if (!user?.id || !companion?.id) {
-      return localSessionId;
-    }
-
-    try {
-      if (!(await ensureFunctionSession({ silent: true }))) {
-        return localSessionId;
-      }
-
-      const { data, error } = await supabase.functions.invoke(
-        "companion-chat-opener",
-        {
-          body: {
-            companionId: companion.id,
-            surface: "companion",
-            sessionId: localSessionId,
-            skipIfSessionHasUserMessage: true,
-            currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
-          },
-        },
-      );
-
-      if (error) throw error;
-      if (threadMutationVersionRef.current !== openerMutationVersion) {
-        return localSessionId;
-      }
-
-      const response = data as CompanionChatOpenerResponse;
-      if (!response?.sessionId || !response?.reply) {
-        throw new Error("Companion opener returned an empty response.");
-      }
-
-      const createdAt = response.createdAt || new Date().toISOString();
-      localThreadCreatedAtRef.current = createdAt;
-      applyActiveSessionId(response.sessionId);
-      setDraftInput("");
-      setInterimText("");
-      setStructuredResponse(null);
-      setActiveFollowUp(null);
-      setUnderstandingState(null);
-      setProposedActions([]);
-      setPendingAction(null);
-      setSavedSuggestionProposalIds([]);
-      setPendingSuggestionProposalId(null);
-      lastStarterIntentRef.current = null;
-      lastReplayablePlannerMessageRef.current = null;
-      pendingStarterIntentRef.current = null;
-      pendingQuestCaptureSelectedDateRef.current = null;
-      setMessages([
-        createMessage("assistant", stripMarkdown(response.reply), {
-          createdAt,
-          source: "agent",
-        }),
-      ]);
-      if (!response.persistenceReady) {
-        console.warn(
-          "Companion opener was not persisted; continuing with local opener.",
-        );
-      }
-      void invalidateThreads();
-      return response.sessionId;
-    } catch (error) {
-      if (threadMutationVersionRef.current !== openerMutationVersion) {
-        return localSessionId;
-      }
-      console.warn("Generated companion opener unavailable; using local opener.", {
-        name: error instanceof Error ? error.name : null,
-        message: error instanceof Error ? error.message : null,
-      });
-      void invalidateThreads();
-      return localSessionId;
-    }
-  }, [
-    applyActiveSessionId,
-    companion?.id,
-    ensureFunctionSession,
-    invalidateThreads,
-    openFreshThread,
-    surface,
-    user?.id,
-  ]);
+  }, [openFreshThread, surface]);
 
   useEffect(() => {
     if (surface !== "companion") return;
@@ -1497,23 +1235,18 @@ export function useCompanionAssistant({
     const openCycleKey = `${scopeKey}:${Date.now()}`;
     if (companionOpenCycleKeyRef.current) return;
     companionOpenCycleKeyRef.current = openCycleKey;
-    void startGeneratedCompanionOpener();
+    void startLocalCompanionOpener();
   }, [
     conversationEnabled,
     companion?.id,
     scopeKey,
-    startGeneratedCompanionOpener,
+    startLocalCompanionOpener,
     surface,
     user?.id,
   ]);
 
   const appendAssistantResponse = useCallback(
-    (
-      response: CompanionAgentResponse,
-      options?: {
-        pendingProposalId?: string | null;
-      },
-    ) => {
+    (response: CompanionAgentResponse) => {
       const nextStructuredResponse =
         response.structuredResponse === undefined
           ? (structuredResponse ?? null)
@@ -1524,7 +1257,6 @@ export function useCompanionAssistant({
           source: "agent",
           understandingState: response.understandingState,
           followUp: response.followUp ?? null,
-          proposedActions: response.proposedActions ?? [],
           assumptions: response.assumptions ?? [],
           evidenceIds: response.evidenceIds ?? [],
           structuredResponse: nextStructuredResponse,
@@ -1535,113 +1267,10 @@ export function useCompanionAssistant({
       setStructuredResponse(nextStructuredResponse);
       setActiveFollowUp(response.followUp ?? null);
       setUnderstandingState(response.understandingState ?? null);
-      setProposedActions(response.proposedActions ?? []);
       setPendingAction(response.pendingAction ?? null);
-      setSavedSuggestionProposalIds((previous) =>
-        pruneProposalIdsToStructuredResponse(previous, nextStructuredResponse),
-      );
-      setPendingSuggestionProposalId(
-        response.pendingAction
-          ? (response.pendingAction.proposalId ??
-              options?.pendingProposalId ??
-              null)
-          : null,
-      );
       void speakAssistantReply(response.reply, response.threadState.sessionId);
     },
     [speakAssistantReply, structuredResponse],
-  );
-
-  const requestDraftOpportunitySidecar = useCallback(
-    async (params: {
-      message: string;
-      inputMode: CompanionChatInputMode;
-      currentDateTime: string;
-      turnOrigin?: CompanionAgentTurnOrigin;
-      starterIntent?: CompanionPlannerLaunchIntent["starterIntent"];
-      selectedDate?: string | null;
-      selectedProposedAction?: CompanionAgentProposedAction | null;
-      response: CompanionAgentResponse;
-    }) => {
-      if (
-        !shouldRequestDraftOpportunitySidecar({
-          surface,
-          response: params.response,
-          selectedProposedAction: params.selectedProposedAction,
-        })
-      ) {
-        return;
-      }
-
-      try {
-        const { data, error } = await supabase.functions.invoke(
-          "companion-draft-opportunity",
-          {
-            body: {
-              surface,
-              sessionId: params.response.threadState.sessionId,
-              message: params.message,
-              inputMode: params.inputMode,
-              currentDateTime: params.currentDateTime,
-              turnOrigin: params.turnOrigin,
-              starterIntent: params.starterIntent,
-              selectedDate: params.selectedDate ?? undefined,
-              activeFollowUp,
-              activeProposedActions: proposedActions.slice(
-                0,
-                MAX_ACTIVE_PROPOSED_ACTIONS,
-              ),
-              assistantReply: params.response.reply,
-              assistantMode: params.response.mode,
-              assistantIntent: params.response.intent,
-              assistantConfidence: params.response.confidence,
-              assistantUnderstandingState:
-                params.response.understandingState ?? undefined,
-              assistantFollowUp: params.response.followUp ?? null,
-              assistantProposedActions: params.response.proposedActions ?? [],
-              assistantStructuredResponse:
-                params.response.structuredResponse ?? null,
-            },
-          },
-        );
-
-        if (error) throw error;
-        if (
-          activeSessionIdRef.current !== params.response.threadState.sessionId
-        ) {
-          return;
-        }
-
-        const sidecarResponse = data as CompanionDraftOpportunityResponse;
-        const sidecarActions = parseDraftOpportunityActions(sidecarResponse);
-        if (sidecarActions.length === 0) return;
-
-        const nextUnderstandingState =
-          sidecarResponse.understandingState ?? "ready_to_propose";
-        setMessages((previous) => {
-          const nextMessages = [...previous];
-          for (let index = nextMessages.length - 1; index >= 0; index -= 1) {
-            const candidate = nextMessages[index];
-            if (candidate?.role !== "assistant") continue;
-            nextMessages[index] = {
-              ...candidate,
-              followUp: null,
-              proposedActions: sidecarActions,
-              understandingState: nextUnderstandingState,
-            };
-            break;
-          }
-          return nextMessages;
-        });
-        setActiveFollowUp(null);
-        setUnderstandingState(nextUnderstandingState);
-        setProposedActions(sidecarActions);
-        void invalidateThreads();
-      } catch (error) {
-        console.warn("Draft opportunity sidecar failed:", error);
-      }
-    },
-    [activeFollowUp, invalidateThreads, proposedActions, surface],
   );
 
   const submitMessage = useCallback(
@@ -1670,11 +1299,7 @@ export function useCompanionAssistant({
         normalizeSelectedDateKey(defaultSelectedDate);
       const selectedDate =
         normalizeSelectedDateKey(options?.selectedDate) ??
-        (pendingStarterIntent === "quest_capture"
-          ? pendingQuestCaptureSelectedDateRef.current
-          : null) ??
         activeFollowUpSelectedDate ??
-        (activeFollowUp ? pendingQuestCaptureSelectedDateRef.current : null) ??
         (shouldApplyDefaultSelectedDateToStarterIntent(starterIntent)
           ? normalizedDefaultSelectedDate
           : null);
@@ -1687,11 +1312,10 @@ export function useCompanionAssistant({
         Boolean(activeFollowUp) &&
         (lastStarterIntentRef.current === "plan_day" ||
           hasRecentPlanDayStarter(messages));
-      const shouldStartFreshLauncherThread =
-        localScheduleReadEnabled &&
-        starterIntent === "upcoming_start" &&
-        options?.turnOrigin === "launcher" &&
-        !options?.selectedProposedAction;
+	      const shouldStartFreshLauncherThread =
+	        localScheduleReadEnabled &&
+	        starterIntent === "upcoming_start" &&
+	        options?.turnOrigin === "launcher";
 
       threadMutationVersionRef.current += 1;
 
@@ -1699,10 +1323,7 @@ export function useCompanionAssistant({
         if (shouldStartFreshLauncherThread) {
           legacyAssistant.startTemplateThread?.({ greetingText: null });
         }
-        const legacyStarterIntent =
-          pendingStarterIntent === "quest_capture" && !options?.starterIntent
-            ? undefined
-            : starterIntent;
+        const legacyStarterIntent = starterIntent;
         const legacySubmitOptions =
           legacyStarterIntent === undefined && !options && !selectedDate
             ? undefined
@@ -1721,16 +1342,14 @@ export function useCompanionAssistant({
           pendingStarterIntentRef.current === pendingStarterIntent
         ) {
           pendingStarterIntentRef.current = null;
-          pendingQuestCaptureSelectedDateRef.current = null;
         }
         return true;
       }
 
-      if (
-        localScheduleReadEnabled &&
-        starterIntent === "upcoming_start" &&
-        !options?.selectedProposedAction
-      ) {
+	      if (
+	        localScheduleReadEnabled &&
+	        starterIntent === "upcoming_start"
+	      ) {
         const legacySubmitOptions = {
           ...options,
           starterIntent,
@@ -1742,8 +1361,6 @@ export function useCompanionAssistant({
           legacyAssistant.hydrateFromUnifiedState?.({
             sessionId: activeSessionIdRef.current,
             messages,
-            savedSuggestionProposalIds,
-            pendingSuggestionProposalId,
           });
         }
         setUseLegacyFallback(true);
@@ -1757,7 +1374,6 @@ export function useCompanionAssistant({
           pendingStarterIntentRef.current === pendingStarterIntent
         ) {
           pendingStarterIntentRef.current = null;
-          pendingQuestCaptureSelectedDateRef.current = null;
         }
         return true;
       }
@@ -1785,12 +1401,10 @@ export function useCompanionAssistant({
         surface,
         message,
         starterIntent,
-        turnOrigin: options?.turnOrigin,
-        selectedDate,
-        selectedProposedAction: options?.selectedProposedAction ?? null,
-        activeFollowUp,
+	        turnOrigin: options?.turnOrigin,
+	        selectedDate,
+	        activeFollowUp,
         pendingAction,
-        proposedActions,
       });
       const directChatHistory = shouldUseDirectChat
         ? buildDirectChatHistory(messages)
@@ -1861,11 +1475,7 @@ export function useCompanionAssistant({
           setStructuredResponse(null);
           setActiveFollowUp(null);
           setUnderstandingState(null);
-          setProposedActions([]);
           setPendingAction(null);
-          setSavedSuggestionProposalIds([]);
-          setPendingSuggestionProposalId(null);
-          pendingQuestCaptureSelectedDateRef.current = null;
 
           void trackInteraction({
             interactionType:
@@ -1916,19 +1526,10 @@ export function useCompanionAssistant({
               currentDateTime,
               turnOrigin: options?.turnOrigin,
               starterIntent,
-              selectedDate: selectedDate ?? undefined,
-              briefingContext: briefingContext ?? undefined,
-              activeFollowUp,
-              activeProposedActions: proposedActions.slice(
-                0,
-                MAX_ACTIVE_PROPOSED_ACTIONS,
-              ),
-              selectedProposedAction:
-                options?.selectedProposedAction ?? undefined,
-              selectedProposedActionIntent: options?.selectedProposedAction
-                ? (options.selectedProposedActionIntent ?? "draft")
-                : undefined,
-            },
+	              selectedDate: selectedDate ?? undefined,
+	              briefingContext: briefingContext ?? undefined,
+	              activeFollowUp,
+	            },
           },
         );
 
@@ -1946,19 +1547,6 @@ export function useCompanionAssistant({
           },
         );
         submitLatencyTimerRef.current = null;
-        void requestDraftOpportunitySidecar({
-          message,
-          inputMode,
-          currentDateTime,
-          turnOrigin: options?.turnOrigin,
-          starterIntent,
-          selectedDate,
-          selectedProposedAction: options?.selectedProposedAction ?? null,
-          response,
-        });
-        const nextQuestCaptureSelectedDate =
-          readFollowUpSelectedDate(response.followUp ?? null) ??
-          (response.followUp && selectedDate ? selectedDate : null);
         void trackInteraction({
           interactionType: "companion_agent",
           inputText: message,
@@ -1973,20 +1561,14 @@ export function useCompanionAssistant({
             hasReceipt: Boolean(response.receipt),
             understandingState: response.understandingState ?? null,
             hasFollowUp: Boolean(response.followUp),
-            proposedActionCount: response.proposedActions?.length ?? 0,
             clientLatencyMs: assistantBubbleLatencyMs,
           },
           userAction: "accepted",
           modifications: {
-            surface,
-            turnOrigin: options?.turnOrigin ?? null,
-            starterIntent: starterIntent ?? null,
-            selectedProposedActionType:
-              options?.selectedProposedAction?.type ?? null,
-            selectedProposedActionIntent: options?.selectedProposedAction
-              ? (options.selectedProposedActionIntent ?? "draft")
-              : null,
-            proposalId: response.pendingAction?.proposalId ?? null,
+	            surface,
+	            turnOrigin: options?.turnOrigin ?? null,
+	            starterIntent: starterIntent ?? null,
+	            proposalId: response.pendingAction?.proposalId ?? null,
             clientLatencyMs: assistantBubbleLatencyMs,
           },
         });
@@ -1999,8 +1581,6 @@ export function useCompanionAssistant({
         ) {
           pendingStarterIntentRef.current = null;
         }
-        pendingQuestCaptureSelectedDateRef.current =
-          nextQuestCaptureSelectedDate ?? null;
         void invalidateThreads();
         return true;
       } catch (error) {
@@ -2011,9 +1591,8 @@ export function useCompanionAssistant({
         }
 
         const parsed = await parseFunctionInvokeError(error);
-        const allowReadOnlyScheduleFallback =
-          starterIntent === "upcoming_start" &&
-          !options?.selectedProposedAction;
+	        const allowReadOnlyScheduleFallback =
+	          starterIntent === "upcoming_start";
         const shouldFallback = shouldFallbackToLegacyAgent(parsed, {
           allowReadOnlyScheduleFallback,
         });
@@ -2033,10 +1612,7 @@ export function useCompanionAssistant({
         });
 
         if (shouldFallback) {
-          const legacyStarterIntent =
-            pendingStarterIntent === "quest_capture" && !options?.starterIntent
-              ? undefined
-              : starterIntent;
+          const legacyStarterIntent = starterIntent;
           const legacySubmitOptions =
             legacyStarterIntent === undefined && !options && !selectedDate
               ? undefined
@@ -2048,8 +1624,6 @@ export function useCompanionAssistant({
           legacyAssistant.hydrateFromUnifiedState?.({
             sessionId: activeSessionIdRef.current,
             messages: nextUnifiedMessages,
-            savedSuggestionProposalIds,
-            pendingSuggestionProposalId,
           });
           pendingLegacyFallbackReplayRef.current = {
             message,
@@ -2084,13 +1658,9 @@ export function useCompanionAssistant({
       legacyAssistant,
       messages,
       pendingAction,
-      requestDraftOpportunitySidecar,
       speakAssistantReply,
       trackInteraction,
       localScheduleReadEnabled,
-      pendingSuggestionProposalId,
-      proposedActions,
-      savedSuggestionProposalIds,
       surface,
       useLegacyFallback,
       user?.id,
@@ -2131,8 +1701,7 @@ export function useCompanionAssistant({
           response.structuredResponse === undefined
             ? (structuredResponse ?? null)
             : (response.structuredResponse ?? null);
-        const resolvedProposalId =
-          pendingAction?.proposalId ?? pendingSuggestionProposalId;
+        const resolvedProposalId = pendingAction.proposalId ?? null;
         setPendingAction(null);
         setMessages((previous) => [
           ...previous,
@@ -2143,7 +1712,6 @@ export function useCompanionAssistant({
             source: "agent",
             understandingState: response.understandingState,
             followUp: response.followUp ?? null,
-            proposedActions: response.proposedActions ?? [],
             assumptions: response.assumptions ?? [],
             evidenceIds: response.evidenceIds ?? [],
             structuredResponse: nextStructuredResponse,
@@ -2153,21 +1721,6 @@ export function useCompanionAssistant({
         setStructuredResponse(nextStructuredResponse);
         setActiveFollowUp(response.followUp ?? null);
         setUnderstandingState(response.understandingState ?? null);
-        setProposedActions(response.proposedActions ?? []);
-        setSavedSuggestionProposalIds((previous) => {
-          const nextProposalIds =
-            mode === "confirm" &&
-            response.receipt?.status === "executed" &&
-            resolvedProposalId
-              ? [...new Set([...previous, resolvedProposalId])]
-              : previous;
-
-          return pruneProposalIdsToStructuredResponse(
-            nextProposalIds,
-            nextStructuredResponse,
-          );
-        });
-        setPendingSuggestionProposalId(null);
         await trackInteraction({
           interactionType: "companion_agent_confirmation",
           inputText: pendingAction.summary,
@@ -2212,131 +1765,7 @@ export function useCompanionAssistant({
       isSubmitting,
       legacyAssistant,
       pendingAction,
-      pendingSuggestionProposalId,
       speakAssistantReply,
-      structuredResponse,
-      surface,
-      trackInteraction,
-      useLegacyFallback,
-    ],
-  );
-
-  const confirmSuggestedQuest = useCallback(
-    async (proposalId: string) => {
-      if (useLegacyFallback) {
-        await legacyAssistant.confirmSuggestedQuest(proposalId);
-        return;
-      }
-
-      if (!proposalId || pendingAction || isSubmitting || isResolvingAction) {
-        return;
-      }
-      if (!(await ensureFunctionSession())) {
-        return;
-      }
-
-      const latestUserMessage =
-        lastReplayablePlannerMessageRef.current?.trim() ||
-        [...messages]
-          .reverse()
-          .find(
-            (message) =>
-              message.role === "user" &&
-              !message.isSeed &&
-              !isSyntheticResolutionMessage(message.content),
-          )
-          ?.content?.trim() ||
-        (structuredResponse?.planDay
-          ? "Plan my day"
-          : structuredResponse?.weeklyPlan
-            ? "Plan my week"
-            : structuredResponse?.priorityOverview
-              ? structuredResponse.priorityOverview.title
-                  .toLowerCase()
-                  .includes("make room")
-                ? "Make room"
-                : "What matters most?"
-              : structuredResponse?.reflectionBridge
-                ? "Prepare me for tomorrow"
-                : structuredResponse?.campaignMomentum
-                  ? "Advance my campaign"
-                  : structuredResponse?.comingUp
-                    ? "What do I have coming up?"
-                    : null);
-
-      if (!latestUserMessage) {
-        toast.error(
-          "I couldn't recover that planner suggestion. Try asking again.",
-        );
-        return;
-      }
-
-      setIsSubmitting(true);
-      try {
-        const starterIntent =
-          lastStarterIntentRef.current ??
-          inferStarterIntentFromStructuredResponse(structuredResponse) ??
-          undefined;
-        lastReplayablePlannerMessageRef.current = latestUserMessage;
-        const { data, error } = await supabase.functions.invoke(
-          "companion-agent",
-          {
-            body: {
-              surface,
-              sessionId: activeSessionIdRef.current,
-              message: latestUserMessage,
-              inputMode: "text",
-              currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
-              turnOrigin: "proposed_action",
-              starterIntent,
-              selectedProposalId: proposalId,
-            },
-          },
-        );
-
-        if (error) throw error;
-
-        const response = data as CompanionAgentResponse;
-        applyActiveSessionId(response.threadState.sessionId);
-        appendAssistantResponse(response, {
-          pendingProposalId: proposalId,
-        });
-        await trackInteraction({
-          interactionType: "companion_agent_suggestion_prepare",
-          inputText: latestUserMessage,
-          detectedIntent: response.intent,
-          aiResponse: {
-            mode: response.mode,
-            actionType: response.pendingAction?.actionType ?? null,
-            proposalId: response.pendingAction?.proposalId ?? proposalId,
-          },
-          userAction: "accepted",
-          modifications: {
-            proposalId,
-            turnOrigin: "proposed_action",
-            starterIntent: starterIntent ?? null,
-            surface,
-          },
-        });
-        void invalidateThreads();
-      } catch (error) {
-        console.error("Failed to prepare planner suggestion:", error);
-        toast.error("I couldn't prepare that suggestion right now.");
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    [
-      appendAssistantResponse,
-      applyActiveSessionId,
-      ensureFunctionSession,
-      invalidateThreads,
-      isResolvingAction,
-      isSubmitting,
-      legacyAssistant,
-      localScheduleReadEnabled,
-      messages,
-      pendingAction,
       structuredResponse,
       surface,
       trackInteraction,
@@ -2364,7 +1793,7 @@ export function useCompanionAssistant({
   const startNewChat = useCallback(
     async (options?: CompanionTemplateThreadOptions) => {
       if (surface === "companion") {
-        return startGeneratedCompanionOpener();
+        return startLocalCompanionOpener();
       }
 
       const threadToArchive =
@@ -2395,7 +1824,7 @@ export function useCompanionAssistant({
       invalidateThreads,
       openFreshThread,
       persistedActiveThread,
-      startGeneratedCompanionOpener,
+      startLocalCompanionOpener,
       surface,
       threadsQuery.data?.threads,
     ],
@@ -2469,10 +1898,7 @@ export function useCompanionAssistant({
   useEffect(() => {
     if (!launchIntent?.id) return;
     if (handledLaunchIntentIdRef.current === launchIntent.id) return;
-    if (launchIntent.starterIntent !== "quest_capture") {
-      pendingStarterIntentRef.current = null;
-      pendingQuestCaptureSelectedDateRef.current = null;
-    }
+    pendingStarterIntentRef.current = null;
     if (launchIntent.starterIntent === "thread_history") return;
     if (
       !useLegacyFallback &&
@@ -2495,8 +1921,6 @@ export function useCompanionAssistant({
     const isCompanionAuthoredConversationStarter =
       launchIntent.target === "conversation" &&
       launchIntent.starterIntent === "free_talk_start";
-    const isQuestCaptureStarter =
-      launchIntent.starterIntent === "quest_capture";
     const isSnapshotOnlyPlanDayStarter =
       hasPlanDaySnapshotBriefing(launchIntent);
     const isLocalUpcomingStarter =
@@ -2520,25 +1944,6 @@ export function useCompanionAssistant({
               visibleAssistantOpening: true,
             });
           }
-          return;
-        }
-
-        if (isQuestCaptureStarter) {
-          const greetingText =
-            launchMessage.trim() || COMPANION_PLANNER_QUEST_CAPTURE_OPENING;
-          if (useLegacyFallback) {
-            legacyAssistant.startQuestCaptureThread?.(greetingText, {
-              selectedDate: launchIntent.selectedDate ?? null,
-            });
-          } else {
-            startTemplateThread({
-              greetingText,
-              visibleAssistantOpening: true,
-            });
-          }
-          pendingStarterIntentRef.current = "quest_capture";
-          pendingQuestCaptureSelectedDateRef.current =
-            launchIntent.selectedDate ?? null;
           return;
         }
 
@@ -2693,14 +2098,7 @@ export function useCompanionAssistant({
       commitDayPlan: legacyAssistant.commitDayPlan ?? (async () => undefined),
       activeFollowUp: null,
       understandingState: null,
-      proposedActions: [],
       pendingAction: legacyAssistant.pendingAction,
-      savedSuggestionProposalIds:
-        legacyAssistant.savedSuggestionProposalIds ?? [],
-      pendingSuggestionProposalId:
-        legacyAssistant.pendingSuggestionProposalId ??
-        legacyAssistant.pendingAction?.proposalId ??
-        null,
       pendingActionCount: legacyAssistant.pendingActionCount,
       readyPendingActionCount: legacyAssistant.readyPendingActionCount,
       draftInput,
@@ -2718,7 +2116,6 @@ export function useCompanionAssistant({
         submitMessage(draftInput, "text", { turnOrigin: "composer" }),
       confirmPendingAction: () => resolvePendingAction("confirm"),
       cancelPendingAction: () => resolvePendingAction("cancel"),
-      confirmSuggestedQuest,
       confirmAllPendingActions: legacyAssistant.confirmAllPendingActions,
       isRecording,
       isAutoStopping,
@@ -2762,10 +2159,7 @@ export function useCompanionAssistant({
     commitDayPlan: async () => undefined,
     activeFollowUp,
     understandingState,
-    proposedActions,
     pendingAction,
-    savedSuggestionProposalIds,
-    pendingSuggestionProposalId,
     pendingActionCount: pendingAction ? 1 : 0,
     readyPendingActionCount: pendingAction ? 1 : 0,
     draftInput,
@@ -2780,7 +2174,6 @@ export function useCompanionAssistant({
       submitMessage(draftInput, "text", { turnOrigin: "composer" }),
     confirmPendingAction: () => resolvePendingAction("confirm"),
     cancelPendingAction: () => resolvePendingAction("cancel"),
-    confirmSuggestedQuest,
     confirmAllPendingActions: () => resolvePendingAction("confirm"),
     isRecording,
     isAutoStopping,

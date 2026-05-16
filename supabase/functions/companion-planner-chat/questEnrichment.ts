@@ -233,9 +233,6 @@ const wantsKeepSimple = (message: string): boolean => KEEP_SIMPLE_REGEX.test(mes
 
 const wantsReplaceBreakdown = (message: string): boolean => REPLACE_BREAKDOWN_REGEX.test(message);
 
-const isQuestCaptureFlow = (input: PlannerBuildInput): boolean =>
-  input.sessionState.pendingStarterIntent === "quest_capture";
-
 const shouldOfferQuestEnrichment = (
   input: PlannerBuildInput,
   baseResult: PlannerBuildResult,
@@ -245,7 +242,6 @@ const shouldOfferQuestEnrichment = (
   if (!proposal.readyToConfirm) return false;
   if (input.sessionState.openQuestionIds.length > 0) return false;
   if (isPureScheduleOrReminderUpdate(proposal) || isRenameOnlyUpdate(proposal)) return false;
-  if (isQuestCaptureFlow(input)) return false;
 
   if (wantsBreakdown(input.message) || wantsNotes(input.message)) {
     return true;

@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 
 import type {
   CompanionStructuredResponse,
@@ -33,8 +33,7 @@ const createQuest = (
 });
 
 describe("CompanionStructuredResponseCards", () => {
-  it("renders plan-day proposal actions and confirms them from the shared quest row", () => {
-    const onConfirmSuggestion = vi.fn();
+  it("renders plan-day suggestions as read-only guidance", () => {
     const structuredResponse: CompanionStructuredResponse = {
       intent: baseIntent,
       planDay: {
@@ -57,15 +56,11 @@ describe("CompanionStructuredResponseCards", () => {
       <CompanionStructuredResponseCards
         structuredResponse={structuredResponse}
         variant="companion"
-        onConfirmSuggestion={onConfirmSuggestion}
       />,
     );
 
-    fireEvent.click(
-      screen.getByTestId("structured-suggestion-confirm-plan-day-1"),
-    );
-
-    expect(onConfirmSuggestion).toHaveBeenCalledWith("proposal-plan-day-1");
+    expect(screen.getByText("Adjust Course launch")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /save|draft/i })).toBeNull();
   });
 
   it("renders plan-day campaign focus without needing a new card path", () => {
@@ -140,8 +135,7 @@ describe("CompanionStructuredResponseCards", () => {
     expect(screen.getByText(/Day status:/)).toHaveTextContent("Overwhelming");
   });
 
-  it("shows pending coming-up proposals as saving", () => {
-    const onConfirmSuggestion = vi.fn();
+  it("shows coming-up suggestions as read-only guidance", () => {
     const structuredResponse: CompanionStructuredResponse = {
       intent: baseIntent,
       comingUp: {
@@ -173,17 +167,11 @@ describe("CompanionStructuredResponseCards", () => {
       <CompanionStructuredResponseCards
         structuredResponse={structuredResponse}
         variant="companion"
-        onConfirmSuggestion={onConfirmSuggestion}
-        pendingProposalId="proposal-coming-up-1"
       />,
     );
 
-    const button = screen.getByTestId(
-      "structured-suggestion-confirm-coming-up-1",
-    );
-
-    expect(button).toHaveTextContent("Saving");
-    expect(button).toBeDisabled();
+    expect(screen.getByText("Adjust Course launch")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /save|draft/i })).toBeNull();
   });
 
   it("renders tomorrow schedule items in coming-up cards", () => {
@@ -430,8 +418,7 @@ describe("CompanionStructuredResponseCards", () => {
       .toBeInTheDocument();
   });
 
-  it("renders weekly proposal actions and confirms them from the shared quest row", () => {
-    const onConfirmSuggestion = vi.fn();
+  it("renders weekly suggestions as read-only guidance", () => {
     const structuredResponse: CompanionStructuredResponse = {
       intent: baseIntent,
       weeklyPlan: {
@@ -467,23 +454,18 @@ describe("CompanionStructuredResponseCards", () => {
       <CompanionStructuredResponseCards
         structuredResponse={structuredResponse}
         variant="companion"
-        onConfirmSuggestion={onConfirmSuggestion}
       />,
     );
 
     expect(screen.getByTestId("structured-weekly-plan")).toBeInTheDocument();
     expect(screen.getByTestId("structured-weekly-campaign-health"))
       .toHaveTextContent("6 days quiet");
-
-    fireEvent.click(
-      screen.getByTestId("structured-suggestion-confirm-weekly-1"),
-    );
-
-    expect(onConfirmSuggestion).toHaveBeenCalledWith("proposal-weekly-1");
+    expect(screen.getByText("Block 45 minutes for launch copy"))
+      .toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /save|draft/i })).toBeNull();
   });
 
-  it("shows saved priority-overview proposals as disabled", () => {
-    const onConfirmSuggestion = vi.fn();
+  it("renders priority-overview suggestions as read-only guidance", () => {
     const structuredResponse: CompanionStructuredResponse = {
       intent: baseIntent,
       priorityOverview: {
@@ -517,29 +499,18 @@ describe("CompanionStructuredResponseCards", () => {
       <CompanionStructuredResponseCards
         structuredResponse={structuredResponse}
         variant="companion"
-        onConfirmSuggestion={onConfirmSuggestion}
-        savedProposalIds={["proposal-priority-1"]}
       />,
-    );
-
-    const button = screen.getByTestId(
-      "structured-suggestion-confirm-priority-1",
     );
 
     expect(screen.getByTestId("structured-priority-campaign-health"))
       .toHaveTextContent("1 recent win");
     expect(screen.getByTestId("structured-priority-campaign-health"))
       .toHaveTextContent("5 days quiet");
-    expect(button).toHaveTextContent("Saved");
-    expect(button).toBeDisabled();
-
-    fireEvent.click(button);
-
-    expect(onConfirmSuggestion).not.toHaveBeenCalled();
+    expect(screen.getByText("Tighten webinar promise")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /save|draft/i })).toBeNull();
   });
 
-  it("shows pending reflection-bridge proposals as saving", () => {
-    const onConfirmSuggestion = vi.fn();
+  it("renders reflection-bridge suggestions as read-only guidance", () => {
     const structuredResponse: CompanionStructuredResponse = {
       intent: baseIntent,
       reflectionBridge: {
@@ -572,21 +543,14 @@ describe("CompanionStructuredResponseCards", () => {
       <CompanionStructuredResponseCards
         structuredResponse={structuredResponse}
         variant="companion"
-        onConfirmSuggestion={onConfirmSuggestion}
-        pendingProposalId="proposal-tomorrow-1"
       />,
     );
 
-    const button = screen.getByTestId(
-      "structured-suggestion-confirm-tomorrow-1",
-    );
-
-    expect(button).toHaveTextContent("Saving");
-    expect(button).toBeDisabled();
+    expect(screen.getByText("Adjust Course launch")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /save|draft/i })).toBeNull();
   });
 
-  it("renders campaign next-step proposals through the same shared action path", () => {
-    const onConfirmSuggestion = vi.fn();
+  it("renders campaign next-step suggestions as read-only guidance", () => {
     const structuredResponse: CompanionStructuredResponse = {
       intent: baseIntent,
       campaignMomentum: {
@@ -624,7 +588,6 @@ describe("CompanionStructuredResponseCards", () => {
       <CompanionStructuredResponseCards
         structuredResponse={structuredResponse}
         variant="journeys"
-        onConfirmSuggestion={onConfirmSuggestion}
       />,
     );
 
@@ -636,11 +599,7 @@ describe("CompanionStructuredResponseCards", () => {
       .toHaveTextContent("8 days quiet");
     expect(screen.getByTestId("structured-campaign-intervention"))
       .toHaveTextContent("reset");
-
-    fireEvent.click(
-      screen.getByTestId("structured-suggestion-confirm-campaign-1"),
-    );
-
-    expect(onConfirmSuggestion).toHaveBeenCalledWith("proposal-campaign-1");
+    expect(screen.getByText("Adjust Course launch")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /save|draft/i })).toBeNull();
   });
 });
