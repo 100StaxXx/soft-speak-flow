@@ -103,13 +103,12 @@ export const DraggableFAB = ({
   const launcherTemplates = useMemo(
     () =>
       getJourneysCompanionLauncherTemplates({ userId: user?.id ?? null })
-        .filter((template) => template.id !== "quest" || Boolean(onCreateQuest))
         .map((template) =>
           template.id === "plan-day" && planDayLabel
             ? { ...template, label: planDayLabel }
             : template
         ),
-    [onCreateQuest, planDayLabel, user?.id],
+    [planDayLabel, user?.id],
   );
   const launcherImageUrlOverride = shouldUseStrictLauncherArt
     ? launcherAwayImageUrl ?? currentSceneImageUrl
@@ -221,7 +220,11 @@ export const DraggableFAB = ({
       window.dispatchEvent(new CustomEvent("companion-new-goal-started"));
     }
     if (template.id === "quest") {
-      onCreateQuest?.();
+      if (onCreateQuest) {
+        onCreateQuest();
+        return;
+      }
+      onTap?.();
       return;
     }
     if (template.id === "plan-day" && createPlanDayLaunchIntent) {
@@ -242,6 +245,7 @@ export const DraggableFAB = ({
     launcherTemplates,
     onCreateQuest,
     onOpenCompanionPlanner,
+    onTap,
   ]);
 
   const handleOpenHistory = useCallback(() => {

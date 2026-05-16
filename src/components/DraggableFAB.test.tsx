@@ -526,12 +526,20 @@ describe("DraggableFAB", () => {
     });
   });
 
-  it("hides the quest option when create quest is unavailable", () => {
-    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
+  it("falls back to the default tap action from the quest option when create quest is unavailable", () => {
+    const onTap = vi.fn();
+    render(
+      <DraggableFAB
+        onOpenCompanionPlanner={mocks.onOpenCompanionPlanner}
+        onTap={onTap}
+      />,
+    );
 
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
+    fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-quest"));
 
-    expect(screen.queryByTestId("journeys-companion-launcher-option-quest")).not.toBeInTheDocument();
+    expect(onTap).toHaveBeenCalledTimes(1);
+    expect(mocks.onOpenCompanionPlanner).not.toHaveBeenCalled();
   });
 
   it("reports top-left popup placement when the launcher sits in the upper-left half", () => {
