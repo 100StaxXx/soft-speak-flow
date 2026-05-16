@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
     productError: null,
     reloadProducts: vi.fn(),
     hasOfferCode: false,
+    activeYearlyOffer: null as null | { tier: string; price: string; priceCents: number; unitPrice: string },
     hasAppliedReferralCode: false,
     appliedReferralCode: null as string | null,
     offerCodePurchaseReady: false,
@@ -88,6 +89,7 @@ describe("Paywall creator offer-code eligibility", () => {
       productError: null,
       reloadProducts: vi.fn(),
       hasOfferCode: false,
+      activeYearlyOffer: null,
       hasAppliedReferralCode: false,
       appliedReferralCode: null,
       offerCodePurchaseReady: false,
@@ -119,6 +121,31 @@ describe("Paywall creator offer-code eligibility", () => {
     expect(screen.queryByRole("button", { name: "Redeem Promo Code" })).not.toBeInTheDocument();
     expect(screen.getAllByText("Cosmiq Pro Yearly").length).toBeGreaterThan(0);
     expect(screen.getByText("$5.83/month for the first year")).toBeInTheDocument();
+  });
+
+  it("shows Genesis yearly pricing for the Genesis Apple offer tier", () => {
+    mocks.appleSubscription.hasAppliedReferralCode = true;
+    mocks.appleSubscription.hasOfferCode = true;
+    mocks.appleSubscription.activeYearlyOffer = {
+      tier: "genesis",
+      price: "$49.99",
+      priceCents: 4999,
+      unitPrice: "$4.17/month for the first year",
+    };
+    mocks.appleSubscription.appliedReferralCode = "GENESIS";
+
+    render(
+      <MemoryRouter>
+        <Paywall />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("Creator code applied")).toBeInTheDocument();
+    expect(screen.getByText("Your annual plan is discounted to $49.99 for the first year.")).toBeInTheDocument();
+    expect(screen.getByText("$49.99")).toBeInTheDocument();
+    expect(screen.getByText("$4.17/month for the first year")).toBeInTheDocument();
+    expect(screen.getByText("GENESIS")).toBeInTheDocument();
+    expect(screen.getByText("Redeem Discount with Apple")).toBeInTheDocument();
   });
 
   it("keeps standard pricing when a saved referral code is not Apple-offer eligible", () => {

@@ -196,6 +196,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
     productError,
     reloadProducts,
     hasOfferCode,
+    activeYearlyOffer,
     hasAppliedReferralCode,
     appliedReferralCode,
     offerCodePurchaseReady,
@@ -248,16 +249,28 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
         surface: "paywall",
         offerCode: sanitized,
       });
-      await applyReferralCode.mutateAsync(sanitized);
+      const result = await applyReferralCode.mutateAsync(sanitized);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["profile", user.id] }),
         queryClient.invalidateQueries({ queryKey: ["referral-stats", user.id] }),
       ]);
       setOfferCode("");
-      toast({
-        title: "Creator code applied",
-        description: "Your yearly plan is now discounted to $69.99 for the first year.",
-      });
+      if (result.code_type === "special") {
+        toast({
+          title: "Genesis code applied",
+          description: "Your yearly plan is now discounted to $49.99 for the first year.",
+        });
+      } else if (result.code_type === "affiliate") {
+        toast({
+          title: "Creator code applied",
+          description: "Your yearly plan is now discounted to $69.99 for the first year.",
+        });
+      } else {
+        toast({
+          title: "Referral code applied",
+          description: "This code is saved to your account, but it does not unlock the Apple creator discount.",
+        });
+      }
     } catch (error) {
       trackPaywallEvent("offer_code_failed", {
         surface: "paywall",
@@ -394,6 +407,9 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
     });
   }, []);
 
+  const activeYearlyOfferPrice = activeYearlyOffer?.price ?? "$69.99";
+  const activeYearlyOfferUnitPrice = activeYearlyOffer?.unitPrice ?? "$5.83/month for the first year";
+
   const plans = {
     monthly: {
       title: "Cosmiq Pro Monthly",
@@ -406,11 +422,11 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
     yearly: {
       title: "Cosmiq Pro Yearly",
       duration: "1 year",
-      fallbackPrice: hasOfferCode ? "$69.99" : "$99.99",
+      fallbackPrice: hasOfferCode ? activeYearlyOfferPrice : "$99.99",
       period: "/year",
       savings: hasOfferCode ? "Code applied" : "Best value",
       fallbackUnitPrice: hasOfferCode
-        ? "$5.83/month for the first year"
+        ? activeYearlyOfferUnitPrice
         : "$8.33/month when billed yearly",
     },
   };
@@ -448,7 +464,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
         subtitle: "Subscribe to keep your companion, unlimited quests, campaigns, companion chat, and the full growth path active.",
         cta: `Subscribe ${selectedPlan === "yearly" ? "Yearly" : "Monthly"}`,
         legalIntro: hasSelectedCreatorYearlyOffer
-          ? "Your creator code unlocks $69.99 for the first year. After the first year, this plan renews at the standard yearly price unless canceled."
+          ? `Your creator code unlocks ${activeYearlyOfferPrice} for the first year. After the first year, this plan renews at the standard yearly price unless canceled.`
           : "Payment will be charged to your Apple ID account at confirmation of purchase.",
         heroBadge: "Continue with Cosmiq",
         shortcutLabel: "Plans",
@@ -459,7 +475,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
         subtitle: "Unlock the full experience: plan with your companion, follow your quests, and watch the world grow from real progress.",
         cta: hasSelectedCreatorYearlyOffer ? "Redeem Discount with Apple" : "Start 3-Day Free Trial",
         legalIntro: hasSelectedCreatorYearlyOffer
-          ? "Your creator code unlocks $69.99 for the first year. After the first year, this plan renews at the standard yearly price unless canceled."
+          ? `Your creator code unlocks ${activeYearlyOfferPrice} for the first year. After the first year, this plan renews at the standard yearly price unless canceled.`
           : "No charge today. Your Apple ID account will be charged when the free trial ends unless canceled at least 24 hours before the end of the trial.",
         heroBadge: "3-day free trial",
         shortcutLabel: "Start trial",
@@ -616,7 +632,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                           </p>
                           <p className="text-sm text-white/70">
                             {hasOfferCode
-                              ? "Your annual plan is discounted to $69.99 for the first year."
+                              ? `Your annual plan is discounted to ${activeYearlyOfferPrice} for the first year.`
                               : "This code is saved to your account, but it does not unlock the Apple creator discount."}
                           </p>
                           {hasOfferCode && appliedReferralCode ? (

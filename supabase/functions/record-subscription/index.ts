@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
 
+const GENESIS_SPECIAL_CODE = "GENESIS";
+
 /**
  * Record Subscription from alilpush
  * 
@@ -214,13 +216,35 @@ serve(async (req) => {
     // Look up referral_code_id with current conversion count
     const { data: codeData, error: codeError } = await supabaseClient
       .from("referral_codes")
-      .select("id, code, owner_type, total_conversions, tier, affiliate_provider")
+      .select("id, code, owner_type, total_conversions, total_revenue, tier, affiliate_provider")
       .eq("code", referral_code.toUpperCase())
       .single();
 
     if (codeError || !codeData) {
       console.error(`Referral code not found: ${referral_code}`);
       return errorResponse(req, "Referral code not found", 400);
+    }
+
+    if (codeData.code?.toUpperCase() === GENESIS_SPECIAL_CODE) {
+      const { error: updateError } = await supabaseClient
+        .from("referral_codes")
+        .update({
+          total_conversions: (codeData.total_conversions || 0) + 1,
+          total_revenue: (codeData.total_revenue || 0) + numAmount,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", codeData.id);
+
+      if (updateError) {
+        console.error(`Failed to update Genesis referral metrics:`, updateError);
+        return errorResponse(req, "Failed to update referral metrics", 500);
+      }
+
+      return jsonResponse(req, {
+        success: true,
+        message: "Genesis conversion recorded without payout",
+        skipped_payout: true,
+      });
     }
 
     const isProviderLinkedAffiliate = codeData.affiliate_provider === "winwinkit";

@@ -21,6 +21,7 @@ const appleSubscriptionMocks = vi.hoisted(() => ({
   handlePresentRevenueCatPaywall: vi.fn(),
   reloadProducts: vi.fn(),
   hasOfferCode: false,
+  activeYearlyOffer: null as null | { tier: string; price: string; priceCents: number; unitPrice: string },
 }));
 
 vi.mock("@/hooks/useAppleSubscription", () => ({
@@ -36,6 +37,7 @@ vi.mock("@/hooks/useAppleSubscription", () => ({
     productError: null,
     reloadProducts: appleSubscriptionMocks.reloadProducts,
     hasOfferCode: appleSubscriptionMocks.hasOfferCode,
+    activeYearlyOffer: appleSubscriptionMocks.activeYearlyOffer,
     handlePresentRevenueCatPaywall: appleSubscriptionMocks.handlePresentRevenueCatPaywall,
   }),
 }));
@@ -44,6 +46,7 @@ describe("SubscriptionManagement", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     appleSubscriptionMocks.hasOfferCode = false;
+    appleSubscriptionMocks.activeYearlyOffer = null;
   });
 
   it("shows concrete subscription benefits while keeping the unlock CTA enabled on native iOS", () => {
@@ -81,6 +84,22 @@ describe("SubscriptionManagement", () => {
 
     expect(screen.getByText("$69.99")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /unlock with yearly/i })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "View All Plans" })).not.toBeInTheDocument();
+  });
+
+  it("shows Genesis pricing when the active Apple offer tier is Genesis", () => {
+    appleSubscriptionMocks.hasOfferCode = true;
+    appleSubscriptionMocks.activeYearlyOffer = {
+      tier: "genesis",
+      price: "$49.99",
+      priceCents: 4999,
+      unitPrice: "$4.17/month for the first year",
+    };
+
+    render(<SubscriptionManagement />);
+
+    expect(screen.getByText("$49.99")).toBeInTheDocument();
+    expect(screen.getByText("$4.17/month for the first year")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "View All Plans" })).not.toBeInTheDocument();
   });
 });

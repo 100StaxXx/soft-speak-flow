@@ -4,12 +4,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "@/components/ui/sonner";
 import { WinWinKit } from "@/plugins/WinWinKitPlugin";
+import { isGenesisSpecialCode } from "@/utils/appleOfferPricing";
 import { isNativeIOSHandheld } from "@/utils/platformTargets";
 
 interface ApplyReferralResult {
   success: boolean;
   message: string;
   code_type?: "affiliate" | "promo" | "referral" | string;
+  offer?: {
+    identifier?: string | null;
+    yearly_price_cents?: number | null;
+  };
 }
 
 export const useReferrals = () => {
@@ -91,14 +96,14 @@ export const useReferrals = () => {
       const normalizedCode = code.trim().toUpperCase();
       const isNativeIOS = Capacitor.isNativePlatform() && isNativeIOSHandheld();
 
-      if (isNativeIOS) {
+      if (isNativeIOS && !isGenesisSpecialCode(normalizedCode)) {
         await WinWinKit.claimCode({ code: normalizedCode });
       }
 
       const { data: result, error } = await supabase.functions.invoke("claim-referral-code", {
         body: {
           code: normalizedCode,
-          provider_claimed: isNativeIOS,
+          provider_claimed: isNativeIOS && !isGenesisSpecialCode(normalizedCode),
         },
       }) as { data: ApplyReferralResult | null; error: Error | null };
 
@@ -119,9 +124,11 @@ export const useReferrals = () => {
       queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
       queryClient.invalidateQueries({ queryKey: ["applied-referral-code-state", user?.id] });
 
-      const defaultMessage = result.code_type === "affiliate"
-        ? "Creator code applied! Your yearly plan is now eligible for the Apple discount flow."
-        : "Referral code applied! Your friend will earn rewards when you reach Stage 5 • Initiate.";
+      const defaultMessage = result.code_type === "special"
+        ? "Genesis code applied! Your yearly plan is now eligible for the $49.99 Apple offer."
+        : result.code_type === "affiliate"
+          ? "Creator code applied! Your yearly plan is now eligible for the Apple discount flow."
+          : "Referral code applied! Your friend will earn rewards when you reach Stage 5 • Initiate.";
 
       toast.success(result.message || defaultMessage);
     },

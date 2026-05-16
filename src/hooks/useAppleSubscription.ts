@@ -10,6 +10,7 @@ import { trackPaywallEvent } from "@/utils/paywallTelemetry";
 import { supabase } from "@/integrations/supabase/client";
 import { queryKeys } from "@/lib/queryKeys";
 import { parseFunctionInvokeError, type ParsedFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
+import { getYearlyOfferDisplay, getYearlyOfferTier } from "@/utils/appleOfferPricing";
 import type { StoreKitTransaction } from "@/types/subscription";
 import {
   buildLocalSubscriptionAccessState,
@@ -105,6 +106,11 @@ export function useAppleSubscription() {
   const hasOfferCode = appliedReferralCodeState.is_apple_offer_eligible;
   const hasAppliedReferralCode = Boolean(appliedReferralCodeState.code);
   const appliedReferralCode = appliedReferralCodeState.code;
+  const activeYearlyOffer = hasOfferCode
+    ? getYearlyOfferDisplay(
+      getYearlyOfferTier(appliedReferralCodeState.apple_offer_campaign_identifier, appliedReferralCode),
+    )
+    : null;
 
   useEffect(() => {
     if (!hasOfferCode) {
@@ -588,6 +594,7 @@ export function useAppleSubscription() {
     hasLoadedProducts,
     reloadProducts,
     hasOfferCode,
+    activeYearlyOffer,
     hasAppliedReferralCode,
     appliedReferralCode,
     offerCodePurchaseReady,

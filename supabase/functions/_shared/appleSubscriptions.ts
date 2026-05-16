@@ -55,7 +55,9 @@ const SANDBOX_VERIFY_URL = "https://sandbox.itunes.apple.com/verifyReceipt";
 const DEFAULT_MONTHLY_PRICE_CENTS = 999; // $9.99
 const DEFAULT_YEARLY_PRICE_CENTS = 9999; // $99.99 standard pricing
 const DEFAULT_DISCOUNTED_YEARLY_PRICE_CENTS = 6999; // $69.99 existing referral offer-code pricing
+const DEFAULT_GENESIS_YEARLY_PRICE_CENTS = 4999; // $49.99 Genesis first-year offer-code pricing
 const DEFAULT_DISCOUNTED_YEARLY_OFFER_ID = "referrals";
+const DEFAULT_GENESIS_YEARLY_OFFER_ID = "Genesis";
 
 export const APPLE_BINDING_CONFLICT_ERROR =
   "This purchase is already linked to another account.";
@@ -73,13 +75,33 @@ export function getDiscountedYearlyOfferId() {
   );
 }
 
+export function getGenesisYearlyOfferId() {
+  return (
+    Deno.env.get("APPLE_GENESIS_OFFER_CODE_IDENTIFIER")?.trim() ||
+    DEFAULT_GENESIS_YEARLY_OFFER_ID
+  );
+}
+
+const sameOfferIdentifier = (left?: string | null, right?: string | null) =>
+  Boolean(left?.trim() && right?.trim()) &&
+  (left ?? "").trim().toLowerCase() === (right ?? "").trim().toLowerCase();
+
+export function isReferralYearlyOffer(
+  options?: { offerIdentifier?: string | null; offerType?: number | null },
+) {
+  return sameOfferIdentifier(options?.offerIdentifier, getDiscountedYearlyOfferId());
+}
+
+export function isGenesisYearlyOffer(
+  options?: { offerIdentifier?: string | null; offerType?: number | null },
+) {
+  return sameOfferIdentifier(options?.offerIdentifier, getGenesisYearlyOfferId());
+}
+
 export function isDiscountedYearlyOffer(
   options?: { offerIdentifier?: string | null; offerType?: number | null },
 ) {
-  const normalizedOfferIdentifier = options?.offerIdentifier?.trim().toLowerCase();
-  const configuredOfferIdentifier = getDiscountedYearlyOfferId().toLowerCase();
-  return Boolean(normalizedOfferIdentifier) &&
-    normalizedOfferIdentifier === configuredOfferIdentifier;
+  return isReferralYearlyOffer(options) || isGenesisYearlyOffer(options);
 }
 
 export function getPriceCents(
@@ -88,10 +110,14 @@ export function getPriceCents(
 ) {
   const isDiscountedYearly = plan === "yearly" &&
     isDiscountedYearlyOffer(options);
+  const isGenesisYearly = plan === "yearly" &&
+    isGenesisYearlyOffer(options);
 
   const envValue = Deno.env.get(
     plan === "monthly"
       ? "APPLE_MONTHLY_PRICE_CENTS"
+      : isGenesisYearly
+      ? "APPLE_GENESIS_OFFER_CODE_YEARLY_PRICE_CENTS"
       : isDiscountedYearly
       ? "APPLE_OFFER_CODE_YEARLY_PRICE_CENTS"
       : "APPLE_YEARLY_PRICE_CENTS",
@@ -99,6 +125,7 @@ export function getPriceCents(
   const parsed = envValue ? Number(envValue) : NaN;
   if (!Number.isFinite(parsed)) {
     if (plan === "monthly") return DEFAULT_MONTHLY_PRICE_CENTS;
+    if (isGenesisYearly) return DEFAULT_GENESIS_YEARLY_PRICE_CENTS;
     return isDiscountedYearly
       ? DEFAULT_DISCOUNTED_YEARLY_PRICE_CENTS
       : DEFAULT_YEARLY_PRICE_CENTS;

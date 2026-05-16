@@ -572,10 +572,33 @@ describe("useAppleSubscription", () => {
       affiliate_provider: "winwinkit",
       is_active: true,
       apple_offer_code_status: "active",
+      apple_offer_campaign_identifier: "referrals",
       is_apple_offer_eligible: true,
     };
     const { result } = renderHook(() => useAppleSubscription());
     expect(result.current.hasOfferCode).toBe(true);
+    expect(result.current.activeYearlyOffer?.price).toBe("$69.99");
+  });
+
+  it("exposes Genesis pricing from the applied code campaign identifier", () => {
+    mocks.appliedReferralCodeState = {
+      ...mocks.appliedReferralCodeState,
+      code: "GENESIS",
+      owner_type: "influencer",
+      affiliate_provider: null,
+      is_active: true,
+      apple_offer_code_status: "active",
+      apple_offer_campaign_identifier: "Genesis",
+      is_apple_offer_eligible: true,
+    };
+    const { result } = renderHook(() => useAppleSubscription());
+    expect(result.current.hasOfferCode).toBe(true);
+    expect(result.current.activeYearlyOffer).toMatchObject({
+      tier: "genesis",
+      price: "$49.99",
+      priceCents: 4999,
+      unitPrice: "$4.17/month for the first year",
+    });
   });
 
   it("keeps hasOfferCode false when a saved code is not Apple-offer eligible", () => {

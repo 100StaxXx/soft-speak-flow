@@ -10,6 +10,101 @@ import {
   normalizeWinWinKitCode,
 } from "../_shared/winwinkit.ts";
 
+const GENESIS_SPECIAL_CODE = "GENESIS";
+const DEFAULT_GENESIS_OFFER_IDENTIFIER = "Genesis";
+
+const getGenesisOfferIdentifier = () =>
+  Deno.env.get("APPLE_GENESIS_OFFER_CODE_IDENTIFIER")?.trim() ||
+  DEFAULT_GENESIS_OFFER_IDENTIFIER;
+
+async function claimGenesisSpecialCode(
+  supabase: any,
+  userId: string,
+  profile: { referral_code?: string | null; email?: string | null },
+) {
+  const now = new Date().toISOString();
+  const genesisOfferIdentifier = getGenesisOfferIdentifier();
+
+  const { data: existingCode, error: lookupError } = await supabase
+    .from("referral_codes")
+    .select("id, total_signups")
+    .eq("code", GENESIS_SPECIAL_CODE)
+    .maybeSingle();
+
+  if (lookupError) {
+    throw lookupError;
+  }
+
+  if (existingCode?.id) {
+    const { error: updateCodeError } = await supabase
+      .from("referral_codes")
+      .update({
+        owner_type: "influencer",
+        is_active: true,
+        affiliate_provider: null,
+        payout_method: null,
+        apple_offer_code_id: null,
+        apple_offer_code_status: "active",
+        apple_offer_campaign_identifier: genesisOfferIdentifier,
+        apple_offer_code_last_error: null,
+        apple_offer_code_synced_at: now,
+        total_signups: Number(existingCode.total_signups ?? 0) + 1,
+      })
+      .eq("id", existingCode.id);
+
+    if (updateCodeError) {
+      throw updateCodeError;
+    }
+  } else {
+    const { error: insertCodeError } = await supabase
+      .from("referral_codes")
+      .insert({
+        code: GENESIS_SPECIAL_CODE,
+        owner_type: "influencer",
+        is_active: true,
+        affiliate_provider: null,
+        payout_method: null,
+        apple_offer_code_id: null,
+        apple_offer_code_status: "active",
+        apple_offer_campaign_identifier: genesisOfferIdentifier,
+        apple_offer_code_last_error: null,
+        apple_offer_code_synced_at: now,
+        total_signups: 1,
+      });
+
+    if (insertCodeError) {
+      throw insertCodeError;
+    }
+  }
+
+  const { error: profileUpdateError } = await supabase
+    .from("profiles")
+    .update({ referred_by_code: GENESIS_SPECIAL_CODE })
+    .eq("id", userId);
+
+  if (profileUpdateError) {
+    throw profileUpdateError;
+  }
+
+  return {
+    success: true,
+    message: "Genesis code applied! Your yearly plan is now eligible for the $49.99 Apple offer.",
+    user: {
+      app_user_id: userId,
+      referral_code: profile.referral_code ?? null,
+      referred_by: { code: GENESIS_SPECIAL_CODE, type: "special" },
+      is_premium: false,
+      stats: null,
+    },
+    rewards_granted: null,
+    code_type: "special",
+    offer: {
+      identifier: genesisOfferIdentifier,
+      yearly_price_cents: 4999,
+    },
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return handleCors(req);
@@ -41,7 +136,7 @@ serve(async (req) => {
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("id, email, created_at, referred_by_code")
+      .select("id, email, created_at, referral_code, referred_by_code")
       .eq("id", userAuth.userId)
       .single();
 
@@ -55,6 +150,15 @@ serve(async (req) => {
         message: "You have already used a referral code",
       }), {
         status: 409,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (claimedCode === GENESIS_SPECIAL_CODE) {
+      const result = await claimGenesisSpecialCode(supabase, userAuth.userId, profile);
+
+      return new Response(JSON.stringify(result), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

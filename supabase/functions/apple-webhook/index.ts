@@ -7,6 +7,7 @@ import {
   fetchAppleTransactionBinding,
   getDiscountedYearlyOfferId,
   getPriceCents,
+  isGenesisYearlyOffer,
   isDiscountedYearlyOffer,
   resolvePlanFromProduct,
   upsertSubscription,
@@ -16,6 +17,7 @@ import { markAffiliateConversionAudit } from "../_shared/referralState.ts";
 import { createOrUpdateWinWinKitUser } from "../_shared/winwinkit.ts";
 
 const defaultAppleBundleId = "com.darrylgraham.revolution";
+const GENESIS_SPECIAL_CODE = "GENESIS";
 const appleWebhookAudiences = [
   Deno.env.get("APPLE_WEBHOOK_AUDIENCE"),
   Deno.env.get("APPLE_SERVICE_ID"),
@@ -719,7 +721,7 @@ async function createReferralPayout(
   const { data: codeData } = await supabase
     .from("referral_codes")
     .select(
-      "id, owner_type, owner_user_id, affiliate_provider, is_active, apple_offer_code_status, apple_offer_campaign_identifier, apple_offer_code_expires_at",
+      "id, code, owner_type, owner_user_id, affiliate_provider, is_active, apple_offer_code_status, apple_offer_campaign_identifier, apple_offer_code_expires_at, total_conversions, total_revenue",
     )
     .eq("code", referralCode)
     .single();
@@ -741,6 +743,11 @@ async function createReferralPayout(
   );
   const hasDiscountedYearlyOffer = plan === "yearly" &&
     isDiscountedYearlyOffer({
+      offerIdentifier,
+      offerType,
+    });
+  const hasGenesisYearlyOffer = plan === "yearly" &&
+    isGenesisYearlyOffer({
       offerIdentifier,
       offerType,
     });
@@ -783,6 +790,31 @@ async function createReferralPayout(
       },
     });
     await syncWinWinKitPremiumStatus(supabase, userId, true);
+    return;
+  }
+
+  if (referralCode.toUpperCase() === GENESIS_SPECIAL_CODE) {
+    const genesisPriceCents = getPriceCents("yearly", {
+      offerIdentifier,
+      offerType,
+    });
+
+    await recordReferralCodeConversionMetrics(
+      supabase,
+      codeData.id,
+      genesisPriceCents,
+    );
+
+    console.log(
+      `Recorded Genesis offer conversion for ${userId}; no payout created`,
+    );
+    return;
+  }
+
+  if (hasGenesisYearlyOffer) {
+    console.log(
+      `Skipping affiliate commission for code ${referralCode} because the Genesis house offer was redeemed`,
+    );
     return;
   }
 
@@ -838,6 +870,35 @@ async function createReferralPayout(
     codeData.id,
     referralCode,
   );
+}
+
+async function recordReferralCodeConversionMetrics(
+  supabase: any,
+  referralCodeId: string,
+  revenueCents: number,
+) {
+  const { data: currentData, error: lookupError } = await supabase
+    .from("referral_codes")
+    .select("total_conversions, total_revenue")
+    .eq("id", referralCodeId)
+    .single();
+
+  if (lookupError) {
+    console.error("Failed to fetch referral code metrics:", lookupError);
+    return;
+  }
+
+  const { error: updateError } = await supabase
+    .from("referral_codes")
+    .update({
+      total_conversions: Number(currentData?.total_conversions ?? 0) + 1,
+      total_revenue: Number(currentData?.total_revenue ?? 0) + revenueCents / 100,
+    })
+    .eq("id", referralCodeId);
+
+  if (updateError) {
+    console.error("Failed to update referral code metrics:", updateError);
+  }
 }
 
 const MINIMUM_PAYOUT_THRESHOLD = 50.00;

@@ -16,6 +16,8 @@ Add the following secrets to your Supabase project (Project Settings → Secrets
 - `APPLE_MONTHLY_PRICE_CENTS` – (Optional) Override the stored amount for monthly receipts; defaults to `999` ($9.99).
 - `APPLE_YEARLY_PRICE_CENTS` – (Optional) Override the stored amount for standard yearly receipts; defaults to `9999` ($99.99).
 - `APPLE_OFFER_CODE_YEARLY_PRICE_CENTS` – (Optional) Override the stored amount for yearly Apple offer-code receipts; defaults to `6999` ($69.99).
+- `APPLE_GENESIS_OFFER_CODE_IDENTIFIER` – (Optional) StoreKit offer-code reference name for the Genesis yearly offer; defaults to `Genesis`.
+- `APPLE_GENESIS_OFFER_CODE_YEARLY_PRICE_CENTS` – (Optional) Override the stored amount for Genesis yearly Apple offer-code receipts; defaults to `4999` ($49.99).
 - `APPLE_SUBSCRIPTION_OFFER_CODE_ID` – App Store Connect resource id for the existing active yearly referral offer-code campaign.
 - `APPLE_OFFER_CODE_IDENTIFIER` – StoreKit offer identifier for the existing yearly referral offer-code campaign; set this to `referrals`.
 - `APPLE_OFFER_CODE_MAX_REDEMPTIONS_PER_CUSTOM_CODE` – (Optional) Max redemptions for each creator custom code; defaults to `25000`.

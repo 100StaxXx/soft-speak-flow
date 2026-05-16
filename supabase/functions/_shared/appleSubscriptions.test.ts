@@ -260,6 +260,7 @@ Deno.test("ensureAppleTransactionBinding creates the first binding when appAccou
 Deno.test("getPriceCents defaults creator yearly offer-code receipts to $69.99", () => {
   Deno.env.delete("APPLE_OFFER_CODE_YEARLY_PRICE_CENTS");
   Deno.env.delete("APPLE_OFFER_CODE_IDENTIFIER");
+  Deno.env.delete("APPLE_GENESIS_OFFER_CODE_IDENTIFIER");
 
   const amountCents = appleSubscriptionsModule.getPriceCents("yearly", {
     offerIdentifier: "Referrals",
@@ -269,10 +270,24 @@ Deno.test("getPriceCents defaults creator yearly offer-code receipts to $69.99",
   assert(amountCents === 6999, `Expected 6999 cents, got ${amountCents}`);
 });
 
+Deno.test("getPriceCents defaults Genesis yearly offer-code receipts to $49.99", () => {
+  Deno.env.delete("APPLE_GENESIS_OFFER_CODE_YEARLY_PRICE_CENTS");
+  Deno.env.delete("APPLE_GENESIS_OFFER_CODE_IDENTIFIER");
+
+  const amountCents = appleSubscriptionsModule.getPriceCents("yearly", {
+    offerIdentifier: "Genesis",
+    offerType: null,
+  });
+
+  assert(amountCents === 4999, `Expected 4999 cents, got ${amountCents}`);
+});
+
 Deno.test("getPriceCents does not discount mismatched yearly offer-code receipts", () => {
   Deno.env.delete("APPLE_YEARLY_PRICE_CENTS");
   Deno.env.delete("APPLE_OFFER_CODE_YEARLY_PRICE_CENTS");
   Deno.env.delete("APPLE_OFFER_CODE_IDENTIFIER");
+  Deno.env.delete("APPLE_GENESIS_OFFER_CODE_YEARLY_PRICE_CENTS");
+  Deno.env.delete("APPLE_GENESIS_OFFER_CODE_IDENTIFIER");
 
   const amountCents = appleSubscriptionsModule.getPriceCents("yearly", {
     offerIdentifier: "Cosmiq_OfferCode_yearly",

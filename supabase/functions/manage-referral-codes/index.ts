@@ -3,6 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { requireAdminRequest } from "../_shared/admin.ts";
 import { syncAppleOfferCodeForReferralCode } from "../_shared/referralState.ts";
 
+const GENESIS_SPECIAL_CODE = "GENESIS";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -101,6 +103,17 @@ serve(async (req) => {
 
       const results = [];
       for (const code of codes ?? []) {
+        if (String(code.code ?? "").toUpperCase() === GENESIS_SPECIAL_CODE) {
+          results.push({
+            code: GENESIS_SPECIAL_CODE,
+            status: "skipped",
+            apple_offer_code_id: code.apple_offer_code_id ?? null,
+            apple_offer_code_expires_at: null,
+            error: "Genesis is a local house offer and is not synced to the referral Apple campaign.",
+          });
+          continue;
+        }
+
         results.push(await syncAppleOfferCodeForReferralCode(supabase, {
           id: code.id,
           code: code.code,

@@ -67,10 +67,13 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
     productError,
     reloadProducts,
     hasOfferCode,
+    activeYearlyOffer,
   } = useAppleSubscription();
 
   const [selectedPlan, setSelectedPlan] = useState<IAPPlan>("yearly");
   const selectedProductId = getPurchaseProductIdForPlan(selectedPlan, products);
+  const activeYearlyOfferPrice = activeYearlyOffer?.price ?? "$69.99";
+  const activeYearlyOfferUnitPrice = activeYearlyOffer?.unitPrice ?? "$5.83/month for the first year";
 
   const subscriptionStatusText = subscription
     ? `You have Cosmiq (${plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : "Active"})`
@@ -95,16 +98,16 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
   const priceByPlan = useMemo(() => {
     return PLAN_OPTIONS.reduce<Record<string, string>>((acc, option) => {
       acc[option.id] = option.id === "yearly" && hasOfferCode
-        ? "$69.99"
+        ? activeYearlyOfferPrice
         : getProductForPlan(option.id, products)?.displayPrice ?? option.fallbackPrice;
       return acc;
     }, {});
-  }, [hasOfferCode, products]);
+  }, [activeYearlyOfferPrice, hasOfferCode, products]);
   const unitPriceByPlan = useMemo(() => {
     return PLAN_OPTIONS.reduce<Record<string, string>>((acc, option) => {
       const product = getProductForPlan(option.id, products);
       if (option.id === "yearly" && hasOfferCode) {
-        acc[option.id] = "$5.83/month for the first year";
+        acc[option.id] = activeYearlyOfferUnitPrice;
         return acc;
       }
 
@@ -115,7 +118,7 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
           : option.fallbackUnitPrice;
       return acc;
     }, {});
-  }, [hasOfferCode, priceByPlan, products]);
+  }, [activeYearlyOfferUnitPrice, hasOfferCode, priceByPlan, products]);
 
   if (isLoading) {
     return (
