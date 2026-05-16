@@ -20,6 +20,31 @@ ensure
   end
 end
 
+def patch_cocoapods_shell_script_error_handler(path)
+  mutate_file(path) do |file|
+    original = <<~'ORIGINAL'
+      function on_error {
+        echo "$(realpath -mq "${0}"):$1: error: Unexpected failure"
+      }
+    ORIGINAL
+
+    patched = <<~'PATCHED'
+      function on_error {
+        local script_path="${0}"
+        if [ -e "${script_path}" ]; then
+          script_path="$(cd "$(dirname "${script_path}")" && pwd -P)/$(basename "${script_path}")"
+        fi
+        echo "${script_path}:$1: error: Unexpected failure"
+      }
+    PATCHED
+
+    file_contents = File.read(file)
+    next unless file_contents.include?(original)
+
+    File.write(file, file_contents.sub(original, patched))
+  end
+end
+
 # Ensure Capgo's hook script runs during pod install so unused providers stay disabled.
 def configure_social_login_podspec
   plugin_root = File.expand_path('../../node_modules/@capgo/capacitor-social-login', __dir__)
@@ -74,6 +99,10 @@ end
 
 post_install do |installer|
   assertDeploymentTarget(installer)
+
+  Dir.glob(File.join(__dir__, 'Pods', 'Target Support Files', '**', '*.sh')).each do |script_path|
+    patch_cocoapods_shell_script_error_handler(script_path)
+  end
 
   script_phase_names = [
     '[CP] Copy XCFrameworks',
