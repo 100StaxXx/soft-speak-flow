@@ -16,7 +16,7 @@ Add the following secrets to your Supabase project (Project Settings → Secrets
 - `APPLE_MONTHLY_PRICE_CENTS` – (Optional) Override the stored amount for monthly receipts; defaults to `999` ($9.99).
 - `APPLE_YEARLY_PRICE_CENTS` – (Optional) Override the stored amount for standard yearly receipts; defaults to `9999` ($99.99).
 - `APPLE_OFFER_CODE_YEARLY_PRICE_CENTS` – (Optional) Override the stored amount for yearly Apple offer-code receipts; defaults to `6999` ($69.99).
-- `APPLE_GENESIS_OFFER_CODE_IDENTIFIER` – (Optional) StoreKit offer-code reference name for the Genesis yearly offer; defaults to `Genesis`.
+- `APPLE_GENESIS_OFFER_CODE_IDENTIFIER` – (Optional) StoreKit offer-code reference name for the Genesis yearly offer; defaults to `GENESIS`.
 - `APPLE_GENESIS_OFFER_CODE_YEARLY_PRICE_CENTS` – (Optional) Override the stored amount for Genesis yearly Apple offer-code receipts; defaults to `4999` ($49.99).
 - `APPLE_SUBSCRIPTION_OFFER_CODE_ID` – App Store Connect resource id for the existing active yearly referral offer-code campaign.
 - `APPLE_OFFER_CODE_IDENTIFIER` – StoreKit offer identifier for the existing yearly referral offer-code campaign; set this to `referrals`.
@@ -25,6 +25,8 @@ Add the following secrets to your Supabase project (Project Settings → Secrets
 
 The functions will log which environment (Production/Sandbox) Apple reports so you can confirm the correct secret is in place.
 `APPLE_TEAM_ID` is not used for App Store Server API auth in this flow; use the App Store Connect issuer UUID in `APPLE_ISSUER_ID`.
+
+For the Genesis house offer, App Store Connect must also have an active custom or one-time use code under the `GENESIS` offer before users can redeem it in Apple's offer-code sheet. The app-side `GENESIS` entry only marks the account eligible and shows the correct $49.99 tier; Apple still controls the final redemption.
 
 ## How it works
 

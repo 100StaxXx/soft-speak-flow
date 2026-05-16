@@ -588,7 +588,7 @@ describe("useAppleSubscription", () => {
       affiliate_provider: null,
       is_active: true,
       apple_offer_code_status: "active",
-      apple_offer_campaign_identifier: "Genesis",
+      apple_offer_campaign_identifier: "GENESIS",
       is_apple_offer_eligible: true,
     };
     const { result } = renderHook(() => useAppleSubscription());

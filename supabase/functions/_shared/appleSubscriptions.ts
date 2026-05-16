@@ -57,7 +57,7 @@ const DEFAULT_YEARLY_PRICE_CENTS = 9999; // $99.99 standard pricing
 const DEFAULT_DISCOUNTED_YEARLY_PRICE_CENTS = 6999; // $69.99 existing referral offer-code pricing
 const DEFAULT_GENESIS_YEARLY_PRICE_CENTS = 4999; // $49.99 Genesis first-year offer-code pricing
 const DEFAULT_DISCOUNTED_YEARLY_OFFER_ID = "referrals";
-const DEFAULT_GENESIS_YEARLY_OFFER_ID = "Genesis";
+const DEFAULT_GENESIS_YEARLY_OFFER_ID = "GENESIS";
 
 export const APPLE_BINDING_CONFLICT_ERROR =
   "This purchase is already linked to another account.";

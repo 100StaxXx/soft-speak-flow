@@ -11,7 +11,7 @@ import {
 } from "../_shared/winwinkit.ts";
 
 const GENESIS_SPECIAL_CODE = "GENESIS";
-const DEFAULT_GENESIS_OFFER_IDENTIFIER = "Genesis";
+const DEFAULT_GENESIS_OFFER_IDENTIFIER = "GENESIS";
 
 const getGenesisOfferIdentifier = () =>
   Deno.env.get("APPLE_GENESIS_OFFER_CODE_IDENTIFIER")?.trim() ||

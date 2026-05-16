@@ -275,7 +275,7 @@ Deno.test("getPriceCents defaults Genesis yearly offer-code receipts to $49.99",
   Deno.env.delete("APPLE_GENESIS_OFFER_CODE_IDENTIFIER");
 
   const amountCents = appleSubscriptionsModule.getPriceCents("yearly", {
-    offerIdentifier: "Genesis",
+    offerIdentifier: "GENESIS",
     offerType: null,
   });
 
