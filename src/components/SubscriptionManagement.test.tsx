@@ -57,8 +57,21 @@ describe("SubscriptionManagement", () => {
     expect(
       screen.getByText("Both monthly and yearly plans include the same Cosmiq features and renew automatically until canceled."),
     ).toBeInTheDocument();
+    expect(screen.getByText("Cosmiq Pro Monthly")).toBeInTheDocument();
+    expect(screen.getAllByText("Cosmiq Pro Yearly").length).toBeGreaterThan(0);
+    expect(screen.getByText("Length: 1 year")).toBeInTheDocument();
+    expect(screen.getByText("$8.33/month when billed yearly")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Subscriptions renew automatically unless canceled at least 24 hours before the end/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("href", "/privacy");
+    expect(screen.getByRole("link", { name: "Terms of Use" })).toHaveAttribute("href", "/terms");
+    expect(screen.getByRole("link", { name: "EULA" })).toHaveAttribute(
+      "href",
+      "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/",
+    );
     expect(screen.getByRole("button", { name: /unlock with yearly/i })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "View All Plans" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "View All Plans" })).not.toBeInTheDocument();
   });
 
   it("hides the RevenueCat paywall bypass when a creator Apple offer code is active", () => {

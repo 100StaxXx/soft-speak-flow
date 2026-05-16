@@ -109,6 +109,8 @@ function revenueCatProductToStoreKitProduct(product: PurchasesStoreProduct): Sto
     displayPrice: product.priceString,
     price: product.price,
     type: product.productType,
+    pricePerMonthString: product.pricePerMonthString,
+    pricePerYearString: product.pricePerYearString,
     ...parseSubscriptionPeriod(product.subscriptionPeriod),
   };
 }

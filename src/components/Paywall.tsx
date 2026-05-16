@@ -42,7 +42,11 @@ import { useNavigate } from "react-router-dom";
 import { StaticBackgroundImage } from "@/components/StaticBackgroundImage";
 import type { StaticBackgroundAsset } from "@/assets/backgrounds";
 import { trackPaywallEvent } from "@/utils/paywallTelemetry";
-import { PREMIUM_PLAN_NOTE } from "@/config/premiumBenefits";
+import {
+  PREMIUM_APPLE_BILLING_DISCLOSURE,
+  PREMIUM_PLAN_NOTE,
+  PREMIUM_SUBSCRIPTION_LEGAL_LINKS,
+} from "@/config/premiumBenefits";
 import { DISCORD_INVITE_URL } from "@/constants/community";
 
 type PlanType = "monthly" | "yearly";
@@ -216,7 +220,6 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
     hasAppliedReferralCode,
     appliedReferralCode,
     offerCodePurchaseReady,
-    handlePresentRevenueCatPaywall,
   } = useAppleSubscription();
   const { toast } = useToast();
   const { user, signOut } = useAuth();
@@ -250,13 +253,6 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
       hasOfferCode,
     });
     const success = await handlePurchase(selectedProductId, "paywall");
-    if (success) {
-      navigate("/premium/success");
-    }
-  };
-
-  const handleOpenRevenueCatPaywall = async () => {
-    const success = await handlePresentRevenueCatPaywall("paywall_revenuecat_ui");
     if (success) {
       navigate("/premium/success");
     }
@@ -421,14 +417,22 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
 
   const plans = {
     monthly: {
+      title: "Cosmiq Pro Monthly",
+      duration: "1 month",
       fallbackPrice: "$9.99",
       period: "/month",
       savings: null,
+      fallbackUnitPrice: "$9.99/month",
     },
     yearly: {
+      title: "Cosmiq Pro Yearly",
+      duration: "1 year",
       fallbackPrice: hasOfferCode ? "$69.99" : "$99.99",
       period: "/year",
       savings: hasOfferCode ? "Code applied" : "Best value",
+      fallbackUnitPrice: hasOfferCode
+        ? "$5.83/month for the first year"
+        : "$8.33/month when billed yearly",
     },
   };
   const hasSelectedCreatorYearlyOffer = hasOfferCode && selectedPlan === "yearly";
@@ -437,6 +441,26 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
     return (plan === "yearly" ? yearlyProduct?.displayPrice : monthlyProduct?.displayPrice)
       ?? plans[plan].fallbackPrice;
   };
+  const getPlanUnitPrice = (plan: PlanType) => {
+    if (plan === "yearly" && hasOfferCode) return plans.yearly.fallbackUnitPrice;
+
+    const product = plan === "yearly" ? yearlyProduct : monthlyProduct;
+    if (plan === "yearly" && product?.pricePerMonthString) {
+      return `${product.pricePerMonthString}/month when billed yearly`;
+    }
+
+    return plan === "monthly"
+      ? `${getPlanDisplayPrice("monthly")}/month`
+      : plans.yearly.fallbackUnitPrice;
+  };
+  const selectedPlanPrice = getPlanDisplayPrice(selectedPlan);
+  const selectedPlanUnitPrice = getPlanUnitPrice(selectedPlan);
+  const selectedPlanPriceText = selectedPlan === "monthly"
+    ? `${selectedPlanPrice}/month`
+    : `${selectedPlanPrice}/year (${selectedPlanUnitPrice})`;
+  const selectedPlanRenewalText = hasSelectedCreatorYearlyOffer
+    ? `${selectedPlanPrice} for the first year (${selectedPlanUnitPrice}), then renews yearly at the standard yearly price unless canceled.`
+    : `${selectedPlanPriceText}; renews every ${plans[selectedPlan].duration} until canceled.`;
 
   const copy = variant === "trial_expired"
     ? {
@@ -666,7 +690,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                         </span>
                       )}
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/58">
-                        {plan}
+                        {plans[plan].title}
                       </p>
                       <p className="mt-5 text-2xl font-bold text-white">
                         {getPlanDisplayPrice(plan)}
@@ -674,8 +698,23 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                       <p className="text-xs text-white/58">
                         {plans[plan].period}
                       </p>
+                      <p className="mt-2 text-xs text-white/62">
+                        Length: {plans[plan].duration}
+                      </p>
+                      <p className="text-xs text-white/62">
+                        {getPlanUnitPrice(plan)}
+                      </p>
                     </button>
                   ))}
+                </div>
+
+                <div className="border border-white/12 bg-white/[0.04] p-3 text-xs leading-relaxed text-white/64">
+                  <p className="font-semibold text-white">
+                    {plans[selectedPlan].title}
+                  </p>
+                  <p>
+                    Length: {plans[selectedPlan].duration}. Price: {selectedPlanRenewalText}
+                  </p>
                 </div>
 
                 <Button
@@ -686,17 +725,6 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                   {loading ? "Processing..." : ctaLabel}
                   {!loading && <ArrowRight className="ml-2 h-4 w-4" />}
                 </Button>
-
-                {!hasOfferCode && (
-                  <Button
-                    variant="outline"
-                    onClick={() => { void handleOpenRevenueCatPaywall(); }}
-                    disabled={!isAvailable || loading}
-                    className="w-full border-white/18 bg-white/[0.04] text-white hover:bg-white/10 hover:text-white"
-                  >
-                    View All Plans
-                  </Button>
-                )}
 
                 <Button
                   asChild
@@ -766,9 +794,30 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                   <p className="text-center text-xs leading-relaxed text-white/54">
                     {copy.legalIntro}
                   </p>
+                  <p className="text-center text-xs leading-relaxed text-white/54">
+                    {PREMIUM_APPLE_BILLING_DISCLOSURE}
+                  </p>
                   <div className="flex justify-center gap-4 text-xs">
-                    <a href="/privacy" className="text-white/58 underline hover:text-white">Privacy Policy</a>
-                    <a href="/terms" className="text-white/58 underline hover:text-white">Terms of Use</a>
+                    <a
+                      href={PREMIUM_SUBSCRIPTION_LEGAL_LINKS.privacy.inAppHref}
+                      className="text-white/58 underline hover:text-white"
+                    >
+                      {PREMIUM_SUBSCRIPTION_LEGAL_LINKS.privacy.label}
+                    </a>
+                    <a
+                      href={PREMIUM_SUBSCRIPTION_LEGAL_LINKS.terms.inAppHref}
+                      className="text-white/58 underline hover:text-white"
+                    >
+                      {PREMIUM_SUBSCRIPTION_LEGAL_LINKS.terms.label}
+                    </a>
+                    <a
+                      href={PREMIUM_SUBSCRIPTION_LEGAL_LINKS.appleEula.publicHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-white/58 underline hover:text-white"
+                    >
+                      EULA
+                    </a>
                   </div>
                 </div>
 

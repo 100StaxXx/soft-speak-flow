@@ -6,15 +6,24 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Crown, Loader2, RefreshCw, Settings } from "lucide-react";
-import { PREMIUM_BENEFITS, PREMIUM_PLAN_NOTE, PREMIUM_BENEFITS_SUMMARY } from "@/config/premiumBenefits";
+import {
+  PREMIUM_APPLE_BILLING_DISCLOSURE,
+  PREMIUM_BENEFITS,
+  PREMIUM_BENEFITS_SUMMARY,
+  PREMIUM_PLAN_NOTE,
+  PREMIUM_SUBSCRIPTION_LEGAL_LINKS,
+} from "@/config/premiumBenefits";
 
 type PlanOption = {
   id: IAPPlan;
   label: string;
+  productTitle: string;
   description: string;
   hint: string;
   fallbackPrice: string;
   billingPeriodLabel: string;
+  subscriptionLength: string;
+  fallbackUnitPrice: string;
   badge?: string;
 };
 
@@ -22,18 +31,24 @@ const PLAN_OPTIONS: PlanOption[] = [
   {
     id: "monthly",
     label: "Monthly",
+    productTitle: "Cosmiq Pro Monthly",
     description: PREMIUM_BENEFITS_SUMMARY,
     hint: "Full Cosmiq access billed monthly.",
     fallbackPrice: "$9.99",
     billingPeriodLabel: "/month",
+    subscriptionLength: "1 month",
+    fallbackUnitPrice: "$9.99/month",
   },
   {
     id: "yearly",
     label: "Yearly",
+    productTitle: "Cosmiq Pro Yearly",
     description: PREMIUM_BENEFITS_SUMMARY,
     hint: "Full Cosmiq access billed yearly with the best recurring value.",
     fallbackPrice: "$99.99",
     billingPeriodLabel: "/year",
+    subscriptionLength: "1 year",
+    fallbackUnitPrice: "$8.33/month when billed yearly",
     badge: "Most popular",
   },
 ];
@@ -52,7 +67,6 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
     productError,
     reloadProducts,
     hasOfferCode,
-    handlePresentRevenueCatPaywall,
   } = useAppleSubscription();
 
   const [selectedPlan, setSelectedPlan] = useState<IAPPlan>("yearly");
@@ -86,6 +100,22 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
       return acc;
     }, {});
   }, [hasOfferCode, products]);
+  const unitPriceByPlan = useMemo(() => {
+    return PLAN_OPTIONS.reduce<Record<string, string>>((acc, option) => {
+      const product = getProductForPlan(option.id, products);
+      if (option.id === "yearly" && hasOfferCode) {
+        acc[option.id] = "$5.83/month for the first year";
+        return acc;
+      }
+
+      acc[option.id] = option.id === "yearly" && product?.pricePerMonthString
+        ? `${product.pricePerMonthString}/month when billed yearly`
+        : option.id === "monthly"
+          ? `${priceByPlan[option.id]}/month`
+          : option.fallbackUnitPrice;
+      return acc;
+    }, {});
+  }, [hasOfferCode, priceByPlan, products]);
 
   if (isLoading) {
     return (
@@ -160,7 +190,7 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Crown className="h-4 w-4 text-primary" />
-                      <p className="text-sm uppercase tracking-wide text-muted-foreground">{planOption.label}</p>
+                      <p className="text-sm uppercase tracking-wide text-muted-foreground">{planOption.productTitle}</p>
                     </div>
                     {planOption.badge && <Badge variant="secondary" className="text-xs">{planOption.badge}</Badge>}
                   </div>
@@ -170,6 +200,8 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
                       {planOption.billingPeriodLabel}
                     </span>
                   </p>
+                  <p className="text-xs text-muted-foreground">Length: {planOption.subscriptionLength}</p>
+                  <p className="text-xs text-muted-foreground">{unitPriceByPlan[planOption.id]}</p>
                   <p className="text-xs text-muted-foreground">{planOption.description}</p>
                   <p className="text-xs text-muted-foreground">{planOption.hint}</p>
                 </button>
@@ -192,20 +224,37 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
             )}
           </Button>
 
-          {!hasOfferCode && (
-            <Button
-              variant="outline"
-              onClick={() => { void handlePresentRevenueCatPaywall("subscription_management_revenuecat_ui"); }}
-              disabled={!isAvailable || purchasing}
-              className="w-full"
-            >
-              View All Plans
-            </Button>
-          )}
-
           <p className="text-xs text-center text-muted-foreground">
             {PREMIUM_PLAN_NOTE}
           </p>
+
+          <div className="rounded-lg border border-border/60 bg-card/40 p-3 text-xs leading-relaxed text-muted-foreground">
+            <p className="font-medium text-foreground">
+              {PLAN_OPTIONS.find((option) => option.id === selectedPlan)?.productTitle}
+            </p>
+            <p>
+              Subscription length: {PLAN_OPTIONS.find((option) => option.id === selectedPlan)?.subscriptionLength}.
+              Price: {priceByPlan[selectedPlan]}{PLAN_OPTIONS.find((option) => option.id === selectedPlan)?.billingPeriodLabel}
+              {" "}({unitPriceByPlan[selectedPlan]}).
+            </p>
+            <p className="mt-2">{PREMIUM_APPLE_BILLING_DISCLOSURE}</p>
+            <div className="mt-3 flex flex-wrap justify-center gap-3">
+              <a href={PREMIUM_SUBSCRIPTION_LEGAL_LINKS.privacy.inAppHref} className="underline">
+                {PREMIUM_SUBSCRIPTION_LEGAL_LINKS.privacy.label}
+              </a>
+              <a href={PREMIUM_SUBSCRIPTION_LEGAL_LINKS.terms.inAppHref} className="underline">
+                {PREMIUM_SUBSCRIPTION_LEGAL_LINKS.terms.label}
+              </a>
+              <a
+                href={PREMIUM_SUBSCRIPTION_LEGAL_LINKS.appleEula.publicHref}
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+              >
+                EULA
+              </a>
+            </div>
+          </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <Button variant="outline" className="w-full sm:flex-1" disabled={manageLoading} onClick={handleManageSubscriptions}>

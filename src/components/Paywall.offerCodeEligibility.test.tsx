@@ -117,6 +117,8 @@ describe("Paywall creator offer-code eligibility", () => {
     expect(screen.getByText("Redeem Discount with Apple")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "View All Plans" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Redeem Promo Code" })).not.toBeInTheDocument();
+    expect(screen.getAllByText("Cosmiq Pro Yearly").length).toBeGreaterThan(0);
+    expect(screen.getByText("$5.83/month for the first year")).toBeInTheDocument();
   });
 
   it("keeps standard pricing when a saved referral code is not Apple-offer eligible", () => {
@@ -135,7 +137,10 @@ describe("Paywall creator offer-code eligibility", () => {
       screen.getByText("This code is saved to your account, but it does not unlock the Apple creator discount."),
     ).toBeInTheDocument();
     expect(screen.getByText("$99.99")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "View All Plans" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "View All Plans" })).not.toBeInTheDocument();
+    expect(screen.getAllByText("Cosmiq Pro Yearly").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Length: 1 year").length).toBeGreaterThan(0);
+    expect(screen.getByText("$8.33/month when billed yearly")).toBeInTheDocument();
     expect(screen.queryByText("Redeem Discount with Apple")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Redeem Promo Code" })).not.toBeInTheDocument();
   });
@@ -164,6 +169,15 @@ describe("Paywall creator offer-code eligibility", () => {
     expect(
       screen.getByText("Both monthly and yearly plans include the same Cosmiq features and renew automatically until canceled."),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Subscriptions renew automatically unless canceled at least 24 hours before the end/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("href", "/privacy");
+    expect(screen.getByRole("link", { name: "Terms of Use" })).toHaveAttribute("href", "/terms");
+    expect(screen.getByRole("link", { name: "EULA" })).toHaveAttribute(
+      "href",
+      "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/",
+    );
     expect(screen.getByRole("link", { name: /join our discord/i })).toHaveAttribute(
       "href",
       "https://discord.gg/rreaAn7JWn",

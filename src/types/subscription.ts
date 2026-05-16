@@ -5,6 +5,8 @@ export interface StoreKitProduct {
   displayPrice: string;
   price: number;
   type: string;
+  pricePerMonthString?: string | null;
+  pricePerYearString?: string | null;
   subscriptionPeriodUnit?: number;
   subscriptionPeriodValue?: number;
 }
