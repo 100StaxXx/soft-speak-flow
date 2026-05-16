@@ -109,11 +109,6 @@ const MOBILE_DRAWER_HEIGHT_MAX_PX = 736;
 const MOBILE_DRAWER_HANDLE_SPACE_PX = 22;
 const MOBILE_DRAWER_VIEWPORT_OFFSET_PX = 24;
 const TRANSCRIPT_BOTTOM_THRESHOLD_PX = 96;
-const COMPOSER_DRAWER_CLOSE_GUARD_MS = 2500;
-const COMPOSER_SUBMIT_DRAWER_CLOSE_GUARD_MS = 5000;
-const JOURNEYS_COMPANION_COMPOSER_SELECTOR =
-  "[data-journeys-companion-composer]";
-
 const formatProposedActionType = (type: string) =>
   type.trim().replace(/[._-]+/g, " ") || "suggestion";
 
@@ -1103,10 +1098,6 @@ const JourneysCompanionOverlayBody = memo(
     onLaunchIntentConsumed,
     onOpenCampaignBuilder,
     onQuestProposalEditHandoff,
-    onComposerInteraction,
-    onComposerDraftStateChange,
-    onComposerSubmitIntent,
-    onComposerSubmittingChange,
     drawerLayout,
   }: {
     presentation: JourneysCompanionPlannerModalPresentation;
@@ -1118,10 +1109,6 @@ const JourneysCompanionOverlayBody = memo(
     onQuestProposalEditHandoff?: (
       proposal: CompanionPlannerProposal,
     ) => Promise<{ saved: boolean; savedTitle?: string | null }>;
-    onComposerInteraction?: (draftValue?: string) => void;
-    onComposerDraftStateChange?: (draftValue: string) => void;
-    onComposerSubmitIntent?: (draftValue: string) => void;
-    onComposerSubmittingChange?: (isSubmitting: boolean) => void;
     drawerLayout?: JourneysCompanionDrawerLayout;
   }) => {
     const {
@@ -1384,28 +1371,18 @@ const JourneysCompanionOverlayBody = memo(
       syncComposerHeight();
     }, [assistant.draftInput, syncComposerHeight]);
 
-    useEffect(() => {
-      onComposerDraftStateChange?.(assistant.draftInput);
-    }, [assistant.draftInput, onComposerDraftStateChange]);
-
-    useEffect(() => {
-      onComposerSubmittingChange?.(assistant.isSubmitting);
-    }, [assistant.isSubmitting, onComposerSubmittingChange]);
-
     const handleComposerKeyDown = useCallback(
       (event: KeyboardEvent<HTMLTextAreaElement>) => {
         if (event.key !== "Enter" || event.shiftKey) return;
         event.preventDefault();
-        onComposerSubmitIntent?.(assistant.draftInput);
         assistant.submitTypedMessage();
       },
-      [assistant, onComposerSubmitIntent],
+      [assistant],
     );
 
     const handleComposerSubmit = useCallback(() => {
-      onComposerSubmitIntent?.(assistant.draftInput);
       assistant.submitTypedMessage();
-    }, [assistant, onComposerSubmitIntent]);
+    }, [assistant]);
 
     const handleVoiceToggle = useCallback(() => {
       assistant.toggleRecording();
@@ -2167,16 +2144,11 @@ const JourneysCompanionOverlayBody = memo(
                 data-journeys-companion-composer
                 data-vaul-no-drag
                 data-tutorial-avoid="true"
-                onFocusCapture={() =>
-                  onComposerInteraction?.(assistant.draftInput)
-                }
                 onPointerDown={(event) => {
-                  onComposerInteraction?.(assistant.draftInput);
                   event.stopPropagation();
                 }}
                 onPointerMove={(event) => event.stopPropagation()}
                 onPointerUp={(event) => {
-                  onComposerInteraction?.(assistant.draftInput);
                   event.stopPropagation();
                 }}
               >
@@ -2191,10 +2163,9 @@ const JourneysCompanionOverlayBody = memo(
                   id="journeys-companion-chat-input"
                   rows={2}
                   value={assistant.draftInput}
-                  onChange={(event) => {
-                    onComposerInteraction?.(event.target.value);
-                    assistant.setDraftInput(event.target.value);
-                  }}
+                  onChange={(event) =>
+                    assistant.setDraftInput(event.target.value)
+                  }
                   onKeyDown={handleComposerKeyDown}
                   placeholder={assistant.placeholder}
                   className={cn(
@@ -2293,71 +2264,6 @@ export const JourneysCompanionPlannerModal = memo(
   }: JourneysCompanionPlannerModalProps) {
     const [drawerLayout, setDrawerLayout] =
       useState<JourneysCompanionDrawerLayout>(() => getDrawerLayout());
-    const lastComposerInteractionAtRef = useRef(0);
-    const lastComposerSubmitAtRef = useRef(0);
-    const composerHasDraftRef = useRef(false);
-    const composerSubmittingRef = useRef(false);
-
-    const markComposerInteraction = useCallback((draftValue?: string) => {
-      lastComposerInteractionAtRef.current = Date.now();
-      if (draftValue !== undefined) {
-        composerHasDraftRef.current = draftValue.trim().length > 0;
-      }
-    }, []);
-
-    const syncComposerDraftState = useCallback((draftValue: string) => {
-      composerHasDraftRef.current = draftValue.trim().length > 0;
-    }, []);
-
-    const markComposerSubmitIntent = useCallback((draftValue: string) => {
-      const now = Date.now();
-      lastComposerInteractionAtRef.current = now;
-      lastComposerSubmitAtRef.current = now;
-      composerHasDraftRef.current = draftValue.trim().length > 0;
-    }, []);
-
-    const syncComposerSubmittingState = useCallback((isSubmitting: boolean) => {
-      composerSubmittingRef.current = isSubmitting;
-      if (isSubmitting) {
-        lastComposerSubmitAtRef.current = Date.now();
-      }
-    }, []);
-
-    const isComposerFocused = useCallback(() => {
-      if (typeof document === "undefined") return false;
-      const activeElement = document.activeElement;
-      if (!(activeElement instanceof Element)) return false;
-      return Boolean(
-        activeElement.closest(JOURNEYS_COMPANION_COMPOSER_SELECTOR),
-      );
-    }, []);
-
-    const shouldIgnoreDrawerCloseFromComposer = useCallback(() => {
-      const now = Date.now();
-      if (isComposerFocused()) return true;
-      if (composerSubmittingRef.current) return true;
-      if (composerHasDraftRef.current) return true;
-      if (
-        now - lastComposerSubmitAtRef.current <=
-        COMPOSER_SUBMIT_DRAWER_CLOSE_GUARD_MS
-      ) {
-        return true;
-      }
-      return (
-        now - lastComposerInteractionAtRef.current <=
-        COMPOSER_DRAWER_CLOSE_GUARD_MS
-      );
-    }, [isComposerFocused]);
-
-    const handleDrawerOpenChange = useCallback(
-      (nextOpen: boolean) => {
-        if (!nextOpen && shouldIgnoreDrawerCloseFromComposer()) {
-          return;
-        }
-        onOpenChange(nextOpen);
-      },
-      [onOpenChange, shouldIgnoreDrawerCloseFromComposer],
-    );
 
     useEffect(() => {
       if (presentation !== "drawer" || !open) return;
@@ -2387,10 +2293,6 @@ export const JourneysCompanionPlannerModal = memo(
         onLaunchIntentConsumed={onLaunchIntentConsumed}
         onOpenCampaignBuilder={onOpenCampaignBuilder}
         onQuestProposalEditHandoff={onQuestProposalEditHandoff}
-        onComposerInteraction={markComposerInteraction}
-        onComposerDraftStateChange={syncComposerDraftState}
-        onComposerSubmitIntent={markComposerSubmitIntent}
-        onComposerSubmittingChange={syncComposerSubmittingState}
         drawerLayout={presentation === "drawer" ? drawerLayout : undefined}
       />
     );
@@ -2417,7 +2319,7 @@ export const JourneysCompanionPlannerModal = memo(
     return (
       <Drawer
         open={open}
-        onOpenChange={handleDrawerOpenChange}
+        onOpenChange={onOpenChange}
         repositionInputs={false}
         handleOnly
       >

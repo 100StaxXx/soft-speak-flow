@@ -844,6 +844,38 @@ describe("useCompanionAssistant", () => {
     tracking.resolve();
   });
 
+  it("does not refresh global auth state before submit when an active token exists", async () => {
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "companion" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.messages[0]?.content).toBe(
+        "Fresh read: today has a little shape to it.",
+      );
+    });
+
+    await act(async () => {
+      const submitted = await result.current.submitMessage(
+        "Not much. How are you?",
+        "text",
+      );
+      expect(submitted).toBe(true);
+    });
+
+    expect(mocks.refreshSession).not.toHaveBeenCalled();
+    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+      "companion-chat",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          message: "Not much. How are you?",
+        }),
+      }),
+    );
+  });
+
   it("keeps external info questions with date language in direct Companion chat", async () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(
@@ -883,7 +915,7 @@ describe("useCompanionAssistant", () => {
     expect(result.current.pendingAction).toBeNull();
   });
 
-  it("does not submit or append Companion chat turns when session refresh cannot recover a token", async () => {
+  it("keeps the typed Companion chat turn visible when session refresh cannot recover a token", async () => {
     mocks.getSession.mockResolvedValue({
       data: { session: null },
       error: null,
@@ -915,7 +947,8 @@ describe("useCompanionAssistant", () => {
       result.current.messages.some(
         (message) => message.content === "Not much. How are you?",
       ),
-    ).toBe(false);
+    ).toBe(true);
+    expect(result.current.isSubmitting).toBe(false);
   });
 
   it("submits explicit Companion write requests through companion-agent without legacy endpoints", async () => {

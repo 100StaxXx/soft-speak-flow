@@ -32,11 +32,14 @@ const DEFAULT_ALLOWED_ORIGINS = [
   "https://app.cosmiq.quest", // Native app redirect base
   // Capacitor apps (iOS/Android)
   "capacitor://localhost",
+  "ionic://localhost",
   "http://localhost",
   // Development
   "http://localhost:5173",
+  "http://localhost:8080",
   "http://localhost:3000",
   "http://127.0.0.1:5173",
+  "http://127.0.0.1:8080",
 ] as const;
 
 function normalizeOrigins(origins: readonly string[]): string[] {

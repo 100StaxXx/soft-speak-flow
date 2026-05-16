@@ -568,6 +568,8 @@ export const CompanionChatModal = memo(function CompanionChatModal({
                 plannerPathfinderTheme.composerBar,
                 "flex-col items-stretch gap-2",
               )}
+              data-companion-chat-composer
+              data-vaul-no-drag
             >
               <label htmlFor="companion-chat-input" className="sr-only">
                 Message your companion
@@ -657,7 +659,12 @@ export const CompanionChatModal = memo(function CompanionChatModal({
   }
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange} repositionInputs={false}>
+    <Drawer
+      open={open}
+      onOpenChange={onOpenChange}
+      repositionInputs={false}
+      handleOnly
+    >
       <DrawerContent
         className="max-h-none border-none bg-transparent p-0 shadow-none"
         style={{ bottom: `${drawerLayout.bottomInset}px` }}

@@ -148,8 +148,19 @@ vi.mock("@/components/PermissionRequestDialog", () => ({
 
 import { CompanionChatModal } from "./CompanionChatModal";
 
-const renderOpenModal = () => {
-  render(<CompanionChatModal open onOpenChange={vi.fn()} />);
+const renderOpenModal = (
+  props: Partial<{
+    onOpenChange: (open: boolean) => void;
+    layoutMode: "desktop" | "mobile";
+  }> = {},
+) => {
+  render(
+    <CompanionChatModal
+      open
+      onOpenChange={props.onOpenChange ?? vi.fn()}
+      layoutMode={props.layoutMode}
+    />,
+  );
 };
 
 const expectOpenChatWithFallbackInitial = () => {
@@ -248,6 +259,7 @@ describe("CompanionChatModal", () => {
     expect(mocks.drawerRootProps[0]).toMatchObject({
       open: true,
       repositionInputs: false,
+      handleOnly: true,
     });
   });
 
@@ -299,5 +311,11 @@ describe("CompanionChatModal", () => {
       "data-vaul-no-drag",
       "true",
     );
+    expect(
+      screen
+        .getByTestId("companion-chat-text-input")
+        .closest("[data-vaul-no-drag]"),
+    ).not.toBeNull();
   });
+
 });

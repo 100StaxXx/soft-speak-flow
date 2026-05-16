@@ -1777,11 +1777,6 @@ export function useCompanionAssistant({
         },
       );
 
-      if (!(await ensureFunctionSession())) {
-        submitLatencyTimerRef.current = null;
-        return false;
-      }
-
       setIsSubmitting(true);
       setDraftInput("");
       setInterimText("");
@@ -1808,6 +1803,10 @@ export function useCompanionAssistant({
       const nextUnifiedMessages = [...messages, optimisticUserMessage];
 
       try {
+        if (!(await ensureFunctionSession())) {
+          return false;
+        }
+
         lastStarterIntentRef.current = starterIntent ?? null;
         lastReplayablePlannerMessageRef.current = shouldUseDirectChat
           ? null

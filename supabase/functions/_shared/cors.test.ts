@@ -15,7 +15,9 @@ Deno.test("getAllowedOrigins keeps native defaults when ALLOWED_ORIGINS is confi
     const origins = corsModule.getAllowedOrigins();
 
     assert(origins.includes("capacitor://localhost"), "Expected Capacitor origin to remain allowed");
+    assert(origins.includes("ionic://localhost"), "Expected Ionic origin to remain allowed");
     assert(origins.includes("http://localhost"), "Expected localhost origin to remain allowed");
+    assert(origins.includes("http://127.0.0.1:8080"), "Expected Vite preview/dev origin to remain allowed");
     assert(origins.includes("https://app.cosmiq.quest"), "Expected production app origin to remain allowed");
     assert(origins.includes("https://custom.cosmiq.quest"), "Expected custom origin from env to be included");
   } finally {
