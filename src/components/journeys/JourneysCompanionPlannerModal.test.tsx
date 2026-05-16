@@ -1068,6 +1068,48 @@ describe("JourneysCompanionPlannerModal", () => {
     ).not.toBeNull();
   });
 
+  it("ignores mobile drawer close requests triggered during composer focus", () => {
+    const onOpenChange = vi.fn();
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={onOpenChange}
+        presentation="drawer"
+      />,
+    );
+
+    fireEvent.focus(
+      screen.getByTestId("journeys-companion-planner-text-input"),
+    );
+
+    const drawerProps = mocks.drawerRootProps.find(
+      (props) => props.open === true,
+    );
+    (drawerProps?.onOpenChange as (open: boolean) => void)(false);
+
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it("allows normal mobile drawer close requests away from the composer", () => {
+    const onOpenChange = vi.fn();
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={onOpenChange}
+        presentation="drawer"
+      />,
+    );
+
+    const drawerProps = mocks.drawerRootProps.find(
+      (props) => props.open === true,
+    );
+    (drawerProps?.onOpenChange as (open: boolean) => void)(false);
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
   it("keeps the mobile planner drawer flush when no keyboard inset is present", () => {
     render(
       <JourneysCompanionPlannerModal
