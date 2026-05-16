@@ -1049,7 +1049,7 @@ describe("JourneysCompanionPlannerModal", () => {
     });
   });
 
-  it("disables Vaul input repositioning for the mobile planner drawer", () => {
+  it("keeps mobile planner typing out of Vaul drawer gestures", () => {
     render(
       <JourneysCompanionPlannerModal
         open
@@ -1060,7 +1060,12 @@ describe("JourneysCompanionPlannerModal", () => {
 
     expect(
       mocks.drawerRootProps.find((props) => props.open === true),
-    ).toMatchObject({ repositionInputs: false });
+    ).toMatchObject({ repositionInputs: false, handleOnly: true });
+    expect(
+      screen
+        .getByTestId("journeys-companion-planner-text-input")
+        .closest("[data-vaul-no-drag]"),
+    ).not.toBeNull();
   });
 
   it("keeps the mobile planner drawer flush when no keyboard inset is present", () => {

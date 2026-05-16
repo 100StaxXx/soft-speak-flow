@@ -2142,6 +2142,7 @@ const JourneysCompanionOverlayBody = memo(
                   plannerPathfinderTheme.composerBar,
                   "flex-col items-stretch gap-2",
                 )}
+                data-vaul-no-drag
                 data-tutorial-avoid="true"
               >
                 <label
@@ -2309,7 +2310,12 @@ export const JourneysCompanionPlannerModal = memo(
     }
 
     return (
-      <Drawer open={open} onOpenChange={onOpenChange} repositionInputs={false}>
+      <Drawer
+        open={open}
+        onOpenChange={onOpenChange}
+        repositionInputs={false}
+        handleOnly
+      >
         <DrawerContent
           className="max-h-none border-none bg-transparent p-0 shadow-none"
           style={{ bottom: `${drawerLayout.bottomInset}px` }}
