@@ -2238,7 +2238,8 @@ describe("Journeys row drag integration", () => {
       expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
       expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeResetRequest);
       expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
-      expect(screen.getByTestId("date-pills-mount-id").textContent).not.toBe(scrollerMountIdBeforeResetRequest);
+      expect(screen.getByTestId("date-pills-mount-id").textContent).toBe(scrollerMountIdBeforeResetRequest);
+      expect(screen.getByTestId("journeys-mobile-date-strip")).not.toHaveStyle({ opacity: "0" });
     });
   });
 

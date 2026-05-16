@@ -150,7 +150,7 @@ const neglectedImageModule = await import(
 const mentorAudioModule = await import("./generate-mentor-audio/index.ts");
 
 const EXPECTED_MENTOR_VOICE_IDS = [
-  ["sage", "sage", "mcuuWJIofmzgKEGk3EMA"],
+  ["sage", "sage", "goT3UYdM9bhm0n2lmKQx"],
   ["lyra", "lyra", "54YYBuRuAG6KJooiOhFI"],
   ["icon", "icon", "6p0P6gezgvY1v6xbLzmU"],
   ["charles", "charles", "jRAAK67SEFE9m7ci5DhD"],
@@ -161,7 +161,7 @@ const EXPECTED_MENTOR_VOICE_IDS = [
 ] as const;
 
 const EXPECTED_ALIAS_VOICE_IDS = [
-  ["atlas", "sage", "mcuuWJIofmzgKEGk3EMA"],
+  ["atlas", "sage", "goT3UYdM9bhm0n2lmKQx"],
   ["carmen", "icon", "6p0P6gezgvY1v6xbLzmU"],
   ["solace", "charles", "jRAAK67SEFE9m7ci5DhD"],
   ["elizabeth", "charles", "jRAAK67SEFE9m7ci5DhD"],

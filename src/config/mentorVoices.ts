@@ -21,7 +21,7 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
     mentorSlug: "sage",
     mentorName: "The Sage",
     voiceName: "The Sage",
-    voiceId: "mcuuWJIofmzgKEGk3EMA",
+    voiceId: "goT3UYdM9bhm0n2lmKQx",
     defaultIntensity: "gentle",
     categories: ["clarity", "calm", "reflection"],
     voiceSettings: {

@@ -20,7 +20,7 @@ export const ELEVENLABS_MENTOR_VOICES: Record<
   MentorVoiceConfig
 > = {
   sage: {
-    voiceId: "mcuuWJIofmzgKEGk3EMA",
+    voiceId: "goT3UYdM9bhm0n2lmKQx",
     stability: 0.72,
     similarity_boost: 0.82,
     style_exaggeration: 0.28,

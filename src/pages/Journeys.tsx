@@ -2039,11 +2039,9 @@ const Journeys = () => {
 
         <QuestsErrorBoundary>
           {!isDesktopLayout ? (
-            <motion.div
-              initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: prefersReducedMotion ? 0 : 0.04, duration: prefersReducedMotion ? 0 : 0.2 }}
-              className="mb-4"
+            <div
+              data-testid="journeys-mobile-date-strip"
+              className="relative z-10 mb-4 min-h-[72px]"
             >
               <DatePillsScroller
                 selectedDate={selectedDate}
@@ -2054,7 +2052,7 @@ const Journeys = () => {
                 centerRequestKey={datePillCenterRequestKey}
                 centerRequestDateKey={datePillCenterRequestDateKey}
               />
-            </motion.div>
+            </div>
           ) : null}
 
           {isInboxRequested || inboxCount > 0 ? (

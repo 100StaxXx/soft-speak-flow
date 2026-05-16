@@ -146,21 +146,24 @@ describe("Paywall creator offer-code eligibility", () => {
   });
 
   it("presents the cinematic Cosmiq positioning across the paywall", () => {
-    render(
+    const { container } = render(
       <MemoryRouter>
         <Paywall />
       </MemoryRouter>,
     );
 
+    expect(container.querySelectorAll("main > section")).toHaveLength(3);
     expect(screen.getByTestId("paywall-overlay")).toHaveClass("z-[120]");
     expect(screen.getByText("Daily quests")).toBeInTheDocument();
     expect(screen.getByText("A companion that turns your goals into daily quests.")).toBeInTheDocument();
-    expect(
-      screen.getByText("Big goals become campaigns, rituals, milestones, and a planned day."),
-    ).toBeInTheDocument();
     expect(screen.getByText("Built for growth")).toBeInTheDocument();
     expect(screen.getByText("Your companion grows when you follow through.")).toBeInTheDocument();
     expect(screen.getByText("Start the trial. Keep the story moving.")).toBeInTheDocument();
+    expect(screen.queryByText("Guidance with a pulse")).not.toBeInTheDocument();
+    expect(screen.queryByText("Goals become systems")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Big goals become campaigns, rituals, milestones, and a planned day."),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("3-day free trial")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /start 3-day free trial/i })).toBeInTheDocument();
     expect(screen.getByText("Unlimited companion chat")).toBeInTheDocument();

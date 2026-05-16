@@ -3,7 +3,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowDown,
   ArrowRight,
-  CalendarDays,
   CheckCircle2,
   Crown,
   Gift,
@@ -91,8 +90,6 @@ const createPaywallBackdrop = (src: string, src2x = src): StaticBackgroundAsset 
 
 const paywallBackdrops = {
   quests: createPaywallBackdrop("/landing-backdrops/quests.webp", "/landing-backdrops/quests@2x.webp"),
-  guide: createPaywallBackdrop("/landing-backdrops/guide.webp", "/landing-backdrops/guide@2x.webp"),
-  campaigns: createPaywallBackdrop("/landing-backdrops/campaigns.webp", "/landing-backdrops/campaigns@2x.webp"),
   companion: createPaywallBackdrop("/landing-backdrops/companion.webp", "/landing-backdrops/companion@2x.webp"),
   profile: createPaywallBackdrop("/landing-backdrops/profile.webp", "/landing-backdrops/profile@2x.webp"),
 };
@@ -106,24 +103,6 @@ const paywallStorySections: PaywallStorySection[] = [
     background: paywallBackdrops.quests,
     icon: Target,
     imagePosition: "50% 42%",
-  },
-  {
-    id: "paywall-guide",
-    eyebrow: "Guidance with a pulse",
-    title: "Check in, get briefed, and find the next clear move.",
-    body: "Your guide helps you turn mood, intention, pep talks, and reflection into practical momentum instead of another blank planning screen.",
-    background: paywallBackdrops.guide,
-    icon: MessageCircle,
-    imagePosition: "50% 44%",
-  },
-  {
-    id: "paywall-campaigns",
-    eyebrow: "Goals become systems",
-    title: "Big goals become campaigns, rituals, milestones, and a planned day.",
-    body: "Cosmiq keeps the long arc visible while your companion helps translate ambition into something you can actually do today.",
-    background: paywallBackdrops.campaigns,
-    icon: CalendarDays,
-    imagePosition: "50% 48%",
   },
   {
     id: "paywall-companion",

@@ -26,7 +26,7 @@ function assert(condition: boolean, message: string): void {
 }
 
 const EXPECTED_VOICE_IDS: Record<SupportedMentorSlug, string> = {
-  sage: "mcuuWJIofmzgKEGk3EMA",
+  sage: "goT3UYdM9bhm0n2lmKQx",
   lyra: "54YYBuRuAG6KJooiOhFI",
   icon: "6p0P6gezgvY1v6xbLzmU",
   charles: "jRAAK67SEFE9m7ci5DhD",
