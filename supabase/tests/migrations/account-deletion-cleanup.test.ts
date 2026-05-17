@@ -4,10 +4,16 @@ function assert(condition: boolean, message: string): void {
   }
 }
 
-Deno.test("account deletion cleanup migration restores hardened relational cleanup", async () => {
+Deno.test("account deletion cleanup migrations restore hardened relational cleanup", async () => {
   const source = await Deno.readTextFile(
     new URL(
       "../../migrations/20260517003500_restore_hardened_delete_user_account.sql",
+      import.meta.url,
+    ),
+  );
+  const timeoutSource = await Deno.readTextFile(
+    new URL(
+      "../../migrations/20260517183000_extend_delete_user_account_statement_timeout.sql",
       import.meta.url,
     ),
   );
@@ -32,5 +38,11 @@ Deno.test("account deletion cleanup migration restores hardened relational clean
   assert(
     !source.includes("DELETE FROM auth.users"),
     "Expected auth deletion to stay in the delete-user Edge Function",
+  );
+  assert(
+    timeoutSource.includes("ALTER FUNCTION public.delete_user_account(uuid)") &&
+      timeoutSource.includes("statement_timeout") &&
+      timeoutSource.includes("'20s'"),
+    "Expected the account deletion RPC to have enough statement-timeout budget for multi-table cleanup",
   );
 });
