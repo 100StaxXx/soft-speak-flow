@@ -484,9 +484,7 @@ export function useLegacyCompanionAssistantAdapter({
 
   const placeholder = hasOpenPlannerThread
     ? "Reply here..."
-    : surface === "journeys"
-    ? `Talk to ${companionLabel}`
-    : `Talk to ${companionLabel} naturally.`;
+    : "chat";
 
   const hydrateFromUnifiedState = useCallback((
     input: LegacyFallbackHydrationInput,

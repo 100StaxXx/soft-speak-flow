@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
-import { useAchievements } from "./useAchievements";
 import { toast } from "@/components/ui/sonner";
 import { useRef, useMemo, useCallback, useEffect } from "react";
 import { useEvolution } from "@/contexts/EvolutionContext";
@@ -410,15 +409,10 @@ export const fetchCompanion = async (userId: string): Promise<Companion | null> 
   }));
 };
 
-interface DirectEvolutionResponse {
-  evolved?: boolean;
-  message?: string;
-  error?: string;
-  code?: string;
-  previous_stage?: number;
-  new_stage?: number;
-  image_url?: string;
-  evolution_id?: string;
+interface QueuedEvolutionJobResponse {
+  job_id: string;
+  requested_stage: number;
+  status: string;
 }
 
 interface HatchCompanionResponse {
@@ -554,15 +548,6 @@ type CreatePresetCompanionInput = {
 };
 
 type CreateCompanionInput = CreateAiCompanionInput | CreatePresetCompanionInput;
-
-type EvolutionFailureClass = "terminal" | "retryable_infrastructure" | "non_retryable";
-
-interface EvolutionResolvedFailure {
-  message: string;
-  failureClass: EvolutionFailureClass;
-  reason: string;
-  code: string | null;
-}
 
 type AwardXpResult = {
   should_evolve: boolean;
@@ -831,111 +816,22 @@ const isRetryableEvolutionInfrastructureSource = (normalizedSource: string) => (
   || normalizedSource.includes("service_unavailable")
 );
 
-const directEvolutionFailureMessage = (data: DirectEvolutionResponse | null) => {
-  const source = [data?.code, data?.message, data?.error].filter(Boolean).join(" ").toLowerCase();
-  if (source.includes("not enough xp")) return "Your companion is not ready to evolve yet.";
-  if (source.includes("max stage")) return "Your companion has already reached the maximum stage.";
-  if (source.includes("companion not found")) return "No companion found to evolve.";
-  if (source.includes("rate limit")) return "Evolution is on cooldown. Please try again in a little while.";
-  return "Unable to start evolution right now. Please try again.";
-};
-
-const resolveDirectEvolutionPayloadFailure = (data: DirectEvolutionResponse | null): EvolutionResolvedFailure => {
-  const source = [data?.code, data?.message, data?.error].filter(Boolean).join(" ").toLowerCase();
+const normalizeQueuedEvolutionRpcError = (error: SupabaseRpcError): Error => {
+  const source = getNormalizedRpcErrorSource(error);
   const terminalFailure = resolveKnownTerminalEvolutionFailure(source);
   if (terminalFailure) {
-    return {
-      message: terminalFailure.message,
-      failureClass: "terminal",
-      reason: terminalFailure.category,
-      code: terminalFailure.code,
-    };
+    return new Error(terminalFailure.message);
   }
 
   if (isRetryableEvolutionInfrastructureSource(source)) {
-    return {
-      message: "Evolution service is temporarily unavailable. Please try again in a minute.",
-      failureClass: "retryable_infrastructure",
-      reason: "direct_payload_infrastructure",
-      code: normalizeEvolutionErrorCode(data?.code) ?? "evolution_service_unavailable",
-    };
+    return new Error("Evolution service is temporarily unavailable. Please try again in a minute.");
   }
 
-  return {
-    message: directEvolutionFailureMessage(data),
-    failureClass: "non_retryable",
-    reason: "direct_payload_terminal",
-    code: normalizeEvolutionErrorCode(data?.code),
-  };
-};
+  const message = [error.message, error.details, error.hint]
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .join(" ");
 
-interface ResolvedDirectInvokeFailure extends EvolutionResolvedFailure {
-  invokeCategory: string;
-  invokeStatus: number | null;
-}
-
-const resolveDirectEvolutionInvokeFailure = async (invokeError: unknown): Promise<ResolvedDirectInvokeFailure> => {
-  const parsed = await parseFunctionInvokeError(invokeError);
-  const backend = `${parsed.responsePayload?.code ?? ""} ${parsed.backendMessage ?? ""} ${parsed.message ?? ""}`.toLowerCase();
-  const terminalFailure = resolveKnownTerminalEvolutionFailure(backend);
-
-  if (terminalFailure) {
-    return {
-      message: terminalFailure.message,
-      failureClass: "terminal",
-      reason: terminalFailure.category,
-      code: terminalFailure.code,
-      invokeCategory: parsed.category,
-      invokeStatus: parsed.status ?? null,
-    };
-  }
-
-  if (parsed.category === "auth") {
-    return {
-      message: "Your session has expired. Please sign in again and try evolving.",
-      failureClass: "terminal",
-      reason: "auth",
-      code: "unauthorized",
-      invokeCategory: parsed.category,
-      invokeStatus: parsed.status ?? null,
-    };
-  }
-
-  if (parsed.category === "rate_limit") {
-    return {
-      message: "Evolution is on cooldown. Please try again in a little while.",
-      failureClass: "terminal",
-      reason: "rate_limit",
-      code: "rate_limited",
-      invokeCategory: parsed.category,
-      invokeStatus: parsed.status ?? null,
-    };
-  }
-
-  if (
-    parsed.category === "network"
-    || parsed.category === "relay"
-    || parsed.status === 408
-    || (typeof parsed.status === "number" && parsed.status >= 500)
-  ) {
-    return {
-      message: "Evolution service is temporarily unavailable. Please try again in a minute.",
-      failureClass: "retryable_infrastructure",
-      reason: "invoke_infrastructure",
-      code: normalizeEvolutionErrorCode(parsed.responsePayload?.code ?? parsed.code) ?? "evolution_service_unavailable",
-      invokeCategory: parsed.category,
-      invokeStatus: parsed.status ?? null,
-    };
-  }
-
-  return {
-    message: toUserFacingFunctionError(parsed, { action: "start evolution" }),
-    failureClass: "non_retryable",
-    reason: "invoke_unknown",
-    code: normalizeEvolutionErrorCode(parsed.responsePayload?.code ?? parsed.code),
-    invokeCategory: parsed.category,
-    invokeStatus: parsed.status ?? null,
-  };
+  return new Error(message || "Unable to start evolution right now. Please try again.");
 };
 
 const normalizeEvolutionError = async (error: unknown): Promise<Error> => {
@@ -948,19 +844,28 @@ const normalizeEvolutionError = async (error: unknown): Promise<Error> => {
   return new Error(message);
 };
 
-type EvolutionMutationResult = { newStage: number | null } | null;
+type EvolutionMutationResult = {
+  queued: true;
+  jobId: string;
+  newStage: number;
+  status: string;
+} | null;
 
-const EVOLUTION_DIRECT_MAX_ATTEMPTS = 2;
-const EVOLUTION_RETRY_DELAYS_MS = [400, 900];
-
-const waitForEvolutionRetry = async (delayMs: number) => {
-  const effectiveDelayMs = import.meta.env.MODE === "test" ? 0 : delayMs;
-  await new Promise((resolve) => setTimeout(resolve, effectiveDelayMs));
-};
-
-const getEvolutionRetryDelayMs = (attempt: number) => {
-  const index = Math.max(0, Math.min(attempt - 1, EVOLUTION_RETRY_DELAYS_MS.length - 1));
-  return EVOLUTION_RETRY_DELAYS_MS[index] ?? EVOLUTION_RETRY_DELAYS_MS[EVOLUTION_RETRY_DELAYS_MS.length - 1];
+const kickQueuedEvolutionJob = (jobId: string) => {
+  void supabase.functions.invoke("process-companion-evolution-job", {
+    body: { jobId },
+  }).then(({ error }) => {
+    if (!error) return;
+    logger.warn("Queued companion evolution processor kick failed", {
+      jobId,
+      error: error.message ?? String(error),
+    });
+  }).catch((error) => {
+    logger.warn("Queued companion evolution processor kick threw", {
+      jobId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  });
 };
 
 interface UseCompanionOptions {
@@ -971,7 +876,6 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
   const { enabled = true } = options;
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { checkCompanionAchievements } = useAchievements();
   const { isEvolvingLoading, setIsEvolvingLoading } = useEvolution();
 
   // Prevent duplicate evolution/XP/companion creation requests during lag
@@ -1868,58 +1772,30 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         setIsEvolvingLoading(true);
 
         try {
-          for (let attempt = 1; attempt <= EVOLUTION_DIRECT_MAX_ATTEMPTS; attempt += 1) {
-            const { data: directEvolutionData, error: directEvolutionError } = await supabase.functions.invoke(
-              "generate-companion-evolution",
-              { body: {} },
-            );
+          const { data: queuedJobData, error: queuedJobError } = await supabase.rpc(
+            "request_companion_evolution_job",
+          );
 
-            if (directEvolutionError) {
-              const invokeFailure = await resolveDirectEvolutionInvokeFailure(directEvolutionError);
-              const shouldRetryInvoke =
-                invokeFailure.failureClass === "retryable_infrastructure"
-                && attempt < EVOLUTION_DIRECT_MAX_ATTEMPTS;
-
-              if (shouldRetryInvoke) {
-                logger.warn("Direct evolution invoke failed; retrying", {
-                  attempt,
-                  max_attempts: EVOLUTION_DIRECT_MAX_ATTEMPTS,
-                  reason: invokeFailure.reason,
-                  status: invokeFailure.invokeStatus,
-                  category: invokeFailure.invokeCategory,
-                });
-                await waitForEvolutionRetry(getEvolutionRetryDelayMs(attempt));
-                continue;
-              }
-
-              throw new Error(invokeFailure.message);
-            }
-
-            const directResult = (directEvolutionData ?? null) as DirectEvolutionResponse | null;
-            if (!directResult || directResult.evolved !== true) {
-              const directFailure = resolveDirectEvolutionPayloadFailure(directResult);
-              const shouldRetryPayload =
-                directFailure.failureClass === "retryable_infrastructure"
-                && attempt < EVOLUTION_DIRECT_MAX_ATTEMPTS;
-
-              if (shouldRetryPayload) {
-                logger.warn("Direct evolution returned unsuccessful payload; retrying", {
-                  attempt,
-                  max_attempts: EVOLUTION_DIRECT_MAX_ATTEMPTS,
-                  reason: directFailure.reason,
-                  code: directFailure.code,
-                });
-                await waitForEvolutionRetry(getEvolutionRetryDelayMs(attempt));
-                continue;
-              }
-
-              throw new Error(directFailure.message);
-            }
-
-            return { newStage: typeof directResult.new_stage === "number" ? directResult.new_stage : null };
+          if (queuedJobError) {
+            throw normalizeQueuedEvolutionRpcError(queuedJobError as SupabaseRpcError);
           }
 
-          throw new Error("Evolution service is temporarily unavailable. Please try again in a minute.");
+          const queuedJob = (Array.isArray(queuedJobData) ? queuedJobData[0] : queuedJobData) as
+            | QueuedEvolutionJobResponse
+            | null;
+
+          if (!queuedJob?.job_id || typeof queuedJob.requested_stage !== "number") {
+            throw new Error("Evolution service is temporarily unavailable. Please try again in a minute.");
+          }
+
+          kickQueuedEvolutionJob(queuedJob.job_id);
+
+          return {
+            queued: true,
+            jobId: queuedJob.job_id,
+            newStage: queuedJob.requested_stage,
+            status: queuedJob.status,
+          };
         } catch (error) {
           logger.error("Evolution mutation failed", {
             error: error instanceof Error ? error.message : String(error),
@@ -1946,21 +1822,12 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         setIsEvolvingLoading(false);
         return;
       }
-      if (typeof result.newStage === "number") {
-        await checkCompanionAchievements(result.newStage);
-      }
       queryClient.invalidateQueries({ queryKey: ["companion"] });
       queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
       queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
       queryClient.invalidateQueries({ queryKey: ["current-evolution-card"] });
 
-      const shouldWaitForEvolutionPresentation =
-        typeof result.newStage === "number"
-        && companion
-        && result.newStage > companion.current_stage;
-      if (!shouldWaitForEvolutionPresentation) {
-        setIsEvolvingLoading(false);
-      }
+      setIsEvolvingLoading(true);
     },
     onError: (error) => {
       evolutionInProgress.current = false;

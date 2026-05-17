@@ -26,10 +26,14 @@ const mocks = vi.hoisted(() => {
   const loggerErrorMock = vi.fn();
   const companionEvolutionPropsMock = vi.fn();
   const toastInfoMock = vi.fn();
+  const toastErrorMock = vi.fn();
   const rpcMock = vi.fn();
   const companionMemoriesInsertMock = vi.fn();
   const state = {
     callback: null as
+      | null
+      | ((payload: Record<string, unknown>) => Promise<void>),
+    jobCallback: null as
       | null
       | ((payload: Record<string, unknown>) => Promise<void>),
     mentorId: null as string | null,
@@ -44,6 +48,8 @@ const mocks = vi.hoisted(() => {
     error: unknown;
   }> = [];
   const animationJobLookupResponses: Array<{ data: unknown; error: unknown }> =
+    [];
+  const evolutionJobLookupResponses: Array<{ data: unknown; error: unknown }> =
     [];
   const functionsInvokeMock = vi.fn();
 
@@ -61,12 +67,14 @@ const mocks = vi.hoisted(() => {
     loggerErrorMock,
     companionEvolutionPropsMock,
     toastInfoMock,
+    toastErrorMock,
     rpcMock,
     companionMemoriesInsertMock,
     functionsInvokeMock,
     state,
     companionEvolutionLookupResponses,
     animationJobLookupResponses,
+    evolutionJobLookupResponses,
   };
 });
 
@@ -79,6 +87,12 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
     user: { id: "user-1" },
+  }),
+}));
+
+vi.mock("@/hooks/useAchievements", () => ({
+  useAchievements: () => ({
+    checkCompanionAchievements: vi.fn().mockResolvedValue(undefined),
   }),
 }));
 
@@ -146,6 +160,7 @@ vi.mock("@/components/CompanionEvolution", () => ({
 vi.mock("@/components/ui/sonner", () => ({
   toast: {
     info: mocks.toastInfoMock,
+    error: mocks.toastErrorMock,
   },
 }));
 
@@ -190,6 +205,28 @@ vi.mock("@/integrations/supabase/client", () => ({
           async () =>
             mocks.animationJobLookupResponses.shift() ?? {
               data: { id: "job-1" },
+              error: null,
+            },
+        );
+
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              order: vi.fn(() => ({
+                limit: vi.fn(() => ({
+                  maybeSingle: maybeSingleMock,
+                })),
+              })),
+            })),
+          })),
+        };
+      }
+
+      if (table === "companion_evolution_jobs") {
+        const maybeSingleMock = vi.fn(
+          async () =>
+            mocks.evolutionJobLookupResponses.shift() ?? {
+              data: null,
               error: null,
             },
         );
@@ -316,12 +353,14 @@ describe("GlobalEvolutionListener", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.state.callback = null;
+    mocks.state.jobCallback = null;
     mocks.state.mentorId = null;
     mocks.state.mentorLookup = null;
     mocks.state.pendingEvolutionReveal = null;
     mocks.state.userCompanionLookup = null;
     mocks.companionEvolutionLookupResponses.length = 0;
     mocks.animationJobLookupResponses.length = 0;
+    mocks.evolutionJobLookupResponses.length = 0;
     mocks.rpcMock.mockResolvedValue({ data: [], error: null });
     mocks.companionMemoriesInsertMock.mockResolvedValue({ error: null });
     mocks.functionsInvokeMock.mockResolvedValue({
@@ -336,6 +375,9 @@ describe("GlobalEvolutionListener", () => {
       window.localStorage.removeItem(
         "companion-evolution-presented:user-1:evo-5",
       );
+      window.localStorage.removeItem(
+        "companion-evolution-job-failed:user-1:evolution-job-1",
+      );
     } catch {
       // Some test localStorage shims are intentionally partial.
     }
@@ -343,10 +385,14 @@ describe("GlobalEvolutionListener", () => {
     mocks.onMock.mockImplementation(
       (
         _event: string,
-        _config: Record<string, unknown>,
+        config: Record<string, unknown>,
         callback: (payload: Record<string, unknown>) => Promise<void>,
       ) => {
-        mocks.state.callback = callback;
+        if (config.table === "companion_evolution_jobs") {
+          mocks.state.jobCallback = callback;
+        } else {
+          mocks.state.callback = callback;
+        }
         return {
           subscribe: mocks.subscribeMock,
         };
@@ -360,6 +406,192 @@ describe("GlobalEvolutionListener", () => {
     mocks.channelMock.mockReturnValue({
       on: mocks.onMock,
     });
+  });
+
+  it("hydrates an active queued evolution job on mount", async () => {
+    mocks.state.userCompanionLookup = {
+      id: "companion-1",
+      current_stage: 4,
+      current_image_url: "https://example.com/stage-4.png",
+      initial_image_url: "https://example.com/egg.png",
+      core_element: "fire",
+    };
+    mocks.evolutionJobLookupResponses.push({
+      data: {
+        id: "evolution-job-1",
+        companion_id: "companion-1",
+        requested_stage: 5,
+        status: "queued",
+        requested_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      error: null,
+    });
+
+    renderListener();
+
+    await waitFor(() => {
+      expect(mocks.setIsEvolvingLoadingMock).toHaveBeenCalledWith(true);
+    });
+    expect(mocks.state.pendingEvolutionReveal).toEqual(
+      expect.objectContaining({
+        status: "preparing",
+        companionId: "companion-1",
+        previousStage: 4,
+        newStage: 5,
+        previousImageUrl: "https://example.com/stage-4.png",
+      }),
+    );
+    expect(mocks.functionsInvokeMock).toHaveBeenCalledWith(
+      "process-companion-evolution-job",
+      { body: { jobId: "evolution-job-1" } },
+    );
+  });
+
+  it("clears loading and notifies when a queued evolution job fails", async () => {
+    renderListener();
+
+    await act(async () => {
+      await mocks.state.jobCallback?.({
+        eventType: "UPDATE",
+        new: {
+          id: "evolution-job-1",
+          companion_id: "companion-1",
+          requested_stage: 5,
+          status: "failed",
+          error_code: "image_generation_failed",
+          error_message: "provider failed",
+          requested_at: new Date().toISOString(),
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      });
+    });
+
+    expect(mocks.setIsEvolvingLoadingMock).toHaveBeenCalledWith(false);
+    expect(mocks.toastErrorMock).toHaveBeenCalledWith(
+      "Unable to evolve your companion. Please try again.",
+    );
+  });
+
+  it("hydrates a missed queued evolution job when the app resumes", async () => {
+    renderListener();
+    await flushMicrotasks();
+
+    mocks.state.userCompanionLookup = {
+      id: "companion-1",
+      current_stage: 4,
+      current_image_url: "https://example.com/stage-4.png",
+      initial_image_url: "https://example.com/egg.png",
+      core_element: "fire",
+    };
+    mocks.evolutionJobLookupResponses.push({
+      data: {
+        id: "evolution-job-resume",
+        companion_id: "companion-1",
+        requested_stage: 5,
+        status: "queued",
+        requested_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      error: null,
+    });
+    mocks.functionsInvokeMock.mockClear();
+
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+      await flushMicrotasks();
+    });
+
+    await waitFor(() => {
+      expect(mocks.setIsEvolvingLoadingMock).toHaveBeenCalledWith(true);
+    });
+    expect(mocks.state.pendingEvolutionReveal).toEqual(
+      expect.objectContaining({
+        status: "preparing",
+        companionId: "companion-1",
+        previousStage: 4,
+        newStage: 5,
+      }),
+    );
+    expect(mocks.functionsInvokeMock).toHaveBeenCalledWith(
+      "process-companion-evolution-job",
+      { body: { jobId: "evolution-job-resume" } },
+    );
+  });
+
+  it("hydrates the ready reveal after an evolution job completes", async () => {
+    renderListener();
+    await flushMicrotasks();
+
+    mocks.state.userCompanionLookup = {
+      id: "companion-1",
+      current_stage: 5,
+      current_image_url: "https://example.com/stage-5.png",
+      preset_id: "phoenix",
+      core_element: "fire",
+      initial_image_url: "https://example.com/egg.png",
+    };
+    mocks.companionEvolutionLookupResponses.push(
+      {
+        data: {
+          id: "evo-5",
+          image_url: "https://example.com/stage-5.png",
+          animation_video_url: "https://example.com/evolution.mp4",
+          animation_status: "succeeded",
+          animation_presented_at: null,
+        },
+        error: null,
+      },
+      {
+        data: {
+          image_url: "https://example.com/stage-4.png",
+        },
+        error: null,
+      },
+      {
+        data: {
+          id: "evo-5",
+          image_url: "https://example.com/stage-5.png",
+          animation_video_url: "https://example.com/evolution.mp4",
+          animation_status: "succeeded",
+          animation_presented_at: null,
+        },
+        error: null,
+      },
+    );
+
+    await act(async () => {
+      await mocks.state.jobCallback?.({
+        eventType: "UPDATE",
+        new: {
+          id: "evolution-job-1",
+          companion_id: "companion-1",
+          requested_stage: 5,
+          status: "succeeded",
+          requested_at: new Date().toISOString(),
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("evolution-animation-preloader"),
+      ).toBeInTheDocument();
+    });
+    await openPlayablePendingAnimation();
+
+    expect(mocks.companionEvolutionPropsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        previousStage: 4,
+        newStage: 5,
+        previousImageUrl: "https://example.com/stage-4.png",
+        newImageUrl: "https://example.com/stage-5.png",
+        animationVideoUrl: "https://example.com/evolution.mp4",
+      }),
+    );
   });
 
   it("invalidates companion-derived queries for non-evolution updates without showing the evolution UI", async () => {

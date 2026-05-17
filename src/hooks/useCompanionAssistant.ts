@@ -831,9 +831,7 @@ export function useCompanionAssistant({
     ? "Reply here or confirm the pending action."
     : activeFollowUp
       ? `Answer ${toPossessiveCompanionLabel(companionLabel)} follow-up.`
-      : surface === "journeys"
-        ? `Talk to ${companionLabel}`
-        : `Talk to ${companionLabel} naturally.`;
+      : "chat";
   const ensureFunctionSession = useCallback(
     async (options?: { silent?: boolean }) => {
       const hasSession = await hasActiveSupabaseFunctionSession(refreshSession);

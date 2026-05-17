@@ -106,8 +106,10 @@ interface FetchJobOptions {
   allowGlobalQueue?: boolean;
 }
 
+type SupabaseClientLike = any;
+
 const fetchJob = async (
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClientLike,
   userId: string | null,
   jobId?: string,
   options?: FetchJobOptions,
@@ -155,7 +157,7 @@ const fetchJob = async (
 };
 
 const claimJob = async (
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClientLike,
   job: CompanionEvolutionJob,
 ): Promise<CompanionEvolutionJob | null> => {
   if (job.status === "succeeded" || job.status === "failed") {
@@ -223,6 +225,7 @@ type EvolutionPipelineAuthContext =
 const runEvolutionPipeline = async (
   supabaseUrl: string,
   authContext: EvolutionPipelineAuthContext,
+  fetchImpl: typeof fetch = fetch,
 ) => {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -236,7 +239,7 @@ const runEvolutionPipeline = async (
     headers.Authorization = authContext.authHeader;
   }
 
-  const response = await fetch(
+  const response = await fetchImpl(
     `${supabaseUrl}/functions/v1/generate-companion-evolution`,
     {
       method: "POST",
@@ -271,7 +274,7 @@ const runEvolutionPipeline = async (
 };
 
 const ensureEvolutionCards = async (
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClientLike,
   companionId: string,
   stage: number,
 ) => {
@@ -291,7 +294,9 @@ const ensureEvolutionCards = async (
     .eq("companion_id", companionId);
 
   const existingStages = new Set(
-    (existingCards ?? []).map((card) => card.evolution_stage),
+    (existingCards ?? []).map((card: { evolution_stage: number }) =>
+      card.evolution_stage
+    ),
   );
 
   for (let currentStage = 0; currentStage <= stage; currentStage += 1) {
@@ -354,7 +359,7 @@ const ensureEvolutionCards = async (
 };
 
 const ensureEvolutionStory = async (
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClientLike,
   companionId: string,
   stage: number,
 ) => {
@@ -380,7 +385,7 @@ const ensureEvolutionStory = async (
 };
 
 const validateReferralStage3 = async (
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClientLike,
   userId: string,
   previousStage: number,
   newStage: number,
@@ -411,7 +416,7 @@ const validateReferralStage3 = async (
 };
 
 const sendCompletionPush = async (
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClientLike,
   internalSecret: string | null,
   userId: string,
 ) => {
@@ -458,7 +463,7 @@ const sendCompletionPush = async (
 };
 
 const runNonCriticalSideEffects = async (
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClientLike,
   internalSecret: string | null,
   job: CompanionEvolutionJob,
   previousStage: number,
@@ -494,8 +499,18 @@ const runNonCriticalSideEffects = async (
   }
 };
 
-serve(async (req) => {
+interface ProcessCompanionEvolutionJobDeps {
+  createClient?: typeof createClient;
+  fetch?: typeof fetch;
+}
+
+export const handleProcessCompanionEvolutionJob = async (
+  req: Request,
+  deps: ProcessCompanionEvolutionJobDeps = {},
+) => {
   let requestedJobId: string | undefined;
+  const createSupabaseClient = deps.createClient ?? createClient;
+  const fetchImpl = deps.fetch ?? fetch;
 
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -553,7 +568,7 @@ serve(async (req) => {
         );
       }
 
-      const authClient = createClient(supabaseUrl, anonKey, {
+      const authClient = createSupabaseClient(supabaseUrl, anonKey, {
         global: {
           headers: {
             Authorization: authHeader,
@@ -585,7 +600,7 @@ serve(async (req) => {
       ? requestBody.jobId
       : undefined;
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const supabase = createSupabaseClient(supabaseUrl, serviceRoleKey);
     const allowGlobalQueue = isInternal && !requestedJobId && !callerUserId;
 
     const job = await fetchJob(supabase, callerUserId, requestedJobId, {
@@ -683,6 +698,7 @@ serve(async (req) => {
     const evolutionPayload = await runEvolutionPipeline(
       supabaseUrl,
       pipelineAuthContext,
+      fetchImpl,
     );
 
     const nowIso = new Date().toISOString();
@@ -739,7 +755,7 @@ serve(async (req) => {
     console.error("process-companion-evolution-job failed", error);
 
     if (supabaseUrl && serviceRoleKey && requestedJobId) {
-      const supabase = createClient(supabaseUrl, serviceRoleKey);
+      const supabase = createSupabaseClient(supabaseUrl, serviceRoleKey);
       const { data: currentJob } = await supabase
         .from("companion_evolution_jobs")
         .select("id, status, retry_count")
@@ -838,4 +854,8 @@ serve(async (req) => {
       },
     );
   }
-});
+};
+
+if (Deno.env.get("SUPABASE_FUNCTIONS_TEST") !== "1") {
+  serve((req) => handleProcessCompanionEvolutionJob(req));
+}

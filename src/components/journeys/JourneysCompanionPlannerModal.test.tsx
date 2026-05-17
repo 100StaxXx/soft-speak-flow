@@ -131,7 +131,7 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
     mocks.assistantOptions.push(options);
     return {
       todayLabel: "Saturday, April 18",
-      placeholder: "Talk to Cosmiq",
+      placeholder: "chat",
       messages: mocks.state.messages,
       structuredResponse: mocks.state.structuredResponse,
       activeFollowUp: mocks.state.activeFollowUp,

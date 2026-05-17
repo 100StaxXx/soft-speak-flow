@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { CompanionEvolution } from "@/components/CompanionEvolution";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAchievements } from "@/hooks/useAchievements";
 import {
   useEvolution,
   type PendingEvolutionReveal,
@@ -61,6 +62,24 @@ type PersistedEvolutionMetadata = {
   animationPresentedAt: string | null;
 };
 
+type CompanionEvolutionJobStatus =
+  | "queued"
+  | "processing"
+  | "succeeded"
+  | "failed";
+
+type PersistedEvolutionJobMetadata = {
+  id: string;
+  companionId: string;
+  requestedStage: number;
+  status: CompanionEvolutionJobStatus;
+  errorCode: string | null;
+  errorMessage: string | null;
+  requestedAt: string | null;
+  completedAt: string | null;
+  updatedAt: string | null;
+};
+
 type AnimationRetryResult = {
   status: CompanionAnimationStatus | "unavailable" | null;
   jobId?: string;
@@ -98,10 +117,14 @@ type EvolutionPresentationRequest = Omit<
 const sleep = (delayMs: number) =>
   new Promise((resolve) => setTimeout(resolve, delayMs));
 const PRESENTED_EVOLUTION_STORAGE_PREFIX = "companion-evolution-presented";
+const FAILED_EVOLUTION_JOB_STORAGE_PREFIX = "companion-evolution-job-failed";
 const locallyPresentedEvolutionKeys = new Set<string>();
+const locallyNotifiedFailedEvolutionJobKeys = new Set<string>();
+const FAILED_EVOLUTION_JOB_NOTIFICATION_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export const clearLocalEvolutionPresentationGuardsForTest = () => {
   locallyPresentedEvolutionKeys.clear();
+  locallyNotifiedFailedEvolutionJobKeys.clear();
 };
 
 const normalizeAnimationStatus = (
@@ -113,6 +136,21 @@ const normalizeAnimationStatus = (
     value === "succeeded" ||
     value === "failed" ||
     value === "skipped"
+  ) {
+    return value;
+  }
+
+  return null;
+};
+
+const normalizeEvolutionJobStatus = (
+  value: unknown,
+): CompanionEvolutionJobStatus | null => {
+  if (
+    value === "queued" ||
+    value === "processing" ||
+    value === "succeeded" ||
+    value === "failed"
   ) {
     return value;
   }
@@ -222,6 +260,64 @@ const fetchPersistedEvolutionMetadata = async ({
   };
 };
 
+const toPersistedEvolutionJobMetadata = (
+  row: Record<string, unknown> | null | undefined,
+): PersistedEvolutionJobMetadata | null => {
+  const status = normalizeEvolutionJobStatus(row?.status);
+  const id = typeof row?.id === "string" ? row.id : null;
+  const companionId =
+    typeof row?.companion_id === "string" ? row.companion_id : null;
+  const requestedStage =
+    typeof row?.requested_stage === "number" ? row.requested_stage : null;
+
+  if (!id || !companionId || requestedStage === null || !status) {
+    return null;
+  }
+
+  return {
+    id,
+    companionId,
+    requestedStage,
+    status,
+    errorCode:
+      typeof row?.error_code === "string" ? row.error_code : null,
+    errorMessage:
+      typeof row?.error_message === "string" ? row.error_message : null,
+    requestedAt:
+      typeof row?.requested_at === "string" ? row.requested_at : null,
+    completedAt:
+      typeof row?.completed_at === "string" ? row.completed_at : null,
+    updatedAt:
+      typeof row?.updated_at === "string" ? row.updated_at : null,
+  };
+};
+
+const fetchLatestEvolutionJobMetadata = async ({
+  userId,
+}: {
+  userId: string;
+}): Promise<PersistedEvolutionJobMetadata | null> => {
+  const { data, error } = await supabase
+    .from("companion_evolution_jobs")
+    .select(
+      "id, companion_id, requested_stage, status, error_code, error_message, requested_at, completed_at, updated_at",
+    )
+    .eq("user_id", userId)
+    .order("requested_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    logger.warn("Evolution listener: Failed to hydrate evolution job", {
+      userId,
+      error: error.message,
+    });
+    return null;
+  }
+
+  return toPersistedEvolutionJobMetadata(data as Record<string, unknown> | null);
+};
+
 const isTimestampAtOrAfter = (
   value: string | null,
   referenceMs: number,
@@ -295,6 +391,11 @@ const getPresentedEvolutionStorageKey = (
   evolutionId: string,
 ): string => `${PRESENTED_EVOLUTION_STORAGE_PREFIX}:${userId}:${evolutionId}`;
 
+const getFailedEvolutionJobStorageKey = (
+  userId: string,
+  jobId: string,
+): string => `${FAILED_EVOLUTION_JOB_STORAGE_PREFIX}:${userId}:${jobId}`;
+
 const markEvolutionPresentedLocally = (userId: string, evolutionId: string) => {
   const storageKey = getPresentedEvolutionStorageKey(userId, evolutionId);
   locallyPresentedEvolutionKeys.add(storageKey);
@@ -312,6 +413,31 @@ const wasEvolutionPresentedLocally = (
 ): boolean => {
   const storageKey = getPresentedEvolutionStorageKey(userId, evolutionId);
   if (locallyPresentedEvolutionKeys.has(storageKey)) return true;
+
+  try {
+    return Boolean(window.localStorage.getItem(storageKey));
+  } catch {
+    return false;
+  }
+};
+
+const markFailedEvolutionJobNotifiedLocally = (userId: string, jobId: string) => {
+  const storageKey = getFailedEvolutionJobStorageKey(userId, jobId);
+  locallyNotifiedFailedEvolutionJobKeys.add(storageKey);
+
+  try {
+    window.localStorage.setItem(storageKey, new Date().toISOString());
+  } catch {
+    // localStorage can be unavailable in privacy modes; the toast is best-effort.
+  }
+};
+
+const wasFailedEvolutionJobNotifiedLocally = (
+  userId: string,
+  jobId: string,
+): boolean => {
+  const storageKey = getFailedEvolutionJobStorageKey(userId, jobId);
+  if (locallyNotifiedFailedEvolutionJobKeys.has(storageKey)) return true;
 
   try {
     return Boolean(window.localStorage.getItem(storageKey));
@@ -680,6 +806,7 @@ export const GlobalEvolutionListener = () => {
   } = useEvolution();
   const { setEvolutionInProgress } = useCelebration();
   const { triggerEvent } = useCompanionMotionSafe();
+  const { checkCompanionAchievements } = useAchievements();
   const [isEvolving, setIsEvolving] = useState(false);
   const [evolutionData, setEvolutionData] =
     useState<EvolutionPresentationData | null>(null);
@@ -695,6 +822,14 @@ export const GlobalEvolutionListener = () => {
   const presentationRetryNotifiedKeysRef = useRef(new Set<string>());
   const recentLocalHatchKeysRef = useRef(new Map<string, number>());
   const recordedEvolutionMemoryIdsRef = useRef(new Set<string>());
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const buildEvolutionKey = useCallback(
     (companionId: string, stage: number) => `${companionId}:${stage}`,
@@ -1135,6 +1270,13 @@ export const GlobalEvolutionListener = () => {
           level,
           evolvedAt: persistedEvolution.evolvedAt,
         });
+        void checkCompanionAchievements(level).catch((error) => {
+          logger.warn("Evolution listener: Failed to check companion achievements", {
+            companionId,
+            level,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
 
         const readyEvolution = await waitForEvolutionAnimation({
           companionId,
@@ -1214,6 +1356,7 @@ export const GlobalEvolutionListener = () => {
     [
       buildEvolutionKey,
       clearPresentationRetryTimer,
+      checkCompanionAchievements,
       markPendingRevealReady,
       recordEvolutionMemory,
       setPendingRevealState,
@@ -1340,24 +1483,24 @@ export const GlobalEvolutionListener = () => {
     };
   }, [pendingEvolutionData, retryPendingAnimationPreload]);
 
+  const invalidateCompanionQueries = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["companion"] });
+    queryClient.invalidateQueries({ queryKey: ["companion-health"] });
+    queryClient.invalidateQueries({ queryKey: ["companion-care-signals"] });
+    queryClient.invalidateQueries({ queryKey: ["companion-attributes"] });
+    queryClient.invalidateQueries({ queryKey: ["companion-story"] });
+    queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
+    queryClient.invalidateQueries({ queryKey: ["companion-memories"] });
+    queryClient.invalidateQueries({ queryKey: ["companion-bond"] });
+    queryClient.invalidateQueries({
+      queryKey: ["companion-evolution-image"],
+    });
+    queryClient.invalidateQueries({ queryKey: ["current-evolution-card"] });
+    queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
+  }, [queryClient]);
+
   useEffect(() => {
     if (!user) return;
-
-    const invalidateCompanionQueries = () => {
-      queryClient.invalidateQueries({ queryKey: ["companion"] });
-      queryClient.invalidateQueries({ queryKey: ["companion-health"] });
-      queryClient.invalidateQueries({ queryKey: ["companion-care-signals"] });
-      queryClient.invalidateQueries({ queryKey: ["companion-attributes"] });
-      queryClient.invalidateQueries({ queryKey: ["companion-story"] });
-      queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
-      queryClient.invalidateQueries({ queryKey: ["companion-memories"] });
-      queryClient.invalidateQueries({ queryKey: ["companion-bond"] });
-      queryClient.invalidateQueries({
-        queryKey: ["companion-evolution-image"],
-      });
-      queryClient.invalidateQueries({ queryKey: ["current-evolution-card"] });
-      queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
-    };
 
     const channel = supabase
       .channel(`companion-evolution-${user.id}`)
@@ -1524,17 +1667,14 @@ export const GlobalEvolutionListener = () => {
     buildEvolutionKey,
     pruneRecentLocalHatchKeys,
     beginEvolutionPresentationWhenReady,
-    queryClient,
+    invalidateCompanionQueries,
     user,
     user?.id,
   ]);
 
-  useEffect(() => {
+  const hydratePendingEvolutionReveal = useCallback(async () => {
     if (!user?.id) return;
 
-    let cancelled = false;
-
-    const hydratePendingEvolutionReveal = async () => {
       const { data: companion, error } = await supabase
         .from("user_companion")
         .select(
@@ -1543,7 +1683,7 @@ export const GlobalEvolutionListener = () => {
         .eq("user_id", user.id)
         .maybeSingle();
 
-      if (cancelled) return;
+      if (!mountedRef.current) return;
 
       if (error) {
         logger.warn(
@@ -1587,7 +1727,7 @@ export const GlobalEvolutionListener = () => {
       });
 
       if (
-        cancelled ||
+        !mountedRef.current ||
         !currentEvolution ||
         !shouldHydratePendingEvolutionReveal(currentEvolution)
       ) {
@@ -1656,7 +1796,11 @@ export const GlobalEvolutionListener = () => {
         }) ??
         currentImageUrl;
 
-      if (cancelled || !resolvedCurrentImageUrl || !resolvedPreviousImageUrl) {
+      if (
+        !mountedRef.current ||
+        !resolvedCurrentImageUrl ||
+        !resolvedPreviousImageUrl
+      ) {
         return;
       }
 
@@ -1688,14 +1832,285 @@ export const GlobalEvolutionListener = () => {
         element,
         dispatchLoadingStart: false,
       });
+  }, [
+    beginEvolutionPresentationWhenReady,
+    markPendingRevealReady,
+    user?.id,
+  ]);
+
+  useEffect(() => {
+    void hydratePendingEvolutionReveal();
+  }, [hydratePendingEvolutionReveal]);
+
+  const setPreparingStateForEvolutionJob = useCallback(
+    async (job: PersistedEvolutionJobMetadata) => {
+      setIsEvolvingLoading(true);
+
+      if (!isTierBoundaryLevel(job.requestedStage)) {
+        return;
+      }
+
+      const currentPending = pendingEvolutionRevealRef.current;
+      if (
+        currentPending?.status === "ready" &&
+        currentPending.companionId === job.companionId &&
+        currentPending.newStage === job.requestedStage
+      ) {
+        return;
+      }
+
+      const { data: companion, error } = await supabase
+        .from("user_companion")
+        .select(
+          "id, current_stage, current_image_url, initial_image_url, preset_id, core_element, dormant_image_url, neglected_image_url",
+        )
+        .eq("id", job.companionId)
+        .maybeSingle();
+
+      if (error) {
+        logger.warn("Evolution listener: Failed to hydrate active evolution job companion", {
+          companionId: job.companionId,
+          jobId: job.id,
+          error: error.message,
+        });
+        return;
+      }
+
+      const companionRecord = companion as Record<string, unknown> | null;
+      const currentStage =
+        typeof companionRecord?.current_stage === "number"
+          ? companionRecord.current_stage
+          : Math.max(0, job.requestedStage - 1);
+      const previousStage = Math.max(
+        0,
+        Math.min(job.requestedStage - 1, currentStage),
+      );
+      const element =
+        typeof companionRecord?.core_element === "string"
+          ? companionRecord.core_element
+          : undefined;
+      const currentImageUrl =
+        typeof companionRecord?.current_image_url === "string"
+          ? companionRecord.current_image_url
+          : typeof companionRecord?.initial_image_url === "string"
+            ? companionRecord.initial_image_url
+            : "";
+      const presetId =
+        typeof companionRecord?.preset_id === "string"
+          ? companionRecord.preset_id
+          : null;
+      const dormantImageUrl =
+        typeof companionRecord?.dormant_image_url === "string"
+          ? companionRecord.dormant_image_url
+          : null;
+      const neglectedImageUrl =
+        typeof companionRecord?.neglected_image_url === "string"
+          ? companionRecord.neglected_image_url
+          : null;
+      const previousImageUrl =
+        resolveCompanionVisualAssetUrl({
+          preset_id: presetId,
+          current_stage: previousStage,
+          core_element: element ?? null,
+          current_image_url: currentImageUrl,
+          dormant_image_url: dormantImageUrl,
+          neglected_image_url: neglectedImageUrl,
+        }) ?? currentImageUrl;
+      const pendingImageUrl =
+        resolveCompanionVisualAssetUrl({
+          preset_id: presetId,
+          current_stage: job.requestedStage,
+          core_element: element ?? null,
+          current_image_url: currentImageUrl,
+          dormant_image_url: dormantImageUrl,
+          neglected_image_url: neglectedImageUrl,
+        }) ?? currentImageUrl;
+
+      if (!previousImageUrl || !pendingImageUrl) {
+        return;
+      }
+
+      setPendingRevealState((current) => {
+        if (
+          current?.status === "ready" &&
+          current.companionId === job.companionId &&
+          current.newStage === job.requestedStage
+        ) {
+          return current;
+        }
+
+        return {
+          status: "preparing",
+          evolutionId: null,
+          companionId: job.companionId,
+          previousStage,
+          newStage: job.requestedStage,
+          previousImageUrl,
+          newImageUrl: pendingImageUrl,
+          animationVideoUrl: null,
+          presetId,
+          element: element ?? null,
+        };
+      });
+    },
+    [setIsEvolvingLoading, setPendingRevealState],
+  );
+
+  const notifyFailedEvolutionJob = useCallback(
+    (job: PersistedEvolutionJobMetadata) => {
+      if (!user?.id) return;
+      if (wasFailedEvolutionJobNotifiedLocally(user.id, job.id)) return;
+
+      const latestActivityMs =
+        getTimestampMs(job.completedAt) ??
+        getTimestampMs(job.updatedAt) ??
+        getTimestampMs(job.requestedAt);
+      if (
+        latestActivityMs !== null &&
+        Date.now() - latestActivityMs >
+          FAILED_EVOLUTION_JOB_NOTIFICATION_WINDOW_MS
+      ) {
+        return;
+      }
+
+      markFailedEvolutionJobNotifiedLocally(user.id, job.id);
+      const normalizedCode = normalizeAnimationReason(job.errorCode);
+      const message =
+        normalizedCode === "not_enough_xp"
+          ? "Your companion is not ready to evolve yet."
+          : normalizedCode === "rate_limited"
+            ? "Evolution is on cooldown. Please try again in a little while."
+            : "Unable to evolve your companion. Please try again.";
+
+      toast.error(message);
+    },
+    [user?.id],
+  );
+
+  const handleEvolutionJobMetadata = useCallback(
+    async (job: PersistedEvolutionJobMetadata) => {
+      invalidateCompanionQueries();
+      const key = buildEvolutionKey(job.companionId, job.requestedStage);
+
+      if (job.status === "queued" || job.status === "processing") {
+        await setPreparingStateForEvolutionJob(job);
+        if (job.status === "queued") {
+          void supabase.functions.invoke("process-companion-evolution-job", {
+            body: { jobId: job.id },
+          });
+        }
+        return;
+      }
+
+      if (job.status === "failed") {
+        clearPresentationRetryTimer(key);
+        pendingEvolutionKeysRef.current.delete(key);
+        pendingPreloadKeyRef.current = null;
+        setPendingEvolutionData(null);
+        setIsEvolvingLoading(false);
+        setPendingRevealState((current) =>
+          current?.companionId === job.companionId &&
+          current.newStage === job.requestedStage
+            ? null
+            : current,
+        );
+        notifyFailedEvolutionJob(job);
+        return;
+      }
+
+      await hydratePendingEvolutionReveal();
+      if (
+        !pendingEvolutionRevealRef.current &&
+        pendingEvolutionKeysRef.current.size === 0 &&
+        !pendingPreloadKeyRef.current
+      ) {
+        setIsEvolvingLoading(false);
+      }
+    },
+    [
+      buildEvolutionKey,
+      clearPresentationRetryTimer,
+      hydratePendingEvolutionReveal,
+      invalidateCompanionQueries,
+      notifyFailedEvolutionJob,
+      setIsEvolvingLoading,
+      setPendingRevealState,
+      setPreparingStateForEvolutionJob,
+    ],
+  );
+
+  const hydrateLatestEvolutionJob = useCallback(async () => {
+    if (!user?.id) return;
+
+    const latestJob = await fetchLatestEvolutionJobMetadata({ userId: user.id });
+    if (!latestJob || !mountedRef.current) {
+      return;
+    }
+
+    await handleEvolutionJobMetadata(latestJob);
+  }, [handleEvolutionJobMetadata, user?.id]);
+
+  useEffect(() => {
+    void hydrateLatestEvolutionJob();
+  }, [hydrateLatestEvolutionJob]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const hydrateWhenVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      void hydrateLatestEvolutionJob();
+      void hydratePendingEvolutionReveal();
     };
 
-    void hydratePendingEvolutionReveal();
+    document.addEventListener("visibilitychange", hydrateWhenVisible);
+    window.addEventListener("focus", hydrateWhenVisible);
 
     return () => {
-      cancelled = true;
+      document.removeEventListener("visibilitychange", hydrateWhenVisible);
+      window.removeEventListener("focus", hydrateWhenVisible);
     };
-  }, [beginEvolutionPresentationWhenReady, markPendingRevealReady, user?.id]);
+  }, [hydrateLatestEvolutionJob, hydratePendingEvolutionReveal, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const jobChannel = supabase
+      .channel(`companion-evolution-jobs-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "companion_evolution_jobs",
+          filter: `user_id=eq.${user.id}`,
+        },
+        async (payload) => {
+          const metadata = toPersistedEvolutionJobMetadata(
+            payload.new as Record<string, unknown> | null,
+          );
+          if (!metadata) return;
+
+          await handleEvolutionJobMetadata(metadata);
+        },
+      )
+      .subscribe((status, err) => {
+        if (status === "SUBSCRIBED") {
+          return;
+        }
+
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          logger.warn("Evolution job listener subscription error", {
+            status,
+            error: err?.message,
+          });
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(jobChannel);
+    };
+  }, [handleEvolutionJobMetadata, user?.id]);
 
   useEffect(() => {
     if (!user) return;

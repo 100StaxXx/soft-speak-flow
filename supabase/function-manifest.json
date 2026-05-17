@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-16T17:53:28Z",
+  "generatedAt": "2026-05-17T08:19:13Z",
   "frontendInvoked": [
     "adjust-epic-plan",
     "analyze-user-patterns",
@@ -24,7 +24,6 @@
     "generate-adversary-image",
     "generate-campaign-welcome-image",
     "generate-check-in-response",
-    "generate-companion-evolution",
     "generate-companion-image",
     "generate-companion-launcher-image",
     "generate-companion-stat-analysis",
@@ -57,6 +56,7 @@
     "mentor-chat",
     "optimize-daily-plan",
     "prewarm-companion-animation",
+    "process-companion-evolution-job",
     "process-paypal-payout",
     "process-referral",
     "record-ai-interaction",
@@ -96,6 +96,7 @@
     "outlook-calendar-auth",
     "prewarm-companion-animation",
     "process-companion-animation-job",
+    "process-companion-evolution-job",
     "sync-daily-pep-talk-transcript",
     "transcribe-audio"
   ],
@@ -106,6 +107,7 @@
     "notifications-dispatch-v2",
     "notifications-enqueue-v2",
     "process-companion-animation-job",
+    "process-companion-evolution-job",
     "rotate-daily-wallpapers"
   ],
   "allowList": [

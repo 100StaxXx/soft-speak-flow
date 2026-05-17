@@ -1428,6 +1428,10 @@ export const handleDeleteUser = async (
       await runDeleteStepWithRetry(
         "delete_user_account rpc",
         async () => {
+          // The bearer token has already been verified with auth.getUser above,
+          // and the RPC receives that verified id. Use the service-role client
+          // here so larger cleanup runs are not capped by the authenticated
+          // role's short statement_timeout.
           const { error } = await supabase.rpc("delete_user_account", {
             p_user_id: user.id,
           });

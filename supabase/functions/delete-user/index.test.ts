@@ -425,7 +425,7 @@ const createHandleDeleteUserHarness = ({
       },
     }),
     rpc: async () => {
-      operations.push("rpc.delete_user_account");
+      operations.push("admin.rpc.delete_user_account");
       return rpcResults[Math.min(rpcCallCount++, rpcResults.length - 1)];
     },
   };
@@ -526,7 +526,7 @@ Deno.test("delete-user removes legacy storage assets before rpc and auth delete"
   const firstRemoveIndex = harness.operations.findIndex((entry) =>
     entry.startsWith("storage.remove:")
   );
-  const rpcIndex = harness.operations.indexOf("rpc.delete_user_account");
+  const rpcIndex = harness.operations.indexOf("admin.rpc.delete_user_account");
   const authDeleteIndex = harness.operations.indexOf("auth.admin.deleteUser");
   assert(firstRemoveIndex !== -1, "Expected storage removal to occur");
   assert(rpcIndex !== -1, "Expected rpc deletion to occur");
@@ -578,7 +578,7 @@ Deno.test("delete-user removes registered storage assets before relational clean
   const registryQueryIndex = harness.operations.indexOf(
     "user_storage_assets.select:user-1:0-99",
   );
-  const rpcIndex = harness.operations.indexOf("rpc.delete_user_account");
+  const rpcIndex = harness.operations.indexOf("admin.rpc.delete_user_account");
   assert(
     registryQueryIndex !== -1,
     "Expected the storage ledger to be queried",

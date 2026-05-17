@@ -281,7 +281,22 @@ describe("useCompanion evolveCompanion", () => {
     mocks.userCompanionResponses.push({ data: companionFixture, error: null });
 
     mocks.fromMock.mockImplementation((table: string) => createQueryBuilder(table));
-    mocks.rpcMock.mockResolvedValue({ data: null, error: null });
+    mocks.rpcMock.mockImplementation(async (fnName: string) => {
+      if (fnName === "request_companion_evolution_job") {
+        return {
+          data: [
+            {
+              job_id: "evolution-job-1",
+              requested_stage: 1,
+              status: "queued",
+            },
+          ],
+          error: null,
+        };
+      }
+
+      return { data: null, error: null };
+    });
     mocks.invokeMock.mockResolvedValue({ data: null, error: null });
     mocks.generateWithValidationMock.mockResolvedValue({
       imageUrl: "https://example.com/generated-companion.png",
@@ -292,12 +307,7 @@ describe("useCompanion evolveCompanion", () => {
     });
   });
 
-  it("calls generate-companion-evolution directly and invalidates companion queries", async () => {
-    mocks.invokeMock.mockResolvedValue({
-      data: { evolved: true, new_stage: 1 },
-      error: null,
-    });
-
+  it("queues a companion evolution job and invalidates companion queries", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -315,8 +325,16 @@ describe("useCompanion evolveCompanion", () => {
       });
     });
 
-    expect(mutationResult!).toEqual({ newStage: 1 });
-    expect(mocks.invokeMock).toHaveBeenCalledWith("generate-companion-evolution", { body: {} });
+    expect(mutationResult!).toEqual({
+      queued: true,
+      jobId: "evolution-job-1",
+      newStage: 1,
+      status: "queued",
+    });
+    expect(mocks.rpcMock).toHaveBeenCalledWith("request_companion_evolution_job");
+    expect(mocks.invokeMock).toHaveBeenCalledWith("process-companion-evolution-job", {
+      body: { jobId: "evolution-job-1" },
+    });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["companion"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["companion-stories-all"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["evolution-cards"] });
@@ -325,10 +343,13 @@ describe("useCompanion evolveCompanion", () => {
     expect(mocks.setIsEvolvingLoadingMock).not.toHaveBeenCalledWith(false);
   });
 
-  it("surfaces evolved:false payloads with a clear user message", async () => {
-    mocks.invokeMock.mockResolvedValue({
-      data: { evolved: false, message: "Not enough XP" },
-      error: null,
+  it("surfaces queue RPC terminal errors with a clear user message", async () => {
+    mocks.rpcMock.mockResolvedValue({
+      data: null,
+      error: {
+        code: "P0001",
+        message: "not_enough_xp",
+      },
     });
 
     const { result } = await renderUseCompanion();
@@ -349,15 +370,11 @@ describe("useCompanion evolveCompanion", () => {
     expect(mocks.setIsEvolvingLoadingMock).toHaveBeenCalledWith(false);
   });
 
-  it("retries a transient invoke failure once and then succeeds", async () => {
+  it("does not fail queued evolution when the immediate processor kick fails", async () => {
     mocks.invokeMock
       .mockResolvedValueOnce({
         data: null,
         error: createRelayInvokeError(),
-      })
-      .mockResolvedValueOnce({
-        data: { evolved: true, new_stage: 1 },
-        error: null,
       });
 
     const { result } = await renderUseCompanion();
@@ -368,20 +385,27 @@ describe("useCompanion evolveCompanion", () => {
           newStage: 1,
           currentXP: 14,
         }),
-      ).resolves.toEqual({ newStage: 1 });
+      ).resolves.toEqual({
+        queued: true,
+        jobId: "evolution-job-1",
+        newStage: 1,
+        status: "queued",
+      });
     });
 
-    const generateInvokeCalls = mocks.invokeMock.mock.calls.filter(
-      ([fnName]) => fnName === "generate-companion-evolution",
+    expect(mocks.loggerWarnMock).toHaveBeenCalledWith(
+      "Queued companion evolution processor kick failed",
+      expect.objectContaining({ jobId: "evolution-job-1" }),
     );
-    expect(generateInvokeCalls).toHaveLength(2);
     expect(mocks.toastErrorMock).not.toHaveBeenCalled();
   });
 
-  it("surfaces a clean error after retryable infrastructure failures are exhausted", async () => {
-    mocks.invokeMock.mockResolvedValue({
+  it("surfaces a clean error when queueing is unavailable", async () => {
+    mocks.rpcMock.mockResolvedValue({
       data: null,
-      error: createRelayInvokeError(),
+      error: {
+        message: "Could not find the function public.request_companion_evolution_job in the schema cache",
+      },
     });
 
     const { result } = await renderUseCompanion();
@@ -395,10 +419,7 @@ describe("useCompanion evolveCompanion", () => {
       ).rejects.toThrow("Evolution service is temporarily unavailable. Please try again in a minute.");
     });
 
-    const generateInvokeCalls = mocks.invokeMock.mock.calls.filter(
-      ([fnName]) => fnName === "generate-companion-evolution",
-    );
-    expect(generateInvokeCalls).toHaveLength(2);
+    expect(mocks.invokeMock).not.toHaveBeenCalledWith("process-companion-evolution-job", expect.anything());
     expect(mocks.toastErrorMock).toHaveBeenCalledWith(
       "Evolution service is temporarily unavailable. Please try again in a minute.",
       expect.objectContaining({ duration: MAX_TOAST_DURATION_MS }),
@@ -406,10 +427,10 @@ describe("useCompanion evolveCompanion", () => {
   });
 
   it("suppresses duplicate-click evolution requests while one is in flight", async () => {
-    let resolveInvoke: ((value: unknown) => void) | null = null;
-    mocks.invokeMock.mockImplementationOnce(
+    let resolveRpc: ((value: unknown) => void) | null = null;
+    mocks.rpcMock.mockImplementationOnce(
       () => new Promise((resolve) => {
-        resolveInvoke = resolve;
+        resolveRpc = resolve;
       }),
     );
 
@@ -426,20 +447,31 @@ describe("useCompanion evolveCompanion", () => {
     });
 
     await waitFor(() => {
-      expect(mocks.invokeMock).toHaveBeenCalledTimes(1);
+      expect(mocks.rpcMock).toHaveBeenCalledTimes(1);
     });
 
-    resolveInvoke?.({
-      data: { evolved: true, new_stage: 1 },
+    resolveRpc?.({
+      data: [
+        {
+          job_id: "evolution-job-1",
+          requested_stage: 1,
+          status: "queued",
+        },
+      ],
       error: null,
     });
 
     await act(async () => {
-      await expect(firstMutation).resolves.toEqual({ newStage: 1 });
+      await expect(firstMutation).resolves.toEqual({
+        queued: true,
+        jobId: "evolution-job-1",
+        newStage: 1,
+        status: "queued",
+      });
       await expect(secondMutation).resolves.toBeNull();
     });
 
-    expect(mocks.invokeMock).toHaveBeenCalledTimes(1);
+    expect(mocks.rpcMock).toHaveBeenCalledTimes(1);
   });
 
   it("surfaces a clear error when award_xp_v2 is unavailable", async () => {
@@ -1086,12 +1118,6 @@ describe("useCompanion evolveCompanion", () => {
   });
 
   it("targets Level 5 for manual evolution after intermediate levels are already earned", async () => {
-    let resolveInvoke: ((value: unknown) => void) | null = null;
-    mocks.invokeMock.mockImplementationOnce(
-      () => new Promise((resolve) => {
-        resolveInvoke = resolve;
-      }),
-    );
     mocks.userCompanionResponses.length = 0;
     const levelFiveReadyCompanion = {
       ...companionFixture,
@@ -1115,8 +1141,6 @@ describe("useCompanion evolveCompanion", () => {
         currentXP: 100,
       });
     });
-
-    resolveInvoke?.({ data: { evolved: true, new_stage: 5 }, error: null });
   });
 
   it("keeps stage 0 eggs hatch-ready without auto-advancing them", async () => {
@@ -1747,7 +1771,7 @@ describe("useCompanion evolveCompanion", () => {
       result.current.triggerManualEvolution();
     });
 
-    expect(mocks.invokeMock).not.toHaveBeenCalledWith("generate-companion-evolution", expect.anything());
+    expect(mocks.rpcMock).not.toHaveBeenCalledWith("request_companion_evolution_job");
     expect(mocks.setIsEvolvingLoadingMock).not.toHaveBeenCalled();
   });
 
@@ -1823,7 +1847,7 @@ describe("useCompanion evolveCompanion", () => {
     expect(mocks.setIsEvolvingLoadingMock).toHaveBeenCalledWith(true);
   });
 
-  it("routes AI eggs through generate-companion-evolution instead of the preset hatch RPC", async () => {
+  it("routes AI eggs through the queued evolution job instead of the preset hatch RPC", async () => {
     mocks.userCompanionResponses.length = 0;
     mocks.userCompanionResponses.push(
       {
@@ -1853,11 +1877,6 @@ describe("useCompanion evolveCompanion", () => {
         error: null,
       },
     );
-    mocks.invokeMock.mockResolvedValueOnce({
-      data: { evolved: true, new_stage: 1 },
-      error: null,
-    });
-
     const { result } = await renderUseCompanion();
 
     expect(result.current.requiresHatchSelection).toBe(false);
@@ -1868,7 +1887,10 @@ describe("useCompanion evolveCompanion", () => {
     });
 
     await waitFor(() => {
-      expect(mocks.invokeMock).toHaveBeenCalledWith("generate-companion-evolution", { body: {} });
+      expect(mocks.rpcMock).toHaveBeenCalledWith("request_companion_evolution_job");
+      expect(mocks.invokeMock).toHaveBeenCalledWith("process-companion-evolution-job", {
+        body: { jobId: "evolution-job-1" },
+      });
     });
 
     expect(mocks.rpcMock).not.toHaveBeenCalledWith(

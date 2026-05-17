@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import confetti from "canvas-confetti";
 import { Sparkles } from "lucide-react";
@@ -78,6 +78,7 @@ const EMERGENCY_EXIT_DELAY_MS = 15_000;
 const IMAGE_PRELOAD_TIMEOUT_MS = 2_000;
 const HATCH_FOREGROUND_STAGE_MAX_WIDTH_PX = 560;
 const HATCH_FOREGROUND_STAGE_MAX_HEIGHT_PX = 700;
+const HATCH_FOREGROUND_STAGE_FALLBACK_ASPECT_RATIO = 1764 / 1172;
 const STROBE_BEAT_OFFSETS_MS = [
   0,
   350,
@@ -341,6 +342,13 @@ const CompanionEvolutionContent = ({
   const animationVideoRef = useRef<HTMLVideoElement | null>(null);
   const [isHatchVideoMuted, setIsHatchVideoMuted] = useState(() => globalAudio.getMuted());
   const [disableHatchVideo, setDisableHatchVideo] = useState(false);
+  const [hatchVideoAspectRatio, setHatchVideoAspectRatio] = useState(
+    HATCH_FOREGROUND_STAGE_FALLBACK_ASPECT_RATIO,
+  );
+  const [hatchVideoViewport, setHatchVideoViewport] = useState(() => ({
+    width: typeof window === "undefined" ? HATCH_FOREGROUND_STAGE_MAX_WIDTH_PX : window.innerWidth,
+    height: typeof window === "undefined" ? HATCH_FOREGROUND_STAGE_MAX_HEIGHT_PX : window.innerHeight,
+  }));
   const [animationVideoReady, setAnimationVideoReady] = useState(Boolean(animationVideoUrl));
   const [animationVideoFailed, setAnimationVideoFailed] = useState(false);
   const [animationVideoEnded, setAnimationVideoEnded] = useState(false);
@@ -452,6 +460,27 @@ const CompanionEvolutionContent = ({
     : isFirstEvolution
       ? "portrait"
       : "cover";
+  const hatchVideoStageAspectRatio =
+    Number.isFinite(hatchVideoAspectRatio) && hatchVideoAspectRatio > 0
+      ? hatchVideoAspectRatio
+      : HATCH_FOREGROUND_STAGE_FALLBACK_ASPECT_RATIO;
+  const safeHatchVideoViewportWidth = hatchVideoViewport.width > 0
+    ? hatchVideoViewport.width
+    : HATCH_FOREGROUND_STAGE_MAX_WIDTH_PX;
+  const safeHatchVideoViewportHeight = hatchVideoViewport.height > 0
+    ? hatchVideoViewport.height
+    : HATCH_FOREGROUND_STAGE_MAX_HEIGHT_PX;
+  const hatchVideoStageMaxHeightPx = Math.min(
+    safeHatchVideoViewportHeight * 0.78,
+    HATCH_FOREGROUND_STAGE_MAX_HEIGHT_PX,
+  );
+  const hatchVideoStageWidthPx = Math.min(
+    safeHatchVideoViewportWidth * 0.92,
+    HATCH_FOREGROUND_STAGE_MAX_WIDTH_PX,
+    hatchVideoStageMaxHeightPx * hatchVideoStageAspectRatio,
+  );
+  const hatchVideoStageWidth = `${Math.round(hatchVideoStageWidthPx * 100) / 100}px`;
+  const hatchVideoStageMaxHeight = `${Math.round(hatchVideoStageMaxHeightPx * 100) / 100}px`;
 
   useEffect(() => {
     setDisableHatchVideo(false);
@@ -483,6 +512,30 @@ const CompanionEvolutionContent = ({
   useEffect(() => {
     if (!hatchVideoBackdropRef.current) return;
     hatchVideoBackdropRef.current.muted = true;
+  }, [useHatchVideo]);
+
+  useEffect(() => {
+    setHatchVideoAspectRatio(HATCH_FOREGROUND_STAGE_FALLBACK_ASPECT_RATIO);
+  }, [hatchVideoUrl]);
+
+  useEffect(() => {
+    if (!useHatchVideo || typeof window === "undefined") return;
+
+    const updateHatchVideoViewport = () => {
+      setHatchVideoViewport({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+
+    updateHatchVideoViewport();
+    window.addEventListener("resize", updateHatchVideoViewport);
+    window.addEventListener("orientationchange", updateHatchVideoViewport);
+
+    return () => {
+      window.removeEventListener("resize", updateHatchVideoViewport);
+      window.removeEventListener("orientationchange", updateHatchVideoViewport);
+    };
   }, [useHatchVideo]);
 
   useEffect(() => {
@@ -854,6 +907,14 @@ const CompanionEvolutionContent = ({
     finishEvolution();
   };
 
+  const handleHatchVideoLoadedMetadata = useCallback((event: SyntheticEvent<HTMLVideoElement>) => {
+    const { videoHeight, videoWidth } = event.currentTarget;
+
+    if (videoWidth <= 0 || videoHeight <= 0) return;
+
+    setHatchVideoAspectRatio(videoWidth / videoHeight);
+  }, []);
+
   if (!isEvolving) return null;
 
   if (!artReadiness.ready) {
@@ -1007,11 +1068,12 @@ const CompanionEvolutionContent = ({
               />
               <div className="relative flex h-full w-full items-center justify-center px-4 py-10 sm:px-6">
                 <div
-                  className="relative w-full overflow-hidden rounded-[2rem] border border-white/12 bg-black/20 shadow-[0_0_48px_rgba(0,0,0,0.45)] backdrop-blur-[2px]"
+                  className="relative overflow-hidden rounded-[2rem] border border-white/12 bg-black/20 shadow-[0_0_48px_rgba(0,0,0,0.45)] backdrop-blur-[2px]"
                   data-testid="evolution-hatch-video-stage"
                   style={{
-                    width: `min(92vw, ${HATCH_FOREGROUND_STAGE_MAX_WIDTH_PX}px)`,
-                    height: `min(78vh, ${HATCH_FOREGROUND_STAGE_MAX_HEIGHT_PX}px)`,
+                    width: hatchVideoStageWidth,
+                    maxHeight: hatchVideoStageMaxHeight,
+                    aspectRatio: `${hatchVideoStageAspectRatio}`,
                   }}
                 >
                   <video
@@ -1022,6 +1084,7 @@ const CompanionEvolutionContent = ({
                     preload="auto"
                     muted={isHatchVideoMuted}
                     data-testid="evolution-hatch-video"
+                    onLoadedMetadata={handleHatchVideoLoadedMetadata}
                   />
                 </div>
               </div>

@@ -90,7 +90,7 @@ vi.mock("@/hooks/useLegacyCompanionAssistantAdapter", () => ({
     mocks.legacyAdapterOptions.push(options);
     return {
       todayLabel: "Saturday, April 18",
-      placeholder: "Talk to Nova",
+      placeholder: "chat",
       messages: [],
       structuredResponse: null,
       pendingAction: null,

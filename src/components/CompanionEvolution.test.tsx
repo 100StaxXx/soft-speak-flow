@@ -163,6 +163,7 @@ const FULL_DISMISSABLE_SEQUENCE_MS =
   + FULL_SEQUENCE_MS.apex
   + FULL_SEQUENCE_MS.reveal
   + FULL_SEQUENCE_MS.dismissBuffer;
+const HATCH_VIDEO_FALLBACK_ASPECT_RATIO = 1764 / 1172;
 
 class MockPreloadImage {
   onload: ((event: Event) => void) | null = null;
@@ -598,10 +599,28 @@ describe("CompanionEvolution", () => {
     expect(video.getAttribute("src")).toContain("/companion-hatch-videos/hatch__fox__fire__center-crop.mp4");
     expect(video.muted).toBe(false);
     expect(videoStage).toBeInTheDocument();
+    expect(videoStage.style.height).toBe("");
+    expect(videoStage.style.aspectRatio).toContain(String(HATCH_VIDEO_FALLBACK_ASPECT_RATIO));
     expect(screen.getByTestId("evolution-hatch-video-backdrop")).toBeInTheDocument();
     expect(HTMLMediaElement.prototype.play).toHaveBeenCalled();
     expect(screen.queryByTestId("evolution-hatching-overlay")).not.toBeInTheDocument();
     expect(screen.queryByTestId("evolution-art-stage")).not.toBeInTheDocument();
+
+    Object.defineProperty(video, "videoWidth", {
+      configurable: true,
+      value: 1920,
+    });
+    Object.defineProperty(video, "videoHeight", {
+      configurable: true,
+      value: 1080,
+    });
+
+    await act(async () => {
+      fireEvent.loadedMetadata(video);
+    });
+
+    expect(videoStage.style.height).toBe("");
+    expect(videoStage.style.aspectRatio).toContain(String(1920 / 1080));
 
     fireEvent.ended(video);
     expect(screen.getByText("Tap anywhere to continue")).toBeInTheDocument();
