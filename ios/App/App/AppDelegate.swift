@@ -195,6 +195,7 @@ class AppBridgeViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(AppBadgePlugin())
         bridge?.registerPluginInstance(NativeCalendarPlugin())
         bridge?.registerPluginInstance(NativePlacesAutocompletePlugin())
+        bridge?.registerPluginInstance(EvolutionShareVideoPlugin())
         bridge?.registerPluginInstance(WinWinKitPlugin())
     }
 }

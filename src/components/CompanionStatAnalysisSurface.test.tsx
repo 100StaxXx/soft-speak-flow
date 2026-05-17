@@ -7,6 +7,11 @@ const mocks = vi.hoisted(() => ({
   refreshAnalysisMock: vi.fn().mockResolvedValue(undefined),
   regenerateTitleCardMock: vi.fn().mockResolvedValue(undefined),
   useCompanionStatAnalysisMock: vi.fn(),
+  renderShareCardImageMock: vi.fn(),
+  shareRenderedMediaMock: vi.fn(),
+  isShareCancelledMock: vi.fn(),
+  toastSuccessMock: vi.fn(),
+  toastErrorMock: vi.fn(),
 }));
 
 const originalImage = globalThis.Image;
@@ -37,6 +42,20 @@ class MockImage {
 
 vi.mock("@/hooks/useCompanionStatAnalysis", () => ({
   useCompanionStatAnalysis: (...args: unknown[]) => mocks.useCompanionStatAnalysisMock(...args),
+}));
+
+vi.mock("@/utils/shareMedia", () => ({
+  DEFAULT_STATS_CARD_SHARE_TEXT: "My current Cosmiq title. #Cosmiq",
+  isShareCancelled: mocks.isShareCancelledMock,
+  renderShareCardImage: mocks.renderShareCardImageMock,
+  shareRenderedMedia: mocks.shareRenderedMediaMock,
+}));
+
+vi.mock("@/components/ui/sonner", () => ({
+  toast: {
+    success: mocks.toastSuccessMock,
+    error: mocks.toastErrorMock,
+  },
 }));
 
 vi.mock("@/components/ui/dialog", () => ({
@@ -284,6 +303,21 @@ describe("CompanionStatAnalysisSurface", () => {
     globalThis.Image = MockImage as unknown as typeof Image;
     mocks.refreshAnalysisMock.mockClear();
     mocks.regenerateTitleCardMock.mockClear();
+    mocks.renderShareCardImageMock.mockReset();
+    mocks.renderShareCardImageMock.mockResolvedValue(
+      new File(["title-card"], "cosmiq-the-oathbound-pathfinder-stats-card.png", {
+        type: "image/png",
+      }),
+    );
+    mocks.shareRenderedMediaMock.mockReset();
+    mocks.shareRenderedMediaMock.mockResolvedValue({
+      status: "shared",
+      captionCopied: false,
+    });
+    mocks.isShareCancelledMock.mockReset();
+    mocks.isShareCancelledMock.mockReturnValue(false);
+    mocks.toastSuccessMock.mockReset();
+    mocks.toastErrorMock.mockReset();
     mocks.useCompanionStatAnalysisMock.mockReset();
     mocks.useCompanionStatAnalysisMock.mockReturnValue({
       analysis,
@@ -333,6 +367,52 @@ describe("CompanionStatAnalysisSurface", () => {
     expect(screen.getAllByText("Discipline / Alignment").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Eli")).toBeInTheDocument();
     expect(screen.getByText("Cached for today")).toBeInTheDocument();
+  });
+
+  it("shares the ready title-card front without private stat details", async () => {
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="desktop"
+      />,
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Share Cosmiq title card",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mocks.renderShareCardImageMock).toHaveBeenCalledWith({
+        element: expect.any(HTMLElement),
+        filename: "cosmiq-the-oathbound-pathfinder-stats-card.png",
+        format: "story",
+      });
+    });
+
+    const capturedElement = mocks.renderShareCardImageMock.mock.calls[0]?.[0]
+      .element as HTMLElement;
+    const capturedText = capturedElement.textContent ?? "";
+
+    expect(capturedText).toContain("Cosmiq");
+    expect(capturedText).toContain("The Oathbound Pathfinder");
+    expect(capturedText).toContain(OATHBOUND_PATHFINDER_BIO);
+    expect(capturedText).toContain("2026-04-18");
+    expect(capturedText).not.toContain("Morning check-ins");
+    expect(capturedText).not.toContain("Habit completions");
+    expect(capturedText).not.toContain("Vitality");
+    expect(capturedText).not.toContain("560");
+    expect(capturedText).not.toContain("Strongest recent drivers");
+    expect(capturedText).not.toContain("Pair one morning check-in with one on-time task today.");
+
+    expect(mocks.shareRenderedMediaMock).toHaveBeenCalledWith({
+      uriOrFile: expect.any(File),
+      title: "The Oathbound Pathfinder",
+      text: "My current Cosmiq title. #Cosmiq",
+      dialogTitle: "Share Cosmiq title card",
+    });
   });
 
   it("shows a title loading indicator in the mobile drawer while title art is generating", () => {

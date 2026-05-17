@@ -11,6 +11,7 @@ import {
   Palette,
   RefreshCw,
   RotateCcw,
+  Share2,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
@@ -26,6 +27,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "@/components/ui/sonner";
 import {
   Dialog,
   DialogContent,
@@ -55,6 +57,12 @@ import {
   COMPANION_STAT_ANALYSIS_PRELUDE_CARDS,
 } from "@/shared/companionStatAnalysisPreludeCards";
 import { buildCompanionCosmiqTitleCharacterBio } from "@/shared/companionStatCosmiqTitles";
+import {
+  DEFAULT_STATS_CARD_SHARE_TEXT,
+  isShareCancelled,
+  renderShareCardImage,
+  shareRenderedMedia,
+} from "@/utils/shareMedia";
 
 interface CompanionStatAnalysisSurfaceProps {
   open: boolean;
@@ -189,6 +197,27 @@ const formatSnakeLabel = (value: string) =>
 
 const getScorePercent = (score: number) =>
   Math.max(0, Math.min(100, Math.round(((score - STAT_MIN) / (STAT_MAX - STAT_MIN)) * 100)));
+
+const buildCosmiqTitleShareFilename = (title: string) => {
+  const slug =
+    title
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "title-card";
+
+  return `cosmiq-${slug}-stats-card.png`;
+};
+
+const waitForShareCardRender = () =>
+  new Promise<void>((resolve) => {
+    if (typeof window === "undefined" || typeof window.requestAnimationFrame !== "function") {
+      globalThis.setTimeout(resolve, 0);
+      return;
+    }
+
+    window.requestAnimationFrame(() => resolve());
+  });
 
 interface CompanionStatCardViewModel {
   attribute: CompanionStatAttribute;
@@ -365,6 +394,9 @@ function CosmiqTitleFrontCard({
   testId,
   cardId,
   onFlip,
+  onShare,
+  canShare = false,
+  isSharing = false,
   prefersReducedMotion,
   style,
 }: {
@@ -375,6 +407,9 @@ function CosmiqTitleFrontCard({
   testId: string;
   cardId?: string;
   onFlip?: () => void;
+  onShare?: () => void;
+  canShare?: boolean;
+  isSharing?: boolean;
   prefersReducedMotion: boolean;
   style?: CSSProperties;
 }) {
@@ -410,7 +445,24 @@ function CosmiqTitleFrontCard({
       <div className="absolute inset-0 bg-[linear-gradient(180deg,hsl(var(--background)/0.05),hsl(var(--background)/0.18)_42%,hsl(var(--background)/0.88))]" />
 
       <div className="relative z-10 flex min-h-[min(72vh,760px)] flex-col justify-between p-4 sm:p-6">
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          {onShare && canShare ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              aria-label="Share Cosmiq title card"
+              className="border border-white/20 bg-background/70 backdrop-blur hover:bg-background/85"
+              onClick={onShare}
+              disabled={isSharing}
+            >
+              {isSharing ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+              ) : (
+                <Share2 className="h-4 w-4" />
+              )}
+            </Button>
+          ) : null}
           {onFlip ? (
             <Button
               type="button"
@@ -1057,6 +1109,9 @@ function CosmiqTitleRevealCard({
   isTitleArtFallback,
   isRegeneratingTitleCard,
   onRegenerateTitleCard,
+  onShareTitleCard,
+  canShareTitleCard,
+  isSharingTitleCard,
   prefersReducedMotion,
 }: {
   analysis: CompanionStatAnalysis;
@@ -1069,6 +1124,9 @@ function CosmiqTitleRevealCard({
   isTitleArtFallback: boolean;
   isRegeneratingTitleCard: boolean;
   onRegenerateTitleCard: (analysis: CompanionStatAnalysis) => Promise<unknown>;
+  onShareTitleCard: () => void;
+  canShareTitleCard: boolean;
+  isSharingTitleCard: boolean;
   prefersReducedMotion: boolean;
 }) {
   const imageUrl = isTitleArtFallback ? null : getTitleCardImageUrls(analysis.cosmiqTitleCard)[0] ?? null;
@@ -1165,11 +1223,63 @@ function CosmiqTitleRevealCard({
       imageAlt={`${analysis.cosmiqTitle.title} archetype illustration`}
       imageUrl={imageUrl}
       onFlip={onFlip}
+      onShare={onShareTitleCard}
+      canShare={canShareTitleCard}
+      isSharing={isSharingTitleCard}
       prefersReducedMotion={prefersReducedMotion}
       style={mentorAccentStyle(analysis)}
       testId="companion-cosmiq-title-card"
       title={analysis.cosmiqTitle.title}
     />
+  );
+}
+
+function CosmiqTitleShareCard({
+  analysis,
+  imageUrl,
+  titleCharacterBio,
+}: {
+  analysis: CompanionStatAnalysis;
+  imageUrl: string;
+  titleCharacterBio: string;
+}) {
+  return (
+    <div
+      data-testid="companion-cosmiq-title-share-card"
+      className="relative h-[640px] w-[360px] overflow-hidden bg-[#070912] text-white"
+    >
+      <img
+        alt=""
+        aria-hidden="true"
+        className="absolute inset-0 h-full w-full object-cover"
+        src={imageUrl}
+      />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,9,18,0.08),rgba(7,9,18,0.22)_36%,rgba(7,9,18,0.90))]" />
+      <div className="absolute inset-x-0 top-0 h-48 bg-[linear-gradient(180deg,rgba(7,9,18,0.62),rgba(7,9,18,0))]" />
+
+      <div className="relative z-10 flex h-full flex-col justify-between p-7">
+        <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.22em] text-white/78">
+          <span>Cosmiq</span>
+          <span>{analysis.analysisDate}</span>
+        </div>
+
+        <div className="rounded-lg border border-white/16 bg-[#090b14]/78 p-5 shadow-2xl backdrop-blur-md">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.20em] text-white/62">
+            Current Title
+          </p>
+          <h2 className="mt-3 text-4xl font-semibold leading-[1.02] text-white">
+            {analysis.cosmiqTitle.title}
+          </h2>
+          <p className="mt-4 text-[15px] leading-6 text-white/82">
+            {titleCharacterBio}
+          </p>
+          <div className="mt-5 h-px bg-white/16" />
+          <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/58">
+            My current Cosmiq title
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1191,6 +1301,9 @@ function CompanionStatAnalysisView({
   const prefersReducedMotion = useReducedMotion();
   const viewModel = useMemo(() => buildCompanionStatAnalysisViewModel(analysis), [analysis]);
   const [isFlipped, setIsFlipped] = useState(false);
+  const [isSharingTitleCard, setIsSharingTitleCard] = useState(false);
+  const [isShareCardRenderMounted, setIsShareCardRenderMounted] = useState(false);
+  const shareCardRef = useRef<HTMLDivElement>(null);
   const {
     imageState,
     isLoaded: isTitleCardImageLoaded,
@@ -1211,6 +1324,10 @@ function CompanionStatAnalysisView({
     : getTitleArtPreviewDwellMs(titleCardImageUrls.length);
   const [isTitleCardPreviewDwellComplete, setIsTitleCardPreviewDwellComplete] = useState(false);
   const [verifiedTitleCardPreviewCount, setVerifiedTitleCardPreviewCount] = useState(0);
+  const titleCharacterBio = useMemo(
+    () => buildCompanionCosmiqTitleCharacterBio(analysis.cosmiqTitle),
+    [analysis.cosmiqTitle],
+  );
   const handleVerifiedPreviewCountChange = useCallback((verifiedCount: number) => {
     setVerifiedTitleCardPreviewCount(verifiedCount);
   }, []);
@@ -1239,6 +1356,58 @@ function CompanionStatAnalysisView({
     };
   }, [isTitleCardImageLoaded, titleCardPreviewDwellMs, titleCardPreviewKey, verifiedTitleCardPreviewCount]);
   const isTitleCardPreviewDwellSatisfied = titleCardPreviewDwellMs <= 0 || isTitleCardPreviewDwellComplete;
+  const canShareTitleCard =
+    !isTitleArtFallback &&
+    titleCardStatus === "ready" &&
+    Boolean(primaryTitleCardImageUrl) &&
+    isTitleCardImageLoaded;
+
+  const handleShareTitleCard = useCallback(async () => {
+    if (!canShareTitleCard || !primaryTitleCardImageUrl) return;
+
+    setIsSharingTitleCard(true);
+    setIsShareCardRenderMounted(true);
+
+    try {
+      await waitForShareCardRender();
+      if (!shareCardRef.current) {
+        throw new Error("Cosmiq title share card was not ready");
+      }
+
+      const renderedCard = await renderShareCardImage({
+        element: shareCardRef.current,
+        filename: buildCosmiqTitleShareFilename(analysis.cosmiqTitle.title),
+        format: "story",
+      });
+
+      const result = await shareRenderedMedia({
+        uriOrFile: renderedCard,
+        title: analysis.cosmiqTitle.title,
+        text: DEFAULT_STATS_CARD_SHARE_TEXT,
+        dialogTitle: "Share Cosmiq title card",
+      });
+
+      if (result.status === "cancelled") return;
+
+      const captionText = result.captionCopied ? " Caption copied." : "";
+      toast.success(
+        result.status === "downloaded"
+          ? `Cosmiq title card downloaded.${captionText}`
+          : `Cosmiq title card ready to share.${captionText}`,
+      );
+    } catch (error) {
+      if (isShareCancelled(error)) return;
+      console.error("Failed to share Cosmiq title card:", error);
+      toast.error("Could not prepare this title card for sharing.");
+    } finally {
+      setIsShareCardRenderMounted(false);
+      setIsSharingTitleCard(false);
+    }
+  }, [
+    analysis.cosmiqTitle.title,
+    canShareTitleCard,
+    primaryTitleCardImageUrl,
+  ]);
 
   if (
     !isTitleArtFallback
@@ -1281,9 +1450,25 @@ function CompanionStatAnalysisView({
           isTitleArtFallback={isTitleArtFallback}
           isRegeneratingTitleCard={isRegeneratingTitleCard}
           onRegenerateTitleCard={onRegenerateTitleCard}
+          onShareTitleCard={() => void handleShareTitleCard()}
+          canShareTitleCard={canShareTitleCard}
+          isSharingTitleCard={isSharingTitleCard}
           prefersReducedMotion={prefersReducedMotion}
         />
       </motion.div>
+      {isShareCardRenderMounted && primaryTitleCardImageUrl ? (
+        <div
+          aria-hidden="true"
+          className="fixed left-[-10000px] top-0 z-[-1] h-[640px] w-[360px] overflow-hidden"
+          ref={shareCardRef}
+        >
+          <CosmiqTitleShareCard
+            analysis={analysis}
+            imageUrl={primaryTitleCardImageUrl}
+            titleCharacterBio={titleCharacterBio}
+          />
+        </div>
+      ) : null}
     </motion.div>
   );
 }

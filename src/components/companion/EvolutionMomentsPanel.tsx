@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Sparkles } from "lucide-react";
+import { Loader2, Share2, Sparkles } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "@/components/ui/sonner";
 import {
   PROGRESSION_VISUAL_BOUNDARY_LEVELS,
   isTierBoundaryLevel,
@@ -20,6 +22,12 @@ import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
 import { isSupabaseMissingRelationError } from "@/utils/supabaseSchemaErrors";
 import { shouldContainCompanionSceneImage } from "@/lib/companionImageFocal";
 import { cn } from "@/lib/utils";
+import {
+  DEFAULT_EVOLUTION_SHARE_TEXT,
+  isShareCancelled,
+  renderEvolutionShareVideo,
+  shareRenderedMedia,
+} from "@/utils/shareMedia";
 
 type EvolutionMomentStatus = "queued" | "processing" | "succeeded";
 
@@ -359,10 +367,48 @@ const EvolutionMomentsGrid = ({
     null,
   );
   const [videoFailed, setVideoFailed] = useState(false);
+  const [sharingMomentId, setSharingMomentId] = useState<string | null>(null);
 
   useEffect(() => {
     setVideoFailed(false);
   }, [selectedMoment?.id]);
+
+  const handleShareMoment = useCallback(async (moment: EvolutionMoment) => {
+    if (!moment.animation_video_url) return;
+
+    setSharingMomentId(moment.id);
+
+    try {
+      const renderedVideo = await renderEvolutionShareVideo({
+        sourceVideoUrl: moment.animation_video_url,
+        posterImageUrl: moment.image_url,
+        stage: moment.stage,
+        template: "aesthetic-reveal",
+      });
+
+      const result = await shareRenderedMedia({
+        uriOrFile: renderedVideo,
+        title: `Stage ${moment.stage} Evolution`,
+        text: DEFAULT_EVOLUTION_SHARE_TEXT,
+        dialogTitle: "Share evolution video",
+      });
+
+      if (result.status === "cancelled") return;
+
+      const captionText = result.captionCopied ? " Caption copied." : "";
+      toast.success(
+        result.status === "downloaded"
+          ? `Evolution video downloaded.${captionText}`
+          : `Evolution video ready to share.${captionText}`,
+      );
+    } catch (error) {
+      if (isShareCancelled(error)) return;
+      console.error("Failed to share evolution moment:", error);
+      toast.error("Could not prepare this evolution video for sharing.");
+    } finally {
+      setSharingMomentId(null);
+    }
+  }, []);
 
   return (
     <>
@@ -374,6 +420,8 @@ const EvolutionMomentsGrid = ({
             key={moment.id}
             moment={moment}
             onSelect={setSelectedMoment}
+            onShare={handleShareMoment}
+            isSharing={sharingMomentId === moment.id}
           />
         ))}
       </div>
@@ -425,6 +473,24 @@ const EvolutionMomentsGrid = ({
               )}
             </div>
           )}
+
+          {selectedMoment?.animation_video_url ? (
+            <div className="flex justify-end pt-1">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => void handleShareMoment(selectedMoment)}
+                disabled={sharingMomentId === selectedMoment.id}
+              >
+                {sharingMomentId === selectedMoment.id ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Share2 className="h-4 w-4" />
+                )}
+                Share Evolution
+              </Button>
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
     </>
@@ -434,9 +500,13 @@ const EvolutionMomentsGrid = ({
 const EvolutionMomentCard = ({
   moment,
   onSelect,
+  onShare,
+  isSharing,
 }: {
   moment: EvolutionMoment;
   onSelect: (moment: EvolutionMoment) => void;
+  onShare: (moment: EvolutionMoment) => void;
+  isSharing: boolean;
 }) => {
   const canPlay =
     moment.animation_status === "succeeded" &&
@@ -444,50 +514,75 @@ const EvolutionMomentCard = ({
   const usesContainedSceneImage = shouldContainCompanionSceneImage(moment.image_url);
 
   return (
-    <button
-      type="button"
-      disabled={!canPlay}
-      onClick={() => onSelect(moment)}
-      className={`group relative overflow-hidden rounded-lg border text-left transition-all active:scale-95 ${
+    <div
+      className={`group relative overflow-hidden rounded-lg border transition-all active:scale-95 ${
         canPlay
           ? "border-primary/30 bg-card hover:border-primary/60"
           : "cursor-not-allowed border-border/60 bg-secondary/30 opacity-75"
       }`}
-      aria-label={
-        canPlay
-          ? `Stage ${moment.stage} evolution`
-          : `Stage ${moment.stage} evolution generating`
-      }
     >
-      <div
-        className={cn(
-          "relative aspect-[4/3] overflow-hidden",
-          usesContainedSceneImage ? "bg-black" : "bg-secondary/40",
-        )}
+      <button
+        type="button"
+        disabled={!canPlay}
+        onClick={() => onSelect(moment)}
+        className="block w-full text-left"
+        aria-label={
+          canPlay
+            ? `Stage ${moment.stage} evolution`
+            : `Stage ${moment.stage} evolution generating`
+        }
       >
-        {moment.image_url ? (
-          <img
-            src={moment.image_url}
-            alt=""
-            className={cn(
-              "h-full w-full",
-              usesContainedSceneImage ? "object-contain" : "object-cover",
-            )}
-            data-companion-image-fit={usesContainedSceneImage ? "contain" : "cover"}
-            loading="lazy"
-            decoding="async"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <Sparkles className="h-7 w-7 text-muted-foreground/60" />
-          </div>
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/76 via-black/10 to-transparent" />
-        <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-semibold text-white">
-          Stage {moment.stage}
-        </span>
-      </div>
-    </button>
+        <div
+          className={cn(
+            "relative aspect-[4/3] overflow-hidden",
+            usesContainedSceneImage ? "bg-black" : "bg-secondary/40",
+          )}
+        >
+          {moment.image_url ? (
+            <img
+              src={moment.image_url}
+              alt=""
+              className={cn(
+                "h-full w-full",
+                usesContainedSceneImage ? "object-contain" : "object-cover",
+              )}
+              data-companion-image-fit={usesContainedSceneImage ? "contain" : "cover"}
+              loading="lazy"
+              decoding="async"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center">
+              <Sparkles className="h-7 w-7 text-muted-foreground/60" />
+            </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/76 via-black/10 to-transparent" />
+          <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-semibold text-white">
+            Stage {moment.stage}
+          </span>
+        </div>
+      </button>
+
+      {canPlay ? (
+        <Button
+          type="button"
+          variant="secondary"
+          size="icon"
+          aria-label={`Share evolution for stage ${moment.stage}`}
+          className="absolute right-2 top-2 h-8 w-8 border border-white/20 bg-background/70 text-foreground shadow-sm backdrop-blur hover:bg-background/85"
+          onClick={(event) => {
+            event.stopPropagation();
+            onShare(moment);
+          }}
+          disabled={isSharing}
+        >
+          {isSharing ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Share2 className="h-4 w-4" />
+          )}
+        </Button>
+      ) : null}
+    </div>
   );
 };
 

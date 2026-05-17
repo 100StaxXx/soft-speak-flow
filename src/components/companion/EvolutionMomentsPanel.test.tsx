@@ -24,6 +24,11 @@ const mocks = vi.hoisted(() => ({
   realtimeCallback: null as null | (() => void),
   channel: vi.fn(),
   removeChannel: vi.fn(),
+  renderEvolutionShareVideoMock: vi.fn(),
+  shareRenderedMediaMock: vi.fn(),
+  isShareCancelledMock: vi.fn(),
+  toastSuccessMock: vi.fn(),
+  toastErrorMock: vi.fn(),
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
@@ -85,6 +90,20 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
+vi.mock("@/utils/shareMedia", () => ({
+  DEFAULT_EVOLUTION_SHARE_TEXT: "My companion just evolved. #Cosmiq",
+  isShareCancelled: mocks.isShareCancelledMock,
+  renderEvolutionShareVideo: mocks.renderEvolutionShareVideoMock,
+  shareRenderedMedia: mocks.shareRenderedMediaMock,
+}));
+
+vi.mock("@/components/ui/sonner", () => ({
+  toast: {
+    success: mocks.toastSuccessMock,
+    error: mocks.toastErrorMock,
+  },
+}));
+
 import { EvolutionMomentsPanel } from "@/components/companion/EvolutionMomentsPanel";
 
 const succeededMoment = {
@@ -140,6 +159,24 @@ describe("EvolutionMomentsPanel", () => {
     mocks.animationJobs = [];
     mocks.queryFilters = [];
     mocks.realtimeCallback = null;
+    mocks.renderEvolutionShareVideoMock.mockReset();
+    mocks.renderEvolutionShareVideoMock.mockResolvedValue({
+      uri: "file:///tmp/cosmiq-evolution-stage-5.mp4",
+      filename: "cosmiq-evolution-stage-5.mp4",
+      mimeType: "video/mp4",
+      width: 1080,
+      height: 1920,
+      durationMs: 4200,
+    });
+    mocks.shareRenderedMediaMock.mockReset();
+    mocks.shareRenderedMediaMock.mockResolvedValue({
+      status: "shared",
+      captionCopied: false,
+    });
+    mocks.isShareCancelledMock.mockReset();
+    mocks.isShareCancelledMock.mockReturnValue(false);
+    mocks.toastSuccessMock.mockReset();
+    mocks.toastErrorMock.mockReset();
     mocks.removeChannel.mockReset();
     mocks.channel.mockReset();
     mocks.channel.mockImplementation(() => {
@@ -244,6 +281,53 @@ describe("EvolutionMomentsPanel", () => {
     expect(
       screen.queryByTestId("evolution-moment-video"),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows share actions only for completed playable evolution videos", async () => {
+    mocks.evolutions = [succeededMoment, pendingMoment];
+
+    renderPanel();
+
+    expect(
+      await screen.findByRole("button", {
+        name: /share evolution for stage 5/i,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", {
+        name: /share evolution for stage 13/i,
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shares a completed evolution moment as a story video", async () => {
+    renderPanel();
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: /share evolution for stage 5/i,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mocks.renderEvolutionShareVideoMock).toHaveBeenCalledWith({
+        sourceVideoUrl: "https://example.com/stage-5.mp4",
+        posterImageUrl: "https://example.com/stage-5.png",
+        stage: 5,
+        template: "aesthetic-reveal",
+      });
+    });
+    expect(mocks.shareRenderedMediaMock).toHaveBeenCalledWith({
+      uriOrFile: expect.objectContaining({
+        filename: "cosmiq-evolution-stage-5.mp4",
+        mimeType: "video/mp4",
+        width: 1080,
+        height: 1920,
+      }),
+      title: "Stage 5 Evolution",
+      text: "My companion just evolved. #Cosmiq",
+      dialogTitle: "Share evolution video",
+    });
   });
 
   it("shows a stage-one prewarm before the egg is claimed", async () => {
