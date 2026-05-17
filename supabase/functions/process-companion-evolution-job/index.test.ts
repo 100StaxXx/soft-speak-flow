@@ -60,25 +60,30 @@ const processingJob: FakeJob = {
 };
 
 const makeInternalRequest = () =>
-  new Request("https://example.supabase.co/functions/v1/process-companion-evolution-job", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-internal-key": "internal-secret",
+  new Request(
+    "https://example.supabase.co/functions/v1/process-companion-evolution-job",
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-internal-key": "internal-secret",
+      },
+      body: JSON.stringify({}),
     },
-    body: JSON.stringify({}),
-  });
+  );
 
 const createFakeSupabaseFactory = ({
   job = queuedJob,
 }: {
   job?: FakeJob | null;
 }) => {
-  const updates: Array<{ table: string; payload: Record<string, unknown> }> = [];
+  const updates: Array<{ table: string; payload: Record<string, unknown> }> =
+    [];
 
   const createClient = () => {
     const from = (table: string) => {
       let updatePayload: Record<string, unknown> | null = null;
+      const filters: Record<string, unknown> = {};
 
       const resolveMaybeSingle = async () => {
         if (table === "companion_evolution_jobs") {
@@ -109,7 +114,33 @@ const createFakeSupabaseFactory = ({
         }
 
         if (table === "companion_evolutions") {
+          if (filters.id === "evo-5") {
+            return {
+              data: {
+                id: "evo-5",
+                companion_id: "companion-1",
+                stage: 5,
+                image_url: "https://example.com/stage-5.png",
+                generation_metadata: { sourceType: "lineage_generation" },
+                animation_status: null,
+                animation_video_url: null,
+              },
+              error: null,
+            };
+          }
+
+          if (filters.stage === 4) {
+            return {
+              data: { image_url: "https://example.com/stage-4.png" },
+              error: null,
+            };
+          }
+
           return { data: { id: "evo-5" }, error: null };
+        }
+
+        if (table === "companion_animation_jobs") {
+          return { data: null, error: null };
         }
 
         if (table === "companion_stories") {
@@ -151,7 +182,10 @@ const createFakeSupabaseFactory = ({
           updates.push({ table, payload });
           return builder;
         },
-        eq: () => builder,
+        eq: (column: string, value: unknown) => {
+          filters[column] = value;
+          return builder;
+        },
         in: () => builder,
         or: () => builder,
         order: () => builder,
@@ -188,6 +222,7 @@ const createFakeSupabaseFactory = ({
 Deno.test("process-companion-evolution-job internal scheduler claims and completes a queued job", async () => {
   const fakeSupabase = createFakeSupabaseFactory({ job: queuedJob });
   const fetchCalls: Array<{ url: string; body: Record<string, unknown> }> = [];
+  const animationEnqueueCalls: Array<Record<string, unknown>> = [];
 
   const response = await module.handleProcessCompanionEvolutionJob(
     makeInternalRequest(),
@@ -209,6 +244,18 @@ Deno.test("process-companion-evolution-job internal scheduler claims and complet
           { status: 200, headers: { "content-type": "application/json" } },
         );
       }) as typeof fetch,
+      createCostGuardrailSession: (() => ({
+        wrapFetch: (fetchFn: typeof fetch) => fetchFn,
+        enforceAccess: async () => undefined,
+      })) as never,
+      enqueueCompanionAnimationJob: (async (
+        args: Record<string, unknown>,
+      ) => {
+        animationEnqueueCalls.push(args);
+        return { status: "queued", jobId: "animation-job-1" };
+      }) as never,
+      info: () => undefined,
+      warn: () => undefined,
     },
   );
 
@@ -216,6 +263,16 @@ Deno.test("process-companion-evolution-job internal scheduler claims and complet
   assertEquals(response.status, 200, "Expected queued job to complete");
   assertEquals(payload.status, "succeeded", "Expected success payload");
   assertEquals(payload.jobId, "evolution-job-1", "Expected processed job id");
+  assertEquals(
+    payload.animationEnqueue?.status,
+    "queued",
+    "Expected missing animation to be enqueued after image success",
+  );
+  assertEquals(
+    payload.animationEnqueue?.jobId,
+    "animation-job-1",
+    "Expected animation enqueue result to be returned",
+  );
   assertEquals(fetchCalls.length, 1, "Expected one evolution pipeline call");
   assertEquals(
     fetchCalls[0].body.userId,
@@ -235,6 +292,36 @@ Deno.test("process-companion-evolution-job internal scheduler claims and complet
       update.payload.status === "succeeded"
     ),
     "Expected the job to be marked succeeded",
+  );
+  assertEquals(
+    animationEnqueueCalls.length,
+    1,
+    "Expected worker to enqueue the missing animation once",
+  );
+  assertEquals(
+    animationEnqueueCalls[0]?.evolutionId,
+    "evo-5",
+    "Expected animation enqueue to target the returned evolution id",
+  );
+  assertEquals(
+    animationEnqueueCalls[0]?.stage,
+    5,
+    "Expected animation enqueue to use the requested visual stage",
+  );
+  assertEquals(
+    animationEnqueueCalls[0]?.imageUrl,
+    "https://example.com/stage-5.png",
+    "Expected animation enqueue to use the completed evolution image",
+  );
+  assertEquals(
+    animationEnqueueCalls[0]?.previousImageUrl,
+    "https://example.com/stage-4.png",
+    "Expected animation enqueue to include the previous evolution image",
+  );
+  assertEquals(
+    animationEnqueueCalls[0]?.element,
+    "fire",
+    "Expected animation enqueue to include companion element",
   );
 });
 

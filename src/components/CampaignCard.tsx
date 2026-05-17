@@ -1,4 +1,6 @@
 import { memo, useState, useMemo, useCallback, useEffect, useRef, type CSSProperties } from "react";
+import { Capacitor } from "@capacitor/core";
+import { Share } from "@capacitor/share";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +45,23 @@ import { getEpicDaysRemaining, resolveEpicEndDate } from "@/utils/epicDates";
 import { safeClipboardWrite, getClipboardErrorMessage } from "@/utils/clipboard";
 import { buildEpicInviteLink, buildEpicInviteShareText } from "@/utils/epicInviteShare";
 import { getStoredCompanionCustomName } from "@/lib/companionName";
+
+const CAMPAIGN_SHARE_CANCEL_PATTERNS = ["abort", "cancel", "canceled", "cancelled", "dismiss"];
+
+const isCampaignShareCancelled = (error: unknown): boolean => {
+  if (error instanceof DOMException && error.name === "AbortError") return true;
+  if (error instanceof Error && error.name === "AbortError") return true;
+
+  const message =
+    error instanceof Error
+      ? `${error.name} ${error.message}`
+      : typeof error === "string"
+        ? error
+        : String(error);
+
+  const normalized = message.toLowerCase();
+  return CAMPAIGN_SHARE_CANCEL_PATTERNS.some((pattern) => normalized.includes(pattern));
+};
 
 interface Campaign {
   id: string;
@@ -98,6 +117,8 @@ export const CampaignCard = memo(function CampaignCard({
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [renameTitle, setRenameTitle] = useState(campaign.title);
   const [isRenaming, setIsRenaming] = useState(false);
+  const [isSharingCampaign, setIsSharingCampaign] = useState(false);
+  const shareCampaignInFlightRef = useRef(false);
   
   const { companion } = useCompanion();
   const { health } = useCompanionHealth();
@@ -177,38 +198,69 @@ export const CampaignCard = memo(function CampaignCard({
 
   const handleShareCampaign = useCallback(async () => {
     if (!campaign.invite_code || !campaign.is_public) return;
+    if (shareCampaignInFlightRef.current) return;
 
     const inviteLink = buildEpicInviteLink(campaign.invite_code);
     const shareText = buildEpicInviteShareText(campaign.title, campaign.invite_code);
+    const shareTitle = `Join ${campaign.title}`;
+    const clipboardText = `${shareText}\n\n${inviteLink}`;
+    let sharedViaSheet = false;
 
+    shareCampaignInFlightRef.current = true;
+    setIsSharingCampaign(true);
     try {
-      if (navigator.share) {
+      if (Capacitor.isNativePlatform()) {
+        await Share.share({
+          title: shareTitle,
+          text: shareText,
+          url: inviteLink,
+          dialogTitle: "Share campaign invite",
+        });
+        sharedViaSheet = true;
+      } else if (navigator.share) {
         await navigator.share({
-          title: `Join ${campaign.title}`,
+          title: shareTitle,
           text: shareText,
           url: inviteLink,
         });
+        sharedViaSheet = true;
       } else {
-        const didCopy = await safeClipboardWrite(`${shareText}\n\n${inviteLink}`);
+        const didCopy = await safeClipboardWrite(clipboardText);
         if (!didCopy) {
           throw new Error("Clipboard unavailable");
         }
       }
 
       setCopied(true);
-      toast.success(navigator.share ? "Invite ready to share!" : "Invite link copied!", {
+      toast.success(sharedViaSheet ? "Invite ready to share!" : "Invite link copied!", {
         description: "Friends can open the link directly or use the invite code to join.",
       });
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message.toLowerCase() : "";
-      if (errorMsg.includes("abort") || errorMsg.includes("cancel")) {
+      if (isCampaignShareCancelled(error)) {
         return;
       }
 
-      toast.error(getClipboardErrorMessage(error));
+      const didCopy = await safeClipboardWrite(clipboardText);
+      if (didCopy) {
+        setCopied(true);
+        toast.info("Couldn't share, but invite link was copied!", {
+          description: "Friends can open the link directly or use the invite code to join.",
+        });
+        setTimeout(() => setCopied(false), 2000);
+        return;
+      }
+
+      toast.error(
+        Capacitor.isNativePlatform()
+          ? "Failed to share invite. Please try again."
+          : getClipboardErrorMessage(error),
+      );
+    } finally {
+      shareCampaignInFlightRef.current = false;
+      setIsSharingCampaign(false);
     }
-  }, [campaign.invite_code, campaign.title]);
+  }, [campaign.invite_code, campaign.is_public, campaign.title]);
 
   const openRenameDialog = useCallback(() => {
     setRenameTitle(campaign.title);
@@ -266,6 +318,7 @@ export const CampaignCard = memo(function CampaignCard({
                     size="sm"
                     className="h-6 px-2 text-primary hover:text-primary hover:bg-primary/10"
                     onClick={handleShareCampaign}
+                    disabled={isSharingCampaign}
                     aria-label="Share campaign invite"
                   >
                     {copied ? (

@@ -1,6 +1,8 @@
+import { getRedirectUrlWithPath } from "@/utils/redirectUrl";
+
 export const buildEpicInviteLink = (inviteCode: string): string => {
   const normalizedCode = inviteCode.trim();
-  return `${window.location.origin}/join/${encodeURIComponent(normalizedCode)}`;
+  return getRedirectUrlWithPath(`/join/${encodeURIComponent(normalizedCode)}`);
 };
 
 export const buildEpicInviteShareText = (epicTitle: string, inviteCode: string): string =>

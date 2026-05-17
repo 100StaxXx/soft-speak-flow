@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { maybeEnqueueCompanionAnimationJob } from "../_shared/companionAnimationJobs.ts";
+import { createCostGuardrailSession } from "../_shared/costGuardrails.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -107,6 +109,23 @@ interface FetchJobOptions {
 }
 
 type SupabaseClientLike = any;
+
+type AnimationEnqueueResult = {
+  status:
+    | "queued"
+    | "processing"
+    | "succeeded"
+    | "skipped"
+    | "failed"
+    | "missing_evolution_payload"
+    | "missing_evolution_record"
+    | "missing_image_url";
+  evolutionId?: string;
+  jobId?: string;
+  reason?: string;
+};
+
+type EvolutionPipelinePayload = Record<string, unknown>;
 
 const fetchJob = async (
   supabase: SupabaseClientLike,
@@ -271,6 +290,138 @@ const runEvolutionPipeline = async (
   }
 
   return payload;
+};
+
+const asString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+
+const asNumber = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const fetchEvolutionImageUrlForStage = async (
+  supabase: SupabaseClientLike,
+  companionId: string,
+  stage: number,
+): Promise<string | null> => {
+  const { data, error } = await supabase
+    .from("companion_evolutions")
+    .select("image_url")
+    .eq("companion_id", companionId)
+    .eq("stage", stage)
+    .maybeSingle();
+
+  if (error) throw error;
+  return asString(data?.image_url);
+};
+
+const ensureEvolutionAnimationEnqueued = async ({
+  supabase,
+  job,
+  evolutionPayload,
+  enqueueCompanionAnimationJob,
+  createCostGuardrailSessionFn,
+}: {
+  supabase: SupabaseClientLike;
+  job: CompanionEvolutionJob;
+  evolutionPayload: EvolutionPipelinePayload;
+  enqueueCompanionAnimationJob: typeof maybeEnqueueCompanionAnimationJob;
+  createCostGuardrailSessionFn: typeof createCostGuardrailSession;
+}): Promise<AnimationEnqueueResult> => {
+  const evolutionId = asString(evolutionPayload.evolution_id);
+  const newStage = asNumber(evolutionPayload.new_stage) ?? job.requested_stage;
+  const previousStage = asNumber(evolutionPayload.previous_stage);
+
+  if (!evolutionId) {
+    return {
+      status: "missing_evolution_payload",
+      reason: "missing_evolution_id",
+    };
+  }
+
+  const { data: evolution, error: evolutionError } = await supabase
+    .from("companion_evolutions")
+    .select(
+      "id, companion_id, stage, image_url, generation_metadata, animation_status, animation_video_url",
+    )
+    .eq("id", evolutionId)
+    .maybeSingle();
+
+  if (evolutionError) throw evolutionError;
+  if (!evolution) {
+    return { status: "missing_evolution_record", evolutionId };
+  }
+
+  const { data: existingJob, error: jobError } = await supabase
+    .from("companion_animation_jobs")
+    .select("id, status, video_url")
+    .eq("evolution_id", evolutionId)
+    .maybeSingle();
+
+  if (jobError) throw jobError;
+  if (existingJob?.id && typeof existingJob.status === "string") {
+    return {
+      status: existingJob.status as AnimationEnqueueResult["status"],
+      evolutionId,
+      jobId: existingJob.id,
+    };
+  }
+
+  const animationStatus = asString(evolution.animation_status);
+  const animationVideoUrl = asString(evolution.animation_video_url);
+  if (
+    animationStatus === "succeeded" ||
+    animationStatus === "skipped" ||
+    animationStatus === "failed"
+  ) {
+    return {
+      status: animationStatus,
+      evolutionId,
+      reason: animationVideoUrl ? undefined : "terminal_without_job",
+    };
+  }
+
+  const imageUrl = asString(evolutionPayload.image_url) ??
+    asString(evolution.image_url);
+  if (!imageUrl) {
+    return { status: "missing_image_url", evolutionId };
+  }
+
+  const { data: companion, error: companionError } = await supabase
+    .from("user_companion")
+    .select("core_element, initial_image_url")
+    .eq("id", job.companion_id)
+    .maybeSingle();
+
+  if (companionError) throw companionError;
+
+  const previousImageUrl = typeof previousStage === "number"
+    ? await fetchEvolutionImageUrlForStage(
+      supabase,
+      job.companion_id,
+      previousStage,
+    )
+    : null;
+
+  const enqueueResult = await enqueueCompanionAnimationJob({
+    supabase,
+    createCostGuardrailSession: createCostGuardrailSessionFn,
+    userId: job.user_id,
+    companionId: job.companion_id,
+    evolutionId,
+    stage: newStage,
+    imageUrl,
+    generationMetadata: evolution.generation_metadata,
+    previousImageUrl: previousImageUrl ??
+      asString(companion?.initial_image_url),
+    element: asString(companion?.core_element),
+  });
+
+  return {
+    status: enqueueResult.status,
+    evolutionId,
+    jobId: enqueueResult.jobId,
+    reason: enqueueResult.reason,
+  };
 };
 
 const ensureEvolutionCards = async (
@@ -502,6 +653,10 @@ const runNonCriticalSideEffects = async (
 interface ProcessCompanionEvolutionJobDeps {
   createClient?: typeof createClient;
   fetch?: typeof fetch;
+  createCostGuardrailSession?: typeof createCostGuardrailSession;
+  enqueueCompanionAnimationJob?: typeof maybeEnqueueCompanionAnimationJob;
+  info?: typeof console.info;
+  warn?: typeof console.warn;
 }
 
 export const handleProcessCompanionEvolutionJob = async (
@@ -511,6 +666,12 @@ export const handleProcessCompanionEvolutionJob = async (
   let requestedJobId: string | undefined;
   const createSupabaseClient = deps.createClient ?? createClient;
   const fetchImpl = deps.fetch ?? fetch;
+  const createCostGuardrailSessionFn = deps.createCostGuardrailSession ??
+    createCostGuardrailSession;
+  const enqueueCompanionAnimationJob = deps.enqueueCompanionAnimationJob ??
+    maybeEnqueueCompanionAnimationJob;
+  const info = deps.info ?? console.info;
+  const warn = deps.warn ?? console.warn;
 
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -701,6 +862,36 @@ export const handleProcessCompanionEvolutionJob = async (
       fetchImpl,
     );
 
+    let animationEnqueue: AnimationEnqueueResult | null = null;
+    try {
+      animationEnqueue = await ensureEvolutionAnimationEnqueued({
+        supabase,
+        job: claimedJob,
+        evolutionPayload,
+        enqueueCompanionAnimationJob,
+        createCostGuardrailSessionFn,
+      });
+      info("process-companion-evolution-job animation enqueue result", {
+        jobId: claimedJob.id,
+        companionId: claimedJob.companion_id,
+        requestedStage: claimedJob.requested_stage,
+        animationEnqueue,
+      });
+    } catch (animationError) {
+      animationEnqueue = {
+        status: "failed",
+        reason: animationError instanceof Error
+          ? animationError.message
+          : String(animationError),
+      };
+      warn("process-companion-evolution-job animation enqueue failed", {
+        jobId: claimedJob.id,
+        companionId: claimedJob.companion_id,
+        requestedStage: claimedJob.requested_stage,
+        error: animationEnqueue.reason,
+      });
+    }
+
     const nowIso = new Date().toISOString();
     const { error: successUpdateError } = await supabase
       .from("companion_evolution_jobs")
@@ -745,6 +936,7 @@ export const handleProcessCompanionEvolutionJob = async (
         status: "succeeded",
         requestedStage: claimedJob.requested_stage,
         newStage,
+        animationEnqueue,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

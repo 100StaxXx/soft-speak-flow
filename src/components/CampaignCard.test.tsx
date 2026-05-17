@@ -1,12 +1,28 @@
 import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
 
 const mocks = vi.hoisted(() => ({
   companion: null as { favorite_color: string } | null,
   lastEpicCheckInProps: null as null | { companionFrostedThemeStyle?: CSSProperties },
   lastSmartAdjustProps: null as null | { companionFrostedThemeStyle?: CSSProperties },
+  isNativePlatformMock: vi.fn(),
+  getPlatformMock: vi.fn(),
+  nativeShareMock: vi.fn(),
+}));
+
+vi.mock("@capacitor/core", () => ({
+  Capacitor: {
+    isNativePlatform: mocks.isNativePlatformMock,
+    getPlatform: mocks.getPlatformMock,
+  },
+}));
+
+vi.mock("@capacitor/share", () => ({
+  Share: {
+    share: mocks.nativeShareMock,
+  },
 }));
 
 vi.mock("framer-motion", () => ({
@@ -125,10 +141,20 @@ const baseJourney = {
   epic_habits: [],
 };
 
+beforeEach(() => {
+  mocks.isNativePlatformMock.mockReset();
+  mocks.isNativePlatformMock.mockReturnValue(false);
+  mocks.getPlatformMock.mockReset();
+  mocks.getPlatformMock.mockReturnValue("web");
+  mocks.nativeShareMock.mockReset();
+  mocks.nativeShareMock.mockResolvedValue(undefined);
+});
+
 afterEach(() => {
   mocks.companion = null;
   mocks.lastEpicCheckInProps = null;
   mocks.lastSmartAdjustProps = null;
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
   Reflect.deleteProperty(navigator, "share");
 });
@@ -267,7 +293,7 @@ describe("CampaignCard rename", () => {
     });
   });
 
-  it("shares a direct invite link when the campaign has an invite code", async () => {
+  it("shares a direct invite link through Web Share when the campaign has an invite code", async () => {
     const shareMock = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { share: shareMock });
 
@@ -291,5 +317,37 @@ describe("CampaignCard rename", () => {
       text: expect.stringContaining("EPIC-QUEST-1234"),
       url: `${window.location.origin}/join/EPIC-QUEST-1234`,
     }));
+    expect(mocks.nativeShareMock).not.toHaveBeenCalled();
+  });
+
+  it("uses Capacitor Share with a hosted invite link on native platforms", async () => {
+    mocks.isNativePlatformMock.mockReturnValue(true);
+    mocks.getPlatformMock.mockReturnValue("ios");
+    vi.stubEnv("VITE_NATIVE_REDIRECT_BASE", "https://app.cosmiq.quest/");
+    const webShareMock = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { share: webShareMock });
+
+    render(
+      <CampaignCard
+        campaign={{
+          ...baseJourney,
+          invite_code: "EPIC QUEST/1234",
+          is_public: true,
+        }}
+        onRename={vi.fn()}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText("Share campaign invite"));
+    });
+
+    expect(mocks.nativeShareMock).toHaveBeenCalledWith({
+      title: "Join Campaign Alpha",
+      text: 'Join my Cosmiq epic "Campaign Alpha" with invite code EPIC QUEST/1234.',
+      url: "https://app.cosmiq.quest/join/EPIC%20QUEST%2F1234",
+      dialogTitle: "Share campaign invite",
+    });
+    expect(webShareMock).not.toHaveBeenCalled();
   });
 });

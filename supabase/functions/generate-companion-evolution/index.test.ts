@@ -246,6 +246,7 @@ const createDeps = ({
   const extractAnchorCalls: Array<Record<string, unknown>> = [];
   const upsertCalls: Array<Record<string, unknown>> = [];
   const uploadCalls: Array<Record<string, unknown>> = [];
+  const animationEnqueueCalls: Array<Record<string, unknown>> = [];
   const infoLogs: Array<unknown[]> = [];
   let judgeIndex = 0;
   let visualAnchorIndex = 0;
@@ -300,6 +301,10 @@ const createDeps = ({
       upsertCalls.push(args as unknown as Record<string, unknown>);
       return { id: `evo-${upsertCalls.length}` } as never;
     },
+    enqueueCompanionAnimationJob: async (args: Record<string, unknown>) => {
+      animationEnqueueCalls.push(args as unknown as Record<string, unknown>);
+      return { status: "queued", jobId: "animation-job-1" } as never;
+    },
     info: (...args: unknown[]) => {
       infoLogs.push(args);
     },
@@ -314,6 +319,7 @@ const createDeps = ({
     extractAnchorCalls,
     upsertCalls,
     uploadCalls,
+    animationEnqueueCalls,
     infoLogs,
   };
 };
@@ -374,6 +380,32 @@ Deno.test("reveal path uses hidden stage-1 anchor without invoking image generat
     (upsertCall.generationMetadata as Record<string, unknown>).sourceType,
     "reveal",
     "Expected reveal path to persist reveal provenance",
+  );
+
+  const animationEnqueueCall = harness.animationEnqueueCalls[0];
+  assert(
+    animationEnqueueCall,
+    "Expected hidden anchor reveal to enqueue an animation job",
+  );
+  assertEquals(
+    animationEnqueueCall.evolutionId,
+    "evo-1",
+    "Expected animation enqueue to target the persisted evolution",
+  );
+  assertEquals(
+    animationEnqueueCall.stage,
+    1,
+    "Expected animation enqueue to use the revealed stage",
+  );
+  assertEquals(
+    animationEnqueueCall.imageUrl,
+    "https://example.com/hidden-stage-1.png",
+    "Expected animation enqueue to animate the hidden anchor image",
+  );
+  assertEquals(
+    animationEnqueueCall.previousImageUrl,
+    "https://example.com/stage-0.png",
+    "Expected animation enqueue to include the previous companion image",
   );
 });
 
@@ -461,6 +493,38 @@ Deno.test("legacy stage-1 backfill generates a fresh starter and marks provenanc
       message.includes("Missing hidden stage-1 anchor for AI companion")
     ),
     "Expected legacy backfill to emit an explicit info log",
+  );
+
+  const animationEnqueueCall = harness.animationEnqueueCalls[0];
+  assert(
+    animationEnqueueCall,
+    "Expected legacy stage-1 backfill to enqueue an animation job",
+  );
+  assertEquals(
+    animationEnqueueCall.evolutionId,
+    "evo-1",
+    "Expected animation enqueue to target the persisted evolution",
+  );
+  assertEquals(
+    animationEnqueueCall.stage,
+    1,
+    "Expected animation enqueue to use stage 1",
+  );
+  assertEquals(
+    animationEnqueueCall.imageUrl,
+    "https://example.com/generated-stage-1.png",
+    "Expected animation enqueue to use the generated stage-1 image",
+  );
+  assertEquals(
+    animationEnqueueCall.previousImageUrl,
+    "https://example.com/legacy-ai-egg.png",
+    "Expected animation enqueue to include the legacy starter image",
+  );
+  assertEquals(
+    (animationEnqueueCall.generationMetadata as Record<string, unknown>)
+      .sourceType,
+    "legacy_backfill",
+    "Expected animation enqueue metadata to preserve backfill provenance",
   );
 });
 

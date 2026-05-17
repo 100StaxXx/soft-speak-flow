@@ -185,7 +185,7 @@ export function MilestonePostcardPreview({
         animate={{ opacity: 1, y: 0 }}
         onClick={onClick}
         className={cn(
-          'flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20',
+          'no-text-select flex items-center gap-2 rounded-lg border border-amber-300/25 bg-slate-950/55 px-3 py-2 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-sm',
           onClick && 'cursor-pointer hover:border-amber-500/40 transition-colors',
           tierGlow,
           className
@@ -204,7 +204,7 @@ export function MilestonePostcardPreview({
           <div className="text-xs font-medium truncate">
             Ch. {chapterNumber}{totalChapters ? `/${totalChapters}` : ''}: {tagline}
           </div>
-          <div className="text-[10px] text-muted-foreground">
+          <div className="text-[10px] text-white/70">
             {tier === 'imminent' 
               ? "Postcard incoming!" 
               : `${Math.round(remaining)}% to unlock`}
@@ -214,7 +214,7 @@ export function MilestonePostcardPreview({
           animate={{ rotate: isExpanded ? 90 : 0 }}
           transition={{ duration: 0.2 }}
         >
-          <ChevronRight className="w-4 h-4 text-amber-500/50" />
+          <ChevronRight className="w-4 h-4 text-amber-300/70" />
         </motion.div>
       </motion.div>
     );
@@ -226,7 +226,7 @@ export function MilestonePostcardPreview({
       animate={{ opacity: 1, scale: 1 }}
       onClick={onClick}
       className={cn(
-        'p-4 rounded-xl bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-purple-500/10 border border-amber-500/20',
+        'no-text-select rounded-xl border border-amber-300/25 bg-gradient-to-br from-slate-950/70 via-slate-900/60 to-purple-950/55 p-4 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-sm',
         onClick && 'cursor-pointer hover:border-amber-500/40 transition-colors',
         tierGlow,
         className
@@ -247,39 +247,39 @@ export function MilestonePostcardPreview({
           )} />
         </motion.div>
         <div className="flex-1">
-          <div className="text-xs font-medium text-amber-600 mb-0.5">
+          <div className="mb-0.5 text-xs font-semibold text-amber-300 drop-shadow-[0_1px_1px_rgba(0,0,0,0.45)]">
             {tier === 'imminent' 
               ? "Postcard Arriving Soon!" 
               : tier === 'close' 
                 ? "Chapter Nearly Unlocked"
                 : "Next Chapter Awaits"}
           </div>
-          <p className="font-semibold text-sm">
+          <p className="text-sm font-semibold text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.35)]">
             Chapter {chapterNumber}{totalChapters ? ` of ${totalChapters}` : ''}: {tagline}
           </p>
         </div>
       </div>
 
       {/* Story narrative teaser */}
-      <div className="mb-3 px-2 py-2 rounded-lg bg-background/30 border border-amber-500/10">
-        <p className="text-xs text-muted-foreground italic leading-relaxed">
+      <div className="mb-3 rounded-lg border border-white/10 bg-slate-950/65 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+        <p className="text-[13px] font-medium leading-5 text-white/95 drop-shadow-[0_1px_1px_rgba(0,0,0,0.45)]">
           {narrative}
         </p>
       </div>
 
       <div className="space-y-2">
         <div className="flex items-center justify-between text-xs">
-          <span className="text-muted-foreground">Progress to unlock</span>
-          <span className="font-medium">{Math.round(progressTowardMilestone)}%</span>
+          <span className="text-white/75">Progress to unlock</span>
+          <span className="font-semibold text-white">{Math.round(progressTowardMilestone)}%</span>
         </div>
         <Progress 
           value={progressTowardMilestone} 
           className={cn(
-            "h-2 bg-amber-500/10",
-            tier === 'imminent' && "bg-amber-500/20"
+            "h-2 bg-white/15",
+            tier === 'imminent' && "bg-amber-300/25"
           )}
         />
-        <p className="text-xs text-muted-foreground text-center">
+        <p className="text-center text-xs text-white/75">
           {tier === 'imminent' 
             ? `${companionLabel} is preparing your postcard...`
             : tier === 'close'

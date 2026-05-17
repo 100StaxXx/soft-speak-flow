@@ -28,6 +28,7 @@ import { useXPRewards } from "@/hooks/useXPRewards";
 import { useJourneyPathImage } from "@/hooks/useJourneyPathImage";
 import { usePlannerPathfinderAppearance } from "@/hooks/usePlannerPathfinderAppearance";
 import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
+import { plannerPathfinderTheme } from "@/components/companion/plannerPathfinderTheme";
 import { RescheduleDrawer } from "./RescheduleDrawer";
 import { PostcardUnlockCelebration } from "./PostcardUnlockCelebration";
 import { MilestoneDetailDrawer } from "./journey/MilestoneDetailDrawer";
@@ -183,22 +184,31 @@ export const JourneyDetailDrawer = ({
         )}
       </DrawerTrigger>
       <DrawerContent
-        className={cn(themeModeClassName, "max-h-[85vh]")}
+        className={cn(
+          themeModeClassName,
+          "max-h-[85vh] rounded-t-[2.25rem] border-2 border-[hsl(var(--celestial-blue)_/_0.34)] bg-[linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--card))_52%,hsl(var(--secondary))_100%)] text-foreground shadow-[0_-18px_56px_-36px_rgba(var(--primary-rgb),0.58),inset_0_1px_0_rgba(255,255,255,0.72)]",
+        )}
         style={resolvedCompanionFrostedThemeStyle}
         data-testid="journey-detail-drawer-content"
       >
-        <DrawerHeader className="pb-2">
-          <DrawerTitle className="flex items-center gap-2">
-            <Map className="w-5 h-5 text-primary" />
-            {epicTitle}
+        <DrawerHeader className="border-b border-[hsl(var(--celestial-blue)_/_0.24)] bg-card/65 px-4 pb-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] backdrop-blur-xl">
+          <DrawerTitle className="flex items-start gap-2 text-left text-base font-semibold leading-snug text-foreground">
+            <Map className="mt-0.5 h-5 w-5 shrink-0 text-[hsl(var(--category-soul))]" />
+            <span className="min-w-0 flex-1 break-words">{epicTitle}</span>
           </DrawerTitle>
-          <div className="flex items-center justify-between mt-1">
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="text-xs">
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <Badge
+                variant="secondary"
+                className="border border-[hsl(var(--celestial-blue)_/_0.28)] bg-card/90 text-xs font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]"
+              >
                 {completedCount} / {totalCount} milestones
               </Badge>
               {currentPhase && (
-                <Badge variant="outline" className="text-xs">
+                <Badge
+                  variant="outline"
+                  className="border-[hsl(var(--celestial-blue)_/_0.48)] bg-[hsl(var(--celestial-blue)_/_0.12)] text-xs font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.68)]"
+                >
                   Current: {currentPhase}
                 </Badge>
               )}
@@ -212,8 +222,12 @@ export const JourneyDetailDrawer = ({
                 visualStyle="planner"
                 companionFrostedThemeStyle={resolvedCompanionFrostedThemeStyle}
               >
-                <Button variant="ghost" size="sm" className="gap-1.5 text-xs h-7">
-                  <Wand2 className="w-3.5 h-3.5" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={cn(plannerPathfinderTheme.outlineButton, "h-8 gap-1.5 px-3 text-xs font-semibold")}
+                >
+                  <Wand2 className="h-3.5 w-3.5" />
                   Reschedule
                 </Button>
               </RescheduleDrawer>
@@ -222,7 +236,7 @@ export const JourneyDetailDrawer = ({
         </DrawerHeader>
 
         <div 
-          className="flex-1 px-4 pb-6 max-h-[60vh] overflow-y-auto overscroll-contain"
+          className="flex-1 px-4 pb-6 pt-4 max-h-[60vh] overflow-y-auto overscroll-contain text-foreground"
           style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
           data-vaul-no-drag
         >
@@ -236,7 +250,7 @@ export const JourneyDetailDrawer = ({
               <p className="text-sm">No milestones yet</p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {milestones
                 .sort((a, b) => {
                   if (!a.target_date && !b.target_date) return 0;
@@ -250,50 +264,57 @@ export const JourneyDetailDrawer = ({
                   return (
                     <div
                       key={milestone.id}
+                      data-testid={`journey-milestone-row-${milestone.id}`}
                       onClick={() => handleMilestoneClick(milestone)}
                       className={cn(
-                        "flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors",
-                        status === "completed" && "bg-green-500/5",
-                        status === "overdue" && "bg-destructive/5",
-                        status === "pending" && "bg-secondary/30 hover:bg-secondary/50"
+                        "flex min-h-[4.5rem] cursor-pointer items-center gap-3 rounded-[1.4rem] border px-3.5 py-3 text-left text-foreground shadow-[0_10px_24px_-22px_rgba(var(--primary-rgb),0.42),inset_0_1px_0_rgba(255,255,255,0.72)] transition-colors",
+                        status === "completed" && "border-epic-nature/25 bg-[linear-gradient(180deg,hsl(var(--card)_/_0.97),hsl(var(--epic-nature)_/_0.08))] hover:border-epic-nature/40 hover:bg-card",
+                        status === "overdue" && "border-destructive/30 bg-[linear-gradient(180deg,hsl(var(--card)_/_0.97),hsl(var(--destructive)_/_0.08))] hover:border-destructive/45 hover:bg-card",
+                        status === "pending" && "border-[hsl(var(--celestial-blue)_/_0.28)] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.97),hsl(var(--secondary)_/_0.68))] hover:border-[hsl(var(--celestial-blue)_/_0.48)] hover:bg-card"
                       )}
                     >
                       <Checkbox
                         checked={!!milestone.completed_at}
                         disabled={true}
-                        className="pointer-events-none"
+                        className="pointer-events-none h-5 w-5 rounded-full border-2 border-[hsl(var(--celestial-blue)_/_0.58)] bg-card text-primary-foreground disabled:opacity-100 data-[state=checked]:border-epic-nature data-[state=checked]:bg-epic-nature"
                       />
                       
                       <div className="flex-1 min-w-0">
-                        <span className={cn(
-                          "text-sm",
-                          status === "completed" && "line-through text-muted-foreground"
-                        )}>
+                        <span
+                          data-testid={`journey-milestone-title-${milestone.id}`}
+                          className={cn(
+                            "block text-sm font-semibold leading-5 text-foreground",
+                            status === "completed" && "line-through opacity-70"
+                          )}
+                        >
                           {milestone.title}
                         </span>
                       </div>
                       
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {milestone.target_date && (
-                          <span className={cn(
-                            "text-xs text-muted-foreground",
-                            status === "overdue" && "text-destructive"
-                          )}>
+                          <span
+                            data-testid={`journey-milestone-date-${milestone.id}`}
+                            className={cn(
+                              "text-xs font-semibold text-foreground/70",
+                              status === "overdue" && "text-destructive"
+                            )}
+                          >
                             {format(new Date(milestone.target_date), "MMM d")}
                           </span>
                         )}
                         
                         {status === "completed" && (
-                          <CheckCircle2 className="w-4 h-4 text-green-600" />
+                          <CheckCircle2 className="h-4 w-4 shrink-0 text-epic-nature" />
                         )}
                         {status === "overdue" && (
-                          <AlertCircle className="w-4 h-4 text-destructive" />
+                          <AlertCircle className="h-4 w-4 shrink-0 text-destructive" />
                         )}
                         {milestone.is_postcard_milestone && !milestone.completed_at && (
-                          <Star className="w-4 h-4 text-amber-500" />
+                          <Star className="h-4 w-4 shrink-0 text-amber-500" />
                         )}
                         
-                        <ChevronRight className="w-4 h-4 text-muted-foreground/50" />
+                        <ChevronRight className="h-4 w-4 shrink-0 text-foreground/35" />
                       </div>
                     </div>
                   );

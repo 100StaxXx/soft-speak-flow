@@ -1626,6 +1626,82 @@ describe("GlobalEvolutionListener", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("hydrates fresh null animation rows and requests a prewarm", async () => {
+    const evolvedAt = new Date().toISOString();
+    const pendingEvolutionRow = {
+      id: "evo-5",
+      image_url: "https://example.com/stage-5.png",
+      evolved_at: evolvedAt,
+      animation_video_url: null,
+      animation_status: null,
+      animation_error_code: null,
+      animation_requested_at: null,
+      animation_completed_at: null,
+      animation_presented_at: null,
+    };
+    mocks.state.userCompanionLookup = {
+      id: "companion-1",
+      current_stage: 5,
+      current_image_url: "https://example.com/stage-5.png",
+      preset_id: "phoenix",
+      core_element: "fire",
+      initial_image_url: "https://example.com/egg.png",
+    };
+    mocks.companionEvolutionLookupResponses.push(
+      {
+        data: pendingEvolutionRow,
+        error: null,
+      },
+      {
+        data: {
+          image_url: "https://example.com/stage-4.png",
+        },
+        error: null,
+      },
+      {
+        data: pendingEvolutionRow,
+        error: null,
+      },
+    );
+    mocks.animationJobLookupResponses.push(
+      { data: null, error: null },
+      { data: null, error: null },
+      { data: null, error: null },
+    );
+    mocks.functionsInvokeMock.mockResolvedValueOnce({
+      data: {
+        status: "succeeded",
+        videoUrl: "https://example.com/recovered-evolution.mp4",
+      },
+      error: null,
+    });
+
+    renderListener();
+
+    await waitFor(() => {
+      expect(mocks.functionsInvokeMock).toHaveBeenCalledWith(
+        "prewarm-companion-animation",
+        {
+          body: {
+            companionId: "companion-1",
+            stage: 5,
+            force: true,
+            reason: "missing_animation_job",
+          },
+        },
+      );
+    });
+    expect(mocks.state.pendingEvolutionReveal).toEqual(
+      expect.objectContaining({
+        status: "ready",
+        companionId: "companion-1",
+        evolutionId: "evo-5",
+        newStage: 5,
+        animationVideoUrl: "https://example.com/recovered-evolution.mp4",
+      }),
+    );
+  });
+
   it("does not hydrate old evolution rows that have no animation work", async () => {
     mocks.state.userCompanionLookup = {
       id: "companion-1",

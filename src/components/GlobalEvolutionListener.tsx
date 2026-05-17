@@ -38,6 +38,7 @@ const EVOLUTION_ANIMATION_PRELOAD_TIMEOUT_MS = 30_000;
 const EVOLUTION_PRESENTATION_RETRY_DELAY_MS = 5_000;
 const LOCAL_HATCH_DEDUPE_WINDOW_MS = 15000;
 const HYDRATABLE_TERMINAL_ANIMATION_WINDOW_MS = 24 * 60 * 60 * 1000;
+const HYDRATABLE_MISSING_ANIMATION_WINDOW_MS = 24 * 60 * 60 * 1000;
 const NON_RETRYABLE_ANIMATION_REASONS = new Set([
   "image_unchanged",
   "stage_not_animatable",
@@ -355,6 +356,13 @@ const shouldHydratePendingEvolutionReveal = (
     metadata.animationStatus === "processing"
   )
     return true;
+  if (metadata.animationStatus === null) {
+    const evolvedAtMs = getTimestampMs(metadata.evolvedAt);
+    return (
+      evolvedAtMs !== null &&
+      Date.now() - evolvedAtMs <= HYDRATABLE_MISSING_ANIMATION_WINDOW_MS
+    );
+  }
   if (
     metadata.animationStatus !== "failed" &&
     metadata.animationStatus !== "skipped"
@@ -720,7 +728,7 @@ const waitForEvolutionAnimation = async ({
       !jobId &&
       metadata.animationStatus !== "queued" &&
       metadata.animationStatus !== "processing" &&
-      Date.now() > discoveryDeadline
+      (metadata.animationStatus === null || Date.now() > discoveryDeadline)
     ) {
       const retryKey = `missing_job:${metadata.animationStatus ?? "none"}`;
       if (!retryAttemptKeys.has(retryKey)) {
