@@ -22,8 +22,8 @@ vi.mock("@/hooks/useAccessStatus", () => ({
   useAccessStatus: () => accessState,
 }));
 
-vi.mock("@/components/TrialExpiredPaywall", () => ({
-  TrialExpiredPaywall: ({ variant }: { variant?: "pre_trial_signup" | "trial_expired" }) => (
+vi.mock("@/components/Paywall", () => ({
+  Paywall: ({ variant }: { variant?: "pre_trial_signup" | "trial_expired" }) => (
     <div>{`Paywall:${variant ?? "pre_trial_signup"}`}</div>
   ),
 }));
@@ -57,14 +57,14 @@ describe("ProtectedRoute", () => {
     accessState.loading = false;
   });
 
-  it("does not redirect while auth is recovering", () => {
+  it("renders protected content while auth is recovering with an existing user", () => {
     authState.status = "recovering";
     authState.loading = true;
     authState.user = { id: "user-1" };
 
     renderProtectedRoute();
 
-    expect(screen.getByText("Loading...")).toBeInTheDocument();
+    expect(screen.getByText("Protected Content")).toBeInTheDocument();
     expect(screen.queryByText("Welcome Page")).not.toBeInTheDocument();
   });
 
@@ -88,6 +88,18 @@ describe("ProtectedRoute", () => {
     renderProtectedRoute();
 
     expect(screen.getByText("Protected Content")).toBeInTheDocument();
+  });
+
+  it("renders protected content while access status is loading optimistically", () => {
+    authState.status = "authenticated";
+    authState.loading = false;
+    authState.user = { id: "user-loading-access" };
+    accessState.loading = true;
+
+    renderProtectedRoute();
+
+    expect(screen.getByText("Protected Content")).toBeInTheDocument();
+    expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
   });
 
   it("renders pre-trial paywall variant when access requires trial signup", () => {

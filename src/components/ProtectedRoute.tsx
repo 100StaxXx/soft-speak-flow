@@ -17,11 +17,14 @@ export const ProtectedRoute = ({
   requireAccess = true,
 }: ProtectedRouteProps) => {
   const { user, loading: authLoading, status } = useAuth();
-  const { hasAccess, gateReason, loading: accessLoading } = useAccessStatus();
+  const { hasAccess, gateReason } = useAccessStatus();
   const navigate = useNavigate();
   const [progress, setProgress] = useState(0);
   const authStatus = status ?? (authLoading ? 'loading' : user ? 'authenticated' : 'unauthenticated');
-  const isAuthPending = authLoading || authStatus === 'recovering' || authStatus === 'loading';
+  const isAuthPending =
+    authStatus === 'loading' ||
+    (authStatus === 'recovering' && !user) ||
+    (authLoading && !user);
 
   useEffect(() => {
     // Redirect to welcome page if not logged in (for App Store compliance)
@@ -34,7 +37,7 @@ export const ProtectedRoute = ({
   useEffect(() => {
     let timer: NodeJS.Timeout;
     
-    if (isAuthPending || accessLoading) {
+    if (isAuthPending) {
       timer = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 90) return prev;
@@ -50,10 +53,10 @@ export const ProtectedRoute = ({
         clearInterval(timer);
       }
     };
-  }, [accessLoading, isAuthPending]);
+  }, [isAuthPending]);
 
   // Show loading while checking auth
-  if (isAuthPending || accessLoading) {
+  if (isAuthPending) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-full max-w-md px-8 space-y-4">

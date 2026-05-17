@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { renderHook, act, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 
@@ -34,11 +34,11 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 // Import after mocks are set up
-import { useProfile } from "../useProfile";
+import { isPostgresSchemaError, useProfile } from "../useProfile";
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
+    defaultOptions: { queries: { retry: false, retryDelay: 0 } },
   });
   return ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -119,5 +119,29 @@ describe("useProfile", () => {
 
     expect(result.current.loading).toBe(true);
     expect(result.current.profile).toBeNull();
+  });
+
+  it("does not retry deterministic Postgres schema errors", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const schemaError = {
+      code: "42703",
+      message: "column profiles.readable_quest_cards_enabled does not exist",
+    };
+    mockMaybeSingle.mockResolvedValue({
+      data: null,
+      error: schemaError,
+    });
+
+    const { result } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.error).toBe(schemaError);
+    });
+
+    expect(isPostgresSchemaError(schemaError)).toBe(true);
+    expect(mockMaybeSingle).toHaveBeenCalledTimes(1);
+    consoleErrorSpy.mockRestore();
   });
 });
