@@ -113,7 +113,7 @@ describe("useAccessState", () => {
     });
   });
 
-  it("keeps access from a local StoreKit entitlement when backend access has not synced yet", async () => {
+  it("uses a reachable backend no-access response over a local StoreKit entitlement", async () => {
     const { result } = renderHook(() => useAccessState(), { wrapper: createWrapper() });
 
     await waitFor(() => {
@@ -121,11 +121,9 @@ describe("useAccessState", () => {
     });
 
     expect(result.current.accessState).toMatchObject({
-      has_access: true,
-      access_source: "subscription",
-      subscribed: true,
-      plan: "yearly",
-      subscription_end: "2099-01-01T00:00:00.000Z",
+      has_access: false,
+      access_source: "none",
+      subscribed: false,
     });
     expect(mocks.functionsInvoke).toHaveBeenCalledWith("check-apple-subscription");
   });
@@ -174,6 +172,10 @@ describe("useAccessState", () => {
   });
 
   it("keeps sandbox restore access when the StoreKit entitlement has no app-account token", async () => {
+    mocks.functionsInvoke.mockResolvedValueOnce({
+      data: null,
+      error: new Error("Failed to send a request to the Edge Function"),
+    });
     mocks.storeKit = {
       isPro: false,
       activePlan: null,
@@ -198,6 +200,46 @@ describe("useAccessState", () => {
       access_source: "subscription",
       subscribed: true,
       plan: "monthly",
+    });
+  });
+
+  it("does not grant local fallback for a transaction rejected by backend binding", async () => {
+    globalThis.localStorage.setItem(
+      "cosmiq.rejectedLocalSubscriptionTransactions.v1.11111111-1111-4111-8111-111111111111",
+      JSON.stringify({
+        transactionKeys: ["conflict-original-tx", "conflict-current-tx"],
+        updatedAt: "2026-05-17T19:12:00.000Z",
+      }),
+    );
+    mocks.functionsInvoke.mockResolvedValueOnce({
+      data: null,
+      error: new Error("Failed to send a request to the Edge Function"),
+    });
+    mocks.storeKit = {
+      isPro: true,
+      activePlan: "yearly",
+      currentEntitlement: {
+        productId: "cosmiq_premium_yearly",
+        expirationDate: "2099-01-01T00:00:00.000Z",
+        transactionId: "conflict-current-tx",
+        originalTransactionId: "conflict-original-tx",
+        appAccountToken: "11111111-1111-4111-8111-111111111111",
+      } as typeof mocks.storeKit.currentEntitlement,
+      expirationDate: new Date("2099-01-01T00:00:00.000Z"),
+      entitlementError: false,
+      isLoading: false,
+    };
+
+    const { result } = renderHook(() => useAccessState(), { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.accessState).toMatchObject({
+      has_access: false,
+      access_source: "none",
+      subscribed: false,
     });
   });
 
@@ -228,7 +270,11 @@ describe("useAccessState", () => {
     });
   });
 
-  it("uses remembered local subscription access when StoreKit has not returned yet", async () => {
+  it("uses remembered local subscription access when the backend is unreachable and StoreKit has not returned yet", async () => {
+    mocks.functionsInvoke.mockResolvedValueOnce({
+      data: null,
+      error: new Error("Failed to send a request to the Edge Function"),
+    });
     globalThis.localStorage.setItem(
       "cosmiq.localSubscriptionAccess.v1.11111111-1111-4111-8111-111111111111",
       JSON.stringify({
@@ -264,7 +310,11 @@ describe("useAccessState", () => {
     });
   });
 
-  it("uses remembered local subscription access when StoreKit entitlement refresh fails", async () => {
+  it("uses remembered local subscription access when the backend is unreachable and StoreKit entitlement refresh fails", async () => {
+    mocks.functionsInvoke.mockResolvedValueOnce({
+      data: null,
+      error: new Error("Failed to send a request to the Edge Function"),
+    });
     globalThis.localStorage.setItem(
       "cosmiq.localSubscriptionAccess.v1.11111111-1111-4111-8111-111111111111",
       JSON.stringify({

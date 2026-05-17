@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => {
     isNativePlatform: vi.fn(() => false),
     loggerDebug: vi.fn(),
     loggerError: vi.fn(),
+    storeKitIsPro: false,
     accessLoading: false,
     accessState: {
       has_access: false,
@@ -74,7 +75,7 @@ vi.mock("@/hooks/useProfile", () => ({
 
 vi.mock("@/hooks/useStoreKit", () => ({
   useStoreKit: () => ({
-    isPro: false,
+    isPro: mocks.storeKitIsPro,
   }),
 }));
 
@@ -126,6 +127,7 @@ describe("useWinWinKitSync", () => {
     mocks.user = { id: "user-1" };
     mocks.isNativePlatform.mockReturnValue(false);
     mocks.isNativeIOSHandheld.mockReturnValue(false);
+    mocks.storeKitIsPro = false;
     mocks.accessLoading = false;
     mocks.accessState = {
       has_access: false,
@@ -209,6 +211,35 @@ describe("useWinWinKitSync", () => {
     });
 
     expect(mocks.setIsPremium).toHaveBeenCalledWith({ isPremium: true });
+    expect(mocks.loggerError).not.toHaveBeenCalled();
+  });
+
+  it("does not sync premium from raw RevenueCat state when hardened access is inactive", async () => {
+    mocks.storeKitIsPro = true;
+    mocks.isNativePlatform.mockReturnValue(true);
+    mocks.isNativeIOSHandheld.mockReturnValue(true);
+    mocks.invoke.mockResolvedValue({
+      data: {
+        user: {
+          referral_code: null,
+          referred_by: null,
+        },
+      },
+      error: null,
+    });
+
+    renderHook(() => useWinWinKitSync());
+
+    await waitFor(() => {
+      expect(mocks.invoke).toHaveBeenCalledWith("sync-winwinkit-user", {
+        body: {
+          first_seen_at: "2026-04-29T12:00:00.000Z",
+          is_premium: false,
+        },
+      });
+    });
+
+    expect(mocks.setIsPremium).toHaveBeenCalledWith({ isPremium: false });
     expect(mocks.loggerError).not.toHaveBeenCalled();
   });
 

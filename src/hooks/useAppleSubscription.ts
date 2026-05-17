@@ -14,6 +14,8 @@ import { getYearlyOfferDisplay, getYearlyOfferTier } from "@/utils/appleOfferPri
 import type { StoreKitTransaction } from "@/types/subscription";
 import {
   buildLocalSubscriptionAccessState,
+  clearLocalSubscriptionAccess,
+  rememberRejectedLocalSubscriptionTransaction,
   rememberLocalSubscriptionAccess,
 } from "@/utils/localSubscriptionAccess";
 
@@ -22,6 +24,12 @@ const APPLE_BINDING_CONFLICT_CODE = "APPLE_BINDING_CONFLICT";
 const APP_STORE_SUBSCRIPTION_ALREADY_LINKED_TITLE = "Subscription already linked";
 const APP_STORE_SUBSCRIPTION_ALREADY_LINKED_MESSAGE =
   "This App Store subscription is already linked to another Cosmiq account. Sign in to that account, or contact support if this is your purchase.";
+const INACTIVE_ACCESS_STATE = {
+  has_access: false,
+  access_source: "none" as const,
+  trial_ends_at: null,
+  subscribed: false,
+};
 
 function isIAPAvailable(): boolean {
   return Capacitor.isNativePlatform() && isNativeIOS();
@@ -209,6 +217,17 @@ export function useAppleSubscription() {
     return true;
   }, [queryClient, user?.id]);
 
+  const rejectLocalSubscriptionAccess = useCallback(async (
+    transaction: StoreKitTransaction,
+  ) => {
+    if (!user?.id) return;
+
+    clearLocalSubscriptionAccess(user.id);
+    rememberRejectedLocalSubscriptionTransaction(user.id, transaction);
+    queryClient.setQueryData(queryKeys.access.detail(user.id), INACTIVE_ACCESS_STATE);
+    await invalidateSubscriptionState();
+  }, [invalidateSubscriptionState, queryClient, user?.id]);
+
   const clearDeferredVerificationTimers = useCallback(() => {
     deferredVerificationTimersRef.current.forEach((timer) => clearTimeout(timer));
     deferredVerificationTimersRef.current = [];
@@ -231,6 +250,9 @@ export function useAppleSubscription() {
             grantLocalSubscriptionAccess(transaction, plan);
             clearDeferredVerificationTimers();
           } catch (error) {
+            if (isAppleBindingConflict(error)) {
+              await rejectLocalSubscriptionAccess(transaction);
+            }
             if (!canDeferServerVerification(error)) {
               clearDeferredVerificationTimers();
             }
@@ -243,6 +265,7 @@ export function useAppleSubscription() {
   }, [
     clearDeferredVerificationTimers,
     grantLocalSubscriptionAccess,
+    rejectLocalSubscriptionAccess,
     verifyStoreKitTransaction,
   ]);
 
@@ -256,6 +279,11 @@ export function useAppleSubscription() {
       grantLocalSubscriptionAccess(transaction, plan);
       return true;
     } catch (error) {
+      if (isAppleBindingConflict(error)) {
+        clearDeferredVerificationTimers();
+        await rejectLocalSubscriptionAccess(transaction);
+      }
+
       if (canDeferServerVerification(error) && grantLocalSubscriptionAccess(transaction, plan)) {
         const parsed = error instanceof SubscriptionVerificationError ? error.parsed : undefined;
         trackPaywallEvent("purchase_verification_deferred", {
@@ -284,6 +312,8 @@ export function useAppleSubscription() {
   }, [
     grantLocalSubscriptionAccess,
     hasOfferCode,
+    clearDeferredVerificationTimers,
+    rejectLocalSubscriptionAccess,
     scheduleDeferredVerificationRetry,
     toast,
     verifyStoreKitTransaction,
@@ -367,10 +397,7 @@ export function useAppleSubscription() {
         setOfferCodePurchaseReady(true);
         toast({
           title: "Finish redeeming with Apple",
-          description:
-            redemption.status === "opened_url"
-              ? "Complete the Apple offer-code redemption, then return and tap Subscribe Yearly."
-              : "Use the same code in Apple's redemption screen, then tap Subscribe Yearly to finish.",
+          description: "Use the same code in Apple's redemption screen, then tap Subscribe Yearly to finish.",
         });
         return false;
       }

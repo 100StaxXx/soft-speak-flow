@@ -77,13 +77,7 @@ export function useAccessState() {
           ...((data ?? {}) as Partial<AccessState>),
         };
 
-        return (
-          response.subscribed ||
-          isInactiveSubscriptionAccessState(response) ||
-          !currentStoreKitAccessState
-        )
-          ? response
-          : currentStoreKitAccessState;
+        return response;
       } catch (error) {
         const localAccessState = currentStoreKitAccessState ??
           (canUseRememberedLocalAccess ? rememberedLocalAccessState : null);
@@ -102,11 +96,8 @@ export function useAccessState() {
   const canUseRememberedLocalAccessForRender =
     canUseRememberedLocalAccess && !backendHasInactiveSubscriptionAccess;
   const accessState =
-    (backendHasInactiveSubscriptionAccess ? query.data : null) ??
-    currentStoreKitAccessState ??
-    (query.data?.subscribed ? query.data : null) ??
-    (canUseRememberedLocalAccessForRender ? rememberedLocalAccessState : null) ??
     query.data ??
+    (canUseRememberedLocalAccessForRender ? rememberedLocalAccessState : null) ??
     DEFAULT_ACCESS_STATE;
   const waitingForStoreKitFallback =
     !!user &&

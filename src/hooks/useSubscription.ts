@@ -15,10 +15,7 @@ export interface Subscription {
 export function useSubscription() {
   const {
     currentEntitlement,
-    isPro,
-    activePlan,
     expirationDate,
-    isLoading,
     customerInfo,
     refreshEntitlement,
   } = useStoreKit();
@@ -30,17 +27,6 @@ export function useSubscription() {
   } = useAccessState();
 
   const subscription = useMemo((): Subscription | null => {
-    if (isPro && activePlan && currentEntitlement) {
-      return {
-        status: "active",
-        plan: activePlan,
-        current_period_end: currentEntitlement.expirationDate ?? null,
-        product_identifier: currentEntitlement.productId,
-        billing_provider: "revenuecat",
-        trial_ends_at: null,
-      };
-    }
-
     if (!accessState.subscribed || accessState.access_source !== "subscription") return null;
 
     return {
@@ -51,7 +37,7 @@ export function useSubscription() {
       billing_provider: "revenuecat",
       trial_ends_at: accessState.trial_ends_at,
     };
-  }, [accessState, activePlan, currentEntitlement, isPro]);
+  }, [accessState, currentEntitlement]);
 
   const isActive = Boolean(subscription);
   const isCancelled = subscription?.status === "cancelled";
@@ -76,7 +62,7 @@ export function useSubscription() {
 
   return {
     subscription,
-    isLoading: isLoading || accessLoading,
+    isLoading: accessLoading,
     error: accessError,
     refetch,
     isActive,

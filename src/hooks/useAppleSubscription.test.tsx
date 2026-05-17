@@ -312,6 +312,18 @@ describe("useAppleSubscription", () => {
   });
 
   it("shows account-linked recovery copy when Apple purchase belongs to another account", async () => {
+    globalThis.localStorage.setItem(
+      "cosmiq.localSubscriptionAccess.v1.11111111-1111-4111-8111-111111111111",
+      JSON.stringify({
+        has_access: true,
+        access_source: "subscription",
+        trial_ends_at: null,
+        subscribed: true,
+        status: "active",
+        plan: "monthly",
+        subscription_end: "2099-01-01T00:00:00.000Z",
+      }),
+    );
     mocks.functionsInvoke.mockResolvedValueOnce({
       data: null,
       error: {
@@ -342,6 +354,23 @@ describe("useAppleSubscription", () => {
         variant: "destructive",
       }),
     );
+    expect(globalThis.localStorage.getItem(
+      "cosmiq.localSubscriptionAccess.v1.11111111-1111-4111-8111-111111111111",
+    )).toBeNull();
+    expect(globalThis.localStorage.getItem(
+      "cosmiq.rejectedLocalSubscriptionTransactions.v1.11111111-1111-4111-8111-111111111111",
+    )).toContain("tx-1");
+    expect(mocks.setQueryData).toHaveBeenCalledWith(
+      ["access-state", "11111111-1111-4111-8111-111111111111"],
+      expect.objectContaining({
+        has_access: false,
+        access_source: "none",
+        subscribed: false,
+      }),
+    );
+    expect(mocks.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["access-state", "11111111-1111-4111-8111-111111111111"],
+    });
   });
 
   it("unlocks locally when Apple succeeds but the verification function is unreachable", async () => {
@@ -521,6 +550,62 @@ describe("useAppleSubscription", () => {
     });
     expect(mocks.toast).toHaveBeenCalledWith(
       expect.objectContaining({ title: "Purchases restored" }),
+    );
+  });
+
+  it("does not cache local access when restore finds a purchase linked to another account", async () => {
+    globalThis.localStorage.setItem(
+      "cosmiq.localSubscriptionAccess.v1.11111111-1111-4111-8111-111111111111",
+      JSON.stringify({
+        has_access: true,
+        access_source: "subscription",
+        trial_ends_at: null,
+        subscribed: true,
+        status: "active",
+        plan: "monthly",
+        subscription_end: "2099-01-01T00:00:00.000Z",
+      }),
+    );
+    mocks.functionsInvoke.mockResolvedValueOnce({
+      data: null,
+      error: {
+        message: "Edge Function returned a non-2xx status code",
+        status: 403,
+        context: new Response(JSON.stringify({
+          error: "This purchase is already linked to another account.",
+          code: "APPLE_BINDING_CONFLICT",
+        }), { status: 403 }),
+      },
+    });
+
+    const { result } = renderHook(() => useAppleSubscription());
+
+    let success: boolean | undefined;
+    await act(async () => {
+      success = await result.current.handleRestore();
+    });
+
+    expect(success).toBe(false);
+    expect(mocks.restorePurchases).toHaveBeenCalled();
+    expect(globalThis.localStorage.getItem(
+      "cosmiq.localSubscriptionAccess.v1.11111111-1111-4111-8111-111111111111",
+    )).toBeNull();
+    expect(globalThis.localStorage.getItem(
+      "cosmiq.rejectedLocalSubscriptionTransactions.v1.11111111-1111-4111-8111-111111111111",
+    )).toContain("tx-r");
+    expect(mocks.setQueryData).toHaveBeenCalledWith(
+      ["access-state", "11111111-1111-4111-8111-111111111111"],
+      expect.objectContaining({
+        has_access: false,
+        access_source: "none",
+        subscribed: false,
+      }),
+    );
+    expect(mocks.toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Subscription already linked",
+        variant: "destructive",
+      }),
     );
   });
 

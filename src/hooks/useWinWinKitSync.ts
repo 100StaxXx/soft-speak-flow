@@ -5,7 +5,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAccessState } from "@/hooks/useAccessState";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
-import { useStoreKit } from "@/hooks/useStoreKit";
 import { WinWinKit } from "@/plugins/WinWinKitPlugin";
 import { logger } from "@/utils/logger";
 import { isNativeIOSHandheld } from "@/utils/platformTargets";
@@ -23,17 +22,13 @@ function isBrowserOffline() {
 export function useWinWinKitSync() {
   const { user, status } = useAuth();
   const { profile } = useProfile();
-  const { isPro } = useStoreKit();
   const { accessState, isLoading: accessLoading } = useAccessState();
   const queryClient = useQueryClient();
   const lastSyncKeyRef = useRef<string | null>(null);
   const isPremium = Boolean(
-    isPro ||
-    (
-      accessState.has_access &&
-      accessState.subscribed &&
-      accessState.access_source === "subscription"
-    ),
+    accessState.has_access &&
+    accessState.subscribed &&
+    accessState.access_source === "subscription",
   );
 
   useEffect(() => {

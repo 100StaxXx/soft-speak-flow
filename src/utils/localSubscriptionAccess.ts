@@ -3,6 +3,7 @@ import type { StoreKitTransaction } from "@/types/subscription";
 import { resolvePlanFromProductId, type IAPPlan } from "@/utils/appleIAP";
 
 const STORAGE_PREFIX = "cosmiq.localSubscriptionAccess.v1";
+const REJECTED_TRANSACTIONS_STORAGE_PREFIX = "cosmiq.rejectedLocalSubscriptionTransactions.v1";
 
 function normalizeToken(value: string | null | undefined): string | null {
   const normalized = value?.trim().toLowerCase();
@@ -11,6 +12,24 @@ function normalizeToken(value: string | null | undefined): string | null {
 
 function storageKey(userId: string): string {
   return `${STORAGE_PREFIX}.${userId}`;
+}
+
+function rejectedTransactionsStorageKey(userId: string): string {
+  return `${REJECTED_TRANSACTIONS_STORAGE_PREFIX}.${userId}`;
+}
+
+function normalizeTransactionKey(value: string | null | undefined): string | null {
+  const normalized = value?.trim().toLowerCase();
+  return normalized && normalized.length > 0 ? normalized : null;
+}
+
+function transactionKeys(transaction: StoreKitTransaction | null): string[] {
+  if (!transaction) return [];
+
+  return [
+    normalizeTransactionKey(transaction.originalTransactionId),
+    normalizeTransactionKey(transaction.transactionId),
+  ].filter((key, index, keys): key is string => Boolean(key) && keys.indexOf(key) === index);
 }
 
 export function getActiveSubscriptionEnd(transaction: StoreKitTransaction | null): string | null {
@@ -45,6 +64,7 @@ export function buildLocalSubscriptionAccessState(
   userId: string | null | undefined,
   planOverride?: IAPPlan | null,
 ): AccessState | null {
+  if (storeKitTransactionRejectedForUser(transaction, userId)) return null;
   if (!storeKitTransactionMatchesUser(transaction, userId)) return null;
 
   const subscriptionEnd = getActiveSubscriptionEnd(transaction);
@@ -129,4 +149,88 @@ export function rememberLocalSubscriptionAccess(
   } catch {
     // Local persistence is a best-effort backup. RevenueCat and the backend remain the sources of truth.
   }
+}
+
+export function clearLocalSubscriptionAccess(userId: string | null | undefined): void {
+  if (!userId) return;
+
+  const storage = getStorage();
+  if (!storage) return;
+
+  try {
+    storage.removeItem(storageKey(userId));
+  } catch {
+    // Ignore local storage cleanup failures.
+  }
+}
+
+function readRejectedTransactionKeys(userId: string | null | undefined): Set<string> {
+  const rejectedKeys = new Set<string>();
+  if (!userId) return rejectedKeys;
+
+  const storage = getStorage();
+  if (!storage) return rejectedKeys;
+
+  try {
+    const raw = storage.getItem(rejectedTransactionsStorageKey(userId));
+    if (!raw) return rejectedKeys;
+
+    const parsed = JSON.parse(raw) as unknown;
+    const keys = Array.isArray(parsed)
+      ? parsed
+      : parsed && typeof parsed === "object" && Array.isArray((parsed as { transactionKeys?: unknown }).transactionKeys)
+        ? (parsed as { transactionKeys: unknown[] }).transactionKeys
+        : [];
+
+    keys.forEach((key) => {
+      const normalized = normalizeTransactionKey(typeof key === "string" ? key : null);
+      if (normalized) rejectedKeys.add(normalized);
+    });
+  } catch {
+    try {
+      storage.removeItem(rejectedTransactionsStorageKey(userId));
+    } catch {
+      // Ignore local storage cleanup failures.
+    }
+  }
+
+  return rejectedKeys;
+}
+
+export function rememberRejectedLocalSubscriptionTransaction(
+  userId: string | null | undefined,
+  transaction: StoreKitTransaction | null,
+): void {
+  if (!userId) return;
+
+  const nextKeys = transactionKeys(transaction);
+  if (!nextKeys.length) return;
+
+  const storage = getStorage();
+  if (!storage) return;
+
+  try {
+    const rejectedKeys = readRejectedTransactionKeys(userId);
+    nextKeys.forEach((key) => rejectedKeys.add(key));
+    storage.setItem(
+      rejectedTransactionsStorageKey(userId),
+      JSON.stringify({
+        transactionKeys: Array.from(rejectedKeys),
+        updatedAt: new Date().toISOString(),
+      }),
+    );
+  } catch {
+    // This cache is defensive only; backend binding remains authoritative.
+  }
+}
+
+export function storeKitTransactionRejectedForUser(
+  transaction: StoreKitTransaction | null,
+  userId: string | null | undefined,
+): boolean {
+  const keys = transactionKeys(transaction);
+  if (!keys.length) return false;
+
+  const rejectedKeys = readRejectedTransactionKeys(userId);
+  return keys.some((key) => rejectedKeys.has(key));
 }

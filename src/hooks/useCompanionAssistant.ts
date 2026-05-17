@@ -1583,7 +1583,20 @@ export function useCompanionAssistant({
         return true;
       } catch (error) {
         if (shouldUseDirectChat) {
-          console.error("Failed to submit companion chat message:", error);
+          const parsed = await parseFunctionInvokeError(error);
+          console.error("Failed to submit companion chat message:", {
+            status: parsed.status ?? null,
+            code: getParsedFunctionCode(parsed) ?? null,
+            requestId: parsed.requestId ?? null,
+            stage: parsed.stage ?? parsed.responsePayload?.stage ?? null,
+            failureReason:
+              parsed.failureReason ??
+              parsed.responsePayload?.failureReason ??
+              null,
+            category: parsed.category ?? "unknown",
+            surface,
+            sessionId: activeSessionIdRef.current,
+          });
           toast.error(await resolveCompanionChatError(error));
           return false;
         }

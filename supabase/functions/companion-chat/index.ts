@@ -4,6 +4,16 @@ import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
 import {
+  buildAccessStateResponse,
+  fetchAccountEntitlementForUser,
+} from "../_shared/accountEntitlements.ts";
+import {
+  buildPromoSubscriptionResponse,
+  buildSubscriptionResponse,
+  fetchActivePromoAccessForUser,
+  fetchSubscriptionForUser,
+} from "../_shared/appleSubscriptions.ts";
+import {
   buildCostGuardrailBlockedResponse,
   createCostGuardrailSession,
   createCostGuardrailSupabaseClient,
@@ -205,7 +215,40 @@ const chooseBridgeReply = (message: string) => {
   return "That sounds like planning work. I’m switching us to Plan so I can shape it into confirmable changes without saving anything automatically.";
 };
 
-async function enforceDailyTurnCap(supabase: any, userId: string) {
+export async function hasVerifiedPremiumAccess(supabase: any, userId: string) {
+  try {
+    const entitlement = await fetchAccountEntitlementForUser(supabase, userId);
+    const entitlementResponse = buildAccessStateResponse(entitlement);
+    if (entitlementResponse.has_access && entitlementResponse.subscribed) {
+      return true;
+    }
+
+    const hasInactiveSubscriptionEntitlement =
+      entitlement?.source === "subscription";
+    const subscription = await fetchSubscriptionForUser(supabase, userId);
+    const subscriptionResponse = buildSubscriptionResponse(subscription);
+    if (subscriptionResponse.has_access && !hasInactiveSubscriptionEntitlement) {
+      return true;
+    }
+
+    const promoAccess = await fetchActivePromoAccessForUser(supabase, userId);
+    if (promoAccess?.granted_until) {
+      return buildPromoSubscriptionResponse(promoAccess.granted_until).has_access;
+    }
+  } catch (error) {
+    console.warn("[companion-chat] premium access lookup failed", error);
+  }
+
+  return false;
+}
+
+export async function enforceDailyTurnCap(
+  supabase: any,
+  userId: string,
+  options?: { hasVerifiedPremiumAccess?: boolean },
+) {
+  if (options?.hasVerifiedPremiumAccess) return true;
+
   const { count, error } = await supabase
     .from("companion_chats")
     .select("id", { count: "exact", head: true })
@@ -716,7 +759,10 @@ export const handleCompanionChatRequest = async (req: Request) => {
     const sessionId = parsed.data.sessionId ?? crypto.randomUUID();
     const surface = normalizeCompanionChatSurface(parsed.data.surface);
 
-    const underTurnCap = await enforceDailyTurnCap(protectedRequest.supabase, userId);
+    const verifiedPremiumAccess = await hasVerifiedPremiumAccess(protectedRequest.supabase, userId);
+    const underTurnCap = await enforceDailyTurnCap(protectedRequest.supabase, userId, {
+      hasVerifiedPremiumAccess: verifiedPremiumAccess,
+    });
     if (!underTurnCap) {
       return createSafeErrorResponse(req, {
         status: 429,

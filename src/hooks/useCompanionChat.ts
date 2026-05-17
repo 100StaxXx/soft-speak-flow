@@ -22,6 +22,7 @@ import type {
 } from "@/types/companionConversation";
 import { isCompanionChatSetupError } from "@/utils/companionChatSetup";
 import { resolveCompanionChatError } from "@/utils/companionChatErrors";
+import { parseFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
 import { safeLocalStorage } from "@/utils/storage";
 
 const SPOKEN_REPLY_COUNT_KEY = "companion-chat-spoken-replies-v1";
@@ -338,7 +339,19 @@ export function useCompanionChat({ enabled = true }: UseCompanionChatOptions = {
 
       void speakReplyIfNeeded(response);
     } catch (error) {
-      console.error("Failed to submit companion chat message:", error);
+      const parsedError = await parseFunctionInvokeError(error);
+      console.error("Failed to submit companion chat message:", {
+        status: parsedError.status ?? null,
+        code: parsedError.code ?? parsedError.responsePayload?.code ?? null,
+        requestId: parsedError.requestId ?? null,
+        stage: parsedError.stage ?? parsedError.responsePayload?.stage ?? null,
+        failureReason:
+          parsedError.failureReason ??
+          parsedError.responsePayload?.failureReason ??
+          null,
+        category: parsedError.category ?? "unknown",
+        sessionId: sessionIdRef.current,
+      });
       toast.error(await resolveCompanionChatError(error));
       setMessages((previous) => [
         ...previous,

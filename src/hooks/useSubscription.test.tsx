@@ -103,6 +103,35 @@ describe("useSubscription", () => {
     });
   });
 
+  it("does not show an active subscription from raw RevenueCat state when backend access is inactive", () => {
+    mocks.storeKit = {
+      currentEntitlement: {
+        productId: "cosmiq_premium_yearly",
+        expirationDate: "2099-01-01T00:00:00.000Z",
+        transactionId: "other-account-tx",
+        appAccountToken: null,
+      },
+      isPro: true,
+      activePlan: "yearly",
+      expirationDate: new Date("2099-01-01T00:00:00.000Z"),
+      isLoading: false,
+      refreshEntitlement: mocks.refreshEntitlement,
+    };
+    mocks.accessState = {
+      has_access: false,
+      access_source: "none",
+      trial_ends_at: null,
+      subscribed: false,
+    };
+
+    const { result } = renderHook(() => useSubscription());
+
+    expect(result.current.subscription).toBeNull();
+    expect(result.current.isActive).toBe(false);
+    expect(result.current.hasPremium).toBe(false);
+    expect(result.current.plan).toBeUndefined();
+  });
+
   it("refreshes both StoreKit and the access-state fallback", async () => {
     const { result } = renderHook(() => useSubscription());
 
