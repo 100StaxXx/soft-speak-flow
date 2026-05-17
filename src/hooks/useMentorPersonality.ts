@@ -92,7 +92,7 @@ export const useMentorPersonality = (): MentorPersonality | null => {
 
   return {
     name: mentor.name,
-    slug: mentor.slug || '',
+    slug: resolvedSlug || mentor.slug || '',
     tone: mentor.tone_description ?? "",
     style: mentor.style || '',
     avatar_url: mentor.avatar_url || undefined,

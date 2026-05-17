@@ -20,6 +20,8 @@ interface GenerateWeeklyRecapDeps {
   applyAbuseProtectionFn?: typeof applyAbuseProtection;
 }
 
+const MENTOR_INSIGHT_PREVIEW_LENGTH = 500;
+
 const defaultDeps: GenerateWeeklyRecapDeps = {
   authenticate: requireRequestAuth,
   createSupabaseClient: () => {
@@ -53,6 +55,25 @@ function getPreviousWeekBoundaries() {
     weekStartStr: formatLocalDate(weekStart),
     weekEndStr: formatLocalDate(weekEnd),
   };
+}
+
+export function buildMentorInsightPreview(
+  recap: string,
+  maxLength = MENTOR_INSIGHT_PREVIEW_LENGTH,
+): string {
+  const trimmedRecap = recap.trim();
+  if (trimmedRecap.length <= maxLength) {
+    return trimmedRecap;
+  }
+
+  const preview = trimmedRecap.slice(0, maxLength).trimEnd();
+  const nextCharacter = trimmedRecap.charAt(preview.length);
+  if (!nextCharacter || /\s/.test(nextCharacter)) {
+    return preview;
+  }
+
+  const lastWordBreak = preview.search(/\s+\S*$/);
+  return lastWordBreak > 0 ? preview.slice(0, lastWordBreak).trimEnd() : preview;
 }
 
 export function resolveWeeklyRecapScope(
@@ -413,7 +434,7 @@ WRITING REQUIREMENTS:
           const aiData = await aiResponse.json();
           const generatedRecap = aiData.choices?.[0]?.message?.content?.trim();
           mentorStory = generatedRecap || null;
-          mentorInsight = generatedRecap ? generatedRecap.slice(0, 500).trim() : null;
+          mentorInsight = generatedRecap ? buildMentorInsightPreview(generatedRecap) : null;
         } else {
           console.error("AI response not ok:", await aiResponse.text());
         }

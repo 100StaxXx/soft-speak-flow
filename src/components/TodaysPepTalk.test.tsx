@@ -223,6 +223,7 @@ vi.mock("sonner", () => ({
   toast: {
     error: mocks.toastError,
     success: mocks.toastSuccess,
+    dismiss: vi.fn(),
   },
 }));
 
@@ -373,6 +374,33 @@ describe("TodaysPepTalk transcript expand behavior", () => {
     });
 
     expect(screen.getByText("Execute Your Vision")).toBeInTheDocument();
+  });
+
+  it("resolves legacy mentor slugs before querying and refreshing daily pep talks", async () => {
+    mocks.state.mentor = { slug: "eli", name: "The Rival" };
+    mocks.state.todayPepTalk = null;
+    mocks.state.fallbackPepTalk = makePepTalk({
+      mentor_slug: "rival",
+      title: "Prove It Today",
+      for_date: "2026-03-08",
+    });
+    mocks.state.generationResponse = Promise.resolve({
+      data: { pepTalk: makePepTalk({ mentor_slug: "rival", title: "Fresh Rival Message" }) },
+      error: null,
+    });
+
+    renderComponent();
+
+    expect(await screen.findByText("Prove It Today")).toBeInTheDocument();
+    expect(mocks.state.dailyPepTalkEqCalls).toContainEqual(["mentor_slug", "rival"]);
+
+    fireEvent.click(await screen.findByRole("button", { name: /refresh today's/i }));
+
+    await waitFor(() => {
+      expect(mocks.supabase.functions.invoke).toHaveBeenCalledWith("generate-single-daily-pep-talk", {
+        body: { mentorSlug: "rival", forceRegenerate: true },
+      });
+    });
   });
 
   it("updates the daily query when the effective date changes while mounted", async () => {
@@ -731,7 +759,7 @@ describe("TodaysPepTalk transcript expand behavior", () => {
 
     await waitFor(() => {
       expect(mocks.supabase.functions.invoke).toHaveBeenCalledWith("generate-single-daily-pep-talk", {
-        body: { mentorSlug: "carmen", forceRegenerate: true },
+        body: { mentorSlug: "icon", forceRegenerate: true },
       });
     });
 
@@ -823,7 +851,7 @@ describe("TodaysPepTalk transcript expand behavior", () => {
     expect(generationCalls).toEqual([
       [
         "generate-single-daily-pep-talk",
-        { body: { mentorSlug: "carmen", forceRegenerate: true } },
+        { body: { mentorSlug: "icon", forceRegenerate: true } },
       ],
     ]);
   });

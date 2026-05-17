@@ -51,7 +51,7 @@ export const WeeklyRecapModal = () => {
   const endDate = parseISO(selectedRecap.week_end_date);
   const dateRange = `${format(startDate, "MMMM d")} – ${format(endDate, "d, yyyy")}`;
 
-  const storyContent = selectedRecap.mentor_insight || selectedRecap.mentor_story;
+  const storyContent = selectedRecap.mentor_story?.trim() || selectedRecap.mentor_insight?.trim();
   const paragraphs = storyContent?.split(/\n{2,}/).filter(p => p.trim()) || [];
 
   const handleShare = async () => {

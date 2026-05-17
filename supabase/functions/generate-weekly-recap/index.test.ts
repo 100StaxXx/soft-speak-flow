@@ -33,3 +33,12 @@ Deno.test("generate-weekly-recap ignores explicit user mismatches and uses the a
   }
   assert(scope.userId === "user-1", `Expected authenticated user id, got ${scope.userId}`);
 });
+
+Deno.test("buildMentorInsightPreview truncates at a word boundary", () => {
+  const preview = module.buildMentorInsightPreview(
+    "First paragraph keeps whole words intact",
+    19,
+  );
+
+  assert(preview === "First paragraph", `Expected word-safe preview, got "${preview}"`);
+});

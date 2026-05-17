@@ -24,6 +24,7 @@ import { createIOSOptimizedAudio, isIOS, iosAudioManager, safePlay } from "@/uti
 import { logger } from "@/utils/logger";
 import { toast } from "@/components/ui/sonner";
 import { useAchievements } from "@/hooks/useAchievements";
+import { resolveMentorSlugAlias } from "@/lib/mentorRoster";
 
 interface CaptionWord {
   word: string;
@@ -120,11 +121,13 @@ async function fetchTodayPepTalk(
     };
   }
 
+  const mentorSlug = resolveMentorSlugAlias(mentor.slug) ?? mentor.slug;
+
   const { data: todayPepTalk, error: pepTalkError } = await supabase
     .from("daily_pep_talks")
     .select("*")
     .eq("for_date", effectiveDate)
-    .eq("mentor_slug", mentor.slug)
+    .eq("mentor_slug", mentorSlug)
     .maybeSingle();
 
   if (pepTalkError) {
@@ -134,20 +137,20 @@ async function fetchTodayPepTalk(
   if (todayPepTalk) {
     return {
       pepTalk: normalizeDailyPepTalk(todayPepTalk as Record<string, unknown>, mentor.name),
-      mentorSlug: mentor.slug,
+      mentorSlug,
       isFallback: false,
     };
   }
 
   log.debug("No pep talk for today, fetching most recent...", {
-    mentorSlug: mentor.slug,
+    mentorSlug,
     effectiveDate,
   });
 
   const { data: fallbackPepTalk, error: fallbackError } = await supabase
     .from("daily_pep_talks")
     .select("*")
-    .eq("mentor_slug", mentor.slug)
+    .eq("mentor_slug", mentorSlug)
     .order("for_date", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -159,19 +162,19 @@ async function fetchTodayPepTalk(
   if (!fallbackPepTalk) {
     return {
       pepTalk: null,
-      mentorSlug: mentor.slug,
+      mentorSlug,
       isFallback: false,
     };
   }
 
   log.debug("Using fallback pep talk", {
-    mentorSlug: mentor.slug,
+    mentorSlug,
     forDate: fallbackPepTalk.for_date,
   });
 
   return {
     pepTalk: normalizeDailyPepTalk(fallbackPepTalk as Record<string, unknown>, mentor.name),
-    mentorSlug: mentor.slug,
+    mentorSlug,
     isFallback: true,
   };
 }
@@ -458,15 +461,19 @@ export const TodaysPepTalk = memo(() => {
 
         setGenerationStage("loading");
 
+        const generatedMentorSlug =
+          typeof generatedPepTalk.mentor_slug === "string"
+            ? generatedPepTalk.mentor_slug
+            : nextMentorSlug;
         const { data: mentor } = await supabase
           .from("mentors")
           .select("name")
-          .eq("slug", nextMentorSlug)
+          .eq("slug", generatedMentorSlug)
           .maybeSingle();
 
         return {
           pepTalk: normalizeDailyPepTalk(generatedPepTalk, mentor?.name),
-          mentorSlug: nextMentorSlug,
+          mentorSlug: generatedMentorSlug,
           isFallback: false,
         } satisfies TodayPepTalkQueryData;
       } finally {

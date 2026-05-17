@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils";
 import { useMentorConnection } from "@/contexts/MentorConnectionContext";
 import { getEffectiveDailyDate } from "@/utils/timezone";
 import { safeSessionStorage } from "@/utils/storage";
+import { resolveMentorSlugAlias } from "@/lib/mentorRoster";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { CinematicPageBackground } from "@/components/CinematicPageBackground";
 import { useEveningReflection } from "@/hooks/useEveningReflection";
@@ -222,16 +223,17 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
 
       if (mentorError) throw mentorError;
       if (!mentorData) return null;
+      const mentorSlug = resolveMentorSlugAlias(mentorData.slug) ?? mentorData.slug ?? "sage";
 
       // Dynamically load mentor image
-      const imageUrl = await resolveMentorImageSource(mentorData.slug || "sage", mentorData.avatar_url);
+      const imageUrl = await resolveMentorImageSource(mentorSlug, mentorData.avatar_url);
 
       // Get today's pep talk and quote in parallel
       const { data: dailyPepTalk, error: pepTalkError } = await supabase
         .from("daily_pep_talks")
         .select("topic_category")
         .eq("for_date", pepTalkDate)
-        .eq("mentor_slug", mentorData.slug)
+        .eq("mentor_slug", mentorSlug)
         .maybeSingle();
 
       if (pepTalkError) throw pepTalkError;
