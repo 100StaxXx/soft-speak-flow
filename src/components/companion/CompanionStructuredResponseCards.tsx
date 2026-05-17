@@ -1,6 +1,15 @@
-import { memo } from "react";
+import { memo, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Maximize2, X } from "lucide-react";
 
 import { plannerPathfinderTheme } from "@/components/companion/plannerPathfinderTheme";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import type {
   CompanionCampaignHealthSnapshot,
@@ -12,6 +21,8 @@ type CompanionStructuredResponseCardsVariant = "journeys" | "companion";
 type ComingUpOutput = NonNullable<CompanionStructuredResponse["comingUp"]>;
 type ComingUpScheduleItem = ComingUpOutput["remainingToday"][number];
 type ComingUpMissedItem = ComingUpOutput["missedItems"][number];
+type CompanionStructuredResponseCardStyles =
+  (typeof variantStyles)[CompanionStructuredResponseCardsVariant];
 
 interface CompanionStructuredResponseCardsProps {
   structuredResponse?: CompanionStructuredResponse | null;
@@ -213,6 +224,23 @@ const formatComingUpScheduleLabel = (
   return `Tomorrow, ${label}`;
 };
 
+const formatTomorrowSummarySentence = (
+  summary: ComingUpOutput["tomorrowSummary"],
+): string => {
+  switch (summary) {
+    case "open":
+      return "Tomorrow looks open.";
+    case "light":
+      return "Tomorrow looks light.";
+    case "productive":
+      return "Tomorrow looks productive.";
+    case "busy":
+      return "Tomorrow looks busy. Be intentional with your open gaps.";
+    case "overwhelming":
+      return "Tomorrow may need a reset before things slip.";
+  }
+};
+
 const renderCampaignHealthSnapshot = (
   snapshot: CompanionCampaignHealthSnapshot,
   styles: (typeof variantStyles)[CompanionStructuredResponseCardsVariant],
@@ -254,7 +282,7 @@ const renderCampaignHealthSnapshot = (
 
 const renderQuestRow = (
   quest: CompanionSuggestedQuest,
-  styles: (typeof variantStyles)[CompanionStructuredResponseCardsVariant],
+  styles: CompanionStructuredResponseCardStyles,
 ) => {
   return (
     <div key={quest.suggestionId} className={styles.item}>
@@ -280,12 +308,144 @@ const renderQuestRow = (
   );
 };
 
+const renderComingUpContent = ({
+  comingUp,
+  comingUpNextEvent,
+  comingUpRemainingToday,
+  comingUpTomorrowSchedule,
+  comingUpMissedItems,
+  styles,
+  titleAccessory,
+  expanded = false,
+}: {
+  comingUp: ComingUpOutput;
+  comingUpNextEvent: ComingUpOutput["nextEvent"];
+  comingUpRemainingToday: ComingUpScheduleItem[];
+  comingUpTomorrowSchedule: ComingUpScheduleItem[];
+  comingUpMissedItems: ComingUpMissedItem[];
+  styles: CompanionStructuredResponseCardStyles;
+  titleAccessory?: ReactNode;
+  expanded?: boolean;
+}) => {
+  const itemClassName = cn(styles.item, expanded && "px-5 py-4");
+  const bodyClassName = cn(
+    "mt-2",
+    styles.body,
+    expanded && "text-base leading-7",
+  );
+  const subtextClassName = cn(
+    styles.subtext,
+    expanded && "text-base leading-7",
+  );
+  const titleClassName = cn(styles.title, expanded && "text-[0.78rem]");
+
+  return (
+    <>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className={titleClassName}>Coming Up</p>
+          <p className={bodyClassName}>{comingUp.message}</p>
+        </div>
+        {titleAccessory ? (
+          <div className="shrink-0 pt-1">{titleAccessory}</div>
+        ) : null}
+      </div>
+      {comingUpNextEvent
+        ? (
+          <div className={cn("mt-4", itemClassName)}>
+            <p className={titleClassName}>Next</p>
+            <p className={cn("mt-1 font-semibold", expanded ? "text-base" : "text-sm")}>
+              {comingUpNextEvent.title}
+            </p>
+            <p className={cn("mt-1", subtextClassName)}>
+              {comingUpNextEvent.label}
+            </p>
+          </div>
+        )
+        : null}
+      {comingUp.nextBestAction
+        ? (
+          <div className={expanded ? "mt-5" : "mt-4"}>
+            <p className={titleClassName}>Before That</p>
+            <div className="mt-2">
+              {renderQuestRow(
+                comingUp.nextBestAction,
+                styles,
+              )}
+            </div>
+          </div>
+        )
+        : null}
+      <div className={cn(expanded ? "mt-5" : "mt-4", "space-y-2")}>
+        {comingUpRemainingToday.length > 0
+          ? comingUpRemainingToday.map((item) => (
+            <div key={item.id} className={itemClassName}>
+              <p className={cn("font-semibold", expanded ? "text-base" : "text-sm")}>
+                {item.title}
+              </p>
+              <p className={cn("mt-1", subtextClassName)}>
+                {formatComingUpScheduleLabel(item, "today")}
+              </p>
+            </div>
+          ))
+          : (
+            <p className={subtextClassName}>
+              Nothing else is scheduled for the rest of today.
+            </p>
+          )}
+      </div>
+      <p className={cn(expanded ? "mt-5" : "mt-4", subtextClassName)}>
+        {formatTomorrowSummarySentence(comingUp.tomorrowSummary)}
+      </p>
+      {comingUpTomorrowSchedule.length > 0
+        ? (
+          <div className={expanded ? "mt-4" : "mt-3"}>
+            <p className={titleClassName}>Tomorrow</p>
+            <div className="mt-2 space-y-2">
+              {comingUpTomorrowSchedule.map((item) => (
+                <div key={item.id} className={itemClassName}>
+                  <p className={cn("font-semibold", expanded ? "text-base" : "text-sm")}>
+                    {item.title}
+                  </p>
+                  <p className={cn("mt-1", subtextClassName)}>
+                    {formatComingUpScheduleLabel(item, "tomorrow")}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+        : null}
+      {comingUpMissedItems.length > 0
+        ? (
+          <div className={expanded ? "mt-4" : "mt-3"}>
+            <p className={titleClassName}>Earlier Today</p>
+            <div className="mt-2 space-y-2">
+              {comingUpMissedItems.map((item) => (
+                <div key={item.id} className={itemClassName}>
+                  <p className={cn("font-semibold", expanded ? "text-base" : "text-sm")}>
+                    {item.title}
+                  </p>
+                  <p className={cn("mt-1", subtextClassName)}>
+                    {item.label}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+        : null}
+    </>
+  );
+};
+
 export const CompanionStructuredResponseCards = memo(
   function CompanionStructuredResponseCards({
     structuredResponse,
     variant,
     className,
   }: CompanionStructuredResponseCardsProps) {
+    const [isComingUpExpanded, setIsComingUpExpanded] = useState(false);
     if (!structuredResponse) return null;
 
     const styles = variantStyles[variant];
@@ -310,6 +470,25 @@ export const CompanionStructuredResponseCards = memo(
       !comingUpRemainingToday.some((item) =>
         scheduleItemMatchesMissedItem(item, missedItem)
       )
+    );
+    const handleComingUpKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+
+      event.preventDefault();
+      setIsComingUpExpanded(true);
+    };
+    const comingUpExpandIcon = (
+      <span
+        aria-hidden="true"
+        className={cn(
+          "inline-flex h-9 w-9 items-center justify-center rounded-full border text-current shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]",
+          variant === "journeys"
+            ? "border-[#6d3518]/55 bg-white/45"
+            : "border-[hsl(var(--celestial-blue)_/_0.36)] bg-card/70",
+        )}
+      >
+        <Maximize2 className="h-4 w-4" />
+      </span>
     );
 
     return (
@@ -624,7 +803,9 @@ export const CompanionStructuredResponseCards = memo(
                 : null}
               <div className="mt-4 flex flex-wrap gap-2">
                 <span className={styles.accent}>
-                  Tomorrow looks {structuredResponse.reflectionBridge.tomorrowSummary}
+                  {formatTomorrowSummarySentence(
+                    structuredResponse.reflectionBridge.tomorrowSummary,
+                  )}
                 </span>
               </div>
               {structuredResponse.reflectionBridge.firstAction
@@ -667,94 +848,73 @@ export const CompanionStructuredResponseCards = memo(
 
         {structuredResponse.comingUp
           ? (
-            <section
-              className={cn("p-4", styles.card)}
-              data-testid="structured-coming-up"
-            >
-              <p className={styles.title}>Coming Up</p>
-              <p className={cn("mt-2", styles.body)}>
-                {structuredResponse.comingUp.message}
-              </p>
-              {comingUpNextEvent
-                ? (
-                  <div className={cn("mt-4", styles.item)}>
-                    <p className={styles.title}>Next</p>
-                    <p className="mt-1 text-sm font-semibold">
-                      {comingUpNextEvent.title}
-                    </p>
-                    <p className={cn("mt-1", styles.subtext)}>
-                      {comingUpNextEvent.label}
-                    </p>
-                  </div>
-                )
-                : null}
-              {structuredResponse.comingUp.nextBestAction
-                ? (
-                  <div className="mt-4">
-                    <p className={styles.title}>Before That</p>
-                    <div className="mt-2">
-                      {renderQuestRow(
-                        structuredResponse.comingUp.nextBestAction,
+            <>
+              <section
+                className={cn(
+                  "cursor-pointer p-4 outline-none transition-transform hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-[hsl(var(--celestial-blue)_/_0.55)] focus-visible:ring-offset-2 focus-visible:ring-offset-background active:translate-y-0",
+                  styles.card,
+                )}
+                role="button"
+                tabIndex={0}
+                aria-expanded={isComingUpExpanded}
+                aria-label="Expand coming up schedule"
+                onClick={() => setIsComingUpExpanded(true)}
+                onKeyDown={handleComingUpKeyDown}
+                data-testid="structured-coming-up"
+              >
+                {renderComingUpContent({
+                  comingUp: structuredResponse.comingUp,
+                  comingUpNextEvent,
+                  comingUpRemainingToday,
+                  comingUpTomorrowSchedule,
+                  comingUpMissedItems,
+                  styles,
+                  titleAccessory: comingUpExpandIcon,
+                })}
+              </section>
+              <Sheet
+                open={isComingUpExpanded}
+                onOpenChange={setIsComingUpExpanded}
+              >
+                <SheetContent
+                  side="bottom"
+                  className="flex h-[min(88dvh,52rem)] max-h-[88dvh] flex-col overflow-hidden rounded-t-[2rem] border-[hsl(var(--celestial-blue)_/_0.44)] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.98)_0%,hsl(var(--secondary)_/_0.82)_100%)] p-0 shadow-[0_-20px_48px_-30px_rgba(var(--primary-rgb),0.55)]"
+                >
+                  <SheetHeader className="sr-only">
+                    <SheetTitle>Coming Up Schedule</SheetTitle>
+                    <SheetDescription>
+                      Expanded view of your upcoming schedule.
+                    </SheetDescription>
+                  </SheetHeader>
+                  <SheetClose asChild>
+                    <button
+                      type="button"
+                      className="absolute right-4 top-4 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full border border-[hsl(var(--celestial-blue)_/_0.36)] bg-card/90 text-foreground shadow-[0_12px_28px_-22px_rgba(var(--primary-rgb),0.5),inset_0_1px_0_rgba(255,255,255,0.8)] transition-colors hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--celestial-blue)_/_0.45)]"
+                      aria-label="Close expanded coming up schedule"
+                      data-testid="structured-coming-up-expanded-close"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </SheetClose>
+                  <div
+                    className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] pt-8 sm:px-6"
+                    data-testid="structured-coming-up-expanded"
+                  >
+                    <section className={cn("p-5 sm:p-6", styles.card)}>
+                      {renderComingUpContent({
+                        comingUp: structuredResponse.comingUp,
+                        comingUpNextEvent,
+                        comingUpRemainingToday,
+                        comingUpTomorrowSchedule,
+                        comingUpMissedItems,
                         styles,
-                      )}
-                    </div>
+                        expanded: true,
+                      })}
+                    </section>
                   </div>
-                )
-                : null}
-              <div className="mt-4 space-y-2">
-                {comingUpRemainingToday.length > 0
-                  ? comingUpRemainingToday.map((item) => (
-                    <div key={item.id} className={styles.item}>
-                      <p className="text-sm font-semibold">{item.title}</p>
-                      <p className={cn("mt-1", styles.subtext)}>
-                        {formatComingUpScheduleLabel(item, "today")}
-                      </p>
-                    </div>
-                  ))
-                  : (
-                    <p className={styles.subtext}>
-                      Nothing else is scheduled for the rest of today.
-                    </p>
-                  )}
-              </div>
-              <p className={cn("mt-4", styles.subtext)}>
-                Tomorrow looks {structuredResponse.comingUp.tomorrowSummary}.
-              </p>
-              {comingUpTomorrowSchedule.length > 0
-                ? (
-                  <div className="mt-3">
-                    <p className={styles.title}>Tomorrow</p>
-                    <div className="mt-2 space-y-2">
-                      {comingUpTomorrowSchedule.map((item) => (
-                        <div key={item.id} className={styles.item}>
-                          <p className="text-sm font-semibold">{item.title}</p>
-                          <p className={cn("mt-1", styles.subtext)}>
-                            {formatComingUpScheduleLabel(item, "tomorrow")}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )
-                : null}
-              {comingUpMissedItems.length > 0
-                ? (
-                  <div className="mt-3">
-                    <p className={styles.title}>Earlier Today</p>
-                    <div className="mt-2 space-y-2">
-                      {comingUpMissedItems.map((item) => (
-                        <div key={item.id} className={styles.item}>
-                          <p className="text-sm font-semibold">{item.title}</p>
-                          <p className={cn("mt-1", styles.subtext)}>
-                            {item.label}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )
-                : null}
-            </section>
+                </SheetContent>
+              </Sheet>
+            </>
           )
           : null}
 

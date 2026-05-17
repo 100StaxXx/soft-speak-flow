@@ -1,4 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type {
@@ -30,6 +36,46 @@ const createQuest = (
   estimatedDurationMinutes: overrides.estimatedDurationMinutes ?? 30,
   source: overrides.source ?? "optimization",
   reason: overrides.reason ?? "It is the clearest next move right now.",
+});
+
+const createComingUpResponse = (): CompanionStructuredResponse => ({
+  intent: baseIntent,
+  comingUp: {
+    message: "Today: Daily Content Creation. Tomorrow has four planned quests.",
+    nextEvent: {
+      id: "event-content",
+      title: "Daily Content Creation",
+      label: "7:00 pm, 1h",
+      startsAt: "2026-05-16T19:00:00",
+      endsAt: "2026-05-16T20:00:00",
+      isAllDay: false,
+      source: "task",
+    },
+    nextBestAction: null,
+    remainingToday: [],
+    tomorrowSummary: "busy",
+    tomorrowSchedule: [
+      {
+        id: "task-cardio-tomorrow",
+        title: "Daily Cardio",
+        label: "6:00 am, 30 min",
+        startsAt: "2026-05-17T06:00:00",
+        endsAt: "2026-05-17T06:30:00",
+        isAllDay: false,
+        source: "task",
+      },
+      {
+        id: "task-meal-prep-tomorrow",
+        title: "Weekly Meal Prep",
+        label: "10:00 am, 2h",
+        startsAt: "2026-05-17T10:00:00",
+        endsAt: "2026-05-17T12:00:00",
+        isAllDay: false,
+        source: "task",
+      },
+    ],
+    missedItems: [],
+  },
 });
 
 describe("CompanionStructuredResponseCards", () => {
@@ -174,6 +220,94 @@ describe("CompanionStructuredResponseCards", () => {
     expect(screen.queryByRole("button", { name: /save|draft/i })).toBeNull();
   });
 
+  it("opens coming-up cards in an expanded schedule sheet when clicked", () => {
+    render(
+      <CompanionStructuredResponseCards
+        structuredResponse={createComingUpResponse()}
+        variant="journeys"
+      />,
+    );
+
+    const comingUpCard = screen.getByTestId("structured-coming-up");
+    expect(comingUpCard).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByTestId("structured-coming-up-expanded")).toBeNull();
+
+    fireEvent.click(comingUpCard);
+
+    const expandedSchedule = screen.getByTestId(
+      "structured-coming-up-expanded",
+    );
+    expect(comingUpCard).toHaveAttribute("aria-expanded", "true");
+    expect(within(expandedSchedule).getByText("Daily Cardio"))
+      .toBeInTheDocument();
+    expect(within(expandedSchedule).getByText("Weekly Meal Prep"))
+      .toBeInTheDocument();
+  });
+
+  it("opens coming-up cards from keyboard activation", () => {
+    render(
+      <CompanionStructuredResponseCards
+        structuredResponse={createComingUpResponse()}
+        variant="journeys"
+      />,
+    );
+
+    const comingUpCard = screen.getByRole("button", {
+      name: /expand coming up schedule/i,
+    });
+    comingUpCard.focus();
+    fireEvent.keyDown(comingUpCard, { key: "Enter" });
+
+    expect(screen.getByTestId("structured-coming-up-expanded"))
+      .toBeInTheDocument();
+  });
+
+  it("closes the expanded coming-up sheet without removing the inline card", async () => {
+    render(
+      <CompanionStructuredResponseCards
+        structuredResponse={createComingUpResponse()}
+        variant="journeys"
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("structured-coming-up"));
+    expect(screen.getByTestId("structured-coming-up-expanded"))
+      .toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("structured-coming-up-expanded-close"));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("structured-coming-up-expanded")).toBeNull();
+    });
+    expect(screen.getByTestId("structured-coming-up")).toBeInTheDocument();
+    expect(screen.getByTestId("structured-coming-up"))
+      .toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("does not add expansion controls to non-coming-up rich cards", () => {
+    const structuredResponse: CompanionStructuredResponse = {
+      intent: baseIntent,
+      planDay: {
+        message: "Keep the day focused around one campaign reset.",
+        dayAssessment: "balanced",
+        suggestedQuests: [],
+      },
+    };
+
+    render(
+      <CompanionStructuredResponseCards
+        structuredResponse={structuredResponse}
+        variant="journeys"
+      />,
+    );
+
+    expect(screen.getByTestId("structured-plan-day")).toBeInTheDocument();
+    expect(screen.queryByRole("button", {
+      name: /expand coming up schedule/i,
+    })).toBeNull();
+    expect(screen.queryByTestId("structured-coming-up-expanded")).toBeNull();
+  });
+
   it("renders tomorrow schedule items in coming-up cards", () => {
     const structuredResponse: CompanionStructuredResponse = {
       intent: baseIntent,
@@ -210,6 +344,32 @@ describe("CompanionStructuredResponseCards", () => {
     expect(screen.getByText("Morning ritual")).toBeInTheDocument();
     expect(screen.getByText("Morning ritual (tomorrow at 8:00 am)"))
       .toBeInTheDocument();
+  });
+
+  it("renders adaptive tomorrow load copy for productive and overwhelming days", () => {
+    const productiveResponse = createComingUpResponse();
+    productiveResponse.comingUp!.tomorrowSummary = "productive";
+    const { rerender } = render(
+      <CompanionStructuredResponseCards
+        structuredResponse={productiveResponse}
+        variant="companion"
+      />,
+    );
+
+    expect(screen.getByTestId("structured-coming-up"))
+      .toHaveTextContent("Tomorrow looks productive.");
+
+    const overwhelmingResponse = createComingUpResponse();
+    overwhelmingResponse.comingUp!.tomorrowSummary = "overwhelming";
+    rerender(
+      <CompanionStructuredResponseCards
+        structuredResponse={overwhelmingResponse}
+        variant="companion"
+      />,
+    );
+
+    expect(screen.getByTestId("structured-coming-up"))
+      .toHaveTextContent("Tomorrow may need a reset before things slip.");
   });
 
   it("dedupes repeated coming-up rows and keeps next separate", () => {

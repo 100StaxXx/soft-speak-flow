@@ -306,6 +306,10 @@ const plannerTask = (
   estimatedDuration: overrides.estimatedDuration ?? null,
   recurrencePattern: overrides.recurrencePattern ?? null,
   completed: overrides.completed ?? false,
+  priority: overrides.priority ?? null,
+  difficulty: overrides.difficulty ?? null,
+  flexibility: overrides.flexibility ?? null,
+  energyType: overrides.energyType ?? null,
   source: overrides.source ?? null,
   habitSourceId: overrides.habitSourceId ?? null,
   epicId: overrides.epicId ?? null,
@@ -316,6 +320,9 @@ const plannerStatInterpretation = (
   momentumState: NonNullable<
     PlannerBuildInput["plannerContext"]["statInterpretation"]
   >["momentumState"],
+  overrides: Partial<
+    NonNullable<PlannerBuildInput["plannerContext"]["statInterpretation"]>
+  > = {},
 ): NonNullable<PlannerBuildInput["plannerContext"]["statInterpretation"]> => ({
   statProfile: {
     scores: {
@@ -338,9 +345,11 @@ const plannerStatInterpretation = (
     alignment: { level: "low", reasons: [] },
   },
   momentumState,
-  recentMissInterpretation: "normal_variance",
+  recentMissInterpretation:
+    overrides.recentMissInterpretation ?? "normal_variance",
   narrativeBrief: "You're in a solid rhythm.",
   dailyNarrative: "Locked-in day",
+  ...overrides,
 });
 
 const campaignFollowUpContext = (
@@ -3722,6 +3731,108 @@ Deno.test("upcoming_start includes active standalone rituals due tomorrow", () =
       item.title === "Morning standalone ritual" && item.source === "ritual"
     ),
     true,
+  );
+});
+
+Deno.test("upcoming_start calls a spacious five-hour tomorrow productive", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What do I have coming up?",
+    currentDate: "2026-05-16",
+    currentDateTime: "2026-05-16T14:43:00-07:00",
+    plannerContext: {
+      tasks: [
+        plannerTask({
+          id: "cardio",
+          title: "Daily Cardio",
+          taskDate: "2026-05-17",
+          scheduledTime: "06:00",
+          estimatedDuration: 30,
+        }),
+        plannerTask({
+          id: "meal-prep",
+          title: "Weekly Meal Prep",
+          taskDate: "2026-05-17",
+          scheduledTime: "10:00",
+          estimatedDuration: 120,
+        }),
+        plannerTask({
+          id: "strategy",
+          title: "Weekly Strategy Review",
+          taskDate: "2026-05-17",
+          scheduledTime: "14:00",
+          estimatedDuration: 90,
+        }),
+        plannerTask({
+          id: "content",
+          title: "Daily Content Creation",
+          taskDate: "2026-05-17",
+          scheduledTime: "19:00",
+          estimatedDuration: 60,
+        }),
+      ],
+      starterIntent: "upcoming_start",
+    },
+  }));
+
+  assertEquals(
+    result.structuredResponse?.comingUp?.tomorrowSummary,
+    "productive",
+  );
+});
+
+Deno.test("upcoming_start adapts busy language for strained low-energy users", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What do I have coming up?",
+    currentDate: "2026-05-16",
+    currentDateTime: "2026-05-16T14:43:00-07:00",
+    plannerContext: {
+      plannerMemory: {
+        workloadTolerance: "normal",
+      },
+      statInterpretation: plannerStatInterpretation("slipping", {
+        recentMissInterpretation: "low_energy",
+      }),
+      tasks: [
+        plannerTask({
+          id: "missed-one",
+          title: "Missed deep work",
+          taskDate: "2026-05-16",
+          scheduledTime: "08:00",
+          estimatedDuration: 60,
+          priority: "high",
+        }),
+        plannerTask({
+          id: "missed-two",
+          title: "Missed proposal",
+          taskDate: "2026-05-16",
+          scheduledTime: "09:30",
+          estimatedDuration: 60,
+          priority: "high",
+        }),
+        plannerTask({
+          id: "deep-one",
+          title: "Deep work block",
+          taskDate: "2026-05-17",
+          scheduledTime: "09:00",
+          estimatedDuration: 150,
+          priority: "high",
+        }),
+        plannerTask({
+          id: "deep-two",
+          title: "Hard review block",
+          taskDate: "2026-05-17",
+          scheduledTime: "13:00",
+          estimatedDuration: 120,
+          priority: "high",
+        }),
+      ],
+      starterIntent: "upcoming_start",
+    },
+  }));
+
+  assertEquals(
+    result.structuredResponse?.comingUp?.tomorrowSummary,
+    "overwhelming",
   );
 });
 

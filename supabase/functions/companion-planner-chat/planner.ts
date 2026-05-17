@@ -21,6 +21,10 @@ import {
 } from "../../../src/shared/schedulingIntent.ts";
 import { computePlannerPriorityScores } from "../../../src/shared/companionPlannerPriority.ts";
 import {
+  classifyAdaptiveComingUpLoad,
+  type AdaptiveLoadBlock,
+} from "../../../src/shared/adaptiveComingUpLoad.ts";
+import {
   fitPlannerDurationBucketWithin,
   normalizePlannerDurationBucket,
 } from "../_shared/plannerDurationBuckets.ts";
@@ -4699,6 +4703,122 @@ const collectMissedTasksForToday = (
     }));
 };
 
+const collectAdaptiveLoadBlocksForDate = (
+  input: PlannerBuildInput,
+  date: string,
+): AdaptiveLoadBlock[] => {
+  const taskBlocks = getScopedPlannerTasks(input)
+    .filter((task) => task.completed !== true && task.taskDate === date)
+    .map((task): AdaptiveLoadBlock => {
+      const startMinutes = parseTimeToMinutes(task.scheduledTime);
+      const durationMinutes = getTaskDuration(task);
+      return {
+        id: task.id,
+        title: task.title,
+        source: "task",
+        startMinutes,
+        endMinutes: startMinutes === null ? null : startMinutes + durationMinutes,
+        durationMinutes,
+        energyType: task.energyType,
+        priority: task.priority,
+        difficulty: task.difficulty,
+        flexibility: task.flexibility,
+        category: task.category,
+      };
+    });
+
+  const ritualBlocks = shouldIncludeVirtualRitualScheduleItems(input)
+    ? collectRitualScheduleItemsForDate(input, date, false)
+      .map((item): AdaptiveLoadBlock => {
+        const ritualId = item.id.split(":")[1] ?? item.id;
+        const ritual = getScopedPlannerRituals(input)
+          .find((candidate) => candidate.id === ritualId);
+        const durationMinutes = ritual
+          ? getRitualDuration(ritual)
+          : DEFAULT_TASK_DURATION_MINUTES;
+        return {
+          id: item.id,
+          title: item.title,
+          source: "ritual",
+          startMinutes: item.sortMinutes,
+          endMinutes: item.sortMinutes === null
+            ? null
+            : item.sortMinutes + durationMinutes,
+          durationMinutes,
+          energyType: null,
+          priority: null,
+          flexibility: "preferred",
+          category: "ritual",
+        };
+      })
+    : [];
+
+  const { start: dayStart, end: dayEnd } = buildOffsetDateWindow(
+    input.currentDateTime,
+    date,
+  );
+  const eventBlocks = input.plannerContext.calendarEvents
+    .map((event): AdaptiveLoadBlock | null => {
+      const start = new Date(event.start);
+      const end = new Date(event.end);
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+        return null;
+      }
+      if (end <= dayStart || start >= dayEnd) return null;
+
+      if (event.isAllDay) {
+        return {
+          id: event.id,
+          title: event.title,
+          source: "calendar",
+          startMinutes: null,
+          endMinutes: null,
+          durationMinutes: 0,
+          isAllDay: true,
+        };
+      }
+
+      const localStart = start < dayStart ? dayStart : start;
+      const localEnd = end > dayEnd ? dayEnd : end;
+      const startMinutes = Math.round(
+        (localStart.getTime() - dayStart.getTime()) / 60_000,
+      );
+      const endMinutes = Math.round(
+        (localEnd.getTime() - dayStart.getTime()) / 60_000,
+      );
+      if (endMinutes <= startMinutes) return null;
+
+      return {
+        id: event.id,
+        title: event.title,
+        source: "calendar",
+        startMinutes,
+        endMinutes,
+        durationMinutes: endMinutes - startMinutes,
+      };
+    })
+    .filter((block): block is AdaptiveLoadBlock => block !== null);
+
+  return [...taskBlocks, ...ritualBlocks, ...eventBlocks];
+};
+
+const getAdaptiveDateSummary = (
+  input: PlannerBuildInput,
+  date: string,
+  missedCount = 0,
+): CompanionTomorrowSummary =>
+  classifyAdaptiveComingUpLoad({
+    blocks: collectAdaptiveLoadBlocksForDate(input, date),
+    workloadTolerance: input.plannerContext.plannerMemory?.workloadTolerance ??
+      null,
+    momentumState: input.plannerContext.statInterpretation?.momentumState ??
+      null,
+    recentMissInterpretation:
+      input.plannerContext.statInterpretation?.recentMissInterpretation ??
+        null,
+    missedCount,
+  }).label;
+
 const getStructuredScheduleItemStartMinutes = (
   input: PlannerBuildInput,
   item: CompanionScheduleItem | null,
@@ -7197,23 +7317,17 @@ const buildComingUpStructuredOutput = (
   );
   const nextEvent = remainingToday[0] ?? null;
   const tomorrow = addDaysToDateKey(input.currentDate, 1);
-  const tomorrowLoad = input.plannerContext.scheduleInsights?.dayLoads.find((
-    day,
-  ) => day.date === tomorrow);
   const tomorrowItems = collectStructuredScheduleItemsForDate(
     input,
     tomorrow,
     false,
   );
-  const tomorrowSummary: CompanionTomorrowSummary = tomorrowItems.length === 0
-    ? "open"
-    : tomorrowLoad &&
-        tomorrowLoad.status !== "open" &&
-        tomorrowLoad.status !== "balanced"
-    ? "busy"
-    : tomorrowItems.length <= 2 || tomorrowLoad?.status === "balanced"
-    ? "light"
-    : "busy";
+  const missedItems = collectMissedTasksForToday(input);
+  const tomorrowSummary = getAdaptiveDateSummary(
+    input,
+    tomorrow,
+    missedItems.length,
+  );
   return {
     intent: mapPlannerIntentMetadata(input, classificationHint, {
       forceIntentType: getProposalDrivenIntentType(
@@ -7232,7 +7346,7 @@ const buildComingUpStructuredOutput = (
       remainingToday,
       tomorrowSchedule: tomorrowItems,
       tomorrowSummary,
-      missedItems: collectMissedTasksForToday(input),
+      missedItems,
     },
   };
 };
@@ -10884,14 +10998,7 @@ const buildPlanWeekStarterResponse = (
 const getDateSummary = (
   input: PlannerBuildInput,
   date: string,
-): CompanionTomorrowSummary => {
-  const dayLoad = input.plannerContext.scheduleInsights?.dayLoads.find((day) =>
-    day.date === date
-  );
-  if (!dayLoad || dayLoad.status === "open") return "open";
-  if (dayLoad.status === "balanced") return "light";
-  return "busy";
-};
+): CompanionTomorrowSummary => getAdaptiveDateSummary(input, date);
 
 const getWeeklyFollowUpSchedulingHint = (
   input: PlannerBuildInput,
@@ -11176,6 +11283,10 @@ const buildReflectionBridgeResponse = (
     : "Here's the cleanest planner handoff into tomorrow.";
   const scheduleLine = tomorrowSummary === "busy"
     ? "Tomorrow already looks busy, so keep the first move focused and realistic."
+    : tomorrowSummary === "overwhelming"
+    ? "Tomorrow may need a reset before things slip, so keep the first move small and protected."
+    : tomorrowSummary === "productive"
+    ? "Tomorrow looks productive, so the goal is protecting the plan without adding unnecessary pressure."
     : tomorrowSummary === "light"
     ? "Tomorrow has some room, so the goal is starting with the right move instead of adding more noise."
     : "Tomorrow looks open, so the main job is choosing a strong first move before the day fills itself.";

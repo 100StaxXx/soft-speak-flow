@@ -353,7 +353,9 @@ const classifyStorageCleanupFailureReason = (
 
 const shouldContinueAfterStorageCleanupFailure = (error: unknown): boolean => {
   const failureReason = classifyStorageCleanupFailureReason(error);
-  return failureReason === "storage_api" || failureReason === "timeout";
+  return failureReason === "storage_api" ||
+    failureReason === "timeout" ||
+    failureReason === "permission";
 };
 
 const buildStorageCleanupFailureWarning = (error: unknown): string => {
@@ -364,6 +366,10 @@ const buildStorageCleanupFailureWarning = (error: unknown): string => {
 
   if (failureReason === "timeout") {
     return "Storage cleanup timed out before account deletion finished. Database cleanup fallback continued.";
+  }
+
+  if (failureReason === "permission") {
+    return "Storage metadata permission check failed; account deletion continued with database cleanup fallback.";
   }
 
   return `Storage API cleanup failed${statusText}; account deletion continued with database cleanup fallback.`;
@@ -869,8 +875,10 @@ const listOwnedStorageObjectsForColumn = async (
             return;
           }
 
-          // Classify RLS / permission errors as terminal so they aren't
-          // uselessly retried — these require a config fix, not a retry.
+          // Classify RLS / permission errors without retrying. The top-level
+          // deletion flow degrades storage cleanup to a warning and continues
+          // into the database fallback so users are not blocked from deleting
+          // their own account.
           const errorText = getNormalizedErrorText(error);
           if (
             getErrorStatus(error) === 403 ||

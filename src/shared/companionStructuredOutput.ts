@@ -193,7 +193,12 @@ export interface CompanionScheduleItem {
   source: "task" | "calendar" | "ritual";
 }
 
-export type CompanionTomorrowSummary = "busy" | "light" | "open";
+export type CompanionTomorrowSummary =
+  | "busy"
+  | "light"
+  | "open"
+  | "overwhelming"
+  | "productive";
 
 export interface CompanionMissedItem {
   id: string;

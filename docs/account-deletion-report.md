@@ -1,9 +1,14 @@
 # Account deletion failure report
 
 ## Observations
-- Account deletion is driven by the `delete-user-account` Edge Function, invoked from the Profile page via `supabase.functions.invoke` with the user's access token.
-- The Edge Function constructs a Supabase client using the `SUPABASE_SERVICE_ROLE_KEY` and calls the `delete_user_account` RPC before removing the user through `supabase.auth.admin.deleteUser`.
-- The SQL function `delete_user_account` is defined in migrations and requires execution with the `service_role` role.
+- Account deletion is driven by the `delete-user` Edge Function, invoked from the Profile page via `supabase.functions.invoke` with the user's access token.
+- The Edge Function constructs a Supabase client using the `SUPABASE_SERVICE_ROLE_KEY`, attempts Storage API cleanup first, calls the `delete_user_account` RPC as the database cleanup fallback, then removes the auth user through `supabase.auth.admin.deleteUser`.
+- The SQL function `delete_user_account` is defined in migrations, requires execution with the `service_role` role, and can directly clear matching `storage.objects` rows for user-owned storage paths when the Storage API path is incomplete.
+
+## 2026-05-16 storage cleanup diagnosis
+- A Profile toast that says uploaded-file cleanup failed maps to `ACCOUNT_DELETION_STORAGE_CLEANUP_FAILED` with `stage: "storage_cleanup"`.
+- The known blocker is a permission/RLS failure while the Edge Function queries Supabase `storage.objects` metadata to discover user-owned files. That metadata query should not prevent the user from deleting their account.
+- The expected behavior is degraded success: log `failureReason: "permission"`, return a `STORAGE_CLEANUP_INCOMPLETE` warning, continue through `delete_user_account`, then attempt auth deletion.
 
 ## 2026-04-12 production drift verification
 - Linked Supabase project ref: `opbfpbbqvuksuvmtmssd` from `supabase/config.toml`.
@@ -29,6 +34,9 @@
 3. **Invalid/expired user access token**
    - The function requires a Bearer token and returns 401 if the header is missing or empty. The client surfaces session-expired errors, but if the token is expired or revoked, the Edge Function will also respond with 401.
 
+4. **Storage metadata permission failure**
+   - The function queries `storage.objects` ownership metadata to discover user-owned files that were not recorded in `user_storage_assets`. If this query is permission-blocked, deletion should continue with a warning because the database cleanup fallback can still clear user-owned storage object rows.
+
 ## Recommended remedies
 1. **Ensure secrets are set for the Edge Function**
    - Add `SUPABASE_SERVICE_ROLE_KEY` (and confirm `SUPABASE_URL`) to the Edge Function’s secrets in the Supabase dashboard/CLI, then redeploy the function. Without this, deletions will always fail.
@@ -38,3 +46,6 @@
 
 3. **Validate client session flow**
    - Confirm that `supabase.auth.getSession()` returns an active `access_token` before invoking the function and that logout flows refresh tokens as expected. If repeated 401s occur after adding the service role key, capture the exact error payload from the Edge Function logs to pinpoint token issues.
+
+4. **Treat storage metadata permission issues as degraded cleanup**
+   - Keep Storage API cleanup best-effort. Permission failures in storage ownership discovery should be logged and surfaced as warnings, not returned as fatal account deletion failures.

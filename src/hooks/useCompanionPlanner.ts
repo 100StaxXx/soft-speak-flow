@@ -71,6 +71,10 @@ import {
 import { getOnboardingScheduleArchetypeProfile } from "@/shared/onboardingScheduleArchetype";
 import { computePlannerPriorityScores } from "@/shared/companionPlannerPriority";
 import { buildCompanionStatInterpretation } from "@/shared/companionStatSignals";
+import {
+  classifyAdaptiveComingUpLoad,
+  type AdaptiveLoadBlock,
+} from "@/shared/adaptiveComingUpLoad";
 import { isUpcomingScheduleDigestMessage } from "@/shared/schedulingIntent";
 import { withTimeout } from "@/utils/asyncTimeout";
 import { normalizeUuidLikeId } from "@/utils/offlineId";
@@ -1376,6 +1380,25 @@ const getLocalEventSortMinutes = (
   return clampedStart.getHours() * 60 + clampedStart.getMinutes();
 };
 
+const getLocalEventEndMinutes = (
+  event: PlannerContextCalendarEvent,
+  dateKey: string,
+): number | null => {
+  if (event.isAllDay) return null;
+  const dayStart = new Date(`${dateKey}T00:00:00`);
+  const dayEnd = new Date(`${addDaysToDateKey(dateKey, 1)}T00:00:00`);
+  const eventEnd = new Date(event.end);
+  if (
+    Number.isNaN(dayStart.getTime()) ||
+    Number.isNaN(dayEnd.getTime()) ||
+    Number.isNaN(eventEnd.getTime())
+  ) {
+    return null;
+  }
+  const clampedEnd = eventEnd > dayEnd ? dayEnd : eventEnd;
+  return Math.round((clampedEnd.getTime() - dayStart.getTime()) / 60_000);
+};
+
 const formatLocalEventLabel = (event: PlannerContextCalendarEvent): string => {
   if (event.isAllDay) return "All day";
   const start = new Date(event.start);
@@ -1635,6 +1658,69 @@ const stripLocalSortMinutes = (
 const formatLocalDigestItem = (item: LocalComingUpScheduleItem): string =>
   `${item.title} (${item.label})`;
 
+const collectLocalComingUpLoadBlocksForDate = (
+  request: CompanionPlannerRequest,
+  dateKey: string,
+): AdaptiveLoadBlock[] => {
+  const taskBlocks = collectLocalPlannerTasks(request)
+    .filter((task) => task.completed !== true && task.taskDate === dateKey)
+    .map((task): AdaptiveLoadBlock => {
+      const startMinutes = parseLocalClockMinutes(task.scheduledTime);
+      const durationMinutes = getLocalTaskDuration(task);
+      return {
+        id: task.id,
+        title: task.title,
+        source: "task",
+        startMinutes,
+        endMinutes: startMinutes === null ? null : startMinutes + durationMinutes,
+        durationMinutes,
+        energyType: task.energyType,
+        priority: task.priority,
+        difficulty: task.difficulty,
+        flexibility: task.flexibility,
+        category: task.category,
+      };
+    });
+
+  const ritualBlocks = request.plannerContext.rituals
+    .filter((ritual) => isLocalRitualInActiveScope(request, ritual))
+    .filter((ritual) => isLocalRitualScheduledForDate(ritual, dateKey))
+    .filter((ritual) => !hasLocalMaterializedRitualTask(request, ritual, dateKey))
+    .map((ritual): AdaptiveLoadBlock => {
+      const startMinutes = parseLocalClockMinutes(ritual.preferredTime);
+      const durationMinutes = getLocalRitualDuration(ritual);
+      return {
+        id: ritual.id,
+        title: ritual.title,
+        source: "ritual",
+        startMinutes,
+        endMinutes: startMinutes === null ? null : startMinutes + durationMinutes,
+        durationMinutes,
+        energyType: null,
+        priority: null,
+        flexibility: "preferred",
+        category: "ritual",
+      };
+    });
+
+  const eventBlocks = request.plannerContext.calendarEvents
+    .filter((event) => eventOverlapsLocalDate(event, dateKey))
+    .map((event): AdaptiveLoadBlock => {
+      const startMinutes = getLocalEventSortMinutes(event, dateKey);
+      return {
+        id: event.id,
+        title: event.title,
+        source: "calendar",
+        startMinutes,
+        endMinutes: getLocalEventEndMinutes(event, dateKey),
+        durationMinutes: null,
+        isAllDay: event.isAllDay,
+      };
+    });
+
+  return [...taskBlocks, ...ritualBlocks, ...eventBlocks];
+};
+
 const buildLocalDigestLine = (
   request: CompanionPlannerRequest,
   dateKey: string,
@@ -1655,10 +1741,21 @@ const buildLocalDigestLine = (
 };
 
 const getLocalComingUpTomorrowSummary = (
-  tomorrowItems: LocalComingUpScheduleItem[],
+  request: CompanionPlannerRequest,
+  dateKey: string,
+  missedItems: LocalComingUpMissedItem[],
 ): LocalComingUpStructuredOutput["tomorrowSummary"] => {
-  if (tomorrowItems.length === 0) return "open";
-  return tomorrowItems.length <= 2 ? "light" : "busy";
+  return classifyAdaptiveComingUpLoad({
+    blocks: collectLocalComingUpLoadBlocksForDate(request, dateKey),
+    workloadTolerance: request.plannerContext.plannerMemory?.workloadTolerance ??
+      null,
+    momentumState: request.plannerContext.statInterpretation?.momentumState ??
+      null,
+    recentMissInterpretation:
+      request.plannerContext.statInterpretation?.recentMissInterpretation ??
+        null,
+    missedCount: missedItems.length,
+  }).label;
 };
 
 const buildLocalComingUpResponse = (
@@ -1724,7 +1821,11 @@ const buildLocalComingUpResponse = (
         nextBestAction: null,
         remainingToday: stripLocalSortMinutes(remainingToday),
         tomorrowSchedule: stripLocalSortMinutes(tomorrowSchedule),
-        tomorrowSummary: getLocalComingUpTomorrowSummary(tomorrowSchedule),
+        tomorrowSummary: getLocalComingUpTomorrowSummary(
+          request,
+          tomorrow,
+          missedItems,
+        ),
         missedItems,
       },
       campaignMomentum: null,

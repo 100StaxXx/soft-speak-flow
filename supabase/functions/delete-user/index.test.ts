@@ -698,7 +698,7 @@ Deno.test("delete-user skips unavailable storage ownership columns and continues
   );
 });
 
-Deno.test("delete-user returns permission failureReason when storage ownership query is blocked", async () => {
+Deno.test("delete-user returns degraded success when storage ownership query is blocked", async () => {
   const harness = createHandleDeleteUserHarness({
     ownershipQueryErrors: {
       owner: {
@@ -716,25 +716,30 @@ Deno.test("delete-user returns permission failureReason when storage ownership q
 
   assertEquals(
     response.status,
-    500,
-    "Expected storage permission errors to remain fatal",
+    200,
+    "Expected storage permission errors to degrade to success",
   );
-  assertEquals(body.success, false, "Expected error response body");
-  assertEquals(
-    body.code,
-    "ACCOUNT_DELETION_STORAGE_CLEANUP_FAILED",
-    "Expected storage cleanup failure code",
+  assertEquals(body.success, true, "Expected success response body");
+  assert(
+    Array.isArray(body.warnings) && body.warnings.length > 0,
+    "Expected storage cleanup warnings in response",
   );
-  assertEquals(body.stage, "storage_cleanup", "Expected storage cleanup stage");
-  assertEquals(
-    body.failureReason,
-    "permission",
-    "Expected permission failureReason",
+  assert(
+    body.warnings.some((warning: { code: string; message: string }) =>
+      warning.code === "STORAGE_CLEANUP_INCOMPLETE" &&
+      warning.message.includes("Storage metadata permission check failed")
+    ),
+    "Expected storage metadata permission warning",
   );
   assertEquals(
     harness.getRpcCallCount(),
-    0,
-    "Expected relational cleanup not to run after fatal storage failure",
+    1,
+    "Expected relational cleanup to run after degraded storage failure",
+  );
+  assertEquals(
+    harness.getAuthDeleteCallCount(),
+    1,
+    "Expected auth deletion to run after degraded storage failure",
   );
   assertArrayEquals(
     harness.sleepCalls,

@@ -184,7 +184,13 @@ const CompanionStructuredResponseSchema = z.object({
   reflectionBridge: z.object({
     message: z.string().min(1).max(4000),
     carryForward: z.string().min(1).max(2000).nullable(),
-    tomorrowSummary: z.enum(["busy", "light", "open"]),
+    tomorrowSummary: z.enum([
+      "busy",
+      "light",
+      "open",
+      "overwhelming",
+      "productive",
+    ]),
     firstAction: CompanionSuggestedQuestSchema.nullable(),
     tomorrowSchedule: z.array(CompanionScheduleItemSchema).max(24),
   }).nullable().optional(),
@@ -194,7 +200,13 @@ const CompanionStructuredResponseSchema = z.object({
     nextBestAction: CompanionSuggestedQuestSchema.nullable(),
     remainingToday: z.array(CompanionScheduleItemSchema).max(24),
     tomorrowSchedule: z.array(CompanionScheduleItemSchema).max(24).optional(),
-    tomorrowSummary: z.enum(["busy", "light", "open"]),
+    tomorrowSummary: z.enum([
+      "busy",
+      "light",
+      "open",
+      "overwhelming",
+      "productive",
+    ]),
     missedItems: z.array(CompanionMissedItemSchema).max(24),
   }).nullable().optional(),
   campaignMomentum: z.object({

@@ -102,9 +102,13 @@ Deno.test("legacy nonconforming storage writers now prefix uploads with the user
   const companionEvolutionSource = await Deno.readTextFile(
     new URL("./generate-companion-evolution/index.ts", import.meta.url),
   );
+  const compactCompanionEvolutionSource = companionEvolutionSource.replace(
+    /\s+/g,
+    "",
+  );
   assert(
-    companionEvolutionSource.includes(
-      'const fileName = `${userId}/evolutions/${companionId}_stage_${nextStage}_${Date.now()}.png`;',
+    compactCompanionEvolutionSource.includes(
+      'constfileName=`${userId}/evolutions/${companionId}_stage_${nextStage}_${Date.now()}.png`;',
     ),
     "Expected companion evolution uploads to be user-prefixed",
   );
