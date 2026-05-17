@@ -15,6 +15,7 @@ import type { SupportReportCategory, SupportReportPayload } from "@/types/resili
 
 type SupportReportLocationState = {
   defaultCategory?: SupportReportCategory;
+  defaultMessage?: string;
 } | null;
 
 const SUPPORT_REPORT_CATEGORIES: readonly SupportReportCategory[] = [
@@ -49,14 +50,21 @@ export default function SupportReport() {
   const { reportIssue } = useResilience();
 
   const initialCategory = useMemo(() => resolveDefaultCategory(locationState), [locationState]);
+  const initialMessage = typeof locationState?.defaultMessage === "string"
+    ? locationState.defaultMessage
+    : "";
   const [category, setCategory] = useState<SupportReportCategory>(initialCategory);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(initialMessage);
   const [screenshotDataUrl, setScreenshotDataUrl] = useState<string | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     setCategory(initialCategory);
   }, [initialCategory]);
+
+  useEffect(() => {
+    setMessage(initialMessage);
+  }, [initialMessage]);
 
   const isFeedbackCategory = category === "feedback";
 

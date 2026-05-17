@@ -34,7 +34,7 @@ export const ProtectedRoute = ({
   useEffect(() => {
     let timer: NodeJS.Timeout;
     
-    if (isAuthPending || accessLoading) {
+    if (isAuthPending || (requireAccess && accessLoading)) {
       timer = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 90) return prev;
@@ -50,10 +50,10 @@ export const ProtectedRoute = ({
         clearInterval(timer);
       }
     };
-  }, [accessLoading, isAuthPending]);
+  }, [accessLoading, isAuthPending, requireAccess]);
 
   // Show loading while checking auth
-  if (isAuthPending || accessLoading) {
+  if (isAuthPending || (requireAccess && accessLoading)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-full max-w-md px-8 space-y-4">

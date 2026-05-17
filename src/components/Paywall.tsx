@@ -14,7 +14,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAppleSubscription } from "@/hooks/useAppleSubscription";
+import {
+  APP_STORE_SUBSCRIPTION_ALREADY_LINKED_MESSAGE,
+  useAppleSubscription,
+} from "@/hooks/useAppleSubscription";
 import { getProductForPlan, getPurchaseProductIdForPlan } from "@/utils/appleIAP";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -238,6 +241,25 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
     }
   };
 
+  const handleContactSupport = useCallback(() => {
+    const currentIssue = productError === APP_STORE_SUBSCRIPTION_ALREADY_LINKED_MESSAGE
+      ? [
+          "I am stuck on the paywall because my App Store subscription is already linked to another Cosmiq account.",
+          `Current Cosmiq account: ${user?.id ?? "unknown"}.`,
+          "Please help reassign the purchase if this subscription belongs to me.",
+        ].join("\n")
+      : productError
+        ? `I need help with this subscription error:\n${productError}`
+        : "I need help with my App Store subscription.";
+
+    navigate("/support/report", {
+      state: {
+        defaultCategory: "billing",
+        defaultMessage: currentIssue,
+      },
+    });
+  }, [navigate, productError, user?.id]);
+
   const handleApplyOfferCode = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -456,6 +478,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
   const selectedPlanRenewalText = hasSelectedCreatorYearlyOffer
     ? `${selectedPlanPrice} for the first year (${selectedPlanUnitPrice}), then renews yearly at the standard yearly price unless canceled.`
     : `${selectedPlanPriceText}; renews every ${plans[selectedPlan].duration} until canceled.`;
+  const isSubscriptionAlreadyLinkedError = productError === APP_STORE_SUBSCRIPTION_ALREADY_LINKED_MESSAGE;
 
   const copy = variant === "trial_expired"
     ? {
@@ -755,16 +778,19 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                   <div className="flex flex-col gap-2 border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
                     <span>{productError}</span>
                     <div className="flex flex-wrap gap-2">
-                      <Button size="sm" variant="outline" onClick={() => { void reloadProducts(); }}>
-                        Try Again
-                      </Button>
+                      {isSubscriptionAlreadyLinkedError ? (
+                        <Button size="sm" variant="outline" onClick={handleSignOut} disabled={isSigningOut}>
+                          {isSigningOut ? "Signing out..." : "Sign out"}
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="outline" onClick={() => { void reloadProducts(); }}>
+                          Try Again
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => toast({
-                          title: "Need help?",
-                          description: "Please ensure you're signed in to the App Store and retry.",
-                        })}
+                        onClick={handleContactSupport}
                       >
                         Contact support
                       </Button>

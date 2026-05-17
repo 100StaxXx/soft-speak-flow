@@ -99,6 +99,16 @@ describe("SupportReport", () => {
     expect(screen.queryByRole("link", { name: /Email/i })).not.toBeInTheDocument();
   });
 
+  it("prefills billing support copy when opened from the paywall", () => {
+    renderSupportReport({
+      defaultCategory: "billing",
+      defaultMessage: "I am stuck on the paywall.",
+    });
+
+    expect(screen.getByLabelText("Category")).toHaveValue("billing");
+    expect(screen.getByLabelText("What happened?")).toHaveValue("I am stuck on the paywall.");
+  });
+
   it("submits feedback payloads through the shared support pipeline", async () => {
     renderSupportReport({ defaultCategory: "feedback" });
 

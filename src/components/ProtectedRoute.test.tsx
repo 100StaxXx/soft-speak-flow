@@ -30,14 +30,14 @@ vi.mock("@/components/Paywall", () => ({
 
 import { ProtectedRoute } from "./ProtectedRoute";
 
-const renderProtectedRoute = () =>
+const renderProtectedRoute = (props?: Partial<React.ComponentProps<typeof ProtectedRoute>>) =>
   render(
     <MemoryRouter initialEntries={["/protected"]}>
       <Routes>
         <Route
           path="/protected"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute {...props}>
               <div>Protected Content</div>
             </ProtectedRoute>
           }
@@ -112,5 +112,18 @@ describe("ProtectedRoute", () => {
     renderProtectedRoute();
 
     expect(screen.getByText("Paywall:trial_expired")).toBeInTheDocument();
+  });
+
+  it("renders protected content without waiting on subscription checks when access is not required", () => {
+    authState.status = "authenticated";
+    authState.loading = false;
+    authState.user = { id: "user-5" };
+    accessState.hasAccess = false;
+    accessState.loading = true;
+
+    renderProtectedRoute({ requireAccess: false });
+
+    expect(screen.getByText("Protected Content")).toBeInTheDocument();
+    expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
   });
 });

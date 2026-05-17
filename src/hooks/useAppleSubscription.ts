@@ -21,8 +21,8 @@ import {
 
 const DEFERRED_VERIFICATION_RETRY_DELAYS_MS = [5_000, 30_000, 120_000] as const;
 const APPLE_BINDING_CONFLICT_CODE = "APPLE_BINDING_CONFLICT";
-const APP_STORE_SUBSCRIPTION_ALREADY_LINKED_TITLE = "Subscription already linked";
-const APP_STORE_SUBSCRIPTION_ALREADY_LINKED_MESSAGE =
+export const APP_STORE_SUBSCRIPTION_ALREADY_LINKED_TITLE = "Subscription already linked";
+export const APP_STORE_SUBSCRIPTION_ALREADY_LINKED_MESSAGE =
   "This App Store subscription is already linked to another Cosmiq account. Sign in to that account, or contact support if this is your purchase.";
 const INACTIVE_ACCESS_STATE = {
   has_access: false,

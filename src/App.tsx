@@ -426,7 +426,7 @@ const AppContent = memo(() => {
                   <Route path="/premium/success" element={<ProtectedRoute><PremiumSuccess /></ProtectedRoute>} />
                   <Route path="/pep-talk/:id" element={<ProtectedRoute><PepTalkDetail /></ProtectedRoute>} />
                   <Route path="/mentor-selection" element={<ProtectedRoute><MentorSelection /></ProtectedRoute>} />
-                  <Route path="/admin" element={<ProtectedRoute requireMentor={false}><Admin /></ProtectedRoute>} />
+                  <Route path="/admin" element={<ProtectedRoute requireMentor={false} requireAccess={false}><Admin /></ProtectedRoute>} />
                   <Route path="/tasks" element={<Navigate to="/journeys" replace />} />
                   <Route path="/epics" element={<Navigate to="/campaigns" replace />} />
                   <Route path="/join/:code" element={<JoinEpic />} />
@@ -447,7 +447,7 @@ const AppContent = memo(() => {
                   <Route path="/inbox" element={<Navigate to="/journeys?section=inbox" replace />} />
                   <Route path="/contacts" element={<Navigate to="/profile" replace />} />
                   <Route path="/iap-test" element={<IAPTest />} />
-                  <Route path="/support/report" element={<ProtectedRoute><SupportReport /></ProtectedRoute>} />
+                  <Route path="/support/report" element={<ProtectedRoute requireAccess={false}><SupportReport /></ProtectedRoute>} />
                   <Route path="/guilds" element={<Navigate to="/campaigns" replace />} />
                   <Route path="/terms" element={<TermsOfService />} />
                   <Route path="/privacy" element={<PrivacyPolicy />} />
