@@ -45,6 +45,7 @@ const COSMIQ_PRO_ENTITLEMENT_ALIASES = [
   COSMIQ_PRO_ENTITLEMENT_ID,
   COSMIQ_PRO_ENTITLEMENT_NAME,
 ] as const;
+const REVENUECAT_PAYWALL_ENTITLEMENT_ID = COSMIQ_PRO_ENTITLEMENT_NAME;
 
 type RevenueCatPurchaseTransaction = PurchasesStoreTransaction & {
   productId?: string;
@@ -658,7 +659,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
 
     const paywallResult = onlyIfNeeded
       ? await RevenueCatUI.presentPaywallIfNeeded({
-        requiredEntitlementIdentifier: COSMIQ_PRO_ENTITLEMENT_ID,
+        requiredEntitlementIdentifier: REVENUECAT_PAYWALL_ENTITLEMENT_ID,
       })
       : await RevenueCatUI.presentPaywall();
 

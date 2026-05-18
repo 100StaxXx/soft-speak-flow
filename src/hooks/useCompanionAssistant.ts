@@ -108,6 +108,7 @@ interface CachedCompanionThreadUiState {
   understandingState: CompanionAgentUnderstandingState | null;
   lastStarterIntent: CompanionPlannerLaunchIntent["starterIntent"] | null;
   lastReplayablePlannerMessage: string | null;
+  chatOnlyAfterLauncher: boolean;
 }
 
 type ThreadsQueryResult = {
@@ -201,6 +202,27 @@ const shouldApplyDefaultSelectedDateToStarterIntent = (
   Boolean(starterIntent) &&
   starterIntent !== "free_talk_start" &&
   starterIntent !== "thread_history";
+
+const shouldForceChatAfterLauncherStarterIntent = (
+  starterIntent: CompanionPlannerLaunchIntent["starterIntent"] | null | undefined,
+) => starterIntent === "plan_day" || starterIntent === "upcoming_start";
+
+const hasChatOnlyLauncherStructuredResponse = (
+  response: CompanionAgentResponse["structuredResponse"] | null | undefined,
+) => Boolean(response?.planDay || response?.comingUp);
+
+const shouldRestoreChatOnlyLauncherSession = (params: {
+  cachedChatOnlyAfterLauncher?: boolean | null;
+  starterIntent?: CompanionPlannerLaunchIntent["starterIntent"] | null;
+  structuredResponse?: CompanionAgentResponse["structuredResponse"] | null;
+  messages: CompanionAssistantMessage[];
+}) =>
+  params.cachedChatOnlyAfterLauncher === true ||
+  shouldForceChatAfterLauncherStarterIntent(params.starterIntent) ||
+  hasChatOnlyLauncherStructuredResponse(params.structuredResponse) ||
+  params.messages.some((message) =>
+    hasChatOnlyLauncherStructuredResponse(message.structuredResponse),
+  );
 
 const shouldUseDirectCompanionChat = (params: {
   surface: CompanionAssistantSurface;
@@ -809,6 +831,7 @@ export function useCompanionAssistant({
   const pendingStarterIntentRef = useRef<
     CompanionPlannerLaunchIntent["starterIntent"] | null
   >(null);
+  const chatOnlyLauncherSessionRef = useRef<string | null>(null);
   const pendingLegacyFallbackReplayRef =
     useRef<PendingLegacyFallbackReplay | null>(null);
   const submitInFlightRef = useRef(false);
@@ -904,6 +927,7 @@ export function useCompanionAssistant({
       lastStarterIntentRef.current = null;
       lastReplayablePlannerMessageRef.current = null;
       pendingStarterIntentRef.current = null;
+      chatOnlyLauncherSessionRef.current = null;
       setMessages(
         greetingText
           ? [
@@ -934,6 +958,8 @@ export function useCompanionAssistant({
       understandingState,
       lastStarterIntent: lastStarterIntentRef.current,
       lastReplayablePlannerMessage: lastReplayablePlannerMessageRef.current,
+      chatOnlyAfterLauncher:
+        chatOnlyLauncherSessionRef.current === activeSessionIdRef.current,
     });
   }, [
     messages,
@@ -989,6 +1015,15 @@ export function useCompanionAssistant({
       lastReplayablePlannerMessageRef.current =
         cachedThreadUiState?.lastReplayablePlannerMessage ?? null;
       pendingStarterIntentRef.current = null;
+      chatOnlyLauncherSessionRef.current = shouldRestoreChatOnlyLauncherSession({
+        cachedChatOnlyAfterLauncher:
+          cachedThreadUiState?.chatOnlyAfterLauncher ?? null,
+        starterIntent: cachedThreadUiState?.lastStarterIntent ?? null,
+        structuredResponse: restoredStructuredResponse,
+        messages: mappedThreadMessages,
+      })
+        ? sessionId
+        : null;
       return true;
     },
     [applyActiveSessionId, surface],
@@ -1003,6 +1038,7 @@ export function useCompanionAssistant({
     bootstrappedScopeRef.current = null;
     companionOpenCycleKeyRef.current = null;
     handledLaunchIntentIdRef.current = null;
+    chatOnlyLauncherSessionRef.current = null;
     threadUiStateCacheRef.current.clear();
     if (surface === "companion") {
       openFreshThread();
@@ -1286,34 +1322,51 @@ export function useCompanionAssistant({
       ) {
         return false;
       }
+      const forceLauncherContinuationChat =
+        surface === "journeys" &&
+        options?.turnOrigin !== "launcher" &&
+        chatOnlyLauncherSessionRef.current === activeSessionIdRef.current;
       const pendingStarterIntent = pendingStarterIntentRef.current;
       const starterIntent =
-        options?.starterIntent ??
-        pendingStarterIntent ??
-        inferStarterIntentFromMessage(message);
+        forceLauncherContinuationChat
+          ? undefined
+          : options?.starterIntent ??
+            pendingStarterIntent ??
+            inferStarterIntentFromMessage(message);
       const activeFollowUpSelectedDate =
-        readFollowUpSelectedDate(activeFollowUp);
+        forceLauncherContinuationChat
+          ? null
+          : readFollowUpSelectedDate(activeFollowUp);
       const normalizedDefaultSelectedDate =
         normalizeSelectedDateKey(defaultSelectedDate);
       const selectedDate =
-        normalizeSelectedDateKey(options?.selectedDate) ??
-        activeFollowUpSelectedDate ??
-        (shouldApplyDefaultSelectedDateToStarterIntent(starterIntent)
-          ? normalizedDefaultSelectedDate
-          : null);
+        forceLauncherContinuationChat
+          ? null
+          : normalizeSelectedDateKey(options?.selectedDate) ??
+            activeFollowUpSelectedDate ??
+            (shouldApplyDefaultSelectedDateToStarterIntent(starterIntent)
+              ? normalizedDefaultSelectedDate
+              : null);
       const briefingContext =
-        options?.briefingContext ??
-        (activeFollowUp ? readFollowUpBriefingContext(activeFollowUp) : null);
+        forceLauncherContinuationChat
+          ? null
+          : options?.briefingContext ??
+            (activeFollowUp
+              ? readFollowUpBriefingContext(activeFollowUp)
+              : null);
+      const requestActiveFollowUp = forceLauncherContinuationChat
+        ? null
+        : activeFollowUp;
       const shouldConsumePendingStarterIntent = pendingStarterIntent !== null;
       const shouldEmitPlanDayAiAnswered =
         !starterIntent &&
-        Boolean(activeFollowUp) &&
+        Boolean(requestActiveFollowUp) &&
         (lastStarterIntentRef.current === "plan_day" ||
           hasRecentPlanDayStarter(messages));
-	      const shouldStartFreshLauncherThread =
-	        localScheduleReadEnabled &&
-	        starterIntent === "upcoming_start" &&
-	        options?.turnOrigin === "launcher";
+      const shouldStartFreshLauncherThread =
+        localScheduleReadEnabled &&
+        starterIntent === "upcoming_start" &&
+        options?.turnOrigin === "launcher";
 
       threadMutationVersionRef.current += 1;
 
@@ -1344,10 +1397,10 @@ export function useCompanionAssistant({
         return true;
       }
 
-	      if (
-	        localScheduleReadEnabled &&
-	        starterIntent === "upcoming_start"
-	      ) {
+      if (
+        localScheduleReadEnabled &&
+        starterIntent === "upcoming_start"
+      ) {
         const legacySubmitOptions = {
           ...options,
           starterIntent,
@@ -1362,6 +1415,12 @@ export function useCompanionAssistant({
           });
         }
         setUseLegacyFallback(true);
+        if (
+          options?.turnOrigin === "launcher" &&
+          shouldForceChatAfterLauncherStarterIntent(starterIntent)
+        ) {
+          chatOnlyLauncherSessionRef.current = activeSessionIdRef.current;
+        }
         await legacyAssistant.submitMessage(
           message,
           inputMode,
@@ -1399,11 +1458,11 @@ export function useCompanionAssistant({
         surface,
         message,
         starterIntent,
-	        turnOrigin: options?.turnOrigin,
-	        selectedDate,
-	        activeFollowUp,
+        turnOrigin: options?.turnOrigin,
+        selectedDate,
+        activeFollowUp: requestActiveFollowUp,
         pendingAction,
-      });
+      }) || forceLauncherContinuationChat;
       const directChatHistory = shouldUseDirectChat
         ? buildDirectChatHistory(messages)
         : [];
@@ -1419,11 +1478,21 @@ export function useCompanionAssistant({
           return false;
         }
 
+        if (
+          options?.turnOrigin === "launcher" &&
+          shouldForceChatAfterLauncherStarterIntent(starterIntent)
+        ) {
+          chatOnlyLauncherSessionRef.current = activeSessionIdRef.current;
+        }
         lastStarterIntentRef.current = starterIntent ?? null;
         lastReplayablePlannerMessageRef.current = shouldUseDirectChat
           ? null
           : message;
         const currentDateTime = formatCurrentDateTimeWithOffset(new Date());
+        const directChatCurrentDate =
+          surface === "journeys" ? legacyAssistant.currentDate : undefined;
+        const directChatJourneysContext =
+          surface === "journeys" ? legacyAssistant.plannerContext : undefined;
 
         if (shouldUseDirectChat) {
           const { data, error } = await supabase.functions.invoke(
@@ -1436,7 +1505,9 @@ export function useCompanionAssistant({
                 inputMode,
                 surface,
                 sessionId: activeSessionIdRef.current,
+                currentDate: directChatCurrentDate,
                 currentDateTime,
+                journeysContext: directChatJourneysContext,
               } satisfies CompanionChatRequest,
             },
           );
@@ -1444,9 +1515,13 @@ export function useCompanionAssistant({
           if (error) throw error;
 
           const response = data as CompanionChatResponse;
-          const nextSessionId = response.sessionId ?? activeSessionIdRef.current;
+          const nextSessionId = response.sessionId ??
+            activeSessionIdRef.current;
           if (response.sessionId) {
             applyActiveSessionId(response.sessionId);
+            if (forceLauncherContinuationChat) {
+              chatOnlyLauncherSessionRef.current = response.sessionId;
+            }
           }
           if (response.persistenceReady === false) {
             console.warn(
@@ -1524,10 +1599,10 @@ export function useCompanionAssistant({
               currentDateTime,
               turnOrigin: options?.turnOrigin,
               starterIntent,
-	              selectedDate: selectedDate ?? undefined,
-	              briefingContext: briefingContext ?? undefined,
-	              activeFollowUp,
-	            },
+              selectedDate: selectedDate ?? undefined,
+              briefingContext: briefingContext ?? undefined,
+              activeFollowUp: requestActiveFollowUp,
+            },
           },
         );
 
@@ -1535,6 +1610,12 @@ export function useCompanionAssistant({
 
         const response = data as CompanionAgentResponse;
         applyActiveSessionId(response.threadState.sessionId);
+        if (
+          options?.turnOrigin === "launcher" &&
+          shouldForceChatAfterLauncherStarterIntent(starterIntent)
+        ) {
+          chatOnlyLauncherSessionRef.current = response.threadState.sessionId;
+        }
         appendAssistantResponse(response);
         const assistantBubbleLatencyMs = finishCompanionLatencyTimer(
           submitLatencyTimerRef.current,
@@ -1959,10 +2040,16 @@ export function useCompanionAssistant({
         }
 
         if (isSnapshotOnlyPlanDayStarter) {
+          let nextSessionId: string | undefined;
           if (useLegacyFallback) {
-            legacyAssistant.startTemplateThread?.();
+            nextSessionId = legacyAssistant.startTemplateThread?.();
           } else {
-            startTemplateThread({ greetingText: null });
+            nextSessionId = startTemplateThread({ greetingText: null });
+          }
+          if (nextSessionId) {
+            chatOnlyLauncherSessionRef.current = nextSessionId;
+          } else {
+            chatOnlyLauncherSessionRef.current = activeSessionIdRef.current;
           }
           if (typeof window !== "undefined") {
             window.dispatchEvent(
@@ -1991,6 +2078,13 @@ export function useCompanionAssistant({
           legacyAssistant.startTemplateThread?.();
         } else {
           await startNewChat({ greetingText: null });
+        }
+        if (
+          shouldForceChatAfterLauncherStarterIntent(
+            launchIntent.starterIntent,
+          )
+        ) {
+          chatOnlyLauncherSessionRef.current = activeSessionIdRef.current;
         }
 
         const launchSubmitOptions: CompanionAgentSubmitOptions = {

@@ -1,6 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { createRemoteJWKSet, jwtVerify } from "https://esm.sh/jose@5.8.0";
+import {
+  decodeProtectedHeader,
+  importX509,
+  jwtVerify,
+  type JWTPayload,
+} from "https://esm.sh/jose@5.8.0";
+import {
+  PemConverter,
+  X509Certificate,
+} from "https://esm.sh/@peculiar/x509@1.12.3";
 import { upsertAccountEntitlement } from "../_shared/accountEntitlements.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import {
@@ -18,6 +27,9 @@ import { createOrUpdateWinWinKitUser } from "../_shared/winwinkit.ts";
 
 const defaultAppleBundleId = "com.darrylgraham.revolution";
 const GENESIS_SPECIAL_CODE = "GENESIS";
+const WEBHOOK_PROVIDER = "apple";
+const APPLE_ROOT_CA_G3_SHA256_FINGERPRINT =
+  "63343ABFB89A6A03EBB57E9B3F5FA7BE7C4F5C756F3017B3A8C488C3653E9179";
 const appleWebhookAudiences = [
   Deno.env.get("APPLE_WEBHOOK_AUDIENCE"),
   Deno.env.get("APPLE_SERVICE_ID"),
@@ -27,10 +39,6 @@ const appleWebhookAudiences = [
 if (appleWebhookAudiences.length === 0) {
   appleWebhookAudiences.push(defaultAppleBundleId);
 }
-
-const appleWebhookJWKS = createRemoteJWKSet(
-  new URL("https://appleid.apple.com/auth/keys"),
-);
 
 /**
  * Apple Server-to-Server Notification Webhook
@@ -48,7 +56,8 @@ const appleWebhookJWKS = createRemoteJWKSet(
  * 3. Apple will send POST requests for subscription events
  *
  * SECURITY NOTE: Apple webhooks don't send Origin headers, so CORS is permissive.
- * The security comes from the signed JWT payload, which we now verify with Apple's JWKS.
+ * The security comes from Apple's signedPayload JWS, whose x5c certificate chain
+ * must terminate at Apple's pinned App Store root certificate.
  */
 
 // Notification types from Apple
@@ -74,6 +83,8 @@ enum NotificationSubtype {
 type AppleWebhookOptions = {
   payload?: any;
   supabaseClient?: any;
+  now?: Date;
+  trustedRootFingerprints?: string[];
 };
 
 export function isAppleServerNotificationPayload(
@@ -112,7 +123,10 @@ export async function handleAppleWebhookNotification(
 
     let notificationContext;
     try {
-      notificationContext = await buildNotificationContext(payload);
+      notificationContext = await buildNotificationContext(payload, {
+        now: options.now,
+        trustedRootFingerprints: options.trustedRootFingerprints,
+      });
     } catch (verificationError) {
       console.error(
         "Apple webhook signature verification failed:",
@@ -132,6 +146,32 @@ export async function handleAppleWebhookNotification(
       transactionInfo,
       environment,
     } = notificationContext;
+
+    const eventId = await eventIdForNotification(payload, notificationContext);
+    const registeredEvent = await registerAppleWebhookEvent(
+      supabaseClient,
+      eventId,
+      notificationType,
+      {
+        ...payload,
+        decodedNotification: {
+          notificationType,
+          notificationSubtype,
+          environment,
+          originalTransactionId:
+            latestReceiptInfo?.original_transaction_id ?? null,
+          transactionId: latestReceiptInfo?.transaction_id ?? null,
+          productId: latestReceiptInfo?.product_id ?? null,
+        },
+      },
+    );
+
+    if (registeredEvent.duplicate) {
+      return new Response("OK", {
+        status: 200,
+        headers: getCorsHeaders(req),
+      });
+    }
 
     if (!latestReceiptInfo) {
       console.error("No receipt info in notification");
@@ -172,6 +212,7 @@ export async function handleAppleWebhookNotification(
         originalTransactionId,
         "- waiting for verified app-account restore",
       );
+      await markAppleWebhookEventProcessed(supabaseClient, eventId);
       // Still return 200 to prevent Apple from retrying
       return new Response("OK", {
         status: 200,
@@ -304,6 +345,8 @@ export async function handleAppleWebhookNotification(
         console.log("Unhandled notification type:", notificationType);
     }
 
+    await markAppleWebhookEventProcessed(supabaseClient, eventId);
+
     // Return 200 to acknowledge receipt
     return new Response("OK", {
       status: 200,
@@ -386,7 +429,10 @@ async function syncWinWinKitPremiumStatus(
 
 type AppleJWSPayload = Record<string, unknown>;
 
-async function buildNotificationContext(body: any) {
+async function buildNotificationContext(
+  body: any,
+  options: VerifyAppleNotificationOptions = {},
+) {
   let notificationType = body?.notification_type as
     | NotificationType
     | undefined;
@@ -402,6 +448,7 @@ async function buildNotificationContext(body: any) {
     const rootPayload = await verifyAppleNotification(
       body.signedPayload,
       appleWebhookAudiences,
+      { ...options, requireBundleId: true },
     );
     notificationType = rootPayload.notificationType as NotificationType;
     notificationSubtype = rootPayload.subtype as
@@ -420,6 +467,7 @@ async function buildNotificationContext(body: any) {
       transactionInfo = await verifyAppleNotification(
         data.signedTransactionInfo,
         bundleAudience,
+        { ...options, requireBundleId: true },
       );
     }
 
@@ -428,6 +476,7 @@ async function buildNotificationContext(body: any) {
       renewalInfo = await verifyAppleNotification(
         data.signedRenewalInfo,
         bundleAudience,
+        options,
       );
       if (renewalInfo?.autoRenewStatus !== undefined) {
         autoRenewStatus = renewalInfo.autoRenewStatus;
@@ -453,9 +502,16 @@ async function buildNotificationContext(body: any) {
   };
 }
 
-async function verifyAppleNotification(
+type VerifyAppleNotificationOptions = {
+  now?: Date;
+  requireBundleId?: boolean;
+  trustedRootFingerprints?: string[];
+};
+
+export async function verifyAppleNotification(
   token: string,
   audience: string | string[],
+  options: VerifyAppleNotificationOptions = {},
 ) {
   const normalizedAudience = (Array.isArray(audience) ? audience : [audience])
     .filter(
@@ -466,11 +522,280 @@ async function verifyAppleNotification(
     throw new Error("Missing Apple webhook audience configuration");
   }
 
-  const { payload } = await jwtVerify(token, appleWebhookJWKS, {
-    issuer: "appstoreconnect-v1",
-    audience: normalizedAudience,
+  const protectedHeader = decodeProtectedHeader(token);
+  if (protectedHeader.alg !== "ES256") {
+    throw new Error("Unsupported Apple JWS algorithm");
+  }
+
+  const certificates = parseAppleX5cHeader(protectedHeader.x5c);
+  const effectiveDate = options.now ?? signedDateFromToken(token) ?? new Date();
+  await validateAppleX5cCertificateChain(
+    certificates,
+    effectiveDate,
+    options.trustedRootFingerprints ?? trustedAppleRootFingerprints(),
+  );
+
+  const leafCertificatePem = PemConverter.encode(
+    certificates[0].rawData,
+    "CERTIFICATE",
+  );
+  const publicKey = await importX509(leafCertificatePem, "ES256");
+  const { payload } = await jwtVerify(token, publicKey, {
+    algorithms: ["ES256"],
   });
+
+  validateApplePayloadBundleId(
+    payload,
+    normalizedAudience,
+    Boolean(options.requireBundleId),
+  );
   return payload as AppleJWSPayload;
+}
+
+function parseAppleX5cHeader(x5c: unknown): X509Certificate[] {
+  if (!Array.isArray(x5c) || x5c.length < 3) {
+    throw new Error("Apple JWS missing complete x5c certificate chain");
+  }
+
+  return x5c.map((encodedCertificate) => {
+    if (typeof encodedCertificate !== "string" || !encodedCertificate) {
+      throw new Error("Apple JWS x5c certificate is invalid");
+    }
+
+    return new X509Certificate(base64ToArrayBuffer(encodedCertificate));
+  });
+}
+
+async function validateAppleX5cCertificateChain(
+  certificates: X509Certificate[],
+  effectiveDate: Date,
+  trustedRootFingerprints: string[],
+) {
+  const trustedFingerprints = new Set(
+    trustedRootFingerprints.map(normalizeFingerprint).filter(Boolean),
+  );
+  if (trustedFingerprints.size === 0) {
+    throw new Error("Missing trusted Apple root certificate fingerprints");
+  }
+
+  const rootCertificate = certificates[certificates.length - 1];
+  const rootFingerprint = await certificateSha256Fingerprint(rootCertificate);
+  if (!trustedFingerprints.has(rootFingerprint)) {
+    throw new Error("Apple JWS x5c chain does not terminate at a trusted root");
+  }
+
+  if (!await rootCertificate.isSelfSigned()) {
+    throw new Error("Apple JWS trusted root certificate is not self-signed");
+  }
+
+  if (!await rootCertificate.verify({ date: effectiveDate })) {
+    throw new Error("Apple JWS trusted root certificate is invalid");
+  }
+
+  for (let index = 0; index < certificates.length - 1; index += 1) {
+    const childCertificate = certificates[index];
+    const issuerCertificate = certificates[index + 1];
+
+    if (childCertificate.issuer !== issuerCertificate.subject) {
+      throw new Error("Apple JWS x5c certificate chain is out of order");
+    }
+
+    const verified = await childCertificate.verify({
+      publicKey: issuerCertificate.publicKey,
+      date: effectiveDate,
+    });
+    if (!verified) {
+      throw new Error("Apple JWS x5c certificate chain signature is invalid");
+    }
+  }
+}
+
+function validateApplePayloadBundleId(
+  payload: JWTPayload,
+  expectedBundleIds: string[],
+  requireBundleId: boolean,
+) {
+  const payloadBundleIds = bundleIdsFromApplePayload(payload);
+  if (payloadBundleIds.length === 0) {
+    if (requireBundleId) {
+      throw new Error("Apple JWS payload is missing bundleId");
+    }
+    return;
+  }
+
+  if (!payloadBundleIds.some((bundleId) => expectedBundleIds.includes(bundleId))) {
+    throw new Error("Apple JWS payload bundleId does not match this app");
+  }
+}
+
+function bundleIdsFromApplePayload(payload: JWTPayload): string[] {
+  const bundleIds: string[] = [];
+  if (typeof payload.bundleId === "string") {
+    bundleIds.push(payload.bundleId);
+  }
+
+  const data = payload.data;
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    const dataBundleId = (data as Record<string, unknown>).bundleId;
+    if (typeof dataBundleId === "string") {
+      bundleIds.push(dataBundleId);
+    }
+  }
+
+  return [...new Set(bundleIds)];
+}
+
+function trustedAppleRootFingerprints() {
+  const configured = Deno.env.get(
+    "APPLE_WEBHOOK_ROOT_CA_SHA256_FINGERPRINTS",
+  );
+  if (!configured) {
+    return [APPLE_ROOT_CA_G3_SHA256_FINGERPRINT];
+  }
+
+  return configured.split(/[,\s]+/).filter(Boolean);
+}
+
+async function certificateSha256Fingerprint(certificate: X509Certificate) {
+  const digest = await crypto.subtle.digest("SHA-256", certificate.rawData);
+  return bytesToHex(new Uint8Array(digest));
+}
+
+function signedDateFromToken(token: string): Date | undefined {
+  try {
+    const payload = decodeJwsPayloadWithoutVerification(token);
+    const signedDate = payload.signedDate;
+    if (typeof signedDate === "number" && Number.isFinite(signedDate)) {
+      return new Date(signedDate);
+    }
+    if (typeof signedDate === "string" && signedDate) {
+      const parsed = Number(signedDate);
+      if (Number.isFinite(parsed)) return new Date(parsed);
+    }
+  } catch {
+    return undefined;
+  }
+
+  return undefined;
+}
+
+function decodeJwsPayloadWithoutVerification(
+  token: string,
+): Record<string, unknown> {
+  const parts = token.split(".");
+  if (parts.length !== 3) {
+    throw new Error("Invalid JWS format");
+  }
+
+  return JSON.parse(new TextDecoder().decode(base64UrlToBytes(parts[1])));
+}
+
+function base64ToBytes(value: string): Uint8Array {
+  const binary = atob(value);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+}
+
+function base64ToArrayBuffer(value: string): ArrayBuffer {
+  const bytes = base64ToBytes(value);
+  return bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength,
+  ) as ArrayBuffer;
+}
+
+function base64UrlToBytes(value: string): Uint8Array {
+  let padded = value.replace(/-/g, "+").replace(/_/g, "/");
+  while (padded.length % 4 !== 0) {
+    padded += "=";
+  }
+  return base64ToBytes(padded);
+}
+
+function bytesToHex(bytes: Uint8Array) {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0"))
+    .join("")
+    .toUpperCase();
+}
+
+function normalizeFingerprint(value: string) {
+  return value.replace(/[^a-fA-F0-9]/g, "").toUpperCase();
+}
+
+async function eventIdForNotification(
+  payload: any,
+  notificationContext: {
+    notificationType: NotificationType;
+    transactionInfo: AppleJWSPayload | null;
+  },
+) {
+  if (typeof payload?.notificationUUID === "string") {
+    return payload.notificationUUID;
+  }
+
+  if (payload?.signedPayload) {
+    const rootPayload = decodeJwsPayloadWithoutVerification(payload.signedPayload);
+    if (typeof rootPayload.notificationUUID === "string") {
+      return rootPayload.notificationUUID;
+    }
+  }
+
+  const transactionId = notificationContext.transactionInfo?.transactionId;
+  if (typeof transactionId === "string" && transactionId) {
+    return `${notificationContext.notificationType}:${transactionId}`;
+  }
+
+  return `sha256:${await sha256Hex(JSON.stringify(payload))}`;
+}
+
+async function sha256Hex(value: string) {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value),
+  );
+  return bytesToHex(new Uint8Array(digest));
+}
+
+async function registerAppleWebhookEvent(
+  supabaseClient: any,
+  eventId: string,
+  eventType: string,
+  webhookEvent: any,
+): Promise<{ duplicate: boolean }> {
+  const { error } = await supabaseClient
+    .from("payment_webhook_events")
+    .insert({
+      provider: WEBHOOK_PROVIDER,
+      event_id: eventId,
+      event_type: eventType,
+      payload: webhookEvent,
+      received_at: new Date().toISOString(),
+    });
+
+  if (!error) {
+    return { duplicate: false };
+  }
+
+  if (error.code === "23505") {
+    return { duplicate: true };
+  }
+
+  console.error("Failed to register Apple webhook event:", error);
+  return { duplicate: false };
+}
+
+async function markAppleWebhookEventProcessed(
+  supabaseClient: any,
+  eventId: string,
+) {
+  const { error } = await supabaseClient
+    .from("payment_webhook_events")
+    .update({ processed_at: new Date().toISOString() })
+    .eq("provider", WEBHOOK_PROVIDER)
+    .eq("event_id", eventId);
+
+  if (error) {
+    console.error("Failed to mark Apple webhook event processed:", error);
+  }
 }
 
 function convertTransactionToLegacyShape(transactionInfo: AppleJWSPayload) {

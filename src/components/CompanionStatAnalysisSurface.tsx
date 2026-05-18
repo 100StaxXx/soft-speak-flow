@@ -1,4 +1,4 @@
-import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   BarChart3,
@@ -1234,17 +1234,18 @@ function CosmiqTitleRevealCard({
   );
 }
 
-function CosmiqTitleShareCard({
-  analysis,
-  imageUrl,
-  titleCharacterBio,
-}: {
+const CosmiqTitleShareCard = forwardRef<HTMLDivElement, {
   analysis: CompanionStatAnalysis;
   imageUrl: string;
   titleCharacterBio: string;
-}) {
+}>(function CosmiqTitleShareCard({
+  analysis,
+  imageUrl,
+  titleCharacterBio,
+}, ref) {
   return (
     <div
+      ref={ref}
       data-testid="companion-cosmiq-title-share-card"
       className="relative h-[640px] w-[360px] overflow-hidden bg-[#070912] text-white"
     >
@@ -1281,7 +1282,7 @@ function CosmiqTitleShareCard({
       </div>
     </div>
   );
-}
+});
 
 function CompanionStatAnalysisView({
   analysis,
@@ -1460,9 +1461,9 @@ function CompanionStatAnalysisView({
         <div
           aria-hidden="true"
           className="fixed left-[-10000px] top-0 z-[-1] h-[640px] w-[360px] overflow-hidden"
-          ref={shareCardRef}
         >
           <CosmiqTitleShareCard
+            ref={shareCardRef}
             analysis={analysis}
             imageUrl={primaryTitleCardImageUrl}
             titleCharacterBio={titleCharacterBio}

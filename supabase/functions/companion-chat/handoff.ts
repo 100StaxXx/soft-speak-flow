@@ -9,6 +9,8 @@ export const shouldHandoffToPlanner = (
   message: string,
   surface: SchedulingIntentSurface,
 ) => {
+  if (surface === "journeys") return false;
+
   const parsed = parseNaturalLanguage(message);
   const analysis = analyzeSchedulingIntent(message, parsed);
 

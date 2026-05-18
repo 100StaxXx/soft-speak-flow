@@ -400,7 +400,7 @@ struct CosmicTaskLinkRow: View {
     var showsMainQuestBadge: Bool = false
 
     var body: some View {
-        if let url = taskDeepLink(task.id) {
+        if let url = journeysDeepLinkURL {
             Link(destination: url) {
                 CosmicTaskRow(
                     task: task,
@@ -496,13 +496,7 @@ private extension WidgetTask {
     }
 }
 
-private func taskDeepLink(_ taskId: String) -> URL? {
-    guard let encodedTaskId = taskId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
-          !encodedTaskId.isEmpty else {
-        return nil
-    }
-    return URL(string: "cosmiq://task/\(encodedTaskId)")
-}
+private let journeysDeepLinkURL = URL(string: "cosmiq://journeys")
 
 private enum WidgetTaskTimeFormatter {
     static let displayFormatter: DateFormatter = {

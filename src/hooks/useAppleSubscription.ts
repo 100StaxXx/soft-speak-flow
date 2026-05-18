@@ -34,6 +34,7 @@ const INACTIVE_ACCESS_STATE = {
   trial_ends_at: null,
   subscribed: false,
 };
+type ExistingSubscriptionRecoveryResult = "verified" | "not_found" | "verification_failed";
 
 function isIAPAvailable(): boolean {
   return Capacitor.isNativePlatform() && isNativeIOS();
@@ -409,25 +410,30 @@ export function useAppleSubscription() {
     verifyStoreKitTransaction,
   ]);
 
-  const recoverExistingSubscription = useCallback(async (surface: string) => {
+  const recoverExistingSubscription = useCallback(async (
+    surface: string,
+    options: { showSuccessToast?: boolean } = {},
+  ): Promise<ExistingSubscriptionRecoveryResult> => {
     const recoveredTransaction = await recoverPurchases();
-    if (!recoveredTransaction) return false;
+    if (!recoveredTransaction) return "not_found";
 
     const plan = resolvePlanFromProductId(recoveredTransaction.productId);
-    if (!plan) return false;
+    if (!plan) return "not_found";
 
     const verified = await verifyCompletedTransaction(
       recoveredTransaction,
       `${surface}_existing_subscription_recovery`,
       plan,
     );
-    if (!verified) return false;
+    if (!verified) return "verification_failed";
 
-    toast({
-      title: "Cosmiq unlocked",
-      description: "Your existing App Store subscription is active on this account.",
-    });
-    return true;
+    if (options.showSuccessToast !== false) {
+      toast({
+        title: "Cosmiq unlocked",
+        description: "Your existing App Store subscription is active on this account.",
+      });
+    }
+    return "verified";
   }, [recoverPurchases, toast, verifyCompletedTransaction]);
 
   const reloadProducts = useCallback(async () => {
@@ -524,7 +530,7 @@ export function useAppleSubscription() {
 
       if (!result) {
         trackPaywallEvent("purchase_cancelled", { surface, plan, productId: purchaseProductId, hasOfferCode });
-        return await recoverExistingSubscription(surface);
+        return (await recoverExistingSubscription(surface)) === "verified";
       }
 
       setOfferCodePurchaseReady(false);
@@ -551,7 +557,7 @@ export function useAppleSubscription() {
       }
       if (isCancellationError(error)) {
         trackPaywallEvent("purchase_cancelled", { surface, plan, productId: purchaseProductId, hasOfferCode });
-        return await recoverExistingSubscription(surface);
+        return (await recoverExistingSubscription(surface)) === "verified";
       }
 
       if (isAlreadySubscribedError(error)) {
@@ -563,7 +569,7 @@ export function useAppleSubscription() {
           message: getErrorMessage(error),
         });
         const recovered = await recoverExistingSubscription(surface);
-        if (recovered) return true;
+        if (recovered === "verified") return true;
       }
 
       const message = getErrorMessage(error);
@@ -680,9 +686,27 @@ export function useAppleSubscription() {
     try {
       trackPaywallEvent("paywall_viewed", { surface, hasOfferCode });
       const purchasedOrRestored = await presentPaywallIfNeeded();
+      let paywallRecoveryResult: ExistingSubscriptionRecoveryResult = "not_found";
+      if (purchasedOrRestored) {
+        try {
+          paywallRecoveryResult = await recoverExistingSubscription(surface, { showSuccessToast: false });
+        } catch (recoveryError) {
+          paywallRecoveryResult = "verification_failed";
+          const message = getErrorMessage(recoveryError);
+          console.warn("[Subscriptions] Hosted RevenueCat paywall purchase sync failed", {
+            surface,
+            message,
+          });
+          trackPaywallEvent("purchase_recovery_failed", {
+            surface,
+            hasOfferCode,
+            message,
+          });
+        }
+      }
       await invalidateSubscriptionState();
 
-      if (purchasedOrRestored) {
+      if (purchasedOrRestored && paywallRecoveryResult !== "verification_failed") {
         toast({
           title: "Cosmiq unlocked",
           description: "Cosmiq is now active on your account.",
@@ -703,7 +727,14 @@ export function useAppleSubscription() {
     } finally {
       setLoading(false);
     }
-  }, [hasOfferCode, invalidateSubscriptionState, presentPaywallIfNeeded, toast, user?.id]);
+  }, [
+    hasOfferCode,
+    invalidateSubscriptionState,
+    presentPaywallIfNeeded,
+    recoverExistingSubscription,
+    toast,
+    user?.id,
+  ]);
 
   const handlePresentCustomerCenter = useCallback(async () => {
     if (!isIAPAvailable()) {

@@ -140,7 +140,7 @@ export function JourneysCompanionLauncher({
       <CompanionImage
         src={resolvedImageUrl}
         alt={companionLabel}
-        fit={usesGeneratedSceneAvatar ? "contain" : "cover"}
+        fit="cover"
         element={element}
         focalX={resolvedFocalX}
         focalY={resolvedFocalY}

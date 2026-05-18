@@ -289,7 +289,7 @@ export const CompanionChatModal = memo(function CompanionChatModal({
           <CompanionImage
             src={imageUrl}
             alt={companionLabel}
-            fit="contain"
+            fit="cover"
             element={element}
             focalX={focalX}
             focalY={focalY}
@@ -300,7 +300,7 @@ export const CompanionChatModal = memo(function CompanionChatModal({
             variant="avatar"
             src={imageUrl}
             alt={companionLabel}
-            fit={usesGeneratedSceneAvatar ? "contain" : "cover"}
+            fit="cover"
             element={element}
             focalX={focalX}
             focalY={focalY}

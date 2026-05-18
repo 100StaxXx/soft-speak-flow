@@ -354,6 +354,66 @@ describe("useAppleSubscription", () => {
     );
   });
 
+  it("syncs a hosted RevenueCat paywall success through Apple receipt verification", async () => {
+    mocks.presentPaywallIfNeeded.mockResolvedValueOnce(true);
+    mocks.recoverPurchases.mockResolvedValueOnce({
+      productId: "cosmiq_premium_yearly",
+      transactionId: "hosted-paywall-recovered-tx",
+      expirationDate: "2099-01-01T00:00:00.000Z",
+      appAccountToken: "11111111-1111-4111-8111-111111111111",
+    });
+
+    const { result } = renderHook(() => useAppleSubscription());
+
+    let success: boolean | undefined;
+    await act(async () => {
+      success = await result.current.handlePresentRevenueCatPaywall("hosted_paywall");
+    });
+
+    expect(success).toBe(true);
+    expect(mocks.presentPaywallIfNeeded).toHaveBeenCalledTimes(1);
+    expect(mocks.recoverPurchases).toHaveBeenCalledTimes(1);
+    expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
+      body: { transactionId: "hosted-paywall-recovered-tx" },
+    });
+    expect(mocks.setQueryData).toHaveBeenCalledWith(
+      ["access-state", "11111111-1111-4111-8111-111111111111"],
+      expect.objectContaining({
+        has_access: true,
+        access_source: "subscription",
+        subscribed: true,
+        plan: "yearly",
+      }),
+    );
+  });
+
+  it("does not turn hosted RevenueCat paywall success into a paywall error when immediate sync fails", async () => {
+    mocks.presentPaywallIfNeeded.mockResolvedValueOnce(true);
+    mocks.recoverPurchases.mockRejectedValueOnce(new Error("RevenueCat recovery timed out"));
+
+    const { result } = renderHook(() => useAppleSubscription());
+
+    let success: boolean | undefined;
+    await act(async () => {
+      success = await result.current.handlePresentRevenueCatPaywall("hosted_paywall");
+    });
+
+    expect(success).toBe(true);
+    expect(mocks.recoverPurchases).toHaveBeenCalledTimes(1);
+    expect(mocks.functionsInvoke).not.toHaveBeenCalled();
+    expect(mocks.toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Unable to show paywall",
+        variant: "destructive",
+      }),
+    );
+    expect(mocks.toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Cosmiq unlocked",
+      }),
+    );
+  });
+
   it("shows an activation error when Apple succeeds but server verification fails", async () => {
     mocks.functionsInvoke.mockResolvedValueOnce({
       data: null,

@@ -13,6 +13,15 @@ import type { CompanionAgentFollowUp } from "@/types/companionAgent";
 import type { CompanionAssistantMessage } from "@/hooks/useCompanionAssistant";
 
 const mocks = vi.hoisted(() => ({
+  visual: {
+    companionLabel: "Nova",
+    imageUrl: "/placeholder-companion.svg" as string | null,
+    focalX: null as number | null,
+    focalY: null as number | null,
+    element: "fire" as string | null,
+    usesPortraitShell: false,
+    favoriteColor: "#9b6bff" as string | null,
+  },
   assistant: {
     setDraftInput: vi.fn(),
     submitTypedMessage: vi.fn(),
@@ -115,15 +124,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
-  useJourneysCompanionVisual: () => ({
-    companionLabel: "Nova",
-    imageUrl: "/placeholder-companion.svg",
-    focalX: null,
-    focalY: null,
-    element: "fire",
-    usesPortraitShell: false,
-    favoriteColor: "#9b6bff",
-  }),
+  useJourneysCompanionVisual: () => mocks.visual,
 }));
 
 vi.mock("@/hooks/useCompanionAssistant", () => ({
@@ -429,6 +430,15 @@ describe("JourneysCompanionPlannerModal", () => {
     mocks.state.draftInput = "Plan tomorrow for me";
     mocks.state.activeFollowUp = null;
     mocks.state.understandingState = null;
+    mocks.visual = {
+      companionLabel: "Nova",
+      imageUrl: "/placeholder-companion.svg",
+      focalX: null,
+      focalY: null,
+      element: "fire",
+      usesPortraitShell: false,
+      favoriteColor: "#9b6bff",
+    };
 
     Object.defineProperty(window, "matchMedia", {
       writable: true,
@@ -506,6 +516,26 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(
       screen.getByTestId("journeys-companion-planner-send-button"),
     ).toHaveAttribute("data-tour", "companion-plan-day-chat-send");
+  });
+
+  it("fills generated scene avatars in the circular header frame", () => {
+    mocks.visual.imageUrl = "https://assets.example.com/generated-companion-scene.png";
+    mocks.visual.focalX = 0.42;
+    mocks.visual.focalY = 0.58;
+    mocks.visual.usesPortraitShell = false;
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "Nova" })).toHaveAttribute(
+      "data-companion-image-fit",
+      "cover",
+    );
   });
 
   it("keeps text entry local until the user sends", () => {

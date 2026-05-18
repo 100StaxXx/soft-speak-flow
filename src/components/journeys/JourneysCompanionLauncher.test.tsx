@@ -84,7 +84,7 @@ describe("JourneysCompanionLauncher", () => {
     expect(screen.getByRole("img", { name: "Nova" })).toHaveAttribute("data-companion-image-fit", "contain");
   });
 
-  it("uses contain framing for non-preset inline avatar art", () => {
+  it("uses cover framing for non-preset inline avatar art", () => {
     render(
       <JourneysCompanionLauncher
         variant="inline"
@@ -93,7 +93,7 @@ describe("JourneysCompanionLauncher", () => {
       />,
     );
 
-    expect(screen.getByRole("img", { name: "Nova" })).toHaveAttribute("data-companion-image-fit", "contain");
+    expect(screen.getByRole("img", { name: "Nova" })).toHaveAttribute("data-companion-image-fit", "cover");
   });
 
   it("can suppress image fallback and render a neutral placeholder", () => {

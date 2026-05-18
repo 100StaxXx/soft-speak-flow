@@ -814,7 +814,7 @@ const JourneysCompanionOverlayBody = memo(
         <CompanionImage
           src={imageUrl}
           alt={companionLabel}
-          fit={usesGeneratedSceneAvatar ? "contain" : "cover"}
+          fit="cover"
           element={element}
           focalX={focalX}
           focalY={focalY}

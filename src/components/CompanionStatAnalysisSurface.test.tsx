@@ -396,6 +396,8 @@ describe("CompanionStatAnalysisSurface", () => {
       .element as HTMLElement;
     const capturedText = capturedElement.textContent ?? "";
 
+    expect(capturedElement).toHaveAttribute("data-testid", "companion-cosmiq-title-share-card");
+    expect(capturedElement.className).not.toContain("left-[-10000px]");
     expect(capturedText).toContain("Cosmiq");
     expect(capturedText).toContain("The Oathbound Pathfinder");
     expect(capturedText).toContain(OATHBOUND_PATHFINDER_BIO);

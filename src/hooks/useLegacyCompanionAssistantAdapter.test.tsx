@@ -146,7 +146,11 @@ describe("useLegacyCompanionAssistantAdapter", () => {
     mocks.journeysConversation.injectAssistantOpening.mockReset();
     mocks.planner.hydrateThread.mockReset();
     mocks.useJourneysCompanionThreads.mockReset();
+    mocks.companionChat.messages = [];
+    mocks.journeysConversation.messages = [];
     mocks.routeMessageToPlanner = false;
+    mocks.planner.messages = [];
+    mocks.planner.structuredResponse = null;
     mocks.planner.sessionState = { pendingStarterIntent: null };
     mocks.planner.questions = [];
     mocks.planner.proposals = [];
@@ -302,6 +306,53 @@ describe("useLegacyCompanionAssistantAdapter", () => {
       "text",
       { selectedDate: "2026-02-13" },
     );
+  });
+
+  it("routes read-only planner follow-ups through journeys chat even when they look like writes", async () => {
+    mocks.routeMessageToPlanner = true;
+    mocks.planner.messages = [
+      {
+        id: "planner-1",
+        role: "companion",
+        content: "Today has a clean shape.",
+        createdAt: "2026-04-24T08:00:00.000Z",
+      },
+    ];
+
+    const { result } = renderHook(() =>
+      useLegacyCompanionAssistantAdapter({
+        enabled: true,
+        surface: "journeys",
+        plannerFallbackMode: "read_only",
+      })
+    );
+
+    await act(async () => {
+      await result.current.submitMessage("schedule gym at 5", "text");
+    });
+
+    expect(mocks.journeysConversation.submitMessage).toHaveBeenCalledWith(
+      "schedule gym at 5",
+      "text",
+      expect.objectContaining({
+        currentDate: "2026-04-24",
+        currentDateTime: "2026-04-24T12:00:00-07:00",
+      }),
+    );
+    expect(mocks.planner.submitMessage).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.submitMessage("Any recommendations to add?", "text");
+    });
+
+    expect(mocks.journeysConversation.submitMessage).toHaveBeenLastCalledWith(
+      "Any recommendations to add?",
+      "text",
+      expect.objectContaining({
+        currentDate: "2026-04-24",
+      }),
+    );
+    expect(mocks.planner.submitMessage).not.toHaveBeenCalled();
   });
 
   it("exposes planner suggestions as read-only guidance in fallback mode", async () => {

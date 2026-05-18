@@ -219,7 +219,7 @@ describe("CompanionChatModal", () => {
     expectOpenChatWithFallbackInitial();
   });
 
-  it("wraps regular companion images in an Avatar root", () => {
+  it("fills regular companion images in the Avatar root", () => {
     mocks.visual.imageUrl = "https://assets.example.com/generated-companion.png";
     mocks.visual.usesPortraitShell = false;
 
@@ -228,7 +228,7 @@ describe("CompanionChatModal", () => {
     expectOpenChatWithFallbackInitial();
     expect(screen.getByRole("img", { name: "Nova" })).toHaveAttribute(
       "data-companion-image-fit",
-      "contain",
+      "cover",
     );
   });
 

@@ -127,6 +127,14 @@ const Probe = () => {
       >
         Recover
       </button>
+      <button
+        type="button"
+        onClick={() => {
+          void storeKit.presentPaywallIfNeeded();
+        }}
+      >
+        Paywall
+      </button>
     </div>
   );
 };
@@ -246,6 +254,30 @@ describe("StoreKitProvider", () => {
       "11111111-1111-4111-8111-111111111111",
     );
     expect(screen.getByTestId("entitlement-sandbox")).toHaveTextContent("true");
+  });
+
+  it("uses the live RevenueCat entitlement key for hosted paywall eligibility", async () => {
+    vi.useRealTimers();
+    const { RevenueCatUI } = await import("@revenuecat/purchases-capacitor-ui");
+    vi.mocked(RevenueCatUI.presentPaywallIfNeeded).mockResolvedValue({ result: "NOT_PRESENTED" });
+
+    render(
+      <StoreKitProvider>
+        <Probe />
+      </StoreKitProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("storekit-loading")).toHaveTextContent("false");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Paywall" }));
+
+    await waitFor(() => {
+      expect(RevenueCatUI.presentPaywallIfNeeded).toHaveBeenCalledWith({
+        requiredEntitlementIdentifier: "Cosmiq Pro",
+      });
+    });
   });
 
   it("maps an active RevenueCat subscription when entitlement aliases are not present", async () => {

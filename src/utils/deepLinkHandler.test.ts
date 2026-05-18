@@ -43,6 +43,18 @@ describe("parseDeepLink", () => {
     });
   });
 
+  it.each(["cosmiq://journeys", "cosmiq://journeys/plan"])(
+    "parses widget journeys deep links from %s",
+    (url) => {
+      const parsed = parseDeepLink(url);
+      expect(parsed).toEqual({
+        type: "journeys",
+        path: "/journeys",
+        rawUrl: url,
+      });
+    },
+  );
+
   it("parses hosted auth recovery links", () => {
     const parsed = parseDeepLink(
       "https://app.cosmiq.quest/auth/reset-password#access_token=token&refresh_token=refresh&type=recovery",

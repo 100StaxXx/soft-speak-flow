@@ -423,6 +423,13 @@ export function useLegacyCompanionAssistantAdapter({
   const hasOpenPlannerThread = planner.questions.length > 0 ||
     actionablePendingProposals.length > 0 ||
     Boolean(planner.sessionState.pendingStarterIntent);
+  const hasReadOnlyPlannerOutput = surface === "journeys" &&
+    plannerFallbackMode === "read_only" &&
+    (
+      planner.messages.length > 0 ||
+      Boolean(planner.structuredResponse) ||
+      Boolean(planner.dayPlan)
+    );
 
   const journeysThreads = useJourneysCompanionThreads({
     enabled: enabled && surface === "journeys",
@@ -558,6 +565,19 @@ export function useLegacyCompanionAssistantAdapter({
     }
 
     if (
+      hasReadOnlyPlannerOutput &&
+      !starterIntent &&
+      surface === "journeys"
+    ) {
+      await journeysConversation.submitMessage(message, inputMode, {
+        currentDate: planner.currentDate,
+        currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
+        journeysContext: planner.plannerContext,
+      });
+      return;
+    }
+
+    if (
       starterIntent &&
       starterIntent !== "general" &&
       starterIntent !== "free_talk_start" &&
@@ -623,6 +643,7 @@ export function useLegacyCompanionAssistantAdapter({
     surface,
     onOpenCampaignBuilder,
     hasOpenPlannerThread,
+    hasReadOnlyPlannerOutput,
     planner,
     conversationEnabled,
     journeysConversation,
@@ -660,6 +681,8 @@ export function useLegacyCompanionAssistantAdapter({
     committingDayPlan,
     committedDayPlanId,
     commitDayPlan,
+    currentDate: planner.currentDate,
+    plannerContext: planner.plannerContext,
     pendingAction: plannerSuggestionsReadOnly ? null : pendingAction,
     pendingActionCount: plannerSuggestionsReadOnly ? 0 : pendingActionCount,
     readyPendingActionCount: plannerSuggestionsReadOnly
