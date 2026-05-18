@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { queryKeys } from "@/lib/queryKeys";
 import { parseFunctionInvokeError, type ParsedFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
 import { getYearlyOfferDisplay, getYearlyOfferTier } from "@/utils/appleOfferPricing";
+import { resolvePlanFromProductId } from "@/utils/appleIAP";
 import type { StoreKitTransaction } from "@/types/subscription";
 import {
   buildLocalSubscriptionAccessState,
@@ -42,6 +43,18 @@ function isCancellationError(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
   const message = (error as { message?: string }).message ?? "";
   return message.includes("cancel") || message.includes("Cancel");
+}
+
+function isAlreadySubscribedError(error: unknown): boolean {
+  const message = getErrorMessage(error).toLowerCase();
+  return (
+    message.includes("already") &&
+    (
+      message.includes("subscribed") ||
+      message.includes("subscription") ||
+      message.includes("purchased")
+    )
+  );
 }
 
 function getErrorMessage(error: unknown): string {
@@ -116,6 +129,7 @@ export function useAppleSubscription() {
     purchase,
     redeemOfferCode,
     restorePurchases,
+    recoverPurchases,
     manageSubscriptions,
     presentPaywallIfNeeded,
     presentCustomerCenter,
@@ -363,6 +377,27 @@ export function useAppleSubscription() {
     verifyStoreKitTransaction,
   ]);
 
+  const recoverExistingSubscription = useCallback(async (surface: string) => {
+    const recoveredTransaction = await recoverPurchases();
+    if (!recoveredTransaction) return false;
+
+    const plan = resolvePlanFromProductId(recoveredTransaction.productId);
+    if (!plan) return false;
+
+    const verified = await verifyCompletedTransaction(
+      recoveredTransaction,
+      `${surface}_existing_subscription_recovery`,
+      plan,
+    );
+    if (!verified) return false;
+
+    toast({
+      title: "Cosmiq unlocked",
+      description: "Your existing App Store subscription is active on this account.",
+    });
+    return true;
+  }, [recoverPurchases, toast, verifyCompletedTransaction]);
+
   const reloadProducts = useCallback(async () => {
     setProductError(null);
     const loadedProducts = await refreshProducts();
@@ -457,7 +492,7 @@ export function useAppleSubscription() {
 
       if (!result) {
         trackPaywallEvent("purchase_cancelled", { surface, plan, productId: purchaseProductId, hasOfferCode });
-        return false;
+        return await recoverExistingSubscription(surface);
       }
 
       setOfferCodePurchaseReady(false);
@@ -484,7 +519,19 @@ export function useAppleSubscription() {
       }
       if (isCancellationError(error)) {
         trackPaywallEvent("purchase_cancelled", { surface, plan, productId: purchaseProductId, hasOfferCode });
-        return false;
+        return await recoverExistingSubscription(surface);
+      }
+
+      if (isAlreadySubscribedError(error)) {
+        trackPaywallEvent("purchase_recovery_started", {
+          surface,
+          plan,
+          productId: purchaseProductId,
+          hasOfferCode,
+          message: getErrorMessage(error),
+        });
+        const recovered = await recoverExistingSubscription(surface);
+        if (recovered) return true;
       }
 
       const message = getErrorMessage(error);
@@ -503,6 +550,7 @@ export function useAppleSubscription() {
     hasOfferCode,
     offerCodePurchaseReady,
     purchase,
+    recoverExistingSubscription,
     redeemOfferCode,
     toast,
     user?.id,

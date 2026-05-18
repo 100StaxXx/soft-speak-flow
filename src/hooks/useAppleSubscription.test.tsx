@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   purchase: vi.fn(),
   redeemOfferCode: vi.fn(),
   restorePurchases: vi.fn(),
+  recoverPurchases: vi.fn(),
   manageSubscriptions: vi.fn(),
   presentPaywallIfNeeded: vi.fn(),
   presentCustomerCenter: vi.fn(),
@@ -95,6 +96,7 @@ vi.mock("@/hooks/useStoreKit", () => ({
     purchase: (...args: unknown[]) => mocks.purchase(...args),
     redeemOfferCode: (...args: unknown[]) => mocks.redeemOfferCode(...args),
     restorePurchases: (...args: unknown[]) => mocks.restorePurchases(...args),
+    recoverPurchases: (...args: unknown[]) => mocks.recoverPurchases(...args),
     manageSubscriptions: (...args: unknown[]) => mocks.manageSubscriptions(...args),
     presentPaywallIfNeeded: (...args: unknown[]) => mocks.presentPaywallIfNeeded(...args),
     presentCustomerCenter: (...args: unknown[]) => mocks.presentCustomerCenter(...args),
@@ -151,6 +153,7 @@ describe("useAppleSubscription", () => {
       expirationDate: "2099-01-01T00:00:00.000Z",
       appAccountToken: "11111111-1111-4111-8111-111111111111",
     });
+    mocks.recoverPurchases.mockResolvedValue(null);
     mocks.presentPaywallIfNeeded.mockResolvedValue(false);
     mocks.presentCustomerCenter.mockResolvedValue(undefined);
     mocks.refreshProducts.mockResolvedValue(mocks.storeKitProducts);
@@ -286,7 +289,69 @@ describe("useAppleSubscription", () => {
     });
 
     expect(success).toBe(false);
+    expect(mocks.recoverPurchases).toHaveBeenCalledTimes(1);
     expect(mocks.functionsInvoke).not.toHaveBeenCalled();
+  });
+
+  it("recovers an existing App Store subscription when purchase returns null", async () => {
+    mocks.purchase.mockResolvedValue(null);
+    mocks.recoverPurchases.mockResolvedValueOnce({
+      productId: "cosmiq_premium_yearly",
+      transactionId: "recovered-null-purchase-tx",
+      expirationDate: "2099-01-01T00:00:00.000Z",
+      appAccountToken: "11111111-1111-4111-8111-111111111111",
+    });
+
+    const { result } = renderHook(() => useAppleSubscription());
+
+    let success: boolean | undefined;
+    await act(async () => {
+      success = await result.current.handlePurchase("cosmiq_premium_yearly");
+    });
+
+    expect(success).toBe(true);
+    expect(mocks.recoverPurchases).toHaveBeenCalledTimes(1);
+    expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
+      body: { transactionId: "recovered-null-purchase-tx" },
+    });
+    expect(mocks.setQueryData).toHaveBeenCalledWith(
+      ["access-state", "11111111-1111-4111-8111-111111111111"],
+      expect.objectContaining({
+        has_access: true,
+        access_source: "subscription",
+        subscribed: true,
+        plan: "yearly",
+      }),
+    );
+  });
+
+  it("recovers an existing App Store subscription when Apple says already subscribed", async () => {
+    mocks.purchase.mockRejectedValueOnce(new Error("You're already subscribed to this subscription."));
+    mocks.recoverPurchases.mockResolvedValueOnce({
+      productId: "cosmiq_premium_monthly",
+      transactionId: "already-subscribed-recovery-tx",
+      expirationDate: "2099-01-01T00:00:00.000Z",
+      appAccountToken: "11111111-1111-4111-8111-111111111111",
+    });
+
+    const { result } = renderHook(() => useAppleSubscription());
+
+    let success: boolean | undefined;
+    await act(async () => {
+      success = await result.current.handlePurchase("cosmiq_premium_monthly");
+    });
+
+    expect(success).toBe(true);
+    expect(mocks.recoverPurchases).toHaveBeenCalledTimes(1);
+    expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
+      body: { transactionId: "already-subscribed-recovery-tx" },
+    });
+    expect(mocks.toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Purchase failed",
+        variant: "destructive",
+      }),
+    );
   });
 
   it("shows an activation error when Apple succeeds but server verification fails", async () => {

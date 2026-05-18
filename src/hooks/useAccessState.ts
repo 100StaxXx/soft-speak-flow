@@ -65,7 +65,9 @@ export function useAccessState() {
   const [sessionRejectedTransactionId, setSessionRejectedTransactionId] = useState<string | null>(null);
   const recoveryTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const recoveryKeyRef = useRef<string | null>(null);
-  const purchaseRecoveryKeyRef = useRef<string | null>(null);
+  const completedPurchaseRecoveryKeyRef = useRef<string | null>(null);
+  const inFlightPurchaseRecoveryKeyRef = useRef<string | null>(null);
+  const [completedPurchaseRecoveryKey, setCompletedPurchaseRecoveryKey] = useState<string | null>(null);
   const [purchaseRecoveryLoading, setPurchaseRecoveryLoading] = useState(false);
   const {
     activePlan: storeKitPlan,
@@ -168,6 +170,22 @@ export function useAccessState() {
     !canUseFreshLocalActivationAccessForRender &&
     !canUseRememberedLocalAccessForRender &&
     storeKitLoading;
+  const purchaseRecoveryKey = user?.id
+    ? `${user.id}:${query.data?.access_source ?? "none"}:${query.data?.status ?? "unknown"}`
+    : null;
+  const shouldAttemptPurchaseRecovery = Boolean(
+    user?.id &&
+      storeKitAvailable &&
+      typeof recoverPurchases === "function" &&
+      backendHasRecoverableNoAccess &&
+      !currentEntitlement &&
+      !currentStoreKitAccessState &&
+      !storeKitLoading &&
+      !entitlementError &&
+      purchaseRecoveryKey &&
+      completedPurchaseRecoveryKey !== purchaseRecoveryKey &&
+      inFlightPurchaseRecoveryKeyRef.current !== purchaseRecoveryKey,
+  );
 
   useEffect(() => {
     return () => {
@@ -184,20 +202,21 @@ export function useAccessState() {
   useEffect(() => {
     if (
       !user?.id ||
+      !purchaseRecoveryKey ||
       !storeKitAvailable ||
       typeof recoverPurchases !== "function" ||
       !backendHasRecoverableNoAccess ||
       currentEntitlement ||
       currentStoreKitAccessState ||
       storeKitLoading ||
-      entitlementError
+      entitlementError ||
+      completedPurchaseRecoveryKeyRef.current === purchaseRecoveryKey ||
+      inFlightPurchaseRecoveryKeyRef.current === purchaseRecoveryKey
     ) {
       return;
     }
 
-    const recoveryKey = `${user.id}:${query.data?.access_source ?? "none"}:${query.data?.status ?? "unknown"}`;
-    if (purchaseRecoveryKeyRef.current === recoveryKey) return;
-    purchaseRecoveryKeyRef.current = recoveryKey;
+    inFlightPurchaseRecoveryKeyRef.current = purchaseRecoveryKey;
 
     let cancelled = false;
     setPurchaseRecoveryLoading(true);
@@ -241,7 +260,12 @@ export function useAccessState() {
           await queryClient.invalidateQueries({ queryKey: queryKeys.access.detail(user.id) });
         }
       } finally {
+        if (inFlightPurchaseRecoveryKeyRef.current === purchaseRecoveryKey) {
+          inFlightPurchaseRecoveryKeyRef.current = null;
+          completedPurchaseRecoveryKeyRef.current = purchaseRecoveryKey;
+        }
         if (!cancelled) {
+          setCompletedPurchaseRecoveryKey(purchaseRecoveryKey);
           setPurchaseRecoveryLoading(false);
         }
       }
@@ -252,11 +276,11 @@ export function useAccessState() {
     };
   }, [
     backendHasRecoverableNoAccess,
+    completedPurchaseRecoveryKey,
     currentEntitlement,
     currentStoreKitAccessState,
     entitlementError,
-    query.data?.access_source,
-    query.data?.status,
+    purchaseRecoveryKey,
     queryClient,
     recoverPurchases,
     storeKitAvailable,
@@ -340,7 +364,13 @@ export function useAccessState() {
 
   return {
     accessState,
-    isLoading: authLoading || (!!user && (query.isLoading || waitingForStoreKitFallback || purchaseRecoveryLoading)),
+    isLoading: authLoading ||
+      (!!user && (
+        query.isLoading ||
+        waitingForStoreKitFallback ||
+        shouldAttemptPurchaseRecovery ||
+        purchaseRecoveryLoading
+      )),
     error: query.error,
     refetch: query.refetch,
   };
