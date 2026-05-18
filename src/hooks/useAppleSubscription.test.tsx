@@ -556,6 +556,84 @@ describe("useAppleSubscription", () => {
     );
   });
 
+  it("defers local activation when binding-missing is returned as a successful payload", async () => {
+    mocks.purchase.mockResolvedValueOnce({
+      productId: "cosmiq_premium_yearly",
+      transactionId: "tokenless-payload-tx",
+      expirationDate: "2099-01-01T00:00:00.000Z",
+    });
+    mocks.functionsInvoke.mockResolvedValueOnce({
+      data: {
+        error: "This purchase is missing its app-account binding. Update the app and restore the purchase again.",
+        code: "APPLE_BINDING_MISSING",
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useAppleSubscription());
+
+    let success: boolean | undefined;
+    await act(async () => {
+      success = await result.current.handlePurchase("cosmiq_premium_yearly");
+    });
+
+    expect(success).toBe(true);
+    expect(mocks.setQueryData).toHaveBeenCalledWith(
+      ["access-state", "11111111-1111-4111-8111-111111111111"],
+      expect.objectContaining({
+        has_access: true,
+        access_source: "subscription",
+        subscribed: true,
+        plan: "yearly",
+      }),
+    );
+    expect(mocks.toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Subscription activation failed",
+        variant: "destructive",
+      }),
+    );
+  });
+
+  it("defers local activation when Apple has not returned subscription expiration yet", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-18T00:23:39.000Z"));
+    try {
+      mocks.purchase.mockResolvedValueOnce({
+        productId: "cosmiq_premium_yearly",
+        transactionId: "missing-expiration-tx",
+        purchaseDate: "2026-05-18T00:23:39Z",
+      });
+      mocks.functionsInvoke.mockResolvedValueOnce({
+        data: {
+          error: "This Apple transaction is missing its subscription expiration date.",
+        },
+        error: null,
+      });
+
+      const { result } = renderHook(() => useAppleSubscription());
+
+      let success: boolean | undefined;
+      await act(async () => {
+        success = await result.current.handlePurchase("cosmiq_premium_yearly");
+      });
+
+      expect(success).toBe(true);
+      expect(mocks.setQueryData).toHaveBeenCalledWith(
+        ["access-state", "11111111-1111-4111-8111-111111111111"],
+        expect.objectContaining({
+          has_access: true,
+          access_source: "subscription",
+          subscribed: true,
+          plan: "yearly",
+          subscription_end: "2026-05-18T00:38:39.000Z",
+        }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("shows error toast when purchase throws", async () => {
     mocks.purchase.mockRejectedValue(new Error("StoreKit purchase failed"));
 

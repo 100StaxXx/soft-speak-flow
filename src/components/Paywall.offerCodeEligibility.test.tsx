@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -30,6 +30,8 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 
 vi.mock("@/hooks/useAppleSubscription", () => ({
+  APP_STORE_SUBSCRIPTION_ALREADY_LINKED_MESSAGE:
+    "This App Store subscription is already linked to another Cosmiq account. Sign in to that account, or contact support if this is your purchase.",
   useAppleSubscription: () => mocks.appleSubscription,
 }));
 
@@ -213,6 +215,18 @@ describe("Paywall creator offer-code eligibility", () => {
       "https://discord.gg/rreaAn7JWn",
     );
     expect(screen.queryByText("All premium features")).not.toBeInTheDocument();
+  });
+
+  it("starts the default 3-day trial from the hero button", () => {
+    render(
+      <MemoryRouter>
+        <Paywall />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^3-day free trial$/i }));
+
+    expect(mocks.appleSubscription.handlePurchase).toHaveBeenCalledWith("cosmiq_premium_yearly", "paywall");
   });
 
   it("uses continuation copy after a trial has expired", () => {

@@ -559,9 +559,14 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                       See plans
                       <ArrowDown className="h-4 w-4" />
                     </button>
-                    <div className="inline-flex h-14 items-center justify-center border border-white/18 bg-black/20 px-5 text-xs font-semibold uppercase tracking-[0.18em] text-white/72 backdrop-blur-md">
+                    <button
+                      type="button"
+                      onClick={() => { void handleSubscribe(); }}
+                      disabled={!isAvailable || loading || productsLoading}
+                      className="inline-flex h-14 items-center justify-center border border-white/18 bg-black/20 px-5 text-xs font-semibold uppercase tracking-[0.18em] text-white/72 backdrop-blur-md transition hover:border-white/36 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-100 disabled:pointer-events-none disabled:opacity-50"
+                    >
                       {copy.heroBadge}
-                    </div>
+                    </button>
                   </div>
                 ) : null}
               </div>

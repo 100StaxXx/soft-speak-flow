@@ -21,6 +21,9 @@ import {
 
 const DEFERRED_VERIFICATION_RETRY_DELAYS_MS = [5_000, 30_000, 120_000] as const;
 const APPLE_BINDING_CONFLICT_CODE = "APPLE_BINDING_CONFLICT";
+const APPLE_BINDING_MISSING_CODE = "APPLE_BINDING_MISSING";
+const APPLE_MISSING_EXPIRATION_ERROR =
+  "This Apple transaction is missing its subscription expiration date.";
 export const APP_STORE_SUBSCRIPTION_ALREADY_LINKED_TITLE = "Subscription already linked";
 export const APP_STORE_SUBSCRIPTION_ALREADY_LINKED_MESSAGE =
   "This App Store subscription is already linked to another Cosmiq account. Sign in to that account, or contact support if this is your purchase.";
@@ -82,11 +85,23 @@ function canDeferServerVerification(error: unknown): boolean {
   const parsed = error.parsed;
   if (!parsed) return false;
 
-  if (parsed.code === "APPLE_BINDING_MISSING") return true;
+  if (parsed.code === APPLE_BINDING_MISSING_CODE) return true;
+  if (parsed.backendMessage === APPLE_MISSING_EXPIRATION_ERROR) return true;
   if (parsed.category === "network" || parsed.category === "relay") return true;
   if (typeof parsed.status === "number" && parsed.status >= 500) return true;
 
   return false;
+}
+
+function verificationPayloadToError(payload: { error?: string; code?: string } | null): SubscriptionVerificationError {
+  const message = payload?.error ?? "Subscription verification failed";
+  return new SubscriptionVerificationError(message, {
+    message,
+    backendMessage: message,
+    code: payload?.code,
+    isOffline: typeof navigator !== "undefined" ? navigator.onLine === false : false,
+    category: "http",
+  });
 }
 
 export function useAppleSubscription() {
@@ -181,6 +196,7 @@ export function useAppleSubscription() {
 
     const verification = data as { success?: boolean; error?: string; code?: string } | null;
     if (verification?.error) {
+      const verificationError = verificationPayloadToError(verification);
       trackPaywallEvent("purchase_verification_failed", {
         surface,
         plan,
@@ -190,7 +206,7 @@ export function useAppleSubscription() {
         code: verification.code,
         message: verification.error,
       });
-      throw new Error(verification.error);
+      throw verificationError;
     }
 
     await invalidateSubscriptionState();
@@ -280,6 +296,12 @@ export function useAppleSubscription() {
     try {
       await verifyStoreKitTransaction(transaction, surface, plan);
       grantLocalSubscriptionAccess(transaction, plan);
+      console.info("[Subscriptions] Purchase verified and local subscription access granted", {
+        surface,
+        plan,
+        productId: transaction.productId,
+        transactionId: transaction.transactionId,
+      });
       return true;
     } catch (error) {
       if (isAppleBindingConflict(error)) {
@@ -289,6 +311,15 @@ export function useAppleSubscription() {
 
       if (canDeferServerVerification(error) && grantLocalSubscriptionAccess(transaction, plan)) {
         const parsed = error instanceof SubscriptionVerificationError ? error.parsed : undefined;
+        console.info("[Subscriptions] Purchase verification deferred; temporary local access granted", {
+          surface,
+          plan,
+          productId: transaction.productId,
+          transactionId: transaction.transactionId,
+          code: parsed?.code,
+          status: parsed?.status,
+          message: getErrorMessage(error),
+        });
         trackPaywallEvent("purchase_verification_deferred", {
           surface,
           plan,
@@ -304,6 +335,16 @@ export function useAppleSubscription() {
       }
 
       const activationToast = getActivationErrorToast(error);
+      const parsed = error instanceof SubscriptionVerificationError ? error.parsed : undefined;
+      console.warn("[Subscriptions] Purchase verification failed without local activation", {
+        surface,
+        plan,
+        productId: transaction.productId,
+        transactionId: transaction.transactionId,
+        code: parsed?.code,
+        status: parsed?.status,
+        message: activationToast.description,
+      });
       setProductError(activationToast.description);
       toast({
         title: activationToast.title,

@@ -62,11 +62,13 @@ vi.mock("@revenuecat/purchases-capacitor", () => ({
     STOREKIT_2: "STOREKIT_2",
   },
   Purchases: {
-    addCustomerInfoUpdateListener: (...args: unknown[]) => mocks.addCustomerInfoUpdateListener(...args),
+    addCustomerInfoUpdateListener: (...args: unknown[]) => (
+      mocks.addCustomerInfoUpdateListener(...args) ?? Promise.resolve("listener-1")
+    ),
     configure: (...args: unknown[]) => mocks.configure(...args),
     getCustomerInfo: (...args: unknown[]) => mocks.getCustomerInfo(...args),
     getOfferings: (...args: unknown[]) => mocks.getOfferings(...args),
-    getProducts: (...args: unknown[]) => mocks.getProducts(...args),
+    getProducts: (...args: unknown[]) => mocks.getProducts(...args) ?? Promise.resolve({ products: [] }),
     purchaseStoreProduct: (...args: unknown[]) => mocks.purchaseStoreProduct(...args),
     removeCustomerInfoUpdateListener: (...args: unknown[]) => mocks.removeCustomerInfoUpdateListener(...args),
     setLogLevel: (...args: unknown[]) => mocks.setLogLevel(...args),
