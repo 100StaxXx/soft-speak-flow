@@ -39,6 +39,7 @@ import type { StoreKitProduct, StoreKitTransaction } from "@/types/subscription"
 const CUSTOMER_INFO_TIMEOUT_MS = 5000;
 const REVENUECAT_PRODUCTS_TIMEOUT_MS = 8000;
 const REVENUECAT_CONFIGURE_TIMEOUT_MS = 10000;
+const REVENUECAT_PURCHASE_RECOVERY_TIMEOUT_MS = 8000;
 const OFFER_CODE_ENTITLEMENT_POLL_DELAYS_MS = [0, 500, 1000, 1500];
 const COSMIQ_PRO_ENTITLEMENT_ALIASES = [
   COSMIQ_PRO_ENTITLEMENT_ID,
@@ -77,6 +78,7 @@ type StoreKitContextValue = {
   presentPaywall: () => Promise<boolean>;
   presentPaywallIfNeeded: () => Promise<boolean>;
   presentCustomerCenter: () => Promise<void>;
+  recoverPurchases: () => Promise<StoreKitTransaction | null>;
   refreshEntitlement: () => Promise<void>;
   refreshProducts: () => Promise<StoreKitProduct[]>;
 };
@@ -608,6 +610,49 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     return customerInfoToTransaction(restoredCustomerInfo);
   }, [applyCustomerInfo, isAvailable, isConfigured]);
 
+  const recoverPurchasesHandler = useCallback(async (): Promise<StoreKitTransaction | null> => {
+    if (!isAvailable || !isConfigured) return null;
+
+    setEntitlementLoading(true);
+    try {
+      try {
+        await withTimeout(
+          () => Purchases.syncPurchases(),
+          {
+            timeoutMs: REVENUECAT_PURCHASE_RECOVERY_TIMEOUT_MS,
+            operation: "RevenueCat purchase sync",
+            timeoutCode: "REVENUECAT_TIMEOUT",
+          },
+        );
+        const syncedCustomerInfo = await fetchCustomerInfo();
+        const syncedTransaction = customerInfoToTransaction(syncedCustomerInfo);
+        if (syncedTransaction) {
+          setEntitlementError(false);
+          return syncedTransaction;
+        }
+      } catch (syncError) {
+        console.warn("[RevenueCat] Existing purchase sync failed; trying restore purchases", syncError);
+      }
+
+      const { customerInfo: restoredCustomerInfo } = await withTimeout(
+        () => Purchases.restorePurchases(),
+        {
+          timeoutMs: REVENUECAT_PURCHASE_RECOVERY_TIMEOUT_MS,
+          operation: "RevenueCat purchase restore",
+          timeoutCode: "REVENUECAT_TIMEOUT",
+        },
+      );
+      applyCustomerInfo(restoredCustomerInfo);
+      setEntitlementError(false);
+      return customerInfoToTransaction(restoredCustomerInfo);
+    } catch (error) {
+      console.warn("[RevenueCat] Existing purchase recovery failed", error);
+      return null;
+    } finally {
+      setEntitlementLoading(false);
+    }
+  }, [applyCustomerInfo, fetchCustomerInfo, isAvailable, isConfigured]);
+
   const presentRevenueCatPaywall = useCallback(async (onlyIfNeeded: boolean): Promise<boolean> => {
     if (!isAvailable || !isConfigured) return false;
 
@@ -637,8 +682,8 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
 
   const activeEntitlement = activeCosmiqProEntitlement(customerInfo);
   const activePlan = resolvePlanFromProductId(currentEntitlement?.productId);
-  const isPro = Boolean(activeEntitlement?.isActive);
-  const expirationDate = isPro && currentEntitlement?.expirationDate
+  const isPro = Boolean(activeEntitlement?.isActive || currentEntitlement);
+  const expirationDate = currentEntitlement?.expirationDate
     ? new Date(currentEntitlement.expirationDate)
     : null;
 
@@ -661,6 +706,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     presentPaywall: () => presentRevenueCatPaywall(false),
     presentPaywallIfNeeded: () => presentRevenueCatPaywall(true),
     presentCustomerCenter: manageSubscriptionsHandler,
+    recoverPurchases: recoverPurchasesHandler,
     refreshEntitlement,
     refreshProducts,
   }), [
@@ -679,6 +725,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     productsLoading,
     purchase,
     redeemOfferCode,
+    recoverPurchasesHandler,
     refreshEntitlement,
     refreshProducts,
     restorePurchasesHandler,

@@ -1,26 +1,33 @@
 import React from "react";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({
-  user: { id: "11111111-1111-4111-8111-111111111111" } as { id: string } | null,
-  authLoading: false,
-  functionsInvoke: vi.fn(),
-  storeKit: {
-    isPro: true,
-    activePlan: "yearly" as "monthly" | "yearly" | null,
-    currentEntitlement: {
-      productId: "cosmiq_premium_yearly",
-      expirationDate: "2099-01-01T00:00:00.000Z",
-      transactionId: "local-tx",
-      appAccountToken: "11111111-1111-4111-8111-111111111111",
+const mocks = vi.hoisted(() => {
+  const recoverPurchases = vi.fn();
+
+  return {
+    user: { id: "11111111-1111-4111-8111-111111111111" } as { id: string } | null,
+    authLoading: false,
+    functionsInvoke: vi.fn(),
+    recoverPurchases,
+    storeKit: {
+      isAvailable: true,
+      isPro: true,
+      activePlan: "yearly" as "monthly" | "yearly" | null,
+      currentEntitlement: {
+        productId: "cosmiq_premium_yearly",
+        expirationDate: "2099-01-01T00:00:00.000Z",
+        transactionId: "local-tx",
+        appAccountToken: "11111111-1111-4111-8111-111111111111",
+      },
+      expirationDate: new Date("2099-01-01T00:00:00.000Z"),
+      entitlementError: false,
+      isLoading: false,
+      recoverPurchases,
     },
-    expirationDate: new Date("2099-01-01T00:00:00.000Z"),
-    entitlementError: false,
-    isLoading: false,
-  },
-}));
+  };
+});
 
 const localStorageState = vi.hoisted(() => ({
   store: new Map<string, string>(),
@@ -134,9 +141,12 @@ describe("useAccessState", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorageState.store.clear();
+    mocks.recoverPurchases.mockReset();
+    mocks.recoverPurchases.mockResolvedValue(null);
     mocks.user = { id: "11111111-1111-4111-8111-111111111111" };
     mocks.authLoading = false;
     mocks.storeKit = {
+      ...mocks.storeKit,
       isPro: true,
       activePlan: "yearly",
       currentEntitlement: {
@@ -175,6 +185,7 @@ describe("useAccessState", () => {
 
   it("uses valid monthly local StoreKit access over a neutral backend no-access response", async () => {
     mocks.storeKit = {
+      ...mocks.storeKit,
       isPro: true,
       activePlan: "monthly",
       currentEntitlement: {
@@ -207,8 +218,116 @@ describe("useAccessState", () => {
     });
   });
 
+  it("trusts a live RevenueCat TestFlight entitlement even when Apple returns no app-account token", async () => {
+    mocks.storeKit = {
+      ...mocks.storeKit,
+      isPro: true,
+      activePlan: "yearly",
+      currentEntitlement: {
+        productId: "cosmiq_premium_yearly",
+        expirationDate: "2099-01-01T00:00:00.000Z",
+        transactionId: "tokenless-testflight-tx",
+        revenueCatOriginalAppUserId: "11111111-1111-4111-8111-111111111111",
+      } as unknown as typeof mocks.storeKit.currentEntitlement,
+      expirationDate: new Date("2099-01-01T00:00:00.000Z"),
+      entitlementError: false,
+      isLoading: false,
+    };
+
+    const { result } = renderHook(() => useAccessState(), { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.accessState).toMatchObject({
+      has_access: true,
+      access_source: "subscription",
+      subscribed: true,
+      plan: "yearly",
+    });
+    await waitFor(() => {
+      expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
+        body: { transactionId: "tokenless-testflight-tx" },
+      });
+    });
+  });
+
+  it("attempts one native purchase recovery before rendering a hard no-access state", async () => {
+    let resolveRecovery: (transaction: null) => void = () => {};
+    mocks.recoverPurchases.mockReturnValue(
+      new Promise<null>((resolve) => {
+        resolveRecovery = resolve;
+      }),
+    );
+    mocks.storeKit = {
+      ...mocks.storeKit,
+      isAvailable: true,
+      isPro: false,
+      activePlan: null,
+      currentEntitlement: null,
+      expirationDate: null,
+      entitlementError: false,
+      isLoading: false,
+    };
+
+    const { result } = renderHook(() => useAccessState(), { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(mocks.recoverPurchases).toHaveBeenCalledTimes(1);
+    });
+    expect(result.current.isLoading).toBe(true);
+
+    await act(async () => {
+      resolveRecovery(null);
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+    expect(result.current.accessState).toMatchObject({
+      has_access: false,
+      access_source: "none",
+      subscribed: false,
+    });
+  });
+
+  it("unlocks and verifies an active transaction returned by native purchase recovery", async () => {
+    mocks.recoverPurchases.mockResolvedValue({
+      productId: "cosmiq_premium_yearly",
+      expirationDate: "2099-01-01T00:00:00.000Z",
+      transactionId: "recovered-testflight-tx",
+      isSandbox: true,
+    });
+    mocks.storeKit = {
+      ...mocks.storeKit,
+      isAvailable: true,
+      isPro: false,
+      activePlan: null,
+      currentEntitlement: null,
+      expirationDate: null,
+      entitlementError: false,
+      isLoading: false,
+    };
+
+    const { result } = renderHook(() => useAccessState(), { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(result.current.accessState).toMatchObject({
+        has_access: true,
+        access_source: "subscription",
+        subscribed: true,
+        plan: "yearly",
+      });
+    });
+    expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
+      body: { transactionId: "recovered-testflight-tx" },
+    });
+  });
+
   it("does not grant local StoreKit access when no active entitlement exists", async () => {
     mocks.storeKit = {
+      ...mocks.storeKit,
       isPro: false,
       activePlan: null,
       currentEntitlement: null,
@@ -250,6 +369,7 @@ describe("useAccessState", () => {
   it("keeps sandbox restore access when the StoreKit entitlement has no app-account token", async () => {
     mockSubscriptionCheckError(new Error("Failed to send a request to the Edge Function"));
     mocks.storeKit = {
+      ...mocks.storeKit,
       isPro: false,
       activePlan: null,
       currentEntitlement: {
@@ -287,6 +407,7 @@ describe("useAccessState", () => {
     );
     mockSubscriptionCheckError(new Error("Failed to send a request to the Edge Function"));
     mocks.storeKit = {
+      ...mocks.storeKit,
       isPro: true,
       activePlan: "yearly",
       currentEntitlement: {
@@ -316,6 +437,7 @@ describe("useAccessState", () => {
 
   it("does not grant local access for unknown StoreKit subscription products", async () => {
     mocks.storeKit = {
+      ...mocks.storeKit,
       isPro: false,
       activePlan: null,
       currentEntitlement: {
@@ -356,6 +478,7 @@ describe("useAccessState", () => {
       }),
     );
     mocks.storeKit = {
+      ...mocks.storeKit,
       isPro: false,
       activePlan: null,
       currentEntitlement: null,
@@ -393,6 +516,7 @@ describe("useAccessState", () => {
       }),
     );
     mocks.storeKit = {
+      ...mocks.storeKit,
       isPro: false,
       activePlan: null,
       currentEntitlement: null,
@@ -429,6 +553,7 @@ describe("useAccessState", () => {
       }),
     );
     mocks.storeKit = {
+      ...mocks.storeKit,
       isPro: false,
       activePlan: null,
       currentEntitlement: null,
@@ -469,6 +594,7 @@ describe("useAccessState", () => {
       }),
     );
     mocks.storeKit = {
+      ...mocks.storeKit,
       isPro: false,
       activePlan: null,
       currentEntitlement: null,
@@ -510,6 +636,7 @@ describe("useAccessState", () => {
       }),
     );
     mocks.storeKit = {
+      ...mocks.storeKit,
       isPro: false,
       activePlan: null,
       currentEntitlement: null,
@@ -554,6 +681,7 @@ describe("useAccessState", () => {
       subscription_end: "2026-05-11T00:00:00.000Z",
     });
     mocks.storeKit = {
+      ...mocks.storeKit,
       isPro: false,
       activePlan: null,
       currentEntitlement: null,
@@ -671,6 +799,7 @@ describe("useAccessState", () => {
     );
     mockSubscriptionCheckError(new Error("Failed to send a request to the Edge Function"));
     mocks.storeKit = {
+      ...mocks.storeKit,
       isPro: false,
       activePlan: null,
       currentEntitlement: {

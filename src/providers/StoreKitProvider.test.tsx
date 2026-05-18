@@ -11,7 +11,9 @@ const mocks = vi.hoisted(() => ({
   getProducts: vi.fn(),
   purchaseStoreProduct: vi.fn(),
   removeCustomerInfoUpdateListener: vi.fn(),
+  restorePurchases: vi.fn(),
   setLogLevel: vi.fn(),
+  syncPurchases: vi.fn(),
 }));
 
 const inactiveCustomerInfo = {
@@ -71,7 +73,9 @@ vi.mock("@revenuecat/purchases-capacitor", () => ({
     getProducts: (...args: unknown[]) => mocks.getProducts(...args) ?? Promise.resolve({ products: [] }),
     purchaseStoreProduct: (...args: unknown[]) => mocks.purchaseStoreProduct(...args),
     removeCustomerInfoUpdateListener: (...args: unknown[]) => mocks.removeCustomerInfoUpdateListener(...args),
+    restorePurchases: (...args: unknown[]) => mocks.restorePurchases(...args),
     setLogLevel: (...args: unknown[]) => mocks.setLogLevel(...args),
+    syncPurchases: (...args: unknown[]) => mocks.syncPurchases(...args),
   },
 }));
 
@@ -115,6 +119,14 @@ const Probe = () => {
       >
         Purchase
       </button>
+      <button
+        type="button"
+        onClick={() => {
+          void storeKit.recoverPurchases();
+        }}
+      >
+        Recover
+      </button>
     </div>
   );
 };
@@ -144,7 +156,9 @@ describe("StoreKitProvider", () => {
       },
     });
     mocks.removeCustomerInfoUpdateListener.mockResolvedValue({ wasRemoved: true });
+    mocks.restorePurchases.mockResolvedValue({ customerInfo: inactiveCustomerInfo });
     mocks.setLogLevel.mockResolvedValue(undefined);
+    mocks.syncPurchases.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -304,6 +318,52 @@ describe("StoreKitProvider", () => {
     await waitFor(() => {
       expect(screen.getByTestId("entitlement-product")).toHaveTextContent("com.darrylgraham.revolution.yearly");
     });
+    expect(screen.getByTestId("entitlement-sandbox")).toHaveTextContent("true");
+  });
+
+  it("recovers an existing TestFlight subscription before the hard paywall wins", async () => {
+    vi.useRealTimers();
+    const recoveredCustomerInfo = {
+      ...inactiveCustomerInfo,
+      activeSubscriptions: ["cosmiq_premium_yearly"],
+      entitlements: {
+        active: {},
+        all: {},
+      },
+      subscriptionsByProductIdentifier: {
+        cosmiq_premium_yearly: {
+          productIdentifier: "cosmiq_premium_yearly",
+          storeTransactionId: "testflight-subscription-tx-1",
+          purchaseDate: "2026-05-18T12:00:00.000Z",
+          expiresDate: "2099-01-01T00:00:00.000Z",
+          isActive: true,
+          isSandbox: true,
+        },
+      },
+    };
+    mocks.getCustomerInfo
+      .mockResolvedValueOnce({ customerInfo: inactiveCustomerInfo })
+      .mockResolvedValueOnce({ customerInfo: inactiveCustomerInfo })
+      .mockResolvedValueOnce({ customerInfo: recoveredCustomerInfo });
+    mocks.restorePurchases.mockResolvedValue({ customerInfo: recoveredCustomerInfo });
+
+    render(
+      <StoreKitProvider>
+        <Probe />
+      </StoreKitProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("storekit-loading")).toHaveTextContent("false");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Recover" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("entitlement-product")).toHaveTextContent("cosmiq_premium_yearly");
+    });
+    expect(mocks.syncPurchases).toHaveBeenCalled();
+    expect(mocks.restorePurchases).toHaveBeenCalled();
     expect(screen.getByTestId("entitlement-sandbox")).toHaveTextContent("true");
   });
 

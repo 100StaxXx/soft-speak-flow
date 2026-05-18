@@ -1,6 +1,0 @@
-/apple-app-site-association
-  Content-Type: application/json; charset=utf-8
-/.well-known/apple-app-site-association
-  Content-Type: application/json; charset=utf-8
-/calendar/oauth/callback
-  Content-Type: text/html; charset=utf-8

@@ -1,1 +1,0 @@
-import{C as i}from"./vendor-B4Pf7lGT.js";function s(){const t="https://app.cosmiq.quest".trim();if(!t)throw new Error("Missing VITE_NATIVE_REDIRECT_BASE for native auth redirects");return t.endsWith("/")?t.slice(0,-1):t}const o=()=>i.isNativePlatform()?s():window.location.origin,a=(t="/")=>{const r=o(),e=t.startsWith("/")?t:`/${t}`;return`${r}${e}`};export{o as a,a as g};
