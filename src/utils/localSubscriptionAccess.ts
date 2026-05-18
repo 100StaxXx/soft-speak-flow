@@ -4,6 +4,26 @@ import { resolvePlanFromProductId, type IAPPlan } from "@/utils/appleIAP";
 
 const STORAGE_PREFIX = "cosmiq.localSubscriptionAccess.v1";
 const REJECTED_TRANSACTIONS_STORAGE_PREFIX = "cosmiq.rejectedLocalSubscriptionTransactions.v1";
+const LOCAL_ACCESS_RECORD_VERSION = 2;
+export const LOCAL_SUBSCRIPTION_ACTIVATION_GRACE_MS = 15 * 60 * 1000;
+
+type LocalSubscriptionAccessRecord = {
+  version: typeof LOCAL_ACCESS_RECORD_VERSION;
+  accessState: AccessState;
+  storedAt: string;
+  transactionKeys: string[];
+};
+
+type ParsedLocalSubscriptionAccessRecord = {
+  accessState: AccessState;
+  storedAt: string | null;
+  transactionKeys: string[];
+  isLegacy: boolean;
+};
+
+type BuildLocalSubscriptionAccessStateOptions = {
+  trustCurrentSession?: boolean;
+};
 
 function normalizeToken(value: string | null | undefined): string | null {
   const normalized = value?.trim().toLowerCase();
@@ -30,6 +50,15 @@ function transactionKeys(transaction: StoreKitTransaction | null): string[] {
     normalizeTransactionKey(transaction.originalTransactionId),
     normalizeTransactionKey(transaction.transactionId),
   ].filter((key, index, keys): key is string => Boolean(key) && keys.indexOf(key) === index);
+}
+
+function normalizeTransactionKeys(values: unknown): string[] {
+  const keys = Array.isArray(values) ? values : [];
+  return keys
+    .map((key) => normalizeTransactionKey(typeof key === "string" ? key : null))
+    .filter((key, index, normalizedKeys): key is string => (
+      Boolean(key) && normalizedKeys.indexOf(key) === index
+    ));
 }
 
 export function getActiveSubscriptionEnd(transaction: StoreKitTransaction | null): string | null {
@@ -59,13 +88,28 @@ export function storeKitTransactionMatchesUser(
   return appAccountToken === normalizeToken(userId);
 }
 
+function storeKitTransactionCanGrantLocalAccess(
+  transaction: StoreKitTransaction | null,
+  options?: BuildLocalSubscriptionAccessStateOptions,
+): boolean {
+  if (!transaction) return false;
+
+  const appAccountToken = normalizeToken(transaction.appAccountToken);
+  if (appAccountToken) return true;
+  if (transaction.isSandbox) return true;
+
+  return Boolean(options?.trustCurrentSession);
+}
+
 export function buildLocalSubscriptionAccessState(
   transaction: StoreKitTransaction | null,
   userId: string | null | undefined,
   planOverride?: IAPPlan | null,
+  options?: BuildLocalSubscriptionAccessStateOptions,
 ): AccessState | null {
   if (storeKitTransactionRejectedForUser(transaction, userId)) return null;
   if (!storeKitTransactionMatchesUser(transaction, userId)) return null;
+  if (!storeKitTransactionCanGrantLocalAccess(transaction, options)) return null;
 
   const subscriptionEnd = getActiveSubscriptionEnd(transaction);
   if (!subscriptionEnd) return null;
@@ -108,7 +152,44 @@ function isActiveAccessState(value: unknown): value is AccessState {
   return !Number.isNaN(subscriptionEnd.getTime()) && subscriptionEnd > new Date();
 }
 
-export function readLocalSubscriptionAccess(userId: string | null | undefined): AccessState | null {
+function parseLocalSubscriptionAccessRecord(value: unknown): ParsedLocalSubscriptionAccessRecord | null {
+  if (isActiveAccessState(value)) {
+    return {
+      accessState: value,
+      storedAt: null,
+      transactionKeys: [],
+      isLegacy: true,
+    };
+  }
+
+  if (!value || typeof value !== "object") return null;
+
+  const record = value as Partial<LocalSubscriptionAccessRecord>;
+  if (record.version !== LOCAL_ACCESS_RECORD_VERSION) return null;
+  if (!isActiveAccessState(record.accessState)) return null;
+  if (typeof record.storedAt !== "string") return null;
+
+  return {
+    accessState: record.accessState,
+    storedAt: record.storedAt,
+    transactionKeys: normalizeTransactionKeys(record.transactionKeys),
+    isLegacy: false,
+  };
+}
+
+function localAccessRecordRejectedForUser(
+  record: ParsedLocalSubscriptionAccessRecord,
+  userId: string | null | undefined,
+): boolean {
+  if (!record.transactionKeys.length) return false;
+
+  const rejectedKeys = readRejectedTransactionKeys(userId);
+  return record.transactionKeys.some((key) => rejectedKeys.has(key));
+}
+
+function readLocalSubscriptionAccessRecord(
+  userId: string | null | undefined,
+): ParsedLocalSubscriptionAccessRecord | null {
   if (!userId) return null;
 
   const storage = getStorage();
@@ -118,8 +199,8 @@ export function readLocalSubscriptionAccess(userId: string | null | undefined): 
     const raw = storage.getItem(storageKey(userId));
     if (!raw) return null;
 
-    const parsed = JSON.parse(raw) as unknown;
-    if (isActiveAccessState(parsed)) {
+    const parsed = parseLocalSubscriptionAccessRecord(JSON.parse(raw));
+    if (parsed && !localAccessRecordRejectedForUser(parsed, userId)) {
       return parsed;
     }
 
@@ -135,9 +216,26 @@ export function readLocalSubscriptionAccess(userId: string | null | undefined): 
   }
 }
 
+export function readLocalSubscriptionAccess(userId: string | null | undefined): AccessState | null {
+  return readLocalSubscriptionAccessRecord(userId)?.accessState ?? null;
+}
+
+export function readFreshLocalSubscriptionAccess(userId: string | null | undefined): AccessState | null {
+  const record = readLocalSubscriptionAccessRecord(userId);
+  if (!record || record.isLegacy || !record.storedAt) return null;
+
+  const storedAtMs = new Date(record.storedAt).getTime();
+  if (Number.isNaN(storedAtMs)) return null;
+
+  return Date.now() - storedAtMs <= LOCAL_SUBSCRIPTION_ACTIVATION_GRACE_MS
+    ? record.accessState
+    : null;
+}
+
 export function rememberLocalSubscriptionAccess(
   userId: string | null | undefined,
   accessState: AccessState | null,
+  transaction?: StoreKitTransaction | null,
 ): void {
   if (!userId || !isActiveAccessState(accessState)) return;
 
@@ -145,7 +243,13 @@ export function rememberLocalSubscriptionAccess(
   if (!storage) return;
 
   try {
-    storage.setItem(storageKey(userId), JSON.stringify(accessState));
+    const record: LocalSubscriptionAccessRecord = {
+      version: LOCAL_ACCESS_RECORD_VERSION,
+      accessState,
+      storedAt: new Date().toISOString(),
+      transactionKeys: transactionKeys(transaction ?? null),
+    };
+    storage.setItem(storageKey(userId), JSON.stringify(record));
   } catch {
     // Local persistence is a best-effort backup. RevenueCat and the backend remain the sources of truth.
   }

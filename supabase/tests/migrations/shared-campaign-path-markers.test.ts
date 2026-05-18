@@ -14,10 +14,16 @@ Deno.test("shared campaign path marker migration scopes members, rituals, and pr
     "Expected migration to define the shared path marker RPC",
   );
   assert(
-    source.includes("CREATE POLICY \"Members can view joined epics\"") &&
-      source.includes("WHERE em.epic_id = epics.id") &&
-      source.includes("AND em.user_id = auth.uid()"),
-    "Expected joined campaign members to be able to read shared epics",
+    source.includes("CREATE OR REPLACE FUNCTION public.is_current_user_epic_member") &&
+      source.includes("SECURITY DEFINER") &&
+      source.includes("CREATE POLICY \"Members can view joined epics\"") &&
+      source.includes("USING (public.is_current_user_epic_member(epics.id))"),
+    "Expected joined campaign members to read shared epics without recursive RLS policy lookups",
+  );
+  assert(
+    source.includes("DROP CONSTRAINT IF EXISTS epic_milestones_epic_id_milestone_percent_key") &&
+      source.includes("UNIQUE (epic_id, user_id, milestone_percent)"),
+    "Expected epic milestone uniqueness to be scoped by user for copied member milestones",
   );
   assert(
     source.includes("RETURNS TABLE") &&
@@ -45,6 +51,11 @@ Deno.test("shared campaign path marker migration scopes members, rituals, and pr
     source.includes("CREATE OR REPLACE FUNCTION public.copy_shared_epic_planner_structure") &&
       source.includes("PERFORM public.copy_shared_epic_planner_structure"),
     "Expected join flow and backfill to copy user-scoped phases and milestones",
+  );
+  assert(
+    source.includes("INSERT INTO public.journey_phases") &&
+      source.includes("SELECT\n    source_phase.epic_id,\n    p_target_user_id,"),
+    "Expected phase copies to map source epic_id and target user_id in column order",
   );
   assert(
     source.includes("h.user_id = auth.uid()") &&

@@ -56,6 +56,9 @@ vi.mock("@revenuecat/purchases-capacitor", () => ({
   PRODUCT_CATEGORY: {
     SUBSCRIPTION: "SUBSCRIPTION",
   },
+  STOREKIT_VERSION: {
+    STOREKIT_2: "STOREKIT_2",
+  },
   Purchases: {
     addCustomerInfoUpdateListener: (...args: unknown[]) => mocks.addCustomerInfoUpdateListener(...args),
     configure: (...args: unknown[]) => mocks.configure(...args),
@@ -87,6 +90,12 @@ const Probe = () => {
       <span data-testid="storekit-loading">{String(storeKit.isLoading)}</span>
       <span data-testid="products-loading">{String(storeKit.productsLoading)}</span>
       <span data-testid="entitlement-error">{String(storeKit.entitlementError)}</span>
+      <span data-testid="entitlement-product">{storeKit.currentEntitlement?.productId ?? ""}</span>
+      <span data-testid="entitlement-app-token">{storeKit.currentEntitlement?.appAccountToken ?? ""}</span>
+      <span data-testid="entitlement-rc-original-user">
+        {storeKit.currentEntitlement?.revenueCatOriginalAppUserId ?? ""}
+      </span>
+      <span data-testid="entitlement-sandbox">{String(storeKit.currentEntitlement?.isSandbox)}</span>
       <span data-testid="product-count">{String(storeKit.products.length)}</span>
       <span data-testid="product-ids">{storeKit.products.map((product) => product.identifier).join(",")}</span>
     </div>
@@ -135,6 +144,68 @@ describe("StoreKitProvider", () => {
 
     expect(screen.getByTestId("storekit-loading")).toHaveTextContent("false");
     expect(screen.getByTestId("entitlement-error")).toHaveTextContent("true");
+  });
+
+  it("configures RevenueCat with StoreKit 2", async () => {
+    vi.useRealTimers();
+
+    render(
+      <StoreKitProvider>
+        <Probe />
+      </StoreKitProvider>,
+    );
+
+    await waitFor(() => {
+      expect(mocks.configure).toHaveBeenCalledWith(expect.objectContaining({
+        appUserID: "11111111-1111-4111-8111-111111111111",
+        storeKitVersion: "STOREKIT_2",
+      }));
+    });
+  });
+
+  it("maps RevenueCat sandbox metadata without treating originalAppUserId as Apple's app-account token", async () => {
+    vi.useRealTimers();
+    mocks.getCustomerInfo.mockResolvedValue({
+      customerInfo: {
+        ...inactiveCustomerInfo,
+        entitlements: {
+          active: {
+            cosmiq_pro: {
+              isActive: true,
+              productIdentifier: "cosmiq_premium_yearly",
+              latestPurchaseDate: "2026-05-18T12:00:00.000Z",
+              latestPurchaseDateMillis: 1779105600000,
+              expirationDate: "2099-01-01T00:00:00.000Z",
+              isSandbox: true,
+            },
+          },
+          all: {},
+        },
+        subscriptionsByProductIdentifier: {
+          cosmiq_premium_yearly: {
+            storeTransactionId: "store-tx-1",
+            purchaseDate: "2026-05-18T12:00:00.000Z",
+            expiresDate: "2099-01-01T00:00:00.000Z",
+            isSandbox: true,
+          },
+        },
+      },
+    });
+
+    render(
+      <StoreKitProvider>
+        <Probe />
+      </StoreKitProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("entitlement-product")).toHaveTextContent("cosmiq_premium_yearly");
+    });
+    expect(screen.getByTestId("entitlement-app-token")).toHaveTextContent("");
+    expect(screen.getByTestId("entitlement-rc-original-user")).toHaveTextContent(
+      "11111111-1111-4111-8111-111111111111",
+    );
+    expect(screen.getByTestId("entitlement-sandbox")).toHaveTextContent("true");
   });
 
   it("does not keep entitlement loading true while products are still loading", async () => {

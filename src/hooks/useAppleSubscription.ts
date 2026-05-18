@@ -209,11 +209,13 @@ export function useAppleSubscription() {
   ) => {
     if (!user?.id) return false;
 
-    const accessState = buildLocalSubscriptionAccessState(transaction, user.id, plan);
+    const accessState = buildLocalSubscriptionAccessState(transaction, user.id, plan, {
+      trustCurrentSession: true,
+    });
     if (!accessState) return false;
 
     queryClient.setQueryData(queryKeys.access.detail(user.id), accessState);
-    rememberLocalSubscriptionAccess(user.id, accessState);
+    rememberLocalSubscriptionAccess(user.id, accessState, transaction);
     return true;
   }, [queryClient, user?.id]);
 

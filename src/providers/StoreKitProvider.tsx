@@ -15,6 +15,7 @@ import {
   PAYWALL_RESULT,
   PRODUCT_CATEGORY,
   Purchases,
+  STOREKIT_VERSION,
   type CustomerInfo,
   type PurchasesEntitlementInfo,
   type PurchasesOfferings,
@@ -192,7 +193,8 @@ function customerInfoToTransaction(
     productId: entitlement.productIdentifier,
     purchaseDate: entitlement.latestPurchaseDate ?? subscription?.purchaseDate ?? customerInfo.requestDate,
     expirationDate: entitlement.expirationDate ?? subscription?.expiresDate ?? undefined,
-    appAccountToken: customerInfo.originalAppUserId,
+    revenueCatOriginalAppUserId: customerInfo.originalAppUserId,
+    isSandbox: entitlement.isSandbox ?? subscription?.isSandbox,
   };
 }
 
@@ -355,6 +357,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
             () => Purchases.configure({
               apiKey: REVENUECAT_IOS_API_KEY,
               appUserID: user.id,
+              storeKitVersion: STOREKIT_VERSION.STOREKIT_2,
             }),
             {
               timeoutMs: REVENUECAT_CONFIGURE_TIMEOUT_MS,

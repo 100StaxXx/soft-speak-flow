@@ -7,6 +7,7 @@ import { useStoreKit } from "./useStoreKit";
 import {
   buildLocalSubscriptionAccessState,
   clearLocalSubscriptionAccess,
+  readFreshLocalSubscriptionAccess,
   readLocalSubscriptionAccess,
   rememberRejectedLocalSubscriptionTransaction,
   storeKitTransactionMatchesUser,
@@ -80,15 +81,21 @@ export function useAccessState() {
     return buildLocalSubscriptionAccessState(currentEntitlement, user?.id, storeKitPlan);
   }, [currentEntitlement, sessionRejectedTransactionId, storeKitPlan, user?.id]);
 
-  const rememberedLocalAccessState = useMemo<AccessState | null>(() => (
-    readLocalSubscriptionAccess(user?.id)
-  ), [user?.id]);
+  const rememberedLocalAccessState = readLocalSubscriptionAccess(user?.id);
+  const freshLocalActivationAccessState = readFreshLocalSubscriptionAccess(user?.id);
 
+  const hasDifferentUserStoreKitEntitlement = Boolean(
+    currentEntitlement && !storeKitTransactionMatchesUser(currentEntitlement, user?.id),
+  );
+  const canUseFreshLocalActivationAccess = Boolean(
+    freshLocalActivationAccessState &&
+    !hasDifferentUserStoreKitEntitlement,
+  );
   const hasContradictoryStoreKitEntitlement = Boolean(
     currentEntitlement &&
     (
-      !storeKitTransactionMatchesUser(currentEntitlement, user?.id) ||
-      (!storeKitLoading && !currentStoreKitAccessState)
+      hasDifferentUserStoreKitEntitlement ||
+      (!storeKitLoading && !currentStoreKitAccessState && !canUseFreshLocalActivationAccess)
     ),
   );
   const canUseRememberedLocalAccess = Boolean(
@@ -114,6 +121,7 @@ export function useAccessState() {
         return response;
       } catch (error) {
         const localAccessState = currentStoreKitAccessState ??
+          (canUseFreshLocalActivationAccess ? freshLocalActivationAccessState : null) ??
           (canUseRememberedLocalAccess ? rememberedLocalAccessState : null);
         if (localAccessState) {
           return localAccessState;
@@ -128,22 +136,27 @@ export function useAccessState() {
 
   const backendHasInactiveSubscriptionAccess = isInactiveSubscriptionAccessState(query.data);
   const backendHasNeutralNoAccess = isNeutralNoAccessState(query.data);
+  const canUseFreshLocalActivationAccessForRender =
+    canUseFreshLocalActivationAccess && !backendHasInactiveSubscriptionAccess;
   const canUseRememberedLocalAccessForRender =
     canUseRememberedLocalAccess && !backendHasInactiveSubscriptionAccess;
   const graceAccessState =
     backendHasNeutralNoAccess
       ? currentStoreKitAccessState ??
+        (canUseFreshLocalActivationAccessForRender ? freshLocalActivationAccessState : null) ??
         (canUseRememberedLocalAccessForRender ? rememberedLocalAccessState : null)
       : null;
   const accessState =
     graceAccessState ??
     query.data ??
+    (canUseFreshLocalActivationAccessForRender ? freshLocalActivationAccessState : null) ??
     (canUseRememberedLocalAccessForRender ? rememberedLocalAccessState : null) ??
     DEFAULT_ACCESS_STATE;
   const waitingForStoreKitFallback =
     !!user &&
     !query.data?.subscribed &&
     !currentStoreKitAccessState &&
+    !canUseFreshLocalActivationAccessForRender &&
     !canUseRememberedLocalAccessForRender &&
     storeKitLoading;
 
@@ -153,6 +166,11 @@ export function useAccessState() {
       recoveryTimersRef.current = [];
     };
   }, []);
+
+  useEffect(() => {
+    if (!user?.id || !backendHasInactiveSubscriptionAccess) return;
+    clearLocalSubscriptionAccess(user.id);
+  }, [backendHasInactiveSubscriptionAccess, user?.id]);
 
   useEffect(() => {
     if (!user?.id || !backendHasNeutralNoAccess || !currentStoreKitAccessState) return;

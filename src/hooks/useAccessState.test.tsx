@@ -256,6 +256,7 @@ describe("useAccessState", () => {
         productId: "cosmiq_premium_monthly",
         expirationDate: "2099-01-01T00:00:00.000Z",
         transactionId: "tokenless-sandbox-tx",
+        isSandbox: true,
       } as typeof mocks.storeKit.currentEntitlement,
       expirationDate: null,
       entitlementError: false,
@@ -425,6 +426,87 @@ describe("useAccessState", () => {
         status: "active",
         plan: "yearly",
         subscription_end: "2099-01-01T00:00:00.000Z",
+      }),
+    );
+    mocks.storeKit = {
+      isPro: false,
+      activePlan: null,
+      currentEntitlement: null,
+      expirationDate: null,
+      entitlementError: false,
+      isLoading: false,
+    };
+
+    const { result } = renderHook(() => useAccessState(), { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.accessState).toMatchObject({
+      has_access: false,
+      access_source: "none",
+      subscribed: false,
+    });
+  });
+
+  it("uses fresh post-purchase local access over a neutral backend response after StoreKit finishes with no entitlement", async () => {
+    globalThis.localStorage.setItem(
+      "cosmiq.localSubscriptionAccess.v1.11111111-1111-4111-8111-111111111111",
+      JSON.stringify({
+        version: 2,
+        storedAt: new Date().toISOString(),
+        transactionKeys: ["fresh-original-tx", "fresh-current-tx"],
+        accessState: {
+          has_access: true,
+          access_source: "subscription",
+          trial_ends_at: null,
+          subscribed: true,
+          status: "active",
+          plan: "yearly",
+          subscription_end: "2099-01-01T00:00:00.000Z",
+        },
+      }),
+    );
+    mocks.storeKit = {
+      isPro: false,
+      activePlan: null,
+      currentEntitlement: null,
+      expirationDate: null,
+      entitlementError: false,
+      isLoading: false,
+    };
+
+    const { result } = renderHook(() => useAccessState(), { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.accessState).toMatchObject({
+      has_access: true,
+      access_source: "subscription",
+      subscribed: true,
+      plan: "yearly",
+    });
+  });
+
+  it("does not use stale post-purchase local access after StoreKit finishes with no entitlement", async () => {
+    globalThis.localStorage.setItem(
+      "cosmiq.localSubscriptionAccess.v1.11111111-1111-4111-8111-111111111111",
+      JSON.stringify({
+        version: 2,
+        storedAt: "2000-01-01T00:00:00.000Z",
+        transactionKeys: ["stale-original-tx", "stale-current-tx"],
+        accessState: {
+          has_access: true,
+          access_source: "subscription",
+          trial_ends_at: null,
+          subscribed: true,
+          status: "active",
+          plan: "yearly",
+          subscription_end: "2099-01-01T00:00:00.000Z",
+        },
       }),
     );
     mocks.storeKit = {

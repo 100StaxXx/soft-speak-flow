@@ -6,16 +6,37 @@ DROP POLICY IF EXISTS "Users can view own epic habits" ON public.epic_habits;
 DROP POLICY IF EXISTS "Users can insert own epic habits" ON public.epic_habits;
 DROP POLICY IF EXISTS "Users can delete own epic habits" ON public.epic_habits;
 
-CREATE POLICY "Members can view joined epics"
-  ON public.epics FOR SELECT
-  USING (
-    EXISTS (
+CREATE OR REPLACE FUNCTION public.is_current_user_epic_member(p_epic_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT auth.uid() IS NOT NULL
+    AND EXISTS (
       SELECT 1
       FROM public.epic_members em
-      WHERE em.epic_id = epics.id
+      WHERE em.epic_id = p_epic_id
         AND em.user_id = auth.uid()
-    )
-  );
+    );
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.is_current_user_epic_member(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.is_current_user_epic_member(uuid) TO authenticated;
+
+CREATE POLICY "Members can view joined epics"
+  ON public.epics FOR SELECT
+  USING (public.is_current_user_epic_member(epics.id));
+
+ALTER TABLE public.epic_milestones
+  DROP CONSTRAINT IF EXISTS epic_milestones_epic_id_milestone_percent_key;
+
+ALTER TABLE public.epic_milestones
+  DROP CONSTRAINT IF EXISTS epic_milestones_epic_user_percent_key;
+
+ALTER TABLE public.epic_milestones
+  ADD CONSTRAINT epic_milestones_epic_user_percent_key UNIQUE (epic_id, user_id, milestone_percent);
 
 CREATE POLICY "Users can view own epic habits"
   ON public.epic_habits FOR SELECT
@@ -25,12 +46,6 @@ CREATE POLICY "Users can view own epic habits"
       FROM public.habits h
       WHERE h.id = epic_habits.habit_id
         AND h.user_id = auth.uid()
-    )
-    OR EXISTS (
-      SELECT 1
-      FROM public.epics e
-      WHERE e.id = epic_habits.epic_id
-        AND e.user_id = auth.uid()
     )
   );
 
@@ -67,12 +82,6 @@ CREATE POLICY "Users can delete own epic habits"
       FROM public.habits h
       WHERE h.id = epic_habits.habit_id
         AND h.user_id = auth.uid()
-    )
-    OR EXISTS (
-      SELECT 1
-      FROM public.epics e
-      WHERE e.id = epic_habits.epic_id
-        AND e.user_id = auth.uid()
     )
   );
 

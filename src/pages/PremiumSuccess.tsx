@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Crown, CheckCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,40 +7,120 @@ import { useSubscription } from "@/hooks/useSubscription";
 import Confetti from "react-confetti";
 import { PREMIUM_BENEFITS } from "@/config/premiumBenefits";
 
+const CHECKOUT_SESSION_WEBHOOK_DELAY_MS = 2000;
+const ACTIVATION_RETRY_DELAYS_MS = [0, 1000, 2000, 4000] as const;
+
 export default function PremiumSuccess() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { refetch: refetchSubscription } = useSubscription();
-  const [showConfetti, setShowConfetti] = useState(true);
-  const [isVerifying, setIsVerifying] = useState(true);
+  const {
+    refetch: refetchSubscription,
+    isActive,
+    isLoading,
+  } = useSubscription();
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [hasCheckedActivation, setHasCheckedActivation] = useState(false);
+  const [activationTimedOut, setActivationTimedOut] = useState(false);
+  const activeRef = useRef(isActive);
 
   const sessionId = searchParams.get("session_id");
 
   useEffect(() => {
-    // Refetch profile and subscription to get updated premium status
-    const verifySubscription = async () => {
-      if (sessionId) {
-        // Wait a moment for webhook to process
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-      await refetchSubscription();
-      setIsVerifying(false);
-    };
+    activeRef.current = isActive;
+    if (isActive) {
+      setActivationTimedOut(false);
+    }
+  }, [isActive]);
 
-    verifySubscription();
+  useEffect(() => {
+    if (!isActive) return;
 
-    // Stop confetti after 5 seconds
+    setShowConfetti(true);
     const timer = setTimeout(() => setShowConfetti(false), 5000);
     return () => clearTimeout(timer);
+  }, [isActive]);
+
+  const checkActivation = useCallback(async () => {
+    setActivationTimedOut(false);
+    await refetchSubscription();
+    setHasCheckedActivation(true);
+    if (!activeRef.current) {
+      setActivationTimedOut(true);
+    }
+  }, [refetchSubscription]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
+    const wait = (delayMs: number) => new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, delayMs);
+      timers.push(timer);
+    });
+
+    const verifySubscription = async () => {
+      setHasCheckedActivation(false);
+      setActivationTimedOut(false);
+
+      if (sessionId) {
+        await wait(CHECKOUT_SESSION_WEBHOOK_DELAY_MS);
+      }
+
+      for (const delayMs of ACTIVATION_RETRY_DELAYS_MS) {
+        if (delayMs > 0) {
+          await wait(delayMs);
+        }
+        if (cancelled || activeRef.current) return;
+
+        await refetchSubscription();
+        if (cancelled || activeRef.current) return;
+
+        setHasCheckedActivation(true);
+      }
+
+      if (!cancelled && !activeRef.current) {
+        setActivationTimedOut(true);
+      }
+    };
+
+    void verifySubscription();
+
+    return () => {
+      cancelled = true;
+      timers.forEach((timer) => clearTimeout(timer));
+    };
   }, [sessionId, refetchSubscription]);
 
-  if (isVerifying) {
+  if (!isActive && (!activationTimedOut || isLoading || !hasCheckedActivation)) {
     return (
       <div className="min-h-screen pb-nav-safe bg-background flex items-center justify-center p-4">
         <Card className="p-8 text-center max-w-md">
           <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
           <h2 className="text-xl font-semibold mb-2">Activating your subscription...</h2>
           <p className="text-muted-foreground text-sm">This will only take a moment</p>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!isActive) {
+    return (
+      <div className="min-h-screen pb-nav-safe bg-background flex items-center justify-center p-4">
+        <Card className="p-8 text-center max-w-md">
+          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Still activating your subscription</h2>
+          <p className="text-muted-foreground text-sm mb-6">
+            Apple completed checkout, but your access is still syncing.
+          </p>
+
+          <div className="space-y-3">
+            <Button onClick={checkActivation} className="w-full">
+              Check Again
+            </Button>
+            <Button variant="outline" onClick={() => navigate("/profile")} className="w-full">
+              View Subscription Details
+            </Button>
+          </div>
         </Card>
       </div>
     );

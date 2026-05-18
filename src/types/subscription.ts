@@ -13,12 +13,14 @@ export interface StoreKitProduct {
 
 export interface StoreKitTransaction {
   transactionId: string;
-  originalTransactionId: string;
+  originalTransactionId?: string;
   productId: string;
   purchaseDate: string;
   expirationDate?: string;
   revocationDate?: string;
   appAccountToken?: string;
+  revenueCatOriginalAppUserId?: string;
+  isSandbox?: boolean;
   offerIdentifier?: string;
   offerType?: number;
   isUpgraded?: boolean;
