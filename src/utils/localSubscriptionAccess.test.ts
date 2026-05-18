@@ -71,6 +71,29 @@ describe("localSubscriptionAccess", () => {
     });
   });
 
+  it("can grant current-session activation grace before RevenueCat exposes expiration", () => {
+    const justPurchased = transaction({
+      appAccountToken: undefined,
+      isSandbox: false,
+      expirationDate: undefined,
+    });
+
+    expect(buildLocalSubscriptionAccessState(justPurchased, userId, "yearly", {
+      trustCurrentSession: true,
+      allowActivationGraceWithoutExpiration: true,
+    })).toMatchObject({
+      has_access: true,
+      subscribed: true,
+      plan: "yearly",
+      subscription_end: new Date(
+        new Date("2026-05-18T12:00:00.000Z").getTime() + LOCAL_SUBSCRIPTION_ACTIVATION_GRACE_MS,
+      ).toISOString(),
+    });
+    expect(buildLocalSubscriptionAccessState(justPurchased, userId, "yearly", {
+      trustCurrentSession: true,
+    })).toBeNull();
+  });
+
   it("allows tokenless sandbox transactions", () => {
     expect(buildLocalSubscriptionAccessState(transaction({
       appAccountToken: undefined,

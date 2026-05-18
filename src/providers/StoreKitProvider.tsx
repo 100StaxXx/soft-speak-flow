@@ -45,6 +45,12 @@ const COSMIQ_PRO_ENTITLEMENT_ALIASES = [
   COSMIQ_PRO_ENTITLEMENT_NAME,
 ] as const;
 
+type RevenueCatPurchaseTransaction = PurchasesStoreTransaction & {
+  productId?: string;
+  revenueCatId?: string;
+  purchaseDateMillis?: number;
+};
+
 type StoreKitPlan = "monthly" | "yearly";
 
 type StoreKitContextValue = {
@@ -195,6 +201,29 @@ function customerInfoToTransaction(
     expirationDate: entitlement.expirationDate ?? subscription?.expiresDate ?? undefined,
     revenueCatOriginalAppUserId: customerInfo.originalAppUserId,
     isSandbox: entitlement.isSandbox ?? subscription?.isSandbox,
+  };
+}
+
+function purchaseResultToTransaction(
+  productIdentifier: string,
+  customerInfo: CustomerInfo | null,
+  transaction?: PurchasesStoreTransaction | null,
+): StoreKitTransaction | null {
+  const entitlementTransaction = customerInfoToTransaction(customerInfo, transaction);
+  if (entitlementTransaction) return entitlementTransaction;
+  if (!transaction) return null;
+
+  const purchaseTransaction = transaction as RevenueCatPurchaseTransaction;
+  const transactionId = purchaseTransaction.transactionIdentifier || purchaseTransaction.revenueCatId;
+  const productId = purchaseTransaction.productIdentifier || purchaseTransaction.productId || productIdentifier;
+  if (!transactionId || !productId) return null;
+
+  return {
+    transactionId,
+    originalTransactionId: transactionId,
+    productId,
+    purchaseDate: purchaseTransaction.purchaseDate ?? customerInfo?.requestDate ?? new Date().toISOString(),
+    revenueCatOriginalAppUserId: customerInfo?.originalAppUserId,
   };
 }
 
@@ -478,7 +507,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
 
     applyCustomerInfo(result.customerInfo, result.transaction);
     setEntitlementError(false);
-    return customerInfoToTransaction(result.customerInfo, result.transaction);
+    return purchaseResultToTransaction(result.productIdentifier, result.customerInfo, result.transaction);
   }, [applyCustomerInfo, isAvailable, isConfigured]);
 
   const redeemOfferCode = useCallback(async () => {

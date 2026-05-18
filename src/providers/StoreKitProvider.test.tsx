@@ -1,4 +1,5 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -8,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   getCustomerInfo: vi.fn(),
   getOfferings: vi.fn(),
   getProducts: vi.fn(),
+  purchaseStoreProduct: vi.fn(),
   removeCustomerInfoUpdateListener: vi.fn(),
   setLogLevel: vi.fn(),
 }));
@@ -65,6 +67,7 @@ vi.mock("@revenuecat/purchases-capacitor", () => ({
     getCustomerInfo: (...args: unknown[]) => mocks.getCustomerInfo(...args),
     getOfferings: (...args: unknown[]) => mocks.getOfferings(...args),
     getProducts: (...args: unknown[]) => mocks.getProducts(...args),
+    purchaseStoreProduct: (...args: unknown[]) => mocks.purchaseStoreProduct(...args),
     removeCustomerInfoUpdateListener: (...args: unknown[]) => mocks.removeCustomerInfoUpdateListener(...args),
     setLogLevel: (...args: unknown[]) => mocks.setLogLevel(...args),
   },
@@ -84,6 +87,7 @@ const never = <T,>() => new Promise<T>(() => {});
 
 const Probe = () => {
   const storeKit = useStoreKitContext();
+  const [purchaseTransactionId, setPurchaseTransactionId] = useState("");
 
   return (
     <div>
@@ -98,6 +102,17 @@ const Probe = () => {
       <span data-testid="entitlement-sandbox">{String(storeKit.currentEntitlement?.isSandbox)}</span>
       <span data-testid="product-count">{String(storeKit.products.length)}</span>
       <span data-testid="product-ids">{storeKit.products.map((product) => product.identifier).join(",")}</span>
+      <span data-testid="purchase-transaction-id">{purchaseTransactionId}</span>
+      <button
+        type="button"
+        onClick={() => {
+          void storeKit.purchase("cosmiq_premium_yearly").then((transaction) => {
+            setPurchaseTransactionId(transaction?.transactionId ?? "");
+          });
+        }}
+      >
+        Purchase
+      </button>
     </div>
   );
 };
@@ -117,6 +132,15 @@ describe("StoreKitProvider", () => {
     mocks.getCustomerInfo.mockResolvedValue({ customerInfo: inactiveCustomerInfo });
     mocks.getOfferings.mockResolvedValue({ current: null, all: {} });
     mocks.getProducts.mockResolvedValue({ products: [] });
+    mocks.purchaseStoreProduct.mockResolvedValue({
+      productIdentifier: "cosmiq_premium_yearly",
+      customerInfo: inactiveCustomerInfo,
+      transaction: {
+        transactionIdentifier: "2000001171944416",
+        productId: "cosmiq_premium_yearly",
+        purchaseDate: "2026-05-18T00:23:39Z",
+      },
+    });
     mocks.removeCustomerInfoUpdateListener.mockResolvedValue({ wasRemoved: true });
     mocks.setLogLevel.mockResolvedValue(undefined);
   });
@@ -206,6 +230,40 @@ describe("StoreKitProvider", () => {
       "11111111-1111-4111-8111-111111111111",
     );
     expect(screen.getByTestId("entitlement-sandbox")).toHaveTextContent("true");
+  });
+
+  it("returns the raw purchase transaction when customer info has not hydrated the entitlement yet", async () => {
+    vi.useRealTimers();
+    mocks.getProducts.mockResolvedValue({
+      products: [
+        {
+          identifier: "cosmiq_premium_yearly",
+          title: "Cosmiq Pro Yearly",
+          description: "Yearly access",
+          price: 99.99,
+          priceString: "$99.99",
+          productType: "AUTO_RENEWABLE_SUBSCRIPTION",
+          subscriptionPeriod: "P1Y",
+        },
+      ],
+    });
+
+    render(
+      <StoreKitProvider>
+        <Probe />
+      </StoreKitProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("product-count")).toHaveTextContent("1");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Purchase" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("purchase-transaction-id")).toHaveTextContent("2000001171944416");
+    });
+    expect(mocks.purchaseStoreProduct).toHaveBeenCalled();
   });
 
   it("does not keep entitlement loading true while products are still loading", async () => {

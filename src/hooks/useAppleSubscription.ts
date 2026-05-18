@@ -211,6 +211,7 @@ export function useAppleSubscription() {
 
     const accessState = buildLocalSubscriptionAccessState(transaction, user.id, plan, {
       trustCurrentSession: true,
+      allowActivationGraceWithoutExpiration: true,
     });
     if (!accessState) return false;
 

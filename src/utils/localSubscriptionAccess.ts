@@ -23,6 +23,7 @@ type ParsedLocalSubscriptionAccessRecord = {
 
 type BuildLocalSubscriptionAccessStateOptions = {
   trustCurrentSession?: boolean;
+  allowActivationGraceWithoutExpiration?: boolean;
 };
 
 function normalizeToken(value: string | null | undefined): string | null {
@@ -112,11 +113,22 @@ export function buildLocalSubscriptionAccessState(
   if (!storeKitTransactionCanGrantLocalAccess(transaction, options)) return null;
 
   const subscriptionEnd = getActiveSubscriptionEnd(transaction);
-  if (!subscriptionEnd) return null;
+  if (
+    !subscriptionEnd &&
+    (
+      !options?.allowActivationGraceWithoutExpiration ||
+      transaction?.cancelled ||
+      transaction?.pending ||
+      transaction?.revocationDate
+    )
+  ) {
+    return null;
+  }
 
   const productPlan = resolvePlanFromProductId(transaction?.productId);
   const plan = planOverride ?? productPlan;
   if (!productPlan || !plan || plan !== productPlan) return null;
+  const fallbackSubscriptionEnd = new Date(Date.now() + LOCAL_SUBSCRIPTION_ACTIVATION_GRACE_MS).toISOString();
 
   return {
     has_access: true,
@@ -125,7 +137,7 @@ export function buildLocalSubscriptionAccessState(
     subscribed: true,
     status: "active",
     plan,
-    subscription_end: subscriptionEnd,
+    subscription_end: subscriptionEnd ?? fallbackSubscriptionEnd,
   };
 }
 

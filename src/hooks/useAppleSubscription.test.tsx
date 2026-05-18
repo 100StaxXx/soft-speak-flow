@@ -408,6 +408,42 @@ describe("useAppleSubscription", () => {
     )).toContain("2099-01-01T00:00:00.000Z");
   });
 
+  it("unlocks locally when RevenueCat returns a fresh purchase transaction before expiration is hydrated", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-18T00:23:39.000Z"));
+    try {
+      mocks.purchase.mockResolvedValueOnce({
+        productId: "cosmiq_premium_yearly",
+        transactionId: "2000001171944416",
+        purchaseDate: "2026-05-18T00:23:39Z",
+      });
+
+      const { result } = renderHook(() => useAppleSubscription());
+
+      let success: boolean | undefined;
+      await act(async () => {
+        success = await result.current.handlePurchase("cosmiq_premium_yearly");
+      });
+
+      expect(success).toBe(true);
+      expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
+        body: { transactionId: "2000001171944416" },
+      });
+      expect(mocks.setQueryData).toHaveBeenCalledWith(
+        ["access-state", "11111111-1111-4111-8111-111111111111"],
+        expect.objectContaining({
+          has_access: true,
+          access_source: "subscription",
+          subscribed: true,
+          plan: "yearly",
+          subscription_end: "2026-05-18T00:38:39.000Z",
+        }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("silently retries server verification after a deferred local unlock", async () => {
     vi.useFakeTimers();
     try {
