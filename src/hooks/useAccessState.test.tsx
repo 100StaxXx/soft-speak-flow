@@ -257,7 +257,7 @@ describe("useAccessState", () => {
         expirationDate: "2099-01-01T00:00:00.000Z",
         transactionId: "tokenless-sandbox-tx",
         isSandbox: true,
-      } as typeof mocks.storeKit.currentEntitlement,
+      } as unknown as typeof mocks.storeKit.currentEntitlement,
       expirationDate: null,
       entitlementError: false,
       isLoading: false,
@@ -295,7 +295,7 @@ describe("useAccessState", () => {
         transactionId: "conflict-current-tx",
         originalTransactionId: "conflict-original-tx",
         appAccountToken: "11111111-1111-4111-8111-111111111111",
-      } as typeof mocks.storeKit.currentEntitlement,
+      } as unknown as typeof mocks.storeKit.currentEntitlement,
       expirationDate: new Date("2099-01-01T00:00:00.000Z"),
       entitlementError: false,
       isLoading: false,
@@ -322,7 +322,7 @@ describe("useAccessState", () => {
         productId: "com.example.monthly.tip",
         expirationDate: "2099-01-01T00:00:00.000Z",
         transactionId: "unknown-product-tx",
-      } as typeof mocks.storeKit.currentEntitlement,
+      } as unknown as typeof mocks.storeKit.currentEntitlement,
       expirationDate: null,
       entitlementError: false,
       isLoading: false,
@@ -576,7 +576,7 @@ describe("useAccessState", () => {
     });
   });
 
-  it("does not let local StoreKit access override an explicit backend subscription revocation", async () => {
+  it("uses live StoreKit access over a stale inactive backend subscription while recovery verifies", async () => {
     mockSubscriptionCheck({
       has_access: false,
       access_source: "subscription",
@@ -593,6 +593,61 @@ describe("useAccessState", () => {
       expect(result.current.isLoading).toBe(false);
     });
 
+    expect(result.current.accessState).toMatchObject({
+      has_access: true,
+      access_source: "subscription",
+      subscribed: true,
+      status: "active",
+      plan: "yearly",
+    });
+    await waitFor(() => {
+      expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
+        body: { transactionId: "local-tx" },
+      });
+    });
+  });
+
+  it("rejects live StoreKit grace over inactive backend access when recovery finds an account binding conflict", async () => {
+    mocks.functionsInvoke.mockImplementation((functionName: string) => {
+      if (functionName === "check-apple-subscription") {
+        return Promise.resolve({
+          data: {
+            has_access: false,
+            access_source: "subscription",
+            trial_ends_at: null,
+            subscribed: false,
+            status: "cancelled",
+            plan: "yearly",
+            subscription_end: "2026-05-11T00:00:00.000Z",
+          },
+          error: null,
+        });
+      }
+
+      if (functionName === "verify-apple-receipt") {
+        return Promise.resolve({
+          data: null,
+          error: {
+            message: "Edge Function returned a non-2xx status code",
+            status: 403,
+            context: new Response(JSON.stringify({
+              error: "This purchase is already linked to another account.",
+              code: "APPLE_BINDING_CONFLICT",
+            }), { status: 403 }),
+          },
+        });
+      }
+
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const { result } = renderHook(() => useAccessState(), { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(globalThis.localStorage.getItem(
+        "cosmiq.rejectedLocalSubscriptionTransactions.v1.11111111-1111-4111-8111-111111111111",
+      )).toContain("local-tx");
+    });
     expect(result.current.accessState).toMatchObject({
       has_access: false,
       access_source: "subscription",

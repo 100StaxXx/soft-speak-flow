@@ -103,6 +103,7 @@ const mocks = vi.hoisted(() => ({
   lastDatePillSelectedDate: null as Date | null,
   lastDatePillCenterRequestKey: null as number | null,
   lastDatePillCenterRequestDateKey: null as string | null,
+  lastDatePillResetRangeOnCenterRequest: null as boolean | null,
   lastAddQuestSheetProps: null as null | {
     autoFillTimeOnFirstTap?: boolean;
     autoRestoreDraftOnOpen?: boolean;
@@ -240,12 +241,14 @@ vi.mock("@/components/DatePillsScroller", async () => {
       onDateSelect,
       centerRequestKey,
       centerRequestDateKey,
+      resetRangeOnCenterRequest,
       onUserDateInteraction,
     }: {
       selectedDate: Date;
       onDateSelect: (date: Date) => void;
       centerRequestKey?: number;
       centerRequestDateKey?: string;
+      resetRangeOnCenterRequest?: boolean;
       onUserDateInteraction?: () => void;
     }) => {
       const [mountId] = React.useState(() => {
@@ -255,12 +258,14 @@ vi.mock("@/components/DatePillsScroller", async () => {
       mocks.lastDatePillSelectedDate = selectedDate;
       mocks.lastDatePillCenterRequestKey = centerRequestKey ?? 0;
       mocks.lastDatePillCenterRequestDateKey = centerRequestDateKey ?? null;
+      mocks.lastDatePillResetRangeOnCenterRequest = resetRangeOnCenterRequest ?? false;
       return (
         <div data-testid="date-pills">
           <span data-testid="date-pills-mount-id">{mountId}</span>
           <span data-testid="selected-date-iso">{selectedDate.toISOString()}</span>
           <span data-testid="center-request-key">{centerRequestKey ?? 0}</span>
           <span data-testid="center-request-date-key">{centerRequestDateKey ?? ""}</span>
+          <span data-testid="reset-range-on-center-request">{String(resetRangeOnCenterRequest ?? false)}</span>
           <button
             type="button"
             onClick={() => {
@@ -792,6 +797,8 @@ describe("Journeys row drag integration", () => {
     mocks.draggableFabRenderCount = 0;
     mocks.lastDatePillSelectedDate = null;
     mocks.lastDatePillCenterRequestKey = null;
+    mocks.lastDatePillCenterRequestDateKey = null;
+    mocks.lastDatePillResetRangeOnCenterRequest = null;
     mocks.lastAddQuestSheetProps = null;
     mocks.lastCompanionPlannerModalProps = null;
     mocks.lastEditQuestDialogProps = null;
@@ -2237,6 +2244,7 @@ describe("Journeys row drag integration", () => {
       expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
       expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeResetRequest);
       expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
+      expect(screen.getByTestId("reset-range-on-center-request")).toHaveTextContent("true");
       expect(screen.getByTestId("date-pills-mount-id").textContent).toBe(scrollerMountIdBeforeResetRequest);
       expect(screen.getByTestId("journeys-mobile-date-strip")).not.toHaveStyle({ opacity: "0" });
     });
@@ -2324,6 +2332,7 @@ describe("Journeys row drag integration", () => {
       expect(screen.getByTestId("selected-date-iso").textContent).toBe(sameDaySelectedDateIso);
       expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeResetRequest);
       expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
+      expect(screen.getByTestId("reset-range-on-center-request")).toHaveTextContent("true");
       expect(elementScrollToSpy).toHaveBeenCalled();
     });
   });

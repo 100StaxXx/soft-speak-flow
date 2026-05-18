@@ -136,15 +136,16 @@ export function useAccessState() {
 
   const backendHasInactiveSubscriptionAccess = isInactiveSubscriptionAccessState(query.data);
   const backendHasNeutralNoAccess = isNeutralNoAccessState(query.data);
+  const backendHasRecoverableNoAccess = backendHasNeutralNoAccess || backendHasInactiveSubscriptionAccess;
   const canUseFreshLocalActivationAccessForRender =
     canUseFreshLocalActivationAccess && !backendHasInactiveSubscriptionAccess;
   const canUseRememberedLocalAccessForRender =
     canUseRememberedLocalAccess && !backendHasInactiveSubscriptionAccess;
   const graceAccessState =
-    backendHasNeutralNoAccess
+    backendHasRecoverableNoAccess
       ? currentStoreKitAccessState ??
-        (canUseFreshLocalActivationAccessForRender ? freshLocalActivationAccessState : null) ??
-        (canUseRememberedLocalAccessForRender ? rememberedLocalAccessState : null)
+        (backendHasNeutralNoAccess && canUseFreshLocalActivationAccessForRender ? freshLocalActivationAccessState : null) ??
+        (backendHasNeutralNoAccess && canUseRememberedLocalAccessForRender ? rememberedLocalAccessState : null)
       : null;
   const accessState =
     graceAccessState ??
@@ -173,7 +174,7 @@ export function useAccessState() {
   }, [backendHasInactiveSubscriptionAccess, user?.id]);
 
   useEffect(() => {
-    if (!user?.id || !backendHasNeutralNoAccess || !currentStoreKitAccessState) return;
+    if (!user?.id || !backendHasRecoverableNoAccess || !currentStoreKitAccessState) return;
 
     const transactionId = currentEntitlement?.transactionId?.trim();
     if (!transactionId) return;
@@ -239,7 +240,7 @@ export function useAccessState() {
       cancelled = true;
     };
   }, [
-    backendHasNeutralNoAccess,
+    backendHasRecoverableNoAccess,
     currentEntitlement,
     currentStoreKitAccessState,
     queryClient,

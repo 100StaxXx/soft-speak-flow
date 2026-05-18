@@ -234,6 +234,79 @@ describe("StoreKitProvider", () => {
     expect(screen.getByTestId("entitlement-sandbox")).toHaveTextContent("true");
   });
 
+  it("maps an active RevenueCat subscription when entitlement aliases are not present", async () => {
+    vi.useRealTimers();
+    mocks.getCustomerInfo.mockResolvedValue({
+      customerInfo: {
+        ...inactiveCustomerInfo,
+        activeSubscriptions: ["cosmiq_premium_yearly"],
+        entitlements: {
+          active: {},
+          all: {},
+        },
+        subscriptionsByProductIdentifier: {
+          cosmiq_premium_yearly: {
+            productIdentifier: "cosmiq_premium_yearly",
+            storeTransactionId: "subscription-tx-1",
+            purchaseDate: "2026-05-18T12:00:00.000Z",
+            expiresDate: "2099-01-01T00:00:00.000Z",
+            isActive: true,
+            isSandbox: true,
+          },
+        },
+      },
+    });
+
+    render(
+      <StoreKitProvider>
+        <Probe />
+      </StoreKitProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("entitlement-product")).toHaveTextContent("cosmiq_premium_yearly");
+    });
+    expect(screen.getByTestId("entitlement-sandbox")).toHaveTextContent("true");
+    expect(screen.getByTestId("entitlement-rc-original-user")).toHaveTextContent(
+      "11111111-1111-4111-8111-111111111111",
+    );
+  });
+
+  it("maps a legacy active RevenueCat subscription when entitlement aliases are not present", async () => {
+    vi.useRealTimers();
+    mocks.getCustomerInfo.mockResolvedValue({
+      customerInfo: {
+        ...inactiveCustomerInfo,
+        activeSubscriptions: ["com.darrylgraham.revolution.yearly"],
+        entitlements: {
+          active: {},
+          all: {},
+        },
+        subscriptionsByProductIdentifier: {
+          "com.darrylgraham.revolution.yearly": {
+            productIdentifier: "com.darrylgraham.revolution.yearly",
+            storeTransactionId: "legacy-subscription-tx-1",
+            purchaseDate: "2026-05-18T12:00:00.000Z",
+            expiresDate: "2099-01-01T00:00:00.000Z",
+            isActive: true,
+            isSandbox: true,
+          },
+        },
+      },
+    });
+
+    render(
+      <StoreKitProvider>
+        <Probe />
+      </StoreKitProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("entitlement-product")).toHaveTextContent("com.darrylgraham.revolution.yearly");
+    });
+    expect(screen.getByTestId("entitlement-sandbox")).toHaveTextContent("true");
+  });
+
   it("returns the raw purchase transaction when customer info has not hydrated the entitlement yet", async () => {
     vi.useRealTimers();
     mocks.getProducts.mockResolvedValue({

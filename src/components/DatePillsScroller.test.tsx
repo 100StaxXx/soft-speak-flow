@@ -951,6 +951,81 @@ describe("DatePillsScroller", () => {
     }
   });
 
+  it("discards an extended future range when a forced center request asks for a range reset", async () => {
+    const onDateSelect = vi.fn();
+    const scrollToSpy = vi.fn(function (this: HTMLElement, options?: ScrollToOptions) {
+      if (typeof options?.left === "number") {
+        this.scrollLeft = options.left;
+      }
+    });
+    const originalScrollTo = HTMLElement.prototype.scrollTo;
+
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true,
+      value: scrollToSpy,
+    });
+
+    try {
+      const selectedDate = new Date("2026-05-17T12:00:00");
+      const selectedDateKey = "2026-05-17";
+      const { rerender, container } = render(
+        <DatePillsScroller
+          selectedDate={selectedDate}
+          onDateSelect={onDateSelect}
+          daysToShow={7}
+          centerRequestKey={0}
+          centerRequestDateKey={selectedDateKey}
+        />,
+      );
+
+      const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
+      expect(scroller.querySelector("button[data-date-key='2026-05-24']")).toBeNull();
+
+      setScrollMetrics(scroller, { scrollLeft: 700, clientWidth: 320, scrollWidth: 1000 });
+      fireEvent.scroll(scroller);
+
+      await waitFor(() => {
+        expect(scroller.querySelector("button[data-date-key='2026-05-24']")).toBeTruthy();
+      });
+
+      const selectedButton = scroller.querySelector(`button[data-date-key='${selectedDateKey}']`) as HTMLButtonElement;
+      setCenteringMetrics(scroller, selectedButton, {
+        scrollLeft: 700,
+        scrollWidth: 1200,
+        containerWidth: 220,
+        selectedLeft: 360,
+        selectedWidth: 60,
+      });
+
+      scrollToSpy.mockClear();
+      rerender(
+        <DatePillsScroller
+          selectedDate={selectedDate}
+          onDateSelect={onDateSelect}
+          daysToShow={7}
+          centerRequestKey={1}
+          centerRequestDateKey={selectedDateKey}
+          resetRangeOnCenterRequest
+        />,
+      );
+
+      await waitFor(() => {
+        expect(scroller.querySelector("button[data-date-key='2026-05-24']")).toBeNull();
+      });
+      expect(scroller.querySelector("button[data-date-key='2026-05-14']")).toBeTruthy();
+      expect(scroller.querySelector("button[data-date-key='2026-05-20']")).toBeTruthy();
+
+      await waitFor(() => {
+        expect(scroller.scrollLeft).toBe(280);
+      });
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+        configurable: true,
+        value: originalScrollTo,
+      });
+    }
+  });
+
   it("ignores scroll events emitted by a forced center request", async () => {
     const onDateSelect = vi.fn();
     const scrollToSpy = vi.fn(function (this: HTMLElement, options?: ScrollToOptions) {

@@ -50,6 +50,11 @@ type RevenueCatPurchaseTransaction = PurchasesStoreTransaction & {
   revenueCatId?: string;
   purchaseDateMillis?: number;
 };
+type RevenueCatSubscriptionInfo = CustomerInfo["subscriptionsByProductIdentifier"][string];
+type ActiveCosmiqSubscription = {
+  productId: string;
+  subscription: RevenueCatSubscriptionInfo;
+};
 
 type StoreKitPlan = "monthly" | "yearly";
 
@@ -171,6 +176,41 @@ function activeCosmiqProEntitlement(customerInfo: CustomerInfo | null): Purchase
   return null;
 }
 
+function activeCosmiqProSubscription(
+  customerInfo: CustomerInfo | null,
+): ActiveCosmiqSubscription | null {
+  const subscriptions = customerInfo?.subscriptionsByProductIdentifier;
+  if (!subscriptions) return null;
+
+  const activeProductIds = new Set(customerInfo.activeSubscriptions ?? []);
+  const knownProductIds = new Set<string>(REVENUECAT_PRODUCT_IDS);
+  const productIds = [
+    ...REVENUECAT_PRODUCT_IDS,
+    ...Object.keys(subscriptions).filter((productId) => (
+      !knownProductIds.has(productId) && resolvePlanFromProductId(productId)
+    )),
+  ];
+
+  for (const productId of productIds) {
+    const subscription = subscriptions[productId];
+    if (!subscription) continue;
+
+    const expiresDate = subscription.expiresDate ? new Date(subscription.expiresDate) : null;
+    const hasFutureExpiration = Boolean(
+      expiresDate && !Number.isNaN(expiresDate.getTime()) && expiresDate > new Date(),
+    );
+
+    if (subscription.isActive || (activeProductIds.has(productId) && hasFutureExpiration)) {
+      return {
+        productId: subscription.productIdentifier ?? productId,
+        subscription,
+      };
+    }
+  }
+
+  return null;
+}
+
 function transactionIdFor(
   entitlement: PurchasesEntitlementInfo,
   subscription: CustomerInfo["subscriptionsByProductIdentifier"][string] | undefined,
@@ -188,7 +228,9 @@ function customerInfoToTransaction(
   transaction?: PurchasesStoreTransaction | null,
 ): StoreKitTransaction | null {
   const entitlement = activeCosmiqProEntitlement(customerInfo);
-  if (!customerInfo || !entitlement) return null;
+  if (!customerInfo || !entitlement) {
+    return activeSubscriptionToTransaction(customerInfo, transaction);
+  }
 
   const subscription = customerInfo.subscriptionsByProductIdentifier[entitlement.productIdentifier];
   const transactionId = transactionIdFor(entitlement, subscription, transaction);
@@ -204,6 +246,28 @@ function customerInfoToTransaction(
   };
 }
 
+function activeSubscriptionToTransaction(
+  customerInfo: CustomerInfo | null,
+  transaction?: PurchasesStoreTransaction | null,
+): StoreKitTransaction | null {
+  const activeSubscription = activeCosmiqProSubscription(customerInfo);
+  if (!customerInfo || !activeSubscription) return null;
+
+  const { productId, subscription } = activeSubscription;
+  const transactionId = transaction?.transactionIdentifier || subscription.storeTransactionId;
+  if (!transactionId || !productId) return null;
+
+  return {
+    transactionId,
+    originalTransactionId: subscription.storeTransactionId ?? transactionId,
+    productId,
+    purchaseDate: subscription.purchaseDate ?? customerInfo.requestDate,
+    expirationDate: subscription.expiresDate ?? undefined,
+    revenueCatOriginalAppUserId: customerInfo.originalAppUserId,
+    isSandbox: subscription.isSandbox,
+  };
+}
+
 function purchaseResultToTransaction(
   productIdentifier: string,
   customerInfo: CustomerInfo | null,
@@ -211,6 +275,7 @@ function purchaseResultToTransaction(
 ): StoreKitTransaction | null {
   const entitlementTransaction = customerInfoToTransaction(customerInfo, transaction);
   if (entitlementTransaction) return entitlementTransaction;
+
   if (!transaction) return null;
 
   const purchaseTransaction = transaction as RevenueCatPurchaseTransaction;

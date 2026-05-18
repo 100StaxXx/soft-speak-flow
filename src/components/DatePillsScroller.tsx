@@ -20,6 +20,7 @@ interface DatePillsScrollerProps {
   isActive?: boolean;
   centerRequestKey?: number;
   centerRequestDateKey?: string;
+  resetRangeOnCenterRequest?: boolean;
   onUserDateInteraction?: () => void;
 }
 
@@ -76,6 +77,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
   isActive = true,
   centerRequestKey = 0,
   centerRequestDateKey,
+  resetRangeOnCenterRequest = false,
   onUserDateInteraction,
 }: DatePillsScrollerProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -87,6 +89,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
   const isExpandingRef = useRef(false);
   const ignoreProgrammaticScrollRef = useRef(false);
   const releaseProgrammaticScrollFrameRef = useRef<number | null>(null);
+  const lastRangeResetCenterRequestSignatureRef = useRef<string | null>(null);
 
   const [rangeStart, setRangeStart] = useState<Date>(() => getInitialRange(selectedDate, daysToShow).start);
   const [rangeEnd, setRangeEnd] = useState<Date>(() => getInitialRange(selectedDate, daysToShow).end);
@@ -411,9 +414,26 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     const runCentering = (remainingAttempts: number) => {
       if (isCancelled) return;
 
-      if (isForcedCenterRequest && !getPillElementByDateKey(requestedCenterDateKey)) {
+      const forcedCenterRequestSignature = `${centerRequestKey}:${requestedCenterDateKey}`;
+      const shouldResetRangeForCenterRequest =
+        isForcedCenterRequest &&
+        resetRangeOnCenterRequest &&
+        lastRangeResetCenterRequestSignatureRef.current !== forcedCenterRequestSignature;
+
+      if (
+        isForcedCenterRequest &&
+        (shouldResetRangeForCenterRequest || !getPillElementByDateKey(requestedCenterDateKey))
+      ) {
         const container = scrollRef.current;
         ignoreNextForcedScrollEvents();
+        if (shouldResetRangeForCenterRequest) {
+          lastRangeResetCenterRequestSignatureRef.current = forcedCenterRequestSignature;
+          pendingLeftCompensationRef.current = null;
+          isExpandingRef.current = false;
+          if (container) {
+            container.scrollLeft = 0;
+          }
+        }
         if (resetRenderedRangeAroundDateKey(requestedCenterDateKey)) {
           if (container) {
             container.scrollLeft = 0;
@@ -466,6 +486,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     isActive,
     prefersReducedMotion,
     requestedCenterDateKey,
+    resetRangeOnCenterRequest,
     resetRenderedRangeAroundDateKey,
     selectedDateKey,
   ]);

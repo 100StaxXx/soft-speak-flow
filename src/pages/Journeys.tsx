@@ -1772,6 +1772,7 @@ const Journeys = () => {
                 isActive={isJourneysRouteActive}
                 centerRequestKey={datePillCenterRequestKey}
                 centerRequestDateKey={datePillCenterRequestDateKey}
+                resetRangeOnCenterRequest
               />
             </div>
           ) : null}
