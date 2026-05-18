@@ -53,7 +53,12 @@ export const DeepLinkProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    if ((data.type === 'auth_recovery' || data.type === 'calendar_oauth_callback') && data.path) {
+    if (
+      (data.type === 'auth_recovery' ||
+        data.type === 'calendar_oauth_callback' ||
+        data.type === 'join_epic') &&
+      data.path
+    ) {
       if (data.type === 'calendar_oauth_callback') {
         closeOAuthBrowser();
       }

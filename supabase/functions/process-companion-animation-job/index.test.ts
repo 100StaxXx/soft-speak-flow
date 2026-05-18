@@ -97,8 +97,10 @@ Deno.test("handleProcessCompanionAnimationJob returns a playable URL for termina
 
 const createSupabaseHarness = ({
   failEvolutionUpdates = false,
+  deviceTokens = [],
 }: {
   failEvolutionUpdates?: boolean;
+  deviceTokens?: Array<{ device_token: string }>;
 } = {}) => {
   const updates: Array<
     {
@@ -116,19 +118,47 @@ const createSupabaseHarness = ({
       options: Record<string, unknown>;
     }
   > = [];
+  const functionInvocations: Array<{
+    name: string;
+    options?: Record<string, unknown>;
+  }> = [];
 
   const supabase = {
-    from: (table: string) => ({
-      update: (payload: Record<string, unknown>) => ({
-        eq: async (column: string, value: unknown) => {
-          updates.push({ table, payload, column, value });
-          if (table === "companion_evolutions" && failEvolutionUpdates) {
-            return { error: new Error("evolution write failed") };
-          }
-          return { error: null };
-        },
-      }),
-    }),
+    from: (table: string) => {
+      if (table === "push_device_tokens") {
+        const chain = {
+          select: () => chain,
+          eq: () => chain,
+          then: (
+            onFulfilled: (value: unknown) => unknown,
+            onRejected?: (reason: unknown) => unknown,
+          ) =>
+            Promise.resolve({ data: deviceTokens, error: null }).then(
+              onFulfilled,
+              onRejected,
+            ),
+        };
+        return chain;
+      }
+
+      return {
+        update: (payload: Record<string, unknown>) => ({
+          eq: async (column: string, value: unknown) => {
+            updates.push({ table, payload, column, value });
+            if (table === "companion_evolutions" && failEvolutionUpdates) {
+              return { error: new Error("evolution write failed") };
+            }
+            return { error: null };
+          },
+        }),
+      };
+    },
+    functions: {
+      invoke: async (name: string, options?: Record<string, unknown>) => {
+        functionInvocations.push({ name, options });
+        return { data: null, error: null };
+      },
+    },
     storage: {
       from: (bucket: string) => ({
         upload: async (
@@ -149,7 +179,7 @@ const createSupabaseHarness = ({
     },
   };
 
-  return { supabase, updates, uploads };
+  return { supabase, updates, uploads, functionInvocations };
 };
 
 const createDeps = ({
@@ -183,6 +213,7 @@ const createDeps = ({
         if (name === "FAL_KLING_MODEL") {
           return "fal-ai/kling-video/v3/standard/image-to-video";
         }
+        if (name === "INTERNAL_FUNCTION_SECRET") return "internal-secret";
         return undefined;
       },
     },
@@ -196,7 +227,9 @@ const createDeps = ({
 };
 
 Deno.test("processClaimedCompanionAnimationJob submits a new fal queue request", async () => {
-  const { supabase, updates } = createSupabaseHarness();
+  const { supabase, updates, functionInvocations } = createSupabaseHarness({
+    deviceTokens: [{ device_token: "device-token-1" }],
+  });
   const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
   const { deps, costGuardrailCalls } = createDeps({
     fetchFn: ((url: string | URL | Request, init?: RequestInit) => {
@@ -234,10 +267,17 @@ Deno.test("processClaimedCompanionAnimationJob submits a new fal queue request",
       .animation_status,
     "processing",
   );
+  assertEquals(
+    functionInvocations.length,
+    0,
+    "Expected queued animation jobs not to send the evolution ready push",
+  );
 });
 
 Deno.test("processClaimedCompanionAnimationJob skips non-boundary stages before provider submission", async () => {
-  const { supabase, updates } = createSupabaseHarness();
+  const { supabase, updates, functionInvocations } = createSupabaseHarness({
+    deviceTokens: [{ device_token: "device-token-1" }],
+  });
   let providerCalled = false;
   const { deps, costGuardrailCalls } = createDeps({
     fetchFn: (() => {
@@ -269,6 +309,11 @@ Deno.test("processClaimedCompanionAnimationJob skips non-boundary stages before 
     updates.find((update) => update.table === "companion_animation_jobs")
       ?.payload.status,
     "failed",
+  );
+  assertEquals(
+    functionInvocations.length,
+    0,
+    "Expected skipped animation jobs not to send the evolution ready push",
   );
 });
 
@@ -427,7 +472,10 @@ Deno.test("handleProcessCompanionAnimationJob submits explicit queued jobs witho
 });
 
 Deno.test("processClaimedCompanionAnimationJob downloads, uploads, ledgers, and records a completed video", async () => {
-  const { supabase, updates, uploads } = createSupabaseHarness();
+  const { supabase, updates, uploads, functionInvocations } =
+    createSupabaseHarness({
+      deviceTokens: [{ device_token: "device-token-1" }],
+    });
   const { deps, ledgerCalls } = createDeps({
     fetchFn: ((url: string | URL | Request) => {
       const stringUrl = String(url);
@@ -475,6 +523,23 @@ Deno.test("processClaimedCompanionAnimationJob downloads, uploads, ledgers, and 
   assertEquals(
     evolutionUpdate?.payload.animation_video_url,
     resultRecord.videoUrl,
+  );
+  assertEquals(functionInvocations.length, 1);
+  assertEquals(functionInvocations[0]?.name, "send-apns-notification");
+  assertEquals(
+    (functionInvocations[0]?.options?.body as Record<string, unknown>)
+      ?.deviceToken,
+    "device-token-1",
+  );
+  assertEquals(
+    (functionInvocations[0]?.options?.body as Record<string, unknown>)
+      ?.title,
+    "Your companion evolved",
+  );
+  assertEquals(
+    ((functionInvocations[0]?.options?.body as Record<string, unknown>)
+      ?.data as Record<string, unknown>)?.type,
+    "companion_evolution_ready",
   );
 });
 

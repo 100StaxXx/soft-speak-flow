@@ -1,14 +1,17 @@
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { queryKeys } from "@/lib/queryKeys";
 import { useAuth } from "./useAuth";
 import { useStoreKit } from "./useStoreKit";
 import {
   buildLocalSubscriptionAccessState,
+  clearLocalSubscriptionAccess,
   readLocalSubscriptionAccess,
+  rememberRejectedLocalSubscriptionTransaction,
   storeKitTransactionMatchesUser,
 } from "@/utils/localSubscriptionAccess";
+import { parseFunctionInvokeError, type ParsedFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
 
 export type AccessSource = "subscription" | "promo_code" | "trial" | "manual" | "none";
 
@@ -28,13 +31,37 @@ const DEFAULT_ACCESS_STATE: AccessState = {
   trial_ends_at: null,
   subscribed: false,
 };
+const APPLE_BINDING_CONFLICT_CODE = "APPLE_BINDING_CONFLICT";
+const APPLE_BINDING_MISSING_CODE = "APPLE_BINDING_MISSING";
+const ACCESS_RECOVERY_RETRY_DELAYS_MS = [0, 5_000, 30_000, 120_000] as const;
 
 function isInactiveSubscriptionAccessState(accessState: AccessState | null | undefined): boolean {
   return accessState?.access_source === "subscription" && !accessState.subscribed;
 }
 
+function isNeutralNoAccessState(accessState: AccessState | null | undefined): boolean {
+  return Boolean(
+    accessState &&
+      accessState.access_source === "none" &&
+      !accessState.has_access &&
+      !accessState.subscribed,
+  );
+}
+
+function canRetryAccessRecovery(parsed: ParsedFunctionInvokeError): boolean {
+  if (parsed.code === APPLE_BINDING_MISSING_CODE) return true;
+  if (parsed.category === "network" || parsed.category === "relay") return true;
+  if (typeof parsed.status === "number" && parsed.status >= 500) return true;
+
+  return false;
+}
+
 export function useAccessState() {
   const { user, loading: authLoading } = useAuth();
+  const queryClient = useQueryClient();
+  const [sessionRejectedTransactionId, setSessionRejectedTransactionId] = useState<string | null>(null);
+  const recoveryTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const recoveryKeyRef = useRef<string | null>(null);
   const {
     activePlan: storeKitPlan,
     currentEntitlement,
@@ -43,8 +70,15 @@ export function useAccessState() {
   } = useStoreKit();
 
   const currentStoreKitAccessState = useMemo<AccessState | null>(() => {
+    if (
+      currentEntitlement?.transactionId &&
+      currentEntitlement.transactionId === sessionRejectedTransactionId
+    ) {
+      return null;
+    }
+
     return buildLocalSubscriptionAccessState(currentEntitlement, user?.id, storeKitPlan);
-  }, [currentEntitlement, storeKitPlan, user?.id]);
+  }, [currentEntitlement, sessionRejectedTransactionId, storeKitPlan, user?.id]);
 
   const rememberedLocalAccessState = useMemo<AccessState | null>(() => (
     readLocalSubscriptionAccess(user?.id)
@@ -93,9 +127,16 @@ export function useAccessState() {
   });
 
   const backendHasInactiveSubscriptionAccess = isInactiveSubscriptionAccessState(query.data);
+  const backendHasNeutralNoAccess = isNeutralNoAccessState(query.data);
   const canUseRememberedLocalAccessForRender =
     canUseRememberedLocalAccess && !backendHasInactiveSubscriptionAccess;
+  const graceAccessState =
+    backendHasNeutralNoAccess
+      ? currentStoreKitAccessState ??
+        (canUseRememberedLocalAccessForRender ? rememberedLocalAccessState : null)
+      : null;
   const accessState =
+    graceAccessState ??
     query.data ??
     (canUseRememberedLocalAccessForRender ? rememberedLocalAccessState : null) ??
     DEFAULT_ACCESS_STATE;
@@ -105,6 +146,87 @@ export function useAccessState() {
     !currentStoreKitAccessState &&
     !canUseRememberedLocalAccessForRender &&
     storeKitLoading;
+
+  useEffect(() => {
+    return () => {
+      recoveryTimersRef.current.forEach((timer) => clearTimeout(timer));
+      recoveryTimersRef.current = [];
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user?.id || !backendHasNeutralNoAccess || !currentStoreKitAccessState) return;
+
+    const transactionId = currentEntitlement?.transactionId?.trim();
+    if (!transactionId) return;
+
+    const recoveryKey = `${user.id}:${transactionId}`;
+    if (recoveryKeyRef.current === recoveryKey) return;
+    recoveryKeyRef.current = recoveryKey;
+
+    recoveryTimersRef.current.forEach((timer) => clearTimeout(timer));
+    recoveryTimersRef.current = [];
+    let cancelled = false;
+
+    const rejectLocalAccess = async () => {
+      clearLocalSubscriptionAccess(user.id);
+      rememberRejectedLocalSubscriptionTransaction(user.id, currentEntitlement);
+      setSessionRejectedTransactionId(transactionId);
+      queryClient.setQueryData(queryKeys.access.detail(user.id), DEFAULT_ACCESS_STATE);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.access.detail(user.id) });
+    };
+
+    ACCESS_RECOVERY_RETRY_DELAYS_MS.forEach((delayMs) => {
+      const timer = setTimeout(() => {
+        void (async () => {
+          if (cancelled) return;
+
+          const { data, error } = await supabase.functions.invoke("verify-apple-receipt", {
+            body: { transactionId },
+          });
+
+          if (cancelled) return;
+
+          if (!error && !(data as { error?: unknown } | null)?.error) {
+            recoveryTimersRef.current.forEach((pendingTimer) => clearTimeout(pendingTimer));
+            recoveryTimersRef.current = [];
+            await queryClient.invalidateQueries({ queryKey: queryKeys.access.detail(user.id) });
+            return;
+          }
+
+          const parsed = await parseFunctionInvokeError(
+            error ?? new Error(String((data as { error?: unknown })?.error ?? "Subscription verification failed")),
+          );
+
+          if (cancelled) return;
+
+          if (parsed.code === APPLE_BINDING_CONFLICT_CODE) {
+            recoveryTimersRef.current.forEach((pendingTimer) => clearTimeout(pendingTimer));
+            recoveryTimersRef.current = [];
+            await rejectLocalAccess();
+            return;
+          }
+
+          if (!canRetryAccessRecovery(parsed)) {
+            recoveryTimersRef.current.forEach((pendingTimer) => clearTimeout(pendingTimer));
+            recoveryTimersRef.current = [];
+          }
+        })();
+      }, delayMs);
+
+      recoveryTimersRef.current.push(timer);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    backendHasNeutralNoAccess,
+    currentEntitlement,
+    currentStoreKitAccessState,
+    queryClient,
+    user?.id,
+  ]);
 
   return {
     accessState,

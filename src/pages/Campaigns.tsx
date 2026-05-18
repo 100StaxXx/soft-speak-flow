@@ -57,6 +57,7 @@ const Campaigns = () => {
     [companionFavoriteColor],
   );
   const [showPathfinder, setShowPathfinder] = useState(false);
+  const [pathfinderSessionKey, setPathfinderSessionKey] = useState(0);
   const [pathfinderResumeDraft, setPathfinderResumeDraft] = useState<CampaignBuilderDraftSnapshot | null>(null);
   const [pathfinderResumeDraftKey, setPathfinderResumeDraftKey] = useState<string | null>(null);
   const [showPageInfo, setShowPageInfo] = useState(false);
@@ -68,10 +69,13 @@ const Campaigns = () => {
   const hasReachedLimit = hasReachedActiveCampaignLimit(activeEpics.length);
 
   const openCampaignBuilder = useCallback(() => {
+    clearCreationPopupMarker(user?.id, "campaign");
+    clearCampaignBuilderDraftSnapshot(user?.id);
     setPathfinderResumeDraft(null);
     setPathfinderResumeDraftKey(null);
+    setPathfinderSessionKey((currentKey) => currentKey + 1);
     setShowPathfinder(true);
-  }, []);
+  }, [user?.id]);
 
   const clearCampaignCreationPopupState = useCallback(() => {
     clearCreationPopupMarker(user?.id, "campaign");
@@ -105,6 +109,7 @@ const Campaigns = () => {
     const draft = readCampaignBuilderDraftSnapshot(user.id);
     setPathfinderResumeDraft(draft);
     setPathfinderResumeDraftKey(`resume-${marker.updatedAt}`);
+    setPathfinderSessionKey((currentKey) => currentKey + 1);
     setShowPathfinder(true);
   }, [isTabActive, showPathfinder, user?.id]);
 
@@ -272,6 +277,7 @@ const Campaigns = () => {
           </motion.div>
 
           <Pathfinder
+            key={pathfinderSessionKey}
             open={showPathfinder}
             onOpenChange={(open) => {
               setShowPathfinder(open);

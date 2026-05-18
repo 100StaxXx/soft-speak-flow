@@ -17,6 +17,7 @@ import { useJourneyPathImage } from "@/hooks/useJourneyPathImage";
 import { usePreloadedImageUrl } from "@/hooks/usePreloadedImageUrl";
 import { useMilestones } from "@/hooks/useMilestones";
 import { useCompanion } from "@/hooks/useCompanion";
+import { useSharedCampaignPathMarkers } from "@/hooks/useSharedCampaignPathMarkers";
 import { usePlannerPathfinderAppearance } from "@/hooks/usePlannerPathfinderAppearance";
 import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
 import { getJourneyPathDrawerImageUrl } from "@/utils/journeyPathUrls";
@@ -65,6 +66,7 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
   const { resolvedImageUrl: loadedDrawerImageUrl } = usePreloadedImageUrl(drawerImageUrl);
   const { milestones, totalCount } = useMilestones(epic.id);
   const { companion } = useCompanion();
+  const { markers: sharedPathMarkers } = useSharedCampaignPathMarkers(epic.id);
   const { themeModeClassName } = usePlannerPathfinderAppearance();
   const companionFrostedThemeStyle = useMemo(
     () => getCompanionFrostedThemeStyle(companion?.favorite_color),
@@ -133,6 +135,10 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
       chapter_number: m.chapter_number,
     }));
   }, [milestones]);
+  const trailCompanionMarkers = useMemo(
+    () => sharedPathMarkers.length > 0 ? sharedPathMarkers : undefined,
+    [sharedPathMarkers],
+  );
 
   return (
     <Drawer open={open} onOpenChange={setOpen} shouldScaleBackground={false} handleOnly={true}>
@@ -210,6 +216,7 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
                   companionImageFocalY={companion?.current_image_focal_y ?? null}
                   companionMood={companion?.current_mood}
                   showCompanion={true}
+                  companionMarkers={trailCompanionMarkers}
                   milestones={trailMilestones}
                   epicId={epic.id}
                   transparentBackground={!!loadedDrawerImageUrl}

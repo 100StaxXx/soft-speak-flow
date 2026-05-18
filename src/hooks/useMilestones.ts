@@ -308,6 +308,7 @@ export const useMilestones = (epicId?: string) => {
     },
     onSuccess: ({ milestone, onPostcardTrigger }) => {
       queryClient.invalidateQueries({ queryKey: ["milestones", epicId] });
+      queryClient.invalidateQueries({ queryKey: ["shared-campaign-path-markers", epicId] });
       queryClient.invalidateQueries({ queryKey: ["epics"] });
       
       toast.success(`Milestone completed: ${milestone.title}`);
@@ -341,6 +342,7 @@ export const useMilestones = (epicId?: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["milestones", epicId] });
+      queryClient.invalidateQueries({ queryKey: ["shared-campaign-path-markers", epicId] });
       queryClient.invalidateQueries({ queryKey: ["epics"] });
       toast.success("Milestone unmarked");
     },
@@ -399,6 +401,7 @@ export const useMilestones = (epicId?: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['milestones', epicId] });
+      queryClient.invalidateQueries({ queryKey: ['shared-campaign-path-markers', epicId] });
       queryClient.invalidateQueries({ queryKey: ['epics'] });
     },
     onError: (error) => {

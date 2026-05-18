@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   isNativePlatformMock: vi.fn(),
   getPlatformMock: vi.fn(),
   nativeShareMock: vi.fn(),
+  useSharedCampaignPathMarkersMock: vi.fn(),
 }));
 
 vi.mock("@capacitor/core", () => ({
@@ -125,6 +126,10 @@ vi.mock("@/hooks/useMilestones", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useSharedCampaignPathMarkers", () => ({
+  useSharedCampaignPathMarkers: (...args: unknown[]) => mocks.useSharedCampaignPathMarkersMock(...args),
+}));
+
 import { CampaignCard } from "./CampaignCard";
 
 const baseJourney = {
@@ -148,6 +153,8 @@ beforeEach(() => {
   mocks.getPlatformMock.mockReturnValue("web");
   mocks.nativeShareMock.mockReset();
   mocks.nativeShareMock.mockResolvedValue(undefined);
+  mocks.useSharedCampaignPathMarkersMock.mockReset();
+  mocks.useSharedCampaignPathMarkersMock.mockReturnValue({ markers: [] });
 });
 
 afterEach(() => {
@@ -320,10 +327,9 @@ describe("CampaignCard rename", () => {
     expect(mocks.nativeShareMock).not.toHaveBeenCalled();
   });
 
-  it("uses Capacitor Share with a hosted invite link on native platforms", async () => {
+  it("uses Capacitor Share with an app-only invite deep link on native platforms", async () => {
     mocks.isNativePlatformMock.mockReturnValue(true);
     mocks.getPlatformMock.mockReturnValue("ios");
-    vi.stubEnv("VITE_NATIVE_REDIRECT_BASE", "https://app.cosmiq.quest/");
     const webShareMock = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { share: webShareMock });
 
@@ -345,7 +351,7 @@ describe("CampaignCard rename", () => {
     expect(mocks.nativeShareMock).toHaveBeenCalledWith({
       title: "Join Campaign Alpha",
       text: 'Join my Cosmiq epic "Campaign Alpha" with invite code EPIC QUEST/1234.',
-      url: "https://app.cosmiq.quest/join/EPIC%20QUEST%2F1234",
+      url: "cosmiq://join/EPIC%20QUEST%2F1234",
       dialogTitle: "Share campaign invite",
     });
     expect(webShareMock).not.toHaveBeenCalled();

@@ -74,11 +74,17 @@ const makeInternalRequest = () =>
 
 const createFakeSupabaseFactory = ({
   job = queuedJob,
+  deviceTokens = [],
 }: {
   job?: FakeJob | null;
+  deviceTokens?: Array<{ device_token: string }>;
 }) => {
   const updates: Array<{ table: string; payload: Record<string, unknown> }> =
     [];
+  const functionInvocations: Array<{
+    name: string;
+    options?: Record<string, unknown>;
+  }> = [];
 
   const createClient = () => {
     const from = (table: string) => {
@@ -169,7 +175,7 @@ const createFakeSupabaseFactory = ({
         }
 
         if (table === "push_device_tokens") {
-          return { data: [], error: null };
+          return { data: deviceTokens, error: null };
         }
 
         return resolveMaybeSingle();
@@ -204,7 +210,10 @@ const createFakeSupabaseFactory = ({
     return {
       from,
       functions: {
-        invoke: async () => ({ data: null, error: null }),
+        invoke: async (name: string, options?: Record<string, unknown>) => {
+          functionInvocations.push({ name, options });
+          return { data: null, error: null };
+        },
       },
       rpc: async () => ({ data: null, error: null }),
       auth: {
@@ -216,11 +225,14 @@ const createFakeSupabaseFactory = ({
     };
   };
 
-  return { createClient, updates };
+  return { createClient, updates, functionInvocations };
 };
 
 Deno.test("process-companion-evolution-job internal scheduler claims and completes a queued job", async () => {
-  const fakeSupabase = createFakeSupabaseFactory({ job: queuedJob });
+  const fakeSupabase = createFakeSupabaseFactory({
+    job: queuedJob,
+    deviceTokens: [{ device_token: "device-token-1" }],
+  });
   const fetchCalls: Array<{ url: string; body: Record<string, unknown> }> = [];
   const animationEnqueueCalls: Array<Record<string, unknown>> = [];
 
@@ -322,6 +334,13 @@ Deno.test("process-companion-evolution-job internal scheduler claims and complet
     animationEnqueueCalls[0]?.element,
     "fire",
     "Expected animation enqueue to include companion element",
+  );
+  assertEquals(
+    fakeSupabase.functionInvocations.some((call) =>
+      call.name === "send-apns-notification"
+    ),
+    false,
+    "Expected evolution image worker not to send the ready push before animation completion",
   );
 });
 

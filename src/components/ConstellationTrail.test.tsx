@@ -165,6 +165,69 @@ describe("ConstellationTrail", () => {
     expect(screen.getAllByTestId("trail-branch-base-path").length).toBeGreaterThan(0);
   });
 
+  it("renders shared campaign companion markers with accessible labels and fallback art", () => {
+    render(
+      <ConstellationTrail
+        progress={48}
+        targetDays={45}
+        epicId="epic-shared"
+        companionMarkers={[
+          {
+            userId: "user-1",
+            displayName: "Aria",
+            progressPercentage: 64,
+            isCurrentUser: true,
+            companionImageUrl: "https://example.com/aria-companion.png",
+          },
+          {
+            userId: "user-2",
+            displayName: "Mira",
+            progressPercentage: 27,
+            companionImageUrl: null,
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /aria companion at 64% progress/i })).toBeInTheDocument();
+    expect(screen.getByAltText("Aria's companion")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /mira companion at 27% progress/i })).toBeInTheDocument();
+    expect(screen.getByAltText("Mira's companion")).toHaveAttribute("src", "/placeholder-companion.svg");
+  });
+
+  it("offsets overlapping shared companion markers so they remain separately targetable", () => {
+    render(
+      <ConstellationTrail
+        progress={48}
+        targetDays={45}
+        epicId="epic-overlap"
+        companionMarkers={[
+          {
+            userId: "user-1",
+            displayName: "Aria",
+            progressPercentage: 40,
+            isCurrentUser: true,
+            companionImageUrl: "https://example.com/aria-companion.png",
+          },
+          {
+            userId: "user-2",
+            displayName: "Mira",
+            progressPercentage: 40,
+            companionImageUrl: "https://example.com/mira-companion.png",
+          },
+        ]}
+      />,
+    );
+
+    const ariaMarker = screen.getByRole("button", { name: /aria companion at 40% progress/i });
+    const miraMarker = screen.getByRole("button", { name: /mira companion at 40% progress/i });
+
+    expect(ariaMarker).not.toHaveStyle({
+      left: miraMarker.style.left,
+      top: miraMarker.style.top,
+    });
+  });
+
   it("shows a static fallback immediately and keeps it visible while the path updates", () => {
     mocks.useJourneyPathImageMock.mockReturnValue({
       pathImageUrl: null,

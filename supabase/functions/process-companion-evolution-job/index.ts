@@ -566,56 +566,8 @@ const validateReferralStage3 = async (
   });
 };
 
-const sendCompletionPush = async (
-  supabase: SupabaseClientLike,
-  internalSecret: string | null,
-  userId: string,
-) => {
-  if (!internalSecret) {
-    console.warn(
-      "Skipping evolution completion push because INTERNAL_FUNCTION_SECRET is missing",
-      {
-        userId,
-      },
-    );
-    return;
-  }
-
-  const { data: deviceTokens } = await supabase
-    .from("push_device_tokens")
-    .select("device_token")
-    .eq("user_id", userId)
-    .eq("platform", "ios");
-
-  if (!deviceTokens?.length) {
-    return;
-  }
-
-  for (const token of deviceTokens) {
-    try {
-      await supabase.functions.invoke("send-apns-notification", {
-        body: {
-          deviceToken: token.device_token,
-          title: "Your companion evolved",
-          body: "Your companion is ready. Tap to see the new form.",
-          data: {
-            type: "companion_evolution_ready",
-            url: "/companion",
-          },
-        },
-        headers: {
-          "x-internal-key": internalSecret,
-        },
-      });
-    } catch (pushError) {
-      console.error("Failed to send evolution completion push", pushError);
-    }
-  }
-};
-
 const runNonCriticalSideEffects = async (
   supabase: SupabaseClientLike,
-  internalSecret: string | null,
   job: CompanionEvolutionJob,
   previousStage: number,
   newStage: number,
@@ -641,12 +593,6 @@ const runNonCriticalSideEffects = async (
     );
   } catch (error) {
     console.error("Referral validation side effect failed", error);
-  }
-
-  try {
-    await sendCompletionPush(supabase, internalSecret, job.user_id);
-  } catch (error) {
-    console.error("Push side effect failed", error);
   }
 };
 
@@ -924,7 +870,6 @@ export const handleProcessCompanionEvolutionJob = async (
 
     await runNonCriticalSideEffects(
       supabase,
-      internalSecret ?? null,
       claimedJob,
       previousStage,
       newStage,

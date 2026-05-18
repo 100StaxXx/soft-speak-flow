@@ -91,47 +91,19 @@ export default function SharedEpics() {
         throw new Error("You're already part of this guild!");
       }
 
-      // Join the epic as a member (not create a copy!)
-      const { error: memberError } = await supabase
-        .from('epic_members')
-        .insert({
-          epic_id: epicId,
-          user_id: user.id,
-        });
+      if (!epic.invite_code) {
+        throw new Error('This epic is missing an invite code');
+      }
 
-      if (memberError) throw memberError;
+      const { data: joinResultRows, error: joinError } = await supabase.rpc('join_epic_by_invite_code', {
+        p_invite_code: epic.invite_code,
+      });
 
-      // Copy habits to user's account and link to the ORIGINAL epic
-      if (epic.epic_habits && epic.epic_habits.length > 0) {
-        const habitsToCreate = epic.epic_habits.map((eh: { habit: { title: string; difficulty: string; frequency?: string; custom_days?: number[] | null; custom_month_days?: number[] | null } }) => ({
-          user_id: user.id,
-          title: eh.habit.title,
-          difficulty: eh.habit.difficulty,
-          frequency: eh.habit.frequency || 'daily',
-          custom_days: eh.habit.custom_days || null,
-          custom_month_days: eh.habit.custom_month_days || null,
-        }));
+      if (joinError) throw joinError;
 
-        const { data: newHabits, error: habitsError } = await supabase
-          .from('habits')
-          .insert(habitsToCreate)
-          .select();
-
-        if (habitsError) throw habitsError;
-
-        // Link new habits to the ORIGINAL epic (not a copy)
-        if (newHabits && newHabits.length > 0) {
-          const habitLinks = newHabits.map((habit: { id: string }) => ({
-            epic_id: epicId,
-            habit_id: habit.id,
-          }));
-
-          const { error: linkError } = await supabase
-            .from('epic_habits')
-            .insert(habitLinks);
-
-          if (linkError) throw linkError;
-        }
+      const joinResult = joinResultRows?.[0];
+      if (!joinResult?.success) {
+        throw new Error(joinResult?.message || 'Failed to join epic');
       }
 
       return epic;

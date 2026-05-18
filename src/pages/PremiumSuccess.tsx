@@ -22,9 +22,8 @@ export default function PremiumSuccess() {
       if (sessionId) {
         // Wait a moment for webhook to process
         await new Promise(resolve => setTimeout(resolve, 2000));
-
-        await refetchSubscription();
       }
+      await refetchSubscription();
       setIsVerifying(false);
     };
 

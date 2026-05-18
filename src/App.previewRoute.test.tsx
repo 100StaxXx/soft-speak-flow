@@ -117,7 +117,11 @@ vi.mock("@/hooks/useAuth", () => ({
 }));
 
 vi.mock("@/components/ProtectedRoute", () => ({
-  ProtectedRoute: passthroughProvider,
+  ProtectedRoute: ({ children, requireAccess = true }: { children?: ReactNode; requireAccess?: boolean }) => (
+    <div data-testid="protected-route" data-require-access={String(requireAccess)}>
+      {children}
+    </div>
+  ),
 }));
 
 vi.mock("@/components/ErrorBoundary", () => ({
@@ -244,6 +248,10 @@ vi.mock("./pages/NotFound", () => ({
   default: () => <div>Page Not Found</div>,
 }));
 
+vi.mock("./pages/PremiumSuccess", () => ({
+  default: () => <div>Premium Success Page</div>,
+}));
+
 import App from "./App";
 
 describe("App preview route", () => {
@@ -268,6 +276,18 @@ describe("App preview route", () => {
     render(<App />);
 
     expect(await screen.findByText("Page Not Found")).toBeInTheDocument();
+  });
+
+  it("renders premium success without requiring active access while activation syncs", async () => {
+    authMock.session = { user: { id: "user-1" } };
+    authMock.user = { id: "user-1" };
+    authMock.status = "authenticated";
+    window.history.pushState({}, "", "/premium/success");
+
+    render(<App />);
+
+    expect(await screen.findByText("Premium Success Page")).toBeInTheDocument();
+    expect(screen.getByTestId("protected-route")).toHaveAttribute("data-require-access", "false");
   });
 
   it("redirects legacy reflection routes to the canonical mentor reflection URL", async () => {

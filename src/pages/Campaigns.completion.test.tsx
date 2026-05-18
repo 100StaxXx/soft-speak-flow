@@ -1,6 +1,6 @@
 import type { HTMLAttributes, ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import type { Pathfinder } from "@/components/Pathfinder";
 
@@ -29,6 +29,11 @@ const mocks = vi.hoisted(() => ({
   },
   campaignDraft: null as null | { updatedAt: string; goalInput: string },
   lastPathfinderProps: null as null | ComponentProps<typeof Pathfinder>,
+  pathfinderMountCount: 0,
+  lastPathfinderMountId: null as number | null,
+  writeCreationPopupMarker: vi.fn(),
+  clearCreationPopupMarker: vi.fn(),
+  clearCampaignBuilderDraftSnapshot: vi.fn(),
 }));
 
 const createEpic = ({
@@ -80,12 +85,29 @@ vi.mock("@/components/CampaignCard", () => ({
   CampaignCard: () => <div data-testid="campaign-card" />,
 }));
 
-vi.mock("@/components/Pathfinder", () => ({
-  Pathfinder: (props: ComponentProps<typeof Pathfinder>) => {
-    mocks.lastPathfinderProps = props;
-    return <div data-testid="pathfinder" data-open={String(props.open)} />;
-  },
-}));
+vi.mock("@/components/Pathfinder", async () => {
+  const React = await import("react");
+
+  return {
+    Pathfinder: (props: ComponentProps<typeof Pathfinder>) => {
+      const mountIdRef = React.useRef<number | null>(null);
+
+      if (mountIdRef.current === null) {
+        mocks.pathfinderMountCount += 1;
+        mountIdRef.current = mocks.pathfinderMountCount;
+      }
+
+      mocks.lastPathfinderProps = props;
+      mocks.lastPathfinderMountId = mountIdRef.current;
+
+      return React.createElement("div", {
+        "data-testid": "pathfinder",
+        "data-open": String(props.open),
+        "data-mount-id": mountIdRef.current,
+      });
+    },
+  };
+});
 
 vi.mock("@/components/CampaignCreatedAnimation", () => ({
   CampaignCreatedAnimation: () => null,
@@ -112,9 +134,9 @@ vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
 vi.mock("@/utils/creationPopupPersistence", () => ({
   readCreationPopupMarker: () => mocks.creationMarker,
   readCampaignBuilderDraftSnapshot: () => mocks.campaignDraft,
-  writeCreationPopupMarker: vi.fn(),
-  clearCreationPopupMarker: vi.fn(),
-  clearCampaignBuilderDraftSnapshot: vi.fn(),
+  writeCreationPopupMarker: mocks.writeCreationPopupMarker,
+  clearCreationPopupMarker: mocks.clearCreationPopupMarker,
+  clearCampaignBuilderDraftSnapshot: mocks.clearCampaignBuilderDraftSnapshot,
 }));
 
 vi.mock("@/hooks/useEpics", () => ({
@@ -138,6 +160,11 @@ describe("Campaigns populated layout", () => {
     mocks.creationMarker = null;
     mocks.campaignDraft = null;
     mocks.lastPathfinderProps = null;
+    mocks.pathfinderMountCount = 0;
+    mocks.lastPathfinderMountId = null;
+    mocks.writeCreationPopupMarker.mockClear();
+    mocks.clearCreationPopupMarker.mockClear();
+    mocks.clearCampaignBuilderDraftSnapshot.mockClear();
   });
 
   it("places the create button inside the existing campaigns section above the active campaign cards", () => {
@@ -175,6 +202,30 @@ describe("Campaigns populated layout", () => {
     expect(screen.queryByTestId("campaigns-stat-active")).not.toBeInTheDocument();
     expect(screen.queryByTestId("campaigns-stat-completed")).not.toBeInTheDocument();
     expect(screen.queryByTestId("campaigns-stat-completion")).not.toBeInTheDocument();
+  });
+
+  it("opens a fresh Pathfinder session when the create campaign button is clicked", async () => {
+    mocks.activeEpics = [createEpic({ id: "active-1", status: "active", progress_percentage: 40 })];
+    mocks.campaignDraft = {
+      updatedAt: "2026-05-01T12:01:00.000Z",
+      goalInput: "Old campaign draft",
+    };
+
+    render(<Campaigns />);
+
+    const initialPathfinderMountId = mocks.lastPathfinderMountId;
+
+    fireEvent.click(screen.getByTestId("campaigns-create-button"));
+
+    await waitFor(() => {
+      expect(mocks.lastPathfinderProps?.open).toBe(true);
+    });
+
+    expect(mocks.clearCreationPopupMarker).toHaveBeenCalledWith("user-1", "campaign");
+    expect(mocks.clearCampaignBuilderDraftSnapshot).toHaveBeenCalledWith("user-1");
+    expect(mocks.lastPathfinderProps?.resumeDraft).toBeNull();
+    expect(mocks.lastPathfinderProps?.resumeDraftKey).toBeNull();
+    expect(mocks.lastPathfinderMountId).not.toBe(initialPathfinderMountId);
   });
 
   it("reopens Pathfinder with a stored campaign draft for the campaigns tab", async () => {

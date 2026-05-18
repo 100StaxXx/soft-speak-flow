@@ -28,12 +28,19 @@ describe("epicInviteShare", () => {
     );
   });
 
-  it("builds invite links from the native redirect base on native platforms", () => {
+  it("builds app-only invite deep links on native platforms", () => {
     capacitorMocks.isNativePlatform.mockReturnValue(true);
-    vi.stubEnv("VITE_NATIVE_REDIRECT_BASE", "https://app.cosmiq.quest/");
 
     expect(buildEpicInviteLink("EPIC-QUEST-1234")).toBe(
-      "https://app.cosmiq.quest/join/EPIC-QUEST-1234",
+      "cosmiq://join/EPIC-QUEST-1234",
+    );
+  });
+
+  it("trims and URL-encodes native invite deep links", () => {
+    capacitorMocks.isNativePlatform.mockReturnValue(true);
+
+    expect(buildEpicInviteLink(" EPIC QUEST/1234 ")).toBe(
+      "cosmiq://join/EPIC%20QUEST%2F1234",
     );
   });
 

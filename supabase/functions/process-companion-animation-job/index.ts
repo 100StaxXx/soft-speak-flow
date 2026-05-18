@@ -265,6 +265,96 @@ const updateJob = async (
   }
 };
 
+const sendEvolutionReadyPush = async ({
+  supabase,
+  job,
+  videoUrl,
+  deps,
+}: {
+  supabase: SupabaseServiceClient;
+  job: CompanionAnimationJob;
+  videoUrl: string;
+  deps: ProcessCompanionAnimationJobDeps;
+}) => {
+  const internalSecret = deps.env.get("INTERNAL_FUNCTION_SECRET")?.trim();
+  if (!internalSecret) {
+    deps.warn(
+      "Skipping evolution ready push because INTERNAL_FUNCTION_SECRET is missing",
+      {
+        userId: job.user_id,
+        companionId: job.companion_id,
+        evolutionId: job.evolution_id,
+      },
+    );
+    return;
+  }
+
+  const invoke = supabase.functions?.invoke?.bind(supabase.functions);
+  if (typeof invoke !== "function") {
+    deps.warn("Skipping evolution ready push because functions.invoke is unavailable", {
+      userId: job.user_id,
+      companionId: job.companion_id,
+      evolutionId: job.evolution_id,
+    });
+    return;
+  }
+
+  const { data: deviceTokens, error } = await supabase
+    .from("push_device_tokens")
+    .select("device_token")
+    .eq("user_id", job.user_id)
+    .eq("platform", "ios");
+
+  if (error) {
+    deps.warn("Failed to load device tokens for evolution ready push", {
+      userId: job.user_id,
+      companionId: job.companion_id,
+      evolutionId: job.evolution_id,
+      error: error.message ?? String(error),
+    });
+    return;
+  }
+
+  if (!deviceTokens?.length) {
+    return;
+  }
+
+  for (const token of deviceTokens) {
+    const deviceToken = typeof token?.device_token === "string"
+      ? token.device_token
+      : null;
+    if (!deviceToken) continue;
+
+    try {
+      await invoke("send-apns-notification", {
+        body: {
+          deviceToken,
+          title: "Your companion evolved",
+          body: "Your companion is ready. Tap to see the new form.",
+          data: {
+            type: "companion_evolution_ready",
+            url: "/companion",
+            companion_id: job.companion_id,
+            evolution_id: job.evolution_id,
+            stage: job.stage,
+            animation_video_url: videoUrl,
+          },
+        },
+        headers: {
+          "x-internal-key": internalSecret,
+        },
+      });
+    } catch (pushError) {
+      deps.warn("Failed to send evolution ready push", {
+        userId: job.user_id,
+        companionId: job.companion_id,
+        evolutionId: job.evolution_id,
+        error: pushError instanceof Error ? pushError.message : String(pushError),
+      });
+    }
+  }
+};
+
 const fetchSucceededEvolutionAnimation = async (
   supabase: SupabaseServiceClient,
   evolutionId: string,
@@ -713,6 +803,12 @@ export const processClaimedCompanionAnimationJob = async ({
     error_code: null,
     error_message: null,
     updated_at: toIso(now),
+  });
+  await sendEvolutionReadyPush({
+    supabase,
+    job,
+    videoUrl: uploadedVideo.publicUrl,
+    deps,
   });
 
   return {

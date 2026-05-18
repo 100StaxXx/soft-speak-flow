@@ -25,6 +25,24 @@ describe("parseDeepLink", () => {
     });
   });
 
+  it("parses app-only epic invite deep links", () => {
+    const parsed = parseDeepLink("cosmiq://join/EPIC-QUEST-1234");
+    expect(parsed).toEqual({
+      type: "join_epic",
+      path: "/join/EPIC-QUEST-1234",
+      rawUrl: "cosmiq://join/EPIC-QUEST-1234",
+    });
+  });
+
+  it("preserves encoded epic invite codes in app-only deep links", () => {
+    const parsed = parseDeepLink("cosmiq://join/EPIC%20QUEST%2F1234");
+    expect(parsed).toEqual({
+      type: "join_epic",
+      path: "/join/EPIC%20QUEST%2F1234",
+      rawUrl: "cosmiq://join/EPIC%20QUEST%2F1234",
+    });
+  });
+
   it("parses hosted auth recovery links", () => {
     const parsed = parseDeepLink(
       "https://app.cosmiq.quest/auth/reset-password#access_token=token&refresh_token=refresh&type=recovery",

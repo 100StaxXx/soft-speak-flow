@@ -27,6 +27,19 @@ interface TrailMilestone {
   chapter_number?: number | null;
 }
 
+export interface TrailCompanionMarker {
+  id?: string;
+  userId: string;
+  displayName: string;
+  progressPercentage: number;
+  isCurrentUser?: boolean;
+  isOwner?: boolean;
+  companionImageUrl?: string | null;
+  companionImageFocalX?: number | null;
+  companionImageFocalY?: number | null;
+  companionMood?: string | null;
+}
+
 interface ConstellationTrailProps {
   progress: number; // 0-100
   targetDays: number;
@@ -36,6 +49,7 @@ interface ConstellationTrailProps {
   companionImageFocalY?: number | null;
   companionMood?: string;
   showCompanion?: boolean;
+  companionMarkers?: TrailCompanionMarker[];
   milestones?: TrailMilestone[]; // Actual milestones from database
   epicId?: string; // For fetching journey path background
   transparentBackground?: boolean; // Skip background when parent handles path image
@@ -67,6 +81,12 @@ interface TrailRouteModel {
   decorativeBranches: TrailBranchSegment[];
 }
 
+interface PlacedCompanionMarker extends TrailCompanionMarker {
+  positionX: number;
+  positionY: number;
+  markerIndex: number;
+}
+
 const hashString = (value: string) => {
   let hash = 0;
   for (let index = 0; index < value.length; index += 1) {
@@ -77,6 +97,7 @@ const hashString = (value: string) => {
 };
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+const clampProgress = (value: number) => clamp(Number.isFinite(value) ? value : 0, 0, 100);
 
 // Generate star positions along a constellation-like path with wave pattern
 const generateStarPositions = (count: number) => {
@@ -916,6 +937,193 @@ const getMoodStyles = (mood?: string) => {
   }
 };
 
+const getFallbackCompanionMarker = ({
+  progress,
+  companionImageUrl,
+  companionImageFocalX,
+  companionImageFocalY,
+  companionMood,
+}: {
+  progress: number;
+  companionImageUrl?: string;
+  companionImageFocalX?: number | null;
+  companionImageFocalY?: number | null;
+  companionMood?: string;
+}): TrailCompanionMarker | null => {
+  if (!companionImageUrl) return null;
+
+  return {
+    id: "current-companion",
+    userId: "current-user",
+    displayName: "Companion",
+    progressPercentage: progress,
+    isCurrentUser: true,
+    companionImageUrl,
+    companionImageFocalX,
+    companionImageFocalY,
+    companionMood,
+  };
+};
+
+const buildCompanionMarkerPlacements = (
+  markers: TrailCompanionMarker[],
+  starPositions: Array<Pick<TrailPoint, "x" | "y">>,
+): PlacedCompanionMarker[] => {
+  const groupedMarkers = new Map<string, Array<TrailCompanionMarker & { baseX: number; baseY: number; originalIndex: number }>>();
+
+  markers.forEach((marker, originalIndex) => {
+    const progressPercentage = clampProgress(marker.progressPercentage);
+    const position = getPositionOnPath(progressPercentage, starPositions);
+    const bucketKey = `${Math.round(position.x / 3)}:${Math.round(position.y / 3)}`;
+
+    if (!groupedMarkers.has(bucketKey)) {
+      groupedMarkers.set(bucketKey, []);
+    }
+
+    groupedMarkers.get(bucketKey)?.push({
+      ...marker,
+      progressPercentage,
+      baseX: position.x,
+      baseY: position.y,
+      originalIndex,
+    });
+  });
+
+  return [...groupedMarkers.values()]
+    .flatMap((group) => {
+      const orderedGroup = group.slice().sort((left, right) => {
+        if (left.isCurrentUser !== right.isCurrentUser) {
+          return left.isCurrentUser ? 1 : -1;
+        }
+        return left.originalIndex - right.originalIndex;
+      });
+
+      return orderedGroup.map((marker, markerIndex) => {
+        const hasCluster = orderedGroup.length > 1;
+        const radius = hasCluster ? 3.2 + Math.min(orderedGroup.length, 5) * 0.45 : 0;
+        const angle = hasCluster
+          ? ((markerIndex / orderedGroup.length) * Math.PI * 2) - (Math.PI / 2)
+          : 0;
+
+        return {
+          ...marker,
+          markerIndex,
+          positionX: clamp(marker.baseX + Math.cos(angle) * radius, 5, 95),
+          positionY: clamp(marker.baseY + Math.sin(angle) * radius, 8, 88),
+        };
+      });
+    })
+    .sort((left, right) => {
+      if (left.isCurrentUser !== right.isCurrentUser) {
+        return left.isCurrentUser ? 1 : -1;
+      }
+      return left.originalIndex - right.originalIndex;
+    });
+};
+
+const CompanionTrailMarker = ({ marker }: { marker: PlacedCompanionMarker }) => {
+  const imageUrl = marker.companionImageUrl || "/placeholder-companion.svg";
+  const usesContainedCompanionScene = shouldContainCompanionSceneImage(imageUrl);
+  const progressLabel = `${Math.round(clampProgress(marker.progressPercentage))}%`;
+  const altText = marker.displayName === "Companion"
+    ? "Companion"
+    : `${marker.displayName}'s companion`;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <motion.button
+          type="button"
+          className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+          style={{
+            left: `${marker.positionX}%`,
+            top: `${marker.positionY}%`,
+            zIndex: marker.isCurrentUser ? 34 : 24 + marker.markerIndex,
+          }}
+          title={`${marker.displayName}: ${progressLabel} complete`}
+          aria-label={`${marker.displayName} companion at ${progressLabel} progress`}
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{
+            scale: 1,
+            opacity: 1,
+            y: [0, marker.isCurrentUser ? -4 : -2, 0],
+          }}
+          transition={{
+            scale: { duration: 0.5 },
+            opacity: { duration: 0.5 },
+            y: { duration: marker.isCurrentUser ? 2 : 2.4, repeat: Infinity, ease: "easeInOut" },
+          }}
+        >
+          <motion.div
+            className={cn(
+              "absolute inset-0 rounded-full",
+              marker.isCurrentUser ? "bg-primary/45" : "bg-white/28",
+            )}
+            style={{
+              width: marker.isCurrentUser ? 42 : 36,
+              height: marker.isCurrentUser ? 42 : 36,
+              marginLeft: marker.isCurrentUser ? -5 : -4,
+              marginTop: marker.isCurrentUser ? -5 : -4,
+              filter: "blur(7px)",
+            }}
+            animate={{
+              scale: [1, 1.2, 1],
+              opacity: marker.isCurrentUser ? [0.45, 0.75, 0.45] : [0.25, 0.45, 0.25],
+            }}
+            transition={{
+              duration: marker.isCurrentUser ? 2 : 2.6,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
+
+          <span
+            className={cn(
+              "relative flex rounded-full overflow-hidden shadow-lg",
+              marker.isCurrentUser
+                ? "h-8 w-8 border-[3px] border-primary ring-2 ring-primary/35"
+                : "h-7 w-7 border-2 border-white/75 ring-1 ring-slate-950/35",
+              usesContainedCompanionScene ? "bg-black" : "bg-background",
+              getMoodStyles(marker.companionMood ?? undefined),
+            )}
+          >
+            <CompanionImage
+              src={imageUrl}
+              alt={altText}
+              fit={usesContainedCompanionScene ? "contain" : "cover"}
+              focalX={marker.companionImageFocalX}
+              focalY={marker.companionImageFocalY}
+              className="h-full w-full"
+            />
+          </span>
+        </motion.button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-auto min-w-36 border-white/15 bg-slate-950/92 p-3 text-white shadow-xl backdrop-blur-xl"
+        sideOffset={10}
+        collisionPadding={{ top: 48, bottom: 48, left: 12, right: 12 }}
+      >
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <p className="max-w-40 truncate text-sm font-semibold leading-none">{marker.displayName}</p>
+            {marker.isCurrentUser && (
+              <span className="rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                You
+              </span>
+            )}
+            {marker.isOwner && !marker.isCurrentUser && (
+              <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-white/70">
+                Owner
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-white/70">{progressLabel} complete</p>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 export const ConstellationTrail = memo(function ConstellationTrail({ 
   progress, 
   targetDays: _targetDays,
@@ -925,6 +1133,7 @@ export const ConstellationTrail = memo(function ConstellationTrail({
   companionImageFocalY,
   companionMood,
   showCompanion = true,
+  companionMarkers,
   milestones: propMilestones,
   epicId,
   transparentBackground = false
@@ -963,7 +1172,38 @@ export const ConstellationTrail = memo(function ConstellationTrail({
   
   const starPositions = useMemo(() => generateStarPositions(sortedMilestones.length), [sortedMilestones.length]);
   const routeModel = useMemo(() => buildTrailRouteModel(starPositions), [starPositions]);
-  const usesContainedCompanionScene = shouldContainCompanionSceneImage(companionImageUrl);
+  const resolvedCompanionMarkers = useMemo(() => {
+    if (!showCompanion) return [];
+    if (companionMarkers && companionMarkers.length > 0) {
+      return companionMarkers.map((marker) => ({
+        ...marker,
+        displayName: marker.displayName?.trim() || "Adventurer",
+        progressPercentage: clampProgress(marker.progressPercentage),
+      }));
+    }
+
+    const fallbackMarker = getFallbackCompanionMarker({
+      progress,
+      companionImageUrl,
+      companionImageFocalX,
+      companionImageFocalY,
+      companionMood,
+    });
+
+    return fallbackMarker ? [fallbackMarker] : [];
+  }, [
+    companionImageFocalX,
+    companionImageFocalY,
+    companionImageUrl,
+    companionMarkers,
+    companionMood,
+    progress,
+    showCompanion,
+  ]);
+  const companionMarkerPlacements = useMemo(
+    () => buildCompanionMarkerPlacements(resolvedCompanionMarkers, starPositions),
+    [resolvedCompanionMarkers, starPositions],
+  );
   
   const bgStars = useMemo(() => {
     const seededRandom = (seed: number) => {
@@ -1292,64 +1532,13 @@ export const ConstellationTrail = memo(function ConstellationTrail({
         />
       ))}
 
-      {/* Companion Avatar on Trail */}
-      {showCompanion && companionImageUrl && (
-        <motion.div
-          className="absolute transform -translate-x-1/2 -translate-y-1/2 z-20"
-          style={{
-            left: `${getPositionOnPath(progress, starPositions).x}%`,
-            top: `${getPositionOnPath(progress, starPositions).y}%`,
-          }}
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ 
-            scale: 1, 
-            opacity: 1,
-            y: [0, -4, 0],
-          }}
-          transition={{
-            scale: { duration: 0.5 },
-            opacity: { duration: 0.5 },
-            y: { duration: 2, repeat: Infinity, ease: "easeInOut" }
-          }}
-        >
-          <motion.div
-            className="absolute inset-0 rounded-full bg-primary/40"
-            style={{
-              width: 36,
-              height: 36,
-              marginLeft: -4,
-              marginTop: -4,
-              filter: "blur(6px)",
-            }}
-            animate={{
-              scale: [1, 1.2, 1],
-              opacity: [0.4, 0.7, 0.4],
-            }}
-            transition={{
-              duration: 2,
-              repeat: Infinity,
-              ease: "easeInOut",
-            }}
-          />
-          
-          <div 
-            className={cn(
-              "w-7 h-7 rounded-full border-2 border-primary overflow-hidden shadow-lg",
-              usesContainedCompanionScene ? "bg-black" : "bg-background",
-              getMoodStyles(companionMood)
-            )}
-          >
-            <CompanionImage 
-              src={companionImageUrl} 
-              alt="Companion" 
-              fit={usesContainedCompanionScene ? "contain" : "cover"}
-              focalX={companionImageFocalX}
-              focalY={companionImageFocalY}
-              className="w-full h-full"
-            />
-          </div>
-        </motion.div>
-      )}
+      {/* Companion markers on trail */}
+      {companionMarkerPlacements.map((marker) => (
+        <CompanionTrailMarker
+          key={marker.id ?? marker.userId}
+          marker={marker}
+        />
+      ))}
 
       {/* Progress indicator */}
       <div className="absolute bottom-2 right-3 flex items-center gap-1.5">

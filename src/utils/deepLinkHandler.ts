@@ -7,11 +7,12 @@ export type CalendarOAuthStatus = 'success' | 'error';
 
 const AUTH_RESET_PATH = '/auth/reset-password';
 const CALENDAR_OAUTH_CALLBACK_PATH = '/calendar/oauth/callback';
+const JOIN_EPIC_PATH = '/join';
 const HOSTED_APP_LINK_HOSTS = new Set(['app.cosmiq.quest', 'cosmiq.quest']);
 const CALENDAR_CALLBACK_ORIGIN_PARAM = 'calendar_callback_origin';
 
 export interface DeepLinkData {
-  type: 'task' | 'calendar_oauth' | 'calendar_oauth_callback' | 'auth_recovery' | 'unknown';
+  type: 'task' | 'calendar_oauth' | 'calendar_oauth_callback' | 'auth_recovery' | 'join_epic' | 'unknown';
   taskId?: string;
   provider?: CalendarOAuthProvider;
   status?: CalendarOAuthStatus;
@@ -42,6 +43,12 @@ const isHostedCalendarOAuthCallbackLink = (parsed: URL): boolean => (
   ['https:', 'http:'].includes(parsed.protocol) &&
   HOSTED_APP_LINK_HOSTS.has(parsed.hostname) &&
   parsed.pathname === CALENDAR_OAUTH_CALLBACK_PATH
+);
+
+const isNativeJoinEpicLink = (parsed: URL): boolean => (
+  parsed.protocol === 'cosmiq:' &&
+  parsed.hostname === 'join' &&
+  parsed.pathname.length > 1
 );
 
 const buildHostedCalendarOAuthCallbackPath = (parsed: URL): string => {
@@ -81,6 +88,14 @@ export const parseDeepLink = (url: string): DeepLinkData => {
     }
 
     const parsed = new URL(url);
+
+    if (isNativeJoinEpicLink(parsed)) {
+      return {
+        type: 'join_epic',
+        path: `${JOIN_EPIC_PATH}${parsed.pathname}`,
+        rawUrl: url,
+      };
+    }
 
     if (isHostedCalendarOAuthCallbackLink(parsed)) {
       return {

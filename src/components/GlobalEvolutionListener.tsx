@@ -1345,7 +1345,6 @@ export const GlobalEvolutionListener = () => {
         };
         pendingPreloadKeyRef.current = key;
         setPendingEvolutionData(readyPendingEvolution);
-        markPendingRevealReady(readyPendingEvolution);
         queuedForPreload = true;
         return true;
       } finally {
@@ -1365,7 +1364,6 @@ export const GlobalEvolutionListener = () => {
       buildEvolutionKey,
       clearPresentationRetryTimer,
       checkCompanionAchievements,
-      markPendingRevealReady,
       recordEvolutionMemory,
       setPendingRevealState,
       setIsEvolvingLoading,
@@ -1742,6 +1740,18 @@ export const GlobalEvolutionListener = () => {
         return;
       }
 
+      if (
+        user?.id &&
+        wasEvolutionPresentedLocally(user.id, currentEvolution.id)
+      ) {
+        setPendingRevealState((current) =>
+          current?.companionId === companionId && current.newStage === currentStage
+            ? null
+            : current,
+        );
+        return;
+      }
+
       const previousStage = Math.max(0, currentStage - 1);
       let previousImageUrl: string | null =
         typeof companionRecord?.initial_image_url === "string"
@@ -1812,17 +1822,52 @@ export const GlobalEvolutionListener = () => {
         return;
       }
 
-      if (currentPendingMatches && currentEvolution.animationVideoUrl) {
-        markPendingRevealReady({
+      if (currentEvolution.animationVideoUrl) {
+        const key = buildEvolutionKey(companionId, currentStage);
+        const previousImageForPreload = currentPendingMatches && currentPending
+          ? currentPending.previousImageUrl
+          : resolvedPreviousImageUrl;
+        const currentImageForPreload = currentPendingMatches && currentPending
+          ? currentPending.newImageUrl
+          : resolvedCurrentImageUrl;
+        const presetIdForPreload = currentPendingMatches && currentPending
+          ? currentPending.presetId ?? undefined
+          : typeof companionRecord?.preset_id === "string"
+            ? companionRecord.preset_id
+            : undefined;
+        const elementForPreload = currentPendingMatches && currentPending
+          ? currentPending.element ?? undefined
+          : element;
+
+        pendingEvolutionKeysRef.current.add(key);
+        pendingPreloadKeyRef.current = key;
+        setIsEvolvingLoading(true);
+        setPendingRevealState({
+          status: "preparing",
           evolutionId: currentEvolution.id,
           companionId,
-          previousLevel: currentPending.previousStage,
+          previousStage: currentPendingMatches && currentPending
+            ? currentPending.previousStage
+            : previousStage,
+          newStage: currentStage,
+          previousImageUrl: previousImageForPreload,
+          newImageUrl: currentImageForPreload,
+          animationVideoUrl: null,
+          presetId: presetIdForPreload ?? null,
+          element: elementForPreload ?? null,
+        });
+        setPendingEvolutionData({
+          evolutionId: currentEvolution.id,
+          companionId,
+          previousLevel: currentPendingMatches && currentPending
+            ? currentPending.previousStage
+            : previousStage,
           level: currentStage,
-          previousImageUrl: currentPending.previousImageUrl,
-          imageUrl: currentPending.newImageUrl,
+          previousImageUrl: previousImageForPreload,
+          imageUrl: currentImageForPreload,
           animationVideoUrl: currentEvolution.animationVideoUrl,
-          presetId: currentPending.presetId ?? undefined,
-          element: currentPending.element ?? undefined,
+          presetId: presetIdForPreload,
+          element: elementForPreload,
         });
         return;
       }
@@ -1842,7 +1887,7 @@ export const GlobalEvolutionListener = () => {
       });
   }, [
     beginEvolutionPresentationWhenReady,
-    markPendingRevealReady,
+    buildEvolutionKey,
     user?.id,
   ]);
 

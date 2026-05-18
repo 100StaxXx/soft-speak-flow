@@ -40,6 +40,7 @@ import {
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useMilestones } from "@/hooks/useMilestones";
+import { useSharedCampaignPathMarkers } from "@/hooks/useSharedCampaignPathMarkers";
 import { plannerPathfinderTheme } from "@/components/companion/plannerPathfinderTheme";
 import { getEpicDaysRemaining, resolveEpicEndDate } from "@/utils/epicDates";
 import { safeClipboardWrite, getClipboardErrorMessage } from "@/utils/clipboard";
@@ -134,6 +135,7 @@ export const CampaignCard = memo(function CampaignCard({
     backfillLegacyMilestones,
     isBackfilling,
   } = useMilestones(campaign.id);
+  const { markers: sharedPathMarkers } = useSharedCampaignPathMarkers(campaign.id);
   
   const resolvedEndDate = useMemo(() => resolveEpicEndDate(campaign), [campaign]);
   const daysRemaining = useMemo(
@@ -195,6 +197,10 @@ export const CampaignCard = memo(function CampaignCard({
       chapter_number: m.chapter_number,
     }));
   }, [milestones]);
+  const trailCompanionMarkers = useMemo(
+    () => sharedPathMarkers.length > 0 ? sharedPathMarkers : undefined,
+    [sharedPathMarkers],
+  );
 
   const handleShareCampaign = useCallback(async () => {
     if (!campaign.invite_code || !campaign.is_public) return;
@@ -373,6 +379,7 @@ export const CampaignCard = memo(function CampaignCard({
             companionImageFocalY={health?.imageFocalY ?? companion?.current_image_focal_y ?? null}
             companionMood={health?.moodState}
             showCompanion={true}
+            companionMarkers={trailCompanionMarkers}
             milestones={trailMilestones}
             epicId={campaign.id}
           />

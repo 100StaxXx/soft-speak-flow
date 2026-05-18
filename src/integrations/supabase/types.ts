@@ -9225,6 +9225,22 @@ export type Database = {
         Args: { current_stage: number }
         Returns: number
       }
+      get_shared_epic_path_markers: {
+        Args: { p_epic_id: string }
+        Returns: {
+          companion_image_focal_x: number | null
+          companion_image_focal_y: number | null
+          companion_image_url: string | null
+          companion_mood: string | null
+          display_name: string
+          is_current_user: boolean
+          is_owner: boolean
+          joined_at: string | null
+          last_activity_at: string | null
+          progress_percentage: number
+          user_id: string
+        }[]
+      }
       get_user_display_info: {
         Args: { p_user_ids: string[] }
         Returns: {
@@ -9259,6 +9275,17 @@ export type Database = {
       }
       is_service_role: { Args: never; Returns: boolean }
       join_community_by_id: { Args: { p_community_id: string }; Returns: Json }
+      join_epic_by_invite_code: {
+        Args: { p_invite_code: string }
+        Returns: {
+          code: string
+          copied_habit_count: number
+          epic_id: string | null
+          epic_title: string | null
+          message: string
+          success: boolean
+        }[]
+      }
       request_companion_evolution_job: {
         Args: Record<string, never>
         Returns: {

@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   useJourneyPathImageMock: vi.fn(),
   useMilestonesMock: vi.fn(),
   usePreloadedImageUrlMock: vi.fn(),
+  useSharedCampaignPathMarkersMock: vi.fn(),
 }));
 
 vi.mock("framer-motion", () => ({
@@ -88,6 +89,10 @@ vi.mock("@/hooks/useCompanion", () => ({
   useCompanion: (...args: unknown[]) => mocks.useCompanionMock(...args),
 }));
 
+vi.mock("@/hooks/useSharedCampaignPathMarkers", () => ({
+  useSharedCampaignPathMarkers: (...args: unknown[]) => mocks.useSharedCampaignPathMarkersMock(...args),
+}));
+
 import { JourneyPathDrawer } from "./JourneyPathDrawer";
 
 const baseEpic = {
@@ -144,6 +149,9 @@ describe("JourneyPathDrawer", () => {
     mocks.useCompanionMock.mockReturnValue({
       companion: null,
     });
+    mocks.useSharedCampaignPathMarkersMock.mockReturnValue({
+      markers: [],
+    });
   });
 
   it("passes the epic id to the nested constellation trail", () => {
@@ -154,11 +162,39 @@ describe("JourneyPathDrawer", () => {
     );
 
     expect(mocks.useJourneyPathImageMock).toHaveBeenCalledWith("epic-1");
+    expect(mocks.useSharedCampaignPathMarkersMock).toHaveBeenCalledWith("epic-1");
     expect(mocks.constellationTrailProps[0]).toMatchObject({
       epicId: "epic-1",
       transparentBackground: false,
     });
     expect(screen.getByTestId("constellation-trail")).toBeInTheDocument();
+  });
+
+  it("passes shared campaign markers to the nested constellation trail", () => {
+    const markers = [{
+      userId: "friend-1",
+      displayName: "Mira",
+      progressPercentage: 72,
+      isCurrentUser: false,
+      isOwner: false,
+      companionImageUrl: "https://example.com/mira.png",
+      companionImageFocalX: null,
+      companionImageFocalY: null,
+      companionMood: "neutral",
+      joinedAt: "2026-05-01T00:00:00.000Z",
+      lastActivityAt: "2026-05-16T00:00:00.000Z",
+    }];
+    mocks.useSharedCampaignPathMarkersMock.mockReturnValue({ markers });
+
+    render(
+      <JourneyPathDrawer epic={baseEpic}>
+        <button type="button">Open</button>
+      </JourneyPathDrawer>,
+    );
+
+    expect(mocks.constellationTrailProps[0]).toMatchObject({
+      companionMarkers: markers,
+    });
   });
 
   it("renders quick view image, progress, ritual summary, and actions", () => {

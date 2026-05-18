@@ -423,7 +423,7 @@ const AppContent = memo(() => {
                   
                   <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                   <Route path="/premium" element={<Navigate to="/" replace />} />
-                  <Route path="/premium/success" element={<ProtectedRoute><PremiumSuccess /></ProtectedRoute>} />
+                  <Route path="/premium/success" element={<ProtectedRoute requireAccess={false}><PremiumSuccess /></ProtectedRoute>} />
                   <Route path="/pep-talk/:id" element={<ProtectedRoute><PepTalkDetail /></ProtectedRoute>} />
                   <Route path="/mentor-selection" element={<ProtectedRoute><MentorSelection /></ProtectedRoute>} />
                   <Route path="/admin" element={<ProtectedRoute requireMentor={false} requireAccess={false}><Admin /></ProtectedRoute>} />
