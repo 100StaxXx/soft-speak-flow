@@ -325,6 +325,64 @@ describe("useAccessState", () => {
     });
   });
 
+  it("keeps a recovered TestFlight subscription unlocked when backend binding belongs to an old account", async () => {
+    mocks.functionsInvoke.mockImplementation((functionName: string) => {
+      if (functionName === "check-apple-subscription") {
+        return Promise.resolve({
+          data: neutralAccessState,
+          error: null,
+        });
+      }
+
+      if (functionName === "verify-apple-receipt") {
+        return Promise.resolve({
+          data: null,
+          error: {
+            message: "Edge Function returned a non-2xx status code",
+            status: 403,
+            context: new Response(JSON.stringify({
+              error: "This purchase is already linked to another account.",
+              code: "APPLE_BINDING_CONFLICT",
+            }), { status: 403 }),
+          },
+        });
+      }
+
+      return Promise.resolve({ data: null, error: null });
+    });
+    mocks.recoverPurchases.mockResolvedValue({
+      productId: "cosmiq_premium_yearly",
+      expirationDate: "2099-01-01T00:00:00.000Z",
+      transactionId: "recovered-sandbox-conflict-tx",
+      originalTransactionId: "recovered-sandbox-conflict-orig",
+      isSandbox: true,
+    });
+    mocks.storeKit = {
+      ...mocks.storeKit,
+      isAvailable: true,
+      isPro: false,
+      activePlan: null,
+      currentEntitlement: null,
+      expirationDate: null,
+      entitlementError: false,
+      isLoading: false,
+    };
+
+    const { result } = renderHook(() => useAccessState(), { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(result.current.accessState).toMatchObject({
+        has_access: true,
+        access_source: "subscription",
+        subscribed: true,
+        plan: "yearly",
+      });
+    });
+    expect(globalThis.localStorage.getItem(
+      "cosmiq.rejectedLocalSubscriptionTransactions.v1.11111111-1111-4111-8111-111111111111",
+    )).toBeNull();
+  });
+
   it("does not grant local StoreKit access when no active entitlement exists", async () => {
     mocks.storeKit = {
       ...mocks.storeKit,
@@ -782,6 +840,72 @@ describe("useAccessState", () => {
       subscribed: false,
       status: "cancelled",
     });
+  });
+
+  it("does not reject live TestFlight access when backend binding points at an old account", async () => {
+    mocks.functionsInvoke.mockImplementation((functionName: string) => {
+      if (functionName === "check-apple-subscription") {
+        return Promise.resolve({
+          data: {
+            has_access: false,
+            access_source: "subscription",
+            trial_ends_at: null,
+            subscribed: false,
+            status: "cancelled",
+            plan: "yearly",
+            subscription_end: "2026-05-11T00:00:00.000Z",
+          },
+          error: null,
+        });
+      }
+
+      if (functionName === "verify-apple-receipt") {
+        return Promise.resolve({
+          data: null,
+          error: {
+            message: "Edge Function returned a non-2xx status code",
+            status: 403,
+            context: new Response(JSON.stringify({
+              error: "This purchase is already linked to another account.",
+              code: "APPLE_BINDING_CONFLICT",
+            }), { status: 403 }),
+          },
+        });
+      }
+
+      return Promise.resolve({ data: null, error: null });
+    });
+    mocks.storeKit = {
+      ...mocks.storeKit,
+      currentEntitlement: {
+        productId: "cosmiq_premium_yearly",
+        expirationDate: "2099-01-01T00:00:00.000Z",
+        transactionId: "sandbox-local-tx",
+        originalTransactionId: "sandbox-local-orig",
+        isSandbox: true,
+      } as unknown as typeof mocks.storeKit.currentEntitlement,
+      expirationDate: new Date("2099-01-01T00:00:00.000Z"),
+      entitlementError: false,
+      isLoading: false,
+    };
+
+    const { result } = renderHook(() => useAccessState(), { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
+        body: { transactionId: "sandbox-local-tx" },
+      });
+    });
+    expect(result.current.accessState).toMatchObject({
+      has_access: true,
+      access_source: "subscription",
+      subscribed: true,
+      status: "active",
+      plan: "yearly",
+    });
+    expect(globalThis.localStorage.getItem(
+      "cosmiq.rejectedLocalSubscriptionTransactions.v1.11111111-1111-4111-8111-111111111111",
+    )).toBeNull();
   });
 
   it("does not let remembered local access override a StoreKit entitlement for a different user", async () => {

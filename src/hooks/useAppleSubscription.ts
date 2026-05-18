@@ -78,6 +78,10 @@ function isAppleBindingConflict(error: unknown): boolean {
   return error.parsed?.code === APPLE_BINDING_CONFLICT_CODE;
 }
 
+function canTrustSandboxBindingConflict(error: unknown, transaction: StoreKitTransaction): boolean {
+  return Boolean(transaction.isSandbox && isAppleBindingConflict(error));
+}
+
 function getActivationErrorToast(error: unknown): { title: string; description: string } {
   if (isAppleBindingConflict(error)) {
     return {
@@ -284,6 +288,10 @@ export function useAppleSubscription() {
             clearDeferredVerificationTimers();
           } catch (error) {
             if (isAppleBindingConflict(error)) {
+              if (transaction.isSandbox) {
+                clearDeferredVerificationTimers();
+                return;
+              }
               await rejectLocalSubscriptionAccess(transaction);
             }
             if (!canDeferServerVerification(error)) {
@@ -318,6 +326,30 @@ export function useAppleSubscription() {
       });
       return true;
     } catch (error) {
+      if (canTrustSandboxBindingConflict(error, transaction) && grantLocalSubscriptionAccess(transaction, plan)) {
+        const parsed = error instanceof SubscriptionVerificationError ? error.parsed : undefined;
+        console.info("[Subscriptions] Sandbox binding conflict deferred; local subscription access granted", {
+          surface,
+          plan,
+          productId: transaction.productId,
+          transactionId: transaction.transactionId,
+          code: parsed?.code,
+          status: parsed?.status,
+          message: getErrorMessage(error),
+        });
+        trackPaywallEvent("purchase_verification_deferred", {
+          surface,
+          plan,
+          productId: transaction.productId,
+          hasOfferCode,
+          code: parsed?.code,
+          status: parsed?.status,
+          message: getErrorMessage(error),
+        });
+        setProductError(null);
+        return true;
+      }
+
       if (isAppleBindingConflict(error)) {
         clearDeferredVerificationTimers();
         await rejectLocalSubscriptionAccess(transaction);

@@ -156,4 +156,16 @@ describe("localSubscriptionAccess", () => {
     expect(readLocalSubscriptionAccess(userId)).toBeNull();
     expect(localStorage.getItem(storageKey)).toBeNull();
   });
+
+  it("does not let a cached rejection block an active sandbox transaction", () => {
+    rememberRejectedLocalSubscriptionTransaction(userId, transaction());
+
+    expect(buildLocalSubscriptionAccessState(transaction({
+      isSandbox: true,
+    }), userId, "yearly")).toMatchObject({
+      has_access: true,
+      subscribed: true,
+      plan: "yearly",
+    });
+  });
 });

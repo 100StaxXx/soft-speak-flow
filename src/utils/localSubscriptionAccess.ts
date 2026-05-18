@@ -344,6 +344,8 @@ export function storeKitTransactionRejectedForUser(
   transaction: StoreKitTransaction | null,
   userId: string | null | undefined,
 ): boolean {
+  if (transaction?.isSandbox) return false;
+
   const keys = transactionKeys(transaction);
   if (!keys.length) return false;
 

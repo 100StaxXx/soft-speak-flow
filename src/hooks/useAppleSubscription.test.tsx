@@ -438,6 +438,54 @@ describe("useAppleSubscription", () => {
     });
   });
 
+  it("keeps TestFlight sandbox subscriptions unlocked when backend binding points at an old account", async () => {
+    mocks.purchase.mockResolvedValueOnce({
+      productId: "cosmiq_premium_yearly",
+      transactionId: "sandbox-conflict-tx",
+      originalTransactionId: "sandbox-conflict-orig",
+      expirationDate: "2099-01-01T00:00:00.000Z",
+      isSandbox: true,
+    });
+    mocks.functionsInvoke.mockResolvedValueOnce({
+      data: null,
+      error: {
+        message: "Edge Function returned a non-2xx status code",
+        status: 403,
+        context: new Response(JSON.stringify({
+          error: "This purchase is already linked to another account.",
+          code: "APPLE_BINDING_CONFLICT",
+        }), { status: 403 }),
+      },
+    });
+
+    const { result } = renderHook(() => useAppleSubscription());
+
+    let success: boolean | undefined;
+    await act(async () => {
+      success = await result.current.handlePurchase("cosmiq_premium_yearly");
+    });
+
+    expect(success).toBe(true);
+    expect(mocks.setQueryData).toHaveBeenCalledWith(
+      ["access-state", "11111111-1111-4111-8111-111111111111"],
+      expect.objectContaining({
+        has_access: true,
+        access_source: "subscription",
+        subscribed: true,
+        plan: "yearly",
+      }),
+    );
+    expect(globalThis.localStorage.getItem(
+      "cosmiq.rejectedLocalSubscriptionTransactions.v1.11111111-1111-4111-8111-111111111111",
+    )).toBeNull();
+    expect(mocks.toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Subscription already linked",
+        variant: "destructive",
+      }),
+    );
+  });
+
   it("unlocks locally when Apple succeeds but the verification function is unreachable", async () => {
     mocks.functionsInvoke.mockResolvedValueOnce({
       data: null,
@@ -539,6 +587,61 @@ describe("useAppleSubscription", () => {
         expect.objectContaining({
           title: "Subscription activation failed",
           variant: "destructive",
+        }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not reject a TestFlight subscription when a deferred verification retry reports a binding conflict", async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.purchase.mockResolvedValueOnce({
+        productId: "cosmiq_premium_yearly",
+        transactionId: "sandbox-deferred-conflict-tx",
+        originalTransactionId: "sandbox-deferred-conflict-orig",
+        expirationDate: "2099-01-01T00:00:00.000Z",
+        isSandbox: true,
+      });
+      mocks.functionsInvoke
+        .mockResolvedValueOnce({
+          data: null,
+          error: new Error("Failed to send a request to the Edge Function"),
+        })
+        .mockResolvedValueOnce({
+          data: null,
+          error: {
+            message: "Edge Function returned a non-2xx status code",
+            status: 403,
+            context: new Response(JSON.stringify({
+              error: "This purchase is already linked to another account.",
+              code: "APPLE_BINDING_CONFLICT",
+            }), { status: 403 }),
+          },
+        });
+
+      const { result } = renderHook(() => useAppleSubscription());
+
+      await act(async () => {
+        await result.current.handlePurchase("cosmiq_premium_yearly");
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_000);
+      });
+
+      expect(globalThis.localStorage.getItem(
+        "cosmiq.localSubscriptionAccess.v1.11111111-1111-4111-8111-111111111111",
+      )).toContain("sandbox-deferred-conflict-tx");
+      expect(globalThis.localStorage.getItem(
+        "cosmiq.rejectedLocalSubscriptionTransactions.v1.11111111-1111-4111-8111-111111111111",
+      )).toBeNull();
+      expect(mocks.setQueryData).not.toHaveBeenCalledWith(
+        ["access-state", "11111111-1111-4111-8111-111111111111"],
+        expect.objectContaining({
+          has_access: false,
+          subscribed: false,
         }),
       );
     } finally {

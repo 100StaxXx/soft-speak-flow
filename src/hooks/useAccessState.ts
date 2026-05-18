@@ -252,6 +252,9 @@ export function useAccessState() {
         const parsed = await parseFunctionInvokeError(
           error ?? new Error(String((data as { error?: unknown })?.error ?? "Subscription verification failed")),
         );
+        if (parsed.code === APPLE_BINDING_CONFLICT_CODE && recoveredTransaction.isSandbox) {
+          return;
+        }
         if (parsed.code === APPLE_BINDING_CONFLICT_CODE || !canRetryAccessRecovery(parsed)) {
           clearLocalSubscriptionAccess(user.id);
           rememberRejectedLocalSubscriptionTransaction(user.id, recoveredTransaction);
@@ -337,6 +340,9 @@ export function useAccessState() {
           if (parsed.code === APPLE_BINDING_CONFLICT_CODE) {
             recoveryTimersRef.current.forEach((pendingTimer) => clearTimeout(pendingTimer));
             recoveryTimersRef.current = [];
+            if (currentEntitlement.isSandbox) {
+              return;
+            }
             await rejectLocalAccess();
             return;
           }
