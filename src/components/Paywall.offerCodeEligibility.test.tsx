@@ -193,7 +193,10 @@ describe("Paywall creator offer-code eligibility", () => {
     expect(
       screen.queryByText("Big goals become campaigns, rituals, milestones, and a planned day."),
     ).not.toBeInTheDocument();
-    expect(screen.getByText("3-day free trial")).toBeInTheDocument();
+    expect(screen.getAllByText("3-day free trial").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("paywall-trial-callout")).toBeInTheDocument();
+    expect(screen.getByTestId("paywall-trial-callout")).toHaveTextContent("3-day free trial");
+    expect(screen.getByTestId("paywall-trial-callout")).toHaveTextContent("No charge today.");
     expect(screen.getByRole("button", { name: /start 3-day free trial/i })).toBeInTheDocument();
     expect(screen.getByText("Unlimited companion chat")).toBeInTheDocument();
     expect(screen.getByText("Unlimited quests and campaigns")).toBeInTheDocument();
@@ -243,6 +246,7 @@ describe("Paywall creator offer-code eligibility", () => {
     expect(screen.getByRole("button", { name: /subscribe yearly/i })).toBeInTheDocument();
     expect(screen.getByText("Continue with Cosmiq")).toBeInTheDocument();
     expect(screen.queryByText("3-day free trial")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("paywall-trial-callout")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /start 3-day free trial/i })).not.toBeInTheDocument();
     expect(screen.queryByText("Start the trial. Keep the story moving.")).not.toBeInTheDocument();
   });

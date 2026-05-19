@@ -637,6 +637,30 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                   </div>
                 </div>
 
+                {variant === "pre_trial_signup" ? (
+                  <div
+                    data-testid="paywall-trial-callout"
+                    className="border border-cyan-100/36 bg-cyan-100/12 p-4 shadow-[0_0_34px_rgba(165,243,252,0.12)]"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 bg-cyan-100 p-2 text-slate-950">
+                        <Gift className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-100">
+                          3-day free trial
+                        </p>
+                        <p className="mt-1 text-base font-semibold text-white">
+                          No charge today.
+                        </p>
+                        <p className="mt-1 text-sm leading-6 text-white/72">
+                          Try the full Cosmiq experience before your Apple ID account is charged.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="space-y-3 border border-white/12 bg-white/[0.04] p-4">
                   <div className="flex items-start gap-3">
                     <div className="mt-0.5 bg-cyan-100/12 p-2 text-cyan-100">
