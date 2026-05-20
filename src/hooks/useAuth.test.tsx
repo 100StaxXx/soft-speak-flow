@@ -135,7 +135,46 @@ describe("useAuth provider", () => {
 
     expect(result.current.status).toBe("recovering");
     expect(result.current.user?.id).toBe("user-1");
+    expect(result.current.loading).toBe(false);
   });
+
+  it("retries immediately when connectivity returns during recovery", async () => {
+    const session = { user: { id: "user-online", email: "online@example.com" } } as Session;
+    mocks.getSessionMock.mockResolvedValueOnce({ data: { session }, error: null });
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
+
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.status).toBe("authenticated"));
+
+    mocks.getSessionMock.mockResolvedValue({
+      data: { session: null },
+      error: new Error("network timeout"),
+    });
+
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    await waitFor(() => expect(result.current.status).toBe("recovering"), { timeout: 10000 });
+
+    mocks.getSessionMock.mockResolvedValue({
+      data: { session },
+      error: null,
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new Event("online"));
+    });
+
+    await waitFor(() => expect(result.current.status).toBe("authenticated"));
+    expect(result.current.user?.id).toBe("user-online");
+  }, 10000);
 
   it("transitions to unauthenticated when session is confirmed missing", async () => {
     const session = { user: { id: "user-2", email: "test2@example.com" } } as Session;

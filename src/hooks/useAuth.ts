@@ -300,7 +300,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [refreshOnResume]);
 
-  const loading = status === "loading" || status === "recovering";
+  useEffect(() => {
+    const handleOnline = () => {
+      if (statusRef.current === "recovering") {
+        void refreshSession();
+        return;
+      }
+      refreshOnResume();
+    };
+
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, [refreshOnResume, refreshSession]);
+
+  const loading = status === "loading" || (status === "recovering" && !user);
 
   const value = useMemo(
     () => ({

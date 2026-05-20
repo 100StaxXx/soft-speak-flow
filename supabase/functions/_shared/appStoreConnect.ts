@@ -1,4 +1,5 @@
-const APP_STORE_CONNECT_API_BASE_URL = "https://api.appstoreconnect.apple.com/v1";
+const APP_STORE_CONNECT_API_BASE_URL =
+  "https://api.appstoreconnect.apple.com/v1";
 export const DEFAULT_CUSTOM_CODE_REDEMPTION_LIMIT = 25000;
 
 type JsonApiData<T> = {
@@ -9,7 +10,12 @@ type JsonApiData<T> = {
 
 type JsonApiResponse<T> = {
   data?: JsonApiData<T> | Array<JsonApiData<T>>;
-  errors?: Array<{ detail?: string; title?: string; code?: string; status?: string }>;
+  errors?: Array<
+    { detail?: string; title?: string; code?: string; status?: string }
+  >;
+  links?: {
+    next?: string | null;
+  };
 };
 
 type SubscriptionOfferCodeCustomCodeAttributes = {
@@ -48,7 +54,9 @@ const getRequiredEnv = (key: string) => {
 };
 
 const base64UrlEncode = (data: Uint8Array): string => {
-  const binString = Array.from(data, (byte) => String.fromCharCode(byte)).join("");
+  const binString = Array.from(data, (byte) => String.fromCharCode(byte)).join(
+    "",
+  );
   const base64 = btoa(binString);
   return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 };
@@ -74,8 +82,12 @@ async function createAppStoreConnectJWT(): Promise<string> {
     aud: "appstoreconnect-v1",
   };
 
-  const encodedHeader = base64UrlEncode(new TextEncoder().encode(JSON.stringify(header)));
-  const encodedPayload = base64UrlEncode(new TextEncoder().encode(JSON.stringify(payload)));
+  const encodedHeader = base64UrlEncode(
+    new TextEncoder().encode(JSON.stringify(header)),
+  );
+  const encodedPayload = base64UrlEncode(
+    new TextEncoder().encode(JSON.stringify(payload)),
+  );
   const signingInput = `${encodedHeader}.${encodedPayload}`;
 
   const keyBase64 = privateKeyPem
@@ -83,7 +95,8 @@ async function createAppStoreConnectJWT(): Promise<string> {
     .filter((line) => !line.startsWith("-----"))
     .join("");
 
-  const keyBuffer = Uint8Array.from(atob(keyBase64), (char) => char.charCodeAt(0)).buffer;
+  const keyBuffer =
+    Uint8Array.from(atob(keyBase64), (char) => char.charCodeAt(0)).buffer;
   const cryptoKey = await crypto.subtle.importKey(
     "pkcs8",
     keyBuffer,
@@ -106,7 +119,10 @@ async function appStoreConnectRequest<T>(
   options: RequestInit = {},
 ): Promise<JsonApiResponse<T>> {
   const jwt = await createAppStoreConnectJWT();
-  const response = await fetch(`${APP_STORE_CONNECT_API_BASE_URL}${path}`, {
+  const url = path.startsWith("http://") || path.startsWith("https://")
+    ? path
+    : `${APP_STORE_CONNECT_API_BASE_URL}${path}`;
+  const response = await fetch(url, {
     ...options,
     headers: {
       Authorization: `Bearer ${jwt}`,
@@ -121,7 +137,9 @@ async function appStoreConnectRequest<T>(
     : { data: undefined } as JsonApiResponse<T>;
 
   if (!response.ok) {
-    const details = payload.errors?.map((error) => error.detail || error.title).filter(Boolean).join("; ") || text;
+    const details = payload.errors?.map((error) =>
+      error.detail || error.title
+    ).filter(Boolean).join("; ") || text;
     throw new AppStoreConnectApiError(
       `App Store Connect request failed with status ${response.status}`,
       response.status,
@@ -142,11 +160,15 @@ const normalizeCustomCodeRecord = (
   numberOfCodes: data.attributes?.numberOfCodes ?? null,
 });
 
-const getOfferCodeCampaignId = () => getRequiredEnv("APPLE_SUBSCRIPTION_OFFER_CODE_ID");
-export const getOfferCodeCampaignIdentifier = () => getRequiredEnv("APPLE_OFFER_CODE_IDENTIFIER");
+const getOfferCodeCampaignId = () =>
+  getRequiredEnv("APPLE_SUBSCRIPTION_OFFER_CODE_ID");
+export const getOfferCodeCampaignIdentifier = () =>
+  getRequiredEnv("APPLE_OFFER_CODE_IDENTIFIER");
 
 export const getCustomCodeRedemptionLimit = () => {
-  const rawValue = Deno.env.get("APPLE_OFFER_CODE_MAX_REDEMPTIONS_PER_CUSTOM_CODE");
+  const rawValue = Deno.env.get(
+    "APPLE_OFFER_CODE_MAX_REDEMPTIONS_PER_CUSTOM_CODE",
+  );
   const parsedValue = rawValue ? Number(rawValue) : NaN;
   return Number.isFinite(parsedValue) && parsedValue > 0
     ? Math.floor(parsedValue)
@@ -154,7 +176,8 @@ export const getCustomCodeRedemptionLimit = () => {
 };
 
 export const getOfferCodeExpiryDate = () => {
-  const configuredDate = Deno.env.get("APPLE_OFFER_CODE_EXPIRATION_DATE")?.trim();
+  const configuredDate = Deno.env.get("APPLE_OFFER_CODE_EXPIRATION_DATE")
+    ?.trim();
   if (configuredDate) {
     return configuredDate;
   }
@@ -162,10 +185,11 @@ export const getOfferCodeExpiryDate = () => {
   return null;
 };
 
-export const buildAppleCustomOfferCodeCreateAttributes = (customCode: string) => {
+export const buildAppleCustomOfferCodeCreateAttributes = (
+  customCode: string,
+) => {
   const expirationDate = getOfferCodeExpiryDate();
   const attributes: SubscriptionOfferCodeCustomCodeAttributes = {
-    active: true,
     customCode,
     numberOfCodes: getCustomCodeRedemptionLimit(),
   };
@@ -193,23 +217,49 @@ export const buildAppleCustomOfferCodeUpdateAttributes = () => {
 
 export async function findAppleCustomOfferCodeByValue(customCode: string) {
   const offerCodeId = getOfferCodeCampaignId();
-  const searchParams = new URLSearchParams({
-    "filter[customCode]": customCode,
-    limit: "1",
-  });
+  const targetCode = customCode.trim().toUpperCase();
+  let nextPath: string | null =
+    `/subscriptionOfferCodes/${offerCodeId}/customCodes?limit=200`;
+  const visitedPaths = new Set<string>();
 
-  const response = await appStoreConnectRequest<SubscriptionOfferCodeCustomCodeAttributes>(
-    `/subscriptionOfferCodes/${offerCodeId}/customCodes?${searchParams.toString()}`,
-  );
+  while (nextPath && !visitedPaths.has(nextPath)) {
+    visitedPaths.add(nextPath);
 
-  const firstRecord = Array.isArray(response.data) ? response.data[0] : response.data;
-  return firstRecord ? normalizeCustomCodeRecord(firstRecord) : null;
+    const response: JsonApiResponse<SubscriptionOfferCodeCustomCodeAttributes> =
+      await appStoreConnectRequest<SubscriptionOfferCodeCustomCodeAttributes>(
+        nextPath,
+      );
+
+    const records: Array<
+      JsonApiData<SubscriptionOfferCodeCustomCodeAttributes>
+    > = Array.isArray(response.data)
+      ? response.data
+      : response.data
+      ? [response.data]
+      : [];
+
+    const matchedRecord = records.find((
+      record: JsonApiData<SubscriptionOfferCodeCustomCodeAttributes>,
+    ) => record.attributes?.customCode?.trim().toUpperCase() === targetCode);
+    if (matchedRecord) {
+      return normalizeCustomCodeRecord(matchedRecord);
+    }
+
+    const nextLink: string | null = response.links?.next ?? null;
+    nextPath = nextLink
+      ? `${new URL(nextLink).pathname}${new URL(nextLink).search}`
+      : null;
+  }
+
+  return null;
 }
 
 export async function createAppleCustomOfferCode(customCode: string) {
   const offerCodeId = getOfferCodeCampaignId();
 
-  const response = await appStoreConnectRequest<SubscriptionOfferCodeCustomCodeAttributes>(
+  const response = await appStoreConnectRequest<
+    SubscriptionOfferCodeCustomCodeAttributes
+  >(
     "/subscriptionOfferCodeCustomCodes",
     {
       method: "POST",
@@ -230,9 +280,14 @@ export async function createAppleCustomOfferCode(customCode: string) {
     },
   );
 
-  const createdRecord = Array.isArray(response.data) ? response.data[0] : response.data;
+  const createdRecord = Array.isArray(response.data)
+    ? response.data[0]
+    : response.data;
   if (!createdRecord) {
-    throw new AppStoreConnectApiError("App Store Connect returned no custom offer code", 502);
+    throw new AppStoreConnectApiError(
+      "App Store Connect returned no custom offer code",
+      502,
+    );
   }
 
   return normalizeCustomCodeRecord(createdRecord);
@@ -242,7 +297,9 @@ export async function updateAppleCustomOfferCode(
   customCodeId: string,
   attributes: Partial<SubscriptionOfferCodeCustomCodeAttributes>,
 ) {
-  const response = await appStoreConnectRequest<SubscriptionOfferCodeCustomCodeAttributes>(
+  const response = await appStoreConnectRequest<
+    SubscriptionOfferCodeCustomCodeAttributes
+  >(
     `/subscriptionOfferCodeCustomCodes/${customCodeId}`,
     {
       method: "PATCH",
@@ -256,9 +313,14 @@ export async function updateAppleCustomOfferCode(
     },
   );
 
-  const updatedRecord = Array.isArray(response.data) ? response.data[0] : response.data;
+  const updatedRecord = Array.isArray(response.data)
+    ? response.data[0]
+    : response.data;
   if (!updatedRecord) {
-    throw new AppStoreConnectApiError("App Store Connect returned no updated custom offer code", 502);
+    throw new AppStoreConnectApiError(
+      "App Store Connect returned no updated custom offer code",
+      502,
+    );
   }
 
   return normalizeCustomCodeRecord(updatedRecord);
@@ -293,11 +355,15 @@ export async function ensureAppleCustomOfferCode(params: {
 }, client: AppleOfferCodeClient = defaultAppleOfferCodeClient) {
   const targetCampaignIdentifier = getOfferCodeCampaignIdentifier();
   const existingCustomCodeId = params.existingCustomCodeId?.trim() || null;
-  const existingCampaignIdentifier = params.existingCampaignIdentifier?.trim() || null;
+  const existingCampaignIdentifier =
+    params.existingCampaignIdentifier?.trim() || null;
   const shouldReplaceExistingCampaign = Boolean(
     existingCustomCodeId &&
       existingCampaignIdentifier &&
-      !sameOfferCampaignIdentifier(existingCampaignIdentifier, targetCampaignIdentifier),
+      !sameOfferCampaignIdentifier(
+        existingCampaignIdentifier,
+        targetCampaignIdentifier,
+      ),
   );
   const desiredUpdateAttributes = buildAppleCustomOfferCodeUpdateAttributes();
 
@@ -317,8 +383,13 @@ export async function ensureAppleCustomOfferCode(params: {
     } catch (error) {
       if (error instanceof AppStoreConnectApiError && error.status === 409) {
         const conflictedRecord = await client.findByValue(params.customCode);
-        if (conflictedRecord?.id && conflictedRecord.id !== existingCustomCodeId) {
-          return await client.update(conflictedRecord.id, desiredUpdateAttributes);
+        if (
+          conflictedRecord?.id && conflictedRecord.id !== existingCustomCodeId
+        ) {
+          return await client.update(
+            conflictedRecord.id,
+            desiredUpdateAttributes,
+          );
         }
       }
       throw error;
@@ -347,7 +418,10 @@ export async function ensureAppleCustomOfferCode(params: {
   try {
     existingRecord = await client.findByValue(params.customCode);
   } catch (error) {
-    console.warn("Unable to look up Apple custom offer code before create:", error);
+    console.warn(
+      "Unable to look up Apple custom offer code before create:",
+      error,
+    );
   }
 
   if (existingRecord?.id) {
@@ -360,14 +434,19 @@ export async function ensureAppleCustomOfferCode(params: {
     if (error instanceof AppStoreConnectApiError && error.status === 409) {
       const conflictedRecord = await client.findByValue(params.customCode);
       if (conflictedRecord?.id) {
-        return await client.update(conflictedRecord.id, desiredUpdateAttributes);
+        return await client.update(
+          conflictedRecord.id,
+          desiredUpdateAttributes,
+        );
       }
     }
     throw error;
   }
 }
 
-export async function deactivateAppleCustomOfferCode(customCodeId: string | null | undefined) {
+export async function deactivateAppleCustomOfferCode(
+  customCodeId: string | null | undefined,
+) {
   if (!customCodeId) {
     return null;
   }

@@ -29,19 +29,33 @@ const mocks = vi.hoisted(() => {
   const toastErrorMock = vi.fn();
   const rpcMock = vi.fn();
   const companionMemoriesInsertMock = vi.fn();
+  const queryClientMock = { invalidateQueries: invalidateQueriesMock };
+  const checkCompanionAchievementsMock = vi.fn().mockResolvedValue(undefined);
+  const userMock = { id: "user-1" };
+  const refreshConnectionMock = vi.fn();
   const state = {
     callback: null as
       | null
-      | ((payload: Record<string, unknown>) => Promise<void>),
+      | ((payload: Record<string, unknown>) => void | Promise<void>),
     jobCallback: null as
       | null
-      | ((payload: Record<string, unknown>) => Promise<void>),
+      | ((payload: Record<string, unknown>) => void | Promise<void>),
+    animationJobCallback: null as
+      | null
+      | ((payload: Record<string, unknown>) => void | Promise<void>),
     mentorId: null as string | null,
     mentorLookup: null as
       | null
       | (() => Promise<{ data: unknown; error: unknown }>),
     pendingEvolutionReveal: null as null | Record<string, unknown>,
     userCompanionLookup: null as null | Record<string, unknown>,
+  };
+  const setPendingEvolutionReveal = (next: unknown) => {
+    state.pendingEvolutionReveal =
+      typeof next === "function"
+        ? next(state.pendingEvolutionReveal)
+        : next;
+    setPendingEvolutionRevealMock(state.pendingEvolutionReveal);
   };
   const companionEvolutionLookupResponses: Array<{
     data: unknown;
@@ -70,6 +84,11 @@ const mocks = vi.hoisted(() => {
     toastErrorMock,
     rpcMock,
     companionMemoriesInsertMock,
+    queryClientMock,
+    checkCompanionAchievementsMock,
+    userMock,
+    refreshConnectionMock,
+    setPendingEvolutionReveal,
     functionsInvokeMock,
     state,
     companionEvolutionLookupResponses,
@@ -79,20 +98,18 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("@tanstack/react-query", () => ({
-  useQueryClient: () => ({
-    invalidateQueries: mocks.invalidateQueriesMock,
-  }),
+  useQueryClient: () => mocks.queryClientMock,
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
-    user: { id: "user-1" },
+    user: mocks.userMock,
   }),
 }));
 
 vi.mock("@/hooks/useAchievements", () => ({
   useAchievements: () => ({
-    checkCompanionAchievements: vi.fn().mockResolvedValue(undefined),
+    checkCompanionAchievements: mocks.checkCompanionAchievementsMock,
   }),
 }));
 
@@ -100,7 +117,7 @@ vi.mock("@/contexts/MentorConnectionContext", () => ({
   useMentorConnection: () => ({
     mentorId: mocks.state.mentorId,
     status: "ready",
-    refreshConnection: vi.fn(),
+    refreshConnection: mocks.refreshConnectionMock,
   }),
 }));
 
@@ -108,13 +125,7 @@ vi.mock("@/contexts/EvolutionContext", () => ({
   useEvolution: () => ({
     setIsEvolvingLoading: mocks.setIsEvolvingLoadingMock,
     pendingEvolutionReveal: mocks.state.pendingEvolutionReveal,
-    setPendingEvolutionReveal: (next: unknown) => {
-      mocks.state.pendingEvolutionReveal =
-        typeof next === "function"
-          ? next(mocks.state.pendingEvolutionReveal)
-          : next;
-      mocks.setPendingEvolutionRevealMock(mocks.state.pendingEvolutionReveal);
-    },
+    setPendingEvolutionReveal: mocks.setPendingEvolutionReveal,
     onEvolutionComplete: mocks.onEvolutionCompleteMock,
   }),
 }));
@@ -361,6 +372,7 @@ describe("GlobalEvolutionListener", () => {
     vi.clearAllMocks();
     mocks.state.callback = null;
     mocks.state.jobCallback = null;
+    mocks.state.animationJobCallback = null;
     mocks.state.mentorId = null;
     mocks.state.mentorLookup = null;
     mocks.state.pendingEvolutionReveal = null;
@@ -393,10 +405,12 @@ describe("GlobalEvolutionListener", () => {
       (
         _event: string,
         config: Record<string, unknown>,
-        callback: (payload: Record<string, unknown>) => Promise<void>,
+        callback: (payload: Record<string, unknown>) => void | Promise<void>,
       ) => {
         if (config.table === "companion_evolution_jobs") {
           mocks.state.jobCallback = callback;
+        } else if (config.table === "companion_animation_jobs") {
+          mocks.state.animationJobCallback = callback;
         } else {
           mocks.state.callback = callback;
         }
@@ -610,6 +624,157 @@ describe("GlobalEvolutionListener", () => {
         animationVideoUrl: "https://example.com/evolution.mp4",
       }),
     );
+  });
+
+  it("hydrates a completed animation job realtime update into the ready reveal", async () => {
+    mocks.state.pendingEvolutionReveal = {
+      status: "preparing",
+      evolutionId: "evo-5",
+      companionId: "companion-1",
+      previousStage: 4,
+      newStage: 5,
+      previousImageUrl: "https://example.com/stage-4.png",
+      newImageUrl: "https://example.com/stage-5.png",
+      animationVideoUrl: null,
+      presetId: "phoenix",
+      element: "fire",
+    };
+
+    renderListener();
+    await flushMicrotasks();
+
+    mocks.state.userCompanionLookup = {
+      id: "companion-1",
+      current_stage: 5,
+      current_image_url: "https://example.com/stage-5.png",
+      preset_id: "phoenix",
+      core_element: "fire",
+      initial_image_url: "https://example.com/egg.png",
+    };
+    mocks.companionEvolutionLookupResponses.push(
+      {
+        data: {
+          id: "evo-5",
+          image_url: "https://example.com/stage-5.png",
+          animation_video_url: "https://example.com/job-ready.mp4",
+          animation_status: "succeeded",
+          animation_presented_at: null,
+        },
+        error: null,
+      },
+      {
+        data: {
+          image_url: "https://example.com/stage-4.png",
+        },
+        error: null,
+      },
+    );
+
+    act(() => {
+      void mocks.state.animationJobCallback?.({
+        eventType: "UPDATE",
+        new: {
+          id: "animation-job-1",
+          companion_id: "companion-1",
+          evolution_id: "evo-5",
+          stage: 5,
+          status: "succeeded",
+          video_url: "https://example.com/job-ready.mp4",
+        },
+      });
+    });
+    await act(async () => {
+      await flushMicrotasks();
+    });
+
+    expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: ["companion"],
+    });
+    await waitFor(() => {
+      const currentSrc = document
+        .querySelector("[data-testid='evolution-animation-preloader']")
+        ?.getAttribute("src");
+      expect(currentSrc).toBe("https://example.com/job-ready.mp4");
+    });
+    await preloadPlayablePendingAnimation();
+    expect(mocks.state.pendingEvolutionReveal).toEqual(
+      expect.objectContaining({
+        status: "ready",
+        companionId: "companion-1",
+        evolutionId: "evo-5",
+        newStage: 5,
+        animationVideoUrl: "https://example.com/job-ready.mp4",
+      }),
+    );
+  });
+
+  it("polls preparing reveals so completed videos recover when realtime is missed", async () => {
+    vi.useFakeTimers();
+    mocks.state.pendingEvolutionReveal = {
+      status: "preparing",
+      evolutionId: "evo-5",
+      companionId: "companion-1",
+      previousStage: 4,
+      newStage: 5,
+      previousImageUrl: "https://example.com/stage-4.png",
+      newImageUrl: "https://example.com/stage-5.png",
+      animationVideoUrl: null,
+      presetId: "phoenix",
+      element: "fire",
+    };
+
+    try {
+      renderListener();
+      await flushMicrotasks();
+
+      mocks.state.userCompanionLookup = {
+        id: "companion-1",
+        current_stage: 5,
+        current_image_url: "https://example.com/stage-5.png",
+        preset_id: "phoenix",
+        core_element: "fire",
+        initial_image_url: "https://example.com/egg.png",
+      };
+      mocks.companionEvolutionLookupResponses.push(
+        {
+          data: {
+            id: "evo-5",
+            image_url: "https://example.com/stage-5.png",
+            animation_video_url: "https://example.com/watchdog-ready.mp4",
+            animation_status: "succeeded",
+            animation_presented_at: null,
+          },
+          error: null,
+        },
+        {
+          data: {
+            image_url: "https://example.com/stage-4.png",
+          },
+          error: null,
+        },
+      );
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(15_000);
+        await flushMicrotasks();
+      });
+
+      expect(
+        screen.getByTestId("evolution-animation-preloader"),
+      ).toHaveAttribute("src", "https://example.com/watchdog-ready.mp4");
+      await preloadPlayablePendingAnimation();
+      expect(mocks.state.pendingEvolutionReveal).toEqual(
+        expect.objectContaining({
+          status: "ready",
+          companionId: "companion-1",
+          evolutionId: "evo-5",
+          newStage: 5,
+          animationVideoUrl: "https://example.com/watchdog-ready.mp4",
+        }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("invalidates companion-derived queries for non-evolution updates without showing the evolution UI", async () => {

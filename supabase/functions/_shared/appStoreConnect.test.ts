@@ -17,6 +17,7 @@ Deno.test("Apple custom offer-code attributes default to no expiration and 25,00
     appStoreConnectModule.buildAppleCustomOfferCodeUpdateAttributes();
 
   assert(createAttributes.customCode === "CREATOR123", "Expected custom code to be set");
+  assert(!("active" in createAttributes), "Expected create to omit active");
   assert(createAttributes.numberOfCodes === 25000, "Expected 25,000 default redemptions");
   assert(!("expirationDate" in createAttributes), "Expected no default expiration date");
   assert(updateAttributes.numberOfCodes === 25000, "Expected update redemption limit");

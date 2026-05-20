@@ -30,22 +30,24 @@ vi.mock("@/components/Paywall", () => ({
 
 import { ProtectedRoute } from "./ProtectedRoute";
 
+const ProtectedRouteTree = (props?: Partial<React.ComponentProps<typeof ProtectedRoute>>) => (
+  <MemoryRouter initialEntries={["/protected"]}>
+    <Routes>
+      <Route
+        path="/protected"
+        element={
+          <ProtectedRoute {...props}>
+            <div>Protected Content</div>
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/welcome" element={<div>Welcome Page</div>} />
+    </Routes>
+  </MemoryRouter>
+);
+
 const renderProtectedRoute = (props?: Partial<React.ComponentProps<typeof ProtectedRoute>>) =>
-  render(
-    <MemoryRouter initialEntries={["/protected"]}>
-      <Routes>
-        <Route
-          path="/protected"
-          element={
-            <ProtectedRoute {...props}>
-              <div>Protected Content</div>
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/welcome" element={<div>Welcome Page</div>} />
-      </Routes>
-    </MemoryRouter>,
-  );
+  render(ProtectedRouteTree(props));
 
 describe("ProtectedRoute", () => {
   beforeEach(() => {
@@ -57,10 +59,22 @@ describe("ProtectedRoute", () => {
     accessState.loading = false;
   });
 
-  it("does not redirect while auth is recovering", () => {
+  it("renders protected content while auth is recovering with a cached user", () => {
     authState.status = "recovering";
     authState.loading = true;
     authState.user = { id: "user-1" };
+
+    renderProtectedRoute();
+
+    expect(screen.getByText("Protected Content")).toBeInTheDocument();
+    expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
+    expect(screen.queryByText("Welcome Page")).not.toBeInTheDocument();
+  });
+
+  it("does not redirect while auth is recovering without a cached user", () => {
+    authState.status = "recovering";
+    authState.loading = true;
+    authState.user = null;
 
     renderProtectedRoute();
 
@@ -88,6 +102,59 @@ describe("ProtectedRoute", () => {
     renderProtectedRoute();
 
     expect(screen.getByText("Protected Content")).toBeInTheDocument();
+  });
+
+  it("keeps rendered content visible while access refreshes", () => {
+    authState.status = "authenticated";
+    authState.loading = false;
+    authState.user = { id: "user-6" };
+
+    const view = renderProtectedRoute();
+
+    expect(screen.getByText("Protected Content")).toBeInTheDocument();
+
+    accessState.loading = true;
+    view.rerender(ProtectedRouteTree());
+
+    expect(screen.getByText("Protected Content")).toBeInTheDocument();
+    expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
+  });
+
+  it("does not reuse a previous user's access decision during account switches", () => {
+    authState.status = "authenticated";
+    authState.loading = false;
+    authState.user = { id: "user-a" };
+
+    const view = renderProtectedRoute();
+
+    expect(screen.getByText("Protected Content")).toBeInTheDocument();
+
+    authState.user = { id: "user-b" };
+    accessState.loading = true;
+    view.rerender(ProtectedRouteTree());
+
+    expect(screen.getByText("Loading...")).toBeInTheDocument();
+    expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
+  });
+
+  it("keeps the paywall visible while denied access refreshes", () => {
+    authState.status = "authenticated";
+    authState.loading = false;
+    authState.user = { id: "user-7" };
+    accessState.hasAccess = false;
+    accessState.gateReason = "pre_trial_signup";
+
+    const view = renderProtectedRoute();
+
+    expect(screen.getByText("Paywall:pre_trial_signup")).toBeInTheDocument();
+
+    accessState.loading = true;
+    accessState.hasAccess = true;
+    view.rerender(ProtectedRouteTree());
+
+    expect(screen.getByText("Paywall:pre_trial_signup")).toBeInTheDocument();
+    expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
+    expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
   });
 
   it("renders pre-trial paywall variant when access requires trial signup", () => {

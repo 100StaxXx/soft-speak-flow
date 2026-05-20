@@ -36,6 +36,7 @@ const EVOLUTION_ANIMATION_POLL_INTERVAL_MS = 2_000;
 const EVOLUTION_ANIMATION_PROCESS_INTERVAL_MS = 5_000;
 const EVOLUTION_ANIMATION_PRELOAD_TIMEOUT_MS = 30_000;
 const EVOLUTION_PRESENTATION_RETRY_DELAY_MS = 5_000;
+const PENDING_EVOLUTION_REVEAL_HYDRATION_INTERVAL_MS = 15_000;
 const LOCAL_HATCH_DEDUPE_WINDOW_MS = 15000;
 const HYDRATABLE_TERMINAL_ANIMATION_WINDOW_MS = 24 * 60 * 60 * 1000;
 const HYDRATABLE_MISSING_ANIMATION_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -2128,6 +2129,21 @@ export const GlobalEvolutionListener = () => {
   useEffect(() => {
     if (!user?.id) return;
 
+    const intervalId = window.setInterval(() => {
+      if (pendingEvolutionRevealRef.current?.status !== "preparing") return;
+
+      void hydrateLatestEvolutionJob();
+      void hydratePendingEvolutionReveal();
+    }, PENDING_EVOLUTION_REVEAL_HYDRATION_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [hydrateLatestEvolutionJob, hydratePendingEvolutionReveal, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
     const jobChannel = supabase
       .channel(`companion-evolution-jobs-${user.id}`)
       .on(
@@ -2164,6 +2180,42 @@ export const GlobalEvolutionListener = () => {
       supabase.removeChannel(jobChannel);
     };
   }, [handleEvolutionJobMetadata, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const animationJobChannel = supabase
+      .channel(`companion-animation-jobs-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "companion_animation_jobs",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          invalidateCompanionQueries();
+          void hydratePendingEvolutionReveal();
+        },
+      )
+      .subscribe((status, err) => {
+        if (status === "SUBSCRIBED") {
+          return;
+        }
+
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          logger.warn("Evolution animation job listener subscription error", {
+            status,
+            error: err?.message,
+          });
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(animationJobChannel);
+    };
+  }, [hydratePendingEvolutionReveal, invalidateCompanionQueries, user?.id]);
 
   useEffect(() => {
     if (!user) return;
