@@ -5,7 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation, Navigate, useNavigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
-import { useEffect, Suspense, lazy, memo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, Suspense, lazy, memo, useRef, useState, type ReactNode } from "react";
 import { Capacitor } from "@capacitor/core";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ViewModeProvider } from "@/contexts/ViewModeContext";
@@ -233,6 +233,8 @@ MentorTutorialLayer.displayName = "MentorTutorialLayer";
 
 const DEFAULT_SONNER_BOTTOM_OFFSET = "calc(env(safe-area-inset-bottom, 0px) + 16px)";
 const BOTTOM_NAV_SONNER_BOTTOM_OFFSET = "calc(var(--bottom-nav-runtime-offset, var(--bottom-nav-safe-offset)) + 12px)";
+const SPLASH_HIDE_READY_DELAY_MS = 100;
+const SPLASH_HIDE_WATCHDOG_MS = 3500;
 
 const MentorConnectedThemeProvider = memo(({ children }: { children: ReactNode }) => {
   const { mentorId } = useMentorConnection();
@@ -262,6 +264,13 @@ const AppContent = memo(() => {
   useAppResumeRefresh({ enabled: status === "authenticated" && Boolean(session?.user) });
   useCreationPopupResume();
   useDailyTaskBadgeSync();
+
+  const hideNativeSplashOnce = useCallback(() => {
+    if (splashHidden) return;
+
+    setSplashHidden(true);
+    void hideSplashScreen();
+  }, [splashHidden]);
   
   // Handle password recovery tokens BEFORE routes render - prevents paywall from blocking reset
   useEffect(() => {
@@ -366,17 +375,38 @@ const AppContent = memo(() => {
     };
   }, [pushUserId]);
   
-  // Hide splash screen once profile data is loaded (or failed to load)
+  // Hide splash screen once startup data is ready, with a watchdog so iOS never
+  // leaves the WebView covered if a network request stalls during launch.
   useEffect(() => {
-    if (!profileLoading && !splashHidden) {
-      // Small delay to ensure smooth transition
-      const timer = setTimeout(() => {
-        hideSplashScreen();
-        setSplashHidden(true);
-      }, 100);
-      return () => clearTimeout(timer);
+    const canHideSplash =
+      recoveryChecked &&
+      status !== "loading" &&
+      (!session?.user || !profileLoading);
+
+    if (!canHideSplash || splashHidden) {
+      return undefined;
     }
-  }, [profileLoading, splashHidden]);
+
+    const timer = window.setTimeout(hideNativeSplashOnce, SPLASH_HIDE_READY_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [hideNativeSplashOnce, profileLoading, recoveryChecked, session?.user, splashHidden, status]);
+
+  useEffect(() => {
+    if (splashHidden) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      logger.warn("Native splash watchdog elapsed before startup data finished loading", {
+        hasSession: Boolean(session?.user),
+        profileLoading,
+        status,
+      });
+      hideNativeSplashOnce();
+    }, SPLASH_HIDE_WATCHDOG_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [hideNativeSplashOnce, profileLoading, session?.user, splashHidden, status]);
 
   const activeMainTabPath = isMainTabPath(location.pathname) ? location.pathname : null;
   const showBottomNav = shouldShowBottomNav(location.pathname, Boolean(session?.user));

@@ -258,7 +258,7 @@ describe("DraggableFAB", () => {
     expect(mocks.onOpenCompanionPlanner).not.toHaveBeenCalled();
   });
 
-  it("requests AI launcher art and shows available scene art until the transparent cutout exists", () => {
+  it("requests AI launcher art without rendering scene art before the transparent cutout exists", () => {
     mocks.visual = {
       companionId: "companion-ai",
       companionLabel: "Nova",
@@ -286,12 +286,9 @@ describe("DraggableFAB", () => {
       enabled: true,
     });
     expect(
-      screen.queryByTestId("journeys-companion-launcher-placeholder"),
-    ).not.toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "Nova" })).toHaveAttribute(
-      "src",
-      "https://assets.example.com/scenic-companion.png",
-    );
+      screen.getByTestId("journeys-companion-launcher-placeholder"),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Nova" })).not.toBeInTheDocument();
   });
 
   it("keeps preset-backed remote companions on cached cutout art when the menu opens", () => {

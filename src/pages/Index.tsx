@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useCallback, useRef, type CSSProperties } from "react";
+import { useEffect, useMemo, useCallback, useRef, useState, type CSSProperties } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -22,6 +22,7 @@ import { resolveMentorImageSource } from "@/utils/mentorImageLoader";
 import {
   buildEstablishedProfileSelfHealPatch,
   getOnboardingGateState,
+  hasWalkthroughCompleted,
 } from "@/utils/profileOnboarding";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
@@ -52,6 +53,8 @@ type MentorPageData = {
     author?: string;
   } | null;
 };
+
+const INITIAL_ROUTE_LOAD_STALL_MS = 12_000;
 
 const GUIDE_TIFFANY_THEME_VARS: CSSProperties = {
   "--primary": "181 57% 56%",
@@ -142,6 +145,9 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
   const { isActive: isTutorialActive, currentStep: tutorialStep } = usePostOnboardingMentorGuidance();
   const onboardingSelfHealAttemptedRef = useRef(false);
   const didAutoScrollTutorialMorningCheckinRef = useRef(false);
+  const initialLoadTimeoutRef = useRef<number | null>(null);
+  const [hasInitialLoadTimedOut, setHasInitialLoadTimedOut] = useState(false);
+  const [initialLoadRetryNonce, setInitialLoadRetryNonce] = useState(0);
   const pepTalkDate = useMemo(
     () => getEffectiveDailyDate(profile?.timezone ?? undefined),
     [profile?.timezone],
@@ -290,13 +296,92 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
       }),
     [profile, companion],
   );
-  const onboardingGateReady = Boolean(user) && !profileLoading && !companionLoading;
+  const profileOnlyOnboardingGate = useMemo(
+    () =>
+      getOnboardingGateState({
+        profile,
+      }),
+    [profile],
+  );
+  const hasProfileCompletionMarker =
+    profile?.onboarding_step === "complete" ||
+    hasWalkthroughCompleted(profile?.onboarding_data) ||
+    profileOnlyOnboardingGate.reason === "legacy_resolved_mentor";
+  const canResolveOnboardingWithoutCompanion =
+    hasProfileCompletionMarker ||
+    profileOnlyOnboardingGate.resumeStep !== null ||
+    profileOnlyOnboardingGate.needsProgressionReset;
+  const routingOnboardingGate =
+    canResolveOnboardingWithoutCompanion ? profileOnlyOnboardingGate : onboardingGate;
+  const canProceedAfterCompanionStall =
+    hasInitialLoadTimedOut && Boolean(profile) && !profileLoading && companionLoading;
+  const onboardingGateReady =
+    Boolean(user) &&
+    !profileLoading &&
+    (
+      !companionLoading ||
+      canResolveOnboardingWithoutCompanion ||
+      canProceedAfterCompanionStall
+    );
 
   const isReady = useMemo(() => {
     if (!user) return false;
+    if (profileLoading) return false;
+    if (!enableOnboardingGuard) return true;
 
-    return !profileLoading && !companionLoading;
-  }, [user, profileLoading, companionLoading]);
+    return !companionLoading || canResolveOnboardingWithoutCompanion || canProceedAfterCompanionStall;
+  }, [
+    canProceedAfterCompanionStall,
+    canResolveOnboardingWithoutCompanion,
+    companionLoading,
+    enableOnboardingGuard,
+    profileLoading,
+    user,
+  ]);
+
+  const unresolvedInitialLoad =
+    Boolean(user) &&
+    (
+      profileLoading ||
+      (
+        enableOnboardingGuard &&
+        companionLoading &&
+        !canResolveOnboardingWithoutCompanion
+      )
+    );
+
+  useEffect(() => {
+    if (initialLoadTimeoutRef.current !== null) {
+      window.clearTimeout(initialLoadTimeoutRef.current);
+      initialLoadTimeoutRef.current = null;
+    }
+
+    if (!unresolvedInitialLoad) {
+      setHasInitialLoadTimedOut(false);
+      return undefined;
+    }
+
+    initialLoadTimeoutRef.current = window.setTimeout(() => {
+      initialLoadTimeoutRef.current = null;
+      setHasInitialLoadTimedOut(true);
+    }, INITIAL_ROUTE_LOAD_STALL_MS);
+
+    return () => {
+      if (initialLoadTimeoutRef.current !== null) {
+        window.clearTimeout(initialLoadTimeoutRef.current);
+        initialLoadTimeoutRef.current = null;
+      }
+    };
+  }, [initialLoadRetryNonce, unresolvedInitialLoad, user?.id]);
+
+  const handleRetryInitialLoad = useCallback(() => {
+    if (!user?.id) return;
+
+    setHasInitialLoadTimedOut(false);
+    setInitialLoadRetryNonce((nonce) => nonce + 1);
+    void queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
+    void queryClient.invalidateQueries({ queryKey: ["companion", user.id] });
+  }, [queryClient, user?.id]);
 
   useEffect(() => {
     onboardingSelfHealAttemptedRef.current = false;
@@ -333,14 +418,14 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
   useEffect(() => {
     if (location.pathname !== "/") return;
     if (!onboardingGateReady) return;
-    if (!onboardingGate.isEstablished) return;
+    if (!routingOnboardingGate.isEstablished) return;
 
     const hasRedirected = safeSessionStorage.getItem("initialRouteRedirected");
     if (!hasRedirected) {
       safeSessionStorage.setItem("initialRouteRedirected", "true");
       navigate("/journeys", { replace: true });
     }
-  }, [location.pathname, navigate, onboardingGate.isEstablished, onboardingGateReady]);
+  }, [location.pathname, navigate, routingOnboardingGate.isEstablished, onboardingGateReady]);
 
   const mentorConnectionMissing = !enableOnboardingGuard && mentorConnectionStatus === "missing";
   const mentorConnectionIssue =
@@ -381,18 +466,13 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     if (!enableOnboardingGuard) return;
     if (!user || !onboardingGateReady) return;
 
-    if (onboardingGate.needsOnboarding) {
+    if (routingOnboardingGate.needsOnboarding) {
       navigate("/onboarding");
     }
-  }, [enableOnboardingGuard, user, onboardingGateReady, onboardingGate.needsOnboarding, navigate]);
-
-  // Show loading state with skeleton while critical data loads
-  if (isTransitioning || !isReady) {
-    return <IndexPageSkeleton />;
-  }
+  }, [enableOnboardingGuard, user, onboardingGateReady, routingOnboardingGate.needsOnboarding, navigate]);
 
   // Show error state if critical data failed to load
-  if (!profileLoading && !companionLoading && !profile) {
+  if (user && !profileLoading && !profile) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="text-center space-y-4 max-w-md">
@@ -414,6 +494,30 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
         </div>
       </div>
     );
+  }
+
+  if (hasInitialLoadTimedOut && profileLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="text-center space-y-4 max-w-md rounded-lg border border-border bg-card p-6 text-card-foreground shadow-lg">
+          <div className="h-12 w-12 mx-auto rounded-full border-4 border-primary border-t-transparent animate-spin" />
+          <div>
+            <h2 className="text-xl font-bold mb-2">Still loading your setup</h2>
+            <p className="text-muted-foreground mb-4">
+              The connection is taking longer than expected. Retry the startup sync to keep going.
+            </p>
+            <Button onClick={handleRetryInitialLoad}>
+              Retry loading
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading state with skeleton while critical data loads.
+  if (isTransitioning || !isReady) {
+    return <IndexPageSkeleton />;
   }
 
   const mobileContent = (

@@ -264,6 +264,27 @@ describe("Index mentor connection state", () => {
     expect(screen.getByRole("button", { name: "Ask your guide" })).toBeInTheDocument();
   });
 
+  it("renders completed profiles while companion data is still loading", () => {
+    mocks.mentorStatus = "ready";
+    mocks.effectiveMentorId = "mentor-1";
+    mocks.companionLoading = true;
+    mocks.mentorQuery = {
+      data: {
+        mentorName: "Atlas",
+        mentorImage: "/mentor.png",
+        todaysQuote: { text: "Stay steady.", author: "Atlas" },
+      },
+      isLoading: false,
+      isError: false,
+    };
+
+    renderIndex();
+
+    expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
+    expect(screen.getByTestId("mentor-mobile-layout")).toBeInTheDocument();
+    expect(screen.getByText("MorningCheckIn")).toBeInTheDocument();
+  });
+
   it("shows mentor connection lost only after recovery fails", () => {
     mocks.layoutMode = "desktop";
     mocks.mentorStatus = "missing";

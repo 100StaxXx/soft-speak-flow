@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { passthroughProvider, isMainTabPathMock, authMock, profileMock, storageMock } = vi.hoisted(() => ({
+const { passthroughProvider, isMainTabPathMock, authMock, profileMock, storageMock, hideSplashScreenMock } = vi.hoisted(() => ({
   passthroughProvider: ({ children }: { children?: ReactNode }) => <>{children}</>,
   isMainTabPathMock: vi.fn((pathname: string) => pathname === "/mentor"),
+  hideSplashScreenMock: vi.fn(),
   authMock: {
     session: null as null | { user: { id: string } },
     status: "unauthenticated",
@@ -201,7 +202,7 @@ vi.mock("@/utils/orientationLock", () => ({
 }));
 
 vi.mock("@/utils/capacitor", () => ({
-  hideSplashScreen: vi.fn(),
+  hideSplashScreen: hideSplashScreenMock,
 }));
 
 vi.mock("@/utils/nativePushNotifications", () => ({
@@ -255,6 +256,10 @@ vi.mock("./pages/PremiumSuccess", () => ({
 import App from "./App";
 
 describe("App preview route", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     authMock.session = null;
     authMock.status = "unauthenticated";
@@ -267,6 +272,7 @@ describe("App preview route", () => {
     storageMock.setItem.mockReset();
     storageMock.removeItem.mockReset();
     storageMock.clear.mockReset();
+    hideSplashScreenMock.mockReset();
     isMainTabPathMock.mockImplementation((pathname: string) => pathname === "/mentor");
   });
 
@@ -343,4 +349,25 @@ describe("App preview route", () => {
       expect(screen.queryByRole("button", { name: /open notifications/i })).not.toBeInTheDocument();
     },
   );
+
+  it("hides the native splash after the watchdog if startup data keeps loading", async () => {
+    vi.useFakeTimers();
+    authMock.session = { user: { id: "user-1" } };
+    authMock.user = { id: "user-1" };
+    authMock.status = "authenticated";
+    profileMock.loading = true;
+    isMainTabPathMock.mockImplementation((pathname: string) => pathname === "/mentor");
+    window.history.pushState({}, "", "/mentor");
+
+    render(<App />);
+
+    expect(hideSplashScreenMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      vi.advanceTimersByTime(3500);
+    });
+
+    expect(hideSplashScreenMock).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
 });

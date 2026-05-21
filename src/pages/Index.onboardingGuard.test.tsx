@@ -38,6 +38,7 @@ const mocks = vi.hoisted(() => {
       isError: false,
     },
     queryClient: {
+      invalidateQueries: vi.fn().mockResolvedValue(undefined),
       refetchQueries: vi.fn().mockResolvedValue(undefined),
     },
     refreshConnection: vi.fn().mockResolvedValue(undefined),
@@ -211,6 +212,7 @@ describe("Index onboarding guard", () => {
     mocks.profilesUpdateEqMock.mockClear();
     mocks.profilesUpdateMock.mockClear();
     mocks.fromMock.mockClear();
+    mocks.queryClient.invalidateQueries.mockClear();
   });
 
   it("does not send legacy returning users back through onboarding", () => {
@@ -229,6 +231,22 @@ describe("Index onboarding guard", () => {
     renderIndex();
 
     expect(mocks.navigate).not.toHaveBeenCalledWith("/onboarding");
+  });
+
+  it("does not block completed profiles on the companion startup query", async () => {
+    mocks.profile = {
+      onboarding_completed: true,
+      selected_mentor_id: "mentor-legacy",
+      onboarding_data: { walkthrough_completed: true },
+    };
+    mocks.companionLoading = true;
+
+    renderIndex();
+
+    expect(mocks.navigate).not.toHaveBeenCalledWith("/onboarding");
+    await waitFor(() => {
+      expect(mocks.navigate).toHaveBeenCalledWith("/journeys", { replace: true });
+    });
   });
 
   it("does not send companion-backed stale profiles back through onboarding", async () => {

@@ -18,7 +18,10 @@ const configuration = process.env.IOS_CONFIGURATION ?? "Debug";
 const bundleId = process.env.IOS_BUNDLE_ID ?? "com.darrylgraham.revolution";
 const derivedDataPath = path.join(projectRoot, "ios", "App", "build-cli-device-smoke");
 const appPath = path.join(derivedDataPath, "Build", "Products", "Debug-iphoneos", "App.app");
-const coreDeviceTimeoutPattern = /Timed out waiting for CoreDeviceService/i;
+const coreDeviceTransientErrorPatterns = [
+  /Timed out waiting for CoreDeviceService/i,
+  /CoreDeviceService was unable to locate a device matching the requested device identifier/i,
+];
 const xcodeTransientErrorPatterns = [
   /CoreSimulatorService connection became invalid/i,
   /not a workspace file/i,
@@ -90,8 +93,9 @@ const runCoreDeviceCommand = async (args, retries = 2) => {
     } catch (error) {
       lastError = error;
       const message = error instanceof Error ? error.message : String(error);
-      if (coreDeviceTimeoutPattern.test(message) && attempt < retries) {
-        log(`CoreDevice timed out (attempt ${attempt}/${retries}). Retrying...`);
+      const isTransient = coreDeviceTransientErrorPatterns.some((pattern) => pattern.test(message));
+      if (isTransient && attempt < retries) {
+        log(`CoreDevice transient failure (attempt ${attempt}/${retries}). Retrying...`);
         await sleep(2000);
         continue;
       }
@@ -180,7 +184,7 @@ const run = async () => {
     "--device",
     deviceId,
     appPath,
-  ]);
+  ], 4);
 
   log(`Launching ${bundleId} on device ${deviceId}...`);
   await runCoreDeviceCommand([
@@ -190,9 +194,9 @@ const run = async () => {
     "launch",
     "--device",
     deviceId,
-    bundleId,
     "--terminate-existing",
-  ]);
+    bundleId,
+  ], 4);
 
   log("Device smoke test passed.");
 };

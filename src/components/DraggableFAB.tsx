@@ -111,7 +111,7 @@ export const DraggableFAB = ({
     [planDayLabel, user?.id],
   );
   const launcherImageUrlOverride = shouldUseStrictLauncherArt
-    ? launcherAwayImageUrl ?? currentSceneImageUrl
+    ? launcherAwayImageUrl
     : isMenuOpen ? null : launcherAwayImageUrl;
   const launcherFocalXOverride = shouldUseStrictLauncherArt
     ? launcherAwayImageUrl ? launcherAwayFocalX : undefined
