@@ -2,15 +2,23 @@ import { SplashScreen } from '@capacitor/splash-screen';
 import { Share } from '@capacitor/share';
 import { Capacitor } from '@capacitor/core';
 
+const CAPACITOR_DEBUG = import.meta.env.VITE_CAPACITOR_DEBUG === 'true';
+
+function capacitorDebug(message: string, ...args: unknown[]): void {
+  if (CAPACITOR_DEBUG) {
+    console.debug(message, ...args);
+  }
+}
+
 /**
  * Initialize Capacitor features (called early in app lifecycle)
  */
 export const initializeCapacitor = async () => {
   try {
     // Keep splash screen visible - will be hidden when app is ready
-    console.debug('Capacitor initialized, splash screen visible');
+    capacitorDebug('Capacitor initialized, splash screen visible');
   } catch (error) {
-    console.debug('Capacitor initialization error:', error);
+    capacitorDebug('Capacitor initialization error:', error);
   }
 };
 
@@ -23,10 +31,10 @@ export const hideSplashScreen = async () => {
     await SplashScreen.hide({
       fadeOutDuration: 300 // Smooth 300ms fade out
     });
-    console.debug('Splash screen hidden');
+    capacitorDebug('Splash screen hidden');
   } catch (error) {
     // Splash screen plugin not available (web), ignore
-    console.debug('Splash screen not available:', error);
+    capacitorDebug('Splash screen not available:', error);
   }
 };
 

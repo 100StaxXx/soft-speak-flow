@@ -15,7 +15,7 @@ export const useGlobalWidgetSync = (options: GlobalWidgetSyncOptions = {}): void
   const { user } = useAuth();
 
   const syncEnabled = enabled && !!user;
-  const { tasks, taskDate } = useTasksQuery(undefined, { enabled: syncEnabled });
+  const { tasks, taskDate, isLoading } = useTasksQuery(undefined, { enabled: syncEnabled });
 
-  useWidgetSync(tasks, taskDate, { enabled: syncEnabled, profileWallpaper });
+  useWidgetSync(tasks, taskDate, { enabled: syncEnabled && !isLoading, profileWallpaper });
 };

@@ -47,7 +47,7 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
               let completedCount = call.getInt("completedCount"),
               let totalCount = call.getInt("totalCount"),
               let date = call.getString("date") else {
-            print("[WidgetDataPlugin] updateWidgetData rejected: missing required parameters")
+            CosmiqNativeLog.warning("[WidgetDataPlugin] updateWidgetData rejected: missing required parameters")
             appendDiagnosticsLog(
                 event: "updateWidgetData_failed",
                 status: "error",
@@ -85,7 +85,7 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
 
         // Write to App Group shared container
         guard let userDefaults = UserDefaults(suiteName: appGroupId) else {
-            print("[WidgetDataPlugin] updateWidgetData rejected: failed to access App Group container \(appGroupId)")
+            CosmiqNativeLog.warning("[WidgetDataPlugin] updateWidgetData rejected: failed to access App Group container \(appGroupId)")
             appendDiagnosticsLog(
                 event: "updateWidgetData_failed",
                 status: "error",
@@ -142,7 +142,7 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func reloadWidget(_ call: CAPPluginCall) {
-        print("[WidgetDataPlugin] reloadWidget called from JS")
+        CosmiqNativeLog.debug("[WidgetDataPlugin] reloadWidget called from JS")
         appendDiagnosticsLog(
             event: "reloadWidget_called",
             status: "success"
@@ -153,7 +153,7 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func getWidgetSyncDiagnostics(_ call: CAPPluginCall) {
         guard let userDefaults = UserDefaults(suiteName: appGroupId) else {
-            print("[WidgetDataPlugin] Diagnostics: App Group inaccessible \(appGroupId)")
+            CosmiqNativeLog.warning("[WidgetDataPlugin] Diagnostics: App Group inaccessible \(appGroupId)")
             setLastError(
                 code: ErrorCode.appGroupInaccessible,
                 message: "Failed to access App Group container \(appGroupId)"
@@ -196,7 +196,7 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
                 payloadObject = try JSONSerialization.jsonObject(with: payloadData) as? [String: Any]
             }
         } catch {
-            print("[WidgetDataPlugin] Diagnostics decode failed: \(error.localizedDescription)")
+            CosmiqNativeLog.warning("[WidgetDataPlugin] Diagnostics decode failed: \(error.localizedDescription)")
             appendDiagnosticsLog(
                 event: "getWidgetSyncDiagnostics_failed",
                 status: "error",
@@ -215,7 +215,7 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
-        print(
+        CosmiqNativeLog.debug(
             "[WidgetDataPlugin] Diagnostics " +
             "accessible=true " +
             "hasPayload=\(hasPayload) " +
@@ -363,7 +363,7 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
                 readBackSucceeded = decodedNonce == probeNonce
             }
         } catch {
-            print("[WidgetDataPlugin] Probe decode failed: \(error.localizedDescription)")
+            CosmiqNativeLog.warning("[WidgetDataPlugin] Probe decode failed: \(error.localizedDescription)")
         }
 
         if writeSucceeded && readBackSucceeded {
@@ -404,13 +404,13 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private func triggerWidgetReload(withDelay delay: TimeInterval, reason: String) {
         guard #available(iOS 14.0, *) else {
-            print("[WidgetDataPlugin] Skipped widget reload (\(reason)): iOS < 14")
+            CosmiqNativeLog.debug("[WidgetDataPlugin] Skipped widget reload (\(reason)): iOS < 14")
             return
         }
 
-        print("[WidgetDataPlugin] Scheduling widget reload reason=\(reason) delay=\(delay)s")
+        CosmiqNativeLog.debug("[WidgetDataPlugin] Scheduling widget reload reason=\(reason) delay=\(delay)s")
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            print("[WidgetDataPlugin] Reloading widget timelines reason=\(reason)")
+            CosmiqNativeLog.debug("[WidgetDataPlugin] Reloading widget timelines reason=\(reason)")
             WidgetCenter.shared.reloadTimelines(ofKind: "CosmiqWidget")
             WidgetCenter.shared.reloadAllTimelines()
         }
@@ -429,7 +429,7 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
         wallpaperState: ProfileWallpaperState
     ) {
         guard let jsonData = try? JSONSerialization.data(withJSONObject: widgetData) else {
-            print("[WidgetDataPlugin] updateWidgetData rejected: failed to serialize widget payload")
+            CosmiqNativeLog.warning("[WidgetDataPlugin] updateWidgetData rejected: failed to serialize widget payload")
             appendDiagnosticsLog(
                 event: "updateWidgetData_failed",
                 status: "error",
@@ -452,7 +452,7 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
         userDefaults.set(jsonData, forKey: dataKey)
         let didSynchronize = userDefaults.synchronize()
         guard let readBackData = userDefaults.data(forKey: dataKey), !readBackData.isEmpty else {
-            print("[WidgetDataPlugin] updateWidgetData rejected: payload missing after write")
+            CosmiqNativeLog.warning("[WidgetDataPlugin] updateWidgetData rejected: payload missing after write")
             appendDiagnosticsLog(
                 event: "updateWidgetData_failed",
                 status: "error",
@@ -474,7 +474,7 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
-        print(
+        CosmiqNativeLog.debug(
             "[WidgetDataPlugin] Wrote widget payload " +
             "date=\(date) " +
             "tasks=\(taskCount) " +
@@ -745,7 +745,7 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
             }
             lineData = Data((jsonLine + "\n").utf8)
         } catch {
-            print("[WidgetDataPlugin] Diagnostics file encode failed: \(error.localizedDescription)")
+            CosmiqNativeLog.warning("[WidgetDataPlugin] Diagnostics file encode failed: \(error.localizedDescription)")
             return
         }
 
@@ -771,7 +771,7 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
 
             try lineData.write(to: logURL, options: .atomic)
         } catch {
-            print("[WidgetDataPlugin] Diagnostics file write failed: \(error.localizedDescription)")
+            CosmiqNativeLog.warning("[WidgetDataPlugin] Diagnostics file write failed: \(error.localizedDescription)")
         }
     }
 

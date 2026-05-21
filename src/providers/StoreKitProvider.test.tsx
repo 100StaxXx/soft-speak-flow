@@ -50,6 +50,7 @@ vi.mock("@/utils/platformTargets", () => ({
 vi.mock("@revenuecat/purchases-capacitor", () => ({
   LOG_LEVEL: {
     DEBUG: "DEBUG",
+    ERROR: "ERROR",
     INFO: "INFO",
   },
   PAYWALL_RESULT: {

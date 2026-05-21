@@ -24,6 +24,8 @@ const PUSH_INSTALLATION_ID_STORAGE_KEY = 'native_push_installation_id';
 const FOREGROUND_PUSH_TOAST_DEDUPE_MS = 10_000;
 const foregroundPushToastShownAt = new Map<string, number>();
 export const NATIVE_PUSH_RECEIVED_EVENT = 'native-push-received';
+const NATIVE_PUSH_DEBUG = import.meta.env.VITE_NATIVE_PUSH_DEBUG === 'true';
+const SHOULD_LOG_NATIVE_PUSH_WARNINGS = import.meta.env.MODE !== 'test';
 
 interface PushDeviceTokenRow {
   id: string;
@@ -52,6 +54,24 @@ interface ForegroundPushNotificationInput {
   title?: unknown;
   body?: unknown;
   data?: unknown;
+}
+
+function nativePushDebug(message: string, ...args: unknown[]): void {
+  if (NATIVE_PUSH_DEBUG) {
+    console.debug(message, ...args);
+  }
+}
+
+function nativePushWarn(message: string, ...args: unknown[]): void {
+  if (SHOULD_LOG_NATIVE_PUSH_WARNINGS) {
+    console.warn(message, ...args);
+  }
+}
+
+function nativePushError(message: string, ...args: unknown[]): void {
+  if (SHOULD_LOG_NATIVE_PUSH_WARNINGS) {
+    console.error(message, ...args);
+  }
 }
 
 export interface ForegroundPushToastDetails {
@@ -229,14 +249,11 @@ export function isNativePushSupported(): boolean {
     const platform = Capacitor.getPlatform();
     const isSupported = isNativeIOSHandheld();
     
-    // Log for debugging in Xcode console
-    console.log('[NativePush] Platform check:', { isNative, platform, isSupported });
-    logger.info('[NativePush] Platform check:', { isNative, platform, isSupported });
+    nativePushDebug('[NativePush] Platform check:', { isNative, platform, isSupported });
     
     return isSupported;
   } catch (error) {
-    console.log('[NativePush] Platform check error:', error);
-    logger.info('Native push not available:', error);
+    nativePushDebug('[NativePush] Platform check error:', error);
     return false;
   }
 }
@@ -251,10 +268,10 @@ export async function getPermissionStatus(): Promise<string> {
   
   try {
     const status = await PushNotifications.checkPermissions();
-    console.log('[NativePush] Permission status:', status.receive);
+    nativePushDebug('[NativePush] Permission status:', status.receive);
     return status.receive;
   } catch (error) {
-    console.log('[NativePush] Error checking permissions:', error);
+    nativePushWarn('[NativePush] Error checking permissions:', error);
     return 'unknown';
   }
 }
@@ -265,39 +282,35 @@ async function bindPushListenersOnce(): Promise<void> {
   const handles: PluginListenerHandle[] = [];
 
   handles.push(await PushNotifications.addListener('registration', async (token) => {
-    console.log('[NativePush] ✅ REGISTRATION SUCCESS');
-    console.log('[NativePush] Device token received');
-    logger.log('Push registration success');
+    nativePushDebug('[NativePush] Registration success');
+    nativePushDebug('[NativePush] Device token received');
 
     if (!currentPushUserId) {
-      console.log('[NativePush] Skipping token save because no active user is set');
+      nativePushDebug('[NativePush] Skipping token save because no active user is set');
       return;
     }
 
     try {
       await saveDeviceToken(currentPushUserId, token.value);
-      console.log('[NativePush] Token saved to database successfully');
+      nativePushDebug('[NativePush] Token saved to database successfully');
     } catch (saveError) {
-      console.log('[NativePush] ❌ Failed to save token:', saveError);
+      nativePushError('[NativePush] Failed to save token:', saveError);
     }
   }));
 
   handles.push(await PushNotifications.addListener('registrationError', (error) => {
-    console.log('[NativePush] ❌ REGISTRATION ERROR');
-    console.log('[NativePush] Error details:', JSON.stringify(error));
+    nativePushError('[NativePush] Registration error:', error);
     logger.error('Push registration error:', error);
   }));
 
   handles.push(await PushNotifications.addListener('pushNotificationReceived', (notification) => {
-    console.log('[NativePush] Notification received:', notification);
-    logger.log('Push notification received:', notification);
+    nativePushDebug('[NativePush] Notification received:', notification);
     dispatchNativePushReceived(notification);
     showForegroundPushNotificationToast(notification);
   }));
 
   handles.push(await PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
-    console.log('[NativePush] Notification action performed:', notification);
-    logger.log('Push notification action performed:', notification);
+    nativePushDebug('[NativePush] Notification action performed:', notification);
     const data = notification.notification.data;
     dispatchNativePushNavigation(
       buildPushNotificationNavigationDetail(data, readNonEmptyString(data?.type)),
@@ -319,7 +332,7 @@ async function removePushListeners(): Promise<void> {
     try {
       await handle.remove();
     } catch (error) {
-      console.log('[NativePush] Error removing listener:', error);
+      nativePushWarn('[NativePush] Error removing listener:', error);
     }
   }
 }
@@ -328,55 +341,52 @@ async function removePushListeners(): Promise<void> {
  * Initialize native push notifications
  */
 export async function initializeNativePush(userId: string): Promise<void> {
-  console.log('[NativePush] ========== INIT START ==========');
-  console.log('[NativePush] User ID:', userId);
+  nativePushDebug('[NativePush] Init start');
+  nativePushDebug('[NativePush] User ID:', userId);
 
   currentPushUserId = userId;
   
   if (!isNativePushSupported()) {
-    console.log('[NativePush] Not supported on this platform, aborting');
-    logger.info('Native push not supported on this platform');
+    nativePushDebug('[NativePush] Not supported on this platform, aborting');
     return;
   }
 
   if (initializedUserId === userId && listenersBound) {
-    console.log('[NativePush] Already initialized for current user, refreshing APNs registration');
+    nativePushDebug('[NativePush] Already initialized for current user, refreshing APNs registration');
     await PushNotifications.register();
     return;
   }
 
   if (initializationPromise) {
-    console.log('[NativePush] Initialization already in progress, waiting...');
+    nativePushDebug('[NativePush] Initialization already in progress, waiting...');
     await initializationPromise;
     return;
   }
 
   initializationPromise = (async () => {
     try {
-      console.log('[NativePush] Step 1: Requesting permissions...');
+      nativePushDebug('[NativePush] Requesting permissions');
 
       const permission = await PushNotifications.requestPermissions();
 
-      console.log('[NativePush] Permission result:', permission);
-      console.log('[NativePush] Permission receive status:', permission.receive);
+      nativePushDebug('[NativePush] Permission result:', permission);
+      nativePushDebug('[NativePush] Permission receive status:', permission.receive);
 
       if (permission.receive !== 'granted') {
-        console.log('[NativePush] Permission DENIED - user did not grant access');
-        logger.log('Push notification permission denied');
+        nativePushWarn('[NativePush] Permission denied');
         throw new Error('Push notification permission denied. Please enable in Settings.');
       }
 
-      console.log('[NativePush] Step 2: Binding listeners...');
+      nativePushDebug('[NativePush] Binding listeners');
       await bindPushListenersOnce();
 
-      console.log('[NativePush] Step 3: Registering with APNs...');
+      nativePushDebug('[NativePush] Registering with APNs');
       await PushNotifications.register();
 
       initializedUserId = userId;
-      console.log('[NativePush] ========== INIT COMPLETE ==========');
+      nativePushDebug('[NativePush] Init complete');
     } catch (error) {
-      console.log('[NativePush] ❌ INIT FAILED');
-      console.log('[NativePush] Error:', error);
+      nativePushError('[NativePush] Init failed:', error);
       logger.error('Error initializing native push:', error);
       throw error;
     } finally {
@@ -421,7 +431,7 @@ export async function getNativePushTokenDebugSnapshot(userId: string): Promise<N
       currentInstallationIdPreview: previewValue(currentInstallationId),
     };
   } catch (error) {
-    console.log('[NativePush] Failed to load token snapshot:', error);
+    nativePushWarn('[NativePush] Failed to load token snapshot:', error);
     return {
       tokenCount: 0,
       installationCount: 0,
@@ -460,9 +470,9 @@ export async function saveDeviceTokenForInstallation(
   deviceToken: string,
   installationId = getOrCreatePushInstallationId(),
 ): Promise<void> {
-  console.log('[NativePush] Saving token to database...');
-  console.log('[NativePush] User:', userId);
-  console.log('[NativePush] Token (first 20 chars):', deviceToken.substring(0, 20) + '...');
+  nativePushDebug('[NativePush] Saving token to database');
+  nativePushDebug('[NativePush] User:', userId);
+  nativePushDebug('[NativePush] Token preview:', `${deviceToken.substring(0, 20)}...`);
   
   try {
     const claimArgs = buildPushDeviceTokenClaimArgs({
@@ -473,15 +483,14 @@ export async function saveDeviceTokenForInstallation(
     const { error } = await supabase.rpc('claim_push_device_token', claimArgs);
 
     if (error) {
-      console.log('[NativePush] Database error:', error);
+      nativePushError('[NativePush] Database error:', error);
       logger.error('Error saving device token:', error);
       throw error;
     }
 
-    console.log('[NativePush] ✅ Device token saved successfully');
-    logger.log('Device token saved successfully');
+    nativePushDebug('[NativePush] Device token saved successfully');
   } catch (error) {
-    console.log('[NativePush] ❌ Error saving device token:', error);
+    nativePushError('[NativePush] Error saving device token:', error);
     logger.error('Error saving device token:', error);
     throw error;
   }
@@ -495,7 +504,7 @@ async function saveDeviceToken(userId: string, deviceToken: string): Promise<voi
  * Unregister from push notifications
  */
 export async function unregisterNativePush(userId: string): Promise<void> {
-  console.log('[NativePush] Unregistering...');
+  nativePushDebug('[NativePush] Unregistering');
   
   if (!isNativePushSupported()) {
     return;
@@ -514,7 +523,7 @@ export async function unregisterNativePush(userId: string): Promise<void> {
     
     // Get current device token before unregistering
     const deliveredNotifications = await PushNotifications.getDeliveredNotifications();
-    console.log('[NativePush] Delivered notifications:', deliveredNotifications);
+    nativePushDebug('[NativePush] Delivered notifications:', deliveredNotifications);
 
     const installationId = getOrCreatePushInstallationId();
 
@@ -527,10 +536,10 @@ export async function unregisterNativePush(userId: string): Promise<void> {
       .eq('installation_id', installationId);
 
     if (error) {
-      console.log('[NativePush] Error deleting token:', error);
+      nativePushError('[NativePush] Error deleting token:', error);
       logger.error('Error deleting device token:', error);
     } else {
-      console.log('[NativePush] Token deleted from database');
+      nativePushDebug('[NativePush] Token deleted from database');
     }
 
     if (initializedUserId === userId) {
@@ -541,7 +550,7 @@ export async function unregisterNativePush(userId: string): Promise<void> {
     }
 
   } catch (error) {
-    console.log('[NativePush] Unregister error:', error);
+    nativePushError('[NativePush] Unregister error:', error);
     logger.error('Error unregistering from push:', error);
     throw error;
   }
@@ -563,10 +572,10 @@ export async function hasActiveNativePushSubscription(userId: string): Promise<b
 
     if (error) throw error;
     const hasSubscription = (data?.length || 0) > 0;
-    console.log('[NativePush] Has active subscription:', hasSubscription);
+    nativePushDebug('[NativePush] Has active subscription:', hasSubscription);
     return hasSubscription;
   } catch (error) {
-    console.log('[NativePush] Error checking subscription:', error);
+    nativePushError('[NativePush] Error checking subscription:', error);
     logger.error('Error checking native push subscription:', error);
     return false;
   }
@@ -606,6 +615,6 @@ export async function debugTestRegistration(_userId: string): Promise<{
     error
   };
   
-  console.log('[NativePush] Debug info:', result);
+  nativePushDebug('[NativePush] Debug info:', result);
   return result;
 }

@@ -3,6 +3,27 @@ import Capacitor
 import GooglePlaces
 import UserNotifications
 
+enum CosmiqNativeLog {
+    static var verboseEnabled: Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains("-CosmiqVerboseNativeLogs") ||
+            UserDefaults.standard.bool(forKey: "CosmiqVerboseNativeLogs")
+        #else
+        return false
+        #endif
+    }
+
+    static func debug(_ message: @autoclosure () -> String) {
+        if verboseEnabled {
+            print(message())
+        }
+    }
+
+    static func warning(_ message: @autoclosure () -> String) {
+        print(message())
+    }
+}
+
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
@@ -14,6 +35,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         configureGooglePlaces()
         logNotificationSettings(context: "didFinishLaunching")
         return true
+    }
+
+    func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+        UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
@@ -61,7 +86,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Log for debugging
         let tokenParts = deviceToken.map { data in String(format: "%02.2hhx", data) }
         let token = tokenParts.joined()
-        print("[APNs] Successfully registered for remote notifications with token: \(token)")
+        CosmiqNativeLog.debug("[APNs] Successfully registered for remote notifications with token preview: \(token.prefix(20))...")
         logNotificationSettings(context: "didRegisterForRemoteNotifications")
     }
 
@@ -70,7 +95,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
         
         // Log for debugging
-        print("[APNs] Failed to register for remote notifications: \(error.localizedDescription)")
+        CosmiqNativeLog.warning("[APNs] Failed to register for remote notifications: \(error.localizedDescription)")
     }
 
     private func logNotificationSettings(context: String) {
@@ -94,7 +119,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 parts.append("timeSensitive=\(self.string(from: settings.timeSensitiveSetting))")
             }
 
-            print("[APNs] Notification settings (\(context)): \(parts.joined(separator: ", "))")
+            CosmiqNativeLog.debug("[APNs] Notification settings (\(context)): \(parts.joined(separator: ", "))")
         }
     }
 
@@ -149,7 +174,7 @@ enum GooglePlacesConfiguration {
     static func configuredAPIKey(logIfMissing: Bool = false) -> String? {
         guard let rawKey = Bundle.main.object(forInfoDictionaryKey: "GooglePlacesAPIKey") as? String else {
             if logIfMissing {
-                print("[GooglePlaces] GooglePlacesAPIKey is not configured.")
+                CosmiqNativeLog.warning("[GooglePlaces] GooglePlacesAPIKey is not configured.")
             }
             return nil
         }
@@ -159,7 +184,7 @@ enum GooglePlacesConfiguration {
               !key.hasPrefix("$("),
               key != "your-ios-google-places-api-key" else {
             if logIfMissing {
-                print("[GooglePlaces] GooglePlacesAPIKey is empty or still using a placeholder.")
+                CosmiqNativeLog.warning("[GooglePlaces] GooglePlacesAPIKey is empty or still using a placeholder.")
             }
             return nil
         }

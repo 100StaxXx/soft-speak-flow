@@ -27,6 +27,13 @@ interface WidgetSyncOptions {
 
 export const WIDGET_SYNC_DIAGNOSTICS_STORAGE_KEY = 'widget-sync-diagnostics';
 export const WIDGET_SYNC_LAST_ERROR_STORAGE_KEY = 'widget-sync-last-error';
+const WIDGET_SYNC_DEBUG = import.meta.env.VITE_WIDGET_SYNC_DEBUG === 'true';
+
+function widgetSyncDebug(message: string, ...args: unknown[]): void {
+  if (WIDGET_SYNC_DEBUG) {
+    console.debug(message, ...args);
+  }
+}
 
 export const useWidgetSync = (
   tasks: DailyTask[],
@@ -104,7 +111,7 @@ export const useWidgetSync = (
       });
       lastSyncRef.current = fingerprint;
       persistWidgetErrorToSession(null);
-      console.info('[WidgetSync] Synced widget payload', {
+      widgetSyncDebug('[WidgetSync] Synced widget payload', {
         taskDate,
         force,
         totalCount: quests.length,
@@ -117,7 +124,7 @@ export const useWidgetSync = (
     } catch (error) {
       if (isUnimplementedPluginError(error)) {
         sessionSyncDisabledRef.current = true;
-        console.info('[WidgetSync] WidgetData plugin unavailable at runtime; disabling widget sync for this session.');
+        widgetSyncDebug('[WidgetSync] WidgetData plugin unavailable at runtime; disabling widget sync for this session.');
         return;
       }
       const details = getErrorDetails(error);
@@ -154,7 +161,9 @@ export const useWidgetSync = (
     }
 
     const timer = setTimeout(() => {
-      syncRef.current(true);
+      if (!lastSyncRef.current) {
+        syncRef.current(true);
+      }
     }, 500);
     return () => clearTimeout(timer);
   }, [enabled, isIOS]);
@@ -189,7 +198,7 @@ export const useWidgetSync = (
           return;
         }
         persistWidgetDiagnosticsToSession(diagnostics);
-        console.info('[WidgetSync] Diagnostics snapshot', diagnostics);
+        widgetSyncDebug('[WidgetSync] Diagnostics snapshot', diagnostics);
 
         if (!diagnostics.appGroupAccessible || !diagnostics.hasPayload) {
           console.warn('[WidgetSync] Diagnostics indicate missing shared payload state', diagnostics);
@@ -197,7 +206,7 @@ export const useWidgetSync = (
       } catch (error) {
         if (isUnimplementedPluginError(error)) {
           sessionSyncDisabledRef.current = true;
-          console.info('[WidgetSync] WidgetData plugin unavailable at runtime; disabling widget sync for this session.');
+          widgetSyncDebug('[WidgetSync] WidgetData plugin unavailable at runtime; disabling widget sync for this session.');
           return;
         }
 

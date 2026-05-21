@@ -41,6 +41,7 @@ const REVENUECAT_PRODUCTS_TIMEOUT_MS = 8000;
 const REVENUECAT_CONFIGURE_TIMEOUT_MS = 10000;
 const REVENUECAT_PURCHASE_RECOVERY_TIMEOUT_MS = 8000;
 const OFFER_CODE_ENTITLEMENT_POLL_DELAYS_MS = [0, 500, 1000, 1500];
+const REVENUECAT_DEBUG = import.meta.env.VITE_REVENUECAT_DEBUG === "true";
 const COSMIQ_PRO_ENTITLEMENT_ALIASES = [
   COSMIQ_PRO_ENTITLEMENT_ID,
   COSMIQ_PRO_ENTITLEMENT_NAME,
@@ -321,6 +322,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
   const [entitlementError, setEntitlementError] = useState(false);
   const [isConfigured, setIsConfigured] = useState(false);
   const configuredAppUserIdRef = useRef<string | null>(null);
+  const purchaseRecoveryPromiseRef = useRef<Promise<StoreKitTransaction | null> | null>(null);
   const packagesRef = useRef<PurchasesPackage[]>([]);
   const storeProductsRef = useRef<Map<string, PurchasesStoreProduct>>(new Map());
 
@@ -448,7 +450,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
       try {
         if (!configuredAppUserIdRef.current) {
           await Purchases.setLogLevel({
-            level: import.meta.env.DEV ? LOG_LEVEL.DEBUG : LOG_LEVEL.INFO,
+            level: REVENUECAT_DEBUG ? LOG_LEVEL.DEBUG : LOG_LEVEL.ERROR,
           });
           await withTimeout(
             () => Purchases.configure({
@@ -613,44 +615,58 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
 
   const recoverPurchasesHandler = useCallback(async (): Promise<StoreKitTransaction | null> => {
     if (!isAvailable || !isConfigured) return null;
+    if (purchaseRecoveryPromiseRef.current) {
+      return purchaseRecoveryPromiseRef.current;
+    }
 
-    setEntitlementLoading(true);
-    try {
+    const recoveryPromise = (async (): Promise<StoreKitTransaction | null> => {
+      setEntitlementLoading(true);
       try {
-        await withTimeout(
-          () => Purchases.syncPurchases(),
+        try {
+          await withTimeout(
+            () => Purchases.syncPurchases(),
+            {
+              timeoutMs: REVENUECAT_PURCHASE_RECOVERY_TIMEOUT_MS,
+              operation: "RevenueCat purchase sync",
+              timeoutCode: "REVENUECAT_TIMEOUT",
+            },
+          );
+          const syncedCustomerInfo = await fetchCustomerInfo();
+          const syncedTransaction = customerInfoToTransaction(syncedCustomerInfo);
+          if (syncedTransaction) {
+            setEntitlementError(false);
+            return syncedTransaction;
+          }
+        } catch (syncError) {
+          console.warn("[RevenueCat] Existing purchase sync failed; trying restore purchases", syncError);
+        }
+
+        const { customerInfo: restoredCustomerInfo } = await withTimeout(
+          () => Purchases.restorePurchases(),
           {
             timeoutMs: REVENUECAT_PURCHASE_RECOVERY_TIMEOUT_MS,
-            operation: "RevenueCat purchase sync",
+            operation: "RevenueCat purchase restore",
             timeoutCode: "REVENUECAT_TIMEOUT",
           },
         );
-        const syncedCustomerInfo = await fetchCustomerInfo();
-        const syncedTransaction = customerInfoToTransaction(syncedCustomerInfo);
-        if (syncedTransaction) {
-          setEntitlementError(false);
-          return syncedTransaction;
-        }
-      } catch (syncError) {
-        console.warn("[RevenueCat] Existing purchase sync failed; trying restore purchases", syncError);
+        applyCustomerInfo(restoredCustomerInfo);
+        setEntitlementError(false);
+        return customerInfoToTransaction(restoredCustomerInfo);
+      } catch (error) {
+        console.warn("[RevenueCat] Existing purchase recovery failed", error);
+        return null;
+      } finally {
+        setEntitlementLoading(false);
       }
+    })();
 
-      const { customerInfo: restoredCustomerInfo } = await withTimeout(
-        () => Purchases.restorePurchases(),
-        {
-          timeoutMs: REVENUECAT_PURCHASE_RECOVERY_TIMEOUT_MS,
-          operation: "RevenueCat purchase restore",
-          timeoutCode: "REVENUECAT_TIMEOUT",
-        },
-      );
-      applyCustomerInfo(restoredCustomerInfo);
-      setEntitlementError(false);
-      return customerInfoToTransaction(restoredCustomerInfo);
-    } catch (error) {
-      console.warn("[RevenueCat] Existing purchase recovery failed", error);
-      return null;
+    purchaseRecoveryPromiseRef.current = recoveryPromise;
+    try {
+      return await recoveryPromise;
     } finally {
-      setEntitlementLoading(false);
+      if (purchaseRecoveryPromiseRef.current === recoveryPromise) {
+        purchaseRecoveryPromiseRef.current = null;
+      }
     }
   }, [applyCustomerInfo, fetchCustomerInfo, isAvailable, isConfigured]);
 
