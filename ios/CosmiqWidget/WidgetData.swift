@@ -96,29 +96,17 @@ class WidgetDataManager {
     static let shared = WidgetDataManager()
     
     private let appGroupId = "group.com.darrylgraham.revolution"
-    private let dataKey = "widget_tasks_data"
+    private let payloadFileName = "widget_tasks_data.json"
     
     private init() {}
     
-    /// Load task data from shared App Group UserDefaults
+    /// Load task data from the shared App Group file container.
     func loadData() -> WidgetTaskData? {
-        guard let userDefaults = UserDefaults(suiteName: appGroupId) else {
+        guard let data = loadPayloadData() else {
             return nil
         }
 
-        let decodedData: WidgetTaskData?
-
-        if let data = userDefaults.data(forKey: dataKey) {
-            decodedData = decodeWidgetData(from: data)
-        } else if let jsonString = userDefaults.string(forKey: dataKey),
-                  let data = jsonString.data(using: .utf8) {
-            // Legacy string payload support
-            decodedData = decodeWidgetData(from: data)
-        } else {
-            return nil
-        }
-
-        guard let payload = decodedData else {
+        guard let payload = decodeWidgetData(from: data) else {
             return nil
         }
 
@@ -130,11 +118,21 @@ class WidgetDataManager {
         return getEmptyData(for: WidgetTaskData.localDateString())
     }
 
+    private func loadPayloadData() -> Data? {
+        guard let containerURL = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: appGroupId
+        ) else {
+            return nil
+        }
+
+        let payloadURL = containerURL.appendingPathComponent(payloadFileName, isDirectory: false)
+        return try? Data(contentsOf: payloadURL)
+    }
+
     private func decodeWidgetData(from data: Data) -> WidgetTaskData? {
         do {
             return try JSONDecoder().decode(WidgetTaskData.self, from: data)
         } catch {
-            print("[WidgetDataManager] Failed to decode data: \(error)")
             return nil
         }
     }

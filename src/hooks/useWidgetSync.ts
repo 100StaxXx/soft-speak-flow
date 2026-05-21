@@ -10,7 +10,7 @@ import type { DailyTask } from './useTasksQuery';
 
 /**
  * Hook to sync daily tasks to the iOS WidgetKit extension
- * via App Group shared UserDefaults
+ * via the App Group shared file container
  * 
  * Syncs:
  * - When tasks change

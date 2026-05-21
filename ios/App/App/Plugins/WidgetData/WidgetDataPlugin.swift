@@ -19,13 +19,12 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
     private var lastErrorCode: String?
     private var lastErrorMessage: String?
     private let isoFormatter = ISO8601DateFormatter()
+    private let payloadFileName = "widget_tasks_data.json"
     private let diagnosticsDirectoryName = "WidgetSync"
     private let diagnosticsFileName = "widget-sync-diagnostics.jsonl"
     private let diagnosticsMaxFileBytes = 256 * 1024
-    private let profileWallpaperSourceUrlKey = "widget_profile_wallpaper_source_url"
-    private let profileWallpaperDateKeyKey = "widget_profile_wallpaper_date_key"
-    private let profileWallpaperRelativePathKey = "widget_profile_wallpaper_relative_path"
     private let profileWallpaperRelativePath = "WidgetBackgrounds/profile-wallpaper"
+    private let profileWallpaperStateRelativePath = "WidgetBackgrounds/profile-wallpaper-state.json"
 
     private enum ErrorCode {
         static let appGroupInaccessible = "APP_GROUP_INACCESSIBLE"
@@ -40,6 +39,12 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
     private struct ProfileWallpaperState {
         let relativePath: String?
         let dateKey: String?
+    }
+
+    private struct StoredProfileWallpaperState: Codable {
+        let sourceUrl: String
+        let dateKey: String
+        let relativePath: String
     }
     
     @objc func updateWidgetData(_ call: CAPPluginCall) {
@@ -83,8 +88,7 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
             ]
         )
 
-        // Write to App Group shared container
-        guard let userDefaults = UserDefaults(suiteName: appGroupId) else {
+        guard appGroupContainerURL() != nil else {
             CosmiqNativeLog.warning("[WidgetDataPlugin] updateWidgetData rejected: failed to access App Group container \(appGroupId)")
             appendDiagnosticsLog(
                 event: "updateWidgetData_failed",
@@ -105,8 +109,7 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
 
         syncProfileWallpaper(
             imageUrl: profileWallpaperImageUrl,
-            dateKey: profileWallpaperDateKey,
-            userDefaults: userDefaults
+            dateKey: profileWallpaperDateKey
         ) { wallpaperState in
             var widgetData: [String: Any] = [
                 "tasks": tasksArray,
@@ -128,7 +131,6 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
 
             self.writeWidgetPayload(
                 call,
-                userDefaults: userDefaults,
                 widgetData: widgetData,
                 date: date,
                 taskCount: tasksArray.count,
@@ -152,7 +154,7 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func getWidgetSyncDiagnostics(_ call: CAPPluginCall) {
-        guard let userDefaults = UserDefaults(suiteName: appGroupId) else {
+        guard let payloadURL = widgetPayloadFileURL() else {
             CosmiqNativeLog.warning("[WidgetDataPlugin] Diagnostics: App Group inaccessible \(appGroupId)")
             setLastError(
                 code: ErrorCode.appGroupInaccessible,
@@ -180,13 +182,7 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
-        var payloadData = userDefaults.data(forKey: dataKey)
-
-        if payloadData == nil,
-           let jsonString = userDefaults.string(forKey: dataKey) {
-            payloadData = jsonString.data(using: .utf8)
-        }
-
+        let payloadData = try? Data(contentsOf: payloadURL)
         let hasPayload = payloadData != nil
         let payloadByteCount = payloadData?.count ?? 0
         var payloadObject: [String: Any]?
@@ -259,7 +255,7 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
             ]
         )
 
-        guard let userDefaults = UserDefaults(suiteName: appGroupId) else {
+        guard let payloadURL = widgetPayloadFileURL() else {
             let message = "Failed to access App Group container \(appGroupId)"
             setLastError(code: ErrorCode.appGroupInaccessible, message: message)
             appendDiagnosticsLog(
@@ -283,18 +279,15 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
-        let originalData = userDefaults.data(forKey: dataKey)
-        let originalString = originalData == nil ? userDefaults.string(forKey: dataKey) : nil
+        let fileManager = FileManager.default
+        let originalData = try? Data(contentsOf: payloadURL)
 
         defer {
             if let originalData {
-                userDefaults.set(originalData, forKey: dataKey)
-            } else if let originalString {
-                userDefaults.set(originalString, forKey: dataKey)
+                try? originalData.write(to: payloadURL, options: .atomic)
             } else {
-                userDefaults.removeObject(forKey: dataKey)
+                try? fileManager.removeItem(at: payloadURL)
             }
-            userDefaults.synchronize()
         }
 
         let probeNonce = UUID().uuidString
@@ -328,10 +321,16 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
-        userDefaults.set(jsonData, forKey: dataKey)
-        let synchronized = userDefaults.synchronize()
-        guard let readBackData = userDefaults.data(forKey: dataKey) else {
-            let message = "Probe write failed: no data after write"
+        let readBackData: Data
+        do {
+            try fileManager.createDirectory(
+                at: payloadURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try jsonData.write(to: payloadURL, options: .atomic)
+            readBackData = try Data(contentsOf: payloadURL)
+        } catch {
+            let message = "Probe write failed: \(error.localizedDescription)"
             setLastError(code: ErrorCode.payloadWriteFailed, message: message)
             appendDiagnosticsLog(
                 event: "runWidgetSyncProbe_failed",
@@ -339,7 +338,6 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
                 details: [
                     "errorCode": ErrorCode.payloadWriteFailed,
                     "errorMessage": message,
-                    "synchronized": synchronized,
                     "timestamp": timestamp
                 ]
             )
@@ -371,9 +369,7 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
         } else {
             setLastError(
                 code: ErrorCode.payloadWriteFailed,
-                message: synchronized
-                    ? "Probe readback mismatch"
-                    : "Probe synchronization failed"
+                message: "Probe readback mismatch"
             )
         }
         appendDiagnosticsLog(
@@ -384,7 +380,6 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
                 "writeSucceeded": writeSucceeded,
                 "readBackSucceeded": readBackSucceeded,
                 "payloadByteCount": readBackData.count,
-                "synchronized": synchronized,
                 "errorCode": writeSucceeded && readBackSucceeded ? NSNull() : (lastErrorCode ?? NSNull()),
                 "errorMessage": writeSucceeded && readBackSucceeded ? NSNull() : (lastErrorMessage ?? NSNull()),
                 "timestamp": timestamp
@@ -418,7 +413,6 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private func writeWidgetPayload(
         _ call: CAPPluginCall,
-        userDefaults: UserDefaults,
         widgetData: [String: Any],
         date: String,
         taskCount: Int,
@@ -449,9 +443,7 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
-        userDefaults.set(jsonData, forKey: dataKey)
-        let didSynchronize = userDefaults.synchronize()
-        guard let readBackData = userDefaults.data(forKey: dataKey), !readBackData.isEmpty else {
+        guard let payloadURL = widgetPayloadFileURL() else {
             CosmiqNativeLog.warning("[WidgetDataPlugin] updateWidgetData rejected: payload missing after write")
             appendDiagnosticsLog(
                 event: "updateWidgetData_failed",
@@ -459,9 +451,8 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
                 details: [
                     "date": date,
                     "errorCode": ErrorCode.payloadWriteFailed,
-                    "errorMessage": "Failed to write widget payload to shared storage",
-                    "payloadByteCount": jsonData.count,
-                    "synchronized": didSynchronize
+                    "errorMessage": "Failed to access App Group payload file",
+                    "payloadByteCount": jsonData.count
                 ]
             )
             DispatchQueue.main.async {
@@ -469,6 +460,44 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
                     call,
                     message: "Failed to write widget payload to shared storage",
                     code: ErrorCode.payloadWriteFailed
+                )
+            }
+            return
+        }
+
+        let readBackData: Data
+        do {
+            try FileManager.default.createDirectory(
+                at: payloadURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try jsonData.write(to: payloadURL, options: .atomic)
+            readBackData = try Data(contentsOf: payloadURL)
+            guard !readBackData.isEmpty else {
+                throw NSError(
+                    domain: "WidgetDataPlugin",
+                    code: 2,
+                    userInfo: [NSLocalizedDescriptionKey: "Payload file was empty after write"]
+                )
+            }
+        } catch {
+            CosmiqNativeLog.warning("[WidgetDataPlugin] updateWidgetData rejected: payload file write failed")
+            appendDiagnosticsLog(
+                event: "updateWidgetData_failed",
+                status: "error",
+                details: [
+                    "date": date,
+                    "errorCode": ErrorCode.payloadWriteFailed,
+                    "errorMessage": error.localizedDescription,
+                    "payloadByteCount": jsonData.count
+                ]
+            )
+            DispatchQueue.main.async {
+                self.reject(
+                    call,
+                    message: "Failed to write widget payload to shared storage",
+                    code: ErrorCode.payloadWriteFailed,
+                    error: error
                 )
             }
             return
@@ -483,7 +512,6 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
             "rituals=\(ritualCompleted)/\(ritualCount) " +
             "bytes=\(jsonData.count) " +
             "readBackBytes=\(readBackData.count) " +
-            "synchronized=\(didSynchronize) " +
             "hasProfileWallpaper=\(wallpaperState.relativePath != nil)"
         )
         appendDiagnosticsLog(
@@ -498,7 +526,6 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
                 "ritualCompleted": ritualCompleted,
                 "payloadByteCount": jsonData.count,
                 "readBackByteCount": readBackData.count,
-                "synchronized": didSynchronize,
                 "profileWallpaperRelativePath": wallpaperState.relativePath ?? NSNull(),
                 "profileWallpaperDateKey": wallpaperState.dateKey ?? NSNull()
             ]
@@ -514,19 +541,17 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
     private func syncProfileWallpaper(
         imageUrl: String?,
         dateKey: String?,
-        userDefaults: UserDefaults,
         completion: @escaping (ProfileWallpaperState) -> Void
     ) {
         guard let imageUrl, let dateKey else {
-            clearCachedProfileWallpaper(userDefaults: userDefaults)
+            clearCachedProfileWallpaper()
             completion(ProfileWallpaperState(relativePath: nil, dateKey: nil))
             return
         }
 
         if let cachedState = cachedProfileWallpaperState(
             imageUrl: imageUrl,
-            dateKey: dateKey,
-            userDefaults: userDefaults
+            dateKey: dateKey
         ) {
             completion(cachedState)
             return
@@ -541,7 +566,7 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
                     "errorMessage": "Invalid profile wallpaper URL"
                 ]
             )
-            clearCachedProfileWallpaper(userDefaults: userDefaults)
+            clearCachedProfileWallpaper()
             completion(ProfileWallpaperState(relativePath: nil, dateKey: nil))
             return
         }
@@ -562,7 +587,7 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
                         "errorMessage": error.localizedDescription
                     ]
                 )
-                self.clearCachedProfileWallpaper(userDefaults: userDefaults)
+                self.clearCachedProfileWallpaper()
                 completion(ProfileWallpaperState(relativePath: nil, dateKey: nil))
                 return
             }
@@ -577,7 +602,7 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
                         "errorMessage": "Wallpaper request failed with status \(httpResponse.statusCode)"
                     ]
                 )
-                self.clearCachedProfileWallpaper(userDefaults: userDefaults)
+                self.clearCachedProfileWallpaper()
                 completion(ProfileWallpaperState(relativePath: nil, dateKey: nil))
                 return
             }
@@ -591,17 +616,20 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
                         "errorMessage": "Wallpaper response was empty"
                     ]
                 )
-                self.clearCachedProfileWallpaper(userDefaults: userDefaults)
+                self.clearCachedProfileWallpaper()
                 completion(ProfileWallpaperState(relativePath: nil, dateKey: nil))
                 return
             }
 
             do {
                 let relativePath = try self.writeProfileWallpaperImage(data: data)
-                userDefaults.set(imageUrl, forKey: self.profileWallpaperSourceUrlKey)
-                userDefaults.set(dateKey, forKey: self.profileWallpaperDateKeyKey)
-                userDefaults.set(relativePath, forKey: self.profileWallpaperRelativePathKey)
-                userDefaults.synchronize()
+                try self.writeProfileWallpaperCache(
+                    StoredProfileWallpaperState(
+                        sourceUrl: imageUrl,
+                        dateKey: dateKey,
+                        relativePath: relativePath
+                    )
+                )
                 self.appendDiagnosticsLog(
                     event: "updateWidgetData_wallpaper_cached",
                     status: "success",
@@ -621,7 +649,7 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
                         "errorMessage": error.localizedDescription
                     ]
                 )
-                self.clearCachedProfileWallpaper(userDefaults: userDefaults)
+                self.clearCachedProfileWallpaper()
                 completion(ProfileWallpaperState(relativePath: nil, dateKey: nil))
             }
         }.resume()
@@ -629,22 +657,19 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private func cachedProfileWallpaperState(
         imageUrl: String,
-        dateKey: String,
-        userDefaults: UserDefaults
+        dateKey: String
     ) -> ProfileWallpaperState? {
         guard
-            let sourceUrl = normalizedOptionalString(userDefaults.string(forKey: profileWallpaperSourceUrlKey)),
-            let cachedDateKey = normalizedOptionalString(userDefaults.string(forKey: profileWallpaperDateKeyKey)),
-            let relativePath = normalizedOptionalString(userDefaults.string(forKey: profileWallpaperRelativePathKey)),
-            let fileURL = profileWallpaperFileURL(relativePath: relativePath),
+            let storedState = readProfileWallpaperCache(),
+            let fileURL = profileWallpaperFileURL(relativePath: storedState.relativePath),
             FileManager.default.fileExists(atPath: fileURL.path),
-            sourceUrl == imageUrl,
-            cachedDateKey == dateKey
+            storedState.sourceUrl == imageUrl,
+            storedState.dateKey == dateKey
         else {
             return nil
         }
 
-        return ProfileWallpaperState(relativePath: relativePath, dateKey: cachedDateKey)
+        return ProfileWallpaperState(relativePath: storedState.relativePath, dateKey: storedState.dateKey)
     }
 
     private func writeProfileWallpaperImage(data: Data) throws -> String {
@@ -676,31 +701,73 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
         return relativePath
     }
 
-    private func clearCachedProfileWallpaper(userDefaults: UserDefaults) {
-        if let relativePath = normalizedOptionalString(userDefaults.string(forKey: profileWallpaperRelativePathKey)),
+    private func clearCachedProfileWallpaper() {
+        if let relativePath = readProfileWallpaperCache()?.relativePath,
            let fileURL = profileWallpaperFileURL(relativePath: relativePath),
            FileManager.default.fileExists(atPath: fileURL.path) {
             try? FileManager.default.removeItem(at: fileURL)
         }
 
-        userDefaults.removeObject(forKey: profileWallpaperSourceUrlKey)
-        userDefaults.removeObject(forKey: profileWallpaperDateKeyKey)
-        userDefaults.removeObject(forKey: profileWallpaperRelativePathKey)
-        userDefaults.synchronize()
+        if let stateURL = profileWallpaperStateFileURL(),
+           FileManager.default.fileExists(atPath: stateURL.path) {
+            try? FileManager.default.removeItem(at: stateURL)
+        }
     }
 
-    private func profileWallpaperFileURL(relativePath: String) -> URL? {
+    private func appGroupContainerURL() -> URL? {
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId)
+    }
+
+    private func widgetPayloadFileURL() -> URL? {
+        appGroupFileURL(relativePath: payloadFileName)
+    }
+
+    private func profileWallpaperStateFileURL() -> URL? {
+        appGroupFileURL(relativePath: profileWallpaperStateRelativePath)
+    }
+
+    private func appGroupFileURL(relativePath: String) -> URL? {
         guard
             !relativePath.isEmpty,
             !relativePath.contains(".."),
-            let containerURL = FileManager.default.containerURL(
-                forSecurityApplicationGroupIdentifier: appGroupId
-            )
+            let containerURL = appGroupContainerURL()
         else {
             return nil
         }
 
         return containerURL.appendingPathComponent(relativePath, isDirectory: false)
+    }
+
+    private func readProfileWallpaperCache() -> StoredProfileWallpaperState? {
+        guard
+            let stateURL = profileWallpaperStateFileURL(),
+            let data = try? Data(contentsOf: stateURL)
+        else {
+            return nil
+        }
+
+        return try? JSONDecoder().decode(StoredProfileWallpaperState.self, from: data)
+    }
+
+    private func writeProfileWallpaperCache(_ state: StoredProfileWallpaperState) throws {
+        guard let stateURL = profileWallpaperStateFileURL() else {
+            throw NSError(
+                domain: "WidgetDataPlugin",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "Failed to access App Group wallpaper state file"]
+            )
+        }
+
+        try FileManager.default.createDirectory(
+            at: stateURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let data = try JSONEncoder().encode(state)
+        try data.write(to: stateURL, options: .atomic)
+    }
+
+    private func profileWallpaperFileURL(relativePath: String) -> URL? {
+        appGroupFileURL(relativePath: relativePath)
     }
 
     private func normalizedOptionalString(_ value: String?) -> String? {
