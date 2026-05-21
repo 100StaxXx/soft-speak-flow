@@ -27,12 +27,11 @@
  *   timer.end(); // Logs: "fetchData completed in 123ms"
  */
 
-import * as Sentry from "@sentry/react";
-
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
  
 type LogContext = Record<string, any>;
+type SentryModule = typeof import("@sentry/react");
 
 interface LogEntry {
   level: LogLevel;
@@ -56,6 +55,12 @@ const LOG_LEVELS: Record<LogLevel, number> = {
 
 // Minimum level to log in production (warn and above)
 const PROD_MIN_LEVEL: LogLevel = 'warn';
+let sentryModulePromise: Promise<SentryModule> | null = null;
+
+function loadSentry(): Promise<SentryModule> {
+  sentryModulePromise ??= import("@sentry/react");
+  return sentryModulePromise;
+}
 
 /**
  * Check if a log level should be output based on environment
@@ -78,14 +83,18 @@ function formatLogEntry(entry: LogEntry): string {
  * Send error to Sentry for production error tracking
  */
 function reportToErrorTracking(entry: LogEntry): void {
-  // Only report if Sentry is initialized (has valid DSN in production)
-  if (Sentry.isInitialized()) {
-    Sentry.captureMessage(entry.message, {
-      level: 'error',
-      extra: entry.context,
-      tags: entry.scope ? { scope: entry.scope } : undefined,
-    });
-  }
+  void loadSentry()
+    .then((Sentry) => {
+      // Only report if Sentry is initialized (has valid DSN in production)
+      if (Sentry.isInitialized()) {
+        Sentry.captureMessage(entry.message, {
+          level: 'error',
+          extra: entry.context,
+          tags: entry.scope ? { scope: entry.scope } : undefined,
+        });
+      }
+    })
+    .catch(() => undefined);
 }
 
 /**

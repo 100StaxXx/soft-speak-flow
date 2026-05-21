@@ -479,20 +479,51 @@ export default defineConfig(({ mode }) => {
               return undefined;
             }
 
-            // CRITICAL: Keep React and all React-dependent libraries in a SINGLE chunk
-            // iOS WKWebView can load chunks out of order, causing "createContext" errors
-            // when React isn't loaded before components that use it
+            const normalizedId = id.split(path.sep).join("/");
 
-            if (id.includes('node_modules')) {
-              // Only split standalone libraries that don't use React contexts/hooks
-              // NOTE: recharts was removed - it uses React.useLayoutEffect and must stay with React
-              if (id.includes('date-fns')) return 'date-vendor';
-              // Only split pure three.js - NOT @react-three/fiber which uses React hooks
-              if (id.includes('node_modules/three/')) return 'three-vendor';
+            if (normalizedId.includes('/node_modules/')) {
+              // Keep the React runtime and startup React-adjacent UI stack together.
+              // Route-only React libraries are left to Rollup so lazy pages do not
+              // get pulled back into the initial vendor payload.
+              if (
+                normalizedId.includes('/node_modules/react/') ||
+                normalizedId.includes('/node_modules/react-dom/') ||
+                normalizedId.includes('/node_modules/scheduler/') ||
+                normalizedId.includes('/node_modules/react-router/') ||
+                normalizedId.includes('/node_modules/react-router-dom/') ||
+                normalizedId.includes('/node_modules/@tanstack/react-query/') ||
+                normalizedId.includes('/node_modules/@supabase/') ||
+                normalizedId.includes('/node_modules/framer-motion/') ||
+                normalizedId.includes('/node_modules/@radix-ui/') ||
+                normalizedId.includes('/node_modules/@floating-ui/') ||
+                normalizedId.includes('/node_modules/lucide-react/') ||
+                normalizedId.includes('/node_modules/sonner/') ||
+                normalizedId.includes('/node_modules/vaul/') ||
+                normalizedId.includes('/node_modules/class-variance-authority/') ||
+                normalizedId.includes('/node_modules/clsx/') ||
+                normalizedId.includes('/node_modules/tailwind-merge/')
+              ) {
+                return 'vendor';
+              }
 
-              // Everything else (React, Radix, React Query, Framer Motion, etc.)
-              // stays in a single vendor chunk for iOS compatibility
-              return 'vendor';
+              if (normalizedId.includes('/node_modules/@sentry/')) return 'sentry-vendor';
+              if (normalizedId.includes('/node_modules/@revenuecat/')) return 'revenuecat-vendor';
+              if (normalizedId.includes('/node_modules/date-fns/')) return 'date-vendor';
+              // Only split pure three.js - NOT @react-three/fiber which uses React hooks.
+              if (normalizedId.includes('/node_modules/three/')) return 'three-vendor';
+
+              if (
+                normalizedId.includes('/node_modules/@capacitor/core/') ||
+                normalizedId.includes('/node_modules/@capacitor/app/') ||
+                normalizedId.includes('/node_modules/@capacitor/browser/') ||
+                normalizedId.includes('/node_modules/@capacitor/push-notifications/') ||
+                normalizedId.includes('/node_modules/@capacitor/screen-orientation/') ||
+                normalizedId.includes('/node_modules/@capacitor/splash-screen/')
+              ) {
+                return 'native-vendor';
+              }
+
+              return undefined;
             }
           }
         },

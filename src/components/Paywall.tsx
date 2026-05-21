@@ -92,9 +92,9 @@ const createPaywallBackdrop = (src: string, src2x = src): StaticBackgroundAsset 
 });
 
 const paywallBackdrops = {
-  quests: createPaywallBackdrop("/landing-backdrops/quests.webp", "/landing-backdrops/quests@2x.webp"),
-  companion: createPaywallBackdrop("/landing-backdrops/companion.webp", "/landing-backdrops/companion@2x.webp"),
-  profile: createPaywallBackdrop("/landing-backdrops/profile.webp", "/landing-backdrops/profile@2x.webp"),
+  quests: createPaywallBackdrop("/landing-backdrops/quests.jpg", "/landing-backdrops/quests@2x.jpg"),
+  companion: createPaywallBackdrop("/landing-backdrops/companion.jpg", "/landing-backdrops/companion@2x.jpg"),
+  profile: createPaywallBackdrop("/landing-backdrops/profile.jpg", "/landing-backdrops/profile@2x.jpg"),
 };
 
 const paywallStorySections: PaywallStorySection[] = [

@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/reac
 import { BrowserRouter, Routes, Route, useLocation, Navigate, useNavigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { useEffect, Suspense, lazy, memo, useRef, useState, type ReactNode } from "react";
+import { Capacitor } from "@capacitor/core";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ViewModeProvider } from "@/contexts/ViewModeContext";
 import { TimeProvider } from "@/contexts/TimeContext";
@@ -129,13 +130,26 @@ const prefetchCriticalRoutes = () => {
   routes.forEach(route => route());
 };
 
+const scheduleCriticalRoutePrefetch = () => {
+  const runWhenIdle = () => {
+    if ('requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(prefetchCriticalRoutes, { timeout: 3000 });
+    } else {
+      setTimeout(prefetchCriticalRoutes, 1500);
+    }
+  };
+
+  if (Capacitor.isNativePlatform()) {
+    setTimeout(runWhenIdle, 8000);
+    return;
+  }
+
+  runWhenIdle();
+};
+
 // Run prefetch when browser is idle
 if (typeof window !== 'undefined') {
-  if ('requestIdleCallback' in window) {
-    (window as any).requestIdleCallback(prefetchCriticalRoutes, { timeout: 3000 });
-  } else {
-    setTimeout(prefetchCriticalRoutes, 1500);
-  }
+  scheduleCriticalRoutePrefetch();
 }
 
 // Memoized loading fallback to prevent recreation

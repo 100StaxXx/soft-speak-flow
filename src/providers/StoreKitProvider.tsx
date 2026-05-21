@@ -10,20 +10,14 @@ import {
 } from "react";
 import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
-import {
-  LOG_LEVEL,
-  PAYWALL_RESULT,
-  PRODUCT_CATEGORY,
-  Purchases,
-  STOREKIT_VERSION,
-  type CustomerInfo,
-  type PurchasesEntitlementInfo,
-  type PurchasesOfferings,
-  type PurchasesPackage,
-  type PurchasesStoreProduct,
-  type PurchasesStoreTransaction,
+import type {
+  CustomerInfo,
+  PurchasesEntitlementInfo,
+  PurchasesOfferings,
+  PurchasesPackage,
+  PurchasesStoreProduct,
+  PurchasesStoreTransaction,
 } from "@revenuecat/purchases-capacitor";
-import { RevenueCatUI } from "@revenuecat/purchases-capacitor-ui";
 import { isNativeIOS } from "@/utils/platformTargets";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -47,6 +41,22 @@ const COSMIQ_PRO_ENTITLEMENT_ALIASES = [
   COSMIQ_PRO_ENTITLEMENT_NAME,
 ] as const;
 const REVENUECAT_PAYWALL_ENTITLEMENT_ID = COSMIQ_PRO_ENTITLEMENT_NAME;
+
+type RevenueCatModule = typeof import("@revenuecat/purchases-capacitor");
+type RevenueCatUIModule = typeof import("@revenuecat/purchases-capacitor-ui");
+
+let revenueCatModulePromise: Promise<RevenueCatModule> | null = null;
+let revenueCatUIModulePromise: Promise<RevenueCatUIModule> | null = null;
+
+function loadRevenueCat(): Promise<RevenueCatModule> {
+  revenueCatModulePromise ??= import("@revenuecat/purchases-capacitor");
+  return revenueCatModulePromise;
+}
+
+function loadRevenueCatUI(): Promise<RevenueCatUIModule> {
+  revenueCatUIModulePromise ??= import("@revenuecat/purchases-capacitor-ui");
+  return revenueCatUIModulePromise;
+}
 
 type RevenueCatPurchaseTransaction = PurchasesStoreTransaction & {
   productId?: string;
@@ -296,8 +306,8 @@ function purchaseResultToTransaction(
   };
 }
 
-function paywallSucceeded(result: PAYWALL_RESULT): boolean {
-  return result === PAYWALL_RESULT.PURCHASED || result === PAYWALL_RESULT.RESTORED;
+function paywallSucceeded(result: string): boolean {
+  return result === "PURCHASED" || result === "RESTORED";
 }
 
 function revenueCatErrorMessage(error: unknown): string {
@@ -335,6 +345,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const fetchCustomerInfo = useCallback(async () => {
+    const { Purchases } = await loadRevenueCat();
     const { customerInfo: nextCustomerInfo } = await withTimeout(
       () => Purchases.getCustomerInfo(),
       {
@@ -352,6 +363,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
 
     setProductsLoading(true);
     try {
+      const { PRODUCT_CATEGORY, Purchases } = await loadRevenueCat();
       const [offeringsResult, productsResult] = await withTimeout(
         () => Promise.allSettled([
           Purchases.getOfferings(),
@@ -448,6 +460,8 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     void (async () => {
       setEntitlementLoading(true);
       try {
+        const { LOG_LEVEL, Purchases, STOREKIT_VERSION } = await loadRevenueCat();
+
         if (!configuredAppUserIdRef.current) {
           await Purchases.setLogLevel({
             level: REVENUECAT_DEBUG ? LOG_LEVEL.DEBUG : LOG_LEVEL.ERROR,
@@ -514,23 +528,29 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     let listenerId: string | null = null;
     let cancelled = false;
 
-    void Purchases.addCustomerInfoUpdateListener((nextCustomerInfo) => {
-      applyCustomerInfo(nextCustomerInfo);
-      setEntitlementError(false);
-    }).then((id) => {
-      if (cancelled) {
-        void Purchases.removeCustomerInfoUpdateListener({ listenerToRemove: id });
-      } else {
-        listenerId = id;
-      }
-    }).catch((error) => {
+    void (async () => {
+      const { Purchases } = await loadRevenueCat();
+      return Purchases.addCustomerInfoUpdateListener((nextCustomerInfo) => {
+        applyCustomerInfo(nextCustomerInfo);
+        setEntitlementError(false);
+      }).then((id) => {
+        if (cancelled) {
+          void Purchases.removeCustomerInfoUpdateListener({ listenerToRemove: id });
+        } else {
+          listenerId = id;
+        }
+      });
+    })().catch((error) => {
       console.error("[RevenueCat] Failed to register customer info listener:", error);
     });
 
     return () => {
       cancelled = true;
       if (listenerId) {
-        void Purchases.removeCustomerInfoUpdateListener({ listenerToRemove: listenerId });
+        const idToRemove = listenerId;
+        void loadRevenueCat().then(({ Purchases }) =>
+          Purchases.removeCustomerInfoUpdateListener({ listenerToRemove: idToRemove }),
+        );
       }
     };
   }, [applyCustomerInfo, isAvailable, isConfigured]);
@@ -556,6 +576,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
   const purchase = useCallback(async (productId: string): Promise<StoreKitTransaction | null> => {
     if (!isAvailable || !isConfigured) return null;
 
+    const { PRODUCT_CATEGORY, Purchases } = await loadRevenueCat();
     const packageToPurchase = packagesRef.current.find((pkg) => pkg.product.identifier === productId);
     let result;
     if (packageToPurchase) {
@@ -585,6 +606,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
       throw new Error("Offer code redemption is only available after RevenueCat is configured on iOS.");
     }
 
+    const { Purchases } = await loadRevenueCat();
     await Purchases.presentCodeRedemptionSheet();
     await refreshProducts();
 
@@ -607,6 +629,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
   const restorePurchasesHandler = useCallback(async (): Promise<StoreKitTransaction | null> => {
     if (!isAvailable || !isConfigured) return null;
 
+    const { Purchases } = await loadRevenueCat();
     const { customerInfo: restoredCustomerInfo } = await Purchases.restorePurchases();
     applyCustomerInfo(restoredCustomerInfo);
     setEntitlementError(false);
@@ -622,6 +645,8 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     const recoveryPromise = (async (): Promise<StoreKitTransaction | null> => {
       setEntitlementLoading(true);
       try {
+        const { Purchases } = await loadRevenueCat();
+
         try {
           await withTimeout(
             () => Purchases.syncPurchases(),
@@ -673,6 +698,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
   const presentRevenueCatPaywall = useCallback(async (onlyIfNeeded: boolean): Promise<boolean> => {
     if (!isAvailable || !isConfigured) return false;
 
+    const { RevenueCatUI } = await loadRevenueCatUI();
     const paywallResult = onlyIfNeeded
       ? await RevenueCatUI.presentPaywallIfNeeded({
         requiredEntitlementIdentifier: REVENUECAT_PAYWALL_ENTITLEMENT_ID,
@@ -684,7 +710,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
       return true;
     }
 
-    if (paywallResult.result === PAYWALL_RESULT.NOT_PRESENTED) {
+    if (paywallResult.result === "NOT_PRESENTED") {
       await refreshEntitlement();
     }
 
@@ -693,6 +719,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
 
   const manageSubscriptionsHandler = useCallback(async () => {
     if (!isAvailable || !isConfigured) return;
+    const { RevenueCatUI } = await loadRevenueCatUI();
     await RevenueCatUI.presentCustomerCenter();
     await refreshEntitlement();
   }, [isAvailable, isConfigured, refreshEntitlement]);

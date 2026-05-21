@@ -1,6 +1,5 @@
 import { createRoot } from "react-dom/client";
 import { useEffect } from "react";
-import * as Sentry from "@sentry/react";
 import { Capacitor } from "@capacitor/core";
 import "./index.css";
 import { initializeCapacitor } from "./utils/capacitor";
@@ -11,14 +10,16 @@ import App from "./App";
 // Initialize Sentry error tracking (only in production with valid DSN)
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
 if (sentryDsn && import.meta.env.PROD) {
-  Sentry.init({
-    dsn: sentryDsn,
-    environment: import.meta.env.MODE,
-    integrations: [
-      Sentry.browserTracingIntegration(),
-      // replayIntegration removed - causes WKWebView crashes on iOS
-    ],
-    tracesSampleRate: 0.1, // 10% of transactions
+  void import("@sentry/react").then((Sentry) => {
+    Sentry.init({
+      dsn: sentryDsn,
+      environment: import.meta.env.MODE,
+      integrations: [
+        Sentry.browserTracingIntegration(),
+        // replayIntegration removed - causes WKWebView crashes on iOS
+      ],
+      tracesSampleRate: 0.1, // 10% of transactions
+    });
   });
 }
 
