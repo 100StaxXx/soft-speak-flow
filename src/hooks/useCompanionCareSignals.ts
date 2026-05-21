@@ -2,6 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useMemo } from "react";
+import { logger } from "@/utils/logger";
+import {
+  extractErrorMessage,
+  isNetworkLikeError,
+} from "@/utils/networkErrors";
 
 /**
  * INTERNAL hook for hidden care signals - these values drive behavior
@@ -95,13 +100,23 @@ export const useCompanionCareSignals = (
         .maybeSingle();
 
       if (error) {
-        console.error('Failed to fetch care signals:', error);
+        if (isNetworkLikeError(error)) {
+          logger.debug("Care signals temporarily unavailable", {
+            error: extractErrorMessage(error),
+          });
+          return null;
+        }
+
+        logger.error("Failed to fetch care signals:", {
+          error: extractErrorMessage(error),
+        });
         throw error;
       }
       
       return data;
     },
     enabled: enabled && !!user?.id,
+    retry: false,
     staleTime: 60000, // 1 minute
   });
 

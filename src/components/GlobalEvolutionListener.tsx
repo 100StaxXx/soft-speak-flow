@@ -20,6 +20,10 @@ import {
   isCompanionHatchStartedDetail,
 } from "@/lib/companionEvolutionEvents";
 import { logger } from "@/utils/logger";
+import {
+  extractErrorMessage,
+  isNetworkLikeError,
+} from "@/utils/networkErrors";
 import { isSupabaseMissingRelationError } from "@/utils/supabaseSchemaErrors";
 import {
   getProgressionLevelDisplay,
@@ -44,6 +48,11 @@ const NON_RETRYABLE_ANIMATION_REASONS = new Set([
   "image_unchanged",
   "stage_not_animatable",
 ]);
+const TRANSIENT_SUPABASE_READ_LOG_INTERVAL_MS = 60_000;
+const transientSupabaseReadLogTimes = new Map<string, number>();
+const PERSISTED_EVOLUTION_METADATA_UNAVAILABLE = Symbol(
+  "persisted-evolution-metadata-unavailable",
+);
 
 type CompanionAnimationStatus =
   | "queued"
@@ -63,6 +72,11 @@ type PersistedEvolutionMetadata = {
   animationCompletedAt: string | null;
   animationPresentedAt: string | null;
 };
+
+type PersistedEvolutionMetadataLookup =
+  | PersistedEvolutionMetadata
+  | null
+  | typeof PERSISTED_EVOLUTION_METADATA_UNAVAILABLE;
 
 type CompanionEvolutionJobStatus =
   | "queued"
@@ -88,6 +102,7 @@ type AnimationRetryResult = {
   videoUrl?: string;
   code?: string;
   reason?: string;
+  transientUnavailable?: boolean;
 };
 
 type EvolutionPresentationData = {
@@ -127,6 +142,7 @@ const FAILED_EVOLUTION_JOB_NOTIFICATION_WINDOW_MS = 24 * 60 * 60 * 1000;
 export const clearLocalEvolutionPresentationGuardsForTest = () => {
   locallyPresentedEvolutionKeys.clear();
   locallyNotifiedFailedEvolutionJobKeys.clear();
+  transientSupabaseReadLogTimes.clear();
 };
 
 const normalizeAnimationStatus = (
@@ -168,6 +184,46 @@ const getNonRetryableAnimationReason = (value: unknown): string | null => {
   return reason && NON_RETRYABLE_ANIMATION_REASONS.has(reason) ? reason : null;
 };
 
+const isOffline = (): boolean =>
+  typeof navigator !== "undefined" && navigator.onLine === false;
+
+const isTransientSupabaseReadError = (error: unknown): boolean =>
+  isOffline() || isNetworkLikeError(error);
+
+const logEvolutionSupabaseReadError = ({
+  logKey,
+  message,
+  context,
+  error,
+}: {
+  logKey: string;
+  message: string;
+  context: Record<string, unknown>;
+  error: unknown;
+}) => {
+  const errorMessage = extractErrorMessage(error);
+  const isTransientNetworkError = isTransientSupabaseReadError(error);
+
+  if (isTransientNetworkError) {
+    const now = Date.now();
+    const lastLoggedAt = transientSupabaseReadLogTimes.get(logKey) ?? 0;
+    if (now - lastLoggedAt >= TRANSIENT_SUPABASE_READ_LOG_INTERVAL_MS) {
+      transientSupabaseReadLogTimes.set(logKey, now);
+      logger.debug("Evolution listener: Supabase read temporarily unavailable", {
+        ...context,
+        operation: logKey,
+        error: errorMessage,
+      });
+    }
+    return;
+  }
+
+  logger.warn(message, {
+    ...context,
+    error: errorMessage,
+  });
+};
+
 const hasNonRetryableTerminalAnimation = (
   metadata: PersistedEvolutionMetadata,
 ): boolean =>
@@ -181,7 +237,7 @@ const fetchPersistedEvolutionMetadata = async ({
 }: {
   companionId: string;
   stage: number;
-}): Promise<PersistedEvolutionMetadata | null> => {
+}): Promise<PersistedEvolutionMetadataLookup> => {
   const { data, error } = await supabase
     .from("companion_evolutions")
     .select(
@@ -192,12 +248,18 @@ const fetchPersistedEvolutionMetadata = async ({
     .maybeSingle();
 
   if (error) {
-    logger.warn("Evolution listener: Failed to verify persisted evolution", {
-      companionId,
-      stage,
-      error: error.message,
+    logEvolutionSupabaseReadError({
+      logKey: "verify-persisted-evolution",
+      message: "Evolution listener: Failed to verify persisted evolution",
+      context: {
+        companionId,
+        stage,
+      },
+      error,
     });
-    return null;
+    return isTransientSupabaseReadError(error)
+      ? PERSISTED_EVOLUTION_METADATA_UNAVAILABLE
+      : null;
   }
 
   if (!data?.id) return null;
@@ -214,11 +276,15 @@ const fetchPersistedEvolutionMetadata = async ({
     jobError &&
     !isSupabaseMissingRelationError(jobError, "companion_animation_jobs")
   ) {
-    logger.warn("Evolution listener: Failed to verify animation job", {
-      companionId,
-      stage,
-      evolutionId: data.id,
-      error: jobError.message,
+    logEvolutionSupabaseReadError({
+      logKey: "verify-animation-job",
+      message: "Evolution listener: Failed to verify animation job",
+      context: {
+        companionId,
+        stage,
+        evolutionId: data.id,
+      },
+      error: jobError,
     });
   }
 
@@ -310,9 +376,13 @@ const fetchLatestEvolutionJobMetadata = async ({
     .maybeSingle();
 
   if (error) {
-    logger.warn("Evolution listener: Failed to hydrate evolution job", {
-      userId,
-      error: error.message,
+    logEvolutionSupabaseReadError({
+      logKey: "hydrate-evolution-job",
+      message: "Evolution listener: Failed to hydrate evolution job",
+      context: {
+        userId,
+      },
+      error,
     });
     return null;
   }
@@ -461,7 +531,9 @@ const waitForEvolutionPersistence = async ({
 }: {
   companionId: string;
   stage: number;
-}): Promise<PersistedEvolutionMetadata | null> => {
+}): Promise<PersistedEvolutionMetadataLookup> => {
+  let sawTransientUnavailable = false;
+
   for (const delayMs of EVOLUTION_RECORD_RETRY_DELAYS_MS) {
     if (delayMs > 0) await sleep(delayMs);
 
@@ -469,10 +541,32 @@ const waitForEvolutionPersistence = async ({
       companionId,
       stage,
     });
+    if (metadata === PERSISTED_EVOLUTION_METADATA_UNAVAILABLE) {
+      sawTransientUnavailable = true;
+      continue;
+    }
     if (metadata) return metadata;
   }
 
-  return null;
+  return sawTransientUnavailable
+    ? PERSISTED_EVOLUTION_METADATA_UNAVAILABLE
+    : null;
+};
+
+const refreshPersistedEvolutionMetadata = async ({
+  companionId,
+  stage,
+}: {
+  companionId: string;
+  stage: number;
+}): Promise<PersistedEvolutionMetadata | null> => {
+  const metadata = await fetchPersistedEvolutionMetadata({
+    companionId,
+    stage,
+  });
+  return metadata === PERSISTED_EVOLUTION_METADATA_UNAVAILABLE
+    ? null
+    : metadata;
 };
 
 const requestAnimationJobRetry = async ({
@@ -494,16 +588,22 @@ const requestAnimationJobRetry = async ({
   );
 
   if (error) {
-    logger.warn(
-      "Evolution listener: Companion animation retry request failed",
-      {
+    const transientUnavailable = isTransientSupabaseReadError(error);
+    logEvolutionSupabaseReadError({
+      logKey: "animation-retry-request",
+      message: "Evolution listener: Companion animation retry request failed",
+      context: {
         companionId,
         stage,
         reason,
-        error: error.message ?? String(error),
       },
-    );
-    return { status: "unavailable", reason: error.message ?? String(error) };
+      error,
+    });
+    return {
+      status: "unavailable",
+      reason: extractErrorMessage(error),
+      transientUnavailable,
+    };
   }
 
   const result = (data ?? {}) as {
@@ -629,6 +729,14 @@ const waitForEvolutionAnimation = async ({
         );
         if (terminalMetadata) return terminalMetadata;
 
+        if (retryResult.transientUnavailable) {
+          await sleep(EVOLUTION_ANIMATION_POLL_INTERVAL_MS);
+          metadata =
+            (await refreshPersistedEvolutionMetadata({ companionId, stage })) ??
+            metadata;
+          continue;
+        }
+
         if (
           retryResult.status === "queued" ||
           retryResult.status === "processing"
@@ -636,7 +744,7 @@ const waitForEvolutionAnimation = async ({
           jobId = retryResult.jobId ?? jobId;
           await sleep(EVOLUTION_ANIMATION_POLL_INTERVAL_MS);
           metadata =
-            (await fetchPersistedEvolutionMetadata({ companionId, stage })) ??
+            (await refreshPersistedEvolutionMetadata({ companionId, stage })) ??
             metadata;
           continue;
         }
@@ -709,6 +817,14 @@ const waitForEvolutionAnimation = async ({
         );
         if (terminalMetadata) return terminalMetadata;
 
+        if (retryResult.transientUnavailable) {
+          await sleep(EVOLUTION_ANIMATION_POLL_INTERVAL_MS);
+          metadata =
+            (await refreshPersistedEvolutionMetadata({ companionId, stage })) ??
+            metadata;
+          continue;
+        }
+
         if (
           retryResult.status === "queued" ||
           retryResult.status === "processing"
@@ -716,7 +832,7 @@ const waitForEvolutionAnimation = async ({
           jobId = retryResult.jobId ?? jobId;
           await sleep(EVOLUTION_ANIMATION_POLL_INTERVAL_MS);
           metadata =
-            (await fetchPersistedEvolutionMetadata({ companionId, stage })) ??
+            (await refreshPersistedEvolutionMetadata({ companionId, stage })) ??
             metadata;
           continue;
         }
@@ -753,7 +869,7 @@ const waitForEvolutionAnimation = async ({
           jobId = retryResult.jobId ?? jobId;
           await sleep(EVOLUTION_ANIMATION_POLL_INTERVAL_MS);
           metadata =
-            (await fetchPersistedEvolutionMetadata({ companionId, stage })) ??
+            (await refreshPersistedEvolutionMetadata({ companionId, stage })) ??
             metadata;
           continue;
         }
@@ -764,7 +880,7 @@ const waitForEvolutionAnimation = async ({
 
     await sleep(EVOLUTION_ANIMATION_POLL_INTERVAL_MS);
     metadata =
-      (await fetchPersistedEvolutionMetadata({ companionId, stage })) ??
+      (await refreshPersistedEvolutionMetadata({ companionId, stage })) ??
       metadata;
   }
 
@@ -1237,6 +1353,11 @@ export const GlobalEvolutionListener = () => {
           stage: level,
         });
 
+        if (persistedEvolution === PERSISTED_EVOLUTION_METADATA_UNAVAILABLE) {
+          schedulePresentationRetry("persisted_evolution_unavailable");
+          return false;
+        }
+
         if (!persistedEvolution) {
           logger.warn(
             "Evolution listener: Ignoring stage update without persisted evolution row",
@@ -1693,13 +1814,15 @@ export const GlobalEvolutionListener = () => {
       if (!mountedRef.current) return;
 
       if (error) {
-        logger.warn(
-          "Evolution listener: Failed to hydrate pending reveal companion",
-          {
+        logEvolutionSupabaseReadError({
+          logKey: "hydrate-pending-reveal-companion",
+          message:
+            "Evolution listener: Failed to hydrate pending reveal companion",
+          context: {
             userId: user.id,
-            error: error.message,
           },
-        );
+          error,
+        });
         return;
       }
 
@@ -1732,6 +1855,10 @@ export const GlobalEvolutionListener = () => {
         companionId,
         stage: currentStage,
       });
+
+      if (currentEvolution === PERSISTED_EVOLUTION_METADATA_UNAVAILABLE) {
+        return;
+      }
 
       if (
         !mountedRef.current ||
@@ -1922,10 +2049,15 @@ export const GlobalEvolutionListener = () => {
         .maybeSingle();
 
       if (error) {
-        logger.warn("Evolution listener: Failed to hydrate active evolution job companion", {
-          companionId: job.companionId,
-          jobId: job.id,
-          error: error.message,
+        logEvolutionSupabaseReadError({
+          logKey: "hydrate-active-evolution-job-companion",
+          message:
+            "Evolution listener: Failed to hydrate active evolution job companion",
+          context: {
+            companionId: job.companionId,
+            jobId: job.id,
+          },
+          error,
         });
         return;
       }

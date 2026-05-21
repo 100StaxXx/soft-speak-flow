@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => {
   const setEvolutionInProgressMock = vi.fn();
   const loggerWarnMock = vi.fn();
   const loggerErrorMock = vi.fn();
+  const loggerDebugMock = vi.fn();
   const companionEvolutionPropsMock = vi.fn();
   const toastInfoMock = vi.fn();
   const toastErrorMock = vi.fn();
@@ -49,6 +50,7 @@ const mocks = vi.hoisted(() => {
       | (() => Promise<{ data: unknown; error: unknown }>),
     pendingEvolutionReveal: null as null | Record<string, unknown>,
     userCompanionLookup: null as null | Record<string, unknown>,
+    userCompanionError: null as null | { message: string },
   };
   const setPendingEvolutionReveal = (next: unknown) => {
     state.pendingEvolutionReveal =
@@ -79,6 +81,7 @@ const mocks = vi.hoisted(() => {
     setEvolutionInProgressMock,
     loggerWarnMock,
     loggerErrorMock,
+    loggerDebugMock,
     companionEvolutionPropsMock,
     toastInfoMock,
     toastErrorMock,
@@ -177,6 +180,7 @@ vi.mock("@/components/ui/sonner", () => ({
 
 vi.mock("@/utils/logger", () => ({
   logger: {
+    debug: mocks.loggerDebugMock,
     warn: mocks.loggerWarnMock,
     error: mocks.loggerErrorMock,
   },
@@ -263,7 +267,7 @@ vi.mock("@/integrations/supabase/client", () => ({
                 data: mocks.state.userCompanionLookup ?? {
                   core_element: "fire",
                 },
-                error: null,
+                error: mocks.state.userCompanionError,
               }),
             })),
           })),
@@ -377,6 +381,7 @@ describe("GlobalEvolutionListener", () => {
     mocks.state.mentorLookup = null;
     mocks.state.pendingEvolutionReveal = null;
     mocks.state.userCompanionLookup = null;
+    mocks.state.userCompanionError = null;
     mocks.companionEvolutionLookupResponses.length = 0;
     mocks.animationJobLookupResponses.length = 0;
     mocks.evolutionJobLookupResponses.length = 0;
@@ -427,6 +432,89 @@ describe("GlobalEvolutionListener", () => {
     mocks.channelMock.mockReturnValue({
       on: mocks.onMock,
     });
+  });
+
+  it("keeps transient pending-reveal hydration network failures out of warning logs", async () => {
+    mocks.state.userCompanionError = { message: "TypeError: Load failed" };
+
+    renderListener();
+
+    await waitFor(() => {
+      expect(mocks.loggerDebugMock).toHaveBeenCalledWith(
+        "Evolution listener: Supabase read temporarily unavailable",
+        expect.objectContaining({
+          operation: "hydrate-pending-reveal-companion",
+          error: "TypeError: Load failed",
+        }),
+      );
+    });
+    expect(mocks.loggerWarnMock).not.toHaveBeenCalledWith(
+      "Evolution listener: Failed to hydrate pending reveal companion",
+      expect.anything(),
+    );
+  });
+
+  it("retries persisted evolution lookups without warning on transient network failure", async () => {
+    vi.useFakeTimers();
+    mocks.companionEvolutionLookupResponses.push(
+      { data: null, error: { message: "TypeError: Load failed" } },
+      { data: null, error: { message: "TypeError: Load failed" } },
+      { data: null, error: { message: "TypeError: Load failed" } },
+      {
+        data: {
+          id: "evo-1",
+          animation_video_url: "https://example.com/evolution.mp4",
+          animation_status: "succeeded",
+        },
+        error: null,
+      },
+    );
+
+    try {
+      renderListener();
+
+      const callbackPromise =
+        mocks.state.callback?.({
+          eventType: "UPDATE",
+          new: {
+            id: "companion-1",
+            current_stage: 5,
+            current_image_url: "https://example.com/stage-5.png",
+          },
+          old: {
+            id: "companion-1",
+            current_stage: 4,
+            current_image_url: "https://example.com/stage-4.png",
+          },
+        }) ?? Promise.resolve();
+
+      await act(async () => {
+        await flushMicrotasks();
+        await vi.advanceTimersByTimeAsync(225);
+      });
+      await callbackPromise;
+
+      expect(mocks.loggerWarnMock).not.toHaveBeenCalledWith(
+        "Evolution listener: Failed to verify persisted evolution",
+        expect.anything(),
+      );
+      expect(mocks.loggerWarnMock).not.toHaveBeenCalledWith(
+        "Evolution listener: Ignoring stage update without persisted evolution row",
+        expect.anything(),
+      );
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+        await flushMicrotasks();
+      });
+
+      expect(screen.getByTestId("evolution-animation-preloader")).toHaveAttribute(
+        "src",
+        "https://example.com/evolution.mp4",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("hydrates an active queued evolution job on mount", async () => {
