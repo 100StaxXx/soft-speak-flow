@@ -4,7 +4,7 @@ import { Rocket, Sparkles, ChevronRight } from 'lucide-react';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { useWelcomeImage } from '../hooks/useWelcomeImage';
 import { useDeviceOrientation } from '@/hooks/useDeviceOrientation';
-import campaignWelcomeFallback from '@/assets/campaign-welcome-fallback.webp';
+import campaignWelcomeFallback from '@/assets/campaign-welcome-fallback.jpg';
 
 interface CampaignEmptyStateModalProps {
   open: boolean;
