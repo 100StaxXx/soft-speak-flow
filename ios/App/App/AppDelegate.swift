@@ -174,7 +174,7 @@ enum GooglePlacesConfiguration {
     static func configuredAPIKey(logIfMissing: Bool = false) -> String? {
         guard let rawKey = Bundle.main.object(forInfoDictionaryKey: "GooglePlacesAPIKey") as? String else {
             if logIfMissing {
-                CosmiqNativeLog.warning("[GooglePlaces] GooglePlacesAPIKey is not configured.")
+                CosmiqNativeLog.debug("[GooglePlaces] GooglePlacesAPIKey is not configured.")
             }
             return nil
         }
@@ -184,7 +184,7 @@ enum GooglePlacesConfiguration {
               !key.hasPrefix("$("),
               key != "your-ios-google-places-api-key" else {
             if logIfMissing {
-                CosmiqNativeLog.warning("[GooglePlaces] GooglePlacesAPIKey is empty or still using a placeholder.")
+                CosmiqNativeLog.debug("[GooglePlaces] GooglePlacesAPIKey is empty or still using a placeholder.")
             }
             return nil
         }

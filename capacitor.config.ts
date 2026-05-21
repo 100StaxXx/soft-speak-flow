@@ -4,6 +4,7 @@ const config: CapacitorConfig = {
   appId: 'com.darrylgraham.revolution',
   appName: 'Cosmiq',
   webDir: 'dist',
+  loggingBehavior: 'none',
   // ⚠️ PRODUCTION BUILD: server config commented out
   // Only use during LOCAL development - DO NOT uncomment for iOS/Android builds!
   // server: {

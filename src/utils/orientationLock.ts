@@ -1,12 +1,20 @@
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { isNativeIOSHandheld } from '@/utils/platformTargets';
 
+const ORIENTATION_DEBUG = import.meta.env.VITE_ORIENTATION_DEBUG === 'true';
+
+function orientationDebug(message: string): void {
+  if (ORIENTATION_DEBUG) {
+    console.debug(message);
+  }
+}
+
 export const lockToPortrait = async () => {
   // Only lock orientation on native platforms
   if (isNativeIOSHandheld()) {
     try {
       await ScreenOrientation.lock({ orientation: 'portrait' });
-      console.log('Orientation locked to portrait');
+      orientationDebug('Orientation locked to portrait');
     } catch (error) {
       console.error('Failed to lock orientation:', error);
     }
@@ -18,7 +26,7 @@ export const lockToLandscape = async () => {
   if (isNativeIOSHandheld()) {
     try {
       await ScreenOrientation.lock({ orientation: 'landscape' });
-      console.log('Orientation locked to landscape');
+      orientationDebug('Orientation locked to landscape');
     } catch (error) {
       console.error('Failed to lock to landscape:', error);
     }
@@ -29,7 +37,7 @@ export const unlockOrientation = async () => {
   if (isNativeIOSHandheld()) {
     try {
       await ScreenOrientation.unlock();
-      console.log('Orientation unlocked');
+      orientationDebug('Orientation unlocked');
     } catch (error) {
       console.error('Failed to unlock orientation:', error);
     }
