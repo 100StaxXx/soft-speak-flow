@@ -191,7 +191,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.generate-companion-launcher-image]
-verify_jwt = true
+verify_jwt = false
 
 [functions.backfill-companion-image-focal]
 verify_jwt = true

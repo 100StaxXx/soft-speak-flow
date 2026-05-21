@@ -2,8 +2,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   errorResponse,
-  requireAuthenticatedUser,
-  type UserRequestAuth,
+  requireUserOrInternalRequest,
+  type UserOrInternalRequestAuth,
 } from "../_shared/auth.ts";
 import {
   buildCostGuardrailBlockedResponse,
@@ -20,7 +20,7 @@ import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-internal-key",
 };
 
 const COMPANION_IMAGE_BUCKET = "mentors-avatars";
@@ -46,7 +46,7 @@ interface GenerateCompanionLauncherImageDeps {
   authenticate: (
     req: Request,
     corsHeaders: HeadersInit,
-  ) => Promise<UserRequestAuth | Response>;
+  ) => Promise<UserOrInternalRequestAuth | Response>;
   createSupabaseClient: () => any;
   createCostGuardrailSessionFn: any;
   fetchFn: typeof fetch;
@@ -55,7 +55,7 @@ interface GenerateCompanionLauncherImageDeps {
 }
 
 const defaultDeps: GenerateCompanionLauncherImageDeps = {
-  authenticate: requireAuthenticatedUser,
+  authenticate: requireUserOrInternalRequest,
   createSupabaseClient: () => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -329,9 +329,13 @@ const createPhotoRoomLauncherCutout = async ({
   referenceImage: DownloadedReferenceImage;
 }): Promise<PhotoRoomLauncherCutout> => {
   const formData = new FormData();
+  const referenceImageBuffer = referenceImage.bytes.buffer.slice(
+    referenceImage.bytes.byteOffset,
+    referenceImage.bytes.byteOffset + referenceImage.bytes.byteLength,
+  ) as ArrayBuffer;
   formData.append(
     "image_file",
-    new Blob([referenceImage.bytes], { type: referenceImage.contentType }),
+    new Blob([referenceImageBuffer], { type: referenceImage.contentType }),
     "companion.png",
   );
   formData.append("format", "png");
@@ -428,6 +432,9 @@ export async function handleGenerateCompanionLauncherImage(
     const requestedSourceImageUrl = typeof body?.sourceImageUrl === "string"
       ? body.sourceImageUrl.trim()
       : "";
+    const requestedUserId = typeof body?.userId === "string"
+      ? body.userId.trim()
+      : "";
 
     if (!companionId) {
       return launcherErrorResponse({
@@ -440,14 +447,22 @@ export async function handleGenerateCompanionLauncherImage(
     }
 
     const supabase = deps.createSupabaseClient();
-    const { data, error: companionError } = await supabase
+    let companionQuery = supabase
       .from("user_companion")
       .select(
         "id, user_id, preset_id, current_stage, current_image_url, launcher_image_url, launcher_image_focal_x, launcher_image_focal_y, launcher_image_source_url",
       )
-      .eq("id", companionId)
-      .eq("user_id", requestAuth.userId)
-      .maybeSingle();
+      .eq("id", companionId);
+
+    if (requestAuth.isInternal) {
+      if (requestedUserId) {
+        companionQuery = companionQuery.eq("user_id", requestedUserId);
+      }
+    } else {
+      companionQuery = companionQuery.eq("user_id", requestAuth.userId);
+    }
+
+    const { data, error: companionError } = await companionQuery.maybeSingle();
 
     if (companionError) {
       console.error(

@@ -216,7 +216,7 @@ const createMockFetch = ({
       if (photoRoomStatus >= 400) {
         return new Response(photoRoomText, { status: photoRoomStatus });
       }
-      return new Response(photoRoomBody, {
+      return new Response(photoRoomBody.slice().buffer as ArrayBuffer, {
         status: photoRoomStatus,
         headers: { "Content-Type": "image/png" },
       });
@@ -287,6 +287,32 @@ Deno.test("generate-companion-launcher-image rejects anonymous access", async ()
     401,
     "Expected anonymous launcher generation to be rejected",
   );
+});
+
+Deno.test("generate-companion-launcher-image accepts internal backfill auth without a user token", async () => {
+  const { fetchFn } = createMockFetch();
+  const supabase = createMockSupabase({ companion: baseCompanion() });
+
+  const response = await callHandler(
+    buildDeps({
+      supabase,
+      fetchFn,
+      authenticate: async () => ({ isInternal: true }),
+    }),
+  );
+  const body = await response.json();
+  const selectQuery = supabase.queryLog.find((entry) =>
+    entry.table === "user_companion" && entry.operation === "select"
+  );
+
+  assertEquals(response.status, 200, "Expected internal backfill to generate");
+  assertEquals(body.provider, "photoroom:live", "Expected PhotoRoom provider");
+  assertEquals(
+    selectQuery?.filters.user_id,
+    undefined,
+    "Expected internal backfill to load by companion id without caller user scope",
+  );
+  assertEquals(supabase.uploadLog.length, 1, "Expected generated cutout upload");
 });
 
 Deno.test("generate-companion-launcher-image returns a fresh cached launcher", async () => {
@@ -423,7 +449,7 @@ Deno.test("generate-companion-launcher-image generates cutouts for preset-backed
 
   assertEquals(response.status, 200, "Expected preset-backed remote cutout to save");
   assertEquals(body.provider, "photoroom:live", "Expected PhotoRoom provider");
-  assert(photoRoomCall, "Expected PhotoRoom fetch for remote preset-backed image");
+  assert(Boolean(photoRoomCall), "Expected PhotoRoom fetch for remote preset-backed image");
   assertEquals(supabase.uploadLog.length, 1, "Expected generated cutout upload");
 });
 
