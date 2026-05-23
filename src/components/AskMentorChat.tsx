@@ -8,6 +8,7 @@ import { MentorResponseLoader } from "./MentorResponseLoader";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { hasActiveSupabaseFunctionSession } from "@/services/supabaseFunctionSession";
 import { resolveMentorSlugAlias } from "@/lib/mentorRoster";
 import { cn } from "@/lib/utils";
 import { getFallbackResponse, getConnectionErrorFallback } from "@/utils/mentorFallbacks";
@@ -100,7 +101,7 @@ export const AskMentorChat = ({
   briefingContext,
   comprehensiveMode = false
 }: AskMentorChatProps) => {
-  const { user } = useAuth();
+  const { user, refreshSession } = useAuth();
   const location = useLocation();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -119,10 +120,18 @@ export const AskMentorChat = ({
   messagesRef.current = messages;
 
   const sendMessage = useCallback(async (text: string) => {
-    // Verify user is still authenticated
-    const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
-    if (authError || !currentUser) {
+    if (!user) {
       toast({ title: "Error", description: "You must be logged in", variant: "destructive" });
+      return;
+    }
+
+    const hasSession = await hasActiveSupabaseFunctionSession(refreshSession);
+    if (!hasSession) {
+      toast({
+        title: "Session expired",
+        description: "Please sign in again to chat with your guide.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -181,8 +190,8 @@ export const AskMentorChat = ({
       // Only save if mentorId is defined to maintain data integrity
       if (mentorId) {
         void supabase.from('mentor_chats').insert([
-          { user_id: currentUser.id, mentor_id: mentorId, role: 'user', content: text },
-          { user_id: currentUser.id, mentor_id: mentorId, role: 'assistant', content: data.response }
+          { user_id: user.id, mentor_id: mentorId, role: 'user', content: text },
+          { user_id: user.id, mentor_id: mentorId, role: 'assistant', content: data.response }
         ]).then(({ error }) => { if (error) console.error('Failed to save chat history:', error); });
       }
     } catch (error) {
@@ -225,7 +234,7 @@ export const AskMentorChat = ({
     } finally {
       setIsLoading(false);
     }
-  }, [dailyMessageCount, dailyLimit, toast, mentorName, mentorTone, mentorSlug, mentorId, isOnline, comprehensiveMode, briefingContext]);
+  }, [dailyMessageCount, dailyLimit, toast, mentorName, mentorTone, mentorSlug, mentorId, isOnline, comprehensiveMode, briefingContext, refreshSession, user]);
 
   useEffect(() => {
     // Check today's message count on mount only

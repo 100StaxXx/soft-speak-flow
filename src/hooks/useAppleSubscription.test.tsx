@@ -1,5 +1,5 @@
 import React from "react";
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -15,6 +15,30 @@ const mocks = vi.hoisted(() => ({
   functionsInvoke: vi.fn(),
   invalidateQueries: vi.fn(),
   setQueryData: vi.fn(),
+  accessState: {
+    has_access: false,
+    access_source: "none",
+    trial_ends_at: null,
+    subscribed: false,
+  } as {
+    has_access: boolean;
+    access_source: "subscription" | "promo_code" | "trial" | "manual" | "none";
+    trial_ends_at: string | null;
+    subscribed: boolean;
+    status?: string;
+    plan?: string;
+    subscription_end?: string;
+  },
+  accessLoading: false,
+  currentEntitlement: null as {
+    productId: string;
+    transactionId: string;
+    expirationDate?: string;
+    originalTransactionId?: string;
+    appAccountToken?: string | null;
+    isSandbox?: boolean;
+  } | null,
+  activePlan: null as "monthly" | "yearly" | null,
   storeKitProducts: [
     { identifier: "cosmiq_premium_monthly", displayName: "Monthly", description: "", price: 9.99, displayPrice: "$9.99" },
     { identifier: "cosmiq_premium_yearly", displayName: "Yearly", description: "", price: 99.99, displayPrice: "$99.99" },
@@ -88,11 +112,22 @@ vi.mock("@/hooks/useAppliedReferralCodeState", () => ({
   }),
 }));
 
+vi.mock("./useAccessState", () => ({
+  useAccessState: () => ({
+    accessState: mocks.accessState,
+    isLoading: mocks.accessLoading,
+    error: null,
+    refetch: vi.fn(),
+  }),
+}));
+
 vi.mock("@/hooks/useStoreKit", () => ({
   useStoreKit: () => ({
     isAvailable: true,
     products: mocks.storeKitProducts,
     productsLoading: false,
+    activePlan: mocks.activePlan,
+    currentEntitlement: mocks.currentEntitlement,
     purchase: (...args: unknown[]) => mocks.purchase(...args),
     redeemOfferCode: (...args: unknown[]) => mocks.redeemOfferCode(...args),
     restorePurchases: (...args: unknown[]) => mocks.restorePurchases(...args),
@@ -130,6 +165,15 @@ describe("useAppleSubscription", () => {
       { identifier: "cosmiq_premium_yearly", displayName: "Yearly", description: "", price: 99.99, displayPrice: "$99.99" },
     ];
     mocks.user = { id: "11111111-1111-4111-8111-111111111111" };
+    mocks.accessState = {
+      has_access: false,
+      access_source: "none",
+      trial_ends_at: null,
+      subscribed: false,
+    };
+    mocks.accessLoading = false;
+    mocks.currentEntitlement = null;
+    mocks.activePlan = null;
     mocks.appliedReferralCodeState = {
       code: null,
       owner_type: null,
@@ -172,6 +216,90 @@ describe("useAppleSubscription", () => {
       body: { transactionId: "tx-1" },
     });
     expect(mocks.redeemOfferCode).not.toHaveBeenCalled();
+  });
+
+  it("skips purchase when access state is already subscribed", async () => {
+    mocks.accessState = {
+      has_access: true,
+      access_source: "subscription",
+      trial_ends_at: null,
+      subscribed: true,
+      status: "active",
+      plan: "yearly",
+      subscription_end: "2099-01-01T00:00:00.000Z",
+    };
+
+    const { result } = renderHook(() => useAppleSubscription());
+
+    let success: boolean | undefined;
+    await act(async () => {
+      success = await result.current.handlePurchase("cosmiq_premium_yearly");
+    });
+
+    expect(success).toBe(true);
+    expect(mocks.purchase).not.toHaveBeenCalled();
+    expect(mocks.recoverPurchases).not.toHaveBeenCalled();
+    expect(mocks.functionsInvoke).not.toHaveBeenCalled();
+  });
+
+  it("does not skip purchase for active promo access", async () => {
+    mocks.accessState = {
+      has_access: true,
+      access_source: "promo_code",
+      trial_ends_at: null,
+      subscribed: true,
+      status: "active",
+      subscription_end: "2099-01-01T00:00:00.000Z",
+    };
+
+    const { result } = renderHook(() => useAppleSubscription());
+
+    let success: boolean | undefined;
+    await act(async () => {
+      success = await result.current.handlePurchase("cosmiq_premium_yearly");
+    });
+
+    expect(success).toBe(true);
+    expect(mocks.purchase).toHaveBeenCalledWith("cosmiq_premium_yearly");
+    expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
+      body: { transactionId: "tx-1" },
+    });
+  });
+
+  it("skips purchase and unlocks locally for an active TestFlight entitlement", async () => {
+    mocks.currentEntitlement = {
+      productId: "cosmiq_premium_yearly",
+      transactionId: "current-sandbox-tx",
+      originalTransactionId: "current-sandbox-orig",
+      expirationDate: "2099-01-01T00:00:00.000Z",
+      isSandbox: true,
+    };
+    mocks.activePlan = "yearly";
+
+    const { result } = renderHook(() => useAppleSubscription());
+
+    let success: boolean | undefined;
+    await act(async () => {
+      success = await result.current.handlePurchase("cosmiq_premium_yearly");
+    });
+
+    expect(success).toBe(true);
+    expect(mocks.purchase).not.toHaveBeenCalled();
+    expect(mocks.recoverPurchases).not.toHaveBeenCalled();
+    expect(mocks.setQueryData).toHaveBeenCalledWith(
+      ["access-state", "11111111-1111-4111-8111-111111111111"],
+      expect.objectContaining({
+        has_access: true,
+        access_source: "subscription",
+        subscribed: true,
+        plan: "yearly",
+      }),
+    );
+    await waitFor(() => {
+      expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
+        body: { transactionId: "current-sandbox-tx" },
+      });
+    });
   });
 
   it("starts offer code redemption for yearly when user has offer code", async () => {
@@ -352,6 +480,54 @@ describe("useAppleSubscription", () => {
         variant: "destructive",
       }),
     );
+  });
+
+  it("recovers TestFlight access when Apple says already subscribed", async () => {
+    mocks.purchase.mockRejectedValueOnce(new Error("You're currently subscribed to this."));
+    mocks.recoverPurchases.mockResolvedValueOnce({
+      productId: "cosmiq_premium_yearly",
+      transactionId: "already-subscribed-sandbox-tx",
+      originalTransactionId: "already-subscribed-sandbox-orig",
+      expirationDate: "2099-01-01T00:00:00.000Z",
+      isSandbox: true,
+    });
+
+    const { result } = renderHook(() => useAppleSubscription());
+
+    let success: boolean | undefined;
+    await act(async () => {
+      success = await result.current.handlePurchase("cosmiq_premium_yearly");
+    });
+
+    expect(success).toBe(true);
+    expect(mocks.purchase).toHaveBeenCalledTimes(1);
+    expect(mocks.recoverPurchases).toHaveBeenCalledTimes(1);
+    expect(mocks.setQueryData).toHaveBeenCalledWith(
+      ["access-state", "11111111-1111-4111-8111-111111111111"],
+      expect.objectContaining({
+        has_access: true,
+        access_source: "subscription",
+        subscribed: true,
+        plan: "yearly",
+      }),
+    );
+    expect(mocks.toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Purchase failed",
+        variant: "destructive",
+      }),
+    );
+    expect(mocks.toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Subscription already linked",
+        variant: "destructive",
+      }),
+    );
+    await waitFor(() => {
+      expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
+        body: { transactionId: "already-subscribed-sandbox-tx" },
+      });
+    });
   });
 
   it("syncs a hosted RevenueCat paywall success through Apple receipt verification", async () => {

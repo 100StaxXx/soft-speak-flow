@@ -22,6 +22,7 @@ import { getProductForPlan, getPurchaseProductIdForPlan } from "@/utils/appleIAP
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useAccessStatus } from "@/hooks/useAccessStatus";
 import {
   deleteCurrentAccount,
   getAccountDeletionErrorMetadata,
@@ -203,12 +204,16 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
     hasAppliedReferralCode,
     appliedReferralCode,
     offerCodePurchaseReady,
+    handleRecoverExistingSubscription,
+    recoveringExistingSubscription,
   } = useAppleSubscription();
   const { toast } = useToast();
   const { user, signOut } = useAuth();
+  const { hasAccess, loading: accessStatusLoading } = useAccessStatus();
   const { applyReferralCode } = useReferrals();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [recoveredExistingSubscription, setRecoveredExistingSubscription] = useState(false);
 
   const monthlyProduct = useMemo(() => getProductForPlan("monthly", products), [products]);
   const yearlyProduct = useMemo(
@@ -227,6 +232,23 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
       hasOfferCode,
     });
   }, [hasOfferCode, variant]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      const recovered = await handleRecoverExistingSubscription("paywall_mount", {
+        showSuccessToast: false,
+      });
+      if (!cancelled && recovered === "verified") {
+        setRecoveredExistingSubscription(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [handleRecoverExistingSubscription]);
 
   const handleSubscribe = async () => {
     trackPaywallEvent("package_selected", {
@@ -506,6 +528,11 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
   const ctaLabel = hasSelectedCreatorYearlyOffer
     ? (offerCodePurchaseReady ? "Subscribe Yearly" : "Redeem Discount with Apple")
     : copy.cta;
+  const purchaseActionDisabled = !isAvailable || loading || productsLoading || recoveringExistingSubscription;
+
+  if ((!accessStatusLoading && hasAccess) || recoveredExistingSubscription) {
+    return null;
+  }
 
   return (
     <div data-testid="paywall-overlay" className="fixed inset-0 z-[120] overflow-hidden bg-[#05080d] text-white">
@@ -562,7 +589,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                     <button
                       type="button"
                       onClick={() => { void handleSubscribe(); }}
-                      disabled={!isAvailable || loading || productsLoading}
+                      disabled={purchaseActionDisabled}
                       className="inline-flex h-14 items-center justify-center border border-white/18 bg-black/20 px-5 text-xs font-semibold uppercase tracking-[0.18em] text-white/72 backdrop-blur-md transition hover:border-white/36 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-100 disabled:pointer-events-none disabled:opacity-50"
                     >
                       {copy.heroBadge}
@@ -766,7 +793,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
 
                 <Button
                   onClick={() => { void handleSubscribe(); }}
-                  disabled={!isAvailable || loading || productsLoading}
+                  disabled={purchaseActionDisabled}
                   className="h-14 w-full bg-cyan-100 text-sm font-semibold uppercase tracking-[0.16em] text-slate-950 shadow-[0_18px_44px_rgba(165,243,252,0.18)] hover:bg-white"
                 >
                   {loading ? "Processing..." : ctaLabel}
@@ -830,7 +857,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                 <Button
                   variant="ghost"
                   onClick={() => { void handleRestore("paywall"); }}
-                  disabled={loading}
+                  disabled={loading || recoveringExistingSubscription}
                   className="w-full text-white/64 hover:bg-white/8 hover:text-white"
                 >
                   <RefreshCw className="mr-2 h-4 w-4" />

@@ -5,6 +5,7 @@ import { isNativeIOS } from "@/utils/platformTargets";
 import { useToast } from "./use-toast";
 import { useAuth } from "./useAuth";
 import { useAppliedReferralCodeState } from "./useAppliedReferralCodeState";
+import { useAccessState } from "./useAccessState";
 import { useStoreKit } from "./useStoreKit";
 import { trackPaywallEvent } from "@/utils/paywallTelemetry";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,11 +50,14 @@ function isCancellationError(error: unknown): boolean {
 function isAlreadySubscribedError(error: unknown): boolean {
   const message = getErrorMessage(error).toLowerCase();
   return (
-    message.includes("already") &&
+    (message.includes("currently") && message.includes("subscribed")) ||
     (
-      message.includes("subscribed") ||
-      message.includes("subscription") ||
-      message.includes("purchased")
+      message.includes("already") &&
+      (
+        message.includes("subscribed") ||
+        message.includes("subscription") ||
+        message.includes("purchased")
+      )
     )
   );
 }
@@ -131,6 +135,8 @@ export function useAppleSubscription() {
     isAvailable,
     products,
     productsLoading,
+    activePlan: storeKitPlan,
+    currentEntitlement,
     purchase,
     redeemOfferCode,
     restorePurchases,
@@ -144,7 +150,9 @@ export function useAppleSubscription() {
   const [manageLoading, setManageLoading] = useState(false);
   const [productError, setProductError] = useState<string | null>(null);
   const [offerCodePurchaseReady, setOfferCodePurchaseReady] = useState(false);
+  const [recoveringExistingSubscription, setRecoveringExistingSubscription] = useState(false);
   const deferredVerificationTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const { accessState } = useAccessState();
   const hasOfferCode = appliedReferralCodeState.is_apple_offer_eligible;
   const hasAppliedReferralCode = Boolean(appliedReferralCodeState.code);
   const appliedReferralCode = appliedReferralCodeState.code;
@@ -311,6 +319,42 @@ export function useAppleSubscription() {
     verifyStoreKitTransaction,
   ]);
 
+  const verifySandboxRecoveryInBackground = useCallback((
+    transaction: StoreKitTransaction,
+    surface: string,
+    plan: "monthly" | "yearly",
+  ) => {
+    void (async () => {
+      try {
+        await verifyStoreKitTransaction(transaction, `${surface}_sandbox_existing_subscription`, plan);
+        grantLocalSubscriptionAccess(transaction, plan);
+        clearDeferredVerificationTimers();
+      } catch (error) {
+        if (canTrustSandboxBindingConflict(error, transaction)) {
+          return;
+        }
+
+        if (canDeferServerVerification(error)) {
+          scheduleDeferredVerificationRetry(transaction, surface, plan);
+          return;
+        }
+
+        console.warn("[Subscriptions] Sandbox existing subscription verification failed", {
+          surface,
+          plan,
+          productId: transaction.productId,
+          transactionId: transaction.transactionId,
+          message: getErrorMessage(error),
+        });
+      }
+    })();
+  }, [
+    clearDeferredVerificationTimers,
+    grantLocalSubscriptionAccess,
+    scheduleDeferredVerificationRetry,
+    verifyStoreKitTransaction,
+  ]);
+
   const verifyCompletedTransaction = useCallback(async (
     transaction: StoreKitTransaction,
     surface: string,
@@ -414,27 +458,70 @@ export function useAppleSubscription() {
     surface: string,
     options: { showSuccessToast?: boolean } = {},
   ): Promise<ExistingSubscriptionRecoveryResult> => {
-    const recoveredTransaction = await recoverPurchases();
-    if (!recoveredTransaction) return "not_found";
+    if (!user?.id) return "not_found";
 
-    const plan = resolvePlanFromProductId(recoveredTransaction.productId);
-    if (!plan) return "not_found";
+    setRecoveringExistingSubscription(true);
+    try {
+      if (currentEntitlement?.isSandbox) {
+        const currentPlan = resolvePlanFromProductId(currentEntitlement.productId) ?? storeKitPlan;
+        if (currentPlan && grantLocalSubscriptionAccess(currentEntitlement, currentPlan)) {
+          setProductError(null);
+          verifySandboxRecoveryInBackground(currentEntitlement, surface, currentPlan);
+          if (options.showSuccessToast !== false) {
+            toast({
+              title: "Cosmiq unlocked",
+              description: "Your existing TestFlight subscription is active on this account.",
+            });
+          }
+          return "verified";
+        }
+      }
 
-    const verified = await verifyCompletedTransaction(
-      recoveredTransaction,
-      `${surface}_existing_subscription_recovery`,
-      plan,
-    );
-    if (!verified) return "verification_failed";
+      const recoveredTransaction = await recoverPurchases();
+      if (!recoveredTransaction) return "not_found";
 
-    if (options.showSuccessToast !== false) {
-      toast({
-        title: "Cosmiq unlocked",
-        description: "Your existing App Store subscription is active on this account.",
-      });
+      const plan = resolvePlanFromProductId(recoveredTransaction.productId);
+      if (!plan) return "not_found";
+
+      if (recoveredTransaction.isSandbox && grantLocalSubscriptionAccess(recoveredTransaction, plan)) {
+        setProductError(null);
+        verifySandboxRecoveryInBackground(recoveredTransaction, surface, plan);
+        if (options.showSuccessToast !== false) {
+          toast({
+            title: "Cosmiq unlocked",
+            description: "Your existing TestFlight subscription is active on this account.",
+          });
+        }
+        return "verified";
+      }
+
+      const verified = await verifyCompletedTransaction(
+        recoveredTransaction,
+        `${surface}_existing_subscription_recovery`,
+        plan,
+      );
+      if (!verified) return "verification_failed";
+
+      if (options.showSuccessToast !== false) {
+        toast({
+          title: "Cosmiq unlocked",
+          description: "Your existing App Store subscription is active on this account.",
+        });
+      }
+      return "verified";
+    } finally {
+      setRecoveringExistingSubscription(false);
     }
-    return "verified";
-  }, [recoverPurchases, toast, verifyCompletedTransaction]);
+  }, [
+    currentEntitlement,
+    grantLocalSubscriptionAccess,
+    recoverPurchases,
+    storeKitPlan,
+    toast,
+    user?.id,
+    verifyCompletedTransaction,
+    verifySandboxRecoveryInBackground,
+  ]);
 
   const reloadProducts = useCallback(async () => {
     setProductError(null);
@@ -446,19 +533,32 @@ export function useAppleSubscription() {
   }, [isAvailable, refreshProducts]);
 
   const handlePurchase = useCallback(async (productId: string, surface: string = "paywall") => {
-    if (!isIAPAvailable()) {
+    if (!user?.id) {
       toast({
-        title: "Not Available",
-        description: "In-App Purchases are only available on iOS devices",
+        title: "Sign in required",
+        description: "Please sign in before purchasing Cosmiq.",
         variant: "destructive",
       });
       return false;
     }
 
-    if (!user?.id) {
+    if (
+      accessState.has_access &&
+      accessState.subscribed &&
+      accessState.access_source === "subscription"
+    ) {
+      return true;
+    }
+
+    if (currentEntitlement?.isSandbox) {
+      const recovered = await recoverExistingSubscription(surface, { showSuccessToast: false });
+      if (recovered === "verified") return true;
+    }
+
+    if (!isIAPAvailable()) {
       toast({
-        title: "Sign in required",
-        description: "Please sign in before purchasing Cosmiq.",
+        title: "Not Available",
+        description: "In-App Purchases are only available on iOS devices",
         variant: "destructive",
       });
       return false;
@@ -585,6 +685,10 @@ export function useAppleSubscription() {
       setLoading(false);
     }
   }, [
+    accessState.has_access,
+    accessState.access_source,
+    accessState.subscribed,
+    currentEntitlement,
     hasOfferCode,
     offerCodePurchaseReady,
     purchase,
@@ -767,8 +871,10 @@ export function useAppleSubscription() {
     handleManageSubscriptions,
     handlePresentRevenueCatPaywall,
     handlePresentCustomerCenter,
+    handleRecoverExistingSubscription: recoverExistingSubscription,
     loading,
     manageLoading,
+    recoveringExistingSubscription,
     isAvailable,
     products,
     productsLoading,

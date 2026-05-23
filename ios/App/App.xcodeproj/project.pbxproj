@@ -14,7 +14,6 @@
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
-		SC1000001000000000000001 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = SC2000001000000000000001 /* SceneDelegate.swift */; };
 		A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
 		AB1000001000000000000001 /* Plugins/AppBadge/AppBadgePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB2000001000000000000001 /* Plugins/AppBadge/AppBadgePlugin.swift */; };
 		AB1000001000000000000002 /* Plugins/AppBadge/AppBadgePlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = AB2000001000000000000002 /* Plugins/AppBadge/AppBadgePlugin.m */; };
@@ -28,6 +27,7 @@
 		NC1000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = NC2000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m */; };
 		NP1000001000000000000001 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = NP2000001000000000000001 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.swift */; };
 		NP1000001000000000000002 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = NP2000001000000000000002 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.m */; };
+		SC1000001000000000000001 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = SC2000001000000000000001 /* SceneDelegate.swift */; };
 		WD1000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = WD2000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift */; };
 		WD1000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = WD2000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m */; };
 		WW1000001000000000000001 /* Plugins/WinWinKit/WinWinKitPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = WW2000001000000000000001 /* Plugins/WinWinKit/WinWinKitPlugin.swift */; };
@@ -64,7 +64,6 @@
 		50379B242058CBB4000EE86E /* CosmiqProducts.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = CosmiqProducts.storekit; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		SC2000001000000000000001 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		504EC30E1FED79650016851F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -91,6 +90,7 @@
 		NC2000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/NativeCalendar/NativeCalendarPlugin.m; sourceTree = "<group>"; };
 		NP2000001000000000000001 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.swift; sourceTree = "<group>"; };
 		NP2000001000000000000002 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.m; sourceTree = "<group>"; };
+		SC2000001000000000000001 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		WD2000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/WidgetData/WidgetDataPlugin.swift; sourceTree = "<group>"; };
 		WD2000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/WidgetData/WidgetDataPlugin.m; sourceTree = "<group>"; };
 		WW2000001000000000000001 /* Plugins/WinWinKit/WinWinKitPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/WinWinKit/WinWinKitPlugin.swift; sourceTree = "<group>"; };
@@ -627,7 +627,7 @@
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 328;
+				CURRENT_PROJECT_VERSION = 329;
 				DEVELOPMENT_TEAM = B6VW78ABTR;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = App/Info.plist;
@@ -657,7 +657,7 @@
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 328;
+				CURRENT_PROJECT_VERSION = 329;
 				DEVELOPMENT_TEAM = B6VW78ABTR;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = App/Info.plist;
@@ -685,7 +685,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = ../CosmiqWidget/CosmiqWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 328;
+				CURRENT_PROJECT_VERSION = 329;
 				DEVELOPMENT_TEAM = B6VW78ABTR;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ../CosmiqWidget/Info.plist;
@@ -714,7 +714,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = ../CosmiqWidget/CosmiqWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 328;
+				CURRENT_PROJECT_VERSION = 329;
 				DEVELOPMENT_TEAM = B6VW78ABTR;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ../CosmiqWidget/Info.plist;

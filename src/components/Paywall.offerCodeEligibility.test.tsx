@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -18,6 +18,12 @@ const mocks = vi.hoisted(() => ({
     appliedReferralCode: null as string | null,
     offerCodePurchaseReady: false,
     handlePresentRevenueCatPaywall: vi.fn(),
+    handleRecoverExistingSubscription: vi.fn(),
+    recoveringExistingSubscription: false,
+  },
+  accessStatus: {
+    hasAccess: false,
+    loading: false,
   },
   toast: vi.fn(),
   signOut: vi.fn(),
@@ -48,6 +54,10 @@ vi.mock("@/hooks/useAuth", () => ({
     user: { id: "user-1" },
     signOut: mocks.signOut,
   }),
+}));
+
+vi.mock("@/hooks/useAccessStatus", () => ({
+  useAccessStatus: () => mocks.accessStatus,
 }));
 
 vi.mock("@/hooks/useReferrals", () => ({
@@ -96,6 +106,12 @@ describe("Paywall creator offer-code eligibility", () => {
       appliedReferralCode: null,
       offerCodePurchaseReady: false,
       handlePresentRevenueCatPaywall: vi.fn(),
+      handleRecoverExistingSubscription: vi.fn().mockResolvedValue("not_found"),
+      recoveringExistingSubscription: false,
+    };
+    mocks.accessStatus = {
+      hasAccess: false,
+      loading: false,
     };
   });
 
@@ -230,6 +246,54 @@ describe("Paywall creator offer-code eligibility", () => {
     fireEvent.click(screen.getByRole("button", { name: /^3-day free trial$/i }));
 
     expect(mocks.appleSubscription.handlePurchase).toHaveBeenCalledWith("cosmiq_premium_yearly", "paywall");
+  });
+
+  it("silently recovers existing TestFlight access on mount", async () => {
+    mocks.appleSubscription.handleRecoverExistingSubscription.mockResolvedValueOnce("verified");
+
+    render(
+      <MemoryRouter>
+        <Paywall />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(mocks.appleSubscription.handleRecoverExistingSubscription).toHaveBeenCalledWith(
+        "paywall_mount",
+        { showSuccessToast: false },
+      );
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId("paywall-overlay")).not.toBeInTheDocument();
+    });
+  });
+
+  it("disables purchase CTAs while checking existing TestFlight access", () => {
+    mocks.appleSubscription.recoveringExistingSubscription = true;
+
+    render(
+      <MemoryRouter>
+        <Paywall />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("button", { name: /^3-day free trial$/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /start 3-day free trial/i })).toBeDisabled();
+  });
+
+  it("does not render when refreshed access is already active", () => {
+    mocks.accessStatus = {
+      hasAccess: true,
+      loading: false,
+    };
+
+    render(
+      <MemoryRouter>
+        <Paywall />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByTestId("paywall-overlay")).not.toBeInTheDocument();
   });
 
   it("uses continuation copy after a trial has expired", () => {
