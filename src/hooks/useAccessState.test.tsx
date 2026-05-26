@@ -292,6 +292,40 @@ describe("useAccessState", () => {
     });
   });
 
+  it("does not block on native purchase recovery for inactive manual no-access", async () => {
+    mockSubscriptionCheck({
+      has_access: false,
+      access_source: "manual",
+      trial_ends_at: null,
+      subscribed: false,
+      status: "inactive",
+    });
+    mocks.storeKit = {
+      ...mocks.storeKit,
+      isAvailable: true,
+      isPro: false,
+      activePlan: null,
+      currentEntitlement: null,
+      expirationDate: null,
+      entitlementError: false,
+      isLoading: false,
+    };
+
+    const { result } = renderHook(() => useAccessState(), { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(mocks.recoverPurchases).not.toHaveBeenCalled();
+    expect(result.current.accessState).toMatchObject({
+      has_access: false,
+      access_source: "manual",
+      subscribed: false,
+      status: "inactive",
+    });
+  });
+
   it("unlocks and verifies an active transaction returned by native purchase recovery", async () => {
     mocks.recoverPurchases.mockResolvedValue({
       productId: "cosmiq_premium_yearly",
