@@ -332,9 +332,11 @@ const renderListener = () =>
   );
 
 const preloadPlayablePendingAnimation = async () => {
-  const preloader = screen.getByTestId("evolution-animation-preloader");
   await act(async () => {
-    fireEvent.canPlay(preloader);
+    const preloader = screen.queryByTestId("evolution-animation-preloader");
+    if (preloader) {
+      fireEvent.canPlay(preloader);
+    }
     await flushMicrotasks();
   });
   expect(mocks.state.pendingEvolutionReveal).toEqual(
@@ -508,9 +510,11 @@ describe("GlobalEvolutionListener", () => {
         await flushMicrotasks();
       });
 
-      expect(screen.getByTestId("evolution-animation-preloader")).toHaveAttribute(
-        "src",
-        "https://example.com/evolution.mp4",
+      expect(mocks.state.pendingEvolutionReveal).toEqual(
+        expect.objectContaining({
+          status: "ready",
+          animationVideoUrl: "https://example.com/evolution.mp4",
+        }),
       );
     } finally {
       vi.useRealTimers();
@@ -693,13 +697,15 @@ describe("GlobalEvolutionListener", () => {
     });
     expect(mocks.state.pendingEvolutionReveal).toEqual(
       expect.objectContaining({
-        status: "preparing",
-        animationVideoUrl: null,
+        status: "ready",
+        animationVideoUrl: "https://example.com/evolution.mp4",
       }),
     );
-    expect(mocks.toastInfoMock).not.toHaveBeenCalledWith(
+    expect(mocks.toastInfoMock).toHaveBeenCalledWith(
       "Your companion's evolution is ready.",
-      expect.anything(),
+      expect.objectContaining({
+        action: expect.objectContaining({ label: "Reveal" }),
+      }),
     );
     await openPlayablePendingAnimation();
 
@@ -847,10 +853,6 @@ describe("GlobalEvolutionListener", () => {
         await flushMicrotasks();
       });
 
-      expect(
-        screen.getByTestId("evolution-animation-preloader"),
-      ).toHaveAttribute("src", "https://example.com/watchdog-ready.mp4");
-      await preloadPlayablePendingAnimation();
       expect(mocks.state.pendingEvolutionReveal).toEqual(
         expect.objectContaining({
           status: "ready",
@@ -863,6 +865,57 @@ describe("GlobalEvolutionListener", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("clears a preparing reveal when hydration finds terminal animation metadata", async () => {
+    const now = new Date().toISOString();
+    mocks.state.pendingEvolutionReveal = {
+      status: "preparing",
+      evolutionId: "evo-5",
+      companionId: "companion-1",
+      previousStage: 4,
+      newStage: 5,
+      previousImageUrl: "https://example.com/stage-4.png",
+      newImageUrl: "https://example.com/stage-5.png",
+      animationVideoUrl: null,
+      presetId: "phoenix",
+      element: "fire",
+    };
+    mocks.state.userCompanionLookup = {
+      id: "companion-1",
+      current_stage: 5,
+      current_image_url: "https://example.com/stage-5.png",
+      preset_id: "phoenix",
+      core_element: "fire",
+      initial_image_url: "https://example.com/egg.png",
+    };
+    mocks.companionEvolutionLookupResponses.push({
+      data: {
+        id: "evo-5",
+        image_url: "https://example.com/stage-5.png",
+        animation_video_url: null,
+        animation_status: "failed",
+        animation_error_code: "fal_key_missing",
+        animation_requested_at: now,
+        animation_completed_at: now,
+        animation_presented_at: null,
+      },
+      error: null,
+    });
+
+    renderListener();
+
+    await waitFor(() => {
+      expect(mocks.state.pendingEvolutionReveal).toBeNull();
+    });
+    expect(mocks.setIsEvolvingLoadingMock).toHaveBeenLastCalledWith(false);
+    expect(
+      screen.queryByTestId("evolution-animation-preloader"),
+    ).not.toBeInTheDocument();
+    expect(mocks.functionsInvokeMock).not.toHaveBeenCalledWith(
+      "prewarm-companion-animation",
+      expect.anything(),
+    );
   });
 
   it("invalidates companion-derived queries for non-evolution updates without showing the evolution UI", async () => {
@@ -1107,7 +1160,7 @@ describe("GlobalEvolutionListener", () => {
     expect(mocks.companionEvolutionPropsMock).not.toHaveBeenCalled();
   });
 
-  it("defers the modal after preload and invites the user back to Companion", async () => {
+  it("defers the modal after the animation URL is ready and invites the user back to Companion", async () => {
     renderListener();
 
     await act(async () => {
@@ -1128,16 +1181,10 @@ describe("GlobalEvolutionListener", () => {
 
     expect(mocks.state.pendingEvolutionReveal).toEqual(
       expect.objectContaining({
-        status: "preparing",
-        animationVideoUrl: null,
+        status: "ready",
+        animationVideoUrl: "https://example.com/evolution.mp4",
       }),
     );
-    expect(mocks.toastInfoMock).not.toHaveBeenCalledWith(
-      "Your companion's evolution is ready.",
-      expect.anything(),
-    );
-    await preloadPlayablePendingAnimation();
-
     expect(mocks.toastInfoMock).toHaveBeenCalledWith(
       "Your companion's evolution is ready.",
       expect.objectContaining({
@@ -1513,7 +1560,7 @@ describe("GlobalEvolutionListener", () => {
     }
   });
 
-  it("keeps retrying after a failed animation retry cannot immediately queue", async () => {
+  it("stops retrying after a failed animation retry returns a terminal skipped reason", async () => {
     vi.useFakeTimers();
     mocks.functionsInvokeMock.mockResolvedValueOnce({
       data: { status: "skipped", reason: "fal_key_missing" },
@@ -1567,23 +1614,26 @@ describe("GlobalEvolutionListener", () => {
       expect(
         screen.queryByTestId("evolution-animation-preloader"),
       ).not.toBeInTheDocument();
+      expect(mocks.state.pendingEvolutionReveal).toBeNull();
+      expect(mocks.rpcMock).toHaveBeenCalledWith(
+        "mark_companion_evolution_animation_presented",
+        { p_evolution_id: "evo-1" },
+      );
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(5000);
         await flushMicrotasks();
       });
 
-      const preloader = screen.getByTestId("evolution-animation-preloader");
-      expect(preloader).toHaveAttribute(
-        "src",
-        "https://example.com/recovered-evolution.mp4",
-      );
-
-      await openPlayablePendingAnimation();
-
-      expect(screen.getByTestId("companion-evolution")).toHaveAttribute(
-        "data-animation-video-url",
-        "https://example.com/recovered-evolution.mp4",
+      expect(mocks.functionsInvokeMock).toHaveBeenCalledTimes(1);
+      expect(
+        screen.queryByTestId("evolution-animation-preloader"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("companion-evolution"),
+      ).not.toBeInTheDocument();
+      expect(mocks.setIsEvolvingLoadingMock).toHaveBeenLastCalledWith(
+        false,
       );
     } finally {
       vi.useRealTimers();
@@ -1975,10 +2025,11 @@ describe("GlobalEvolutionListener", () => {
     });
     expect(mocks.state.pendingEvolutionReveal).toEqual(
       expect.objectContaining({
-        status: "preparing",
+        status: "ready",
         companionId: "companion-1",
+        evolutionId: "evo-5",
         newStage: 5,
-        animationVideoUrl: null,
+        animationVideoUrl: "https://example.com/recovered-evolution.mp4",
       }),
     );
     expect(screen.getByTestId("evolution-animation-preloader")).toHaveAttribute(

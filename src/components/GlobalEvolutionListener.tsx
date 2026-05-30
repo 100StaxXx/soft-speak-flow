@@ -45,7 +45,14 @@ const LOCAL_HATCH_DEDUPE_WINDOW_MS = 15000;
 const HYDRATABLE_TERMINAL_ANIMATION_WINDOW_MS = 24 * 60 * 60 * 1000;
 const HYDRATABLE_MISSING_ANIMATION_WINDOW_MS = 24 * 60 * 60 * 1000;
 const NON_RETRYABLE_ANIMATION_REASONS = new Set([
+  "animation_worker_auth_failed",
+  "animation_worker_config_error",
+  "cost_guardrail_blocked",
+  "disabled",
+  "fal_key_missing",
   "image_unchanged",
+  "source_image_unavailable",
+  "source_image_url_unavailable",
   "stage_not_animatable",
 ]);
 const TRANSIENT_SUPABASE_READ_LOG_INTERVAL_MS = 60_000;
@@ -988,6 +995,36 @@ export const GlobalEvolutionListener = () => {
     [setPendingEvolutionReveal],
   );
 
+  const clearPendingRevealForEvolution = useCallback(
+    ({
+      companionId,
+      stage,
+    }: {
+      companionId: string;
+      stage: number;
+    }) => {
+      const key = buildEvolutionKey(companionId, stage);
+      clearPresentationRetryTimer(key);
+      pendingEvolutionKeysRef.current.delete(key);
+      if (pendingPreloadKeyRef.current === key) {
+        pendingPreloadKeyRef.current = null;
+      }
+      setPendingEvolutionData(null);
+      setIsEvolvingLoading(false);
+      setPendingRevealState((current) =>
+        current?.companionId === companionId && current.newStage === stage
+          ? null
+          : current,
+      );
+    },
+    [
+      buildEvolutionKey,
+      clearPresentationRetryTimer,
+      setIsEvolvingLoading,
+      setPendingRevealState,
+    ],
+  );
+
   useEffect(() => {
     pendingEvolutionRevealRef.current = pendingEvolutionReveal;
   }, [pendingEvolutionReveal]);
@@ -1373,11 +1410,7 @@ export const GlobalEvolutionListener = () => {
         }
 
         if (persistedEvolution.animationPresentedAt) {
-          setPendingRevealState((current) =>
-            current?.companionId === companionId && current.newStage === level
-              ? null
-              : current,
-          );
+          clearPendingRevealForEvolution({ companionId, stage: level });
           return false;
         }
 
@@ -1385,11 +1418,7 @@ export const GlobalEvolutionListener = () => {
           user?.id &&
           wasEvolutionPresentedLocally(user.id, persistedEvolution.id)
         ) {
-          setPendingRevealState((current) =>
-            current?.companionId === companionId && current.newStage === level
-              ? null
-              : current,
-          );
+          clearPendingRevealForEvolution({ companionId, stage: level });
           return false;
         }
 
@@ -1432,11 +1461,7 @@ export const GlobalEvolutionListener = () => {
             if (user?.id) {
               markEvolutionPresentedLocally(user.id, readyEvolution.id);
             }
-            setPendingRevealState((current) =>
-              current?.companionId === companionId && current.newStage === level
-                ? null
-                : current,
-            );
+            clearPendingRevealForEvolution({ companionId, stage: level });
             void markEvolutionAnimationPresented(readyEvolution.id).then(
               (marked) => {
                 if (marked) {
@@ -1465,6 +1490,7 @@ export const GlobalEvolutionListener = () => {
           presetId,
           element,
         };
+        markPendingRevealReady(readyPendingEvolution);
         pendingPreloadKeyRef.current = key;
         setPendingEvolutionData(readyPendingEvolution);
         queuedForPreload = true;
@@ -1485,7 +1511,9 @@ export const GlobalEvolutionListener = () => {
     [
       buildEvolutionKey,
       clearPresentationRetryTimer,
+      clearPendingRevealForEvolution,
       checkCompanionAchievements,
+      markPendingRevealReady,
       recordEvolutionMemory,
       setPendingRevealState,
       setIsEvolvingLoading,
@@ -1514,7 +1542,7 @@ export const GlobalEvolutionListener = () => {
     markPendingRevealReady(pending);
   }, [buildEvolutionKey, markPendingRevealReady, pendingEvolutionData]);
 
-  const retryPendingAnimationPreload = useCallback(
+  const handlePendingAnimationPreloadMiss = useCallback(
     (reason: string) => {
       const pending = pendingEvolutionData;
       if (!pending) return;
@@ -1543,7 +1571,7 @@ export const GlobalEvolutionListener = () => {
       }
 
       logger.warn(
-        "Evolution listener: Animation video could not be preloaded",
+        "Evolution listener: Animation video preload was skipped",
         {
           companionId: pending.companionId,
           level: pending.level,
@@ -1551,65 +1579,24 @@ export const GlobalEvolutionListener = () => {
           reason,
         },
       );
-      toast.info(
-        "Your companion animation needs another pass. We'll try again.",
-      );
 
       pendingPreloadKeyRef.current = null;
       setPendingEvolutionData(null);
-      pendingEvolutionKeysRef.current.delete(key);
-      setIsEvolvingLoading(true);
-      setPendingRevealState({
-        status: "preparing",
-        companionId: pending.companionId,
-        evolutionId: pending.evolutionId,
-        previousStage: pending.previousLevel,
-        newStage: pending.level,
-        previousImageUrl: pending.previousImageUrl,
-        newImageUrl: pending.imageUrl,
-        animationVideoUrl: null,
-        presetId: pending.presetId ?? null,
-        element: pending.element ?? null,
-      });
-
-      void requestAnimationJobRetry({
-        companionId: pending.companionId,
-        stage: pending.level,
-        reason: `preload_${reason}`,
-        force: true,
-      }).then(() => {
-        void beginEvolutionPresentationWhenReady({
-          companionId: pending.companionId,
-          previousLevel: pending.previousLevel,
-          level: pending.level,
-          previousImageUrl: pending.previousImageUrl,
-          imageUrl: pending.imageUrl,
-          presetId: pending.presetId,
-          element: pending.element,
-          dispatchLoadingStart: false,
-        });
-      });
     },
-    [
-      beginEvolutionPresentationWhenReady,
-      buildEvolutionKey,
-      pendingEvolutionData,
-      setIsEvolvingLoading,
-      setPendingRevealState,
-    ],
+    [buildEvolutionKey, pendingEvolutionData],
   );
 
   useEffect(() => {
     if (!pendingEvolutionData) return;
 
     const timeoutId = window.setTimeout(() => {
-      retryPendingAnimationPreload("timeout");
+      handlePendingAnimationPreloadMiss("timeout");
     }, EVOLUTION_ANIMATION_PRELOAD_TIMEOUT_MS);
 
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [pendingEvolutionData, retryPendingAnimationPreload]);
+  }, [handlePendingAnimationPreloadMiss, pendingEvolutionData]);
 
   const invalidateCompanionQueries = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["companion"] });
@@ -1860,11 +1847,17 @@ export const GlobalEvolutionListener = () => {
         return;
       }
 
-      if (
-        !mountedRef.current ||
-        !currentEvolution ||
-        !shouldHydratePendingEvolutionReveal(currentEvolution)
-      ) {
+      if (!mountedRef.current || !currentEvolution) {
+        return;
+      }
+
+      if (!shouldHydratePendingEvolutionReveal(currentEvolution)) {
+        if (currentPendingMatches && currentPending.status === "preparing") {
+          clearPendingRevealForEvolution({
+            companionId,
+            stage: currentStage,
+          });
+        }
         return;
       }
 
@@ -1872,11 +1865,10 @@ export const GlobalEvolutionListener = () => {
         user?.id &&
         wasEvolutionPresentedLocally(user.id, currentEvolution.id)
       ) {
-        setPendingRevealState((current) =>
-          current?.companionId === companionId && current.newStage === currentStage
-            ? null
-            : current,
-        );
+        clearPendingRevealForEvolution({
+          companionId,
+          stage: currentStage,
+        });
         return;
       }
 
@@ -1967,24 +1959,7 @@ export const GlobalEvolutionListener = () => {
           ? currentPending.element ?? undefined
           : element;
 
-        pendingEvolutionKeysRef.current.add(key);
-        pendingPreloadKeyRef.current = key;
-        setIsEvolvingLoading(true);
-        setPendingRevealState({
-          status: "preparing",
-          evolutionId: currentEvolution.id,
-          companionId,
-          previousStage: currentPendingMatches && currentPending
-            ? currentPending.previousStage
-            : previousStage,
-          newStage: currentStage,
-          previousImageUrl: previousImageForPreload,
-          newImageUrl: currentImageForPreload,
-          animationVideoUrl: null,
-          presetId: presetIdForPreload ?? null,
-          element: elementForPreload ?? null,
-        });
-        setPendingEvolutionData({
+        const readyPendingEvolution = {
           evolutionId: currentEvolution.id,
           companionId,
           previousLevel: currentPendingMatches && currentPending
@@ -1996,7 +1971,12 @@ export const GlobalEvolutionListener = () => {
           animationVideoUrl: currentEvolution.animationVideoUrl,
           presetId: presetIdForPreload,
           element: elementForPreload,
-        });
+        };
+
+        pendingEvolutionKeysRef.current.add(key);
+        pendingPreloadKeyRef.current = key;
+        markPendingRevealReady(readyPendingEvolution);
+        setPendingEvolutionData(readyPendingEvolution);
         return;
       }
 
@@ -2016,6 +1996,8 @@ export const GlobalEvolutionListener = () => {
   }, [
     beginEvolutionPresentationWhenReady,
     buildEvolutionKey,
+    clearPendingRevealForEvolution,
+    markPendingRevealReady,
     user?.id,
   ]);
 
@@ -2455,7 +2437,7 @@ export const GlobalEvolutionListener = () => {
           src={pendingEvolutionData.animationVideoUrl}
           onCanPlay={handlePendingAnimationReady}
           onCanPlayThrough={handlePendingAnimationReady}
-          onError={() => retryPendingAnimationPreload("error")}
+          onError={() => handlePendingAnimationPreloadMiss("error")}
           style={{
             position: "fixed",
             width: 1,
