@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useAccessStatus, type AccessGateReason } from "@/hooks/useAccessStatus";
 import { Progress } from "@/components/ui/progress";
@@ -11,6 +11,8 @@ interface ProtectedRouteProps {
   requireAccess?: boolean;
 }
 
+export const PROTECTED_ROUTE_ACCESS_STALL_MS = 8_000;
+
 export const ProtectedRoute = ({
   children,
   requireMentor: _requireMentor = true,
@@ -19,7 +21,10 @@ export const ProtectedRoute = ({
   const { user, loading: authLoading, status } = useAuth();
   const { hasAccess, gateReason, loading: accessLoading } = useAccessStatus();
   const navigate = useNavigate();
+  const location = useLocation();
   const [progress, setProgress] = useState(0);
+  const [accessGateTimedOut, setAccessGateTimedOut] = useState(false);
+  const accessGateTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const [resolvedAccessDecision, setResolvedAccessDecision] = useState<{
     userId: string;
     requireAccess: boolean;
@@ -37,11 +42,73 @@ export const ProtectedRoute = ({
       resolvedAccessDecision?.userId === userId &&
       resolvedAccessDecision.requireAccess === requireAccess,
   );
-  const isAccessPending = requireAccess && accessLoading && !hasResolvedAccessForCurrentRoute;
+  const isAccessPending =
+    requireAccess &&
+    accessLoading &&
+    !hasResolvedAccessForCurrentRoute &&
+    !accessGateTimedOut;
   const effectiveAccessDecision =
-    requireAccess && accessLoading && hasResolvedAccessForCurrentRoute && resolvedAccessDecision
-      ? resolvedAccessDecision
-      : { hasAccess, gateReason };
+    requireAccess && accessLoading && accessGateTimedOut && !hasResolvedAccessForCurrentRoute
+      ? { hasAccess: true, gateReason: "none" as AccessGateReason }
+      : requireAccess && accessLoading && hasResolvedAccessForCurrentRoute && resolvedAccessDecision
+        ? resolvedAccessDecision
+        : { hasAccess, gateReason };
+
+  useEffect(() => {
+    setAccessGateTimedOut(false);
+    setProgress(0);
+    if (accessGateTimerRef.current !== null) {
+      window.clearTimeout(accessGateTimerRef.current);
+      accessGateTimerRef.current = null;
+    }
+  }, [requireAccess, userId]);
+
+  useEffect(() => {
+    if (accessGateTimerRef.current !== null) {
+      window.clearTimeout(accessGateTimerRef.current);
+      accessGateTimerRef.current = null;
+    }
+
+    if (
+      !requireAccess ||
+      !userId ||
+      isAuthPending ||
+      !accessLoading ||
+      hasResolvedAccessForCurrentRoute ||
+      accessGateTimedOut
+    ) {
+      return undefined;
+    }
+
+    accessGateTimerRef.current = window.setTimeout(() => {
+      accessGateTimerRef.current = null;
+      setAccessGateTimedOut(true);
+      setProgress(100);
+      console.warn("ProtectedRoute access gate timed out; rendering optimistically.", {
+        authStatus,
+        gateReason,
+        path: location.pathname,
+        userIdPrefix: userId.slice(0, 8),
+      });
+    }, PROTECTED_ROUTE_ACCESS_STALL_MS);
+
+    return () => {
+      if (accessGateTimerRef.current !== null) {
+        window.clearTimeout(accessGateTimerRef.current);
+        accessGateTimerRef.current = null;
+      }
+    };
+  }, [
+    accessGateTimedOut,
+    accessLoading,
+    authStatus,
+    gateReason,
+    hasResolvedAccessForCurrentRoute,
+    isAuthPending,
+    location.pathname,
+    requireAccess,
+    userId,
+  ]);
 
   useEffect(() => {
     // Redirect to welcome page if not logged in (for App Store compliance)
@@ -71,10 +138,6 @@ export const ProtectedRoute = ({
       }
     };
   }, [isAccessPending, isAuthPending]);
-
-  useEffect(() => {
-    setProgress(0);
-  }, [requireAccess, userId]);
 
   useEffect(() => {
     if (!userId || !hasCachedUser || isAuthPending) return;

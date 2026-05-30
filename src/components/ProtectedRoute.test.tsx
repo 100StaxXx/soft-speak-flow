@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -28,7 +28,7 @@ vi.mock("@/components/Paywall", () => ({
   ),
 }));
 
-import { ProtectedRoute } from "./ProtectedRoute";
+import { ProtectedRoute, PROTECTED_ROUTE_ACCESS_STALL_MS } from "./ProtectedRoute";
 
 const ProtectedRouteTree = (props?: Partial<React.ComponentProps<typeof ProtectedRoute>>) => (
   <MemoryRouter initialEntries={["/protected"]}>
@@ -135,6 +135,66 @@ describe("ProtectedRoute", () => {
 
     expect(screen.getByText("Loading...")).toBeInTheDocument();
     expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
+  });
+
+  it("renders protected content when the initial access gate stalls", async () => {
+    vi.useFakeTimers();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    authState.status = "authenticated";
+    authState.loading = false;
+    authState.user = { id: "user-stalled" };
+    accessState.hasAccess = true;
+    accessState.gateReason = "none";
+    accessState.loading = true;
+
+    try {
+      renderProtectedRoute();
+
+      expect(screen.getByText("Loading...")).toBeInTheDocument();
+      expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
+
+      await act(async () => {
+        vi.advanceTimersByTime(PROTECTED_ROUTE_ACCESS_STALL_MS);
+      });
+
+      expect(screen.getByText("Protected Content")).toBeInTheDocument();
+      expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
+    } finally {
+      warnSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it("shows the paywall if access resolves denied after an initial stall timeout", async () => {
+    vi.useFakeTimers();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    authState.status = "authenticated";
+    authState.loading = false;
+    authState.user = { id: "user-denied-after-stall" };
+    accessState.hasAccess = true;
+    accessState.gateReason = "none";
+    accessState.loading = true;
+
+    try {
+      const view = renderProtectedRoute();
+
+      await act(async () => {
+        vi.advanceTimersByTime(PROTECTED_ROUTE_ACCESS_STALL_MS);
+      });
+
+      expect(screen.getByText("Protected Content")).toBeInTheDocument();
+
+      accessState.loading = false;
+      accessState.hasAccess = false;
+      accessState.gateReason = "trial_expired";
+      view.rerender(ProtectedRouteTree());
+
+      expect(screen.getByText("Paywall:trial_expired")).toBeInTheDocument();
+      expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
+    } finally {
+      warnSpy.mockRestore();
+      vi.useRealTimers();
+    }
   });
 
   it("keeps the paywall visible while denied access refreshes", () => {
