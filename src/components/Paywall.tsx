@@ -204,7 +204,6 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
     hasAppliedReferralCode,
     appliedReferralCode,
     offerCodePurchaseReady,
-    handleRecoverExistingSubscription,
     recoveringExistingSubscription,
   } = useAppleSubscription();
   const { toast } = useToast();
@@ -213,7 +212,6 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
   const { applyReferralCode } = useReferrals();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [recoveredExistingSubscription, setRecoveredExistingSubscription] = useState(false);
 
   const monthlyProduct = useMemo(() => getProductForPlan("monthly", products), [products]);
   const yearlyProduct = useMemo(
@@ -232,23 +230,6 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
       hasOfferCode,
     });
   }, [hasOfferCode, variant]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    void (async () => {
-      const recovered = await handleRecoverExistingSubscription("paywall_mount", {
-        showSuccessToast: false,
-      });
-      if (!cancelled && recovered === "verified") {
-        setRecoveredExistingSubscription(true);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [handleRecoverExistingSubscription]);
 
   const handleSubscribe = async () => {
     trackPaywallEvent("package_selected", {
@@ -530,7 +511,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
     : copy.cta;
   const purchaseActionDisabled = !isAvailable || loading || productsLoading || recoveringExistingSubscription;
 
-  if ((!accessStatusLoading && hasAccess) || recoveredExistingSubscription) {
+  if (!accessStatusLoading && hasAccess) {
     return null;
   }
 

@@ -253,13 +253,8 @@ describe("useAccessState", () => {
     });
   });
 
-  it("attempts one native purchase recovery before rendering a hard no-access state", async () => {
-    let resolveRecovery: (transaction: null) => void = () => {};
-    mocks.recoverPurchases.mockReturnValue(
-      new Promise<null>((resolve) => {
-        resolveRecovery = resolve;
-      }),
-    );
+  it("does not attempt native purchase recovery while reading access state", async () => {
+    mocks.recoverPurchases.mockReturnValue(new Promise<null>(() => {}));
     mocks.storeKit = {
       ...mocks.storeKit,
       isAvailable: true,
@@ -274,17 +269,10 @@ describe("useAccessState", () => {
     const { result } = renderHook(() => useAccessState(), { wrapper: createWrapper() });
 
     await waitFor(() => {
-      expect(mocks.recoverPurchases).toHaveBeenCalledTimes(1);
-    });
-    expect(result.current.isLoading).toBe(true);
-
-    await act(async () => {
-      resolveRecovery(null);
-    });
-
-    await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
+
+    expect(mocks.recoverPurchases).not.toHaveBeenCalled();
     expect(result.current.accessState).toMatchObject({
       has_access: false,
       access_source: "none",
@@ -324,97 +312,6 @@ describe("useAccessState", () => {
       subscribed: false,
       status: "inactive",
     });
-  });
-
-  it("unlocks and verifies an active transaction returned by native purchase recovery", async () => {
-    mocks.recoverPurchases.mockResolvedValue({
-      productId: "cosmiq_premium_yearly",
-      expirationDate: "2099-01-01T00:00:00.000Z",
-      transactionId: "recovered-testflight-tx",
-      isSandbox: true,
-    });
-    mocks.storeKit = {
-      ...mocks.storeKit,
-      isAvailable: true,
-      isPro: false,
-      activePlan: null,
-      currentEntitlement: null,
-      expirationDate: null,
-      entitlementError: false,
-      isLoading: false,
-    };
-
-    const { result } = renderHook(() => useAccessState(), { wrapper: createWrapper() });
-
-    await waitFor(() => {
-      expect(result.current.accessState).toMatchObject({
-        has_access: true,
-        access_source: "subscription",
-        subscribed: true,
-        plan: "yearly",
-      });
-    });
-    expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
-      body: { transactionId: "recovered-testflight-tx" },
-    });
-  });
-
-  it("keeps a recovered TestFlight subscription unlocked when backend binding belongs to an old account", async () => {
-    mocks.functionsInvoke.mockImplementation((functionName: string) => {
-      if (functionName === "check-apple-subscription") {
-        return Promise.resolve({
-          data: neutralAccessState,
-          error: null,
-        });
-      }
-
-      if (functionName === "verify-apple-receipt") {
-        return Promise.resolve({
-          data: null,
-          error: {
-            message: "Edge Function returned a non-2xx status code",
-            status: 403,
-            context: new Response(JSON.stringify({
-              error: "This purchase is already linked to another account.",
-              code: "APPLE_BINDING_CONFLICT",
-            }), { status: 403 }),
-          },
-        });
-      }
-
-      return Promise.resolve({ data: null, error: null });
-    });
-    mocks.recoverPurchases.mockResolvedValue({
-      productId: "cosmiq_premium_yearly",
-      expirationDate: "2099-01-01T00:00:00.000Z",
-      transactionId: "recovered-sandbox-conflict-tx",
-      originalTransactionId: "recovered-sandbox-conflict-orig",
-      isSandbox: true,
-    });
-    mocks.storeKit = {
-      ...mocks.storeKit,
-      isAvailable: true,
-      isPro: false,
-      activePlan: null,
-      currentEntitlement: null,
-      expirationDate: null,
-      entitlementError: false,
-      isLoading: false,
-    };
-
-    const { result } = renderHook(() => useAccessState(), { wrapper: createWrapper() });
-
-    await waitFor(() => {
-      expect(result.current.accessState).toMatchObject({
-        has_access: true,
-        access_source: "subscription",
-        subscribed: true,
-        plan: "yearly",
-      });
-    });
-    expect(globalThis.localStorage.getItem(
-      "cosmiq.rejectedLocalSubscriptionTransactions.v1.11111111-1111-4111-8111-111111111111",
-    )).toBeNull();
   });
 
   it("does not grant local StoreKit access when no active entitlement exists", async () => {

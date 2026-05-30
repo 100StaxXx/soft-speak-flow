@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   getCustomerInfo: vi.fn(),
   getOfferings: vi.fn(),
   getProducts: vi.fn(),
+  logIn: vi.fn(),
   purchaseStoreProduct: vi.fn(),
   removeCustomerInfoUpdateListener: vi.fn(),
   restorePurchases: vi.fn(),
@@ -72,6 +73,7 @@ vi.mock("@revenuecat/purchases-capacitor", () => ({
     getCustomerInfo: (...args: unknown[]) => mocks.getCustomerInfo(...args),
     getOfferings: (...args: unknown[]) => mocks.getOfferings(...args),
     getProducts: (...args: unknown[]) => mocks.getProducts(...args) ?? Promise.resolve({ products: [] }),
+    logIn: (...args: unknown[]) => mocks.logIn(...args),
     purchaseStoreProduct: (...args: unknown[]) => mocks.purchaseStoreProduct(...args),
     removeCustomerInfoUpdateListener: (...args: unknown[]) => mocks.removeCustomerInfoUpdateListener(...args),
     restorePurchases: (...args: unknown[]) => mocks.restorePurchases(...args),
@@ -123,6 +125,22 @@ const Probe = () => {
       <button
         type="button"
         onClick={() => {
+          void storeKit.refreshEntitlement();
+        }}
+      >
+        Refresh Entitlement
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          void storeKit.refreshProducts();
+        }}
+      >
+        Refresh Products
+      </button>
+      <button
+        type="button"
+        onClick={() => {
           void storeKit.recoverPurchases();
         }}
       >
@@ -155,6 +173,7 @@ describe("StoreKitProvider", () => {
     mocks.getCustomerInfo.mockResolvedValue({ customerInfo: inactiveCustomerInfo });
     mocks.getOfferings.mockResolvedValue({ current: null, all: {} });
     mocks.getProducts.mockResolvedValue({ products: [] });
+    mocks.logIn.mockResolvedValue({ customerInfo: inactiveCustomerInfo });
     mocks.purchaseStoreProduct.mockResolvedValue({
       productIdentifier: "cosmiq_premium_yearly",
       customerInfo: inactiveCustomerInfo,
@@ -176,7 +195,21 @@ describe("StoreKitProvider", () => {
     vi.useRealTimers();
   });
 
-  it("times out a stalled entitlement refresh so startup can leave loading", async () => {
+  it("does not initialize RevenueCat on startup", () => {
+    render(
+      <StoreKitProvider>
+        <Probe />
+      </StoreKitProvider>,
+    );
+
+    expect(screen.getByTestId("storekit-loading")).toHaveTextContent("false");
+    expect(screen.getByTestId("products-loading")).toHaveTextContent("false");
+    expect(mocks.configure).not.toHaveBeenCalled();
+    expect(mocks.getCustomerInfo).not.toHaveBeenCalled();
+    expect(mocks.getProducts).not.toHaveBeenCalled();
+  });
+
+  it("times out a stalled explicit entitlement refresh", async () => {
     mocks.getCustomerInfo.mockReturnValue(never());
 
     render(
@@ -185,6 +218,7 @@ describe("StoreKitProvider", () => {
       </StoreKitProvider>,
     );
 
+    fireEvent.click(screen.getByRole("button", { name: "Refresh Entitlement" }));
     expect(screen.getByTestId("storekit-loading")).toHaveTextContent("true");
 
     await act(async () => {
@@ -203,6 +237,8 @@ describe("StoreKitProvider", () => {
         <Probe />
       </StoreKitProvider>,
     );
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh Entitlement" }));
 
     await waitFor(() => {
       expect(mocks.configure).toHaveBeenCalledWith(expect.objectContaining({
@@ -246,6 +282,8 @@ describe("StoreKitProvider", () => {
         <Probe />
       </StoreKitProvider>,
     );
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh Entitlement" }));
 
     await waitFor(() => {
       expect(screen.getByTestId("entitlement-product")).toHaveTextContent("cosmiq_premium_yearly");
@@ -310,6 +348,8 @@ describe("StoreKitProvider", () => {
       </StoreKitProvider>,
     );
 
+    fireEvent.click(screen.getByRole("button", { name: "Refresh Entitlement" }));
+
     await waitFor(() => {
       expect(screen.getByTestId("entitlement-product")).toHaveTextContent("cosmiq_premium_yearly");
     });
@@ -347,6 +387,8 @@ describe("StoreKitProvider", () => {
         <Probe />
       </StoreKitProvider>,
     );
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh Entitlement" }));
 
     await waitFor(() => {
       expect(screen.getByTestId("entitlement-product")).toHaveTextContent("com.darrylgraham.revolution.yearly");
@@ -422,6 +464,8 @@ describe("StoreKitProvider", () => {
       </StoreKitProvider>,
     );
 
+    fireEvent.click(screen.getByRole("button", { name: "Refresh Products" }));
+
     await waitFor(() => {
       expect(screen.getByTestId("product-count")).toHaveTextContent("1");
     });
@@ -443,10 +487,7 @@ describe("StoreKitProvider", () => {
       </StoreKitProvider>,
     );
 
-    await act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    fireEvent.click(screen.getByRole("button", { name: "Refresh Products" }));
 
     expect(screen.getByTestId("storekit-loading")).toHaveTextContent("false");
     expect(screen.getByTestId("products-loading")).toHaveTextContent("true");
@@ -480,6 +521,8 @@ describe("StoreKitProvider", () => {
         <Probe />
       </StoreKitProvider>,
     );
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh Products" }));
 
     await waitFor(() => {
       expect(screen.getByTestId("product-count")).toHaveTextContent("1");

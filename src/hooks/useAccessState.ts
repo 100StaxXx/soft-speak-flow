@@ -13,7 +13,6 @@ import {
   rememberRejectedLocalSubscriptionTransaction,
   storeKitTransactionMatchesUser,
 } from "@/utils/localSubscriptionAccess";
-import { resolvePlanFromProductId } from "@/utils/appleIAP";
 import { parseFunctionInvokeError, type ParsedFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
 
 export type AccessSource = "subscription" | "promo_code" | "trial" | "manual" | "none";
@@ -65,17 +64,11 @@ export function useAccessState() {
   const [sessionRejectedTransactionId, setSessionRejectedTransactionId] = useState<string | null>(null);
   const recoveryTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const recoveryKeyRef = useRef<string | null>(null);
-  const completedPurchaseRecoveryKeyRef = useRef<string | null>(null);
-  const inFlightPurchaseRecoveryKeyRef = useRef<string | null>(null);
-  const [completedPurchaseRecoveryKey, setCompletedPurchaseRecoveryKey] = useState<string | null>(null);
-  const [purchaseRecoveryLoading, setPurchaseRecoveryLoading] = useState(false);
   const {
     activePlan: storeKitPlan,
     currentEntitlement,
     entitlementError,
-    isAvailable: storeKitAvailable,
     isLoading: storeKitLoading,
-    recoverPurchases,
   } = useStoreKit();
 
   const currentStoreKitAccessState = useMemo<AccessState | null>(() => {
@@ -170,23 +163,6 @@ export function useAccessState() {
     !canUseFreshLocalActivationAccessForRender &&
     !canUseRememberedLocalAccessForRender &&
     storeKitLoading;
-  const purchaseRecoveryKey = user?.id
-    ? `${user.id}:${query.data?.access_source ?? "none"}:${query.data?.status ?? "unknown"}`
-    : null;
-  const shouldAttemptPurchaseRecovery = Boolean(
-    user?.id &&
-      storeKitAvailable &&
-      typeof recoverPurchases === "function" &&
-      backendHasRecoverableNoAccess &&
-      !currentEntitlement &&
-      !currentStoreKitAccessState &&
-      !storeKitLoading &&
-      !entitlementError &&
-      purchaseRecoveryKey &&
-      completedPurchaseRecoveryKey !== purchaseRecoveryKey &&
-      inFlightPurchaseRecoveryKeyRef.current !== purchaseRecoveryKey,
-  );
-
   useEffect(() => {
     return () => {
       recoveryTimersRef.current.forEach((timer) => clearTimeout(timer));
@@ -198,98 +174,6 @@ export function useAccessState() {
     if (!user?.id || !backendHasInactiveSubscriptionAccess) return;
     clearLocalSubscriptionAccess(user.id);
   }, [backendHasInactiveSubscriptionAccess, user?.id]);
-
-  useEffect(() => {
-    if (
-      !user?.id ||
-      !purchaseRecoveryKey ||
-      !storeKitAvailable ||
-      typeof recoverPurchases !== "function" ||
-      !backendHasRecoverableNoAccess ||
-      currentEntitlement ||
-      currentStoreKitAccessState ||
-      storeKitLoading ||
-      entitlementError ||
-      completedPurchaseRecoveryKeyRef.current === purchaseRecoveryKey ||
-      inFlightPurchaseRecoveryKeyRef.current === purchaseRecoveryKey
-    ) {
-      return;
-    }
-
-    inFlightPurchaseRecoveryKeyRef.current = purchaseRecoveryKey;
-
-    let cancelled = false;
-    setPurchaseRecoveryLoading(true);
-
-    void (async () => {
-      try {
-        const recoveredTransaction = await recoverPurchases();
-        if (cancelled || !recoveredTransaction) return;
-
-        const plan = resolvePlanFromProductId(recoveredTransaction.productId);
-        const recoveredAccessState = buildLocalSubscriptionAccessState(
-          recoveredTransaction,
-          user.id,
-          plan,
-          { trustCurrentSession: true },
-        );
-        if (!recoveredAccessState) return;
-
-        rememberLocalSubscriptionAccess(user.id, recoveredAccessState, recoveredTransaction);
-        queryClient.setQueryData(queryKeys.access.detail(user.id), recoveredAccessState);
-
-        const transactionId = recoveredTransaction.transactionId?.trim();
-        if (!transactionId) return;
-
-        const { data, error } = await supabase.functions.invoke("verify-apple-receipt", {
-          body: { transactionId },
-        });
-        if (!error && !(data as { error?: unknown } | null)?.error) {
-          await queryClient.invalidateQueries({ queryKey: queryKeys.access.detail(user.id) });
-          return;
-        }
-
-        const parsed = await parseFunctionInvokeError(
-          error ?? new Error(String((data as { error?: unknown })?.error ?? "Subscription verification failed")),
-        );
-        if (parsed.code === APPLE_BINDING_CONFLICT_CODE && recoveredTransaction.isSandbox) {
-          return;
-        }
-        if (parsed.code === APPLE_BINDING_CONFLICT_CODE || !canRetryAccessRecovery(parsed)) {
-          clearLocalSubscriptionAccess(user.id);
-          rememberRejectedLocalSubscriptionTransaction(user.id, recoveredTransaction);
-          setSessionRejectedTransactionId(transactionId);
-          queryClient.setQueryData(queryKeys.access.detail(user.id), DEFAULT_ACCESS_STATE);
-          await queryClient.invalidateQueries({ queryKey: queryKeys.access.detail(user.id) });
-        }
-      } finally {
-        if (inFlightPurchaseRecoveryKeyRef.current === purchaseRecoveryKey) {
-          inFlightPurchaseRecoveryKeyRef.current = null;
-          completedPurchaseRecoveryKeyRef.current = purchaseRecoveryKey;
-        }
-        if (!cancelled) {
-          setCompletedPurchaseRecoveryKey(purchaseRecoveryKey);
-          setPurchaseRecoveryLoading(false);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    backendHasRecoverableNoAccess,
-    completedPurchaseRecoveryKey,
-    currentEntitlement,
-    currentStoreKitAccessState,
-    entitlementError,
-    purchaseRecoveryKey,
-    queryClient,
-    recoverPurchases,
-    storeKitAvailable,
-    storeKitLoading,
-    user?.id,
-  ]);
 
   useEffect(() => {
     if (!user?.id || !backendHasRecoverableNoAccess || !currentStoreKitAccessState) return;
@@ -373,9 +257,7 @@ export function useAccessState() {
     isLoading: authLoading ||
       (!!user && (
         query.isLoading ||
-        waitingForStoreKitFallback ||
-        shouldAttemptPurchaseRecovery ||
-        purchaseRecoveryLoading
+        waitingForStoreKitFallback
       )),
     error: query.error,
     refetch: query.refetch,

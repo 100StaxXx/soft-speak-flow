@@ -248,7 +248,7 @@ describe("Paywall creator offer-code eligibility", () => {
     expect(mocks.appleSubscription.handlePurchase).toHaveBeenCalledWith("cosmiq_premium_yearly", "paywall");
   });
 
-  it("silently recovers existing TestFlight access on mount", async () => {
+  it("does not contact StoreKit to recover existing access on mount", () => {
     mocks.appleSubscription.handleRecoverExistingSubscription.mockResolvedValueOnce("verified");
 
     render(
@@ -257,15 +257,8 @@ describe("Paywall creator offer-code eligibility", () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      expect(mocks.appleSubscription.handleRecoverExistingSubscription).toHaveBeenCalledWith(
-        "paywall_mount",
-        { showSuccessToast: false },
-      );
-    });
-    await waitFor(() => {
-      expect(screen.queryByTestId("paywall-overlay")).not.toBeInTheDocument();
-    });
+    expect(mocks.appleSubscription.handleRecoverExistingSubscription).not.toHaveBeenCalled();
+    expect(screen.getByTestId("paywall-overlay")).toBeInTheDocument();
   });
 
   it("disables purchase CTAs while checking existing TestFlight access", () => {

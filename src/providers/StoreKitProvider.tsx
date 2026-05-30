@@ -328,10 +328,11 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
   const [currentEntitlement, setCurrentEntitlement] = useState<StoreKitTransaction | null>(null);
   const [offerings, setOfferings] = useState<PurchasesOfferings | null>(null);
-  const [entitlementLoading, setEntitlementLoading] = useState(isAvailable);
+  const [entitlementLoading, setEntitlementLoading] = useState(false);
   const [entitlementError, setEntitlementError] = useState(false);
   const [isConfigured, setIsConfigured] = useState(false);
   const configuredAppUserIdRef = useRef<string | null>(null);
+  const configurationPromiseRef = useRef<Promise<void> | null>(null);
   const purchaseRecoveryPromiseRef = useRef<Promise<StoreKitTransaction | null> | null>(null);
   const packagesRef = useRef<PurchasesPackage[]>([]);
   const storeProductsRef = useRef<Map<string, PurchasesStoreProduct>>(new Map());
@@ -343,6 +344,72 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     setCustomerInfo(nextCustomerInfo);
     setCurrentEntitlement(customerInfoToTransaction(nextCustomerInfo, transaction));
   }, []);
+
+  const ensureConfigured = useCallback(async () => {
+    if (!isAvailable || status !== "authenticated" || !user?.id) {
+      return false;
+    }
+
+    if (isConfigured && configuredAppUserIdRef.current === user.id) {
+      return true;
+    }
+
+    if (configurationPromiseRef.current) {
+      await configurationPromiseRef.current;
+      return configuredAppUserIdRef.current === user.id;
+    }
+
+    const appUserId = user.id;
+    const configurationPromise = (async () => {
+      const { LOG_LEVEL, Purchases, STOREKIT_VERSION } = await loadRevenueCat();
+
+      if (!configuredAppUserIdRef.current) {
+        await Purchases.setLogLevel({
+          level: REVENUECAT_DEBUG ? LOG_LEVEL.DEBUG : LOG_LEVEL.ERROR,
+        });
+        await withTimeout(
+          () => Purchases.configure({
+            apiKey: REVENUECAT_IOS_API_KEY,
+            appUserID: appUserId,
+            storeKitVersion: STOREKIT_VERSION.STOREKIT_2,
+          }),
+          {
+            timeoutMs: REVENUECAT_CONFIGURE_TIMEOUT_MS,
+            operation: "RevenueCat configure",
+            timeoutCode: "REVENUECAT_TIMEOUT",
+          },
+        );
+      } else if (configuredAppUserIdRef.current !== appUserId) {
+        await withTimeout(
+          () => Purchases.logIn({ appUserID: appUserId }),
+          {
+            timeoutMs: REVENUECAT_CONFIGURE_TIMEOUT_MS,
+            operation: "RevenueCat user switch",
+            timeoutCode: "REVENUECAT_TIMEOUT",
+          },
+        );
+      }
+
+      configuredAppUserIdRef.current = appUserId;
+    })();
+
+    configurationPromiseRef.current = configurationPromise;
+    try {
+      await configurationPromise;
+      setIsConfigured(true);
+      setEntitlementError(false);
+      return true;
+    } catch (error) {
+      setIsConfigured(false);
+      setEntitlementError(true);
+      console.error("[RevenueCat] Configuration failed:", revenueCatErrorMessage(error));
+      throw error;
+    } finally {
+      if (configurationPromiseRef.current === configurationPromise) {
+        configurationPromiseRef.current = null;
+      }
+    }
+  }, [isAvailable, isConfigured, status, user?.id]);
 
   const fetchCustomerInfo = useCallback(async () => {
     const { Purchases } = await loadRevenueCat();
@@ -359,10 +426,12 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
   }, [applyCustomerInfo]);
 
   const refreshProducts = useCallback(async () => {
-    if (!isAvailable || !isConfigured) return [];
+    if (!isAvailable) return [];
 
     setProductsLoading(true);
     try {
+      const configured = await ensureConfigured();
+      if (!configured) return [];
       const { PRODUCT_CATEGORY, Purchases } = await loadRevenueCat();
       const [offeringsResult, productsResult] = await withTimeout(
         () => Promise.allSettled([
@@ -426,13 +495,15 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setProductsLoading(false);
     }
-  }, [isAvailable, isConfigured]);
+  }, [ensureConfigured, isAvailable]);
 
   const refreshEntitlement = useCallback(async () => {
-    if (!isAvailable || !isConfigured) return;
+    if (!isAvailable) return;
 
     setEntitlementLoading(true);
     try {
+      const configured = await ensureConfigured();
+      if (!configured) return;
       await fetchCustomerInfo();
       setEntitlementError(false);
     } catch (error) {
@@ -441,86 +512,28 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setEntitlementLoading(false);
     }
-  }, [fetchCustomerInfo, isAvailable, isConfigured]);
+  }, [ensureConfigured, fetchCustomerInfo, isAvailable]);
 
   useEffect(() => {
     if (!isAvailable) {
+      setIsConfigured(false);
       setEntitlementLoading(false);
       return;
     }
 
     if (status !== "authenticated" || !user?.id) {
       applyCustomerInfo(null);
+      setIsConfigured(false);
       setEntitlementLoading(false);
       return;
     }
 
-    let cancelled = false;
-
-    void (async () => {
-      setEntitlementLoading(true);
-      try {
-        const { LOG_LEVEL, Purchases, STOREKIT_VERSION } = await loadRevenueCat();
-
-        if (!configuredAppUserIdRef.current) {
-          await Purchases.setLogLevel({
-            level: REVENUECAT_DEBUG ? LOG_LEVEL.DEBUG : LOG_LEVEL.ERROR,
-          });
-          await withTimeout(
-            () => Purchases.configure({
-              apiKey: REVENUECAT_IOS_API_KEY,
-              appUserID: user.id,
-              storeKitVersion: STOREKIT_VERSION.STOREKIT_2,
-            }),
-            {
-              timeoutMs: REVENUECAT_CONFIGURE_TIMEOUT_MS,
-              operation: "RevenueCat configure",
-              timeoutCode: "REVENUECAT_TIMEOUT",
-            },
-          );
-          configuredAppUserIdRef.current = user.id;
-          if (!cancelled) setIsConfigured(true);
-          const nextCustomerInfo = await fetchCustomerInfo();
-          if (!cancelled) {
-            applyCustomerInfo(nextCustomerInfo);
-          }
-        } else if (configuredAppUserIdRef.current !== user.id) {
-          const result = await Purchases.logIn({ appUserID: user.id });
-          configuredAppUserIdRef.current = user.id;
-          if (!cancelled) {
-            setIsConfigured(true);
-            applyCustomerInfo(result.customerInfo);
-          }
-        } else {
-          if (!cancelled) setIsConfigured(true);
-          const nextCustomerInfo = await fetchCustomerInfo();
-          if (!cancelled) applyCustomerInfo(nextCustomerInfo);
-        }
-
-        if (!cancelled) {
-          setEntitlementError(false);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setEntitlementError(true);
-          console.error("[RevenueCat] Configuration failed:", revenueCatErrorMessage(error));
-        }
-      } finally {
-        if (!cancelled) {
-          setEntitlementLoading(false);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [applyCustomerInfo, fetchCustomerInfo, isAvailable, status, user?.id]);
-
-  useEffect(() => {
-    if (!isAvailable || !isConfigured) return;
-    void refreshProducts();
-  }, [isAvailable, isConfigured, refreshProducts]);
+    if (configuredAppUserIdRef.current !== user.id) {
+      applyCustomerInfo(null);
+      setIsConfigured(false);
+      setEntitlementLoading(false);
+    }
+  }, [applyCustomerInfo, isAvailable, status, user?.id]);
 
   useEffect(() => {
     if (!isAvailable || !isConfigured) return;
@@ -574,7 +587,9 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
   }, [isAvailable, isConfigured, refreshEntitlement, refreshProducts]);
 
   const purchase = useCallback(async (productId: string): Promise<StoreKitTransaction | null> => {
-    if (!isAvailable || !isConfigured) return null;
+    if (!isAvailable) return null;
+    const configured = await ensureConfigured();
+    if (!configured) return null;
 
     const { PRODUCT_CATEGORY, Purchases } = await loadRevenueCat();
     const packageToPurchase = packagesRef.current.find((pkg) => pkg.product.identifier === productId);
@@ -599,10 +614,15 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     applyCustomerInfo(result.customerInfo, result.transaction);
     setEntitlementError(false);
     return purchaseResultToTransaction(result.productIdentifier, result.customerInfo, result.transaction);
-  }, [applyCustomerInfo, isAvailable, isConfigured]);
+  }, [applyCustomerInfo, ensureConfigured, isAvailable]);
 
   const redeemOfferCode = useCallback(async () => {
-    if (!isAvailable || !isConfigured) {
+    if (!isAvailable) {
+      throw new Error("Offer code redemption is only available after RevenueCat is configured on iOS.");
+    }
+
+    const configured = await ensureConfigured();
+    if (!configured) {
       throw new Error("Offer code redemption is only available after RevenueCat is configured on iOS.");
     }
 
@@ -624,20 +644,29 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
       status: "presented" as const,
       entitlement,
     };
-  }, [applyCustomerInfo, fetchCustomerInfo, isAvailable, isConfigured, refreshProducts]);
+  }, [applyCustomerInfo, ensureConfigured, fetchCustomerInfo, isAvailable, refreshProducts]);
 
   const restorePurchasesHandler = useCallback(async (): Promise<StoreKitTransaction | null> => {
-    if (!isAvailable || !isConfigured) return null;
+    if (!isAvailable) return null;
+    const configured = await ensureConfigured();
+    if (!configured) return null;
 
     const { Purchases } = await loadRevenueCat();
-    const { customerInfo: restoredCustomerInfo } = await Purchases.restorePurchases();
+    const { customerInfo: restoredCustomerInfo } = await withTimeout(
+      () => Purchases.restorePurchases(),
+      {
+        timeoutMs: REVENUECAT_PURCHASE_RECOVERY_TIMEOUT_MS,
+        operation: "RevenueCat purchase restore",
+        timeoutCode: "REVENUECAT_TIMEOUT",
+      },
+    );
     applyCustomerInfo(restoredCustomerInfo);
     setEntitlementError(false);
     return customerInfoToTransaction(restoredCustomerInfo);
-  }, [applyCustomerInfo, isAvailable, isConfigured]);
+  }, [applyCustomerInfo, ensureConfigured, isAvailable]);
 
   const recoverPurchasesHandler = useCallback(async (): Promise<StoreKitTransaction | null> => {
-    if (!isAvailable || !isConfigured) return null;
+    if (!isAvailable) return null;
     if (purchaseRecoveryPromiseRef.current) {
       return purchaseRecoveryPromiseRef.current;
     }
@@ -645,6 +674,8 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     const recoveryPromise = (async (): Promise<StoreKitTransaction | null> => {
       setEntitlementLoading(true);
       try {
+        const configured = await ensureConfigured();
+        if (!configured) return null;
         const { Purchases } = await loadRevenueCat();
 
         try {
@@ -693,10 +724,12 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
         purchaseRecoveryPromiseRef.current = null;
       }
     }
-  }, [applyCustomerInfo, fetchCustomerInfo, isAvailable, isConfigured]);
+  }, [applyCustomerInfo, ensureConfigured, fetchCustomerInfo, isAvailable]);
 
   const presentRevenueCatPaywall = useCallback(async (onlyIfNeeded: boolean): Promise<boolean> => {
-    if (!isAvailable || !isConfigured) return false;
+    if (!isAvailable) return false;
+    const configured = await ensureConfigured();
+    if (!configured) return false;
 
     const { RevenueCatUI } = await loadRevenueCatUI();
     const paywallResult = onlyIfNeeded
@@ -715,14 +748,16 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     }
 
     return false;
-  }, [isAvailable, isConfigured, refreshEntitlement]);
+  }, [ensureConfigured, isAvailable, refreshEntitlement]);
 
   const manageSubscriptionsHandler = useCallback(async () => {
-    if (!isAvailable || !isConfigured) return;
+    if (!isAvailable) return;
+    const configured = await ensureConfigured();
+    if (!configured) return;
     const { RevenueCatUI } = await loadRevenueCatUI();
     await RevenueCatUI.presentCustomerCenter();
     await refreshEntitlement();
-  }, [isAvailable, isConfigured, refreshEntitlement]);
+  }, [ensureConfigured, isAvailable, refreshEntitlement]);
 
   const activeEntitlement = activeCosmiqProEntitlement(customerInfo);
   const activePlan = resolvePlanFromProductId(currentEntitlement?.productId);
