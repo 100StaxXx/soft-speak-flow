@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useTalkPopupContextSafe } from "@/contexts/TalkPopupContext";
+import { useTalkPopupContextSafe, type CompanionTalkPopupAction } from "@/contexts/TalkPopupContext";
 import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
 import { logger } from "@/utils/logger";
 import {
@@ -15,7 +15,14 @@ import type {
 
 const AI_FEEDBACK_REPLACE_WINDOW_MS = 900;
 
-const toPopupOptions = (feedback: CompletionFeedbackResponse) => ({
+interface CompletionFeedbackTriggerOptions {
+  action?: CompanionTalkPopupAction | null;
+}
+
+const toPopupOptions = (
+  feedback: CompletionFeedbackResponse,
+  options?: CompletionFeedbackTriggerOptions,
+) => ({
   message: feedback.companion.message,
   tone: feedback.companion.tone,
   mentor: feedback.mentor?.show
@@ -24,6 +31,7 @@ const toPopupOptions = (feedback: CompletionFeedbackResponse) => ({
         message: feedback.mentor.message,
       }
     : undefined,
+  action: options?.action ?? undefined,
 });
 
 const isSameFeedback = (
@@ -41,13 +49,16 @@ export const useCompletionFeedback = () => {
   const talkPopup = useTalkPopupContextSafe();
   const { triggerEvent } = useCompanionMotionSafe();
 
-  const triggerCompletionFeedback = useCallback(async (event: CompletionFeedbackEvent) => {
+  const triggerCompletionFeedback = useCallback(async (
+    event: CompletionFeedbackEvent,
+    options?: CompletionFeedbackTriggerOptions,
+  ) => {
     if (!event.taskId || !event.taskTitle) return;
 
     const completedAt = event.completedAt ?? new Date().toISOString();
     const fallback = buildCompletionFeedbackFallback({ ...event, completedAt });
 
-    await talkPopup.show(toPopupOptions(fallback));
+    await talkPopup.show(toPopupOptions(fallback, options));
     const fallbackShownAt = Date.now();
     triggerEvent({
       type: event.habitSourceId || event.completionSource === "ritual" ? "streak" : "quest_complete",
@@ -81,7 +92,7 @@ export const useCompletionFeedback = () => {
         const feedback = normalizeCompletionFeedbackResponse(data);
         const canReplaceFreshFallback = Date.now() - fallbackShownAt <= AI_FEEDBACK_REPLACE_WINDOW_MS;
         if (feedback?.generationSource === "ai" && canReplaceFreshFallback && !isSameFeedback(feedback, fallback)) {
-          await talkPopup.replaceCurrent(toPopupOptions(feedback), fallback.companion.message);
+          await talkPopup.replaceCurrent(toPopupOptions(feedback, options), fallback.companion.message);
         }
       } catch (error) {
         logger.warn("Completion feedback generation failed after fallback display", error);

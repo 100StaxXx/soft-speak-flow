@@ -36,12 +36,14 @@ vi.mock("@/components/companion/CompanionTalkPopup", () => ({
     message,
     tone,
     mentor,
+    action,
     companionName,
   }: {
     isVisible: boolean;
     message: string;
     tone?: string | null;
     mentor?: { personality: string; message: string } | null;
+    action?: { label: string } | null;
     companionName: string;
   }) => (
     <div
@@ -51,6 +53,7 @@ vi.mock("@/components/companion/CompanionTalkPopup", () => ({
       data-tone={tone ?? ""}
       data-mentor-personality={mentor?.personality ?? ""}
       data-mentor-message={mentor?.message ?? ""}
+      data-action-label={action?.label ?? ""}
       data-name={companionName}
     />
   ),
@@ -63,6 +66,7 @@ const ShowProbe = ({
     message: string;
     tone?: "proud" | "locked_in" | "recovery" | "calm" | "hype";
     mentor?: { personality: string; message: string };
+    action?: { label: string; onSelect: () => void };
     companionName?: string | null;
   };
 }) => {
@@ -231,7 +235,7 @@ describe("TalkPopupContext", () => {
     expect(mocks.evolutionMaybeSingle).not.toHaveBeenCalled();
   });
 
-  it("passes completion tone and mentor stack data to the popup", async () => {
+  it("passes completion tone, mentor stack data, and actions to the popup", async () => {
     mocks.companion = {
       id: "comp-5",
       current_stage: 2,
@@ -250,6 +254,10 @@ describe("TalkPopupContext", () => {
               personality: "Disciplined",
               message: "That is the standard. Keep it there.",
             },
+            action: {
+              label: "Undo",
+              onSelect: vi.fn(),
+            },
           }}
         />
       </TalkPopupProvider>,
@@ -264,6 +272,7 @@ describe("TalkPopupContext", () => {
       "data-mentor-message",
       "That is the standard. Keep it there.",
     );
+    expect(screen.getByTestId("popup-props")).toHaveAttribute("data-action-label", "Undo");
   });
 
   it("can replace the current popup when AI feedback upgrades the fallback", async () => {

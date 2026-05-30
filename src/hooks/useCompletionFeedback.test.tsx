@@ -65,6 +65,11 @@ describe("useCompletionFeedback", () => {
   it("shows deterministic fallback immediately, then quickly replaces it with valid AI feedback", async () => {
     const deferred = createDeferred<{ data: unknown; error: null }>();
     mocks.invokeMock.mockReturnValue(deferred.promise);
+    const action = {
+      label: "Undo",
+      ariaLabel: "Undo completion",
+      onSelect: vi.fn(),
+    };
 
     const { result } = renderHook(() => useCompletionFeedback());
     const completionPromise = result.current.triggerCompletionFeedback({
@@ -72,11 +77,12 @@ describe("useCompletionFeedback", () => {
       taskTitle: "Portfolio session",
       completionSource: "quest",
       taskDate: getTodayTaskDate(),
-    });
+    }, { action });
 
     await waitFor(() => {
       expect(mocks.showMock).toHaveBeenCalledWith(expect.objectContaining({
         tone: "proud",
+        action,
       }));
     });
     const fallbackMessage = (mocks.showMock.mock.calls[0]?.[0] as { message: string }).message;
@@ -109,6 +115,7 @@ describe("useCompletionFeedback", () => {
           personality: "Disciplined",
           message: "That is the standard.",
         },
+        action,
       }),
       fallbackMessage,
     );

@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { HTMLAttributes, ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -33,6 +33,39 @@ vi.mock("framer-motion", async () => {
         </div>
       )),
     },
+  };
+});
+
+vi.mock("@/components/CompanionImage", async () => {
+  const React = await vi.importActual<typeof import("react")>("react");
+
+  return {
+    CompanionPortraitShell: ({
+      children,
+      className,
+    }: {
+      children: ReactNode;
+      className?: string;
+    }) => React.createElement("div", { className }, children),
+    CompanionImage: ({
+      alt,
+      className,
+      containerAspectRatio,
+      fit,
+      src,
+    }: {
+      alt: string;
+      className?: string;
+      containerAspectRatio?: number;
+      fit?: string;
+      src?: string | null;
+    }) => React.createElement("img", {
+      alt,
+      className,
+      "data-companion-container-aspect-ratio": containerAspectRatio,
+      "data-companion-image-fit": fit,
+      src: src ?? undefined,
+    }),
   };
 });
 
@@ -87,10 +120,31 @@ describe("CompanionTalkPopup", () => {
       />,
     );
 
-    expect(screen.getByRole("img", { name: "Nova" })).toHaveAttribute(
+    const image = screen.getByRole("img", { name: "Nova" });
+
+    expect(image).toHaveAttribute(
       "data-companion-image-fit",
       "contain",
     );
+    expect(image).toHaveAttribute("data-companion-container-aspect-ratio", String(4 / 3));
+    expect(image.closest("span")).toHaveClass("h-12", "w-16");
+  });
+
+  it("keeps bundled portrait companion art in a square popup avatar", () => {
+    render(
+      <CompanionTalkPopup
+        isVisible
+        onDismiss={vi.fn()}
+        message="Hello, friend."
+        companionName="Nova"
+        companionImageUrl="/companion-presets/lion/t1_youth/normal/lion__t1_youth__normal__ice.png"
+      />,
+    );
+
+    const image = screen.getByRole("img", { name: "Nova" });
+
+    expect(image).toHaveAttribute("data-companion-image-fit", "portrait");
+    expect(image.closest("span")).toHaveClass("h-16", "w-16");
   });
 
   it("hides byline and keeps accessible label meaningful when name is empty", () => {
@@ -129,6 +183,33 @@ describe("CompanionTalkPopup", () => {
     expect(screen.getByText("Disciplined")).toBeInTheDocument();
     expect(screen.getByText('"That is the standard. Keep it there."')).toBeInTheDocument();
     expect(screen.getByText("Disciplined").closest("div")?.parentElement).toHaveClass("border-t");
+  });
+
+  it("renders an optional action and dismisses after selecting it", async () => {
+    const onDismiss = vi.fn();
+    const onSelect = vi.fn();
+
+    render(
+      <CompanionTalkPopup
+        isVisible
+        onDismiss={onDismiss}
+        message="Quest complete."
+        companionName="Nova"
+        companionImageUrl={null}
+        action={{
+          label: "Undo",
+          ariaLabel: "Undo completion",
+          onSelect,
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Undo completion" }));
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(onDismiss).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("publishes toast stacking offsets while visible", async () => {

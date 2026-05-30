@@ -2,13 +2,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { ToastAction, type ToastActionElement } from "@/components/ui/toast";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
 import { useXPToast } from "@/contexts/XPContext";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { useSchedulingLearner } from "@/hooks/useSchedulingLearner";
-import { useRef, createElement } from "react";
+import { useRef } from "react";
 import { getEffectiveQuestXP, MAIN_QUEST_XP_MULTIPLIER } from "@/config/xpRewards";
 import { calculateGuildBonus } from "@/utils/guildBonus";
 import { format } from "date-fns";
@@ -31,7 +30,6 @@ import type { DailyTask } from "@/services/dailyTasksRemote";
 import type { QuestCreationSource } from "@/features/quests/types";
 import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
 import type { ResilienceState } from "@/types/resilience";
-import { QUEST_ACTION_TOAST_DURATION_MS } from "@/constants/questToast";
 import { normalizeUuidFields, normalizeUuidLikeId } from "@/utils/offlineId";
 import {
   createOfflinePlannerId,
@@ -1915,22 +1913,38 @@ export const useTaskMutations = (taskDate: string) => {
           feedbackCompletedAt,
         );
         if (!shouldSuppressRedoFeedback) {
-          void triggerCompletionFeedback({
-            taskId,
-            taskTitle: taskText,
-            completionSource: completionFeedback?.completionSource ?? (habitSourceId ? "ritual" : "quest"),
-            completedAt: feedbackCompletedAt,
-            taskDate: taskDate ?? null,
-            scheduledTime: taskScheduledTime ?? null,
-            difficulty: taskDifficulty ?? null,
-            category: taskCategory ?? null,
-            habitSourceId: habitSourceId ?? null,
-            epicId: epicId ?? null,
-            epicTitle: epicTitle ?? null,
-            completedAllRituals: completionFeedback?.completedAllRituals === true,
-            firstRitualToday: completionFeedback?.firstRitualToday === true,
-            ...completionFeedbackDaySignals,
-          }).catch((feedbackError) => {
+          void triggerCompletionFeedback(
+            {
+              taskId,
+              taskTitle: taskText,
+              completionSource: completionFeedback?.completionSource ?? (habitSourceId ? "ritual" : "quest"),
+              completedAt: feedbackCompletedAt,
+              taskDate: taskDate ?? null,
+              scheduledTime: taskScheduledTime ?? null,
+              difficulty: taskDifficulty ?? null,
+              category: taskCategory ?? null,
+              habitSourceId: habitSourceId ?? null,
+              epicId: epicId ?? null,
+              epicTitle: epicTitle ?? null,
+              completedAllRituals: completionFeedback?.completedAllRituals === true,
+              firstRitualToday: completionFeedback?.firstRitualToday === true,
+              ...completionFeedbackDaySignals,
+            },
+            {
+              action: {
+                label: "Undo",
+                ariaLabel: `Undo completion for ${taskText}`,
+                onSelect: () => {
+                  toggleTask.mutate({
+                    taskId,
+                    completed: false,
+                    xpReward: xpAwarded,
+                    forceUndo: true,
+                  });
+                },
+              },
+            },
+          ).catch((feedbackError) => {
             console.warn("[TaskMutations] Completion feedback failed:", feedbackError);
           });
         }
@@ -1958,27 +1972,6 @@ export const useTaskMutations = (taskDate: string) => {
         } catch (trackError) {
           console.error('[TaskMutations] trackTaskCompletion failed:', trackError);
         }
-
-        toast({
-          title: "Quest completed! ✨",
-          description: taskText.length > 40 ? taskText.substring(0, 40) + '...' : taskText,
-          duration: QUEST_ACTION_TOAST_DURATION_MS,
-          action: createElement(
-            ToastAction,
-            {
-              altText: "Undo completion",
-              onClick: () => {
-                toggleTask.mutate({ 
-                  taskId, 
-                  completed: false, 
-                  xpReward: xpAwarded,
-                  forceUndo: true 
-                });
-              }
-            },
-            "Undo"
-          ) as unknown as ToastActionElement,
-        });
       }
     },
     onError: (error: Error, variables: ToggleTaskVariables) => {

@@ -2,7 +2,6 @@ import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { QUEST_ACTION_TOAST_DURATION_MS } from "@/constants/questToast";
 
 const mocks = vi.hoisted(() => {
   const fromMock = vi.fn();
@@ -1370,7 +1369,7 @@ describe("useTaskMutations attachment handling", () => {
     expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Attachments unavailable" }));
   });
 
-  it("shows a fast quest completion toast with an Undo action", async () => {
+  it("shows companion completion feedback with an Undo action instead of the top toast", async () => {
     setOnline(true);
     mocks.awardCustomXPMock.mockResolvedValueOnce({ xpAwarded: 16 });
 
@@ -1391,22 +1390,38 @@ describe("useTaskMutations attachment handling", () => {
     });
 
     await waitFor(() => {
+      expect(mocks.triggerCompletionFeedbackMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          taskId: "task-1",
+          taskTitle: "Ship feature",
+        }),
+        expect.objectContaining({
+          action: expect.objectContaining({
+            label: "Undo",
+            ariaLabel: "Undo completion for Ship feature",
+            onSelect: expect.any(Function),
+          }),
+        }),
+      );
+    });
+
+    expect(mocks.toastMock.mock.calls.find(([toastArg]) => toastArg?.title === "Quest completed! ✨")).toBeUndefined();
+
+    const feedbackOptions = mocks.triggerCompletionFeedbackMock.mock.calls[0]?.[1] as
+      | { action?: { onSelect?: () => void } }
+      | undefined;
+
+    await act(async () => {
+      feedbackOptions?.action?.onSelect?.();
+    });
+
+    await waitFor(() => {
       expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({
-        title: "Quest completed! ✨",
-        duration: QUEST_ACTION_TOAST_DURATION_MS,
+        title: "Quest undone",
       }));
     });
 
-    const completionToastCall = mocks.toastMock.mock.calls.find(
-      ([toastArg]) => toastArg?.title === "Quest completed! ✨",
-    );
-
-    expect(completionToastCall).toBeDefined();
-    expect(completionToastCall?.[0]).toEqual(expect.objectContaining({
-      action: expect.any(Object),
-    }));
-    expect(completionToastCall?.[0].action.props.altText).toBe("Undo completion");
-    expect(completionToastCall?.[0].action.props.children).toBe("Undo");
+    expect(mocks.triggerCompletionFeedbackMock).toHaveBeenCalledTimes(1);
     expect(completionUpdateSelectMock).toHaveBeenCalledTimes(1);
   });
 
@@ -1678,13 +1693,11 @@ describe("useTaskMutations attachment handling", () => {
     });
 
     await waitFor(() => {
-      const completionToastCalls = mocks.toastMock.mock.calls.filter(
-        ([toastArg]) => toastArg?.title === "Quest completed! ✨",
-      );
-      expect(completionToastCalls).toHaveLength(2);
+      expect(completionUpdateSelectMock).toHaveBeenCalledTimes(2);
     });
 
     expect(mocks.triggerCompletionFeedbackMock).toHaveBeenCalledTimes(1);
+    expect(mocks.toastMock.mock.calls.find(([toastArg]) => toastArg?.title === "Quest completed! ✨")).toBeUndefined();
     expect(queryClient.getQueryData(getCompletionFeedbackLocalCompletionsQueryKey("user-1", "2026-02-20")))
       .toEqual([
         expect.objectContaining({
@@ -1692,7 +1705,6 @@ describe("useTaskMutations attachment handling", () => {
           completed: true,
         }),
       ]);
-    expect(completionUpdateSelectMock).toHaveBeenCalledTimes(2);
   });
 
   it("passes campaign ritual metadata to completion feedback after a real completion", async () => {
@@ -1742,6 +1754,9 @@ describe("useTaskMutations attachment handling", () => {
           firstRitualToday: true,
           completedAllRituals: true,
         }),
+        expect.objectContaining({
+          action: expect.objectContaining({ label: "Undo" }),
+        }),
       );
     });
   });
@@ -1778,6 +1793,9 @@ describe("useTaskMutations attachment handling", () => {
           firstCompletionToday: true,
           isBuildingMomentum: false,
           isOverloaded: false,
+        }),
+        expect.objectContaining({
+          action: expect.objectContaining({ label: "Undo" }),
         }),
       );
     });
@@ -1862,6 +1880,9 @@ describe("useTaskMutations attachment handling", () => {
           isBuildingMomentum: false,
           isOverloaded: false,
         }),
+        expect.objectContaining({
+          action: expect.objectContaining({ label: "Undo" }),
+        }),
       );
     });
 
@@ -1910,6 +1931,9 @@ describe("useTaskMutations attachment handling", () => {
           isBuildingMomentum: true,
           isOverloaded: true,
         }),
+        expect.objectContaining({
+          action: expect.objectContaining({ label: "Undo" }),
+        }),
       );
     });
   });
@@ -1953,6 +1977,9 @@ describe("useTaskMutations attachment handling", () => {
           firstCompletionToday: false,
           isBuildingMomentum: false,
           isOverloaded: false,
+        }),
+        expect.objectContaining({
+          action: expect.objectContaining({ label: "Undo" }),
         }),
       );
     });

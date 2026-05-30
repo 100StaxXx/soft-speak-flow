@@ -8,6 +8,12 @@ import { useCompanion } from "@/hooks/useCompanion";
 import { CompanionTalkPopup } from "@/components/companion/CompanionTalkPopup";
 import { resolveCompanionName } from "@/lib/companionName";
 import type { CompletionCompanionTone } from "@/types/completionFeedback";
+
+export interface CompanionTalkPopupAction {
+  label: string;
+  ariaLabel?: string;
+  onSelect: () => void | Promise<void>;
+}
  
 interface ShowOptions {
   message: string;
@@ -16,6 +22,7 @@ interface ShowOptions {
     personality: string;
     message: string;
   };
+  action?: CompanionTalkPopupAction | null;
   companionName?: string | null;
   companionImageUrl?: string;
   companionImageFocalX?: number | null;
@@ -41,6 +48,7 @@ export const TalkPopupProvider = memo(({ children }: TalkPopupProviderProps) => 
   const [message, setMessage] = useState("");
   const [tone, setTone] = useState<CompletionCompanionTone | null>(null);
   const [mentor, setMentor] = useState<ShowOptions["mentor"] | null>(null);
+  const [action, setAction] = useState<CompanionTalkPopupAction | null>(null);
   const [companionName, setCompanionName] = useState("");
   const [companionImageUrl, setCompanionImageUrl] = useState<string | null>(null);
   const [companionImageFocalX, setCompanionImageFocalX] = useState<number | null>(null);
@@ -65,6 +73,7 @@ export const TalkPopupProvider = memo(({ children }: TalkPopupProviderProps) => 
     setMessage(options.message);
     setTone(options.tone ?? null);
     setMentor(options.mentor ?? null);
+    setAction(options.action ?? null);
     setCompanionName(name);
     setCompanionImageUrl(imageUrl);
     setCompanionImageFocalX(imageFocalX);
@@ -119,6 +128,7 @@ export const TalkPopupProvider = memo(({ children }: TalkPopupProviderProps) => 
          message={message}
          tone={tone}
          mentor={mentor}
+         action={action}
          companionName={companionName}
          companionImageUrl={companionImageUrl}
          companionImageFocalX={companionImageFocalX}
