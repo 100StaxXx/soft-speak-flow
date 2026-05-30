@@ -1,30 +1,13 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  warmDailyTasksQueryFromRemote: vi.fn().mockResolvedValue([]),
-  warmEpicsQueryFromRemote: vi.fn().mockResolvedValue([]),
   mountCounts: {
     mentor: 0,
     journeys: 0,
     campaigns: 0,
     companion: 0,
   },
-}));
-
-vi.mock("@tanstack/react-query", () => ({
-  useQueryClient: () => ({}),
-}));
-
-vi.mock("@/hooks/useAuth", () => ({
-  useAuth: () => ({
-    user: { id: "user-1" },
-  }),
-}));
-
-vi.mock("@/utils/plannerSync", () => ({
-  warmDailyTasksQueryFromRemote: (...args: unknown[]) => mocks.warmDailyTasksQueryFromRemote(...args),
-  warmEpicsQueryFromRemote: (...args: unknown[]) => mocks.warmEpicsQueryFromRemote(...args),
 }));
 
 vi.mock("@/pages/Mentor", async () => {
@@ -106,10 +89,6 @@ const renderMainTabsKeepAliveElement = (
 
 describe("MainTabsKeepAlive", () => {
   beforeEach(() => {
-    mocks.warmDailyTasksQueryFromRemote.mockReset();
-    mocks.warmDailyTasksQueryFromRemote.mockResolvedValue([]);
-    mocks.warmEpicsQueryFromRemote.mockReset();
-    mocks.warmEpicsQueryFromRemote.mockResolvedValue([]);
     mocks.mountCounts.mentor = 0;
     mocks.mountCounts.journeys = 0;
     mocks.mountCounts.campaigns = 0;
@@ -139,15 +118,13 @@ describe("MainTabsKeepAlive", () => {
     expect(await screen.findByTestId("campaigns-visibility")).toHaveTextContent("active");
   });
 
-  it("prefetches journeys tasks and epics on mount", async () => {
+  it("mounts only the active tab on initial render", async () => {
     renderMainTabsKeepAlive("/mentor");
 
-    await waitFor(() => {
-      expect(mocks.warmDailyTasksQueryFromRemote).toHaveBeenCalledTimes(1);
-      expect(mocks.warmEpicsQueryFromRemote).toHaveBeenCalledTimes(1);
-    });
-    expect(mocks.warmDailyTasksQueryFromRemote).toHaveBeenCalledWith(expect.any(Object), "user-1", expect.any(String));
-    expect(mocks.warmEpicsQueryFromRemote).toHaveBeenCalledWith(expect.any(Object), "user-1");
+    expect(await screen.findByTestId("mentor-visibility")).toHaveTextContent("active");
+    expect(screen.queryByTestId("journeys-visibility")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("campaigns-visibility")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("companion-visibility")).not.toBeInTheDocument();
   });
 
   it("preserves tab state and avoids remounting visited tabs", async () => {

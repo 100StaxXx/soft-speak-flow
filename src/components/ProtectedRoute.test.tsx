@@ -28,7 +28,7 @@ vi.mock("@/components/Paywall", () => ({
   ),
 }));
 
-import { ProtectedRoute, PROTECTED_ROUTE_ACCESS_STALL_MS } from "./ProtectedRoute";
+import { ProtectedRoute, PROTECTED_ROUTE_AUTH_STALL_MS } from "./ProtectedRoute";
 
 const ProtectedRouteTree = (props?: Partial<React.ComponentProps<typeof ProtectedRoute>>) => (
   <MemoryRouter initialEntries={["/protected"]}>
@@ -133,13 +133,11 @@ describe("ProtectedRoute", () => {
     accessState.loading = true;
     view.rerender(ProtectedRouteTree());
 
-    expect(screen.getByText("Loading...")).toBeInTheDocument();
-    expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
+    expect(screen.getByText("Protected Content")).toBeInTheDocument();
+    expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
   });
 
-  it("renders protected content when the initial access gate stalls", async () => {
-    vi.useFakeTimers();
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  it("renders protected content while the initial access check is still loading", () => {
     authState.status = "authenticated";
     authState.loading = false;
     authState.user = { id: "user-stalled" };
@@ -147,27 +145,13 @@ describe("ProtectedRoute", () => {
     accessState.gateReason = "none";
     accessState.loading = true;
 
-    try {
-      renderProtectedRoute();
+    renderProtectedRoute();
 
-      expect(screen.getByText("Loading...")).toBeInTheDocument();
-      expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
-
-      await act(async () => {
-        vi.advanceTimersByTime(PROTECTED_ROUTE_ACCESS_STALL_MS);
-      });
-
-      expect(screen.getByText("Protected Content")).toBeInTheDocument();
-      expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
-    } finally {
-      warnSpy.mockRestore();
-      vi.useRealTimers();
-    }
+    expect(screen.getByText("Protected Content")).toBeInTheDocument();
+    expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
   });
 
-  it("shows the paywall if access resolves denied after an initial stall timeout", async () => {
-    vi.useFakeTimers();
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  it("shows the paywall if access resolves denied after the optimistic initial render", () => {
     authState.status = "authenticated";
     authState.loading = false;
     authState.user = { id: "user-denied-after-stall" };
@@ -175,22 +159,37 @@ describe("ProtectedRoute", () => {
     accessState.gateReason = "none";
     accessState.loading = true;
 
+    const view = renderProtectedRoute();
+
+    expect(screen.getByText("Protected Content")).toBeInTheDocument();
+
+    accessState.loading = false;
+    accessState.hasAccess = false;
+    accessState.gateReason = "trial_expired";
+    view.rerender(ProtectedRouteTree());
+
+    expect(screen.getByText("Paywall:trial_expired")).toBeInTheDocument();
+    expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
+  });
+
+  it("leaves auth loading and redirects to welcome if auth never resolves", async () => {
+    vi.useFakeTimers();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    authState.status = "loading";
+    authState.loading = true;
+    authState.user = null;
+
     try {
-      const view = renderProtectedRoute();
+      renderProtectedRoute();
+
+      expect(screen.getByText("Loading...")).toBeInTheDocument();
 
       await act(async () => {
-        vi.advanceTimersByTime(PROTECTED_ROUTE_ACCESS_STALL_MS);
+        await vi.advanceTimersByTimeAsync(PROTECTED_ROUTE_AUTH_STALL_MS);
+        await Promise.resolve();
       });
 
-      expect(screen.getByText("Protected Content")).toBeInTheDocument();
-
-      accessState.loading = false;
-      accessState.hasAccess = false;
-      accessState.gateReason = "trial_expired";
-      view.rerender(ProtectedRouteTree());
-
-      expect(screen.getByText("Paywall:trial_expired")).toBeInTheDocument();
-      expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
+      expect(screen.getByText("Welcome Page")).toBeInTheDocument();
     } finally {
       warnSpy.mockRestore();
       vi.useRealTimers();

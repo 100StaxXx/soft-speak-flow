@@ -2,7 +2,6 @@ import {
   lazy,
   memo,
   Suspense,
-  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -10,15 +9,8 @@ import {
   type ComponentType,
   type LazyExoticComponent,
 } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
-import { useAuth } from "@/hooks/useAuth";
 import { MainTabVisibilityProvider } from "@/contexts/MainTabVisibilityContext";
 import { logger } from "@/utils/logger";
-import {
-  warmDailyTasksQueryFromRemote,
-  warmEpicsQueryFromRemote,
-} from "@/utils/plannerSync";
 
 type MainTabPath = "/mentor" | "/journeys" | "/campaigns" | "/companion";
 
@@ -52,32 +44,12 @@ const MainTabLoadingFallback = memo(() => (
 MainTabLoadingFallback.displayName = "MainTabLoadingFallback";
 
 export const MainTabsKeepAlive = memo(({ activePath }: { activePath: MainTabPath }) => {
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
   const [mountedTabs, setMountedTabs] = useState<MainTabPath[]>([activePath]);
   const activePathRef = useRef<MainTabPath>(activePath);
   const visitedTabsRef = useRef<Set<MainTabPath>>(new Set([activePath]));
   const scrollPositionsRef = useRef<Record<MainTabPath, number>>(initialScrollPositions);
   const hasInitializedScrollRestoreRef = useRef(false);
   const rafHandlesRef = useRef<number[]>([]);
-
-  const prefetchJourneysTasks = useCallback(() => {
-    if (!user?.id) return;
-
-    const today = format(new Date(), "yyyy-MM-dd");
-    void Promise.resolve(warmDailyTasksQueryFromRemote(queryClient, user.id, today)).catch(() => undefined);
-  }, [queryClient, user?.id]);
-
-  const prefetchEpics = useCallback(() => {
-    if (!user?.id) return;
-
-    void Promise.resolve(warmEpicsQueryFromRemote(queryClient, user.id)).catch(() => undefined);
-  }, [queryClient, user?.id]);
-
-  useEffect(() => {
-    prefetchJourneysTasks();
-    prefetchEpics();
-  }, [prefetchJourneysTasks, prefetchEpics]);
 
   useEffect(() => {
     setMountedTabs((previous) =>
