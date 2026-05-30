@@ -2,13 +2,10 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { requireAuthenticatedUser } from "../_shared/auth.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
-import { finalizeClaimedReferralCode } from "../_shared/referralState.ts";
 import {
-  claimWinWinKitCode,
-  createOrUpdateWinWinKitUser,
-  fetchWinWinKitUser,
-  normalizeWinWinKitCode,
-} from "../_shared/winwinkit.ts";
+  normalizeReferralCode,
+  syncAppleOfferCodeForReferralCode,
+} from "../_shared/referralState.ts";
 
 const GENESIS_SPECIAL_CODE = "GENESIS";
 const DEFAULT_GENESIS_OFFER_IDENTIFIER = "GENESIS";
@@ -119,8 +116,7 @@ serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const claimedCode = normalizeWinWinKitCode(typeof body?.code === "string" ? body.code : null);
-    const providerClaimed = body?.provider_claimed === true;
+    const claimedCode = normalizeReferralCode(typeof body?.code === "string" ? body.code : null);
 
     if (!claimedCode) {
       return new Response(JSON.stringify({ error: "Referral code is required" }), {
@@ -144,7 +140,7 @@ serve(async (req) => {
       throw profileError;
     }
 
-    if (normalizeWinWinKitCode(profile.referred_by_code)) {
+    if (normalizeReferralCode(profile.referred_by_code)) {
       return new Response(JSON.stringify({
         success: false,
         message: "You have already used a referral code",
@@ -163,44 +159,107 @@ serve(async (req) => {
       });
     }
 
-    await createOrUpdateWinWinKitUser({
-      appUserId: userAuth.userId,
-      firstSeenAt: profile.created_at ?? new Date().toISOString(),
-      metadata: profile.email ? { email: profile.email } : undefined,
-    });
+    const { data: codeData, error: codeLookupError } = await supabase
+      .from("referral_codes")
+      .select("id, code, owner_type, owner_user_id, is_active, total_signups, apple_offer_code_id, apple_offer_campaign_identifier")
+      .eq("code", claimedCode)
+      .maybeSingle();
 
-    const result = providerClaimed
-      ? {
-          user: await fetchWinWinKitUser(userAuth.userId),
-          rewardsGranted: null,
-        }
-      : await claimWinWinKitCode({
-          appUserId: userAuth.userId,
-          code: claimedCode,
-        });
+    if (codeLookupError) {
+      throw codeLookupError;
+    }
 
-    const finalized = await finalizeClaimedReferralCode({
-      supabase,
-      appUserId: userAuth.userId,
-      user: result.user,
-      claimedCode,
-      providerClaimed,
-    });
+    if (!codeData?.id || codeData.is_active === false) {
+      return new Response(JSON.stringify({
+        success: false,
+        message: "Invalid referral code",
+      }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (codeData.owner_type === "user" && codeData.owner_user_id === userAuth.userId) {
+      return new Response(JSON.stringify({
+        success: false,
+        message: "Cannot use your own referral code",
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const codeType = codeData.owner_type === "influencer" ? "affiliate" : "referral";
+
+    if (codeType === "affiliate") {
+      await syncAppleOfferCodeForReferralCode(supabase, {
+        id: codeData.id,
+        code: claimedCode,
+        apple_offer_code_id: codeData.apple_offer_code_id ?? null,
+        apple_offer_campaign_identifier: codeData.apple_offer_campaign_identifier ?? null,
+      });
+    }
+
+    const { error: profileUpdateError } = await supabase
+      .from("profiles")
+      .update({
+        referred_by_code: claimedCode,
+        referred_by: codeData.owner_user_id ?? null,
+      })
+      .eq("id", userAuth.userId);
+
+    if (profileUpdateError) {
+      throw profileUpdateError;
+    }
+
+    const { error: signupUpdateError } = await supabase
+      .from("referral_codes")
+      .update({
+        total_signups: Number(codeData.total_signups ?? 0) + 1,
+      })
+      .eq("id", codeData.id);
+
+    if (signupUpdateError) {
+      throw signupUpdateError;
+    }
+
+    if (codeData.owner_user_id) {
+      const { data: ownerProfile, error: ownerProfileLookupError } = await supabase
+        .from("profiles")
+        .select("referral_count")
+        .eq("id", codeData.owner_user_id)
+        .maybeSingle();
+
+      if (ownerProfileLookupError) {
+        throw ownerProfileLookupError;
+      }
+
+      const { error: ownerProfileUpdateError } = await supabase
+        .from("profiles")
+        .update({
+          referral_count: Number(ownerProfile?.referral_count ?? 0) + 1,
+        })
+        .eq("id", codeData.owner_user_id);
+
+      if (ownerProfileUpdateError) {
+        throw ownerProfileUpdateError;
+      }
+    }
 
     return new Response(JSON.stringify({
       success: true,
-      message: finalized.codeType === "affiliate"
+      message: codeType === "affiliate"
         ? "Creator code applied! Your yearly plan is now eligible for the Apple discount flow."
         : "Referral code applied! Your friend will earn rewards when you reach Stage 5 • Initiate.",
       user: {
-        app_user_id: result.user.app_user_id,
-        referral_code: result.user.referral_code,
-        referred_by: result.user.referred_by ?? null,
-        is_premium: result.user.is_premium,
-        stats: result.user.stats ?? null,
+        app_user_id: userAuth.userId,
+        referral_code: profile.referral_code ?? null,
+        referred_by: { code: claimedCode, type: codeType },
+        is_premium: false,
+        stats: null,
       },
-      rewards_granted: result.rewardsGranted,
-      code_type: finalized.codeType,
+      rewards_granted: null,
+      code_type: codeType,
     }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

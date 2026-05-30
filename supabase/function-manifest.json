@@ -69,7 +69,7 @@
     "submit-support-report",
     "suggest-task-times",
     "sync-daily-pep-talk-transcript",
-    "sync-winwinkit-user",
+    "sync-referral-user",
     "verify-admin-access",
     "verify-apple-receipt"
   ],
@@ -207,7 +207,7 @@
     "submit-support-report",
     "suggest-task-times",
     "sync-daily-pep-talk-transcript",
-    "sync-winwinkit-user",
+    "sync-referral-user",
     "transcribe-audio",
     "verify-admin-access",
     "verify-apple-receipt"

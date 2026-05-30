@@ -22,8 +22,6 @@ import {
   upsertSubscription,
 } from "../_shared/appleSubscriptions.ts";
 import { normalizeAppAccountToken } from "../_shared/appleServerAPI.ts";
-import { markAffiliateConversionAudit } from "../_shared/referralState.ts";
-import { createOrUpdateWinWinKitUser } from "../_shared/winwinkit.ts";
 
 const defaultAppleBundleId = "com.darrylgraham.revolution";
 const GENESIS_SPECIAL_CODE = "GENESIS";
@@ -401,30 +399,6 @@ async function handleActivation(
   });
 
   console.log(`Activated subscription for user ${userId}`);
-  await syncWinWinKitPremiumStatus(supabase, userId, true);
-}
-
-async function syncWinWinKitPremiumStatus(
-  supabase: any,
-  userId: string,
-  isPremium: boolean,
-) {
-  const { data: profile, error } = await supabase
-    .from("profiles")
-    .select("created_at, email")
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  await createOrUpdateWinWinKitUser({
-    appUserId: userId,
-    firstSeenAt: profile?.created_at ?? new Date().toISOString(),
-    isPremium,
-    metadata: profile?.email ? { email: profile.email } : undefined,
-  });
 }
 
 type AppleJWSPayload = Record<string, unknown>;
@@ -901,7 +875,6 @@ async function handlePlanChange(
   });
 
   console.log(`Plan changed for user ${userId} to ${newPlan}`);
-  await syncWinWinKitPremiumStatus(supabase, userId, true);
 }
 
 async function handleBillingIssue(
@@ -931,7 +904,6 @@ async function handleBillingIssue(
   });
 
   console.log(`Billing issue for user ${userId}`);
-  await syncWinWinKitPremiumStatus(supabase, userId, expiresDate > new Date());
 }
 
 async function handleCancellation(
@@ -969,7 +941,6 @@ async function handleCancellation(
   console.log(
     `Subscription cancelled for user ${userId}, expires ${expiresDate.toISOString()}`,
   );
-  await syncWinWinKitPremiumStatus(supabase, userId, isStillActive);
 }
 
 async function handleRefund(
@@ -1016,7 +987,6 @@ async function handleRefund(
   }).eq("stripe_payment_intent_id", transactionId);
 
   console.log(`Refund processed for user ${userId}`);
-  await syncWinWinKitPremiumStatus(supabase, userId, false);
 }
 
 async function createReferralPayout(
@@ -1046,7 +1016,7 @@ async function createReferralPayout(
   const { data: codeData } = await supabase
     .from("referral_codes")
     .select(
-      "id, code, owner_type, owner_user_id, affiliate_provider, is_active, apple_offer_code_status, apple_offer_campaign_identifier, apple_offer_code_expires_at, total_conversions, total_revenue",
+      "id, code, owner_type, owner_user_id, is_active, apple_offer_code_status, apple_offer_campaign_identifier, apple_offer_code_expires_at, total_conversions, total_revenue",
     )
     .eq("code", referralCode)
     .single();
@@ -1056,7 +1026,6 @@ async function createReferralPayout(
     return;
   }
 
-  const isProviderLinkedAffiliate = codeData.affiliate_provider === "winwinkit";
   const isAppleOfferCodeEligible = Boolean(
     codeData.is_active &&
       codeData.apple_offer_code_status === "active" &&
@@ -1077,9 +1046,9 @@ async function createReferralPayout(
       offerType,
     });
 
-  if (isProviderLinkedAffiliate && !isAppleOfferCodeEligible) {
+  if (codeData.owner_type === "influencer" && !isAppleOfferCodeEligible) {
     console.log(
-      `Skipping WinWinKit conversion audit for code ${referralCode} because the Apple custom offer code is not active`,
+      `Skipping affiliate commission for code ${referralCode} because the Apple custom offer code is not active`,
     );
     return;
   }
@@ -1088,33 +1057,6 @@ async function createReferralPayout(
     console.log(
       `Skipping affiliate commission for code ${referralCode} because the yearly offer-code discount was not redeemed`,
     );
-    return;
-  }
-
-  if (isProviderLinkedAffiliate) {
-    const normalizedOfferIdentifier = offerIdentifier?.trim() ||
-      getDiscountedYearlyOfferId();
-    const revenueCents = getPriceCents("yearly", {
-      offerIdentifier: normalizedOfferIdentifier,
-      offerType,
-    });
-    const commissionCents = Math.round(revenueCents * 0.2);
-
-    await markAffiliateConversionAudit({
-      supabase,
-      referralCodeId: codeData.id,
-      userId,
-      sourceTransactionId: transactionId,
-      sourceProductId: productId ?? "cosmiq_premium_yearly",
-      appliedOfferId: normalizedOfferIdentifier,
-      amountCents: revenueCents,
-      commissionCents,
-      metadata: {
-        billing_source: "apple_webhook",
-        user_email: profile.email ?? null,
-      },
-    });
-    await syncWinWinKitPremiumStatus(supabase, userId, true);
     return;
   }
 

@@ -3,15 +3,33 @@ import {
   ensureAppleCustomOfferCode,
   getOfferCodeCampaignIdentifier,
 } from "./appStoreConnect.ts";
-import {
-  normalizeWinWinKitCode,
-  type WinWinKitCodeType,
-  type WinWinKitUser,
-} from "./winwinkit.ts";
 
 type SupabaseClientLike = any;
 
-function claimsCount(user: WinWinKitUser): number {
+export type ReferralCodeType = "affiliate" | "promo" | "referral" | "special" | string;
+
+export type ReferralUser = {
+  app_user_id: string;
+  referral_code: string | null;
+  is_premium: boolean;
+  referred_by?: {
+    code: string;
+    type: ReferralCodeType;
+  } | null;
+  stats?: {
+    claims?: number | null;
+    conversions?: number | null;
+    churns?: number | null;
+  } | null;
+};
+
+export function normalizeReferralCode(code: string | null | undefined): string | null {
+  if (typeof code !== "string") return null;
+  const normalized = code.trim().toUpperCase();
+  return normalized || null;
+}
+
+function claimsCount(user: ReferralUser): number {
   return Number.isFinite(user.stats?.claims)
     ? Number(user.stats?.claims)
     : 0;
@@ -27,13 +45,13 @@ function metadataRecord(
   };
 }
 
-export async function syncWinWinKitUserToLocalState(
+export async function syncReferralUserToLocalState(
   supabase: SupabaseClientLike,
   userId: string,
-  user: WinWinKitUser,
+  user: ReferralUser,
 ) {
-  const normalizedReferralCode = normalizeWinWinKitCode(user.referral_code);
-  const normalizedReferredByCode = normalizeWinWinKitCode(user.referred_by?.code);
+  const normalizedReferralCode = normalizeReferralCode(user.referral_code);
+  const normalizedReferredByCode = normalizeReferralCode(user.referred_by?.code);
   const profileUpdate: Record<string, unknown> = {
     referral_count: claimsCount(user),
   };
@@ -55,7 +73,7 @@ export async function syncWinWinKitUserToLocalState(
     throw profileLookupError;
   }
 
-  const previousReferredByCode = normalizeWinWinKitCode(currentProfile?.referred_by_code);
+  const previousReferredByCode = normalizeReferralCode(currentProfile?.referred_by_code);
 
   const { error: profileUpdateError } = await supabase
     .from("profiles")
@@ -124,7 +142,7 @@ export async function ensureAffiliateReferralCodeRecord(
   supabase: SupabaseClientLike,
   code: string,
 ): Promise<string> {
-  const normalizedCode = normalizeWinWinKitCode(code);
+  const normalizedCode = normalizeReferralCode(code);
   if (!normalizedCode) {
     throw new Error("Missing affiliate code");
   }
@@ -150,9 +168,9 @@ export async function ensureAffiliateReferralCodeRecord(
       .insert({
         code: normalizedCode,
         owner_type: "influencer",
-        payout_method: "winwinkit",
+        payout_method: "paypal",
         is_active: true,
-        affiliate_provider: "winwinkit",
+        affiliate_provider: "supabase",
         provider_status: "active",
         provider_synced_at: now,
         apple_offer_code_status: "pending",
@@ -172,9 +190,9 @@ export async function ensureAffiliateReferralCodeRecord(
       .from("referral_codes")
       .update({
         owner_type: "influencer",
-        payout_method: "winwinkit",
+        payout_method: "paypal",
         is_active: true,
-        affiliate_provider: "winwinkit",
+        affiliate_provider: "supabase",
         provider_status: "active",
         provider_synced_at: now,
       })
@@ -208,7 +226,7 @@ export async function syncAppleOfferCodeForReferralCode(
     apple_offer_campaign_identifier?: string | null;
   },
 ) {
-  const normalizedCode = normalizeWinWinKitCode(referralCode.code);
+  const normalizedCode = normalizeReferralCode(referralCode.code);
   if (!normalizedCode) {
     throw new Error("Missing referral code");
   }
@@ -279,23 +297,22 @@ export async function syncAppleOfferCodeForReferralCode(
 export async function finalizeClaimedReferralCode(params: {
   supabase: SupabaseClientLike;
   appUserId: string;
-  user: WinWinKitUser;
+  user: ReferralUser;
   claimedCode: string;
-  providerClaimed: boolean;
 }) {
-  const normalizedClaimedCode = normalizeWinWinKitCode(params.claimedCode);
+  const normalizedClaimedCode = normalizeReferralCode(params.claimedCode);
   if (!normalizedClaimedCode) {
     throw new Error("Missing referral code");
   }
 
-  const { previousReferredByCode, normalizedReferredByCode } = await syncWinWinKitUserToLocalState(
+  const { previousReferredByCode, normalizedReferredByCode } = await syncReferralUserToLocalState(
     params.supabase,
     params.appUserId,
     params.user,
   );
 
   if (!normalizedReferredByCode) {
-    throw new Error("WinWinKit did not return an applied code for this user");
+    throw new Error("The referral code was not applied for this user");
   }
 
   if (normalizedReferredByCode !== normalizedClaimedCode) {
@@ -364,15 +381,14 @@ export async function finalizeClaimedReferralCode(params: {
   }
 
   return {
-    codeType: codeType as WinWinKitCodeType,
+    codeType: codeType as ReferralCodeType,
     normalizedClaimedCode,
     normalizedReferredByCode,
-    providerClaimed: params.providerClaimed,
     referralCodeId,
   };
 }
 
-export async function markAffiliateConversionAudit(params: {
+export async function markAffiliateConversion(params: {
   supabase: SupabaseClientLike;
   referralCodeId: string;
   userId: string;
@@ -386,7 +402,7 @@ export async function markAffiliateConversionAudit(params: {
   const existing = await params.supabase
     .from("affiliate_conversions")
     .select("id, metadata")
-    .eq("provider", "winwinkit")
+    .eq("provider", "supabase")
     .eq("source_transaction_id", params.sourceTransactionId)
     .maybeSingle();
 
@@ -418,7 +434,7 @@ export async function markAffiliateConversionAudit(params: {
   const inserted = await params.supabase
     .from("affiliate_conversions")
     .insert({
-      provider: "winwinkit",
+      provider: "supabase",
       referral_code_id: params.referralCodeId,
       user_id: params.userId,
       source_transaction_id: params.sourceTransactionId,

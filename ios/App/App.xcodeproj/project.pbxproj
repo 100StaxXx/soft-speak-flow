@@ -30,8 +30,6 @@
 		SC1000001000000000000001 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = SC2000001000000000000001 /* SceneDelegate.swift */; };
 		WD1000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = WD2000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift */; };
 		WD1000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = WD2000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m */; };
-		WW1000001000000000000001 /* Plugins/WinWinKit/WinWinKitPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = WW2000001000000000000001 /* Plugins/WinWinKit/WinWinKitPlugin.swift */; };
-		WW1000001000000000000002 /* WinWinKit in Frameworks */ = {isa = PBXBuildFile; productRef = WW4000001000000000000001 /* WinWinKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -93,17 +91,15 @@
 		SC2000001000000000000001 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		WD2000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/WidgetData/WidgetDataPlugin.swift; sourceTree = "<group>"; };
 		WD2000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/WidgetData/WidgetDataPlugin.m; sourceTree = "<group>"; };
-		WW2000001000000000000001 /* Plugins/WinWinKit/WinWinKitPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/WinWinKit/WinWinKitPlugin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		504EC3011FED79650016851F /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
-			files = (
-				A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */,
-				WW1000001000000000000002 /* WinWinKit in Frameworks */,
-			);
+				files = (
+					A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */,
+				);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		CW7000001000000000000001 /* Frameworks */ = {
@@ -163,7 +159,6 @@
 				EV2000001000000000000002 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.m */,
 				AB2000001000000000000001 /* Plugins/AppBadge/AppBadgePlugin.swift */,
 				AB2000001000000000000002 /* Plugins/AppBadge/AppBadgePlugin.m */,
-				WW2000001000000000000001 /* Plugins/WinWinKit/WinWinKitPlugin.swift */,
 				WD2000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift */,
 				WD2000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
@@ -220,7 +215,6 @@
 			);
 			name = App;
 			packageProductDependencies = (
-				WW4000001000000000000001 /* WinWinKit */,
 			);
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
@@ -273,7 +267,6 @@
 			);
 			mainGroup = 504EC2FB1FED79650016851F;
 			packageReferences = (
-				WW3000001000000000000001 /* XCRemoteSwiftPackageReference "winwinkit-swift" */,
 			);
 			productRefGroup = 504EC3051FED79650016851F /* Products */;
 			projectDirPath = "";
@@ -453,7 +446,6 @@
 				EV1000001000000000000002 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.m in Sources */,
 				AB1000001000000000000001 /* Plugins/AppBadge/AppBadgePlugin.swift in Sources */,
 				AB1000001000000000000002 /* Plugins/AppBadge/AppBadgePlugin.m in Sources */,
-				WW1000001000000000000001 /* Plugins/WinWinKit/WinWinKitPlugin.swift in Sources */,
 				WD1000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift in Sources */,
 				WD1000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m in Sources */,
 			);
@@ -768,24 +760,6 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		WW3000001000000000000001 /* XCRemoteSwiftPackageReference "winwinkit-swift" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/winwinkit/winwinkit-swift.git";
-			requirement = {
-				branch = main;
-				kind = branch;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		WW4000001000000000000001 /* WinWinKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = WW3000001000000000000001 /* XCRemoteSwiftPackageReference "winwinkit-swift" */;
-			productName = WinWinKit;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 504EC2FC1FED79650016851F /* Project object */;
 }

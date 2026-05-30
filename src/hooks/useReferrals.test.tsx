@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
-  claimCode: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
 }));
@@ -63,22 +62,6 @@ vi.mock("@/components/ui/sonner", () => ({
   },
 }));
 
-vi.mock("@/plugins/WinWinKitPlugin", () => ({
-  WinWinKit: {
-    claimCode: (...args: unknown[]) => mocks.claimCode(...args),
-  },
-}));
-
-vi.mock("@capacitor/core", () => ({
-  Capacitor: {
-    isNativePlatform: () => true,
-  },
-}));
-
-vi.mock("@/utils/platformTargets", () => ({
-  isNativeIOSHandheld: () => true,
-}));
-
 import { useReferrals } from "./useReferrals";
 
 describe("useReferrals", () => {
@@ -94,7 +77,7 @@ describe("useReferrals", () => {
     });
   });
 
-  it("skips WinWinKit native claiming for the local Genesis code", async () => {
+  it("applies the local Genesis code through Supabase", async () => {
     mocks.invoke.mockResolvedValue({
       data: {
         success: true,
@@ -112,16 +95,14 @@ describe("useReferrals", () => {
       await result.current.applyReferralCode.mutateAsync("genesis");
     });
 
-    expect(mocks.claimCode).not.toHaveBeenCalled();
     expect(mocks.invoke).toHaveBeenCalledWith("claim-referral-code", {
       body: {
         code: "GENESIS",
-        provider_claimed: false,
       },
     });
   });
 
-  it("keeps WinWinKit native claiming for normal creator codes", async () => {
+  it("applies normal creator codes through Supabase only", async () => {
     const { result } = renderHook(() => useReferrals(), {
       wrapper: createQueryWrapper(),
     });
@@ -130,11 +111,9 @@ describe("useReferrals", () => {
       await result.current.applyReferralCode.mutateAsync("creator123");
     });
 
-    expect(mocks.claimCode).toHaveBeenCalledWith({ code: "CREATOR123" });
     expect(mocks.invoke).toHaveBeenCalledWith("claim-referral-code", {
       body: {
         code: "CREATOR123",
-        provider_claimed: true,
       },
     });
   });

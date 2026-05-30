@@ -189,8 +189,8 @@ vi.mock("@/hooks/useDailyTaskBadgeSync", () => ({
   useDailyTaskBadgeSync: () => undefined,
 }));
 
-vi.mock("@/hooks/useWinWinKitSync", () => ({
-  useWinWinKitSync: () => undefined,
+vi.mock("@/hooks/useReferralSync", () => ({
+  useReferralSync: () => undefined,
 }));
 
 vi.mock("@/hooks/useGlobalWidgetSync", () => ({

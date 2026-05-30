@@ -7,13 +7,9 @@ const mocks = vi.hoisted(() => {
   };
 
   return {
-    configure: vi.fn(),
     invoke: vi.fn(),
-    isNativeIOSHandheld: vi.fn(() => false),
-    isNativePlatform: vi.fn(() => false),
     loggerDebug: vi.fn(),
     loggerError: vi.fn(),
-    storeKitIsPro: false,
     accessLoading: false,
     accessState: {
       has_access: false,
@@ -35,9 +31,6 @@ const mocks = vi.hoisted(() => {
       referred_by_code: null as string | null,
     },
     queryClient,
-    setAppUserId: vi.fn(),
-    setFirstSeenAt: vi.fn(),
-    setIsPremium: vi.fn(),
     status: "authenticated",
     user: { id: "user-1" },
   };
@@ -45,12 +38,6 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => mocks.queryClient,
-}));
-
-vi.mock("@capacitor/core", () => ({
-  Capacitor: {
-    isNativePlatform: () => mocks.isNativePlatform(),
-  },
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
@@ -73,31 +60,12 @@ vi.mock("@/hooks/useProfile", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useStoreKit", () => ({
-  useStoreKit: () => ({
-    isPro: mocks.storeKitIsPro,
-  }),
-}));
-
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     functions: {
       invoke: (...args: unknown[]) => mocks.invoke(...args),
     },
   },
-}));
-
-vi.mock("@/plugins/WinWinKitPlugin", () => ({
-  WinWinKit: {
-    configure: () => mocks.configure(),
-    setAppUserId: (...args: unknown[]) => mocks.setAppUserId(...args),
-    setFirstSeenAt: (...args: unknown[]) => mocks.setFirstSeenAt(...args),
-    setIsPremium: (...args: unknown[]) => mocks.setIsPremium(...args),
-  },
-}));
-
-vi.mock("@/utils/platformTargets", () => ({
-  isNativeIOSHandheld: () => mocks.isNativeIOSHandheld(),
 }));
 
 vi.mock("@/utils/logger", () => ({
@@ -107,7 +75,7 @@ vi.mock("@/utils/logger", () => ({
   },
 }));
 
-import { useWinWinKitSync } from "./useWinWinKitSync";
+import { useReferralSync } from "./useReferralSync";
 
 const originalOnlineDescriptor = Object.getOwnPropertyDescriptor(Navigator.prototype, "onLine");
 
@@ -118,16 +86,13 @@ function setOnline(online: boolean) {
   });
 }
 
-describe("useWinWinKitSync", () => {
+describe("useReferralSync", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.profile.referral_code = null;
     mocks.profile.referred_by_code = null;
     mocks.status = "authenticated";
     mocks.user = { id: "user-1" };
-    mocks.isNativePlatform.mockReturnValue(false);
-    mocks.isNativeIOSHandheld.mockReturnValue(false);
-    mocks.storeKitIsPro = false;
     mocks.accessLoading = false;
     mocks.accessState = {
       has_access: false,
@@ -155,12 +120,11 @@ describe("useWinWinKitSync", () => {
       error: null,
     });
 
-    renderHook(() => useWinWinKitSync());
+    renderHook(() => useReferralSync());
 
     await waitFor(() => {
-      expect(mocks.invoke).toHaveBeenCalledWith("sync-winwinkit-user", {
+      expect(mocks.invoke).toHaveBeenCalledWith("sync-referral-user", {
         body: {
-          first_seen_at: "2026-04-29T12:00:00.000Z",
           is_premium: false,
         },
       });
@@ -187,8 +151,6 @@ describe("useWinWinKitSync", () => {
       plan: "yearly",
       subscription_end: "2099-01-01T00:00:00.000Z",
     };
-    mocks.isNativePlatform.mockReturnValue(true);
-    mocks.isNativeIOSHandheld.mockReturnValue(true);
     mocks.invoke.mockResolvedValue({
       data: {
         user: {
@@ -199,25 +161,20 @@ describe("useWinWinKitSync", () => {
       error: null,
     });
 
-    renderHook(() => useWinWinKitSync());
+    renderHook(() => useReferralSync());
 
     await waitFor(() => {
-      expect(mocks.invoke).toHaveBeenCalledWith("sync-winwinkit-user", {
+      expect(mocks.invoke).toHaveBeenCalledWith("sync-referral-user", {
         body: {
-          first_seen_at: "2026-04-29T12:00:00.000Z",
           is_premium: true,
         },
       });
     });
 
-    expect(mocks.setIsPremium).toHaveBeenCalledWith({ isPremium: true });
     expect(mocks.loggerError).not.toHaveBeenCalled();
   });
 
-  it("does not sync premium from raw RevenueCat state when hardened access is inactive", async () => {
-    mocks.storeKitIsPro = true;
-    mocks.isNativePlatform.mockReturnValue(true);
-    mocks.isNativeIOSHandheld.mockReturnValue(true);
+  it("does not sync premium when hardened access is inactive", async () => {
     mocks.invoke.mockResolvedValue({
       data: {
         user: {
@@ -228,18 +185,16 @@ describe("useWinWinKitSync", () => {
       error: null,
     });
 
-    renderHook(() => useWinWinKitSync());
+    renderHook(() => useReferralSync());
 
     await waitFor(() => {
-      expect(mocks.invoke).toHaveBeenCalledWith("sync-winwinkit-user", {
+      expect(mocks.invoke).toHaveBeenCalledWith("sync-referral-user", {
         body: {
-          first_seen_at: "2026-04-29T12:00:00.000Z",
           is_premium: false,
         },
       });
     });
 
-    expect(mocks.setIsPremium).toHaveBeenCalledWith({ isPremium: false });
     expect(mocks.loggerError).not.toHaveBeenCalled();
   });
 
@@ -255,11 +210,11 @@ describe("useWinWinKitSync", () => {
       error: null,
     });
 
-    renderHook(() => useWinWinKitSync());
+    renderHook(() => useReferralSync());
 
     await waitFor(() => {
       expect(mocks.loggerDebug).toHaveBeenCalledWith(
-        "WinWinKit referral sync deferred while offline",
+        "Referral sync deferred while offline",
         expect.objectContaining({ source: "initial" }),
       );
     });
@@ -295,11 +250,11 @@ describe("useWinWinKitSync", () => {
         error: null,
       });
 
-    renderHook(() => useWinWinKitSync());
+    renderHook(() => useReferralSync());
 
     await waitFor(() => {
       expect(mocks.loggerDebug).toHaveBeenCalledWith(
-        "WinWinKit referral sync deferred; will retry",
+        "Referral sync deferred; will retry",
         expect.objectContaining({
           category: "network",
           name: "FunctionsFetchError",

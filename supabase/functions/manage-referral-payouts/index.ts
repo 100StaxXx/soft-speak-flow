@@ -155,7 +155,7 @@ serve(async (req) => {
 
       const { data: codeData, error: codeError } = await supabase
         .from("referral_codes")
-        .select("id, code, owner_user_id, total_conversions, total_revenue, affiliate_provider")
+        .select("id, code, owner_user_id, total_conversions, total_revenue")
         .eq("code", code)
         .maybeSingle();
 
@@ -164,16 +164,6 @@ serve(async (req) => {
       if (!codeData) {
         return new Response(JSON.stringify({ error: "Referral code not found" }), {
           status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const isProviderLinkedAffiliate = codeData.affiliate_provider === "winwinkit";
-      if (isProviderLinkedAffiliate) {
-        return new Response(JSON.stringify({
-          error: "WinWinKit-linked codes are reported through the Apple yearly webhook flow, not local test payouts.",
-        }), {
-          status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }

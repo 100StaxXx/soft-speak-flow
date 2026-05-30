@@ -2,8 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { requireAuthenticatedUser } from "../_shared/auth.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
-import { syncWinWinKitUserToLocalState } from "../_shared/referralState.ts";
-import { createOrUpdateWinWinKitUser } from "../_shared/winwinkit.ts";
+import { syncReferralUserToLocalState } from "../_shared/referralState.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -24,12 +23,11 @@ serve(async (req) => {
     );
 
     const body = await req.json().catch(() => ({}));
-    const explicitFirstSeenAt = typeof body?.first_seen_at === "string" ? body.first_seen_at : null;
-    const explicitIsPremium = typeof body?.is_premium === "boolean" ? body.is_premium : null;
+    const explicitIsPremium = typeof body?.is_premium === "boolean" ? body.is_premium : false;
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("id, email, created_at")
+      .select("id, referral_code, referred_by_code, referral_count")
       .eq("id", userAuth.userId)
       .single();
 
@@ -37,38 +35,35 @@ serve(async (req) => {
       throw profileError;
     }
 
-    const winWinKitUser = await createOrUpdateWinWinKitUser({
-      appUserId: userAuth.userId,
-      firstSeenAt: explicitFirstSeenAt ?? profile.created_at ?? new Date().toISOString(),
-      isPremium: explicitIsPremium ?? undefined,
-      metadata: profile.email
-        ? { email: profile.email }
-        : undefined,
-    });
+    const referralUser = {
+      app_user_id: userAuth.userId,
+      referral_code: profile.referral_code ?? null,
+      referred_by: profile.referred_by_code
+        ? { code: profile.referred_by_code, type: "referral" }
+        : null,
+      is_premium: explicitIsPremium,
+      stats: {
+        claims: Number(profile.referral_count ?? 0),
+      },
+    };
 
-    await syncWinWinKitUserToLocalState(
+    await syncReferralUserToLocalState(
       supabase,
       userAuth.userId,
-      winWinKitUser,
+      referralUser,
     );
 
     return new Response(JSON.stringify({
       success: true,
-      user: {
-        app_user_id: winWinKitUser.app_user_id,
-        referral_code: winWinKitUser.referral_code,
-        referred_by: winWinKitUser.referred_by ?? null,
-        is_premium: winWinKitUser.is_premium,
-        stats: winWinKitUser.stats ?? null,
-      },
+      user: referralUser,
     }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("sync-winwinkit-user error:", error);
+    console.error("sync-referral-user error:", error);
     return new Response(JSON.stringify({
-      error: error instanceof Error ? error.message : "Failed to sync WinWinKit user",
+      error: error instanceof Error ? error.message : "Failed to sync referral user",
     }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

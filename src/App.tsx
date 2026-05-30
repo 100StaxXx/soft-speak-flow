@@ -55,7 +55,7 @@ import { WallpaperManifestProvider } from "@/contexts/WallpaperManifestContext";
 import { GlobalWidgetSyncBridge } from "@/components/GlobalWidgetSyncBridge";
 import { StoreKitProvider } from "@/providers/StoreKitProvider";
 import { EVENING_REFLECTION_CANONICAL_PATH } from "@/utils/eveningReflectionNavigation";
-import { useWinWinKitSync } from "@/hooks/useWinWinKitSync";
+import { useReferralSync } from "@/hooks/useReferralSync";
 import { useCreationPopupResume } from "@/hooks/useCreationPopupResume";
 import {
   REMAINING_TODAY_BADGE_COUNT_QUERY_KEY,
@@ -258,7 +258,7 @@ const AppContent = memo(() => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  useWinWinKitSync();
+  useReferralSync();
   
   // Refresh critical data on app resume (iOS/Android) or tab visibility (web)
   useAppResumeRefresh({ enabled: status === "authenticated" && Boolean(session?.user) });

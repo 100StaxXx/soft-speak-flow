@@ -1,20 +1,9 @@
-import { useEffect } from "react";
 import { ArrowRight, CheckCircle2, DollarSign, Sparkles, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
-import { WINWINKIT_AFFILIATES_URL } from "@/constants/winwinkit";
-import { redirectToWinWinKit } from "@/utils/winwinkit";
 
 export default function Partners() {
-  useEffect(() => {
-    redirectToWinWinKit();
-  }, []);
-
-  const openPortal = () => {
-    window.location.href = WINWINKIT_AFFILIATES_URL;
-  };
-
   return (
     <div className="min-h-screen pb-nav-safe relative overflow-hidden">
       <StarfieldBackground />
@@ -35,7 +24,7 @@ export default function Partners() {
             <div className="flex flex-wrap gap-8 justify-center mb-12 text-sm">
               <div className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-primary" />
-                <span>Affiliate portal powered by WinWinKit</span>
+                <span>Creator codes managed in Cosmiq</span>
               </div>
               <div className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5 text-primary" />
@@ -44,12 +33,14 @@ export default function Partners() {
             </div>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Button size="lg" className="text-lg px-8" onClick={openPortal}>
-                Apply To The Partner Program
-                <ArrowRight className="ml-2 h-5 w-5" />
+              <Button asChild size="lg" className="text-lg px-8">
+                <a href="/creator">
+                  Apply To The Partner Program
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </a>
               </Button>
-              <Button size="lg" variant="outline" className="text-lg px-8" onClick={openPortal}>
-                Open Partner Portal
+              <Button asChild size="lg" variant="outline" className="text-lg px-8">
+                <a href="/profile">Open Your Rewards</a>
               </Button>
             </div>
           </div>
@@ -58,9 +49,9 @@ export default function Partners() {
         <section className="py-20 px-4">
           <div className="max-w-5xl mx-auto grid gap-6 md:grid-cols-3">
             <Card className="p-8 cosmic-glass">
-              <h2 className="font-heading text-2xl font-bold mb-4">1. Join Through WinWinKit</h2>
+              <h2 className="font-heading text-2xl font-bold mb-4">1. Join Through Cosmiq</h2>
               <p className="text-sm text-muted-foreground">
-                Creators now apply and manage their partnership through the WinWinKit portal instead of the legacy in-app signup form.
+                Creators apply and manage their partnership through Cosmiq's Supabase-backed referral system.
               </p>
             </Card>
             <Card className="p-8 cosmic-glass">
@@ -88,7 +79,7 @@ export default function Partners() {
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-muted-foreground">
-                  Creator onboarding, reporting, and payouts now run through WinWinKit.
+                  Creator onboarding, reporting, and payouts now run through Cosmiq.
                 </p>
               </div>
             </Card>

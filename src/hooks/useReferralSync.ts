@@ -1,25 +1,22 @@
 import { useEffect, useRef } from "react";
-import { Capacitor } from "@capacitor/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccessState } from "@/hooks/useAccessState";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
-import { WinWinKit } from "@/plugins/WinWinKitPlugin";
 import { logger } from "@/utils/logger";
-import { isNativeIOSHandheld } from "@/utils/platformTargets";
 import {
   isRetriableFunctionInvokeError,
   parseFunctionInvokeError,
 } from "@/utils/supabaseFunctionErrors";
 
-const WINWINKIT_SYNC_RETRY_DELAYS_MS = [5_000, 30_000, 120_000] as const;
+const REFERRAL_SYNC_RETRY_DELAYS_MS = [5_000, 30_000, 120_000] as const;
 
 function isBrowserOffline() {
   return typeof navigator !== "undefined" && "onLine" in navigator && navigator.onLine === false;
 }
 
-export function useWinWinKitSync() {
+export function useReferralSync() {
   const { user, status } = useAuth();
   const { profile } = useProfile();
   const { accessState, isLoading: accessLoading } = useAccessState();
@@ -59,9 +56,9 @@ export function useWinWinKitSync() {
         return;
       }
 
-      const delayMs = WINWINKIT_SYNC_RETRY_DELAYS_MS[retryAttempt];
+      const delayMs = REFERRAL_SYNC_RETRY_DELAYS_MS[retryAttempt];
       if (typeof delayMs !== "number") {
-        logger.debug("WinWinKit referral sync retry budget exhausted", { reason });
+        logger.debug("Referral sync retry budget exhausted", { reason });
         return;
       }
 
@@ -103,12 +100,12 @@ export function useWinWinKitSync() {
       };
 
       if (retryable) {
-        logger.debug("WinWinKit referral sync deferred; will retry", context);
+        logger.debug("Referral sync deferred; will retry", context);
         scheduleRetry(parsed.category);
         return;
       }
 
-      logger.error("WinWinKit referral sync failed", context);
+      logger.error("Referral sync failed", context);
     };
 
     async function sync(source: string) {
@@ -117,25 +114,16 @@ export function useWinWinKitSync() {
       }
 
       if (isBrowserOffline()) {
-        logger.debug("WinWinKit referral sync deferred while offline", { source });
+        logger.debug("Referral sync deferred while offline", { source });
         scheduleRetry("offline");
         return;
       }
 
       syncInFlight = true;
-      const isNativeIOS = Capacitor.isNativePlatform() && isNativeIOSHandheld();
 
       try {
-        if (isNativeIOS) {
-          await WinWinKit.configure();
-          await WinWinKit.setAppUserId({ appUserId: user.id });
-          await WinWinKit.setFirstSeenAt({ isoDate: profile.created_at });
-          await WinWinKit.setIsPremium({ isPremium });
-        }
-
-        const { data, error } = await supabase.functions.invoke("sync-winwinkit-user", {
+        const { data, error } = await supabase.functions.invoke("sync-referral-user", {
           body: {
-            first_seen_at: profile.created_at,
             is_premium: isPremium,
           },
         });

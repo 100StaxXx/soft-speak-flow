@@ -139,7 +139,7 @@ verify_jwt = false
 [functions.claim-referral-code]
 verify_jwt = true
 
-[functions.sync-winwinkit-user]
+[functions.sync-referral-user]
 verify_jwt = true
 
 [functions.generate-daily-horoscope]

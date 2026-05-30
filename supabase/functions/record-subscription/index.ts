@@ -214,9 +214,9 @@ serve(async (req) => {
     }
 
     // Look up referral_code_id with current conversion count
-    const { data: codeData, error: codeError } = await supabaseClient
-      .from("referral_codes")
-      .select("id, code, owner_type, total_conversions, total_revenue, tier, affiliate_provider")
+      const { data: codeData, error: codeError } = await supabaseClient
+        .from("referral_codes")
+        .select("id, code, owner_type, total_conversions, total_revenue, tier")
       .eq("code", referral_code.toUpperCase())
       .single();
 
@@ -244,16 +244,6 @@ serve(async (req) => {
         success: true,
         message: "Genesis conversion recorded without payout",
         skipped_payout: true,
-      });
-    }
-
-    const isProviderLinkedAffiliate = codeData.affiliate_provider === "winwinkit";
-    if (isProviderLinkedAffiliate) {
-      console.log(`Skipping local payout creation for WinWinKit-linked code ${referral_code}`);
-      return jsonResponse(req, {
-        success: true,
-        message: "WinWinKit affiliate commissions are handled by the Apple webhook yearly flow",
-        skipped: true,
       });
     }
 

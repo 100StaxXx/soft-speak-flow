@@ -1,11 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "@/components/ui/sonner";
-import { WinWinKit } from "@/plugins/WinWinKitPlugin";
-import { isGenesisSpecialCode } from "@/utils/appleOfferPricing";
-import { isNativeIOSHandheld } from "@/utils/platformTargets";
 
 interface ApplyReferralResult {
   success: boolean;
@@ -94,16 +90,10 @@ export const useReferrals = () => {
       if (!user) throw new Error("User not authenticated");
 
       const normalizedCode = code.trim().toUpperCase();
-      const isNativeIOS = Capacitor.isNativePlatform() && isNativeIOSHandheld();
-
-      if (isNativeIOS && !isGenesisSpecialCode(normalizedCode)) {
-        await WinWinKit.claimCode({ code: normalizedCode });
-      }
 
       const { data: result, error } = await supabase.functions.invoke("claim-referral-code", {
         body: {
           code: normalizedCode,
-          provider_claimed: isNativeIOS && !isGenesisSpecialCode(normalizedCode),
         },
       }) as { data: ApplyReferralResult | null; error: Error | null };
 
