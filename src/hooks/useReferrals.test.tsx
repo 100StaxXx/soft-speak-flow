@@ -117,4 +117,29 @@ describe("useReferrals", () => {
       },
     });
   });
+
+  it("preserves backend invalid-code messages and can suppress hook toasts", async () => {
+    const invalidReferralError = Object.assign(new Error("Edge Function returned a non-2xx status code"), {
+      context: new Response(JSON.stringify({ message: "Invalid referral code" }), { status: 404 }),
+    });
+    mocks.invoke.mockResolvedValueOnce({
+      data: null,
+      error: invalidReferralError,
+    });
+
+    const { result } = renderHook(() => useReferrals(), {
+      wrapper: createQueryWrapper(),
+    });
+
+    await act(async () => {
+      await expect(
+        result.current.applyReferralCode.mutateAsync({
+          code: "73WJL3EPLWX7WA36E6",
+          suppressToast: true,
+        }),
+      ).rejects.toThrow("Invalid referral code");
+    });
+
+    expect(mocks.toastError).not.toHaveBeenCalled();
+  });
 });

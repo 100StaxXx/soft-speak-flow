@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "@/components/ui/sonner";
+import { parseFunctionInvokeError, type ParsedFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
 
 interface ApplyReferralResult {
   success: boolean;
@@ -11,6 +12,32 @@ interface ApplyReferralResult {
     identifier?: string | null;
     yearly_price_cents?: number | null;
   };
+}
+
+type ApplyReferralCodeVariables = string | {
+  code: string;
+  suppressToast?: boolean;
+};
+
+export class ReferralCodeApplyError extends Error {
+  parsed?: ParsedFunctionInvokeError;
+
+  constructor(message: string, parsed?: ParsedFunctionInvokeError) {
+    super(message);
+    this.name = "ReferralCodeApplyError";
+    this.parsed = parsed;
+  }
+}
+
+export function isInvalidReferralCodeError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return message.trim().toLowerCase() === "invalid referral code";
+}
+
+function normalizeApplyReferralCodeVariables(input: ApplyReferralCodeVariables) {
+  return typeof input === "string"
+    ? { code: input, suppressToast: false }
+    : { code: input.code, suppressToast: Boolean(input.suppressToast) };
 }
 
 export const useReferrals = () => {
@@ -86,9 +113,10 @@ export const useReferrals = () => {
   });
 
   const applyReferralCode = useMutation({
-    mutationFn: async (code: string) => {
+    mutationFn: async (input: ApplyReferralCodeVariables) => {
       if (!user) throw new Error("User not authenticated");
 
+      const { code } = normalizeApplyReferralCodeVariables(input);
       const normalizedCode = code.trim().toUpperCase();
 
       const { data: result, error } = await supabase.functions.invoke("claim-referral-code", {
@@ -98,21 +126,26 @@ export const useReferrals = () => {
       }) as { data: ApplyReferralResult | null; error: Error | null };
 
       if (error) {
-        throw new Error("Unable to apply referral code. Please try again.");
+        const parsed = await parseFunctionInvokeError(error);
+        const message = parsed.backendMessage ?? parsed.message ?? "Unable to apply referral code. Please try again.";
+        throw new ReferralCodeApplyError(message, parsed);
       }
 
       const applyResult = result ?? undefined;
       
       if (!applyResult?.success) {
-        throw new Error(applyResult?.message || "Failed to apply referral code");
+        throw new ReferralCodeApplyError(applyResult?.message || "Failed to apply referral code");
       }
 
       return applyResult;
     },
-    onSuccess: (result) => {
+    onSuccess: (result, variables) => {
       queryClient.invalidateQueries({ queryKey: ["referral-stats"] });
       queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
       queryClient.invalidateQueries({ queryKey: ["applied-referral-code-state", user?.id] });
+
+      const { suppressToast } = normalizeApplyReferralCodeVariables(variables);
+      if (suppressToast) return;
 
       const defaultMessage = result.code_type === "special"
         ? "Genesis code applied! Your yearly plan is now eligible for the $49.99 Apple offer."
@@ -122,7 +155,9 @@ export const useReferrals = () => {
 
       toast.success(result.message || defaultMessage);
     },
-    onError: (error: Error) => {
+    onError: (error: Error, variables) => {
+      const { suppressToast } = normalizeApplyReferralCodeVariables(variables);
+      if (suppressToast) return;
       toast.error(error.message);
     },
   });

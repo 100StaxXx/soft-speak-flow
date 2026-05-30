@@ -1,8 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  appStateListeners: [] as Array<(state: { isActive: boolean }) => void>,
+  browserFinishedListeners: [] as Array<() => void>,
+  browserOpen: vi.fn(),
   appleSubscription: {
     handlePurchase: vi.fn(),
     handleRestore: vi.fn(),
@@ -27,12 +30,43 @@ const mocks = vi.hoisted(() => ({
   },
   toast: vi.fn(),
   signOut: vi.fn(),
+  applyReferralCodeMutateAsync: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({
     invalidateQueries: vi.fn(),
   }),
+}));
+
+vi.mock("@capacitor/app", () => ({
+  App: {
+    addListener: vi.fn((eventName: string, callback: (state: { isActive: boolean }) => void) => {
+      if (eventName === "appStateChange") {
+        mocks.appStateListeners.push(callback);
+      }
+      return Promise.resolve({ remove: vi.fn() });
+    }),
+  },
+}));
+
+vi.mock("@capacitor/browser", () => ({
+  Browser: {
+    addListener: vi.fn((eventName: string, callback: () => void) => {
+      if (eventName === "browserFinished") {
+        mocks.browserFinishedListeners.push(callback);
+      }
+      return Promise.resolve({ remove: vi.fn() });
+    }),
+    open: (...args: unknown[]) => mocks.browserOpen(...args),
+  },
+}));
+
+vi.mock("@capacitor/core", () => ({
+  Capacitor: {
+    isNativePlatform: () => true,
+    getPlatform: () => "ios",
+  },
 }));
 
 vi.mock("@/hooks/useAppleSubscription", () => ({
@@ -61,9 +95,11 @@ vi.mock("@/hooks/useAccessStatus", () => ({
 }));
 
 vi.mock("@/hooks/useReferrals", () => ({
+  isInvalidReferralCodeError: (error: unknown) =>
+    error instanceof Error && error.message === "Invalid referral code",
   useReferrals: () => ({
     applyReferralCode: {
-      mutateAsync: vi.fn(),
+      mutateAsync: (...args: unknown[]) => mocks.applyReferralCodeMutateAsync(...args),
       isPending: false,
     },
   }),
@@ -113,6 +149,14 @@ describe("Paywall creator offer-code eligibility", () => {
       hasAccess: false,
       loading: false,
     };
+    mocks.appStateListeners = [];
+    mocks.browserFinishedListeners = [];
+    mocks.browserOpen.mockResolvedValue(undefined);
+    mocks.applyReferralCodeMutateAsync.mockResolvedValue({
+      success: true,
+      message: "Creator code applied",
+      code_type: "affiliate",
+    });
   });
 
   it("shows discounted yearly pricing only for Apple-eligible creator codes", () => {
@@ -246,6 +290,173 @@ describe("Paywall creator offer-code eligibility", () => {
     fireEvent.click(screen.getByRole("button", { name: /^3-day free trial$/i }));
 
     expect(mocks.appleSubscription.handlePurchase).toHaveBeenCalledWith("cosmiq_premium_yearly", "paywall");
+  });
+
+  it("applies a valid creator code through the existing referral path", async () => {
+    render(
+      <MemoryRouter>
+        <Paywall />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("ENTER CREATOR CODE"), {
+      target: { value: "creator123" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Apply Creator Code" }));
+
+    await waitFor(() => {
+      expect(mocks.applyReferralCodeMutateAsync).toHaveBeenCalledWith({
+        code: "CREATOR123",
+        suppressToast: true,
+      });
+    });
+    expect(mocks.browserOpen).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith({
+      title: "Creator code applied",
+      description: "Your yearly plan is now discounted to $69.99 for the first year.",
+    });
+  });
+
+  it("shows the normal invalid-code error for non-Apple code shapes", async () => {
+    mocks.applyReferralCodeMutateAsync.mockRejectedValueOnce(new Error("Invalid referral code"));
+
+    render(
+      <MemoryRouter>
+        <Paywall />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("ENTER CREATOR CODE"), {
+      target: { value: "friend123" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Apply Creator Code" }));
+
+    await waitFor(() => {
+      expect(mocks.toast).toHaveBeenCalledWith({
+        title: "Unable to apply code",
+        description: "Invalid referral code",
+        variant: "destructive",
+      });
+    });
+    expect(mocks.browserOpen).not.toHaveBeenCalled();
+  });
+
+  it("opens Apple redemption when an invalid referral looks like a one-time offer code", async () => {
+    mocks.applyReferralCodeMutateAsync.mockRejectedValueOnce(new Error("Invalid referral code"));
+
+    render(
+      <MemoryRouter>
+        <Paywall />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("ENTER CREATOR CODE"), {
+      target: { value: "73wjl3eplwx7wa36e6" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Apply Creator Code" }));
+
+    await waitFor(() => {
+      expect(mocks.browserOpen).toHaveBeenCalledWith({
+        url: "https://apps.apple.com/redeem?ctx=offercodes&id=6755738842&code=73WJL3EPLWX7WA36E6",
+      });
+    });
+    expect(mocks.toast).toHaveBeenCalledWith({
+      title: "Redeeming with Apple...",
+      description: "Opening Apple's offer-code redemption flow.",
+    });
+  });
+
+  it("does not open Apple redemption for network or server failures", async () => {
+    mocks.applyReferralCodeMutateAsync.mockRejectedValueOnce(
+      new Error("Unable to apply referral code. Please try again."),
+    );
+
+    render(
+      <MemoryRouter>
+        <Paywall />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("ENTER CREATOR CODE"), {
+      target: { value: "73wjl3eplwx7wa36e6" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Apply Creator Code" }));
+
+    await waitFor(() => {
+      expect(mocks.toast).toHaveBeenCalledWith({
+        title: "Unable to apply code",
+        description: "Unable to apply referral code. Please try again.",
+        variant: "destructive",
+      });
+    });
+    expect(mocks.browserOpen).not.toHaveBeenCalled();
+  });
+
+  it("refreshes subscription state when returning from Apple redemption", async () => {
+    mocks.applyReferralCodeMutateAsync.mockRejectedValueOnce(new Error("Invalid referral code"));
+    mocks.appleSubscription.handleRecoverExistingSubscription.mockResolvedValueOnce("verified");
+
+    render(
+      <MemoryRouter>
+        <Paywall />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("ENTER CREATOR CODE"), {
+      target: { value: "73wjl3eplwx7wa36e6" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Apply Creator Code" }));
+
+    await waitFor(() => {
+      expect(mocks.browserOpen).toHaveBeenCalled();
+    });
+
+    await act(async () => {
+      mocks.appStateListeners.forEach((listener) => listener({ isActive: false }));
+      mocks.appStateListeners.forEach((listener) => listener({ isActive: true }));
+    });
+
+    await waitFor(() => {
+      expect(mocks.appleSubscription.handleRecoverExistingSubscription).toHaveBeenCalledWith(
+        "paywall_apple_offer_code",
+        { showSuccessToast: false },
+      );
+    });
+    expect(mocks.toast).toHaveBeenCalledWith({
+      title: "Cosmiq unlocked",
+      description: "Your Apple offer code is active on this account.",
+    });
+  });
+
+  it("refreshes subscription state when the Apple redemption browser closes", async () => {
+    mocks.applyReferralCodeMutateAsync.mockRejectedValueOnce(new Error("Invalid referral code"));
+    mocks.appleSubscription.handleRecoverExistingSubscription.mockResolvedValueOnce("verified");
+
+    render(
+      <MemoryRouter>
+        <Paywall />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("ENTER CREATOR CODE"), {
+      target: { value: "73wjl3eplwx7wa36e6" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Apply Creator Code" }));
+
+    await waitFor(() => {
+      expect(mocks.browserOpen).toHaveBeenCalled();
+    });
+
+    await act(async () => {
+      mocks.browserFinishedListeners.forEach((listener) => listener());
+    });
+
+    await waitFor(() => {
+      expect(mocks.appleSubscription.handleRecoverExistingSubscription).toHaveBeenCalledWith(
+        "paywall_apple_offer_code",
+        { showSuccessToast: false },
+      );
+    });
   });
 
   it("does not contact StoreKit to recover existing access on mount", () => {

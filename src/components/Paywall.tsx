@@ -1,5 +1,8 @@
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type PointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type PointerEvent, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { App as CapacitorApp } from "@capacitor/app";
+import { Browser } from "@capacitor/browser";
+import { Capacitor } from "@capacitor/core";
 import {
   ArrowDown,
   ArrowRight,
@@ -30,7 +33,7 @@ import {
   isAccountDeletionAuthError,
 } from "@/services/accountDeletion";
 import { logger } from "@/utils/logger";
-import { useReferrals } from "@/hooks/useReferrals";
+import { isInvalidReferralCodeError, useReferrals } from "@/hooks/useReferrals";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -51,6 +54,12 @@ import {
   PREMIUM_SUBSCRIPTION_LEGAL_LINKS,
 } from "@/config/premiumBenefits";
 import { DISCORD_INVITE_URL } from "@/constants/community";
+import {
+  buildAppleOfferCodeRedeemUrl,
+  isAppleOneTimeOfferCode,
+  normalizePaywallOfferCodeInput,
+} from "@/utils/appleOfferCodeRedemption";
+import { queryKeys } from "@/lib/queryKeys";
 
 type PlanType = "monthly" | "yearly";
 export type PaywallVariant = "pre_trial_signup" | "trial_expired";
@@ -185,14 +194,17 @@ const PaywallLandscapeSection = ({
 export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
   const [selectedPlan, setSelectedPlan] = useState<PlanType>("yearly");
   const [offerCode, setOfferCode] = useState("");
+  const [isRedeemingAppleCode, setIsRedeemingAppleCode] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const pendingAppleRedemptionRecoveryRef = useRef(false);
 
   const {
     handlePurchase,
     handleRestore,
+    handleRecoverExistingSubscription,
     loading,
     isAvailable,
     products,
@@ -263,10 +275,153 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
     });
   }, [navigate, productError, user?.id]);
 
+  const invalidateAppleRedemptionState = useCallback(async () => {
+    if (!user?.id) return;
+
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.access.detail(user.id) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.subscription.detail(user.id) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.profile.detail(user.id) }),
+      queryClient.invalidateQueries({ queryKey: ["subscription"] }),
+      queryClient.invalidateQueries({ queryKey: ["referral-stats", user.id] }),
+      queryClient.invalidateQueries({ queryKey: ["applied-referral-code-state", user.id] }),
+    ]);
+  }, [queryClient, user?.id]);
+
+  const recoverAfterAppleOfferRedemption = useCallback(async () => {
+    if (!pendingAppleRedemptionRecoveryRef.current) return;
+
+    pendingAppleRedemptionRecoveryRef.current = false;
+    setIsRedeemingAppleCode(true);
+    try {
+      const result = await handleRecoverExistingSubscription("paywall_apple_offer_code", {
+        showSuccessToast: false,
+      });
+      await invalidateAppleRedemptionState();
+
+      if (result === "verified") {
+        toast({
+          title: "Cosmiq unlocked",
+          description: "Your Apple offer code is active on this account.",
+        });
+        navigate("/premium/success");
+        return;
+      }
+
+      toast({
+        title: "Apple redemption checked",
+        description: "If Apple accepted the code, access can take a moment to appear. Try Restore Purchases if it does not unlock.",
+      });
+    } catch (error) {
+      toast({
+        title: "Unable to refresh Apple redemption",
+        description: error instanceof Error ? error.message : "Try Restore Purchases after redeeming your code.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRedeemingAppleCode(false);
+    }
+  }, [handleRecoverExistingSubscription, invalidateAppleRedemptionState, navigate, toast]);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return undefined;
+
+    let sawInactiveState = false;
+    let isMounted = true;
+    let listener: { remove: () => Promise<void> } | undefined;
+
+    void CapacitorApp.addListener("appStateChange", ({ isActive }) => {
+      if (!pendingAppleRedemptionRecoveryRef.current) return;
+      if (!isActive) {
+        sawInactiveState = true;
+        return;
+      }
+
+      if (sawInactiveState) {
+        sawInactiveState = false;
+        void recoverAfterAppleOfferRedemption();
+      }
+    }).then((handle) => {
+      if (!isMounted) {
+        void handle.remove();
+        return;
+      }
+      listener = handle;
+    });
+
+    return () => {
+      isMounted = false;
+      void listener?.remove();
+    };
+  }, [recoverAfterAppleOfferRedemption]);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return undefined;
+
+    let isMounted = true;
+    let listener: { remove: () => Promise<void> } | undefined;
+
+    void Browser.addListener("browserFinished", () => {
+      void recoverAfterAppleOfferRedemption();
+    }).then((handle) => {
+      if (!isMounted) {
+        void handle.remove();
+        return;
+      }
+      listener = handle;
+    });
+
+    return () => {
+      isMounted = false;
+      void listener?.remove();
+    };
+  }, [recoverAfterAppleOfferRedemption]);
+
+  const openAppleOfferCodeRedemption = useCallback(async (code: string) => {
+    const redeemUrl = buildAppleOfferCodeRedeemUrl(code);
+    pendingAppleRedemptionRecoveryRef.current = true;
+    setIsRedeemingAppleCode(true);
+    trackPaywallEvent("offer_code_redemption_started", {
+      surface: "paywall",
+      offerCode: normalizePaywallOfferCodeInput(code),
+      redemptionType: "apple_one_time_code",
+    });
+
+    toast({
+      title: "Redeeming with Apple...",
+      description: "Opening Apple's offer-code redemption flow.",
+    });
+
+    try {
+      if (Capacitor.isNativePlatform()) {
+        await Browser.open({ url: redeemUrl });
+        return;
+      }
+
+      window.location.href = redeemUrl;
+    } catch (error) {
+      pendingAppleRedemptionRecoveryRef.current = false;
+      setIsRedeemingAppleCode(false);
+      toast({
+        title: "Unable to open Apple redemption",
+        description: error instanceof Error ? error.message : "Try the App Store redemption link again.",
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
+
+  const showOfferCodeApplyError = useCallback((error: unknown) => {
+    toast({
+      title: "Unable to apply code",
+      description: error instanceof Error ? error.message : "Please check the code and try again.",
+      variant: "destructive",
+    });
+  }, [toast]);
+
   const handleApplyOfferCode = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const sanitized = offerCode.trim().toUpperCase();
+    const sanitized = normalizePaywallOfferCodeInput(offerCode);
     if (!sanitized || !user?.id) return;
 
     try {
@@ -274,7 +429,10 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
         surface: "paywall",
         offerCode: sanitized,
       });
-      const result = await applyReferralCode.mutateAsync(sanitized);
+      const result = await applyReferralCode.mutateAsync({
+        code: sanitized,
+        suppressToast: true,
+      });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["profile", user.id] }),
         queryClient.invalidateQueries({ queryKey: ["referral-stats", user.id] }),
@@ -297,13 +455,27 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
         });
       }
     } catch (error) {
+      if (isInvalidReferralCodeError(error) && isAppleOneTimeOfferCode(sanitized)) {
+        await openAppleOfferCodeRedemption(sanitized);
+        return;
+      }
+
       trackPaywallEvent("offer_code_failed", {
         surface: "paywall",
         offerCode: sanitized,
         message: error instanceof Error ? error.message : "unknown_error",
       });
+      showOfferCodeApplyError(error);
     }
-  }, [applyReferralCode, queryClient, offerCode, toast, user?.id]);
+  }, [
+    applyReferralCode,
+    offerCode,
+    openAppleOfferCodeRedemption,
+    queryClient,
+    showOfferCodeApplyError,
+    toast,
+    user?.id,
+  ]);
 
   const handleSignOut = async () => {
     setIsSigningOut(true);
@@ -509,7 +681,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
   const ctaLabel = hasSelectedCreatorYearlyOffer
     ? (offerCodePurchaseReady ? "Subscribe Yearly" : "Redeem Discount with Apple")
     : copy.cta;
-  const purchaseActionDisabled = !isAvailable || loading || productsLoading || recoveringExistingSubscription;
+  const purchaseActionDisabled = !isAvailable || loading || productsLoading || recoveringExistingSubscription || isRedeemingAppleCode;
 
   if (!accessStatusLoading && hasAccess) {
     return null;
@@ -714,10 +886,14 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                       />
                       <Button
                         type="submit"
-                        disabled={applyReferralCode.isPending || !offerCode.trim()}
+                        disabled={applyReferralCode.isPending || isRedeemingAppleCode || !offerCode.trim()}
                         className="w-full"
                       >
-                        {applyReferralCode.isPending ? "Applying..." : "Apply Creator Code"}
+                        {isRedeemingAppleCode
+                          ? "Redeeming with Apple..."
+                          : applyReferralCode.isPending
+                            ? "Applying..."
+                            : "Apply Creator Code"}
                       </Button>
                       <p className="text-center text-xs text-white/54">
                         Entering a valid code unlocks discounted annual pricing.
