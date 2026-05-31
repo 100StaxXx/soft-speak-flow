@@ -159,6 +159,17 @@ const blurActiveElement = () => {
   }
 };
 
+const isReferralCodeBusinessRuleError = (error: unknown): boolean => {
+  if (isInvalidReferralCodeError(error)) return true;
+
+  if (!error || typeof error !== "object" || !("parsed" in error)) {
+    return false;
+  }
+
+  const parsed = (error as { parsed?: { category?: string; status?: number } }).parsed;
+  return parsed?.category === "http" && (parsed.status === 404 || parsed.status === 409);
+};
+
 const PaywallLandscapeSection = ({
   id,
   background,
@@ -455,7 +466,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
         });
       }
     } catch (error) {
-      if (isInvalidReferralCodeError(error) && isAppleOneTimeOfferCode(sanitized)) {
+      if (isAppleOneTimeOfferCode(sanitized) && isReferralCodeBusinessRuleError(error)) {
         await openAppleOfferCodeRedemption(sanitized);
         return;
       }

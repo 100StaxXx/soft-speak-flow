@@ -422,6 +422,35 @@ describe("Paywall creator offer-code eligibility", () => {
     });
   });
 
+  it("opens Apple redemption for Apple-shaped codes when a referral code is already saved", async () => {
+    mocks.applyReferralCodeMutateAsync.mockRejectedValueOnce(
+      Object.assign(new Error("You have already used a referral code"), {
+        parsed: { category: "http", status: 409 },
+      }),
+    );
+
+    render(
+      <MemoryRouter>
+        <Paywall />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("ENTER CODE"), {
+      target: { value: "73wjl3eplwx7wa36e6" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Apply Code" }));
+
+    await waitFor(() => {
+      expect(mocks.browserOpen).toHaveBeenCalledWith({
+        url: "https://apps.apple.com/redeem?ctx=offercodes&id=6755738842&code=73WJL3EPLWX7WA36E6",
+      });
+    });
+    expect(mocks.toast).toHaveBeenCalledWith({
+      title: "Redeeming with Apple...",
+      description: "Opening Apple's offer-code redemption flow.",
+    });
+  });
+
   it("does not open Apple redemption for network or server failures", async () => {
     mocks.applyReferralCodeMutateAsync.mockRejectedValueOnce(
       new Error("Unable to apply referral code. Please try again."),
