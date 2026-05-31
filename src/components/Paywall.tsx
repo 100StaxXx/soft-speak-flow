@@ -95,6 +95,8 @@ interface PaywallLandscapeSectionProps {
 }
 
 const PAYWALL_CHECKOUT_ID = "cosmiq-pro-plans";
+const APPLE_OFFER_CODE_LOCAL_LOOKUP_TIMEOUT_MS = 4500;
+const APPLE_OFFER_CODE_LOOKUP_TIMEOUT_MESSAGE = "Cosmiq code lookup timed out";
 
 const createPaywallBackdrop = (src: string, src2x = src): StaticBackgroundAsset => ({
   src,
@@ -169,6 +171,26 @@ const isReferralCodeBusinessRuleError = (error: unknown): boolean => {
   const parsed = (error as { parsed?: { category?: string; status?: number } }).parsed;
   return parsed?.category === "http" && (parsed.status === 404 || parsed.status === 409);
 };
+
+const isAppleOfferCodeLookupTimeoutError = (error: unknown): boolean =>
+  error instanceof Error && error.message === APPLE_OFFER_CODE_LOOKUP_TIMEOUT_MESSAGE;
+
+const shouldOpenAppleRedemptionAfterReferralFailure = (error: unknown): boolean =>
+  isAppleOfferCodeLookupTimeoutError(error) || isReferralCodeBusinessRuleError(error);
+
+function withAppleOfferCodeLookupTimeout<T>(promise: Promise<T>, enabled: boolean): Promise<T> {
+  if (!enabled) return promise;
+
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = globalThis.setTimeout(() => {
+      reject(new Error(APPLE_OFFER_CODE_LOOKUP_TIMEOUT_MESSAGE));
+    }, APPLE_OFFER_CODE_LOCAL_LOOKUP_TIMEOUT_MS);
+
+    promise.then(resolve, reject).finally(() => {
+      globalThis.clearTimeout(timeoutId);
+    });
+  });
+}
 
 const PaywallLandscapeSection = ({
   id,
@@ -433,17 +455,43 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
     event.preventDefault();
 
     const sanitized = normalizePaywallOfferCodeInput(offerCode);
-    if (!sanitized || !user?.id) return;
+    if (!sanitized) {
+      toast({
+        title: "Enter a code",
+        description: "Paste a creator code or Apple offer code, then try again.",
+      });
+      return;
+    }
 
+    if (!user?.id) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in again before applying an offer code.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const appleOneTimeCode = isAppleOneTimeOfferCode(sanitized);
     try {
       trackPaywallEvent("offer_code_applied", {
         surface: "paywall",
         offerCode: sanitized,
       });
-      const result = await applyReferralCode.mutateAsync({
-        code: sanitized,
-        suppressToast: true,
-      });
+      if (appleOneTimeCode) {
+        toast({
+          title: "Apple offer code detected",
+          description: "Checking Cosmiq first. Apple redemption will open if this is not a local code.",
+        });
+      }
+
+      const result = await withAppleOfferCodeLookupTimeout(
+        applyReferralCode.mutateAsync({
+          code: sanitized,
+          suppressToast: true,
+        }),
+        appleOneTimeCode,
+      );
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["profile", user.id] }),
         queryClient.invalidateQueries({ queryKey: ["referral-stats", user.id] }),
@@ -466,7 +514,13 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
         });
       }
     } catch (error) {
-      if (isAppleOneTimeOfferCode(sanitized) && isReferralCodeBusinessRuleError(error)) {
+      if (appleOneTimeCode && shouldOpenAppleRedemptionAfterReferralFailure(error)) {
+        if (isAppleOfferCodeLookupTimeoutError(error)) {
+          toast({
+            title: "Cosmiq code lookup timed out",
+            description: "Opening Apple's redemption flow for this Apple offer code.",
+          });
+        }
         await openAppleOfferCodeRedemption(sanitized);
         return;
       }

@@ -451,6 +451,46 @@ describe("Paywall creator offer-code eligibility", () => {
     });
   });
 
+  it("shows progress and opens Apple redemption if the local lookup stalls", async () => {
+    vi.useFakeTimers();
+    mocks.applyReferralCodeMutateAsync.mockReturnValueOnce(new Promise(() => undefined));
+
+    try {
+      render(
+        <MemoryRouter>
+          <Paywall />
+        </MemoryRouter>,
+      );
+
+      fireEvent.change(screen.getByPlaceholderText("ENTER CODE"), {
+        target: { value: "73wjl3eplwx7wa36e6" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Apply Code" }));
+
+      expect(mocks.toast).toHaveBeenCalledWith({
+        title: "Apple offer code detected",
+        description: "Checking Cosmiq first. Apple redemption will open if this is not a local code.",
+      });
+
+      await act(async () => {
+        vi.advanceTimersByTime(4500);
+        await Promise.resolve();
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    await waitFor(() => {
+      expect(mocks.browserOpen).toHaveBeenCalledWith({
+        url: "https://apps.apple.com/redeem?ctx=offercodes&id=6755738842&code=73WJL3EPLWX7WA36E6",
+      });
+    });
+    expect(mocks.toast).toHaveBeenCalledWith({
+      title: "Cosmiq code lookup timed out",
+      description: "Opening Apple's redemption flow for this Apple offer code.",
+    });
+  });
+
   it("does not open Apple redemption for network or server failures", async () => {
     mocks.applyReferralCodeMutateAsync.mockRejectedValueOnce(
       new Error("Unable to apply referral code. Please try again."),
