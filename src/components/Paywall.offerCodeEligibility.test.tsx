@@ -257,6 +257,10 @@ describe("Paywall creator offer-code eligibility", () => {
     expect(screen.getByTestId("paywall-trial-callout")).toBeInTheDocument();
     expect(screen.getByTestId("paywall-trial-callout")).toHaveTextContent("3-day free trial");
     expect(screen.getByTestId("paywall-trial-callout")).toHaveTextContent("No charge today.");
+    expect(screen.getByText("Have a creator or Apple offer code?")).toBeInTheDocument();
+    expect(
+      screen.getByText("Entering a valid creator or Apple offer code unlocks discounted annual pricing."),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /start 3-day free trial/i })).toBeInTheDocument();
     expect(screen.getByText("Unlimited companion chat")).toBeInTheDocument();
     expect(screen.getByText("Unlimited quests and campaigns")).toBeInTheDocument();
@@ -299,10 +303,10 @@ describe("Paywall creator offer-code eligibility", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.change(screen.getByPlaceholderText("ENTER CREATOR CODE"), {
+    fireEvent.change(screen.getByPlaceholderText("ENTER CODE"), {
       target: { value: "creator123" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Apply Creator Code" }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply Code" }));
 
     await waitFor(() => {
       expect(mocks.applyReferralCodeMutateAsync).toHaveBeenCalledWith({
@@ -326,10 +330,10 @@ describe("Paywall creator offer-code eligibility", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.change(screen.getByPlaceholderText("ENTER CREATOR CODE"), {
+    fireEvent.change(screen.getByPlaceholderText("ENTER CODE"), {
       target: { value: "friend123" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Apply Creator Code" }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply Code" }));
 
     await waitFor(() => {
       expect(mocks.toast).toHaveBeenCalledWith({
@@ -350,10 +354,10 @@ describe("Paywall creator offer-code eligibility", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.change(screen.getByPlaceholderText("ENTER CREATOR CODE"), {
+    fireEvent.change(screen.getByPlaceholderText("ENTER CODE"), {
       target: { value: "73wjl3eplwx7wa36e6" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Apply Creator Code" }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply Code" }));
 
     await waitFor(() => {
       expect(mocks.browserOpen).toHaveBeenCalledWith({
@@ -363,6 +367,58 @@ describe("Paywall creator offer-code eligibility", () => {
     expect(mocks.toast).toHaveBeenCalledWith({
       title: "Redeeming with Apple...",
       description: "Opening Apple's offer-code redemption flow.",
+    });
+  });
+
+  it("opens Apple redemption for all-letter Apple one-time offer codes", async () => {
+    mocks.applyReferralCodeMutateAsync.mockRejectedValueOnce(new Error("Invalid referral code"));
+
+    render(
+      <MemoryRouter>
+        <Paywall />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("ENTER CODE"), {
+      target: { value: "abcdefghijklmnopqr" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Apply Code" }));
+
+    await waitFor(() => {
+      expect(mocks.applyReferralCodeMutateAsync).toHaveBeenCalledWith({
+        code: "ABCDEFGHIJKLMNOPQR",
+        suppressToast: true,
+      });
+      expect(mocks.browserOpen).toHaveBeenCalledWith({
+        url: "https://apps.apple.com/redeem?ctx=offercodes&id=6755738842&code=ABCDEFGHIJKLMNOPQR",
+      });
+    });
+  });
+
+  it("opens Apple redemption when users paste an Apple redemption URL", async () => {
+    mocks.applyReferralCodeMutateAsync.mockRejectedValueOnce(new Error("Invalid referral code"));
+
+    render(
+      <MemoryRouter>
+        <Paywall />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("ENTER CODE"), {
+      target: {
+        value: "https://apps.apple.com/redeem?ctx=offercodes&id=6755738842&code=73wjl3eplwx7wa36e6",
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Apply Code" }));
+
+    await waitFor(() => {
+      expect(mocks.applyReferralCodeMutateAsync).toHaveBeenCalledWith({
+        code: "73WJL3EPLWX7WA36E6",
+        suppressToast: true,
+      });
+      expect(mocks.browserOpen).toHaveBeenCalledWith({
+        url: "https://apps.apple.com/redeem?ctx=offercodes&id=6755738842&code=73WJL3EPLWX7WA36E6",
+      });
     });
   });
 
@@ -377,10 +433,10 @@ describe("Paywall creator offer-code eligibility", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.change(screen.getByPlaceholderText("ENTER CREATOR CODE"), {
+    fireEvent.change(screen.getByPlaceholderText("ENTER CODE"), {
       target: { value: "73wjl3eplwx7wa36e6" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Apply Creator Code" }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply Code" }));
 
     await waitFor(() => {
       expect(mocks.toast).toHaveBeenCalledWith({
@@ -402,10 +458,10 @@ describe("Paywall creator offer-code eligibility", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.change(screen.getByPlaceholderText("ENTER CREATOR CODE"), {
+    fireEvent.change(screen.getByPlaceholderText("ENTER CODE"), {
       target: { value: "73wjl3eplwx7wa36e6" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Apply Creator Code" }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply Code" }));
 
     await waitFor(() => {
       expect(mocks.browserOpen).toHaveBeenCalled();
@@ -438,10 +494,10 @@ describe("Paywall creator offer-code eligibility", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.change(screen.getByPlaceholderText("ENTER CREATOR CODE"), {
+    fireEvent.change(screen.getByPlaceholderText("ENTER CODE"), {
       target: { value: "73wjl3eplwx7wa36e6" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Apply Creator Code" }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply Code" }));
 
     await waitFor(() => {
       expect(mocks.browserOpen).toHaveBeenCalled();

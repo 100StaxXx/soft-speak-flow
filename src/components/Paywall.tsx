@@ -847,9 +847,9 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                       <Gift className="h-5 w-5" />
                     </div>
                     <div className="space-y-1">
-                      <h4 className="text-base font-semibold text-white">Have a creator code?</h4>
+                      <h4 className="text-base font-semibold text-white">Have a creator or Apple offer code?</h4>
                       <p className="text-sm text-white/68">
-                        Enter it here to unlock the discounted annual price.
+                        Enter it here to unlock Apple offer pricing.
                       </p>
                     </div>
                   </div>
@@ -878,10 +878,10 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                   ) : (
                     <form className="space-y-3" onSubmit={handleApplyOfferCode}>
                       <Input
-                        placeholder="ENTER CREATOR CODE"
+                        placeholder="ENTER CODE"
                         value={offerCode}
                         onChange={(event) => setOfferCode(event.target.value.toUpperCase())}
-                        maxLength={24}
+                        maxLength={256}
                         className="h-12 border-white/15 bg-black/40 text-center text-base uppercase tracking-[0.2em] text-white placeholder:text-white/36"
                       />
                       <Button
@@ -893,10 +893,10 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                           ? "Redeeming with Apple..."
                           : applyReferralCode.isPending
                             ? "Applying..."
-                            : "Apply Creator Code"}
+                            : "Apply Code"}
                       </Button>
                       <p className="text-center text-xs text-white/54">
-                        Entering a valid code unlocks discounted annual pricing.
+                        Entering a valid creator or Apple offer code unlocks discounted annual pricing.
                       </p>
                     </form>
                   )}
