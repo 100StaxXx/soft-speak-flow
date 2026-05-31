@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   appStateListeners: [] as Array<(state: { isActive: boolean }) => void>,
   browserFinishedListeners: [] as Array<() => void>,
   browserOpen: vi.fn(),
+  appleOfferCodeOpen: vi.fn(),
   appleSubscription: {
     handlePurchase: vi.fn(),
     handleRestore: vi.fn(),
@@ -114,12 +115,19 @@ vi.mock("@/services/accountDeletion", () => ({
 
 vi.mock("@/utils/logger", () => ({
   logger: {
+    warn: vi.fn(),
     error: vi.fn(),
   },
 }));
 
 vi.mock("@/utils/paywallTelemetry", () => ({
   trackPaywallEvent: vi.fn(),
+}));
+
+vi.mock("@/plugins/AppleOfferCodeRedemptionPlugin", () => ({
+  AppleOfferCodeRedemption: {
+    openRedemptionUrl: (...args: unknown[]) => mocks.appleOfferCodeOpen(...args),
+  },
 }));
 
 import { Paywall } from "./Paywall";
@@ -152,6 +160,7 @@ describe("Paywall creator offer-code eligibility", () => {
     mocks.appStateListeners = [];
     mocks.browserFinishedListeners = [];
     mocks.browserOpen.mockResolvedValue(undefined);
+    mocks.appleOfferCodeOpen.mockResolvedValue({ opened: true });
     mocks.applyReferralCodeMutateAsync.mockResolvedValue({
       success: true,
       message: "Creator code applied",
@@ -342,6 +351,7 @@ describe("Paywall creator offer-code eligibility", () => {
         variant: "destructive",
       });
     });
+    expect(mocks.appleOfferCodeOpen).not.toHaveBeenCalled();
     expect(mocks.browserOpen).not.toHaveBeenCalled();
   });
 
@@ -360,14 +370,91 @@ describe("Paywall creator offer-code eligibility", () => {
     fireEvent.click(screen.getByRole("button", { name: "Apply Code" }));
 
     await waitFor(() => {
-      expect(mocks.browserOpen).toHaveBeenCalledWith({
+      expect(mocks.appleOfferCodeOpen).toHaveBeenCalledWith({
         url: "https://apps.apple.com/redeem?ctx=offercodes&id=6755738842&code=73WJL3EPLWX7WA36E6",
       });
     });
+    expect(mocks.browserOpen).not.toHaveBeenCalled();
     expect(mocks.toast).toHaveBeenCalledWith({
       title: "Redeeming with Apple...",
       description: "Opening Apple's offer-code redemption flow.",
     });
+    expect(screen.getByRole("link", { name: "Open Apple redemption link" })).toHaveAttribute(
+      "href",
+      "https://apps.apple.com/redeem?ctx=offercodes&id=6755738842&code=73WJL3EPLWX7WA36E6",
+    );
+  });
+
+  it("falls back to the browser opener if the native Apple handoff fails", async () => {
+    mocks.applyReferralCodeMutateAsync.mockRejectedValueOnce(new Error("Invalid referral code"));
+    mocks.appleOfferCodeOpen.mockRejectedValueOnce(new Error("Native opener unavailable"));
+
+    render(
+      <MemoryRouter>
+        <Paywall />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("ENTER CODE"), {
+      target: { value: "73wjl3eplwx7wa36e6" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Apply Code" }));
+
+    await waitFor(() => {
+      expect(mocks.browserOpen).toHaveBeenCalledWith({
+        url: "https://apps.apple.com/redeem?ctx=offercodes&id=6755738842&code=73WJL3EPLWX7WA36E6",
+      });
+    });
+    expect(screen.getByRole("link", { name: "Open Apple redemption link" })).toHaveAttribute(
+      "href",
+      "https://apps.apple.com/redeem?ctx=offercodes&id=6755738842&code=73WJL3EPLWX7WA36E6",
+    );
+  });
+
+  it("shows a visible fallback when the Apple redemption handoff hangs", async () => {
+    vi.useFakeTimers();
+    mocks.applyReferralCodeMutateAsync.mockRejectedValueOnce(new Error("Invalid referral code"));
+    mocks.appleOfferCodeOpen.mockReturnValueOnce(new Promise(() => undefined));
+
+    try {
+      render(
+        <MemoryRouter>
+          <Paywall />
+        </MemoryRouter>,
+      );
+
+      fireEvent.change(screen.getByPlaceholderText("ENTER CODE"), {
+        target: { value: "73wjl3eplwx7wa36e6" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Apply Code" }));
+
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(mocks.appleOfferCodeOpen).toHaveBeenCalledWith({
+        url: "https://apps.apple.com/redeem?ctx=offercodes&id=6755738842&code=73WJL3EPLWX7WA36E6",
+      });
+
+      await act(async () => {
+        vi.advanceTimersByTime(6000);
+        await Promise.resolve();
+      });
+
+      expect(mocks.toast).toHaveBeenCalledWith({
+        title: "Apple redemption did not open",
+        description: "Use the Apple redemption link below, then return and tap Restore Purchases if access does not unlock.",
+        variant: "destructive",
+      });
+      expect(screen.getByRole("button", { name: "Apply Code" })).toBeEnabled();
+      expect(screen.getByRole("link", { name: "Open Apple redemption link" })).toHaveAttribute(
+        "href",
+        "https://apps.apple.com/redeem?ctx=offercodes&id=6755738842&code=73WJL3EPLWX7WA36E6",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("opens Apple redemption for all-letter Apple one-time offer codes", async () => {
@@ -389,7 +476,7 @@ describe("Paywall creator offer-code eligibility", () => {
         code: "ABCDEFGHIJKLMNOPQR",
         suppressToast: true,
       });
-      expect(mocks.browserOpen).toHaveBeenCalledWith({
+      expect(mocks.appleOfferCodeOpen).toHaveBeenCalledWith({
         url: "https://apps.apple.com/redeem?ctx=offercodes&id=6755738842&code=ABCDEFGHIJKLMNOPQR",
       });
     });
@@ -416,7 +503,7 @@ describe("Paywall creator offer-code eligibility", () => {
         code: "73WJL3EPLWX7WA36E6",
         suppressToast: true,
       });
-      expect(mocks.browserOpen).toHaveBeenCalledWith({
+      expect(mocks.appleOfferCodeOpen).toHaveBeenCalledWith({
         url: "https://apps.apple.com/redeem?ctx=offercodes&id=6755738842&code=73WJL3EPLWX7WA36E6",
       });
     });
@@ -441,7 +528,7 @@ describe("Paywall creator offer-code eligibility", () => {
     fireEvent.click(screen.getByRole("button", { name: "Apply Code" }));
 
     await waitFor(() => {
-      expect(mocks.browserOpen).toHaveBeenCalledWith({
+      expect(mocks.appleOfferCodeOpen).toHaveBeenCalledWith({
         url: "https://apps.apple.com/redeem?ctx=offercodes&id=6755738842&code=73WJL3EPLWX7WA36E6",
       });
     });
@@ -481,7 +568,7 @@ describe("Paywall creator offer-code eligibility", () => {
     }
 
     await waitFor(() => {
-      expect(mocks.browserOpen).toHaveBeenCalledWith({
+      expect(mocks.appleOfferCodeOpen).toHaveBeenCalledWith({
         url: "https://apps.apple.com/redeem?ctx=offercodes&id=6755738842&code=73WJL3EPLWX7WA36E6",
       });
     });
@@ -514,6 +601,7 @@ describe("Paywall creator offer-code eligibility", () => {
         variant: "destructive",
       });
     });
+    expect(mocks.appleOfferCodeOpen).not.toHaveBeenCalled();
     expect(mocks.browserOpen).not.toHaveBeenCalled();
   });
 
@@ -533,7 +621,7 @@ describe("Paywall creator offer-code eligibility", () => {
     fireEvent.click(screen.getByRole("button", { name: "Apply Code" }));
 
     await waitFor(() => {
-      expect(mocks.browserOpen).toHaveBeenCalled();
+      expect(mocks.appleOfferCodeOpen).toHaveBeenCalled();
     });
 
     await act(async () => {
@@ -569,7 +657,7 @@ describe("Paywall creator offer-code eligibility", () => {
     fireEvent.click(screen.getByRole("button", { name: "Apply Code" }));
 
     await waitFor(() => {
-      expect(mocks.browserOpen).toHaveBeenCalled();
+      expect(mocks.appleOfferCodeOpen).toHaveBeenCalled();
     });
 
     await act(async () => {

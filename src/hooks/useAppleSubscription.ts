@@ -547,12 +547,22 @@ export function useAppleSubscription() {
       accessState.subscribed &&
       accessState.access_source === "subscription"
     ) {
+      toast({
+        title: "Subscription already active",
+        description: "Cosmiq is already unlocked for this account.",
+      });
       return true;
     }
 
     if (currentEntitlement?.isSandbox) {
       const recovered = await recoverExistingSubscription(surface, { showSuccessToast: false });
-      if (recovered === "verified") return true;
+      if (recovered === "verified") {
+        toast({
+          title: "Existing TestFlight subscription restored",
+          description: "Cosmiq was unlocked from an existing sandbox/App Store entitlement, so no new trial purchase was needed.",
+        });
+        return true;
+      }
     }
 
     if (!isIAPAvailable()) {

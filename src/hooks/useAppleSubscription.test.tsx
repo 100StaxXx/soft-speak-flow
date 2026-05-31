@@ -240,6 +240,10 @@ describe("useAppleSubscription", () => {
     expect(mocks.purchase).not.toHaveBeenCalled();
     expect(mocks.recoverPurchases).not.toHaveBeenCalled();
     expect(mocks.functionsInvoke).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith({
+      title: "Subscription already active",
+      description: "Cosmiq is already unlocked for this account.",
+    });
   });
 
   it("does not skip purchase for active promo access", async () => {
@@ -286,6 +290,10 @@ describe("useAppleSubscription", () => {
     expect(success).toBe(true);
     expect(mocks.purchase).not.toHaveBeenCalled();
     expect(mocks.recoverPurchases).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith({
+      title: "Existing TestFlight subscription restored",
+      description: "Cosmiq was unlocked from an existing sandbox/App Store entitlement, so no new trial purchase was needed.",
+    });
     expect(mocks.setQueryData).toHaveBeenCalledWith(
       ["access-state", "11111111-1111-4111-8111-111111111111"],
       expect.objectContaining({

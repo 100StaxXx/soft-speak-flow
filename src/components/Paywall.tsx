@@ -46,6 +46,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import { StaticBackgroundImage } from "@/components/StaticBackgroundImage";
+import { AppleOfferCodeRedemption } from "@/plugins/AppleOfferCodeRedemptionPlugin";
 import type { StaticBackgroundAsset } from "@/assets/backgrounds";
 import { trackPaywallEvent } from "@/utils/paywallTelemetry";
 import {
@@ -97,6 +98,8 @@ interface PaywallLandscapeSectionProps {
 const PAYWALL_CHECKOUT_ID = "cosmiq-pro-plans";
 const APPLE_OFFER_CODE_LOCAL_LOOKUP_TIMEOUT_MS = 4500;
 const APPLE_OFFER_CODE_LOOKUP_TIMEOUT_MESSAGE = "Cosmiq code lookup timed out";
+const APPLE_OFFER_CODE_REDEMPTION_HANDOFF_TIMEOUT_MS = 6000;
+const APPLE_OFFER_CODE_REDEMPTION_HANDOFF_TIMEOUT_MESSAGE = "Apple redemption handoff timed out";
 
 const createPaywallBackdrop = (src: string, src2x = src): StaticBackgroundAsset => ({
   src,
@@ -192,6 +195,23 @@ function withAppleOfferCodeLookupTimeout<T>(promise: Promise<T>, enabled: boolea
   });
 }
 
+async function withAppleRedemptionHandoffTimeout<T>(promise: Promise<T>): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error(APPLE_OFFER_CODE_REDEMPTION_HANDOFF_TIMEOUT_MESSAGE));
+        }, APPLE_OFFER_CODE_REDEMPTION_HANDOFF_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
 const PaywallLandscapeSection = ({
   id,
   background,
@@ -228,6 +248,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
   const [selectedPlan, setSelectedPlan] = useState<PlanType>("yearly");
   const [offerCode, setOfferCode] = useState("");
   const [isRedeemingAppleCode, setIsRedeemingAppleCode] = useState(false);
+  const [appleRedemptionFallbackUrl, setAppleRedemptionFallbackUrl] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
@@ -333,6 +354,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
       await invalidateAppleRedemptionState();
 
       if (result === "verified") {
+        setAppleRedemptionFallbackUrl(null);
         toast({
           title: "Cosmiq unlocked",
           description: "Your Apple offer code is active on this account.",
@@ -414,6 +436,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
     const redeemUrl = buildAppleOfferCodeRedeemUrl(code);
     pendingAppleRedemptionRecoveryRef.current = true;
     setIsRedeemingAppleCode(true);
+    setAppleRedemptionFallbackUrl(redeemUrl);
     trackPaywallEvent("offer_code_redemption_started", {
       surface: "paywall",
       offerCode: normalizePaywallOfferCodeInput(code),
@@ -427,7 +450,15 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
 
     try {
       if (Capacitor.isNativePlatform()) {
-        await Browser.open({ url: redeemUrl });
+        await withAppleRedemptionHandoffTimeout(
+          AppleOfferCodeRedemption.openRedemptionUrl({ url: redeemUrl }).catch(async (error) => {
+            logger.warn("[Paywall] Native Apple redemption handoff failed; trying browser fallback", {
+              message: error instanceof Error ? error.message : String(error),
+            });
+            await Browser.open({ url: redeemUrl });
+          }),
+        );
+        setIsRedeemingAppleCode(false);
         return;
       }
 
@@ -435,9 +466,16 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
     } catch (error) {
       pendingAppleRedemptionRecoveryRef.current = false;
       setIsRedeemingAppleCode(false);
+      setAppleRedemptionFallbackUrl(redeemUrl);
+      const handoffTimedOut = error instanceof Error
+        && error.message === APPLE_OFFER_CODE_REDEMPTION_HANDOFF_TIMEOUT_MESSAGE;
       toast({
-        title: "Unable to open Apple redemption",
-        description: error instanceof Error ? error.message : "Try the App Store redemption link again.",
+        title: handoffTimedOut ? "Apple redemption did not open" : "Unable to open Apple redemption",
+        description: handoffTimedOut
+          ? "Use the Apple redemption link below, then return and tap Restore Purchases if access does not unlock."
+          : error instanceof Error
+            ? error.message
+            : "Use the Apple redemption link below, then return and tap Restore Purchases.",
         variant: "destructive",
       });
     }
@@ -455,6 +493,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
     event.preventDefault();
 
     const sanitized = normalizePaywallOfferCodeInput(offerCode);
+    setAppleRedemptionFallbackUrl(null);
     if (!sanitized) {
       toast({
         title: "Enter a code",
@@ -497,6 +536,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
         queryClient.invalidateQueries({ queryKey: ["referral-stats", user.id] }),
       ]);
       setOfferCode("");
+      setAppleRedemptionFallbackUrl(null);
       if (result.code_type === "special") {
         toast({
           title: "Genesis code applied",
@@ -945,7 +985,10 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                       <Input
                         placeholder="ENTER CODE"
                         value={offerCode}
-                        onChange={(event) => setOfferCode(event.target.value.toUpperCase())}
+                        onChange={(event) => {
+                          setOfferCode(event.target.value.toUpperCase());
+                          setAppleRedemptionFallbackUrl(null);
+                        }}
                         maxLength={256}
                         className="h-12 border-white/15 bg-black/40 text-center text-base uppercase tracking-[0.2em] text-white placeholder:text-white/36"
                       />
@@ -963,6 +1006,21 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                       <p className="text-center text-xs text-white/54">
                         Entering a valid creator or Apple offer code unlocks discounted annual pricing.
                       </p>
+                      {appleRedemptionFallbackUrl ? (
+                        <div className="border border-cyan-100/24 bg-cyan-100/10 p-3 text-center">
+                          <p className="text-xs leading-5 text-white/68">
+                            If Apple redemption did not appear, open the link below, redeem the code, then return and tap Restore Purchases.
+                          </p>
+                          <a
+                            href={appleRedemptionFallbackUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-2 inline-flex text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100 underline underline-offset-4"
+                          >
+                            Open Apple redemption link
+                          </a>
+                        </div>
+                      ) : null}
                     </form>
                   )}
                 </div>

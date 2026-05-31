@@ -17,6 +17,8 @@
 		A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
 		AB1000001000000000000001 /* Plugins/AppBadge/AppBadgePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB2000001000000000000001 /* Plugins/AppBadge/AppBadgePlugin.swift */; };
 		AB1000001000000000000002 /* Plugins/AppBadge/AppBadgePlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = AB2000001000000000000002 /* Plugins/AppBadge/AppBadgePlugin.m */; };
+		AC1000001000000000000001 /* Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2000001000000000000001 /* Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.swift */; };
+		AC1000001000000000000002 /* Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = AC2000001000000000000002 /* Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.m */; };
 		CW1000001000000000000001 /* CosmiqWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = CW2000001000000000000001 /* CosmiqWidget.swift */; };
 		CW1000001000000000000002 /* WidgetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = CW2000001000000000000002 /* WidgetData.swift */; };
 		CW1000001000000000000003 /* WidgetViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CW2000001000000000000003 /* WidgetViews.swift */; };
@@ -73,6 +75,8 @@
 		9DA2C7842ED96C570052831B /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		AB2000001000000000000001 /* Plugins/AppBadge/AppBadgePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/AppBadge/AppBadgePlugin.swift; sourceTree = "<group>"; };
 		AB2000001000000000000002 /* Plugins/AppBadge/AppBadgePlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/AppBadge/AppBadgePlugin.m; sourceTree = "<group>"; };
+		AC2000001000000000000001 /* Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.swift; sourceTree = "<group>"; };
+		AC2000001000000000000002 /* Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.m; sourceTree = "<group>"; };
 		AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_App.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
 		CW2000001000000000000001 /* CosmiqWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmiqWidget.swift; sourceTree = "<group>"; };
@@ -157,10 +161,12 @@
 				NP2000001000000000000002 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.m */,
 				EV2000001000000000000001 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.swift */,
 				EV2000001000000000000002 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.m */,
-				AB2000001000000000000001 /* Plugins/AppBadge/AppBadgePlugin.swift */,
-				AB2000001000000000000002 /* Plugins/AppBadge/AppBadgePlugin.m */,
-				WD2000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift */,
-				WD2000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m */,
+					AB2000001000000000000001 /* Plugins/AppBadge/AppBadgePlugin.swift */,
+					AB2000001000000000000002 /* Plugins/AppBadge/AppBadgePlugin.m */,
+					AC2000001000000000000001 /* Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.swift */,
+					AC2000001000000000000002 /* Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.m */,
+					WD2000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift */,
+					WD2000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -443,12 +449,14 @@
 				NP1000001000000000000001 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.swift in Sources */,
 				NP1000001000000000000002 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.m in Sources */,
 				EV1000001000000000000001 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.swift in Sources */,
-				EV1000001000000000000002 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.m in Sources */,
-				AB1000001000000000000001 /* Plugins/AppBadge/AppBadgePlugin.swift in Sources */,
-				AB1000001000000000000002 /* Plugins/AppBadge/AppBadgePlugin.m in Sources */,
-				WD1000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift in Sources */,
-				WD1000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m in Sources */,
-			);
+					EV1000001000000000000002 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.m in Sources */,
+					AB1000001000000000000001 /* Plugins/AppBadge/AppBadgePlugin.swift in Sources */,
+					AB1000001000000000000002 /* Plugins/AppBadge/AppBadgePlugin.m in Sources */,
+					AC1000001000000000000001 /* Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.swift in Sources */,
+					AC1000001000000000000002 /* Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.m in Sources */,
+					WD1000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift in Sources */,
+					WD1000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m in Sources */,
+				);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		CWB000001000000000000001 /* Sources */ = {
