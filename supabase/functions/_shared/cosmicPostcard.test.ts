@@ -55,4 +55,5 @@ Deno.test("postcard prompt locks identity and prohibits printed artifacts", () =
   assertMatch(prompt, /full body at roughly 35–45%/i);
   assertMatch(prompt, /Text, letters, captions, logos, watermarks/i);
   assertMatch(prompt, /never a redesign or evolution/i);
+  assertMatch(prompt, /same production art bible/i);
 });

@@ -187,6 +187,10 @@ IDENTITY LOCK — preserve exactly
     describe(companion.favoriteColor, "match the reference exactly")
   }.
 
+SERIES CONTINUITY
+- Match the same soft-cinematic 2D/2.5D fantasy game art direction, material detail, restrained particle density, and luminous rim-light language used across every Cosmiq companion scene.
+- This should read as another frame from the same world and the same production art bible, never a new franchise or artist interpretation.
+
 COMPOSITION
 - Cinematic 4:3 landscape with a readable foreground, midground, and background.
 - Show the companion's full body at roughly 35–45% of the frame, near the center or lower third, with generous safe margins and no cropping.

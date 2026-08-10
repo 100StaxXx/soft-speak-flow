@@ -9,6 +9,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { PageTransition } from "@/components/PageTransition";
 import { CinematicPageBackground } from "@/components/CinematicPageBackground";
 import { TodaysAgenda } from "@/components/TodaysAgenda";
+import { DailyMissionThreadCard } from "@/components/DailyMissionThreadCard";
 import { DesktopWeekPlanner } from "@/components/DesktopWeekPlanner";
 import { cn } from "@/lib/utils";
 
@@ -250,6 +251,7 @@ const Journeys = () => {
   const [plannerLaunchIntent, setPlannerLaunchIntent] = useState<CompanionPlannerLaunchIntent | null>(null);
   const [showMonthView, setShowMonthView] = useState(false);
   const [desktopPlannerMode, setDesktopPlannerMode] = useState<DesktopPlannerMode>("week");
+  const [primaryMissionTaskId, setPrimaryMissionTaskId] = useState<string | null>(null);
 
   const [prefilledTime, setPrefilledTime] = useState<string | null>(null);
   const [questSheetPrefillDraft, setQuestSheetPrefillDraft] = useState<QuestComposerPrefillDraft | null>(null);
@@ -2007,6 +2009,26 @@ const Journeys = () => {
             </motion.div>
           ) : null}
 
+          {isSelectedDateToday ? (
+            <DailyMissionThreadCard
+              missionDate={effectiveTodayDateKey}
+              tasks={dailyTasks}
+              externalEvents={selectedDateExternalCalendarEvents}
+              connectedCalendarCount={connectedExternalCalendarCount}
+              onAddQuest={(prefill) => openAddQuestSheet(prefill ? {
+                date: selectedDate,
+                prefillDraft: {
+                  text: prefill.title,
+                  taskDate: effectiveTodayDateKey,
+                  estimatedDuration: prefill.durationMinutes,
+                  creationSource: "manual",
+                },
+                prefillKey: `daily-mission-${effectiveTodayDateKey}`,
+              } : undefined)}
+              onPrimaryTaskIdChange={setPrimaryMissionTaskId}
+            />
+          ) : null}
+
           {/* Main Content Area */}
           <motion.div
             initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
@@ -2049,6 +2071,7 @@ const Journeys = () => {
             ) : (
               <TodaysAgenda
                 tasks={dailyTasks}
+                primaryMissionTaskId={primaryMissionTaskId}
                 externalEvents={selectedDateExternalCalendarEvents}
                 connectedCalendarCount={connectedExternalCalendarCount}
                 isExternalCalendarSyncing={isExternalCalendarSyncing}

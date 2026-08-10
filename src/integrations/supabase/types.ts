@@ -2745,6 +2745,83 @@ export type Database = {
           },
         ]
       }
+      daily_mission_threads: {
+        Row: {
+          calendar_evidence: Json
+          calendar_summary: string | null
+          companion_ack: string
+          completed_at: string | null
+          created_at: string
+          id: string
+          intention_key: string
+          intention_label: string
+          mission_date: string
+          optional_task_ids: string[]
+          optional_task_titles: string[]
+          primary_task_duration_minutes: number | null
+          primary_task_id: string | null
+          primary_task_title: string
+          reflected_at: string | null
+          reflection_key: string | null
+          reflection_label: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          calendar_evidence?: Json
+          calendar_summary?: string | null
+          companion_ack: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          intention_key: string
+          intention_label: string
+          mission_date: string
+          optional_task_ids?: string[]
+          optional_task_titles?: string[]
+          primary_task_duration_minutes?: number | null
+          primary_task_id?: string | null
+          primary_task_title: string
+          reflected_at?: string | null
+          reflection_key?: string | null
+          reflection_label?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          calendar_evidence?: Json
+          calendar_summary?: string | null
+          companion_ack?: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          intention_key?: string
+          intention_label?: string
+          mission_date?: string
+          optional_task_ids?: string[]
+          optional_task_titles?: string[]
+          primary_task_duration_minutes?: number | null
+          primary_task_id?: string | null
+          primary_task_title?: string
+          reflected_at?: string | null
+          reflection_key?: string | null
+          reflection_label?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_mission_threads_primary_task_id_fkey"
+            columns: ["primary_task_id"]
+            isOneToOne: false
+            referencedRelation: "daily_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_missions: {
         Row: {
           auto_complete: boolean | null

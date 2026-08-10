@@ -13,6 +13,7 @@ import {
   resolveCompanionSpiritLockProfile,
 } from "../_shared/companionSpiritLock.ts";
 import { resolveCompanionStoryTier } from "../_shared/companionStoryProgression.ts";
+import { buildMissionEvidenceContext } from "../_shared/missionEvidence.ts";
 
 // Helper function to convert hex colors to descriptive names
 function getColorName(color: string): string {
@@ -302,7 +303,7 @@ serve(async (req) => {
       : {};
     const { data: recentEpic } = await supabaseClient
       .from('epics')
-      .select('title, description, status, progress_percentage')
+      .select('id, title, description, status, progress_percentage')
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false })
       .limit(1)
@@ -348,6 +349,39 @@ serve(async (req) => {
         ))
         .join('\n')
       : 'No user-chosen canon has been recorded yet.';
+
+    let completedTasksQuery = supabaseClient
+      .from('daily_tasks')
+      .select('task_text, completed_at, task_date, difficulty, actual_time_spent')
+      .eq('user_id', user.id)
+      .eq('completed', true)
+      .not('completed_at', 'is', null)
+      .order('completed_at', { ascending: false })
+      .limit(12);
+    if (recentEpic?.id) completedTasksQuery = completedTasksQuery.eq('epic_id', recentEpic.id);
+
+    const [completedTasksResult, missionThreadsResult] = await Promise.all([
+      completedTasksQuery,
+      supabaseClient
+        .from('daily_mission_threads')
+        .select('mission_date, intention_label, primary_task_title, status, completed_at, reflection_label')
+        .eq('user_id', user.id)
+        .in('status', ['completed', 'reflected'])
+        .order('mission_date', { ascending: false })
+        .limit(7),
+    ]);
+
+    if (completedTasksResult.error) {
+      console.warn('[Companion Story] Could not load completed quest evidence:', completedTasksResult.error);
+    }
+    if (missionThreadsResult.error) {
+      console.warn('[Companion Story] Could not load mission thread evidence:', missionThreadsResult.error);
+    }
+
+    const verifiedMissionEvidence = buildMissionEvidenceContext({
+      completedTasks: completedTasksResult.data,
+      missionThreads: missionThreadsResult.data,
+    });
 
     // Get previous chapters for continuity with smart truncation
     let memoryNotes = "This is the beginning of your journey.";
@@ -435,6 +469,7 @@ USER VARIABLES:
 - Tone: ${tonePreference}
 - Memory Notes: ${memoryNotes}
 - User-Chosen Canon: ${canonMemoryNotes}
+- Verified Real-World Progress: ${verifiedMissionEvidence}
 
 STRUCTURE FOR EACH CHAPTER:
 
@@ -452,7 +487,7 @@ STRUCTURE FOR EACH CHAPTER:
    • keep the creature anatomically consistent with ${speciesTraits}
    • incorporate ${getColorName(companion.favorite_color)}, ${getColorName(companion.fur_color)}, and ${getColorName(companion.eye_color)} subtly and beautifully
    • display elemental effects appropriate to ${companion.core_element}
-   • include at least one "Goal Mirror Moment" tied to "${userGoal}"
+   • include one "Goal Mirror Moment" tied to "${userGoal}" and, when available, one action from Verified Real-World Progress
    ${stage > 0 ? `• reference at least one detail from: ${memoryNotes}` : ''}
    ${canonMemories?.length ? `• honor at least one user-chosen canon thread from: ${canonMemoryNotes}` : ''}
    • keep the stakes appropriate to this tier: ${storyTier.stakes}
@@ -477,6 +512,9 @@ STRUCTURE FOR EACH CHAPTER:
 
 WRITING RULES:
 • Never contradict previous lore or biology
+• The user is the protagonist; the companion is an observant scout and witness, not a mentor, therapist, narrator, or separate Guide
+• Mention only real-world actions listed under Verified Real-World Progress; never invent a completion, streak, emotion, hardship, or outcome
+• When no verified progress event is available, use symbolic imagery without claiming the user completed anything specific
 • Treat user-chosen canon as an established preference or memory; develop it naturally without quoting it mechanically
 • Never force evolution changes inappropriate for the species
 • Element is decoration, mood, and power — not transformation

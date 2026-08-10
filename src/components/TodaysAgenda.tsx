@@ -28,6 +28,7 @@ import {
   CalendarPlus,
   CalendarDays,
   CalendarArrowUp,
+  Compass,
   Trash2,
   ChevronLeft,
   ChevronRight,
@@ -226,6 +227,7 @@ const patchSubtaskCompletionInTaskList = <T extends { id: string; subtasks?: Tas
 
 interface TodaysAgendaProps {
   tasks: Task[];
+  primaryMissionTaskId?: string | null;
   externalEvents?: ExternalCalendarEvent[];
   connectedCalendarCount?: number;
   isExternalCalendarSyncing?: boolean;
@@ -534,6 +536,7 @@ const getLaneOffsetPx = (laneIndex: number, overlapCount: number) => {
 
 export const TodaysAgenda = memo(function TodaysAgenda({
   tasks,
+  primaryMissionTaskId = null,
   externalEvents = [],
   connectedCalendarCount = 0,
   isExternalCalendarSyncing = false,
@@ -2214,6 +2217,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     timelineContext?: TimelineTaskRenderContext,
   ) => {
     const isComplete = !!task.completed || optimisticCompleted.has(task.id);
+    const isPrimaryMission = primaryMissionTaskId === task.id;
     const isRitual = !!task.habit_source_id;
     const isCampaignRitual = isCampaignRitualTask(task);
     const campaignTitle = task.epic_title?.trim() || "Campaign";
@@ -2329,6 +2333,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             ),
             isDesktopDetailOpen && JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME,
             isDesktopDetailOpen && !readableQuestCardsEnabled && "border-primary/40 bg-primary/[0.08]",
+            isPrimaryMission && "border-cyan-200/45 bg-cyan-300/[0.08] shadow-[0_0_0_1px_rgba(165,243,252,0.08)]",
             isComplete && "opacity-70",
           )}
           onContextMenu={suppressNativeContextMenu}
@@ -2383,6 +2388,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               >
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
+                    {isPrimaryMission ? (
+                      <Compass className="h-3.5 w-3.5 flex-shrink-0 text-cyan-200" aria-label="Today’s primary mission" />
+                    ) : null}
                     {isRitual ? (
                       <Repeat
                         className={cn(
@@ -2439,6 +2447,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             ),
             isMobileQuestShellActive && JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME,
             isMobileQuestShellActive && !readableQuestCardsEnabled && "border-primary/35 bg-primary/[0.06]",
+            isPrimaryMission && "border-cyan-200/45 bg-cyan-300/[0.08] shadow-[0_0_0_1px_rgba(165,243,252,0.08)]",
             isComplete && "opacity-70",
           )}
         >
@@ -2669,6 +2678,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     Main
                   </Badge>
                 )}
+                {isPrimaryMission && (
+                  <Badge variant="outline" className="h-5 border-cyan-200/35 bg-cyan-300/10 px-1.5 py-0.5 text-xs text-cyan-100">
+                    Mission
+                  </Badge>
+                )}
                 <span className="text-sm font-bold text-stardust-gold/80">+{effectiveTaskXP}</span>
 
                 {/* Chevron for expandable details - scheduled rows open a drawer to avoid changing timeline height */}
@@ -2716,6 +2730,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     return taskContent;
   }, [
     onToggle,
+    primaryMissionTaskId,
     onUndoToggle,
     onEditQuest,
     onSendToCalendar,
