@@ -1,0 +1,57 @@
+name: Frontend Release Gate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "codex/**"
+  workflow_dispatch:
+
+env:
+  VITE_SUPABASE_URL: https://ci-build.supabase.co
+  VITE_SUPABASE_PUBLISHABLE_KEY: ci-public-key
+  VITE_GOOGLE_WEB_CLIENT_ID: ci-web-client-id
+  VITE_GOOGLE_IOS_CLIENT_ID: ci-ios-client-id
+  VITE_GOOGLE_MAPS_API_KEY: ci-maps-key
+  VITE_NATIVE_REDIRECT_BASE: https://ci-build.example.org
+  VITE_REVENUECAT_IOS_API_KEY: ci-revenuecat-key
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: npm ci
+      - run: npm run product:verify
+      - run: npm run secrets:scan
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run deadcode:check
+      - run: npm run test:run
+      - run: npm run test:migrations:static
+      - run: npm run functions:typecheck
+      - run: npm run functions:test
+      - run: npm run build
+      - run: npm run maps:verify-autocomplete -- dist
+      - run: npm run bundle:check
+
+  ios-assets:
+    runs-on: macos-15
+    needs: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - run: npm run ios:sync:testflight
+      - run: npm run ios:verify-widget-signing

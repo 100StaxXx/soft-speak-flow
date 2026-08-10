@@ -136,6 +136,10 @@ const flushMicrotasks = async () => {
   });
 };
 
+const acceptSignupConsent = () => {
+  fireEvent.click(screen.getByRole("checkbox", { name: /i agree to cosmiq/i }));
+};
+
 describe("Auth social auth intent guard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -217,6 +221,7 @@ describe("Auth social auth intent guard", () => {
     await flushMicrotasks();
 
     expect(screen.getByLabelText(/^confirm password$/i)).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: /i agree to cosmiq/i })).not.toBeChecked();
     expect(screen.getByRole("button", { name: /^get started$/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /already have an account\? sign in/i })).toBeInTheDocument();
   });
@@ -318,6 +323,7 @@ describe("Auth social auth intent guard", () => {
     await flushMicrotasks();
 
     fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    acceptSignupConsent();
     fireEvent.click(screen.getByRole("button", { name: /sign up with apple/i }));
 
     await waitFor(() => {

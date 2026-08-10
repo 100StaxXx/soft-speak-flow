@@ -2031,6 +2031,167 @@ export type Database = {
           },
         ]
       }
+      companion_narrative_choices: {
+        Row: {
+          chapter_number: number | null
+          companion_id: string
+          companion_reply: string | null
+          consequence_tags: string[]
+          created_at: string
+          epic_id: string | null
+          id: string
+          option_key: string
+          option_label: string
+          prompt_key: string
+          prompt_text: string
+          response_note: string | null
+          side_quest_status: string
+          side_quest_task_id: string | null
+          side_quest_title: string | null
+          source_id: string
+          source_type: string
+          stage: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chapter_number?: number | null
+          companion_id: string
+          companion_reply?: string | null
+          consequence_tags?: string[]
+          created_at?: string
+          epic_id?: string | null
+          id?: string
+          option_key: string
+          option_label: string
+          prompt_key: string
+          prompt_text: string
+          response_note?: string | null
+          side_quest_status?: string
+          side_quest_task_id?: string | null
+          side_quest_title?: string | null
+          source_id: string
+          source_type: string
+          stage?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chapter_number?: number | null
+          companion_id?: string
+          companion_reply?: string | null
+          consequence_tags?: string[]
+          created_at?: string
+          epic_id?: string | null
+          id?: string
+          option_key?: string
+          option_label?: string
+          prompt_key?: string
+          prompt_text?: string
+          response_note?: string | null
+          side_quest_status?: string
+          side_quest_task_id?: string | null
+          side_quest_title?: string | null
+          source_id?: string
+          source_type?: string
+          stage?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companion_narrative_choices_companion_id_fkey"
+            columns: ["companion_id"]
+            isOneToOne: false
+            referencedRelation: "user_companion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "companion_narrative_choices_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "companion_narrative_choices_side_quest_task_id_fkey"
+            columns: ["side_quest_task_id"]
+            isOneToOne: false
+            referencedRelation: "daily_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      companion_narrative_memories: {
+        Row: {
+          companion_id: string
+          created_at: string
+          details: Json
+          epic_id: string | null
+          id: string
+          memory_key: string
+          memory_type: string
+          salience: number
+          source_choice_id: string | null
+          status: string
+          summary: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          companion_id: string
+          created_at?: string
+          details?: Json
+          epic_id?: string | null
+          id?: string
+          memory_key: string
+          memory_type: string
+          salience?: number
+          source_choice_id?: string | null
+          status?: string
+          summary: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          companion_id?: string
+          created_at?: string
+          details?: Json
+          epic_id?: string | null
+          id?: string
+          memory_key?: string
+          memory_type?: string
+          salience?: number
+          source_choice_id?: string | null
+          status?: string
+          summary?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companion_narrative_memories_companion_id_fkey"
+            columns: ["companion_id"]
+            isOneToOne: false
+            referencedRelation: "user_companion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "companion_narrative_memories_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "companion_narrative_memories_source_choice_id_fkey"
+            columns: ["source_choice_id"]
+            isOneToOne: false
+            referencedRelation: "companion_narrative_choices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companion_postcards: {
         Row: {
           caption: string | null
@@ -9129,6 +9290,53 @@ export type Database = {
       mark_companion_active: {
         Args: never
         Returns: string
+      }
+      accept_companion_narrative_side_quest: {
+        Args: { p_choice_id: string }
+        Returns: Database["public"]["Tables"]["daily_tasks"]["Row"]
+      }
+      record_companion_narrative_choice: {
+        Args: {
+          p_chapter_number?: number | null
+          p_companion_id: string
+          p_companion_reply?: string | null
+          p_consequence_tags?: string[]
+          p_epic_id?: string | null
+          p_memory_key: string
+          p_memory_summary: string
+          p_memory_type: string
+          p_option_key: string
+          p_option_label: string
+          p_prompt_key: string
+          p_prompt_text: string
+          p_response_note?: string | null
+          p_side_quest_title?: string | null
+          p_source_id: string
+          p_source_type: string
+          p_stage?: number | null
+        }
+        Returns: {
+          chapter_number: number | null
+          companion_id: string
+          companion_reply: string | null
+          consequence_tags: string[]
+          created_at: string
+          epic_id: string | null
+          id: string
+          option_key: string
+          option_label: string
+          prompt_key: string
+          prompt_text: string
+          response_note: string | null
+          side_quest_status: string
+          side_quest_task_id: string | null
+          side_quest_title: string | null
+          source_id: string
+          source_type: string
+          stage: number | null
+          updated_at: string
+          user_id: string
+        }
       }
       mark_companion_evolution_animation_presented: {
         Args: { p_evolution_id: string }

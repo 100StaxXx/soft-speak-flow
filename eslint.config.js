@@ -9,6 +9,7 @@ export default tseslint.config(
     ignores: [
       "dist",
       "build/**",
+      "output/**",
       "supabase/functions/**",
       "ios/App/App/public/**",
       "ios/App/build-xc/**",

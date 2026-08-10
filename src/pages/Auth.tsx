@@ -100,6 +100,9 @@ const signupSchema = z.object({
   email: emailSchema,
   password: newPasswordSchema,
   confirmPassword: z.string(),
+  consent: z.literal(true, {
+    errorMap: () => ({ message: "Please agree to the Terms and acknowledge the Privacy Policy." }),
+  }),
 }).refine((data) => {
   return data.password === data.confirmPassword;
 }, {
@@ -317,6 +320,7 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [signupConsent, setSignupConsent] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [showSignupConfirmPassword, setShowSignupConfirmPassword] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
@@ -756,7 +760,12 @@ const Auth = () => {
     const sanitizedEmail = email.trim().toLowerCase();
     const result = isLogin
       ? loginSchema.safeParse({ email: sanitizedEmail, password })
-      : signupSchema.safeParse({ email: sanitizedEmail, password, confirmPassword });
+      : signupSchema.safeParse({
+          email: sanitizedEmail,
+          password,
+          confirmPassword,
+          consent: signupConsent,
+        });
     if (!result.success) {
       const message = result.error.errors[0].message;
       setInlineError(message);
@@ -874,6 +883,10 @@ const Auth = () => {
 
     clearPendingPostAuthNavigationContext();
     setInlineError(null);
+    if (socialAuthIntent === "sign_up" && !signupConsent) {
+      setInlineError("Please agree to the Terms and acknowledge the Privacy Policy.");
+      return;
+    }
     setOauthLoading(provider);
     console.log(`[OAuth Debug] Starting ${provider} sign-in flow`);
     console.log(`[OAuth Debug] Platform: ${Capacitor.isNativePlatform() ? 'Native' : 'Web'}`);
@@ -1109,7 +1122,7 @@ const Auth = () => {
   const fieldInputClassName =
     "h-[3.35rem] rounded-[1.15rem] border border-[#2a1a49] bg-[#12091f] px-5 text-[0.98rem] font-medium text-white shadow-[0_0_0_1px_rgba(255,255,255,0.01),0_10px_28px_rgba(5,2,16,0.45),inset_0_1px_0_rgba(255,255,255,0.03)] placeholder:text-white/[0.34] focus-visible:border-[#4b2c7e] focus-visible:ring-[3px] focus-visible:ring-[#b86dff]/15 focus-visible:ring-offset-0";
   const passwordToggleButtonClassName =
-    "absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-white/[0.58] transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b86dff]/35";
+    "absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-white/[0.58] transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b86dff]/35";
   const passwordInputClassName = `${fieldInputClassName} pr-14`;
   const switchMode = () => {
     setInlineError(null);
@@ -1129,6 +1142,7 @@ const Auth = () => {
 
     setIsLogin(nextIsLogin);
     setConfirmPassword("");
+    setSignupConsent(false);
     setShowSignupPassword(false);
     setShowSignupConfirmPassword(false);
     navigate(
@@ -1293,12 +1307,24 @@ const Auth = () => {
                   {loading ? "Loading..." : isLogin ? "Sign In" : "Get Started"}
                 </Button>
                 {!isLogin && (
-                  <p className="px-1 text-center text-xs leading-5 text-white/[0.56]">
-                    By creating an account, you agree to Cosmiq&apos;s{" "}
-                    <a className="underline underline-offset-2 hover:text-white" href="/terms">Terms</a>
-                    {" "}and acknowledge the{" "}
-                    <a className="underline underline-offset-2 hover:text-white" href="/privacy">Privacy Policy</a>.
-                  </p>
+                  <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl px-1 py-1 text-xs leading-5 text-white/[0.66]">
+                    <input
+                      type="checkbox"
+                      checked={signupConsent}
+                      onChange={(event) => {
+                        setInlineError(null);
+                        setSignupConsent(event.target.checked);
+                      }}
+                      required
+                      className="mt-0.5 h-5 w-5 shrink-0 accent-[#c45ff3]"
+                    />
+                    <span>
+                      I agree to Cosmiq&apos;s{" "}
+                      <a className="underline underline-offset-2 hover:text-white" href="/terms">Terms</a>
+                      {" "}and acknowledge the{" "}
+                      <a className="underline underline-offset-2 hover:text-white" href="/privacy">Privacy Policy</a>.
+                    </span>
+                  </label>
                 )}
               </form>
             )}
@@ -1350,7 +1376,7 @@ const Auth = () => {
               <button
                 type="button"
                 onClick={switchMode}
-                className="text-[0.93rem] font-medium text-white/[0.72] underline underline-offset-[3px] transition-colors hover:text-white"
+                className="inline-flex min-h-11 items-center justify-center px-3 text-[0.93rem] font-medium text-white/[0.72] underline underline-offset-[3px] transition-colors hover:text-white"
               >
                 {isForgotPassword 
                   ? "Back to Sign In" 

@@ -13,14 +13,20 @@ import type {
   PlannerMemoryProfile,
   PlannerScheduleInsights,
 } from "@/types/companionPlanner";
+import type {
+  CompanionChatInputMode,
+  CompanionChatRole,
+  CompanionChatSurface,
+} from "@/types/companionChatPrimitives";
+
+export type {
+  CompanionChatInputMode,
+  CompanionChatRole,
+  CompanionChatSurface,
+} from "@/types/companionChatPrimitives";
 
 export type CompanionConversationMode = "talk" | "plan";
-export type CompanionChatSurface = "companion" | "journeys";
 export type CompanionChatSource = "chat" | "plan" | "agent";
-
-export type CompanionChatRole = "assistant" | "user";
-
-export type CompanionChatInputMode = "text" | "voice";
 
 export interface CompanionChatMessage {
   id: string;

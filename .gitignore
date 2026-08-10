@@ -25,6 +25,8 @@ dist-ssr
 *.env.save
 ios/App/build*/
 ios/App/App/Config/LocalSecrets.xcconfig
+/build/
+/output/
 
 # Editor directories and files
 .claude/worktrees/

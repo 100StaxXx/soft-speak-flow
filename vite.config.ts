@@ -375,8 +375,24 @@ function calendarOAuthCallbackBridgePlugin(env: Record<string, string>): Plugin 
 }
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
+
+  if (command === "build" && mode === "production" && process.env.KNIP !== "true") {
+    const requiredEnvironmentVariables = [
+      "VITE_SUPABASE_URL",
+      "VITE_SUPABASE_PUBLISHABLE_KEY",
+    ] as const;
+    const missingEnvironmentVariables = requiredEnvironmentVariables.filter(
+      (name) => !env[name]?.trim(),
+    );
+
+    if (missingEnvironmentVariables.length > 0) {
+      throw new Error(
+        `Production build aborted: missing ${missingEnvironmentVariables.join(", ")}.`,
+      );
+    }
+  }
 
   return {
     server: {
@@ -557,7 +573,7 @@ export default defineConfig(({ mode }) => {
           }
         },
       },
-      chunkSizeWarningLimit: 700,
+      chunkSizeWarningLimit: 500,
       sourcemap: false, // Disable source maps in production for smaller bundle
       reportCompressedSize: false, // Faster builds
     },
@@ -574,7 +590,7 @@ export default defineConfig(({ mode }) => {
     },
     esbuild: {
       logOverride: { 'this-is-undefined-in-esm': 'silent' },
-      drop: [],  // Temporarily keep console statements to debug iOS black screen
+      drop: mode === "production" ? ["console", "debugger"] : [],
     },
   };
 });

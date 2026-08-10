@@ -4,7 +4,7 @@ import type {
   CompanionChatInputMode,
   CompanionChatRole,
   CompanionChatSurface,
-} from "@/types/companionConversation";
+} from "@/types/companionChatPrimitives";
 import type { CompanionPlannerStarterIntent } from "@/types/companionPlanner";
 
 export type CompanionAgentMode =
@@ -59,11 +59,14 @@ export interface CompanionAgentFollowUp {
 }
 
 export type CompanionPendingActionType =
+  | "task_create"
   | "task_update"
   | "ritual_create"
   | "reminder_create"
+  | "campaign_create"
   | "campaign_update"
   | "campaign_adjust"
+  | "day_plan_apply"
   | "journal_entry";
 
 export interface CompanionAgentSelectedEntityIds {

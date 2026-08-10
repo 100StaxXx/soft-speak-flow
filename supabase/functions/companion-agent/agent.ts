@@ -570,13 +570,62 @@ const PrepareTaskUpdateSchema = z.object({
     .nullable(),
 });
 
+const CalendarProviderSchema = z.enum(["google", "outlook", "all"]);
+const QuestCategorySchema = z.enum(["mind", "body", "soul"]);
+
+const PrepareTaskCreateSchema = z.object({
+  title: z.string().min(1).max(200),
+  task_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  scheduled_time: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
+  estimated_duration: z.number().int().min(5).max(1440).default(30),
+  difficulty: z.enum(["easy", "medium", "hard"]).default("medium"),
+  energy_type: z.enum([
+    "deep",
+    "admin",
+    "physical",
+    "errand",
+    "social",
+    "creative",
+    "recovery",
+  ]).optional().nullable(),
+  notes: z.string().max(2000).optional().nullable(),
+  category: QuestCategorySchema.optional().nullable(),
+  reminder_enabled: z.boolean().default(false),
+  reminder_minutes_before: z.number().int().min(0).max(1440).optional()
+    .nullable(),
+  send_to_calendar: z.boolean().default(false),
+  calendar_provider: CalendarProviderSchema.optional().nullable(),
+}).superRefine((value, ctx) => {
+  if (value.task_date && !value.scheduled_time) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["scheduled_time"],
+      message: "A dated task needs a scheduled time",
+    });
+  }
+  if (value.scheduled_time && !value.task_date) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["task_date"],
+      message: "A scheduled time needs a task date",
+    });
+  }
+  if (value.send_to_calendar && (!value.task_date || !value.scheduled_time)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["send_to_calendar"],
+      message: "Calendar sync needs a date and time",
+    });
+  }
+});
+
 const PrepareRitualCreateSchema = z.object({
   title: z.string().min(1).max(200),
   frequency: z.string().min(1).max(50),
   preferred_time: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
   estimated_minutes: z.number().int().min(1).max(1440).optional().nullable(),
   description: z.string().max(2000).optional().nullable(),
-  category: z.string().max(80).optional().nullable(),
+  category: QuestCategorySchema.optional().nullable(),
   reminder_enabled: z.boolean().optional().nullable(),
   reminder_minutes_before: z.number().int().min(0).max(1440).optional()
     .nullable(),
@@ -597,6 +646,101 @@ export const PrepareCampaignUpdateSchema = z.object({
   end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
   status: CampaignLifecycleStatusSchema.optional().nullable(),
   target_days: z.number().int().min(1).max(365).optional().nullable(),
+});
+
+const CampaignRitualSchema = z.object({
+  title: z.string().min(1).max(200),
+  frequency: z.enum(["daily", "5x_week", "3x_week", "custom", "monthly"])
+    .default("daily"),
+  custom_days: z.array(z.number().int().min(0).max(6)).max(7).optional()
+    .nullable(),
+  preferred_time: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
+  estimated_minutes: z.number().int().min(1).max(1440).default(15),
+  description: z.string().max(2000).optional().nullable(),
+  category: QuestCategorySchema.optional().nullable(),
+  difficulty: z.enum(["easy", "medium", "hard"]).default("easy"),
+  reminder_enabled: z.boolean().default(false),
+  reminder_minutes_before: z.number().int().min(0).max(1440).optional()
+    .nullable(),
+});
+
+const PrepareCampaignCreateSchema = z.object({
+  title: z.string().min(1).max(200),
+  description: z.string().max(2000).optional().nullable(),
+  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  target_days: z.number().int().min(1).max(365).default(30),
+  rituals: z.array(CampaignRitualSchema).min(1).max(3),
+});
+
+const DayPlanBlockSchema = z.object({
+  task_id: z.string().uuid().optional().nullable(),
+  title: z.string().min(1).max(200),
+  start_time: z.string().regex(/^\d{2}:\d{2}$/),
+  duration_minutes: z.number().int().min(5).max(480),
+  energy_type: z.enum([
+    "deep",
+    "admin",
+    "physical",
+    "errand",
+    "social",
+    "creative",
+    "recovery",
+  ]).optional().nullable(),
+  source: z.enum(["campaign", "habit", "recovery", "optimization"])
+    .default("optimization"),
+  reasoning: z.string().max(1000).optional().nullable(),
+  epic_id: z.string().uuid().optional().nullable(),
+  habit_source_id: z.string().uuid().optional().nullable(),
+  difficulty: z.enum(["easy", "medium", "hard"]).default("medium"),
+  reminder_enabled: z.boolean().default(false),
+  reminder_minutes_before: z.number().int().min(0).max(1440).optional()
+    .nullable(),
+  category: QuestCategorySchema.optional().nullable(),
+  notes: z.string().max(2000).optional().nullable(),
+});
+
+const PrepareDayPlanSchema = z.object({
+  plan_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  blocks: z.array(DayPlanBlockSchema).min(1).max(8),
+  send_to_calendar: z.boolean().default(false),
+  calendar_provider: CalendarProviderSchema.optional().nullable(),
+}).superRefine((value, ctx) => {
+  const sortedBlocks = [...value.blocks].sort((left, right) =>
+    left.start_time.localeCompare(right.start_time)
+  );
+  const seenTaskIds = new Set<string>();
+  for (let index = 0; index < value.blocks.length; index += 1) {
+    const taskId = value.blocks[index].task_id;
+    if (!taskId) continue;
+    if (seenTaskIds.has(taskId)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["blocks", index, "task_id"],
+        message: "An existing task can appear only once in a day plan",
+      });
+    }
+    seenTaskIds.add(taskId);
+  }
+  for (let index = 1; index < sortedBlocks.length; index += 1) {
+    const previous = sortedBlocks[index - 1];
+    const current = sortedBlocks[index];
+    const [previousHour, previousMinute] = previous.start_time.split(":").map(
+      Number,
+    );
+    const [currentHour, currentMinute] = current.start_time.split(":").map(
+      Number,
+    );
+    const previousEnd = previousHour * 60 + previousMinute +
+      previous.duration_minutes;
+    const currentStart = currentHour * 60 + currentMinute;
+    if (currentStart < previousEnd) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["blocks", index, "start_time"],
+        message: "Day-plan blocks cannot overlap",
+      });
+    }
+  }
 });
 
 const PrepareJournalEntrySchema = z.object({
@@ -622,6 +766,7 @@ export interface UserCompanionRow {
 interface RunAgentParams {
   guardedFetch: GuardedFetch;
   supabase: any;
+  actorSupabase?: any;
   userId: string;
   request: CompanionAgentRequest;
   openAIApiKey?: string;
@@ -982,7 +1127,8 @@ export const isContextualPlanDayFastPathRequest = (
   return request.surface === "journeys" &&
     request.starterIntent === "plan_day" &&
     isLauncherTurn(request) &&
-    Boolean(request.briefingContext);
+    Boolean(request.briefingContext) &&
+    !isExplicitCompanionWriteRequest(request);
 };
 
 const looksLikePlannerActionMessage = (message: string): boolean => {
@@ -1096,10 +1242,10 @@ const buildLenientChatSubmitResult = (
     reply,
     mode,
     intent,
-	    confidence: clampConfidence(record.confidence),
-	    understanding_state: understandingState,
-	    follow_up: null,
-	    assumptions: [],
+    confidence: clampConfidence(record.confidence),
+    understanding_state: understandingState,
+    follow_up: null,
+    assumptions: [],
     evidence_ids: [],
     structured_response: null,
     prepared_action_id: null,
@@ -1123,6 +1269,14 @@ const parseSubmitCompanionResultArguments = (
 };
 
 const EXPLICIT_COMPANION_WRITE_STARTER_INTENTS = new Set<string>([
+  "plan_day",
+  "plan_week",
+  "advance_campaign_start",
+  "make_room",
+  "what_matters",
+  "low_energy_adjust",
+  "briefing_followup",
+  "goal_breakdown",
   "goal_breakdown_start",
 ]);
 
@@ -1149,6 +1303,20 @@ const SCHEDULE_WRITE_REQUEST_PATTERNS = [
   /^(?:please\s+|pls\s+)?schedule\b/,
   /\b(?:can|could|would|will)\s+(?:you|we)\s+schedule\b/,
   /\b(?:help me|i need(?: you)? to|i want(?: you)? to|let's|lets)\s+schedule\b/,
+];
+
+const PLANNING_WRITE_REQUEST_PATTERNS = [
+  /^(?:please\s+|pls\s+)?(?:plan|organize|map\s+out)\s+(?:out\s+)?(?:my\s+)?(?:day|today|tomorrow|week)\b/,
+  /\b(?:can|could|would|will)\s+you\s+(?:plan|organize|map\s+out)\s+(?:out\s+)?(?:my\s+)?(?:day|today|tomorrow|week)\b/,
+  /\b(?:help\s+me|i\s+need(?:\s+you)?\s+to|i\s+want(?:\s+you)?\s+to|let's|lets)\s+(?:plan|organize|map\s+out)\s+(?:out\s+)?(?:my\s+)?(?:day|today|tomorrow|week)\b/,
+  /\b(?:make|build)\s+(?:me\s+)?(?:a\s+)?plan\s+for\s+(?:my\s+)?(?:day|today|tomorrow|week)\b/,
+];
+
+const GOAL_WRITE_REQUEST_PATTERNS = [
+  /^(?:please\s+|pls\s+)?(?:set|start|build|create|make|lock\s+in)\s+(?:up\s+)?(?:a\s+)?(?:goal|campaign)\b/,
+  /\b(?:can|could|would|will)\s+you\s+(?:help\s+me\s+)?(?:set|start|build|create|make|lock\s+in)\s+(?:up\s+)?(?:a\s+)?(?:goal|campaign)\b/,
+  /\b(?:help\s+me|i\s+need(?:\s+you)?\s+to|i\s+want(?:\s+you)?\s+to|let's|lets)\s+(?:set|start|build|create|make|lock\s+in)\s+(?:up\s+)?(?:a\s+)?(?:goal|campaign)\b/,
+  /\b(?:turn|make|convert)\b.+\b(?:into|as)\b.+\b(?:goal|campaign)\b/,
 ];
 
 const CORE_UPDATE_WRITE_REQUEST_PATTERNS = [
@@ -1189,6 +1357,10 @@ const isExplicitCompanionWriteMessage = (message: string): boolean => {
       ));
 
   return isDirectWriteRequest ||
+    PLANNING_WRITE_REQUEST_PATTERNS.some((pattern) =>
+      pattern.test(normalized)
+    ) ||
+    GOAL_WRITE_REQUEST_PATTERNS.some((pattern) => pattern.test(normalized)) ||
     /\b(remind me|set(?: up)? (?:a )?reminder)\b/.test(normalized) ||
     /\b(?:ritual for)\b/.test(normalized) ||
     /\b(?:turn|make|convert)\b.+\b(?:into|as)\b.+\b(?:quest|task|reminder|ritual|journal)\b/
@@ -1202,7 +1374,8 @@ const isExplicitCompanionWriteMessage = (message: string): boolean => {
 function isExplicitCompanionWriteRequest(
   request: CompanionAgentRequest,
 ): boolean {
-  if (request.surface !== "companion") return true;
+  if (request.turnOrigin === "follow_up_option") return true;
+  if (request.surface === "journeys" && request.activeFollowUp) return true;
   if (
     request.starterIntent &&
     EXPLICIT_COMPANION_WRITE_STARTER_INTENTS.has(request.starterIntent)
@@ -1210,7 +1383,11 @@ function isExplicitCompanionWriteRequest(
     return true;
   }
 
-  return isExplicitCompanionWriteMessage(request.message);
+  return isExplicitCompanionWriteMessage(request.message) ||
+    /\b(?:make|keep)\s+(?:it|today|tomorrow|my day)\s+(?:lighter|easier|simpler|more focused|less busy|more realistic)\b/i
+      .test(request.message) ||
+    /\b(?:rework|redo|rebalance|lighten|simplify)\s+(?:it|today|tomorrow|my day|the plan)\b/i
+      .test(request.message);
 }
 
 const getScheduleReadStarterIntent = (
@@ -1240,6 +1417,7 @@ const resolveBareStarterFollowUp = (
       BareStarterIntent
     >
   ) {
+    if (starterIntent === "plan_day") continue;
     const config = BARE_STARTER_FOLLOW_UPS[starterIntent];
     if (!config.prompts.includes(normalizedMessage)) continue;
     if (request.starterIntent && request.starterIntent !== starterIntent) {
@@ -1790,6 +1968,7 @@ async function loadUserAIPreferences(supabase: any, userId: string) {
 
 export async function loadCompanionAgentContext(params: {
   supabase: any;
+  actorSupabase?: any;
   userId: string;
   companionId: string;
   sessionId: string;
@@ -1837,6 +2016,7 @@ export async function loadCompanionAgentContext(params: {
   let companionMemories: any;
   let reflections: any;
   let dailyCheckIns: any;
+  let calendarConnectionsResult: any;
 
   [
     thread,
@@ -1854,6 +2034,7 @@ export async function loadCompanionAgentContext(params: {
     companionMemories,
     reflections,
     dailyCheckIns,
+    calendarConnectionsResult,
   ] = await Promise.all([
     loadCompanionContextBestEffort({
       requestId: params.requestId,
@@ -2055,6 +2236,18 @@ export async function loadCompanionAgentContext(params: {
         .order("created_at", { ascending: false })
         .limit(MAX_REFLECTIONS),
     ),
+    queryBestEffort(
+      "user_calendar_connections",
+      false,
+      emptyRowsResult(),
+      params.supabase
+        .from("user_calendar_connections")
+        .select(
+          "id, provider, primary_calendar_id, primary_calendar_name, sync_enabled",
+        )
+        .eq("user_id", params.userId)
+        .eq("sync_enabled", true),
+    ),
   ]);
 
   const requiredContextWarnings = loadWarnings.filter((warning) =>
@@ -2161,7 +2354,72 @@ export async function loadCompanionAgentContext(params: {
         ritualDurationStart,
       ),
   });
+  const calendarConnections = ((calendarConnectionsResult.data ?? []) as Array<
+    Record<string, unknown>
+  >).filter((connection) =>
+    connection.provider === "google" || connection.provider === "outlook"
+  );
+  const shouldLoadExternalCalendar = Boolean(params.actorSupabase) &&
+    (Boolean(
+      params.request.starterIntent &&
+        !["free_talk_start", "general"].includes(params.request.starterIntent),
+    ) ||
+      /\b(?:plan|day|week|calendar|schedule|meeting|appointment|today|tomorrow|time|room)\b/i
+        .test(params.request.message));
   const calendarEvents: Array<Record<string, unknown>> = [];
+
+  if (shouldLoadExternalCalendar && calendarConnections.length > 0) {
+    const startDateTime = buildOffsetDateTime(
+      range.start,
+      "00:00",
+      range.timezone,
+    );
+    const endDateTime = buildOffsetDateTime(
+      addDays(range.end, 1),
+      "00:00",
+      range.timezone,
+    );
+    const reads = await Promise.allSettled(
+      calendarConnections.map(async (connection) => {
+        const provider = String(connection.provider);
+        const { data, error } = await params.actorSupabase.functions.invoke(
+          `${provider}-calendar-events`,
+          {
+            body: {
+              action: "listRangeEvents",
+              startDateTime,
+              endDateTime,
+              ...(typeof connection.primary_calendar_id === "string"
+                ? { calendarId: connection.primary_calendar_id }
+                : {}),
+            },
+          },
+        );
+        if (error) throw error;
+        return Array.isArray(data?.events)
+          ? data.events as Array<Record<string, unknown>>
+          : [];
+      }),
+    );
+
+    for (let index = 0; index < reads.length; index += 1) {
+      const read = reads[index];
+      if (read.status === "fulfilled") {
+        calendarEvents.push(...read.value);
+        continue;
+      }
+      const provider = String(
+        calendarConnections[index]?.provider ?? "calendar",
+      );
+      loadWarnings.push(
+        buildContextLoadWarning(
+          `${provider}_calendar_events`,
+          false,
+          read.reason,
+        ),
+      );
+    }
+  }
 
   const reminders = [
     ...tasks
@@ -2240,6 +2498,7 @@ export async function loadCompanionAgentContext(params: {
     rituals,
     campaigns,
     calendarEvents,
+    calendarConnections,
     reminders,
     goals: [...new Set([...campaignGoals, ...profileGoals])].slice(0, 12),
     recentMemory,
@@ -2295,17 +2554,17 @@ function buildInstructions(params: {
   const companionChatOnlyTurn = params.surface === "companion" &&
     !isExplicitCompanionWriteRequest(params.request);
   const writePolicyInstructions = journeysReadOnlyTurn
-	    ? [
-	      "For this Journeys turn, you are the user-facing chat only. Do not call prepare tools and do not return pending_confirmation for new actions or campaigns.",
+    ? [
+      "For this Journeys turn, you are the user-facing chat only. Do not call prepare tools and do not return pending_confirmation for new actions or campaigns.",
       "If the user mentions a concrete quest, plan change, journal item, reminder, ritual, or broad campaign goal, answer naturally in chat without creating or suggesting app action cards.",
       "Do not ask structured draft-consent follow-ups like 'Should I draft this?' or 'Would you like to start a campaign?'",
       "If a normal conversational question would help, ask it in your reply text with mode conversation and understanding_state enough_to_discuss.",
       "Never say you drafted, prepared, saved, queued, or opened something from this turn.",
     ]
     : companionChatOnlyTurn
-	    ? [
-	      "This Companion tab turn has no explicit write request. Reply as direct natural chat only.",
-	      "Do not call prepare tools, do not return pending_confirmation or ready_to_draft, and do not return structured planner proposals.",
+    ? [
+      "This Companion tab turn has no explicit write request. Reply as direct natural chat only.",
+      "Do not call prepare tools, do not return pending_confirmation or ready_to_draft, and do not return structured planner proposals.",
       "Do not ask structured draft-consent follow-ups like 'Should I draft this?' or 'Would you like me to turn this into a quest?'",
       "Words like future, thinking, vibing, goal, or plan are conversational unless the user explicitly asks you to create, add, draft, schedule, move, reschedule, shift, push, pull, adjust, edit, rename, book, fit, squeeze, lock in, update, cancel, delete, save, remind, log, or turn something into a quest.",
       "Never say you drafted, prepared, saved, queued, opened, created, added, or scheduled something from this turn.",
@@ -2323,9 +2582,9 @@ function buildInstructions(params: {
     "You are the decision layer. The app supplies context, validates actions, and executes only after allowed confirmation.",
     "Interpret intent before acting. Short launcher prompts are complete intent signals, not incomplete forms.",
     "Prompts like 'Plan my day', 'Adjust my day', 'What should I do right now?', 'Make room', 'What matters?', 'Prepare me for tomorrow', and 'Advance my campaign' give you permission to reason from app context.",
-    "A bare launcher prompt starts the ChatGPT-style conversation; it is not automatic permission to produce quest cards, structured planner responses, or pending drafts on the first turn.",
-    "For a bare launcher prompt with no follow-up answer, selected proposal, or concrete extra details, do not call consult_planner just to generate default proposals. Ask one targeted follow-up or answer conversationally instead.",
-	    "Turn origin matters: launcher means an app template started the turn, composer means the user freely typed or dictated into chat, and follow_up_option means the user clicked a follow-up chip.",
+    "A planning or goal launcher is permission to reason from the supplied app and calendar context and prepare one useful confirmation draft. Do not make the user fill out a wizard.",
+    "For Plan my day, build a realistic plan directly from existing tasks, rituals, campaigns, preferences, and busy calendar events. Ask at most one follow-up only when a missing fact would materially change or make the plan unsafe.",
+    "Turn origin matters: launcher means an app template started the turn, composer means the user freely typed or dictated into chat, and follow_up_option means the user clicked a follow-up chip.",
     "For composer turns, treat activeFollowUp as context only. The user may answer it, refine it, ignore it, ask something else, or pivot naturally like ChatGPT; do not force them back into the template form.",
     "Only treat latestUserMessageAnswersFollowUp as true when the context packet says it is true.",
     ...(journeysReadOnlyTurn
@@ -2339,14 +2598,14 @@ function buildInstructions(params: {
         "If the user is reflecting, venting, exploring possibilities, or thinking out loud, respond to that content instead of converting it into an app action.",
       ]
       : [
-        "For planning launchers, keep the experience conversational and read-only until the user explicitly opts into a supported non-quest app action. This covers Plan my day, What should I do right now, Adjust my day, Make room, What matters, Prepare me for tomorrow, Advance my campaign, Relationship touch, and low-energy planning.",
-        "Do not turn a planning-launcher follow-up into a new quest draft, and do not ask generic quest-consent questions.",
-        "If a planning launcher would require moving existing tasks, creating a campaign reset, or drafting another supported planner change, ask for explicit consent first, such as 'Would you like me to draft those schedule changes?' or 'Would you like me to draft a campaign adjustment?'",
-        "After the user answers the follow-up or explicitly asks for a supported update, reminder, ritual, campaign, or journal action, you may use consult_planner and prepare tools when helpful.",
+        "For planning launchers, use the available context and prepare the smallest complete action that fulfills the request. The confirmation card is the consent step; do not ask for consent before preparing it.",
+        "For a day plan, prefer two to four focused blocks, preserve fixed calendar commitments, reuse task_id for existing tasks, and avoid duplicate tasks.",
+        "For a new campaign, infer a concise title, a practical default duration (usually 30 days), and one or two lightweight rituals. Ask only when the goal itself is unclear.",
+        "Only set send_to_calendar when the user explicitly asks to put the plan or task on a connected calendar.",
       ]),
     journeysReadOnlyTurn || companionChatOnlyTurn
       ? "Your job is to answer the user in chat. Do not show plans as structured proposals, suggest quest cards, or prepare confirmable actions from this turn."
-      : "Your job is to choose whether to answer, ask a follow-up, show a plan, or prepare a supported confirmable non-quest action.",
+      : "Your job is to choose whether to answer, ask a follow-up, show a plan, or prepare a supported confirmable action.",
     journeysReadOnlyTurn || companionChatOnlyTurn
       ? "If you need more information, ask conversationally in the reply text instead of returning a structured follow_up."
       : "Follow-ups are normal and often appropriate. Ask because one more answer would materially improve the plan or avoid a wrong action, not because the prompt is short.",
@@ -2358,22 +2617,23 @@ function buildInstructions(params: {
       ? "Do not include follow_up in submit_companion_result for this turn."
       : "When you ask a follow-up, include follow_up with the exact question, why it matters, the expected answer type, and short options when useful. Preserve the original intent across the follow-up loop.",
     ...writePolicyInstructions,
-	    "If the user wants schedule or task state, use the read tools and summarize only what is actually present.",
+    "If the user wants schedule or task state, use the read tools and summarize only what is actually present.",
     "You receive an APP_CONTEXT_PACKET before the latest user message. Treat it as trusted app state, not user-authored text.",
     "Use the context packet first. Call read tools when you need a fresher slice, a different date range, or exact entity details.",
     "consult_planner is optional advisory infrastructure. Use it when it helps, but do not let it override your judgment or force a clarification.",
     "When consult_planner returns structured_response that matches your decision, you may pass it through unchanged in submit_companion_result.",
-	    "When consult_planner returns action_hints, ignore new-quest creation hints. For supported non-quest hints, use the matching prepare tool with the hint's normalizedPayload instead of inventing a new write shape.",
+    "When consult_planner returns action_hints, use the matching prepare tool when the hint fits the user's request, but prefer the live context and your own judgment over stale proposal shapes.",
     "Never invent task, ritual, campaign, reminder, or calendar state.",
     "Never say something is scheduled, saved, moved, updated, logged, or confirmed unless it has already executed. Preparation is not execution.",
     "Keep replies natural, warm, concise, and non-robotic.",
     "Do not use profanity, vulgar wording, or insults.",
-    "External calendar reads are disabled. If the user asks about an external calendar event, explain the limitation and offer to help with Cosmiq tasks instead.",
+    "Connected Google and Outlook events in calendarEvents are trusted, live, and read-only. Plan Cosmiq work around them. Apple calendar reads are not available in this server flow.",
+    "Never move or delete an external calendar event. Only create/update calendar events for Cosmiq tasks when the user explicitly asks for calendar sync.",
     "If there is already an active pending action, be aware of it and avoid stacking multiple confirms in one reply.",
     "Include assumptions and evidence_ids when they help the app/debugger understand why you made the decision. Evidence IDs should reference actual task, ritual, campaign, reminder, or calendar IDs from context.",
-	    journeysReadOnlyTurn || companionChatOnlyTurn
-	      ? "Quest and campaign suggestion cards from chat are retired."
-	      : "If you are ready to prepare a supported non-quest app action, use a prepare tool; otherwise answer or ask one follow-up.",
+    journeysReadOnlyTurn || companionChatOnlyTurn
+      ? "Do not create action cards from a purely conversational turn."
+      : "If you are ready to prepare a supported app action, use a prepare tool; otherwise answer or ask one grounded follow-up.",
     "Always finish by calling submit_companion_result. Do not end with a plain assistant message.",
     `Surface: ${params.surface}.`,
     `Current local datetime from the app: ${params.currentDateTime}.`,
@@ -2401,7 +2661,8 @@ function buildInstructions(params: {
 }
 
 function isJourneysReadOnlyTurn(request: CompanionAgentRequest) {
-  return request.surface === "journeys";
+  return request.surface === "journeys" &&
+    !isExplicitCompanionWriteRequest(request);
 }
 
 function getDiscussionModeForIntent(
@@ -2536,6 +2797,7 @@ function buildAgentContextPacket(params: {
     rituals: params.context.rituals,
     campaigns: params.context.campaigns,
     calendarEvents: params.context.calendarEvents,
+    calendarConnections: params.context.calendarConnections ?? [],
     reminders: params.context.reminders,
     reflections: params.context.reflections,
     memory: params.context.recentMemory,
@@ -2548,16 +2810,21 @@ function buildAgentContextPacket(params: {
       "read_rituals",
       "read_campaigns",
       "read_reminders",
+      "prepare_task_create",
       "prepare_task_update",
       "prepare_ritual_create",
       "prepare_reminder_create",
+      "prepare_campaign_create",
       "prepare_campaign_update",
+      "prepare_day_plan",
       "prepare_journal_entry",
     ],
     safety: {
       writesRequirePreparedAction: true,
       userConfirmationRequiredBeforeExecution: true,
-      externalCalendarReadsEnabled: false,
+      externalCalendarReadsEnabled: (params.context.calendarConnections ?? [])
+        .length > 0,
+      externalCalendarWritesRequireExplicitRequest: true,
     },
   };
 }
@@ -2861,6 +3128,46 @@ export function buildToolDefinitions() {
       },
     ),
     functionTool(
+      "prepare_task_create",
+      "Prepare one new Cosmiq task. Infer sensible duration and energy defaults. A dated task must include a time. Set send_to_calendar only when the user explicitly requests calendar sync.",
+      {
+        type: "object",
+        additionalProperties: false,
+        required: ["title"],
+        properties: {
+          title: { type: "string" },
+          task_date: { type: "string" },
+          scheduled_time: { type: "string" },
+          estimated_duration: { type: "number" },
+          difficulty: { type: "string", enum: ["easy", "medium", "hard"] },
+          energy_type: {
+            type: "string",
+            enum: [
+              "deep",
+              "admin",
+              "physical",
+              "errand",
+              "social",
+              "creative",
+              "recovery",
+            ],
+          },
+          notes: { type: "string" },
+          category: {
+            type: "string",
+            enum: ["mind", "body", "soul"],
+          },
+          reminder_enabled: { type: "boolean" },
+          reminder_minutes_before: { type: "number" },
+          send_to_calendar: { type: "boolean" },
+          calendar_provider: {
+            type: "string",
+            enum: ["google", "outlook", "all"],
+          },
+        },
+      },
+    ),
+    functionTool(
       "prepare_task_update",
       "Prepare an update to an existing task or scheduled plan item.",
       {
@@ -2895,7 +3202,10 @@ export function buildToolDefinitions() {
           preferred_time: { type: "string" },
           estimated_minutes: { type: "number" },
           description: { type: "string" },
-          category: { type: "string" },
+          category: {
+            type: "string",
+            enum: ["mind", "body", "soul"],
+          },
           reminder_enabled: { type: "boolean" },
           reminder_minutes_before: { type: "number" },
         },
@@ -2917,6 +3227,52 @@ export function buildToolDefinitions() {
       },
     ),
     functionTool(
+      "prepare_campaign_create",
+      "Prepare a new campaign from a conversational goal. Infer a practical title, usually 30 days, and one or two small rituals so the user does not need a setup wizard.",
+      {
+        type: "object",
+        additionalProperties: false,
+        required: ["title", "rituals"],
+        properties: {
+          title: { type: "string" },
+          description: { type: "string" },
+          start_date: { type: "string" },
+          target_days: { type: "number" },
+          rituals: {
+            type: "array",
+            minItems: 1,
+            maxItems: 3,
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["title"],
+              properties: {
+                title: { type: "string" },
+                frequency: {
+                  type: "string",
+                  enum: ["daily", "5x_week", "3x_week", "custom", "monthly"],
+                },
+                custom_days: { type: "array", items: { type: "number" } },
+                preferred_time: { type: "string" },
+                estimated_minutes: { type: "number" },
+                description: { type: "string" },
+                category: {
+                  type: "string",
+                  enum: ["mind", "body", "soul"],
+                },
+                difficulty: {
+                  type: "string",
+                  enum: ["easy", "medium", "hard"],
+                },
+                reminder_enabled: { type: "boolean" },
+                reminder_minutes_before: { type: "number" },
+              },
+            },
+          },
+        },
+      },
+    ),
+    functionTool(
       "prepare_campaign_update",
       "Prepare an update to an existing campaign or goal track.",
       {
@@ -2933,6 +3289,69 @@ export function buildToolDefinitions() {
             enum: [...COMPANION_CAMPAIGN_LIFECYCLE_STATUSES],
           },
           target_days: { type: "number" },
+        },
+      },
+    ),
+    functionTool(
+      "prepare_day_plan",
+      "Prepare and apply a realistic Cosmiq day plan after confirmation. Use existing task_id values when scheduling existing tasks, plan around read-only calendar events, and set send_to_calendar only when explicitly requested.",
+      {
+        type: "object",
+        additionalProperties: false,
+        required: ["plan_date", "blocks"],
+        properties: {
+          plan_date: { type: "string" },
+          blocks: {
+            type: "array",
+            minItems: 1,
+            maxItems: 8,
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["title", "start_time", "duration_minutes"],
+              properties: {
+                task_id: { type: "string" },
+                title: { type: "string" },
+                start_time: { type: "string" },
+                duration_minutes: { type: "number" },
+                energy_type: {
+                  type: "string",
+                  enum: [
+                    "deep",
+                    "admin",
+                    "physical",
+                    "errand",
+                    "social",
+                    "creative",
+                    "recovery",
+                  ],
+                },
+                source: {
+                  type: "string",
+                  enum: ["campaign", "habit", "recovery", "optimization"],
+                },
+                reasoning: { type: "string" },
+                epic_id: { type: "string" },
+                habit_source_id: { type: "string" },
+                difficulty: {
+                  type: "string",
+                  enum: ["easy", "medium", "hard"],
+                },
+                reminder_enabled: { type: "boolean" },
+                reminder_minutes_before: { type: "number" },
+                category: {
+                  type: "string",
+                  enum: ["mind", "body", "soul"],
+                },
+                notes: { type: "string" },
+              },
+            },
+          },
+          send_to_calendar: { type: "boolean" },
+          calendar_provider: {
+            type: "string",
+            enum: ["google", "outlook", "all"],
+          },
         },
       },
     ),
@@ -3074,6 +3493,18 @@ function buildToolExecutor(params: {
     params.context.tasks.find((task) => task.id === taskId);
   const findCampaign = (campaignId: string) =>
     params.context.campaigns.find((campaign) => campaign.id === campaignId);
+  const hasExplicitCalendarSyncRequest =
+    /\b(?:add|put|place|send|sync|block|schedule|save|show)\b[^.?!]*\b(?:calendar|google|outlook)\b|\b(?:calendar|google|outlook)\b[^.?!]*\b(?:add|put|place|send|sync|block|schedule|save|show)\b/i
+      .test(params.requestMessage);
+  const enforceCalendarSyncConsent = <
+    T extends {
+      send_to_calendar: boolean;
+      calendar_provider?: "google" | "outlook" | "all" | null;
+    },
+  >(data: T): T =>
+    data.send_to_calendar && !hasExplicitCalendarSyncRequest
+      ? { ...data, send_to_calendar: false, calendar_provider: null }
+      : data;
 
   return async (call: ToolCall): Promise<Record<string, unknown>> => {
     const parsed = JSON.parse(call.arguments || "{}");
@@ -3154,6 +3585,22 @@ function buildToolExecutor(params: {
           structured_response: plannerResult.structuredResponse,
         };
       }
+      case "prepare_task_create": {
+        const data = enforceCalendarSyncConsent(
+          PrepareTaskCreateSchema.parse(parsed),
+        );
+        const when = formatDateTimeLabel(data.task_date, data.scheduled_time);
+        const candidate = createPreparedAction({
+          actionType: "task_create",
+          intent: "schedule_task",
+          summary: `Create "${data.title}" for ${when}.`,
+          confirmationMessage: `Want me to add "${data.title}" for ${when}?`,
+          normalizedPayload: data,
+          affectedEntities: null,
+        });
+        params.preparedActions.set(candidate.id, candidate);
+        return { prepared_action_id: candidate.id, ...candidate };
+      }
       case "prepare_task_update": {
         const data = PrepareTaskUpdateSchema.parse(parsed);
         const existingTask = findTask(data.task_id);
@@ -3218,6 +3665,27 @@ function buildToolExecutor(params: {
         params.preparedActions.set(candidate.id, candidate);
         return { prepared_action_id: candidate.id, ...candidate };
       }
+      case "prepare_campaign_create": {
+        const parsedData = PrepareCampaignCreateSchema.parse(parsed);
+        const data = {
+          ...parsedData,
+          start_date: parsedData.start_date ??
+            toDateOnly(params.context.currentDateTime),
+        };
+        const ritualLabel = data.rituals.length === 1 ? "ritual" : "rituals";
+        const candidate = createPreparedAction({
+          actionType: "campaign_create",
+          intent: "goal_setting",
+          summary:
+            `Create a ${data.target_days}-day campaign "${data.title}" with ${data.rituals.length} ${ritualLabel}.`,
+          confirmationMessage:
+            `Ready for me to start "${data.title}" and add those ${ritualLabel}?`,
+          normalizedPayload: data,
+          affectedEntities: null,
+        });
+        params.preparedActions.set(candidate.id, candidate);
+        return { prepared_action_id: candidate.id, ...candidate };
+      }
       case "prepare_campaign_update": {
         const data = PrepareCampaignUpdateSchema.parse(parsed);
         const existingCampaign = findCampaign(data.campaign_id);
@@ -3231,6 +3699,29 @@ function buildToolExecutor(params: {
           confirmationMessage: `Want me to update that campaign?`,
           normalizedPayload: data,
           affectedEntities: { campaign_id: data.campaign_id },
+        });
+        params.preparedActions.set(candidate.id, candidate);
+        return { prepared_action_id: candidate.id, ...candidate };
+      }
+      case "prepare_day_plan": {
+        const data = enforceCalendarSyncConsent(
+          PrepareDayPlanSchema.parse(parsed),
+        );
+        const candidate = createPreparedAction({
+          actionType: "day_plan_apply",
+          intent: "plan_day",
+          summary: `Plan ${data.plan_date} with ${data.blocks.length} focused ${
+            data.blocks.length === 1 ? "block" : "blocks"
+          }.`,
+          confirmationMessage:
+            `Want me to apply this plan to ${data.plan_date}?`,
+          normalizedPayload: data,
+          affectedEntities: {
+            plan_date: data.plan_date,
+            task_ids: data.blocks.flatMap((block) =>
+              block.task_id ? [block.task_id] : []
+            ),
+          },
         });
         params.preparedActions.set(candidate.id, candidate);
         return { prepared_action_id: candidate.id, ...candidate };
@@ -3455,7 +3946,8 @@ function buildDeterministicPlanDayTriageResult(params: {
   });
   const mode = plannerResult.questions.length > 0
     ? "clarify" as CompanionAgentMode
-    : plannerResult.mode === "proposal" || plannerResult.mode === "schedule_read"
+    : plannerResult.mode === "proposal" ||
+        plannerResult.mode === "schedule_read"
     ? "schedule_read" as CompanionAgentMode
     : "conversation" as CompanionAgentMode;
   const followUp = plannerResult.questions[0]
@@ -3506,6 +3998,9 @@ const buildAffectedEntities = (
   actionType === "task_update" &&
     typeof normalizedPayload.task_id === "string"
     ? { task_id: normalizedPayload.task_id }
+    : actionType === "day_plan_apply" &&
+        typeof normalizedPayload.plan_date === "string"
+    ? { plan_date: normalizedPayload.plan_date }
     : (actionType === "campaign_update" || actionType === "campaign_adjust") &&
         typeof normalizedPayload.campaign_id === "string"
     ? { campaign_id: normalizedPayload.campaign_id }
@@ -3528,6 +4023,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
     () =>
       loadCompanionAgentContext({
         supabase: params.supabase,
+        actorSupabase: params.actorSupabase,
         userId: params.userId,
         companionId: companion.id,
         sessionId: params.request.sessionId,
@@ -4094,7 +4590,10 @@ export async function runCompanionAgent(params: RunAgentParams) {
   ) {
     normalizeJourneysReadOnlyResult(agentResult.result);
   }
-  if (!isExplicitCompanionWriteRequest(params.request)) {
+  if (
+    params.request.surface === "companion" &&
+    !isExplicitCompanionWriteRequest(params.request)
+  ) {
     normalizeCompanionChatOnlyResult(agentResult.result);
   }
 

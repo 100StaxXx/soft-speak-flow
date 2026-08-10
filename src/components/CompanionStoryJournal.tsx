@@ -20,6 +20,9 @@ import {
   Grid3x3,
   Heart,
   Lightbulb,
+  ScrollText,
+  Telescope,
+  RefreshCw,
 } from "lucide-react";
 import { Separator } from "./ui/separator";
 import { toast } from "@/components/ui/sonner";
@@ -36,6 +39,10 @@ import { CompanionImage } from "./CompanionImage";
 import { cn } from "@/lib/utils";
 import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
 import { shouldContainCompanionSceneImage } from "@/lib/companionImageFocal";
+import { motion, useReducedMotion } from "framer-motion";
+import { buildStoryLivingNarrativePrompt } from "@/shared/livingNarrative";
+import { LivingNarrativeChoiceCard } from "./companion/LivingNarrativeChoiceCard";
+import { NarrativeConstellation } from "./companion/NarrativeConstellation";
 
 interface CompanionStoryJournalProps {
   layoutMode?: CompanionLayoutMode;
@@ -48,6 +55,7 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
   const [showGallery, setShowGallery] = useState(false);
   const [chapterImageSourceAspectRatio, setChapterImageSourceAspectRatio] = useState<number | null>(null);
   const isDesktop = layoutMode === "desktop";
+  const shouldReduceMotion = useReducedMotion();
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -57,7 +65,7 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
     return () => clearTimeout(timer);
   }, [viewingLevel]);
 
-  const { story, allStories, isLoading, generateStory } = useCompanionStory(
+  const { story, allStories, isLoading, error: storyError, refetch, generateStory } = useCompanionStory(
     companion?.id,
     debouncedLevel,
   );
@@ -129,6 +137,20 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
     : null;
   const hasStory = allStories?.some((entry) => entry.stage === debouncedLevel) ?? false;
   const chapterLabel = debouncedLevel === 0 ? "Prologue" : getProgressionLevelDisplay(debouncedLevel);
+  const companionDisplayName = companion?.companion_name ||
+    companion?.cached_creature_name ||
+    companion?.spirit_animal ||
+    "Your companion";
+  const livingNarrativePrompt = useMemo(
+    () => story
+      ? buildStoryLivingNarrativePrompt({
+        story,
+        companionName: companionDisplayName,
+        chapterLabel,
+      })
+      : null,
+    [chapterLabel, companionDisplayName, story],
+  );
   const chapterImageFocal = useMemo(() => {
     if (!companion) return { x: null, y: null };
     if (debouncedLevel === 0) {
@@ -258,15 +280,39 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
         </Button>
       </div>
 
+      <NarrativeConstellation
+        companionId={companion.id}
+        companionName={companionDisplayName}
+      />
+
       <Card className={cn(outerShellCardClassName, isDesktop ? "p-8" : "p-6")}>
         {chapterImage && isLevelUnlocked && (
           <div className="flex justify-center mb-6">
-            <div
+            <motion.div
               className={cn(
                 "relative w-48 h-48 rounded-2xl overflow-hidden border-2 border-primary/20 shadow-glow",
                 chapterImageUsesContainedScene && "bg-black",
               )}
+              animate={shouldReduceMotion ? undefined : {
+                y: [0, -3, 0],
+                scale: [1, 1.012, 1],
+              }}
+              transition={shouldReduceMotion ? undefined : {
+                duration: 5.5,
+                ease: "easeInOut",
+                repeat: Infinity,
+              }}
             >
+              <motion.div
+                aria-hidden="true"
+                className="absolute inset-5 rounded-full bg-primary/25 blur-2xl"
+                animate={shouldReduceMotion ? undefined : { opacity: [0.25, 0.55, 0.25] }}
+                transition={shouldReduceMotion ? undefined : {
+                  duration: 4.5,
+                  ease: "easeInOut",
+                  repeat: Infinity,
+                }}
+              />
               <CompanionImage
                 src={chapterImage}
                 alt={`${companion.spirit_animal} at ${chapterLabel}`}
@@ -288,7 +334,7 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
                   {chapterLabel}
                 </p>
               </div>
-            </div>
+            </motion.div>
           </div>
         )}
 
@@ -381,7 +427,59 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
                 <p className="text-sm text-foreground/90">{story.life_lesson}</p>
               </div>
             )}
+
+            {story.lore_expansion?.length > 0 && (
+              <div className="bg-violet-500/10 p-4 rounded-lg border border-violet-500/20">
+                <div className="flex items-center gap-2 text-sm font-semibold mb-3 text-violet-700 dark:text-violet-300">
+                  <ScrollText className="w-4 h-4" />
+                  <span>Lore Discovered</span>
+                </div>
+                <ul className="space-y-2 text-sm text-foreground/90">
+                  {story.lore_expansion.map((loreItem, index) => (
+                    <li key={`${index}-${loreItem}`} className="flex gap-2">
+                      <Sparkles className="w-3.5 h-3.5 mt-1 shrink-0 text-violet-500" aria-hidden="true" />
+                      <span>{loreItem}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {story.next_hook && (
+              <div className="bg-sky-500/10 p-4 rounded-lg border border-sky-500/20">
+                <div className="flex items-center gap-2 text-sm font-semibold mb-2 text-sky-700 dark:text-sky-300">
+                  <Telescope className="w-4 h-4" />
+                  <span>Next Chapter</span>
+                </div>
+                <p className="text-sm text-foreground/90 italic">{story.next_hook}</p>
+              </div>
+            )}
+
+            {livingNarrativePrompt && (
+              <LivingNarrativeChoiceCard
+                sourceType="story"
+                sourceId={story.id}
+                companionId={companion.id}
+                companionName={companionDisplayName}
+                prompt={livingNarrativePrompt}
+                stage={story.stage}
+              />
+            )}
           </div>
+        ) : isLevelUnlocked && storyError ? (
+          <Card className="p-8 text-center space-y-4" role="alert">
+            <BookOpen className="w-16 h-16 mx-auto text-muted-foreground" />
+            <div>
+              <h3 className="text-xl font-semibold mb-2">Chapter unavailable</h3>
+              <p className="text-muted-foreground mb-6">
+                We couldn&apos;t load this chapter. Your story is still safe.
+              </p>
+              <Button variant="outline" onClick={() => void refetch()}>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Try again
+              </Button>
+            </div>
+          </Card>
         ) : isLevelUnlocked ? (
           <Card className="p-8 text-center space-y-4">
             <BookOpen className="w-16 h-16 mx-auto text-muted-foreground" />

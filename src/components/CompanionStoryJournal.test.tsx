@@ -17,11 +17,25 @@ const mocks = vi.hoisted(() => ({
     preset_id: null as string | null,
     spirit_animal: "Frostynia",
     core_element: "ice",
+    companion_name: "Nova",
+    cached_creature_name: null as string | null,
   },
   generateStory: {
     mutate: vi.fn(),
     isPending: false,
   },
+  story: null as null | {
+    id: string;
+    stage: number;
+    chapter_title: string;
+    intro_line: string;
+    main_story: string;
+    bond_moment: string;
+    life_lesson: string;
+    lore_expansion: string[];
+    next_hook: string;
+  },
+  refetch: vi.fn(),
 }));
 
 vi.mock("@/hooks/useCompanion", () => ({
@@ -33,11 +47,35 @@ vi.mock("@/hooks/useCompanion", () => ({
 
 vi.mock("@/hooks/useCompanionStory", () => ({
   useCompanionStory: () => ({
-    story: null,
+    story: mocks.story,
     allStories: [],
     isLoading: false,
+    error: null,
+    refetch: mocks.refetch,
     generateStory: mocks.generateStory,
   }),
+}));
+
+vi.mock("@/hooks/useLivingNarrativeChoice", () => ({
+  useLivingNarrativeChoice: () => ({
+    choice: null,
+    isLoading: false,
+    error: null,
+    recordChoice: { isPending: false, mutateAsync: vi.fn() },
+    updateSideQuest: { isPending: false, mutateAsync: vi.fn() },
+  }),
+}));
+
+vi.mock("@/hooks/useCompanionNarrativeMemories", () => ({
+  useCompanionNarrativeMemories: () => ({
+    data: [],
+    isLoading: false,
+    error: null,
+  }),
+}));
+
+vi.mock("@/hooks/useTaskMutations", () => ({
+  useTaskMutations: () => ({ addTask: vi.fn() }),
 }));
 
 vi.mock("@/lib/companionAssetResolver", () => ({
@@ -70,6 +108,8 @@ const renderWithQueryClient = (children: ReactNode) => {
 describe("CompanionStoryJournal", () => {
   beforeEach(() => {
     mocks.generateStory.mutate.mockClear();
+    mocks.story = null;
+    mocks.refetch.mockClear();
   });
 
   it("contains generated landscape checkpoint art to match video framing", async () => {
@@ -94,6 +134,32 @@ describe("CompanionStoryJournal", () => {
       expect(image).toHaveAttribute("data-companion-image-fit", "contain");
       expect(image).toHaveStyle({ objectPosition: "center center" });
     });
+  });
+
+  it("shows generated lore and the next chapter hook", async () => {
+    mocks.story = {
+      id: "story-1",
+      stage: 0,
+      chapter_title: "The Glass Signal",
+      intro_line: "A bell rang beneath the ice.",
+      main_story: "Frostynia followed the sound and uncovered a sleeping observatory.",
+      bond_moment: "The signal matched their shared heartbeat.",
+      life_lesson: "Attention turns uncertainty into a path.",
+      lore_expansion: [
+        "World Truth: Starlight can be stored in winter glass.",
+        "Historical Reference: The first keepers mapped the northern bells.",
+        "Foreshadowing Seed: One bell is still missing.",
+      ],
+      next_hook: "At dawn, a fourth note answered from beyond the ridge.",
+    };
+
+    renderWithQueryClient(<CompanionStoryJournal />);
+
+    expect(await screen.findByText("Lore Discovered")).toBeInTheDocument();
+    expect(screen.getByText(/Starlight can be stored/)).toBeInTheDocument();
+    expect(screen.getByText("Next Chapter")).toBeInTheDocument();
+    expect(screen.getAllByText(/a fourth note answered/)).toHaveLength(2);
+    expect(screen.getByText("What should Nova carry forward from this chapter?")).toBeInTheDocument();
   });
 });
 

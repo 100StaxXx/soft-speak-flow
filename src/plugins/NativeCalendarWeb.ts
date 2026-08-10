@@ -4,7 +4,7 @@ import type {
   NativeCalendarDescriptor,
   NativeCalendarEventDescriptor,
   NativeCalendarEventOptions,
-} from './NativeCalendarPlugin';
+} from './NativeCalendarTypes';
 
 export class NativeCalendarWeb extends WebPlugin implements NativeCalendarPlugin {
   async isAvailable(): Promise<{ available: boolean }> {

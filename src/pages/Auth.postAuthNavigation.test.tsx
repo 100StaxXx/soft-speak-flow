@@ -134,6 +134,10 @@ const flushMicrotasks = async () => {
   });
 };
 
+const acceptSignupConsent = () => {
+  fireEvent.click(screen.getByRole("checkbox", { name: /i agree to cosmiq/i }));
+};
+
 const signedInSession = {
   user: {
     id: "user-1234",
@@ -428,6 +432,7 @@ describe("Auth post-auth navigation", () => {
     await flushMicrotasks();
 
     fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    acceptSignupConsent();
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "new@example.com" },
     });
@@ -482,6 +487,7 @@ describe("Auth post-auth navigation", () => {
     await flushMicrotasks();
 
     fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    acceptSignupConsent();
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "new@example.com" },
     });
@@ -520,6 +526,7 @@ describe("Auth post-auth navigation", () => {
     await flushMicrotasks();
 
     fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    acceptSignupConsent();
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "new@example.c" },
     });
@@ -562,6 +569,7 @@ describe("Auth post-auth navigation", () => {
     await flushMicrotasks();
 
     fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    acceptSignupConsent();
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "existing@example.com" },
     });
@@ -611,6 +619,7 @@ describe("Auth post-auth navigation", () => {
     await flushMicrotasks();
 
     fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    acceptSignupConsent();
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "new@example.com" },
     });
@@ -682,6 +691,7 @@ describe("Auth post-auth navigation", () => {
     await flushMicrotasks();
 
     fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    acceptSignupConsent();
     fireEvent.click(screen.getByRole("button", { name: /sign up with apple/i }));
 
     await waitFor(() => {

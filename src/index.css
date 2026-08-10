@@ -2674,60 +2674,6 @@ All colors MUST be HSL.
     z-index: -1;
   }
 
-  /* React Joyride Custom Styles - Border Pulse Only */
-  .__floater__open {
-    filter: none !important;
-    animation: none !important;
-    opacity: 1 !important;
-    transition: none !important;
-  }
-
-  .react-joyride__tooltip {
-    opacity: 1 !important;
-    background-color: hsl(var(--card)) !important;
-    transition: none !important;
-    animation: tooltip-border-pulse 2s ease-in-out infinite !important;
-  }
-
-  @keyframes spotlight-border-pulse {
-    0%, 100% {
-      box-shadow:
-        0 0 0 4px hsl(var(--primary) / 0.4),
-        0 0 20px hsl(var(--primary) / 0.3);
-    }
-    50% {
-      box-shadow:
-        0 0 0 6px hsl(var(--primary) / 0.7),
-        0 0 30px hsl(var(--primary) / 0.5);
-    }
-  }
-
-  @keyframes tooltip-border-pulse {
-    0%, 100% {
-      border-color: hsl(var(--primary) / 0.8);
-      box-shadow:
-        0 0 0 2px hsl(var(--primary) / 0.3),
-        0 20px 50px rgba(0, 0, 0, 0.5);
-    }
-    50% {
-      border-color: hsl(var(--primary) / 1);
-      box-shadow:
-        0 0 0 4px hsl(var(--primary) / 0.5),
-        0 0 40px hsl(var(--primary) / 0.3),
-        0 20px 50px rgba(0, 0, 0, 0.5);
-    }
-  }
-
-  .react-joyride__spotlight {
-    background-color: transparent !important;
-    border-radius: var(--radius) !important;
-    animation: spotlight-border-pulse 2s ease-in-out infinite !important;
-  }
-
-  .react-joyride__overlay {
-    background-color: hsl(0 0% 0% / 0.75) !important;
-  }
-
   .mentor-spotlight-root {
     position: fixed;
     inset: 0;

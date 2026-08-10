@@ -3,22 +3,23 @@ installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requireRequestAuth } from "../_shared/auth.ts";
+import { requireAdminOrServiceRoleAuth } from "../_shared/auth.ts";
 import { checkRateLimit, createRateLimitResponse, RATE_LIMITS } from "../_shared/rateLimiter.ts";
+import {
+  buildCosmicPostcardImagePrompt,
+  getPostcardSpeciesType,
+  resolvePostcardTier,
+  selectDeterministicPostcardLocation,
+  type PostcardLocation,
+} from "../_shared/cosmicPostcard.ts";
+import { editCompanionImage } from "../_shared/openaiCompanionImageClient.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Species type preferences for location matching
-type SpeciesTag = 'aquatic' | 'flying' | 'land' | 'mythic' | 'all';
-
-interface CosmicLocation {
-  name: string;
-  description: string;
-  tags?: SpeciesTag[];
-}
+type CosmicLocation = PostcardLocation;
 
 // Cosmic locations organized by milestone tier with species tags
 const cosmicLocations: Record<number, CosmicLocation[]> = {
@@ -54,42 +55,13 @@ const cosmicLocations: Record<number, CosmicLocation[]> = {
   ],
 };
 
-// Determine species type from spirit animal
-function getSpeciesType(spiritAnimal: string): SpeciesTag {
-  const animal = spiritAnimal?.toLowerCase() || '';
-  
-  if (['whale', 'dolphin', 'shark', 'fish', 'octopus', 'jellyfish', 'seahorse', 'turtle', 'seal', 'otter', 'penguin'].some(a => animal.includes(a))) {
-    return 'aquatic';
-  }
-  
-  if (['eagle', 'hawk', 'owl', 'phoenix', 'dragon', 'butterfly', 'hummingbird', 'raven', 'falcon', 'dove', 'swan', 'bat'].some(a => animal.includes(a))) {
-    return 'flying';
-  }
-  
-  if (['unicorn', 'griffin', 'chimera', 'sphinx', 'basilisk', 'hydra', 'cerberus', 'pegasus'].some(a => animal.includes(a))) {
-    return 'mythic';
-  }
-  
-  return 'land';
-}
-
-// Select a location weighted by species compatibility
-function selectLocation(locations: CosmicLocation[], speciesType: SpeciesTag): CosmicLocation {
-  const compatibleLocations = locations.filter(loc => 
-    !loc.tags || loc.tags.length === 0 || loc.tags.includes(speciesType) || loc.tags.includes('all')
-  );
-  
-  const pool = compatibleLocations.length > 0 ? compatibleLocations : locations;
-  return pool[Math.floor(Math.random() * pool.length)];
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const auth = await requireRequestAuth(req, corsHeaders);
+    const auth = await requireAdminOrServiceRoleAuth(req, corsHeaders);
     if (auth instanceof Response) {
       return auth;
     }
@@ -132,89 +104,43 @@ serve(async (req) => {
     const furColor = companionData?.fur_color || '#8B4513';
 
     // Determine species type for location matching
-    const speciesType = getSpeciesType(spiritAnimal);
+    const speciesType = getPostcardSpeciesType(spiritAnimal);
     console.log(`[Cosmic Postcard Test] Species type: ${speciesType}`);
 
     // Select location weighted by species compatibility
-    const tierLocations = cosmicLocations[milestonePercent as keyof typeof cosmicLocations] || cosmicLocations[25];
-    const location = selectLocation(tierLocations, speciesType);
+    const tierLocations = cosmicLocations[resolvePostcardTier(Number(milestonePercent))];
+    const location = selectDeterministicPostcardLocation({
+      locations: tierLocations,
+      speciesType,
+      seed: `${auth.userId}:${sourceImageUrl}:${milestonePercent}`,
+    });
 
     console.log(`[Cosmic Postcard Test] Selected location: ${location.name}`);
 
     // Build image editing prompt that preserves exact companion appearance
-    const editPrompt = `Place this EXACT companion creature into a cosmic postcard scene.
-
-LOCATION: ${location.name} - ${location.description}
-
-CRITICAL - PRESERVE COMPLETELY (DO NOT CHANGE):
-- The creature's EXACT appearance, species (${spiritAnimal}), face shape, and body structure
-- ALL colors, markings, and patterns (especially ${favoriteColor} tones)
-- Eye color (${eyeColor}) and facial features
-- Fur/scale color (${furColor}) and texture
-- The art style and quality of the original image
-- The creature's proportions and silhouette
-- Any unique characteristics or accessories
-
-CREATE THE SCENE:
-- Place the companion naturally within ${location.name}
-- Add appropriate cosmic background elements: ${location.description}
-- Maintain the companion as the clear focal point (roughly 40-50% of the image)
-- Use cinematic lighting that complements both the companion and the cosmic setting
-- Add subtle sparkles, cosmic dust, and ethereal ${coreElement} energy effects
-- Create a 4:3 landscape aspect ratio, postcard-style composition
-- The scene should feel like a treasured travel memory or vacation photo
-
-OUTPUT: A beautiful cosmic postcard showing THIS EXACT companion visiting ${location.name}. The companion must be immediately recognizable as the same creature from the input image - like they actually traveled there.`;
-
-    console.log('[Cosmic Postcard Test] Calling Gemini image edit API...');
-
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
+    const editPrompt = buildCosmicPostcardImagePrompt({
+      location,
+      companion: {
+        spiritAnimal,
+        coreElement,
+        favoriteColor,
+        eyeColor,
+        furColor,
       },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image-preview",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: editPrompt },
-              { type: "image_url", image_url: { url: sourceImageUrl } },
-            ],
-          },
-        ],
-        modalities: ["image", "text"],
-      }),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[Cosmic Postcard Test] AI API error:', response.status, errorText);
-      
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limited. Please try again later." }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI credits required." }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      throw new Error(`AI generation failed: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-
-    if (!imageUrl) {
-      console.error('[Cosmic Postcard Test] No image in response');
-      throw new Error("Failed to generate image - no image URL in response");
-    }
+    console.log('[Cosmic Postcard Test] Calling high-fidelity companion image edit API...');
+    const imageResult = await editCompanionImage({
+      guardedFetch: fetch,
+      openAIApiKey: OPENAI_API_KEY,
+      prompt: editPrompt,
+      size: "1536x1024",
+      quality: "high",
+      outputFormat: "png",
+      userId: auth.userId,
+      referenceImages: [{ imageUrl: sourceImageUrl }],
+    });
+    const imageUrl = imageResult.imageDataUrl;
 
     console.log('[Cosmic Postcard Test] Image generated successfully');
 

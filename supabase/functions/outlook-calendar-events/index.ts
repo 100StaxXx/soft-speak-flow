@@ -14,6 +14,7 @@ type SyncMode = "send_only";
 
 type Action =
   | "listEvents"
+  | "listRangeEvents"
   | "createLinkedEvent"
   | "updateLinkedEvent"
   | "deleteLinkedEvent";
@@ -73,6 +74,8 @@ function normalizeAction(raw: string | undefined): Action | null {
   const map: Record<string, Action> = {
     listEvents: "listEvents",
     list_events: "listEvents",
+    listRangeEvents: "listRangeEvents",
+    list_range_events: "listRangeEvents",
     createLinkedEvent: "createLinkedEvent",
     create_linked_event: "createLinkedEvent",
     updateLinkedEvent: "updateLinkedEvent",
@@ -104,6 +107,47 @@ function parseEventRange(body: Record<string, unknown>): { startDate: string; en
   }
 
   return { startDate: start.toISOString(), endDate: end.toISOString() };
+}
+
+const readRangeDateTime = (value: unknown): string | null => {
+  if (typeof value !== "string" || value.trim().length === 0) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+};
+
+const normalizeOutlookUtcDateTime = (value: unknown): string | null => {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const trimmed = value.trim();
+  return /(?:Z|[+-]\d{2}:\d{2})$/i.test(trimmed) ? trimmed : `${trimmed}Z`;
+};
+
+export function mapOutlookRangeEvent(
+  event: Record<string, any>,
+  connectionId: string,
+) {
+  const startTime = normalizeOutlookUtcDateTime(event.start?.dateTime);
+  const endTime = normalizeOutlookUtcDateTime(event.end?.dateTime);
+  if (!event.id || !startTime || !endTime) return null;
+
+  const location = typeof event.location?.displayName === "string"
+    ? event.location.displayName.slice(0, 300)
+    : null;
+  return {
+    id: `outlook:${connectionId}:${event.id}`,
+    external_event_id: String(event.id),
+    title: typeof event.subject === "string" && event.subject.trim()
+      ? event.subject.trim().slice(0, 200)
+      : "Busy",
+    description: typeof event.bodyPreview === "string"
+      ? event.bodyPreview.slice(0, 1000)
+      : null,
+    start_time: startTime,
+    end_time: endTime,
+    is_all_day: event.isAllDay === true,
+    location,
+    source: "outlook",
+    read_only: true,
+  };
 }
 
 function normalizeSyncMode(mode: unknown): SyncMode {
@@ -731,6 +775,58 @@ async function handleOutlookCalendarEvents(req: Request) {
         .eq("id", connection.id);
 
       return jsonResponse({ events, syncedAt });
+    }
+
+    if (action === "listRangeEvents") {
+      const startDateTime = readRangeDateTime(
+        body?.startDateTime ?? body?.start_date_time,
+      );
+      const endDateTime = readRangeDateTime(
+        body?.endDateTime ?? body?.end_date_time,
+      );
+      if (!startDateTime || !endDateTime) {
+        return jsonResponse(
+          { error: "startDateTime and endDateTime are required" },
+          400,
+        );
+      }
+      const rangeMs = new Date(endDateTime).getTime() -
+        new Date(startDateTime).getTime();
+      if (rangeMs <= 0 || rangeMs > 32 * 24 * 60 * 60 * 1000) {
+        return jsonResponse({ error: "Calendar range must be 1 to 32 days" }, 400);
+      }
+
+      const externalCalendarId =
+        (body?.calendarId || body?.calendar_id) as string | undefined ||
+        connection.primary_calendar_id ||
+        connection.calendar_id;
+      if (!externalCalendarId) {
+        return jsonResponse({ error: "No primary Outlook calendar selected" }, 400);
+      }
+      const query = new URLSearchParams({
+        startDateTime,
+        endDateTime,
+        "$select": "id,subject,bodyPreview,start,end,isAllDay,location,isCancelled",
+        "$orderby": "start/dateTime",
+        "$top": "100",
+      });
+      const response = await outlookApi(
+        accessToken,
+        `/me/calendars/${encodeURIComponent(externalCalendarId)}/calendarView?${query.toString()}`,
+      );
+      const events = (Array.isArray(response?.value) ? response.value : [])
+        .filter((event: Record<string, unknown>) => event.isCancelled !== true)
+        .map((event: Record<string, any>) =>
+          mapOutlookRangeEvent(event, connection.id)
+        )
+        .filter(Boolean);
+
+      return jsonResponse({
+        success: true,
+        provider: "outlook",
+        calendarId: externalCalendarId,
+        events,
+      });
     }
 
     if (action === "createLinkedEvent") {

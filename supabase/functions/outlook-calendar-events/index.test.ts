@@ -84,6 +84,23 @@ Deno.test("outlook-calendar-events maps synced UTC instants back to local quest 
   assertEquals(patch.estimated_duration, 30, "Expected provider pull to preserve duration");
 });
 
+Deno.test("outlook-calendar-events maps live range events into read-only planner context", () => {
+  const event = moduleUnderTest.mapOutlookRangeEvent(
+    {
+      id: "event-1",
+      subject: "Customer call",
+      start: { dateTime: "2026-05-11T18:00:00.000" },
+      end: { dateTime: "2026-05-11T18:30:00.000" },
+      isAllDay: false,
+      location: { displayName: "Teams" },
+    },
+    "connection-1",
+  );
+  assertEquals(event?.title, "Customer call", "Expected the event title");
+  assertEquals(event?.source, "outlook", "Expected Outlook attribution");
+  assertEquals(event?.read_only, true, "Expected external events to stay read-only");
+});
+
 Deno.test("outlook-calendar-events normalizes Graph UTC event times for the agenda", () => {
   const event = moduleUnderTest.toOutlookExternalCalendarEvent(
     {

@@ -495,7 +495,7 @@ describe("CompanionDisplay overlay stack", () => {
     await screen.findByText("Nova");
     fireEvent.click(screen.getByTestId("companion-stats-analysis-trigger"));
 
-    expect(screen.getByTestId("companion-stats-analysis-surface")).toBeInTheDocument();
+    expect(await screen.findByTestId("companion-stats-analysis-surface")).toBeInTheDocument();
   });
 
   it("starts subtle idle drift once the companion art has loaded", async () => {
@@ -771,7 +771,7 @@ describe("CompanionDisplay overlay stack", () => {
     fireEvent.click(screen.getByRole("button", { name: "HATCH" }));
 
     expect(mocks.triggerManualEvolution).not.toHaveBeenCalled();
-    expect(screen.getByText("Hatch chooser")).toBeInTheDocument();
+    expect(await screen.findByText("Hatch chooser")).toBeInTheDocument();
   });
 
   it("forces stale stage 1 companion data back to a stage 0 egg during the companion intro step", async () => {

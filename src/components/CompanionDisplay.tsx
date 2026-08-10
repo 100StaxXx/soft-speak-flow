@@ -16,17 +16,12 @@ import { CompanionSkeleton } from "@/components/CompanionSkeleton";
 import { AttributeTooltip } from "@/components/AttributeTooltip";
 import { CompanionBadge } from "@/components/CompanionBadge";
 import { CompanionBondBadge } from "@/components/companion/CompanionBondBadge";
-import { WelcomeBackModal } from "@/components/WelcomeBackModal";
 import { EvolveButton } from "@/components/companion/EvolveButton";
 import { EvolutionPathBadge } from "@/components/companion/EvolutionPathBadge";
 import { DormancyWarning, DormantOverlay } from "@/components/companion/DormancyWarning";
 import { CompanionDialogue } from "@/components/companion/CompanionDialogue";
 import { CompanionMotionSurface } from "@/components/companion/motion/CompanionMotionSurface";
-import { WakeUpCelebration } from "@/components/companion/WakeUpCelebration";
-import { CompanionChatModal } from "@/components/companion/CompanionChatModal";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
-import { CompanionStatAnalysisSurface } from "@/components/CompanionStatAnalysisSurface";
-import { CompanionPersonalization } from "@/components/CompanionPersonalization";
 import { CompanionImage } from "@/components/CompanionImage";
 import {
   Dialog,
@@ -70,6 +65,8 @@ import {
   memo,
   useRef,
   useCallback,
+  lazy,
+  Suspense,
   type MouseEvent as ReactMouseEvent,
   type TouchEvent as ReactTouchEvent,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -92,6 +89,32 @@ import {
   getVisualStageLabelForLevel,
   resolveProgressionLevelFromXp,
 } from "@/config/progression";
+
+const LazyWelcomeBackModal = lazy(() =>
+  import("@/components/WelcomeBackModal").then((module) => ({
+    default: module.WelcomeBackModal,
+  })),
+);
+const LazyWakeUpCelebration = lazy(() =>
+  import("@/components/companion/WakeUpCelebration").then((module) => ({
+    default: module.WakeUpCelebration,
+  })),
+);
+const LazyCompanionChatModal = lazy(() =>
+  import("@/components/companion/CompanionChatModal").then((module) => ({
+    default: module.CompanionChatModal,
+  })),
+);
+const LazyCompanionStatAnalysisSurface = lazy(() =>
+  import("@/components/CompanionStatAnalysisSurface").then((module) => ({
+    default: module.CompanionStatAnalysisSurface,
+  })),
+);
+const LazyCompanionPersonalization = lazy(() =>
+  import("@/components/CompanionPersonalization").then((module) => ({
+    default: module.CompanionPersonalization,
+  })),
+);
 
 interface CompanionDisplayProps {
   layoutMode?: CompanionLayoutMode;
@@ -1165,41 +1188,55 @@ export const CompanionDisplay = memo(({
       </Card>
 
       {/* Welcome Back Modal */}
-      <WelcomeBackModal 
-        isOpen={showWelcomeBack} 
-        onClose={() => {
-          setShowWelcomeBack(false);
-          setWelcomeBackDismissed(true);
-        }} 
-      />
-
-      {/* Wake-Up Celebration Modal */}
-      <WakeUpCelebration
-        isOpen={showWakeUpCelebration}
-        onClose={dismissWakeUpCelebration}
-        companionName={wakeUpCompanionName}
-        companionImageUrl={wakeUpCompanionImageUrl}
-        companionImageFocalX={wakeUpCompanionImageFocalX}
-        companionImageFocalY={wakeUpCompanionImageFocalY}
-        dormantImageUrl={wakeUpDormantImageUrl}
-        dormantImageFocalX={wakeUpDormantImageFocalX}
-        dormantImageFocalY={wakeUpDormantImageFocalY}
-        bondLevel={wakeUpBondLevel}
-      />
-
-      {showStatsAnalysis ? (
-        <CompanionStatAnalysisSurface
-          open={showStatsAnalysis}
-          onOpenChange={setShowStatsAnalysis}
-          layoutMode={layoutMode}
-        />
+      {showWelcomeBack ? (
+        <Suspense fallback={null}>
+          <LazyWelcomeBackModal
+            isOpen
+            onClose={() => {
+              setShowWelcomeBack(false);
+              setWelcomeBackDismissed(true);
+            }}
+          />
+        </Suspense>
       ) : null}
 
-      <CompanionChatModal
-        open={companionChatOpen}
-        onOpenChange={setCompanionChatOpen}
-        layoutMode={layoutMode}
-      />
+      {/* Wake-Up Celebration Modal */}
+      {showWakeUpCelebration ? (
+        <Suspense fallback={null}>
+          <LazyWakeUpCelebration
+            isOpen
+            onClose={dismissWakeUpCelebration}
+            companionName={wakeUpCompanionName}
+            companionImageUrl={wakeUpCompanionImageUrl}
+            companionImageFocalX={wakeUpCompanionImageFocalX}
+            companionImageFocalY={wakeUpCompanionImageFocalY}
+            dormantImageUrl={wakeUpDormantImageUrl}
+            dormantImageFocalX={wakeUpDormantImageFocalX}
+            dormantImageFocalY={wakeUpDormantImageFocalY}
+            bondLevel={wakeUpBondLevel}
+          />
+        </Suspense>
+      ) : null}
+
+      {showStatsAnalysis ? (
+        <Suspense fallback={null}>
+          <LazyCompanionStatAnalysisSurface
+            open
+            onOpenChange={setShowStatsAnalysis}
+            layoutMode={layoutMode}
+          />
+        </Suspense>
+      ) : null}
+
+      {companionChatOpen ? (
+        <Suspense fallback={null}>
+          <LazyCompanionChatModal
+            open
+            onOpenChange={setCompanionChatOpen}
+            layoutMode={layoutMode}
+          />
+        </Suspense>
+      ) : null}
 
       <Dialog open={hatchDialogOpen} onOpenChange={setHatchDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -1208,15 +1245,17 @@ export const CompanionDisplay = memo(({
               Choose The Hatch
             </DialogTitle>
           </DialogHeader>
-          {companion ? (
-            <CompanionPersonalization
-              onComplete={handleHatchSelection}
-              mode="hatch"
-              layout="compact"
-              initialElement={companion.core_element as CompanionElementId}
-              initialStoryTone={(companion.story_tone ?? "epic_adventure") as CompanionStoryTone}
-              initialCompanionName={companion.companion_name ?? null}
-            />
+          {hatchDialogOpen && companion ? (
+            <Suspense fallback={<CompanionSkeleton />}>
+              <LazyCompanionPersonalization
+                onComplete={handleHatchSelection}
+                mode="hatch"
+                layout="compact"
+                initialElement={companion.core_element as CompanionElementId}
+                initialStoryTone={(companion.story_tone ?? "epic_adventure") as CompanionStoryTone}
+                initialCompanionName={companion.companion_name ?? null}
+              />
+            </Suspense>
           ) : null}
         </DialogContent>
       </Dialog>

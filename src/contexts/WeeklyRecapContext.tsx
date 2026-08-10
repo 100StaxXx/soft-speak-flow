@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react";
-import { WeeklyRecap } from "@/hooks/useWeeklyRecap";
+import type { WeeklyRecap } from "@/types/weeklyRecap";
 
 interface WeeklyRecapContextType {
   isModalOpen: boolean;

@@ -4,7 +4,6 @@ import {
   ArrowLeft, 
   Sparkles, 
   Swords, 
-  Users, 
   Target, 
   MessageCircle, 
   Zap, 
@@ -197,30 +196,6 @@ const HelpCenter = () => {
         {
           title: "Switching Guides",
           content: "Change your guide anytime in Command Center. Your conversation history and progress are preserved - only the guide's voice and personality change. Experiment to find the guide that best supports your current needs."
-        }
-      ]
-    },
-    {
-      id: "guilds",
-      title: "Guilds & Community",
-      icon: Users,
-      color: "text-cyan-400",
-      items: [
-        {
-          title: "Joining Guilds",
-          content: "Guilds are communities of Cosmiq users working toward common goals. Join public guilds or create private ones for friends. Guild members can see each other's progress and encourage one another."
-        },
-        {
-          title: "Guild Features",
-          content: "In guilds, you can: view member activity and streaks, send 'shouts' to encourage others, set friendly rivalries for motivation, and collaborate on Shared Epics. Guilds add a social layer to your personal growth journey."
-        },
-        {
-          title: "Creating a Guild",
-          content: "Start your own guild with a custom name, description, and theme. Invite friends via invite code or make it public for anyone to join. As the owner, you can customize the guild's appearance and manage members."
-        },
-        {
-          title: "Guild Stories",
-          content: "Active guilds unlock collective story chapters as members reach milestones together. These narratives feature all guild members' companions and celebrate shared achievements."
         }
       ]
     },

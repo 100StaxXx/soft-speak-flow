@@ -88,7 +88,7 @@ describe("journeys companion launcher greetings", () => {
       id: "goal",
       label: "Let's lock in a new goal",
       message: "Let's lock in a new goal",
-      target: "campaign_builder",
+      target: "planner",
       starterIntent: "goal_breakdown_start",
     });
 

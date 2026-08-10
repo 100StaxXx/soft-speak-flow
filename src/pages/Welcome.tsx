@@ -115,14 +115,14 @@ const Welcome = () => {
             <div className="pointer-events-auto mx-auto mt-9 flex w-full max-w-xl flex-col gap-3 sm:flex-row sm:justify-center">
               <a
                 href="/auth?mode=signup"
-                className="inline-flex h-14 flex-1 items-center justify-center gap-2 border border-cyan-100/70 bg-cyan-100 px-6 text-sm font-semibold uppercase tracking-[0.18em] text-slate-950 transition hover:bg-white sm:max-w-[16rem]"
+                className="inline-flex min-h-14 w-full items-center justify-center gap-2 border border-cyan-100/70 bg-cyan-100 px-6 text-sm font-semibold uppercase tracking-[0.18em] text-slate-950 transition hover:bg-white sm:max-w-[16rem] sm:flex-1"
               >
                 <UserPlus className="h-4 w-4" />
                 Register
               </a>
               <a
                 href="/auth"
-                className="inline-flex h-14 flex-1 items-center justify-center gap-2 border border-white/24 bg-black/28 px-6 text-sm font-semibold uppercase tracking-[0.18em] text-white backdrop-blur-md transition hover:border-white/48 hover:bg-white/12 sm:max-w-[16rem]"
+                className="inline-flex min-h-14 w-full items-center justify-center gap-2 border border-white/24 bg-black/28 px-6 text-sm font-semibold uppercase tracking-[0.18em] text-white backdrop-blur-md transition hover:border-white/48 hover:bg-white/12 sm:max-w-[16rem] sm:flex-1"
               >
                 <LogIn className="h-4 w-4" />
                 Sign in

@@ -48,6 +48,22 @@ Deno.test("google-calendar-events maps synced UTC instants back to local quest t
   assertEquals(patch.estimated_duration, 30, "Expected provider pull to preserve duration");
 });
 
+Deno.test("google-calendar-events maps live range events into read-only planner context", () => {
+  const event = moduleUnderTest.mapGoogleRangeEvent(
+    {
+      id: "event-1",
+      summary: "Design review",
+      start: { dateTime: "2026-05-11T17:00:00-07:00" },
+      end: { dateTime: "2026-05-11T17:45:00-07:00" },
+      location: "Studio",
+    },
+    "connection-1",
+  );
+  assertEquals(event?.title, "Design review", "Expected the event title");
+  assertEquals(event?.source, "google", "Expected Google attribution");
+  assertEquals(event?.read_only, true, "Expected external events to stay read-only");
+});
+
 Deno.test("google-calendar-events exposes read-only events for the agenda", () => {
   const event = moduleUnderTest.toGoogleExternalCalendarEvent(
     {

@@ -30,34 +30,35 @@ describe("companionImageFocal", () => {
     });
   });
 
-  it("uses the normalized egg focal point for contain presentation", () => {
-    expect(
-      resolveCompanionImagePresentation({
-        src: "/companion-eggs/egg__t0_egg__normal__nature.png",
-        fit: "contain",
-      }),
-    ).toMatchObject({
+  it("preserves normalized egg metadata while centering contain presentation", () => {
+    const presentation = resolveCompanionImagePresentation({
+      src: "/companion-eggs/egg__t0_egg__normal__nature.png",
+      fit: "contain",
+    });
+
+    expect(presentation).toMatchObject({
       focalSource: "manifest",
       style: {
-        transform: "translate(0.098%, -2.051%)",
+        objectPosition: "center center",
       },
     });
+    expect(presentation.style).not.toHaveProperty("transform");
   });
 
-  it("uses the same normalized focal treatment for the primary WebP egg art", () => {
-    expect(
-      resolveCompanionImagePresentation({
-        src: "/companion-eggs/v2/egg__t0_egg__normal__storm.webp",
-        fit: "portrait",
-      }),
-    ).toMatchObject({
+  it("centers primary WebP egg art without discarding its manifest metadata", () => {
+    const presentation = resolveCompanionImagePresentation({
+      src: "/companion-eggs/v2/egg__t0_egg__normal__storm.webp",
+      fit: "portrait",
+    });
+
+    expect(presentation).toMatchObject({
       focalSource: "manifest",
       assetKey: "companion-eggs/v2/egg__t0_egg__normal__storm.webp",
       style: {
         objectPosition: "center center",
-        transform: "translate(0.056%, -2.056%)",
       },
     });
+    expect(presentation.style).not.toHaveProperty("transform");
   });
 
   it("keeps every bundled elemental egg on the shared art focal contract", () => {

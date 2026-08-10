@@ -1246,10 +1246,10 @@ describe("useCompanion evolveCompanion", () => {
         p_preset_id: "wolf",
         p_current_image_url: "/companion-eggs/v2/egg__t0_egg__normal__fire.webp",
         p_current_image_focal_x: 0.5,
-        p_current_image_focal_y: 0.5,
+        p_current_image_focal_y: 0.520556,
         p_initial_image_url: "/companion-eggs/v2/egg__t0_egg__normal__fire.webp",
         p_initial_image_focal_x: 0.5,
-        p_initial_image_focal_y: 0.5,
+        p_initial_image_focal_y: 0.520556,
       }),
     );
   });

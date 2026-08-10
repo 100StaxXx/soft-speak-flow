@@ -7,6 +7,14 @@ const product = JSON.parse(fs.readFileSync(path.join(projectRoot, "product.confi
 
 const read = (relativePath) => fs.readFileSync(path.join(projectRoot, relativePath), "utf8");
 const failures = [];
+const walkTextFiles = (directory) => fs.readdirSync(path.join(projectRoot, directory), { withFileTypes: true })
+  .flatMap((entry) => {
+    const relativePath = path.join(directory, entry.name);
+    if (entry.isDirectory()) return walkTextFiles(relativePath);
+    return /\.(?:ts|tsx|js|mjs|cjs|html|md|json|plist)$/.test(entry.name)
+      ? [relativePath]
+      : [];
+  });
 const requireText = (relativePath, expected) => {
   if (!read(relativePath).includes(expected)) {
     failures.push(`${relativePath} must contain ${JSON.stringify(expected)}`);
@@ -43,6 +51,20 @@ for (const identityFile of [
   rejectText(identityFile, "Graceward");
   rejectText(identityFile, "Soft Speak Flow");
 }
+
+for (const productFacingFile of [
+  "index.html",
+  "capacitor.config.ts",
+  ...walkTextFiles("src"),
+  ...walkTextFiles("public"),
+]) {
+  rejectText(productFacingFile, "Graceward");
+  rejectText(productFacingFile, "Soft Speak Flow");
+}
+
+requireText("src/pages/Welcome.tsx", "Cosmiq Quest");
+requireText("src/pages/Auth.tsx", "I agree to Cosmiq");
+rejectText("src/pages/HelpCenter.tsx", "Guilds & Community");
 
 if (failures.length > 0) {
   console.error("Cosmiq product-boundary verification failed:\n");

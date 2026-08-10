@@ -70,7 +70,10 @@ import {
 } from "@/utils/companionLatencyMetrics";
 import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
 import type { CompanionChatThreadSummary } from "@/types/companionConversation";
-import type { CompanionAgentFollowUp } from "@/types/companionAgent";
+import type {
+  CompanionAgentFollowUp,
+  PendingActionView,
+} from "@/types/companionAgent";
 import type {
   CompanionPlannerLaunchIntent,
   CompanionPlannerProposal,
@@ -113,6 +116,82 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
+
+const PendingActionPreview = memo(function PendingActionPreview({
+  action,
+}: {
+  action: PendingActionView;
+}) {
+  const payload = asRecord(action.normalizedPayload);
+  if (!payload) return null;
+  const calendarNote = payload.send_to_calendar === true
+    ? `Also send to ${
+      typeof payload.calendar_provider === "string"
+        ? payload.calendar_provider
+        : "connected calendar"
+    }`
+    : null;
+
+  if (action.actionType === "day_plan_apply") {
+    const blocks = Array.isArray(payload.blocks)
+      ? payload.blocks.map(asRecord).filter(Boolean)
+      : [];
+    return (
+      <div className="mt-3 space-y-2 rounded-2xl border border-white/[0.08] bg-black/10 p-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {String(payload.plan_date ?? "Day plan")}
+        </p>
+        {blocks.map((block, index) => (
+          <div key={`${String(block?.start_time)}-${index}`} className="flex items-start gap-3 text-sm">
+            <span className="w-12 shrink-0 font-medium text-foreground">
+              {String(block?.start_time ?? "")}
+            </span>
+            <span className="min-w-0 flex-1 text-foreground">
+              {String(block?.title ?? "Focus block")}
+            </span>
+            <span className="shrink-0 text-muted-foreground">
+              {String(block?.duration_minutes ?? 30)}m
+            </span>
+          </div>
+        ))}
+        {calendarNote ? <p className="text-xs text-muted-foreground">{calendarNote}</p> : null}
+      </div>
+    );
+  }
+
+  if (action.actionType === "campaign_create") {
+    const rituals = Array.isArray(payload.rituals)
+      ? payload.rituals.map(asRecord).filter(Boolean)
+      : [];
+    return (
+      <div className="mt-3 rounded-2xl border border-white/[0.08] bg-black/10 p-3 text-sm">
+        <p className="font-medium text-foreground">
+          {String(payload.target_days ?? 30)} days
+        </p>
+        <ul className="mt-2 space-y-1 text-muted-foreground">
+          {rituals.map((ritual, index) => (
+            <li key={`${String(ritual?.title)}-${index}`}>
+              {String(ritual?.title ?? "Daily ritual")} · {String(ritual?.frequency ?? "daily")}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
+  if (action.actionType === "task_create") {
+    return (
+      <div className="mt-3 rounded-2xl border border-white/[0.08] bg-black/10 p-3 text-sm text-muted-foreground">
+        <span className="font-medium text-foreground">{String(payload.title ?? "New task")}</span>
+        {payload.task_date ? ` · ${String(payload.task_date)}` : " · Inbox"}
+        {payload.scheduled_time ? ` at ${String(payload.scheduled_time)}` : ""}
+        {calendarNote ? <p className="mt-1 text-xs">{calendarNote}</p> : null}
+      </div>
+    );
+  }
+
+  return null;
+});
 
 const readSnapshotValue = (
   snapshot: Record<string, unknown> | null,
@@ -1176,6 +1255,7 @@ const JourneysCompanionOverlayBody = memo(
                       <p className="mt-3 text-sm font-semibold text-foreground">
                         {assistant.pendingAction.summary}
                       </p>
+                      <PendingActionPreview action={assistant.pendingAction} />
                       {assistant.pendingAction.confirmationMessage ? (
                         <p className="mt-1 text-sm text-muted-foreground">
                           {assistant.pendingAction.confirmationMessage}
