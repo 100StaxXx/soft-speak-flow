@@ -20,6 +20,7 @@ Deno.test("living narrative side quest acceptance is atomic and idempotent", () 
 
 Deno.test("companion is an allowed inbox task source", () => {
   assertMatch(sql, /daily_tasks_source_check/);
+  assertMatch(sql, /'faithful_step'/);
   assertMatch(sql, /'companion'/);
   assertMatch(sql, /task_date,[\s\S]*scheduled_time,[\s\S]*source/);
   assertMatch(sql, /NULL,[\s\S]*NULL,[\s\S]*'easy'/);

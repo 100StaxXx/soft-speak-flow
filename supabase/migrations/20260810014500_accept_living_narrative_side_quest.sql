@@ -16,6 +16,7 @@ ALTER TABLE public.daily_tasks
         'onboarding',
         'plan_my_day',
         'outlook_sync',
+        'faithful_step',
         'companion'
       ]
     )
