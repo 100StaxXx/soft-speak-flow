@@ -433,12 +433,12 @@ function isRecord(value) {
 }
 
 function printUsage() {
-  console.log(`Usage:
-  SUPABASE_SERVICE_ROLE_KEY=... node scripts/apply-loading-screen-hotfix.mjs tester@example.com
-  SUPABASE_SERVICE_ROLE_KEY=... node scripts/apply-loading-screen-hotfix.mjs user-uuid-1 user-uuid-2
-  SUPABASE_SERVICE_ROLE_KEY=... node scripts/apply-loading-screen-hotfix.mjs --file affected-testers.txt
-  SUPABASE_SERVICE_ROLE_KEY=... node scripts/apply-loading-screen-hotfix.mjs --dry-run tester@example.com
-  SUPABASE_SERVICE_ROLE_KEY=... node scripts/apply-loading-screen-hotfix.mjs --rollback .hotfix-backups/loading-screen-hotfix-2026-05-28/<backup>.json
+  console.log(`Usage (with SUPABASE_SERVICE_ROLE_KEY already set in your environment):
+  node scripts/apply-loading-screen-hotfix.mjs tester@example.com
+  node scripts/apply-loading-screen-hotfix.mjs user-uuid-1 user-uuid-2
+  node scripts/apply-loading-screen-hotfix.mjs --file affected-testers.txt
+  node scripts/apply-loading-screen-hotfix.mjs --dry-run tester@example.com
+  node scripts/apply-loading-screen-hotfix.mjs --rollback .hotfix-backups/loading-screen-hotfix-2026-05-28/<backup>.json
 
 Options:
   --days N              Manual access duration. Default: ${DEFAULT_GRANT_DAYS}

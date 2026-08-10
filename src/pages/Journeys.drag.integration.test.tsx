@@ -595,7 +595,21 @@ vi.mock("@/hooks/useQuestCalendarSync", () => ({
       mutateAsync: mocks.sendTaskToCalendarMutateAsync,
       isPending: false,
     },
+    syncLinkedTask: { mutateAsync: vi.fn() },
+    removeTaskFromCalendars: { mutateAsync: vi.fn() },
     hasLinkedEvent: mocks.hasLinkedEvent,
+    links: [],
+    outlookTaskLinks: [],
+  }),
+}));
+
+vi.mock("@/hooks/useExternalCalendarEvents", () => ({
+  useExternalCalendarEvents: () => ({
+    events: [],
+    errors: [],
+    connectedProviderCount: 0,
+    isFetching: false,
+    refresh: vi.fn(),
   }),
 }));
 
@@ -626,6 +640,7 @@ vi.mock("@/hooks/useDailyTasks", () => ({
     deleteTask: mocks.deleteTask,
     restoreTask: mocks.restoreTask,
     moveTaskToDate: mocks.moveTaskToDate,
+    moveTaskToDateAsync: mocks.moveTaskToDate,
     completedCount: mocks.dailyTasks.filter((task) => task.completed).length,
     totalCount: mocks.dailyTasks.length,
     isAdding: false,

@@ -336,7 +336,7 @@ describe('AstralEncounterModal companion portrait resolution', () => {
     });
 
     const props = getLastBattleProps();
-    expect(props.companionImageUrl).toBe('/companion-eggs/egg__t0_egg__normal__light.png');
+    expect(props.companionImageUrl).toBe('/companion-eggs/v2/egg__t0_egg__normal__light.webp');
   });
 
   it('passes through already-correct stage 1 hatchling art', () => {

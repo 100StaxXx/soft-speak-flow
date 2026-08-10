@@ -345,7 +345,7 @@ export function CalendarIntegrationsSettings() {
           Calendar Integrations
         </CardTitle>
         <CardDescription className="text-xs">
-          Connect destinations for sending quests to external calendars.
+          Show selected calendars in Agenda and send quests outward when you choose. Imported events stay read-only.
         </CardDescription>
       </CardHeader>
 
@@ -396,6 +396,11 @@ export function CalendarIntegrationsSettings() {
                           ? appleNativeUnavailableReason || 'Apple Calendar is unavailable in this app build.'
                         : 'Not connected'}
                   </p>
+                  {connection?.last_synced_at ? (
+                    <p className="mt-1 text-[11px] text-muted-foreground/80">
+                      Agenda synced {new Date(connection.last_synced_at).toLocaleString()}
+                    </p>
+                  ) : null}
                 </div>
 
                 {connection ? (

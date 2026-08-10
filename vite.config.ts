@@ -481,29 +481,58 @@ export default defineConfig(({ mode }) => {
 
             const normalizedId = id.split(path.sep).join("/");
 
+            if (normalizedId.endsWith('/src/components/companion/FocusTab.tsx')) {
+              return 'companion-focus';
+            }
+            if (normalizedId.endsWith('/src/components/companion/CollectionTab.tsx')) {
+              return 'companion-collection';
+            }
             if (normalizedId.includes('/node_modules/')) {
-              // Keep the React runtime and startup React-adjacent UI stack together.
-              // Route-only React libraries are left to Rollup so lazy pages do not
-              // get pulled back into the initial vendor payload.
               if (
                 normalizedId.includes('/node_modules/react/') ||
                 normalizedId.includes('/node_modules/react-dom/') ||
-                normalizedId.includes('/node_modules/scheduler/') ||
+                normalizedId.includes('/node_modules/scheduler/')
+              ) {
+                return 'react-vendor';
+              }
+
+              if (
                 normalizedId.includes('/node_modules/react-router/') ||
-                normalizedId.includes('/node_modules/react-router-dom/') ||
+                normalizedId.includes('/node_modules/react-router-dom/')
+              ) {
+                return 'router-vendor';
+              }
+
+              if (
                 normalizedId.includes('/node_modules/@tanstack/react-query/') ||
-                normalizedId.includes('/node_modules/@supabase/') ||
-                normalizedId.includes('/node_modules/framer-motion/') ||
+                normalizedId.includes('/node_modules/@supabase/')
+              ) {
+                return 'data-vendor';
+              }
+
+              if (normalizedId.includes('/node_modules/framer-motion/')) {
+                return 'motion-vendor';
+              }
+
+              if (
                 normalizedId.includes('/node_modules/@radix-ui/') ||
                 normalizedId.includes('/node_modules/@floating-ui/') ||
-                normalizedId.includes('/node_modules/lucide-react/') ||
                 normalizedId.includes('/node_modules/sonner/') ||
-                normalizedId.includes('/node_modules/vaul/') ||
+                normalizedId.includes('/node_modules/vaul/')
+              ) {
+                return 'ui-vendor';
+              }
+
+              if (normalizedId.includes('/node_modules/lucide-react/')) {
+                return 'icons-vendor';
+              }
+
+              if (
                 normalizedId.includes('/node_modules/class-variance-authority/') ||
                 normalizedId.includes('/node_modules/clsx/') ||
                 normalizedId.includes('/node_modules/tailwind-merge/')
               ) {
-                return 'vendor';
+                return 'style-vendor';
               }
 
               if (normalizedId.includes('/node_modules/@sentry/')) return 'sentry-vendor';
@@ -528,7 +557,7 @@ export default defineConfig(({ mode }) => {
           }
         },
       },
-      chunkSizeWarningLimit: 1300,
+      chunkSizeWarningLimit: 700,
       sourcemap: false, // Disable source maps in production for smaller bundle
       reportCompressedSize: false, // Faster builds
     },

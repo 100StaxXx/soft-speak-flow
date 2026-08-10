@@ -58,10 +58,12 @@ export function useAccessStatus(): AccessStatus {
 
   const loading = profileLoading || accessLoading;
 
-  // If still loading, return safe defaults (grant access during load to avoid flash)
+  // Entitlement checks fail closed while they are unresolved. ProtectedRoute can
+  // keep a previously resolved decision for the same user during background
+  // refreshes, but a new session must never inherit optimistic access.
   if (loading) {
     return {
-      hasAccess: true, // Optimistic - don't block during load
+      hasAccess: false,
       isSubscribed: false,
       isInTrial: false,
       trialExpired: false,
@@ -73,16 +75,17 @@ export function useAccessStatus(): AccessStatus {
     };
   }
 
-  // Profile should exist for authenticated users, but fail open if it does not.
+  // Profile data is part of the access decision. A missing profile must not
+  // become an implicit entitlement.
   if (!profile) {
     return {
-      hasAccess: true,
+      hasAccess: false,
       isSubscribed,
       isInTrial: false,
       trialExpired: false,
       trialDaysRemaining: 0,
       accessSource: isSubscribed ? 'subscription' : 'none',
-      gateReason: 'none' as AccessGateReason,
+      gateReason: 'pre_trial_signup' as AccessGateReason,
       trialEndsAt: null,
       loading: false,
     };

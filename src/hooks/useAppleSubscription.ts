@@ -135,6 +135,7 @@ export function useAppleSubscription() {
     isAvailable,
     products,
     productsLoading,
+    productsError = null,
     activePlan: storeKitPlan,
     currentEntitlement,
     purchase,
@@ -169,6 +170,7 @@ export function useAppleSubscription() {
   }, [hasOfferCode]);
 
   const hasLoadedProducts = products.length > 0;
+  const effectiveProductError = productError ?? productsError;
 
   const invalidateSubscriptionState = useCallback(async () => {
     if (!user?.id) return;
@@ -888,7 +890,7 @@ export function useAppleSubscription() {
     isAvailable,
     products,
     productsLoading,
-    productError,
+    productError: effectiveProductError,
     hasLoadedProducts,
     reloadProducts,
     hasOfferCode,

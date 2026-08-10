@@ -11,6 +11,18 @@ describe("parseDeepLink", () => {
     });
   });
 
+  it.each([
+    "com.darrylgraham.revolution://tasks/task-legacy",
+    "https://app.cosmiq.quest/task/task-legacy",
+    "https://cosmiq.quest/tasks/task-legacy",
+  ])("normalizes legacy and universal task URLs from %s", (url) => {
+    expect(parseDeepLink(url)).toEqual({
+      type: "task",
+      taskId: "task-legacy",
+      rawUrl: url,
+    });
+  });
+
   it("parses calendar oauth callback deep links", () => {
     const parsed = parseDeepLink(
       "cosmiq://calendar/oauth/callback?provider=google&status=error&message=OAuth%20failed",
@@ -43,6 +55,18 @@ describe("parseDeepLink", () => {
     });
   });
 
+  it.each([
+    "com.darrylgraham.revolution://epics/join/EPIC-OLD-1234",
+    "https://app.cosmiq.quest/join/EPIC-OLD-1234",
+    "https://cosmiq.quest/campaigns/join/EPIC-OLD-1234",
+  ])("normalizes legacy and universal epic invite URLs from %s", (url) => {
+    expect(parseDeepLink(url)).toEqual({
+      type: "join_epic",
+      path: "/join/EPIC-OLD-1234",
+      rawUrl: url,
+    });
+  });
+
   it.each(["cosmiq://journeys", "cosmiq://journeys/plan"])(
     "parses widget journeys deep links from %s",
     (url) => {
@@ -54,6 +78,18 @@ describe("parseDeepLink", () => {
       });
     },
   );
+
+  it.each([
+    "com.darrylgraham.revolution://journeys",
+    "https://app.cosmiq.quest/journeys",
+    "https://cosmiq.quest/tasks",
+  ])("normalizes legacy and universal journeys URLs from %s", (url) => {
+    expect(parseDeepLink(url)).toEqual({
+      type: "journeys",
+      path: "/journeys",
+      rawUrl: url,
+    });
+  });
 
   it("parses hosted auth recovery links", () => {
     const parsed = parseDeepLink(

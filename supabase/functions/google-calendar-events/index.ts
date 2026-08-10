@@ -12,6 +12,7 @@ const GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3";
 type SyncMode = "send_only";
 
 type Action =
+  | "listEvents"
   | "createLinkedEvent"
   | "updateLinkedEvent"
   | "deleteLinkedEvent";
@@ -27,6 +28,7 @@ interface CalendarConnection {
   primary_calendar_id: string | null;
   primary_calendar_name: string | null;
   sync_mode: SyncMode;
+  last_synced_at?: string | null;
 }
 
 interface DailyTask {
@@ -54,6 +56,8 @@ function normalizeAction(raw: string | undefined): Action | null {
   if (!raw) return null;
 
   const map: Record<string, Action> = {
+    listEvents: "listEvents",
+    list_events: "listEvents",
     createLinkedEvent: "createLinkedEvent",
     create_linked_event: "createLinkedEvent",
     updateLinkedEvent: "updateLinkedEvent",
@@ -63,6 +67,29 @@ function normalizeAction(raw: string | undefined): Action | null {
   };
 
   return map[raw] ?? null;
+}
+
+function parseEventRange(body: Record<string, unknown>): { startDate: string; endDate: string } {
+  const startDate = typeof body.startDate === "string" ? body.startDate : "";
+  const endDate = typeof body.endDate === "string" ? body.endDate : "";
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  if (
+    !startDate
+    || !endDate
+    || Number.isNaN(start.getTime())
+    || Number.isNaN(end.getTime())
+    || end <= start
+  ) {
+    throw new Error("A valid startDate and endDate range is required");
+  }
+
+  if (end.getTime() - start.getTime() > 62 * 24 * 60 * 60 * 1000) {
+    throw new Error("Calendar event range cannot exceed 62 days");
+  }
+
+  return { startDate: start.toISOString(), endDate: end.toISOString() };
 }
 
 function normalizeSyncMode(mode: unknown): SyncMode {
@@ -286,6 +313,38 @@ export function mapGoogleEventToTaskUpdate(
   };
 }
 
+export function toGoogleExternalCalendarEvent(
+  event: Record<string, any>,
+  calendarId: string,
+  calendarName: string,
+) {
+  const id = typeof event.id === "string" ? event.id : "";
+  const startDate = typeof event.start?.date === "string"
+    ? event.start.date
+    : typeof event.start?.dateTime === "string"
+      ? event.start.dateTime
+      : "";
+  const endDate = typeof event.end?.date === "string"
+    ? event.end.date
+    : typeof event.end?.dateTime === "string"
+      ? event.end.dateTime
+      : "";
+
+  if (!id || !startDate || !endDate || event.status === "cancelled") return null;
+
+  return {
+    id,
+    title: typeof event.summary === "string" && event.summary.trim() ? event.summary : "Busy",
+    startDate,
+    endDate,
+    isAllDay: Boolean(event.start?.date),
+    location: typeof event.location === "string" ? event.location : null,
+    calendarId,
+    calendarName,
+    htmlLink: typeof event.htmlLink === "string" ? event.htmlLink : null,
+  };
+}
+
 async function googleApi(
   accessToken: string,
   path: string,
@@ -384,6 +443,50 @@ async function handleGoogleCalendarEvents(req: Request) {
 
     const connection = await getGoogleConnection(supabase, userId);
     const accessToken = await refreshAccessTokenIfNeeded(supabase, connection, googleClientId, googleClientSecret);
+
+    if (action === "listEvents") {
+      const range = parseEventRange(body as Record<string, unknown>);
+      const externalCalendarId =
+        (body?.calendarId || body?.calendar_id) as string | undefined
+        || connection.primary_calendar_id
+        || connection.calendar_id
+        || "primary";
+      const calendarName = connection.primary_calendar_name || "Google Calendar";
+      const query = new URLSearchParams({
+        timeMin: range.startDate,
+        timeMax: range.endDate,
+        singleEvents: "true",
+        orderBy: "startTime",
+        maxResults: "2500",
+      });
+      const events = [];
+      let nextPageToken: string | null = null;
+      let pageCount = 0;
+
+      do {
+        if (nextPageToken) query.set("pageToken", nextPageToken);
+        const response = await googleApi(
+          accessToken,
+          `/calendars/${encodeURIComponent(externalCalendarId)}/events?${query.toString()}`,
+        );
+        events.push(
+          ...(Array.isArray(response?.items) ? response.items : [])
+            .map((event: Record<string, unknown>) =>
+              toGoogleExternalCalendarEvent(event, externalCalendarId, calendarName))
+            .filter(Boolean),
+        );
+        nextPageToken = typeof response?.nextPageToken === "string" ? response.nextPageToken : null;
+        pageCount += 1;
+      } while (nextPageToken && pageCount < 10);
+      const syncedAt = new Date().toISOString();
+
+      await supabase
+        .from("user_calendar_connections")
+        .update({ last_synced_at: syncedAt, updated_at: syncedAt })
+        .eq("id", connection.id);
+
+      return jsonResponse({ events, syncedAt });
+    }
 
     if (action === "createLinkedEvent") {
       const taskId = (body?.taskId || body?.task_id) as string | undefined;
@@ -544,7 +647,11 @@ async function handleGoogleCalendarEvents(req: Request) {
     return jsonResponse({ error: "Unsupported action" }, 400);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Internal server error";
-    const status = message.toLowerCase().includes("unauthorized") ? 401 : 500;
+    const status = message.toLowerCase().includes("unauthorized")
+      ? 401
+      : message.toLowerCase().includes("range")
+        ? 400
+        : 500;
     return jsonResponse({ error: message }, status);
   }
 }

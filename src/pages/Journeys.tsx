@@ -53,13 +53,18 @@ import { useTaskCompletionWithInteraction, type InteractionType } from "@/hooks/
 import { InteractionLogModal } from "@/components/tasks/InteractionLogModal";
 import { getCalendarSendSuccessCopy, useQuestCalendarSync } from "@/hooks/useQuestCalendarSync";
 import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
+import { useExternalCalendarEvents } from "@/hooks/useExternalCalendarEvents";
 import {
   buildCalendarSendTargetOptions,
   isCalendarSendTargetAvailable,
   type CalendarSendTarget,
 } from "@/utils/calendarDestinationOptions";
 import { HourlyViewModal } from "@/components/HourlyViewModal";
-import { JourneysCompanionPlannerModal } from "@/components/journeys/JourneysCompanionPlannerModal";
+import {
+  JourneysCompanionPlannerModal,
+  type JourneysQuestProposalEditHandoff,
+  type JourneysQuestProposalEditResult,
+} from "@/components/journeys/JourneysCompanionPlannerModal";
 import { DraggableFAB } from "@/components/DraggableFAB";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { JOURNEYS_RESET_TO_TODAY_EVENT, JOURNEYS_ROUTE } from "@/pages/journeysDateSync";
@@ -81,7 +86,7 @@ import {
 } from "@/features/quests/utils/voiceQuestPrefill";
 import { resolveCampaignBuilderInitialGoal } from "@/shared/bigGoalIntent";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
-import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
+import type { CompanionPlannerLaunchIntent, CompanionPlannerProposal } from "@/types/companionPlanner";
 import {
   clearCampaignBuilderDraftSnapshot,
   clearCreationPopupMarker,
@@ -92,6 +97,10 @@ import {
 } from "@/utils/creationPopupPersistence";
 import { getEffectiveMissionDate } from "@/utils/timezone";
 import { createPlanDayCompanionLaunchIntent } from "@/utils/companionPlannerLaunchContext";
+import {
+  externalCalendarEventKey,
+  externalCalendarEventToCalendarTask,
+} from "@/types/externalCalendar";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -158,6 +167,57 @@ const createPlannerLaunchIntentId = () =>
     : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 const parseDateKeyAtNoon = (dateKey: string): Date => parseISO(`${dateKey}T12:00:00`);
 
+const readPlannerString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim() ? value.trim() : null;
+
+const readPlannerNumber = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const readPlannerStringArray = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value
+      .filter((entry): entry is string => typeof entry === "string" && Boolean(entry.trim()))
+      .map((entry) => entry.trim())
+    : [];
+
+const buildPlannerQuestPrefill = (
+  proposal: CompanionPlannerProposal,
+): QuestComposerPrefillDraft | null => {
+  if (proposal.kind !== "create_quest") return null;
+
+  const payload = proposal.payload;
+  const title = readPlannerString(payload.taskText) ?? readPlannerString(payload.title) ?? proposal.title.trim();
+  if (!title) return null;
+  const difficulty = payload.difficulty === "easy" || payload.difficulty === "hard"
+    ? payload.difficulty
+    : "medium";
+
+  return {
+    text: title,
+    taskDate: readPlannerString(payload.taskDate),
+    difficulty,
+    scheduledTime: readPlannerString(payload.scheduledTime),
+    estimatedDuration: readPlannerNumber(payload.estimatedDuration),
+    recurrencePattern: readPlannerString(payload.recurrencePattern),
+    recurrenceDays: Array.isArray(payload.recurrenceDays)
+      ? payload.recurrenceDays.filter((day): day is number => Number.isInteger(day))
+      : [],
+    recurrenceMonthDays: Array.isArray(payload.recurrenceMonthDays)
+      ? payload.recurrenceMonthDays.filter((day): day is number => Number.isInteger(day))
+      : [],
+    recurrenceCustomPeriod:
+      payload.recurrenceCustomPeriod === "week" || payload.recurrenceCustomPeriod === "month"
+        ? payload.recurrenceCustomPeriod
+        : null,
+    reminderEnabled: payload.reminderEnabled === true,
+    reminderMinutesBefore: readPlannerNumber(payload.reminderMinutesBefore) ?? 15,
+    moreInformation: readPlannerString(payload.notes) ?? readPlannerString(payload.moreInformation),
+    location: readPlannerString(payload.location),
+    subtasks: readPlannerStringArray(payload.subtasks),
+    creationSource: "nlp",
+  };
+};
+
 const Journeys = () => {
   const prefersReducedMotion = useReducedMotion();
   const location = useLocation();
@@ -186,6 +246,7 @@ const Journeys = () => {
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [isCompanionPlannerPinned, setIsCompanionPlannerPinned] = useState(false);
+  const [isPlannerQuestEditHandoffActive, setIsPlannerQuestEditHandoffActive] = useState(false);
   const [plannerLaunchIntent, setPlannerLaunchIntent] = useState<CompanionPlannerLaunchIntent | null>(null);
   const [showMonthView, setShowMonthView] = useState(false);
   const [desktopPlannerMode, setDesktopPlannerMode] = useState<DesktopPlannerMode>("week");
@@ -217,6 +278,9 @@ const Journeys = () => {
   const inboxSectionRef = useRef<HTMLDivElement | null>(null);
   const notificationTaskProcessedRef = useRef<string | null>(null);
   const notificationTaskDatePinnedRef = useRef(false);
+  const plannerQuestEditResolverRef = useRef<
+    ((result: JourneysQuestProposalEditResult) => void) | null
+  >(null);
   const hasInitializedInboxVisibilityRef = useRef(false);
   const tutorialOverlayCleanupSignatureRef = useRef<string | null>(null);
   const hasConsumedCreationPopupResumeRef = useRef(false);
@@ -287,15 +351,23 @@ const Journeys = () => {
     setPathfinderResumeDraftKey(null);
   }, [user?.id]);
 
+  const finishPlannerQuestEditHandoff = useCallback((result: JourneysQuestProposalEditResult) => {
+    const resolve = plannerQuestEditResolverRef.current;
+    plannerQuestEditResolverRef.current = null;
+    setIsPlannerQuestEditHandoffActive(false);
+    resolve?.(result);
+  }, []);
+
   const handleAddQuestSheetOpenChange = useCallback((nextOpen: boolean) => {
     setAddQuestSheetOpen(nextOpen);
     if (!nextOpen) {
+      finishPlannerQuestEditHandoff({ saved: false });
       clearQuestCreationPopupState();
       setPrefilledTime(null);
       setQuestSheetPrefillDraft(null);
       setQuestSheetPrefillKey(null);
     }
-  }, [clearQuestCreationPopupState, setAddQuestSheetOpen]);
+  }, [clearQuestCreationPopupState, finishPlannerQuestEditHandoff, setAddQuestSheetOpen]);
 
   const openAddQuestSheet = useCallback((options?: {
     date?: Date;
@@ -312,6 +384,25 @@ const Journeys = () => {
     setAutoRestoreQuestDraftOnOpen(false);
     setAddQuestSheetOpen(true);
   }, [setAddQuestSheetOpen]);
+
+  const handleQuestProposalEditHandoff = useCallback<JourneysQuestProposalEditHandoff>((proposal) => {
+    const prefillDraft = buildPlannerQuestPrefill(proposal);
+    if (!prefillDraft) {
+      return Promise.resolve({ saved: false });
+    }
+
+    finishPlannerQuestEditHandoff({ saved: false });
+    setIsPlannerQuestEditHandoffActive(true);
+    openAddQuestSheet({
+      time: prefillDraft.scheduledTime ?? null,
+      prefillDraft,
+      prefillKey: proposal.id,
+    });
+
+    return new Promise<JourneysQuestProposalEditResult>((resolve) => {
+      plannerQuestEditResolverRef.current = resolve;
+    });
+  }, [finishPlannerQuestEditHandoff, openAddQuestSheet]);
 
   const handleEditQuestDialogOpenChange = useCallback((nextOpen: boolean) => {
     if (nextOpen) return;
@@ -649,13 +740,46 @@ const Journeys = () => {
   );
 
   const { currentStreak } = useStreakMultiplier();
-  const { sendTaskToCalendar, hasLinkedEvent } = useQuestCalendarSync({
+  const {
+    sendTaskToCalendar,
+    syncLinkedTask,
+    removeTaskFromCalendars,
+    hasLinkedEvent,
+    links: calendarLinks,
+    outlookTaskLinks,
+  } = useQuestCalendarSync({
     enabled: isTabActive,
   });
   const {
     connections: calendarConnections,
     defaultProvider: calendarDefaultProvider,
   } = useCalendarIntegrations({ enabled: isTabActive });
+  const {
+    events: fetchedExternalCalendarEvents,
+    errors: externalCalendarErrors,
+    connectedProviderCount: connectedExternalCalendarCount,
+    isFetching: isExternalCalendarSyncing,
+    refresh: refreshExternalCalendars,
+  } = useExternalCalendarEvents(selectedDate, { enabled: isTabActive });
+  const linkedExternalCalendarEventKeys = useMemo(
+    () => new Set(calendarLinks.map((link) => `${link.provider}:${link.external_event_id}`)),
+    [calendarLinks],
+  );
+  const externalCalendarEvents = useMemo(
+    () => fetchedExternalCalendarEvents.filter(
+      (event) => !linkedExternalCalendarEventKeys.has(externalCalendarEventKey(event)),
+    ),
+    [fetchedExternalCalendarEvents, linkedExternalCalendarEventKeys],
+  );
+  const selectedDateExternalCalendarEvents = useMemo(() => {
+    const selectedDateKey = format(selectedDate, "yyyy-MM-dd");
+    return externalCalendarEvents.filter((event) => event.taskDate === selectedDateKey);
+  }, [externalCalendarEvents, selectedDate]);
+  const externalCalendarSyncError = externalCalendarErrors.length > 0
+    ? externalCalendarErrors
+      .map((error) => `${error.provider}: ${error.message}`)
+      .join(" ")
+    : null;
 
   // Contact interaction logging
   const {
@@ -684,7 +808,7 @@ const Journeys = () => {
     updateTask,
     deleteTask,
     restoreTask,
-    moveTaskToDate,
+    moveTaskToDateAsync,
     completedCount,
     totalCount,
     isAdding,
@@ -700,7 +824,7 @@ const Journeys = () => {
   } = useInboxTasks({ enabled: isTabActive });
 
 
-  const isCompanionPlannerBlocked = showAddSheet
+  const isCompanionPlannerBlocked = (showAddSheet && !isPlannerQuestEditHandoffActive)
     || showMonthView
     || showPageInfo
     || showPathfinder
@@ -769,6 +893,13 @@ const Journeys = () => {
   );
   const { tasks: allCalendarTasks } = useCalendarTasks(selectedDate, "month", { enabled: isTabActive });
   const { tasks: weekCalendarTasks } = useCalendarTasks(selectedDate, "week", { enabled: isTabActive });
+  const calendarTasksWithExternalEvents = useMemo(
+    () => [
+      ...allCalendarTasks,
+      ...externalCalendarEvents.map(externalCalendarEventToCalendarTask),
+    ],
+    [allCalendarTasks, externalCalendarEvents],
+  );
   const isSelectedDateToday = isSameDay(selectedDate, effectiveTodayDate);
   const fabPlanDayLabel = isSelectedDateToday ? "Plan Today" : "Plan Day";
   const createFabPlanDayLaunchIntent = useCallback(() => {
@@ -1168,12 +1299,12 @@ const Journeys = () => {
 
   const tasksPerDay = useMemo(() => {
     const map: Record<string, number> = {};
-    allCalendarTasks.forEach((task: { task_date?: string | null }) => {
+    calendarTasksWithExternalEvents.forEach((task: { task_date?: string | null }) => {
       if (!task.task_date) return;
       map[task.task_date] = (map[task.task_date] || 0) + 1;
     });
     return map;
-  }, [allCalendarTasks]);
+  }, [calendarTasksWithExternalEvents]);
 
   const handleOpenCalendarPreferences = useCallback(() => {
     navigate("/profile", { state: { openTab: "preferences" } });
@@ -1388,6 +1519,7 @@ const Journeys = () => {
 
     setAddQuestSheetOpen(false);
     clearQuestCreationPopupState();
+    finishPlannerQuestEditHandoff({ saved: true, savedTitle: data.text });
 
     if (SEND_TO_CALENDAR_ENABLED && data.sendToCalendar && createdTask?.id) {
       const calendarSendStartedAt = Date.now();
@@ -1408,6 +1540,7 @@ const Journeys = () => {
     selectedDate,
     addTask,
     clearQuestCreationPopupState,
+    finishPlannerQuestEditHandoff,
     handleSendTaskToCalendar,
     setAddQuestSheetOpen,
   ]);
@@ -1485,12 +1618,25 @@ const Journeys = () => {
     }
     queryClient.invalidateQueries({ queryKey: ["inbox-tasks"] });
     queryClient.invalidateQueries({ queryKey: ["inbox-count"] });
+    if (hasLinkedEvent(taskId)) {
+      try {
+        await syncLinkedTask.mutateAsync({ taskId });
+      } catch (error) {
+        logger.warn("Quest saved but its linked calendar copy did not sync", {
+          taskId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        toast.error("Quest saved, but its linked calendar item could not be updated.");
+      }
+    }
     setEditingTask(null);
   }, [
+    hasLinkedEvent,
     queryClient,
     queueAction,
     retryNow,
     shouldQueueWrites,
+    syncLinkedTask,
     updateTask,
     user?.id,
   ]);
@@ -1501,6 +1647,9 @@ const Journeys = () => {
       .catch(() => undefined)
       .then(async () => {
         await updateTask({ taskId, updates: { scheduled_time: newTime } });
+        if (hasLinkedEvent(taskId)) {
+          await syncLinkedTask.mutateAsync({ taskId });
+        }
       })
       .catch((error) => {
         logger.warn("Failed to update quest scheduled time from timeline drag", {
@@ -1515,17 +1664,29 @@ const Journeys = () => {
       });
 
     scheduledTimeUpdateQueueRef.current.set(taskId, nextTaskUpdate);
-  }, [updateTask]);
+  }, [hasLinkedEvent, syncLinkedTask, updateTask]);
 
   const handleDeleteQuest = useCallback(async (taskId: string, isAIGenerated?: boolean) => {
     // Track deletion for AI learning
     if (isAIGenerated) {
       trackDailyPlanOutcome(taskId, 'deleted');
     }
+    if (hasLinkedEvent(taskId)) {
+      try {
+        await removeTaskFromCalendars.mutateAsync({ taskId });
+      } catch (error) {
+        logger.warn("Failed to remove linked calendar item before deleting quest", {
+          taskId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        toast.error("Could not remove the linked calendar item. The quest was not deleted.");
+        return;
+      }
+    }
     await deleteTask(taskId);
     toast.success("Quest deleted");
     setEditingTask(null);
-  }, [deleteTask, trackDailyPlanOutcome]);
+  }, [deleteTask, hasLinkedEvent, removeTaskFromCalendars, trackDailyPlanOutcome]);
 
   const createRestorableTaskData = useCallback((task: DailyTask) => ({
     task_text: task.task_text,
@@ -1555,6 +1716,10 @@ const Journeys = () => {
 
   const handleDeleteQuestFromWeekPlanner = useCallback(async (task: DailyTask) => {
     const taskData = createRestorableTaskData(task);
+    const linkedProviders = Array.from(new Set([
+      ...calendarLinks.filter((link) => link.task_id === task.id).map((link) => link.provider),
+      ...outlookTaskLinks.filter((link) => link.task_id === task.id).map(() => "outlook" as const),
+    ]));
 
     if (task.ai_generated) {
       trackDailyPlanOutcome(task.id, 'deleted');
@@ -1566,6 +1731,19 @@ const Journeys = () => {
       // Haptics not available on web
     }
 
+    if (linkedProviders.length > 0) {
+      try {
+        await removeTaskFromCalendars.mutateAsync({ taskId: task.id });
+      } catch (error) {
+        logger.warn("Failed to remove linked calendar item before deleting quest", {
+          taskId: task.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        toast.error("Could not remove the linked calendar item. The quest was not deleted.");
+        return;
+      }
+    }
+
     await deleteTask(task.id);
 
     toast("Quest deleted", {
@@ -1574,7 +1752,16 @@ const Journeys = () => {
         label: "Undo",
         onClick: async () => {
           try {
-            await restoreTask(taskData);
+            const restoredTask = await restoreTask(taskData);
+            const restoredTaskId = (restoredTask as { id?: string } | null)?.id;
+            if (restoredTaskId) {
+              for (const provider of linkedProviders) {
+                await sendTaskToCalendar.mutateAsync({
+                  taskId: restoredTaskId,
+                  options: { provider },
+                });
+              }
+            }
             toast.success("Quest restored");
           } catch {
             toast.error("Failed to restore quest");
@@ -1582,7 +1769,16 @@ const Journeys = () => {
         },
       },
     });
-  }, [createRestorableTaskData, deleteTask, restoreTask, trackDailyPlanOutcome]);
+  }, [
+    calendarLinks,
+    createRestorableTaskData,
+    deleteTask,
+    outlookTaskLinks,
+    removeTaskFromCalendars,
+    restoreTask,
+    sendTaskToCalendar,
+    trackDailyPlanOutcome,
+  ]);
 
   const handleMoveQuestToNextDayFromWeekPlanner = useCallback(async (task: DailyTask) => {
     if (!task.task_date) return;
@@ -1597,19 +1793,33 @@ const Journeys = () => {
     const nextDay = addDays(taskDate, 1);
     const nextDayStr = format(nextDay, 'yyyy-MM-dd');
 
-    moveTaskToDate({ taskId: task.id, targetDate: nextDayStr });
+    await moveTaskToDateAsync({ taskId: task.id, targetDate: nextDayStr });
+    if (hasLinkedEvent(task.id)) {
+      try {
+        await syncLinkedTask.mutateAsync({ taskId: task.id });
+      } catch (error) {
+        logger.warn("Quest moved but its linked calendar copy did not sync", {
+          taskId: task.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        toast.error("Quest moved, but its linked calendar item could not be updated.");
+      }
+    }
 
     toast(`Moved to ${format(nextDay, "EEEE, MMM d")}`, {
       duration: QUEST_ACTION_TOAST_DURATION_MS,
       action: {
         label: "Undo",
-        onClick: () => {
-          moveTaskToDate({ taskId: task.id, targetDate: task.task_date! });
+        onClick: async () => {
+          await moveTaskToDateAsync({ taskId: task.id, targetDate: task.task_date! });
+          if (hasLinkedEvent(task.id)) {
+            await syncLinkedTask.mutateAsync({ taskId: task.id });
+          }
           toast.success("Move undone");
         },
       },
     });
-  }, [moveTaskToDate]);
+  }, [hasLinkedEvent, moveTaskToDateAsync, syncLinkedTask]);
 
   const handleToggleInboxQuest = useCallback((taskId: string, completed: boolean) => {
     toggleInboxTask({ taskId, completed }, {
@@ -1839,6 +2049,13 @@ const Journeys = () => {
             ) : (
               <TodaysAgenda
                 tasks={dailyTasks}
+                externalEvents={selectedDateExternalCalendarEvents}
+                connectedCalendarCount={connectedExternalCalendarCount}
+                isExternalCalendarSyncing={isExternalCalendarSyncing}
+                externalCalendarSyncError={externalCalendarSyncError}
+                onRefreshExternalCalendars={() => {
+                  void refreshExternalCalendars();
+                }}
                 selectedDate={selectedDate}
                 readableQuestCardsEnabled={profile?.readable_quest_cards_enabled ?? false}
                 layoutMode={journeysLayoutMode}
@@ -1895,6 +2112,7 @@ const Journeys = () => {
           );
           }}
           onOpenCampaignBuilder={openCampaignBuilderFromAssistant}
+          onQuestProposalEditHandoff={handleQuestProposalEditHandoff}
         />
 
         {showJourneysPlannerFab ? (
@@ -1954,7 +2172,7 @@ const Journeys = () => {
           onOpenChange={setShowMonthView}
           selectedDate={selectedDate}
           onDateSelect={handleUserDateSelect}
-          tasks={allCalendarTasks}
+          tasks={calendarTasksWithExternalEvents}
           milestones={[]}
           onTaskDrop={() => {}}
           onTimeSlotLongPress={(date, time) => {

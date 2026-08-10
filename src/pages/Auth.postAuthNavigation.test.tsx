@@ -119,9 +119,9 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 import Auth from "./Auth";
 
-const renderAuth = () =>
+const renderAuth = (path = "/auth") =>
   render(
-    <MemoryRouter initialEntries={["/auth"]}>
+    <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/auth" element={<Auth />} />
       </Routes>
@@ -176,6 +176,7 @@ const primeNativeAppleFlow = () => {
 describe("Auth post-auth navigation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
     mocks.isNativePlatform = false;
     mocks.platform = "web";
     mocks.applePluginAvailable = false;
@@ -238,6 +239,15 @@ describe("Auth post-auth navigation", () => {
     expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/tasks");
     expect(mocks.safeNavigateMock).toHaveBeenCalledTimes(1);
     expect(mocks.toastMock).not.toHaveBeenCalled();
+  });
+
+  it("returns a signed-in invitee to the invitation after authentication", async () => {
+    renderAuth("/auth?returnTo=%2Fjoin%2FINVITE123");
+
+    await waitFor(() => {
+      expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/join/INVITE123");
+    });
+    expect(window.sessionStorage.getItem("cosmiq.authReturnPath.v1")).toBeNull();
   });
 
   it("does not render a guest-mode CTA", async () => {
@@ -316,12 +326,44 @@ describe("Auth post-auth navigation", () => {
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "user@example.com" },
     });
-    fireEvent.change(screen.getByLabelText(/password/i), {
+    fireEvent.change(screen.getByLabelText(/^password$/i), {
       target: { value: "password1" },
     });
     fireEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Request could not be completed.");
+  });
+
+  it("lets the server authenticate an existing short password", async () => {
+    mocks.getSessionMock.mockResolvedValue({ data: { session: null } });
+    mocks.invokeMock.mockResolvedValue({
+      data: {
+        access_token: "access-token",
+        refresh_token: "refresh-token",
+      },
+      error: null,
+    });
+
+    renderAuth();
+    await flushMicrotasks();
+
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: "legacy@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText(/^password$/i), {
+      target: { value: "legacy" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
+
+    await waitFor(() => {
+      expect(mocks.invokeMock).toHaveBeenCalledWith("auth-gateway", {
+        body: expect.objectContaining({
+          action: "sign_in_password",
+          email: "legacy@example.com",
+          password: "legacy",
+        }),
+      });
+    });
   });
 
   it("shows a friendly inline error when reset password cannot reach the auth service", async () => {
@@ -467,7 +509,7 @@ describe("Auth post-auth navigation", () => {
     );
   });
 
-  it("shows an accurate toast when sign-up validation fails before submit", async () => {
+  it("shows one inline error when sign-up validation fails before submit", async () => {
     mocks.getSessionMock.mockResolvedValue({
       data: {
         session: null,
@@ -491,13 +533,7 @@ describe("Auth post-auth navigation", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Invalid email address");
     expect(mocks.invokeMock).not.toHaveBeenCalled();
-    expect(mocks.toastMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: "Couldn't create account",
-        description: "Invalid email address",
-        variant: "destructive",
-      }),
-    );
+    expect(mocks.toastMock).not.toHaveBeenCalled();
   });
 
   it("shows an accurate toast when email sign-up fails because the email already exists", async () => {

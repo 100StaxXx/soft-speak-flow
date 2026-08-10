@@ -4402,3 +4402,70 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(windowScrollToSpy).not.toHaveBeenCalled();
   });
 });
+
+describe("TodaysAgenda external calendar overlay", () => {
+  it("renders connected calendar events as read-only agenda items and refreshes them", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    const onRefresh = vi.fn();
+
+    render(
+      <TodaysAgenda
+        tasks={[]}
+        externalEvents={[
+          {
+            id: "meeting-1",
+            provider: "google",
+            title: "Project review",
+            taskDate: "2026-02-13",
+            scheduledTime: "10:00",
+            estimatedDuration: 45,
+            isAllDay: false,
+            startDate: "2026-02-13T18:00:00.000Z",
+            endDate: "2026-02-13T18:45:00.000Z",
+            location: null,
+            calendarId: "primary",
+            calendarName: "Work",
+            htmlLink: "https://calendar.google.com/event?eid=1",
+          },
+          {
+            id: "holiday-1",
+            provider: "outlook",
+            title: "Holiday",
+            taskDate: "2026-02-13",
+            scheduledTime: null,
+            estimatedDuration: 1440,
+            isAllDay: true,
+            startDate: "2026-02-13",
+            endDate: "2026-02-14",
+            location: null,
+            calendarId: "work",
+            calendarName: "Company",
+            htmlLink: null,
+          },
+        ]}
+        connectedCalendarCount={2}
+        onRefreshExternalCalendars={onRefresh}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={0}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(screen.getByTestId("external-calendar-event-external:google:meeting-1")).toHaveTextContent(
+      "Project review",
+    );
+    expect(screen.getByTestId("external-calendar-all-day-events")).toHaveTextContent("Holiday");
+    expect(screen.queryByTestId("empty-state-pane")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh external calendars" }));
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+  });
+});

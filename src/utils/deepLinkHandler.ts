@@ -10,6 +10,7 @@ const CALENDAR_OAUTH_CALLBACK_PATH = '/calendar/oauth/callback';
 const JOIN_EPIC_PATH = '/join';
 const JOURNEYS_PATH = '/journeys';
 const HOSTED_APP_LINK_HOSTS = new Set(['app.cosmiq.quest', 'cosmiq.quest']);
+const APP_SCHEME_PROTOCOLS = new Set(['cosmiq:', 'com.darrylgraham.revolution:']);
 const CALENDAR_CALLBACK_ORIGIN_PARAM = 'calendar_callback_origin';
 
 export interface DeepLinkData {
@@ -46,16 +47,50 @@ const isHostedCalendarOAuthCallbackLink = (parsed: URL): boolean => (
   parsed.pathname === CALENDAR_OAUTH_CALLBACK_PATH
 );
 
-const isNativeJoinEpicLink = (parsed: URL): boolean => (
-  parsed.protocol === 'cosmiq:' &&
-  parsed.hostname === 'join' &&
-  parsed.pathname.length > 1
-);
+const isHostedAppLink = (parsed: URL): boolean =>
+  ['https:', 'http:'].includes(parsed.protocol) && HOSTED_APP_LINK_HOSTS.has(parsed.hostname);
+
+const readTaskId = (parsed: URL): string | null => {
+  if (APP_SCHEME_PROTOCOLS.has(parsed.protocol) && ['task', 'tasks'].includes(parsed.hostname)) {
+    return parsed.pathname.split('/').filter(Boolean)[0] ?? null;
+  }
+
+  if (isHostedAppLink(parsed)) {
+    return /^\/(?:task|tasks)\/([^/]+)\/?$/.exec(parsed.pathname)?.[1] ?? null;
+  }
+
+  return null;
+};
+
+const readJoinEpicPath = (parsed: URL): string | null => {
+  if (APP_SCHEME_PROTOCOLS.has(parsed.protocol)) {
+    if (parsed.hostname === 'join' && parsed.pathname.length > 1) {
+      return `${JOIN_EPIC_PATH}${parsed.pathname}`;
+    }
+
+    const legacyMatch = parsed.hostname === 'epics'
+      ? /^\/join\/([^/]+)\/?$/.exec(parsed.pathname)
+      : null;
+    if (legacyMatch) return `${JOIN_EPIC_PATH}/${legacyMatch[1]}`;
+  }
+
+  if (isHostedAppLink(parsed)) {
+    const hostedMatch = /^\/(?:join|epics\/join|campaigns\/join)\/([^/]+)\/?$/.exec(parsed.pathname);
+    if (hostedMatch) return `${JOIN_EPIC_PATH}/${hostedMatch[1]}`;
+  }
+
+  return null;
+};
 
 const isNativeJourneysLink = (parsed: URL): boolean => (
-  parsed.protocol === 'cosmiq:' &&
+  APP_SCHEME_PROTOCOLS.has(parsed.protocol) &&
   parsed.hostname === 'journeys' &&
   (parsed.pathname === '' || parsed.pathname === '/' || parsed.pathname === '/plan')
+);
+
+const isHostedJourneysLink = (parsed: URL): boolean => (
+  isHostedAppLink(parsed) &&
+  ['/journeys', '/journeys/', '/journeys/plan', '/tasks', '/tasks/'].includes(parsed.pathname)
 );
 
 const buildHostedCalendarOAuthCallbackPath = (parsed: URL): string => {
@@ -70,12 +105,6 @@ const buildHostedCalendarOAuthCallbackPath = (parsed: URL): string => {
  */
 export const parseDeepLink = (url: string): DeepLinkData => {
   try {
-    // cosmiq://task/{taskId}
-    if (url.startsWith('cosmiq://task/')) {
-      const taskId = url.replace('cosmiq://task/', '').split('?')[0];
-      return { type: 'task', taskId, rawUrl: url };
-    }
-
     if (url.startsWith('cosmiq://calendar/oauth/callback')) {
       const parsed = new URL(url);
       const providerRaw = parsed.searchParams.get('provider');
@@ -95,8 +124,12 @@ export const parseDeepLink = (url: string): DeepLinkData => {
     }
 
     const parsed = new URL(url);
+    const taskId = readTaskId(parsed);
+    if (taskId) {
+      return { type: 'task', taskId, rawUrl: url };
+    }
 
-    if (isNativeJourneysLink(parsed)) {
+    if (isNativeJourneysLink(parsed) || isHostedJourneysLink(parsed)) {
       return {
         type: 'journeys',
         path: JOURNEYS_PATH,
@@ -104,10 +137,11 @@ export const parseDeepLink = (url: string): DeepLinkData => {
       };
     }
 
-    if (isNativeJoinEpicLink(parsed)) {
+    const joinEpicPath = readJoinEpicPath(parsed);
+    if (joinEpicPath) {
       return {
         type: 'join_epic',
-        path: `${JOIN_EPIC_PATH}${parsed.pathname}`,
+        path: joinEpicPath,
         rawUrl: url,
       };
     }

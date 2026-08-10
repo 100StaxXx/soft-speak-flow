@@ -459,6 +459,13 @@ export function useLegacyCompanionAssistantAdapter({
     [actionablePendingProposals],
   );
   const plannerSuggestionsReadOnly = plannerFallbackMode === "read_only";
+  const editableQuestProposal = plannerSuggestionsReadOnly
+    ? null
+    : planner.pendingProposals.find((proposal) =>
+      proposal.status === "pending" &&
+      proposal.kind === "create_quest" &&
+      proposal.readyToConfirm
+    ) ?? null;
   const pendingActionCount = actionablePendingProposals.length;
   const readyPendingActionCount = actionablePendingProposals.filter(
     (proposal) => proposal.readyToConfirm,
@@ -688,6 +695,9 @@ export function useLegacyCompanionAssistantAdapter({
     readyPendingActionCount: plannerSuggestionsReadOnly
       ? 0
       : readyPendingActionCount,
+    editableQuestProposal,
+    completeEditableQuestProposal: planner.completeProposalEdit,
+    rejectEditableQuestProposal: planner.rejectProposal,
     placeholder,
     todayLabel: planner.todayLabel,
     isSubmitting: planner.isSubmitting || conversation.isSubmitting,

@@ -602,4 +602,132 @@ describe("useQuestCalendarSync", () => {
     });
   });
 
+  it("updates an existing linked calendar event when a quest changes", async () => {
+    mocks.questLinksEqMock.mockResolvedValue({
+      data: [
+        {
+          id: "link-google-1",
+          task_id: "task-linked-1",
+          user_id: "user-1",
+          connection_id: "conn-1",
+          provider: "google",
+          external_calendar_id: "primary-calendar",
+          external_event_id: "event-google-1",
+          sync_mode: "send_only",
+          last_app_sync_at: null,
+          last_provider_sync_at: null,
+        },
+      ],
+      error: null,
+    });
+    mocks.dailyTaskSingleMock.mockResolvedValueOnce({
+      data: {
+        id: "task-linked-1",
+        task_text: "Updated quest",
+        task_date: "2026-02-12",
+        scheduled_time: "11:00",
+        estimated_duration: 60,
+        recurrence_pattern: null,
+        recurrence_days: [],
+        recurrence_month_days: [],
+        recurrence_custom_period: null,
+        location: null,
+        notes: null,
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useQuestCalendarSync(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.links).toHaveLength(1);
+    });
+
+    await act(async () => {
+      await result.current.syncLinkedTask.mutateAsync({ taskId: "task-linked-1" });
+    });
+
+    expect(mocks.functionsInvokeMock).toHaveBeenCalledWith("google-calendar-events", {
+      body: {
+        action: "updateLinkedEvent",
+        taskId: "task-linked-1",
+        syncMode: "send_only",
+      },
+    });
+  });
+
+  it("removes linked calendar and To Do entries before a quest is deleted", async () => {
+    mocks.useCalendarIntegrationsMock.mockReturnValue({
+      connections: [
+        {
+          id: "conn-outlook-delete",
+          provider: "outlook",
+          primary_calendar_id: "calendar-delete",
+          primary_calendar_name: "Calendar",
+          sync_mode: "send_only",
+          sync_enabled: true,
+          platform: "web",
+          last_synced_at: null,
+        },
+      ],
+      defaultProvider: "outlook",
+    });
+    mocks.questLinksEqMock.mockResolvedValue({
+      data: [
+        {
+          id: "link-outlook-delete",
+          task_id: "task-delete-1",
+          user_id: "user-1",
+          connection_id: "conn-outlook-delete",
+          provider: "outlook",
+          external_calendar_id: "calendar-delete",
+          external_event_id: "event-delete",
+          sync_mode: "send_only",
+          last_app_sync_at: null,
+          last_provider_sync_at: null,
+        },
+      ],
+      error: null,
+    });
+    mocks.outlookTaskLinksEqMock.mockResolvedValue({
+      data: [
+        {
+          id: "todo-link-delete",
+          task_id: "task-delete-1",
+          user_id: "user-1",
+          connection_id: "conn-outlook-delete",
+          provider: "outlook",
+          external_task_list_id: "todo-list-delete",
+          external_task_id: "todo-delete",
+          sync_mode: "send_only",
+          last_app_sync_at: null,
+          last_provider_sync_at: null,
+        },
+      ],
+      error: null,
+    });
+
+    const { result } = renderHook(() => useQuestCalendarSync(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.links).toHaveLength(1);
+      expect(result.current.outlookTaskLinks).toHaveLength(1);
+    });
+
+    await act(async () => {
+      await result.current.removeTaskFromCalendars.mutateAsync({ taskId: "task-delete-1" });
+    });
+
+    expect(mocks.functionsInvokeMock).toHaveBeenCalledWith("outlook-calendar-events", {
+      body: { action: "deleteLinkedEvent", taskId: "task-delete-1" },
+    });
+    expect(mocks.functionsInvokeMock).toHaveBeenCalledWith("outlook-todo-tasks", {
+      body: { action: "deleteLinkedTask", taskId: "task-delete-1" },
+    });
+  });
+
 });

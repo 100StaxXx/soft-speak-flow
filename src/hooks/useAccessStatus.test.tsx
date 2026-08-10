@@ -77,6 +77,25 @@ describe("useAccessStatus", () => {
     mocks.profile = createProfile();
   });
 
+  it("fails closed while profile or entitlement state is loading", () => {
+    mocks.profileLoading = true;
+    mocks.accessLoading = true;
+
+    const { result } = renderHook(() => useAccessStatus());
+
+    expect(result.current.loading).toBe(true);
+    expect(result.current.hasAccess).toBe(false);
+  });
+
+  it("does not grant an implicit entitlement when the authenticated profile is missing", () => {
+    mocks.profile = null;
+
+    const { result } = renderHook(() => useAccessStatus());
+
+    expect(result.current.hasAccess).toBe(false);
+    expect(result.current.gateReason).toBe("pre_trial_signup");
+  });
+
   it("does not trigger the pre-trial gate from bare tutorial completion", () => {
     mocks.profile = createProfile({
       onboarding_data: {

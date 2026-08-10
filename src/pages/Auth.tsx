@@ -31,6 +31,11 @@ import {
   type SocialAuthIntent,
 } from "@/utils/socialAuth";
 import { Eye, EyeOff } from "lucide-react";
+import { loginPasswordSchema, newPasswordSchema } from "@/utils/passwordPolicy";
+import {
+  consumeAuthReturnPath,
+  rememberAuthReturnPath,
+} from "@/utils/authReturnPath";
 
 const POST_AUTH_NAVIGATION_TIMEOUT_MS = 5000;
 const POST_AUTH_DEFAULT_PATH = '/onboarding';
@@ -78,25 +83,25 @@ const hasOAuthCallbackParams = (): boolean => {
   return Boolean(url.searchParams.get("code") || url.hash.includes("access_token"));
 };
 
-const authSchema = z.object({
-  email: z.string()
-    .trim()
-    .toLowerCase()
-    .email("Invalid email address")
-    .min(3, "Email too short")
-    .max(255, "Email too long")
-    .regex(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, "Invalid email format"),
-  password: z.string()
-    .min(8, "Password must be at least 8 characters")
-    .max(100, "Password too long")
-    .regex(/^(?=.*[a-zA-Z])(?=.*[0-9]|.*[!@#$%^&*])/, "Password must contain letters and at least one number or special character"),
-  confirmPassword: z.string().optional()
+const emailSchema = z.string()
+  .trim()
+  .toLowerCase()
+  .email("Invalid email address")
+  .min(3, "Email too short")
+  .max(255, "Email too long")
+  .regex(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, "Invalid email format");
+
+const loginSchema = z.object({
+  email: emailSchema,
+  password: loginPasswordSchema,
+});
+
+const signupSchema = z.object({
+  email: emailSchema,
+  password: newPasswordSchema,
+  confirmPassword: z.string(),
 }).refine((data) => {
-  // Only validate password match during signup (when confirmPassword is provided)
-  if (data.confirmPassword !== undefined) {
-    return data.password === data.confirmPassword;
-  }
-  return true;
+  return data.password === data.confirmPassword;
 }, {
   message: "Passwords do not match",
   path: ["confirmPassword"]
@@ -304,7 +309,9 @@ const readFunctionErrorContext = async (error: unknown) => {
 const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const requestedAuthMode = new URLSearchParams(location.search).get("mode");
+  const authSearchParams = new URLSearchParams(location.search);
+  const requestedAuthMode = authSearchParams.get("mode");
+  const requestedReturnPath = authSearchParams.get("returnTo");
   const [isLogin, setIsLogin] = useState(() => requestedAuthMode !== "signup");
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState("");
@@ -316,6 +323,11 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'apple' | null>(null);
   const { toast } = useToast();
+  const navigationSafetyTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    rememberAuthReturnPath(requestedReturnPath);
+  }, [requestedReturnPath]);
   const pendingPostAuthNavigationContextRef = useRef<
     (PostAuthNavigationContext & { userId: string }) | null
   >(null);
@@ -364,6 +376,10 @@ const Auth = () => {
     (path: string, context: PostAuthNavigationContext): string => {
       if (context.preferGuardedLanding && path === POST_AUTH_DEFAULT_PATH) {
         return "/";
+      }
+
+      if (path !== POST_AUTH_DEFAULT_PATH) {
+        return consumeAuthReturnPath() ?? path;
       }
 
       return path;
@@ -416,8 +432,12 @@ const Auth = () => {
       safeNavigate(navigate, normalizedPath);
 
       // Safety valve: if routing fails and we are still on /auth, allow retry.
-      setTimeout(() => {
-        if (window.location.pathname === '/auth') {
+      if (navigationSafetyTimeout.current) {
+        clearTimeout(navigationSafetyTimeout.current);
+      }
+      navigationSafetyTimeout.current = setTimeout(() => {
+        navigationSafetyTimeout.current = null;
+        if (typeof window !== "undefined" && window.location.pathname === '/auth') {
           logger.warn(`[Auth ${source}] Navigation did not leave /auth, resetting redirect guard`);
           hasRedirected.current = false;
         }
@@ -707,6 +727,10 @@ const Auth = () => {
       if (appleFallbackTimeout.current) {
         clearTimeout(appleFallbackTimeout.current);
       }
+      if (navigationSafetyTimeout.current) {
+        clearTimeout(navigationSafetyTimeout.current);
+        navigationSafetyTimeout.current = null;
+      }
     };
   }, [handlePostAuthNavigation]);
 
@@ -730,17 +754,12 @@ const Auth = () => {
 
     // Sanitize inputs before validation
     const sanitizedEmail = email.trim().toLowerCase();
-    const result = authSchema.safeParse({ 
-      email: sanitizedEmail, 
-      password,
-      confirmPassword: isLogin ? undefined : confirmPassword 
-    });
+    const result = isLogin
+      ? loginSchema.safeParse({ email: sanitizedEmail, password })
+      : signupSchema.safeParse({ email: sanitizedEmail, password, confirmPassword });
     if (!result.success) {
       const message = result.error.errors[0].message;
       setInlineError(message);
-      if (!isLogin) {
-        showAccountCreationError(message);
-      }
       return;
     }
 
@@ -876,7 +895,7 @@ const Auth = () => {
         
         // Generate secure random nonce (Supabase provides this method)
         const rawNonce = crypto.randomUUID();
-        console.log('[Apple OAuth] Raw nonce generated:', rawNonce.substring(0, 8) + '...');
+        logger.debug('[Auth Apple] Nonce generated');
         
         // Hash the nonce for Apple (Apple requires SHA-256 hashed nonce)
         const encoder = new TextEncoder();
@@ -885,7 +904,7 @@ const Auth = () => {
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const hashedNonce = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         
-        console.log('[Apple OAuth] Hashed nonce:', hashedNonce.substring(0, 16) + '...');
+        logger.debug('[Auth Apple] Nonce prepared for authorization');
 
         console.log('[Apple OAuth] Calling SignInWithApple.authorize with clientId: com.darrylgraham.revolution');
         
@@ -1091,7 +1110,7 @@ const Auth = () => {
     "h-[3.35rem] rounded-[1.15rem] border border-[#2a1a49] bg-[#12091f] px-5 text-[0.98rem] font-medium text-white shadow-[0_0_0_1px_rgba(255,255,255,0.01),0_10px_28px_rgba(5,2,16,0.45),inset_0_1px_0_rgba(255,255,255,0.03)] placeholder:text-white/[0.34] focus-visible:border-[#4b2c7e] focus-visible:ring-[3px] focus-visible:ring-[#b86dff]/15 focus-visible:ring-offset-0";
   const passwordToggleButtonClassName =
     "absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-white/[0.58] transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b86dff]/35";
-  const passwordInputClassName = isLogin ? fieldInputClassName : `${fieldInputClassName} pr-14`;
+  const passwordInputClassName = `${fieldInputClassName} pr-14`;
   const switchMode = () => {
     setInlineError(null);
     if (isForgotPassword) {
@@ -1100,26 +1119,41 @@ const Auth = () => {
       return;
     }
 
-    setIsLogin(!isLogin);
+    const nextIsLogin = !isLogin;
+    const nextSearchParams = new URLSearchParams(location.search);
+    if (nextIsLogin) {
+      nextSearchParams.delete("mode");
+    } else {
+      nextSearchParams.set("mode", "signup");
+    }
+
+    setIsLogin(nextIsLogin);
     setConfirmPassword("");
     setShowSignupPassword(false);
     setShowSignupConfirmPassword(false);
+    navigate(
+      {
+        pathname: location.pathname,
+        search: nextSearchParams.toString() ? `?${nextSearchParams.toString()}` : "",
+      },
+      { replace: true },
+    );
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-[#090311] text-pure-white">
+    <div className="relative min-h-[100svh] overflow-x-hidden bg-[#090311] text-pure-white">
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_82%,rgba(179,92,255,0.16),transparent_28%),radial-gradient(circle_at_50%_18%,rgba(39,18,71,0.3),transparent_38%),linear-gradient(180deg,#090311_0%,#0a0314_38%,#09020f_100%)]" />
       <div className="absolute inset-x-0 bottom-0 -z-10 h-[30vh] bg-[radial-gradient(circle_at_50%_100%,rgba(209,100,255,0.12),transparent_52%)]" />
       <section
         id="auth-form"
-        className="min-h-screen relative flex items-center justify-center px-6 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(4.5rem,env(safe-area-inset-top)+2.75rem)]"
+        className="relative flex min-h-[100svh] items-start justify-center px-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top)+1rem)] sm:items-center sm:pb-[max(2rem,env(safe-area-inset-bottom))] sm:pt-[max(4.5rem,env(safe-area-inset-top)+2.75rem)]"
       >
-        <div className="relative z-10 w-full max-w-[20.5rem] py-4 sm:max-w-[21.75rem]">
+        <div className="relative z-10 w-full max-w-[20.5rem] py-2 sm:max-w-[21.75rem] sm:py-4">
           <h1 className="sr-only">
             {isForgotPassword ? "Reset password" : isLogin ? "Sign in" : "Create account"}
           </h1>
 
-          <div className="space-y-5">
+          <div className="space-y-4 sm:space-y-5">
             {isForgotPassword ? (
               <form onSubmit={handleForgotPassword} className="space-y-5">
                 <div className="space-y-2 pb-1">
@@ -1180,7 +1214,7 @@ const Auth = () => {
                   <div className="relative">
                     <Input
                       id="password"
-                      type={!isLogin && showSignupPassword ? "text" : "password"}
+                      type={showSignupPassword ? "text" : "password"}
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => {
@@ -1191,21 +1225,19 @@ const Auth = () => {
                       required
                       className={passwordInputClassName}
                     />
-                    {!isLogin && (
-                      <button
-                        type="button"
-                        aria-label={showSignupPassword ? "Hide password" : "Show password"}
-                        aria-pressed={showSignupPassword}
-                        onClick={() => setShowSignupPassword((isVisible) => !isVisible)}
-                        className={passwordToggleButtonClassName}
-                      >
-                        {showSignupPassword ? (
-                          <EyeOff aria-hidden="true" className="h-5 w-5" />
-                        ) : (
-                          <Eye aria-hidden="true" className="h-5 w-5" />
-                        )}
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      aria-label={showSignupPassword ? "Hide password" : "Show password"}
+                      aria-pressed={showSignupPassword}
+                      onClick={() => setShowSignupPassword((isVisible) => !isVisible)}
+                      className={passwordToggleButtonClassName}
+                    >
+                      {showSignupPassword ? (
+                        <EyeOff aria-hidden="true" className="h-5 w-5" />
+                      ) : (
+                        <Eye aria-hidden="true" className="h-5 w-5" />
+                      )}
+                    </button>
                   </div>
                   {isLogin && (
                     <button
@@ -1260,6 +1292,14 @@ const Auth = () => {
                 >
                   {loading ? "Loading..." : isLogin ? "Sign In" : "Get Started"}
                 </Button>
+                {!isLogin && (
+                  <p className="px-1 text-center text-xs leading-5 text-white/[0.56]">
+                    By creating an account, you agree to Cosmiq&apos;s{" "}
+                    <a className="underline underline-offset-2 hover:text-white" href="/terms">Terms</a>
+                    {" "}and acknowledge the{" "}
+                    <a className="underline underline-offset-2 hover:text-white" href="/privacy">Privacy Policy</a>.
+                  </p>
+                )}
               </form>
             )}
 

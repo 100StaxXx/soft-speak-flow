@@ -22,6 +22,7 @@ import {
   storeKitProductToIAP,
   getProductForPlan,
   getPurchaseProductIdForPlan,
+  getFreeTrialLabel,
   PREMIUM_MONTHLY_PRODUCT_ID,
   PREMIUM_YEARLY_PRODUCT_ID,
 } from "@/utils/appleIAP";
@@ -145,6 +146,37 @@ describe("appleIAP StoreKit 2 utilities", () => {
     it("falls back to constant when products are empty", () => {
       expect(getPurchaseProductIdForPlan("monthly", [])).toBe(PREMIUM_MONTHLY_PRODUCT_ID);
       expect(getPurchaseProductIdForPlan("yearly", [])).toBe(PREMIUM_YEARLY_PRODUCT_ID);
+    });
+  });
+
+  describe("getFreeTrialLabel", () => {
+    it("uses the introductory offer returned by the App Store", () => {
+      expect(getFreeTrialLabel({
+        ...mockProducts[1],
+        introductoryPrice: {
+          price: 0,
+          displayPrice: "$0.00",
+          cycles: 1,
+          period: "P3D",
+          periodUnit: "DAY",
+          periodNumberOfUnits: 3,
+        },
+      })).toBe("3-day free trial");
+    });
+
+    it("does not advertise a trial when the product has no free introductory offer", () => {
+      expect(getFreeTrialLabel(mockProducts[1])).toBeNull();
+      expect(getFreeTrialLabel({
+        ...mockProducts[1],
+        introductoryPrice: {
+          price: 4.99,
+          displayPrice: "$4.99",
+          cycles: 1,
+          period: "P1M",
+          periodUnit: "MONTH",
+          periodNumberOfUnits: 1,
+        },
+      })).toBeNull();
     });
   });
 });

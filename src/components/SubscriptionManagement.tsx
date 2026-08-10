@@ -1,4 +1,4 @@
-import { useMemo, useState, memo } from "react";
+import { useEffect, useMemo, useRef, useState, memo } from "react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAppleSubscription } from "@/hooks/useAppleSubscription";
 import { getProductForPlan, getPurchaseProductIdForPlan, type IAPPlan } from "@/utils/appleIAP";
@@ -34,10 +34,10 @@ const PLAN_OPTIONS: PlanOption[] = [
     productTitle: "Cosmiq Pro Monthly",
     description: PREMIUM_BENEFITS_SUMMARY,
     hint: "Full Cosmiq access billed monthly.",
-    fallbackPrice: "$9.99",
+    fallbackPrice: "Price unavailable",
     billingPeriodLabel: "/month",
     subscriptionLength: "1 month",
-    fallbackUnitPrice: "$9.99/month",
+    fallbackUnitPrice: "Connect to the App Store to see your localized price",
   },
   {
     id: "yearly",
@@ -45,10 +45,10 @@ const PLAN_OPTIONS: PlanOption[] = [
     productTitle: "Cosmiq Pro Yearly",
     description: PREMIUM_BENEFITS_SUMMARY,
     hint: "Full Cosmiq access billed yearly with the best recurring value.",
-    fallbackPrice: "$99.99",
+    fallbackPrice: "Price unavailable",
     billingPeriodLabel: "/year",
     subscriptionLength: "1 year",
-    fallbackUnitPrice: "$8.33/month when billed yearly",
+    fallbackUnitPrice: "Connect to the App Store to see your localized price",
     badge: "Most popular",
   },
 ];
@@ -72,6 +72,8 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
 
   const [selectedPlan, setSelectedPlan] = useState<IAPPlan>("yearly");
   const selectedProductId = getPurchaseProductIdForPlan(selectedPlan, products);
+  const selectedProduct = getProductForPlan(selectedPlan, products);
+  const initialProductLoadAttemptedRef = useRef(false);
   const activeYearlyOfferPrice = activeYearlyOffer?.price ?? "$69.99";
   const activeYearlyOfferUnitPrice = activeYearlyOffer?.unitPrice ?? "$5.83/month for the first year";
 
@@ -119,6 +121,21 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
       return acc;
     }, {});
   }, [activeYearlyOfferUnitPrice, hasOfferCode, priceByPlan, products]);
+
+  useEffect(() => {
+    if (
+      !isAvailable ||
+      productsLoading ||
+      products.length > 0 ||
+      productError ||
+      initialProductLoadAttemptedRef.current
+    ) {
+      return;
+    }
+
+    initialProductLoadAttemptedRef.current = true;
+    void reloadProducts();
+  }, [isAvailable, productError, products.length, productsLoading, reloadProducts]);
 
   if (isLoading) {
     return (
@@ -213,8 +230,14 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
           </div>
 
           <Button
-            onClick={() => { void handlePurchase(selectedProductId); }}
-            disabled={!isAvailable || purchasing}
+            onClick={() => {
+              if (!selectedProduct) {
+                void reloadProducts();
+                return;
+              }
+              void handlePurchase(selectedProductId);
+            }}
+            disabled={!isAvailable || !selectedProduct || productsLoading || purchasing}
             className="w-full"
           >
             {purchasing ? (

@@ -42,7 +42,9 @@ const scheduleDismiss = (toastId: string | number, duration = MAX_TOAST_DURATION
 
   const timeout = globalThis.setTimeout(() => {
     dismissTimeouts.delete(toastId);
-    sonnerToast.dismiss(toastId);
+    if (typeof sonnerToast.dismiss === "function") {
+      sonnerToast.dismiss(toastId);
+    }
   }, duration);
 
   dismissTimeouts.set(toastId, timeout);

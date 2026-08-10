@@ -12,9 +12,29 @@ const mocks = vi.hoisted(() => ({
     handleRestore: vi.fn(),
     loading: false,
     isAvailable: true,
-    products: [],
+    products: [
+      {
+        identifier: "cosmiq_premium_monthly",
+        displayName: "Monthly",
+        description: "Monthly plan",
+        price: 9.99,
+        displayPrice: "$9.99",
+        type: "autoRenewable",
+        introductoryPrice: { price: 0, displayPrice: "$0.00", cycles: 1, period: "P3D", periodUnit: "DAY", periodNumberOfUnits: 3 },
+      },
+      {
+        identifier: "cosmiq_premium_yearly",
+        displayName: "Yearly",
+        description: "Yearly plan",
+        price: 99.99,
+        displayPrice: "$99.99",
+        type: "autoRenewable",
+        pricePerMonthString: "$8.33",
+        introductoryPrice: { price: 0, displayPrice: "$0.00", cycles: 1, period: "P3D", periodUnit: "DAY", periodNumberOfUnits: 3 },
+      },
+    ],
     productsLoading: false,
-    productError: null,
+    productError: null as string | null,
     reloadProducts: vi.fn(),
     hasOfferCode: false,
     activeYearlyOffer: null as null | { tier: string; price: string; priceCents: number; unitPrice: string },
@@ -140,7 +160,27 @@ describe("Paywall creator offer-code eligibility", () => {
       handleRestore: vi.fn(),
       loading: false,
       isAvailable: true,
-      products: [],
+      products: [
+        {
+          identifier: "cosmiq_premium_monthly",
+          displayName: "Monthly",
+          description: "Monthly plan",
+          price: 9.99,
+          displayPrice: "$9.99",
+          type: "autoRenewable",
+          introductoryPrice: { price: 0, displayPrice: "$0.00", cycles: 1, period: "P3D", periodUnit: "DAY", periodNumberOfUnits: 3 },
+        },
+        {
+          identifier: "cosmiq_premium_yearly",
+          displayName: "Yearly",
+          description: "Yearly plan",
+          price: 99.99,
+          displayPrice: "$99.99",
+          type: "autoRenewable",
+          pricePerMonthString: "$8.33",
+          introductoryPrice: { price: 0, displayPrice: "$0.00", cycles: 1, period: "P3D", periodUnit: "DAY", periodNumberOfUnits: 3 },
+        },
+      ],
       productsLoading: false,
       productError: null,
       reloadProducts: vi.fn(),
@@ -303,6 +343,23 @@ describe("Paywall creator offer-code eligibility", () => {
     fireEvent.click(screen.getByRole("button", { name: /^3-day free trial$/i }));
 
     expect(mocks.appleSubscription.handlePurchase).toHaveBeenCalledWith("cosmiq_premium_yearly", "paywall");
+  });
+
+  it("does not advertise or enable a purchase when StoreKit returns no products", () => {
+    mocks.appleSubscription.products = [];
+    mocks.appleSubscription.productError = "No App Store products are available. Check your connection and try again.";
+
+    render(
+      <MemoryRouter>
+        <Paywall />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByText("3-day free trial")).not.toBeInTheDocument();
+    screen.getAllByRole("button", { name: /subscribe yearly/i }).forEach((button) => {
+      expect(button).toBeDisabled();
+    });
+    expect(screen.getByText(/no app store products are available/i)).toBeInTheDocument();
   });
 
   it("applies a valid creator code through the existing referral path", async () => {

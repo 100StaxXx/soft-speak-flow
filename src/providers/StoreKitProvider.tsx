@@ -76,6 +76,7 @@ type StoreKitContextValue = {
   isLoading: boolean;
   products: StoreKitProduct[];
   productsLoading: boolean;
+  productsError: string | null;
   currentEntitlement: StoreKitTransaction | null;
   customerInfo: CustomerInfo | null;
   offerings: PurchasesOfferings | null;
@@ -137,6 +138,16 @@ function revenueCatProductToStoreKitProduct(product: PurchasesStoreProduct): Sto
     type: product.productType,
     pricePerMonthString: product.pricePerMonthString,
     pricePerYearString: product.pricePerYearString,
+    introductoryPrice: product.introPrice
+      ? {
+          price: product.introPrice.price,
+          displayPrice: product.introPrice.priceString,
+          cycles: product.introPrice.cycles,
+          period: product.introPrice.period,
+          periodUnit: product.introPrice.periodUnit,
+          periodNumberOfUnits: product.introPrice.periodNumberOfUnits,
+        }
+      : null,
     ...parseSubscriptionPeriod(product.subscriptionPeriod),
   };
 }
@@ -325,6 +336,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
   const isAvailable = Capacitor.isNativePlatform() && isNativeIOS();
   const [products, setProducts] = useState<StoreKitProduct[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
+  const [productsError, setProductsError] = useState<string | null>(null);
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
   const [currentEntitlement, setCurrentEntitlement] = useState<StoreKitTransaction | null>(null);
   const [offerings, setOfferings] = useState<PurchasesOfferings | null>(null);
@@ -429,6 +441,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     if (!isAvailable) return [];
 
     setProductsLoading(true);
+    setProductsError(null);
     try {
       const configured = await ensureConfigured();
       if (!configured) return [];
@@ -482,6 +495,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
           productIds: REVENUECAT_PRODUCT_IDS,
           platform: Capacitor.getPlatform(),
         });
+        setProductsError("No App Store products are available. Check your connection and try again.");
       }
 
       return mappedProducts;
@@ -491,6 +505,8 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
         platform: Capacitor.getPlatform(),
         error,
       });
+      setProducts([]);
+      setProductsError("Cosmiq couldn't load App Store products. Check your connection and try again.");
       return [];
     } finally {
       setProductsLoading(false);
@@ -518,6 +534,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     if (!isAvailable) {
       setIsConfigured(false);
       setEntitlementLoading(false);
+      setProductsError(null);
       return;
     }
 
@@ -771,6 +788,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     isLoading: entitlementLoading,
     products,
     productsLoading,
+    productsError,
     currentEntitlement,
     customerInfo,
     offerings,
@@ -801,6 +819,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     offerings,
     presentRevenueCatPaywall,
     products,
+    productsError,
     productsLoading,
     purchase,
     redeemOfferCode,

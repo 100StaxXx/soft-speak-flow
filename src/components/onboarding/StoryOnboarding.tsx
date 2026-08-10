@@ -21,6 +21,7 @@ import { CompanionPersonalization } from "@/components/CompanionPersonalization"
 import { CompanionCreationLoader } from "@/components/CompanionCreationLoader";
 import { AICompanionCreator } from "@/components/AICompanionCreator";
 import { JourneyBegins } from "./JourneyBegins";
+import { consumeAuthReturnPath } from "@/utils/authReturnPath";
 import { MentorGrid } from "@/components/MentorGrid";
 import { MentorResult } from "@/components/MentorResult";
 import { generateMentorExplanation, type MentorExplanation } from "@/utils/mentorExplanation";
@@ -1436,7 +1437,7 @@ export const StoryOnboarding = ({
         mode,
       });
       toast.success("Welcome to Cosmiq! Your journey begins.");
-      safeNavigate(navigate, "/journeys");
+      safeNavigate(navigate, consumeAuthReturnPath() ?? "/journeys");
       return true;
     } catch (error) {
       logger.error("Journey completion finalization failed", {

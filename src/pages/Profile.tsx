@@ -8,7 +8,6 @@ import { User, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Trash2, Sparkl
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useLongPress } from "@/hooks/useLongPress";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -104,28 +103,6 @@ const QuickActionCard = memo(({
   </button>
 ));
 QuickActionCard.displayName = 'QuickActionCard';
-
-// Hidden developer trigger - long press on header to access IAP test page
-const DevTriggerHeader = memo(({ onNavigate }: { onNavigate: () => void }) => {
-  const { handlers, isActivated } = useLongPress({
-    onLongPress: onNavigate,
-    threshold: 800,
-  });
-
-  return (
-    <div 
-      {...handlers}
-      className={`cursor-pointer select-none transition-opacity ${isActivated ? 'opacity-50' : ''}`}
-      style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
-    >
-      <h1 className="text-2xl font-semibold tracking-tight">
-        Command Center
-      </h1>
-      <p className="text-sm text-muted-foreground">Your account & settings</p>
-    </div>
-  );
-});
-DevTriggerHeader.displayName = 'DevTriggerHeader';
 
 const blurActiveElement = () => {
   if (typeof document === "undefined") return;
@@ -385,7 +362,10 @@ const Profile = () => {
         <div className="sticky top-0 z-40 cosmiq-glass-header safe-area-top">
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
-              <DevTriggerHeader onNavigate={() => navigate('/iap-test')} />
+              <div>
+                <h1 className="text-2xl font-semibold tracking-tight">Command Center</h1>
+                <p className="text-sm text-muted-foreground">Your account &amp; settings</p>
+              </div>
               <PageInfoButton onClick={() => setShowPageInfo(true)} />
             </div>
           </div>

@@ -782,7 +782,7 @@ export function useCompanionAssistant({
     surface,
     conversationEnabled,
     onOpenCampaignBuilder,
-    plannerFallbackMode: "read_only",
+    plannerFallbackMode: useLegacyFallback ? "interactive" : "read_only",
   });
 
   const [activeSessionId, setActiveSessionId] = useState(() =>
@@ -2206,6 +2206,9 @@ export function useCompanionAssistant({
       pendingAction: legacyAssistant.pendingAction,
       pendingActionCount: legacyAssistant.pendingActionCount,
       readyPendingActionCount: legacyAssistant.readyPendingActionCount,
+      editableQuestProposal: legacyAssistant.editableQuestProposal,
+      completeEditableQuestProposal: legacyAssistant.completeEditableQuestProposal,
+      rejectEditableQuestProposal: legacyAssistant.rejectEditableQuestProposal,
       draftInput,
       setDraftInput,
       interimText,
@@ -2267,6 +2270,9 @@ export function useCompanionAssistant({
     pendingAction,
     pendingActionCount: pendingAction ? 1 : 0,
     readyPendingActionCount: pendingAction ? 1 : 0,
+    editableQuestProposal: null,
+    completeEditableQuestProposal: async () => undefined,
+    rejectEditableQuestProposal: async () => undefined,
     draftInput,
     setDraftInput,
     interimText,

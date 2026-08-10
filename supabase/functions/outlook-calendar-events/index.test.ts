@@ -83,3 +83,23 @@ Deno.test("outlook-calendar-events maps synced UTC instants back to local quest 
   assertEquals(patch.scheduled_time, "06:00", "Expected provider pull to preserve local time");
   assertEquals(patch.estimated_duration, 30, "Expected provider pull to preserve duration");
 });
+
+Deno.test("outlook-calendar-events normalizes Graph UTC event times for the agenda", () => {
+  const event = moduleUnderTest.toOutlookExternalCalendarEvent(
+    {
+      id: "event-1",
+      subject: "Team sync",
+      start: { dateTime: "2026-05-11T13:00:00.0000000", timeZone: "UTC" },
+      end: { dateTime: "2026-05-11T13:30:00.0000000", timeZone: "UTC" },
+      isAllDay: false,
+      location: { displayName: "Teams" },
+      webLink: "https://outlook.office.com/calendar/item/1",
+    },
+    "calendar-1",
+    "Work",
+  );
+
+  assertEquals(event?.startDate.endsWith("Z"), true, "Expected UTC Graph timestamps to carry a zone");
+  assertEquals(event?.calendarName, "Work", "Expected the selected calendar label");
+  assertEquals(event?.location, "Teams", "Expected the event location");
+});

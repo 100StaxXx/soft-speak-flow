@@ -143,7 +143,7 @@ describe("CalendarIntegrationsSettings", () => {
   it("shows calendar integrations by default when nothing is connected", () => {
     render(<CalendarIntegrationsSettings />);
 
-    expect(screen.getByText("Connect destinations for sending quests to external calendars.")).toBeInTheDocument();
+    expect(screen.getByText(/show selected calendars in agenda and send quests outward/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /connect outlook calendar/i })).toBeInTheDocument();
   });
 

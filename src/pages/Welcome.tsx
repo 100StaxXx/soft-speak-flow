@@ -53,7 +53,7 @@ const LandscapeSection = ({
   imagePosition = "50% 50%",
   loading = "lazy",
 }: LandscapeSectionProps) => (
-  <section id={id} className={`relative isolate h-screen min-h-[100svh] snap-start snap-always overflow-hidden ${className}`}>
+  <section id={id} className={`relative isolate min-h-[100svh] snap-start overflow-hidden ${className}`}>
     <StaticBackgroundImage
       background={background}
       className="absolute inset-0 -z-20 h-full w-full object-cover pointer-events-none select-none"
@@ -61,7 +61,7 @@ const LandscapeSection = ({
       objectPosition={imagePosition}
     />
     <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(3,7,12,0.56)_0%,rgba(3,7,12,0.22)_42%,rgba(3,7,12,0.9)_100%),linear-gradient(90deg,rgba(3,7,12,0.82)_0%,rgba(3,7,12,0.24)_54%,rgba(3,7,12,0.68)_100%)]" />
-    <div className={`relative mx-auto flex h-screen min-h-[100svh] w-full max-w-6xl px-5 ${contentClassName}`}>
+    <div className={`relative mx-auto flex min-h-[100svh] w-full max-w-6xl px-5 ${contentClassName}`}>
       {children}
     </div>
   </section>
@@ -83,10 +83,10 @@ const Welcome = () => {
   }, [user, loading, navigate]);
 
   return (
-    <div className="h-screen min-h-[100svh] overflow-hidden bg-[#05080d] text-white">
+    <div className="h-[100svh] overflow-hidden bg-[#05080d] text-white">
       <main
         data-landing-scroll
-        className="h-full snap-y snap-mandatory overflow-y-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="h-full snap-y snap-proximity overflow-y-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:snap-mandatory"
       >
         <LandscapeSection
           id="start"

@@ -73,10 +73,20 @@ import type { CompanionChatThreadSummary } from "@/types/companionConversation";
 import type { CompanionAgentFollowUp } from "@/types/companionAgent";
 import type {
   CompanionPlannerLaunchIntent,
+  CompanionPlannerProposal,
   PlannerBriefingContext,
 } from "@/types/companionPlanner";
 
 type JourneysCompanionPlannerModalPresentation = "dialog" | "drawer";
+
+export interface JourneysQuestProposalEditResult {
+  saved: boolean;
+  savedTitle?: string | null;
+}
+
+export type JourneysQuestProposalEditHandoff = (
+  proposal: CompanionPlannerProposal,
+) => Promise<JourneysQuestProposalEditResult>;
 
 interface JourneysCompanionPlannerModalProps {
   open: boolean;
@@ -86,6 +96,7 @@ interface JourneysCompanionPlannerModalProps {
   launchIntent?: CompanionPlannerLaunchIntent | null;
   onLaunchIntentConsumed?: (intentId: string) => void;
   onOpenCampaignBuilder?: (message: string) => void;
+  onQuestProposalEditHandoff?: JourneysQuestProposalEditHandoff;
 }
 
 type JourneysCompanionDrawerLayout = {
@@ -442,6 +453,7 @@ const JourneysCompanionOverlayBody = memo(
     launchIntent,
     onLaunchIntentConsumed,
     onOpenCampaignBuilder,
+    onQuestProposalEditHandoff,
     drawerLayout,
   }: {
     presentation: JourneysCompanionPlannerModalPresentation;
@@ -450,6 +462,7 @@ const JourneysCompanionOverlayBody = memo(
     launchIntent?: CompanionPlannerLaunchIntent | null;
     onLaunchIntentConsumed?: (intentId: string) => void;
     onOpenCampaignBuilder?: (message: string) => void;
+    onQuestProposalEditHandoff?: JourneysQuestProposalEditHandoff;
     drawerLayout?: JourneysCompanionDrawerLayout;
   }) => {
     const {
@@ -485,6 +498,7 @@ const JourneysCompanionOverlayBody = memo(
     const [pendingFollowUpOption, setPendingFollowUpOption] = useState<
       string | null
     >(null);
+    const [isEditingQuestProposal, setIsEditingQuestProposal] = useState(false);
     const [handledLocalFollowUpKey, setHandledLocalFollowUpKey] = useState<
       string | null
     >(null);
@@ -745,6 +759,23 @@ const JourneysCompanionOverlayBody = memo(
       await assistant.startNewChat();
     }, [assistant]);
 
+    const handleEditQuestProposal = useCallback(async () => {
+      const proposal = assistant.editableQuestProposal;
+      if (!proposal || !onQuestProposalEditHandoff || isEditingQuestProposal) return;
+
+      setIsEditingQuestProposal(true);
+      try {
+        const result = await onQuestProposalEditHandoff(proposal);
+        if (result.saved) {
+          await assistant.completeEditableQuestProposal(proposal.id, {
+            savedTitle: result.savedTitle,
+          });
+        }
+      } finally {
+        setIsEditingQuestProposal(false);
+      }
+    }, [assistant, isEditingQuestProposal, onQuestProposalEditHandoff]);
+
     const localActionPending = Boolean(pendingFollowUpOption);
 
     const handleFollowUpOption = useCallback(
@@ -999,6 +1030,55 @@ const JourneysCompanionOverlayBody = memo(
                     structuredResponse={assistant.structuredResponse}
                     variant="journeys"
                   />
+                ) : null}
+
+                {assistant.editableQuestProposal && onQuestProposalEditHandoff ? (
+                  <div
+                    className="flex w-full justify-start"
+                    data-testid="journeys-companion-editable-quest-proposal"
+                    data-tutorial-avoid="true"
+                  >
+                    <div className={cn(plannerPathfinderTheme.raisedPanel, "max-w-[88%] p-4")}>
+                      <Badge variant="outline" className={plannerPathfinderTheme.chip}>
+                        Quest draft
+                      </Badge>
+                      <p className="mt-3 text-sm font-semibold text-foreground">
+                        {assistant.editableQuestProposal.title}
+                      </p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {assistant.editableQuestProposal.summary}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          className={plannerPathfinderTheme.primaryButton}
+                          onClick={() => { void handleEditQuestProposal(); }}
+                          disabled={assistantActionDisabled || isEditingQuestProposal}
+                        >
+                          {isEditingQuestProposal ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : null}
+                          Review and save
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className={plannerPathfinderTheme.outlineButton}
+                          onClick={() => {
+                            void assistant.rejectEditableQuestProposal(
+                              assistant.editableQuestProposal!.id,
+                            );
+                          }}
+                          disabled={assistantActionDisabled || isEditingQuestProposal}
+                        >
+                          <X className="mr-2 h-4 w-4" />
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
                 ) : null}
 
                 {hasFollowUpPanel && assistant.activeFollowUp ? (
@@ -1335,6 +1415,7 @@ export const JourneysCompanionPlannerModal = memo(
     launchIntent,
     onLaunchIntentConsumed,
     onOpenCampaignBuilder,
+    onQuestProposalEditHandoff,
   }: JourneysCompanionPlannerModalProps) {
     const [drawerLayout, setDrawerLayout] =
       useState<JourneysCompanionDrawerLayout>(() => getDrawerLayout());
@@ -1366,6 +1447,7 @@ export const JourneysCompanionPlannerModal = memo(
         launchIntent={launchIntent}
         onLaunchIntentConsumed={onLaunchIntentConsumed}
         onOpenCampaignBuilder={onOpenCampaignBuilder}
+        onQuestProposalEditHandoff={onQuestProposalEditHandoff}
         drawerLayout={presentation === "drawer" ? drawerLayout : undefined}
       />
     );

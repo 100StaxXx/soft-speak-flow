@@ -88,7 +88,7 @@ const Recaps = () => {
         <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border/50 safe-area-top">
           <div className="max-w-4xl mx-auto px-4 py-4">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => navigate("/profile")}>
+              <Button variant="ghost" size="icon" onClick={() => navigate("/profile")} aria-label="Back to profile">
                 <ChevronLeft className="h-5 w-5" />
               </Button>
               <div>

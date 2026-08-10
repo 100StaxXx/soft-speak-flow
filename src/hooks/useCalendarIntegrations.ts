@@ -142,6 +142,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
       queryClient.invalidateQueries({ queryKey: ['calendar-connections'] }),
       queryClient.invalidateQueries({ queryKey: ['quest-calendar-links'] }),
       queryClient.invalidateQueries({ queryKey: ['quest-outlook-task-links'] }),
+      queryClient.invalidateQueries({ queryKey: ['external-calendar-events'] }),
     ]);
   }, [queryClient]);
 
