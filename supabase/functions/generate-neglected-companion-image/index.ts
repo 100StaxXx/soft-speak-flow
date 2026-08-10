@@ -3,27 +3,41 @@ installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { resolveCompanionImageSizeForUser } from "../_shared/companionImagePolicy.ts";
-import { errorResponse, type InternalRequestAuth, requireInternalRequest } from "../_shared/auth.ts";
+import {
+  getCompanionFinalImageQuality,
+  resolveCompanionImageSizeForUser,
+} from "../_shared/companionImagePolicy.ts";
+import { buildCompanionArtDirection } from "../_shared/companionLineage.ts";
+import { editCompanionImage } from "../_shared/openaiCompanionImageClient.ts";
+import {
+  errorResponse,
+  type InternalRequestAuth,
+  requireInternalRequest,
+} from "../_shared/auth.ts";
 import {
   buildCostGuardrailBlockedResponse,
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
 import {
-  COMPANION_PRESET_BUCKET,
   coerceCompanionElementId,
   coerceCompanionPresetId,
+  COMPANION_PRESET_BUCKET,
   resolveCompanionAssetPath,
 } from "../../../src/config/companionCatalog.ts";
+import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 interface GenerateNeglectedCompanionImageDeps {
-  authenticate: (req: Request, corsHeaders: HeadersInit) => Promise<InternalRequestAuth | Response>;
+  authenticate: (
+    req: Request,
+    corsHeaders: HeadersInit,
+  ) => Promise<InternalRequestAuth | Response>;
   createSupabaseClient: () => any;
   createCostGuardrailSessionFn: any;
   fetchImpl: typeof fetch;
@@ -57,7 +71,9 @@ export async function handleGenerateNeglectedCompanionImage(
     }
 
     const body = await req.json().catch(() => ({}));
-    const companionId = typeof body?.companionId === "string" ? body.companionId : null;
+    const companionId = typeof body?.companionId === "string"
+      ? body.companionId
+      : null;
 
     if (!companionId) {
       return errorResponse(400, "Missing companionId", corsHeaders);
@@ -66,12 +82,17 @@ export async function handleGenerateNeglectedCompanionImage(
     const supabase = deps.createSupabaseClient();
     const { data: companion, error: companionError } = await supabase
       .from("user_companion")
-      .select("id, user_id, current_image_url, current_image_focal_x, current_image_focal_y, spirit_animal, core_element, favorite_color, current_stage, neglected_image_url, neglected_image_focal_x, neglected_image_focal_y, preset_id")
+      .select(
+        "id, user_id, current_image_url, current_image_focal_x, current_image_focal_y, spirit_animal, core_element, favorite_color, current_stage, neglected_image_url, neglected_image_focal_x, neglected_image_focal_y, preset_id",
+      )
       .eq("id", companionId)
       .maybeSingle();
 
     if (companionError) {
-      console.error("[Neglected Image] Failed to fetch companion:", companionError);
+      console.error(
+        "[Neglected Image] Failed to fetch companion:",
+        companionError,
+      );
       return errorResponse(500, "Failed to load companion", corsHeaders);
     }
 
@@ -103,19 +124,28 @@ export async function handleGenerateNeglectedCompanionImage(
           .eq("id", companionId);
 
         if (updateError) {
-          console.error("[Neglected Image] Failed to save preset image:", updateError);
+          console.error(
+            "[Neglected Image] Failed to save preset image:",
+            updateError,
+          );
           throw updateError;
         }
       }
 
       return new Response(
-        JSON.stringify({ success: true, imageUrl, cached: companion.neglected_image_url === imageUrl }),
+        JSON.stringify({
+          success: true,
+          imageUrl,
+          cached: companion.neglected_image_url === imageUrl,
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     const imageSize = resolveCompanionImageSizeForUser(companion.user_id);
-    console.log(`[NeglectedImagePolicy] user=${companion.user_id} image_size=${imageSize}`);
+    console.log(
+      `[NeglectedImagePolicy] user=${companion.user_id} image_size=${imageSize}`,
+    );
     console.log(`[Neglected Image] Generating for companion ${companionId}`);
     const costGuardrails = deps.createCostGuardrailSessionFn({
       supabase,
@@ -130,9 +160,15 @@ export async function handleGenerateNeglectedCompanionImage(
     });
 
     if (companion.neglected_image_url) {
-      console.log(`[Neglected Image] Already exists for companion ${companionId}`);
+      console.log(
+        `[Neglected Image] Already exists for companion ${companionId}`,
+      );
       return new Response(
-        JSON.stringify({ success: true, imageUrl: companion.neglected_image_url, cached: true }),
+        JSON.stringify({
+          success: true,
+          imageUrl: companion.neglected_image_url,
+          cached: true,
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -146,7 +182,8 @@ export async function handleGenerateNeglectedCompanionImage(
       throw new Error("OPENAI_API_KEY not configured");
     }
 
-    const editPrompt = `Edit this companion creature to look sad and neglected while PRESERVING ITS EXACT APPEARANCE:
+    const editPrompt =
+      `Edit this companion creature to look sad and neglected while PRESERVING ITS EXACT APPEARANCE:
 
 PRESERVE COMPLETELY (DO NOT CHANGE):
 - The creature's species (${companion.spirit_animal}), face shape, and body structure
@@ -164,60 +201,63 @@ MODIFY TO SHOW NEGLECT (SUBTLE CHANGES ONLY):
 - DO NOT make it look sick, injured, or dramatically different
 
 MOOD: Sad, lonely, longing for attention - but still recognizable as the same companion
-OUTPUT: Same composition and framing as the original image`;
+OUTPUT: The posture change overrides only the standard stance rule. Preserve the canonical square canvas, camera distance, subject scale, lighting recipe, edge finish, and transparent cutout.
+
+Canonical Cosmiq render contract:
+${buildCompanionArtDirection().map((rule) => `- ${rule}`).join("\n")}`;
 
     console.log("[Neglected Image] Calling image edit API...");
 
-    const response = await guardedFetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${openAIApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image-preview",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: editPrompt },
-              { type: "image_url", image_url: { url: companion.current_image_url } },
-            ],
-          },
-        ],
-        modalities: ["image", "text"],
-        image_size: imageSize,
-      }),
+    const rendered = await editCompanionImage({
+      guardedFetch,
+      openAIApiKey,
+      prompt: editPrompt,
+      size: imageSize,
+      quality: getCompanionFinalImageQuality(),
+      background: "transparent",
+      outputFormat: "png",
+      userId: companion.user_id,
+      referenceImages: [{ imageUrl: companion.current_image_url }],
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[Neglected Image] API error:", response.status, errorText);
-
-      if (response.status === 429) {
-        throw new Error("RATE_LIMITED: AI service is currently busy. Please try again later.");
-      }
-      if (response.status === 402) {
-        throw new Error("INSUFFICIENT_CREDITS: Insufficient AI credits.");
-      }
-
-      throw new Error(`AI service error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const editedImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    const editedImageUrl = rendered.imageDataUrl;
 
     if (!editedImageUrl) {
-      console.error("[Neglected Image] No image in response:", data);
+      console.error(
+        "[Neglected Image] No image returned by canonical image client",
+      );
       throw new Error("Failed to generate neglected image");
     }
 
-    console.log(`[Neglected Image] Successfully generated, saving to database for ${companionId}...`);
+    console.log(
+      `[Neglected Image] Successfully generated, saving to database for ${companionId}...`,
+    );
+
+    const base64Data = editedImageUrl.replace(/^data:image\/\w+;base64,/, "");
+    const imageBuffer = Uint8Array.from(
+      atob(base64Data),
+      (char) => char.charCodeAt(0),
+    );
+    const fileName =
+      `${companion.user_id}/neglected/${companionId}-${Date.now()}.png`;
+    const { error: uploadError } = await supabase.storage
+      .from("companion-images")
+      .upload(fileName, imageBuffer, {
+        contentType: "image/png",
+        upsert: false,
+      });
+    if (uploadError) {
+      throw new Error(
+        `Failed to upload neglected image: ${uploadError.message}`,
+      );
+    }
+    const { data: publicUrl } = supabase.storage
+      .from("companion-images")
+      .getPublicUrl(fileName);
 
     const { error: updateError } = await supabase
       .from("user_companion")
       .update({
-        neglected_image_url: editedImageUrl,
+        neglected_image_url: publicUrl.publicUrl,
         neglected_image_focal_x: companion.current_image_focal_x ?? 0.5,
         neglected_image_focal_y: companion.current_image_focal_y ?? 0.5,
       })
@@ -228,12 +268,22 @@ OUTPUT: Same composition and framing as the original image`;
       throw updateError;
     }
 
+    await registerUserStorageAsset({
+      supabase,
+      userId: companion.user_id,
+      bucketId: "companion-images",
+      storagePath: fileName,
+      sourceKind: "companion_neglected_image",
+      sourceRecordTable: "user_companion",
+      sourceRecordId: companion.id,
+    });
+
     console.log(`[Neglected Image] Complete for companion ${companionId}`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        imageUrl: editedImageUrl,
+        imageUrl: publicUrl.publicUrl,
         cached: false,
       }),
       {
@@ -245,7 +295,9 @@ OUTPUT: Same composition and framing as the original image`;
       return buildCostGuardrailBlockedResponse(error, corsHeaders);
     }
     console.error("[Neglected Image] Error:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorMessage = error instanceof Error
+      ? error.message
+      : "Unknown error";
     return new Response(
       JSON.stringify({ error: errorMessage }),
       {
@@ -254,7 +306,9 @@ OUTPUT: Same composition and framing as the original image`;
       },
     );
   } finally {
-    console.log(`[NeglectedImageTiming] total_ms=${Date.now() - requestStartedAt}`);
+    console.log(
+      `[NeglectedImageTiming] total_ms=${Date.now() - requestStartedAt}`,
+    );
   }
 }
 

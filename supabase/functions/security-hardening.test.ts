@@ -946,7 +946,11 @@ Deno.test("generate-mentor-audio fails instead of using OpenAI when primary voic
   );
 
   const body = await response.json();
-  assertEquals(response.status, 500);
+  assertEquals(
+    response.status,
+    500,
+    "Expected internal error response when the authenticated query fails",
+  );
   assert(
     String(body.error).includes("ElevenLabs primary failed after retry"),
     "Expected ElevenLabs failure to be surfaced",

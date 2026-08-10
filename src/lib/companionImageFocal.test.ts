@@ -8,12 +8,12 @@ import {
 } from "./companionImageFocal";
 
 describe("companionImageFocal", () => {
-  it("resolves bundled storm egg focal metadata for cover presentation", () => {
+  it("keeps bundled square egg art centered for cover presentation", () => {
     expect(
       getBundledCompanionImageFocalPoint("/companion-eggs/egg__t0_egg__normal__storm.png"),
     ).toEqual({
-      x: 0.48827,
-      y: 0.445313,
+      x: 0.5,
+      y: 0.519531,
     });
 
     expect(
@@ -25,12 +25,12 @@ describe("companionImageFocal", () => {
       focalSource: "manifest",
       assetKey: "companion-eggs/egg__t0_egg__normal__storm.png",
       style: {
-        objectPosition: "50% 33.62588070175439%",
+        objectPosition: "50% 50%",
       },
     });
   });
 
-  it("applies contain translation for top-heavy bundled eggs", () => {
+  it("uses the normalized egg focal point for contain presentation", () => {
     expect(
       resolveCompanionImagePresentation({
         src: "/companion-eggs/egg__t0_egg__normal__nature.png",
@@ -39,12 +39,12 @@ describe("companionImageFocal", () => {
     ).toMatchObject({
       focalSource: "manifest",
       style: {
-        transform: "translate(1.906%, 9.668%)",
+        transform: "translate(0.098%, -2.051%)",
       },
     });
   });
 
-  it("keeps centered square egg art in the center without a no-op transform", () => {
+  it("uses the same normalized focal treatment for the primary WebP egg art", () => {
     expect(
       resolveCompanionImagePresentation({
         src: "/companion-eggs/v2/egg__t0_egg__normal__storm.webp",
@@ -55,15 +55,25 @@ describe("companionImageFocal", () => {
       assetKey: "companion-eggs/v2/egg__t0_egg__normal__storm.webp",
       style: {
         objectPosition: "center center",
+        transform: "translate(0.056%, -2.056%)",
       },
     });
+  });
 
-    expect(
-      resolveCompanionImagePresentation({
-        src: "/companion-eggs/v2/egg__t0_egg__normal__storm.webp",
-        fit: "portrait",
-      }).style.transform,
-    ).toBeUndefined();
+  it("keeps every bundled elemental egg on the shared art focal contract", () => {
+    for (const element of ["fire", "ice", "light", "nature", "storm", "void"]) {
+      const cutout = getBundledCompanionImageFocalPoint(
+        `/companion-eggs/egg__t0_egg__normal__${element}.png`,
+      );
+      const primary = getBundledCompanionImageFocalPoint(
+        `/companion-eggs/v2/egg__t0_egg__normal__${element}.webp`,
+      );
+
+      expect(cutout?.x).toBeCloseTo(0.5, 2);
+      expect(cutout?.y).toBeCloseTo(0.52, 2);
+      expect(primary?.x).toBeCloseTo(0.5, 2);
+      expect(primary?.y).toBeCloseTo(0.52, 2);
+    }
   });
 
   it("detects preset portrait assets and resolves portrait framing from bundled metadata", () => {

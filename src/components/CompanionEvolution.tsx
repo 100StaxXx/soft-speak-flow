@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import confetti from "canvas-confetti";
-import { Sparkles } from "lucide-react";
 import { haptics } from "@/utils/haptics";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { EvolutionErrorFallback } from "@/components/ErrorFallback";
@@ -53,14 +52,14 @@ interface SilhouetteStrobePolicyInput {
 }
 
 const FULL_SEQUENCE_MS = {
-  hold: 800,
-  charge: 3200,
-  conceal: 850,
-  strobe: 2920,
-  apex: 340,
-  reveal: 2400,
+  hold: 700,
+  charge: 2400,
+  conceal: 650,
+  strobe: 1800,
+  apex: 300,
+  reveal: 1900,
   settle: 1600,
-  dismissBuffer: 3000,
+  dismissBuffer: 1000,
 } as const;
 
 const REDUCED_SEQUENCE_MS = {
@@ -81,20 +80,40 @@ const HATCH_FOREGROUND_STAGE_MAX_HEIGHT_PX = 700;
 const HATCH_FOREGROUND_STAGE_FALLBACK_ASPECT_RATIO = 1764 / 1172;
 const STROBE_BEAT_OFFSETS_MS = [
   0,
-  350,
-  685,
-  1005,
-  1305,
-  1585,
-  1845,
-  2085,
-  2305,
-  2495,
-  2660,
-  2800,
+  250,
+  480,
+  690,
+  880,
+  1050,
+  1200,
+  1335,
+  1455,
+  1555,
+  1640,
+  1710,
 ] as const;
 const STROBE_PULSE_INTERVAL = 4;
 const LAST_STROBE_BEAT_INDEX = STROBE_BEAT_OFFSETS_MS.length - 1;
+
+const EVOLUTION_PHASE_COPY: Record<EvolutionPhase, string> = {
+  hold: "Resonance detected",
+  charge: "Energy converging",
+  conceal: "Form taking shape",
+  strobe: "Essence synchronizing",
+  apex: "Threshold reached",
+  reveal: "Evolution complete",
+  settle: "Bond ascended",
+};
+
+const EVOLUTION_PHASE_ORDER: EvolutionPhase[] = [
+  "hold",
+  "charge",
+  "conceal",
+  "strobe",
+  "apex",
+  "reveal",
+  "settle",
+];
 
 const shouldUseMappedPresetHatchVideo = ({
   isFirstEvolution,
@@ -204,6 +223,160 @@ const ConvergenceParticles = ({
         />
       ))}
     </div>
+  );
+};
+
+const EvolutionAtmosphere = ({
+  phase,
+  theme,
+  prefersReducedMotion,
+  moteCount,
+}: {
+  phase: EvolutionPhase;
+  theme: EvoTheme;
+  prefersReducedMotion: boolean;
+  moteCount: number;
+}) => {
+  const orbitMotes = useMemo(
+    () => Array.from({ length: moteCount }, (_, index) => ({
+      id: index,
+      angle: (index / moteCount) * 360 + (index % 3) * 7,
+      radius: 34 + (index % 4) * 9,
+      size: 2 + (index % 3),
+      delay: (index % 6) * 0.18,
+    })),
+    [moteCount],
+  );
+  const isGathering = phase === "charge" || phase === "conceal" || phase === "strobe" || phase === "apex";
+  const isRevealed = phase === "reveal" || phase === "settle";
+
+  return (
+    <div
+      className="evo-ascension-atmosphere absolute inset-0 pointer-events-none"
+      data-testid="evolution-atmosphere"
+      aria-hidden="true"
+    >
+      <motion.div
+        className="evo-aurora evo-aurora-a absolute inset-[-25%]"
+        initial={false}
+        animate={{
+          opacity: phase === "hold" ? 0.2 : isGathering ? 0.58 : 0.42,
+          scale: phase === "apex" ? 0.82 : isRevealed ? 1.18 : 1,
+          rotate: phase === "apex" ? -8 : isRevealed ? 10 : 0,
+        }}
+        transition={{ duration: prefersReducedMotion ? 0.2 : 1.2, ease: [0.22, 1, 0.36, 1] }}
+        style={{
+          background: `conic-gradient(from 205deg at 48% 48%, transparent 0deg, hsl(${theme.glowA} / 0.24) 62deg, transparent 116deg, hsl(${theme.glowB} / 0.18) 214deg, transparent 292deg)`,
+        }}
+      />
+      <motion.div
+        className="evo-aurora evo-aurora-b absolute inset-[-20%]"
+        initial={false}
+        animate={{
+          opacity: phase === "hold" ? 0.12 : phase === "apex" ? 0.08 : isRevealed ? 0.44 : 0.28,
+          scale: isGathering ? 0.88 : isRevealed ? 1.12 : 1,
+          rotate: isRevealed ? -12 : 0,
+        }}
+        transition={{ duration: prefersReducedMotion ? 0.2 : 1.45, ease: [0.22, 1, 0.36, 1] }}
+        style={{
+          background: `radial-gradient(ellipse at 52% 46%, hsl(${theme.glowB} / 0.3) 0%, hsl(${theme.glowA} / 0.12) 34%, transparent 66%)`,
+        }}
+      />
+
+      {!prefersReducedMotion && (
+        <>
+          <div className="evo-starfield absolute inset-0" />
+          <motion.div
+            className="evo-orbit-system absolute left-1/2 top-1/2 aspect-square w-[min(92vw,760px)] -translate-x-1/2 -translate-y-1/2"
+            data-testid="evolution-orbit-system"
+            initial={false}
+            animate={{
+              opacity: phase === "hold" ? 0.22 : phase === "apex" ? 0.12 : isRevealed ? 0.55 : 0.72,
+              scale: phase === "conceal" ? 0.8 : phase === "apex" ? 0.62 : isRevealed ? 1.08 : 1,
+              rotate: phase === "apex" ? 32 : isRevealed ? 58 : 18,
+            }}
+            transition={{ duration: phase === "apex" ? 0.3 : 1.5, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <div className="evo-orbit-ring evo-orbit-ring-outer absolute inset-[3%] rounded-full" />
+            <div className="evo-orbit-ring evo-orbit-ring-middle absolute inset-[14%] rounded-full" />
+            <div className="evo-orbit-ring evo-orbit-ring-inner absolute inset-[27%] rounded-full" />
+            {orbitMotes.map((mote) => (
+              <span
+                key={mote.id}
+                className="evo-orbit-mote absolute left-1/2 top-1/2 rounded-full"
+                style={{
+                  width: `${mote.size}px`,
+                  height: `${mote.size}px`,
+                  transform: `rotate(${mote.angle}deg) translateX(${mote.radius}cqw)`,
+                  animationDelay: `${mote.delay}s`,
+                  background: mote.id % 2 === 0 ? `hsl(${theme.glowA})` : theme.flashCore,
+                  boxShadow: `0 0 12px ${theme.revealBurstColor}`,
+                }}
+              />
+            ))}
+          </motion.div>
+
+          {isRevealed && (
+            <div
+              className="evo-reveal-rings absolute left-1/2 top-1/2 aspect-square w-[min(82vw,680px)] -translate-x-1/2 -translate-y-1/2"
+              data-testid="evolution-reveal-rings"
+            >
+              <span className="evo-reveal-ring absolute inset-[20%] rounded-full" />
+              <span className="evo-reveal-ring absolute inset-[20%] rounded-full [animation-delay:180ms]" />
+              <span className="evo-reveal-ring absolute inset-[20%] rounded-full [animation-delay:360ms]" />
+            </div>
+          )}
+        </>
+      )}
+
+      <div className="evo-cinematic-vignette absolute inset-0" />
+    </div>
+  );
+};
+
+const EvolutionPhaseBeacon = ({
+  phase,
+  previousStage,
+  newStage,
+  isFirstEvolution,
+}: {
+  phase: EvolutionPhase;
+  previousStage: number;
+  newStage: number;
+  isFirstEvolution: boolean;
+}) => {
+  const phaseIndex = EVOLUTION_PHASE_ORDER.indexOf(phase);
+  const progress = ((phaseIndex + 1) / EVOLUTION_PHASE_ORDER.length) * 100;
+
+  return (
+    <motion.div
+      className="evo-phase-beacon absolute left-1/2 top-0 z-30 -translate-x-1/2"
+      initial={{ opacity: 0, x: "-50%", y: -8 }}
+      animate={{ opacity: 1, x: "-50%", y: 0 }}
+      transition={{ duration: 0.4 }}
+      aria-hidden="true"
+      data-testid="evolution-phase-beacon"
+    >
+      <div className="flex items-center gap-2.5 whitespace-nowrap px-4 py-2.5">
+        <span className="evo-beacon-glyph" />
+        <span className="text-[0.65rem] font-bold uppercase tracking-[0.24em] text-white/82 sm:text-xs">
+          {isFirstEvolution ? "Awakening" : `Ascension ${previousStage} → ${newStage}`}
+        </span>
+        <span className="h-1 w-1 rounded-full bg-white/35" />
+        <span className="text-[0.6rem] font-semibold uppercase tracking-[0.18em] text-white/55 sm:text-[0.68rem]">
+          {EVOLUTION_PHASE_COPY[phase]}
+        </span>
+      </div>
+      <div className="h-px overflow-hidden bg-white/10">
+        <motion.div
+          className="h-full origin-left"
+          initial={false}
+          animate={{ width: `${progress}%` }}
+          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+          style={{ background: "linear-gradient(90deg, hsl(var(--evo-glow-a)), hsl(var(--evo-glow-b)), white)" }}
+        />
+      </div>
+    </motion.div>
   );
 };
 
@@ -383,8 +556,9 @@ const CompanionEvolutionContent = ({
   const holdStillRevealForAnimation =
     shouldUseAnimationVideo && !animationVideoEnded && isAnimationRevealPhase;
   const canDismissNow = canDismiss && !holdStillRevealForAnimation;
-  const canShowEmergencyExit = showEmergencyExit && (!shouldUseAnimationVideo || animationVideoEnded);
+  const canShowEmergencyExit = showEmergencyExit && !canDismissNow;
   const convergenceParticleCount = Math.max(4, Math.min(12, Math.round(capabilities.maxParticles * 0.5)));
+  const ambientMoteCount = Math.max(8, Math.min(18, capabilities.maxParticles));
   const confettiParticleCount = profile === "enhanced"
     ? theme.confettiParticleCount
     : Math.min(theme.confettiParticleCount, 88);
@@ -443,6 +617,11 @@ const CompanionEvolutionContent = ({
   const celebrationDescription = isFirstEvolution
     ? "Your companion has emerged."
     : `Your companion reached ${levelDisplay}.`;
+  const previousStageLabel = isFirstEvolution ? "Origin" : `Stage ${previousStage}`;
+  const newStageLabel = isFirstEvolution ? "Hatchling" : `Stage ${newStage}`;
+  const elementLabel = element?.trim()
+    ? `${element.trim().charAt(0).toUpperCase()}${element.trim().slice(1).toLowerCase()} essence`
+    : "Cosmic essence";
 
   const animationVideoReadyForCinematic =
     !shouldUseGeneratedAnimationVideo || animationVideoReady;
@@ -937,7 +1116,7 @@ const CompanionEvolutionContent = ({
           role="alertdialog"
           aria-labelledby="evolution-title"
           aria-describedby="evolution-description"
-          className={`fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden gpu-layer ${canDismissNow ? "cursor-pointer" : ""}`}
+          className={`evo-cinematic-root fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden gpu-layer ${canDismissNow ? "cursor-pointer" : ""}`}
           onClick={handleDismiss}
           onTouchStart={(event) => !canDismissNow && event.preventDefault()}
           data-phase={phase}
@@ -958,6 +1137,31 @@ const CompanionEvolutionContent = ({
             ["--evo-glow-b" as string]: theme.glowB,
           }}
         >
+          <div className="sr-only" aria-live="assertive" aria-atomic="true">
+            <h1 id="evolution-title">Companion evolution</h1>
+            <p id="evolution-description">
+              {phase === "reveal" || phase === "settle"
+                ? celebrationDescription
+                : EVOLUTION_PHASE_COPY[phase]}
+            </p>
+          </div>
+
+          <EvolutionAtmosphere
+            phase={phase}
+            theme={theme}
+            prefersReducedMotion={prefersReducedMotion}
+            moteCount={ambientMoteCount}
+          />
+
+          {!useHatchVideo && (
+            <EvolutionPhaseBeacon
+              phase={phase}
+              previousStage={previousStage}
+              newStage={newStage}
+              isFirstEvolution={isFirstEvolution}
+            />
+          )}
+
           <motion.div
             className="absolute inset-[-10%] pointer-events-none"
             initial={false}
@@ -1097,7 +1301,7 @@ const CompanionEvolutionContent = ({
             </div>
           )}
 
-          <div className="relative z-10 flex w-full max-w-5xl flex-col items-center justify-center gap-8 px-6">
+          <div className="evo-cinematic-content relative z-10 flex w-full max-w-5xl flex-col items-center justify-center gap-5 px-5 sm:gap-7 sm:px-6">
             <AnimatePresence mode="wait">
               {!useHatchVideo && (phase === "hold" || phase === "charge" || phase === "conceal") && (
                 <motion.div
@@ -1106,11 +1310,13 @@ const CompanionEvolutionContent = ({
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 1.02, y: -10 }}
                   transition={{ duration: 0.28 }}
-                  className="text-center"
+                  className="evo-anticipation-copy text-center"
                 >
+                  <p className="mb-3 text-[0.62rem] font-bold uppercase tracking-[0.42em] text-white/45 sm:text-xs">
+                    Evolution in progress
+                  </p>
                   <h2
-                    id="evolution-title"
-                    className="text-3xl font-black tracking-[0.18em] text-white sm:text-4xl md:text-5xl"
+                    className="text-2xl font-black tracking-[0.14em] text-white sm:text-4xl sm:tracking-[0.18em] md:text-5xl"
                     style={{
                       textShadow: `0 0 28px hsl(${theme.glowA}), 0 0 56px hsl(${theme.glowB} / 0.48)`,
                     }}
@@ -1118,7 +1324,6 @@ const CompanionEvolutionContent = ({
                     {anticipationTitle}
                   </h2>
                   <p
-                    id="evolution-description"
                     className="mt-3 text-sm font-medium uppercase tracking-[0.28em] text-white/70 sm:text-base"
                   >
                     {phase === "hold" ? "A new form is drawing near" : "The transformation takes shape"}
@@ -1129,20 +1334,20 @@ const CompanionEvolutionContent = ({
 
             {!useHatchVideo && (
               <div
-                className="relative flex w-full items-center justify-center"
+                className="evo-art-stage-shell relative flex w-full items-center justify-center"
                 style={{
-                  minHeight: "min(54vh, 470px)",
+                  minHeight: "min(50dvh, 470px)",
                 }}
               >
                 <motion.div
-                  className="relative flex w-full max-w-[580px] items-center justify-center"
+                  className="evo-art-stage relative flex w-full max-w-[580px] items-center justify-center"
                   data-testid="evolution-art-stage"
                   data-art-presentation={hasDualArt ? "swap" : "single"}
                   data-strobe-enabled={silhouetteStrobeEnabled ? "true" : "false"}
                   data-strobe-beat={strobeBeatIndex === null ? "-1" : String(strobeBeatIndex)}
                   data-strobe-target={strobeTarget}
                   style={{
-                    height: "min(54vh, 470px)",
+                    height: "min(50dvh, 470px)",
                     ["--evo-strobe-duration" as string]: `${sequence.strobe / 1000}s`,
                     ["--evo-strobe-progress" as string]: strobeProgress.toFixed(3),
                   }}
@@ -1168,6 +1373,14 @@ const CompanionEvolutionContent = ({
                     ease: [0.22, 1, 0.36, 1],
                   }}
                 >
+                <div className="evo-stage-portal absolute inset-[-8%] pointer-events-none" aria-hidden="true">
+                  <span className="evo-stage-portal-ring evo-stage-portal-ring-outer absolute inset-[1%] rounded-[2.75rem]" />
+                  <span className="evo-stage-portal-ring evo-stage-portal-ring-inner absolute inset-[5%] rounded-[2.4rem]" />
+                  <span className="evo-stage-corner evo-stage-corner-tl" />
+                  <span className="evo-stage-corner evo-stage-corner-tr" />
+                  <span className="evo-stage-corner evo-stage-corner-bl" />
+                  <span className="evo-stage-corner evo-stage-corner-br" />
+                </div>
                 <motion.div
                   className="absolute inset-[10%] rounded-full pointer-events-none"
                   initial={false}
@@ -1246,7 +1459,7 @@ const CompanionEvolutionContent = ({
                   <motion.div
                     key={`previous-art-${previousDisplayImageUrl}`}
                     data-testid="evolution-previous-art"
-                    className="absolute inset-0"
+                    className="evo-companion-frame absolute inset-0 overflow-hidden rounded-[2rem]"
                     initial={false}
                     animate={{
                       opacity: phase === "reveal" || phase === "settle"
@@ -1255,8 +1468,8 @@ const CompanionEvolutionContent = ({
                           ? 0.02
                         : phase === "strobe"
                             ? strobeTarget === "previous"
-                              ? 0.92
-                              : 0.18
+                              ? 0.68
+                              : 0.3
                             : 1,
                       scale: phase === "hold"
                         ? 1
@@ -1275,8 +1488,8 @@ const CompanionEvolutionContent = ({
                         ? "brightness(0) saturate(0) contrast(1.48) blur(4px)"
                         : phase === "strobe"
                           ? strobeTarget === "previous"
-                            ? "brightness(0) saturate(0) contrast(1.62) blur(4px)"
-                            : "brightness(0) saturate(0) contrast(1.82) blur(8px)"
+                            ? "brightness(0) saturate(0) contrast(1.52) blur(4px)"
+                            : "brightness(0) saturate(0) contrast(1.7) blur(7px)"
                           : phase === "apex"
                             ? "brightness(0) saturate(0) contrast(2) blur(10px)"
                         : phase === "charge"
@@ -1307,7 +1520,7 @@ const CompanionEvolutionContent = ({
                     key={`reveal-art-${revealDisplayImageUrl}`}
                     data-testid="evolution-reveal-art"
                     data-hold-for-animation={holdStillRevealForAnimation ? "true" : "false"}
-                    className="absolute inset-0"
+                    className="evo-companion-frame absolute inset-0 overflow-hidden rounded-[2rem]"
                     initial={false}
                     animate={hasDualArt
                       ? {
@@ -1319,8 +1532,8 @@ const CompanionEvolutionContent = ({
                             ? 0.28
                             : phase === "strobe"
                               ? strobeTarget === "next"
-                                ? 0.92
-                                : 0.18
+                                ? 0.68
+                                : 0.3
                               : 0,
                         scale: phase === "strobe"
                           ? strobeTarget === "next"
@@ -1341,9 +1554,10 @@ const CompanionEvolutionContent = ({
                               ? "brightness(0) saturate(0) contrast(1.8) blur(6px)"
                               : phase === "strobe"
                                 ? strobeTarget === "next"
-                                  ? "brightness(0) saturate(0) contrast(1.64) blur(4px)"
-                                  : "brightness(0) saturate(0) contrast(1.84) blur(8px)"
+                                  ? "brightness(0) saturate(0) contrast(1.54) blur(4px)"
+                                  : "brightness(0) saturate(0) contrast(1.72) blur(7px)"
                                 : "brightness(0) saturate(0) contrast(1.7) blur(10px)",
+                        y: phase === "reveal" ? -8 : phase === "settle" ? 0 : 4,
                       }
                       : {
                         opacity: holdStillRevealForAnimation ? 0 : 1,
@@ -1442,24 +1656,12 @@ const CompanionEvolutionContent = ({
                 )}
 
                 {(phase === "reveal" || phase === "settle") && (
-                  <>
-                    <Sparkles
-                      className="absolute -left-4 -top-4 h-10 w-10 text-white/80"
-                      style={{ filter: `drop-shadow(0 0 14px ${theme.revealBurstColor})` }}
-                    />
-                    <Sparkles
-                      className="absolute -right-4 -top-4 h-10 w-10 text-white/80"
-                      style={{ filter: `drop-shadow(0 0 14px ${theme.revealBurstColor})` }}
-                    />
-                    <Sparkles
-                      className="absolute -bottom-4 -left-4 h-10 w-10 text-white/70"
-                      style={{ filter: `drop-shadow(0 0 12px ${theme.revealBurstColor})` }}
-                    />
-                    <Sparkles
-                      className="absolute -bottom-4 -right-4 h-10 w-10 text-white/70"
-                      style={{ filter: `drop-shadow(0 0 12px ${theme.revealBurstColor})` }}
-                    />
-                  </>
+                  <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+                    <span className="evo-prism-flare evo-prism-flare-tl" />
+                    <span className="evo-prism-flare evo-prism-flare-tr" />
+                    <span className="evo-prism-flare evo-prism-flare-bl" />
+                    <span className="evo-prism-flare evo-prism-flare-br" />
+                  </div>
                 )}
                 </motion.div>
               </div>
@@ -1473,11 +1675,15 @@ const CompanionEvolutionContent = ({
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -12, scale: 1.02 }}
                   transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-                  className="text-center"
+                  className="evo-celebration-card text-center"
                 >
+                  <div className="mb-3 flex items-center justify-center gap-2 text-[0.62rem] font-bold uppercase tracking-[0.34em] text-white/55 sm:text-xs">
+                    <span className="h-px w-7 bg-gradient-to-r from-transparent to-white/50" />
+                    Ascension complete
+                    <span className="h-px w-7 bg-gradient-to-l from-transparent to-white/50" />
+                  </div>
                   <motion.h1
-                    id="evolution-title"
-                    className="text-4xl font-black uppercase tracking-[0.18em] sm:text-5xl md:text-6xl"
+                    className="text-4xl font-black uppercase tracking-[0.16em] sm:text-5xl sm:tracking-[0.18em] md:text-6xl"
                     style={{
                       background: `linear-gradient(135deg, ${theme.flashCore}, hsl(${theme.glowA}), hsl(${theme.glowB}), ${theme.flashCore})`,
                       backgroundSize: "200% 200%",
@@ -1492,58 +1698,76 @@ const CompanionEvolutionContent = ({
                     {celebrationTitle}
                   </motion.h1>
                   <p
-                    id="evolution-description"
-                    className="mt-3 text-lg font-semibold text-white/90 sm:text-xl md:text-2xl"
+                    className="mt-2 text-base font-semibold text-white/90 sm:text-xl md:text-2xl"
                     style={{ textShadow: "0 0 16px rgba(255,255,255,0.34)" }}
                   >
                     {celebrationDescription}
                   </p>
-                  <p className="mt-2 text-sm font-medium uppercase tracking-[0.28em] text-white/60 sm:text-base">
-                    {levelDisplay}
-                  </p>
+                  <div
+                    className="evo-stage-transition mx-auto mt-4 flex w-fit items-center gap-3 px-4 py-2.5"
+                    data-testid="evolution-stage-transition"
+                  >
+                    <span className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-white/45 sm:text-xs">
+                      {previousStageLabel}
+                    </span>
+                    <span className="evo-stage-arrow" aria-hidden="true">→</span>
+                    <span className="text-[0.65rem] font-black uppercase tracking-[0.2em] text-white sm:text-xs">
+                      {newStageLabel}
+                    </span>
+                    <span className="h-3 w-px bg-white/20" />
+                    <span className="text-[0.6rem] font-semibold uppercase tracking-[0.16em] text-white/55 sm:text-[0.68rem]">
+                      {elementLabel}
+                    </span>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
 
             <AnimatePresence>
-              {canDismissNow && !canShowEmergencyExit && (
+              {canDismissNow && (
                 <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
+                  initial={{ opacity: 0, x: "-50%", y: 10 }}
+                  animate={{ opacity: 1, x: "-50%", y: 0 }}
                   exit={{ opacity: 0 }}
-                  className="absolute left-1/2 -translate-x-1/2"
+                  className="fixed left-1/2 z-[10001]"
                   style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}
                 >
-                  <motion.p
-                    className="text-base font-medium text-white/90 sm:text-lg"
+                  <motion.button
+                    type="button"
+                    autoFocus
+                    className="evo-continue-button whitespace-nowrap px-5 py-3 text-sm font-bold uppercase tracking-[0.18em] text-white/90 sm:text-base"
                     animate={{ opacity: [0.58, 1, 0.58] }}
                     transition={{ duration: 1.8, repeat: Infinity }}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      finishEvolution();
+                    }}
                   >
                     Tap anywhere to continue
-                  </motion.p>
+                  </motion.button>
                 </motion.div>
               )}
             </AnimatePresence>
 
             {canShowEmergencyExit && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="absolute z-[10002]"
+                initial={{ opacity: 0, x: "-50%", scale: 0.9 }}
+                animate={{ opacity: 1, x: "-50%", scale: 1 }}
+                className="fixed left-1/2 z-[10002]"
                 style={{
-                  top: "calc(1rem + env(safe-area-inset-top, 0px))",
-                  right: "calc(1rem + env(safe-area-inset-right, 0px))",
+                  bottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))",
                 }}
               >
                 <button
+                  autoFocus
                   onClick={(event) => {
                     event.stopPropagation();
                     handleEmergencyExit();
                   }}
-                  className="rounded-lg bg-destructive/90 px-4 py-2 font-bold text-destructive-foreground shadow-lg transition-colors hover:bg-destructive"
+                  className="evo-continue-button px-4 py-2.5 text-xs font-bold uppercase tracking-[0.18em] text-white/90 shadow-lg"
                   aria-label="Close evolution modal"
                 >
-                  Close
+                  Continue
                 </button>
               </motion.div>
             )}

@@ -3,28 +3,41 @@ installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { resolveCompanionImageSizeForUser } from "../_shared/companionImagePolicy.ts";
-import { errorResponse, type InternalRequestAuth, requireInternalRequest } from "../_shared/auth.ts";
+import {
+  getCompanionFinalImageQuality,
+  resolveCompanionImageSizeForUser,
+} from "../_shared/companionImagePolicy.ts";
+import { buildCompanionArtDirection } from "../_shared/companionLineage.ts";
+import { editCompanionImage } from "../_shared/openaiCompanionImageClient.ts";
+import {
+  errorResponse,
+  type InternalRequestAuth,
+  requireInternalRequest,
+} from "../_shared/auth.ts";
 import {
   buildCostGuardrailBlockedResponse,
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
 import {
-  COMPANION_PRESET_BUCKET,
   coerceCompanionElementId,
   coerceCompanionPresetId,
+  COMPANION_PRESET_BUCKET,
   resolveCompanionAssetPath,
 } from "../../../src/config/companionCatalog.ts";
 import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 interface GenerateDormantCompanionImageDeps {
-  authenticate: (req: Request, corsHeaders: HeadersInit) => Promise<InternalRequestAuth | Response>;
+  authenticate: (
+    req: Request,
+    corsHeaders: HeadersInit,
+  ) => Promise<InternalRequestAuth | Response>;
   createSupabaseClient: () => any;
   createCostGuardrailSessionFn: any;
   fetchImpl: typeof fetch;
@@ -58,7 +71,9 @@ export async function handleGenerateDormantCompanionImage(
     }
 
     const body = await req.json().catch(() => ({}));
-    const companionId = typeof body?.companionId === "string" ? body.companionId : null;
+    const companionId = typeof body?.companionId === "string"
+      ? body.companionId
+      : null;
 
     if (!companionId) {
       return errorResponse(400, "Missing companionId", corsHeaders);
@@ -67,12 +82,17 @@ export async function handleGenerateDormantCompanionImage(
     const supabase = deps.createSupabaseClient();
     const { data: companion, error: companionError } = await supabase
       .from("user_companion")
-      .select("id, user_id, current_image_url, current_image_focal_x, current_image_focal_y, dormant_image_url, dormant_image_focal_x, dormant_image_focal_y, spirit_animal, companion_name, core_element, current_stage, preset_id")
+      .select(
+        "id, user_id, current_image_url, current_image_focal_x, current_image_focal_y, dormant_image_url, dormant_image_focal_x, dormant_image_focal_y, spirit_animal, companion_name, core_element, current_stage, preset_id",
+      )
       .eq("id", companionId)
       .maybeSingle();
 
     if (companionError) {
-      console.error("[Dormant Image] Failed to fetch companion:", companionError);
+      console.error(
+        "[Dormant Image] Failed to fetch companion:",
+        companionError,
+      );
       return errorResponse(500, "Failed to load companion", corsHeaders);
     }
 
@@ -104,19 +124,28 @@ export async function handleGenerateDormantCompanionImage(
           .eq("id", companionId);
 
         if (updateError) {
-          console.error("[Dormant Image] Failed to save preset image:", updateError);
+          console.error(
+            "[Dormant Image] Failed to save preset image:",
+            updateError,
+          );
           throw updateError;
         }
       }
 
       return new Response(
-        JSON.stringify({ success: true, imageUrl, cached: companion.dormant_image_url === imageUrl }),
+        JSON.stringify({
+          success: true,
+          imageUrl,
+          cached: companion.dormant_image_url === imageUrl,
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     const imageSize = resolveCompanionImageSizeForUser(companion.user_id);
-    console.log(`[DormantImagePolicy] user=${companion.user_id} image_size=${imageSize}`);
+    console.log(
+      `[DormantImagePolicy] user=${companion.user_id} image_size=${imageSize}`,
+    );
     const costGuardrails = deps.createCostGuardrailSessionFn({
       supabase,
       endpointKey: "generate-dormant-companion-image",
@@ -131,7 +160,11 @@ export async function handleGenerateDormantCompanionImage(
 
     if (companion.dormant_image_url) {
       return new Response(
-        JSON.stringify({ success: true, imageUrl: companion.dormant_image_url, cached: true }),
+        JSON.stringify({
+          success: true,
+          imageUrl: companion.dormant_image_url,
+          cached: true,
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -147,57 +180,46 @@ export async function handleGenerateDormantCompanionImage(
 
     console.log(`[Dormant Image] Generating for companion ${companionId}`);
 
-    const editPrompt = `Transform this creature into a peaceful sleeping state:
+    const editPrompt =
+      `Transform this exact companion into a peaceful sleeping state while preserving its identity and canonical Cosmiq artwork:
 - Eyes gently closed, serene expression
 - Curled up in a comfortable resting position
-- Soft, muted colors with a slight blue-grey tint suggesting deep sleep
+- Preserve the exact palette; reduce saturation no more than 10% and use a faint body-attached blue-grey sleep aura
 - Gentle breathing visible through subtle chest movement suggestion
-- Surrounded by soft shadow or comfortable darkness
-- Dreamlike atmosphere with subtle stardust or sleep particles
+- Dreamlike mood with subtle stardust or sleep particles over transparency
 - Peaceful but with a hint of waiting/longing
 - The creature should look like it's in a deep, protective slumber
-- Preserve the core identity and features of the creature
-- Add a subtle ethereal glow suggesting the spirit is dormant but alive`;
+- Preserve the exact species, anatomy, face, markings, materials, signature features, and maturity
+- The sleeping pose overrides only the standard stance rule; preserve the standard square canvas, camera distance, subject scale, lighting recipe, edge finish, and transparent cutout
 
-    const response = await guardedFetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${openAIApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image-preview",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: editPrompt },
-              { type: "image_url", image_url: { url: companion.current_image_url } },
-            ],
-          },
-        ],
-        modalities: ["image", "text"],
-        image_size: imageSize,
-      }),
+Canonical Cosmiq render contract:
+${buildCompanionArtDirection().map((rule) => `- ${rule}`).join("\n")}`;
+
+    const rendered = await editCompanionImage({
+      guardedFetch,
+      openAIApiKey,
+      prompt: editPrompt,
+      size: imageSize,
+      quality: getCompanionFinalImageQuality(),
+      background: "transparent",
+      outputFormat: "png",
+      userId: companion.user_id,
+      referenceImages: [{ imageUrl: companion.current_image_url }],
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[Dormant Image] API error:", errorText);
-      throw new Error(`AI API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const generatedImage = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    const generatedImage = rendered.imageDataUrl;
 
     if (!generatedImage) {
       throw new Error("No image generated");
     }
 
     const base64Data = generatedImage.replace(/^data:image\/\w+;base64,/, "");
-    const imageBuffer = Uint8Array.from(atob(base64Data), (char) => char.charCodeAt(0));
+    const imageBuffer = Uint8Array.from(
+      atob(base64Data),
+      (char) => char.charCodeAt(0),
+    );
 
-    const fileName = `${companion.user_id}/dormant/${companionId}-${Date.now()}.png`;
+    const fileName =
+      `${companion.user_id}/dormant/${companionId}-${Date.now()}.png`;
 
     const { error: uploadError } = await supabase.storage
       .from("companion-images")
@@ -239,7 +261,9 @@ export async function handleGenerateDormantCompanionImage(
       sourceRecordId: companion.id,
     });
 
-    console.log(`[Dormant Image] Generated and saved for companion ${companionId}`);
+    console.log(
+      `[Dormant Image] Generated and saved for companion ${companionId}`,
+    );
 
     return new Response(
       JSON.stringify({ success: true, imageUrl: publicUrl.publicUrl }),
@@ -251,11 +275,18 @@ export async function handleGenerateDormantCompanionImage(
     }
     console.error("[Dormant Image] Error:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      JSON.stringify({
+        error: error instanceof Error ? error.message : "Unknown error",
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   } finally {
-    console.log(`[DormantImageTiming] total_ms=${Date.now() - requestStartedAt}`);
+    console.log(
+      `[DormantImageTiming] total_ms=${Date.now() - requestStartedAt}`,
+    );
   }
 }
 

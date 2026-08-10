@@ -100,7 +100,7 @@ describe("useCompanionRegenerate", () => {
     });
   });
 
-  it("uses reduced retry budget and regenerate flow type", async () => {
+  it("uses the current portrait as identity evidence for regeneration", async () => {
     const { result } = renderHook(() => useCompanionRegenerate(), {
       wrapper: createWrapper(),
     });
@@ -112,6 +112,7 @@ describe("useCompanionRegenerate", () => {
         core_element: "Fire",
         favorite_color: "#FF6B35",
         current_stage: 3,
+        current_image_url: "https://example.com/current-image.png",
       });
     });
 
@@ -122,6 +123,8 @@ describe("useCompanionRegenerate", () => {
     expect(mocks.generateWithValidationMock).toHaveBeenCalledWith(
       expect.objectContaining({
         flowType: "regenerate",
+        companionId: "companion-1",
+        previousStageImageUrl: "https://example.com/current-image.png",
       }),
       expect.objectContaining({
         maxRetries: 1,

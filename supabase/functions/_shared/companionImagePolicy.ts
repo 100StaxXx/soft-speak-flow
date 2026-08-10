@@ -1,6 +1,9 @@
 import { resolveImageSize, type SupportedImageSize } from "./aiClient.ts";
 
-export const DEFAULT_COMPANION_IMAGE_SIZE: SupportedImageSize = "1536x1024";
+// Companion art is authored and displayed as a square collectible portrait.
+// Keep every generation path on the same canvas so framing does not drift
+// between onboarding, regeneration, health states, and evolution boundaries.
+export const DEFAULT_COMPANION_IMAGE_SIZE: SupportedImageSize = "1024x1024";
 const DEFAULT_FAST_IMAGE_SIZE: SupportedImageSize = "1024x1024";
 
 const DEFAULT_FAST_PATH_PERCENT = 0;
@@ -64,11 +67,14 @@ export function resolveCompanionImageSizeForUser(
   requestedSize?: unknown,
 ): SupportedImageSize {
   const normalizedRequested = resolveImageSize(requestedSize, null);
-  if (normalizedRequested) {
-    return normalizedRequested;
+  if (normalizedRequested === DEFAULT_COMPANION_IMAGE_SIZE) {
+    return DEFAULT_COMPANION_IMAGE_SIZE;
   }
   if (isCompanionFastPathEligible(userId)) {
-    return getCompanionFastImageSize();
+    const fastSize = getCompanionFastImageSize();
+    if (fastSize === DEFAULT_COMPANION_IMAGE_SIZE) {
+      return fastSize;
+    }
   }
   return DEFAULT_COMPANION_IMAGE_SIZE;
 }

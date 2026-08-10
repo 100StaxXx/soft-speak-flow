@@ -18,7 +18,10 @@ function assertEquals<T>(actual: T, expected: T, message: string): void {
 
 Deno.test("companion image judge requires and returns background cutout scoring", async () => {
   const capturedBodies: Array<Record<string, unknown>> = [];
-  const guardedFetch = async (_input: RequestInfo | URL, init?: RequestInit) => {
+  const guardedFetch = async (
+    _input: RequestInfo | URL,
+    init?: RequestInit,
+  ) => {
     capturedBodies.push(JSON.parse(String(init?.body ?? "{}")));
     return new Response(
       JSON.stringify({
@@ -33,6 +36,8 @@ Deno.test("companion image judge requires and returns background cutout scoring"
                       difference: 7,
                       anatomy: 9,
                       centering: 8,
+                      styleConsistency: 9,
+                      compositionConsistency: 8,
                       backgroundCutout: 3,
                       overall: 7,
                       subjectCenterX: 0.48,
@@ -64,7 +69,17 @@ Deno.test("companion image judge requires and returns background cutout scoring"
     nextLevel: 1,
   });
 
-  assertEquals(scores?.backgroundCutout, 3, "Expected parsed background cutout score");
+  assertEquals(
+    scores?.backgroundCutout,
+    3,
+    "Expected parsed background cutout score",
+  );
+  assertEquals(scores?.styleConsistency, 9, "Expected parsed style score");
+  assertEquals(
+    scores?.compositionConsistency,
+    8,
+    "Expected parsed composition score",
+  );
   const capturedBody = capturedBodies[0];
   assert(capturedBody, "Expected judge request body to be captured");
 
@@ -73,6 +88,11 @@ Deno.test("companion image judge requires and returns background cutout scoring"
   assert(
     parameters.required.includes("backgroundCutout"),
     "Expected judge tool schema to require backgroundCutout",
+  );
+  assert(
+    parameters.required.includes("styleConsistency") &&
+      parameters.required.includes("compositionConsistency"),
+    "Expected judge tool schema to require uniform art scoring",
   );
 
   const messages = capturedBody.messages as Array<Record<string, any>>;
@@ -83,5 +103,11 @@ Deno.test("companion image judge requires and returns background cutout scoring"
       instructions.includes("sky") &&
       instructions.includes("rectangular backdrop"),
     "Expected judge instructions to define visible backdrop failures",
+  );
+  assert(
+    instructions.includes("Canonical Cosmiq render contract") &&
+      instructions.includes("68-78%") &&
+      instructions.includes("StyleConsistency"),
+    "Expected judge instructions to enforce canonical art and framing",
   );
 });

@@ -85,6 +85,9 @@ export interface CompanionGenerationMetadata {
     difference: number | null;
     anatomy: number | null;
     centering: number | null;
+    styleConsistency: number | null;
+    compositionConsistency: number | null;
+    backgroundCutout: number | null;
     overall: number | null;
   };
   notes: string | null;
@@ -97,7 +100,8 @@ interface VisualIdentitySeed {
   storyTone?: string | null;
 }
 
-export const COMPANION_IMAGE_PROMPT_VERSION = "companion_lineage_v3";
+export const COMPANION_IMAGE_PROMPT_VERSION = "companion_lineage_v4";
+export const COMPANION_ART_DIRECTION_VERSION = "cosmiq_collectible_v1";
 const DEFAULT_IMAGE_LINEAGE_PROVIDER = "openai";
 const DEFAULT_IMAGE_LINEAGE_PIPELINE = "stage1_first_bootstrap_v1";
 
@@ -474,10 +478,19 @@ const getEvolutionDeltaBudget = (
   }
 };
 
-const buildArtDirection = (): string[] => [
-  "single companion as the subject",
-  "silhouette-first composition",
-  "high readability at thumbnail size",
+export const buildCompanionArtDirection = (): string[] => [
+  `Cosmiq render contract: ${COMPANION_ART_DIRECTION_VERSION}`,
+  "premium polished 2D/2.5D fantasy creature-collecting game illustration with clean dark-warm contour lines, softly modeled gradient fills, selective painterly texture, luminous expressive eyes, crisp silhouette edges, and simplified readable forms",
+  "keep this same rendering medium, edge finish, material detail, eye treatment, and polish across every egg, companion, state, and evolution tier",
+  "do not drift into photorealism, flat vector diagrams, anime-screen or cel-only rendering, sketch art, gritty horror, plastic 3D, or extreme chibi proportions",
+  "single companion or egg as the only subject; no extra characters",
+  "square 1:1 portrait composition with a neutral eye-level three-quarter-front camera and no extreme perspective or foreshortening",
+  "show the complete silhouette; center the visible subject near x=0.50 and y=0.52, filling roughly 68-78% of canvas height",
+  "keep all anatomy, wings, horns, tails, fins, aura, glow, and particles inside a 10% safe-area inset; no cropping or edge collisions",
+  "use a stable grounded stance or controlled hover appropriate to the species, with the face and eyes unobstructed",
+  "use one lighting recipe: soft neutral key from upper-left, gentle cool rim separation, lifted readable midtones, clean eye highlights, and controlled saturated accents",
+  "story tone may influence expression and the mood of body-attached aura only; it must not replace the canonical camera, lighting, palette hierarchy, or rendering style",
+  "silhouette-first composition with high readability at thumbnail size",
   "true transparent background / alpha canvas; isolated subject-only cutout",
   "no scenic or environmental backdrop, sky, clouds, horizon, landscape, room, floor, frame, border, card, shadow plane, or solid rectangular background",
   "the output must not read as a cropped scene or a sticker sitting on a visible rectangle",
@@ -850,6 +863,7 @@ export const updateLineageMetadataAfterBoundaryEvolution = ({
   const metadata = coerceImageLineageMetadata(existing);
   return {
     ...metadata,
+    promptVersion: COMPANION_IMAGE_PROMPT_VERSION,
     lastReachedBoundaryLevel: boundaryLevel,
     lastReachedBoundaryImageUrl: imageUrl,
     updatedAt: new Date().toISOString(),
@@ -899,6 +913,9 @@ export const buildCompanionGenerationMetadata = ({
     difference: scores?.difference ?? null,
     anatomy: scores?.anatomy ?? null,
     centering: scores?.centering ?? null,
+    styleConsistency: scores?.styleConsistency ?? null,
+    compositionConsistency: scores?.compositionConsistency ?? null,
+    backgroundCutout: scores?.backgroundCutout ?? null,
     overall: scores?.overall ?? null,
   },
   notes,
@@ -946,7 +963,7 @@ export const buildAiEggPrompt = (profile: VisualIdentityProfile): string => {
     "- The shell should imply power sleeping inside",
     "",
     "Art Direction:",
-    ...buildArtDirection().map((item) => `- ${item}`),
+    ...buildCompanionArtDirection().map((item) => `- ${item}`),
     "",
     "Continuity Checklist:",
     ...buildContinuityChecklist(profile).map((item) => `- ${item}`),
@@ -984,7 +1001,7 @@ export const buildStage1BootstrapPrompt = (
     "- Strong silhouette and facial read matter more than ornament density",
     "",
     "Art Direction:",
-    ...buildArtDirection().map((item) => `- ${item}`),
+    ...buildCompanionArtDirection().map((item) => `- ${item}`),
     "",
     "Continuity Checklist:",
     ...buildContinuityChecklist(profile).map((item) => `- ${item}`),
@@ -1015,6 +1032,9 @@ export const buildEggFromStage1Prompt = (
     "- The egg must feel like it contains the referenced hatchling specifically",
     "- Render as an isolated transparent-alpha cutout with no scenic backdrop, sky, clouds, horizon, landscape, floor, frame, card, shadow plane, or solid rectangular background",
     "- Strong mystery and premium readability, with any glow or particles attached to the egg over transparency",
+    "",
+    "Art Direction:",
+    ...buildCompanionArtDirection().map((item) => `- ${item}`),
     "",
     "Continuity Checklist:",
     ...buildContinuityChecklist(profile).map((item) => `- ${item}`),
@@ -1074,7 +1094,7 @@ export const buildAiEvolutionPrompt = ({
     ),
     "",
     "Art Direction:",
-    ...buildArtDirection().map((item) => `- ${item}`),
+    ...buildCompanionArtDirection().map((item) => `- ${item}`),
     "",
     "Continuity Checklist:",
     ...buildContinuityChecklist(profile).map((item) => `- ${item}`),
@@ -1142,6 +1162,7 @@ export const buildBoundaryEvolutionGenerationPrompt = ({
     "- Preserve the companion's recognizable family, face logic, markings, palette identity, and signature features",
     "- Evolve scale, maturity, posture, proportions, ornamentation, and elemental expression enough to read as a new tier",
     "- The result must look like a direct evolution of the previous companion, not a sibling, variant, or unrelated redesign",
+    "- Previous pose, framing, lighting, or art-style notes are evidence only; the Cosmiq render contract above is authoritative for composition and finish",
     "",
     ...(previousSummary
       ? ["Previous form summary:", `- ${previousSummary}`, ""]

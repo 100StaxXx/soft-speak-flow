@@ -1,14 +1,24 @@
-import type { VisualIdentityProfile } from "./companionLineage.ts";
+import {
+  buildCompanionArtDirection,
+  type VisualIdentityProfile,
+} from "./companionLineage.ts";
 
-const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
+const OPENAI_CHAT_COMPLETIONS_URL =
+  "https://api.openai.com/v1/chat/completions";
 
-export type CompanionImageJudgeMode = "bootstrap" | "egg" | "evolution" | "launcher";
+export type CompanionImageJudgeMode =
+  | "bootstrap"
+  | "egg"
+  | "evolution"
+  | "launcher";
 
 export interface CompanionImageJudgeScores {
   continuity: number;
   difference: number;
   anatomy: number;
   centering: number;
+  styleConsistency: number;
+  compositionConsistency: number;
   backgroundCutout: number;
   overall: number;
   subjectCenterX: number | null;
@@ -37,6 +47,12 @@ const buildJudgeInstructions = ({
     typeof previousLevel === "number" && typeof nextLevel === "number"
       ? `Evaluate the jump from level ${previousLevel} to level ${nextLevel}.`
       : "Evaluate the companion image on its own merits.";
+  const renderContract = [
+    "Canonical Cosmiq render contract:",
+    ...buildCompanionArtDirection().map((rule) => `- ${rule}`),
+    "StyleConsistency means the candidate follows this exact medium, lighting, edge finish, eye treatment, and polish. When a reference exists, it must also feel drawn by the same art team.",
+    "CompositionConsistency means the full subject and effects remain inside the safe area at the specified center, scale, camera angle, and framing without cropping.",
+  ].join("\n");
 
   switch (mode) {
     case "bootstrap":
@@ -52,6 +68,7 @@ const buildJudgeInstructions = ({
         "Anatomy means: no extra limbs, no broken face logic, and no obvious malformed body plan.",
         "Centering means: the subject is well framed and not awkwardly cropped.",
         "BackgroundCutout means: 10 for a clean companion-only transparent/empty cutout; 0-4 for any visible sky, clouds, landscape, room, floor, frame, card, rectangular backdrop, or scenic environment.",
+        renderContract,
       ].join("\n");
     case "egg":
       return [
@@ -66,6 +83,7 @@ const buildJudgeInstructions = ({
         "Anatomy means: the egg is coherent, readable, and not malformed.",
         "Centering means: the egg is cleanly framed and visually centered.",
         "BackgroundCutout means: 10 for a clean egg-only transparent/empty cutout; 0-4 for any visible sky, clouds, landscape, room, floor, frame, card, rectangular backdrop, or scenic environment.",
+        renderContract,
       ].join("\n");
     case "launcher":
       return [
@@ -80,6 +98,7 @@ const buildJudgeInstructions = ({
         "Anatomy means: no extra limbs, no broken face logic, and no obvious malformed body plan.",
         "Centering means: the subject is well framed, full body, and not awkwardly cropped.",
         "BackgroundCutout means: 10 for a clean companion-only transparent/empty cutout; 0-4 for any visible sky, clouds, landscape, room, floor, frame, card, rectangular backdrop, or scenic environment.",
+        renderContract,
       ].join("\n");
     case "evolution":
     default:
@@ -95,6 +114,7 @@ const buildJudgeInstructions = ({
         "Anatomy means: no malformed limbs, duplicate heads, or broken body logic.",
         "Centering means: the subject is framed well and not awkwardly cropped.",
         "BackgroundCutout means: 10 for a clean companion-only transparent/empty cutout; 0-4 for any visible sky, clouds, landscape, room, floor, frame, card, rectangular backdrop, or scenic environment.",
+        renderContract,
       ].join("\n");
   }
 };
@@ -122,7 +142,8 @@ export const judgeCompanionImage = async ({
     type: "function",
     function: {
       name: "score_companion_image",
-      description: "Score a fantasy companion image for continuity, difference, anatomy, centering, and overall quality.",
+      description:
+        "Score a fantasy companion image for lineage continuity, evolution difference, anatomy, canonical Cosmiq style, composition, cutout quality, and overall quality.",
       parameters: {
         type: "object",
         properties: {
@@ -130,13 +151,27 @@ export const judgeCompanionImage = async ({
           difference: { type: "number" },
           anatomy: { type: "number" },
           centering: { type: "number" },
+          styleConsistency: { type: "number" },
+          compositionConsistency: { type: "number" },
           backgroundCutout: { type: "number" },
           overall: { type: "number" },
           subjectCenterX: { type: "number" },
           subjectCenterY: { type: "number" },
           notes: { type: "string" },
         },
-        required: ["continuity", "difference", "anatomy", "centering", "backgroundCutout", "overall", "subjectCenterX", "subjectCenterY", "notes"],
+        required: [
+          "continuity",
+          "difference",
+          "anatomy",
+          "centering",
+          "styleConsistency",
+          "compositionConsistency",
+          "backgroundCutout",
+          "overall",
+          "subjectCenterX",
+          "subjectCenterY",
+          "notes",
+        ],
         additionalProperties: false,
       },
     },
@@ -174,9 +209,9 @@ export const judgeCompanionImage = async ({
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: Deno.env.get("OPENAI_COMPANION_JUDGE_MODEL")
-          ?? Deno.env.get("OPENAI_TEXT_MODEL")
-          ?? "gpt-4.1-mini",
+        model: Deno.env.get("OPENAI_COMPANION_JUDGE_MODEL") ??
+          Deno.env.get("OPENAI_TEXT_MODEL") ??
+          "gpt-4.1-mini",
         messages: [
           {
             role: "user",
@@ -194,7 +229,10 @@ export const judgeCompanionImage = async ({
     });
 
     if (!response.ok) {
-      console.warn("Companion image judge request failed", await response.text());
+      console.warn(
+        "Companion image judge request failed",
+        await response.text(),
+      );
       return null;
     }
 
@@ -210,24 +248,53 @@ export const judgeCompanionImage = async ({
       }>;
     };
 
-    const rawArguments = payload.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
+    const rawArguments = payload.choices?.[0]?.message?.tool_calls?.[0]
+      ?.function?.arguments;
     if (typeof rawArguments !== "string") {
       return null;
     }
 
     const parsed = JSON.parse(rawArguments) as Record<string, unknown>;
     return {
-      continuity: clampScore(typeof parsed.continuity === "number" ? parsed.continuity : 0),
-      difference: clampScore(typeof parsed.difference === "number" ? parsed.difference : 0),
-      anatomy: clampScore(typeof parsed.anatomy === "number" ? parsed.anatomy : 0),
-      centering: clampScore(typeof parsed.centering === "number" ? parsed.centering : 0),
-      backgroundCutout: clampScore(typeof parsed.backgroundCutout === "number" ? parsed.backgroundCutout : 0),
-      overall: clampScore(typeof parsed.overall === "number" ? parsed.overall : 0),
+      continuity: clampScore(
+        typeof parsed.continuity === "number" ? parsed.continuity : 0,
+      ),
+      difference: clampScore(
+        typeof parsed.difference === "number" ? parsed.difference : 0,
+      ),
+      anatomy: clampScore(
+        typeof parsed.anatomy === "number" ? parsed.anatomy : 0,
+      ),
+      centering: clampScore(
+        typeof parsed.centering === "number" ? parsed.centering : 0,
+      ),
+      styleConsistency: clampScore(
+        typeof parsed.styleConsistency === "number"
+          ? parsed.styleConsistency
+          : 0,
+      ),
+      compositionConsistency: clampScore(
+        typeof parsed.compositionConsistency === "number"
+          ? parsed.compositionConsistency
+          : 0,
+      ),
+      backgroundCutout: clampScore(
+        typeof parsed.backgroundCutout === "number"
+          ? parsed.backgroundCutout
+          : 0,
+      ),
+      overall: clampScore(
+        typeof parsed.overall === "number" ? parsed.overall : 0,
+      ),
       subjectCenterX: clampNormalizedCenter(
-        typeof parsed.subjectCenterX === "number" ? parsed.subjectCenterX : null,
+        typeof parsed.subjectCenterX === "number"
+          ? parsed.subjectCenterX
+          : null,
       ),
       subjectCenterY: clampNormalizedCenter(
-        typeof parsed.subjectCenterY === "number" ? parsed.subjectCenterY : null,
+        typeof parsed.subjectCenterY === "number"
+          ? parsed.subjectCenterY
+          : null,
       ),
       notes: typeof parsed.notes === "string" ? parsed.notes : "",
     };
