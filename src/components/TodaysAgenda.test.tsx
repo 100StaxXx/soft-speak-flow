@@ -3686,7 +3686,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     });
     expect(screen.getByText("Time")).toBeInTheDocument();
     expect(screen.getByText("Priority")).toBeInTheDocument();
-    expect(screen.getByText("XP")).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "XP" })).toBeInTheDocument();
   });
 
   it("shows the row action trigger when move-to-tomorrow is available", () => {
@@ -4412,6 +4412,8 @@ describe("TodaysAgenda external calendar overlay", () => {
       },
     });
     const onRefresh = vi.fn();
+    const onManageCalendars = vi.fn();
+    const onDateSelect = vi.fn();
 
     render(
       <TodaysAgenda
@@ -4450,7 +4452,9 @@ describe("TodaysAgenda external calendar overlay", () => {
         ]}
         connectedCalendarCount={2}
         onRefreshExternalCalendars={onRefresh}
+        onManageCalendars={onManageCalendars}
         selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onDateSelect={onDateSelect}
         onToggle={vi.fn()}
         onAddQuest={vi.fn()}
         completedCount={0}
@@ -4467,5 +4471,11 @@ describe("TodaysAgenda external calendar overlay", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Refresh external calendars" }));
     expect(onRefresh).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "2 calendars connected" }));
+    expect(onManageCalendars).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Previous day" }));
+    expect(onDateSelect).toHaveBeenLastCalledWith(expect.any(Date));
   });
 });

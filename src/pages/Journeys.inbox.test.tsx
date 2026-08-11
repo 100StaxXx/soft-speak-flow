@@ -597,7 +597,7 @@ describe("Journeys inbox integration", () => {
     );
   });
 
-  it("renders the inbox section above the agenda when unscheduled quests exist", async () => {
+  it("keeps the agenda above the secondary inbox when unscheduled quests exist", async () => {
     mocks.inboxTasks = [
       {
         id: "inbox-1",
@@ -619,7 +619,7 @@ describe("Journeys inbox integration", () => {
       document.querySelectorAll('[data-testid="journeys-inbox-section"], [data-testid="todays-agenda"]'),
     ).map((node) => node.getAttribute("data-testid"));
 
-    expect(orderedSections).toEqual(["journeys-inbox-section", "todays-agenda"]);
+    expect(orderedSections).toEqual(["todays-agenda", "journeys-inbox-section"]);
 
     fireEvent.click(screen.getByRole("button", { name: /expand inbox section/i }));
 

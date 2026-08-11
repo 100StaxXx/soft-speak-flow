@@ -233,6 +233,7 @@ interface TodaysAgendaProps {
   isExternalCalendarSyncing?: boolean;
   externalCalendarSyncError?: string | null;
   onRefreshExternalCalendars?: () => void;
+  onManageCalendars?: () => void;
   selectedDate: Date;
   readableQuestCardsEnabled?: boolean;
   layoutMode?: JourneysLayoutMode;
@@ -337,7 +338,7 @@ const OUTLOOK_TIMELINE_HOUR_HEIGHT_PX = 104;
 const OUTLOOK_TIMELINE_PX_PER_MINUTE = OUTLOOK_TIMELINE_HOUR_HEIGHT_PX / 60;
 const OUTLOOK_TIMELINE_SLOT_HEIGHT_PX = OUTLOOK_TIMELINE_PX_PER_MINUTE * FULL_DAY_SLOT_INTERVAL_MINUTES;
 const OUTLOOK_TIMELINE_HEIGHT_PX = FULL_DAY_END_MINUTE * OUTLOOK_TIMELINE_PX_PER_MINUTE;
-const OUTLOOK_TIMELINE_GUTTER_WIDTH_PX = 52;
+const OUTLOOK_TIMELINE_GUTTER_WIDTH_PX = 64;
 const OUTLOOK_TIMELINE_EVENT_GAP_PX = 4;
 const OUTLOOK_TIMELINE_MIN_EVENT_HEIGHT_PX = 52;
 const COMPACT_TIMELINE_ROW_MAX_HEIGHT_PX = OUTLOOK_TIMELINE_MIN_EVENT_HEIGHT_PX;
@@ -542,6 +543,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   isExternalCalendarSyncing = false,
   externalCalendarSyncError = null,
   onRefreshExternalCalendars,
+  onManageCalendars,
   selectedDate,
   readableQuestCardsEnabled = false,
   layoutMode,
@@ -2253,9 +2255,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         >
           <CalendarDays className="h-4 w-4 flex-shrink-0 text-celestial-blue" aria-hidden="true" />
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-foreground">{task.task_text}</p>
+            <p className={cn("truncate font-semibold text-foreground", isCompactTimelineItem ? "text-sm" : "text-base")}>
+              {task.task_text}
+            </p>
             {!isCompactTimelineItem ? (
-              <p className="truncate text-[10px] text-muted-foreground">
+              <p className="truncate text-xs text-muted-foreground">
                 {calendarName} · Read only
               </p>
             ) : null}
@@ -2563,7 +2567,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     text={task.task_text}
                     className="min-w-0 w-full flex-1"
                     textClassName={cn(
-                      "text-sm",
+                      isCompactTimelineItem ? "text-sm" : "text-base font-medium",
                       isComplete && "text-muted-foreground",
                       isComplete && (justCompletedTasks.has(task.id) ? "animate-strikethrough" : "line-through")
                     )}
@@ -2575,7 +2579,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   </span>
                 )}
                 {task.scheduled_time && (
-                  <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                  <span className="mt-1 flex items-center gap-1 text-sm font-medium text-muted-foreground">
                     <Clock className="w-3 h-3" />
                     {formatTime(task.scheduled_time)}
                   </span>
@@ -2950,63 +2954,181 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           isDesktopLayout && "journeys-desktop-shell flex min-h-0 flex-col rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,21,39,0.95),rgba(13,11,23,0.92))] px-5 py-5 shadow-[0_28px_54px_rgba(0,0,0,0.24)]",
         )}
       >
-        {/* Compact Header: Date + Progress Ring + XP */}
-        <div className={cn("mb-3 flex items-center justify-between gap-3", isDesktopLayout && "mb-5")}>
-          <div className={cn("flex items-center gap-2", isDesktopLayout && "gap-3")}>
-            <button
-              type="button"
-              onClick={() => onOpenMonthView?.()}
-              className="flex items-center gap-1.5 rounded-2xl transition-opacity hover:opacity-80"
-            >
-              <span className={cn("text-lg font-bold", isDesktopLayout && "text-[1.8rem] tracking-tight")}>
-                {safeFormat(selectedDate, "MMM d, yyyy", "Invalid date")}
-              </span>
-            </button>
-            {currentStreak > 0 && (
-              <div className={cn(
-                "flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
-                currentStreak >= 30
-                  ? "bg-stardust-gold/20 text-stardust-gold"
-                  : currentStreak >= 14
-                    ? "bg-celestial-blue/20 text-celestial-blue"
-                    : "bg-orange-500/10 text-orange-400"
-              )}>
-                <Flame className="h-3.5 w-3.5" />
-                {currentStreak}
-              </div>
-            )}
-          </div>
-
-          <div className={cn("flex items-center gap-2", isDesktopLayout && "gap-3")}>
-            {/* Compact progress ring */}
-            {totalCount > 0 && (
-              <div
-                className={cn(
-                  "flex items-center gap-1.5 rounded-2xl border border-white/8 bg-white/[0.03] px-2.5 py-1.5",
-                  isDesktopLayout && "px-3 py-2",
-                )}
-              >
-                <ProgressRing percent={progressPercent} size={24} strokeWidth={2.5} />
-                <span className="text-xs font-medium text-muted-foreground">
-                  {completedCount}/{totalCount}
-                </span>
-              </div>
-            )}
+        {!isDesktopLayout ? (
+          <header className="mb-4 space-y-3" data-testid="agenda-mobile-header">
             <div
-              className={cn(
-                "flex items-center gap-1 rounded-2xl border border-white/8 bg-white/[0.03] px-2.5 py-1.5 text-sm",
-                isDesktopLayout && "px-3 py-2",
-              )}
+              className="flex items-stretch gap-2"
+              role="group"
+              aria-label="Agenda date navigation"
             >
-              <Trophy className={cn(
-                "h-4 w-4",
-                allComplete ? "text-stardust-gold" : "text-stardust-gold/70"
-              )} />
-              <span className="font-semibold text-stardust-gold">{totalXP}</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-12 w-12 flex-shrink-0 rounded-[18px] border-white/10 bg-white/[0.05] hover:bg-white/10"
+                onClick={() => onDateSelect?.(addDays(selectedDate, -1))}
+                aria-label="Previous day"
+                disabled={!onDateSelect}
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+              <button
+                type="button"
+                onClick={() => onOpenMonthView?.()}
+                className="flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-[20px] border border-white/10 bg-white/[0.05] px-3 text-left transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                aria-label={`Open month calendar for ${safeFormat(selectedDate, "MMMM d, yyyy", "selected date")}`}
+              >
+                <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[14px] bg-celestial-blue/15 text-celestial-blue">
+                  <CalendarDays className="h-5 w-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-celestial-blue">
+                    {isSelectedToday ? "Today" : safeFormat(selectedDate, "EEEE", "Selected day")}
+                  </span>
+                  <span className="block truncate text-base font-semibold text-foreground">
+                    {safeFormat(selectedDate, "MMMM d, yyyy", "Invalid date")}
+                  </span>
+                </span>
+              </button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-12 w-12 flex-shrink-0 rounded-[18px] border-white/10 bg-white/[0.05] hover:bg-white/10"
+                onClick={() => onDateSelect?.(addDays(selectedDate, 1))}
+                aria-label="Next day"
+                disabled={!onDateSelect}
+              >
+                <ChevronRight className="h-5 w-5" />
+              </Button>
             </div>
-            {!isDesktopLayout ? quickCaptureControls : null}
+
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2">
+                {totalCount > 0 ? (
+                  <div
+                    className="flex min-h-10 items-center gap-2 rounded-[18px] border border-white/8 bg-white/[0.04] px-3"
+                    aria-label={`${completedCount} of ${totalCount} agenda items complete`}
+                  >
+                    <ProgressRing percent={progressPercent} size={26} strokeWidth={2.5} />
+                    <span className="text-sm font-semibold text-foreground">{completedCount}/{totalCount}</span>
+                    <span className="hidden text-xs text-muted-foreground min-[390px]:inline">done</span>
+                  </div>
+                ) : null}
+                <div
+                  className="flex min-h-10 items-center gap-1.5 rounded-[18px] border border-white/8 bg-white/[0.04] px-3 text-sm"
+                  aria-label={`${totalXP} experience points available`}
+                >
+                  <Trophy className={cn("h-4 w-4", allComplete ? "text-stardust-gold" : "text-stardust-gold/70")} />
+                  <span className="font-semibold text-stardust-gold">{totalXP}</span>
+                  <span className="text-xs text-muted-foreground">XP</span>
+                </div>
+                {currentStreak > 0 ? (
+                  <div
+                    className={cn(
+                      "hidden min-h-10 items-center gap-1 rounded-[18px] px-3 text-sm font-semibold min-[430px]:flex",
+                      currentStreak >= 30
+                        ? "bg-stardust-gold/20 text-stardust-gold"
+                        : currentStreak >= 14
+                          ? "bg-celestial-blue/20 text-celestial-blue"
+                          : "bg-orange-500/10 text-orange-400",
+                    )}
+                    aria-label={`${currentStreak} day streak`}
+                  >
+                    <Flame className="h-4 w-4" />
+                    {currentStreak}
+                  </div>
+                ) : null}
+              </div>
+              {quickCaptureControls}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {onManageCalendars ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-10 min-w-0 flex-1 justify-start rounded-[18px] border-celestial-blue/20 bg-celestial-blue/[0.07] px-3 text-xs hover:bg-celestial-blue/[0.12]"
+                  onClick={onManageCalendars}
+                >
+                  <CalendarDays className="h-4 w-4 flex-shrink-0 text-celestial-blue" />
+                  <span className="truncate">
+                    {connectedCalendarCount > 0
+                      ? `${connectedCalendarCount} calendar${connectedCalendarCount === 1 ? "" : "s"} connected`
+                      : "Connect a calendar"}
+                  </span>
+                </Button>
+              ) : null}
+              {!isSelectedToday && onDateSelect ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-10 rounded-[18px] border-white/10 bg-white/[0.05] px-3 text-xs hover:bg-white/10"
+                  onClick={() => onDateSelect(new Date())}
+                >
+                  Today
+                </Button>
+              ) : null}
+              {connectedCalendarCount > 0 && onRefreshExternalCalendars ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className={cn(
+                    "h-10 w-10 flex-shrink-0 rounded-[18px] border-white/10 bg-white/[0.05] hover:bg-white/10",
+                    externalCalendarSyncError && "border-destructive/40 text-destructive",
+                  )}
+                  onClick={onRefreshExternalCalendars}
+                  disabled={isExternalCalendarSyncing}
+                  aria-label={externalCalendarSyncError ? "Retry calendar sync" : "Refresh external calendars"}
+                  title={externalCalendarSyncError || "Refresh external calendars"}
+                >
+                  {externalCalendarSyncError ? (
+                    <AlertTriangle className="h-4 w-4" />
+                  ) : (
+                    <RefreshCcw className={cn("h-4 w-4", isExternalCalendarSyncing && "animate-spin")} />
+                  )}
+                </Button>
+              ) : null}
+            </div>
+          </header>
+        ) : (
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => onOpenMonthView?.()}
+                className="flex items-center gap-2 rounded-2xl transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                aria-label={`Open month calendar for ${safeFormat(selectedDate, "MMMM d, yyyy", "selected date")}`}
+              >
+                <CalendarDays className="h-5 w-5 text-celestial-blue" />
+                <span className="text-[1.8rem] font-bold tracking-tight">
+                  {safeFormat(selectedDate, "MMM d, yyyy", "Invalid date")}
+                </span>
+              </button>
+              {currentStreak > 0 ? (
+                <div className="flex items-center gap-1 rounded-full bg-orange-500/10 px-2 py-1 text-xs font-medium text-orange-400">
+                  <Flame className="h-3.5 w-3.5" />
+                  {currentStreak}
+                </div>
+              ) : null}
+            </div>
+            <div className="flex items-center gap-3">
+              {totalCount > 0 ? (
+                <div className="flex items-center gap-2 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
+                  <ProgressRing percent={progressPercent} size={24} strokeWidth={2.5} />
+                  <span className="text-xs font-medium text-muted-foreground">{completedCount}/{totalCount}</span>
+                </div>
+              ) : null}
+              <div className="flex items-center gap-1 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2 text-sm">
+                <Trophy className={cn("h-4 w-4", allComplete ? "text-stardust-gold" : "text-stardust-gold/70")} />
+                <span className="font-semibold text-stardust-gold">{totalXP}</span>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
         {isDesktopLayout ? (
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -3093,6 +3215,18 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 >
                   <CalendarDays className="h-4 w-4" />
                   Month
+                </Button>
+              ) : null}
+              {onManageCalendars ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9 rounded-[18px] border-white/10 bg-white/5 px-3 text-xs hover:bg-white/10"
+                  onClick={onManageCalendars}
+                >
+                  <CalendarDays className="h-4 w-4" />
+                  Calendars
                 </Button>
               ) : null}
               {showCompanionPlannerHeaderAction && onOpenCompanionPlanner ? (
@@ -3248,7 +3382,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 </Drawer>
               ) : null}
 
-              {connectedCalendarCount > 0 && onRefreshExternalCalendars ? (
+              {isDesktopLayout && connectedCalendarCount > 0 && onRefreshExternalCalendars ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -3389,7 +3523,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                         onTouchCancel={clearTimeSlotLongPress}
                       >
                         <div
-                          className="flex-shrink-0 px-1.5 pt-1.5 text-right text-[10px] font-medium text-muted-foreground/80"
+                          className="flex-shrink-0 px-2 pt-1.5 text-right text-xs font-semibold text-muted-foreground/90"
                           style={{ width: `${OUTLOOK_TIMELINE_GUTTER_WIDTH_PX}px` }}
                         >
                           {isHour ? formatGridTimeLabel(slotMinute) : null}
@@ -3408,7 +3542,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       style={{ top: `${getTimelineTopPx(nowMarkerMinute)}px` }}
                     >
                       <div
-                        className="pr-1 text-right text-[10px] font-semibold text-stardust-gold"
+                        className="pr-2 text-right text-xs font-semibold text-stardust-gold"
                         style={{ width: `${OUTLOOK_TIMELINE_GUTTER_WIDTH_PX}px` }}
                       >
                         <span aria-hidden="true">{formatCurrentTimeLabel(nowMarkerMinute)}</span>

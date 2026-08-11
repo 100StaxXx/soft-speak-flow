@@ -654,9 +654,9 @@ const Profile = () => {
 
             {/* Preferences Tab */}
             <TabsContent value="preferences" className="space-y-4">
+              <CalendarIntegrationsSettings />
               <QuestBehaviorSettings />
               <PlannerAppearanceSettings />
-              <CalendarIntegrationsSettings />
               <CompanionAccessibilitySettings />
               <SoundSettings />
             </TabsContent>

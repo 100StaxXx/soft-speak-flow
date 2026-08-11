@@ -1702,7 +1702,7 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByText("Plan your quests for the week ahead.")).toBeInTheDocument();
+    expect(screen.getByText("See what’s next and shape the day.")).toBeInTheDocument();
     const row = await screen.findByTestId("timeline-row-task-1");
 
     act(() => {
@@ -1712,7 +1712,7 @@ describe("Journeys row drag integration", () => {
     });
 
     expect(mocks.updateTask).not.toHaveBeenCalled();
-    expect(screen.getByText("Plan your quests for the week ahead.")).toBeInTheDocument();
+    expect(screen.getByText("See what’s next and shape the day.")).toBeInTheDocument();
   });
 
   it("does not reschedule a quest from a sub-threshold timeline row wiggle on /journeys", async () => {
@@ -1960,7 +1960,7 @@ describe("Journeys row drag integration", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Plan your quests for the week ahead.")).toBeInTheDocument();
+      expect(screen.getByText("See what’s next and shape the day.")).toBeInTheDocument();
     });
 
     expect(mocks.surfaceAllEpicHabits).not.toHaveBeenCalled();

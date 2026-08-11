@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback, useLayoutEffect } from "react";
 import { format, addDays, isSameDay, parseISO } from "date-fns";
 import { motion, useReducedMotion } from "framer-motion";
-import { Compass } from "lucide-react";
+import { CalendarDays, Compass } from "lucide-react";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
@@ -1928,6 +1928,26 @@ const Journeys = () => {
     window.dispatchEvent(new CustomEvent(CAMPAIGN_CREATED_ANIMATION_COMPLETE_EVENT));
   }, []);
 
+  const inboxSection = isInboxRequested || inboxCount > 0 ? (
+    <motion.div
+      initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: prefersReducedMotion ? 0 : 0.08, duration: prefersReducedMotion ? 0 : 0.2 }}
+      className="mb-4"
+    >
+      <QuestInboxSection
+        tasks={inboxTasks}
+        isLoading={inboxLoading}
+        isExpanded={isInboxExpanded}
+        onExpandedChange={setIsInboxExpanded}
+        onToggleQuest={handleToggleInboxQuest}
+        onEditQuest={handleEditQuest}
+        onDeleteQuest={handleDeleteInboxQuest}
+        sectionRef={inboxSectionRef}
+      />
+    </motion.div>
+  ) : null;
+
   return (
     <PageTransition mode="instant">
       <CinematicPageBackground preset="quests" />
@@ -1952,7 +1972,21 @@ const Journeys = () => {
                 : "text-center",
             )}
           >
-            <div className={cn(isDesktopLayout ? "static flex-shrink-0" : "absolute right-0 top-0")}>
+            <div className={cn(
+              isDesktopLayout
+                ? "static flex flex-shrink-0 items-center gap-2"
+                : "absolute right-0 top-0",
+            )}>
+              {isDesktopLayout ? (
+                <button
+                  type="button"
+                  onClick={() => navigate("/profile", { state: { openTab: "preferences" } })}
+                  className="flex min-h-11 items-center gap-2 rounded-[18px] border border-white/10 bg-white/[0.05] px-4 text-sm font-medium text-foreground transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                >
+                  <CalendarDays className="h-4 w-4 text-celestial-blue" />
+                  Calendars
+                </button>
+              ) : null}
               <PageInfoButton
                 onClick={() => setShowPageInfo(true)}
               />
@@ -1964,9 +1998,9 @@ const Journeys = () => {
                   isDesktopLayout && "mb-1",
                 )}
               >
-                Quests
+                Agenda
               </h1>
-              <p className="text-sm text-muted-foreground/90">Plan your quests for the week ahead.</p>
+              <p className="text-sm text-muted-foreground/90">See what’s next and shape the day.</p>
             </div>
           </motion.div>
 
@@ -1989,45 +2023,7 @@ const Journeys = () => {
             </div>
           ) : null}
 
-          {isInboxRequested || inboxCount > 0 ? (
-            <motion.div
-              initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: prefersReducedMotion ? 0 : 0.08, duration: prefersReducedMotion ? 0 : 0.2 }}
-              className="mb-4"
-            >
-              <QuestInboxSection
-                tasks={inboxTasks}
-                isLoading={inboxLoading}
-                isExpanded={isInboxExpanded}
-                onExpandedChange={setIsInboxExpanded}
-                onToggleQuest={handleToggleInboxQuest}
-                onEditQuest={handleEditQuest}
-                onDeleteQuest={handleDeleteInboxQuest}
-                sectionRef={inboxSectionRef}
-              />
-            </motion.div>
-          ) : null}
-
-          {isSelectedDateToday ? (
-            <DailyMissionThreadCard
-              missionDate={effectiveTodayDateKey}
-              tasks={dailyTasks}
-              externalEvents={selectedDateExternalCalendarEvents}
-              connectedCalendarCount={connectedExternalCalendarCount}
-              onAddQuest={(prefill) => openAddQuestSheet(prefill ? {
-                date: selectedDate,
-                prefillDraft: {
-                  text: prefill.title,
-                  taskDate: effectiveTodayDateKey,
-                  estimatedDuration: prefill.durationMinutes,
-                  creationSource: "manual",
-                },
-                prefillKey: `daily-mission-${effectiveTodayDateKey}`,
-              } : undefined)}
-              onPrimaryTaskIdChange={setPrimaryMissionTaskId}
-            />
-          ) : null}
+          {isInboxRequested ? inboxSection : null}
 
           {/* Main Content Area */}
           <motion.div
@@ -2079,6 +2075,7 @@ const Journeys = () => {
                 onRefreshExternalCalendars={() => {
                   void refreshExternalCalendars();
                 }}
+                onManageCalendars={() => navigate("/profile", { state: { openTab: "preferences" } })}
                 selectedDate={selectedDate}
                 readableQuestCardsEnabled={profile?.readable_quest_cards_enabled ?? false}
                 layoutMode={journeysLayoutMode}
@@ -2121,6 +2118,28 @@ const Journeys = () => {
               />
             )}
           </motion.div>
+
+          {!isInboxRequested ? inboxSection : null}
+
+          {isSelectedDateToday ? (
+            <DailyMissionThreadCard
+              missionDate={effectiveTodayDateKey}
+              tasks={dailyTasks}
+              externalEvents={selectedDateExternalCalendarEvents}
+              connectedCalendarCount={connectedExternalCalendarCount}
+              onAddQuest={(prefill) => openAddQuestSheet(prefill ? {
+                date: selectedDate,
+                prefillDraft: {
+                  text: prefill.title,
+                  taskDate: effectiveTodayDateKey,
+                  estimatedDuration: prefill.durationMinutes,
+                  creationSource: "manual",
+                },
+                prefillKey: `daily-mission-${effectiveTodayDateKey}`,
+              } : undefined)}
+              onPrimaryTaskIdChange={setPrimaryMissionTaskId}
+            />
+          ) : null}
         </QuestsErrorBoundary>
 
         <JourneysCompanionPlannerModal
@@ -2209,15 +2228,15 @@ const Journeys = () => {
         <PageInfoModal
           open={showPageInfo}
           onClose={() => setShowPageInfo(false)}
-          title="About Quests"
-          icon={Compass}
-          description="Quests and Campaigns work together in one powerful view."
+          title="About Agenda"
+          icon={CalendarDays}
+          description="Your quests, rituals, and connected calendars come together here."
           features={[
-            "Quests are your daily actions to earn XP and build momentum",
-            "Campaigns are goals you break down with your guide into routines",
-            "Track progress across quests and campaigns to stay consistent"
+            "Move between days from the date strip or open the month calendar",
+            "See timed quests and external events together in one schedule",
+            "Complete, edit, reschedule, or add quests without leaving the day"
           ]}
-          tip="Add a quest with +, or start a Campaign to plan your bigger goal."
+          tip="Tap the date to open the month, or hold an open time slot to add a quest there."
         />
 
         {/* Streak Freeze Prompt */}
