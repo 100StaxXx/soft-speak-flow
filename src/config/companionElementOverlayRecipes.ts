@@ -86,6 +86,10 @@ const DEFAULT_EVENT_BURSTS: Record<CompanionMotionEventType, EventBurstProfile> 
   quest_complete: { ringInset: "16%", secondaryInset: "22%", rays: false, swirl: true, beam: false },
   streak: { ringInset: "12%", secondaryInset: "18%", rays: true, swirl: true, beam: false },
   wake: { ringInset: "10%", secondaryInset: "16%", rays: true, swirl: false, beam: true },
+  touch: { ringInset: "21%", secondaryInset: "28%", rays: false, swirl: false, beam: false },
+  pet: { ringInset: "18%", secondaryInset: "25%", rays: false, swirl: true, beam: false },
+  comfort: { ringInset: "17%", secondaryInset: "23%", rays: false, swirl: false, beam: true },
+  play: { ringInset: "14%", secondaryInset: "20%", rays: true, swirl: true, beam: false },
   evolution_start: { ringInset: "8%", secondaryInset: "14%", rays: false, swirl: true, beam: true },
   evolution_reveal: { ringInset: "4%", secondaryInset: "10%", rays: true, swirl: true, beam: true },
 };

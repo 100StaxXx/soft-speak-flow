@@ -1,7 +1,7 @@
 import { Card, outerShellCardClassName } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { PawPrint, Sparkles } from "lucide-react";
+import { PawPrint, RotateCcw, Sparkles } from "lucide-react";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useReferrals } from "@/hooks/useReferrals";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
@@ -18,6 +18,7 @@ import { CompanionBondBadge } from "@/components/companion/CompanionBondBadge";
 import { EvolveButton } from "@/components/companion/EvolveButton";
 import { EvolutionPathBadge } from "@/components/companion/EvolutionPathBadge";
 import { CompanionDialogue } from "@/components/companion/CompanionDialogue";
+import { CompanionInteractionBubble } from "@/components/companion/CompanionInteractionBubble";
 import { CompanionMotionSurface } from "@/components/companion/motion/CompanionMotionSurface";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
 import { CompanionImage } from "@/components/CompanionImage";
@@ -56,6 +57,7 @@ import {
 } from "@/lib/companionEvolutionEvents";
 import { useMotionProfile } from "@/hooks/useMotionProfile";
 import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
+import { useCompanionInteractions } from "@/hooks/useCompanionInteractions";
 import {
   useState,
   useEffect,
@@ -67,7 +69,6 @@ import {
   Suspense,
   type MouseEvent as ReactMouseEvent,
   type TouchEvent as ReactTouchEvent,
-  type KeyboardEvent as ReactKeyboardEvent,
   type SyntheticEvent as ReactSyntheticEvent,
   type CSSProperties,
 } from "react";
@@ -221,6 +222,9 @@ export const CompanionDisplay = memo(({
   
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const touchStartPoint = useRef<{ x: number; y: number } | null>(null);
+  const latestPressPoint = useRef<{ x: number; y: number } | null>(null);
+  const pressStartedAt = useRef<number | null>(null);
+  const longPressTriggered = useRef(false);
   const previousImageUrl = useRef<string | null>(null);
   const inlineReplayPosterUrlRef = useRef(COMPANION_PLACEHOLDER);
   const wasVisible = useRef(isVisible);
@@ -260,6 +264,11 @@ export const CompanionDisplay = memo(({
       progressToNext,
     ],
   );
+  const companionInteractions = useCompanionInteractions({
+    companionId: displayCompanion?.id,
+    currentStage: displayCompanion?.current_stage ?? 0,
+    prefersReducedMotion,
+  });
   const displayRequiresHatchSelection = Boolean(
     displayCompanion
     && displayCompanion.current_stage === 0
@@ -281,10 +290,9 @@ export const CompanionDisplay = memo(({
 
   const finishInlineEvolutionReplay = useCallback(() => {
     setInlineEvolutionReplay(null);
-    openCompanionChat();
-  }, [openCompanionChat]);
+  }, []);
 
-  const handleCompanionImageHoldAction = useCallback(async () => {
+  const handleReplayEvolution = useCallback(async () => {
     if (!displayCompanion || inlineEvolutionReplay) return;
 
     const replay =
@@ -301,63 +309,125 @@ export const CompanionDisplay = memo(({
       return;
     }
 
-    toast.info("No evolution replay yet.");
-    openCompanionChat();
+    toast.info("No evolution replay is available yet.");
   }, [
     currentEvolutionReplay,
     displayCompanion,
     inlineEvolutionReplay,
-    openCompanionChat,
     refetchCurrentEvolutionReplay,
   ]);
 
+  const getPressPoint = useCallback((
+    event: ReactMouseEvent<HTMLButtonElement> | ReactTouchEvent<HTMLButtonElement>,
+  ) => {
+    if ("touches" in event) {
+      const touch = event.touches[0] ?? event.changedTouches[0];
+      return touch ? { x: touch.clientX, y: touch.clientY } : null;
+    }
+
+    return { x: event.clientX, y: event.clientY };
+  }, []);
+
   const handlePressStart = useCallback((
-    event: ReactMouseEvent<HTMLDivElement> | ReactTouchEvent<HTMLDivElement>,
+    event: ReactMouseEvent<HTMLButtonElement> | ReactTouchEvent<HTMLButtonElement>,
   ) => {
     if (!displayCompanion || inlineEvolutionReplay) return;
 
-    if ("touches" in event && event.touches[0]) {
-      const touch = event.touches[0];
-      touchStartPoint.current = { x: touch.clientX, y: touch.clientY };
-    } else {
-      touchStartPoint.current = null;
-    }
+    const point = getPressPoint(event);
+    touchStartPoint.current = point;
+    latestPressPoint.current = point;
+    pressStartedAt.current = Date.now();
+    longPressTriggered.current = false;
 
     longPressTimer.current = setTimeout(() => {
       longPressTimer.current = null;
-      void handleCompanionImageHoldAction();
+      longPressTriggered.current = true;
+      companionInteractions.interact("hold");
     }, LONG_PRESS_DURATION_MS);
-  }, [displayCompanion, handleCompanionImageHoldAction, inlineEvolutionReplay]);
+  }, [companionInteractions, displayCompanion, getPressPoint, inlineEvolutionReplay]);
 
-  const handlePressEnd = useCallback(() => {
+  const handlePressEnd = useCallback((
+    event: ReactMouseEvent<HTMLButtonElement> | ReactTouchEvent<HTMLButtonElement>,
+  ) => {
+    const point = getPressPoint(event) ?? latestPressPoint.current;
+    const start = touchStartPoint.current;
+    const didLongPress = longPressTriggered.current;
+
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+
+    if (!didLongPress && start && point) {
+      const deltaX = point.x - start.x;
+      const deltaY = point.y - start.y;
+      const horizontalDistance = Math.abs(deltaX);
+      const verticalDistance = Math.abs(deltaY);
+      const distance = Math.hypot(deltaX, deltaY);
+      const elapsed = pressStartedAt.current === null ? 0 : Date.now() - pressStartedAt.current;
+      const isTouchGesture = "changedTouches" in event;
+      const isIntentionalPet = distance >= 24
+        && elapsed <= 1_500
+        && (!isTouchGesture || horizontalDistance >= verticalDistance);
+
+      if (isIntentionalPet) {
+        companionInteractions.interact("pet");
+      } else if (distance < MOVE_CANCEL_THRESHOLD_PX) {
+        companionInteractions.interact("tap");
+      }
+    }
+
+    touchStartPoint.current = null;
+    latestPressPoint.current = null;
+    pressStartedAt.current = null;
+    longPressTriggered.current = false;
+  }, [companionInteractions, getPressPoint]);
+
+  const handlePressCancel = useCallback(() => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
     touchStartPoint.current = null;
+    latestPressPoint.current = null;
+    pressStartedAt.current = null;
+    longPressTriggered.current = false;
   }, []);
 
-  const handlePressMove = useCallback((event: ReactTouchEvent<HTMLDivElement>) => {
-    if (!touchStartPoint.current || !longPressTimer.current) return;
+  const handlePressMove = useCallback((event: ReactTouchEvent<HTMLButtonElement>) => {
+    if (!touchStartPoint.current) return;
 
     const touch = event.touches[0];
     if (!touch) return;
 
+    latestPressPoint.current = { x: touch.clientX, y: touch.clientY };
+
     const deltaX = Math.abs(touch.clientX - touchStartPoint.current.x);
     const deltaY = Math.abs(touch.clientY - touchStartPoint.current.y);
 
-    if (deltaX > MOVE_CANCEL_THRESHOLD_PX || deltaY > MOVE_CANCEL_THRESHOLD_PX) {
-      handlePressEnd();
+    if (
+      longPressTimer.current
+      && (deltaX > MOVE_CANCEL_THRESHOLD_PX || deltaY > MOVE_CANCEL_THRESHOLD_PX)
+    ) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
     }
-  }, [handlePressEnd]);
+  }, []);
 
-  const handleKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== "Enter" && event.key !== " ") return;
+  const handleMouseMove = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
+    if (!touchStartPoint.current) return;
+    latestPressPoint.current = { x: event.clientX, y: event.clientY };
 
-    event.preventDefault();
-    if (!displayCompanion || inlineEvolutionReplay) return;
-    void handleCompanionImageHoldAction();
-  }, [displayCompanion, handleCompanionImageHoldAction, inlineEvolutionReplay]);
+    const deltaX = Math.abs(event.clientX - touchStartPoint.current.x);
+    const deltaY = Math.abs(event.clientY - touchStartPoint.current.y);
+    if (
+      longPressTimer.current
+      && (deltaX > MOVE_CANCEL_THRESHOLD_PX || deltaY > MOVE_CANCEL_THRESHOLD_PX)
+    ) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
 
   // Get equipped skin and calculate styles
   const equippedSkin = useMemo(() => {
@@ -667,6 +737,7 @@ export const CompanionDisplay = memo(({
     && imageLoaded
     && !imageError
     && !inlineEvolutionReplay
+    && !companionInteractions.activeBehaviorId
     && expressionState.mood === "calm";
   const customDisplayName = getStoredCompanionCustomName(displayCompanion);
   const displayedCreatureName = creatureName
@@ -819,9 +890,7 @@ export const CompanionDisplay = memo(({
 
           {/* Companion Image */}
           <div
-            className="flex justify-center py-2 relative group"
-            role="img"
-            aria-label={`Your companion at ${visualStageDisplay}, ${currentLevelLabel}`}
+            className="flex flex-col items-center justify-center py-2 relative group"
           >
             {/* Cosmiq orbital glow effect */}
             <div 
@@ -832,20 +901,47 @@ export const CompanionDisplay = memo(({
               aria-hidden="true" 
             />
             <div className={`absolute inset-0 bg-gradient-to-r from-celestial-blue/20 via-nebula-pink/20 to-cosmiq-glow/20 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : ''}`} aria-hidden="true" />
-            <div
-              className="relative select-none focus-visible:ring-2 focus-visible:ring-primary/70 rounded-2xl outline-none"
-              role="button"
-              tabIndex={0}
-              aria-label="Press and hold to replay your companion's latest evolution, then open companion chat."
-              onMouseDown={handlePressStart}
-              onMouseUp={handlePressEnd}
-              onMouseLeave={handlePressEnd}
-              onTouchStart={handlePressStart}
-              onTouchMove={handlePressMove}
-              onTouchEnd={handlePressEnd}
-              onTouchCancel={handlePressEnd}
-              onKeyDown={handleKeyDown}
-            >
+            <div className="relative select-none rounded-2xl">
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                className="absolute right-2 top-2 z-40 h-9 w-9 rounded-full border-white/20 bg-black/40 text-white shadow-lg backdrop-blur-md hover:bg-black/55"
+                onMouseDown={(event) => event.stopPropagation()}
+                onTouchStart={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void handleReplayEvolution();
+                }}
+                aria-label="Replay latest evolution"
+                title="Replay latest evolution"
+              >
+                <RotateCcw className="h-4 w-4" aria-hidden="true" />
+              </Button>
+              {!imageError && !inlineEvolutionReplay ? (
+                <button
+                  type="button"
+                  className="absolute inset-0 z-20 cursor-pointer touch-pan-y rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                  aria-label="Interact with your companion. Tap for a reaction, swipe to pet, or press and hold for a quiet moment."
+                  onMouseDown={handlePressStart}
+                  onMouseUp={handlePressEnd}
+                  onMouseMove={handleMouseMove}
+                  onMouseLeave={handlePressCancel}
+                  onTouchStart={handlePressStart}
+                  onTouchMove={handlePressMove}
+                  onTouchEnd={handlePressEnd}
+                  onTouchCancel={handlePressCancel}
+                  onClick={(event) => {
+                    if (event.detail === 0) {
+                      companionInteractions.interact("keyboard");
+                    }
+                  }}
+                >
+                  <span className="sr-only">
+                    Interact with {displayedCreatureName}, your {visualStageLabel} companion.
+                  </span>
+                </button>
+              ) : null}
               {/* Twinkling star particles around companion */}
               <div className={`absolute inset-0 rounded-2xl ${!prefersReducedMotion ? 'star-shimmer' : ''}`} aria-hidden="true" />
               <div className={`absolute inset-0 bg-gradient-to-br from-nebula-pink/30 to-celestial-blue/30 rounded-2xl blur-xl ${!prefersReducedMotion ? 'animate-pulse' : ''}`} aria-hidden="true" />
@@ -853,6 +949,7 @@ export const CompanionDisplay = memo(({
                 className={cn(
                   "relative overflow-hidden rounded-2xl",
                   portraitFrameSizeClass,
+                  companionInteractions.activeBehaviorClassName,
                   shouldAnimateIdleDrift && "animate-companion-idle-drift",
                 )}
                 style={portraitFrameStyle}
@@ -862,6 +959,7 @@ export const CompanionDisplay = memo(({
                 data-companion-expression-mood={expressionState.mood}
                 data-companion-expression-variant={expressionState.variant}
                 data-companion-expression-reason={expressionState.reason}
+                data-companion-behavior={companionInteractions.activeBehaviorId ?? "idle"}
               >
                 <CompanionMotionSurface
                   variant="companion"
@@ -984,6 +1082,17 @@ export const CompanionDisplay = memo(({
                 ) : null}
               </div>
             </div>
+            <CompanionInteractionBubble
+              companionName={displayedCreatureName}
+              message={companionInteractions.bubble?.message ?? null}
+              prompt={companionInteractions.bubble?.prompt ?? null}
+              prefersReducedMotion={prefersReducedMotion}
+              onAnswer={companionInteractions.answerPrompt}
+              onDismiss={companionInteractions.dismissBubble}
+            />
+            <p className="relative z-10 mt-2 text-center text-[11px] font-medium tracking-wide text-muted-foreground/80">
+              Tap to connect <span aria-hidden="true">•</span> Swipe to pet <span aria-hidden="true">•</span> Hold for a quiet moment
+            </p>
           </div>
 
           <div className="space-y-3">

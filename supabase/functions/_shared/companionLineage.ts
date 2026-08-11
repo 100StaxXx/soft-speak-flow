@@ -488,6 +488,8 @@ export const buildCompanionArtDirection = (): string[] => [
   "show the complete silhouette; center the visible subject near x=0.50 and y=0.52, filling roughly 68-78% of canvas height",
   "keep all anatomy, wings, horns, tails, fins, aura, glow, and particles inside a 10% safe-area inset; no cropping or edge collisions",
   "use a stable grounded stance or controlled hover appropriate to the species, with the face and eyes unobstructed",
+  "animation-ready pose with a clearly readable head, torso, limbs, wings, fins, and tail; avoid tangled overlaps that prevent believable breathing, turning, hopping, or nuzzling motion",
+  "keep the facial focal area clean and expressive so eye-contact and touch reactions remain readable at mobile portrait size",
   "use one lighting recipe: soft neutral key from upper-left, gentle cool rim separation, lifted readable midtones, clean eye highlights, and controlled saturated accents",
   "story tone may influence expression and the mood of body-attached aura only; it must not replace the canonical camera, lighting, palette hierarchy, or rendering style",
   "silhouette-first composition with high readability at thumbnail size",

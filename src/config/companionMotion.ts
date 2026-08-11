@@ -9,6 +9,10 @@ export type CompanionMotionEventType =
   | "quest_complete"
   | "streak"
   | "wake"
+  | "touch"
+  | "pet"
+  | "comfort"
+  | "play"
   | "evolution_start"
   | "evolution_reveal";
 
@@ -93,6 +97,10 @@ export const COMPANION_MOTION_EVENT_DURATIONS: Record<CompanionMotionEventType, 
   quest_complete: 1200,
   streak: 1500,
   wake: 2200,
+  touch: 900,
+  pet: 1400,
+  comfort: 1800,
+  play: 1800,
   evolution_start: 2200,
   evolution_reveal: 2800,
 };
@@ -116,6 +124,10 @@ export const getCompanionMotionEventCode = (eventType: CompanionMotionEventType)
     wake: 4,
     evolution_start: 5,
     evolution_reveal: 6,
+    touch: 7,
+    pet: 8,
+    comfort: 9,
+    play: 10,
   })[eventType];
 
 export const getCompanionMotionStagePower = (stage: number): number => {

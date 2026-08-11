@@ -1695,6 +1695,50 @@ export type Database = {
         }
         Relationships: []
       }
+      companion_interaction_memory: {
+        Row: {
+          answer_key: string | null
+          companion_id: string
+          companion_stage: number
+          created_at: string
+          id: string
+          interaction_day: string
+          interaction_kind: string
+          prompt_key: string | null
+          user_id: string
+        }
+        Insert: {
+          answer_key?: string | null
+          companion_id: string
+          companion_stage?: number
+          created_at?: string
+          id?: string
+          interaction_day?: string
+          interaction_kind: string
+          prompt_key?: string | null
+          user_id: string
+        }
+        Update: {
+          answer_key?: string | null
+          companion_id?: string
+          companion_stage?: number
+          created_at?: string
+          id?: string
+          interaction_day?: string
+          interaction_kind?: string
+          prompt_key?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companion_interaction_memory_companion_id_fkey"
+            columns: ["companion_id"]
+            isOneToOne: false
+            referencedRelation: "user_companion"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companion_memorials: {
         Row: {
           companion_name: string
@@ -9140,6 +9184,22 @@ export type Database = {
       }
     }
     Functions: {
+      record_companion_interaction: {
+        Args: {
+          p_answer_key?: string | null
+          p_companion_id: string
+          p_kind: string
+          p_local_date?: string
+          p_prompt_key?: string | null
+          p_stage?: number
+        }
+        Returns: {
+          bond_level: number
+          counted: boolean
+          last_interaction_at: string
+          total_interactions: number
+        }[]
+      }
       award_companion_attribute: {
         Args: {
           p_amount: number

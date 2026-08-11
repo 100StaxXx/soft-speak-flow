@@ -22,6 +22,10 @@ const ACTIVE_MOTION_EVENT_TYPES = new Set([
   "quest_complete",
   "streak",
   "wake",
+  "touch",
+  "pet",
+  "comfort",
+  "play",
   "evolution_reveal",
 ]);
 

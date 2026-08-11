@@ -399,31 +399,36 @@ describe("CompanionDialogue", () => {
     }
   });
 
-  it("falls back to bundled youth preset art when expressive portraits are not available for the current tier", () => {
+  it("keeps generated higher-stage art when no matching preset portrait exists", async () => {
+    const restoreImage = installMockImageLoader(() => false);
     mocks.companion.current_stage = 21;
-    mocks.companion.current_image_url = "/companion-eggs/egg__t0_egg__normal__fire.png";
+    mocks.companion.current_image_url = "https://assets.example.com/griffin-stage-21.png";
     mocks.companion.preset_id = "griffin";
     mocks.companion.core_element = "fire";
     mocks.companion.cached_creature_name = "Griffin";
     mocks.companion.spirit_animal = "Griffin";
 
-    const { container } = render(<CompanionDialogue />);
+    try {
+      const { container } = render(<CompanionDialogue />);
 
-    expect(container.innerHTML).toContain(
-      "griffin/t1_youth/normal/griffin__t1_youth__normal__fire.png",
-    );
-    expect(container.innerHTML).not.toContain("/companion-eggs/egg__t0_egg__normal__fire.png");
+      await waitFor(() => {
+        expect(container.innerHTML).toContain("https://assets.example.com/griffin-stage-21.png");
+      });
+      expect(container.innerHTML).not.toContain("griffin/t1_youth/normal");
 
-    fireEvent.click(screen.getByRole("button", { name: /open griffin dialogue/i }));
-    const dialog = screen.getByRole("dialog", { name: "Griffin" });
-    expect(dialog.innerHTML).toContain(
-      "griffin/t1_youth/normal/griffin__t1_youth__normal__fire.png",
-    );
+      fireEvent.click(screen.getByRole("button", { name: /open griffin dialogue/i }));
+      const dialog = screen.getByRole("dialog", { name: "Griffin" });
+      await waitFor(() => {
+        expect(dialog.innerHTML).toContain("https://assets.example.com/griffin-stage-21.png");
+      });
+    } finally {
+      restoreImage();
+    }
   });
 
-  it("uses expressive portraits for the dialogue avatar when the active tier supports them", () => {
+  it("keeps expression metadata while using generated art when expressive portraits are unavailable", () => {
     mocks.companion.current_stage = 6;
-    mocks.companion.current_image_url = "/companion-eggs/egg__t0_egg__normal__fire.png";
+    mocks.companion.current_image_url = "https://assets.example.com/griffin-stage-6.png";
     mocks.companion.preset_id = "griffin";
     mocks.companion.core_element = "fire";
     mocks.companion.cached_creature_name = "Griffin";
@@ -446,14 +451,15 @@ describe("CompanionDialogue", () => {
       "4",
     );
     expect(container.innerHTML).toContain(
-      "griffin/t2_guardian/happy/griffin__t2_guardian__happy__v4__fire.png",
+      "griffin/t2_guardian/normal/griffin__t2_guardian__normal__fire.png",
     );
+    expect(container.innerHTML).not.toContain("griffin/t2_guardian/happy");
   });
 
-  it("falls back to the normal portrait when the expressive avatar URL fails to load", async () => {
-    const restoreImage = installMockImageLoader((src) => src.includes("/calm/"));
+  it("uses the current generated portrait when no expressive avatar URL exists", async () => {
+    const restoreImage = installMockImageLoader(() => false);
     mocks.companion.current_stage = 6;
-    mocks.companion.current_image_url = "/companion-eggs/egg__t0_egg__normal__ice.png";
+    mocks.companion.current_image_url = "https://assets.example.com/phoenix-stage-6.png";
     mocks.companion.preset_id = "phoenix";
     mocks.companion.core_element = "ice";
     mocks.companion.cached_creature_name = "Phoenix";
@@ -472,16 +478,14 @@ describe("CompanionDialogue", () => {
         expect(container.innerHTML).toContain(
           "phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__ice.png",
         );
-        expect(container.innerHTML).not.toContain(
-          "phoenix/t2_guardian/calm/phoenix__t2_guardian__calm__v1__ice.png",
-        );
+        expect(container.innerHTML).not.toContain("phoenix/t2_guardian/calm");
       });
     } finally {
       restoreImage();
     }
   });
 
-  it("ignores stale dormant overrides and keeps the companion expressive", () => {
+  it("ignores stale dormant overrides and keeps the current generated companion art", () => {
     mocks.companion.current_stage = 6;
     mocks.companion.current_image_url = "https://example.com/current.png";
     mocks.companion.dormant_image_url = "/companion-presets/griffin/t2_guardian/dormant/griffin__t2_guardian__dormant__fire.png";
@@ -500,8 +504,9 @@ describe("CompanionDialogue", () => {
     const { container } = render(<CompanionDialogue />);
 
     expect(container.innerHTML).toContain(
-      "griffin/t2_guardian/excited/griffin__t2_guardian__excited__v5__fire.png",
+      "griffin/t2_guardian/normal/griffin__t2_guardian__normal__fire.png",
     );
+    expect(container.innerHTML).not.toContain("griffin/t2_guardian/excited");
     expect(container.innerHTML).not.toContain(
       "/companion-presets/griffin/t2_guardian/dormant/griffin__t2_guardian__dormant__fire.png",
     );
