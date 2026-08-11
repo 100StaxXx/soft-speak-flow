@@ -287,6 +287,24 @@ describe("CalendarIntegrationsSettings", () => {
     });
   });
 
+  it("does not hand an invalid OAuth response to the native browser", async () => {
+    mocks.state.nativePlatform = true;
+    mocks.beginOAuthConnectionMutateAsync.mockResolvedValue(undefined);
+
+    render(<CalendarIntegrationsSettings />);
+
+    fireEvent.click(screen.getByRole("button", { name: /connect google calendar/i }));
+
+    await waitFor(() => {
+      expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({
+        title: "Failed to start connection",
+        description: expect.stringMatching(/did not return a sign-in link/i),
+        variant: "destructive",
+      }));
+    });
+    expect(mocks.browserOpenMock).not.toHaveBeenCalled();
+  });
+
   it("does not auto-load Outlook destinations for a connected account", async () => {
     mocks.state.integrationVisible = true;
     mocks.state.connections = [

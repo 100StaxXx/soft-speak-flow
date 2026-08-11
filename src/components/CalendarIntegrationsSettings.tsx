@@ -12,6 +12,7 @@ import {
   type CalendarProvider,
 } from '@/hooks/useCalendarIntegrations';
 import { getCalendarOAuthRedirectUri, getCalendarOAuthSource } from '@/utils/calendarOAuthRedirect';
+import { parseCalendarOAuthUrl } from '@/utils/calendarOAuthUrl';
 
 const PROVIDERS: Array<{ key: CalendarProvider; label: string; web: boolean; ios: boolean }> = [
   { key: 'google', label: 'Google Calendar', web: true, ios: true },
@@ -225,12 +226,13 @@ export function CalendarIntegrationsSettings() {
 
       const source = getCalendarOAuthSource();
       const callbackBase = getCalendarOAuthRedirectUri({ provider, source });
-      const url = await beginOAuthConnection.mutateAsync({
+      const responseUrl = await beginOAuthConnection.mutateAsync({
         provider,
         redirectUri: callbackBase,
         syncMode: 'send_only',
         source,
       });
+      const url = parseCalendarOAuthUrl(responseUrl);
       if (source === 'native') {
         await Browser.open({ url });
         return;

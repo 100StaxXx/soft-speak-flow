@@ -107,9 +107,10 @@ export function useAccessStatus(): AccessStatus {
     trialDaysRemaining = Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
   }
 
-  // Product rule: once guided tutorial concludes, unsubscribed users should land on the trial CTA gate.
-  // This intentionally takes precedence over legacy trial timestamp fields.
-  const needsPreTrialSignup = !isSubscribed && tutorialCompleted;
+  // Completing the tutorial should only expose the trial CTA when there is no
+  // verified entitlement. An active App Store trial is access, even though it
+  // is not yet a paid subscription.
+  const needsPreTrialSignup = !isSubscribed && !accessState.has_access && tutorialCompleted;
 
   let hasAccess = true;
   let accessSource: AccessSource = 'none';

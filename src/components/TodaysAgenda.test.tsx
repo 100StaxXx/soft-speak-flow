@@ -3928,7 +3928,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(slotMinutes).toHaveLength(48);
     expect(slotMinutes[0]).toBe(0);
     expect(slotMinutes.at(-1)).toBe(23 * 60 + 30);
-    expect(screen.getByTestId("journeys-day-grid")).toHaveStyle({ height: "2496px" });
+    expect(screen.getByTestId("journeys-day-grid")).toHaveStyle({ height: "1728px" });
     expect(screen.getByText("No tasks for this day")).toBeInTheDocument();
   });
 
@@ -3963,9 +3963,9 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
 
     const wrapper = getTimelineRowWrapper("task-scheduled-1");
     expect(Number(wrapper.getAttribute("data-start-minute"))).toBe(minuteFromTime("01:30"));
-    expect(Number(wrapper.getAttribute("data-top-px"))).toBeCloseTo(156);
-    expect(Number(wrapper.getAttribute("data-duration-height-px"))).toBeCloseTo(104);
-    expect(wrapper).toHaveStyle({ top: "156px", height: "104px" });
+    expect(Number(wrapper.getAttribute("data-top-px"))).toBeCloseTo(108);
+    expect(Number(wrapper.getAttribute("data-duration-height-px"))).toBeCloseTo(72);
+    expect(wrapper).toHaveStyle({ top: "108px", height: "72px" });
   });
 
   it("clips 30-minute scheduled quest cards while opening details in a drawer", async () => {
@@ -4101,8 +4101,8 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     const row = screen.getByTestId("timeline-row-task-scheduled-60");
     const shell = getQuestCardShell(row);
 
-    expect(Number(wrapper.getAttribute("data-duration-height-px"))).toBeCloseTo(104);
-    expect(wrapper).toHaveStyle({ height: "104px" });
+    expect(Number(wrapper.getAttribute("data-duration-height-px"))).toBeCloseTo(72);
+    expect(wrapper).toHaveStyle({ height: "72px" });
     expect(row.style.overflow).toBe("");
     expect(row).not.toHaveAttribute("data-timeline-compact");
     expect(shell).not.toHaveAttribute("data-compact-timeline-card");
@@ -4472,10 +4472,7 @@ describe("TodaysAgenda external calendar overlay", () => {
     fireEvent.click(screen.getByRole("button", { name: "Refresh external calendars" }));
     expect(onRefresh).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole("button", { name: "2 calendars connected" }));
+    fireEvent.click(screen.getByRole("button", { name: "2 connected" }));
     expect(onManageCalendars).toHaveBeenCalledTimes(1);
-
-    fireEvent.click(screen.getByRole("button", { name: "Previous day" }));
-    expect(onDateSelect).toHaveBeenLastCalledWith(expect.any(Date));
   });
 });

@@ -345,6 +345,8 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
   const [isConfigured, setIsConfigured] = useState(false);
   const configuredAppUserIdRef = useRef<string | null>(null);
   const configurationPromiseRef = useRef<Promise<void> | null>(null);
+  const entitlementBootstrapUserIdRef = useRef<string | null>(null);
+  const entitlementSyncAttemptUserIdRef = useRef<string | null>(null);
   const purchaseRecoveryPromiseRef = useRef<Promise<StoreKitTransaction | null> | null>(null);
   const packagesRef = useRef<PurchasesPackage[]>([]);
   const storeProductsRef = useRef<Map<string, PurchasesStoreProduct>>(new Map());
@@ -520,7 +522,33 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     try {
       const configured = await ensureConfigured();
       if (!configured) return;
-      await fetchCustomerInfo();
+      const nextCustomerInfo = await fetchCustomerInfo();
+
+      // A TestFlight/App Store transaction can predate the current RevenueCat
+      // app-user mapping. Reconcile StoreKit once per signed-in session when a
+      // normal customer-info refresh is empty. syncPurchases is silent (unlike
+      // restorePurchases) and lets existing subscribers avoid a false paywall.
+      if (
+        user?.id
+        && !customerInfoToTransaction(nextCustomerInfo)
+        && entitlementSyncAttemptUserIdRef.current !== user.id
+      ) {
+        entitlementSyncAttemptUserIdRef.current = user.id;
+        try {
+          const { Purchases } = await loadRevenueCat();
+          await withTimeout(
+            () => Purchases.syncPurchases(),
+            {
+              timeoutMs: REVENUECAT_PURCHASE_RECOVERY_TIMEOUT_MS,
+              operation: "RevenueCat purchase sync",
+              timeoutCode: "REVENUECAT_TIMEOUT",
+            },
+          );
+          await fetchCustomerInfo();
+        } catch (syncError) {
+          console.warn("[RevenueCat] Silent existing-purchase sync failed", syncError);
+        }
+      }
       setEntitlementError(false);
     } catch (error) {
       setEntitlementError(true);
@@ -528,10 +556,12 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setEntitlementLoading(false);
     }
-  }, [ensureConfigured, fetchCustomerInfo, isAvailable]);
+  }, [ensureConfigured, fetchCustomerInfo, isAvailable, user?.id]);
 
   useEffect(() => {
     if (!isAvailable) {
+      entitlementBootstrapUserIdRef.current = null;
+      entitlementSyncAttemptUserIdRef.current = null;
       setIsConfigured(false);
       setEntitlementLoading(false);
       setProductsError(null);
@@ -539,6 +569,8 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if (status !== "authenticated" || !user?.id) {
+      entitlementBootstrapUserIdRef.current = null;
+      entitlementSyncAttemptUserIdRef.current = null;
       applyCustomerInfo(null);
       setIsConfigured(false);
       setEntitlementLoading(false);
@@ -546,11 +578,24 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if (configuredAppUserIdRef.current !== user.id) {
+      entitlementBootstrapUserIdRef.current = null;
+      entitlementSyncAttemptUserIdRef.current = null;
       applyCustomerInfo(null);
       setIsConfigured(false);
       setEntitlementLoading(false);
     }
   }, [applyCustomerInfo, isAvailable, status, user?.id]);
+
+  useEffect(() => {
+    if (!isAvailable || status !== "authenticated" || !user?.id) return;
+    if (entitlementBootstrapUserIdRef.current === user.id) return;
+
+    // Hydrate existing App Store/TestFlight entitlements as part of session
+    // startup. Product loading alone does not fetch customer information, so
+    // without this an already-subscribed user can be shown the trial paywall.
+    entitlementBootstrapUserIdRef.current = user.id;
+    void refreshEntitlement();
+  }, [isAvailable, refreshEntitlement, status, user?.id]);
 
   useEffect(() => {
     if (!isAvailable || !isConfigured) return;

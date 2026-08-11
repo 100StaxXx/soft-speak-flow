@@ -195,18 +195,54 @@ describe("StoreKitProvider", () => {
     vi.useRealTimers();
   });
 
-  it("does not initialize RevenueCat on startup", () => {
+  it("hydrates an existing RevenueCat entitlement on authenticated startup", async () => {
+    vi.useRealTimers();
     render(
       <StoreKitProvider>
         <Probe />
       </StoreKitProvider>,
     );
 
-    expect(screen.getByTestId("storekit-loading")).toHaveTextContent("false");
+    await waitFor(() => {
+      expect(mocks.configure).toHaveBeenCalledTimes(1);
+      expect(mocks.getCustomerInfo).toHaveBeenCalledTimes(2);
+      expect(screen.getByTestId("storekit-loading")).toHaveTextContent("false");
+    });
     expect(screen.getByTestId("products-loading")).toHaveTextContent("false");
-    expect(mocks.configure).not.toHaveBeenCalled();
-    expect(mocks.getCustomerInfo).not.toHaveBeenCalled();
     expect(mocks.getProducts).not.toHaveBeenCalled();
+  });
+
+  it("silently reconciles an existing TestFlight subscription on startup", async () => {
+    vi.useRealTimers();
+    const recoveredCustomerInfo = {
+      ...inactiveCustomerInfo,
+      activeSubscriptions: ["cosmiq_premium_yearly"],
+      subscriptionsByProductIdentifier: {
+        cosmiq_premium_yearly: {
+          productIdentifier: "cosmiq_premium_yearly",
+          storeTransactionId: "testflight-startup-tx-1",
+          purchaseDate: "2026-05-18T12:00:00.000Z",
+          expiresDate: "2099-01-01T00:00:00.000Z",
+          isActive: true,
+          isSandbox: true,
+        },
+      },
+    };
+    mocks.getCustomerInfo
+      .mockResolvedValueOnce({ customerInfo: inactiveCustomerInfo })
+      .mockResolvedValueOnce({ customerInfo: recoveredCustomerInfo });
+
+    render(
+      <StoreKitProvider>
+        <Probe />
+      </StoreKitProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("entitlement-product")).toHaveTextContent("cosmiq_premium_yearly");
+    });
+    expect(mocks.syncPurchases).toHaveBeenCalledTimes(1);
+    expect(mocks.restorePurchases).not.toHaveBeenCalled();
   });
 
   it("times out a stalled explicit entitlement refresh", async () => {
@@ -416,10 +452,7 @@ describe("StoreKitProvider", () => {
         },
       },
     };
-    mocks.getCustomerInfo
-      .mockResolvedValueOnce({ customerInfo: inactiveCustomerInfo })
-      .mockResolvedValueOnce({ customerInfo: inactiveCustomerInfo })
-      .mockResolvedValueOnce({ customerInfo: recoveredCustomerInfo });
+    mocks.getCustomerInfo.mockResolvedValue({ customerInfo: inactiveCustomerInfo });
     mocks.restorePurchases.mockResolvedValue({ customerInfo: recoveredCustomerInfo });
 
     render(
@@ -486,6 +519,11 @@ describe("StoreKitProvider", () => {
         <Probe />
       </StoreKitProvider>,
     );
+
+    await vi.waitFor(() => {
+      expect(screen.getByTestId("storekit-loading")).toHaveTextContent("false");
+      expect(mocks.getCustomerInfo).toHaveBeenCalledTimes(2);
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Refresh Products" }));
 

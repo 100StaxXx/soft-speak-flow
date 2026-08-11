@@ -238,8 +238,8 @@ describe("DraggableFAB", () => {
     const image = screen.getByRole("img", { name: "Nova" });
 
     expect(launcher).toHaveClass(
-      "h-36",
-      "w-36",
+      "h-24",
+      "w-24",
       "overflow-visible",
       "rounded-full",
       "border-0",
@@ -247,7 +247,7 @@ describe("DraggableFAB", () => {
       "shadow-none",
     );
     expect(launcher.querySelectorAll('[aria-hidden="true"]')).toHaveLength(0);
-    expect(image.parentElement).toHaveClass("h-[7.75rem]", "w-[7.75rem]");
+    expect(image.parentElement).toHaveClass("h-[5.25rem]", "w-[5.25rem]");
     expect(launcher.style.boxShadow).toBe("");
     expect(launcher).toHaveAttribute("data-face-direction", "away");
 

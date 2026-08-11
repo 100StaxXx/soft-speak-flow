@@ -178,7 +178,7 @@ describe("useAccessStatus", () => {
     expect(result.current.gateReason).toBe("none");
   });
 
-  it("shows pre-trial signup gate after final closeout even if legacy trial dates exist", () => {
+  it("keeps an active trial accessible after final tutorial closeout", () => {
     mocks.accessState = {
       has_access: true,
       access_source: "trial",
@@ -196,8 +196,10 @@ describe("useAccessStatus", () => {
 
     const { result } = renderHook(() => useAccessStatus());
 
-    expect(result.current.hasAccess).toBe(false);
-    expect(result.current.gateReason).toBe("pre_trial_signup");
+    expect(result.current.hasAccess).toBe(true);
+    expect(result.current.isInTrial).toBe(true);
+    expect(result.current.accessSource).toBe("trial");
+    expect(result.current.gateReason).toBe("none");
   });
 
   it("shows pre-trial signup gate from local final closeout completion before profile refresh", () => {

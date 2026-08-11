@@ -334,10 +334,8 @@ const LANE_OFFSET_STEP_PX = 10;
 const FULL_DAY_START_MINUTE = 0;
 const FULL_DAY_END_MINUTE = 24 * 60;
 const FULL_DAY_SLOT_INTERVAL_MINUTES = 30;
-const OUTLOOK_TIMELINE_HOUR_HEIGHT_PX = 104;
-const OUTLOOK_TIMELINE_PX_PER_MINUTE = OUTLOOK_TIMELINE_HOUR_HEIGHT_PX / 60;
-const OUTLOOK_TIMELINE_SLOT_HEIGHT_PX = OUTLOOK_TIMELINE_PX_PER_MINUTE * FULL_DAY_SLOT_INTERVAL_MINUTES;
-const OUTLOOK_TIMELINE_HEIGHT_PX = FULL_DAY_END_MINUTE * OUTLOOK_TIMELINE_PX_PER_MINUTE;
+const DESKTOP_TIMELINE_HOUR_HEIGHT_PX = 104;
+const MOBILE_TIMELINE_HOUR_HEIGHT_PX = 72;
 const OUTLOOK_TIMELINE_GUTTER_WIDTH_PX = 64;
 const OUTLOOK_TIMELINE_EVENT_GAP_PX = 4;
 const OUTLOOK_TIMELINE_MIN_EVENT_HEIGHT_PX = 52;
@@ -509,10 +507,6 @@ const buildFullDaySlotMinutes = () => {
   return slots;
 };
 
-const getTimelineTopPx = (minute: number) => (
-  Math.max(FULL_DAY_START_MINUTE, Math.min(FULL_DAY_END_MINUTE, minute)) * OUTLOOK_TIMELINE_PX_PER_MINUTE
-);
-
 const isTimeSlotInteractiveTarget = (target: EventTarget | null): boolean => {
   if (typeof HTMLElement === "undefined" || !(target instanceof HTMLElement)) {
     return false;
@@ -639,6 +633,15 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     if (typeof window === "undefined") return false;
     return window.innerWidth >= DESKTOP_LAYOUT_MIN_WIDTH;
   });
+  const timelineHourHeightPx = isDesktopLayout
+    ? DESKTOP_TIMELINE_HOUR_HEIGHT_PX
+    : MOBILE_TIMELINE_HOUR_HEIGHT_PX;
+  const timelinePxPerMinute = timelineHourHeightPx / 60;
+  const timelineSlotHeightPx = timelinePxPerMinute * FULL_DAY_SLOT_INTERVAL_MINUTES;
+  const timelineHeightPx = FULL_DAY_END_MINUTE * timelinePxPerMinute;
+  const getTimelineTopPx = useCallback((minute: number) => (
+    Math.max(FULL_DAY_START_MINUTE, Math.min(FULL_DAY_END_MINUTE, minute)) * timelinePxPerMinute
+  ), [timelinePxPerMinute]);
   const isNativeIOS = useMemo(() => {
     if (typeof window === "undefined") return false;
     const capacitor = (window as Window & {
@@ -1499,7 +1502,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         const heightPx = durationMinutesToPixels(task.estimated_duration, {
           fallbackMinutes: timedTaskDurationFallbackMinutes,
           minHeightPx: OUTLOOK_TIMELINE_MIN_EVENT_HEIGHT_PX,
-          pxPerMinute: OUTLOOK_TIMELINE_PX_PER_MINUTE,
+          pxPerMinute: timelinePxPerMinute,
         });
 
         return {
@@ -1525,7 +1528,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         leftPercent: number;
         widthPercent: number;
       } => entry !== null)
-  ), [flowOrderedScheduledItems, scheduledFlow.byTaskId, timedTaskDurationFallbackMinutes]);
+  ), [flowOrderedScheduledItems, getTimelineTopPx, scheduledFlow.byTaskId, timedTaskDurationFallbackMinutes, timelinePxPerMinute]);
 
   const hasRenderableNowMarker = isTodaySelected;
 
@@ -1608,7 +1611,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     wasTodayRef.current = isToday;
     hadNowMarkerRef.current = hasRenderableNowMarker;
     lastCenterNowRequestKeyRef.current = centerNowRequestKey;
-  }, [centerNowRequestKey, hasRenderableNowMarker, isTodaySelected, isVisible, timelineBodyHeightPx, timelineIsDragging]);
+  }, [centerNowRequestKey, getTimelineTopPx, hasRenderableNowMarker, isTodaySelected, isVisible, timelineBodyHeightPx, timelineIsDragging]);
 
   const baseTimelineConflictMap = useMemo(
     () => buildTaskConflictMap(draggableTimelineItems),
@@ -2955,117 +2958,70 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         )}
       >
         {!isDesktopLayout ? (
-          <header className="mb-4 space-y-3" data-testid="agenda-mobile-header">
-            <div
-              className="flex items-stretch gap-2"
-              role="group"
-              aria-label="Agenda date navigation"
-            >
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-12 w-12 flex-shrink-0 rounded-[18px] border-white/10 bg-white/[0.05] hover:bg-white/10"
-                onClick={() => onDateSelect?.(addDays(selectedDate, -1))}
-                aria-label="Previous day"
-                disabled={!onDateSelect}
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
+          <header
+            className="mb-2 rounded-[20px] border border-white/10 bg-slate-950/55 p-2 shadow-[0_12px_28px_rgba(0,0,0,0.18)] backdrop-blur-xl"
+            data-testid="agenda-mobile-header"
+          >
+            <div className="flex min-w-0 items-center gap-2">
               <button
                 type="button"
                 onClick={() => onOpenMonthView?.()}
-                className="flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-[20px] border border-white/10 bg-white/[0.05] px-3 text-left transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-[16px] px-2 text-left transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                 aria-label={`Open month calendar for ${safeFormat(selectedDate, "MMMM d, yyyy", "selected date")}`}
               >
-                <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[14px] bg-celestial-blue/15 text-celestial-blue">
-                  <CalendarDays className="h-5 w-5" />
+                <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[12px] bg-celestial-blue/15 text-celestial-blue">
+                  <CalendarDays className="h-4 w-4" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-celestial-blue">
+                  <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-celestial-blue">
                     {isSelectedToday ? "Today" : safeFormat(selectedDate, "EEEE", "Selected day")}
                   </span>
-                  <span className="block truncate text-base font-semibold text-foreground">
+                  <span className="block truncate text-sm font-semibold text-foreground">
                     {safeFormat(selectedDate, "MMMM d, yyyy", "Invalid date")}
                   </span>
                 </span>
               </button>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-12 w-12 flex-shrink-0 rounded-[18px] border-white/10 bg-white/[0.05] hover:bg-white/10"
-                onClick={() => onDateSelect?.(addDays(selectedDate, 1))}
-                aria-label="Next day"
-                disabled={!onDateSelect}
-              >
-                <ChevronRight className="h-5 w-5" />
-              </Button>
-            </div>
-
-            <div className="flex min-w-0 items-center justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-2">
-                {totalCount > 0 ? (
-                  <div
-                    className="flex min-h-10 items-center gap-2 rounded-[18px] border border-white/8 bg-white/[0.04] px-3"
-                    aria-label={`${completedCount} of ${totalCount} agenda items complete`}
-                  >
-                    <ProgressRing percent={progressPercent} size={26} strokeWidth={2.5} />
-                    <span className="text-sm font-semibold text-foreground">{completedCount}/{totalCount}</span>
-                    <span className="hidden text-xs text-muted-foreground min-[390px]:inline">done</span>
-                  </div>
-                ) : null}
-                <div
-                  className="flex min-h-10 items-center gap-1.5 rounded-[18px] border border-white/8 bg-white/[0.04] px-3 text-sm"
-                  aria-label={`${totalXP} experience points available`}
-                >
-                  <Trophy className={cn("h-4 w-4", allComplete ? "text-stardust-gold" : "text-stardust-gold/70")} />
-                  <span className="font-semibold text-stardust-gold">{totalXP}</span>
-                  <span className="text-xs text-muted-foreground">XP</span>
-                </div>
-                {currentStreak > 0 ? (
-                  <div
-                    className={cn(
-                      "hidden min-h-10 items-center gap-1 rounded-[18px] px-3 text-sm font-semibold min-[430px]:flex",
-                      currentStreak >= 30
-                        ? "bg-stardust-gold/20 text-stardust-gold"
-                        : currentStreak >= 14
-                          ? "bg-celestial-blue/20 text-celestial-blue"
-                          : "bg-orange-500/10 text-orange-400",
-                    )}
-                    aria-label={`${currentStreak} day streak`}
-                  >
-                    <Flame className="h-4 w-4" />
-                    {currentStreak}
-                  </div>
-                ) : null}
-              </div>
               {quickCaptureControls}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="mt-1 flex min-w-0 items-center gap-1.5 border-t border-white/[0.07] pt-2">
+              {totalCount > 0 ? (
+                <div
+                  className="flex h-8 items-center gap-1.5 rounded-[14px] bg-white/[0.045] px-2"
+                  aria-label={`${completedCount} of ${totalCount} agenda items complete`}
+                >
+                  <ProgressRing percent={progressPercent} size={21} strokeWidth={2.5} />
+                  <span className="text-xs font-semibold text-foreground">{completedCount}/{totalCount}</span>
+                </div>
+              ) : null}
+              <div
+                className="flex h-8 items-center gap-1 rounded-[14px] bg-white/[0.045] px-2 text-xs"
+                aria-label={`${totalXP} experience points available`}
+              >
+                <Trophy className={cn("h-3.5 w-3.5", allComplete ? "text-stardust-gold" : "text-stardust-gold/70")} />
+                <span className="font-semibold text-stardust-gold">{totalXP}</span>
+                <span className="text-muted-foreground">XP</span>
+              </div>
               {onManageCalendars ? (
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  className="h-10 min-w-0 flex-1 justify-start rounded-[18px] border-celestial-blue/20 bg-celestial-blue/[0.07] px-3 text-xs hover:bg-celestial-blue/[0.12]"
+                  className="h-8 min-w-0 flex-1 justify-end rounded-[14px] px-2 text-xs text-celestial-blue hover:bg-celestial-blue/[0.1]"
                   onClick={onManageCalendars}
                 >
-                  <CalendarDays className="h-4 w-4 flex-shrink-0 text-celestial-blue" />
+                  <CalendarDays className="h-3.5 w-3.5 flex-shrink-0" />
                   <span className="truncate">
-                    {connectedCalendarCount > 0
-                      ? `${connectedCalendarCount} calendar${connectedCalendarCount === 1 ? "" : "s"} connected`
-                      : "Connect a calendar"}
+                    {connectedCalendarCount > 0 ? `${connectedCalendarCount} connected` : "Connect"}
                   </span>
                 </Button>
               ) : null}
               {!isSelectedToday && onDateSelect ? (
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  className="h-10 rounded-[18px] border-white/10 bg-white/[0.05] px-3 text-xs hover:bg-white/10"
+                  className="h-8 rounded-[14px] px-2 text-xs"
                   onClick={() => onDateSelect(new Date())}
                 >
                   Today
@@ -3074,11 +3030,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               {connectedCalendarCount > 0 && onRefreshExternalCalendars ? (
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                   size="icon"
                   className={cn(
-                    "h-10 w-10 flex-shrink-0 rounded-[18px] border-white/10 bg-white/[0.05] hover:bg-white/10",
-                    externalCalendarSyncError && "border-destructive/40 text-destructive",
+                    "h-8 w-8 flex-shrink-0 rounded-[14px]",
+                    externalCalendarSyncError && "text-destructive",
                   )}
                   onClick={onRefreshExternalCalendars}
                   disabled={isExternalCalendarSyncing}
@@ -3086,9 +3042,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   title={externalCalendarSyncError || "Refresh external calendars"}
                 >
                   {externalCalendarSyncError ? (
-                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTriangle className="h-3.5 w-3.5" />
                   ) : (
-                    <RefreshCcw className={cn("h-4 w-4", isExternalCalendarSyncing && "animate-spin")} />
+                    <RefreshCcw className={cn("h-3.5 w-3.5", isExternalCalendarSyncing && "animate-spin")} />
                   )}
                 </Button>
               ) : null}
@@ -3496,9 +3452,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 style={scheduledTimelineContentStyle}
               >
                 <div
-                  className="relative overflow-hidden rounded-[24px] border border-white/10 bg-black/10"
+                  className="relative overflow-hidden rounded-[20px] border border-white/15 bg-slate-950/55 shadow-[0_14px_32px_rgba(0,0,0,0.2)] backdrop-blur-md"
                   data-testid="journeys-day-grid"
-                  style={{ height: `${OUTLOOK_TIMELINE_HEIGHT_PX}px` }}
+                  style={{ height: `${timelineHeightPx}px` }}
                 >
                   {fullDaySlotMinutes.map((slotMinute) => {
                     const isHour = slotMinute % 60 === 0;
@@ -3507,15 +3463,15 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       <div
                         key={slotMinute}
                         className={cn(
-                          "absolute left-0 right-0 flex border-b border-white/[0.07]",
-                          isHour ? "border-t border-white/[0.10]" : "border-t border-dashed border-white/[0.06]",
+                          "absolute left-0 right-0 flex border-b border-white/[0.06]",
+                          isHour ? "border-t border-white/[0.13]" : "border-t border-dashed border-white/[0.045]",
                           onTimeSlotLongPress && "touch-manipulation",
                         )}
                         data-testid={`journeys-day-grid-slot-${slotToken}`}
                         data-minute={slotMinute}
                         style={{
                           top: `${getTimelineTopPx(slotMinute)}px`,
-                          height: `${OUTLOOK_TIMELINE_SLOT_HEIGHT_PX}px`,
+                          height: `${timelineSlotHeightPx}px`,
                         }}
                         onTouchStart={(event) => handleTimeSlotTouchStart(slotMinute, event)}
                         onTouchMove={handleTimeSlotTouchMove}
@@ -3523,7 +3479,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                         onTouchCancel={clearTimeSlotLongPress}
                       >
                         <div
-                          className="flex-shrink-0 px-2 pt-1.5 text-right text-xs font-semibold text-muted-foreground/90"
+                          className="flex-shrink-0 px-2 pt-1.5 text-right text-[11px] font-semibold text-slate-300/90"
                           style={{ width: `${OUTLOOK_TIMELINE_GUTTER_WIDTH_PX}px` }}
                         >
                           {isHour ? formatGridTimeLabel(slotMinute) : null}

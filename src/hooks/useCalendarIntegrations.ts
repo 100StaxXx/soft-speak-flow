@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { NativeCalendar } from '@/plugins/NativeCalendarPlugin';
 import { parseFunctionInvokeError, toUserFacingFunctionError } from '@/utils/supabaseFunctionErrors';
 import { toUserFacingCalendarOAuthError } from '@/utils/calendarOAuthErrors';
+import { parseCalendarOAuthUrl } from '@/utils/calendarOAuthUrl';
 
 export type CalendarProvider = 'google' | 'outlook' | 'apple';
 export type CalendarSyncMode = 'send_only';
@@ -190,7 +191,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
         });
       }
 
-      return (data?.url || data?.auth_url) as string;
+      return parseCalendarOAuthUrl(data);
     },
   });
 

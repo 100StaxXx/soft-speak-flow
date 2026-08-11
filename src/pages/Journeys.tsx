@@ -1953,7 +1953,7 @@ const Journeys = () => {
       <CinematicPageBackground preset="quests" />
       <div
         className={cn(
-          "min-h-screen pb-nav-safe pt-safe px-4 relative z-10",
+          "min-h-screen pb-nav-safe pt-safe px-3 relative z-10",
           isDesktopLayout && "px-6",
         )}
         style={companionFrostedThemeStyle}
@@ -1966,16 +1966,16 @@ const Journeys = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: prefersReducedMotion ? 0 : 0.22 }}
             className={cn(
-              "relative mb-6",
+              "relative mb-2",
               isDesktopLayout
                 ? "mb-5 flex items-end justify-between gap-6 text-left"
-                : "text-center",
+                : "flex min-h-11 items-center justify-between text-left",
             )}
           >
             <div className={cn(
               isDesktopLayout
                 ? "static flex flex-shrink-0 items-center gap-2"
-                : "absolute right-0 top-0",
+                : "order-2",
             )}>
               {isDesktopLayout ? (
                 <button
@@ -1991,16 +1991,16 @@ const Journeys = () => {
                 onClick={() => setShowPageInfo(true)}
               />
             </div>
-            <div>
+            <div className={cn(!isDesktopLayout && "order-1 min-w-0")}>
               <h1
                 className={cn(
-                  "mb-2 text-3xl font-semibold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent",
+                  "text-2xl font-semibold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent",
                   isDesktopLayout && "mb-1",
                 )}
               >
                 Agenda
               </h1>
-              <p className="text-sm text-muted-foreground/90">See what’s next and shape the day.</p>
+              <p className={cn("text-sm text-muted-foreground/90", !isDesktopLayout && "hidden")}>See what’s next and shape the day.</p>
             </div>
           </motion.div>
 
@@ -2008,7 +2008,7 @@ const Journeys = () => {
           {!isDesktopLayout ? (
             <div
               data-testid="journeys-mobile-date-strip"
-              className="relative z-10 mb-4 min-h-[72px]"
+              className="relative z-10 mb-2 min-h-[52px]"
             >
               <DatePillsScroller
                 selectedDate={selectedDate}
