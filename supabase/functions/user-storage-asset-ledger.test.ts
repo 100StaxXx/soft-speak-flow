@@ -37,9 +37,6 @@ Deno.test("user-owned media writers register uploaded assets in the ledger", asy
     "./generate-companion-evolution/index.ts",
     "./generate-cosmic-postcard/index.ts",
     "./generate-journey-path/index.ts",
-    "./generate-dormant-companion-image/index.ts",
-    "./generate-neglected-companion-image/index.ts",
-    "./generate-memorial-image/index.ts",
     "./process-companion-animation-job/index.ts",
   ];
 
@@ -129,24 +126,4 @@ Deno.test("legacy nonconforming storage writers now prefix uploads with the user
     "Expected companion evolution uploads to be user-prefixed",
   );
 
-  const dormantSource = await Deno.readTextFile(
-    new URL("./generate-dormant-companion-image/index.ts", import.meta.url),
-  );
-  const compactDormantSource = dormantSource.replace(/\s+/g, "");
-  assert(
-    compactDormantSource.includes(
-      "constfileName=`${companion.user_id}/dormant/${companionId}-${Date.now()}.png`;",
-    ),
-    "Expected dormant image uploads to be user-prefixed",
-  );
-
-  const memorialSource = await Deno.readTextFile(
-    new URL("./generate-memorial-image/index.ts", import.meta.url),
-  );
-  assert(
-    memorialSource.includes(
-      "const fileName = `${ownerUserId}/memorials/${memorialId}-${Date.now()}.png`;",
-    ),
-    "Expected memorial image uploads to be user-prefixed",
-  );
 });

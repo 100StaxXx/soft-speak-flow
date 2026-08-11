@@ -481,7 +481,7 @@ describe("CompanionDialogue", () => {
     }
   });
 
-  it("keeps dormant overrides ahead of expressive portraits", () => {
+  it("ignores stale dormant overrides and keeps the companion expressive", () => {
     mocks.companion.current_stage = 6;
     mocks.companion.current_image_url = "https://example.com/current.png";
     mocks.companion.dormant_image_url = "/companion-presets/griffin/t2_guardian/dormant/griffin__t2_guardian__dormant__fire.png";
@@ -500,10 +500,10 @@ describe("CompanionDialogue", () => {
     const { container } = render(<CompanionDialogue />);
 
     expect(container.innerHTML).toContain(
-      "/companion-presets/griffin/t2_guardian/dormant/griffin__t2_guardian__dormant__fire.png",
+      "griffin/t2_guardian/excited/griffin__t2_guardian__excited__v5__fire.png",
     );
     expect(container.innerHTML).not.toContain(
-      "griffin/t2_guardian/excited/griffin__t2_guardian__excited__v5__fire.png",
+      "/companion-presets/griffin/t2_guardian/dormant/griffin__t2_guardian__dormant__fire.png",
     );
   });
 

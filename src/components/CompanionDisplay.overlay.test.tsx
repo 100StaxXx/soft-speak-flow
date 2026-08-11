@@ -155,17 +155,6 @@ vi.mock("@/components/ui/sonner", () => ({
   },
 }));
 
-vi.mock("@/hooks/useCompanionWakeUp", () => ({
-  useCompanionWakeUp: () => ({
-    showCelebration: false,
-    dismissCelebration: vi.fn(),
-    companionName: null,
-    companionImageUrl: null,
-    dormantImageUrl: null,
-    bondLevel: 0,
-  }),
-}));
-
 vi.mock("@/hooks/useEpicRewards", () => ({
   useEpicRewards: () => ({
     equippedRewards: {},
@@ -293,10 +282,6 @@ vi.mock("@/components/companion/CompanionDialogue", () => ({
   CompanionDialogue: () => <div>Dialogue Panel</div>,
 }));
 
-vi.mock("@/components/companion/WakeUpCelebration", () => ({
-  WakeUpCelebration: () => null,
-}));
-
 vi.mock("@/components/CompanionAttributes", () => ({
   CompanionAttributes: () => <div data-testid="companion-attributes">Attributes</div>,
 }));
@@ -403,13 +388,13 @@ describe("CompanionDisplay overlay stack", () => {
     vi.clearAllMocks();
   });
 
-  it("keeps backdrop and foreground motion planes active alongside dormant overlays", async () => {
+  it("keeps backdrop and foreground motion planes active", async () => {
     render(<CompanionDisplay />);
 
     const surface = screen.getByTestId("companion-motion-surface");
     const outerShell = screen.getByTestId("companion-outer-shell");
     expect(await screen.findByText("Nova")).toBeInTheDocument();
-    expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Stage 2 • Initiate");
+    expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Form 2 • Initiate");
     expect(screen.getByTestId("companion-level-chip")).toHaveTextContent("Level 8");
     expect(screen.getByText("Bond")).toBeInTheDocument();
     expect(screen.getByText("Dialogue Panel")).toBeInTheDocument();
@@ -426,10 +411,10 @@ describe("CompanionDisplay overlay stack", () => {
     expect(surface.querySelector('[data-overlay-layer="event-beam"]')).not.toBeNull();
 
     expect(screen.queryByLabelText("Refreshing companion look")).not.toBeInTheDocument();
-    expect(screen.getByText("Dormant")).toBeInTheDocument();
+    expect(screen.queryByText("Dormant")).not.toBeInTheDocument();
     expect(
-      screen.getByText("Your companion has fallen into a deep sleep"),
-    ).toBeInTheDocument();
+      screen.queryByText("Your companion has fallen into a deep sleep"),
+    ).not.toBeInTheDocument();
   });
 
   it("renders generated companion page art with the same contained media framing as evolution replays", async () => {
@@ -640,7 +625,7 @@ describe("CompanionDisplay overlay stack", () => {
     };
 
     render(<CompanionDisplay />);
-    await screen.findByText("Stage 0 • Egg");
+    await screen.findByText("Form 0 • Egg");
 
     fireEvent.keyDown(
       screen.getByRole("button", {
@@ -795,7 +780,7 @@ describe("CompanionDisplay overlay stack", () => {
     expect(screen.queryByText("Nova")).not.toBeInTheDocument();
     expect(screen.getAllByText("Ready to hatch").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "HATCH" })).toBeInTheDocument();
-    expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Stage 0 • Egg");
+    expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Form 0 • Egg");
     expect(screen.getByTestId("companion-level-chip")).toHaveTextContent("Level 0");
 
     const image = screen.getByAltText(/egg companion at level 0/i);
@@ -844,7 +829,7 @@ describe("CompanionDisplay overlay stack", () => {
 
     expect(await screen.findByText("Nova")).toBeInTheDocument();
     expect(screen.queryByText("Ember Egg")).not.toBeInTheDocument();
-    expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Stage 1 • Hatchling");
+    expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Form 1 • Hatchling");
     expect(screen.getByTestId("companion-level-chip")).toHaveTextContent("Level 1");
     expect(screen.getByText(/XP to Level 2/)).toBeInTheDocument();
     const image = screen.getByAltText(/hatchling companion at level 1/i);
@@ -870,9 +855,9 @@ describe("CompanionDisplay overlay stack", () => {
     render(<CompanionDisplay />);
 
     expect(await screen.findByText("Nova")).toBeInTheDocument();
-    expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Stage 1 • Hatchling");
+    expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Form 1 • Hatchling");
     expect(screen.getByTestId("companion-level-chip")).toHaveTextContent("Level 2");
-    expect(screen.getByText("Next stage at Level 5 • Initiate")).toBeInTheDocument();
+    expect(screen.getByText("Next form at Level 5 • Initiate")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "EVOLVE" })).not.toBeInTheDocument();
   });
 
@@ -960,7 +945,7 @@ describe("CompanionDisplay overlay stack", () => {
     render(<CompanionDisplay />);
 
     expect(await screen.findByText("Nova")).toBeInTheDocument();
-    expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Stage 7 • Ascended");
+    expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Form 7 • Ascended");
     expect(screen.getByTestId("companion-level-chip")).toHaveTextContent("Level 100");
     expect(screen.getByText("Level 100 maxed")).toBeInTheDocument();
   });

@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import type { RewardCssEffect } from "@/types/epicRewards";
 import { FrameCornerDecorations } from "./companion/FrameCornerDecorations";
 import { ATTRIBUTE_DESCRIPTIONS, type AttributeType } from "@/config/attributeDescriptions";
+import { getVisualStageDisplay } from "@/config/progression";
 
 interface EvolutionCard {
   id: string;
@@ -203,7 +204,7 @@ export function EvolutionCardFlip({ card, equippedFrame }: Props) {
             </Badge>
             
             <Badge className="absolute top-2 right-2 bg-background/90 backdrop-blur-sm text-xs">
-              Stage {card.evolution_stage}
+              {getVisualStageDisplay(card.evolution_stage)}
             </Badge>
 
             <div className="absolute bottom-0 left-0 right-0 p-3 space-y-2">
@@ -387,7 +388,7 @@ export function EvolutionCardFlip({ card, equippedFrame }: Props) {
                           {ELEMENT_SYMBOLS[card.element.toLowerCase()] || "✨"} {card.element}
                         </Badge>
                         <Badge className="bg-black/70 backdrop-blur-sm text-white text-sm px-3 py-1 border border-white/20">
-                          Stage {card.evolution_stage}
+                          {getVisualStageDisplay(card.evolution_stage)}
                         </Badge>
                       </div>
 
@@ -423,7 +424,7 @@ export function EvolutionCardFlip({ card, equippedFrame }: Props) {
                           ★ {card.creature_name.toUpperCase()} ★
                         </h3>
                         <div className="text-sm text-center text-white/90 drop-shadow-lg">
-                          Stage {card.evolution_stage} • {card.rarity}
+                          {getVisualStageDisplay(card.evolution_stage)} • {card.rarity}
                         </div>
                       </div>
                     </div>

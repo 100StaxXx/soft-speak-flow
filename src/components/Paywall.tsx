@@ -126,7 +126,7 @@ const paywallStorySections: PaywallStorySection[] = [
     id: "paywall-companion",
     eyebrow: "Built for growth",
     title: "Your companion grows when you follow through.",
-    body: "XP, daily missions, evolutions, stories, collection, and memories turn ordinary consistency into a world worth returning to.",
+    body: "XP, Daily Chapters, evolutions, stories, collection, and memories turn ordinary consistency into a world worth returning to.",
     background: paywallBackdrops.companion,
     icon: Sparkles,
     imagePosition: "50% 48%",

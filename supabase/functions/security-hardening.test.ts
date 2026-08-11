@@ -141,13 +141,8 @@ const pepTalkModule = await import("./generate-complete-pep-talk/index.ts");
 const weeklyInsightsModule = await import(
   "./generate-weekly-insights/index.ts"
 );
-const dormantImageModule = await import(
-  "./generate-dormant-companion-image/index.ts"
-);
-const neglectedImageModule = await import(
-  "./generate-neglected-companion-image/index.ts"
-);
 const mentorAudioModule = await import("./generate-mentor-audio/index.ts");
+const dailyCompanionStateModule = await import("./process-daily-decay/index.ts");
 
 const EXPECTED_MENTOR_VOICE_IDS = [
   ["sage", "sage", "goT3UYdM9bhm0n2lmKQx"],
@@ -169,6 +164,21 @@ const EXPECTED_ALIAS_VOICE_IDS = [
   ["stryker", "operator", "pNInz6obpgDQGcFmaJgB"],
   ["eli", "rival", "V33LkP9pVLdcjeB2y5Na"],
 ] as const;
+
+Deno.test("process-daily-decay rejects requests without the internal key", async () => {
+  const previousSecret = Deno.env.get("INTERNAL_FUNCTION_SECRET");
+  Deno.env.set("INTERNAL_FUNCTION_SECRET", "test-internal-secret");
+
+  try {
+    const response = await dailyCompanionStateModule.handleProcessDailyCompanionState(
+      new Request("https://example.com", { method: "POST" }),
+    );
+    assertEquals(response.status, 401, "Expected internal-only companion state processing");
+  } finally {
+    if (previousSecret) Deno.env.set("INTERNAL_FUNCTION_SECRET", previousSecret);
+    else Deno.env.delete("INTERNAL_FUNCTION_SECRET");
+  }
+});
 
 Deno.test("retry-failed-payouts rejects unauthenticated callers", async () => {
   const response = await retryModule.handleRetryFailedPayouts(
@@ -561,90 +571,6 @@ Deno.test("generate-weekly-insights ignores spoofed user ids for rate limiting",
     "auth-user",
     "Expected weekly insights limiter to use authenticated user id",
   );
-});
-
-Deno.test("generate-dormant-companion-image rejects anonymous access", async () => {
-  const response = await dormantImageModule.handleGenerateDormantCompanionImage(
-    new Request("https://example.com"),
-    {
-      authenticate: async () =>
-        new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401,
-        }),
-      createSupabaseClient: () => createMockSupabase({}),
-      createCostGuardrailSessionFn: createNoopCostGuardrailSession,
-      fetchImpl: fetch,
-    },
-  );
-
-  assertEquals(
-    response.status,
-    401,
-    "Expected dormant companion image endpoint to require auth",
-  );
-});
-
-Deno.test("generate-neglected-companion-image hides foreign companions", async () => {
-  const supabase = createMockSupabase({
-    user_companion: () => ({ data: null, error: null }),
-  });
-
-  const response = await neglectedImageModule
-    .handleGenerateNeglectedCompanionImage(
-      new Request("https://example.com", {
-        method: "POST",
-        body: JSON.stringify({ companionId: "companion-1" }),
-      }),
-      {
-        authenticate: async () => ({ isInternal: true }),
-        createSupabaseClient: () => supabase,
-        createCostGuardrailSessionFn: createNoopCostGuardrailSession,
-        fetchImpl: fetch,
-      },
-    );
-
-  assertEquals(
-    response.status,
-    404,
-    "Expected foreign companion lookup to return 404",
-  );
-});
-
-Deno.test("generate-dormant-companion-image allows internal cached access", async () => {
-  const supabase = createMockSupabase({
-    user_companion: () => ({
-      data: {
-        id: "companion-1",
-        user_id: "owner-user",
-        current_image_url: "https://example.com/current.png",
-        dormant_image_url: "https://example.com/cached.png",
-        spirit_animal: "fox",
-        companion_name: "Nova",
-      },
-      error: null,
-    }),
-  });
-
-  const response = await dormantImageModule.handleGenerateDormantCompanionImage(
-    new Request("https://example.com", {
-      method: "POST",
-      body: JSON.stringify({ companionId: "companion-1" }),
-    }),
-    {
-      authenticate: async () => ({ isInternal: true }),
-      createSupabaseClient: () => supabase,
-      createCostGuardrailSessionFn: createNoopCostGuardrailSession,
-      fetchImpl: fetch,
-    },
-  );
-
-  const body = await response.json();
-  assertEquals(
-    response.status,
-    200,
-    "Expected internal access to succeed for cached companion image",
-  );
-  assert(body.cached === true, "Expected cached dormant image response");
 });
 
 Deno.test("generate-mentor-audio rejects unauthenticated callers", async () => {

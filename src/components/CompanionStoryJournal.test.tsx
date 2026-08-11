@@ -118,7 +118,7 @@ describe("CompanionStoryJournal", () => {
     fireEvent.click(screen.getByRole("button", { name: /next/i }));
 
     const image = await screen.findByRole("img", {
-      name: "Frostynia at Stage 1 • Hatchling",
+      name: "Frostynia at Level 1 • Hatchling",
     });
 
     await waitFor(() => {

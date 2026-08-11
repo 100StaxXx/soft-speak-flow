@@ -2,7 +2,7 @@ import { createContext, useContext, useMemo, memo, ReactNode } from "react";
 import { useCompanionCareSignals } from "@/hooks/useCompanionCareSignals";
 import { useAuth } from "@/hooks/useAuth";
 
-export type CompanionMood = 'joyful' | 'content' | 'neutral' | 'reserved' | 'quiet' | 'dormant';
+export type CompanionMood = 'joyful' | 'content' | 'neutral' | 'reserved' | 'quiet';
 export type ParticleEffect = 'sparkle' | 'gentle' | 'minimal' | 'none';
 
 export interface CompanionPresenceState {
@@ -14,7 +14,7 @@ export interface CompanionPresenceState {
   pulseRate: number;         // Animation speed multiplier (0.5-2)
   isPresent: boolean;        // Whether companion is "with" the user
   evolutionPath: string | null;
-  needsAttention: boolean;   // True if dormancy warning or low care
+  needsAttention: boolean;   // Reserved for explicit, user-authored attention states
   overallCare: number;       // 0-1 care level
 }
 
@@ -56,7 +56,6 @@ const MOOD_CONFIG: Record<CompanionMood, { particleEffect: ParticleEffect; parti
   neutral: { particleEffect: 'gentle', particleCount: [3, 4], opacity: [0.02, 0.03] },
   reserved: { particleEffect: 'minimal', particleCount: [2, 3], opacity: [0.01, 0.02] },
   quiet: { particleEffect: 'minimal', particleCount: [1, 2], opacity: [0.005, 0.01] },
-  dormant: { particleEffect: 'none', particleCount: [0, 0], opacity: [0, 0] },
 };
 
 export const CompanionPresenceProvider = memo(({ children }: { children: ReactNode }) => {
@@ -68,14 +67,14 @@ export const CompanionPresenceProvider = memo(({ children }: { children: ReactNo
       return defaultPresence;
     }
 
-    const { overallCare, evolutionPath, dormancy, hasDormancyWarning, dialogueTone } = care;
+    const { overallCare, evolutionPath, dialogueTone } = care;
     
     // Map dialogue tone to mood - validate that dialogueTone is a valid CompanionMood
-    const validMoods: CompanionMood[] = ['joyful', 'content', 'neutral', 'reserved', 'quiet', 'dormant'];
+    const validMoods: CompanionMood[] = ['joyful', 'content', 'neutral', 'reserved', 'quiet'];
     const mappedMood = dialogueTone as CompanionMood;
-    const mood: CompanionMood = dormancy.isDormant 
-      ? 'dormant' 
-      : validMoods.includes(mappedMood) ? mappedMood : 'neutral';
+    const mood: CompanionMood = validMoods.includes(mappedMood)
+      ? mappedMood
+      : 'neutral';
     
     // Get evolution path hue or default to neutral gold
     const auraHue = evolutionPath.path ? PATH_HUES[evolutionPath.path] ?? 45 : 45;
@@ -101,9 +100,9 @@ export const CompanionPresenceProvider = memo(({ children }: { children: ReactNo
       particleEffect: moodConfig.particleEffect,
       particleCount,
       pulseRate,
-      isPresent: !dormancy.isDormant,
+      isPresent: true,
       evolutionPath: evolutionPath.path,
-      needsAttention: hasDormancyWarning || overallCare < 0.3,
+      needsAttention: false,
       overallCare,
     };
   }, [user, isLoading, care]);

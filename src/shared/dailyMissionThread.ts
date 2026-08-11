@@ -30,6 +30,7 @@ export interface DailyMissionRecommendation {
   calendarSummary: string;
   companionAck: string;
   availableMinutes: number;
+  suggestedWindowLabel: string;
 }
 
 export const DAILY_MISSION_INTENTIONS: ReadonlyArray<{
@@ -89,16 +90,35 @@ const collectBusyIntervals = (
     .sort((left, right) => left.start - right.start);
 };
 
-const getLargestFreeWindowMinutes = (intervals: BusyInterval[]): number => {
-  let cursor = DAY_START_MINUTES;
-  let largestGap = 0;
+interface FreeWindow {
+  start: number;
+  end: number;
+}
+
+const getLargestFreeWindow = (
+  intervals: BusyInterval[],
+  earliestStartMinutes = DAY_START_MINUTES,
+): FreeWindow => {
+  const latestUsefulStart = 23 * 60 + 45;
+  let cursor = Math.min(latestUsefulStart, Math.max(DAY_START_MINUTES, earliestStartMinutes));
+  const windowEnd = cursor >= DAY_END_MINUTES
+    ? Math.min(24 * 60, cursor + 120)
+    : DAY_END_MINUTES;
+  let largest: FreeWindow = { start: cursor, end: cursor };
 
   for (const interval of intervals) {
-    largestGap = Math.max(largestGap, interval.start - cursor);
+    if (interval.end <= cursor) continue;
+    if (interval.start > cursor && interval.start - cursor > largest.end - largest.start) {
+      largest = { start: cursor, end: interval.start };
+    }
     cursor = Math.max(cursor, interval.end);
   }
 
-  return Math.max(largestGap, DAY_END_MINUTES - cursor, 0);
+  if (windowEnd - cursor > largest.end - largest.start) {
+    largest = { start: cursor, end: windowEnd };
+  }
+
+  return largest;
 };
 
 const scoreTask = (
@@ -144,6 +164,18 @@ const formatWindow = (minutes: number): string => {
   return remainder ? `${hours}h ${remainder}m` : `${hours} hours`;
 };
 
+const formatClockTime = (minutes: number): string => {
+  const normalized = ((Math.round(minutes) % (24 * 60)) + (24 * 60)) % (24 * 60);
+  const hours = Math.floor(normalized / 60);
+  const minuteValue = normalized % 60;
+  const displayHour = hours % 12 || 12;
+  const suffix = hours >= 12 ? "PM" : "AM";
+  return `${displayHour}:${String(minuteValue).padStart(2, "0")} ${suffix}`;
+};
+
+const formatSuggestedWindow = (start: number, duration: number): string =>
+  `${formatClockTime(start)}–${formatClockTime(start + duration)}`;
+
 const getFallbackTitle = (intention: DailyMissionIntention): string => {
   if (intention === "recover") return "Protect one 10-minute recovery window";
   if (intention === "progress") return "Choose one 15-minute next step";
@@ -154,12 +186,15 @@ export function buildDailyMissionRecommendation(input: {
   intention: DailyMissionIntention;
   tasks: MissionThreadTask[];
   calendarEvents?: MissionThreadCalendarEvent[];
+  currentTimeMinutes?: number;
 }): DailyMissionRecommendation {
   const { intention } = input;
   const calendarEvents = input.calendarEvents ?? [];
   const openTasks = input.tasks.filter((task) => !task.completed);
   const hasAllDayCommitment = calendarEvents.some((event) => event.isAllDay);
-  const freeWindowMinutes = getLargestFreeWindowMinutes(collectBusyIntervals(openTasks, calendarEvents));
+  const busyIntervals = collectBusyIntervals(openTasks, calendarEvents);
+  const freeWindow = getLargestFreeWindow(busyIntervals, input.currentTimeMinutes);
+  const freeWindowMinutes = Math.max(0, freeWindow.end - freeWindow.start);
   const intentionCap = intention === "recover" ? 20 : intention === "finish" ? 45 : 90;
   const availableMinutes = Math.max(10, Math.min(freeWindowMinutes || 10, intentionCap));
   const rankedTasks = [...openTasks].sort((left, right) =>
@@ -173,6 +208,9 @@ export function buildDailyMissionRecommendation(input: {
   const primaryTaskDurationMinutes = primary
     ? Math.min(clampDuration(primary.estimated_duration), availableMinutes)
     : intention === "recover" ? 10 : 15;
+  const primaryScheduledStart = parseTimeMinutes(primary?.scheduled_time);
+  const suggestedStart = primaryScheduledStart ?? freeWindow.start;
+  const suggestedWindowLabel = formatSuggestedWindow(suggestedStart, primaryTaskDurationMinutes);
 
   const calendarSummary = hasAllDayCommitment
     ? `Your calendar carries an all-day commitment, so this mission stays deliberately small: ${primaryTaskDurationMinutes} minutes.`
@@ -197,5 +235,6 @@ export function buildDailyMissionRecommendation(input: {
     calendarSummary,
     companionAck,
     availableMinutes: freeWindowMinutes,
+    suggestedWindowLabel,
   };
 }

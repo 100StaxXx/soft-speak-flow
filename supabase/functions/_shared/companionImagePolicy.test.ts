@@ -47,8 +47,6 @@ Deno.test("companion artwork defaults to the same square canvas as bundled asset
 Deno.test("primary and health-state companion renders use one image provider contract", async () => {
   const functionPaths = [
     "../generate-companion-image/index.ts",
-    "../generate-dormant-companion-image/index.ts",
-    "../generate-neglected-companion-image/index.ts",
   ];
 
   for (const functionPath of functionPaths) {

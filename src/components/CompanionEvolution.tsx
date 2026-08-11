@@ -9,7 +9,7 @@ import { logger } from "@/utils/logger";
 import { useMotionProfile } from "@/hooks/useMotionProfile";
 import { CompanionMotionLayer } from "@/components/companion/motion/CompanionMotionLayer";
 import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
-import { getProgressionLevelDisplay } from "@/config/progression";
+import { getProgressionLevelDisplay, getVisualStageDisplay } from "@/config/progression";
 import type { CompanionMotionEvent } from "@/config/companionMotion";
 import { getCompanionHatchVideoUrl } from "@/config/companionHatchVideos";
 import { globalAudio } from "@/utils/globalAudio";
@@ -617,8 +617,8 @@ const CompanionEvolutionContent = ({
   const celebrationDescription = isFirstEvolution
     ? "Your companion has emerged."
     : `Your companion reached ${levelDisplay}.`;
-  const previousStageLabel = isFirstEvolution ? "Origin" : `Stage ${previousStage}`;
-  const newStageLabel = isFirstEvolution ? "Hatchling" : `Stage ${newStage}`;
+  const previousStageLabel = isFirstEvolution ? "Origin" : getVisualStageDisplay(previousStage);
+  const newStageLabel = isFirstEvolution ? "Hatchling" : getVisualStageDisplay(newStage);
   const elementLabel = element?.trim()
     ? `${element.trim().charAt(0).toUpperCase()}${element.trim().slice(1).toLowerCase()} essence`
     : "Cosmic essence";

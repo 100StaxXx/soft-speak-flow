@@ -106,8 +106,7 @@
   );
 }
 
-/* ===== COMPANION CARE-BASED ANIMATIONS ===== */
-/* These animations reflect hidden care signals - users see behavior, not numbers */
+/* ===== COMPANION PRESENCE ANIMATIONS ===== */
 
 @keyframes companion-bounce {
   0%, 100% { transform: translateY(0); }
@@ -117,28 +116,9 @@
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.02); }
 }
-@keyframes companion-shiver {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-2px); }
-  75% { transform: translateX(2px); }
-}
 @keyframes companion-droop {
   0%, 100% { transform: translateY(0) rotate(0deg); }
   50% { transform: translateY(4px) rotate(-1deg); }
-}
-@keyframes companion-dormant {
-  0%, 100% { 
-    transform: scale(1) translateY(0); 
-    opacity: 0.7;
-  }
-  50% { 
-    transform: scale(1.01) translateY(1px); 
-    opacity: 0.75;
-  }
-}
-@keyframes companion-avert-gaze {
-  0%, 70%, 100% { transform: scaleX(1); }
-  35% { transform: scaleX(-1); }
 }
 @keyframes companion-slow-breathe {
   0%, 100% { transform: scale(1); opacity: 0.9; }
@@ -161,9 +141,7 @@
 
 .animate-companion-bounce { animation: companion-bounce 2s ease-in-out infinite; }
 .animate-companion-pulse { animation: companion-pulse 4s ease-in-out infinite; }
-.animate-companion-shiver { animation: companion-shiver 0.3s ease-in-out infinite; }
 .animate-companion-droop { animation: companion-droop 3s ease-in-out infinite; }
-.animate-companion-dormant { animation: companion-dormant 6s ease-in-out infinite; }
 .animate-companion-slow-breathe { animation: companion-slow-breathe 5s ease-in-out infinite; }
 .animate-companion-idle-drift {
   animation: companion-idle-drift 7.5s ease-in-out infinite;

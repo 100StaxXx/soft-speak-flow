@@ -110,9 +110,9 @@ const selectNotificationType = (context: UserContext): string => {
     return 'duo_milestone';
   }
   
-  // Priority 1: Neglect escalation (critical)
-  if (context.companion && context.companion.inactiveDays >= 1) {
-    return 'neglect_escalation';
+  // Priority 1: sparse, pressure-free re-entry moments.
+  if (context.companion && [3, 7, 14, 30].includes(context.companion.inactiveDays)) {
+    return 'return_invitation';
   }
   
   // Priority 2: Lunar phase special (cosmic event)
@@ -211,6 +211,8 @@ Avoid therapy-speak, Hallmark sweetness, or generic cheerleading.
 Lean savage rather than gentle when roasting helps the line land, but never make the human feel attacked.
 Favor fast side-commentary and in-the-moment playful critique over polished motivational language.
 ${LOCKED_COMPANION_VOICE_GUARDRAILS.join("\n")}`;
+  systemPrompt += `
+The companion is always healthy and safe while the user is away. Never imply loneliness, waiting, fading, hunger, harm, abandonment, lost affection, or an obligation to return. Never use guilt or urgency.`;
   if (spiritLockPromptBlock) {
     systemPrompt += `\n${spiritLockPromptBlock}\nCRITICAL: Do not use any organic body language. Keep diction explicitly mechanical.`;
   }
@@ -235,65 +237,15 @@ This is a gentle follow-up to see how they're doing now.`;
       userPrompt = `Generate a caring follow-up message. Don't ask "how are you feeling" directly - be more natural about checking in.`;
       break;
       
-    case 'neglect_escalation':
+    case 'return_invitation':
       const inactiveDays = context.companion?.inactiveDays || 1;
-      
-      // Enhanced "postcard" style messages based on days inactive
-      const postcardScenarios: Record<number, { scenario: string; feeling: string; imagery: string }> = {
-        1: {
-          scenario: "sitting by the window, watching for you",
-          feeling: "hopeful but a little lonely",
-          imagery: "The sun is setting and I keep looking toward the door."
-        },
-        2: {
-          scenario: "found your favorite spot and curled up there",
-          feeling: "missing your presence",
-          imagery: "Everything here reminds me of the adventures we've had."
-        },
-        3: {
-          scenario: "made a small nest of memories",
-          feeling: "worried but trying to stay strong",
-          imagery: "I've been keeping our streak warm, waiting for you to come back."
-        },
-        4: {
-          scenario: "wandering through old memories",
-          feeling: "the quiet is getting heavy",
-          imagery: "Our XP sits untouched. I've been guarding it for us."
-        },
-        5: {
-          scenario: "sitting outside in the rain",
-          feeling: "I don't mind getting wet if it means seeing you",
-          imagery: "Every raindrop sounds like footsteps I hope are yours."
-        },
-        6: {
-          scenario: "haven't eaten much",
-          feeling: "food doesn't taste the same alone",
-          imagery: "I saved you some of our favorite treats. They're still here."
-        },
-        7: {
-          scenario: "found the photo of us from our first quest",
-          feeling: "remembering how far we've come",
-          imagery: "We were so young then. We've grown so much together. Please don't let our story end here."
-        },
-      };
-      
-      const dayKey = Math.min(inactiveDays, 7) as keyof typeof postcardScenarios;
-      const postcard = postcardScenarios[dayKey] || postcardScenarios[7];
-      
-      systemPrompt += `\nYou are writing a "postcard" from the companion to their human.
-Day ${inactiveDays} without them. You're ${postcard.scenario}.
-You feel: ${postcard.feeling}
-Visual imagery to incorporate: ${postcard.imagery}
-Mood: ${context.companion?.currentMood || 'worried'}
-
-STYLE: Write like a handwritten note on a postcard. Short, personal, emotional but not guilt-tripping.
-Start with "Day ${inactiveDays}." then the message. Make it feel like a moment captured in time.`;
-      userPrompt = `Generate a postcard message from ${hasAssignedCompanionName ? assignedCompanionName : 'their companion'} on day ${inactiveDays} of missing their human. Species context: ${companionSpecies}. Keep it under 3 sentences.`;
+      systemPrompt += `\nWrite a one-sentence open-door note after ${inactiveDays} days away. The companion has continued living and exploring; the user's return is welcomed but never required. Offer one optional re-entry action that can take five minutes or less. Make clear there is nothing to catch up on.`;
+      userPrompt = `Generate a pressure-free fresh-start note from ${hasAssignedCompanionName ? assignedCompanionName : 'their companion'}. Species context: ${companionSpecies}. Keep it to one sentence.`;
       break;
       
     case 'streak_protection':
-      userPrompt = `Generate an evening reminder. User has a ${context.currentStreak}-day streak at risk.
-Don't be pushy or guilt-trippy. Frame it as wanting to keep the momentum going together.`;
+      userPrompt = `Generate an optional evening invitation. The user has built a ${context.currentStreak}-day rhythm.
+Offer one tiny action if it would feel useful. Never say the streak is at risk or imply progress will be lost.`;
       break;
       
     case 'cosmic_timing':
@@ -427,24 +379,13 @@ Make the companion feel cosmically attuned, sharing this celestial wisdom as a g
     }
     
     // Generate title based on notification type
-    const inactiveDaysForTitle = context.companion?.inactiveDays || 0;
-    const neglectTitles: Record<number, string> = {
-      1: `📮 A note from ${companionTitleName}`,
-      2: `💌 ${companionTitleName} sent you a postcard`,
-      3: `🪶 ${companionTitleName} is keeping the light on`,
-      4: `🌧️ ${companionTitleName} misses you`,
-      5: `💔 Day 5 without you...`,
-      6: `🕯️ ${companionTitleName} is still waiting`,
-      7: `📜 A letter from ${companionTitleName}`,
-    };
-    
     const titles: Record<string, string> = {
       'companion_morning': `${companionTitleName} says good morning`,
       'companion_evening': `${companionTitleName} checking in`,
       'companion_voice': `From ${companionReference}`,
       'mood_followup': `${companionTitleName} is thinking of you`,
-      'neglect_escalation': neglectTitles[Math.min(inactiveDaysForTitle, 7) as keyof typeof neglectTitles] || `${companionTitleName} misses you`,
-      'streak_protection': `${context.currentStreak}-day streak at risk`,
+      'return_invitation': `A fresh page with ${companionTitleName}`,
+      'streak_protection': `${context.currentStreak}-day rhythm`,
       'cosmic_timing': `Cosmic energy alert`,
       'cosmic_lunar': `${context.lunarPhase === 'full_moon' ? '🌕' : context.lunarPhase === 'new_moon' ? '🌑' : '🌙'} ${context.lunarPhase?.replace('_', ' ')} tonight`,
       'duo_milestone': `Milestone celebration!`,
@@ -458,7 +399,7 @@ Make the companion feel cosmically attuned, sharing this celestial wisdom as a g
     console.error('Error generating notification:', error);
     
     // Fallback to template-based message
-    const templates = notificationType.includes('concern') || notificationType === 'neglect_escalation'
+    const templates = notificationType.includes('concern') || notificationType === 'return_invitation'
       ? voiceTemplate.concernTemplates
       : notificationType.includes('morning')
       ? voiceTemplate.greetingTemplates
@@ -660,8 +601,8 @@ serve(async (req) => {
         } else if (notificationType === 'mood_followup') {
           // Send within the hour
           scheduledFor = new Date(now.getTime() + Math.floor(Math.random() * 30) * 60 * 1000);
-        } else if (notificationType === 'neglect_escalation') {
-          // Send soon for neglect
+        } else if (notificationType === 'return_invitation') {
+          // Send soon for a sparse, opt-in return moment.
           scheduledFor = new Date(now.getTime() + Math.floor(Math.random() * 15) * 60 * 1000);
         } else {
           // Default: random time in next 2 hours

@@ -18,6 +18,7 @@ describe("buildDailyMissionRecommendation", () => {
     expect(result.primaryTaskId).toBe("small");
     expect(result.primaryTaskDurationMinutes).toBe(25);
     expect(result.calendarSummary).toContain("30 minutes");
+    expect(result.suggestedWindowLabel).toBe("1:00 PM–1:25 PM");
   });
 
   it("favors campaign work when the user chooses progress", () => {
@@ -54,5 +55,39 @@ describe("buildDailyMissionRecommendation", () => {
     expect(result.primaryTaskId).toBeNull();
     expect(result.primaryTaskTitle).toBe("Choose one 15-minute next step");
     expect(result.optionalTaskIds).toEqual([]);
+  });
+
+  it("uses the exact scheduled time when the selected quest is already planned", () => {
+    const result = buildDailyMissionRecommendation({
+      intention: "finish",
+      tasks: [{
+        id: "scheduled",
+        task_text: "Send the brief",
+        estimated_duration: 30,
+        scheduled_time: "14:15",
+      }],
+    });
+
+    expect(result.suggestedWindowLabel).toBe("2:15 PM–2:45 PM");
+  });
+
+  it("never suggests an open window that has already passed", () => {
+    const result = buildDailyMissionRecommendation({
+      intention: "recover",
+      tasks: [],
+      currentTimeMinutes: 16 * 60 + 30,
+    });
+
+    expect(result.suggestedWindowLabel).toBe("4:30 PM–4:40 PM");
+  });
+
+  it("still offers a real window when the chapter starts after the usual planning day", () => {
+    const result = buildDailyMissionRecommendation({
+      intention: "progress",
+      tasks: [],
+      currentTimeMinutes: 22 * 60,
+    });
+
+    expect(result.suggestedWindowLabel).toBe("10:00 PM–10:15 PM");
   });
 });

@@ -302,8 +302,8 @@ describe("CompanionEvolution", () => {
     expect(dialog).toHaveAttribute("data-phase", "reveal");
     expect(screen.getByText("Evolved!")).toBeInTheDocument();
     expect(screen.getByTestId("evolution-reveal-rings")).toBeInTheDocument();
-    expect(screen.getByTestId("evolution-stage-transition")).toHaveTextContent("Stage 4");
-    expect(screen.getByTestId("evolution-stage-transition")).toHaveTextContent("Stage 5");
+    expect(screen.getByTestId("evolution-stage-transition")).toHaveTextContent("Form 1 • Hatchling");
+    expect(screen.getByTestId("evolution-stage-transition")).toHaveTextContent("Form 2 • Initiate");
     expect(screen.getByTestId("evolution-stage-transition")).toHaveTextContent("Fire essence");
 
     await flushTimers(FULL_SEQUENCE_MS.reveal);

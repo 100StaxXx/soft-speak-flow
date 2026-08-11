@@ -7,7 +7,6 @@ import { useReferrals } from "@/hooks/useReferrals";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useCompanionExpressionState } from "@/hooks/useCompanionExpressionState";
 import { useCompanionVisualState } from "@/hooks/useCompanionVisualState";
-import { useCompanionWakeUp } from "@/hooks/useCompanionWakeUp";
 import { useCompanionCurrentEvolutionReplay } from "@/hooks/useCompanionCurrentEvolutionReplay";
 import { useEpicRewards } from "@/hooks/useEpicRewards";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
@@ -18,7 +17,6 @@ import { CompanionBadge } from "@/components/CompanionBadge";
 import { CompanionBondBadge } from "@/components/companion/CompanionBondBadge";
 import { EvolveButton } from "@/components/companion/EvolveButton";
 import { EvolutionPathBadge } from "@/components/companion/EvolutionPathBadge";
-import { DormancyWarning, DormantOverlay } from "@/components/companion/DormancyWarning";
 import { CompanionDialogue } from "@/components/companion/CompanionDialogue";
 import { CompanionMotionSurface } from "@/components/companion/motion/CompanionMotionSurface";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
@@ -93,11 +91,6 @@ import {
 const LazyWelcomeBackModal = lazy(() =>
   import("@/components/WelcomeBackModal").then((module) => ({
     default: module.WelcomeBackModal,
-  })),
-);
-const LazyWakeUpCelebration = lazy(() =>
-  import("@/components/companion/WakeUpCelebration").then((module) => ({
-    default: module.WakeUpCelebration,
   })),
 );
 const LazyCompanionChatModal = lazy(() =>
@@ -202,35 +195,12 @@ export const CompanionDisplay = memo(({
   const { isPreHatchCompanionStep } = usePostOnboardingMentorGuidance();
   const { pendingEvolutionReveal } = useEvolution();
   
-  // Wake-up celebration detection
-  const {
-    showCelebration: showWakeUpCelebration,
-    dismissCelebration: dismissWakeUpCelebration,
-    companionName: wakeUpCompanionName,
-    companionImageUrl: wakeUpCompanionImageUrl,
-    companionImageFocalX: wakeUpCompanionImageFocalX,
-    companionImageFocalY: wakeUpCompanionImageFocalY,
-    dormantImageUrl: wakeUpDormantImageUrl,
-    dormantImageFocalX: wakeUpDormantImageFocalX,
-    dormantImageFocalY: wakeUpDormantImageFocalY,
-    bondLevel: wakeUpBondLevel,
-  } = useCompanionWakeUp();
-  
   // Use care-based visual state (includes care signals to avoid duplicate hook calls)
   const { 
     cssStyles: careStyles, 
     animationClass, 
-    care,
     evolutionPath, 
-    isDormant,
-    hasDormancyWarning,
-  } = useCompanionVisualState(
-    health.moodState,
-    health.hunger,
-    health.happiness,
-    health.isAlive,
-    health.recoveryProgress
-  );
+  } = useCompanionVisualState();
   const expressionState = useCompanionExpressionState();
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -477,31 +447,11 @@ export const CompanionDisplay = memo(({
   const normalDisplayImageUrl = useMemo(() => {
     if (!displayCompanion) return null;
 
-    if (isDormant) {
-      return resolveCompanionVisualAssetUrl(displayCompanion, "dormant");
-    }
-    if (
-      health.isNeglected
-      && health.neglectedImageUrl
-      && (typeof displayCompanion.current_stage !== "number" || displayCompanion.current_stage > 0)
-    ) {
-      return health.neglectedImageUrl;
-    }
-    if (health.isNeglected) {
-      return resolveCompanionVisualAssetUrl(displayCompanion, "neglected");
-    }
     return resolveCompanionVisualAssetUrl(displayCompanion, "normal");
-  }, [
-    displayCompanion,
-    health.isNeglected,
-    health.neglectedImageUrl,
-    isDormant,
-  ]);
+  }, [displayCompanion]);
 
   const expressiveImageUrl = useMemo(() => {
-    if (!displayCompanion || isDormant || health.isNeglected) {
-      return null;
-    }
+    if (!displayCompanion) return null;
 
     return resolveCompanionExpressiveAssetUrl(displayCompanion, {
       mood: expressionState.mood,
@@ -511,8 +461,6 @@ export const CompanionDisplay = memo(({
     displayCompanion,
     expressionState.mood,
     expressionState.variant,
-    health.isNeglected,
-    isDormant,
   ]);
 
   const displayImageUrl = fallbackToDefaultPortrait || !expressiveImageUrl
@@ -546,28 +494,6 @@ export const CompanionDisplay = memo(({
   const effectiveImageFocal = useMemo(() => {
     if (!displayCompanion) return { x: null, y: null };
 
-    if (isDormant) {
-      return {
-        x: displayCompanion.dormant_image_focal_x ?? displayCompanion.current_image_focal_x ?? null,
-        y: displayCompanion.dormant_image_focal_y ?? displayCompanion.current_image_focal_y ?? null,
-      };
-    }
-
-    if (health.isNeglected) {
-      return {
-        x:
-          health.neglectedImageFocalX ??
-          displayCompanion.neglected_image_focal_x ??
-          displayCompanion.current_image_focal_x ??
-          null,
-        y:
-          health.neglectedImageFocalY ??
-          displayCompanion.neglected_image_focal_y ??
-          displayCompanion.current_image_focal_y ??
-          null,
-      };
-    }
-
     return {
       x: health.imageFocalX ?? displayCompanion.current_image_focal_x ?? null,
       y: health.imageFocalY ?? displayCompanion.current_image_focal_y ?? null,
@@ -576,10 +502,6 @@ export const CompanionDisplay = memo(({
     displayCompanion,
     health.imageFocalX,
     health.imageFocalY,
-    health.isNeglected,
-    health.neglectedImageFocalX,
-    health.neglectedImageFocalY,
-    isDormant,
   ]);
 
   // Track image URL changes to reset loading state
@@ -617,7 +539,7 @@ export const CompanionDisplay = memo(({
 
   useEffect(() => {
     setFallbackToDefaultPortrait(false);
-  }, [expressiveImageUrl, isDormant, health.isNeglected]);
+  }, [expressiveImageUrl]);
 
   const companionPalette = useMemo(
     () =>
@@ -740,15 +662,11 @@ export const CompanionDisplay = memo(({
       concerned: "animate-companion-droop",
       sleepy: "animate-companion-slow-breathe",
     } as const)[expressionState.mood];
-  const activePortraitAnimationClass = isDormant || health.isNeglected
-    ? animationClass
-    : expressionAnimationClass;
+  const activePortraitAnimationClass = expressionAnimationClass || animationClass;
   const shouldAnimateIdleDrift = !prefersReducedMotion
     && imageLoaded
     && !imageError
     && !inlineEvolutionReplay
-    && !isDormant
-    && !health.isNeglected
     && expressionState.mood === "calm";
   const customDisplayName = getStoredCompanionCustomName(displayCompanion);
   const displayedCreatureName = creatureName
@@ -871,8 +789,8 @@ export const CompanionDisplay = memo(({
                   : displayCanEvolve && readyEvolutionCopy
                     ? readyEvolutionCopy
                     : nextVisualStageBoundaryLevel === null || !nextVisualStageLabel
-                      ? `Final stage • ${visualStageLabel}`
-                      : `Next stage at Level ${nextVisualStageBoundaryLevel} • ${nextVisualStageLabel}`}
+                      ? `Final form • ${visualStageLabel}`
+                      : `Next form at Level ${nextVisualStageBoundaryLevel} • ${nextVisualStageLabel}`}
               </p>
             </div>
             <div
@@ -996,7 +914,7 @@ export const CompanionDisplay = memo(({
                         "relative h-full w-full overflow-hidden rounded-2xl ring-4 shadow-2xl transition-all duration-500 group-hover:scale-105",
                         imageLoaded ? "opacity-100" : "opacity-0 absolute inset-0",
                         usesGeneratedSceneShell && "bg-black",
-                        health.isNeglected ? "ring-destructive/50" : "ring-primary/30",
+                        "ring-primary/30",
                         activePortraitAnimationClass,
                       )}
                     >
@@ -1044,7 +962,7 @@ export const CompanionDisplay = memo(({
                       muted
                       playsInline
                       data-testid="companion-inline-evolution-video"
-                      aria-label={`Stage ${inlineEvolutionReplay.stage} evolution replay`}
+                      aria-label={`${getVisualStageDisplay(inlineEvolutionReplay.stage)} evolution replay`}
                       onEnded={finishInlineEvolutionReplay}
                       onError={finishInlineEvolutionReplay}
                     />
@@ -1065,17 +983,6 @@ export const CompanionDisplay = memo(({
                   </div>
                 ) : null}
               </div>
-              {/* Dormancy warning component */}
-              <DormancyWarning 
-                show={hasDormancyWarning && !isDormant}
-                daysUntilDormancy={care.dormancy.daysUntilDormancy ?? undefined}
-              />
-              {/* Dormant overlay component */}
-              <DormantOverlay 
-                isDormant={care.dormancy.isDormant}
-                recoveryDays={care.dormancy.recoveryDays}
-                daysUntilWake={care.dormancy.daysUntilWake}
-              />
             </div>
           </div>
 
@@ -1196,24 +1103,6 @@ export const CompanionDisplay = memo(({
               setShowWelcomeBack(false);
               setWelcomeBackDismissed(true);
             }}
-          />
-        </Suspense>
-      ) : null}
-
-      {/* Wake-Up Celebration Modal */}
-      {showWakeUpCelebration ? (
-        <Suspense fallback={null}>
-          <LazyWakeUpCelebration
-            isOpen
-            onClose={dismissWakeUpCelebration}
-            companionName={wakeUpCompanionName}
-            companionImageUrl={wakeUpCompanionImageUrl}
-            companionImageFocalX={wakeUpCompanionImageFocalX}
-            companionImageFocalY={wakeUpCompanionImageFocalY}
-            dormantImageUrl={wakeUpDormantImageUrl}
-            dormantImageFocalX={wakeUpDormantImageFocalX}
-            dormantImageFocalY={wakeUpDormantImageFocalY}
-            bondLevel={wakeUpBondLevel}
           />
         </Suspense>
       ) : null}

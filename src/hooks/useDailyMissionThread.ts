@@ -20,6 +20,7 @@ export function useDailyMissionThread(missionDate: string) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const queryKey = ["daily-mission-thread", user?.id, missionDate] as const;
+  const previousQueryKey = ["daily-mission-thread", user?.id, missionDate, "previous"] as const;
 
   const query = useQuery({
     queryKey,
@@ -32,6 +33,28 @@ export function useDailyMissionThread(missionDate: string) {
         .select("*")
         .eq("user_id", user.id)
         .eq("mission_date", missionDate)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    },
+    staleTime: 60_000,
+  });
+
+  const previousQuery = useQuery({
+    queryKey: previousQueryKey,
+    enabled: Boolean(user?.id && missionDate),
+    queryFn: async (): Promise<DailyMissionThread | null> => {
+      if (!user?.id) return null;
+
+      const { data, error } = await supabase
+        .from("daily_mission_threads")
+        .select("*")
+        .eq("user_id", user.id)
+        .lt("mission_date", missionDate)
+        .in("status", ["completed", "reflected"])
+        .order("mission_date", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (error) throw error;
@@ -58,6 +81,7 @@ export function useDailyMissionThread(missionDate: string) {
           optional_task_titles: recommendation.optionalTaskTitles,
           companion_ack: recommendation.companionAck,
           calendar_summary: recommendation.calendarSummary,
+          suggested_window_label: recommendation.suggestedWindowLabel,
           calendar_evidence: calendarEvidence as unknown as Json,
           status: "active",
           completed_at: null,
@@ -149,7 +173,8 @@ export function useDailyMissionThread(missionDate: string) {
         .from("daily_mission_threads")
         .delete()
         .eq("id", query.data.id)
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .eq("status", "active");
       if (error) throw error;
     },
     onSuccess: () => {
@@ -160,6 +185,7 @@ export function useDailyMissionThread(missionDate: string) {
 
   return {
     thread: query.data ?? null,
+    previousThread: previousQuery.data ?? null,
     isLoading: query.isLoading,
     error: query.error,
     retry: query.refetch,

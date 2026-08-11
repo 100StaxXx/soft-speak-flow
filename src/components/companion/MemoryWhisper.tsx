@@ -29,8 +29,7 @@ export const MemoryWhisper = memo(({ className, chance = 0.15 }: MemoryWhisperPr
 
   // Try to show a memory on mount if conditions are right
   useEffect(() => {
-    // Don't show if companion is dormant or not present
-    if (!presence.isPresent || presence.mood === 'dormant') return;
+    if (!presence.isPresent) return;
     
     // Don't show if no memories
     if (memories.length === 0) return;
@@ -58,7 +57,7 @@ export const MemoryWhisper = memo(({ className, chance = 0.15 }: MemoryWhisperPr
     return () => clearTimeout(timer);
     // Only depend on stable values to prevent re-triggering
      
-  }, [memories.length, presence.isPresent, presence.mood, chance]);
+  }, [memories.length, presence.isPresent, chance]);
 
   if (!memoryLine || !isVisible) {
     return null;

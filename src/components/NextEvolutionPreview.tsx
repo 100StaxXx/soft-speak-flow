@@ -27,7 +27,7 @@ interface NextEvolutionPreviewProps {
 const XP_TIPS = [
   { action: "Complete a habit", xp: "7-24 XP", icon: "✓" },
   { action: "Finish all daily habits", xp: "+15 XP bonus", icon: "🎯" },
-  { action: "Complete daily missions", xp: "8-28 XP (Main Quest 1.5x)", icon: "⚡" },
+  { action: "Complete agenda quests", xp: "8-28 XP (Main Quest 1.5x)", icon: "⚡" },
   { action: "Challenge day bonus", xp: "25 XP", icon: "💪" },
   { action: "Streak milestones", xp: "15 XP", icon: "🔥" },
   { action: "Weekly challenge complete", xp: "60 XP", icon: "🏆" },
@@ -110,7 +110,7 @@ export const NextEvolutionPreview = memo(({
           </div>
           <div className="flex-1">
             <h3 className="font-heading font-bold text-sm">
-              {readyBoundaryDisplay ? "Next Stage" : "Next Level"}
+              {readyBoundaryDisplay ? "Next Form" : "Next Level"}
             </h3>
             <p className="text-xs text-muted-foreground">
               {readyBoundaryDisplay ?? nextLevelLabel}
@@ -139,7 +139,7 @@ export const NextEvolutionPreview = memo(({
           </p>
           {!isMaxStage && nextVisualStageBoundaryLevel !== null && nextVisualStageDisplay && (
             <p className="text-xs text-muted-foreground">
-              Next stage: {nextVisualStageDisplay} at {getProgressionLevelLabel(nextVisualStageBoundaryLevel)}
+              Next form: {nextVisualStageDisplay} at {getProgressionLevelLabel(nextVisualStageBoundaryLevel)}
             </p>
           )}
         </div>

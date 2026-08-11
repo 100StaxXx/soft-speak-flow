@@ -8,13 +8,16 @@ const markCompleted = vi.fn();
 const linkPrimaryTask = vi.fn();
 const reflectOnMission = vi.fn();
 const clearThread = vi.fn();
+const awardCompanionAttribute = vi.fn();
 const show = vi.fn();
 
 let thread: Record<string, unknown> | null = null;
+let previousThread: Record<string, unknown> | null = null;
 
 vi.mock("@/hooks/useDailyMissionThread", () => ({
   useDailyMissionThread: () => ({
     thread,
+    previousThread,
     isLoading: false,
     error: null,
     retry: vi.fn(),
@@ -29,6 +32,14 @@ vi.mock("@/hooks/useDailyMissionThread", () => ({
     clearThread,
     isClearing: false,
   }),
+}));
+
+vi.mock("@/hooks/useCompanion", () => ({
+  useCompanion: () => ({ companion: { id: "companion-1" } }),
+}));
+
+vi.mock("@/hooks/useCompanionAttributes", () => ({
+  useCompanionAttributes: () => ({ awardCompanionAttribute }),
 }));
 
 vi.mock("@/contexts/TalkPopupContext", () => ({
@@ -102,12 +113,14 @@ const renderCard = () => render(
 describe("DailyMissionThreadCard", () => {
   beforeEach(() => {
     thread = null;
+    previousThread = null;
     vi.clearAllMocks();
     saveThread.mockResolvedValue({});
     markCompleted.mockResolvedValue({});
     linkPrimaryTask.mockResolvedValue({});
     reflectOnMission.mockResolvedValue({});
     clearThread.mockResolvedValue(undefined);
+    awardCompanionAttribute.mockResolvedValue({ wasDuplicate: false });
     show.mockResolvedValue(undefined);
   });
 
@@ -123,6 +136,23 @@ describe("DailyMissionThreadCard", () => {
     expect(show).toHaveBeenCalledWith(expect.objectContaining({
       message: expect.stringContaining("Send the final launch notes"),
     }));
+  });
+
+  it("carries the previous chapter's reflection into today's opening", () => {
+    previousThread = {
+      id: "thread-previous",
+      mission_date: "2026-08-09",
+      status: "reflected",
+      intention_label: "Finish something",
+      reflection_label: "It cleared some space",
+    };
+
+    renderCard();
+
+    expect(screen.getByText(
+      /Yesterday you chose to finish something, and said “it cleared some space.”/i,
+    )).toBeInTheDocument();
+    expect(screen.getByText(/Nothing to make up for/i)).toBeInTheDocument();
   });
 
   it("renders the persisted mission and optional quests", () => {

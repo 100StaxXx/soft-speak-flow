@@ -38,7 +38,6 @@ import {
   getCompanionFrostedThemeStyle,
 } from "@/lib/companionFrostedTheme";
 import { useCompanion } from "@/hooks/useCompanion";
-import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useMilestones } from "@/hooks/useMilestones";
 import { useSharedCampaignPathMarkers } from "@/hooks/useSharedCampaignPathMarkers";
 import { plannerPathfinderTheme } from "@/components/companion/plannerPathfinderTheme";
@@ -122,7 +121,6 @@ export const CampaignCard = memo(function CampaignCard({
   const shareCampaignInFlightRef = useRef(false);
   
   const { companion } = useCompanion();
-  const { health } = useCompanionHealth();
   const resolvedCompanionFrostedThemeStyle = useMemo(
     () => companionFrostedThemeStyle ?? getCompanionFrostedThemeStyle(companion?.favorite_color),
     [companionFrostedThemeStyle, companion?.favorite_color],
@@ -374,10 +372,10 @@ export const CampaignCard = memo(function CampaignCard({
             progress={campaign.progress_percentage} 
             targetDays={campaign.target_days}
             className="mb-3"
-            companionImageUrl={health?.imageUrl || companion?.current_image_url}
-            companionImageFocalX={health?.imageFocalX ?? companion?.current_image_focal_x ?? null}
-            companionImageFocalY={health?.imageFocalY ?? companion?.current_image_focal_y ?? null}
-            companionMood={health?.moodState}
+            companionImageUrl={companion?.current_image_url}
+            companionImageFocalX={companion?.current_image_focal_x ?? null}
+            companionImageFocalY={companion?.current_image_focal_y ?? null}
+            companionMood={companion?.current_mood}
             showCompanion={true}
             companionMarkers={trailCompanionMarkers}
             milestones={trailMilestones}

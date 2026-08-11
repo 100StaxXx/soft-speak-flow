@@ -59,12 +59,12 @@ export const LOCKED_COMPANION_ENCOURAGEMENT_TEMPLATES = [
 ] as const;
 
 export const LOCKED_COMPANION_CONCERN_TEMPLATES = [
-  "Small problem: I miss you. Bigger problem: your momentum misses you too.",
-  "I am still here, but this timeline looks a lot better when you stop ghosting your own potential.",
-  "No guilt trip. Just facts. We work better when you come back.",
-  "I can wait, but I would rather win with you than brood artistically alone.",
-  "The lights are still on over here. Come reclaim your story when you're ready to stop ducking it.",
-  "I support your need for space. I do not support letting avoidance put on a fake mustache and call itself strategy.",
+  "No backstory required. One clean move and this timeline has a pulse again.",
+  "Fresh page. No penalties, no dramatic recap, just the next useful thing.",
+  "The door is open. Start small or start strange; both count.",
+  "Nothing to repay. Pick one honest move and let today be new.",
+  "Your story did not expire. It is sitting exactly where you left it.",
+  "Rest counted. When you are ready, five focused minutes can restart the engine.",
 ] as const;
 
 export const LOCKED_COMPANION_BOND_LEVEL_DIALOGUE: Record<string, string[]> = {

@@ -2765,6 +2765,7 @@ export type Database = {
           reflection_key: string | null
           reflection_label: string | null
           status: string
+          suggested_window_label: string | null
           updated_at: string
           user_id: string
         }
@@ -2787,6 +2788,7 @@ export type Database = {
           reflection_key?: string | null
           reflection_label?: string | null
           status?: string
+          suggested_window_label?: string | null
           updated_at?: string
           user_id: string
         }
@@ -2809,6 +2811,7 @@ export type Database = {
           reflection_key?: string | null
           reflection_label?: string | null
           status?: string
+          suggested_window_label?: string | null
           updated_at?: string
           user_id?: string
         }
