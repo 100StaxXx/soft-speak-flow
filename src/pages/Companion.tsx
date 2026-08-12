@@ -57,11 +57,6 @@ const LazyXPBreakdown = lazy(() =>
     default: module.XPBreakdown,
   })),
 );
-const LazyDailyChapterOverviewCard = lazy(() =>
-  import("@/components/DailyChapterOverviewCard").then((module) => ({
-    default: module.DailyChapterOverviewCard,
-  })),
-);
 const LazyFocusTab = lazy(() =>
   import("@/components/companion/FocusTab").then((module) => ({
     default: module.FocusTab,
@@ -136,7 +131,6 @@ const OverviewTab = memo(({
           <LazyXPBreakdown />
         </div>
 
-        <LazyDailyChapterOverviewCard />
       </div>
     );
   }
@@ -157,9 +151,6 @@ const OverviewTab = memo(({
             progressPercent={progressToNext}
           />
         </div>
-      </ParallaxCard>
-      <ParallaxCard offset={16}>
-        <LazyDailyChapterOverviewCard />
       </ParallaxCard>
       <ParallaxCard offset={12}>
         <LazyXPBreakdown />

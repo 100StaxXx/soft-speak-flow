@@ -8,6 +8,7 @@ import {
   type CompanionGesture,
   type CompanionInteractionPrompt,
 } from "@/config/companionBehaviors";
+import type { CompanionMotionEventType } from "@/config/companionMotion";
 import { supabase } from "@/integrations/supabase/client";
 import { haptics } from "@/utils/haptics";
 import { logger } from "@/utils/logger";
@@ -259,6 +260,32 @@ export const useCompanionInteractions = ({
     showBubble({ message: option.response, prompt: null });
   }, [companionId, currentStage, playBehavior, prompt, recordInteraction, showBubble, triggerEvent]);
 
+  const reactToAdventureChoice = useCallback(({
+    promptKey,
+    answerKey,
+    behaviorId,
+    message,
+    eventType = "play",
+  }: {
+    promptKey: string;
+    answerKey: string;
+    behaviorId: CompanionBehaviorId;
+    message: string;
+    eventType?: CompanionMotionEventType;
+  }) => {
+    if (!companionId) return;
+    playBehavior(behaviorId);
+    haptics.success();
+    triggerEvent({
+      type: eventType,
+      intensity: eventType === "quest_complete" ? "heroic" : "medium",
+      stage: currentStage,
+      reason: message,
+    });
+    recordInteraction({ kind: "answer", promptKey, answerKey });
+    showBubble({ message, prompt: null });
+  }, [companionId, currentStage, playBehavior, recordInteraction, showBubble, triggerEvent]);
+
   return {
     activeBehaviorId,
     activeBehaviorClassName: activeBehaviorId && !prefersReducedMotion
@@ -267,6 +294,7 @@ export const useCompanionInteractions = ({
     bubble,
     interact,
     answerPrompt,
+    reactToAdventureChoice,
     dismissBubble: () => {
       clearBubbleTimer();
       setBubble(null);

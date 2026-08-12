@@ -2791,6 +2791,7 @@ export type Database = {
       }
       daily_mission_threads: {
         Row: {
+          adventure_state: Json
           calendar_evidence: Json
           calendar_summary: string | null
           companion_ack: string
@@ -2814,6 +2815,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          adventure_state?: Json
           calendar_evidence?: Json
           calendar_summary?: string | null
           companion_ack: string
@@ -2837,6 +2839,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          adventure_state?: Json
           calendar_evidence?: Json
           calendar_summary?: string | null
           companion_ack?: string

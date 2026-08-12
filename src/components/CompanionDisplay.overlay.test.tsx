@@ -78,6 +78,10 @@ const mocks = vi.hoisted(() => ({
   dismissCompanionBubble: vi.fn(),
 }));
 
+vi.mock("@/components/companion/DailyAdventurePanel", () => ({
+  DailyAdventurePanel: () => <div data-testid="daily-adventure-panel" />,
+}));
+
 vi.mock("@/hooks/useCompanion", () => ({
   useCompanion: () => ({
     companion: mocks.companion,

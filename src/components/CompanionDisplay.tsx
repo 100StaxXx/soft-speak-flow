@@ -19,6 +19,7 @@ import { EvolveButton } from "@/components/companion/EvolveButton";
 import { EvolutionPathBadge } from "@/components/companion/EvolutionPathBadge";
 import { CompanionDialogue } from "@/components/companion/CompanionDialogue";
 import { CompanionInteractionBubble } from "@/components/companion/CompanionInteractionBubble";
+import { DailyAdventurePanel } from "@/components/companion/DailyAdventurePanel";
 import { CompanionMotionSurface } from "@/components/companion/motion/CompanionMotionSurface";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
 import { CompanionImage } from "@/components/CompanionImage";
@@ -1093,6 +1094,13 @@ export const CompanionDisplay = memo(({
             <p className="relative z-10 mt-2 text-center text-[11px] font-medium tracking-wide text-muted-foreground/80">
               Tap to connect <span aria-hidden="true">•</span> Swipe to pet <span aria-hidden="true">•</span> Hold for a quiet moment
             </p>
+            {!isPreHatchDisplay && !isPendingRevealDisplay ? (
+              <DailyAdventurePanel
+                companionName={displayedCreatureName}
+                currentStage={displayCompanion.current_stage}
+                onReaction={companionInteractions.reactToAdventureChoice}
+              />
+            ) : null}
           </div>
 
           <div className="space-y-3">

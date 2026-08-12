@@ -43,6 +43,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { buildStoryLivingNarrativePrompt } from "@/shared/livingNarrative";
 import { LivingNarrativeChoiceCard } from "./companion/LivingNarrativeChoiceCard";
 import { NarrativeConstellation } from "./companion/NarrativeConstellation";
+import { DailyAdventureJournal } from "./companion/DailyAdventureJournal";
 
 interface CompanionStoryJournalProps {
   layoutMode?: CompanionLayoutMode;
@@ -284,6 +285,8 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
         companionId={companion.id}
         companionName={companionDisplayName}
       />
+
+      <DailyAdventureJournal companionName={companionDisplayName} />
 
       <Card className={cn(outerShellCardClassName, isDesktop ? "p-8" : "p-6")}>
         {chapterImage && isLevelUnlocked && (

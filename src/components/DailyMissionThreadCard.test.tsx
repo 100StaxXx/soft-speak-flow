@@ -127,12 +127,15 @@ describe("DailyMissionThreadCard", () => {
   it("turns an intention into one specific agenda mission", async () => {
     renderCard();
 
-    fireEvent.click(screen.getByRole("button", { name: /finish something/i }));
+    fireEvent.click(screen.getByRole("button", {
+      name: /seal the open rift|recover the lost signal|clear the orbital debris/i,
+    }));
 
     await waitFor(() => expect(saveThread).toHaveBeenCalledTimes(1));
     const input = saveThread.mock.calls[0][0];
     expect(input.recommendation.primaryTaskTitle).toBe("Send the final launch notes");
     expect(input.recommendation.intention).toBe("finish");
+    expect(input.adventureState.morningChoice.label).toBeTruthy();
     expect(show).toHaveBeenCalledWith(expect.objectContaining({
       message: expect.stringContaining("Send the final launch notes"),
     }));

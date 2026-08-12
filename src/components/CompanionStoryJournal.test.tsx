@@ -56,6 +56,10 @@ vi.mock("@/hooks/useCompanionStory", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useDailyMissionThread", () => ({
+  useDailyAdventureHistory: () => ({ data: [], isLoading: false, error: null }),
+}));
+
 vi.mock("@/hooks/useLivingNarrativeChoice", () => ({
   useLivingNarrativeChoice: () => ({
     choice: null,

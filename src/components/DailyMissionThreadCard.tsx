@@ -19,9 +19,15 @@ import { useDailyMissionThread } from "@/hooks/useDailyMissionThread";
 import type { DailyTask } from "@/services/dailyTasksRemote";
 import {
   buildDailyMissionRecommendation,
-  DAILY_MISSION_INTENTIONS,
-  type DailyMissionIntention,
 } from "@/shared/dailyMissionThread";
+import {
+  addAdventureDecision,
+  buildMorningAdventureChoices,
+  createDailyAdventureState,
+  getDailyAdventureStory,
+  parseDailyAdventureState,
+  type DailyAdventureChoice,
+} from "@/shared/dailyAdventure";
 import type { ExternalCalendarEvent } from "@/types/externalCalendar";
 import { cn } from "@/lib/utils";
 
@@ -69,7 +75,13 @@ const getPreviousChapterCallback = (
 
 const getCurrentTimeMinutes = (missionDate: string): number | undefined => {
   const now = new Date();
-  if (missionDate !== now.toLocaleDateString("en-CA")) return undefined;
+  const localDate = now.toLocaleDateString("en-CA");
+  const previous = new Date(now);
+  previous.setDate(previous.getDate() - 1);
+  const previousDate = previous.toLocaleDateString("en-CA");
+  if (missionDate !== localDate) {
+    return now.getHours() < 2 && missionDate === previousDate ? 23 * 60 + 45 : undefined;
+  }
   const current = now.getHours() * 60 + now.getMinutes();
   return Math.min(23 * 60 + 45, Math.ceil(current / 15) * 15);
 };
@@ -104,6 +116,18 @@ export function DailyMissionThreadCard({
     reflectOnMission,
     isReflecting,
   } = useDailyMissionThread(missionDate);
+  const adventureStory = useMemo(
+    () => getDailyAdventureStory({
+      missionDate,
+      companionName: "Your companion",
+      currentStage: 0,
+    }),
+    [missionDate],
+  );
+  const morningChoices = useMemo(
+    () => buildMorningAdventureChoices({ missionDate, currentStage: 0 }),
+    [missionDate],
+  );
   const previousChapterCallback = useMemo(
     () => getPreviousChapterCallback(previousThread, missionDate),
     [missionDate, previousThread],
@@ -161,7 +185,7 @@ export function DailyMissionThreadCard({
   }, [markCompleted, primaryTask?.completed, thread]);
 
   useEffect(() => {
-    if (!thread || !["completed", "reflected"].includes(thread.status) || completionAwardAttemptedRef.current === thread.id) {
+    if (!thread?.completed_at || !["completed", "reflected"].includes(thread.status) || completionAwardAttemptedRef.current === thread.id) {
       return;
     }
 
@@ -196,9 +220,10 @@ export function DailyMissionThreadCard({
     });
   }, [awardCompanionAttribute, thread]);
 
-  const handleChooseIntention = useCallback(async (intention: DailyMissionIntention) => {
+  const handleChooseIntention = useCallback(async (choice: DailyAdventureChoice) => {
+    if (!choice.intention) return;
     const recommendation = buildDailyMissionRecommendation({
-      intention,
+      intention: choice.intention,
       tasks,
       calendarEvents: externalEvents,
       currentTimeMinutes: getCurrentTimeMinutes(missionDate),
@@ -206,6 +231,7 @@ export function DailyMissionThreadCard({
 
     await saveThread({
       recommendation,
+      adventureState: createDailyAdventureState({ story: adventureStory, choice }),
       calendarEvidence: {
         connectedCalendarCount,
         externalEventCount: externalEvents.length,
@@ -213,7 +239,7 @@ export function DailyMissionThreadCard({
       },
     });
     await talkPopup.show({ message: recommendation.companionAck });
-  }, [connectedCalendarCount, externalEvents, missionDate, saveThread, talkPopup, tasks]);
+  }, [adventureStory, connectedCalendarCount, externalEvents, missionDate, saveThread, talkPopup, tasks]);
 
   const handleClear = useCallback(async () => {
     await clearThread();
@@ -222,9 +248,27 @@ export function DailyMissionThreadCard({
   }, [clearThread]);
 
   const handleReflection = useCallback(async (choice: typeof RETURN_CHOICES[number]) => {
-    await reflectOnMission({ key: choice.key, label: choice.label });
+    const currentAdventureState = parseDailyAdventureState(thread?.adventure_state);
+    const adventureState = currentAdventureState
+      ? addAdventureDecision({
+        state: currentAdventureState,
+        phase: "evening",
+        choice: {
+          ...choice,
+          description: choice.label,
+          behaviorId: "touch_nuzzle",
+          closesChapter: true,
+        },
+        outcome: "quest_completed",
+      })
+      : undefined;
+    await reflectOnMission({
+      key: choice.key,
+      label: choice.label,
+      ...(adventureState ? { adventureState } : {}),
+    });
     await talkPopup.show({ message: choice.reply });
-  }, [reflectOnMission, talkPopup]);
+  }, [reflectOnMission, talkPopup, thread?.adventure_state]);
 
   if (isLoading) {
     return (
@@ -262,10 +306,10 @@ export function DailyMissionThreadCard({
                 Daily Chapter
               </div>
               <h2 id="daily-mission-thread-title" className="text-lg font-semibold text-foreground">
-                What would make today count?
+                {adventureStory.chapterTitle}
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Choose the shape of the day. Your companion will pick one realistic action from your agenda.
+                {adventureStory.openingScene} Choose a route and your companion will turn it into one realistic agenda quest.
               </p>
             </div>
             <div className="rounded-full border border-cyan-300/20 bg-cyan-300/10 p-2 text-cyan-100">
@@ -284,13 +328,13 @@ export function DailyMissionThreadCard({
           </div>
 
           <div className="mt-4 grid gap-2 sm:grid-cols-3" aria-label="Choose today’s intention">
-            {DAILY_MISSION_INTENTIONS.map((option) => (
+            {morningChoices.map((option) => (
               <button
                 key={option.key}
                 type="button"
                 disabled={isSaving}
                 className="min-h-20 rounded-2xl border border-white/10 bg-white/[0.045] px-3 py-3 text-left transition-colors hover:border-cyan-200/35 hover:bg-cyan-300/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/60 disabled:opacity-55"
-                onClick={() => void handleChooseIntention(option.key)}
+                onClick={() => void handleChooseIntention(option)}
               >
                 <span className="block text-sm font-semibold text-foreground">{option.label}</span>
                 <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{option.description}</span>
