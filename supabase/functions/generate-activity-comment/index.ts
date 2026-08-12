@@ -76,7 +76,7 @@ serve(async (req) => {
 
     // Get mentor personality
     const { data: mentor } = await supabase
-      .from('mentors')
+      .from('graceward_guides')
       .select('name, tone_description')
       .eq('id', profile.selected_mentor_id)
       .maybeSingle()

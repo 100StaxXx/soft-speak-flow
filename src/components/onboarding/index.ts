@@ -1,5 +1,5 @@
 // Onboarding components
-export { StoryOnboarding } from "./StoryOnboarding";
+export { GracewardOnboarding, StoryOnboarding } from "./StoryOnboarding";
 export { OnboardingEggSelection, type OnboardingEggSelectionProps } from "./OnboardingEggSelection";
 export { OnboardingStoryToneSelection } from "./OnboardingStoryToneSelection";
 export { EggSelectionPrelude } from "./EggSelectionPrelude";

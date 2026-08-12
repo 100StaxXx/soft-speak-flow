@@ -106,7 +106,7 @@ serve(async (req) => {
 
     // Get mentor personality details
     const { data: mentor, error: mentorError } = await supabaseClient
-      .from('mentors')
+      .from('graceward_guides')
       .select('name, tone_description, style_description')
       .eq('slug', mentorSlug)
       .single();
@@ -141,9 +141,9 @@ Generate a SHORT, powerful one-liner (10-15 words MAX) celebrating that the user
 Focus on DISCIPLINE and CONSISTENCY.
 
 Examples for different mentors:
-- The Sage: "Steady effort becomes visible all at once."
-- The Operator: "This is what disciplined execution produces."
-- Charles: "See? Progress. Try acting shocked."
+- Micah: "Steady effort becomes visible all at once."
+- Ezra: "This is what disciplined execution produces."
+- Jude: "See? Progress. Try acting shocked."
 
 Make it personal to ${mentor.name}'s voice. Keep it SHORT and IMPACTFUL.`
           },

@@ -117,7 +117,7 @@ export function TimelineView({
         </div>
         <div className="flex items-center gap-1.5">
           <Star className="w-4 h-4 text-stardust-gold" />
-          <span>{postcardCount}/{maxPostcards} celebration milestones</span>
+          <span>{milestones.length} milestones</span>
         </div>
       </div>
 
@@ -175,7 +175,7 @@ export function TimelineView({
       {/* Rituals Summary */}
       <div className={`${plannerPathfinderTheme.mutedPanel} p-4`}>
         <p className="mb-2 text-xs font-medium text-muted-foreground">
-          Daily & Weekly Rituals ({rituals.length})
+          Daily & weekly rhythms ({rituals.length})
         </p>
         <div className="flex flex-wrap gap-2">
           {rituals.slice(0, 4).map(ritual => (

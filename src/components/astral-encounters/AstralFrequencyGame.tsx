@@ -745,7 +745,7 @@ export const AstralFrequencyGame = ({
       {/* HUD overlay */}
       {compact ? (
         <GameHUD
-          title="Cosmiq Dash"
+          title="Graceward Dash"
           subtitle={`${Math.floor(distance)}m traversed`}
           score={score}
           combo={combo}

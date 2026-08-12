@@ -21,6 +21,10 @@ import {
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
+import {
+  CHRISTIAN_GUIDANCE_POLICY,
+  validateChristianGuidanceOutput,
+} from "../_shared/christianGuidancePolicy.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -253,6 +257,8 @@ ${getExecutionModelInstructions(planningShape.executionModel)}
 
 Milestones should have actual dates, not just weeks. Spread them across phases.
 
+${CHRISTIAN_GUIDANCE_POLICY}
+
 CRITICAL: Return ONLY valid JSON with this exact structure:
 {
   "feasibilityAssessment": {
@@ -379,6 +385,11 @@ ${timelineContext ? '14. Adjust the schedule based on the user\'s context (exist
       }
       
       schedule = JSON.parse(jsonStr);
+
+      const guidanceSafety = validateChristianGuidanceOutput(JSON.stringify(schedule));
+      if (!guidanceSafety.safe) {
+        throw new Error(`Unsafe guidance output: ${guidanceSafety.reason}`);
+      }
       
       // Log parsed rituals for debugging
       console.log('[Journey Schedule] Parsed rituals:', schedule.rituals?.length, schedule.rituals?.map(r => r.title));

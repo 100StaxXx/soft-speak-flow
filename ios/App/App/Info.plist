@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Cosmiq</string>
+	<string>Graceward</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -37,7 +37,7 @@
 			<string>app-callback</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-			<string>com.darrylgraham.revolution</string>
+				<string>com.darrylgraham.graceward</string>
 		</array>
 	</dict>
 	<dict>
@@ -47,26 +47,28 @@
 		<string>widget-deeplink</string>
 		<key>CFBundleURLSchemes</key>
 		<array>
-			<string>cosmiq</string>
+				<string>graceward</string>
 		</array>
 	</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>We use the camera only if you choose to take photos for your profile, progress tracking, or to attach images to your quests.</string>
+	<string>We use the camera only if you choose to take a profile photo or attach an image to an action.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>We use the microphone for voice input to create tasks and chat with your mentor using your voice.</string>
+	<string>We use the microphone only when you choose voice input for an action or guided reflection.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>We use speech recognition to convert your voice into text for creating tasks and sending messages.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>We access your photo library only if you choose to attach images to your quests or update your profile photo.</string>
+	<string>We access your photo library only if you choose to attach an image to an action or update your profile photo.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>We save photos to your library only if you choose to download images from the app.</string>
 	<key>NSCalendarsUsageDescription</key>
-	<string>We use calendar access to let you optionally send quests to your Apple Calendar and keep linked events in sync.</string>
+	<string>We use calendar access to let you optionally add planned actions to Apple Calendar and keep linked events in sync.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

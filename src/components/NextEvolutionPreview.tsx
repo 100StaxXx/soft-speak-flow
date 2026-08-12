@@ -15,6 +15,7 @@ import {
   getVisualStageDisplay,
   resolveProgressionLevelFromXp,
 } from "@/config/progression";
+import { PRODUCT } from "@/config/product";
 
 interface NextEvolutionPreviewProps {
   currentStage: number;
@@ -23,15 +24,6 @@ interface NextEvolutionPreviewProps {
   progressPercent: number;
   showBondProgress?: boolean;
 }
-
-const XP_TIPS = [
-  { action: "Complete a habit", xp: "7-24 XP", icon: "✓" },
-  { action: "Finish all daily habits", xp: "+15 XP bonus", icon: "🎯" },
-  { action: "Complete daily missions", xp: "8-28 XP (Main Quest 1.5x)", icon: "⚡" },
-  { action: "Challenge day bonus", xp: "25 XP", icon: "💪" },
-  { action: "Streak milestones", xp: "15 XP", icon: "🔥" },
-  { action: "Weekly challenge complete", xp: "60 XP", icon: "🏆" },
-];
 
 export const NextEvolutionPreview = memo(({
   currentStage,
@@ -79,13 +71,13 @@ export const NextEvolutionPreview = memo(({
 
   if (isMaxStage) {
     return (
-      <Card className={cn("p-5 border-accent/16", outerShellCardClassName)}>
+      <Card className={cn("p-5 border-accent/[0.16]", outerShellCardClassName)}>
         <div className="flex items-center gap-3 mb-3">
           <div className="h-10 w-10 rounded-full bg-accent/20 flex items-center justify-center">
             <Sparkles className="h-5 w-5 text-accent" />
           </div>
           <div>
-            <h3 className="font-heading font-bold text-sm">Maximum Evolution!</h3>
+            <h3 className="font-heading font-bold text-sm">Fully Flourished</h3>
             <p className="text-xs text-muted-foreground">
               Your companion has reached {getProgressionLevelAndTierDisplay(100)}
             </p>
@@ -98,7 +90,7 @@ export const NextEvolutionPreview = memo(({
   return (
     <Card
       className={cn(
-        "p-5 border-primary/16 hover:border-primary/32 transition-all duration-300",
+        "p-5 border-primary/[0.16] hover:border-primary/[0.32] transition-all duration-300",
         outerShellCardClassName,
       )}
     >
@@ -121,7 +113,7 @@ export const NextEvolutionPreview = memo(({
         {/* XP Progress */}
         <div
           data-testid="next-evolution-progress"
-          className={nearEvolution ? "space-y-2 rounded-lg bg-primary/8 p-2 motion-safe:animate-pulse" : "space-y-2"}
+          className={nearEvolution ? "space-y-2 rounded-lg bg-primary/[0.08] p-2 motion-safe:animate-pulse" : "space-y-2"}
         >
           <div className="flex justify-between text-xs">
             <span className="text-muted-foreground">Progress</span>
@@ -164,20 +156,10 @@ export const NextEvolutionPreview = memo(({
           </div>
         )}
 
-        {/* XP Tips */}
-        <div className="space-y-2 pt-2 border-t border-border/50">
-          <p className="text-xs font-medium text-muted-foreground">Quick XP Tips:</p>
-          <div className="space-y-1.5">
-            {XP_TIPS.slice(0, 3).map((tip, index) => (
-              <div key={index} className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground flex items-center gap-1.5">
-                  <span>{tip.icon}</span>
-                  {tip.action}
-                </span>
-                <span className="font-medium text-primary">{tip.xp}</span>
-              </div>
-            ))}
-          </div>
+        <div className="rounded-lg border border-border/40 bg-background/35 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
+          {PRODUCT.mode === "christian"
+            ? "Daily practices gently nourish this one growth path. Your level reflects return, not spiritual worth."
+            : "Complete meaningful quests to fill this level. Major visual changes arrive only at the stage shown above."}
         </div>
       </div>
     </Card>

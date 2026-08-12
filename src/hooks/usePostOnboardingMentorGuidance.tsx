@@ -54,8 +54,7 @@ const EVOLVE_AUTOSCROLL_SELECTOR = '[data-tour="evolve-companion-button"]';
 const EVOLVE_AUTOSCROLL_VIEWPORT_MARGIN_PX = 72;
 const HATCH_READY_XP = getProgressionThreshold(HATCH_READY_LEVEL) ?? 10;
 
-// Campaign creation itself awards hatch-ready XP. The hatch step top-up below
-// remains as a fallback for legacy or interrupted tutorial states.
+// The hatch step tops up only the XP still needed after the user's first prayer.
 const STEP_XP_REWARDS: Partial<Record<GuidedTutorialStepId, number>> = {};
 
 interface GuidedStep {
@@ -65,8 +64,8 @@ interface GuidedStep {
 
 const GUIDED_STEPS: GuidedStep[] = [
   {
-    id: "new_goal",
-    route: "/campaigns",
+    id: "morning_checkin",
+    route: "/mentor",
   },
   {
     id: "hatch_companion",
@@ -93,6 +92,7 @@ const QUEST_ADD_LAUNCHER_SELECTORS = [
 const ACTIVE_GUIDED_STEP_ID_SET = new Set<GuidedTutorialStepId>(GUIDED_STEPS.map((step) => step.id));
 // Legacy IDs are accepted only to sanitize older persisted progress. New flows should use GUIDED_STEPS above.
 const LEGACY_GUIDED_STEP_ID_SET = new Set<GuidedTutorialStepId>([
+  "new_goal",
   "quests_campaigns_intro",
   "create_quest",
   "meet_companion",
@@ -230,11 +230,15 @@ const getTargetSelectorsForMilestone = (milestoneId: GuidedMilestoneId): string[
     case "open_mentor_tab":
       return ['[data-tour="mentor-tab"]'];
     case "submit_morning_checkin":
-      return ['[data-tour="morning-checkin"]', '[data-tour="checkin-submit"]'];
+      return [
+        '[data-tour="morning-prayer-complete"]',
+        '[data-tour="morning-prayer-open"]',
+        '[data-tour="morning-checkin"]',
+      ];
     case "tap_evolve_companion":
       return ['[data-tour="evolve-companion-button"]'];
     case "tap_hatch_companion":
-      return [];
+      return [EVOLVE_AUTOSCROLL_SELECTOR];
     case "complete_companion_hatch":
       return [];
     case "complete_companion_evolution":
@@ -266,7 +270,7 @@ type TutorialDialogueKey =
 
 const TUTORIAL_COMPLETION_TITLE = "You're ready.";
 const TUTORIAL_COMPLETION_BODY =
-  "Your Companion is awake, your first path is set, and today has somewhere to go.";
+  "Your Companion is awake, your first prayer is complete, and today has somewhere to go.";
 const TUTORIAL_COMPLETION_CTA_LABEL = "Start my journey";
 const HATCH_WAITING_NOTICE_TITLE = "Your Companion is hatching.";
 const HATCH_WAITING_NOTICE_BODY =
@@ -275,7 +279,7 @@ const HATCH_WAITING_NOTICE_CTA_LABEL = "Dismiss";
 
 const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, MentorDialogueLine>> = {
   sage: {
-    mentor_intro_hello: { text: "Hey, I'm Sage. I'll walk you through this." },
+    mentor_intro_hello: { text: "Hey, I'm Micah. I'll walk you through this." },
     start_new_goal: { text: "Create your first campaign.", support: "Pathfinder will turn a bigger goal into rituals and milestones." },
     complete_pathfinder_campaign: { text: "Build your campaign.", support: "I'll meet you when it's saved." },
     campaign_calendar_handoff: { text: "Your rituals are on the calendar now.", support: "They'll show up where your days are planned. Let's hatch your Companion." },
@@ -289,7 +293,7 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
     mentor_closeout_message: { text: TUTORIAL_COMPLETION_TITLE, support: TUTORIAL_COMPLETION_BODY },
   },
   lyra: {
-    mentor_intro_hello: { text: "Hey, I'm Lyra. I'll help you get started." },
+    mentor_intro_hello: { text: "Hey, I'm Clara. I'll help you get started." },
     start_new_goal: { text: "Create your first campaign.", support: "Pathfinder will shape it into rituals and milestones." },
     complete_pathfinder_campaign: { text: "Build your campaign.", support: "I'll meet you when it's saved." },
     campaign_calendar_handoff: { text: "Your rituals are on the calendar now.", support: "They'll keep your path visible. Let's meet your Companion." },
@@ -303,7 +307,7 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
     mentor_closeout_message: { text: TUTORIAL_COMPLETION_TITLE, support: TUTORIAL_COMPLETION_BODY },
   },
   icon: {
-    mentor_intro_hello: { text: "I'm Icon. Let's get this set up right." },
+    mentor_intro_hello: { text: "I'm Lydia. Let's get this set up right." },
     start_new_goal: { text: "Create your first campaign.", support: "Pathfinder will turn the goal into rituals and milestones." },
     complete_pathfinder_campaign: { text: "Build your campaign.", support: "I'll meet you when it's saved." },
     campaign_calendar_handoff: { text: "Your rituals are on the calendar now.", support: "Structure is in place. Time to hatch your Companion." },
@@ -317,7 +321,7 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
     mentor_closeout_message: { text: TUTORIAL_COMPLETION_TITLE, support: TUTORIAL_COMPLETION_BODY },
   },
   charles: {
-    mentor_intro_hello: { text: "Charles. This won't take long." },
+    mentor_intro_hello: { text: "Jude. This won't take long." },
     start_new_goal: { text: "Create your first campaign.", support: "Pathfinder will do the organizing." },
     complete_pathfinder_campaign: { text: "Build your campaign.", support: "I'll be back when it's saved." },
     campaign_calendar_handoff: { text: "Your rituals are on the calendar now.", support: "The system has a pulse. Go hatch your Companion." },
@@ -331,7 +335,7 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
     mentor_closeout_message: { text: TUTORIAL_COMPLETION_TITLE, support: TUTORIAL_COMPLETION_BODY },
   },
   princess: {
-    mentor_intro_hello: { text: "Hi, I'm Princess. Let's ease into this." },
+    mentor_intro_hello: { text: "Hi, I'm Grace. Let's ease into this." },
     start_new_goal: { text: "Create your first campaign.", support: "Pathfinder will make it feel manageable." },
     complete_pathfinder_campaign: { text: "Build your campaign.", support: "I'll meet you when it's saved." },
     campaign_calendar_handoff: { text: "Your rituals are on the calendar now.", support: "A gentle path is waiting. Let's hatch your Companion." },
@@ -345,7 +349,7 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
     mentor_closeout_message: { text: TUTORIAL_COMPLETION_TITLE, support: TUTORIAL_COMPLETION_BODY },
   },
   operator: {
-    mentor_intro_hello: { text: "Operator. Let's set your system." },
+    mentor_intro_hello: { text: "Ezra. Let's set your system." },
     start_new_goal: { text: "Create your first campaign.", support: "Pathfinder creates rituals and milestones." },
     complete_pathfinder_campaign: { text: "Build your campaign.", support: "I'll resume once it's saved." },
     campaign_calendar_handoff: { text: "Your rituals are on the calendar now.", support: "Operating rhythm installed. Proceed to Companion hatch." },
@@ -359,7 +363,7 @@ const TUTORIAL_DIALOGUE: Record<ActiveMentorSlug, Record<TutorialDialogueKey, Me
     mentor_closeout_message: { text: TUTORIAL_COMPLETION_TITLE, support: TUTORIAL_COMPLETION_BODY },
   },
   rival: {
-    mentor_intro_hello: { text: "I'm Rival. Let's see what you do with this." },
+    mentor_intro_hello: { text: "I'm Caleb. Let's see what you do with this." },
     start_new_goal: { text: "Create your first campaign.", support: "Pathfinder will show whether you mean it." },
     complete_pathfinder_campaign: { text: "Build your campaign.", support: "I'll meet you when it's saved." },
     campaign_calendar_handoff: { text: "Your rituals are on the calendar now.", support: "You made the path. Go hatch your Companion." },
@@ -556,11 +560,14 @@ const migrateGuidedTutorialProgress = ({
     milestonesCompleted,
   });
   const isCurrentFlowPrematureCompletion =
-    completed && isCurrentFlowVersion && !hasFinalCloseoutEvidence;
+    completed
+    && (isCurrentFlowVersion || flowVersion === 10)
+    && !hasFinalCloseoutEvidence;
   const isLegacyTutorialComplete =
     rawCompletedSet.has("mentor_closeout") ||
     (completed && !isCurrentFlowPrematureCompletion);
-  const shouldMarkNewGoalComplete =
+  const shouldMarkMorningCheckInComplete =
+    rawCompletedSet.has("morning_checkin") ||
     rawCompletedSet.has("new_goal") ||
     rawCompletedSet.has("meet_companion") ||
     rawCompletedSet.has("plan_my_day") ||
@@ -583,8 +590,8 @@ const migrateGuidedTutorialProgress = ({
   if (isLegacyTutorialComplete) {
     GUIDED_STEPS.forEach((step) => migratedCompletedSet.add(step.id));
   } else {
-    if (shouldMarkNewGoalComplete || isCurrentFlowPrematureCompletion) {
-      migratedCompletedSet.add("new_goal");
+    if (shouldMarkMorningCheckInComplete || isCurrentFlowPrematureCompletion) {
+      migratedCompletedSet.add("morning_checkin");
     }
     if (shouldMarkHatchComplete || isCurrentFlowPrematureCompletion) {
       migratedCompletedSet.add("hatch_companion");
@@ -593,12 +600,8 @@ const migrateGuidedTutorialProgress = ({
 
   const currentFlowMilestones = new Set<GuidedMilestoneId>([
     "mentor_intro_hello",
-    "start_new_goal",
-    "complete_pathfinder_campaign",
-    "campaign_calendar_handoff",
-    "start_plan_my_day",
-    "answer_plan_day_ai",
-    "save_plan_day_action",
+    "open_mentor_tab",
+    "submit_morning_checkin",
     "tap_hatch_companion",
     "complete_companion_hatch",
     "mentor_closeout_message",
@@ -609,22 +612,9 @@ const migrateGuidedTutorialProgress = ({
   if (isCurrentFlowPrematureCompletion) {
     migratedMilestoneSet.add("mentor_intro_hello");
   }
-  if (migratedMilestoneSet.has("answer_plan_day_ai")) {
-    migratedMilestoneSet.add("start_plan_my_day");
-  }
-  if (migratedMilestoneSet.has("save_plan_day_action")) {
-    migratedMilestoneSet.add("start_plan_my_day");
-    migratedMilestoneSet.add("answer_plan_day_ai");
-  }
-  if (migratedCompletedSet.has("new_goal")) {
-    migratedMilestoneSet.add("start_new_goal");
-    migratedMilestoneSet.add("complete_pathfinder_campaign");
-    migratedMilestoneSet.add("campaign_calendar_handoff");
-  }
-  if (migratedCompletedSet.has("plan_my_day")) {
-    migratedMilestoneSet.add("start_plan_my_day");
-    migratedMilestoneSet.add("answer_plan_day_ai");
-    migratedMilestoneSet.add("save_plan_day_action");
+  if (migratedCompletedSet.has("morning_checkin")) {
+    migratedMilestoneSet.add("open_mentor_tab");
+    migratedMilestoneSet.add("submit_morning_checkin");
   }
   if (migratedCompletedSet.has("hatch_companion")) {
     migratedMilestoneSet.add("tap_hatch_companion");
@@ -634,12 +624,8 @@ const migrateGuidedTutorialProgress = ({
     migratedMilestoneSet.add("mentor_closeout_message");
   }
   if (isLegacyTutorialComplete) {
-    migratedMilestoneSet.add("start_new_goal");
-    migratedMilestoneSet.add("complete_pathfinder_campaign");
-    migratedMilestoneSet.add("campaign_calendar_handoff");
-    migratedMilestoneSet.add("start_plan_my_day");
-    migratedMilestoneSet.add("answer_plan_day_ai");
-    migratedMilestoneSet.add("save_plan_day_action");
+    migratedMilestoneSet.add("open_mentor_tab");
+    migratedMilestoneSet.add("submit_morning_checkin");
     migratedMilestoneSet.add("tap_hatch_companion");
     migratedMilestoneSet.add("complete_companion_hatch");
     migratedMilestoneSet.add("mentor_closeout_message");
@@ -806,6 +792,9 @@ export const getMentorInstructionLines = (
   mentorSlug: string | undefined = undefined,
 ): string[] => {
   if (!currentStep) return [];
+  if (currentStep === "morning_checkin") {
+    return ["Open today's reflection, then mark your prayer complete."];
+  }
   const key = STEP_TO_DIALOGUE_KEY[currentStep];
   if (!key) return [];
   return [getDialogueForMentor(mentorSlug, key).text];
@@ -833,6 +822,20 @@ const getTargetAwareMilestoneDialogue = (
   mentorSlug: string | undefined,
   activeTargetSelector: string | null,
 ): MentorDialogueLine => {
+  if (milestoneId === "submit_morning_checkin") {
+    if (activeTargetSelector === '[data-tour="morning-prayer-open"]') {
+      return {
+        text: "Open today's reflection.",
+        support: "Read the scripture and prayer, then mark it complete.",
+      };
+    }
+
+    return {
+      text: "Mark your prayer complete.",
+      support: "This first practice gives your Companion the spark it needs.",
+    };
+  }
+
   if (activeTargetSelector === COMPANION_QUICK_ACTIONS_SELECTOR) {
     if (milestoneId === "start_new_goal") {
       return {
@@ -1549,34 +1552,6 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       if (!milestoneSet.has("open_mentor_tab") && location.pathname === "/mentor") {
         markMilestoneComplete("open_mentor_tab");
       }
-
-      if (milestoneSet.has("open_mentor_tab") && !milestoneSet.has("submit_morning_checkin")) {
-        const tryCompleteExistingCheckIn = () => {
-          if (typeof document === "undefined") return false;
-          if (location.pathname !== "/mentor") return false;
-
-          const hasSubmitButton = Boolean(document.querySelector('[data-tour="checkin-submit"]'));
-          const hasMorningCheckInCard = Boolean(document.querySelector('[data-tour="morning-checkin"]'));
-
-          if (!hasMorningCheckInCard || hasSubmitButton) return false;
-
-          markMilestoneComplete("submit_morning_checkin");
-          void markStepComplete("morning_checkin");
-          return true;
-        };
-
-        if (tryCompleteExistingCheckIn()) return;
-
-        const interval = window.setInterval(() => {
-          if (tryCompleteExistingCheckIn()) {
-            window.clearInterval(interval);
-          }
-        }, TARGET_RESOLVE_POLL_MS);
-
-        return () => {
-          window.clearInterval(interval);
-        };
-      }
       return;
     }
 
@@ -1938,9 +1913,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     }
 
     if (currentStep.id === "morning_checkin") {
-      return milestoneSet.has("open_mentor_tab")
-        ? "submit_morning_checkin"
-        : "open_mentor_tab";
+      return "submit_morning_checkin";
     }
 
     if (currentStep.id === "companion_tab_intro") {

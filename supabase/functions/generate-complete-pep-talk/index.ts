@@ -110,7 +110,7 @@ export async function handleGenerateCompletePepTalk(
     }
 
     const { data: mentor, error: mentorError } = await supabase
-      .from("mentors")
+      .from("graceward_guides")
       .select("*")
       .eq("slug", mentorSlug)
       .single();

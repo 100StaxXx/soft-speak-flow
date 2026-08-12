@@ -24,9 +24,9 @@ describe("OnboardingStoryToneSelection", () => {
 
     render(<OnboardingStoryToneSelection onComplete={onComplete} initialTone="epic_adventure" />);
 
-    expect(screen.getByRole("button", { name: /Epic Adventure/i })).toHaveAttribute("data-selected", "true");
+    expect(screen.getByRole("button", { name: /Brave/i })).toHaveAttribute("data-selected", "true");
     expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
-    expect(screen.getByText(/Species and color come next/i)).toBeInTheDocument();
+    expect(screen.getByText(/symbolic form and color come next/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
@@ -47,7 +47,7 @@ describe("OnboardingStoryToneSelection", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Whimsical & Playful/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Playful/i }));
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
@@ -60,9 +60,9 @@ describe("OnboardingStoryToneSelection", () => {
   it("describes the next step as color and species selection", () => {
     render(<OnboardingStoryToneSelection onComplete={vi.fn()} initialTone="epic_adventure" />);
 
-    expect(screen.getByText("Shape The Hidden Lineage")).toBeInTheDocument();
+    expect(screen.getByText("Choose Its Symbolic Form")).toBeInTheDocument();
     expect(
-      screen.getByText(/Choose the spirit animal and favorite color/i),
+      screen.getByText(/Choose a creature and color that will visually represent your daily growth/i),
     ).toBeInTheDocument();
   });
 });

@@ -104,7 +104,7 @@ export const CollectionTab = memo(({ layoutMode = "mobile" }: CollectionTabProps
           </TabsTrigger>
           <TabsTrigger value="loot" className="flex items-center gap-2">
             <Gift className="h-4 w-4" />
-            <span className={cn(isDesktop ? "inline" : "hidden sm:inline")}>Loot</span>
+            <span className={cn(isDesktop ? "inline" : "hidden sm:inline")}>Keepsakes</span>
           </TabsTrigger>
         </TabsList>
 

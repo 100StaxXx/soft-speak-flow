@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -9,12 +8,12 @@ import { Shield, Trash2, Info, ArrowLeft, Mail } from "lucide-react";
 
 const deletionSteps = [
   {
-    title: "Open the Profile tab",
-    description: "Tap Profile in the bottom navigation once you're signed in.",
+    title: "Open Account & settings",
+    description: "Open settings from the Today screen once you're signed in.",
   },
   {
-    title: "Choose the Account section",
-    description: "Scroll to Account ▸ Danger Zone and tap Delete Account.",
+    title: "Choose Delete account and data",
+    description: "Scroll to the bottom and open the permanent deletion dialog.",
   },
   {
     title: "Confirm the permanent deletion",
@@ -24,10 +23,10 @@ const deletionSteps = [
 
 const dataTypes = [
   "Profile + onboarding answers",
-  "Guide chat history and nudges",
-  "Companion evolutions, postcards, and XP events",
-  "Quests, epics, and streak progress",
-  "Referral codes, payouts, and applied tags",
+  "Saved reflections and check-ins",
+  "Completed daily practices and saved progress",
+  "Notification settings and connected integration data",
+  "Uploaded profile and reflection media",
 ];
 
 export default function AccountDeletionHelp() {
@@ -49,8 +48,7 @@ export default function AccountDeletionHelp() {
   }, [user, navigate]);
 
   return (
-    <div className="relative min-h-screen pb-nav-safe bg-background text-foreground">
-      <StarfieldBackground />
+    <div className="daily-way-page relative min-h-screen pb-nav-safe bg-background text-foreground">
       <div className="relative z-10 max-w-4xl mx-auto px-4 py-12 space-y-8">
         <div className="pt-safe-top">
           <Button
@@ -64,9 +62,9 @@ export default function AccountDeletionHelp() {
         </div>
 
         <div className="space-y-4">
-          <h1 className="text-4xl font-bold">Delete your Cosmiq account</h1>
+          <h1 className="text-4xl font-bold">Delete your Graceward account</h1>
           <p className="text-muted-foreground text-lg max-w-2xl">
-            Cosmiq lets you permanently delete your account at any time, right inside the app. Follow the steps below or start the flow directly from the Profile tab.
+            Graceward lets you permanently delete your account at any time inside the app. Follow the steps below or open the deletion flow directly.
           </p>
           <div className="flex flex-wrap gap-3">
             <Button size="lg" onClick={primaryCta.action}>
@@ -133,12 +131,12 @@ export default function AccountDeletionHelp() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Email our team from the address tied to your account and include "Cosmiq account deletion" in the subject. We will verify ownership and run the same deletion routine on your behalf.
+              Email our team from the address tied to your account and include “Graceward account deletion” in the subject. We will verify ownership and run the same deletion routine on your behalf.
             </p>
             <Button asChild variant="outline">
-              <a href="mailto:admin@cosmiq.quest">
+              <a href="mailto:hello@graceward.app">
                 <Mail className="h-4 w-4 mr-2" />
-                admin@cosmiq.quest
+                hello@graceward.app
               </a>
             </Button>
           </CardContent>

@@ -1,9 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 import { useXPRewards } from "@/hooks/useXPRewards";
-import { format } from "date-fns";
+import { isEveningReflectionAvailableAtHour } from "@/utils/eveningReflectionSchedule";
+import { getEffectiveDailyDate, getLocalHour, getUserTimezone } from "@/utils/timezone";
+import { updateDailyGuideThread } from "@/services/dailyGuideThread";
+import { trackProductExperience } from "@/lib/productAnalytics";
+
+const CLOCK_REFRESH_MS = 60_000;
 
 export interface EveningReflection {
   id: string;
@@ -20,15 +26,31 @@ export interface EveningReflection {
 
 export const useEveningReflection = () => {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
+  const { profile } = useProfile();
   const { awardReflectionComplete } = useXPRewards();
+  const queryClient = useQueryClient();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [now, setNow] = useState(() => new Date());
 
-  // Use current date (recalculates on each render for accuracy)
-  const today = format(new Date(), "yyyy-MM-dd");
+  useEffect(() => {
+    const refreshClock = () => setNow(new Date());
+    const interval = window.setInterval(refreshClock, CLOCK_REFRESH_MS);
+    window.addEventListener("focus", refreshClock);
+    document.addEventListener("visibilitychange", refreshClock);
 
-  // Check if it's evening (after 6 PM)
-  const isEvening = new Date().getHours() >= 18;
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshClock);
+      document.removeEventListener("visibilitychange", refreshClock);
+    };
+  }, []);
+
+  const timezone = profile?.timezone || getUserTimezone();
+  const localHour = getLocalHour(timezone, now);
+  const today = getEffectiveDailyDate(timezone);
+
+  // Keep the reflection available after 6 PM and through the app's 2 AM reset.
+  const isEvening = isEveningReflectionAvailableAtHour(localHour);
 
   // Check if reflection exists for today
   const { data: todaysReflection, isLoading } = useQuery({
@@ -79,16 +101,30 @@ export const useEveningReflection = () => {
 
       if (error) throw error;
 
-      // Generate mentor response in background
+      await updateDailyGuideThread(user.id, today, {
+        evening_reflection_id: reflection.id,
+        evening_reflected_at: reflection.created_at,
+        companion_response: "You made room to notice the day instead of only moving through it. We can let it rest now.",
+        companion_acknowledged_at: null,
+      });
+
+      // Generate a bounded AI acknowledgment in the background.
       supabase.functions.invoke("generate-evening-response", {
         body: { reflectionId: reflection.id },
       }).catch(console.error);
 
       return reflection;
     },
-    onSuccess: () => {
+    onSuccess: (reflection) => {
       queryClient.invalidateQueries({ queryKey: ["evening-reflection"] });
-      void awardReflectionComplete();
+      void awardReflectionComplete({ date: today, reflectionId: reflection.id });
+      window.dispatchEvent(new CustomEvent("evening-reflection-completed", {
+        detail: { reflectionId: reflection.id },
+      }));
+      void trackProductExperience("evening_reflection_completed", {
+        surface: "today",
+        properties: { has_guide_thread: true },
+      });
       setIsDrawerOpen(false);
     },
   });

@@ -36,7 +36,7 @@ const STEP_CONFIG: Record<WizardStep, { title: string; subtitle: string; number:
     number: 2,
   },
   shape: {
-    title: "Shape Your Quest",
+    title: "Shape your action",
     subtitle: "Design how your day flows",
     number: 3,
   },

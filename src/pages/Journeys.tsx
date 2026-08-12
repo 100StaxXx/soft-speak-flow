@@ -7,7 +7,6 @@ import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
 import { useLocation, useNavigate } from "react-router-dom";
 import { PageTransition } from "@/components/PageTransition";
-import { CinematicPageBackground } from "@/components/CinematicPageBackground";
 import { TodaysAgenda } from "@/components/TodaysAgenda";
 import { DesktopWeekPlanner } from "@/components/DesktopWeekPlanner";
 import { cn } from "@/lib/utils";
@@ -17,7 +16,6 @@ import { AddQuestSheet, AddQuestData } from "@/components/AddQuestSheet";
 import type { QuestAttachmentInput } from "@/types/questAttachments";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
-import { StreakFreezePromptModal } from "@/components/StreakFreezePromptModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
@@ -35,18 +33,15 @@ import { useHabitSurfacing } from "@/hooks/useHabitSurfacing";
 import { useRecurringTaskSpawner } from "@/hooks/useRecurringTaskSpawner";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
-import { useStreakAtRisk } from "@/hooks/useStreakAtRisk";
 
 import { useOnboardingTaskCleanup } from "@/hooks/useOnboardingTaskCleanup";
 import { useEpics } from "@/hooks/useEpics";
 import { useInboxTasks } from "@/hooks/useInboxTasks";
 import { useDeepLink } from "@/contexts/DeepLinkContext";
 import { logger } from "@/utils/logger";
-import { CAMPAIGN_CREATED_ANIMATION_COMPLETE_EVENT } from "@/utils/tutorialEvents";
 
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
-import { Pathfinder } from "@/components/Pathfinder";
-import { CampaignCreatedAnimation } from "@/components/CampaignCreatedAnimation";
+import { Pathfinder } from "@/components/Pathfinder/Pathfinder";
 import { QuestsErrorBoundary } from "@/components/SectionErrorBoundary";
 
 import { useTaskCompletionWithInteraction, type InteractionType } from "@/hooks/useTaskCompletionWithInteraction";
@@ -61,13 +56,10 @@ import {
 import { HourlyViewModal } from "@/components/HourlyViewModal";
 import { JourneysCompanionPlannerModal } from "@/components/journeys/JourneysCompanionPlannerModal";
 import { DraggableFAB } from "@/components/DraggableFAB";
-import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { JOURNEYS_RESET_TO_TODAY_EVENT, JOURNEYS_ROUTE } from "@/pages/journeysDateSync";
 import { isOnboardingCleanupEligible } from "@/pages/journeysCleanupEligibility";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 import { SEND_TO_CALENDAR_ENABLED } from "@/utils/calendarFeatureFlags";
-import { COMPANION_FLOATING_ACTION_BUTTON_ENABLED } from "@/config/companionLauncherFeatureFlags";
-import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
 import { useJourneysLayoutMode } from "@/hooks/useJourneysLayoutMode";
 import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
 import { isMacDesignedForIPadIOSApp, isMacSession } from "@/utils/platformTargets";
@@ -75,11 +67,9 @@ import { QuestInboxSection } from "@/components/QuestInboxSection";
 import { QUEST_ACTION_TOAST_DURATION_MS } from "@/constants/questToast";
 import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
 import { normalizeUuidLikeId } from "@/utils/offlineId";
-import { parseNaturalLanguage } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import {
   buildVoiceQuestPrefillFromTranscript,
 } from "@/features/quests/utils/voiceQuestPrefill";
-import { resolveCampaignBuilderInitialGoal } from "@/shared/bigGoalIntent";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
 import {
@@ -92,6 +82,7 @@ import {
 } from "@/utils/creationPopupPersistence";
 import { getEffectiveMissionDate } from "@/utils/timezone";
 import { createPlanDayCompanionLaunchIntent } from "@/utils/companionPlannerLaunchContext";
+import { PRODUCT } from "@/config/product";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -120,11 +111,6 @@ const toEditableQuestTask = (
   location: task.location ?? null,
   subtasks: task.subtasks ?? [],
 });
-
-interface CreatedCampaignData {
-  title: string;
-  habits: Array<{ title: string }>;
-}
 
 type EditableQuestTask = Pick<
   DailyTask,
@@ -167,10 +153,9 @@ const Journeys = () => {
   const isDesktopLayout = journeysLayoutMode === "desktop";
   const isMacHostedIOSApp = useMemo(() => isMacDesignedForIPadIOSApp(), []);
   const isMacDesktopSession = useMemo(() => isMacSession(), []);
-  const { favoriteColor: companionFavoriteColor } = useJourneysCompanionVisual();
   const companionFrostedThemeStyle = useMemo(
-    () => getCompanionFrostedThemeStyle(companionFavoriteColor),
-    [companionFavoriteColor],
+    () => getCompanionFrostedThemeStyle("#2f5938"),
+    [],
   );
   const macTimedTaskDurationFallbackMinutes = isMacDesktopSession
     ? MAC_TIMED_TASK_DURATION_FALLBACK_MINUTES
@@ -185,7 +170,7 @@ const Journeys = () => {
   );
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
-  const [isCompanionPlannerPinned, setIsCompanionPlannerPinned] = useState(false);
+  const [isCompanionPlannerOpen, setIsCompanionPlannerOpen] = useState(false);
   const [plannerLaunchIntent, setPlannerLaunchIntent] = useState<CompanionPlannerLaunchIntent | null>(null);
   const [showMonthView, setShowMonthView] = useState(false);
   const [desktopPlannerMode, setDesktopPlannerMode] = useState<DesktopPlannerMode>("week");
@@ -201,8 +186,6 @@ const Journeys = () => {
   const [pathfinderSessionKey, setPathfinderSessionKey] = useState(0);
   const [pathfinderResumeDraft, setPathfinderResumeDraft] = useState<CampaignBuilderDraftSnapshot | null>(null);
   const [pathfinderResumeDraftKey, setPathfinderResumeDraftKey] = useState<string | null>(null);
-  const [showCreatedAnimation, setShowCreatedAnimation] = useState(false);
-  const [createdCampaignData, setCreatedCampaignData] = useState<CreatedCampaignData | null>(null);
   const [isInboxExpanded, setIsInboxExpanded] = useState(false);
   const previousIsJourneysRouteActiveRef = useRef(false);
   const previousJourneysLocationSignatureRef = useRef<string | null>(null);
@@ -218,12 +201,7 @@ const Journeys = () => {
   const notificationTaskProcessedRef = useRef<string | null>(null);
   const notificationTaskDatePinnedRef = useRef(false);
   const hasInitializedInboxVisibilityRef = useRef(false);
-  const tutorialOverlayCleanupSignatureRef = useRef<string | null>(null);
   const hasConsumedCreationPopupResumeRef = useRef(false);
-  const { isActive: tutorialActive, currentStep: tutorialStep, currentSubstep: tutorialSubstep } =
-    usePostOnboardingMentorGuidance();
-  const shouldAutoFillTutorialTime =
-    tutorialActive && tutorialStep === "create_quest" && tutorialSubstep === "select_time";
 
   const isInboxRequested = useMemo(
     () => new URLSearchParams(location.search).get("section") === "inbox",
@@ -233,7 +211,9 @@ const Journeys = () => {
     () => new URLSearchParams(location.search).get("taskId"),
     [location.search],
   );
-  const isJourneysRouteActive = isTabActive && location.pathname === JOURNEYS_ROUTE;
+  const isJourneysRouteActive = isTabActive && (
+    location.pathname === JOURNEYS_ROUTE || location.pathname === "/advanced-planner"
+  );
   const journeysLocationSignature = `${location.pathname}${location.search}`;
 
   // Auth and profile for onboarding
@@ -249,16 +229,6 @@ const Journeys = () => {
     () => parseDateKeyAtNoon(effectiveTodayDateKey),
     [effectiveTodayDateKey],
   );
-
-  // Streak freeze
-  const {
-    needsStreakDecision,
-    currentStreak: freezeStreak,
-    freezesAvailable,
-    useFreeze,
-    resetStreak,
-    isResolving
-  } = useStreakAtRisk();
 
   // Edit quest state (for regular quests)
   const [editingTask, setEditingTask] = useState<EditableQuestTask | null>(null);
@@ -328,14 +298,12 @@ const Journeys = () => {
   }, []);
 
   const openCompanionPlanner = useCallback((intent?: CompanionPlannerLaunchIntent | null) => {
-    if (intent) {
-      if (intent.target === "campaign_builder") {
-        openCampaignBuilder(resolveCampaignBuilderInitialGoal(intent.message, undefined));
-        return;
-      }
-      setPlannerLaunchIntent(intent);
+    if (intent?.target === "campaign_builder") {
+      openCampaignBuilder(intent.message);
+      return;
     }
-    setIsCompanionPlannerPinned(true);
+    setPlannerLaunchIntent(intent ?? null);
+    setIsCompanionPlannerOpen(true);
   }, [openCampaignBuilder]);
 
   const {
@@ -368,15 +336,6 @@ const Journeys = () => {
     language: "en-US",
     autoStopOnSilence: true,
   });
-
-  const openCampaignBuilderFromAssistant = useCallback((message: string) => {
-    const parsed = parseNaturalLanguage(message);
-    const initialGoal = resolveCampaignBuilderInitialGoal(message, parsed.text);
-
-    setPlannerLaunchIntent(null);
-    setIsCompanionPlannerPinned(false);
-    openCampaignBuilder(initialGoal);
-  }, [openCampaignBuilder]);
 
   const handlePathfinderOpenChange = useCallback((nextOpen: boolean) => {
     setShowPathfinder(nextOpen);
@@ -672,10 +631,6 @@ const Journeys = () => {
     closeInteractionModalRef.current = closeInteractionModal;
   }, [closeInteractionModal]);
 
-  const handleOpenCampaigns = useCallback(() => {
-    navigate("/campaigns");
-  }, [navigate]);
-
   const {
     tasks: dailyTasks,
     isLoading: dailyTasksLoading,
@@ -699,63 +654,6 @@ const Journeys = () => {
     deleteInboxTask,
   } = useInboxTasks({ enabled: isTabActive });
 
-
-  const isCompanionPlannerBlocked = showAddSheet
-    || showMonthView
-    || showPageInfo
-    || showPathfinder
-    || !!editingTask
-    || !!editingRitual
-    || needsStreakDecision
-    || isInteractionModalOpen;
-  const showCompanionPlanner = isCompanionPlannerPinned && !isCompanionPlannerBlocked;
-
-  useEffect(() => {
-    if (!tutorialActive) {
-      tutorialOverlayCleanupSignatureRef.current = null;
-      return;
-    }
-
-    const shouldKeepPlannerOpenForPlanMyDay =
-      isTabActive && location.pathname === JOURNEYS_ROUTE && tutorialStep === "plan_my_day";
-    if (!shouldKeepPlannerOpenForPlanMyDay) {
-      setPlannerLaunchIntent(null);
-      setIsCompanionPlannerPinned(false);
-    }
-
-    const signature = `${location.pathname}|${tutorialStep ?? "none"}|${isTabActive ? "active" : "inactive"}`;
-    if (tutorialOverlayCleanupSignatureRef.current === signature) return;
-    tutorialOverlayCleanupSignatureRef.current = signature;
-
-    setShowMonthView(false);
-    setShowPageInfo(false);
-    setEditingTask(null);
-    closeEditingRitual();
-    closeInteractionModalRef.current();
-
-    if (tutorialStep !== "create_quest") {
-      clearQuestCreationPopupState();
-      setAddQuestSheetOpen(false);
-      setPrefilledTime(null);
-      setQuestSheetPrefillDraft(null);
-      setQuestSheetPrefillKey(null);
-    }
-
-    clearCampaignCreationPopupState();
-    setShowPathfinder(false);
-    setPathfinderInitialGoal("");
-    setShowCreatedAnimation(false);
-    setCreatedCampaignData(null);
-  }, [
-    clearCampaignCreationPopupState,
-    clearQuestCreationPopupState,
-    isTabActive,
-    location.pathname,
-    setAddQuestSheetOpen,
-    tutorialActive,
-    tutorialStep,
-  ]);
-
   const desktopInteractionResetKey = useMemo(
     () => [
       format(selectedDate, "yyyy-MM-dd"),
@@ -769,31 +667,12 @@ const Journeys = () => {
   );
   const { tasks: allCalendarTasks } = useCalendarTasks(selectedDate, "month", { enabled: isTabActive });
   const { tasks: weekCalendarTasks } = useCalendarTasks(selectedDate, "week", { enabled: isTabActive });
-  const isSelectedDateToday = isSameDay(selectedDate, effectiveTodayDate);
-  const fabPlanDayLabel = isSelectedDateToday ? "Plan Today" : "Plan Day";
-  const createFabPlanDayLaunchIntent = useCallback(() => {
-    const useVisibleWeekContext = isDesktopLayout && desktopPlannerMode === "week";
-
-    return createPlanDayCompanionLaunchIntent({
-      selectedDate,
-      tasks: useVisibleWeekContext ? weekCalendarTasks : dailyTasks,
-      activeEpics,
-      assumeTasksAreForSelectedDate: !useVisibleWeekContext,
-    });
-  }, [
-    activeEpics,
-    dailyTasks,
-    desktopPlannerMode,
-    isDesktopLayout,
+  const createPlanDayLaunchIntent = useCallback(() => createPlanDayCompanionLaunchIntent({
     selectedDate,
-    weekCalendarTasks,
-  ]);
-  const showJourneysPlannerFab = (
-    COMPANION_FLOATING_ACTION_BUTTON_ENABLED
-    && !isMacHostedIOSApp
-    && isJourneysRouteActive
-  );
-
+    tasks: isDesktopLayout && desktopPlannerMode === "week" ? weekCalendarTasks : dailyTasks,
+    activeEpics,
+    assumeTasksAreForSelectedDate: !(isDesktopLayout && desktopPlannerMode === "week"),
+  }), [activeEpics, dailyTasks, desktopPlannerMode, isDesktopLayout, selectedDate, weekCalendarTasks]);
   useEffect(() => {
     if (hasInitializedInboxVisibilityRef.current) return;
     if (inboxLoading && !isInboxRequested && inboxCount === 0) return;
@@ -822,8 +701,6 @@ const Journeys = () => {
     } | null) ?? null;
     const nextCreateQuestRequest = routeState?.journeysCreateQuestRequest ?? null;
     if (nextCreateQuestRequest?.id) {
-      setPlannerLaunchIntent(null);
-      setIsCompanionPlannerPinned(false);
       openAddQuestSheet();
 
       const nextState = {
@@ -848,7 +725,13 @@ const Journeys = () => {
     const nextLaunchIntent = routeState?.companionPlannerLaunchIntent ?? null;
     if (!nextLaunchIntent?.id) return;
 
-    openCompanionPlanner(nextLaunchIntent);
+    if (PRODUCT.mode === "cosmiq") {
+      openCompanionPlanner(nextLaunchIntent);
+    } else if (nextLaunchIntent.target === "campaign_builder") {
+      openCampaignBuilder(nextLaunchIntent.message);
+    } else {
+      openAddQuestSheet();
+    }
 
     const nextState = {
       ...(routeState ?? {}),
@@ -865,10 +748,10 @@ const Journeys = () => {
         state: nextState,
       },
     );
-  }, [location.pathname, location.search, location.state, navigate, openAddQuestSheet, openCompanionPlanner]);
+  }, [location.pathname, location.search, location.state, navigate, openAddQuestSheet, openCampaignBuilder, openCompanionPlanner]);
 
   useEffect(() => {
-    if (!isMacHostedIOSApp || location.pathname !== JOURNEYS_ROUTE) return;
+    if (!isMacHostedIOSApp || !isJourneysRouteActive) return;
 
     const isEditableTarget = (target: EventTarget | null): boolean => {
       if (!(target instanceof HTMLElement)) return false;
@@ -882,13 +765,11 @@ const Journeys = () => {
       if (event.key.toLowerCase() !== "n") return;
       if (
         showAddSheet
-        || showCompanionPlanner
         || showMonthView
         || showPageInfo
         || showPathfinder
         || !!editingTask
         || !!editingRitual
-        || needsStreakDecision
         || isInteractionModalOpen
       ) {
         return;
@@ -912,11 +793,10 @@ const Journeys = () => {
     editingTask,
     isInteractionModalOpen,
     isMacHostedIOSApp,
+    isJourneysRouteActive,
     location.pathname,
-    needsStreakDecision,
     openAddQuestSheet,
     showAddSheet,
-    showCompanionPlanner,
     showMonthView,
     showPageInfo,
     showPathfinder,
@@ -1208,7 +1088,7 @@ const Journeys = () => {
         scheduledOnly: false,
       });
       const promptMessage = [
-        "Send this quest where?",
+        "Send this action where?",
         ...options.map((option, index) => `${index + 1}. ${option.label} - ${option.description}`),
       ].join("\n");
       const picked = window.prompt(promptMessage, "1");
@@ -1256,7 +1136,7 @@ const Journeys = () => {
       const destinations = results
         .map((result) => `${result.providerLabel} ${result.destinationKind === "todo" ? "To Do" : "Calendar"} -> ${result.destinationName}`)
         .join("; ");
-      toast.success(`Quest sent to ${results.length} destinations`, {
+      toast.success(`Action sent to ${results.length} destinations`, {
         description: `Destinations: ${destinations}.`,
       });
     };
@@ -1266,7 +1146,7 @@ const Journeys = () => {
       showSuccess(results);
       return;
     } catch (error) {
-      let message = error instanceof Error ? error.message : "Failed to send quest to calendar";
+      let message = error instanceof Error ? error.message : "Failed to send action to calendar";
       if (message.includes("MULTI_DAY_MONTHLY_UNSUPPORTED")) {
         toast.error("Calendar send doesn't support multi-day monthly recurrence yet.");
         return;
@@ -1294,7 +1174,7 @@ const Journeys = () => {
 
         if (message.includes("TASK_DATE_REQUIRED") && !taskDateOverride) {
           const pickedDate = window.prompt(
-            "Choose a date to send this quest (YYYY-MM-DD)",
+            "Choose a date to send this action (YYYY-MM-DD)",
             format(selectedDate, "yyyy-MM-dd"),
           );
           if (!pickedDate || !DATE_INPUT_REGEX.test(pickedDate)) {
@@ -1305,7 +1185,7 @@ const Journeys = () => {
         }
 
         if ((message.includes("SCHEDULED_TIME_REQUIRED") || message.includes("SCHEDULED_TIME_INVALID")) && !scheduledTimeOverride) {
-          const pickedTime = window.prompt("Choose a time to send this quest (HH:mm)", "09:00");
+          const pickedTime = window.prompt("Choose a time to send this action (HH:mm)", "09:00");
           if (!pickedTime || !TIME_24H_REGEX.test(pickedTime)) {
             toast.error("Calendar send cancelled. Please choose a valid HH:mm time.");
             return;
@@ -1318,7 +1198,7 @@ const Journeys = () => {
           showSuccess(results);
           return;
         } catch (retryError) {
-          message = retryError instanceof Error ? retryError.message : "Failed to send quest to calendar";
+          message = retryError instanceof Error ? retryError.message : "Failed to send action to calendar";
           if (message.includes("MULTI_DAY_MONTHLY_UNSUPPORTED")) {
             toast.error("Calendar send doesn't support multi-day monthly recurrence yet.");
             return;
@@ -1344,12 +1224,12 @@ const Journeys = () => {
       }
 
       if (message.includes("TASK_DATE_REQUIRED")) {
-        toast.error("Please assign a date before sending this quest to calendar.");
+        toast.error("Please assign a date before sending this action to calendar.");
         return;
       }
 
       if (message.includes("SCHEDULED_TIME_REQUIRED") || message.includes("SCHEDULED_TIME_INVALID")) {
-        toast.error("Please assign a time before sending this quest to calendar.");
+        toast.error("Please assign a time before sending this action to calendar.");
         return;
       }
 
@@ -1523,7 +1403,7 @@ const Journeys = () => {
       trackDailyPlanOutcome(taskId, 'deleted');
     }
     await deleteTask(taskId);
-    toast.success("Quest deleted");
+    toast.success("Action deleted");
     setEditingTask(null);
   }, [deleteTask, trackDailyPlanOutcome]);
 
@@ -1568,16 +1448,16 @@ const Journeys = () => {
 
     await deleteTask(task.id);
 
-    toast("Quest deleted", {
+    toast("Action deleted", {
       duration: QUEST_ACTION_TOAST_DURATION_MS,
       action: {
         label: "Undo",
         onClick: async () => {
           try {
             await restoreTask(taskData);
-            toast.success("Quest restored");
+            toast.success("Action restored");
           } catch {
-            toast.error("Failed to restore quest");
+            toast.error("Failed to restore action");
           }
         },
       },
@@ -1664,10 +1544,10 @@ const Journeys = () => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['epics'] });
 
-      toast.success('Ritual deleted');
+      toast.success('Rhythm deleted');
     } catch (error) {
       console.error('Error deleting ritual:', error);
-      toast.error('Failed to delete ritual');
+      toast.error('Failed to delete rhythm');
     }
     closeEditingRitual();
   }, [user?.id, queryClient, closeEditingRitual]);
@@ -1699,29 +1579,20 @@ const Journeys = () => {
       setPathfinderInitialGoal("");
       clearCampaignCreationPopupState();
       setShowPathfinder(false);
-      setCreatedCampaignData({
-        title: data.title,
-        habits: data.habits.map(h => ({ title: h.title })),
+      toast.success("Commitment created", {
+        description: "Its rhythms are ready in your plan.",
       });
-      setShowCreatedAnimation(true);
     } catch (error) {
       console.error('Failed to create campaign:', error);
       throw error;
     }
   }, [clearCampaignCreationPopupState, createEpic]);
 
-  const handleAnimationComplete = useCallback(() => {
-    setShowCreatedAnimation(false);
-    setCreatedCampaignData(null);
-    window.dispatchEvent(new CustomEvent(CAMPAIGN_CREATED_ANIMATION_COMPLETE_EVENT));
-  }, []);
-
   return (
     <PageTransition mode="instant">
-      <CinematicPageBackground preset="quests" />
       <div
         className={cn(
-          "min-h-screen pb-nav-safe pt-safe px-4 relative z-10",
+          "daily-way-page min-h-screen pb-nav-safe pt-safe px-4 relative z-10",
           isDesktopLayout && "px-6",
         )}
         style={companionFrostedThemeStyle}
@@ -1752,9 +1623,9 @@ const Journeys = () => {
                   isDesktopLayout && "mb-1",
                 )}
               >
-                Quests
+                Plan
               </h1>
-              <p className="text-sm text-muted-foreground/90">Plan your quests for the week ahead.</p>
+              <p className="text-sm text-muted-foreground/90">Shape a realistic week of actions and rhythms.</p>
             </div>
           </motion.div>
 
@@ -1811,7 +1682,6 @@ const Journeys = () => {
                 currentStreak={currentStreak}
                 activeEpics={activeEpics}
                 isCampaignsLoading={epicsLoading}
-                onOpenCampaigns={handleOpenCampaigns}
                 hideAnytimeRow={isMacDesktopSession}
                 plannerMode={desktopPlannerMode}
                 timedTaskDurationFallbackMinutes={macTimedTaskDurationFallbackMinutes}
@@ -1822,11 +1692,11 @@ const Journeys = () => {
                 onPlannerModeChange={setDesktopPlannerMode}
                 onToggle={handleToggleTask}
                 onAddQuest={() => openAddQuestSheet()}
-                onOpenCompanionPlanner={openCompanionPlanner}
                 onVoiceAddQuest={toggleVoiceAddRecording}
                 isVoiceAddRecording={isVoiceAddRecording}
                 isVoiceAddSupported={isVoiceAddSupported}
-                showCompanionPlannerHeaderAction={isMacHostedIOSApp}
+                showCompanionPlannerHeaderAction={false}
+                onOpenCompanionPlanner={PRODUCT.mode === "cosmiq" ? openCompanionPlanner : undefined}
                 onOpenMonthView={() => setShowMonthView(true)}
                 onUndoToggle={handleUndoToggle}
                 onEditQuest={handleEditQuest}
@@ -1842,16 +1712,16 @@ const Journeys = () => {
                 selectedDate={selectedDate}
                 readableQuestCardsEnabled={profile?.readable_quest_cards_enabled ?? false}
                 layoutMode={journeysLayoutMode}
-                hideDesktopRailAddButton={isMacHostedIOSApp}
-                isVisible={location.pathname === JOURNEYS_ROUTE}
+                hideDesktopRailAddButton={false}
+                isVisible={isJourneysRouteActive}
                 disableTimelineDrag
                 onToggle={handleToggleTask}
                 onAddQuest={() => openAddQuestSheet()}
-                onOpenCompanionPlanner={openCompanionPlanner}
                 onVoiceAddQuest={toggleVoiceAddRecording}
                 isVoiceAddRecording={isVoiceAddRecording}
                 isVoiceAddSupported={isVoiceAddSupported}
-                showCompanionPlannerHeaderAction={isMacHostedIOSApp}
+                showCompanionPlannerHeaderAction={false}
+                onOpenCompanionPlanner={PRODUCT.mode === "cosmiq" ? openCompanionPlanner : undefined}
                 completedCount={completedCount}
                 totalCount={totalCount}
                 currentStreak={currentStreak}
@@ -1865,7 +1735,6 @@ const Journeys = () => {
                 weekTasks={weekCalendarTasks}
                 activeEpics={activeEpics}
                 isCampaignsLoading={epicsLoading}
-                onOpenCampaigns={handleOpenCampaigns}
                 onDeleteQuest={handleSwipeDeleteQuest}
                 onSendToCalendar={SEND_TO_CALENDAR_ENABLED ? handleSendTaskToCalendar : undefined}
                 hasCalendarLink={hasLinkedEvent}
@@ -1883,27 +1752,31 @@ const Journeys = () => {
           </motion.div>
         </QuestsErrorBoundary>
 
-        <JourneysCompanionPlannerModal
-          open={showCompanionPlanner}
-          onOpenChange={setIsCompanionPlannerPinned}
-          presentation={isDesktopLayout || isMacHostedIOSApp ? "dialog" : "drawer"}
-          selectedDate={selectedDate}
-          launchIntent={plannerLaunchIntent}
-          onLaunchIntentConsumed={(intentId) => {
-            setPlannerLaunchIntent((currentIntent) =>
-            currentIntent?.id === intentId ? null : currentIntent
-          );
-          }}
-          onOpenCampaignBuilder={openCampaignBuilderFromAssistant}
-        />
-
-        {showJourneysPlannerFab ? (
-          <DraggableFAB
-            onOpenCompanionPlanner={openCompanionPlanner}
-            onCreateQuest={() => openAddQuestSheet()}
-            createPlanDayLaunchIntent={createFabPlanDayLaunchIntent}
-            planDayLabel={fabPlanDayLabel}
-          />
+        {PRODUCT.mode === "cosmiq" ? (
+          <>
+            <JourneysCompanionPlannerModal
+              open={isCompanionPlannerOpen}
+              onOpenChange={setIsCompanionPlannerOpen}
+              presentation={isDesktopLayout || isMacHostedIOSApp ? "dialog" : "drawer"}
+              selectedDate={selectedDate}
+              launchIntent={plannerLaunchIntent}
+              onLaunchIntentConsumed={(intentId) => {
+                setPlannerLaunchIntent((current) => current?.id === intentId ? null : current);
+              }}
+              onOpenCampaignBuilder={(message) => {
+                setIsCompanionPlannerOpen(false);
+                openCampaignBuilder(message);
+              }}
+            />
+            {!isMacHostedIOSApp && isJourneysRouteActive ? (
+              <DraggableFAB
+                onOpenCompanionPlanner={openCompanionPlanner}
+                onCreateQuest={() => openAddQuestSheet()}
+                createPlanDayLaunchIntent={createPlanDayLaunchIntent}
+                planDayLabel={isSameDay(selectedDate, effectiveTodayDate) ? "Plan Today" : "Plan Day"}
+              />
+            ) : null}
+          </>
         ) : null}
 
         {/* Add Quest Sheet */}
@@ -1914,7 +1787,7 @@ const Journeys = () => {
           onAdd={handleAddQuest}
           isAdding={isAdding}
           prefilledTime={prefilledTime}
-          autoFillTimeOnFirstTap={shouldAutoFillTutorialTime}
+          autoFillTimeOnFirstTap={false}
           presentation={isMacHostedIOSApp ? "desktop-panel" : "mobile-sheet"}
           prefillDraft={questSheetPrefillDraft}
           prefillKey={questSheetPrefillKey}
@@ -1968,25 +1841,15 @@ const Journeys = () => {
         <PageInfoModal
           open={showPageInfo}
           onClose={() => setShowPageInfo(false)}
-          title="About Quests"
+          title="About your plan"
           icon={Compass}
-          description="Quests and Campaigns work together in one powerful view."
+          description="Daily actions and longer commitments belong in one realistic view."
           features={[
-            "Quests are your daily actions to earn XP and build momentum",
-            "Campaigns are goals you break down with your guide into routines",
-            "Track progress across quests and campaigns to stay consistent"
+            "Add, schedule, and complete daily actions",
+            "Create Commitments for goals that need a longer horizon",
+            "Keep recurring rhythms beside ordinary responsibilities"
           ]}
-          tip="Add a quest with +, or start a Campaign to plan your bigger goal."
-        />
-
-        {/* Streak Freeze Prompt */}
-        <StreakFreezePromptModal
-          open={needsStreakDecision}
-          currentStreak={freezeStreak}
-          freezesAvailable={freezesAvailable}
-          onUseFreeze={useFreeze}
-          onResetStreak={resetStreak}
-          isResolving={isResolving}
+          tip="Add one clear action with +, or create a Commitment for a goal that needs a rhythm."
         />
 
         {/* Contact Interaction Log Modal */}
@@ -2018,13 +1881,6 @@ const Journeys = () => {
           companionFrostedThemeStyle={companionFrostedThemeStyle}
         />
 
-        {/* Campaign Created Celebration */}
-        <CampaignCreatedAnimation
-          isVisible={showCreatedAnimation}
-          campaignTitle={createdCampaignData?.title || ''}
-          habits={createdCampaignData?.habits || []}
-          onComplete={handleAnimationComplete}
-        />
       </div>
       </div>
 

@@ -95,7 +95,7 @@ describe("useSubscription", () => {
     expect(result.current.isActive).toBe(true);
     expect(result.current.hasPremium).toBe(true);
     expect(result.current.plan).toBe("yearly");
-    expect(result.current.planPrice).toBe("$99.99/year");
+    expect(result.current.planPrice).toBe("$49.99/year");
     expect(result.current.subscription).toMatchObject({
       status: "active",
       plan: "yearly",

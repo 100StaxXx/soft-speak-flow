@@ -7,27 +7,12 @@ const authState = vi.hoisted(() => ({
   loading: false,
 }));
 
-vi.mock("@/hooks/useAuth", () => ({
-  useAuth: () => authState,
-}));
-
-vi.mock("@/utils/authRedirect", () => ({
-  getAuthRedirectPath: vi.fn(),
-}));
-
-vi.mock("@/components/PageLoader", () => ({
-  PageLoader: ({ message }: { message: string }) => <div>{message}</div>,
-}));
-
-vi.mock("@/components/StaticBackgroundImage", () => ({
-  StaticBackgroundImage: ({ background }: { background: { src: string } }) => (
-    <img alt="" src={background.src} />
-  ),
-}));
+vi.mock("@/hooks/useAuth", () => ({ useAuth: () => authState }));
+vi.mock("@/utils/authRedirect", () => ({ getAuthRedirectPath: vi.fn() }));
 
 import Welcome from "./Welcome";
 
-describe("Welcome", () => {
+describe("Graceward welcome", () => {
   beforeEach(() => {
     authState.user = null;
     authState.loading = false;
@@ -41,25 +26,20 @@ describe("Welcome", () => {
     );
   });
 
-  it("renders an informational landing page with auth CTAs", () => {
+  it("introduces Graceward's daily faith experience with clear account actions", () => {
     render(
       <MemoryRouter initialEntries={["/welcome"]}>
         <Welcome />
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("heading", { name: /^cosmiq quest$/i })).toBeInTheDocument();
-    expect(screen.getByText(/start your quest/i)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /one place for quests, guidance, and momentum/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /the story is the system/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /register/i })).toHaveAttribute("href", "/auth?mode=signup");
-    expect(screen.getByRole("link", { name: /sign in/i })).toHaveAttribute("href", "/auth");
-    expect(screen.queryByRole("link", { name: /^cosmiq$/i })).not.toBeInTheDocument();
-    expect(screen.queryByText(/mythic habit quests/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: /email address/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /request access/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: /more signal\. fewer screens\. a clearer day/i })).not.toBeInTheDocument();
-    expect(screen.queryByAltText(/companion artwork/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Graceward", level: 1 })).toBeInTheDocument();
+    expect(screen.getByText(/a christian daily companion/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /receive the day/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /without pretending to speak for god/i })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /begin|start a daily rhythm/i })[0]).toHaveAttribute("href", "/auth?mode=signup");
+    expect(screen.getAllByRole("link", { name: /sign in/i })[0]).toHaveAttribute("href", "/auth");
+    expect(screen.queryByText(/faction|destiny|quest-based/i)).not.toBeInTheDocument();
   });
 
   it("keeps legal links available", () => {

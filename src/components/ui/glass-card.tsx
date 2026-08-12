@@ -9,12 +9,12 @@ const glassCardVariants = cva(
     variants: {
       variant: {
         default: [
-          "bg-card/78 backdrop-blur-lg",
+          "bg-card/[0.78] backdrop-blur-lg",
           "border-border/60",
           "shadow-[0_10px_24px_rgba(0,0,0,0.22)]",
         ],
         elevated: [
-          "bg-card/86 backdrop-blur-2xl",
+          "bg-card/[0.86] backdrop-blur-2xl",
           "border-border/70",
           "shadow-[0_14px_34px_rgba(0,0,0,0.28),0_2px_8px_rgba(0,0,0,0.12)]",
         ],
@@ -30,7 +30,7 @@ const glassCardVariants = cva(
         ],
         pageShell: [outerShellCardClassName],
         subtle: [
-          "bg-card/62 backdrop-blur-md",
+          "bg-card/[0.62] backdrop-blur-md",
           "border-border/45",
           "shadow-[0_6px_16px_rgba(0,0,0,0.16)]",
         ],

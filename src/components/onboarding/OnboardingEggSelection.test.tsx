@@ -114,7 +114,7 @@ describe("OnboardingEggSelection", () => {
     expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   });
 
-  it("allows every element and renders no future-state labels", () => {
+  it("keeps the two pilot elements active and greys the rest as coming soon", () => {
     const onComplete = vi.fn();
 
     render(
@@ -127,20 +127,21 @@ describe("OnboardingEggSelection", () => {
     );
 
     const stormSlot = screen.getByTestId("egg-slot-storm");
-    expect(stormSlot).toBeEnabled();
-    expect(stormSlot).toHaveAttribute("data-supported", "true");
-    expect(screen.getByTestId("egg-slot-void")).toBeEnabled();
+    expect(stormSlot).toBeDisabled();
+    expect(stormSlot).toHaveAttribute("data-supported", "false");
+    expect(screen.getByTestId("egg-slot-void")).toBeDisabled();
     expect(screen.getByTestId("egg-slot-light")).toBeEnabled();
-    expect(screen.queryByText("Coming Soon")).not.toBeInTheDocument();
+    expect(screen.getByTestId("egg-slot-nature")).toBeEnabled();
+    expect(screen.getAllByText("Coming Soon").length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole("button", { name: "Select Storm element" }));
+    fireEvent.click(screen.getByRole("button", { name: "Select Dawn Gold element" }));
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(onComplete).toHaveBeenCalledWith({
       presetId: "fox",
-      favoriteColor: "#38BDF8",
+      favoriteColor: "#FACC15",
       spiritAnimal: "Kitsune",
-      coreElement: "storm",
+      coreElement: "light",
       storyTone: "epic_adventure",
       companionName: null,
     });
@@ -158,19 +159,19 @@ describe("OnboardingEggSelection", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Select Ice element" }));
+    fireEvent.click(screen.getByRole("button", { name: "Select Living Green element" }));
 
-    expect(screen.getByTestId("egg-slot-ice")).toHaveAttribute("data-selected", "true");
+    expect(screen.getByTestId("egg-slot-nature")).toHaveAttribute("data-selected", "true");
     expect(screen.getByTestId("egg-slot-fire")).toHaveAttribute("data-selected", "false");
-    expect(screen.getByTestId("egg-slot-nature")).toHaveAttribute("data-selected", "false");
+    expect(screen.getByTestId("egg-slot-light")).toHaveAttribute("data-selected", "false");
 
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(onComplete).toHaveBeenCalledWith({
       presetId: "phoenix",
-      favoriteColor: "#60A5FA",
+      favoriteColor: "#34D399",
       spiritAnimal: "Phoenix",
-      coreElement: "ice",
+      coreElement: "nature",
       storyTone: "dark_intense",
       companionName: null,
     });
@@ -191,14 +192,14 @@ describe("OnboardingEggSelection", () => {
     fireEvent.change(screen.getByLabelText("Companion Name"), {
       target: { value: "  Nova  " },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Select Ember element" }));
+    fireEvent.click(screen.getByRole("button", { name: "Select Dawn Gold element" }));
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(onComplete).toHaveBeenCalledWith({
       presetId: "dragon",
-      favoriteColor: "#F97316",
+      favoriteColor: "#FACC15",
       spiritAnimal: "Dragon",
-      coreElement: "fire",
+      coreElement: "light",
       storyTone: "epic_adventure",
       companionName: "Nova",
     });

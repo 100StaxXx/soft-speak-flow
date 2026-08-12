@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { maybeEnqueueCompanionAnimationJob } from "../_shared/companionAnimationJobs.ts";
 import { createCostGuardrailSession } from "../_shared/costGuardrails.ts";
+import { getCurrentVisualStageBoundaryLevel } from "../../../src/config/progression.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -329,7 +330,6 @@ const ensureEvolutionAnimationEnqueued = async ({
 }): Promise<AnimationEnqueueResult> => {
   const evolutionId = asString(evolutionPayload.evolution_id);
   const newStage = asNumber(evolutionPayload.new_stage) ?? job.requested_stage;
-  const previousStage = asNumber(evolutionPayload.previous_stage);
 
   if (!evolutionId) {
     return {
@@ -394,11 +394,14 @@ const ensureEvolutionAnimationEnqueued = async ({
 
   if (companionError) throw companionError;
 
-  const previousImageUrl = typeof previousStage === "number"
+  const previousBoundaryStage = getCurrentVisualStageBoundaryLevel(
+    newStage - 1,
+  );
+  const previousImageUrl = previousBoundaryStage > 0
     ? await fetchEvolutionImageUrlForStage(
       supabase,
       job.companion_id,
-      previousStage,
+      previousBoundaryStage,
     )
     : null;
 

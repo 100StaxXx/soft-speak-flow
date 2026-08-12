@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => {
   return {
     user: { id: "11111111-1111-4111-8111-111111111111" } as { id: string } | null,
     authLoading: false,
+    authStatus: "authenticated" as "loading" | "recovering" | "authenticated" | "unauthenticated",
     functionsInvoke: vi.fn(),
     recoverPurchases,
     storeKit: {
@@ -57,6 +58,7 @@ vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
     user: mocks.user,
     loading: mocks.authLoading,
+    status: mocks.authStatus,
   }),
 }));
 
@@ -145,6 +147,7 @@ describe("useAccessState", () => {
     mocks.recoverPurchases.mockResolvedValue(null);
     mocks.user = { id: "11111111-1111-4111-8111-111111111111" };
     mocks.authLoading = false;
+    mocks.authStatus = "authenticated";
     mocks.storeKit = {
       ...mocks.storeKit,
       isPro: true,
@@ -160,6 +163,23 @@ describe("useAccessState", () => {
       isLoading: false,
     };
     mockSubscriptionCheck();
+  });
+
+  it("waits for session recovery before checking access on app resume", async () => {
+    mocks.authStatus = "recovering";
+
+    const { result, rerender } = renderHook(() => useAccessState(), { wrapper: createWrapper() });
+
+    expect(result.current.isLoading).toBe(true);
+    expect(mocks.functionsInvoke).not.toHaveBeenCalledWith("check-apple-subscription");
+
+    mocks.authStatus = "authenticated";
+    rerender();
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+    expect(mocks.functionsInvoke).toHaveBeenCalledWith("check-apple-subscription");
   });
 
   it("uses valid local StoreKit access over a neutral backend no-access response", async () => {

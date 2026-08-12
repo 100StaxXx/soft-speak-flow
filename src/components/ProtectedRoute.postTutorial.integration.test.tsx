@@ -141,6 +141,20 @@ describe("ProtectedRoute post-tutorial gating", () => {
     expect(screen.queryByText("Paywall:pre_trial_signup")).not.toBeInTheDocument();
   });
 
+  it("does not let tutorial dismissal bypass the trial choice", () => {
+    profileState.profile = {
+      ...profileState.profile,
+      onboarding_data: {
+        guided_tutorial: { completed: false, dismissed: true },
+      },
+    };
+
+    renderRoute();
+
+    expect(screen.getByText("Paywall:pre_trial_signup")).toBeInTheDocument();
+    expect(screen.queryByText("Tutorial Complete Screen")).not.toBeInTheDocument();
+  });
+
   it("still renders trial-expired gate when tutorial is not complete and trial is expired", () => {
     profileState.profile = {
       ...profileState.profile,

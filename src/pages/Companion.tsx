@@ -47,6 +47,7 @@ import {
 } from "@/hooks/useCompanionLayoutMode";
 import { deriveCompanionDisplayState } from "@/lib/companionDisplayState";
 import { cn } from "@/lib/utils";
+import { PRODUCT } from "@/config/product";
 
 type CompanionTab = "overview" | "focus" | "stories" | "collection";
 
@@ -91,6 +92,7 @@ const OverviewTab = memo(({
   isActive: boolean;
 }) => {
   const isDesktop = layoutMode === "desktop";
+  const isGraceward = PRODUCT.mode === "christian";
 
   if (isDesktop) {
     return (
@@ -99,19 +101,21 @@ const OverviewTab = memo(({
           <MemoryWhisper chance={0.2} className="px-0" />
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-2">
-          <div data-tour="companion-progress-area">
-            <NextEvolutionPreview
-              currentXP={companion?.current_xp || 0}
-              nextEvolutionXP={nextEvolutionXP || 0}
-              currentStage={companion?.current_stage || 0}
-              progressPercent={progressToNext}
-            />
-          </div>
-          <XPBreakdown />
-        </div>
+        {companion?.current_stage === 0 ? <div data-tour="companion-progress-area">
+          <NextEvolutionPreview
+            currentXP={companion.current_xp || 0}
+            nextEvolutionXP={nextEvolutionXP || 0}
+            currentStage={0}
+            progressPercent={progressToNext}
+            showBondProgress={false}
+          />
+        </div> : null}
 
-        <DailyMissions />
+        {!isGraceward ? <div>
+          <XPBreakdown />
+        </div> : null}
+
+        {!isGraceward ? <DailyMissions /> : null}
       </div>
     );
   }
@@ -121,9 +125,9 @@ const OverviewTab = memo(({
       <MemoryWhisper chance={0.2} className="px-2" />
 
       <ParallaxCard offset={30}>
-        <CompanionDisplay isVisible={isActive} />
+        <CompanionDisplay isVisible={isActive} experienceMode={isGraceward ? "formation" : "full"} />
       </ParallaxCard>
-      <ParallaxCard offset={22}>
+      {companion?.current_stage === 0 ? <ParallaxCard offset={22}>
         <div data-tour="companion-progress-area">
           <NextEvolutionPreview
             currentXP={companion?.current_xp || 0}
@@ -132,13 +136,13 @@ const OverviewTab = memo(({
             progressPercent={progressToNext}
           />
         </div>
-      </ParallaxCard>
-      <ParallaxCard offset={16}>
+      </ParallaxCard> : null}
+      {!isGraceward ? <ParallaxCard offset={16}>
         <DailyMissions />
-      </ParallaxCard>
-      <ParallaxCard offset={12}>
+      </ParallaxCard> : null}
+      {!isGraceward ? <ParallaxCard offset={12}>
         <XPBreakdown />
-      </ParallaxCard>
+      </ParallaxCard> : null}
     </div>
   );
 });
@@ -188,7 +192,7 @@ const CompanionTabBar = ({
       <TabsList
         data-testid="companion-tab-list"
         className={cn(
-          "border-stardust-gold/16 bg-[linear-gradient(180deg,rgba(34,28,15,0.56),rgba(20,16,8,0.6))] text-stardust-gold/78 backdrop-blur-md shadow-[0_16px_34px_rgba(0,0,0,0.16)]",
+          "border-stardust-gold/[0.16] bg-[linear-gradient(180deg,rgba(34,28,15,0.56),rgba(20,16,8,0.6))] text-stardust-gold/[0.78] backdrop-blur-md shadow-[0_16px_34px_rgba(0,0,0,0.16)]",
           isDesktop
             ? "inline-grid h-auto w-auto min-w-[460px] grid-cols-4 justify-start p-1.5"
             : "grid w-full grid-cols-4",
@@ -196,21 +200,21 @@ const CompanionTabBar = ({
     >
       <TabsTrigger
         value="overview"
-        className="flex items-center gap-2 data-[state=active]:border-stardust-gold/35 data-[state=active]:bg-stardust-gold/12 data-[state=active]:text-stardust-gold"
+        className="flex items-center gap-2 data-[state=active]:border-stardust-gold/35 data-[state=active]:bg-stardust-gold/[0.12] data-[state=active]:text-stardust-gold"
       >
         <TrendingUp className="h-4 w-4" />
         <span className={cn(isDesktop ? "inline" : "hidden sm:inline")}>Overview</span>
       </TabsTrigger>
       <TabsTrigger
         value="focus"
-        className="flex items-center gap-2 data-[state=active]:border-stardust-gold/35 data-[state=active]:bg-stardust-gold/12 data-[state=active]:text-stardust-gold"
+        className="flex items-center gap-2 data-[state=active]:border-stardust-gold/35 data-[state=active]:bg-stardust-gold/[0.12] data-[state=active]:text-stardust-gold"
       >
         <Timer className="h-4 w-4" />
         <span className={cn(isDesktop ? "inline" : "hidden sm:inline")}>Focus</span>
       </TabsTrigger>
       <TabsTrigger
         value="stories"
-        className="flex items-center gap-2 data-[state=active]:border-stardust-gold/35 data-[state=active]:bg-stardust-gold/12 data-[state=active]:text-stardust-gold"
+        className="flex items-center gap-2 data-[state=active]:border-stardust-gold/35 data-[state=active]:bg-stardust-gold/[0.12] data-[state=active]:text-stardust-gold"
         onPointerDown={onStoriesPrefetch}
         onFocus={onStoriesPrefetch}
       >
@@ -219,7 +223,7 @@ const CompanionTabBar = ({
       </TabsTrigger>
       <TabsTrigger
         value="collection"
-        className="flex items-center gap-2 data-[state=active]:border-stardust-gold/35 data-[state=active]:bg-stardust-gold/12 data-[state=active]:text-stardust-gold"
+        className="flex items-center gap-2 data-[state=active]:border-stardust-gold/35 data-[state=active]:bg-stardust-gold/[0.12] data-[state=active]:text-stardust-gold"
         onPointerDown={onCollectionPrefetch}
         onFocus={onCollectionPrefetch}
       >
@@ -336,7 +340,6 @@ const Companion = () => {
 
       setActiveTab(value);
       markTabMounted(value);
-
       if (!isTabActive) {
         return;
       }
@@ -508,14 +511,14 @@ const Companion = () => {
             <Sparkles className="h-16 w-16 mx-auto text-primary" />
             <h2 className="text-2xl font-bold">No Companion Found</h2>
             <p className="text-muted-foreground max-w-md">
-              It looks like you haven't created your companion yet. Please complete the onboarding process to get started.
+              Your companion has not been created yet. Shape one now and your completed daily actions will begin building its XP.
             </p>
             <Button
               variant="default"
-              onClick={() => navigate('/onboarding')}
+              onClick={() => navigate('/onboarding?companion=1')}
               className="mt-4 h-11 px-6"
             >
-              Start Onboarding
+              Create My Companion
             </Button>
           </div>
         </div>
@@ -538,16 +541,21 @@ const Companion = () => {
               >
                 <div className="space-y-1 px-1">
                   <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground/70">
-                    Living Companion
+                    {PRODUCT.mode === "christian" ? "Daily Formation" : "Living Companion"}
                   </p>
                   <h2 className="text-3xl font-semibold tracking-tight">
-                    Your companion, anchored
+                    {PRODUCT.mode === "christian" ? "Mind, body, and soul" : "Your companion, anchored"}
                   </h2>
                   <p className="text-sm text-muted-foreground">
-                    Keep the creature visible while you track growth, stories, and rewards.
+                    {PRODUCT.mode === "christian"
+                      ? "Choose one gentle practice at a time and let faithful action shape your companion’s growth."
+                      : "Keep your symbolic companion visible while you track growth, stories, and rewards."}
                   </p>
                 </div>
-                <CompanionDisplay layoutMode={layoutMode} />
+                <CompanionDisplay
+                  layoutMode={layoutMode}
+                  experienceMode={PRODUCT.mode === "christian" ? "formation" : "full"}
+                />
               </div>
             </aside>
 
@@ -555,10 +563,12 @@ const Companion = () => {
               <div className="space-y-3">
                 <div className="space-y-1 px-1">
                   <p className="text-sm font-medium text-muted-foreground">
-                    Companion spaces
+                    {PRODUCT.mode === "christian" ? "Companion life" : "Companion spaces"}
                   </p>
                   <p className="text-2xl font-semibold tracking-tight">
-                    Switch between growth, focus, story, and collection
+                    {PRODUCT.mode === "christian"
+                      ? "Focus, remember, and grow together"
+                      : "Switch between growth, focus, story, and collection"}
                   </p>
                 </div>
                 <CompanionTabBar

@@ -21,6 +21,12 @@ const HATCH_VIDEO_MAP = {
   },
 } as const satisfies Partial<Record<CompanionPresetId, Partial<Record<CompanionElementId, string>>>>;
 
+// Retain the legacy clips for archival compatibility, but never select them:
+// their encoded endpoints do not exactly match the current egg and infant art.
+// Both Graceward and supported Cosmiq transitions use the generated two-image
+// animation path instead.
+export const LEGACY_STATIC_HATCH_VIDEOS_ENABLED = false;
+
 export const getCompanionHatchVideoUrl = ({
   presetId,
   element,
@@ -28,6 +34,8 @@ export const getCompanionHatchVideoUrl = ({
   presetId: CompanionPresetId | string | null | undefined;
   element: CompanionElementId | string | null | undefined;
 }): string | null => {
+  if (!LEGACY_STATIC_HATCH_VIDEOS_ENABLED) return null;
+
   if (!isPilotCompanionPreset(presetId) || !isPilotCompanionElement(element)) {
     return null;
   }

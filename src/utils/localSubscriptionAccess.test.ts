@@ -55,6 +55,20 @@ describe("localSubscriptionAccess", () => {
     });
   });
 
+  it("preserves an Apple introductory offer as trialing access", () => {
+    expect(buildLocalSubscriptionAccessState(transaction({
+      offerType: 1,
+      expirationDate: "2026-05-25T12:00:00.000Z",
+    }), userId, "yearly")).toMatchObject({
+      has_access: true,
+      access_source: "subscription",
+      subscribed: true,
+      status: "trialing",
+      trial_ends_at: "2026-05-25T12:00:00.000Z",
+      subscription_end: "2026-05-25T12:00:00.000Z",
+    });
+  });
+
   it("does not passively trust tokenless production transactions", () => {
     const tokenlessProduction = transaction({
       appAccountToken: undefined,

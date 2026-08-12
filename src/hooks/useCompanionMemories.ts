@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useCompanion } from "./useCompanion";
 import { useMemo, useCallback } from "react";
+import { useProfile } from "./useProfile";
 
 export type MemoryType = 
   | 'first_meeting'       // When companion was created
@@ -74,10 +75,11 @@ const getStableRandom = (seed: string): number => {
 export function useCompanionMemories() {
   const { user } = useAuth();
   const { companion } = useCompanion();
+  const { profile } = useProfile();
   const queryClient = useQueryClient();
 
   // Fetch all memories for the companion
-  const { data: memories, isLoading: memoriesLoading } = useQuery({
+  const { data: storedMemories, isLoading: memoriesLoading } = useQuery({
     queryKey: ['companion-memories', companion?.id],
     queryFn: async (): Promise<CompanionMemory[]> => {
       if (!companion?.id) return [];
@@ -99,6 +101,12 @@ export function useCompanionMemories() {
     enabled: !!companion?.id,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
+
+  const memories = useMemo(() => (storedMemories ?? []).filter((memory) => {
+    if (profile?.companion_memory_enabled !== false) return true;
+    const details = memory.memory_context?.details;
+    return !(memory.memory_type === "special_moment" && details?.source === "companion_chat");
+  }), [profile?.companion_memory_enabled, storedMemories]);
 
   // Fetch current bond level
   const { data: bondData, isLoading: bondLoading } = useQuery({

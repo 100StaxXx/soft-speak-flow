@@ -288,7 +288,7 @@ export const useInboxTasks = (options: InboxTasksOptions = {}) => {
       invalidateInboxQueries();
       queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
       if ((data as { queued?: boolean } | undefined)?.queued) {
-        toast("Quest schedule queued. It will sync when connection is restored.");
+        toast("Action schedule queued. It will sync when connection is restored.");
         return;
       }
       if (
@@ -296,7 +296,7 @@ export const useInboxTasks = (options: InboxTasksOptions = {}) => {
         && "normalizedToInbox" in data
         && data.normalizedToInbox
       ) {
-        toast("Regular quests without time stay in Inbox.");
+        toast("Actions without a time stay in Inbox.");
       }
     },
   });
@@ -414,7 +414,7 @@ export const useInboxTasks = (options: InboxTasksOptions = {}) => {
         completedAt,
         wasAlreadyCompleted: false,
         taskId: taskDetails?.id ?? remoteTaskId,
-        taskText: taskDetails?.task_text ?? "Quest",
+        taskText: taskDetails?.task_text ?? "Action",
         taskDate: taskDetails?.task_date ?? null,
         scheduledTime: taskDetails?.scheduled_time ?? null,
         difficulty: taskDetails?.difficulty ?? null,
@@ -428,7 +428,7 @@ export const useInboxTasks = (options: InboxTasksOptions = {}) => {
       invalidateInboxQueries();
       queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
       if ((data as { queued?: boolean } | undefined)?.queued) {
-        toast("Quest completion queued. It will sync when connection is restored.");
+        toast("Action completion queued. It will sync when connection is restored.");
         return;
       }
 
@@ -484,7 +484,7 @@ export const useInboxTasks = (options: InboxTasksOptions = {}) => {
       invalidateInboxQueries();
       queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
       if ((data as { queued?: boolean } | undefined)?.queued) {
-        toast("Quest deletion queued. It will sync when connection is restored.");
+        toast("Action deletion queued. It will sync when connection is restored.");
       }
     },
   });

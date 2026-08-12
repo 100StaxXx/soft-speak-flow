@@ -1,5 +1,5 @@
-import type { ParsedTask } from "@/features/tasks/hooks";
-import { parseNaturalLanguage } from "@/features/tasks/hooks";
+import { parseNaturalLanguage } from "@/features/tasks/hooks/useNaturalLanguageParser";
+import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import type { QuestComposerPrefillDraft, QuestCreationSource } from "@/features/quests/types";
 import { formatGeneratedTaskTitle } from "@/shared/taskTitleNormalization";
 import { format, startOfDay } from "date-fns";

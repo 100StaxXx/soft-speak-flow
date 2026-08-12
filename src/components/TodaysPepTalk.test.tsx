@@ -54,7 +54,13 @@ const mocks = vi.hoisted(() => {
     existingPepTalkXpEvent: boolean;
     isTabActive: boolean;
     isGloballyMuted: boolean;
-    mentor: { slug: string; name: string };
+    mentor: {
+      id: string;
+      slug: string;
+      name: string;
+      avatar_url: string | null;
+      primary_color: string | null;
+    };
     pepTalkWallpaper: {
       dateKey: string;
       imageUrl: string;
@@ -75,7 +81,13 @@ const mocks = vi.hoisted(() => {
     existingPepTalkXpEvent: false,
     isTabActive: true,
     isGloballyMuted: false,
-    mentor: { slug: "carmen", name: "Carmen" },
+    mentor: {
+      id: "mentor-1",
+      slug: "carmen",
+      name: "Carmen",
+      avatar_url: null,
+      primary_color: "#376f4a",
+    },
     pepTalkWallpaper: null,
   };
 
@@ -88,6 +100,8 @@ const mocks = vi.hoisted(() => {
   const registerAudioMock = vi.fn();
   const unregisterAudioMock = vi.fn();
   const reportWallpaperRenderError = vi.fn();
+  const recordProgress = vi.fn(async () => ({ data: {}, error: null }));
+  const updateDailyGuideThread = vi.fn(async () => null);
 
   const invoke = vi.fn(async (fnName: string) => {
     if (fnName === "sync-daily-pep-talk-transcript") {
@@ -146,6 +160,8 @@ const mocks = vi.hoisted(() => {
     registerAudioMock,
     unregisterAudioMock,
     reportWallpaperRenderError,
+    recordProgress,
+    updateDailyGuideThread,
     audioListeners,
     safeLocalStorage: {
       getItem: (key: string) => storage.get(key) ?? null,
@@ -165,6 +181,7 @@ const mocks = vi.hoisted(() => {
     supabase: {
       from,
       functions: { invoke },
+      rpc: recordProgress,
     },
   };
 });
@@ -180,6 +197,15 @@ vi.mock("@/utils/storage", () => ({
 vi.mock("@/hooks/useProfile", () => ({
   useProfile: () => ({
     profile: { id: "user-1", selected_mentor_id: "mentor-1", timezone: mocks.state.profileTimezone },
+  }),
+}));
+
+vi.mock("@/hooks/useDailyGuideThread", () => ({
+  useDailyGuideThread: () => ({
+    thread: null,
+    previousThread: null,
+    isUpdating: false,
+    updateThread: mocks.updateDailyGuideThread,
   }),
 }));
 
@@ -342,6 +368,8 @@ describe("TodaysPepTalk transcript expand behavior", () => {
     mocks.registerAudioMock.mockClear();
     mocks.unregisterAudioMock.mockClear();
     mocks.reportWallpaperRenderError.mockClear();
+    mocks.recordProgress.mockClear();
+    mocks.updateDailyGuideThread.mockClear();
     mocks.supabase.from.mockClear();
     mocks.supabase.functions.invoke.mockClear();
     mocks.state.syncResponse = Promise.resolve({ data: {}, error: null });
@@ -358,7 +386,13 @@ describe("TodaysPepTalk transcript expand behavior", () => {
     mocks.state.existingPepTalkXpEvent = false;
     mocks.state.isTabActive = true;
     mocks.state.isGloballyMuted = false;
-    mocks.state.mentor = { slug: "carmen", name: "Carmen" };
+    mocks.state.mentor = {
+      id: "mentor-1",
+      slug: "carmen",
+      name: "Carmen",
+      avatar_url: null,
+      primary_color: "#376f4a",
+    };
     mocks.state.pepTalkWallpaper = null;
     mocks.audioListeners.clear();
   });
@@ -376,8 +410,56 @@ describe("TodaysPepTalk transcript expand behavior", () => {
     expect(screen.getByText("Execute Your Vision")).toBeInTheDocument();
   });
 
+  it("automatically records the received daily encouragement", async () => {
+    renderComponent();
+
+    await screen.findByText("Execute Your Vision");
+    await waitFor(() => {
+      expect(mocks.recordProgress).toHaveBeenCalledWith("record_daily_encouragement_progress", {
+        p_daily_pep_talk_id: "pep-talk-1",
+        p_event: "opened",
+        p_progress: 0,
+      });
+    });
+    expect(screen.getByRole("button", { name: /past encouragements/i })).toBeInTheDocument();
+  });
+
+  it("makes the encouragement feel Guide-led and carries the chosen focus forward", async () => {
+    const focusEvent = vi.fn();
+    window.addEventListener("daily-guide-focus-selected", focusEvent);
+
+    try {
+      renderComponent();
+
+      expect(await screen.findByText("A word from Carmen")).toBeInTheDocument();
+      expect(screen.getByText("Carmen asks")).toBeInTheDocument();
+      expect(screen.getByText("Where would a little more direction help today?")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Clarity" }));
+
+      await waitFor(() => {
+        expect(mocks.updateDailyGuideThread).toHaveBeenCalledWith(expect.objectContaining({
+          mentor_id: "mentor-1",
+          mentor_name: "Carmen",
+          focus_option_id: "clarity",
+          focus_label: "Clarity",
+          focus_category: "Mind",
+        }));
+      });
+      expect(focusEvent).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener("daily-guide-focus-selected", focusEvent);
+    }
+  });
+
   it("resolves legacy mentor slugs before querying and refreshing daily pep talks", async () => {
-    mocks.state.mentor = { slug: "eli", name: "The Rival" };
+    mocks.state.mentor = {
+      id: "mentor-rival",
+      slug: "eli",
+      name: "The Rival",
+      avatar_url: null,
+      primary_color: "#375b8b",
+    };
     mocks.state.todayPepTalk = null;
     mocks.state.fallbackPepTalk = makePepTalk({
       mentor_slug: "rival",
@@ -434,42 +516,42 @@ describe("TodaysPepTalk transcript expand behavior", () => {
     expect(await screen.findByText("Fresh Today's Message")).toBeInTheDocument();
   });
 
-  it("uses a transparent shell while loading", () => {
+  it("uses the Graceward card shell while loading", () => {
     renderComponent();
 
     const shell = screen.getByTestId("pep-talk-shell");
 
-    expect(shell).toHaveClass("bg-transparent");
-    expect(shell).toHaveClass("backdrop-blur-none");
-    expect(shell).toHaveClass("shadow-none");
+    expect(shell).toHaveClass("bg-card/[0.86]");
+    expect(shell).toHaveClass("backdrop-blur-xl");
+    expect(shell).toHaveClass("shadow-sm");
   });
 
-  it("uses a transparent shell for the empty state", async () => {
+  it("uses the Graceward card shell for the empty state", async () => {
     mocks.state.todayPepTalk = null;
     mocks.state.fallbackPepTalk = null;
 
     renderComponent();
 
-    await screen.findByText("No pep talk available today");
+    await screen.findByText("No daily encouragement is available yet");
 
     const shell = screen.getByTestId("pep-talk-shell");
 
-    expect(shell).toHaveClass("bg-transparent");
-    expect(shell).toHaveClass("backdrop-blur-none");
-    expect(shell).toHaveClass("shadow-none");
+    expect(shell).toHaveClass("bg-card/[0.86]");
+    expect(shell).toHaveClass("backdrop-blur-xl");
+    expect(shell).toHaveClass("shadow-sm");
     expect(shell.querySelector(".from-primary\\/10")).toBeNull();
   });
 
-  it("uses a transparent shell for the loaded state while keeping the inner content panel", async () => {
+  it("uses the Graceward card shell for the loaded state while keeping the inner content panel", async () => {
     renderComponent();
 
     await screen.findByText("Execute Your Vision");
 
     const shell = screen.getByTestId("pep-talk-shell");
 
-    expect(shell).toHaveClass("bg-transparent");
-    expect(shell).toHaveClass("backdrop-blur-none");
-    expect(shell).toHaveClass("shadow-none");
+    expect(shell).toHaveClass("bg-card/[0.86]");
+    expect(shell).toHaveClass("backdrop-blur-xl");
+    expect(shell).toHaveClass("shadow-sm");
     expect(shell.querySelector(".animate-gradient-shift")).toBeNull();
     expect(shell.querySelector(".from-card\\/90")).not.toBeNull();
   });
@@ -600,39 +682,22 @@ describe("TodaysPepTalk transcript expand behavior", () => {
     expect(screen.queryByText(/word21/)).not.toBeInTheDocument();
   });
 
-  it("preserves displayed script while applying timed transcript returned by background sync", async () => {
+  it("keeps legacy scripts available without starting paid transcript repair from the client", async () => {
     mocks.state.todayPepTalk = makePepTalk({
       id: "pep-talk-sync-success",
       script: "Original preview text stays intact before transcript expansion.",
       transcript: [],
     });
-    mocks.state.syncResponse = Promise.resolve({
-      data: {
-        script: "Bad garbled replacement text",
-        transcript: [
-          { word: "Stay", start: 0, end: 0.5 },
-          { word: "Sharp", start: 0.5, end: 1 },
-        ],
-      },
-      error: null,
-    });
-
     renderComponent();
 
-    await waitFor(() => {
-      expect(mocks.supabase.functions.invoke).toHaveBeenCalledWith("sync-daily-pep-talk-transcript", {
-        body: { id: "pep-talk-sync-success" },
-      });
-    });
-
-    expect(screen.getByText(/Original preview text stays intact/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Bad garbled replacement text/i)).not.toBeInTheDocument();
+    expect(await screen.findByText(/Original preview text stays intact/i)).toBeInTheDocument();
+    expect(mocks.supabase.functions.invoke).not.toHaveBeenCalledWith(
+      "sync-daily-pep-talk-transcript",
+      expect.anything(),
+    );
 
     fireEvent.click(await screen.findByRole("button", { name: /show full transcript/i }));
-
-    expect(await screen.findByText("Stay")).toBeInTheDocument();
-    expect(screen.getByText("Sharp")).toBeInTheDocument();
-    expect(screen.queryByText(/Original preview text stays intact/i)).not.toBeInTheDocument();
+    expect(await screen.findByText(/Original preview text stays intact/i)).toBeInTheDocument();
   });
 
   it("auto-scrolls transcript container without calling word scrollIntoView", async () => {
@@ -754,7 +819,7 @@ describe("TodaysPepTalk transcript expand behavior", () => {
 
     renderComponent();
 
-    const refreshButton = await screen.findByRole("button", { name: /prepare today's pep talk/i });
+    const refreshButton = await screen.findByRole("button", { name: /prepare today's encouragement/i });
     fireEvent.click(refreshButton);
 
     await waitFor(() => {

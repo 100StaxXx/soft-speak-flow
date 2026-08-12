@@ -40,7 +40,7 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
         >
           <h1 className="text-2xl font-bold text-foreground mb-1">Choose Your Path</h1>
           <p className="text-muted-foreground text-sm">
-            Your faction shapes your cosmic journey
+            Your Path shapes the practices, guidance, and companion world prepared for you.
           </p>
         </motion.div>
       </header>
@@ -127,7 +127,7 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
                   transition={{ delay: 0.15, duration: 0.4 }}
                   className="space-y-5"
                 >
-                  {/* Faction Icon & Name */}
+                  {/* Path Icon & Name */}
                   <div className="flex items-center gap-3">
                     <div 
                       className="p-2 rounded-lg"
@@ -206,7 +206,7 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
                         background: `linear-gradient(135deg, ${expandedData.color}, ${expandedData.color}80)`,
                       }}
                     >
-                      Join {expandedData.name}
+                      Choose This Path
                       <ChevronRight className="ml-2" />
                     </Button>
                   </motion.div>

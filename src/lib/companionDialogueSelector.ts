@@ -213,6 +213,9 @@ const inferPreferredTonePack = (
   if (
     normalized.includes("calm")
     || normalized.includes("mentor")
+    || normalized.includes("gentle")
+    || normalized.includes("reflective")
+    || normalized.includes("faith-aware")
     || normalized.includes("grounded")
     || normalized.includes("supportive")
     || normalized.includes("wise")
@@ -223,6 +226,8 @@ const inferPreferredTonePack = (
 
   if (
     normalized.includes("strategic")
+    || normalized.includes("practical")
+    || normalized.includes("organized")
     || normalized.includes("analytical")
     || normalized.includes("efficient")
     || normalized.includes("systems")
@@ -233,6 +238,10 @@ const inferPreferredTonePack = (
   if (
     normalized.includes("alpha")
     || normalized.includes("chaotic")
+    || normalized.includes("steadfast")
+    || normalized.includes("courageous")
+    || normalized.includes("joyful")
+    || normalized.includes("playful")
     || normalized.includes("sharp")
     || normalized.includes("streetwise")
     || normalized.includes("irreverent")

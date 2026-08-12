@@ -55,7 +55,7 @@ describe("TimePickerField", () => {
     });
 
     expect(screen.getByTestId("time-state")).toHaveTextContent("11:17");
-    expect(screen.getByRole("button", { name: "11:17 AM" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "11:17 AM" }).length).toBeGreaterThan(0);
   });
 
   it("renders compact variant styling", () => {

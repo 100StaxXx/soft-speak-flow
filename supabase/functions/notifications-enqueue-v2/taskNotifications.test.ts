@@ -40,7 +40,7 @@ Deno.test("enqueues only the early reminder before the quest start time", () => 
     throw new Error(`Unexpected reminder dedupe key: ${rows[0].dedupeKey}`);
   }
 
-  if (rows[0].payload.url !== "/journeys?taskId=task-1") {
+  if (rows[0].payload.url !== "/advanced-planner?taskId=task-1") {
     throw new Error(`Expected reminder payload to route to the quest, got ${JSON.stringify(rows[0].payload)}`);
   }
 

@@ -46,10 +46,15 @@ import {
   isAiGeneratedCompanion,
   isPresetEggCompanion,
 } from "@/lib/companionPredicates";
+import {
+  CHRISTIAN_COMPANION_ART_BIBLE_VERSION,
+  getChristianCompanionForm,
+} from "@/config/christianCompanionForms";
 
 export interface Companion {
   id: string;
   user_id: string;
+  product_mode?: "graceward" | "cosmiq";
   preset_id?: string | null;
   favorite_color: string;
   spirit_animal: string;
@@ -460,6 +465,41 @@ interface CompanionAnimationPrewarmResponse {
 }
 
 const AI_COMPANION_IMAGE_REQUEST_KEY_PREFIX = "soft-speak-flow:ai-companion-image-request:";
+const MAX_CANONICAL_COMPANION_REFERENCE_BYTES = 750_000;
+
+const loadCanonicalCompanionReferenceDataUrl = async (
+  spiritAnimal: string,
+): Promise<string | null> => {
+  const form = getChristianCompanionForm(spiritAnimal);
+  if (!form || typeof fetch !== "function" || typeof btoa !== "function") return null;
+
+  try {
+    const response = await fetch(form.image);
+    if (!response.ok) return null;
+
+    const contentType = response.headers.get("content-type")?.toLowerCase() ?? "image/webp";
+    if (!contentType.startsWith("image/")) return null;
+
+    const buffer = await response.arrayBuffer();
+    if (buffer.byteLength === 0 || buffer.byteLength > MAX_CANONICAL_COMPANION_REFERENCE_BYTES) {
+      return null;
+    }
+
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+      binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+    }
+
+    return `data:${contentType};base64,${btoa(binary)}`;
+  } catch (error) {
+    logger.warn("Canonical companion reference could not be loaded", {
+      spiritAnimal,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+};
 
 const createClientRequestId = (): string => {
   if (typeof globalThis.crypto?.randomUUID === "function") {
@@ -1006,7 +1046,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
           ? data.favoriteColor?.trim() || getCompanionElementAnchorColor(normalizedElement)
           : getCompanionElementAnchorColor(normalizedElement);
         const resolvedSpiritAnimal = isAiCreation
-          ? data.spiritAnimal?.trim() || "Dragon"
+          ? data.spiritAnimal?.trim() || "Lamb"
           : data.spiritAnimal?.trim() || preset?.displayName || "Egg";
 
         logger.info("Companion creation started", {
@@ -1034,6 +1074,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
             favoriteColor: resolvedFavoriteColor,
             storyTone: data.storyTone,
             flowType: "ai_onboarding_egg",
+            artBibleVersion: CHRISTIAN_COMPANION_ART_BIBLE_VERSION,
             idempotencyKey: getAiCompanionImageRequestKey(
               user.id,
               JSON.stringify({
@@ -1042,6 +1083,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
                 favoriteColor: resolvedFavoriteColor,
                 storyTone: data.storyTone,
                 flowType: "ai_onboarding_egg",
+                artBibleVersion: CHRISTIAN_COMPANION_ART_BIBLE_VERSION,
               }),
             ),
           }
@@ -1052,9 +1094,15 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
             throw new Error("AI companion image request was not prepared.");
           }
 
+          const canonicalReferenceImageDataUrl =
+            await loadCanonicalCompanionReferenceDataUrl(resolvedSpiritAnimal);
+
           const { data: generatedImageData, error: generatedImageError } =
             await supabase.functions.invoke("generate-companion-image", {
-              body: aiImageRequest,
+              body: {
+                ...aiImageRequest,
+                canonicalReferenceImageDataUrl,
+              },
             });
 
           if (generatedImageError) {

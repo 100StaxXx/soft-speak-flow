@@ -2003,7 +2003,7 @@ export async function loadCompanionAgentContext(params: {
       params.supabase
         .from("profiles")
         .select(
-          "onboarding_data, current_habit_streak, longest_habit_streak, streak_at_risk, streak_at_risk_since, streak_freezes_available",
+          "onboarding_data, companion_memory_enabled, current_habit_streak, longest_habit_streak, streak_at_risk, streak_at_risk_since, streak_freezes_available",
         )
         .eq("id", params.userId)
         .maybeSingle(),
@@ -2185,8 +2185,12 @@ export async function loadCompanionAgentContext(params: {
       })),
   ];
 
+  const profileRecord = asRecord(profileResult.data);
+  const companionMemoryEnabled = profileRecord?.companion_memory_enabled !== false;
   const learningRecord = asRecord(aiLearning.data);
-  const profile = asRecord(learningRecord?.conversation_profile);
+  const profile = companionMemoryEnabled
+    ? asRecord(learningRecord?.conversation_profile)
+    : null;
   const profileGoals = Array.isArray(profile?.goals)
     ? profile?.goals.filter((entry): entry is string =>
       typeof entry === "string"
@@ -2196,19 +2200,19 @@ export async function loadCompanionAgentContext(params: {
     .map((campaign) => campaign.title)
     .filter((entry): entry is string => typeof entry === "string");
 
-  const profileRecord = asRecord(profileResult.data);
-
   const recentMemory = {
-    ai_learning: learningRecord,
-    ai_learning_peak_productivity_times: learningRecord
-      ?.peak_productivity_times,
+    ai_learning: companionMemoryEnabled ? learningRecord : null,
+    ai_learning_peak_productivity_times: companionMemoryEnabled
+      ? learningRecord?.peak_productivity_times
+      : null,
     ai_preferences: asRecord(aiPreferences),
     planner_preferences: asRecord(plannerPreferences.data),
     profile: profileRecord,
     profile_onboarding: asRecord(profileRecord?.onboarding_data),
-    callback_memories: (companionMemories.data ?? []) as Array<
-      Record<string, unknown>
-    >,
+    callback_memories: companionMemoryEnabled
+      ? (companionMemories.data ?? []) as Array<Record<string, unknown>>
+      : [],
+    companion_memory_enabled: companionMemoryEnabled,
   };
 
   const preferenceRecord = asRecord(aiPreferences);
@@ -2221,10 +2225,10 @@ export async function loadCompanionAgentContext(params: {
   const companionModeAdaptationEnabled =
     preferenceRecord?.companion_mode_adaptation_enabled !== false;
 
-  const reflectionRows = [
+  const reflectionRows = (companionMemoryEnabled ? [
     ...((reflections.data ?? []) as Array<Record<string, unknown>>),
     ...((dailyCheckIns.data ?? []) as Array<Record<string, unknown>>),
-  ]
+  ] : [])
     .sort((left, right) =>
       String(right.created_at ?? "").localeCompare(
         String(left.created_at ?? ""),

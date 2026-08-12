@@ -11,7 +11,7 @@ import type {
   UseUpdateAvailabilityResult,
 } from "@/types/updateAvailability";
 
-const IOS_BUNDLE_ID = "com.darrylgraham.revolution";
+const IOS_BUNDLE_ID = "com.darrylgraham.graceward";
 const IOS_LOOKUP_URL = `https://itunes.apple.com/lookup?bundleId=${IOS_BUNDLE_ID}`;
 const UPDATE_DISMISS_PREFIX = "update-dismissed";
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours

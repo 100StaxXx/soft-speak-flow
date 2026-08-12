@@ -4,7 +4,10 @@ import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { requireInternalRequest } from "../_shared/auth.ts";
 import { summarizeFunctionInvokeError } from "../_shared/functionInvokeError.ts";
 import { invokeInternalFunction } from "../_shared/internalFunctionAuth.ts";
-import { ACTIVE_MENTOR_SLUGS, selectThemeForDate } from "../_shared/mentorPepTalkConfig.ts";
+import {
+  ACTIVE_MENTOR_SLUGS,
+  selectThemeForDate,
+} from "../_shared/mentorPepTalkConfig.ts";
 import {
   buildReadyTranscriptState,
   buildRetryTranscriptState,
@@ -16,10 +19,20 @@ import {
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
-import { getDateAnchorForIsoDate, getUtcIsoDate } from "../_shared/effectiveDailyDate.ts";
+import {
+  getDateAnchorForIsoDate,
+  getUtcIsoDate,
+} from "../_shared/effectiveDailyDate.ts";
+import {
+  getDailyEncouragementSummary,
+  getDailyEncouragementTitle,
+} from "../_shared/dailyEncouragementCopy.ts";
+import { mapWithConcurrency } from "../_shared/concurrency.ts";
+
+const GENERATION_CONCURRENCY = 2;
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return handleCors(req);
   }
 
@@ -31,10 +44,10 @@ serve(async (req) => {
       return auth;
     }
 
-    console.log('Starting daily mentor pep talk generation...');
+    console.log("Starting daily mentor pep talk generation...");
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const costGuardrails = createCostGuardrailSession({
       supabase,
@@ -50,227 +63,311 @@ serve(async (req) => {
     const todayAnchor = getDateAnchorForIsoDate(todayDate);
     console.log(`Generating pep talks for date: ${todayDate}`);
 
-    const results = [];
-    const errors = [];
+    const results: Array<{
+      mentor: string;
+      status: string;
+      reason?: string;
+      id?: string;
+      title?: string;
+      category?: string;
+    }> = [];
+    const errors: Array<{ mentor: string; error: string }> = [];
 
-    for (const mentorSlug of ACTIVE_MENTOR_SLUGS) {
-      try {
-        console.log(`Processing mentor: ${mentorSlug}`);
-
-        // Check if already generated for today
-        const { data: existing, error: checkError } = await supabase
-          .from('daily_pep_talks')
-          .select('id')
-          .eq('mentor_slug', mentorSlug)
-          .eq('for_date', todayDate)
-          .maybeSingle();
-
-        if (checkError) {
-          console.error(`Error checking existing for ${mentorSlug}:`, checkError);
-          errors.push({ mentor: mentorSlug, error: checkError.message });
-          continue;
-        }
-
-        if (existing) {
-          console.log(`Pep talk already exists for ${mentorSlug} on ${todayDate}, skipping`);
-          results.push({ mentor: mentorSlug, status: 'skipped', reason: 'already_exists' });
-          continue;
-        }
-
-        const { theme, usedFallbackTheme } = selectThemeForDate(mentorSlug, todayAnchor);
-        if (usedFallbackTheme) {
-          console.warn(`Using fallback theme for mentor ${mentorSlug}`);
-        }
-        
-        console.log(`Selected theme for ${mentorSlug}:`, theme);
-
-        // Fetch mentor details
-        const { data: mentor, error: mentorError } = await supabase
-          .from('mentors')
-          .select('*')
-          .eq('slug', mentorSlug)
-          .maybeSingle();
-
-        if (mentorError || !mentor) {
-          console.error(`Error fetching mentor ${mentorSlug}:`, mentorError);
-          errors.push({ mentor: mentorSlug, error: 'Mentor not found' });
-          continue;
-        }
-
-        // Generate pep talk using existing function
-        console.log(`Calling generate-full-mentor-audio for ${mentorSlug}...`);
-        const generateResponse = await invokeInternalFunction("generate-full-mentor-audio", {
-          mentorSlug,
-          topic_category: theme.topic_category,
-          intensity: theme.intensity,
-          emotionalTriggers: theme.triggers,
-        });
-        const generateRaw = await generateResponse.text();
-        const generatedData = generateRaw.length > 0 ? JSON.parse(generateRaw) : null;
-
-        if (!generateResponse.ok || !generatedData) {
-          console.error(`Error generating audio for ${mentorSlug}:`, generateRaw);
-          errors.push({ mentor: mentorSlug, error: generateRaw || 'Generation failed' });
-          continue;
-        }
-
-        const { script, audioUrl } = generatedData;
-        
-        if (!script || !audioUrl) {
-          console.error(`Missing script or audioUrl for ${mentorSlug}`);
-          errors.push({ mentor: mentorSlug, error: 'Incomplete generation response' });
-          continue;
-        }
-
-        // Generate title and summary
-        const title = generateTitle(mentorSlug, theme.topic_category);
-        const summary = generateSummary(theme.topic_category, theme.triggers);
-
-        console.log(`Generated content for ${mentorSlug}: ${title}`);
-
-        // Insert into daily_pep_talks
-        const { data: dailyPepTalk, error: dailyInsertError } = await supabase
-          .from('daily_pep_talks')
-          .insert({
-            mentor_slug: mentorSlug,
-            topic_category: theme.topic_category,
-            emotional_triggers: theme.triggers,
-            intensity: theme.intensity,
-            title,
-            summary,
-            script,
-            audio_url: audioUrl,
-            for_date: todayDate,
-            transcript_status: TRANSCRIPT_STATUS_PENDING,
-            transcript_attempt_count: 0,
-            transcript_next_retry_at: new Date().toISOString(),
-          })
-          .select()
-          .single();
-
-        if (dailyInsertError) {
-          console.error(`Error inserting daily pep talk for ${mentorSlug}:`, dailyInsertError);
-          errors.push({ mentor: mentorSlug, error: dailyInsertError.message });
-          continue;
-        }
-
-        // Insert into main pep_talks library (automatic, no approval needed)
-        const { error: libraryInsertError } = await supabase
-          .from('pep_talks')
-          .insert({
-            title,
-            description: summary,
-            quote: script.substring(0, 200) + '...', // First 200 chars as quote
-            audio_url: audioUrl,
-            category: theme.topic_category,
-            topic_category: [theme.topic_category],
-            emotional_triggers: theme.triggers,
-            intensity: theme.intensity,
-            mentor_slug: mentorSlug,
-            mentor_id: mentor.id,
-            source: 'daily_auto',
-            for_date: todayDate,
-            is_featured: false,
-            is_premium: false,
-            transcript: []
-          });
-
-        if (libraryInsertError) {
-          console.error(`Error inserting to library for ${mentorSlug}:`, libraryInsertError);
-          // Don't fail the whole process if library insert fails
-        }
-
-        const currentAttemptCount = dailyPepTalk.transcript_attempt_count ?? 0;
-        const persistTranscriptState = async (payload: Record<string, unknown>) => {
-          const { error } = await supabase
-            .from('daily_pep_talks')
-            .update(payload)
-            .eq('id', dailyPepTalk.id);
-
-          if (error) {
-            console.error(`Failed to persist transcript state for ${mentorSlug}:`, error);
-          }
-        };
-
-        // Sync transcript for the daily pep talk to enable word-by-word highlighting
+    await mapWithConcurrency(
+      ACTIVE_MENTOR_SLUGS,
+      GENERATION_CONCURRENCY,
+      async (mentorSlug) => {
         try {
-          console.log(`Syncing transcript for daily pep talk ${dailyPepTalk.id}...`);
-          const syncResponse = await invokeInternalFunction("sync-daily-pep-talk-transcript", {
-            id: dailyPepTalk.id,
-          });
-          const syncRaw = await syncResponse.text();
-          const syncData = syncRaw.length > 0 ? JSON.parse(syncRaw) : null;
+          console.log(`Processing mentor: ${mentorSlug}`);
 
-          if (!syncResponse.ok) {
-            const summary = await summarizeFunctionInvokeError(new Error(syncRaw || `HTTP ${syncResponse.status}`));
-            console.error(`Transcript sync returned error for ${mentorSlug}:`, summary);
+          // Check if already generated for today
+          const { data: existing, error: checkError } = await supabase
+            .from("daily_pep_talks")
+            .select("id")
+            .eq("mentor_slug", mentorSlug)
+            .eq("for_date", todayDate)
+            .maybeSingle();
+
+          if (checkError) {
+            console.error(
+              `Error checking existing for ${mentorSlug}:`,
+              checkError,
+            );
+            errors.push({ mentor: mentorSlug, error: checkError.message });
+            return;
+          }
+
+          if (existing) {
+            console.log(
+              `Pep talk already exists for ${mentorSlug} on ${todayDate}, skipping`,
+            );
+            results.push({
+              mentor: mentorSlug,
+              status: "skipped",
+              reason: "already_exists",
+            });
+            return;
+          }
+
+          const { theme, usedFallbackTheme } = selectThemeForDate(
+            mentorSlug,
+            todayAnchor,
+          );
+          if (usedFallbackTheme) {
+            console.warn(`Using fallback theme for mentor ${mentorSlug}`);
+          }
+
+          console.log(`Selected theme for ${mentorSlug}:`, theme);
+
+          // Fetch mentor details
+          const { data: mentor, error: mentorError } = await supabase
+            .from("graceward_guides")
+            .select("*")
+            .eq("slug", mentorSlug)
+            .maybeSingle();
+
+          if (mentorError || !mentor) {
+            console.error(`Error fetching mentor ${mentorSlug}:`, mentorError);
+            errors.push({ mentor: mentorSlug, error: "Mentor not found" });
+            return;
+          }
+
+          // Generate pep talk using existing function
+          console.log(
+            `Calling generate-full-mentor-audio for ${mentorSlug}...`,
+          );
+          const generateResponse = await invokeInternalFunction(
+            "generate-full-mentor-audio",
+            {
+              mentorSlug,
+              topic_category: theme.topic_category,
+              intensity: theme.intensity,
+              emotionalTriggers: theme.triggers,
+            },
+          );
+          const generateRaw = await generateResponse.text();
+          const generatedData = generateRaw.length > 0
+            ? JSON.parse(generateRaw)
+            : null;
+
+          if (!generateResponse.ok || !generatedData) {
+            console.error(
+              `Error generating audio for ${mentorSlug}:`,
+              generateRaw,
+            );
+            errors.push({
+              mentor: mentorSlug,
+              error: generateRaw || "Generation failed",
+            });
+            return;
+          }
+
+          const { script, audioUrl } = generatedData;
+          const transcript = Array.isArray(generatedData.transcript)
+            ? generatedData.transcript
+            : [];
+          const hasWordTimestamps = transcript.length > 0;
+
+          if (!script || !audioUrl) {
+            console.error(`Missing script or audioUrl for ${mentorSlug}`);
+            errors.push({
+              mentor: mentorSlug,
+              error: "Incomplete generation response",
+            });
+            return;
+          }
+
+          // Generate title and summary
+          const title = getDailyEncouragementTitle(theme.topic_category);
+          const summary = getDailyEncouragementSummary(theme.topic_category);
+
+          console.log(`Generated content for ${mentorSlug}: ${title}`);
+
+          // Insert into daily_pep_talks
+          const { data: dailyPepTalk, error: dailyInsertError } = await supabase
+            .from("daily_pep_talks")
+            .insert({
+              mentor_slug: mentorSlug,
+              topic_category: theme.topic_category,
+              emotional_triggers: theme.triggers,
+              intensity: theme.intensity,
+              title,
+              summary,
+              script,
+              audio_url: audioUrl,
+              for_date: todayDate,
+              transcript,
+              transcript_status: hasWordTimestamps ? "ready" : TRANSCRIPT_STATUS_PENDING,
+              transcript_attempt_count: 0,
+              transcript_next_retry_at: hasWordTimestamps ? null : new Date().toISOString(),
+              transcript_ready_at: hasWordTimestamps ? new Date().toISOString() : null,
+              transcript_last_error: null,
+            })
+            .select()
+            .single();
+
+          if (dailyInsertError) {
+            console.error(
+              `Error inserting daily pep talk for ${mentorSlug}:`,
+              dailyInsertError,
+            );
+            errors.push({
+              mentor: mentorSlug,
+              error: dailyInsertError.message,
+            });
+            return;
+          }
+
+          // Insert into main pep_talks library (automatic, no approval needed)
+          const { error: libraryInsertError } = await supabase
+            .from("pep_talks")
+            .insert({
+              title,
+              description: summary,
+              quote: script.substring(0, 200) + "...", // First 200 chars as quote
+              audio_url: audioUrl,
+              category: theme.topic_category,
+              topic_category: [theme.topic_category],
+              emotional_triggers: theme.triggers,
+              intensity: theme.intensity,
+              mentor_slug: mentorSlug,
+              mentor_id: mentor.id,
+              source: "daily_auto",
+              for_date: todayDate,
+              is_featured: false,
+              is_premium: false,
+              transcript,
+            });
+
+          if (libraryInsertError) {
+            console.error(
+              `Error inserting to library for ${mentorSlug}:`,
+              libraryInsertError,
+            );
+            // Don't fail the whole process if library insert fails
+          }
+
+          const currentAttemptCount = dailyPepTalk.transcript_attempt_count ??
+            0;
+          const persistTranscriptState = async (
+            payload: Record<string, unknown>,
+          ) => {
+            const { error } = await supabase
+              .from("daily_pep_talks")
+              .update(payload)
+              .eq("id", dailyPepTalk.id);
+
+            if (error) {
+              console.error(
+                `Failed to persist transcript state for ${mentorSlug}:`,
+                error,
+              );
+            }
+          };
+
+          // Only repair fallback/legacy audio. ElevenLabs timing is already exact.
+          if (!hasWordTimestamps) try {
+            console.log(
+              `Syncing transcript for daily pep talk ${dailyPepTalk.id}...`,
+            );
+            const syncResponse = await invokeInternalFunction(
+              "sync-daily-pep-talk-transcript",
+              {
+                id: dailyPepTalk.id,
+              },
+            );
+            const syncRaw = await syncResponse.text();
+            const syncData = syncRaw.length > 0 ? JSON.parse(syncRaw) : null;
+
+            if (!syncResponse.ok) {
+              const summary = await summarizeFunctionInvokeError(
+                new Error(syncRaw || `HTTP ${syncResponse.status}`),
+              );
+              console.error(
+                `Transcript sync returned error for ${mentorSlug}:`,
+                summary,
+              );
+              const retryState = buildRetryTranscriptState({
+                currentAttemptCount,
+                errorMessage: summary.body ?? summary.message,
+              });
+              await persistTranscriptState(retryState.update);
+            } else {
+              const syncPayload = (syncData && typeof syncData === "object")
+                ? syncData as Record<string, unknown>
+                : {};
+              const parsedPayload = parseTranscriptSyncPayload(syncPayload);
+              const libraryRowsUpdated =
+                typeof syncPayload.libraryRowsUpdated === "number"
+                  ? syncPayload.libraryRowsUpdated
+                  : 0;
+              const warning = typeof syncPayload.warning === "string"
+                ? syncPayload.warning
+                : null;
+
+              if (
+                parsedPayload.hasWordTimestamps && parsedPayload.wordCount > 0
+              ) {
+                await persistTranscriptState(
+                  buildReadyTranscriptState(currentAttemptCount),
+                );
+              } else {
+                const retryState = buildRetryTranscriptState({
+                  currentAttemptCount,
+                  errorMessage: parsedPayload.error ??
+                    warning ??
+                    "Transcription returned no word-level timestamps",
+                });
+                await persistTranscriptState(retryState.update);
+              }
+
+              console.log(`✓ Transcript synced for ${mentorSlug}`, {
+                updated: syncPayload.updated === true,
+                hasWordTimestamps: parsedPayload.hasWordTimestamps,
+                wordCount: parsedPayload.wordCount,
+                retryRecommended: parsedPayload.retryRecommended,
+                transcriptChanged: syncPayload.transcriptChanged === true,
+                libraryUpdated: syncPayload.libraryUpdated === true,
+                libraryRowsUpdated,
+                warning,
+              });
+            }
+          } catch (syncError) {
+            const summary = await summarizeFunctionInvokeError(syncError);
+            console.error(
+              `Failed to sync transcript for ${mentorSlug}:`,
+              summary,
+            );
             const retryState = buildRetryTranscriptState({
               currentAttemptCount,
               errorMessage: summary.body ?? summary.message,
             });
             await persistTranscriptState(retryState.update);
-          } else {
-            const syncPayload = (syncData && typeof syncData === "object")
-              ? syncData as Record<string, unknown>
-              : {};
-            const parsedPayload = parseTranscriptSyncPayload(syncPayload);
-            const libraryRowsUpdated =
-              typeof syncPayload.libraryRowsUpdated === "number" ? syncPayload.libraryRowsUpdated : 0;
-            const warning = typeof syncPayload.warning === "string" ? syncPayload.warning : null;
-
-            if (parsedPayload.hasWordTimestamps && parsedPayload.wordCount > 0) {
-              await persistTranscriptState(buildReadyTranscriptState(currentAttemptCount));
-            } else {
-              const retryState = buildRetryTranscriptState({
-                currentAttemptCount,
-                errorMessage:
-                  parsedPayload.error ??
-                  warning ??
-                  "Transcription returned no word-level timestamps",
-              });
-              await persistTranscriptState(retryState.update);
-            }
-
-            console.log(`✓ Transcript synced for ${mentorSlug}`, {
-              updated: syncPayload.updated === true,
-              hasWordTimestamps: parsedPayload.hasWordTimestamps,
-              wordCount: parsedPayload.wordCount,
-              retryRecommended: parsedPayload.retryRecommended,
-              transcriptChanged: syncPayload.transcriptChanged === true,
-              libraryUpdated: syncPayload.libraryUpdated === true,
-              libraryRowsUpdated,
-              warning,
-            });
+            // Non-blocking - continue even if transcript sync fails
           }
-        } catch (syncError) {
-          const summary = await summarizeFunctionInvokeError(syncError);
-          console.error(`Failed to sync transcript for ${mentorSlug}:`, summary);
-          const retryState = buildRetryTranscriptState({
-            currentAttemptCount,
-            errorMessage: summary.body ?? summary.message,
+
+          console.log(
+            `✓ Successfully generated daily pep talk for ${mentorSlug}`,
+          );
+          results.push({
+            mentor: mentorSlug,
+            status: "success",
+            id: dailyPepTalk.id,
+            title,
+            category: theme.topic_category,
           });
-          await persistTranscriptState(retryState.update);
-          // Non-blocking - continue even if transcript sync fails
+        } catch (error) {
+          console.error(`Error processing ${mentorSlug}:`, error);
+          const errorMessage = error instanceof Error
+            ? error.message
+            : "Unknown error";
+          errors.push({ mentor: mentorSlug, error: errorMessage });
         }
+      },
+    );
 
-        console.log(`✓ Successfully generated daily pep talk for ${mentorSlug}`);
-        results.push({ 
-          mentor: mentorSlug, 
-          status: 'success', 
-          id: dailyPepTalk.id,
-          title,
-          category: theme.topic_category
-        });
-
-      } catch (error) {
-        console.error(`Error processing ${mentorSlug}:`, error);
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        errors.push({ mentor: mentorSlug, error: errorMessage });
-      }
-    }
-
-    console.log('Daily generation complete. Results:', results);
-    console.log('Errors:', errors);
+    console.log("Daily generation complete. Results:", results);
+    console.log("Errors:", errors);
 
     return new Response(
       JSON.stringify({
@@ -278,58 +375,24 @@ serve(async (req) => {
         date: todayDate,
         generated: results.length,
         results,
-        errors
+        errors,
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
-
   } catch (error) {
     if (isCostGuardrailBlockedError(error)) {
       return buildCostGuardrailBlockedResponse(error, corsHeaders);
     }
-    console.error('Fatal error in daily generation:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error("Fatal error in daily generation:", error);
+    const errorMessage = error instanceof Error
+      ? error.message
+      : "Unknown error";
     return new Response(
       JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   }
 });
-
-function generateTitle(mentorSlug: string, category: string): string {
-  const titles: Record<string, string[]> = {
-    discipline: ['Lock In and Execute', 'Stay Consistent Today', 'Build Your Discipline', 'No Excuses, Just Action'],
-    confidence: ['Step Into Your Power', 'Believe in Yourself', 'Own Your Worth', 'Rise Above Doubt'],
-    physique: ['Train Like a Champion', 'Push Your Limits', 'Build Your Body', 'Strength Is Earned'],
-    focus: ['Stay Locked In', 'Focus on What Matters', 'Eliminate Distractions', 'Sharp Mind, Clear Goals'],
-    mindset: ['Shift Your Perspective', 'Master Your Mind', 'Think Bigger Today', 'Growth Starts Here'],
-    business: ['Execute Your Vision', 'Build Your Empire', 'Make It Happen', 'Business Moves Today'],
-    strategy: ['Find the Signal', 'Choose the Leverage Point', 'See the Pattern', 'Make the Clean Move'],
-    boundaries: ['Protect the Standard', 'Choose What Aligns', 'Hold the Line', 'Respect Your Energy'],
-    habits: ['Build the Ritual', 'Repeat the Standard', 'Small Steps, Real Trust', 'Return to the Routine'],
-    identity: ['Act Like the Future You', 'Become on Purpose', 'Choose Your Standard', 'Move in Alignment'],
-    reflection: ['Read the Pattern', 'Learn From This Season', 'Find the Clear Lesson', 'Step Back and See']
-  };
-
-  const categoryTitles = titles[category] || ['Take Action Today'];
-  const randomIndex = Math.floor(Math.random() * categoryTitles.length);
-  return categoryTitles[randomIndex];
-}
-
-function generateSummary(category: string, triggers: string[]): string {
-  const summaries: Record<string, string> = {
-    discipline: 'A powerful reminder to stay consistent and take action, no matter how you feel.',
-    confidence: 'Build unshakeable confidence and step into your power with clarity and purpose.',
-    physique: 'Push your physical limits and transform your body through dedication and effort.',
-    focus: 'Cut through distractions and lock in on what truly matters for your success.',
-    mindset: 'Shift your thinking, overcome mental blocks, and embrace a growth-oriented perspective.',
-    business: 'Take strategic action and build momentum toward your entrepreneurial goals.',
-    strategy: 'Separate signal from noise and choose the highest-leverage next move.',
-    boundaries: 'Protect your energy, honor your standard, and choose what truly aligns.',
-    habits: 'Build sustainable consistency through small routines you can trust.',
-    identity: 'Make choices that reinforce the person you are becoming.',
-    reflection: 'Step back, read the pattern clearly, and carry the lesson forward.'
-  };
-
-  return summaries[category] || 'A daily push to help you move forward with purpose and intention.';
-}

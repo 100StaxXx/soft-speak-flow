@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PageTransition } from "@/components/PageTransition";
-import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { useToast } from "@/hooks/use-toast";
 import { useResilience } from "@/contexts/ResilienceContext";
 import type { SupportReportCategory, SupportReportPayload } from "@/types/resilience";
@@ -70,7 +69,7 @@ export default function SupportReport() {
 
   const pageTitle = isFeedbackCategory ? "Send Feedback" : "Report a Problem";
   const pageDescription = isFeedbackCategory
-    ? "Share ideas, feature requests, or anything that would make Cosmiq better. If you're offline or services are down, this feedback will be queued and sent later."
+    ? "Share ideas, feature requests, or anything that would make Graceward better. If you're offline or services are down, this feedback will be queued and sent later."
     : "Tell us what happened. If you're offline or services are down, this report will be queued and sent later.";
   const messageLabel = isFeedbackCategory ? "What would you like to share?" : "What happened?";
   const messagePlaceholder = isFeedbackCategory
@@ -166,8 +165,7 @@ export default function SupportReport() {
 
   return (
     <PageTransition>
-      <StarfieldBackground />
-      <div className="relative z-10 min-h-screen pb-nav-safe">
+      <div className="daily-way-page relative z-10 min-h-screen pb-nav-safe">
         <div className="mx-auto max-w-3xl px-4 py-8">
           <div className="pt-safe-top">
             <Button variant="ghost" className="mb-4" onClick={() => navigate(-1)}>

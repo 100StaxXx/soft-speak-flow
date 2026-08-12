@@ -12,6 +12,14 @@ import {
   evaluateSpiritLockTextCompliance,
   resolveCompanionSpiritLockProfile,
 } from "../_shared/companionSpiritLock.ts";
+import {
+  buildGracewardFormationMemory,
+  resolveGracewardCompanionStoryChapter,
+} from "../_shared/gracewardCompanionStory.ts";
+import {
+  buildCompanionSpeciesIdentityPromptBlock,
+  resolveCompanionSpeciesIdentity,
+} from "../_shared/companionSpeciesIdentity.ts";
 
 // Helper function to convert hex colors to descriptive names
 function getColorName(color: string): string {
@@ -80,26 +88,12 @@ function sanitizeHexCodes(text: string): string {
   });
 }
 
-const EVOLUTION_THEMES = [
-  "Fate sleeping",              // Stage 0: Egg
-  "First awakening",            // Stage 1: Hatchling
-  "Young courage",              // Stage 2: Youngling
-  "Curious growth",             // Stage 3: Juvenile
-  "A path appears",             // Stage 4: Scout
-  "Strength takes form",        // Stage 5: Warrior
-  "A vow to protect",           // Stage 6: Guardian
-  "Victory calls",              // Stage 7: Champion
-  "Power ascends",              // Stage 8: Ascended
-  "Titanic presence",           // Stage 9: Titan
-  "Mythic calling",             // Stage 10: Mythic
-  "Prime mastery",              // Stage 11: Prime
-  "Transcendent horizon",       // Stage 12: Transcendent
-  "Apex becoming",              // Stage 13: Apex
-  "Ultimate existence"          // Stage 14: Ultimate Form
-];
-
 // Species anatomical traits for accuracy - ALL 66 ANIMALS SUPPORTED
 const SPECIES_TRAITS: Record<string, string> = {
+  // Graceward biblical-symbolic companions
+  "Lamb": "Natural four-legged lamb with dense white wool, broad gentle ears, a short sheep muzzle, cloven hooves, and soft attentive movements",
+  "Stag": "Natural red stag with four long deer legs, cloven hooves, a long deer face, large alert ears, and age-appropriate symmetrical branching antlers",
+  "Dove": "Natural compact white dove with two pink legs, two feathered wings, a small pale beak, round dark eyes, and a short fan tail",
   // Canines
   "Wolf": "Four-legged canine with powerful legs, flowing fur, pointed ears, and a long bushy tail",
   "Fox": "Four-legged canine with slender build, pointed ears, bushy tail, and agile movements",
@@ -264,6 +258,40 @@ serve(async (req) => {
     const userGoal = onboardingData.userGoal || "achieving personal growth";
     const userPersonality = onboardingData.userPersonality || "determined";
     const creaturePersonality = onboardingData.creaturePersonality || "loyal and brave";
+    const storyChapter = resolveGracewardCompanionStoryChapter(stage);
+    const isCosmiqCompanion = companion.product_mode === "cosmiq";
+    const productName = isCosmiqCompanion ? "Cosmiq" : "Graceward";
+    const productStoryPrinciples = isCosmiqCompanion
+      ? `COSMIQ STORY PRINCIPLES:
+• The companion grows through the user's progress, choices, quests, and returning bond.
+• Preserve the selected Cosmiq species, element, anatomy, and established fantasy identity across every chapter.
+• Keep wonder playful and adventurous without importing Graceward-specific faith language, formation claims, or Guide theology.
+• Avoid punitive streak language, fear-based grinding, chosen-one clichés, and empty power escalation.`
+      : `GRACEWARD STORY PRINCIPLES:
+• The companion grows because the user keeps taking honest daily steps, not because of grinding, fear, or perfection.
+• The Guide offers encouragement and reflection; the companion remembers, reacts, plays, and travels beside the user. Keep those roles connected but distinct.
+• Make the world feel explorable, surprising, and alive while grounding the emotional meaning in grace, courage, stewardship, hope, and faithful return.
+• Never imply that the companion is divine, speaks for God, grants spiritual authority, or should be worshiped.
+• Avoid occult ritual, cosmic destiny claims, punitive streak language, and empty power escalation.`;
+    const productWritingRules = isCosmiqCompanion
+      ? `• Say Cosmiq when the product world needs a name; never say Graceward.
+• Use the shared eight-stage progression while preserving the companion's existing Cosmiq lineage.
+• Keep the user and creature as companions, not commander and tool.`
+      : `• Say Graceward when the product world needs a name; never say Cosmiq.
+• Use the current eight-stage Graceward progression only.
+• Keep the user and creature as companions, not commander and tool.
+• Keep physical behavior true to the selected animal. A Lamb nuzzles and steps on cloven hooves; a Lion stretches and uses feline paws; a Stag bows and listens with ears and antlers; a Dove hops, bobs, and settles its wings; an Eagle mantles, turns, and grips with talons; a Wolf scents, play-bows, and sweeps its tail.`;
+
+    const { data: recentDailyThreads, error: dailyThreadError } = await supabaseClient
+      .from('daily_guide_threads')
+      .select('thread_date, mentor_name, focus_label, companion_answer_label, encouragement_completed_at, practice_completed_at, evening_reflected_at')
+      .eq('user_id', user.id)
+      .order('thread_date', { ascending: false })
+      .limit(5);
+    if (dailyThreadError) {
+      console.warn('Recent Graceward formation memory was unavailable:', dailyThreadError.message);
+    }
+    const formationMemory = buildGracewardFormationMemory(recentDailyThreads);
 
     // Get previous chapters for continuity with smart truncation
     let memoryNotes = "This is the beginning of your journey.";
@@ -305,6 +333,12 @@ serve(async (req) => {
     }
 
     const speciesTraits = getSpeciesTraits(companion.spirit_animal);
+    const speciesIdentity = resolveCompanionSpeciesIdentity(
+      companion.spirit_animal,
+    );
+    const speciesIdentityPromptBlock = speciesIdentity
+      ? buildCompanionSpeciesIdentityPromptBlock(speciesIdentity)
+      : null;
     const spiritLockProfile = resolveCompanionSpiritLockProfile(companion.spirit_animal);
     const spiritLockPromptBlock = spiritLockProfile
       ? buildSpiritLockPromptBlock(spiritLockProfile, "story")
@@ -317,21 +351,15 @@ serve(async (req) => {
       stage,
     });
 
-    // Build the V2 story generation prompt
-    const storyPrompt = `You are STORY ENGINE V2 — a refined mythic adventure generator that produces a single chapter of a personalized hero journey for the user and their evolving creature companion.
+    // Keep installed Cosmiq lineages available without leaking Graceward's
+    // product identity or formation theology into their legacy story content.
+    const storyPrompt = `You are the ${productName.toUpperCase()} COMPANION STORY ENGINE. Write one emotionally resonant chapter in a growing game-like world shared by the user and their living creature companion.
 
-Your goals:
-• tell a consistent, emotionally resonant story
-• preserve anatomical accuracy of the chosen creature
-• escalate scale, stakes, and epicness with each evolution stage
-• mirror the user's real-life goal in symbolic story beats
-• maintain continuity with previous chapters
-• deepen the bond between user and creature
-• introduce clean lore that gets richer as the story progresses
-• integrate elemental, species-specific, and color-specific visuals naturally
-• NEVER alter creature anatomy; only grow or enhance it
+${productStoryPrinciples}
+• Preserve the creature's species and anatomy. Growth can add maturity, confidence, movement, markings, and elemental expression—not a different species.
+${speciesIdentityPromptBlock ? `\n${speciesIdentityPromptBlock}\n` : ''}
 
-USER VARIABLES:
+USER AND COMPANION:
 - User Name: ${userName}
 - Creature Species: ${companion.spirit_animal}
 - Species Traits: ${speciesTraits}
@@ -342,65 +370,58 @@ USER VARIABLES:
 - Creature Personality: ${creaturePersonality}
 - User Personality: ${userPersonality}
 - User Goal: ${userGoal}
-- Evolution Stage: ${stage} (${EVOLUTION_THEMES[stage]})
-- Tone: ${tonePreference}
-- Memory Notes: ${memoryNotes}
+- ${productName} Level: ${stage}
+- Visual Form: Stage ${storyChapter.visualStage} • ${storyChapter.formName}
+- Chapter Frame: ${storyChapter.chapterTitle}
+- Chapter Theme: ${storyChapter.theme}
+- World Scale: ${storyChapter.worldScale}
+- Bond Development: ${storyChapter.bondDevelopment}
+- Tone Preference: ${tonePreference}
 
-STRUCTURE FOR EACH CHAPTER:
+RECENT ${isCosmiqCompanion ? "ACTIVITY" : "GUIDE-LED FORMATION"}:
+${formationMemory}
+
+PREVIOUS STORY MEMORY:
+${memoryNotes}
+
+CHAPTER STRUCTURE:
 
 1. **Chapter Title**
-   One cinematic, emotionally charged title aligned with the evolution stage theme.
+   A vivid title that belongs naturally inside the “${storyChapter.chapterTitle}” chapter frame.
 
 2. **Intro Line (1–2 sentences)**
-   A bold opening that instantly sets the mood and tone for this chapter.
+   Open on movement, discovery, or a creature behavior—not an abstract summary.
 
-3. **Main Story (80–120 words)**
-   A concise but powerful chapter that captures the essence of this evolution stage. Focus on ONE key moment. The chapter must:
-   • reflect the evolution stage theme (${EVOLUTION_THEMES[stage]})
-   ${stage === 0 ? '• CRITICAL: The companion is an EGG at this stage - NOT a formed creature yet\n   • Describe the egg itself: its appearance, colors, warmth, subtle movements or energy\n   • The user discovers/receives this mysterious egg - their first meeting with their future companion\n   • The egg should feel alive with potential, humming with dormant power\n   • Refer to it as "the egg" or similar - NEVER as the fully-formed creature\n   • Set the tone for an epic journey about to hatch into existence' : ''}
-   ${stage === 1 ? '• THE HATCHING: The creature emerges for the first time - small, vulnerable, but clearly showing its species traits' : ''}
-   • show clear, species-faithful physical evolution
-   • keep the creature anatomically consistent with ${speciesTraits}
-   • incorporate ${getColorName(companion.favorite_color)}, ${getColorName(companion.fur_color)}, and ${getColorName(companion.eye_color)} subtly and beautifully
-   • display elemental effects appropriate to ${companion.core_element}
-   • include at least one "Goal Mirror Moment" tied to "${userGoal}"
-   ${stage > 0 ? `• reference at least one detail from: ${memoryNotes}` : ''}
-   • escalate danger appropriate to stage tier:
-       ∙ Stages 0–4: local or natural threats
-       ∙ Stages 5–8: named foes or magical dangers
-       ∙ Stages 9–11: ancient or legendary forces
-       ∙ Stages 12–14: cosmiq or titanic threats
-   • deepen the bond between user and creature
-   • feel like part of a larger mythic arc
+3. **Main Story (100–160 words)**
+   Focus on one playable-feeling moment with a place, a choice, a complication, and a companion reaction. The chapter must:
+   • embody “${storyChapter.theme}” at the scale of ${storyChapter.worldScale}
+   ${stage === 0 ? '• Keep the companion inside the EGG. Show warmth, wobbling, listening, light, and the first response to the user; do not reveal a formed creature.' : ''}
+   ${stage === 1 ? '• Show the first hatch and vulnerable species-faithful movement. Let trust matter more than spectacle.' : ''}
+   • use species-faithful behavior based on: ${speciesTraits}
+   • let ${companion.core_element} appear through atmosphere and expression rather than changing anatomy
+   • mirror the real-life goal “${userGoal}” through a concrete choice
+   • use one true recent formation signal when available, but never claim the user completed something absent from the data
+   ${stage > 0 ? '• preserve at least one meaningful continuity detail from previous chapters when available' : ''}
+   • deepen the bond through action, play, attention, protection, or gentle return
+   • end with the world slightly more open than before
 
 4. **Bond Moment (1–2 sentences)**
-   A ritual-like emotional connection unique to this chapter.
+   Show an observable creature interaction: a nuzzle, listening tilt, wing/tail/ear movement, shared stillness, playful invitation, protective stance, or species-specific signature.
 
 5. **Life Lesson (1–2 sentences)**
-   A metaphorical lesson that subtly reinforces the user's real-life goal: "${userGoal}"
+   Offer a gentle insight connected to the user's actual goal. Never shame unfinished work.
 
-6. **Lore Expansion (3–7 bullet points)**
-   Must include:
-   • ONE "World Truth"
-   • ONE "Historical Reference"
-   • ONE "Foreshadowing Seed" for future chapters
-   • optional: elemental lore, species lore, geography, old myths
+6. **Lore Expansion (3–5 bullet points)**
+   Include one World Truth, one remembered Historical Reference, and one Foreshadowing Seed. Keep lore coherent and discoverable rather than encyclopedic.
 
 7. **Next Evolution Hook (1–2 sentences)**
-   A cliffhanger leading directly into the next chapter's evolution theme.
+   Open a question, place, relationship, or mystery that can continue. At Grand, open a new horizon rather than declaring a final ending.
 
 WRITING RULES:
-• Never contradict previous lore or biology
-• Never force evolution changes inappropriate for the species
-• Element is decoration, mood, and power — not transformation
-• Tone scales with stage + theme intensity
-• The story must feel handcrafted, not generic
-• Always keep the user at the emotional center
-• Creature growth mirrors user growth
-• Build a mythic epic chapter by chapter
-• Avoid repetition across stages
-• Use vivid but controlled sensory imagery
-• Maintain continuity through Memory Notes
+${productWritingRules}
+• Show the creature doing something physically expressive in every chapter.
+• Keep wonder warm and specific; avoid generic “chosen one,” universe-saving, and ultimate-power clichés.
+• Maintain continuity through Previous Story Memory and Recent Guide-led Formation.
 ${spiritLockPromptBlock ? `• SPIRIT LOCK (MANDATORY):\n${spiritLockPromptBlock.replace(/\n/g, '\n  ')}` : ''}
 
 CRITICAL: Respond ONLY in valid JSON format:
@@ -454,7 +475,9 @@ Generate now:`;
           messages: [
             {
               role: 'system',
-              content: 'You are STORY ENGINE V2, a master mythic storyteller. You create personalized hero journeys that maintain perfect continuity, anatomical accuracy, and emotional resonance. Always respond with valid JSON only. Never alter creature biology.'
+              content: isCosmiqCompanion
+                ? 'You are the Cosmiq Companion Story Engine. Create warm, playable fantasy chapters about an ever-growing creature bond. Preserve continuity, element, and creature biology. Never use Graceward branding or faith-specific formation claims. Always respond with valid JSON only.'
+                : 'You are the Graceward Companion Story Engine. Create warm, playable-feeling chapters about an ever-growing creature bond shaped by honest daily formation. Preserve continuity and creature biology. Never use Cosmiq branding. Always respond with valid JSON only.'
             },
             {
               role: 'user',
@@ -528,17 +551,19 @@ Generate now:`;
     };
 
     const buildMechanicalStoryFallback = () => ({
-      chapter_title: `Clockwork Ascension - Stage ${stage}`,
-      intro_line: `${companion.spirit_animal} stabilizes its alloy frame and locks into a higher precision cadence.`,
-      main_story: `${userName} stands beside ${companion.spirit_animal} as metallic scales settle into a reinforced lattice. Articulated joints calibrate in sequence, each movement aligned to mission-grade control. Gears spin in visible clockwork arcs around the chassis while an engineered energy core pulses with controlled ${companion.core_element.toLowerCase()} output. Their progress is not random; every cycle is measured, every upgrade earned through discipline.\n\nThe moment mirrors ${userGoal}: steady commitment compounding into undeniable strength. Together, they convert effort into exacting momentum and prepare for the next threshold.`,
+      chapter_title: `${storyChapter.chapterTitle}: The Clockwork Answer`,
+      intro_line: `${companion.spirit_animal} steadies its alloy frame, then turns toward ${userName} with an attentive pulse of light.`,
+      main_story: `${userName} stands beside ${companion.spirit_animal} as metallic scales settle into a familiar, living cadence. Its articulated joints calibrate one by one—not for a command, but to match the pace they have learned together. A controlled thread of ${companion.core_element.toLowerCase()} light travels through its core while the path ahead reveals a small obstruction that cannot be forced. ${userName} chooses patience, the same kind of steady commitment needed for ${userGoal}. The dragon lowers one wing to shelter the work, listens, and adjusts. Together they find an opening that strength alone would have missed. Beyond it, a new trail brightens, inviting their next honest step.`,
       bond_moment: `${userName} places a hand on the armored frame, and the core responds with a synchronized pulse.`,
-      life_lesson: `Consistency is engineered one precise action at a time. Reliable systems are built, not wished into existence.`,
+      life_lesson: isCosmiqCompanion
+        ? `Consistency grows through one attentive choice at a time. Returning to the path matters more than flawless control.`
+        : `Consistency grows through one attentive choice at a time. A faithful return matters more than flawless control.`,
       lore_expansion: [
-        "World Truth: The strongest guardians are forged through calibrated repetition.",
-        "Historical Reference: Ancient forge archives describe dragons that stored memory in rotating gear halos.",
-        "Foreshadowing Seed: A sealed protocol in the core awakens when all four mechanical anchors align.",
+        "World Truth: Living mechanisms remember the pace of those who care for them.",
+        "Historical Reference: Old workshop journals describe guardians that learned gentleness before strength.",
+        "Foreshadowing Seed: A quiet pattern inside the core points toward a trail not yet mapped.",
       ],
-      next_hook: `A new resonance begins inside the reactor, signaling the next upgrade path.`,
+      next_hook: `The new trail answers with a distant rhythm, and the dragon tilts its head as if it recognizes the way.`,
     });
 
     let storyData = await generateStoryPayload(storyPrompt);

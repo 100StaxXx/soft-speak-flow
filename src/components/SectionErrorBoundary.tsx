@@ -227,8 +227,8 @@ export const CompanionErrorBoundary = ({ children }: { children: ReactNode }) =>
 export const QuestsErrorBoundary = ({ children }: { children: ReactNode }) => (
   <SectionErrorBoundary
     section="quests"
-    title="Quests unavailable"
-    description="Unable to load your quests right now"
+    title="Daily actions unavailable"
+    description="Unable to load your daily actions right now"
   >
     {children}
   </SectionErrorBoundary>
@@ -238,7 +238,7 @@ export const HoroscopeErrorBoundary = ({ children }: { children: ReactNode }) =>
   <SectionErrorBoundary
     section="horoscope"
     title="Horoscope unavailable"
-    description="Unable to load Cosmiq insights right now"
+    description="Unable to load Graceward insights right now"
   >
     {children}
   </SectionErrorBoundary>

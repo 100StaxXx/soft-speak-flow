@@ -45,6 +45,7 @@ export interface Profile {
   // Quest behavior settings
   completed_tasks_stay_in_place: boolean | null;
   readable_quest_cards_enabled: boolean | null;
+  companion_memory_enabled: boolean;
 }
 
 export const useProfile = () => {
@@ -93,7 +94,8 @@ export const useProfile = () => {
           task_reminders_enabled,
           checkin_reminders_enabled,
           completed_tasks_stay_in_place,
-          readable_quest_cards_enabled
+          readable_quest_cards_enabled,
+          companion_memory_enabled
         `)
         .eq("id", user.id)
         .maybeSingle();
@@ -150,7 +152,8 @@ export const useProfile = () => {
             task_reminders_enabled,
             checkin_reminders_enabled,
             completed_tasks_stay_in_place,
-            readable_quest_cards_enabled
+            readable_quest_cards_enabled,
+            companion_memory_enabled
           `)
           .maybeSingle();
 

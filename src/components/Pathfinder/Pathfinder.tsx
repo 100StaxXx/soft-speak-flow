@@ -47,16 +47,12 @@ import { DeadlinePicker } from '@/components/JourneyWizard/DeadlinePicker';
 import { TimelineView } from '@/components/JourneyWizard/TimelineView';
 import { AdjustmentInput } from '@/components/JourneyWizard/AdjustmentInput';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
-import { useJourneysCompanionVisual } from '@/hooks/useJourneysCompanionVisual';
 import { usePlannerPathfinderAppearance } from '@/hooks/usePlannerPathfinderAppearance';
-import { EPIC_XP_REWARDS } from '@/config/xpRewards';
 import { hasReachedActiveCampaignLimit } from '@/features/epics/constants';
 import type { StoryTypeSlug } from '@/types/narrativeTypes';
 import type { ClarifyingQuestion } from '@/hooks/useIntentClassifier';
 import { getDefaultMonthDaysForFrequency, getDefaultWeekdaysForFrequency } from '@/utils/habitSchedule';
-import { CompanionImage, CompanionPortraitShell } from '@/components/CompanionImage';
-import { shouldContainCompanionSceneImage } from '@/lib/companionImageFocal';
-import { getCompanionFrostedThemeStyle } from '@/lib/companionFrostedTheme';
+import type { CompanionFrostedThemeStyle } from '@/lib/companionFrostedTheme';
 import {
   isValidCampaignMilestonePercent,
   normalizeCampaignMilestonePercentArray,
@@ -94,6 +90,45 @@ const DEFAULT_CLARIFICATION_QUESTIONS: ClarifyingQuestion[] = [
 ];
 
 type WizardStep = 'goal' | 'timeline' | 'suggestions' | 'review';
+
+const GRACEWARD_PATHFINDER_THEME_STYLE: CompanionFrostedThemeStyle = {
+  "--companion-frosted-color": "#3a5b40",
+  "--companion-frosted-background": "43 30% 96%",
+  "--companion-frosted-card": "45 35% 98%",
+  "--companion-frosted-secondary": "42 33% 90%",
+  "--companion-frosted-muted": "42 24% 89%",
+  "--companion-frosted-border": "132 12% 48%",
+  "--companion-frosted-input": "132 12% 48%",
+  "--companion-frosted-popover": "45 35% 98%",
+  "--companion-frosted-primary": "132 31% 30%",
+  "--companion-frosted-accent": "39 45% 60%",
+  "--companion-frosted-ring": "132 31% 30%",
+  "--companion-frosted-celestial-blue": "132 31% 30%",
+  "--companion-frosted-primary-rgb": "53, 100, 62",
+  "--background": "43 30% 96%",
+  "--foreground": "132 21% 16%",
+  "--card": "45 35% 98%",
+  "--card-foreground": "132 21% 16%",
+  "--popover": "45 35% 98%",
+  "--popover-foreground": "132 21% 16%",
+  "--primary": "132 31% 30%",
+  "--primary-foreground": "45 40% 98%",
+  "--secondary": "42 33% 90%",
+  "--secondary-foreground": "132 21% 16%",
+  "--muted": "42 24% 89%",
+  "--muted-foreground": "130 8% 36%",
+  "--accent": "39 45% 60%",
+  "--accent-foreground": "132 21% 16%",
+  "--border": "132 14% 79%",
+  "--input": "132 12% 48%",
+  "--ring": "132 31% 30%",
+  "--celestial-blue": "132 31% 30%",
+  "--stardust-gold": "132 31% 30%",
+  "--category-soul": "132 31% 30%",
+  "--epic-nature": "132 31% 30%",
+  "--deep-space": "132 21% 16%",
+  "--primary-rgb": "53, 100, 62",
+};
 
 interface PathfinderProps {
   open: boolean;
@@ -197,23 +232,13 @@ export function Pathfinder({
   const [timelineContext, setTimelineContext] = useState('');
   
   const { preferences } = useUserAIContext();
-  const { activeEpics } = useEpics({ enabled: open });
+  const { activeEpics = [] } = useEpics({ enabled: open });
   const { themeModeClassName } = usePlannerPathfinderAppearance();
   const hasReachedCampaignLimit = hasReachedActiveCampaignLimit(activeEpics.length);
-  const {
-    companionLabel,
-    imageUrl,
-    focalX,
-    focalY,
-    element,
-    usesPortraitShell,
-    favoriteColor,
-  } = useJourneysCompanionVisual();
   const resolvedCompanionFrostedThemeStyle = useMemo(
-    () => companionFrostedThemeStyle ?? getCompanionFrostedThemeStyle(favoriteColor),
-    [companionFrostedThemeStyle, favoriteColor],
+    () => companionFrostedThemeStyle ?? GRACEWARD_PATHFINDER_THEME_STYLE,
+    [companionFrostedThemeStyle],
   );
-  const usesGeneratedSceneAvatar = shouldContainCompanionSceneImage(imageUrl);
   const { trackInteraction } = useAIInteractionTracker();
   const { schedule, isLoading: isScheduleLoading, generateSchedule, adjustSchedule, toggleMilestone, updateMilestoneDate, reset: resetSchedule, setRituals, hydrateSchedule, postcardCount, maxPostcards } = useJourneySchedule();
   const [originalRituals, setOriginalRituals] = useState<JourneyRitual[]>([]);
@@ -459,7 +484,6 @@ export function Pathfinder({
     [schedule, selectedSuggestions]
   );
 
-  const calculateXP = useMemo(() => targetDays * EPIC_XP_REWARDS.XP_PER_DAY, [targetDays]);
   const currentCampaignBuilderDraftSnapshot = useMemo<Omit<CampaignBuilderDraftSnapshot, "version" | "updatedAt">>(() => ({
     step,
     goalInput,
@@ -698,7 +722,7 @@ export function Pathfinder({
     }));
 
     if (milestones?.some((milestone) => !isValidCampaignMilestonePercent(milestone.milestone_percent))) {
-      toast.error('Campaign plan needs an update', {
+      toast.error('Journey plan needs an update', {
         description: 'One of the generated milestones had an invalid percentage. Rebuild the plan and try again.',
       });
       return;
@@ -713,7 +737,7 @@ export function Pathfinder({
     }));
 
     if (phases?.some((phase) => !phase.start_date || !phase.end_date || !Number.isFinite(Number(phase.phase_order)))) {
-      toast.error('Campaign plan needs dates', {
+      toast.error('Journey plan needs dates', {
         description: 'One of the generated phases is missing dates. Rebuild the plan and try again.',
       });
       return;
@@ -815,41 +839,12 @@ export function Pathfinder({
   const stepDescriptions: Record<WizardStep, string> = {
     goal: 'Set your goal and deadline',
     timeline: 'Review your personalized timeline',
-    suggestions: 'Confirm your rituals and milestones',
-    review: 'Review and create your campaign',
+    suggestions: 'Confirm your rhythms and milestones',
+    review: 'Review and create your journey',
   };
-  const headerAvatar = usesPortraitShell && !usesGeneratedSceneAvatar ? (
-    <CompanionPortraitShell
-      src={imageUrl}
-      element={element}
-      className="h-12 w-12 overflow-hidden rounded-full border border-white/[0.15] shadow-[0_18px_32px_-26px_rgba(0,0,0,0.95)]"
-    >
-      <CompanionImage
-        src={imageUrl}
-        alt={companionLabel}
-        fit="portrait"
-        element={element}
-        focalX={focalX}
-        focalY={focalY}
-        className="rounded-full"
-      />
-    </CompanionPortraitShell>
-  ) : (
-    <div
-      className={cn(
-        "h-12 w-12 overflow-hidden rounded-full border border-white/[0.15] shadow-[0_18px_32px_-26px_rgba(0,0,0,0.95)]",
-        usesGeneratedSceneAvatar ? "bg-black" : "bg-white/10",
-      )}
-    >
-      <CompanionImage
-        src={imageUrl}
-        alt={companionLabel}
-        fit={usesGeneratedSceneAvatar ? "contain" : "cover"}
-        element={element}
-        focalX={focalX}
-        focalY={focalY}
-        className="rounded-full"
-      />
+  const headerAvatar = (
+    <div className="flex h-12 w-12 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-primary">
+      <Target className="h-6 w-6" />
     </div>
   );
 
@@ -875,7 +870,7 @@ export function Pathfinder({
                 />
               </div>
               <DialogHeader className="min-w-0 flex-1 space-y-1 text-left">
-                <DialogTitle className="text-xl text-foreground">Pathfinder</DialogTitle>
+                <DialogTitle className="text-xl text-foreground">Journey builder</DialogTitle>
                 <DialogDescription className="text-sm text-muted-foreground">
                   {stepDescriptions[step]}
                 </DialogDescription>
@@ -886,7 +881,7 @@ export function Pathfinder({
                 variant="outline"
                 className={cn("h-10 w-10 shrink-0", plannerPathfinderTheme.headerIconButton)}
                 onClick={handleClose}
-                aria-label="Close Pathfinder"
+                aria-label="Close journey builder"
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -957,7 +952,7 @@ export function Pathfinder({
                     >
                       <div className="space-y-4 py-4 text-foreground">
                         <div className={cn(plannerPathfinderTheme.raisedPanel, "space-y-3 p-4")}>
-                          <Label htmlFor="goal-input" className="text-base font-semibold text-stardust-gold">
+                          <Label htmlFor="goal-input" className="text-base font-semibold text-primary">
                             What's your goal?
                           </Label>
                           <div className="relative">
@@ -973,7 +968,7 @@ export function Pathfinder({
                               size="icon"
                               variant={isRecording ? 'default' : 'ghost'}
                               className={cn(
-                                "absolute right-3 top-3 h-10 w-10 rounded-full border border-[hsl(var(--celestial-blue)_/_0.3)] bg-card/80 text-[hsl(var(--celestial-blue))] shadow-[inset_0_1px_0_rgba(255,255,255,0.68)] hover:bg-card",
+                                "absolute right-3 top-3 h-10 w-10 rounded-full border border-input bg-card/80 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.68)] hover:border-primary hover:bg-card",
                                 isRecording && "animate-pulse border-category-body/70 bg-[linear-gradient(180deg,hsl(var(--category-body)_/_0.34)_0%,hsl(var(--destructive)_/_0.22)_100%)] text-category-body",
                               )}
                               onClick={handleVoiceToggle}
@@ -986,7 +981,7 @@ export function Pathfinder({
                         </div>
 
                         <div className={cn(plannerPathfinderTheme.mutedPanel, "space-y-3 p-4")}>
-                          <Label htmlFor="context-input" className="flex items-center gap-2 text-base font-semibold text-stardust-gold">
+                          <Label htmlFor="context-input" className="flex items-center gap-2 text-base font-semibold text-primary">
                             List current experience
                             <span className="text-sm font-normal text-muted-foreground">(optional)</span>
                           </Label>
@@ -1001,8 +996,8 @@ export function Pathfinder({
                         </div>
 
                         <div className={cn(plannerPathfinderTheme.raisedPanel, "space-y-3 p-4")}>
-                          <Label className="flex items-center gap-2 text-base font-semibold text-stardust-gold">
-                            <Calendar className="w-4 h-4 text-celestial-blue" />
+                          <Label className="flex items-center gap-2 text-base font-semibold text-primary">
+                            <Calendar className="w-4 h-4 text-primary" />
                             When do you need to achieve this?
                           </Label>
                           <DeadlinePicker
@@ -1150,7 +1145,7 @@ export function Pathfinder({
                         )}
 
                         <div className={cn(plannerPathfinderTheme.raisedPanel, "space-y-3 p-4")}>
-                          <div className="flex items-center gap-2 text-sm font-semibold text-stardust-gold">
+                          <div className="flex items-center gap-2 text-sm font-semibold text-primary">
                             <Flag className="h-4 w-4 text-epic-nature" />
                             Milestones ({selectedMilestones.length})
                           </div>
@@ -1214,12 +1209,12 @@ export function Pathfinder({
                     >
                       <div className="space-y-4 py-4 text-foreground">
                         <div className={cn(plannerPathfinderTheme.raisedPanel, "space-y-3 p-4")}>
-                          <Label htmlFor="epic-why" className="text-stardust-gold">Your Why</Label>
+                          <Label htmlFor="epic-why" className="text-primary">Your Why</Label>
                           <Textarea
                             id="epic-why"
                             value={epicWhy}
                             onChange={(e) => setEpicWhy(e.target.value)}
-                            placeholder="Why are you embarking on this campaign? What's your purpose?"
+                            placeholder="Why does this journey matter? What good are you making room for?"
                             rows={3}
                             className={cn(plannerPathfinderTheme.textField, "min-h-[132px]")}
                           />
@@ -1234,12 +1229,12 @@ export function Pathfinder({
                             animate={{ opacity: 1, y: 0 }}
                             className={cn(plannerPathfinderTheme.mutedPanel, "space-y-3 p-4")}
                           >
-                            <Label htmlFor="epic-title" className="text-stardust-gold">Campaign Name</Label>
+                            <Label htmlFor="epic-title" className="text-primary">Journey name</Label>
                             <Input
                               id="epic-title"
                               value={epicTitle}
                               onChange={(e) => setEpicTitle(e.target.value)}
-                              placeholder="Name your campaign"
+                              placeholder="Name your journey"
                               className={plannerPathfinderTheme.textField}
                             />
                           </motion.div>
@@ -1249,12 +1244,12 @@ export function Pathfinder({
                           <div className="flex items-center justify-between gap-3">
                             <div className="flex items-center gap-2">
                               <Zap className="h-5 w-5 text-epic-nature" />
-                              <span className="font-medium">Completion Reward</span>
+                              <span className="font-medium">Plan summary</span>
                             </div>
-                            <span className="text-xl font-bold">+{calculateXP} XP</span>
+                            <span className="text-xl font-bold">{targetDays} days</span>
                           </div>
                           <p className="mt-1 text-xs text-epic-nature/85">
-                            {targetDays} days • {selectedHabits.length} rituals • {selectedMilestones.length} milestones
+                            {selectedHabits.length} rhythms • {selectedMilestones.length} milestones
                           </p>
                         </div>
                       </div>
@@ -1280,7 +1275,7 @@ export function Pathfinder({
                         ) : (
                           <>
                             <Target className="mr-2 h-4 w-4" />
-                            Create Campaign
+                            Create journey
                           </>
                         )}
                       </Button>

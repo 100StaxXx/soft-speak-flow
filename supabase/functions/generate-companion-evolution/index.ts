@@ -23,20 +23,27 @@ import {
   resolveCompanionSpiritLockProfile,
 } from "../_shared/companionSpiritLock.ts";
 import {
+  buildCompanionSpeciesIdentityPromptBlock,
+  resolveCompanionSpeciesIdentity,
+} from "../_shared/companionSpeciesIdentity.ts";
+import {
   buildBoundaryEvolutionGenerationPrompt,
   buildCompanionGenerationMetadata,
   buildStage1BootstrapPrompt,
   coerceCompanionVisualAnchors,
   coerceImageLineageMetadata,
   getEvolutionDifferenceFloor,
-  getHiddenBoundaryAnchor,
+  getApprovedHiddenBoundaryAnchor,
   shouldGeneratePortraitForStage,
   synthesizeVisualIdentityProfile,
   updateLineageMetadataAfterBoundaryEvolution,
   updateLineageMetadataAfterReveal,
   updateLineageMetadataWithVisualAnchors,
 } from "../_shared/companionLineage.ts";
-import { generateCompanionImage } from "../_shared/openaiCompanionImageClient.ts";
+import {
+  editCompanionImage,
+  generateCompanionImage,
+} from "../_shared/openaiCompanionImageClient.ts";
 import { judgeCompanionImage } from "../_shared/companionImageJudge.ts";
 import { extractCompanionVisualAnchors } from "../_shared/companionVisualAnchors.ts";
 import { maybeEnqueueCompanionAnimationJob } from "../_shared/companionAnimationJobs.ts";
@@ -44,8 +51,15 @@ import {
   coerceCompanionElementId,
   coerceCompanionPresetId,
   COMPANION_PRESET_BUCKET,
+  hasBundledYouthCompanionPresetAssets,
+  hasRemoteCompanionPresetStageAssetCoverage,
+  resolveBundledYouthCompanionAssetPath,
   resolveCompanionAssetPath,
 } from "../../../src/config/companionCatalog.ts";
+import {
+  COSMIQ_CANONICAL_ASSET_BUCKET,
+  getCosmiqCanonicalCompanionAssetDescriptor,
+} from "../../../src/config/cosmiqCanonicalCompanionAssets.ts";
 import {
   getNextUnclaimedVisualStageBoundaryLevel,
   resolveProgressionLevelFromXp,
@@ -68,16 +82,51 @@ const JUDGE_MINIMUMS = {
   overall: 7,
   continuity: 6,
   anatomy: 6,
+  stageMaturity: 8,
   backgroundCutout: 7,
 };
 const EVOLUTION_QUALITY_GATE_CODE = "evolution_quality_gate_failed";
 const EVOLUTION_CONTINUITY_UNVERIFIED_CODE = "evolution_continuity_unverified";
-const EVOLUTION_VALIDATION_UNAVAILABLE_CODE = "evolution_validation_unavailable";
+const EVOLUTION_VALIDATION_UNAVAILABLE_CODE =
+  "evolution_validation_unavailable";
+const CANONICAL_CHRISTIAN_COMPANION_BUCKET = "mentors-avatars";
+const CANONICAL_CHRISTIAN_COMPANION_PATH = "canonical/christian/v2";
+const CANONICAL_CHRISTIAN_COMPANION_IDS = new Map<string, string>([
+  ["dove", "dove"],
+  ["eagle", "eagle"],
+  ["lamb", "lamb"],
+  ["lion", "lion"],
+  ["stag", "stag"],
+  ["wolf", "wolf"],
+]);
+
+export const resolveCanonicalChristianCompanionImageUrl = ({
+  supabaseUrl,
+  spiritAnimal,
+}: {
+  supabaseUrl: string;
+  spiritAnimal: string | null | undefined;
+}): string | null => {
+  const normalizedSpiritAnimal = typeof spiritAnimal === "string"
+    ? spiritAnimal.trim().toLowerCase()
+    : "";
+  const companionId = CANONICAL_CHRISTIAN_COMPANION_IDS.get(
+    normalizedSpiritAnimal,
+  );
+
+  if (!companionId) return null;
+
+  return `${
+    supabaseUrl.replace(/\/+$/, "")
+  }/storage/v1/object/public/${CANONICAL_CHRISTIAN_COMPANION_BUCKET}/${CANONICAL_CHRISTIAN_COMPANION_PATH}/${companionId}.webp`;
+};
 
 const getJudgeBackgroundCutoutScore = (
   scores: Awaited<ReturnType<typeof judgeCompanionImage>>,
 ): number =>
-  scores && typeof scores.backgroundCutout === "number" ? scores.backgroundCutout : 0;
+  scores && typeof scores.backgroundCutout === "number"
+    ? scores.backgroundCutout
+    : 0;
 
 class EvolutionQualityGateError extends Error {
   code: string;
@@ -232,6 +281,7 @@ const judgeScoresPass = ({
     scores.overall < JUDGE_MINIMUMS.overall ||
     scores.continuity < JUDGE_MINIMUMS.continuity ||
     scores.anatomy < JUDGE_MINIMUMS.anatomy ||
+    (mode === "bootstrap" && scores.stageMaturity < JUDGE_MINIMUMS.stageMaturity) ||
     getJudgeBackgroundCutoutScore(scores) < JUDGE_MINIMUMS.backgroundCutout
   ) {
     return false;
@@ -284,6 +334,7 @@ export interface GenerateCompanionEvolutionDeps {
   resolveCompanionImageSizeForUser: typeof resolveCompanionImageSizeForUser;
   createCostGuardrailSession: typeof createCostGuardrailSession;
   generateCompanionImage: typeof generateCompanionImage;
+  editCompanionImage?: typeof editCompanionImage;
   judgeCompanionImage: typeof judgeCompanionImage;
   extractCompanionVisualAnchors: typeof extractCompanionVisualAnchors;
   registerUserStorageAsset: typeof registerUserStorageAsset;
@@ -301,6 +352,7 @@ const defaultGenerateCompanionEvolutionDeps: GenerateCompanionEvolutionDeps = {
   resolveCompanionImageSizeForUser,
   createCostGuardrailSession,
   generateCompanionImage,
+  editCompanionImage,
   judgeCompanionImage,
   extractCompanionVisualAnchors,
   registerUserStorageAsset,
@@ -327,6 +379,7 @@ export const handleGenerateCompanionEvolution = async (
     resolveCompanionImageSizeForUser: resolveCompanionImageSizeForUserFn,
     createCostGuardrailSession: createCostGuardrailSessionFn,
     generateCompanionImage: generateCompanionImageFn,
+    editCompanionImage: editCompanionImageFn,
     judgeCompanionImage: judgeCompanionImageFn,
     extractCompanionVisualAnchors: extractCompanionVisualAnchorsFn,
     registerUserStorageAsset: registerUserStorageAssetFn,
@@ -576,21 +629,77 @@ export const handleGenerateCompanionEvolution = async (
         throw new Error("Companion preset could not be resolved");
       }
 
-      const assetPath = resolveCompanionAssetPath({
-        presetId: normalizedPresetId,
+      const normalizedElement = coerceCompanionElementId(
+        companion.core_element,
+      );
+      const canonicalAsset = getCosmiqCanonicalCompanionAssetDescriptor({
+        species: normalizedPresetId,
+        element: normalizedElement,
         stage: nextStage,
-        state: "normal",
-        element: coerceCompanionElementId(companion.core_element),
       });
-      const newImageUrl =
-        supabase.storage.from(COMPANION_PRESET_BUCKET).getPublicUrl(assetPath)
-          .data.publicUrl;
+      let newImageUrl: string | null = null;
+      let presetAssetSource = "legacy_reuse";
+
+      if (canonicalAsset) {
+        newImageUrl = canonicalAsset.source === "bundled"
+          ? `/${COSMIQ_CANONICAL_ASSET_BUCKET}/${canonicalAsset.storagePath}`
+          : supabase.storage
+            .from(COSMIQ_CANONICAL_ASSET_BUCKET)
+            .getPublicUrl(canonicalAsset.storagePath).data.publicUrl;
+        presetAssetSource = `canonical_cosmiq_${canonicalAsset.source}`;
+      } else if (
+        nextStage === 1 &&
+        hasBundledYouthCompanionPresetAssets(normalizedPresetId)
+      ) {
+        newImageUrl = `/${COMPANION_PRESET_BUCKET}/${
+          resolveBundledYouthCompanionAssetPath({
+            presetId: normalizedPresetId,
+            element: normalizedElement,
+          })
+        }`;
+        presetAssetSource = "legacy_bundled_youth";
+      } else if (
+        hasRemoteCompanionPresetStageAssetCoverage({
+          presetId: normalizedPresetId,
+          stage: nextStage,
+          state: "normal",
+        })
+      ) {
+        const assetPath = resolveCompanionAssetPath({
+          presetId: normalizedPresetId,
+          stage: nextStage,
+          state: "normal",
+          element: normalizedElement,
+        });
+        newImageUrl = supabase.storage
+          .from(COMPANION_PRESET_BUCKET)
+          .getPublicUrl(assetPath).data.publicUrl;
+        presetAssetSource = "legacy_remote_verified";
+      } else {
+        newImageUrl = companion.current_image_url ??
+          companion.initial_image_url ?? null;
+      }
+
+      if (!newImageUrl) {
+        throw new Error("No verified companion portrait is available");
+      }
+
+      const reusedPortrait = presetAssetSource === "legacy_reuse";
+      const generationMetadata = {
+        sourceType: reusedPortrait ? "reuse" : "canonical_preset",
+        portraitRegenerated: !reusedPortrait,
+        presetAssetSource,
+        presetId: normalizedPresetId,
+        element: normalizedElement,
+        boundaryLevel: nextStage,
+      };
       const evolutionRecord = await upsertEvolutionRecordFn({
         supabase,
         companionId: companion.id,
         stage: nextStage,
         imageUrl: newImageUrl,
         xpAtEvolution: currentXP,
+        generationMetadata,
       });
 
       const { error: updateError } = await supabase
@@ -607,6 +716,7 @@ export const handleGenerateCompanionEvolution = async (
       }
 
       await enqueueAnimationForEvolution(evolutionRecord, newImageUrl, {
+        generationMetadata,
         previousImageUrl: companion.current_image_url ??
           companion.initial_image_url ??
           null,
@@ -620,7 +730,7 @@ export const handleGenerateCompanionEvolution = async (
           image_url: newImageUrl,
           xp_at_evolution: currentXP,
           evolution_id: evolutionRecord.id,
-          portrait_regenerated: true,
+          portrait_regenerated: !reusedPortrait,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
@@ -640,16 +750,19 @@ export const handleGenerateCompanionEvolution = async (
     );
 
     const hiddenStageOneAnchor = nextStage === 1
-      ? getHiddenBoundaryAnchor(companion.image_lineage_metadata, 1)
+      ? getApprovedHiddenBoundaryAnchor(companion.image_lineage_metadata, 1)
+      : null;
+    const stageOneRevealAnchor = hiddenStageOneAnchor?.imageUrl
+      ? hiddenStageOneAnchor
       : null;
 
-    if (nextStage === 1 && hiddenStageOneAnchor?.imageUrl) {
+    if (nextStage === 1 && stageOneRevealAnchor?.imageUrl) {
       const lineageMetadataAfterReveal = updateLineageMetadataAfterReveal({
         existing: companion.image_lineage_metadata,
         revealedLevel: 1,
-        imageUrl: hiddenStageOneAnchor.imageUrl,
-        focalX: hiddenStageOneAnchor.focalX,
-        focalY: hiddenStageOneAnchor.focalY,
+        imageUrl: stageOneRevealAnchor.imageUrl,
+        focalX: stageOneRevealAnchor.focalX,
+        focalY: stageOneRevealAnchor.focalY,
       });
       const generationMetadata = buildCompanionGenerationMetadata({
         sourceType: "reveal",
@@ -662,7 +775,7 @@ export const handleGenerateCompanionEvolution = async (
         supabase,
         companionId: companion.id,
         stage: nextStage,
-        imageUrl: hiddenStageOneAnchor.imageUrl,
+        imageUrl: stageOneRevealAnchor.imageUrl,
         xpAtEvolution: currentXP,
         generationMetadata,
       });
@@ -671,9 +784,9 @@ export const handleGenerateCompanionEvolution = async (
         .from("user_companion")
         .update({
           current_stage: nextStage,
-          current_image_url: hiddenStageOneAnchor.imageUrl,
-          current_image_focal_x: hiddenStageOneAnchor.focalX,
-          current_image_focal_y: hiddenStageOneAnchor.focalY,
+          current_image_url: stageOneRevealAnchor.imageUrl,
+          current_image_focal_x: stageOneRevealAnchor.focalX,
+          current_image_focal_y: stageOneRevealAnchor.focalY,
           visual_identity_profile: visualIdentityProfile,
           image_lineage_metadata: lineageMetadataAfterReveal,
           updated_at: new Date().toISOString(),
@@ -686,7 +799,7 @@ export const handleGenerateCompanionEvolution = async (
 
       await enqueueAnimationForEvolution(
         evolutionRecord,
-        hiddenStageOneAnchor.imageUrl,
+        stageOneRevealAnchor.imageUrl,
         {
           generationMetadata,
           previousImageUrl: companion.current_image_url ??
@@ -700,7 +813,7 @@ export const handleGenerateCompanionEvolution = async (
           evolved: true,
           previous_stage: currentStage,
           new_stage: nextStage,
-          image_url: hiddenStageOneAnchor.imageUrl,
+          image_url: stageOneRevealAnchor.imageUrl,
           xp_at_evolution: currentXP,
           evolution_id: evolutionRecord.id,
           portrait_regenerated: false,
@@ -817,6 +930,12 @@ export const handleGenerateCompanionEvolution = async (
     const spiritLockPromptBlock = spiritLockProfile
       ? buildSpiritLockPromptBlock(spiritLockProfile, "image")
       : null;
+    const speciesIdentity = resolveCompanionSpeciesIdentity(
+      companion.spirit_animal,
+    );
+    const speciesIdentityPromptBlock = speciesIdentity
+      ? buildCompanionSpeciesIdentityPromptBlock(speciesIdentity)
+      : null;
     const renderAttempts = getCompanionEvolutionRenderAttempts();
     const finalImageQuality = getCompanionFinalImageQuality();
     const runJudgedRender = async ({
@@ -901,17 +1020,62 @@ export const handleGenerateCompanionEvolution = async (
       const starterPromptBase = buildStage1BootstrapPrompt(
         visualIdentityProfile,
       );
-      const starterPrompt = spiritLockPromptBlock
-        ? `${starterPromptBase}\n\nMechanical spirit-lock:\n${spiritLockPromptBlock}`
-        : starterPromptBase;
+      const starterPrompt = [
+        starterPromptBase,
+        "If a mature canonical reference is attached, use it only for permanent species identity, face, markings, palette, and illustration language. Transform the candidate into an unmistakable infant; do not preserve adult age markers.",
+        speciesIdentityPromptBlock
+          ? `Species identity lock:\n${speciesIdentityPromptBlock}`
+          : "",
+        spiritLockPromptBlock
+          ? `Material identity lock:\n${spiritLockPromptBlock}`
+          : "",
+      ].filter(Boolean).join("\n\n");
 
+      const canonicalStageOneReferenceUrl = resolveCanonicalChristianCompanionImageUrl({
+        supabaseUrl,
+        spiritAnimal: companion.spirit_animal,
+      });
+      let stageOneReferenceEditFailure: string | null = null;
       const stageOneAttempt = await runJudgedRender({
         mode: "bootstrap",
         basePrompt: starterPrompt,
+        referenceImageUrl: canonicalStageOneReferenceUrl,
         previousLevel: 0,
         nextLevel: 1,
-        render: async (prompt) =>
-          await generateCompanionImageFn({
+        render: async (prompt) => {
+          if (
+            canonicalStageOneReferenceUrl &&
+            editCompanionImageFn &&
+            !stageOneReferenceEditFailure
+          ) {
+            try {
+              return await editCompanionImageFn({
+                guardedFetch,
+                openAIApiKey,
+                prompt,
+                size: imageSize,
+                quality: finalImageQuality,
+                background: COMPANION_IMAGE_BACKGROUND,
+                outputFormat: COMPANION_IMAGE_OUTPUT_FORMAT,
+                userId: resolvedUserId,
+                referenceImages: [{ imageUrl: canonicalStageOneReferenceUrl }],
+              });
+            } catch (referenceEditError) {
+              stageOneReferenceEditFailure = referenceEditError instanceof Error
+                ? referenceEditError.message.slice(0, 500)
+                : String(referenceEditError).slice(0, 500);
+              infoLog(
+                "[CompanionEvolution] Canonical infant reference edit failed; falling back to lineage generation",
+                {
+                  companionId: companion.id,
+                  nextStage,
+                  error: stageOneReferenceEditFailure,
+                },
+              );
+            }
+          }
+
+          return await generateCompanionImageFn({
             guardedFetch,
             openAIApiKey,
             prompt,
@@ -920,7 +1084,8 @@ export const handleGenerateCompanionEvolution = async (
             background: COMPANION_IMAGE_BACKGROUND,
             outputFormat: COMPANION_IMAGE_OUTPUT_FORMAT,
             userId: resolvedUserId,
-          }),
+          });
+        },
       });
 
       if (stageOneAttempt.judgeUnavailable) {
@@ -961,6 +1126,9 @@ export const handleGenerateCompanionEvolution = async (
         imageUrl: newImageUrl,
         focalX: stageOneFocalX,
         focalY: stageOneFocalY,
+        sourceType: isLegacyStageOneBackfill
+          ? "legacy_backfill"
+          : "generation",
       });
       const generationMetadata = buildCompanionGenerationMetadata({
         sourceType: isLegacyStageOneBackfill ? "legacy_backfill" : "generation",
@@ -1098,9 +1266,22 @@ export const handleGenerateCompanionEvolution = async (
       previousAnchors: previousVisualAnchors,
       previousGenerationMetadata,
     });
-    const evolutionPrompt = spiritLockPromptBlock
-      ? `${evolutionPromptBase}\n\nMechanical spirit-lock:\n${spiritLockPromptBlock}`
-      : evolutionPromptBase;
+    const evolutionPrompt = [
+      evolutionPromptBase,
+      speciesIdentityPromptBlock
+        ? `Species identity lock:\n${speciesIdentityPromptBlock}`
+        : "",
+      spiritLockPromptBlock
+        ? `Material identity lock:\n${spiritLockPromptBlock}`
+        : "",
+    ].filter(Boolean).join("\n\n");
+
+    let evolutionSourceType:
+      | "previous_portrait_reference_edit"
+      | "lineage_generation" = editCompanionImageFn
+        ? "previous_portrait_reference_edit"
+        : "lineage_generation";
+    let evolutionReferenceEditFailure: string | null = null;
 
     const evolutionAttempt = await runJudgedRender({
       mode: "evolution",
@@ -1108,8 +1289,38 @@ export const handleGenerateCompanionEvolution = async (
       previousLevel: currentStage,
       nextLevel: nextStage,
       referenceImageUrl: previousImageUrl,
-      render: async (prompt) =>
-        await generateCompanionImageFn({
+      render: async (prompt) => {
+        if (editCompanionImageFn && !evolutionReferenceEditFailure) {
+          try {
+            return await editCompanionImageFn({
+              guardedFetch,
+              openAIApiKey,
+              prompt,
+              size: imageSize,
+              quality: finalImageQuality,
+              background: COMPANION_IMAGE_BACKGROUND,
+              outputFormat: COMPANION_IMAGE_OUTPUT_FORMAT,
+              userId: resolvedUserId,
+              referenceImages: [{ imageUrl: previousImageUrl }],
+            });
+          } catch (referenceEditError) {
+            evolutionSourceType = "lineage_generation";
+            evolutionReferenceEditFailure = referenceEditError instanceof Error
+              ? referenceEditError.message.slice(0, 500)
+              : String(referenceEditError).slice(0, 500);
+            infoLog(
+              "[CompanionEvolution] Previous-portrait reference edit failed; falling back to lineage generation",
+              {
+                companionId: companion.id,
+                currentStage,
+                nextStage,
+                error: evolutionReferenceEditFailure,
+              },
+            );
+          }
+        }
+
+        return await generateCompanionImageFn({
           guardedFetch,
           openAIApiKey,
           prompt,
@@ -1118,7 +1329,8 @@ export const handleGenerateCompanionEvolution = async (
           background: COMPANION_IMAGE_BACKGROUND,
           outputFormat: COMPANION_IMAGE_OUTPUT_FORMAT,
           userId: resolvedUserId,
-        }),
+        });
+      },
     });
 
     if (!previousVisualAnchors && evolutionAttempt.judgeUnavailable) {
@@ -1176,6 +1388,8 @@ export const handleGenerateCompanionEvolution = async (
         notes: evolutionAttempt.scores?.notes ?? evolutionAttempt.revisedPrompt,
       }),
       visualAnchorLevel: currentStage,
+      renderSourceType: evolutionSourceType,
+      referenceEditFailure: evolutionReferenceEditFailure,
       visualAnchorSourceImageUrl: previousVisualAnchors?.sourceImageUrl ??
         previousImageUrl,
       visualAnchorExtraction: normalizedExtractedVisualAnchors

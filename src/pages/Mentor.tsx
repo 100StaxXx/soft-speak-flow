@@ -1,7 +1,7 @@
-import Index from "./Index";
+import Today from "./Today";
 
 const Mentor = () => {
-  return <Index enableOnboardingGuard={false} />;
+  return <Today enableOnboardingGuard={false} />;
 };
 
 export default Mentor;

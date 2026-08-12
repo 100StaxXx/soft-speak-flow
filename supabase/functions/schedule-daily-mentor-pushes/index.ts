@@ -63,7 +63,7 @@ serve(async (req) => {
       try {
         // Get mentor slug from mentor_id
         const { data: mentor, error: mentorError } = await supabase
-          .from('mentors')
+          .from('graceward_guides')
           .select('slug')
           .eq('id', profile.selected_mentor_id)
           .maybeSingle();

@@ -20,6 +20,12 @@ vi.mock("@/hooks/useAuth", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useCompanion", () => ({
+  useCompanion: () => ({
+    companion: null,
+  }),
+}));
+
 vi.mock("@/hooks/useEpics", () => ({
   useEpics: () => ({
     createCampaignRitual: (...args: unknown[]) => mocks.createCampaignRitualMock(...args),
@@ -140,11 +146,11 @@ describe("EpicCheckInDrawer", () => {
 
     renderSubject();
 
-    fireEvent.click(screen.getByRole("button", { name: "Add New Ritual" }));
-    fireEvent.change(screen.getByPlaceholderText("New ritual name..."), {
+    fireEvent.click(screen.getByRole("button", { name: "Add new rhythm" }));
+    fireEvent.change(screen.getByPlaceholderText("New rhythm name..."), {
       target: { value: "Evening Walk" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Add Ritual" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add rhythm" }));
 
     await waitFor(() => {
       expect(screen.getByText("Evening Walk")).toBeInTheDocument();
@@ -156,7 +162,7 @@ describe("EpicCheckInDrawer", () => {
         title: "Evening Walk",
       }),
     );
-    expect(screen.queryByPlaceholderText("New ritual name...")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("New rhythm name...")).not.toBeInTheDocument();
   });
 
   it("keeps the add form open when creating the ritual fails", async () => {
@@ -164,18 +170,18 @@ describe("EpicCheckInDrawer", () => {
 
     renderSubject();
 
-    fireEvent.click(screen.getByRole("button", { name: "Add New Ritual" }));
-    fireEvent.change(screen.getByPlaceholderText("New ritual name..."), {
+    fireEvent.click(screen.getByRole("button", { name: "Add new rhythm" }));
+    fireEvent.change(screen.getByPlaceholderText("New rhythm name..."), {
       target: { value: "Evening Walk" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Add Ritual" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add rhythm" }));
 
     await waitFor(() => {
       expect(mocks.createCampaignRitualMock).toHaveBeenCalledTimes(1);
     });
 
     expect(screen.getByDisplayValue("Evening Walk")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add Ritual" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add rhythm" })).toBeInTheDocument();
   });
 
   it("routes ritual completion through task feedback metadata", async () => {
@@ -185,7 +191,7 @@ describe("EpicCheckInDrawer", () => {
 
     renderSubject();
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "Mark ritual as complete" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Mark rhythm as complete" }));
 
     await waitFor(() => {
       expect(mocks.toggleTaskMock).toHaveBeenCalledWith(

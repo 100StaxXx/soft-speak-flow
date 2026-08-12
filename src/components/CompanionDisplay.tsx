@@ -1,7 +1,7 @@
 import { Card, outerShellCardClassName } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { PawPrint, Sparkles } from "lucide-react";
+import { PawPrint, RotateCcw, Sparkles } from "lucide-react";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useReferrals } from "@/hooks/useReferrals";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
@@ -23,11 +23,20 @@ import { DormancyWarning, DormantOverlay } from "@/components/companion/Dormancy
 import { CompanionDialogue } from "@/components/companion/CompanionDialogue";
 import { CompanionMotionSurface } from "@/components/companion/motion/CompanionMotionSurface";
 import { WakeUpCelebration } from "@/components/companion/WakeUpCelebration";
-import { CompanionChatModal } from "@/components/companion/CompanionChatModal";
+import {
+  LivingCompanionCreatureMotion,
+  LivingCompanionInteractionAura,
+  LivingCompanionPresenceBubble,
+  LivingCompanionWorldPulse,
+} from "@/components/companion/LivingCompanionPresence";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
 import { CompanionStatAnalysisSurface } from "@/components/CompanionStatAnalysisSurface";
 import { CompanionPersonalization } from "@/components/CompanionPersonalization";
 import { CompanionImage } from "@/components/CompanionImage";
+import {
+  GracewardDailyFormationBoard,
+  type GracewardFormationMedia,
+} from "@/components/GracewardDailyFormationBoard";
 import {
   Dialog,
   DialogContent,
@@ -46,6 +55,7 @@ import {
   resolveCompanionVisualAssetUrl,
 } from "@/lib/companionAssetResolver";
 import { getCompanionEggLabel } from "@/config/companionCatalog";
+import { PRODUCT } from "@/config/product";
 import {
   getCompanionEggImageAssetKey,
   isCompanionEggImageSource,
@@ -62,6 +72,7 @@ import {
   type CompanionEvolutionRevealRequestedDetail,
 } from "@/lib/companionEvolutionEvents";
 import { useMotionProfile } from "@/hooks/useMotionProfile";
+import { useLivingCompanionPresence } from "@/hooks/useLivingCompanionPresence";
 import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
 import {
   useState,
@@ -81,6 +92,7 @@ import {
   type CompanionElementId,
   type CompanionStoryTone,
 } from "@/config/companionCatalog";
+import { getCompanionInteractionZone } from "@/config/companionLife";
 import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
 import {
   getNextProgressionLevelXp,
@@ -96,6 +108,7 @@ import {
 interface CompanionDisplayProps {
   layoutMode?: CompanionLayoutMode;
   isVisible?: boolean;
+  experienceMode?: "full" | "formation";
 }
 
 const LONG_PRESS_DURATION_MS = 800;
@@ -108,6 +121,12 @@ interface InlineEvolutionReplayState {
   posterUrl: string;
   stage: number;
 }
+
+const FORMATION_FALLBACK_PROPS = {
+  Mind: { primary: "📖", secondary: "👓", label: "reading with a book and glasses" },
+  Body: { primary: "🏋️", secondary: "💪", label: "working out with weights" },
+  Soul: { primary: "🙏", secondary: "✨", label: "pausing for prayer and reflection" },
+} as const;
 
 // Convert hex color to color name (moved outside component for performance)
 const getColorName = (hexColor: string): string => {
@@ -162,6 +181,7 @@ const getColorName = (hexColor: string): string => {
 export const CompanionDisplay = memo(({
   layoutMode = "mobile",
   isVisible = true,
+  experienceMode = "full",
 }: CompanionDisplayProps) => {
   const {
     companion,
@@ -214,20 +234,24 @@ export const CompanionDisplay = memo(({
   const [portraitSourceAspectRatio, setPortraitSourceAspectRatio] = useState<number | null>(null);
   const [imageKey, setImageKey] = useState(0); // Force image reload
   const [fallbackToDefaultPortrait, setFallbackToDefaultPortrait] = useState(false);
+  const [failedFormationStillUrl, setFailedFormationStillUrl] = useState<string | null>(null);
   const [showWelcomeBack, setShowWelcomeBack] = useState(false);
   const [welcomeBackDismissed, setWelcomeBackDismissed] = useState(false);
   const [showStatsAnalysis, setShowStatsAnalysis] = useState(false);
   const [creatureName, setCreatureName] = useState<string | null>(null);
   const [hatchDialogOpen, setHatchDialogOpen] = useState(false);
-  const [companionChatOpen, setCompanionChatOpen] = useState(false);
   const [inlineEvolutionReplay, setInlineEvolutionReplay] = useState<InlineEvolutionReplayState | null>(null);
+  const [formationMedia, setFormationMedia] = useState<GracewardFormationMedia | null>(null);
+  const [formationVideoPlaying, setFormationVideoPlaying] = useState(false);
   const isDesktop = layoutMode === "desktop";
   const { profile, signals } = useMotionProfile();
   const { activeEvent } = useCompanionMotionSafe();
   const prefersReducedMotion = profile === "reduced" || signals.prefersReducedMotion;
   
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const longPressConsumed = useRef(false);
   const touchStartPoint = useRef<{ x: number; y: number } | null>(null);
+  const latestTouchPoint = useRef<{ x: number; y: number } | null>(null);
   const previousImageUrl = useRef<string | null>(null);
   const inlineReplayPosterUrlRef = useRef(COMPANION_PLACEHOLDER);
   const wasVisible = useRef(isVisible);
@@ -282,16 +306,11 @@ export const CompanionDisplay = memo(({
     enabled: Boolean(displayCompanion),
   });
 
-  const openCompanionChat = useCallback(() => {
-    setCompanionChatOpen(true);
-  }, []);
-
   const finishInlineEvolutionReplay = useCallback(() => {
     setInlineEvolutionReplay(null);
-    openCompanionChat();
-  }, [openCompanionChat]);
+  }, []);
 
-  const handleCompanionImageHoldAction = useCallback(async () => {
+  const handleEvolutionReplay = useCallback(async () => {
     if (!displayCompanion || inlineEvolutionReplay) return;
 
     const replay =
@@ -309,62 +328,12 @@ export const CompanionDisplay = memo(({
     }
 
     toast.info("No evolution replay yet.");
-    openCompanionChat();
   }, [
     currentEvolutionReplay,
     displayCompanion,
     inlineEvolutionReplay,
-    openCompanionChat,
     refetchCurrentEvolutionReplay,
   ]);
-
-  const handlePressStart = useCallback((
-    event: ReactMouseEvent<HTMLDivElement> | ReactTouchEvent<HTMLDivElement>,
-  ) => {
-    if (!displayCompanion || inlineEvolutionReplay) return;
-
-    if ("touches" in event && event.touches[0]) {
-      const touch = event.touches[0];
-      touchStartPoint.current = { x: touch.clientX, y: touch.clientY };
-    } else {
-      touchStartPoint.current = null;
-    }
-
-    longPressTimer.current = setTimeout(() => {
-      longPressTimer.current = null;
-      void handleCompanionImageHoldAction();
-    }, LONG_PRESS_DURATION_MS);
-  }, [displayCompanion, handleCompanionImageHoldAction, inlineEvolutionReplay]);
-
-  const handlePressEnd = useCallback(() => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-    touchStartPoint.current = null;
-  }, []);
-
-  const handlePressMove = useCallback((event: ReactTouchEvent<HTMLDivElement>) => {
-    if (!touchStartPoint.current || !longPressTimer.current) return;
-
-    const touch = event.touches[0];
-    if (!touch) return;
-
-    const deltaX = Math.abs(touch.clientX - touchStartPoint.current.x);
-    const deltaY = Math.abs(touch.clientY - touchStartPoint.current.y);
-
-    if (deltaX > MOVE_CANCEL_THRESHOLD_PX || deltaY > MOVE_CANCEL_THRESHOLD_PX) {
-      handlePressEnd();
-    }
-  }, [handlePressEnd]);
-
-  const handleKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== "Enter" && event.key !== " ") return;
-
-    event.preventDefault();
-    if (!displayCompanion || inlineEvolutionReplay) return;
-    void handleCompanionImageHoldAction();
-  }, [displayCompanion, handleCompanionImageHoldAction, inlineEvolutionReplay]);
 
   // Get equipped skin and calculate styles
   const equippedSkin = useMemo(() => {
@@ -496,7 +465,11 @@ export const CompanionDisplay = memo(({
     ? normalDisplayImageUrl
     : expressiveImageUrl;
 
-  const effectiveImageUrl = displayImageUrl || COMPANION_PLACEHOLDER;
+  const formationStillUrl = formationMedia?.stillUrl ?? null;
+  const activeFormationStillUrl = formationStillUrl && formationStillUrl !== failedFormationStillUrl
+    ? formationStillUrl
+    : null;
+  const effectiveImageUrl = activeFormationStillUrl || displayImageUrl || COMPANION_PLACEHOLDER;
   const usesPresetPortraitShell = isCompanionPresetImageSource(effectiveImageUrl);
   const usesEggPortraitShell = isCompanionEggImageSource(effectiveImageUrl);
   const usesSceneEggPortraitShell =
@@ -521,6 +494,7 @@ export const CompanionDisplay = memo(({
     usesEggPortraitShell && !usesSceneEggPortraitShell && "p-2.5 sm:p-3",
   );
   const effectiveImageFocal = useMemo(() => {
+    if (activeFormationStillUrl) return { x: null, y: null };
     if (!displayCompanion) return { x: null, y: null };
 
     if (isDormant) {
@@ -551,6 +525,7 @@ export const CompanionDisplay = memo(({
     };
   }, [
     displayCompanion,
+    activeFormationStillUrl,
     health.imageFocalX,
     health.imageFocalY,
     health.isNeglected,
@@ -567,6 +542,41 @@ export const CompanionDisplay = memo(({
     setImageError(false);
     setPortraitSourceAspectRatio(null);
   }, [effectiveImageUrl]);
+
+  useEffect(() => {
+    if (failedFormationStillUrl !== formationStillUrl) {
+      setFailedFormationStillUrl(null);
+    }
+  }, [failedFormationStillUrl, formationStillUrl]);
+
+  const handleFormationMediaChange = useCallback((media: GracewardFormationMedia | null) => {
+    if (media) {
+      setInlineEvolutionReplay(null);
+    }
+    setFormationMedia(media);
+    const shouldPlay = Boolean(media?.playVideo && !prefersReducedMotion);
+    setFormationVideoPlaying(shouldPlay);
+    if (media?.playVideo && !shouldPlay && media.onPlaybackComplete) {
+      window.setTimeout(media.onPlaybackComplete, 0);
+    }
+  }, [prefersReducedMotion]);
+
+  const finishFormationPlayback = useCallback(() => {
+    setFormationVideoPlaying(false);
+    formationMedia?.onPlaybackComplete?.();
+  }, [formationMedia]);
+
+  useEffect(() => {
+    if (!isVisible) {
+      setFormationVideoPlaying(false);
+    }
+  }, [isVisible]);
+
+  useEffect(() => {
+    if (!formationVideoPlaying || formationMedia?.videoUrl) return;
+    const settleTimer = window.setTimeout(finishFormationPlayback, 1_800);
+    return () => window.clearTimeout(settleTimer);
+  }, [finishFormationPlayback, formationMedia?.videoUrl, formationVideoPlaying]);
 
   useEffect(() => {
     inlineReplayPosterUrlRef.current = effectiveImageUrl;
@@ -669,6 +679,149 @@ export const CompanionDisplay = memo(({
     isPendingRevealDisplay,
   ]);
 
+  const livingPresence = useLivingCompanionPresence({
+    companionId: displayCompanion?.id,
+    companionName: creatureName ?? "Companion",
+    expressionMood: expressionState.mood,
+    isVisible,
+    canInteract: Boolean(displayCompanion),
+    canSpeak: Boolean(displayCompanion && displayCompanion.current_stage > 0),
+    isDormant,
+    hasDormancyWarning,
+    inactiveDays:
+      care.dormancy?.inactiveDays
+      ?? displayCompanion?.inactive_days
+      ?? 0,
+    progressToNext: displayProgressToNext,
+    canEvolve: displayCanEvolve,
+    currentStage: displayCompanion?.current_stage ?? 1,
+    presetId: displayCompanion?.preset_id,
+    spiritAnimal: displayCompanion?.spirit_animal,
+  });
+
+  const getRelativeInteractionPoint = useCallback((
+    clientX: number,
+    clientY: number,
+    target: HTMLDivElement,
+  ) => {
+    const bounds = target.getBoundingClientRect();
+    const x = bounds.width > 0 ? Math.max(0, Math.min(1, (clientX - bounds.left) / bounds.width)) : 0.5;
+    const y = bounds.height > 0 ? Math.max(0, Math.min(1, (clientY - bounds.top) / bounds.height)) : 0.5;
+    return {
+      normalized: { x, y },
+      percent: { x: x * 100, y: y * 100 },
+    };
+  }, []);
+
+  const handlePressStart = useCallback((
+    event: ReactMouseEvent<HTMLDivElement> | ReactTouchEvent<HTMLDivElement>,
+  ) => {
+    if (!displayCompanion || inlineEvolutionReplay) return;
+
+    longPressConsumed.current = false;
+    if ("touches" in event && event.touches[0]) {
+      const touch = event.touches[0];
+      touchStartPoint.current = { x: touch.clientX, y: touch.clientY };
+      latestTouchPoint.current = { x: touch.clientX, y: touch.clientY };
+    } else {
+      touchStartPoint.current = null;
+      latestTouchPoint.current = null;
+    }
+
+    longPressTimer.current = setTimeout(() => {
+      longPressTimer.current = null;
+      longPressConsumed.current = true;
+      livingPresence.comfort();
+    }, LONG_PRESS_DURATION_MS);
+  }, [displayCompanion, inlineEvolutionReplay, livingPresence]);
+
+  const handlePressEnd = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    touchStartPoint.current = null;
+    latestTouchPoint.current = null;
+  }, []);
+
+  const handlePressMove = useCallback((event: ReactTouchEvent<HTMLDivElement>) => {
+    if (!touchStartPoint.current) return;
+
+    const touch = event.touches[0];
+    if (!touch) return;
+    latestTouchPoint.current = { x: touch.clientX, y: touch.clientY };
+    const relativePoint = getRelativeInteractionPoint(touch.clientX, touch.clientY, event.currentTarget);
+    livingPresence.updateGaze({
+      x: relativePoint.normalized.x * 2 - 1,
+      y: relativePoint.normalized.y * 2 - 1,
+      active: true,
+    });
+
+    const deltaX = Math.abs(touch.clientX - touchStartPoint.current.x);
+    const deltaY = Math.abs(touch.clientY - touchStartPoint.current.y);
+    if (deltaX > MOVE_CANCEL_THRESHOLD_PX || deltaY > MOVE_CANCEL_THRESHOLD_PX) {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+    }
+  }, [getRelativeInteractionPoint, livingPresence]);
+
+  const handleTouchEnd = useCallback((event: ReactTouchEvent<HTMLDivElement>) => {
+    const start = touchStartPoint.current;
+    const end = latestTouchPoint.current;
+    if (start && end) {
+      const distance = Math.hypot(end.x - start.x, end.y - start.y);
+      if (distance >= 34 && !longPressConsumed.current) {
+        const relativePoint = getRelativeInteractionPoint(end.x, end.y, event.currentTarget);
+        longPressConsumed.current = true;
+        livingPresence.pet(relativePoint.percent);
+      }
+    }
+    livingPresence.updateGaze({ x: 0, y: 0, active: false });
+    handlePressEnd();
+  }, [getRelativeInteractionPoint, handlePressEnd, livingPresence]);
+
+  const handleCompanionImageClick = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+    if (longPressConsumed.current) {
+      longPressConsumed.current = false;
+      return;
+    }
+    const relativePoint = getRelativeInteractionPoint(event.clientX, event.clientY, event.currentTarget);
+    livingPresence.interact(
+      getCompanionInteractionZone(relativePoint.normalized),
+      relativePoint.percent,
+    );
+  }, [getRelativeInteractionPoint, livingPresence]);
+
+  const handleCompanionMouseMove = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+    const relativePoint = getRelativeInteractionPoint(event.clientX, event.clientY, event.currentTarget);
+    livingPresence.updateGaze({
+      x: relativePoint.normalized.x * 2 - 1,
+      y: relativePoint.normalized.y * 2 - 1,
+      active: true,
+    });
+  }, [getRelativeInteractionPoint, livingPresence]);
+
+  const handleCompanionMouseLeave = useCallback(() => {
+    livingPresence.updateGaze({ x: 0, y: 0, active: false });
+    handlePressEnd();
+  }, [handlePressEnd, livingPresence]);
+
+  const handleKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    livingPresence.interact("heart", { x: 50, y: 55 });
+  }, [livingPresence]);
+
+  useEffect(() => {
+    return () => {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+      }
+    };
+  }, []);
+
   if (isLoading) return <CompanionSkeleton />;
   if (!companion || !displayCompanion) return null;
 
@@ -692,6 +845,8 @@ export const CompanionDisplay = memo(({
   const displayedProgressValue = displayCanEvolve ? 100 : levelProgressToNext;
   const isMaxStage = earnedLevel >= MAX_COMPANION_STAGE;
   const isStageZeroEgg = displayCompanion.current_stage === 0;
+  const hasEmbeddedCompanionControl = imageError || Boolean(inlineEvolutionReplay) || formationVideoPlaying;
+  const companionPortraitIsInteractive = !hasEmbeddedCompanionControl;
   const readyVisualBoundaryLevel = getNextUnclaimedVisualStageBoundaryLevel(
     displayCompanion.current_stage,
     evolutionReadinessLevel,
@@ -716,17 +871,25 @@ export const CompanionDisplay = memo(({
       calm: "",
       concerned: "animate-companion-droop",
       sleepy: "animate-companion-slow-breathe",
-    } as const)[expressionState.mood];
+      curious: "animate-companion-curious",
+    } as const)[livingPresence.bodyLanguage];
   const activePortraitAnimationClass = isDormant || health.isNeglected
     ? animationClass
-    : expressionAnimationClass;
+    : formationVideoPlaying && formationMedia && !formationMedia.videoUrl
+      ? formationMedia.category === "Body"
+        ? "animate-companion-bounce"
+        : formationMedia.category === "Mind"
+          ? "animate-companion-curious"
+          : "animate-companion-slow-breathe"
+      : expressionAnimationClass;
   const shouldAnimateIdleDrift = !prefersReducedMotion
     && imageLoaded
     && !imageError
     && !inlineEvolutionReplay
+    && !formationVideoPlaying
     && !isDormant
     && !health.isNeglected
-    && expressionState.mood === "calm";
+    && livingPresence.bodyLanguage === "calm";
   const customDisplayName = getStoredCompanionCustomName(displayCompanion);
   const displayedCreatureName = creatureName
     || customDisplayName
@@ -879,10 +1042,10 @@ export const CompanionDisplay = memo(({
           {/* Companion Image */}
           <div
             className="flex justify-center py-2 relative group"
-            role="img"
+            role="group"
             aria-label={`Your companion at ${visualStageDisplay}, ${currentLevelLabel}`}
           >
-            {/* Cosmiq orbital glow effect */}
+            {/* Companion presence glow */}
             <div 
               className={`absolute inset-0 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : 'animate-orbit'}`}
               style={{
@@ -890,20 +1053,32 @@ export const CompanionDisplay = memo(({
               }}
               aria-hidden="true" 
             />
-            <div className={`absolute inset-0 bg-gradient-to-r from-celestial-blue/20 via-nebula-pink/20 to-cosmiq-glow/20 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : ''}`} aria-hidden="true" />
+            <div className={`absolute inset-0 bg-gradient-to-r from-primary/20 via-amber-200/20 to-primary/20 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : ''}`} aria-hidden="true" />
             <div
-              className="relative select-none focus-visible:ring-2 focus-visible:ring-primary/70 rounded-2xl outline-none"
-              role="button"
-              tabIndex={0}
-              aria-label="Press and hold to replay your companion's latest evolution, then open companion chat."
-              onMouseDown={handlePressStart}
-              onMouseUp={handlePressEnd}
-              onMouseLeave={handlePressEnd}
-              onTouchStart={handlePressStart}
-              onTouchMove={handlePressMove}
-              onTouchEnd={handlePressEnd}
-              onTouchCancel={handlePressEnd}
-              onKeyDown={handleKeyDown}
+              className="relative touch-manipulation select-none focus-visible:ring-2 focus-visible:ring-primary/70 rounded-2xl outline-none"
+              role={hasEmbeddedCompanionControl ? "group" : "button"}
+              tabIndex={companionPortraitIsInteractive ? 0 : -1}
+              aria-label={
+                imageError
+                  ? `${displayedCreatureName} image is unavailable. Retry the image below.`
+                  : inlineEvolutionReplay
+                    ? `${displayedCreatureName} evolution replay.`
+                    : isStageZeroEgg
+                  ? `${displayedCreatureName} is waiting to hatch. Tap, double tap, swipe, or press and hold to feel it respond.`
+                  : `Interact with ${displayedCreatureName}. Tap different areas, double tap to greet, swipe to pet, or press and hold for comfort.`
+              }
+              data-testid="living-companion-interaction-target"
+              onMouseDown={companionPortraitIsInteractive ? handlePressStart : undefined}
+              onMouseUp={companionPortraitIsInteractive ? handlePressEnd : undefined}
+              onMouseMove={companionPortraitIsInteractive ? handleCompanionMouseMove : undefined}
+              onMouseLeave={companionPortraitIsInteractive ? handleCompanionMouseLeave : undefined}
+              onTouchStart={companionPortraitIsInteractive ? handlePressStart : undefined}
+              onTouchMove={companionPortraitIsInteractive ? handlePressMove : undefined}
+              onTouchEnd={companionPortraitIsInteractive ? handleTouchEnd : undefined}
+              onTouchCancel={companionPortraitIsInteractive ? handlePressEnd : undefined}
+              onClick={companionPortraitIsInteractive ? handleCompanionImageClick : undefined}
+              onDoubleClick={companionPortraitIsInteractive ? livingPresence.greet : undefined}
+              onKeyDown={companionPortraitIsInteractive ? handleKeyDown : undefined}
             >
               {/* Twinkling star particles around companion */}
               <div className={`absolute inset-0 rounded-2xl ${!prefersReducedMotion ? 'star-shimmer' : ''}`} aria-hidden="true" />
@@ -921,6 +1096,7 @@ export const CompanionDisplay = memo(({
                 data-companion-expression-mood={expressionState.mood}
                 data-companion-expression-variant={expressionState.variant}
                 data-companion-expression-reason={expressionState.reason}
+                data-living-body-language={livingPresence.bodyLanguage}
               >
                 <CompanionMotionSurface
                   variant="companion"
@@ -953,7 +1129,11 @@ export const CompanionDisplay = memo(({
                         <div className="text-center p-4">
                           <p className="text-sm text-muted-foreground mb-2" id="image-error-message">Image unavailable</p>
                           <button
-                            onClick={() => {
+                            data-companion-subcontrol="true"
+                            onMouseDown={(event) => event.stopPropagation()}
+                            onTouchStart={(event) => event.stopPropagation()}
+                            onClick={(event) => {
+                              event.stopPropagation();
                               setImageError(false);
                               setImageLoaded(false);
                               setImageKey(prev => prev + 1); // Force image reload with new key
@@ -978,36 +1158,60 @@ export const CompanionDisplay = memo(({
                       )}
                     >
                       <div className={cn("h-full w-full", portraitSceneContentClassName)}>
-                        <CompanionImage
-                          key={imageKey}
-                          src={effectiveImageUrl}
-                          alt={`${visualStageLabel} companion at level ${earnedLevel}`}
-                          fit={portraitImageFit}
-                          element={displayCompanion.core_element}
-                          focalX={effectiveImageFocal.x}
-                          focalY={effectiveImageFocal.y}
-                          sourceAspectRatio={portraitSourceAspectRatio}
-                          className="relative h-full w-full rounded-2xl"
-                          style={{ ...skinStyles, ...careStyles, ...equippedCosmeticStyles }}
-                          onLoad={handlePortraitImageLoad}
-                          onError={() => {
-                            setPortraitSourceAspectRatio(null);
-                            if (!fallbackToDefaultPortrait && expressiveImageUrl) {
-                              setFallbackToDefaultPortrait(true);
-                              setImageKey((prev) => prev + 1);
-                              return;
-                            }
-                            setImageError(true);
-                            setImageLoaded(false);
-                          }}
-                          loading="lazy"
-                          decoding="async"
-                          draggable={false}
-                        />
+                        <LivingCompanionCreatureMotion
+                          activeAction={livingPresence.activeAction}
+                          gaze={livingPresence.gaze}
+                          lifeStage={livingPresence.lifeStage}
+                          speciesMotion={livingPresence.speciesMotion}
+                          prefersReducedMotion={prefersReducedMotion}
+                        >
+                          <CompanionImage
+                            key={imageKey}
+                            src={effectiveImageUrl}
+                            alt={`${visualStageLabel} companion at level ${earnedLevel}`}
+                            fit={portraitImageFit}
+                            element={displayCompanion.core_element}
+                            focalX={effectiveImageFocal.x}
+                            focalY={effectiveImageFocal.y}
+                            sourceAspectRatio={portraitSourceAspectRatio}
+                            className="relative h-full w-full rounded-2xl"
+                            style={{ ...skinStyles, ...careStyles, ...equippedCosmeticStyles }}
+                            onLoad={handlePortraitImageLoad}
+                            onError={() => {
+                              setPortraitSourceAspectRatio(null);
+                              if (activeFormationStillUrl) {
+                                setFailedFormationStillUrl(activeFormationStillUrl);
+                                setImageKey((prev) => prev + 1);
+                                return;
+                              }
+                              if (!fallbackToDefaultPortrait && expressiveImageUrl) {
+                                setFallbackToDefaultPortrait(true);
+                                setImageKey((prev) => prev + 1);
+                                return;
+                              }
+                              setImageError(true);
+                              setImageLoaded(false);
+                            }}
+                            loading="lazy"
+                            decoding="async"
+                            draggable={false}
+                          />
+                        </LivingCompanionCreatureMotion>
                       </div>
                     </div>
                   </>
                 </CompanionMotionSurface>
+                {!inlineEvolutionReplay ? (
+                  <LivingCompanionInteractionAura
+                    bodyLanguage={livingPresence.bodyLanguage}
+                    interactionNonce={livingPresence.interactionNonce}
+                    prefersReducedMotion={prefersReducedMotion}
+                    gaze={livingPresence.gaze}
+                    interactionPoint={livingPresence.interactionPoint}
+                    activeAction={livingPresence.activeAction}
+                    stage={livingPresence.lifeStage.visualStage}
+                  />
+                ) : null}
                 {inlineEvolutionReplay ? (
                   <div
                     className="absolute inset-0 z-30 overflow-hidden rounded-2xl bg-black shadow-2xl ring-4 ring-primary/30"
@@ -1026,6 +1230,7 @@ export const CompanionDisplay = memo(({
                       onError={finishInlineEvolutionReplay}
                     />
                     <Button
+                      data-companion-subcontrol="true"
                       type="button"
                       size="sm"
                       variant="outline"
@@ -1041,6 +1246,60 @@ export const CompanionDisplay = memo(({
                     </Button>
                   </div>
                 ) : null}
+                {formationVideoPlaying && formationMedia ? (
+                  formationMedia.videoUrl ? (
+                    <div
+                      className="absolute inset-0 z-30 overflow-hidden rounded-2xl bg-black/90 shadow-2xl ring-4 ring-primary/25"
+                      data-testid="graceward-formation-animation"
+                    >
+                      <video
+                        key={formationMedia.videoUrl}
+                        src={formationMedia.videoUrl}
+                        poster={effectiveImageUrl}
+                        className="h-full w-full rounded-2xl bg-black object-contain"
+                        autoPlay
+                        muted
+                        playsInline
+                        aria-label={`${formationMedia.category} companion formation animation`}
+                        onLoadedMetadata={(event) => {
+                          event.currentTarget.playbackRate = formationMedia.phase === "practice" ? 1.25 : 1.15;
+                        }}
+                        onEnded={finishFormationPlayback}
+                        onError={finishFormationPlayback}
+                      />
+                      <Button
+                        data-companion-subcontrol="true"
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="absolute right-3 top-3 h-8 rounded-full border-white/20 bg-black/45 px-3 text-xs text-white backdrop-blur-md hover:bg-black/60"
+                        onClick={finishFormationPlayback}
+                      >
+                        Skip
+                      </Button>
+                    </div>
+                  ) : null
+                ) : null}
+                {formationMedia && !formationMedia.videoUrl ? (
+                  <div
+                    className="pointer-events-none absolute inset-0 z-20 flex items-end justify-center rounded-2xl bg-gradient-to-t from-black/35 via-transparent to-transparent pb-3"
+                    data-testid="graceward-formation-fallback"
+                    role="img"
+                    aria-label={`${formationMedia.category} companion ${FORMATION_FALLBACK_PROPS[formationMedia.category].label}`}
+                  >
+                    <div
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-full border border-white/20 bg-black/45 px-3 py-1.5 text-2xl shadow-lg backdrop-blur-md",
+                        formationVideoPlaying && "animate-bounce",
+                      )}
+                    >
+                      <span aria-hidden="true">{FORMATION_FALLBACK_PROPS[formationMedia.category].primary}</span>
+                      <span className="text-lg" aria-hidden="true">
+                        {FORMATION_FALLBACK_PROPS[formationMedia.category].secondary}
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
               </div>
               {/* Dormancy warning component */}
               <DormancyWarning 
@@ -1054,7 +1313,56 @@ export const CompanionDisplay = memo(({
                 daysUntilWake={care.dormancy.daysUntilWake}
               />
             </div>
+            {!inlineEvolutionReplay ? (
+              <LivingCompanionPresenceBubble
+                prompt={livingPresence.prompt}
+                companionName={displayedCreatureName}
+                prefersReducedMotion={prefersReducedMotion}
+                onDismiss={livingPresence.dismissPrompt}
+                onAnswer={livingPresence.answerQuestion}
+              />
+            ) : null}
           </div>
+
+          {PRODUCT.mode === "christian" && !isStageZeroEgg ? (
+            <GracewardDailyFormationBoard
+              companion={displayCompanion}
+              onFormationMediaChange={handleFormationMediaChange}
+            />
+          ) : null}
+
+          {!isStageZeroEgg && experienceMode === "full" ? (
+            <div className="space-y-3 text-center">
+              <p
+                className="text-[11px] font-medium text-muted-foreground/85"
+                data-testid="living-companion-state-label"
+              >
+                {livingPresence.stateLabel}
+              </p>
+              <div className="flex justify-center" data-testid="living-companion-secondary-actions">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-9 rounded-full px-3 text-xs text-muted-foreground hover:bg-primary/[0.08] hover:text-foreground"
+                  onClick={() => void handleEvolutionReplay()}
+                  disabled={Boolean(inlineEvolutionReplay)}
+                >
+                  <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                  Replay evolution
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          {experienceMode === "full" ? (
+            <LivingCompanionWorldPulse
+              lifeStage={livingPresence.lifeStage}
+              speciesMotion={livingPresence.speciesMotion}
+              stateLabel={livingPresence.stateLabel}
+              activeActionLabel={livingPresence.activeActionLabel}
+            />
+          ) : null}
 
           <div className="space-y-3">
             <div className="flex justify-center items-center gap-3 mb-3 flex-wrap">
@@ -1078,7 +1386,7 @@ export const CompanionDisplay = memo(({
               >
                 {currentLevelLabel}
               </Badge>
-              <CompanionBondBadge />
+              {experienceMode === "full" ? <CompanionBondBadge /> : null}
             </div>
             <div className="text-center">
               <p className="text-sm font-medium text-muted-foreground mb-2" id="xp-progress-label">
@@ -1098,7 +1406,7 @@ export const CompanionDisplay = memo(({
               />
             </div>
             
-            <div className="grid grid-cols-3 gap-3 pt-2">
+            {experienceMode === "full" ? <div className="grid grid-cols-3 gap-3 pt-2">
               <div className="text-center p-3 rounded-xl bg-gradient-to-br from-primary/5 to-accent/5 border border-primary/10 hover:border-primary/30 transition-all">
                 <p className="text-xs text-muted-foreground mb-1">Color</p>
                 <p className="font-medium text-sm">{colorName}</p>
@@ -1111,12 +1419,14 @@ export const CompanionDisplay = memo(({
                 <p className="text-xs text-muted-foreground mb-1">Element</p>
                 <p className="font-medium text-sm">{formatDisplayLabel(displayCompanion.core_element)}</p>
               </div>
-            </div>
+            </div> : null}
 
-            {/* 7-Stat Companion Attributes Grid */}
-            <CompanionAttributes companion={displayCompanion} />
+            {/* Detailed attributes are a Cosmiq analysis surface, not part of Graceward's daily ritual. */}
+            {experienceMode === "full" && PRODUCT.mode === "cosmiq" ? (
+              <CompanionAttributes companion={displayCompanion} />
+            ) : null}
 
-            <Button
+            {experienceMode === "full" && PRODUCT.mode === "cosmiq" ? <Button
               type="button"
               variant="outline"
               size="sm"
@@ -1126,26 +1436,26 @@ export const CompanionDisplay = memo(({
             >
               <Sparkles className="h-4 w-4 text-primary" />
               Analyze My Stats
-            </Button>
+            </Button> : null}
           </div>
 
           {/* Evolution Path Badge - visible indicator of care patterns */}
-          <div className="flex items-center justify-center gap-3">
+          {experienceMode === "full" ? <div className="flex items-center justify-center gap-3">
             {evolutionPath.path && (
               <EvolutionPathBadge 
                 path={evolutionPath.path} 
                 isLocked={evolutionPath.isLocked}
               />
             )}
-          </div>
+          </div> : null}
 
-          <CompanionDialogue
+          {experienceMode === "full" ? <CompanionDialogue
             className="mt-2"
             companionName={displayedCreatureName}
             companionOverride={displayCompanion}
             progressToNextOverride={displayProgressToNext}
             canEvolveOverride={displayCanEvolve}
-          />
+          /> : null}
 
           {/* Evolve Button - shows when ready */}
           <div data-tutorial-avoid="true">
@@ -1194,12 +1504,6 @@ export const CompanionDisplay = memo(({
           layoutMode={layoutMode}
         />
       ) : null}
-
-      <CompanionChatModal
-        open={companionChatOpen}
-        onOpenChange={setCompanionChatOpen}
-        layoutMode={layoutMode}
-      />
 
       <Dialog open={hatchDialogOpen} onOpenChange={setHatchDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">

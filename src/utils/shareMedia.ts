@@ -2,6 +2,7 @@ import { Capacitor } from "@capacitor/core";
 import { Directory, Filesystem } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 import { toPng } from "html-to-image";
+import { PRODUCT } from "@/config/product";
 
 import {
   EvolutionShareVideo,
@@ -9,8 +10,8 @@ import {
   type RenderEvolutionShareVideoResult,
 } from "@/plugins/EvolutionShareVideoPlugin";
 
-export const DEFAULT_EVOLUTION_SHARE_TEXT = "My companion just evolved. #Cosmiq";
-export const DEFAULT_STATS_CARD_SHARE_TEXT = "My current Cosmiq title. #Cosmiq";
+export const DEFAULT_EVOLUTION_SHARE_TEXT = `My companion just evolved in ${PRODUCT.name}. #Graceward`;
+export const DEFAULT_STATS_CARD_SHARE_TEXT = `My current ${PRODUCT.name} companion title. #Graceward`;
 
 export type ShareCardFormat = "story" | "square";
 
@@ -278,7 +279,7 @@ const dataUrlToBlob = async (dataUrl: string) => {
 const filenameFromUri = (uri: string) => {
   const path = uri.split("?")[0] ?? uri;
   const filename = path.split("/").filter(Boolean).pop();
-  return filename || "cosmiq-share";
+  return filename || "graceward-share";
 };
 
 const mimeTypeFromFilename = (filename: string) => {

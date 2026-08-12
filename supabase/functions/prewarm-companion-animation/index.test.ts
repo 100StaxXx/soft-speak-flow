@@ -175,6 +175,7 @@ Deno.test("prewarm-companion-animation enqueues a preset stage-one hatch animati
       core_element: "fire",
       current_stage: 0,
       current_xp: 14,
+      initial_image_url: "https://example.com/egg-fire.png",
       image_lineage_metadata: null,
     },
   });
@@ -192,12 +193,15 @@ Deno.test("prewarm-companion-animation enqueues a preset stage-one hatch animati
   assertEquals(harness.upserts[0].payload.stage, 1);
   assertEquals(harness.upserts[0].payload.xp_at_evolution, 9);
   assertEquals(
-    typeof harness.upserts[0].payload.image_url === "string" &&
-      harness.upserts[0].payload.image_url.includes("fox"),
-    true,
+    harness.upserts[0].payload.image_url,
+    "/companion-presets/fox/t1_youth/normal/fox__t1_youth__normal__fire.png",
   );
   assertEquals(harness.enqueueCalls[0].evolutionId, "evo-1");
   assertEquals(harness.enqueueCalls[0].stage, 1);
+  assertEquals(
+    harness.enqueueCalls[0].previousImageUrl,
+    "https://example.com/egg-fire.png",
+  );
   assertEquals(harness.workerCalls[0], "job-1");
 });
 
@@ -210,11 +214,13 @@ Deno.test("prewarm-companion-animation uses hidden AI stage-one lineage art", as
       core_element: "ice",
       current_stage: 0,
       current_xp: 14,
+      initial_image_url: "https://example.com/egg-ice.png",
       image_lineage_metadata: {
         hiddenBoundaryAnchors: {
           "1": {
             imageUrl: "https://example.com/hidden-stage-one.png",
             visibility: "hidden_until_reached",
+            approvedForReveal: true,
           },
         },
       },
@@ -497,6 +503,40 @@ Deno.test("prewarm-companion-animation kicks an existing queued animation worker
   assertEquals(body.jobId, "job-1");
   assertEquals(harness.enqueueCalls.length, 0);
   assertEquals(harness.workerCalls[0], "job-1");
+});
+
+Deno.test("prewarm-companion-animation refuses unapproved AI stage-one lineage art", async () => {
+  const harness = createHarness({
+    companion: {
+      id: "companion-1",
+      user_id: "user-1",
+      preset_id: null,
+      core_element: "nature",
+      current_stage: 0,
+      current_xp: 14,
+      initial_image_url: "https://example.com/egg-nature.png",
+      image_lineage_metadata: {
+        hiddenBoundaryAnchors: {
+          "1": {
+            imageUrl: "https://example.com/unreviewed-stage-one.png",
+            visibility: "hidden_until_reached",
+          },
+        },
+      },
+    },
+  });
+
+  const response = await module.handlePrewarmCompanionAnimation(
+    createRequest({ companionId: "companion-1", stage: 1 }),
+    harness.deps,
+  );
+  const payload = await response.json();
+
+  assertEquals(response.status, 200);
+  assertEquals(payload.status, "skipped");
+  assertEquals(payload.reason, "source_image_unavailable");
+  assertEquals(harness.upserts.length, 0);
+  assertEquals(harness.enqueueCalls.length, 0);
 });
 
 Deno.test("prewarm-companion-animation marks terminal worker config failures", async () => {

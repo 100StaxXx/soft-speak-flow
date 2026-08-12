@@ -9,11 +9,12 @@ const AUTH_RESET_PATH = '/auth/reset-password';
 const CALENDAR_OAUTH_CALLBACK_PATH = '/calendar/oauth/callback';
 const JOIN_EPIC_PATH = '/join';
 const JOURNEYS_PATH = '/journeys';
-const HOSTED_APP_LINK_HOSTS = new Set(['app.cosmiq.quest', 'cosmiq.quest']);
+const TODAY_PATH = '/mentor';
+const HOSTED_APP_LINK_HOSTS = new Set(['graceward.app', 'www.graceward.app', 'app.cosmiq.quest', 'cosmiq.quest']);
 const CALENDAR_CALLBACK_ORIGIN_PARAM = 'calendar_callback_origin';
 
 export interface DeepLinkData {
-  type: 'task' | 'calendar_oauth' | 'calendar_oauth_callback' | 'auth_recovery' | 'join_epic' | 'journeys' | 'unknown';
+  type: 'task' | 'today' | 'calendar_oauth' | 'calendar_oauth_callback' | 'auth_recovery' | 'join_epic' | 'journeys' | 'unknown';
   taskId?: string;
   provider?: CalendarOAuthProvider;
   status?: CalendarOAuthStatus;
@@ -30,7 +31,7 @@ const isNativeAuthRecoveryLink = (parsed: URL): boolean => {
   );
 
   const isSchemeRecoveryLink = (
-    ['cosmiq:', 'com.darrylgraham.revolution:'].includes(parsed.protocol) &&
+    ['graceward:', 'com.darrylgraham.graceward:', 'cosmiq:', 'com.darrylgraham.revolution:'].includes(parsed.protocol) &&
     (
       (parsed.hostname === 'auth' && parsed.pathname === '/reset-password') ||
       parsed.pathname === AUTH_RESET_PATH
@@ -70,13 +71,17 @@ const buildHostedCalendarOAuthCallbackPath = (parsed: URL): string => {
  */
 export const parseDeepLink = (url: string): DeepLinkData => {
   try {
-    // cosmiq://task/{taskId}
-    if (url.startsWith('cosmiq://task/')) {
-      const taskId = url.replace('cosmiq://task/', '').split('?')[0];
+    if (url === 'graceward://today' || url === 'cosmiq://today') {
+      return { type: 'today', path: TODAY_PATH, rawUrl: url };
+    }
+
+    // graceward://task/{taskId}
+    if (url.startsWith('graceward://task/') || url.startsWith('cosmiq://task/')) {
+      const taskId = url.replace(/^(graceward|cosmiq):\/\/task\//, '').split('?')[0];
       return { type: 'task', taskId, rawUrl: url };
     }
 
-    if (url.startsWith('cosmiq://calendar/oauth/callback')) {
+    if (url.startsWith('graceward://calendar/oauth/callback') || url.startsWith('cosmiq://calendar/oauth/callback')) {
       const parsed = new URL(url);
       const providerRaw = parsed.searchParams.get('provider');
       const statusRaw = parsed.searchParams.get('status');

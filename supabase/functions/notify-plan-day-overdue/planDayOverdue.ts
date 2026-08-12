@@ -127,7 +127,7 @@ export const buildOverduePushQueueRow = (
       remaining_overdue: remainingCount,
     },
     payload: {
-      deepLink: "cosmiq://journeys/plan",
+      deepLink: "graceward://journeys/plan",
       planId: plan.id,
       blockId: overdue.block.id,
       url: "/journeys",

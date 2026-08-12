@@ -48,6 +48,7 @@ vi.mock("./useCompanion", () => ({
   XP_REWARDS: {
     HABIT_COMPLETE: 8,
     CHECK_IN: 4,
+    EVENING_REFLECTION: 6,
     STREAK_MILESTONE: 15,
     PEP_TALK_LISTEN: 8,
   },
@@ -116,7 +117,13 @@ describe("useXPRewards discipline rebalance", () => {
     mocks.fromMock.mockReset();
     mocks.showXPToastMock.mockClear();
     mocks.awardXPMutateMock.mockClear();
-    mocks.awardXPMutateAsyncMock.mockClear();
+    mocks.awardXPMutateAsyncMock.mockReset();
+    mocks.awardXPMutateAsyncMock.mockResolvedValue({
+      xpAwarded: 4,
+      capApplied: false,
+      nextThreshold: 120,
+      shouldEvolve: false,
+    });
     mocks.updateWisdomFromLearningMock.mockClear();
     mocks.awardWisdomForHabitLearningMock.mockClear();
     mocks.awardAlignmentForMorningCheckInMock.mockClear();
@@ -153,10 +160,11 @@ describe("useXPRewards discipline rebalance", () => {
     });
 
     expect(mocks.rpcMock).toHaveBeenCalledWith("mark_companion_active");
-    expect(mocks.showXPToastMock).toHaveBeenCalledWith(4, "Check-In Complete!");
-    expect(mocks.awardXPMutateMock).toHaveBeenCalledWith(expect.objectContaining({
+    expect(mocks.showXPToastMock).toHaveBeenCalledWith(4, "Prayer complete");
+    expect(mocks.awardXPMutateAsyncMock).toHaveBeenCalledWith(expect.objectContaining({
       eventType: "check_in",
       xpAmount: 4,
+      idempotencyKey: expect.stringMatching(/^morning-prayer:/),
     }));
     expect(mocks.awardAlignmentForMorningCheckInMock).toHaveBeenCalledWith({
       companionId: "companion-1",
@@ -191,6 +199,12 @@ describe("useXPRewards discipline rebalance", () => {
   });
 
   it("routes evening reflections through tracked alignment awards", async () => {
+    mocks.awardXPMutateAsyncMock.mockResolvedValueOnce({
+      xpAwarded: 6,
+      capApplied: false,
+      nextThreshold: 120,
+      shouldEvolve: false,
+    });
     const { result } = renderHook(() => useXPRewards(), {
       wrapper: createWrapper(),
     });
@@ -203,6 +217,11 @@ describe("useXPRewards discipline rebalance", () => {
       companionId: "companion-1",
       date: expect.any(String),
     });
+    expect(mocks.awardXPMutateAsyncMock).toHaveBeenCalledWith(expect.objectContaining({
+      eventType: "evening_reflection",
+      xpAmount: 6,
+      idempotencyKey: expect.stringMatching(/^evening-reflection:/),
+    }));
   });
 
   it("returns pep talk award results and only toasts on successful XP awards", async () => {

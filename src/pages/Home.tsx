@@ -1,7 +1,7 @@
-import Index from "./Index";
+import Today from "./Today";
 
 const Home = () => {
-  return <Index enableOnboardingGuard />;
+  return <Today enableOnboardingGuard />;
 };
 
 export default Home;

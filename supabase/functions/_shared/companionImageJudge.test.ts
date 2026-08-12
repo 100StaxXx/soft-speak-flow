@@ -16,7 +16,7 @@ function assertEquals<T>(actual: T, expected: T, message: string): void {
   }
 }
 
-Deno.test("companion image judge requires and returns background cutout scoring", async () => {
+Deno.test("companion image judge requires maturity and background cutout scoring", async () => {
   const capturedBodies: Array<Record<string, unknown>> = [];
   const guardedFetch = async (_input: RequestInfo | URL, init?: RequestInit) => {
     capturedBodies.push(JSON.parse(String(init?.body ?? "{}")));
@@ -32,6 +32,7 @@ Deno.test("companion image judge requires and returns background cutout scoring"
                       continuity: 8,
                       difference: 7,
                       anatomy: 9,
+                      stageMaturity: 2,
                       centering: 8,
                       backgroundCutout: 3,
                       overall: 7,
@@ -65,6 +66,7 @@ Deno.test("companion image judge requires and returns background cutout scoring"
   });
 
   assertEquals(scores?.backgroundCutout, 3, "Expected parsed background cutout score");
+  assertEquals(scores?.stageMaturity, 2, "Expected parsed maturity score");
   const capturedBody = capturedBodies[0];
   assert(capturedBody, "Expected judge request body to be captured");
 
@@ -74,12 +76,17 @@ Deno.test("companion image judge requires and returns background cutout scoring"
     parameters.required.includes("backgroundCutout"),
     "Expected judge tool schema to require backgroundCutout",
   );
+  assert(
+    parameters.required.includes("stageMaturity"),
+    "Expected judge tool schema to require stageMaturity",
+  );
 
   const messages = capturedBody.messages as Array<Record<string, any>>;
   const content = messages[0]?.content as Array<Record<string, unknown>>;
   const instructions = String(content[0]?.text ?? "");
   assert(
     instructions.includes("BackgroundCutout") &&
+      instructions.includes("StageMaturity") &&
       instructions.includes("sky") &&
       instructions.includes("rectangular backdrop"),
     "Expected judge instructions to define visible backdrop failures",

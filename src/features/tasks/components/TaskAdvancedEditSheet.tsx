@@ -413,13 +413,13 @@ export function TaskAdvancedEditSheet({
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent className="max-h-[90vh]">
         <DrawerHeader className="pb-2">
-          <DrawerTitle className="text-lg">Edit Quest Details</DrawerTitle>
+          <DrawerTitle className="text-lg">Edit action details</DrawerTitle>
         </DrawerHeader>
         
         <div className="px-4 pb-4 space-y-4 overflow-y-auto overscroll-contain max-h-[60vh]" data-vaul-no-drag>
           {/* Task Title */}
           <div className="space-y-2">
-            <Label htmlFor="task-title" className="text-sm font-medium">Quest Title</Label>
+            <Label htmlFor="task-title" className="text-sm font-medium">Action title</Label>
             <Input
               id="task-title"
               value={text}

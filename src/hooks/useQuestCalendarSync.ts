@@ -158,7 +158,7 @@ export function getCalendarSendSuccessCopy(
 ): { title: string; description: string } {
   const title = result.destinationKind === 'todo'
     ? 'Quest sent to Microsoft To Do'
-    : `Quest sent to ${result.providerLabel} Calendar`;
+    : `Action sent to ${result.providerLabel} Calendar`;
   const target = `${result.providerLabel} ${result.destinationKind === 'todo' ? 'To Do' : 'Calendar'} -> ${result.destinationName}`;
   const suffix = connectedProviderCount > 1
     ? ' Other connected providers are untouched.'

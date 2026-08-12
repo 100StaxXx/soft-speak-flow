@@ -6,14 +6,14 @@ import {
 } from "@/utils/pushNotificationNavigation";
 
 describe("push notification navigation", () => {
-  it("routes legacy task URLs to journeys with the task id", () => {
+  it("routes legacy task URLs to the prepared Today experience", () => {
     expect(
       resolvePushNotificationDestination({
         url: "/tasks",
         task_id: "task-1",
         type: "task_reminder",
       }),
-    ).toBe("/journeys?taskId=task-1");
+    ).toBe("/mentor");
   });
 
   it("rejects external URLs and falls back by notification type", () => {
@@ -22,15 +22,15 @@ describe("push notification navigation", () => {
         url: "https://example.com/phish",
         type: "mentor_nudge",
       }),
-    ).toBe("/companion");
+    ).toBe("/guide");
   });
 
-  it("maps Cosmiq task deep links into app routes", () => {
+  it("maps Cosmiq task deep links to Today", () => {
     expect(
       resolvePushNotificationDestination({
         deepLink: "cosmiq://task/task-2",
       }),
-    ).toBe("/journeys?taskId=task-2");
+    ).toBe("/mentor");
   });
 
   it("keeps queue ids with native push navigation details", () => {
@@ -41,14 +41,28 @@ describe("push notification navigation", () => {
         url: "/tasks",
       }),
     ).toEqual({
-      url: "/journeys?taskId=task-3",
+      url: "/mentor",
       queueId: "queue-1",
     });
   });
 
   it("normalizes the legacy string event detail shape", () => {
     expect(normalizePushNotificationNavigationDetail("/tasks")).toEqual({
-      url: "/journeys",
+      url: "/mentor",
     });
+  });
+
+  it("opens a daily encouragement notification in its full player", () => {
+    expect(
+      resolvePushNotificationDestination({
+        type: "daily_pep",
+        pep_talk_id: "daily-encouragement-1",
+      }),
+    ).toBe("/pep-talk/daily-encouragement-1");
+  });
+
+  it("falls back to the Today encouragement card when an old push has no id", () => {
+    expect(resolvePushNotificationDestination({ type: "daily_pep" }))
+      .toBe("/mentor#daily-encouragement");
   });
 });

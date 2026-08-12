@@ -28,7 +28,7 @@ const APPLE_MISSING_EXPIRATION_ERROR =
   "This Apple transaction is missing its subscription expiration date.";
 export const APP_STORE_SUBSCRIPTION_ALREADY_LINKED_TITLE = "Subscription already linked";
 export const APP_STORE_SUBSCRIPTION_ALREADY_LINKED_MESSAGE =
-  "This App Store subscription is already linked to another Cosmiq account. Sign in to that account, or contact support if this is your purchase.";
+  "This App Store subscription is already linked to another Graceward account. Sign in to that account, or contact support if this is your purchase.";
 const INACTIVE_ACCESS_STATE = {
   has_access: false,
   access_source: "none" as const,
@@ -138,18 +138,15 @@ export function useAppleSubscription() {
     activePlan: storeKitPlan,
     currentEntitlement,
     purchase,
-    redeemOfferCode,
     restorePurchases,
     recoverPurchases,
     manageSubscriptions,
-    presentPaywallIfNeeded,
     presentCustomerCenter,
     refreshProducts,
   } = useStoreKit();
   const [loading, setLoading] = useState(false);
   const [manageLoading, setManageLoading] = useState(false);
   const [productError, setProductError] = useState<string | null>(null);
-  const [offerCodePurchaseReady, setOfferCodePurchaseReady] = useState(false);
   const [recoveringExistingSubscription, setRecoveringExistingSubscription] = useState(false);
   const deferredVerificationTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const { accessState } = useAccessState();
@@ -161,12 +158,6 @@ export function useAppleSubscription() {
       getYearlyOfferTier(appliedReferralCodeState.apple_offer_campaign_identifier, appliedReferralCode),
     )
     : null;
-
-  useEffect(() => {
-    if (!hasOfferCode) {
-      setOfferCodePurchaseReady(false);
-    }
-  }, [hasOfferCode]);
 
   const hasLoadedProducts = products.length > 0;
 
@@ -469,7 +460,7 @@ export function useAppleSubscription() {
           verifySandboxRecoveryInBackground(currentEntitlement, surface, currentPlan);
           if (options.showSuccessToast !== false) {
             toast({
-              title: "Cosmiq unlocked",
+              title: "Graceward unlocked",
               description: "Your existing TestFlight subscription is active on this account.",
             });
           }
@@ -488,7 +479,7 @@ export function useAppleSubscription() {
         verifySandboxRecoveryInBackground(recoveredTransaction, surface, plan);
         if (options.showSuccessToast !== false) {
           toast({
-            title: "Cosmiq unlocked",
+            title: "Graceward unlocked",
             description: "Your existing TestFlight subscription is active on this account.",
           });
         }
@@ -504,7 +495,7 @@ export function useAppleSubscription() {
 
       if (options.showSuccessToast !== false) {
         toast({
-          title: "Cosmiq unlocked",
+          title: "Graceward unlocked",
           description: "Your existing App Store subscription is active on this account.",
         });
       }
@@ -536,7 +527,7 @@ export function useAppleSubscription() {
     if (!user?.id) {
       toast({
         title: "Sign in required",
-        description: "Please sign in before purchasing Cosmiq.",
+        description: "Please sign in before purchasing Graceward.",
         variant: "destructive",
       });
       return false;
@@ -549,7 +540,7 @@ export function useAppleSubscription() {
     ) {
       toast({
         title: "Subscription already active",
-        description: "Cosmiq is already unlocked for this account.",
+        description: "Graceward is already unlocked for this account.",
       });
       return true;
     }
@@ -559,7 +550,7 @@ export function useAppleSubscription() {
       if (recovered === "verified") {
         toast({
           title: "Existing TestFlight subscription restored",
-          description: "Cosmiq was unlocked from an existing sandbox/App Store entitlement, so no new trial purchase was needed.",
+          description: "Graceward was unlocked from an existing sandbox/App Store entitlement, so no new trial purchase was needed.",
         });
         return true;
       }
@@ -590,45 +581,6 @@ export function useAppleSubscription() {
     setLoading(true);
     setProductError(null);
     try {
-      if (usesOfferCodeDiscount && !offerCodePurchaseReady) {
-        trackPaywallEvent("offer_code_redemption_started", {
-          surface,
-          plan,
-          productId,
-          hasOfferCode,
-        });
-
-        const redemption = await redeemOfferCode();
-
-        trackPaywallEvent("offer_code_redemption_completed", {
-          surface,
-          plan,
-          productId,
-          hasOfferCode,
-          status: redemption.status,
-          entitlementActivated: Boolean(redemption.entitlement),
-        });
-
-        if (redemption.entitlement) {
-          const verified = await verifyCompletedTransaction(redemption.entitlement, surface, plan);
-          if (!verified) return false;
-
-          toast({
-            title: "Cosmiq unlocked",
-            description: "Your discounted yearly access is now active.",
-          });
-          setOfferCodePurchaseReady(false);
-          return true;
-        }
-
-        setOfferCodePurchaseReady(true);
-        toast({
-          title: "Finish redeeming with Apple",
-          description: "Use the same code in Apple's redemption screen, then tap Subscribe Yearly to finish.",
-        });
-        return false;
-      }
-
       trackPaywallEvent("purchase_started", {
         surface,
         plan,
@@ -643,28 +595,18 @@ export function useAppleSubscription() {
         return (await recoverExistingSubscription(surface)) === "verified";
       }
 
-      setOfferCodePurchaseReady(false);
       const verified = await verifyCompletedTransaction(result, surface, plan);
       if (!verified) return false;
 
       trackPaywallEvent("purchase_completed", { surface, plan, productId: purchaseProductId, hasOfferCode });
       toast({
-        title: "Cosmiq unlocked",
+        title: "Graceward unlocked",
         description: usesOfferCodeDiscount
-          ? "Your creator-code yearly discount is active on your account."
-          : "Cosmiq is now active on your account.",
+          ? "Your $29.99 founding yearly rate is active and stays locked while your subscription remains active."
+          : "Graceward is now active on your account.",
       });
       return true;
     } catch (error) {
-      if (usesOfferCodeDiscount && !offerCodePurchaseReady) {
-        trackPaywallEvent("offer_code_redemption_failed", {
-          surface,
-          plan,
-          productId: purchaseProductId,
-          hasOfferCode,
-          message: getErrorMessage(error),
-        });
-      }
       if (isCancellationError(error)) {
         trackPaywallEvent("purchase_cancelled", { surface, plan, productId: purchaseProductId, hasOfferCode });
         return (await recoverExistingSubscription(surface)) === "verified";
@@ -700,10 +642,8 @@ export function useAppleSubscription() {
     accessState.subscribed,
     currentEntitlement,
     hasOfferCode,
-    offerCodePurchaseReady,
     purchase,
     recoverExistingSubscription,
-    redeemOfferCode,
     toast,
     user?.id,
     verifyCompletedTransaction,
@@ -776,80 +716,6 @@ export function useAppleSubscription() {
     }
   }, [manageSubscriptions, toast]);
 
-  const handlePresentRevenueCatPaywall = useCallback(async (surface: string = "revenuecat_paywall") => {
-    if (!isIAPAvailable()) {
-      toast({
-        title: "Not Available",
-        description: "RevenueCat Paywalls are only available in the native iOS app",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    if (!user?.id) {
-      toast({
-        title: "Sign in required",
-        description: "Please sign in before purchasing Cosmiq.",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    setLoading(true);
-    setProductError(null);
-    try {
-      trackPaywallEvent("paywall_viewed", { surface, hasOfferCode });
-      const purchasedOrRestored = await presentPaywallIfNeeded();
-      let paywallRecoveryResult: ExistingSubscriptionRecoveryResult = "not_found";
-      if (purchasedOrRestored) {
-        try {
-          paywallRecoveryResult = await recoverExistingSubscription(surface, { showSuccessToast: false });
-        } catch (recoveryError) {
-          paywallRecoveryResult = "verification_failed";
-          const message = getErrorMessage(recoveryError);
-          console.warn("[Subscriptions] Hosted RevenueCat paywall purchase sync failed", {
-            surface,
-            message,
-          });
-          trackPaywallEvent("purchase_recovery_failed", {
-            surface,
-            hasOfferCode,
-            message,
-          });
-        }
-      }
-      await invalidateSubscriptionState();
-
-      if (purchasedOrRestored && paywallRecoveryResult !== "verification_failed") {
-        toast({
-          title: "Cosmiq unlocked",
-          description: "Cosmiq is now active on your account.",
-        });
-      }
-
-      return purchasedOrRestored;
-    } catch (error) {
-      const message = getErrorMessage(error);
-      trackPaywallEvent("purchase_failed", { surface, hasOfferCode, message });
-      setProductError(message);
-      toast({
-        title: "Unable to show paywall",
-        description: message,
-        variant: "destructive",
-      });
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    hasOfferCode,
-    invalidateSubscriptionState,
-    presentPaywallIfNeeded,
-    recoverExistingSubscription,
-    toast,
-    user?.id,
-  ]);
-
   const handlePresentCustomerCenter = useCallback(async () => {
     if (!isIAPAvailable()) {
       toast({
@@ -879,7 +745,6 @@ export function useAppleSubscription() {
     handlePurchase,
     handleRestore,
     handleManageSubscriptions,
-    handlePresentRevenueCatPaywall,
     handlePresentCustomerCenter,
     handleRecoverExistingSubscription: recoverExistingSubscription,
     loading,
@@ -895,6 +760,5 @@ export function useAppleSubscription() {
     activeYearlyOffer,
     hasAppliedReferralCode,
     appliedReferralCode,
-    offerCodePurchaseReady,
   };
 }

@@ -207,7 +207,7 @@ describe("native push registration", () => {
         },
       });
 
-      expect(receivedEvents).toEqual([{ url: "/journeys?taskId=task-4", queueId: "queue-4" }]);
+      expect(receivedEvents).toEqual([{ url: "/mentor", queueId: "queue-4" }]);
     } finally {
       window.removeEventListener(NATIVE_PUSH_RECEIVED_EVENT, handleReceived);
     }

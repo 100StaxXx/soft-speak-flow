@@ -529,7 +529,7 @@ describe("AdvancedQuestOptions reminder picker", () => {
 
     expect(screen.getByText("Custom reminder date")).toBeInTheDocument();
     expect(screen.getByText("Custom reminder time")).toBeInTheDocument();
-    expect(screen.getByText("Choose a future quest time before adding a custom reminder.")).toBeInTheDocument();
+    expect(screen.getByText("Choose a future action time before adding a custom reminder.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
   });
 

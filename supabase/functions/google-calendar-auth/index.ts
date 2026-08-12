@@ -6,7 +6,7 @@ const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_CALENDAR_LIST_URL = "https://www.googleapis.com/calendar/v3/users/me/calendarList";
 const GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo";
-const NATIVE_CALLBACK_SCHEME_URL = "cosmiq://calendar/oauth/callback";
+const NATIVE_CALLBACK_SCHEME_URL = "graceward://calendar/oauth/callback";
 
 const SCOPES = [
   "https://www.googleapis.com/auth/calendar.events",

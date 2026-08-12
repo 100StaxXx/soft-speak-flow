@@ -153,6 +153,10 @@ export const getCompanionMotionEventTypeFromReason = (
     normalizedReason.includes("quest")
     || normalizedReason.includes("challenge")
     || normalizedReason.includes("ritual")
+    || normalizedReason.includes("practice complete")
+    || normalizedReason.includes("action complete")
+    || normalizedReason.includes("step complete")
+    || normalizedReason.includes("mission complete")
   ) {
     return "quest_complete";
   }

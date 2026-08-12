@@ -12,6 +12,9 @@ import wallpaperQuestsSeed from "./wallpaper-quests-seed.webp";
 import wallpaperQuestsSeed_2x from "./wallpaper-quests-seed@2x.webp";
 import wallpaperCampaignsSeed from "./wallpaper-campaigns-seed.jpg";
 import wallpaperCampaignsSeed_2x from "./wallpaper-campaigns-seed@2x.jpg";
+import gracewardTodayFallback from "./graceward-today-fallback.webp";
+import gracewardCompanionFallback from "./graceward-companion-fallback.webp";
+import gracewardGuideFallback from "./graceward-guide-fallback.webp";
 import {
   wallpaperGenerationSpecs,
   type WallpaperPageKey,
@@ -39,6 +42,7 @@ export interface CinematicBackgroundScrim {
 }
 
 export interface CinematicPageBackgroundPreset {
+  fallbackBackground?: StaticBackgroundAsset;
   mobileObjectPosition: string;
   desktopObjectPosition: string;
   loadingGradient: string;
@@ -67,10 +71,11 @@ export const starPathPlaceholderBackgrounds = [
 
 export const cinematicPageBackgrounds: Record<CinematicPageBackgroundKey, CinematicPageBackgroundPreset> = {
   guide: {
+    fallbackBackground: createBackgroundAsset(gracewardGuideFallback),
     mobileObjectPosition: `${wallpaperGenerationSpecs.guide.mobileFocus.x}% ${wallpaperGenerationSpecs.guide.mobileFocus.y}%`,
     desktopObjectPosition: `${wallpaperGenerationSpecs.guide.desktopFocus.x}% ${wallpaperGenerationSpecs.guide.desktopFocus.y}%`,
     loadingGradient: "radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.08), transparent 34%), linear-gradient(180deg, rgba(9, 20, 36, 0.18), rgba(5, 12, 24, 0.08))",
-    showCosmicOverlay: true,
+    showCosmicOverlay: false,
     scrim: {
       topGradientTopAlpha: 0.22,
       topGradientMiddleAlpha: 0.06,
@@ -86,10 +91,11 @@ export const cinematicPageBackgrounds: Record<CinematicPageBackgroundKey, Cinema
     },
   },
   quests: {
+    fallbackBackground: createBackgroundAsset(gracewardTodayFallback),
     mobileObjectPosition: `${wallpaperGenerationSpecs.quests.mobileFocus.x}% ${wallpaperGenerationSpecs.quests.mobileFocus.y}%`,
     desktopObjectPosition: `${wallpaperGenerationSpecs.quests.desktopFocus.x}% ${wallpaperGenerationSpecs.quests.desktopFocus.y}%`,
     loadingGradient: "radial-gradient(circle at 48% 24%, rgba(58, 120, 130, 0.22), transparent 32%), linear-gradient(180deg, rgba(20, 29, 42, 0.98), rgba(11, 16, 26, 0.96))",
-    showCosmicOverlay: true,
+    showCosmicOverlay: false,
     scrim: {
       topGradientTopAlpha: 0.58,
       topGradientMiddleAlpha: 0.2,
@@ -124,10 +130,11 @@ export const cinematicPageBackgrounds: Record<CinematicPageBackgroundKey, Cinema
     },
   },
   companion: {
+    fallbackBackground: createBackgroundAsset(gracewardCompanionFallback),
     mobileObjectPosition: `${wallpaperGenerationSpecs.companion.mobileFocus.x}% ${wallpaperGenerationSpecs.companion.mobileFocus.y}%`,
     desktopObjectPosition: `${wallpaperGenerationSpecs.companion.desktopFocus.x}% ${wallpaperGenerationSpecs.companion.desktopFocus.y}%`,
     loadingGradient: "radial-gradient(circle at 50% 22%, rgba(76, 170, 175, 0.22), transparent 34%), linear-gradient(180deg, rgba(12, 24, 37, 0.985), rgba(7, 14, 24, 0.965))",
-    showCosmicOverlay: true,
+    showCosmicOverlay: false,
     scrim: {
       topGradientTopAlpha: 0.42,
       topGradientMiddleAlpha: 0.12,

@@ -129,13 +129,14 @@ export function buildLocalSubscriptionAccessState(
   const plan = planOverride ?? productPlan;
   if (!productPlan || !plan || plan !== productPlan) return null;
   const fallbackSubscriptionEnd = new Date(Date.now() + LOCAL_SUBSCRIPTION_ACTIVATION_GRACE_MS).toISOString();
+  const isIntroductoryTrial = transaction?.offerType === 1;
 
   return {
     has_access: true,
     access_source: "subscription",
-    trial_ends_at: null,
+    trial_ends_at: isIntroductoryTrial ? subscriptionEnd : null,
     subscribed: true,
-    status: "active",
+    status: isIntroductoryTrial ? "trialing" : "active",
     plan,
     subscription_end: subscriptionEnd ?? fallbackSubscriptionEnd,
   };
@@ -156,7 +157,7 @@ function isActiveAccessState(value: unknown): value is AccessState {
   const accessState = value as Partial<AccessState>;
   if (!accessState.subscribed || !accessState.has_access) return false;
   if (accessState.access_source !== "subscription") return false;
-  if (accessState.status !== "active") return false;
+  if (accessState.status !== "active" && accessState.status !== "trialing") return false;
   if (accessState.plan !== "monthly" && accessState.plan !== "yearly") return false;
   if (typeof accessState.subscription_end !== "string") return false;
 
@@ -263,7 +264,7 @@ export function rememberLocalSubscriptionAccess(
     };
     storage.setItem(storageKey(userId), JSON.stringify(record));
   } catch {
-    // Local persistence is a best-effort backup. RevenueCat and the backend remain the sources of truth.
+    // Local persistence is a best-effort backup. StoreKit and the backend remain the sources of truth.
   }
 }
 

@@ -144,10 +144,10 @@ export function EvolutionCardFlip({ card, equippedFrame }: Props) {
     
     await downloadCardElement(
       cardRef.current,
-      `cosmiq-${card.creature_name.toLowerCase().replace(/\s+/g, '-')}-stage-${card.evolution_stage}.png`,
+      `graceward-${card.creature_name.toLowerCase().replace(/\s+/g, '-')}-stage-${card.evolution_stage}.png`,
       {
-        title: `${card.creature_name} - Cosmiq`,
-        text: `Check out my ${card.creature_name}! ✨ #Cosmiq`,
+        title: `${card.creature_name} - Graceward`,
+        text: `Meet my companion, ${card.creature_name}! ✨ #Graceward`,
         dialogTitle: 'Share Companion Card'
       }
     );
@@ -428,7 +428,7 @@ export function EvolutionCardFlip({ card, equippedFrame }: Props) {
                       </div>
                     </div>
                     
-                    {/* Cosmiq Branding - Centered at Bottom with Ornate Frame */}
+                    {/* Graceward branding - centered at bottom with ornate frame */}
                     <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-30 flex items-center justify-center backface-hidden">
                       <div className="relative px-6 py-2">
                         {/* Decorative side elements */}
@@ -436,7 +436,7 @@ export function EvolutionCardFlip({ card, equippedFrame }: Props) {
                         <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-[2px] bg-gradient-to-l from-transparent to-white/60" />
                         
                         <span className="text-[11px] font-bold tracking-[0.3em] text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] relative z-10">
-                          ✦ COSMIQ ✦
+                          ✦ GRACEWARD ✦
                         </span>
                       </div>
                     </div>

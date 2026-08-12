@@ -120,7 +120,7 @@ export async function handleGenerateCheckInResponse(req: Request) {
 
     // Fetch mentor and pep talk in parallel (pep talk needs mentor slug, so we get mentor first)
     const { data: mentor, error: mentorError } = await supabase
-      .from('mentors')
+      .from('graceward_guides')
       .select('name, tone_description, slug')
       .eq('id', profile.selected_mentor_id)
       .maybeSingle()

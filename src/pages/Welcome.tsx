@@ -1,205 +1,140 @@
-import { useEffect, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
-import { LogIn, UserPlus } from "lucide-react";
+import { useEffect } from "react";
+import { ArrowDown, BookOpen, CheckCircle2, Leaf, LogIn, ShieldCheck, UserPlus } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
-import { StaticBackgroundImage } from "@/components/StaticBackgroundImage";
-import type { StaticBackgroundAsset } from "@/assets/backgrounds";
+import { useNavigate } from "react-router-dom";
+
+import { PRODUCT } from "@/config/product";
 import { useAuth } from "@/hooks/useAuth";
 import { getAuthRedirectPath } from "@/utils/authRedirect";
 
-const createLandingBackdrop = (src: string, src2x = src): StaticBackgroundAsset => ({
-  src,
-  src2x,
-});
-
-const landingBackdrops = {
-  companion: createLandingBackdrop("/landing-backdrops/companion.jpg", "/landing-backdrops/companion@2x.jpg"),
-  guide: createLandingBackdrop("/landing-backdrops/guide.jpg", "/landing-backdrops/guide@2x.jpg"),
-  profile: createLandingBackdrop("/landing-backdrops/profile.jpg", "/landing-backdrops/profile@2x.jpg"),
-  quests: createLandingBackdrop("/landing-backdrops/quests.jpg", "/landing-backdrops/quests@2x.jpg"),
-};
-
 const featureGroups = [
   {
-    title: "Quests",
-    text: "Turn goals, habits, and responsibilities into a focused path for the day.",
+    icon: BookOpen,
+    title: "Scripture & prayer",
+    text: "Begin with reviewed Scripture, a grounded reflection, and a short prayer for the day in front of you.",
   },
   {
-    title: "Mentors",
-    text: "Get a cleaner next step when motivation, planning, or reflection gets noisy.",
+    icon: CheckCircle2,
+    title: "Daily practice",
+    text: "Receive one small, ready-made practice for faith, mind, body, relationships, service, stewardship, or rest.",
   },
   {
-    title: "Companion",
-    text: "Watch a personal myth grow around the consistency you are already building.",
+    icon: Leaf,
+    title: "Faithful growth",
+    text: "Build consistency without confusing a streak, score, or completed task with spiritual worth.",
   },
-];
+] as const;
 
-interface LandscapeSectionProps {
-  background: StaticBackgroundAsset;
-  children: ReactNode;
-  className?: string;
-  contentClassName?: string;
-  id?: string;
-  imagePosition?: string;
-  loading?: "eager" | "lazy";
-}
-
-const LandscapeSection = ({
-  background,
-  children,
-  className = "",
-  contentClassName = "",
-  id,
-  imagePosition = "50% 50%",
-  loading = "lazy",
-}: LandscapeSectionProps) => (
-  <section id={id} className={`relative isolate h-screen min-h-[100svh] snap-start snap-always overflow-hidden ${className}`}>
-    <StaticBackgroundImage
-      background={background}
-      className="absolute inset-0 -z-20 h-full w-full object-cover pointer-events-none select-none"
-      loading={loading}
-      objectPosition={imagePosition}
-    />
-    <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(3,7,12,0.56)_0%,rgba(3,7,12,0.22)_42%,rgba(3,7,12,0.9)_100%),linear-gradient(90deg,rgba(3,7,12,0.82)_0%,rgba(3,7,12,0.24)_54%,rgba(3,7,12,0.68)_100%)]" />
-    <div className={`relative mx-auto flex h-screen min-h-[100svh] w-full max-w-6xl px-5 ${contentClassName}`}>
-      {children}
-    </div>
-  </section>
-);
-
-const Welcome = () => {
+export default function Welcome() {
   const prefersReducedMotion = useReducedMotion();
   const navigate = useNavigate();
   const { user, loading } = useAuth();
 
   useEffect(() => {
     if (!loading && user) {
-      getAuthRedirectPath(user.id, {
-        email: user.email ?? null,
-      }).then((path) => {
+      getAuthRedirectPath(user.id, { email: user.email ?? null }).then((path) => {
         navigate(path, { replace: true });
       });
     }
-  }, [user, loading, navigate]);
+  }, [loading, navigate, user]);
 
   return (
-    <div className="h-screen min-h-[100svh] overflow-hidden bg-[#05080d] text-white">
-      <main
-        data-landing-scroll
-        className="h-full snap-y snap-mandatory overflow-y-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        <LandscapeSection
-          id="start"
-          background={landingBackdrops.quests}
-          contentClassName="items-center justify-center pb-[calc(env(safe-area-inset-bottom,0px)+2rem)] pt-[calc(env(safe-area-inset-top,0px)+2rem)]"
-          imagePosition="50% 42%"
-          loading="eager"
-        >
+    <div className="h-screen min-h-[100svh] overflow-hidden bg-[#f4efe3] text-[#203124]">
+      <main className="h-full snap-y snap-mandatory overflow-y-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <section className="daily-way-welcome-hero relative isolate flex h-screen min-h-[100svh] snap-start snap-always items-center overflow-hidden px-5">
+          <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_72%_18%,rgba(195,162,93,0.2),transparent_34%),radial-gradient(circle_at_18%_78%,rgba(73,111,76,0.18),transparent_38%),linear-gradient(145deg,#f7f1e5_0%,#edf0e4_54%,#dfe8db_100%)]" />
+          <div className="absolute -right-24 bottom-[-8rem] -z-10 h-[34rem] w-[34rem] rounded-full border border-[#496f4c]/15" />
+          <div className="absolute -right-8 bottom-[-5rem] -z-10 h-[26rem] w-[26rem] rounded-full border border-[#496f4c]/15" />
+
           <motion.div
-            initial={prefersReducedMotion ? false : { y: 12, opacity: 1 }}
-            whileInView={{ y: 0, opacity: 1 }}
-            viewport={{ amount: 0.72, once: false }}
-            transition={{ duration: prefersReducedMotion ? 0 : 0.34, ease: "easeOut" }}
-            className="w-full max-w-2xl text-center"
+            initial={prefersReducedMotion ? false : { y: 18, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.5, ease: "easeOut" }}
+            className="mx-auto w-full max-w-6xl"
           >
-            <p className="mb-5 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-100 sm:text-sm">
-              Start your quest
-            </p>
-            <h1 className="text-5xl font-semibold leading-[0.94] tracking-normal sm:text-7xl lg:text-8xl">
-              Cosmiq Quest
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#496f4c]">A Christian daily companion</p>
+            <h1 className="mt-5 max-w-4xl font-serif text-6xl leading-[0.92] tracking-[-0.035em] sm:text-7xl lg:text-8xl">
+              {PRODUCT.name}
             </h1>
-            <p className="mx-auto mt-6 max-w-xl text-lg leading-7 text-white/84 sm:text-2xl sm:leading-8">
-              A cinematic habit app for building better days like a mythic journey.
+            <p className="mt-6 max-w-2xl text-xl leading-8 text-[#3f4d41] sm:text-2xl sm:leading-9">
+              {PRODUCT.tagline} Scripture, prayer, reflection, and faithful action—woven into the day you actually have.
             </p>
 
-            <div className="pointer-events-auto mx-auto mt-9 flex w-full max-w-xl flex-col gap-3 sm:flex-row sm:justify-center">
+            <div className="mt-9 flex w-full max-w-xl flex-col gap-3 sm:flex-row">
               <a
                 href="/auth?mode=signup"
-                className="inline-flex h-14 flex-1 items-center justify-center gap-2 border border-cyan-100/70 bg-cyan-100 px-6 text-sm font-semibold uppercase tracking-[0.18em] text-slate-950 transition hover:bg-white sm:max-w-[16rem]"
+                className="inline-flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-[#2f5938] px-6 text-sm font-semibold uppercase tracking-[0.14em] text-white shadow-lg transition hover:bg-[#24482d]"
               >
                 <UserPlus className="h-4 w-4" />
-                Register
+                Begin
               </a>
               <a
                 href="/auth"
-                className="inline-flex h-14 flex-1 items-center justify-center gap-2 border border-white/24 bg-black/28 px-6 text-sm font-semibold uppercase tracking-[0.18em] text-white backdrop-blur-md transition hover:border-white/48 hover:bg-white/12 sm:max-w-[16rem]"
+                className="inline-flex h-14 flex-1 items-center justify-center gap-2 rounded-full border border-[#2f5938]/25 bg-white/55 px-6 text-sm font-semibold uppercase tracking-[0.14em] text-[#294b31] backdrop-blur transition hover:bg-white/85"
               >
                 <LogIn className="h-4 w-4" />
                 Sign in
               </a>
             </div>
-          </motion.div>
-        </LandscapeSection>
 
-        <LandscapeSection
-          id="features"
-          background={landingBackdrops.guide}
-          contentClassName="flex-col justify-end pb-[calc(env(safe-area-inset-bottom,0px)+3.25rem)] pt-[calc(env(safe-area-inset-top,0px)+2rem)] sm:pb-16"
-          imagePosition="50% 44%"
-        >
+            <a href="#daily-practice" className="mt-12 inline-flex items-center gap-2 text-sm font-medium text-[#496f4c]">
+              See the daily practice <ArrowDown className="h-4 w-4" />
+            </a>
+          </motion.div>
+        </section>
+
+        <section id="daily-practice" className="relative flex h-screen min-h-[100svh] snap-start snap-always items-end overflow-hidden bg-[#203124] px-5 pb-14 pt-24 text-[#f8f4e8] sm:pb-20">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_75%_25%,rgba(183,151,80,0.18),transparent_34%),linear-gradient(180deg,transparent,rgba(0,0,0,0.2))]" />
           <motion.div
-            initial={prefersReducedMotion ? false : { y: 12, opacity: 1 }}
+            initial={prefersReducedMotion ? false : { y: 16, opacity: 0 }}
             whileInView={{ y: 0, opacity: 1 }}
-            viewport={{ amount: 0.72, once: false }}
-            transition={{ duration: prefersReducedMotion ? 0 : 0.34, ease: "easeOut" }}
-            className="relative z-20 w-full"
+            viewport={{ once: false, amount: 0.55 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.4 }}
+            className="relative mx-auto w-full max-w-6xl"
           >
-            <p className="mb-4 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-100 sm:text-sm">
-              What it is
-            </p>
-            <h2 className="max-w-3xl text-4xl font-semibold leading-[0.98] tracking-normal sm:text-6xl lg:text-7xl">
-              One place for quests, guidance, and momentum.
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#d7bd7b]">A practice for ordinary life</p>
+            <h2 className="mt-4 max-w-4xl font-serif text-4xl leading-tight sm:text-6xl">
+              Receive the day. Practice what matters. Return with grace.
             </h2>
-            <div className="mt-7 grid gap-3 sm:grid-cols-3">
-              {featureGroups.map((feature) => (
-                <div key={feature.title} className="border border-white/16 bg-black/22 p-4 backdrop-blur-sm">
-                  <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-white">
-                    {feature.title}
-                  </h3>
-                  <p className="mt-3 text-sm leading-6 text-white/74 sm:text-base">
-                    {feature.text}
-                  </p>
-                </div>
-              ))}
+            <div className="mt-9 grid gap-4 sm:grid-cols-3">
+              {featureGroups.map((feature) => {
+                const Icon = feature.icon;
+                return (
+                  <div key={feature.title} className="rounded-[24px] border border-white/[0.12] bg-white/[0.06] p-5 backdrop-blur-sm">
+                    <Icon className="h-5 w-5 text-[#d7bd7b]" />
+                    <h3 className="mt-4 font-semibold">{feature.title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-white/[0.68]">{feature.text}</p>
+                  </div>
+                );
+              })}
             </div>
           </motion.div>
-        </LandscapeSection>
+        </section>
 
-        <LandscapeSection
-          id="closing"
-          background={landingBackdrops.profile}
-          contentClassName="flex-col justify-end pb-[calc(env(safe-area-inset-bottom,0px)+2.5rem)] pt-[calc(env(safe-area-inset-top,0px)+2rem)] sm:pb-14"
-          imagePosition="50% 55%"
-        >
-          <motion.div
-            initial={prefersReducedMotion ? false : { y: 12, opacity: 1 }}
-            whileInView={{ y: 0, opacity: 1 }}
-            viewport={{ amount: 0.72, once: false }}
-            transition={{ duration: prefersReducedMotion ? 0 : 0.34, ease: "easeOut" }}
-            className="relative z-20 w-full max-w-3xl"
-          >
-            <p className="mb-4 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-100 sm:text-sm">
-              Built for return
+        <section className="relative flex h-screen min-h-[100svh] snap-start snap-always items-end overflow-hidden bg-[#e9e4d7] px-5 pb-10 pt-24 text-[#203124] sm:pb-14">
+          <div className="mx-auto w-full max-w-6xl">
+            <ShieldCheck className="h-8 w-8 text-[#496f4c]" />
+            <h2 className="mt-5 max-w-4xl font-serif text-4xl leading-tight sm:text-6xl">Guidance without pretending to speak for God.</h2>
+            <p className="mt-6 max-w-2xl text-lg leading-8 text-[#4d584f]">
+              Graceward supports daily reflection and practice. It does not replace Scripture, prayer, church, pastoral care, therapy, or medical help. AI-generated reflections are clearly identified and never presented as divine revelation.
             </p>
-            <h2 className="text-4xl font-semibold leading-[0.98] tracking-normal sm:text-6xl lg:text-7xl">
-              The story is the system.
-            </h2>
-            <p className="mt-6 max-w-2xl text-lg leading-7 text-white/82 sm:text-2xl sm:leading-8">
-              Cosmiq is for people who want their routines to feel less like maintenance and more like a world they keep coming back to.
-            </p>
-          </motion.div>
 
-          <footer className="relative z-20 mt-10 flex w-full flex-col gap-3 border-t border-white/18 pt-5 text-sm text-white/64 sm:flex-row sm:items-center sm:justify-between">
-            <p>© 2026 Cosmiq</p>
-            <div className="flex gap-5">
-              <a href="/terms" className="hover:text-white">Terms</a>
-              <a href="/privacy" className="hover:text-white">Privacy</a>
+            <div className="mt-9 flex flex-col gap-3 sm:w-fit sm:flex-row">
+              <a href="/auth?mode=signup" className="inline-flex h-13 items-center justify-center rounded-full bg-[#2f5938] px-7 py-4 text-sm font-semibold text-white">
+                Begin today
+              </a>
+              <a href="/auth" className="inline-flex h-13 items-center justify-center rounded-full border border-[#2f5938]/25 px-7 py-4 text-sm font-semibold text-[#294b31]">
+                Sign in
+              </a>
             </div>
-          </footer>
-        </LandscapeSection>
+
+            <footer className="mt-12 flex flex-col gap-3 border-t border-[#203124]/15 pt-5 text-sm text-[#58645a] sm:flex-row sm:items-center sm:justify-between">
+              <p>© 2026 {PRODUCT.legalEntity} · {PRODUCT.name}</p>
+              <div className="flex gap-5"><a href="/terms">Terms</a><a href="/privacy">Privacy</a></div>
+            </footer>
+          </div>
+        </section>
       </main>
     </div>
   );
-};
-
-export default Welcome;
+}

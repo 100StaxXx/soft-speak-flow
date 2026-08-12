@@ -176,7 +176,7 @@ export const GlobalSearch = ({
             <TabsTrigger value="quotes">Quotes</TabsTrigger>
             <TabsTrigger value="pep-talks">Pep Talks</TabsTrigger>
             <TabsTrigger value="challenges">Challenges</TabsTrigger>
-            <TabsTrigger value="quests">Quests</TabsTrigger>
+            <TabsTrigger value="quests">Actions</TabsTrigger>
             <TabsTrigger value="epics">Epics</TabsTrigger>
           </TabsList>
 
@@ -294,7 +294,7 @@ export const GlobalSearch = ({
                   <div>
                     <div className="flex items-center gap-2 mb-3">
                       <Trophy className="h-4 w-4 text-primary" />
-                      <h3 className="font-semibold">Quests</h3>
+                      <h3 className="font-semibold">Actions</h3>
                       <Badge variant="secondary">{tasks.length}</Badge>
                     </div>
                     <div className="space-y-3">
@@ -341,7 +341,7 @@ export const GlobalSearch = ({
                             </div>
                             <div className="flex flex-col items-end gap-1">
                               {task.is_main_quest && (
-                                <Badge variant="secondary" className="text-xs">Main Quest</Badge>
+                                <Badge variant="secondary" className="text-xs">Main Action</Badge>
                               )}
                               {task.completed && (
                                 <Badge className="text-xs bg-success/10 text-success">Completed</Badge>
@@ -498,7 +498,7 @@ export const GlobalSearch = ({
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       {task.is_main_quest && (
-                        <Badge variant="secondary" className="text-xs">Main Quest</Badge>
+                        <Badge variant="secondary" className="text-xs">Main Action</Badge>
                       )}
                       {task.completed && (
                         <Badge className="text-xs bg-success/10 text-success">Completed</Badge>

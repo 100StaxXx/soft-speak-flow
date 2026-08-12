@@ -537,7 +537,7 @@ async function buildCompletionContext(
   if (profile?.selected_mentor_id) {
     context.mentor = await maybeSingle<MentorRow>(
       supabase
-        .from("mentors")
+        .from("graceward_guides")
         .select("id, name, slug, tone_description, style")
         .eq("id", profile.selected_mentor_id)
         .maybeSingle(),

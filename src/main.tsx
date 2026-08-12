@@ -48,6 +48,13 @@ document.getElementById('debug-indicator')?.remove();
 if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios") {
   document.documentElement.classList.add("platform-native-ios");
   document.body.classList.add("platform-native-ios");
+  document.addEventListener("contextmenu", (event) => {
+    const target = event.target;
+    if (target instanceof Element && target.closest('[data-native-text-selection="allow"], .allow-text-select')) {
+      return;
+    }
+    event.preventDefault();
+  }, { capture: true });
 
   if (isMacDesignedForIPadIOSApp()) {
     document.documentElement.classList.add("platform-mac-hosted-ios");

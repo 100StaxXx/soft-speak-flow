@@ -10,6 +10,15 @@
           "/calendar/oauth/callback",
           "/calendar/oauth/callback/*"
         ]
+      },
+      {
+        "appID": "B6VW78ABTR.com.darrylgraham.graceward",
+        "paths": [
+          "/auth",
+          "/auth/*",
+          "/calendar/oauth/callback",
+          "/calendar/oauth/callback/*"
+        ]
       }
     ]
   }

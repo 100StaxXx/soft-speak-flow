@@ -33,7 +33,7 @@ export const FocusTab = memo(({ layoutMode = 'mobile' }: FocusTabProps) => {
               Run focus sessions or resist an urge without leaving your companion.
             </p>
           </div>
-          <div className="flex gap-2 rounded-2xl bg-background/28 p-1">
+          <div className="flex gap-2 rounded-2xl bg-background/[0.28] p-1">
             <Button
               variant={mode === 'focus' ? 'default' : 'ghost'}
               size="sm"

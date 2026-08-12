@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.darrylgraham.revolution',
-  appName: 'Cosmiq',
+  appId: 'com.darrylgraham.graceward',
+  appName: 'Graceward',
   webDir: 'dist',
   loggingBehavior: 'none',
   // ⚠️ PRODUCTION BUILD: server config commented out
@@ -15,7 +15,7 @@ const config: CapacitorConfig = {
     SplashScreen: {
       launchShowDuration: 2000,
       launchAutoHide: false,
-      backgroundColor: '#1a1a1a',
+      backgroundColor: '#eef0e6',
       androidSplashResourceName: 'splash',
       androidScaleType: 'CENTER_CROP',
       showSpinner: false,

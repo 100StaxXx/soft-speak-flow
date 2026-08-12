@@ -12,10 +12,6 @@ import {
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { useQuery } from "@tanstack/react-query";
-import {
-  createRemoteBackgroundAsset,
-  type StaticBackgroundAsset,
-} from "@/assets/backgrounds";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { queryKeys } from "@/lib/queryKeys";
@@ -35,7 +31,7 @@ type LiveWallpaperManifestRow = Database["public"]["Views"]["live_wallpaper_mani
 export interface ResolvedWallpaper {
   dateKey: string;
   imageUrl: string;
-  background: StaticBackgroundAsset;
+  background: { src: string; src2x: string };
   mobileObjectPosition: string;
   desktopObjectPosition: string;
   source: "remote";
@@ -197,7 +193,7 @@ const toResolvedWallpaper = (
 ): ResolvedWallpaper => ({
   dateKey: entry.forDate,
   imageUrl: entry.imageUrl,
-  background: createRemoteBackgroundAsset(entry.imageUrl),
+  background: { src: entry.imageUrl, src2x: entry.imageUrl },
   mobileObjectPosition: toObjectPosition(entry.mobileFocusX, entry.mobileFocusY),
   desktopObjectPosition: toObjectPosition(entry.desktopFocusX, entry.desktopFocusY),
   source: "remote",

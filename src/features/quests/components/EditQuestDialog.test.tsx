@@ -163,9 +163,9 @@ describe("EditQuestDialog", () => {
     );
   });
 
-  it("falls back to the stored companion color when no theme style is supplied", () => {
+  it("falls back to the Graceward theme when no theme style is supplied", () => {
     mocks.companionFavoriteColor = "#58d68d";
-    const companionFrostedThemeStyle = getCompanionFrostedThemeStyle(mocks.companionFavoriteColor);
+    const companionFrostedThemeStyle = getCompanionFrostedThemeStyle("#2f5938");
 
     render(
       <EditQuestDialog

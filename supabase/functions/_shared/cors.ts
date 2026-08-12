@@ -24,6 +24,8 @@
 
 const DEFAULT_ALLOWED_ORIGINS = [
   // Production domains
+  "https://graceward.app",
+  "https://www.graceward.app",
   "https://cosmiq.app",
   "https://www.cosmiq.app",
   "https://app.cosmiq.app",

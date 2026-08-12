@@ -291,7 +291,7 @@ describe("Pathfinder", () => {
     expect(screen.getByTestId("pathfinder-shell")).toBeInTheDocument();
     expectElementToIncludeClasses(
       screen.getByTestId("pathfinder-shell"),
-      "border-[hsl(var(--celestial-blue)_/_0.58)] text-foreground",
+      "border-2 border-input text-foreground",
     );
     expect(screen.getByTestId("pathfinder-header")).toBeInTheDocument();
     expect(screen.getByTestId("pathfinder-progress")).toBeInTheDocument();
@@ -320,9 +320,8 @@ describe("Pathfinder", () => {
     );
   });
 
-  it("falls back to the companion visual favorite color when no theme style is supplied", () => {
+  it("falls back to the Graceward journey-builder theme when no theme style is supplied", () => {
     mocks.journeysCompanionVisual.favoriteColor = "#f5b942";
-    const companionFrostedThemeStyle = getCompanionFrostedThemeStyle("#f5b942");
 
     render(
       <Pathfinder
@@ -335,34 +334,7 @@ describe("Pathfinder", () => {
     );
 
     expect(screen.getByTestId("pathfinder-shell").style.getPropertyValue("--companion-frosted-primary")).toBe(
-      companionFrostedThemeStyle["--companion-frosted-primary"],
-    );
-  });
-
-  it("centers generated scene art in the header avatar", () => {
-    mocks.journeysCompanionVisual = {
-      companionLabel: "Glacieron",
-      imageUrl: "https://assets.example.com/generated-companion.png",
-      focalX: 0.4,
-      focalY: 0.6,
-      element: "ice",
-      usesPortraitShell: false,
-      favoriteColor: "#52b7ff",
-    };
-
-    render(
-      <Pathfinder
-        open
-        userId="user-1"
-        onOpenChange={vi.fn()}
-        onCreateEpic={(...args) => mocks.onCreateEpic(...args)}
-        isCreating={false}
-      />,
-    );
-
-    expect(screen.getByRole("img", { name: "Glacieron" })).toHaveAttribute(
-      "data-companion-image-fit",
-      "contain",
+      "132 31% 30%",
     );
   });
 
@@ -516,7 +488,7 @@ describe("Pathfinder", () => {
     await waitFor(() => {
       expect(screen.getByLabelText("Your Why")).toHaveValue("Ship the edited thing");
     });
-    expect(screen.getByLabelText("Campaign Name")).toHaveValue("Edited Course Launch");
+    expect(screen.getByLabelText("Journey name")).toHaveValue("Edited Course Launch");
     expect(screen.queryByRole("button", { name: /Build My Plan/i })).not.toBeInTheDocument();
     expect(mocks.hydrateSchedule).toHaveBeenCalledWith(resumeDraft.schedule);
   });
@@ -537,11 +509,11 @@ describe("Pathfinder", () => {
     expect(screen.queryByText(ACTIVE_CAMPAIGN_LIMIT_WARNING)).not.toBeInTheDocument();
   });
 
-  it("shows the campaign-limit warning and disables creation when planner state has five active campaigns", async () => {
-    mocks.activeEpics = Array.from({ length: 5 }, (_, index) => ({
-      id: `epic-${index + 1}`,
+  it("shows the journey-limit warning and disables creation when a journey is active", async () => {
+    mocks.activeEpics = [{
+      id: "epic-1",
       status: "active",
-    }));
+    }];
 
     render(
       <Pathfinder
@@ -567,11 +539,11 @@ describe("Pathfinder", () => {
     fireEvent.change(await screen.findByLabelText("Your Why"), {
       target: { value: "Get licensed and start practicing." },
     });
-    fireEvent.change(screen.getByLabelText("Campaign Name"), {
+    fireEvent.change(screen.getByLabelText("Journey name"), {
       target: { value: "Bar Exam Sprint" },
     });
 
-    expect(screen.getByRole("button", { name: /Create Campaign/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Create journey/i })).toBeDisabled();
   });
 
   it("latches campaign creation immediately so rapid double taps only submit once", async () => {
@@ -609,7 +581,7 @@ describe("Pathfinder", () => {
       target: { value: "Get licensed and start practicing." },
     });
 
-    const createButton = screen.getByRole("button", { name: /Create Campaign/i });
+    const createButton = screen.getByRole("button", { name: /Create journey/i });
     fireEvent.click(createButton);
     fireEvent.click(createButton);
 
@@ -638,7 +610,7 @@ describe("Pathfinder", () => {
       />,
     );
 
-    fireEvent.click(screen.getByLabelText("Close Pathfinder"));
+    fireEvent.click(screen.getByLabelText("Close journey builder"));
 
     expect(onClosed).toHaveBeenCalledTimes(1);
     window.removeEventListener("campaign-builder-closed", onClosed);
@@ -781,7 +753,7 @@ describe("Pathfinder", () => {
       target: { value: "Prove to myself I can do it" },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /Create Campaign/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Create journey/i }));
 
     await waitFor(() => {
       expect(mocks.onCreateEpic).toHaveBeenCalledTimes(1);

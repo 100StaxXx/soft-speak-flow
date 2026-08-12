@@ -72,7 +72,7 @@ serve(async (req) => {
 
     // Fetch all mentors to assign quotes
     const { data: mentors } = await supabase
-      .from("mentors")
+      .from("graceward_guides")
       .select("id, slug, tags");
 
     if (!mentors || mentors.length === 0) {

@@ -42,6 +42,8 @@ describe("companionMotion config", () => {
   it("derives streak-style events from milestone reasons", () => {
     expect(getCompanionMotionEventTypeFromReason("7 Day Streak!")).toBe("streak");
     expect(getCompanionMotionEventTypeFromReason("Quest Complete!")).toBe("quest_complete");
+    expect(getCompanionMotionEventTypeFromReason("Faithful practice complete")).toBe("quest_complete");
+    expect(getCompanionMotionEventTypeFromReason("Faithful action complete")).toBe("quest_complete");
     expect(getCompanionMotionEventTypeFromReason("Subtask Done!")).toBe("xp_gain");
   });
 

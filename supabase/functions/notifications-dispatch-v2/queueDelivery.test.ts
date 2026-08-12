@@ -102,7 +102,7 @@ Deno.test("uses failed_terminal with no_device_tokens when no iOS token exists",
   }
 });
 
-Deno.test("refreshes companion-led queue titles at dispatch time", () => {
+Deno.test("keeps daily encouragement notifications focused on the Guide reflection", () => {
   const copy = resolveDeliveryCopy({
     notification_type: "daily_pep",
     title: "Leviathan has a message for you",
@@ -116,8 +116,8 @@ Deno.test("refreshes companion-led queue titles at dispatch time", () => {
     spiritAnimal: "Leviathan",
   });
 
-  if (copy.title !== "Aetherion has a message for you") {
-    throw new Error(`Expected refreshed title to use assigned name, got ${copy.title}`);
+  if (copy.title !== "Your daily encouragement is ready") {
+    throw new Error(`Expected Graceward daily encouragement title, got ${copy.title}`);
   }
 
   if (copy.body !== "Build unshakeable confidence and step into your power with clarity and purpose.") {

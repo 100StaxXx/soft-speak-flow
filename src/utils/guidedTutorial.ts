@@ -3,7 +3,7 @@ import type { GuidedTutorialProgress } from "@/types/profile";
 // Data schema version: bump when the persisted shape changes.
 export const GUIDED_TUTORIAL_VERSION = 2;
 // User-facing route/step graph version: bump when active steps or milestones change.
-export const GUIDED_TUTORIAL_FLOW_VERSION = 10;
+export const GUIDED_TUTORIAL_FLOW_VERSION = 11;
 
 export const getGuidedTutorialLocalProgressKey = (userId: string) =>
   `guided_tutorial_progress_${userId}`;
@@ -22,6 +22,16 @@ export const hasCompletedFinalTutorialCloseout = (guidedTutorial: unknown): bool
     hasStringEntry(guidedTutorial.milestonesCompleted, "mentor_closeout_message") ||
     hasStringEntry(guidedTutorial.completedSteps, "mentor_closeout")
   );
+};
+
+export const hasConcludedGuidedTutorial = (guidedTutorial: unknown): boolean => {
+  if (!isRecord(guidedTutorial)) return false;
+
+  // Skipping is a legitimate way to conclude an optional walkthrough, but it
+  // must not become an indefinite access bypass around the post-tutorial trial
+  // choice.
+  return guidedTutorial.dismissed === true
+    || hasCompletedFinalTutorialCloseout(guidedTutorial);
 };
 
 export const createInitialGuidedTutorialProgress = (

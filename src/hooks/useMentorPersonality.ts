@@ -75,7 +75,7 @@ export const useMentorPersonality = (): MentorPersonality | null => {
     queryFn: async () => {
       if (!resolvedMentorId) return null;
       const { data, error } = await supabase
-        .from('mentors')
+        .from('graceward_guides')
         .select('name, slug, tone_description, style, avatar_url, primary_color')
         .eq('id', resolvedMentorId)
         .maybeSingle();

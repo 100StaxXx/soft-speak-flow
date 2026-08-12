@@ -71,7 +71,7 @@ describe("DayPlanCard", () => {
     );
 
     const button = screen.getByTestId("companion-day-plan-commit");
-    expect(button).toHaveTextContent(/Lock in plan/i);
+    expect(button).toHaveTextContent(/Add to today/i);
     fireEvent.click(button);
     expect(onCommit).toHaveBeenCalledTimes(1);
   });
@@ -88,7 +88,7 @@ describe("DayPlanCard", () => {
 
     const button = screen.getByTestId("companion-day-plan-commit");
     expect(button).toBeDisabled();
-    expect(button).toHaveTextContent(/Locking in/i);
+    expect(button).toHaveTextContent(/Adding/i);
   });
 
   it("hides the commit button and shows locked-in chip when committed", () => {
@@ -102,7 +102,7 @@ describe("DayPlanCard", () => {
     );
 
     expect(screen.queryByTestId("companion-day-plan-commit")).toBeNull();
-    expect(screen.getByText(/Plan locked in/i)).toBeInTheDocument();
+    expect(screen.getByText(/Added/i)).toBeInTheDocument();
   });
 
   it("renders 'Flexible' for blocks without a startTime", () => {

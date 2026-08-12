@@ -36,22 +36,6 @@ class TaskTableViewCell: UITableViewCell {
         return label
     }()
     
-    private let xpBadge: UIView = {
-        let view = UIView()
-        view.backgroundColor = UIColor(red: 0.13, green: 0.77, blue: 0.37, alpha: 0.2)
-        view.layer.cornerRadius = 8
-        view.translatesAutoresizingMaskIntoConstraints = false
-        return view
-    }()
-    
-    private let xpLabel: UILabel = {
-        let label = UILabel()
-        label.textColor = UIColor(red: 0.13, green: 0.77, blue: 0.37, alpha: 1.0)
-        label.font = .systemFont(ofSize: 12, weight: .semibold)
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
-    }()
-    
     private let difficultyDot: UIView = {
         let view = UIView()
         view.layer.cornerRadius = 4
@@ -111,8 +95,6 @@ class TaskTableViewCell: UITableViewCell {
         contentView.addSubview(containerView)
         containerView.addSubview(checkboxButton)
         containerView.addSubview(taskLabel)
-        containerView.addSubview(xpBadge)
-        xpBadge.addSubview(xpLabel)
         containerView.addSubview(difficultyDot)
         containerView.addSubview(categoryBadge)
         categoryBadge.addSubview(categoryIcon)
@@ -142,24 +124,15 @@ class TaskTableViewCell: UITableViewCell {
             // Task label
             taskLabel.leadingAnchor.constraint(equalTo: checkboxButton.trailingAnchor, constant: 12),
             taskLabel.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
-            taskLabel.trailingAnchor.constraint(equalTo: xpBadge.leadingAnchor, constant: -8),
+            taskLabel.trailingAnchor.constraint(equalTo: categoryBadge.leadingAnchor, constant: -8),
             
             // Grip icon (right side)
             gripIcon.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -12),
             gripIcon.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
             gripIcon.widthAnchor.constraint(equalToConstant: 20),
             
-            // XP Badge
-            xpBadge.trailingAnchor.constraint(equalTo: gripIcon.leadingAnchor, constant: -8),
-            xpBadge.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
-            xpBadge.heightAnchor.constraint(equalToConstant: 20),
-            
-            xpLabel.leadingAnchor.constraint(equalTo: xpBadge.leadingAnchor, constant: 6),
-            xpLabel.trailingAnchor.constraint(equalTo: xpBadge.trailingAnchor, constant: -6),
-            xpLabel.centerYAnchor.constraint(equalTo: xpBadge.centerYAnchor),
-            
             // Difficulty dot
-            difficultyDot.trailingAnchor.constraint(equalTo: xpBadge.leadingAnchor, constant: -6),
+            difficultyDot.trailingAnchor.constraint(equalTo: gripIcon.leadingAnchor, constant: -6),
             difficultyDot.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
             difficultyDot.widthAnchor.constraint(equalToConstant: 8),
             difficultyDot.heightAnchor.constraint(equalToConstant: 8),
@@ -182,8 +155,6 @@ class TaskTableViewCell: UITableViewCell {
     func configure(with task: TaskItem) {
         taskId = task.id
         taskLabel.text = task.task_text
-        xpLabel.text = "+\(task.xp_reward)"
-        
         // Completed state
         if task.completed {
             checkboxButton.backgroundColor = UIColor(red: 0.13, green: 0.77, blue: 0.37, alpha: 1.0)

@@ -46,16 +46,16 @@ export const PostcardFullscreen = ({ postcard, onClose }: PostcardFullscreenProp
 
   const handleShare = async () => {
     const shareText = postcard.chapter_title 
-      ? `📖 Chapter ${postcard.chapter_number}: "${postcard.chapter_title}" - ${postcard.location_name} ✨ #Cosmiq`
-      : `📸 My companion visited ${postcard.location_name}! ✨ #Cosmiq`;
+      ? `📖 Chapter ${postcard.chapter_number}: "${postcard.chapter_title}" - ${postcard.location_name} ✨ #Graceward`
+      : `📸 My companion visited ${postcard.location_name}! ✨ #Graceward`;
     
     if (Capacitor.isNativePlatform()) {
       try {
         await Share.share({
-          title: postcard.chapter_title || `Cosmic Postcard - ${postcard.location_name}`,
+          title: postcard.chapter_title || `Growth Chapter - ${postcard.location_name}`,
           text: shareText,
           url: postcard.image_url,
-          dialogTitle: "Share your cosmic postcard",
+          dialogTitle: "Share your growth chapter",
         });
       } catch (err) {
         console.error("Share failed:", err);
@@ -64,7 +64,7 @@ export const PostcardFullscreen = ({ postcard, onClose }: PostcardFullscreenProp
       if (navigator.share) {
         try {
           await navigator.share({
-            title: postcard.chapter_title || `Cosmic Postcard - ${postcard.location_name}`,
+            title: postcard.chapter_title || `Growth Chapter - ${postcard.location_name}`,
             text: shareText,
             url: postcard.image_url,
           });

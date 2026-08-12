@@ -131,8 +131,8 @@ export const LegalDocumentViewer = memo(({ open, onOpenChange, documentType }: L
         <div className="px-6 py-4 border-t bg-muted/50">
           <p className="text-xs text-muted-foreground text-center">
             For questions or concerns, contact us at{" "}
-            <a href="mailto:admin@cosmiq.quest" className="text-primary underline">
-              admin@cosmiq.quest
+            <a href="mailto:hello@graceward.app" className="text-primary underline">
+              hello@graceward.app
             </a>
           </p>
         </div>

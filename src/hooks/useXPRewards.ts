@@ -213,8 +213,8 @@ export const useXPRewards = () => {
     });
   };
 
-  const awardCheckInComplete = async () => {
-    if (!companion || awardXP.isPending) return;
+  const awardCheckInComplete = async (options?: { date?: string }) => {
+    if (!companion) return;
 
     try {
       // Mark user as active (resets companion decay)
@@ -224,20 +224,29 @@ export const useXPRewards = () => {
         });
       }
       
+      const date = options?.date ?? getLocalDateStamp();
       const reward = XP_REWARDS.CHECK_IN;
-      showXPToast(reward, "Check-In Complete!");
-      awardXPEvent("check_in", reward);
+      const result = await awardXPEventAsync(
+        "check_in",
+        reward,
+        { local_date: date, activity: "morning_prayer" },
+        `morning-prayer:${date}`,
+      );
+      if (result.xpAwarded > 0) {
+        showXPToast(result.xpAwarded, "Prayer complete");
+      }
       
       // Update attributes in background without waiting - verify companion exists at call time
       const companionId = companion.id;
       if (companionId) {
         awardAlignmentForMorningCheckIn({
           companionId,
-          date: getLocalDateStamp(),
+          date,
         }).catch(err => {
           logger.error('Alignment update failed:', err);
         });
       }
+      return result;
     } catch (error) {
       logger.error('Error awarding check-in:', error);
     }
@@ -284,24 +293,36 @@ export const useXPRewards = () => {
     }
   };
 
-  const awardReflectionComplete = async () => {
-    if (!companion || awardXP.isPending) return;
+  const awardReflectionComplete = async (options?: { date?: string; reflectionId?: string }) => {
+    if (!companion) return;
     
     try {
+      const date = options?.date ?? getLocalDateStamp();
       const reward = XP_REWARDS.EVENING_REFLECTION;
-      showXPToast(reward, "Reflection Saved!");
-      awardXPEvent("evening_reflection", reward);
+      const result = await awardXPEventAsync(
+        "evening_reflection",
+        reward,
+        {
+          local_date: date,
+          reflection_id: options?.reflectionId,
+        },
+        `evening-reflection:${date}`,
+      );
+      if (result.xpAwarded > 0) {
+        showXPToast(result.xpAwarded, "Reflection saved");
+      }
       
       // Update soul in background without waiting - verify companion exists at call time
       const companionId = companion.id;
       if (companionId) {
         awardAlignmentForEveningReflection({
           companionId,
-          date: getLocalDateStamp(),
+          date,
         }).catch(err =>
           logger.error('Alignment update failed:', err)
         );
       }
+      return result;
     } catch (error) {
       logger.error('Error awarding reflection:', error);
     }
@@ -520,15 +541,8 @@ export const useXPRewards = () => {
     metadata?: XPEventMetadata,
     idempotencyKey?: string,
   ) => {
-    // Guard: Don't attempt XP award if companion not loaded or mutation in progress
-    if (!companion) {
-      logger.warn('Cannot award XP: companion not loaded yet');
-      return;
-    }
-    if (awardXP.isPending) {
-      logger.warn('Cannot award XP: previous award still in progress');
-      return;
-    }
+    // The underlying mutation can fetch a companion that has not reached the
+    // query cache yet. Do not silently drop rapid or just-after-onboarding XP.
     const effectiveAmount = applyStreakMultiplier(xpAmount, eventType);
     if (displayReason && effectiveAmount > 0) {
       showXPToast(effectiveAmount, displayReason);

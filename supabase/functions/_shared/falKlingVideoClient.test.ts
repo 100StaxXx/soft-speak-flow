@@ -14,8 +14,11 @@ import {
 Deno.test("buildCompanionAnimationPrompt asks for a stable continuous reveal", () => {
   const prompt = buildCompanionAnimationPrompt({ element: "fire", stage: 13 });
 
-  if (!prompt.includes("Preserve the companion identity")) {
-    throw new Error("Expected prompt to preserve identity");
+  if (
+    !prompt.includes("exact prior approved companion portrait") ||
+    !prompt.includes("exact new companion portrait")
+  ) {
+    throw new Error("Expected prompt to lock both evolution endpoints");
   }
   if (!prompt.includes("One continuous shot with no cuts")) {
     throw new Error("Expected prompt to avoid cuts");
@@ -23,8 +26,55 @@ Deno.test("buildCompanionAnimationPrompt asks for a stable continuous reveal", (
   if (!prompt.includes("warm ember motes")) {
     throw new Error("Expected element-specific motion language");
   }
-  if (!prompt.includes("background environment behind the companion")) {
-    throw new Error("Expected prompt to create an animation background");
+  if (!prompt.includes("COMPANION EVOLUTION TRANSITION ART BIBLE V4")) {
+    throw new Error("Expected prompt to identify the animated art bible");
+  }
+  if (!prompt.includes("sole source of product identity")) {
+    throw new Error("Expected shared prompts to derive product identity from the endpoints");
+  }
+  if (
+    !prompt.includes("line weight") ||
+    !prompt.includes("cel shading")
+  ) {
+    throw new Error(
+      "Expected prompt to preserve the 2D anime/cel-shaded style",
+    );
+  }
+  if (!prompt.includes("never introduce a realistic environment")) {
+    throw new Error("Expected prompt to reject realistic animation backdrops");
+  }
+  if (
+    !prompt.includes("Never convert the companion portrait or illustrated scene into photorealism")
+  ) {
+    throw new Error("Expected prompt to prohibit photorealistic style drift");
+  }
+});
+
+Deno.test("buildCompanionAnimationPrompt locks hatch videos to egg and infant endpoints", () => {
+  const prompt = buildCompanionAnimationPrompt({ element: "light", stage: 1 });
+
+  if (
+    !prompt.includes("exact companion egg") || !prompt.includes("opening frame")
+  ) {
+    throw new Error(
+      "Expected the hatch prompt to lock the egg as the first frame",
+    );
+  }
+  if (
+    !prompt.includes("exact infant companion portrait") ||
+    !prompt.includes("final frame")
+  ) {
+    throw new Error(
+      "Expected the hatch prompt to lock the infant as the last frame",
+    );
+  }
+  if (!prompt.includes("final video frame aligns cleanly")) {
+    throw new Error(
+      "Expected the hatch prompt to preserve the handoff to the stage-one portrait",
+    );
+  }
+  if (!prompt.includes("COMPANION HATCH TRANSITION ART BIBLE V2")) {
+    throw new Error("Expected a product-neutral hatch art bible");
   }
 });
 
@@ -43,7 +93,8 @@ Deno.test("submitFalKlingVideo posts the Kling image-to-video queue payload", as
     }) as typeof fetch,
     apiKey: "fal-key",
     model: "fal-ai/kling-video/v3/standard/image-to-video",
-    imageUrl: "https://example.com/companion.png",
+    imageUrl: "https://example.com/egg.png",
+    endImageUrl: "https://example.com/infant.png",
     prompt: "Animate carefully",
     durationSeconds: 5,
   });
@@ -59,12 +110,13 @@ Deno.test("submitFalKlingVideo posts the Kling image-to-video queue payload", as
     "Key fal-key",
   );
   assertEquals(JSON.parse(String(calls[0]?.init.body)), {
-    start_image_url: "https://example.com/companion.png",
+    start_image_url: "https://example.com/egg.png",
+    end_image_url: "https://example.com/infant.png",
     prompt: "Animate carefully",
     duration: "5",
     generate_audio: false,
     negative_prompt:
-      "identity drift, distorted anatomy, extra limbs, extra heads, text, captions, logos, cuts, scene changes, jitter, blur, low quality",
+      "photorealism, live action, realistic fur, realistic feathers, natural-history footage, CGI, 3D render, painterly realism, style drift, identity drift, distorted anatomy, extra limbs, extra heads, text, captions, logos, franchise resemblance, cuts, scene changes, jitter, blur, low quality",
   });
 });
 

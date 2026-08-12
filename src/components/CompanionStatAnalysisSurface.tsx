@@ -57,6 +57,7 @@ import {
   COMPANION_STAT_ANALYSIS_PRELUDE_CARDS,
 } from "@/shared/companionStatAnalysisPreludeCards";
 import { buildCompanionCosmiqTitleCharacterBio } from "@/shared/companionStatCosmiqTitles";
+import { PRODUCT } from "@/config/product";
 import {
   DEFAULT_STATS_CARD_SHARE_TEXT,
   isShareCancelled,
@@ -138,9 +139,9 @@ const RANK_BY_BAND: Record<CompanionStatBand, string> = {
 
 const rankClassName = (rank: string) =>
   ({
-    S: "border-yellow-300/50 bg-yellow-300/12 text-yellow-200",
-    A: "border-sky-300/45 bg-sky-300/12 text-sky-200",
-    B: "border-emerald-300/45 bg-emerald-300/12 text-emerald-200",
+    S: "border-yellow-300/50 bg-yellow-300/[0.12] text-yellow-200",
+    A: "border-sky-300/45 bg-sky-300/[0.12] text-sky-200",
+    B: "border-emerald-300/45 bg-emerald-300/[0.12] text-emerald-200",
     C: "border-muted-foreground/30 bg-muted/30 text-muted-foreground",
   })[rank] ?? "border-border bg-background text-foreground";
 
@@ -206,7 +207,7 @@ const buildCosmiqTitleShareFilename = (title: string) => {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "") || "title-card";
 
-  return `cosmiq-${slug}-stats-card.png`;
+  return `graceward-${slug}-stats-card.png`;
 };
 
 const waitForShareCardRender = () =>
@@ -451,7 +452,7 @@ function CosmiqTitleFrontCard({
               type="button"
               variant="secondary"
               size="icon"
-              aria-label="Share Cosmiq title card"
+              aria-label={`Share ${PRODUCT.name} companion title card`}
               className="border border-white/20 bg-background/70 backdrop-blur hover:bg-background/85"
               onClick={onShare}
               disabled={isSharing}
@@ -478,7 +479,7 @@ function CosmiqTitleFrontCard({
         </div>
 
         <motion.div
-          className="rounded-lg border border-white/15 bg-background/72 p-4 shadow-2xl backdrop-blur-md"
+          className="rounded-lg border border-white/15 bg-background/[0.72] p-4 shadow-2xl backdrop-blur-md"
           initial={prefersReducedMotion ? false : { opacity: 0, y: 12 }}
           animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
           transition={prefersReducedMotion ? undefined : { duration: 0.32, delay: 0.12, ease: "easeOut" }}
@@ -1196,7 +1197,7 @@ function CosmiqTitleRevealCard({
                 type="button"
                 variant="secondary"
                 size="icon"
-                aria-label="Show Cosmiq title card"
+                aria-label={`Show ${PRODUCT.name} companion title card`}
                 className="border border-white/20 bg-background/70 backdrop-blur hover:bg-background/85"
                 onClick={onFlip}
               >
@@ -1259,24 +1260,24 @@ const CosmiqTitleShareCard = forwardRef<HTMLDivElement, {
       <div className="absolute inset-x-0 top-0 h-48 bg-[linear-gradient(180deg,rgba(7,9,18,0.62),rgba(7,9,18,0))]" />
 
       <div className="relative z-10 flex h-full flex-col justify-between p-7">
-        <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.22em] text-white/78">
-          <span>Cosmiq</span>
+        <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.22em] text-white/[0.78]">
+          <span>{PRODUCT.name}</span>
           <span>{analysis.analysisDate}</span>
         </div>
 
-        <div className="rounded-lg border border-white/16 bg-[#090b14]/78 p-5 shadow-2xl backdrop-blur-md">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.20em] text-white/62">
+        <div className="rounded-lg border border-white/[0.16] bg-[#090b14]/[0.78] p-5 shadow-2xl backdrop-blur-md">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.20em] text-white/[0.62]">
             Current Title
           </p>
           <h2 className="mt-3 text-4xl font-semibold leading-[1.02] text-white">
             {analysis.cosmiqTitle.title}
           </h2>
-          <p className="mt-4 text-[15px] leading-6 text-white/82">
+          <p className="mt-4 text-[15px] leading-6 text-white/[0.82]">
             {titleCharacterBio}
           </p>
-          <div className="mt-5 h-px bg-white/16" />
-          <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/58">
-            My current Cosmiq title
+          <div className="mt-5 h-px bg-white/[0.16]" />
+          <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/[0.58]">
+            My current {PRODUCT.name} companion title
           </p>
         </div>
       </div>
@@ -1372,7 +1373,7 @@ function CompanionStatAnalysisView({
     try {
       await waitForShareCardRender();
       if (!shareCardRef.current) {
-        throw new Error("Cosmiq title share card was not ready");
+        throw new Error(`${PRODUCT.name} companion title share card was not ready`);
       }
 
       const renderedCard = await renderShareCardImage({
@@ -1385,7 +1386,7 @@ function CompanionStatAnalysisView({
         uriOrFile: renderedCard,
         title: analysis.cosmiqTitle.title,
         text: DEFAULT_STATS_CARD_SHARE_TEXT,
-        dialogTitle: "Share Cosmiq title card",
+        dialogTitle: `Share ${PRODUCT.name} companion title card`,
       });
 
       if (result.status === "cancelled") return;
@@ -1393,12 +1394,12 @@ function CompanionStatAnalysisView({
       const captionText = result.captionCopied ? " Caption copied." : "";
       toast.success(
         result.status === "downloaded"
-          ? `Cosmiq title card downloaded.${captionText}`
-          : `Cosmiq title card ready to share.${captionText}`,
+          ? `${PRODUCT.name} companion title card downloaded.${captionText}`
+          : `${PRODUCT.name} companion title card ready to share.${captionText}`,
       );
     } catch (error) {
       if (isShareCancelled(error)) return;
-      console.error("Failed to share Cosmiq title card:", error);
+      console.error(`Failed to share ${PRODUCT.name} companion title card:`, error);
       toast.error("Could not prepare this title card for sharing.");
     } finally {
       setIsShareCardRenderMounted(false);

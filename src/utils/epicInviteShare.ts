@@ -1,7 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { getRedirectUrlWithPath } from "@/utils/redirectUrl";
 
-const EPIC_INVITE_DEEP_LINK_BASE = "cosmiq://join";
+const EPIC_INVITE_DEEP_LINK_BASE = "graceward://join";
 
 export const buildEpicInviteLink = (inviteCode: string): string => {
   const normalizedCode = inviteCode.trim();
@@ -15,4 +15,4 @@ export const buildEpicInviteLink = (inviteCode: string): string => {
 };
 
 export const buildEpicInviteShareText = (epicTitle: string, inviteCode: string): string =>
-  `Join my Cosmiq epic "${epicTitle}" with invite code ${inviteCode}.`;
+  `Join my Graceward commitment "${epicTitle}" with invite code ${inviteCode}.`;

@@ -39,7 +39,7 @@ type AppleNativeAuthDeps = {
   verifyIdentityToken: (
     identityToken: string,
     appleServiceId: string,
-    iosBundleId: string,
+    iosBundleIds: string[],
   ) => Promise<Record<string, unknown>>;
   sha256HexFn: (value: string) => Promise<string>;
   applyAbuseProtectionFn: (...args: any[]) => Promise<Response | { requestId: string; ipAddress: string | null; protection: unknown }>;
@@ -86,10 +86,10 @@ const defaultDeps: AppleNativeAuthDeps = {
         autoRefreshToken: false,
       },
     }),
-  verifyIdentityToken: async (identityToken: string, appleServiceId: string, iosBundleId: string) => {
+  verifyIdentityToken: async (identityToken: string, appleServiceId: string, iosBundleIds: string[]) => {
     const verification = await jwtVerify(identityToken, appleJWKS, {
       issuer: "https://appleid.apple.com",
-      audience: [appleServiceId, iosBundleId],
+      audience: [appleServiceId, ...iosBundleIds],
     });
     return verification.payload as Record<string, unknown>;
   },
@@ -148,7 +148,10 @@ export async function handleAppleNativeAuth(
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const appleServiceId = Deno.env.get("APPLE_SERVICE_ID");
-    const iosBundleId = "com.darrylgraham.revolution";
+    const iosBundleIds = (Deno.env.get("APPLE_IOS_BUNDLE_IDS") ?? "com.darrylgraham.graceward,com.darrylgraham.revolution")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
     const missingEnvKeys = findMissingRequiredEnv([...REQUIRED_ENV_KEYS]);
 
     if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey || !appleServiceId || missingEnvKeys.length > 0) {
@@ -229,7 +232,7 @@ export async function handleAppleNativeAuth(
 
     let payload: Record<string, unknown>;
     try {
-      payload = await deps.verifyIdentityToken(identityToken, appleServiceId, iosBundleId);
+      payload = await deps.verifyIdentityToken(identityToken, appleServiceId, iosBundleIds);
     } catch (jwtError) {
       logAuthEvent("apple-native-auth", "error", "JWT verification failed", {
         ...requestContext,

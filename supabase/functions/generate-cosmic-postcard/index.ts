@@ -306,7 +306,7 @@ serve(async (req) => {
 
     if (profile?.selected_mentor_id) {
       const { data: mentor } = await supabase
-        .from('mentors')
+        .from('graceward_guides')
         .select('slug, name')
         .eq('id', profile.selected_mentor_id)
         .maybeSingle();

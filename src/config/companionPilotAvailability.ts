@@ -1,19 +1,37 @@
+import type { CompanionElementId, CompanionPresetId } from "./companionCatalog";
+import type { ChristianCompanionForm } from "./christianCompanionForms";
 import {
-  COMPANION_ELEMENTS,
-  COMPANION_PRESETS,
-  type CompanionElementId,
-  type CompanionPresetId,
-} from "./companionCatalog";
+  COSMIQ_CANONICAL_ELEMENTS,
+  COSMIQ_CANONICAL_SPECIES,
+} from "./cosmiqCanonicalCompanionAssets";
 
 export const COMPANION_FUTURE_STATE_LABEL = "Coming Soon" as const;
+export const COMPANION_LEGACY_STATE_LABEL = "Legacy" as const;
 
-export const PILOT_COMPANION_PRESET_IDS = COMPANION_PRESETS.map(
-  (preset) => preset.id,
-) as readonly CompanionPresetId[];
+// Graceward's early-access motion library intentionally launches small. Locked
+// entries stay visible so testers can see the world that is still coming.
+export const PILOT_CHRISTIAN_COMPANION_FORM_IDS = ["lion", "dove"] as const satisfies readonly ChristianCompanionForm["id"][];
 
-export const PILOT_COMPANION_ELEMENT_IDS = COMPANION_ELEMENTS.map(
-  (element) => element.id,
-) as readonly CompanionElementId[];
+export const PILOT_CHRISTIAN_COMPANION_ELEMENT_IDS = ["light", "nature"] as const satisfies readonly CompanionElementId[];
+
+// Cosmiq's wider catalog remains installed for existing accounts, but only the
+// fully built 3x3 matrix may be chosen on a Cosmiq selection surface.
+export const PILOT_COMPANION_PRESET_IDS = COSMIQ_CANONICAL_SPECIES satisfies readonly CompanionPresetId[];
+export const PILOT_COMPANION_ELEMENT_IDS = COSMIQ_CANONICAL_ELEMENTS satisfies readonly CompanionElementId[];
+
+export const isPilotChristianCompanionForm = (
+  formId: ChristianCompanionForm["id"] | string | null | undefined,
+): formId is ChristianCompanionForm["id"] => (
+  typeof formId === "string"
+  && (PILOT_CHRISTIAN_COMPANION_FORM_IDS as readonly string[]).includes(formId)
+);
+
+export const isPilotChristianCompanionElement = (
+  elementId: CompanionElementId | string | null | undefined,
+): elementId is CompanionElementId => (
+  typeof elementId === "string"
+  && (PILOT_CHRISTIAN_COMPANION_ELEMENT_IDS as readonly string[]).includes(elementId)
+);
 
 export const isPilotCompanionPreset = (
   presetId: CompanionPresetId | string | null | undefined,
@@ -32,3 +50,5 @@ export const isPilotCompanionElement = (
 export const getDefaultPilotCompanionPresetId = (): CompanionPresetId => "fox";
 
 export const getDefaultPilotCompanionElementId = (): CompanionElementId => "fire";
+
+export const getDefaultGracewardCompanionElementId = (): CompanionElementId => "light";

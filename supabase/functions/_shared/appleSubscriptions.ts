@@ -52,10 +52,11 @@ type SubscriptionUpsert = {
 const PROD_VERIFY_URL = "https://buy.itunes.apple.com/verifyReceipt";
 const SANDBOX_VERIFY_URL = "https://sandbox.itunes.apple.com/verifyReceipt";
 
-const DEFAULT_MONTHLY_PRICE_CENTS = 999; // $9.99
-const DEFAULT_YEARLY_PRICE_CENTS = 9999; // $99.99 standard pricing
-const DEFAULT_DISCOUNTED_YEARLY_PRICE_CENTS = 6999; // $69.99 existing referral offer-code pricing
-const DEFAULT_GENESIS_YEARLY_PRICE_CENTS = 4999; // $49.99 Genesis first-year offer-code pricing
+const DEFAULT_MONTHLY_PRICE_CENTS = 899; // $8.99
+const DEFAULT_YEARLY_PRICE_CENTS = 4999; // $49.99 standard pricing
+const DEFAULT_DISCOUNTED_YEARLY_PRICE_CENTS = 2999; // $29.99 founding rate
+const DEFAULT_GENESIS_YEARLY_PRICE_CENTS = 2999; // $29.99 founding rate
+const FOUNDER_YEARLY_PRODUCT_ID = "graceward_plus_founder_yearly";
 const DEFAULT_DISCOUNTED_YEARLY_OFFER_ID = "referrals";
 const DEFAULT_GENESIS_YEARLY_OFFER_ID = "GENESIS";
 
@@ -106,10 +107,11 @@ export function isDiscountedYearlyOffer(
 
 export function getPriceCents(
   plan: "monthly" | "yearly",
-  options?: { offerIdentifier?: string | null; offerType?: number | null },
+  options?: { productId?: string | null; offerIdentifier?: string | null; offerType?: number | null },
 ) {
+  const isFounderProduct = options?.productId?.trim().toLowerCase() === FOUNDER_YEARLY_PRODUCT_ID;
   const isDiscountedYearly = plan === "yearly" &&
-    isDiscountedYearlyOffer(options);
+    (isFounderProduct || isDiscountedYearlyOffer(options));
   const isGenesisYearly = plan === "yearly" &&
     isGenesisYearlyOffer(options);
 
@@ -143,10 +145,13 @@ function normalizeProductIds(envKey: string, defaults: string[]) {
 }
 
 const monthlyProductIds = normalizeProductIds("APPLE_MONTHLY_PRODUCT_IDS", [
+  "graceward_plus_monthly",
   "cosmiq_premium_monthly",
   "com.darrylgraham.revolution.monthly",
 ]);
 const yearlyProductIds = normalizeProductIds("APPLE_YEARLY_PRODUCT_IDS", [
+  "graceward_plus_yearly",
+  FOUNDER_YEARLY_PRODUCT_ID,
   "cosmiq_premium_yearly",
   "com.darrylgraham.revolution.yearly",
 ]);
@@ -236,9 +241,14 @@ function isAdminTransferredBinding(
 export function buildSubscriptionStatus(
   expiresAt: Date,
   cancelledAt?: Date | null,
+  offerType?: number | null,
 ): SubscriptionStatus {
   if (cancelledAt && cancelledAt <= new Date()) return "cancelled";
   if (expiresAt <= new Date()) return "expired";
+  // StoreKit reports introductory offers as raw offer type 1. A free
+  // introductory period is an active entitlement, but it must remain
+  // distinguishable from a paid renewal throughout the access stack.
+  if (offerType === 1) return "trialing";
   return "active";
 }
 
@@ -491,9 +501,11 @@ export async function upsertSubscription(
   const status = buildSubscriptionStatus(
     payload.expiresAt,
     payload.cancellationDate,
+    payload.offerType,
   );
   const now = new Date().toISOString();
   const amountCents = getPriceCents(payload.plan, {
+    productId: payload.productId,
     offerIdentifier: payload.offerIdentifier,
     offerType: payload.offerType,
   });

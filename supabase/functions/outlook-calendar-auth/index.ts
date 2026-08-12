@@ -8,7 +8,7 @@ const MICROSOFT_TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.
 const MICROSOFT_ME_URL = "https://graph.microsoft.com/v1.0/me";
 const MICROSOFT_CALENDARS_URL = "https://graph.microsoft.com/v1.0/me/calendars?$select=id,name,isDefaultCalendar";
 const MICROSOFT_TASK_LISTS_URL = "https://graph.microsoft.com/v1.0/me/todo/lists";
-const NATIVE_CALLBACK_SCHEME_URL = "cosmiq://calendar/oauth/callback";
+const NATIVE_CALLBACK_SCHEME_URL = "graceward://calendar/oauth/callback";
 
 const SCOPES = ["offline_access", "User.Read", "Calendars.ReadWrite", "Tasks.ReadWrite"].join(" ");
 

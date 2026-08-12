@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronRight, Sparkles } from "lucide-react";
+import { ChevronRight, Sunrise } from "lucide-react";
 import { LegalDocumentViewer } from "@/components/LegalDocumentViewer";
 
 interface StoryPrologueProps {
@@ -17,8 +17,7 @@ export const StoryPrologue = ({ onComplete }: StoryPrologueProps) => {
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
 
-  // Memoize star positions to prevent them from jumping on re-render
-  const starPositions = useMemo(() => 
+  const lightMotePositions = useMemo(() =>
     [...Array(30)].map(() => ({
       left: `${Math.random() * 100}%`,
       top: `${Math.random() * 100}%`,
@@ -36,24 +35,24 @@ export const StoryPrologue = ({ onComplete }: StoryPrologueProps) => {
 
   return (
     <div className="min-h-screen relative overflow-hidden flex flex-col items-center justify-center px-6 pt-safe pb-safe-lg">
-      {/* Animated Stars Background */}
+      {/* Warm ambient light motes */}
       <div className="absolute inset-0 overflow-hidden">
-        {starPositions.map((star, i) => (
+        {lightMotePositions.map((mote, i) => (
           <motion.div
             key={i}
-            className="absolute w-1 h-1 bg-white rounded-full"
+            className="absolute h-1 w-1 rounded-full bg-amber-200/65"
             style={{
-              left: star.left,
-              top: star.top,
+              left: mote.left,
+              top: mote.top,
             }}
             animate={{
               opacity: [0.2, 0.8, 0.2],
               scale: [0.5, 1, 0.5],
             }}
             transition={{
-              duration: star.duration,
+              duration: mote.duration,
               repeat: Infinity,
-              delay: star.delay,
+              delay: mote.delay,
             }}
           />
         ))}
@@ -73,7 +72,7 @@ export const StoryPrologue = ({ onComplete }: StoryPrologueProps) => {
           transition={{ type: "spring", delay: 0.3, duration: 0.8 }}
           className="w-24 h-24 mx-auto mb-8 rounded-full bg-primary/20 flex items-center justify-center"
         >
-          <Sparkles className="w-12 h-12 text-primary" />
+          <Sunrise className="w-12 h-12 text-primary" />
         </motion.div>
 
         {/* Title */}
@@ -84,10 +83,10 @@ export const StoryPrologue = ({ onComplete }: StoryPrologueProps) => {
           className="text-center mb-8"
         >
           <h1 className="text-4xl font-bold text-white mb-3">
-            Welcome, Traveler
+            Welcome to Graceward
           </h1>
           <p className="text-white/70 text-lg">
-            A cosmic journey awaits those who dare to begin
+            A daily path of prayer, encouragement, and faithful action begins here.
           </p>
         </motion.div>
 
@@ -174,7 +173,7 @@ export const StoryPrologue = ({ onComplete }: StoryPrologueProps) => {
             disabled={!canContinue}
             className="w-full py-6 text-lg font-semibold bg-primary hover:bg-primary/90"
           >
-            Begin My Journey
+            Begin My Path
             <ChevronRight className="ml-2" />
           </Button>
         </motion.div>

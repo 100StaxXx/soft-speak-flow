@@ -242,7 +242,7 @@ describe("useAppleSubscription", () => {
     expect(mocks.functionsInvoke).not.toHaveBeenCalled();
     expect(mocks.toast).toHaveBeenCalledWith({
       title: "Subscription already active",
-      description: "Cosmiq is already unlocked for this account.",
+      description: "Graceward is already unlocked for this account.",
     });
   });
 
@@ -292,7 +292,7 @@ describe("useAppleSubscription", () => {
     expect(mocks.recoverPurchases).not.toHaveBeenCalled();
     expect(mocks.toast).toHaveBeenCalledWith({
       title: "Existing TestFlight subscription restored",
-      description: "Cosmiq was unlocked from an existing sandbox/App Store entitlement, so no new trial purchase was needed.",
+      description: "Graceward was unlocked from an existing sandbox/App Store entitlement, so no new trial purchase was needed.",
     });
     expect(mocks.setQueryData).toHaveBeenCalledWith(
       ["access-state", "11111111-1111-4111-8111-111111111111"],
@@ -310,7 +310,7 @@ describe("useAppleSubscription", () => {
     });
   });
 
-  it("starts offer code redemption for yearly when user has offer code", async () => {
+  it("purchases the founding yearly product directly when the account is eligible", async () => {
     mocks.appliedReferralCodeState = {
       ...mocks.appliedReferralCodeState,
       code: "OFFER123",
@@ -324,39 +324,14 @@ describe("useAppleSubscription", () => {
     const { result } = renderHook(() => useAppleSubscription());
 
     await act(async () => {
-      await result.current.handlePurchase("cosmiq_premium_yearly");
+      await result.current.handlePurchase("graceward_plus_founder_yearly");
     });
 
-    expect(mocks.redeemOfferCode).toHaveBeenCalledTimes(1);
-    expect(mocks.purchase).not.toHaveBeenCalled();
-  });
-
-  it("purchases yearly after the offer code redemption step is primed", async () => {
-    mocks.appliedReferralCodeState = {
-      ...mocks.appliedReferralCodeState,
-      code: "OFFER123",
-      owner_type: "influencer",
-      affiliate_provider: "supabase",
-      is_active: true,
-      apple_offer_code_status: "active",
-      is_apple_offer_eligible: true,
-    };
-
-    const { result } = renderHook(() => useAppleSubscription());
-
-    await act(async () => {
-      await result.current.handlePurchase("cosmiq_premium_yearly");
-    });
-
-    await act(async () => {
-      await result.current.handlePurchase("cosmiq_premium_yearly");
-    });
-
-    expect(mocks.redeemOfferCode).toHaveBeenCalledTimes(1);
-    expect(mocks.purchase).toHaveBeenCalledWith("cosmiq_premium_yearly");
+    expect(mocks.purchase).toHaveBeenCalledWith("graceward_plus_founder_yearly");
     expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
       body: { transactionId: "tx-1" },
     });
+    expect(mocks.redeemOfferCode).not.toHaveBeenCalled();
   });
 
   it("calls regular purchase for yearly when no offer code", async () => {
@@ -538,66 +513,6 @@ describe("useAppleSubscription", () => {
     });
   });
 
-  it("syncs a hosted RevenueCat paywall success through Apple receipt verification", async () => {
-    mocks.presentPaywallIfNeeded.mockResolvedValueOnce(true);
-    mocks.recoverPurchases.mockResolvedValueOnce({
-      productId: "cosmiq_premium_yearly",
-      transactionId: "hosted-paywall-recovered-tx",
-      expirationDate: "2099-01-01T00:00:00.000Z",
-      appAccountToken: "11111111-1111-4111-8111-111111111111",
-    });
-
-    const { result } = renderHook(() => useAppleSubscription());
-
-    let success: boolean | undefined;
-    await act(async () => {
-      success = await result.current.handlePresentRevenueCatPaywall("hosted_paywall");
-    });
-
-    expect(success).toBe(true);
-    expect(mocks.presentPaywallIfNeeded).toHaveBeenCalledTimes(1);
-    expect(mocks.recoverPurchases).toHaveBeenCalledTimes(1);
-    expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
-      body: { transactionId: "hosted-paywall-recovered-tx" },
-    });
-    expect(mocks.setQueryData).toHaveBeenCalledWith(
-      ["access-state", "11111111-1111-4111-8111-111111111111"],
-      expect.objectContaining({
-        has_access: true,
-        access_source: "subscription",
-        subscribed: true,
-        plan: "yearly",
-      }),
-    );
-  });
-
-  it("does not turn hosted RevenueCat paywall success into a paywall error when immediate sync fails", async () => {
-    mocks.presentPaywallIfNeeded.mockResolvedValueOnce(true);
-    mocks.recoverPurchases.mockRejectedValueOnce(new Error("RevenueCat recovery timed out"));
-
-    const { result } = renderHook(() => useAppleSubscription());
-
-    let success: boolean | undefined;
-    await act(async () => {
-      success = await result.current.handlePresentRevenueCatPaywall("hosted_paywall");
-    });
-
-    expect(success).toBe(true);
-    expect(mocks.recoverPurchases).toHaveBeenCalledTimes(1);
-    expect(mocks.functionsInvoke).not.toHaveBeenCalled();
-    expect(mocks.toast).not.toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: "Unable to show paywall",
-        variant: "destructive",
-      }),
-    );
-    expect(mocks.toast).not.toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: "Cosmiq unlocked",
-      }),
-    );
-  });
-
   it("shows an activation error when Apple succeeds but server verification fails", async () => {
     mocks.functionsInvoke.mockResolvedValueOnce({
       data: null,
@@ -654,12 +569,12 @@ describe("useAppleSubscription", () => {
 
     expect(success).toBe(false);
     expect(result.current.productError).toBe(
-      "This App Store subscription is already linked to another Cosmiq account. Sign in to that account, or contact support if this is your purchase.",
+      "This App Store subscription is already linked to another Graceward account. Sign in to that account, or contact support if this is your purchase.",
     );
     expect(mocks.toast).toHaveBeenCalledWith(
       expect.objectContaining({
         title: "Subscription already linked",
-        description: "This App Store subscription is already linked to another Cosmiq account. Sign in to that account, or contact support if this is your purchase.",
+        description: "This App Store subscription is already linked to another Graceward account. Sign in to that account, or contact support if this is your purchase.",
         variant: "destructive",
       }),
     );
@@ -1188,7 +1103,7 @@ describe("useAppleSubscription", () => {
     };
     const { result } = renderHook(() => useAppleSubscription());
     expect(result.current.hasOfferCode).toBe(true);
-    expect(result.current.activeYearlyOffer?.price).toBe("$69.99");
+    expect(result.current.activeYearlyOffer?.price).toBe("$29.99");
   });
 
   it("exposes Genesis pricing from the applied code campaign identifier", () => {
@@ -1206,9 +1121,9 @@ describe("useAppleSubscription", () => {
     expect(result.current.hasOfferCode).toBe(true);
     expect(result.current.activeYearlyOffer).toMatchObject({
       tier: "genesis",
-      price: "$49.99",
-      priceCents: 4999,
-      unitPrice: "$4.17/month for the first year",
+      price: "$29.99",
+      priceCents: 2999,
+      unitPrice: "$2.50/month, locked while active",
     });
   });
 

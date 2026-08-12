@@ -9,7 +9,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { hasActiveSupabaseFunctionSession } from "@/services/supabaseFunctionSession";
-import { resolveMentorSlugAlias } from "@/lib/mentorRoster";
+import {
+  resolveMentorSlugAlias,
+  type ActiveMentorSlug,
+} from "@/lib/mentorRoster";
 import { cn } from "@/lib/utils";
 import { getFallbackResponse, getConnectionErrorFallback } from "@/utils/mentorFallbacks";
 import { parseFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
@@ -24,6 +27,47 @@ interface Message {
 // Maximum dots to show in the visual indicator to prevent layout issues
 const MAX_VISUAL_INDICATOR_DOTS = 15;
 const DEFAULT_DAILY_LIMIT = 20;
+
+const GRACEWARD_GUIDE_PROMPTS: Record<
+  ActiveMentorSlug,
+  readonly [string, string, string]
+> = {
+  sage: [
+    "Help me slow down and sort through what's weighing on me",
+    "Ask me a reflection question for today",
+    "Help me notice one faithful next step",
+  ],
+  lyra: [
+    "Help me sort what matters from what is noise",
+    "Ask me questions to help me make a wise decision",
+    "Help me understand a pattern I keep repeating",
+  ],
+  icon: [
+    "Help me decide whether I need a boundary",
+    "Help me say something honest and gracious",
+    "Help me make a choice that fits my values",
+  ],
+  charles: [
+    "Help me name what I'm avoiding",
+    "Give me one small action to take now",
+    "Hold me accountable without shaming me",
+  ],
+  princess: [
+    "Help me create a gentle rhythm for today",
+    "Help me make room for prayer, work, and rest",
+    "Help me restart after falling out of a routine",
+  ],
+  operator: [
+    "Help me turn today's responsibilities into a realistic plan",
+    "Help me decide what to do first",
+    "Help me use my time and energy wisely",
+  ],
+  rival: [
+    "Help me face something I've been avoiding",
+    "Challenge me to take one courageous next step",
+    "Help me keep going when I want to quit",
+  ],
+};
 
 interface AskMentorChatProps {
   mentorName: string;
@@ -46,43 +90,33 @@ export const getSmartPrompts = (
   const resolvedSlug = resolveMentorSlugAlias(mentorSlug);
   const isTough = /tough|direct/i.test(mentorTone);
   const isEmpathetic = /empathetic|supportive/i.test(mentorTone);
+
+  if (resolvedSlug && resolvedSlug !== "reign") {
+    return [...GRACEWARD_GUIDE_PROMPTS[resolvedSlug]];
+  }
   
   const prompts: string[] = [];
   
-  if (resolvedSlug === "operator") {
-    prompts.push("Help me build a clean plan for today", "Time-block my next few hours");
-  } else if (resolvedSlug === "lyra") {
-    prompts.push("Help me find the signal", "Show me the pattern I'm missing");
-  } else if (resolvedSlug === "sage") {
-    prompts.push("I'm overwhelmed. Help me reset", "Give me one calm next step");
-  } else if (resolvedSlug === "icon") {
-    prompts.push("Is this aligned with who I'm becoming?", "Help me set a better boundary");
-  } else if (resolvedSlug === "charles") {
-    prompts.push("Call me out and get me moving", "Roast my procrastination");
-  } else if (resolvedSlug === "princess") {
-    prompts.push("Help me build a soft routine", "Give me a gentle reset");
-  } else if (resolvedSlug === "rival") {
-    prompts.push("Push me harder", "Break my laziness");
-  } else if (hour >= 5 && hour < 12) {
-    prompts.push("Help me start my day strong", "What should I focus on today?");
+  if (hour >= 5 && hour < 12) {
+    prompts.push("Help me begin today with prayer and purpose", "What matters most today?");
   } else if (hour >= 12 && hour < 17) {
-    prompts.push("I need an afternoon boost", "Keep me on track");
+    prompts.push("Help me reset for the rest of today", "What needs my attention next?");
   } else {
-    prompts.push("Help me reflect on today", "Prepare me for tomorrow");
+    prompts.push("Help me reflect honestly on today", "Help me release today and prepare for tomorrow");
   }
   
   if (isTough) {
-    prompts.push("Give me the hard truth");
+    prompts.push("Tell me honestly what I may be avoiding");
   } else if (isEmpathetic) {
-    prompts.push("I need some encouragement");
+    prompts.push("Help me receive grace and take one small step");
   } else {
-    prompts.push("Give me a pep talk");
+    prompts.push("Help me choose one faithful next step");
   }
   
   if (hasActiveHabits || hasActiveChallenges) {
-    prompts.push(hasActiveHabits ? "Help me stay consistent" : "Keep me motivated");
+    prompts.push(hasActiveHabits ? "Help me practice steady faithfulness" : "Help me keep going with courage");
   } else {
-    prompts.push("Help me build better habits");
+    prompts.push("Help me discern what I need today");
   }
   
   return [
@@ -168,7 +202,7 @@ export const AskMentorChat = ({
       if (error) throw error;
 
       if (!data || !data.response) {
-        throw new Error("Invalid response from mentor");
+        throw new Error("Invalid response from guide");
       }
 
       const assistantMsg: Message = { role: "assistant", content: data.response };
@@ -201,14 +235,24 @@ export const AskMentorChat = ({
         parsedError.responsePayload?.message ??
         parsedError.responsePayload?.error ??
         parsedError.message;
+      const parsedCode = parsedError.code ?? parsedError.responsePayload?.code;
+      const isDailyGuideLimit =
+        parsedCode === "DAILY_GUIDE_LIMIT_REACHED" ||
+        parsedMessage?.toLowerCase().includes("daily limit reached") === true;
+      const isTemporaryGuideFailure =
+        parsedError.category === "rate_limit" ||
+        parsedCode === "GUIDE_REQUEST_LIMITED" ||
+        parsedCode === "GUIDE_PROVIDER_RATE_LIMITED" ||
+        parsedCode === "GUIDE_PROVIDER_UNAVAILABLE";
 
       // Server-side cap reached: show authoritative message and do not generate fallback.
-      if (parsedError.status === 429) {
+      if (parsedError.status === 429 && isDailyGuideLimit) {
         toast({
           title: "Daily limit reached",
           description: parsedMessage || `You've reached your daily limit of ${dailyLimit} messages. It resets at 00:00 UTC.`,
           variant: "destructive"
         });
+        setDailyMessageCount(dailyLimit);
         setMessages((prev) => prev.filter((_, index) => index !== prev.length - 1));
         return;
       }
@@ -227,8 +271,10 @@ export const AskMentorChat = ({
 
       // Show subtle notification that fallback was used
       toast({
-        title: "Connection issue",
-        description: "Live reply unavailable. Showing fallback guidance.",
+        title: isTemporaryGuideFailure ? "Guide is temporarily busy" : "Connection issue",
+        description: isTemporaryGuideFailure
+          ? "Your daily allowance is still available. Showing a short reflection while live replies recover."
+          : "Live reply unavailable. Showing fallback guidance.",
         duration: 3000
       });
     } finally {
@@ -315,9 +361,9 @@ export const AskMentorChat = ({
       )}
       
       {/* Message Limit Indicator */}
-      <div className="px-4 pt-3 pb-2 border-b border-border/50 bg-muted/30">
+      <div className="rounded-2xl border border-border/60 bg-card/[0.88] px-4 pb-2 pt-3 shadow-soft backdrop-blur-xl">
         <div className="flex items-center justify-between text-xs">
-          <span className="text-muted-foreground">
+          <span className="text-foreground/75">
             Daily messages: {dailyMessageCount}/{dailyLimit}
           </span>
           <div className="flex gap-1">
@@ -337,7 +383,7 @@ export const AskMentorChat = ({
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && showSuggestions && (
           <div className="space-y-4">
-            <p className="text-muted-foreground text-center">
+            <p className="rounded-full bg-card/[0.88] px-4 py-2 text-center text-sm font-medium text-foreground/75 shadow-soft backdrop-blur-xl">
               Choose a prompt or type your own message
             </p>
             <div className="grid gap-2">
@@ -345,7 +391,7 @@ export const AskMentorChat = ({
                 <Button
                   key={idx}
                   variant="outline"
-                  className="justify-start text-left h-auto py-3 px-4 hover:bg-accent"
+                  className="h-auto min-w-0 justify-start whitespace-normal break-words bg-card/[0.88] px-4 py-3 text-left leading-5 shadow-soft backdrop-blur-xl hover:bg-card active:bg-primary/10"
                   onClick={() => handleSuggestionClick(prompt)}
                 >
                   {prompt}

@@ -329,7 +329,7 @@ serve(async (req) => {
         const mentorIds = [...new Set(dailyProfiles.map((row) => row.selected_mentor_id).filter((value): value is string => typeof value === "string"))];
         const mentors = mentorIds.length > 0
           ? (await supabase
-            .from("mentors")
+            .from("graceward_guides")
             .select("id, slug")
             .in("id", mentorIds)).data as MentorRow[] | null
           : [];
@@ -542,7 +542,7 @@ serve(async (req) => {
       },
     });
 
-    // 1) Daily pep talk notifications
+    // 1) Daily encouragement notifications (legacy database type: daily_pep)
     const { data: duePepPushes, error: pepError } = await supabase
       .from("user_daily_pushes")
       .select(`
@@ -591,11 +591,11 @@ serve(async (req) => {
         scheduledFor: push.scheduled_at ?? nowIso,
         payload: {
           pep_talk_id: push.daily_pep_talk_id,
-          title: pepTalk?.title ?? "Your daily pep talk",
-          summary: pepTalk?.summary ?? "Your daily pep talk is ready.",
+          title: pepTalk?.title ?? "Your daily encouragement",
+          summary: pepTalk?.summary ?? "Your daily encouragement is ready.",
           mentor_slug: pepTalk?.mentor_slug ?? null,
           type: "daily_pep",
-          url: `/pep-talk/${push.daily_pep_talk_id}`,
+          url: "/mentor",
         },
         companion: companionMap.get(push.user_id) ?? null,
       }));
@@ -840,7 +840,7 @@ serve(async (req) => {
       }));
     }
 
-    // 6) Check-in reminders
+    // 6) Evening examen reminders. Morning value is already delivered by Daily Grace.
     let checkinProfilesScanned = 0;
 
     await scanPaginatedRows<Pick<ProfileRow, "id" | "timezone" | "checkin_reminders_enabled">>({
@@ -869,46 +869,11 @@ serve(async (req) => {
           const local = getLocalDateTimeParts(now, timezone);
           const nowLocalMinutes = local.hour * 60 + local.minute;
 
-          const morningJitter = await computeDeterministicJitterMinutes(profile.id, local.localDate, "morning", 60);
           const eveningJitter = await computeDeterministicJitterMinutes(profile.id, local.localDate, "evening", 60);
 
-          const morningTarget = Math.max(0, Math.min(23 * 60 + 59, 10 * 60 + morningJitter));
-          let eveningTarget = Math.max(0, Math.min(23 * 60 + 59, 20 * 60 + eveningJitter));
+          const eveningTarget = Math.max(0, Math.min(23 * 60 + 59, 20 * 60 + eveningJitter));
 
-          if (eveningTarget - morningTarget < 6 * 60) {
-            eveningTarget = Math.min(23 * 60 + 59, morningTarget + 6 * 60);
-          }
-
-          const morningDue = nowLocalMinutes >= morningTarget && nowLocalMinutes <= Math.min(16 * 60, morningTarget + 180);
           const eveningDue = nowLocalMinutes >= eveningTarget && nowLocalMinutes <= Math.min(23 * 60 + 30, eveningTarget + 180);
-
-          if (morningDue) {
-            const { data: existingMorning } = await supabase
-              .from("daily_check_ins")
-              .select("id")
-              .eq("user_id", profile.id)
-              .eq("check_in_type", "morning")
-              .eq("check_in_date", local.localDate)
-              .maybeSingle();
-
-            if (!existingMorning) {
-              inserts.push(rowForQueue({
-                userId: profile.id,
-                type: "checkin_morning_reminder",
-                sourceTable: "profiles",
-                sourceId: profile.id,
-                dedupeKey: `checkin_morning:${profile.id}:${local.localDate}`,
-                scheduledFor: nowIso,
-                payload: {
-                  local_date: local.localDate,
-                  local_target_minutes: morningTarget,
-                  timezone,
-                  type: "checkin_morning_reminder",
-                  url: getCheckinReminderUrl("morning"),
-                },
-              }));
-            }
-          }
 
           if (eveningDue) {
             const { data: existingEvening } = await supabase

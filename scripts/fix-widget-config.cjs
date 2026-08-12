@@ -13,8 +13,8 @@ const fs = require('fs');
 const path = require('path');
 
 const PROJECT_FILE = path.join(__dirname, '..', 'ios', 'App', 'App.xcodeproj', 'project.pbxproj');
-const APP_BUNDLE_ID = 'com.darrylgraham.revolution';
-const WIDGET_BUNDLE_ID = 'com.darrylgraham.revolution.CosmiqWidget';
+const APP_BUNDLE_ID = 'com.darrylgraham.graceward';
+const WIDGET_BUNDLE_ID = 'com.darrylgraham.graceward.GracewardWidget';
 const INFO_PLIST_PATH = '../CosmiqWidget/Info.plist';
 
 function escapeRegex(text) {

@@ -1,0 +1,10 @@
+<svg width="2732" height="2732" viewBox="0 0 2732 2732" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Graceward launch screen">
+  <rect width="2732" height="2732" fill="#f4efe3"/>
+  <circle cx="1366" cy="1160" r="560" fill="#d7bd7b" opacity="0.14"/>
+  <circle cx="1366" cy="1160" r="400" fill="#2f5938"/>
+  <path d="M1160 1560c70-160 139-258 204-338 34-42 53-87 57-137h92c-5 78-31 145-75 201-50 63-94 137-128 274h-150Z" fill="#f8f4e8"/>
+  <rect x="1328" y="850" width="76" height="318" rx="36" fill="#d7bd7b"/>
+  <rect x="1224" y="944" width="284" height="76" rx="36" fill="#d7bd7b"/>
+  <text x="1366" y="1785" text-anchor="middle" fill="#203124" font-family="Georgia, 'Times New Roman', serif" font-size="156" font-weight="600">Graceward</text>
+  <text x="1366" y="1885" text-anchor="middle" fill="#526456" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="52" letter-spacing="8">GROW IN FAITH, ONE DAY AT A TIME</text>
+</svg>

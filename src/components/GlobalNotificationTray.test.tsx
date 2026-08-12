@@ -124,7 +124,7 @@ describe("GlobalNotificationTray", () => {
     fireEvent.click(screen.getByRole("button", { name: /open remaining today, 2 remaining/i }));
 
     await waitFor(() => {
-      expect(screen.getByTestId("location")).toHaveTextContent("/journeys");
+      expect(screen.getByTestId("location")).toHaveTextContent("/mentor");
     });
   });
 });

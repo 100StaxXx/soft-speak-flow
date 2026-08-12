@@ -13,9 +13,9 @@ const xcodeProjectPath = path.join(iosAppDirectory, "App.xcodeproj", "project.pb
 
 const APP_TARGET = "App";
 const WIDGET_TARGET = "CosmiqWidgetExtension";
-const EXPECTED_APP_GROUP = "group.com.darrylgraham.revolution";
-const EXPECTED_APP_BUNDLE_ID = "com.darrylgraham.revolution";
-const EXPECTED_WIDGET_BUNDLE_ID = "com.darrylgraham.revolution.CosmiqWidget";
+const EXPECTED_APP_GROUP = "group.com.darrylgraham.graceward";
+const EXPECTED_APP_BUNDLE_ID = "com.darrylgraham.graceward";
+const EXPECTED_WIDGET_BUNDLE_ID = "com.darrylgraham.graceward.GracewardWidget";
 const PREFIX = "[ios:verify-widget-signing]";
 
 const log = (message) => {

@@ -1052,7 +1052,7 @@ export const GlobalEvolutionListener = () => {
     if (!resolvedMentorId) return undefined;
 
     const { data: mentor } = await supabase
-      .from("mentors")
+      .from("graceward_guides")
       .select("slug")
       .eq("id", resolvedMentorId)
       .maybeSingle();

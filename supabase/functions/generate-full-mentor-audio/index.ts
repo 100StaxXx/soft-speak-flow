@@ -209,6 +209,9 @@ serve(async (req) => {
     const provider = typeof audioPayload.provider === "string"
       ? audioPayload.provider
       : null;
+    const transcript = Array.isArray(audioPayload.transcript)
+      ? audioPayload.transcript
+      : [];
     if (!audioUrl) {
       return buildErrorResponse(
         502,
@@ -226,6 +229,8 @@ serve(async (req) => {
         audioUrl,
         audioStoragePath: storagePath,
         audioProvider: provider,
+        transcript,
+        hasWordTimestamps: transcript.length > 0,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

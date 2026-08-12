@@ -127,7 +127,7 @@ export default function PepTalks() {
                       className={`cursor-pointer transition-all duration-200 ${
                         !selectedTrigger 
                           ? "bg-primary text-primary-foreground shadow-[0_8px_18px_hsl(var(--primary)/0.3)]" 
-                          : "hover:border-primary/50 hover:bg-primary/8"
+                          : "hover:border-primary/50 hover:bg-primary/[0.08]"
                       }`}
                       onClick={() => setSelectedTrigger(null)}
                     >
@@ -141,7 +141,7 @@ export default function PepTalks() {
                         className={`cursor-pointer transition-all duration-200 ${
                           selectedTrigger === trigger
                             ? "bg-primary text-primary-foreground shadow-[0_8px_18px_hsl(var(--primary)/0.3)]"
-                            : "hover:border-primary/50 hover:bg-primary/8"
+                            : "hover:border-primary/50 hover:bg-primary/[0.08]"
                         }`}
                         onClick={() => setSelectedTrigger(trigger)}
                       >

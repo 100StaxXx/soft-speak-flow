@@ -10,7 +10,7 @@ type DateParts = {
   day: string;
 };
 
-function resolveTimezone(userTimezone?: string, fallbackTimezone = "UTC"): string {
+function resolveTimezone(userTimezone?: string, fallbackTimezone = resolveDeviceTimezone()): string {
   if (!userTimezone) {
     return fallbackTimezone;
   }
@@ -27,11 +27,11 @@ function resolveDeviceTimezone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 }
 
-function getLocalHour(date: Date, timezone: string): number {
+function getHourForTimezone(date: Date, timezone: string): number {
   const hour = parseInt(
     new Intl.DateTimeFormat('en-US', {
-      hour: 'numeric',
-      hour12: false,
+      hour: '2-digit',
+      hourCycle: 'h23',
       timeZone: timezone
     }).format(date),
     10
@@ -58,7 +58,7 @@ function getEffectiveDailyDateForNow(
   timezone: string,
   resetHour: number,
 ): string {
-  const localHour = getLocalHour(now, timezone);
+  const localHour = getHourForTimezone(now, timezone);
   const localDate = formatDateForTimezone(now, timezone);
 
   if (localHour < resetHour) {
@@ -80,6 +80,26 @@ export function getEffectiveDailyDate(
   const tz = resolveTimezone(userTimezone);
 
   return getEffectiveDailyDateForNow(now, tz, resetHour);
+}
+
+/**
+ * Get the user's calendar date in their current or explicitly supplied timezone.
+ */
+export function getLocalCalendarDate(
+  userTimezone?: string,
+  date = new Date(),
+): string {
+  return formatDateForTimezone(date, resolveTimezone(userTimezone));
+}
+
+/**
+ * Get the current hour (0-23) in the user's local or explicitly supplied timezone.
+ */
+export function getLocalHour(
+  userTimezone?: string,
+  date = new Date(),
+): number {
+  return getHourForTimezone(date, resolveTimezone(userTimezone));
 }
 
 /**

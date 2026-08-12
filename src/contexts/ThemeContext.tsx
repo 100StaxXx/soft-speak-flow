@@ -53,7 +53,7 @@ export const ThemeProvider = ({ children, mentorId }: ThemeProviderProps) => {
       try {
         // Fetch theme data BEFORE showing transition
         const { data: mentor } = await supabase
-          .from("mentors")
+          .from("graceward_guides")
           .select("theme_config")
           .eq("id", mentorId)
           .maybeSingle();
@@ -144,15 +144,26 @@ export const ThemeProvider = ({ children, mentorId }: ThemeProviderProps) => {
   const applyDefaultTheme = () => {
     const root = document.documentElement;
     
-    // Reset to default values from index.css
-    root.style.setProperty("--primary", "270 60% 50%");
-    root.style.setProperty("--secondary", "240 6% 20%");
-    root.style.setProperty("--accent", "270 50% 35%");
-    root.style.setProperty("--background", "0 0% 7%");
-    root.style.setProperty("--foreground", "0 0% 100%");
-    root.style.setProperty("--card", "240 6% 15%");
+    // Daily Way defaults: warm paper, evergreen, and restrained gold.
+    root.style.setProperty("--primary", "132 31% 34%");
+    root.style.setProperty("--primary-foreground", "45 40% 98%");
+    root.style.setProperty("--secondary", "42 33% 90%");
+    root.style.setProperty("--secondary-foreground", "132 21% 16%");
+    root.style.setProperty("--accent", "39 45% 60%");
+    root.style.setProperty("--accent-foreground", "132 21% 16%");
+    root.style.setProperty("--background", "43 30% 96%");
+    root.style.setProperty("--foreground", "132 21% 16%");
+    root.style.setProperty("--card", "45 35% 98%");
+    root.style.setProperty("--card-foreground", "132 21% 16%");
+    root.style.setProperty("--popover", "45 35% 98%");
+    root.style.setProperty("--popover-foreground", "132 21% 16%");
+    root.style.setProperty("--muted", "42 24% 89%");
+    root.style.setProperty("--muted-foreground", "130 8% 40%");
+    root.style.setProperty("--border", "132 14% 79%");
+    root.style.setProperty("--input", "132 12% 53%");
+    root.style.setProperty("--ring", "132 31% 34%");
     root.style.setProperty("--radius", "1.25rem");
-    root.style.setProperty("--shadow-glow", "0 0 24px hsl(270 60% 50% / 0.5)");
+    root.style.setProperty("--shadow-glow", "0 12px 36px hsl(132 31% 24% / 0.16)");
     
     root.classList.remove("sharp-borders");
   };

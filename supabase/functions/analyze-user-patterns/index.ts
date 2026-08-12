@@ -53,6 +53,16 @@ interface MentorChatSignal {
   mentionsWorkStyle: string | null;
 }
 
+interface FormationPracticeCompletionData {
+  assignmentId: string;
+  taskId?: string | null;
+  practiceKey?: string;
+  category?: string;
+  completedAt: string;
+  completionHour: number;
+  dayOfWeek: number;
+}
+
 function inferWorkStyle(patterns: SchedulingPatterns): { style: string; confidence: number } {
   let traditional9to5Score = 0;
   let entrepreneurScore = 0;
@@ -364,6 +374,50 @@ serve(async (req) => {
         comboCounts[comboKey] = (comboCounts[comboKey] || 0) + 1;
         successfulPatterns.category_difficulty = comboCounts;
       }
+    } else if (type === 'formation_practice_completion') {
+      const signal = data as FormationPracticeCompletionData;
+      if (!signal.assignmentId) {
+        throw new Error('Formation assignment id is required');
+      }
+
+      // Never learn from client-supplied category labels alone. Verify that the
+      // authenticated user actually completed this assignment, then use the
+      // reviewed server record as the source of truth.
+      const { data: assignment, error: assignmentError } = await supabase
+        .from('daily_formation_assignments')
+        .select('id, practice_key, category, completed_at')
+        .eq('id', signal.assignmentId)
+        .eq('user_id', user.id)
+        .not('completed_at', 'is', null)
+        .maybeSingle();
+
+      if (assignmentError) throw assignmentError;
+      if (!assignment) throw new Error('Completed formation assignment not found');
+
+      const processedAssignmentIds: string[] = successfulPatterns.formation_assignment_ids || [];
+      if (!processedAssignmentIds.includes(assignment.id)) {
+        const categoryCounts: Record<string, number> = successfulPatterns.formation_categories || {};
+        categoryCounts[assignment.category] = (categoryCounts[assignment.category] || 0) + 1;
+        successfulPatterns.formation_categories = categoryCounts;
+
+        const practiceCounts: Record<string, number> = successfulPatterns.formation_practices || {};
+        practiceCounts[assignment.practice_key] = (practiceCounts[assignment.practice_key] || 0) + 1;
+        successfulPatterns.formation_practices = practiceCounts;
+
+        const parsedCompletionHour = new Date(assignment.completed_at).getUTCHours();
+        const completionHour = Number.isInteger(signal.completionHour)
+          && signal.completionHour >= 0
+          && signal.completionHour <= 23
+          ? signal.completionHour
+          : parsedCompletionHour;
+        const completionHours: number[] = successfulPatterns.formation_completion_hours || [];
+        successfulPatterns.formation_completion_hours = [...completionHours, completionHour].slice(-100);
+        successfulPatterns.formation_assignment_ids = [...processedAssignmentIds, assignment.id].slice(-200);
+        successfulPatterns.total_formation_completions =
+          (successfulPatterns.total_formation_completions || 0) + 1;
+      }
+
+      console.log(`[analyze-user-patterns] Formation practice learned: ${assignment.practice_key} (${assignment.category})`);
     } else if (type === 'mentor_chat_signal') {
       // Learn from mentor chat interactions
       const signal = data as MentorChatSignal;
@@ -516,4 +570,3 @@ serve(async (req) => {
     });
   }
 });
-

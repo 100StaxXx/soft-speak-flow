@@ -161,7 +161,7 @@ export function AdminAppleSubscriptionRecovery() {
               Apple Subscription Recovery
             </CardTitle>
             <CardDescription>
-              Move a verified App Store transaction to the correct Cosmiq account after support confirms ownership.
+              Move a verified App Store transaction to the correct Graceward account after support confirms ownership.
             </CardDescription>
           </div>
           <Badge variant="outline">Admin only</Badge>
@@ -179,7 +179,7 @@ export function AdminAppleSubscriptionRecovery() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="apple-target-user-id">Target Cosmiq user ID</Label>
+            <Label htmlFor="apple-target-user-id">Target Graceward user ID</Label>
             <Input
               id="apple-target-user-id"
               value={targetUserId}

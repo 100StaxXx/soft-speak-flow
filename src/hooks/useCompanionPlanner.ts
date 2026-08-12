@@ -633,7 +633,7 @@ const deriveStarterIntentFromMessage = (
     return "upcoming_start";
   }
   if (
-    /\b(advance my campaign|move my campaign forward|progress my campaign|unstick my campaign|help me progress (?:this|my) campaign)\b/
+    /\b(continue my journey|move my journey forward|advance my campaign|move my campaign forward|progress my campaign|unstick my campaign|help me progress (?:this|my) campaign)\b/
       .test(normalizedMessage)
   ) {
     return "advance_campaign_start";
@@ -739,7 +739,7 @@ const sanitizeCreateQuestProposalPayload = (
       : 15;
 
   return {
-    taskText: typeof payload.taskText === "string" ? payload.taskText : "Quest",
+    taskText: typeof payload.taskText === "string" ? payload.taskText : "Action",
     difficulty: payload.difficulty === "easy" || payload.difficulty === "hard"
       ? payload.difficulty
       : "medium",
@@ -3671,7 +3671,7 @@ export function useCompanionPlanner({
               confirmationContent =
                 `Saved: ${proposal.title}. I couldn't finish the step breakdown yet.`;
               toast(
-                "Quest updated, but I couldn't finish the step breakdown yet.",
+                "Action updated, but I couldn't finish the step breakdown yet.",
               );
             }
           }

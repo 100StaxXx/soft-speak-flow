@@ -41,7 +41,7 @@ serve(async (req) => {
       try {
         // Get mentor slug
         const { data: mentor } = await supabase
-          .from('mentors')
+          .from('graceward_guides')
           .select('slug')
           .eq('id', user.selected_mentor_id)
           .single();

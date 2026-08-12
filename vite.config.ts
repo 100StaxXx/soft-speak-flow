@@ -12,7 +12,7 @@ function buildCalendarOAuthCallbackBridge(env: Record<string, string>): string {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Returning to Cosmiq</title>
+    <title>Returning to Graceward</title>
     <style>
       :root {
         color-scheme: dark;
@@ -67,9 +67,9 @@ function buildCalendarOAuthCallbackBridge(env: Record<string, string>): string {
   </head>
   <body>
     <main>
-      <h1>Returning to Cosmiq</h1>
+      <h1>Returning to Graceward</h1>
       <p id="status">Finishing your calendar connection...</p>
-      <a id="return-link" class="button" href="cosmiq://calendar/oauth/callback?provider=google&status=error">Return to Cosmiq</a>
+      <a id="return-link" class="button" href="graceward://calendar/oauth/callback?provider=google&status=error">Return to Graceward</a>
     </main>
     <script>
       (function () {
@@ -135,7 +135,7 @@ function buildCalendarOAuthCallbackBridge(env: Record<string, string>): string {
             status: status
           });
           if (message) redirectParams.set("message", message);
-          return "cosmiq://calendar/oauth/callback?" + redirectParams.toString();
+          return "graceward://calendar/oauth/callback?" + redirectParams.toString();
         }
 
         function redirectToApp(provider, status, source, message) {
@@ -145,7 +145,7 @@ function buildCalendarOAuthCallbackBridge(env: Record<string, string>): string {
           if (source === "native") {
             window.location.replace(appUrl);
             window.setTimeout(function () {
-              setStatus("Tap the button below if Cosmiq did not reopen automatically.");
+              setStatus("Tap the button below if Graceward did not reopen automatically.");
             }, 1200);
             return;
           }
@@ -388,14 +388,13 @@ export default defineConfig(({ mode }) => {
       calendarOAuthCallbackBridgePlugin(env),
       VitePWA({
         registerType: 'autoUpdate',
-        minify: false,
         includeAssets: ['favicon.ico', 'icon-192.svg', 'icon-512.svg'],
         manifest: {
-          name: 'Cosmiq - Your Personal AI Mentor',
-          short_name: 'Cosmiq',
-          description: 'Your gamified self-improvement companion with AI mentor, evolving digital companion, and quest-based habit tracking.',
-          theme_color: '#000000',
-          background_color: '#000000',
+          name: 'Graceward — Faith for Every Day',
+          short_name: 'Graceward',
+          description: 'Reviewed Scripture, prayer, reflection, and faithful planning for ordinary Christian life.',
+          theme_color: '#2f5938',
+          background_color: '#f4efe3',
           display: 'standalone',
           orientation: 'portrait',
           scope: '/',
@@ -416,7 +415,6 @@ export default defineConfig(({ mode }) => {
           ]
         },
         workbox: {
-          mode: 'development',
           sourcemap: false,
           maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // Keep the install-time precache focused on the app shell.
           globPatterns: ['**/*.{js,css,html,ico,svg,woff,woff2}'],
@@ -427,7 +425,7 @@ export default defineConfig(({ mode }) => {
               ),
               handler: 'CacheFirst',
               options: {
-                cacheName: 'cosmiq-image-cache',
+                cacheName: 'graceward-image-cache',
                 expiration: {
                   maxEntries: 80,
                   maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days

@@ -555,7 +555,7 @@ serve(async (req) => {
             .eq('user_id', profile.id)
             .maybeSingle(),
           profile.selected_mentor_id 
-            ? supabase.from('mentors').select('name, tone_description').eq('id', profile.selected_mentor_id).maybeSingle()
+            ? supabase.from('graceward_guides').select('name, tone_description').eq('id', profile.selected_mentor_id).maybeSingle()
             : Promise.resolve({ data: null }),
           supabase
             .from('daily_check_ins')

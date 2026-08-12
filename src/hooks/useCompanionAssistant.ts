@@ -846,7 +846,7 @@ export function useCompanionAssistant({
       ? getCompanionPlannerOpener({ userId: user?.id ?? null })
       : greeting;
   const companionLabel = useMemo(
-    () => resolveCompanionDisplayLabel(companion, "Cosmiq"),
+    () => resolveCompanionDisplayLabel(companion, "Companion"),
     [companion],
   );
   const todayLabel = getTodayLabel();
@@ -854,7 +854,9 @@ export function useCompanionAssistant({
     ? "Reply here or confirm the pending action."
     : activeFollowUp
       ? `Answer ${toPossessiveCompanionLabel(companionLabel)} follow-up.`
-      : "chat";
+      : surface === "companion"
+        ? "Share what's on your heart..."
+        : "Ask, reflect, or plan...";
   const ensureFunctionSession = useCallback(
     async (options?: { silent?: boolean }) => {
       const hasSession = await hasActiveSupabaseFunctionSession(refreshSession);
@@ -1490,7 +1492,7 @@ export function useCompanionAssistant({
           : message;
         const currentDateTime = formatCurrentDateTimeWithOffset(new Date());
         const directChatCurrentDate =
-          surface === "journeys" ? legacyAssistant.currentDate : undefined;
+          surface === "journeys" ? legacyAssistant.currentDate : currentDateTime.slice(0, 10);
         const directChatJourneysContext =
           surface === "journeys" ? legacyAssistant.plannerContext : undefined;
 

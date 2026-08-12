@@ -1,6 +1,7 @@
 import { memo, useState, useEffect } from "react";
 import { useCompanionPresence } from "@/contexts/CompanionPresenceContext";
 import { useCompanionAuraColors } from "@/hooks/useCompanionAuraColors";
+import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
 
 interface CompanionNavPresenceProps {
   isActive?: boolean;
@@ -14,9 +15,11 @@ interface CompanionNavPresenceProps {
 export const CompanionNavPresence = memo(({ isActive = false }: CompanionNavPresenceProps) => {
   const { presence, isLoading } = useCompanionPresence();
   const { navGlow, primaryAura } = useCompanionAuraColors();
+  const { activeEvent } = useCompanionMotionSafe();
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
   useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
     const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     setPrefersReducedMotion(mediaQuery.matches);
     const handleChange = () => setPrefersReducedMotion(mediaQuery.matches);
@@ -30,6 +33,9 @@ export const CompanionNavPresence = memo(({ isActive = false }: CompanionNavPres
 
   const showBreathing = !prefersReducedMotion && (presence.mood === 'joyful' || presence.mood === 'content');
   const showAttentionDot = presence.needsAttention && !isActive;
+  const showRewardPulse = !prefersReducedMotion && Boolean(
+    activeEvent && (activeEvent.type === "xp_gain" || activeEvent.type === "quest_complete" || activeEvent.type === "streak"),
+  );
 
   return (
     <>
@@ -44,6 +50,19 @@ export const CompanionNavPresence = memo(({ isActive = false }: CompanionNavPres
           willChange: showBreathing ? 'box-shadow' : 'auto',
         }}
       />
+
+      {showRewardPulse ? (
+        <div
+          key={activeEvent?.id}
+          className="pointer-events-none absolute -inset-2 -z-10 rounded-full"
+          data-testid="companion-nav-reward-pulse"
+          style={{
+            border: `1px solid ${primaryAura}`,
+            boxShadow: `0 0 16px ${primaryAura}`,
+            animation: "companion-reward-arrive 900ms cubic-bezier(0.22, 1, 0.36, 1) both",
+          }}
+        />
+      ) : null}
 
       {/* Attention indicator dot */}
       {showAttentionDot && (
@@ -78,6 +97,12 @@ export const CompanionNavPresence = memo(({ isActive = false }: CompanionNavPres
             opacity: 1;
             transform: scale(1.3);
           }
+        }
+
+        @keyframes companion-reward-arrive {
+          0% { opacity: 0; transform: scale(0.45); }
+          38% { opacity: 1; transform: scale(1.22); }
+          100% { opacity: 0; transform: scale(1.5); }
         }
       `}</style>
     </>

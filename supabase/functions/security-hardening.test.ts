@@ -10,6 +10,21 @@ function assertEquals<T>(actual: T, expected: T, message: string): void {
   }
 }
 
+function createElevenLabsTimingResponse(script = "Keep going."): Response {
+  const characters = [...script];
+  return new Response(JSON.stringify({
+    audio_base64: "AQID",
+    alignment: {
+      characters,
+      character_start_times_seconds: characters.map((_, index) => index * 0.1),
+      character_end_times_seconds: characters.map((_, index) => (index + 1) * 0.1),
+    },
+  }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 interface QueryState {
   table: string;
   filters: Record<string, unknown>;
@@ -698,7 +713,7 @@ Deno.test("generate-mentor-audio succeeds for authenticated users and records us
         elevenLabsRequestBody = JSON.parse(
           String(init?.body ?? "{}"),
         ) as Record<string, unknown>;
-        return new Response(new Uint8Array([1, 2, 3]), { status: 200 });
+        return createElevenLabsTimingResponse();
       },
       checkRateLimitFn: async () => ({
         allowed: true,
@@ -761,7 +776,7 @@ Deno.test("generate-mentor-audio resolves every supported mentor voice", async (
           elevenLabsRequestBody = JSON.parse(
             String(init?.body ?? "{}"),
           ) as Record<string, unknown>;
-          return new Response(new Uint8Array([1, 2, 3]), { status: 200 });
+          return createElevenLabsTimingResponse();
         },
         now: () => 1000,
       },
@@ -792,9 +807,14 @@ Deno.test("generate-mentor-audio resolves every supported mentor voice", async (
       unknown
     >;
     assertEquals(
-      voiceSettings.speed,
-      mentorSlug === "princess" ? 1.2 : 1,
-      `Expected ${mentorSlug} to send configured speech speed`,
+      voiceSettings.stability,
+      0.5,
+      `Expected ${mentorSlug} to use ElevenLabs v3 natural stability`,
+    );
+    assertEquals(
+      Object.keys(voiceSettings).sort().join(","),
+      "stability",
+      `Expected ${mentorSlug} to omit unsupported ElevenLabs v3 voice settings`,
     );
   }
 });
@@ -814,7 +834,7 @@ Deno.test("generate-mentor-audio resolves legacy aliases to canonical voices", a
         createSupabaseClient: () => createMockSupabase({}),
         fetchImpl: async (input) => {
           fetchedUrls.push(String(input));
-          return new Response(new Uint8Array([1, 2, 3]), { status: 200 });
+          return createElevenLabsTimingResponse();
         },
         now: () => 1000,
       },
@@ -946,7 +966,7 @@ Deno.test("generate-mentor-audio fails instead of using OpenAI when primary voic
   );
 
   const body = await response.json();
-  assertEquals(response.status, 500);
+  assertEquals(response.status, 500, "Expected required primary voice failure to return 500");
   assert(
     String(body.error).includes("ElevenLabs primary failed after retry"),
     "Expected ElevenLabs failure to be surfaced",

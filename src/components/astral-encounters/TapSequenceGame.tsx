@@ -572,7 +572,7 @@ export const TapSequenceGame = ({
         >
         {/* Background effects */}
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 left-0 w-32 h-32 bg-purple-500/8 rounded-full blur-3xl" />
+          <div className="absolute top-0 left-0 w-32 h-32 bg-purple-500/[0.08] rounded-full blur-3xl" />
           <div className="absolute bottom-0 right-0 w-40 h-40 bg-cyan-500/6 rounded-full blur-3xl" />
         </div>
         

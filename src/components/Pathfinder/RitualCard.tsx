@@ -92,7 +92,7 @@ export const RitualCard = memo(function RitualCard({
           <Input
             value={editedRitual.title}
             onChange={(e) => setEditedRitual({ ...editedRitual, title: e.target.value })}
-            placeholder="Ritual name"
+            placeholder="Rhythm name"
             className={cn(plannerPathfinderTheme.textField, "font-medium")}
           />
           <Input
@@ -126,7 +126,7 @@ export const RitualCard = memo(function RitualCard({
             })}
             label="Time"
             placeholder="No time"
-            ariaLabel="Ritual time"
+            ariaLabel="Rhythm time"
             variant="compact"
             seedValueOnOpen={() => getNextTimeForStep(30)}
             suggestionAction={editedRitual.preferredTime ? (

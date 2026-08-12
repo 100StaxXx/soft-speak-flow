@@ -383,7 +383,7 @@ export function useLegacyCompanionAssistantAdapter({
   const { user } = useAuth();
   const { companion } = useCompanion();
   const companionLabel = useMemo(
-    () => resolveCompanionDisplayLabel(companion, "Cosmiq"),
+    () => resolveCompanionDisplayLabel(companion, "Companion"),
     [companion],
   );
   const { greeting } = useCompanionDialogue();
@@ -485,7 +485,7 @@ export function useLegacyCompanionAssistantAdapter({
 
   const toastPlannerFallbackReadOnly = useCallback(() => {
     toast.error(
-      "Cosmiq is in read-only fallback right now. Nothing will change until the main assistant path is back.",
+      "Your companion is in read-only fallback right now. Nothing will change until the main assistant path is back.",
     );
   }, []);
 

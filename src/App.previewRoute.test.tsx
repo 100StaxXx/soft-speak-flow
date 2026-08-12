@@ -125,6 +125,10 @@ vi.mock("@/components/ProtectedRoute", () => ({
   ),
 }));
 
+vi.mock("@/components/OnboardingExperienceGate", () => ({
+  OnboardingExperienceGate: passthroughProvider,
+}));
+
 vi.mock("@/components/ErrorBoundary", () => ({
   ErrorBoundary: passthroughProvider,
 }));
@@ -218,6 +222,12 @@ vi.mock("@/utils/logger", () => ({
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
+    scope: () => ({
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    }),
     log: vi.fn(),
   },
 }));
@@ -309,35 +319,34 @@ describe("App preview route", () => {
     expect(screen.getByTestId("main-tabs")).toHaveTextContent("/mentor");
   });
 
-  it("navigates once to the route with a persisted creation popup marker", async () => {
+  it.each([
+    ["/journeys", "/mentor"],
+    ["/campaigns", "/mentor"],
+    ["/advanced-planner", "/mentor"],
+    ["/tasks", "/mentor"],
+  ])("redirects retired creation route %s to %s", async (legacyPath, destination) => {
     authMock.session = { user: { id: "user-1" } };
     authMock.user = { id: "user-1" };
     authMock.status = "authenticated";
-    isMainTabPathMock.mockImplementation((pathname: string) => pathname === "/campaigns" || pathname === "/journeys");
-    storageMock.getItem.mockReturnValue(JSON.stringify({
-      surface: "quest",
-      route: "/journeys",
-      selectedDate: "2026-05-01",
-      updatedAt: "2026-05-01T12:00:00.000Z",
-    }));
-    window.history.pushState({}, "", "/campaigns");
+    isMainTabPathMock.mockImplementation((pathname: string) => pathname === "/mentor");
+    window.history.pushState({}, "", legacyPath);
 
     render(<App />);
 
     await waitFor(() => {
-      expect(window.location.pathname).toBe("/journeys");
+      expect(window.location.pathname).toBe(destination);
     });
-    expect(screen.getByTestId("main-tabs")).toHaveTextContent("/journeys");
+    expect(screen.getByTestId("main-tabs")).toHaveTextContent(destination);
   });
 
-  it.each(["/mentor", "/journeys", "/companion", "/campaigns"])(
+  it.each(["/mentor", "/garden", "/companion"])(
     "hides the notifications tray on %s",
     async (pathname) => {
       authMock.session = { user: { id: "user-1" } };
       authMock.user = { id: "user-1" };
       authMock.status = "authenticated";
       isMainTabPathMock.mockImplementation((pathname: string) =>
-        ["/mentor", "/journeys", "/campaigns", "/companion"].includes(pathname),
+        ["/mentor", "/garden", "/companion"].includes(pathname),
       );
       window.history.pushState({}, "", pathname);
 

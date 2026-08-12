@@ -260,7 +260,7 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['epics'] });
       
-      toast.success('Ritual deleted');
+      toast.success('Rhythm deleted');
     } catch (error) {
       console.error('Error deleting ritual:', error);
       toast.error('Failed to delete ritual');
@@ -342,7 +342,7 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({
             <BookOpen className="w-4 h-4 mr-2 text-primary" />
             
             <span className="relative z-10 font-medium">
-              Rituals
+              Rhythms
             </span>
             
             <span className="ml-2 px-2 py-0.5 text-xs bg-primary/20 text-primary rounded-full">
@@ -363,7 +363,7 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({
           <DrawerHeader className="px-0 pb-4">
             <DrawerTitle className="flex items-center gap-2 text-xl">
               <Star className="w-5 h-5 text-stardust-gold fill-stardust-gold/30" />
-              Today's Cosmiq Habits
+              Today's Graceward Rhythms
             </DrawerTitle>
           </DrawerHeader>
           
@@ -443,7 +443,7 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({
                               WebkitTapHighlightColor: 'transparent',
                               touchAction: 'manipulation',
                             }}
-                            aria-label={isCompleted ? "Ritual completed" : "Mark ritual as complete"}
+                            aria-label={isCompleted ? "Rhythm completed" : "Mark rhythm as complete"}
                             role="checkbox"
                             aria-checked={isCompleted}
                             tabIndex={0}
@@ -694,7 +694,7 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({
                                       WebkitTapHighlightColor: 'transparent',
                                       touchAction: 'manipulation',
                                     }}
-                                    aria-label={isCompleted ? "Ritual completed" : "Mark ritual as complete"}
+                                    aria-label={isCompleted ? "Rhythm completed" : "Mark rhythm as complete"}
                                     role="checkbox"
                                     aria-checked={isCompleted}
                                     tabIndex={0}
@@ -849,7 +849,7 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({
                   <Input
                     value={newRitualTitle}
                     onChange={(e) => setNewRitualTitle(e.target.value)}
-                    placeholder="New ritual name..."
+                    placeholder="New rhythm name..."
                     autoFocus
                     className="bg-background/50"
                   />
@@ -872,7 +872,7 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
                         <>
-                          <Plus className="w-4 h-4 mr-1" /> Add Ritual
+                          <Plus className="w-4 h-4 mr-1" /> Add rhythm
                         </>
                       )}
                     </Button>
@@ -896,7 +896,7 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({
                   onClick={() => setIsAddingRitual(true)}
                 >
                   <Plus className="w-4 h-4" />
-                  Add New Ritual
+                  Add new rhythm
                 </Button>
               )}
             </div>

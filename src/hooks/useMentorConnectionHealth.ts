@@ -82,7 +82,7 @@ export function useMentorConnectionHealth(): {
 
   const validateOnboardingMentor = useCallback(async (mentorId: string) => {
     const { data: mentorLookup, error: mentorLookupError } = await supabase
-      .from("mentors")
+      .from("graceward_guides")
       .select("id")
       .eq("id", mentorId)
       .maybeSingle();

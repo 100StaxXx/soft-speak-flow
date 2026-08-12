@@ -95,7 +95,7 @@ struct WidgetTask: Codable, Identifiable {
 class WidgetDataManager {
     static let shared = WidgetDataManager()
     
-    private let appGroupId = "group.com.darrylgraham.revolution"
+    private let appGroupId = "group.com.darrylgraham.graceward"
     private let payloadFileName = "widget_tasks_data.json"
     
     private init() {}
@@ -156,53 +156,23 @@ class WidgetDataManager {
         return WidgetTaskData(
             tasks: [
                 WidgetTask(
-                    id: "preview-ritual-meditation",
-                    text: "Morning meditation",
-                    completed: true,
-                    xpReward: 50,
-                    isMainQuest: false,
-                    category: "wellness",
-                    section: "morning",
-                    scheduledTime: "07:00",
-                    kind: "ritual",
-                    isRitual: true,
-                    isCampaignRitual: false,
-                    habitSourceId: "habit-meditation"
-                ),
-                WidgetTask(
-                    id: "preview-quest-daily",
-                    text: "Complete daily quest",
+                    id: "preview-daily-practice",
+                    text: "Name three gifts from the last 24 hours and thank God for each one.",
                     completed: false,
-                    xpReward: 100,
-                    isMainQuest: true,
-                    category: "growth",
-                    section: "morning",
-                    scheduledTime: "09:00",
-                    kind: "quest",
+                    xpReward: 5,
+                    isMainQuest: false,
+                    category: "soul",
+                    section: "unscheduled",
+                    scheduledTime: nil,
+                    kind: "daily_practice",
                     isRitual: false,
                     isCampaignRitual: false
-                ),
-                WidgetTask(
-                    id: "preview-campaign-portfolio",
-                    text: "Build portfolio website",
-                    completed: false,
-                    xpReward: 30,
-                    isMainQuest: false,
-                    category: "creative",
-                    section: "afternoon",
-                    scheduledTime: "14:00",
-                    kind: "campaign_ritual",
-                    isRitual: true,
-                    isCampaignRitual: true,
-                    campaignTitle: "Portfolio",
-                    epicId: "epic-portfolio",
-                    habitSourceId: "habit-portfolio"
                 )
             ],
             completedCount: 0,
             totalCount: 1,
-            ritualCount: 2,
-            ritualCompleted: 1,
+            ritualCount: 0,
+            ritualCompleted: 0,
             date: WidgetTaskData.localDateString(),
             updatedAt: nil,
             profileWallpaperRelativePath: nil,

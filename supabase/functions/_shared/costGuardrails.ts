@@ -168,6 +168,18 @@ export function getOpenAITextTokenRatesPerThousand(model: string | null): {
   // OpenAI model docs publish GPT-5.x text prices per 1M tokens;
   // guardrails store the same rates converted to per-1K tokens.
   // Sources: https://developers.openai.com/api/docs/models.
+  if (modelName.includes("gpt-5.6-luna")) {
+    return { inputRate: 0.001, outputRate: 0.006 };
+  }
+
+  if (modelName.includes("gpt-5.6-terra")) {
+    return { inputRate: 0.0025, outputRate: 0.015 };
+  }
+
+  if (modelName.includes("gpt-5.6")) {
+    return { inputRate: 0.005, outputRate: 0.03 };
+  }
+
   if (modelName.includes("gpt-5.5-pro")) {
     return { inputRate: 0.03, outputRate: 0.18 };
   }
@@ -550,6 +562,8 @@ function resolveCapabilityFromOpenAIRequest(
 function resolveCapabilityFromElevenLabsRequest(
   pathname: string,
 ): CostCapability | null {
+  if (pathname.includes("/v1/forced-alignment")) return "transcription";
+  if (pathname.includes("/v1/speech-to-text")) return "transcription";
   if (pathname.includes("/v1/text-to-speech/")) return "tts";
   if (pathname.includes("/v1/music")) return "music";
   if (pathname.includes("/v1/video")) return "video";

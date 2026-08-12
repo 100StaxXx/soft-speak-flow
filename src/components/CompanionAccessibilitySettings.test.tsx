@@ -105,7 +105,7 @@ describe("CompanionAccessibilitySettings", () => {
     });
     expect(mocks.toast).toHaveBeenCalledWith({
       title: "Preference Updated",
-      description: "Quest cards will use a clearer backing",
+      description: "Action cards will use a clearer backing",
     });
   });
 });

@@ -101,27 +101,27 @@ export function getPushNotificationSourceLabel(
 
   switch (type) {
     case "daily_pep":
-      return "Daily pep talk";
+      return "Daily Grace";
     case "daily_quote":
       return "Daily quote";
     case "task_start":
-      return isRitualTask ? "Ritual start" : "Quest start";
+      return isRitualTask ? "Rhythm ready" : "Action ready";
     case "task_reminder":
-      return isRitualTask ? "Ritual reminder" : "Quest reminder";
+      return isRitualTask ? "Rhythm reminder" : "Action reminder";
     case "habit_reminder":
-      return "Ritual reminder";
+      return "Rhythm reminder";
     case "contact_reminder":
       return "Contact reminder";
     case "mentor_nudge":
-      return "Companion nudge";
+      return "Guide note";
     case "checkin_morning_reminder":
       return "Morning check-in";
     case "checkin_evening_reminder":
-      return "Evening reflection";
+      return "Evening Reflection";
     case "plan_day_overdue":
       return "Planner alert";
     default:
-      return "Cosmiq";
+      return "Graceward";
   }
 }
 

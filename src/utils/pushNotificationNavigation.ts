@@ -4,6 +4,11 @@ export interface PushNotificationNavigationDetail {
 }
 
 const INTERNAL_PATH_PATTERN = /^\/(?!\/)/;
+const APP_ORIGINS = new Set([
+  "https://graceward.app",
+  "https://www.graceward.app",
+  "https://app.cosmiq.quest",
+]);
 
 const readString = (value: unknown): string | null => {
   if (typeof value !== "string") return null;
@@ -20,19 +25,12 @@ const normalizeInternalPath = (value: string | null | undefined): string | null 
   if (!value || !INTERNAL_PATH_PATTERN.test(value)) return null;
 
   try {
-    const parsed = new URL(value, "https://app.cosmiq.quest");
-    if (parsed.origin !== "https://app.cosmiq.quest") return null;
+    const parsed = new URL(value, "https://graceward.app");
+    if (!APP_ORIGINS.has(parsed.origin)) return null;
     return `${parsed.pathname}${parsed.search}${parsed.hash}`;
   } catch {
     return null;
   }
-};
-
-const appendTaskId = (path: string, taskId: string | null): string => {
-  if (!taskId) return path;
-  const parsed = new URL(path, "https://app.cosmiq.quest");
-  parsed.searchParams.set("taskId", taskId);
-  return `${parsed.pathname}${parsed.search}${parsed.hash}`;
 };
 
 export function resolvePushNotificationDestination(
@@ -41,52 +39,56 @@ export function resolvePushNotificationDestination(
 ): string {
   const payload = readRecord(payloadInput) ?? {};
   const taskId = readString(payload.task_id) ?? readString(payload.taskId);
+  const dailyEncouragementId = readString(payload.pep_talk_id) ?? readString(payload.pepTalkId);
   const type = readString(payload.type) ?? notificationType ?? null;
   const rawUrl = readString(payload.url);
   const deepLink = readString(payload.deepLink);
 
-  if (deepLink?.startsWith("cosmiq://task/")) {
-    const deepTaskId = deepLink.replace("cosmiq://task/", "").split("?")[0]?.trim();
-    return appendTaskId("/journeys", deepTaskId || taskId);
+  if (deepLink?.startsWith("graceward://task/") || deepLink?.startsWith("cosmiq://task/")) {
+    return "/mentor";
   }
 
-  if (deepLink === "cosmiq://journeys/plan") {
+  if (deepLink === "graceward://journeys/plan" || deepLink === "cosmiq://journeys/plan") {
     return "/journeys";
   }
 
   const safeUrl = normalizeInternalPath(rawUrl);
   if (safeUrl) {
     if (safeUrl === "/tasks" || safeUrl.startsWith("/tasks?")) {
-      return appendTaskId("/journeys", taskId);
+      return "/mentor";
     }
     if (safeUrl === "/inbox" || safeUrl.startsWith("/inbox?")) {
-      return "/journeys?section=inbox";
+      return "/mentor";
     }
     if (safeUrl === "/inspire" || safeUrl.startsWith("/inspire?")) {
       return "/pep-talks";
     }
     if (safeUrl === "/journeys" || safeUrl.startsWith("/journeys?")) {
-      return appendTaskId(safeUrl, taskId);
+      return safeUrl;
     }
     return safeUrl;
   }
 
   if (taskId) {
-    return appendTaskId("/journeys", taskId);
+    return "/mentor";
+  }
+
+  if (type === "daily_pep" && dailyEncouragementId) {
+    return `/pep-talk/${encodeURIComponent(dailyEncouragementId)}`;
   }
 
   switch (type) {
     case "daily_pep":
-      return "/pep-talks";
+      return "/mentor#daily-encouragement";
     case "daily_quote":
       return "/mentor";
     case "mentor_nudge":
-      return "/companion";
+      return "/guide";
     case "habit_reminder":
     case "task_start":
     case "task_reminder":
     case "plan_day_overdue":
-      return "/journeys";
+      return "/mentor";
     case "checkin_evening_reminder":
       return "/mentor?open=evening-reflection";
     case "checkin_morning_reminder":

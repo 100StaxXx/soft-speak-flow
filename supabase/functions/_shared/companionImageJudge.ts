@@ -8,6 +8,7 @@ export interface CompanionImageJudgeScores {
   continuity: number;
   difference: number;
   anatomy: number;
+  stageMaturity: number;
   centering: number;
   backgroundCutout: number;
   overall: number;
@@ -47,6 +48,8 @@ const buildJudgeInstructions = ({
         `Core element: ${profile.coreElement}`,
         `Favorite color anchor: ${profile.favoriteColor}`,
         "The candidate image is the generated stage-1 hatchling.",
+        "StageMaturity means: 10 only when the candidate is unmistakably an infant or very young juvenile for its species; 0-4 when it has adult markers such as a mane, antlers, adult flight plumage, mature musculature, or fully mature proportions.",
+        "If a reference image is present, it may depict the mature identity seed. Preserve its species, face, markings, palette, and illustration language while judging the candidate itself as an infant form.",
         "Continuity means: it matches the family bible and reads as a strong starter form for this lineage.",
         "Difference should be 10 for bootstrap images because there is no prior portrait to compare against.",
         "Anatomy means: no extra limbs, no broken face logic, and no obvious malformed body plan.",
@@ -64,6 +67,7 @@ const buildJudgeInstructions = ({
         "Continuity means: the egg clearly hints at the same lineage through shape language, markings, aura, and palette.",
         "Difference should be 10 when the candidate is a convincing egg with no obvious full-body reveal.",
         "Anatomy means: the egg is coherent, readable, and not malformed.",
+        "StageMaturity should be 10 for a convincing unrevealed egg.",
         "Centering means: the egg is cleanly framed and visually centered.",
         "BackgroundCutout means: 10 for a clean egg-only transparent/empty cutout; 0-4 for any visible sky, clouds, landscape, room, floor, frame, card, rectangular backdrop, or scenic environment.",
       ].join("\n");
@@ -78,6 +82,7 @@ const buildJudgeInstructions = ({
         "Continuity means: it is clearly the same companion identity, species, silhouette logic, palette, markings, and maturity.",
         "Difference should be 10 when the only meaningful change is presentation/framing, not a redesign or evolution.",
         "Anatomy means: no extra limbs, no broken face logic, and no obvious malformed body plan.",
+        "StageMaturity means: the candidate matches the same maturity as the launcher reference.",
         "Centering means: the subject is well framed, full body, and not awkwardly cropped.",
         "BackgroundCutout means: 10 for a clean companion-only transparent/empty cutout; 0-4 for any visible sky, clouds, landscape, room, floor, frame, card, rectangular backdrop, or scenic environment.",
       ].join("\n");
@@ -93,6 +98,7 @@ const buildJudgeInstructions = ({
         "Continuity means: same creature line, same facial and silhouette logic, same elemental identity.",
         "Difference means: clearly more evolved at thumbnail size, with meaningful silhouette or posture change and stronger elemental expression.",
         "Anatomy means: no malformed limbs, duplicate heads, or broken body logic.",
+        "StageMaturity means: the candidate is appropriately more mature for the requested next boundary without jumping to an unrelated age or species.",
         "Centering means: the subject is framed well and not awkwardly cropped.",
         "BackgroundCutout means: 10 for a clean companion-only transparent/empty cutout; 0-4 for any visible sky, clouds, landscape, room, floor, frame, card, rectangular backdrop, or scenic environment.",
       ].join("\n");
@@ -129,6 +135,7 @@ export const judgeCompanionImage = async ({
           continuity: { type: "number" },
           difference: { type: "number" },
           anatomy: { type: "number" },
+          stageMaturity: { type: "number" },
           centering: { type: "number" },
           backgroundCutout: { type: "number" },
           overall: { type: "number" },
@@ -136,7 +143,7 @@ export const judgeCompanionImage = async ({
           subjectCenterY: { type: "number" },
           notes: { type: "string" },
         },
-        required: ["continuity", "difference", "anatomy", "centering", "backgroundCutout", "overall", "subjectCenterX", "subjectCenterY", "notes"],
+        required: ["continuity", "difference", "anatomy", "stageMaturity", "centering", "backgroundCutout", "overall", "subjectCenterX", "subjectCenterY", "notes"],
         additionalProperties: false,
       },
     },
@@ -220,6 +227,7 @@ export const judgeCompanionImage = async ({
       continuity: clampScore(typeof parsed.continuity === "number" ? parsed.continuity : 0),
       difference: clampScore(typeof parsed.difference === "number" ? parsed.difference : 0),
       anatomy: clampScore(typeof parsed.anatomy === "number" ? parsed.anatomy : 0),
+      stageMaturity: clampScore(typeof parsed.stageMaturity === "number" ? parsed.stageMaturity : 0),
       centering: clampScore(typeof parsed.centering === "number" ? parsed.centering : 0),
       backgroundCutout: clampScore(typeof parsed.backgroundCutout === "number" ? parsed.backgroundCutout : 0),
       overall: clampScore(typeof parsed.overall === "number" ? parsed.overall : 0),

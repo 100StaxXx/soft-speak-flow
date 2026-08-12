@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
-import { Play, Pause, Sparkles, SkipBack, SkipForward, ChevronDown, ChevronUp, Wand2, Loader2 } from "lucide-react";
+import { Play, Pause, Sparkles, SkipBack, SkipForward, ChevronDown, ChevronUp, Wand2, Loader2, History, MessageCircle, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { getActiveWordIndex } from "@/utils/captionTiming";
@@ -25,6 +25,20 @@ import { logger } from "@/utils/logger";
 import { toast } from "@/components/ui/sonner";
 import { useAchievements } from "@/hooks/useAchievements";
 import { resolveMentorSlugAlias } from "@/lib/mentorRoster";
+import {
+  getNextDailyEncouragementMilestone,
+  recordDailyEncouragementProgress,
+} from "@/services/dailyEncouragementHistory";
+import { estimateWordTiming } from "@/utils/estimatedWordTiming";
+import { MentorAvatar } from "@/components/MentorAvatar";
+import { useDailyGuideThread } from "@/hooks/useDailyGuideThread";
+import {
+  DAILY_ENCOURAGEMENT_COMPLETED_EVENT,
+  DAILY_GUIDE_FOCUS_SELECTED_EVENT,
+  getDailyGuideQuestion,
+  type DailyGuideQuestionOption,
+} from "@/lib/dailyGuideThread";
+import { trackProductExperience } from "@/lib/productAnalytics";
 
 interface CaptionWord {
   word: string;
@@ -50,6 +64,13 @@ interface DailyPepTalk {
 interface TodayPepTalkQueryData {
   pepTalk: DailyPepTalk | null;
   mentorSlug: string | null;
+  mentor: {
+    id: string;
+    name: string;
+    slug: string;
+    avatarUrl: string | null;
+    primaryColor: string;
+  } | null;
   isFallback: boolean;
 }
 
@@ -61,7 +82,7 @@ type InlineAudioElement = HTMLAudioElement & {
 const log = logger.scope("TodaysPepTalk");
 const AUDIO_READY_TIMEOUT_MS = 5000;
 const TODAY_PEP_TALK_QUERY_ROOT = ["today-pep-talk"] as const;
-const transparentShellClassName = "bg-transparent backdrop-blur-none shadow-none border-white/[0.08]";
+const transparentShellClassName = "border-border/70 bg-card/[0.86] shadow-sm backdrop-blur-xl";
 
 function buildTodayPepTalkQueryKey(mentorId: string | null | undefined, effectiveDate: string) {
   return [...TODAY_PEP_TALK_QUERY_ROOT, mentorId ?? null, effectiveDate] as const;
@@ -104,8 +125,8 @@ async function fetchTodayPepTalk(
   effectiveDate: string,
 ): Promise<TodayPepTalkQueryData> {
   const { data: mentor, error: mentorError } = await supabase
-    .from("mentors")
-    .select("slug, name")
+    .from("graceward_guides")
+    .select("id, slug, name, avatar_url, primary_color")
     .eq("id", resolvedMentorId)
     .maybeSingle();
 
@@ -117,6 +138,7 @@ async function fetchTodayPepTalk(
     return {
       pepTalk: null,
       mentorSlug: null,
+      mentor: null,
       isFallback: false,
     };
   }
@@ -138,6 +160,13 @@ async function fetchTodayPepTalk(
     return {
       pepTalk: normalizeDailyPepTalk(todayPepTalk as Record<string, unknown>, mentor.name),
       mentorSlug,
+      mentor: {
+        id: mentor.id,
+        name: mentor.name,
+        slug: mentor.slug,
+        avatarUrl: mentor.avatar_url,
+        primaryColor: mentor.primary_color || "#7c3aed",
+      },
       isFallback: false,
     };
   }
@@ -163,6 +192,13 @@ async function fetchTodayPepTalk(
     return {
       pepTalk: null,
       mentorSlug,
+      mentor: {
+        id: mentor.id,
+        name: mentor.name,
+        slug: mentor.slug,
+        avatarUrl: mentor.avatar_url,
+        primaryColor: mentor.primary_color || "#7c3aed",
+      },
       isFallback: false,
     };
   }
@@ -175,6 +211,13 @@ async function fetchTodayPepTalk(
   return {
     pepTalk: normalizeDailyPepTalk(fallbackPepTalk as Record<string, unknown>, mentor.name),
     mentorSlug,
+    mentor: {
+      id: mentor.id,
+      name: mentor.name,
+      slug: mentor.slug,
+      avatarUrl: mentor.avatar_url,
+      primaryColor: mentor.primary_color || "#7c3aed",
+    },
     isFallback: true,
   };
 }
@@ -189,6 +232,9 @@ export const TodaysPepTalk = memo(() => {
   const queryClient = useQueryClient();
   const { awardPepTalkListenedAsync } = useXPRewards();
   const { checkFirstTimeAchievements, checkPepTalkListeningAchievements } = useAchievements();
+  const { thread, isUpdating: isThreadUpdating, updateThread } = useDailyGuideThread({
+    enabled: isTabActive,
+  });
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -206,11 +252,14 @@ export const TodaysPepTalk = memo(() => {
   const seekDebounceRef = useRef<number | null>(null);
   const transcriptScrollRafRef = useRef<number | null>(null);
   const lastTranscriptScrollTopRef = useRef<number>(0);
-  const transcriptSyncAttemptedIdsRef = useRef<Set<string>>(new Set());
+  const playbackRafRef = useRef<number | null>(null);
   const isAwardingXPRef = useRef(false);
   const hasAwardedXPRef = useRef(false);
   const previousTabActiveRef = useRef(isTabActive);
   const generatePepTalkInFlightRef = useRef(false);
+  const openedHistoryIdsRef = useRef<Set<string>>(new Set());
+  const recordedProgressMilestonesRef = useRef<Set<number>>(new Set());
+  const announcedCompletionIdsRef = useRef<Set<string>>(new Set());
   const isNativeIOS = useMemo(
     () => typeof window !== "undefined" && Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios",
     [],
@@ -257,16 +306,20 @@ export const TodaysPepTalk = memo(() => {
 
   const pepTalk = pepTalkQuery.data?.pepTalk ?? null;
   const mentorSlug = pepTalkQuery.data?.mentorSlug ?? null;
+  const mentor = pepTalkQuery.data?.mentor ?? null;
   const isFallback = pepTalkQuery.data?.isFallback ?? false;
   const loading = pepTalkQuery.isPending || (pepTalkQuery.isFetching && !pepTalkQuery.data);
   const error = pepTalkQuery.isError && !pepTalk;
   const { refetch: refetchPepTalk } = pepTalkQuery;
   const backdropSource = pepTalkWallpaper ? "remote" : "fallback";
-
-  useEffect(() => {
-    if (!pepTalk?.id) return;
-    transcriptSyncAttemptedIdsRef.current.delete(pepTalk.id);
-  }, [pepTalk?.id, pepTalkQuery.dataUpdatedAt]);
+  const dailyGuideQuestion = useMemo(
+    () => getDailyGuideQuestion(pepTalk?.topic_category),
+    [pepTalk?.topic_category],
+  );
+  const selectedFocusOption = useMemo(
+    () => dailyGuideQuestion.options.find((option) => option.id === thread?.focus_option_id) ?? null,
+    [dailyGuideQuestion.options, thread?.focus_option_id],
+  );
 
   useEffect(() => {
     setCurrentTime(0);
@@ -277,7 +330,32 @@ export const TodaysPepTalk = memo(() => {
     setActiveWordIndex(-1);
     isAwardingXPRef.current = false;
     hasAwardedXPRef.current = false;
+    recordedProgressMilestonesRef.current.clear();
   }, [pepTalk?.id]);
+
+  useEffect(() => {
+    if (!pepTalk?.id || openedHistoryIdsRef.current.has(pepTalk.id)) return;
+
+    openedHistoryIdsRef.current.add(pepTalk.id);
+    void recordDailyEncouragementProgress(pepTalk.id, "opened");
+    void trackProductExperience("encouragement_opened", {
+      surface: "today",
+      properties: {
+        fallback: isFallback,
+        topic_category: pepTalk.topic_category,
+      },
+    });
+  }, [isFallback, pepTalk?.id, pepTalk?.topic_category]);
+
+  useEffect(() => {
+    if (!pepTalk?.id || !mentor?.id) return;
+    void updateThread({
+      mentor_id: mentor.id,
+      mentor_name: mentor.name,
+      daily_pep_talk_id: pepTalk.id,
+      encouragement_title: pepTalk.title,
+    });
+  }, [mentor?.id, pepTalk?.id, updateThread]);
 
   useEffect(() => {
     const becameActive = isTabActive && !previousTabActiveRef.current;
@@ -353,66 +431,20 @@ export const TodaysPepTalk = memo(() => {
     () => sanitizeTranscript(pepTalk?.transcript),
     [pepTalk?.transcript],
   );
-  const displayTranscript = useMemo(
-    () => applyScriptPunctuationToTranscript(timedTranscript, pepTalk?.script),
-    [timedTranscript, pepTalk?.script],
+  const estimatedTranscript = useMemo(
+    () => timedTranscript.length === 0
+      ? estimateWordTiming(pepTalk?.script ?? "", duration)
+      : [],
+    [duration, pepTalk?.script, timedTranscript.length],
   );
-
-  useEffect(() => {
-    if (!pepTalk?.id) return;
-    if (timedTranscript.length > 0) return;
-    if (transcriptSyncAttemptedIdsRef.current.has(pepTalk.id)) return;
-
-    transcriptSyncAttemptedIdsRef.current.add(pepTalk.id);
-
-    const syncTranscript = async () => {
-      try {
-        const { data, error: syncError } = await supabase.functions.invoke(
-          "sync-daily-pep-talk-transcript",
-          { body: { id: pepTalk.id } },
-        );
-
-        if (syncError) {
-          log.warn("Background transcript sync failed", {
-            pepTalkId: pepTalk.id,
-            error: syncError instanceof Error ? syncError.message : String(syncError),
-          });
-          return;
-        }
-
-        const nextTranscript = sanitizeTranscript(
-          data && typeof data === "object"
-            ? (data as Record<string, unknown>).transcript
-            : null,
-        );
-
-        if (nextTranscript.length === 0) {
-          return;
-        }
-
-        queryClient.setQueryData<TodayPepTalkQueryData>(pepTalkQueryKey, (current) => {
-          if (!current?.pepTalk || current.pepTalk.id !== pepTalk.id) {
-            return current;
-          }
-
-          return {
-            ...current,
-            pepTalk: {
-              ...current.pepTalk,
-              transcript: nextTranscript,
-            },
-          };
-        });
-      } catch (syncError) {
-        log.warn("Background transcript sync threw unexpectedly", {
-          pepTalkId: pepTalk.id,
-          error: syncError instanceof Error ? syncError.message : String(syncError),
-        });
-      }
-    };
-
-    void syncTranscript();
-  }, [pepTalk?.id, pepTalkQueryKey, queryClient, timedTranscript.length]);
+  const effectiveTranscript = timedTranscript.length > 0
+    ? timedTranscript
+    : estimatedTranscript;
+  const isEstimatedTranscript = timedTranscript.length === 0 && estimatedTranscript.length > 0;
+  const displayTranscript = useMemo(
+    () => applyScriptPunctuationToTranscript(effectiveTranscript, pepTalk?.script),
+    [effectiveTranscript, pepTalk?.script],
+  );
 
   const generatePepTalkMutation = useMutation({
     retry: false,
@@ -434,7 +466,7 @@ export const TodaysPepTalk = memo(() => {
         if (generationError) {
           const parsedError = await parseFunctionInvokeError(generationError);
           const userMessage = toUserFacingFunctionError(parsedError, {
-            action: "refresh today's pep talk",
+            action: "refresh today's encouragement",
           });
 
           log.warn("Pep talk generation returned HTTP error", {
@@ -456,7 +488,7 @@ export const TodaysPepTalk = memo(() => {
             : null;
 
         if (!generatedPepTalk) {
-          throw new Error("No pep talk data returned");
+          throw new Error("No daily encouragement data returned");
         }
 
         setGenerationStage("loading");
@@ -465,15 +497,22 @@ export const TodaysPepTalk = memo(() => {
           typeof generatedPepTalk.mentor_slug === "string"
             ? generatedPepTalk.mentor_slug
             : nextMentorSlug;
-        const { data: mentor } = await supabase
-          .from("mentors")
-          .select("name")
+        const { data: generatedMentor } = await supabase
+          .from("graceward_guides")
+          .select("id, name, slug, avatar_url, primary_color")
           .eq("slug", generatedMentorSlug)
           .maybeSingle();
 
         return {
-          pepTalk: normalizeDailyPepTalk(generatedPepTalk, mentor?.name),
+          pepTalk: normalizeDailyPepTalk(generatedPepTalk, generatedMentor?.name),
           mentorSlug: generatedMentorSlug,
+          mentor: generatedMentor ? {
+            id: generatedMentor.id,
+            name: generatedMentor.name,
+            slug: generatedMentor.slug,
+            avatarUrl: generatedMentor.avatar_url,
+            primaryColor: generatedMentor.primary_color || "#7c3aed",
+          } : null,
           isFallback: false,
         } satisfies TodayPepTalkQueryData;
       } finally {
@@ -484,13 +523,12 @@ export const TodaysPepTalk = memo(() => {
       }
     },
     onSuccess: (nextData) => {
-      transcriptSyncAttemptedIdsRef.current.delete(nextData.pepTalk?.id ?? "");
       queryClient.setQueryData(pepTalkQueryKey, nextData);
-      toast.success("Your pep talk is ready!");
+      toast.success("Your daily encouragement is ready.");
     },
     onError: async (mutationError) => {
       let errorMessage =
-        mutationError instanceof Error ? mutationError.message : "Failed to prepare pep talk";
+        mutationError instanceof Error ? mutationError.message : "Failed to prepare daily encouragement";
 
       const shouldParseFunctionError =
         (typeof mutationError === "object" && mutationError !== null && "context" in mutationError) ||
@@ -499,7 +537,7 @@ export const TodaysPepTalk = memo(() => {
       if (shouldParseFunctionError) {
         const parsedError = await parseFunctionInvokeError(mutationError);
         errorMessage = toUserFacingFunctionError(parsedError, {
-          action: "refresh today's pep talk",
+          action: "refresh today's encouragement",
         });
       }
 
@@ -622,6 +660,31 @@ export const TodaysPepTalk = memo(() => {
     profile?.id,
   ]);
 
+  const announceEncouragementCompleted = useCallback(() => {
+    if (!pepTalk?.id || announcedCompletionIdsRef.current.has(pepTalk.id)) return;
+    announcedCompletionIdsRef.current.add(pepTalk.id);
+    void trackProductExperience("encouragement_completed", {
+      surface: "today",
+      properties: { topic_category: pepTalk.topic_category },
+    });
+    void updateThread({
+      mentor_id: mentor?.id ?? null,
+      mentor_name: mentor?.name ?? pepTalk.mentor_name ?? null,
+      daily_pep_talk_id: pepTalk.id,
+      encouragement_title: pepTalk.title,
+      encouragement_completed_at: new Date().toISOString(),
+      companion_response: `I listened with you. ${mentor?.name ?? pepTalk.mentor_name ?? "Your Guide"}'s encouragement is part of the day now.`,
+      companion_acknowledged_at: null,
+    });
+    window.dispatchEvent(new CustomEvent(DAILY_ENCOURAGEMENT_COMPLETED_EVENT, {
+      detail: {
+        pepTalkId: pepTalk.id,
+        title: pepTalk.title,
+        mentorName: mentor?.name ?? pepTalk.mentor_name ?? "your Guide",
+      },
+    }));
+  }, [mentor?.id, mentor?.name, pepTalk, updateThread]);
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -629,6 +692,22 @@ export const TodaysPepTalk = memo(() => {
     const updateTime = () => {
       const time = audio.currentTime;
       setCurrentTime(time);
+      if (pepTalk?.id && audio.duration > 0) {
+        const progress = Math.min(1, Math.max(0, time / audio.duration));
+        const milestone = getNextDailyEncouragementMilestone(
+          progress,
+          recordedProgressMilestonesRef.current,
+        );
+        if (milestone !== null) {
+          recordedProgressMilestonesRef.current.add(milestone);
+          void recordDailyEncouragementProgress(
+            pepTalk.id,
+            milestone >= 0.8 ? "completed" : "progress",
+            milestone,
+          );
+          if (milestone >= 0.8) announceEncouragementCompleted();
+        }
+      }
       void maybeAwardPepTalkXP();
     };
 
@@ -649,6 +728,11 @@ export const TodaysPepTalk = memo(() => {
       setCurrentTime(audio.currentTime);
       setIsPlaying(false);
       setActiveWordIndex(-1);
+      if (pepTalk?.id) {
+        recordedProgressMilestonesRef.current.add(0.8);
+        void recordDailyEncouragementProgress(pepTalk.id, "completed", 1);
+        announceEncouragementCompleted();
+      }
       void maybeAwardPepTalkXP();
     };
 
@@ -663,18 +747,100 @@ export const TodaysPepTalk = memo(() => {
       audio.removeEventListener("seeked", handleSeeked);
       audio.removeEventListener("ended", handleEnded);
     };
-  }, [maybeAwardPepTalkXP]);
+  }, [announceEncouragementCompleted, maybeAwardPepTalkXP, pepTalk?.id]);
+
+  const handleFocusSelection = async (option: DailyGuideQuestionOption) => {
+    if (!mentor?.id || !pepTalk?.id || thread?.focus_answered_at || isThreadUpdating) return;
+
+    await updateThread({
+      mentor_id: mentor.id,
+      mentor_name: mentor.name,
+      daily_pep_talk_id: pepTalk.id,
+      encouragement_title: pepTalk.title,
+      guide_question_id: dailyGuideQuestion.id,
+      guide_question: dailyGuideQuestion.prompt,
+      focus_option_id: option.id,
+      focus_label: option.label,
+      focus_category: option.category,
+      focus_answered_at: new Date().toISOString(),
+      companion_response: option.companionResponse,
+      companion_acknowledged_at: null,
+    });
+    void trackProductExperience("focus_selected", {
+      surface: "today",
+      properties: {
+        category: option.category,
+        option_id: option.id,
+      },
+    });
+
+    window.dispatchEvent(new CustomEvent(DAILY_GUIDE_FOCUS_SELECTED_EVENT, {
+      detail: {
+        category: option.category,
+        focusLabel: option.label,
+        guideName: mentor.name,
+        source: "guide",
+      },
+    }));
+  };
+
+  const openGuideConversation = () => {
+    if (!pepTalk || !mentor) return;
+    void trackProductExperience("guide_chat_started", {
+      surface: "today",
+      properties: {
+        has_focus: Boolean(thread?.focus_label),
+        source: "daily_encouragement",
+      },
+    });
+    const focusContext = thread?.focus_label
+      ? ` I chose “${thread.focus_label}” as my focus today.`
+      : "";
+    navigate("/mentor-chat", {
+      state: {
+        initialMessage: `Help me apply today's encouragement, “${pepTalk.title}.”${focusContext}`,
+        briefingContext: [
+          `Today's daily encouragement from ${mentor.name}: ${pepTalk.title}.`,
+          pepTalk.summary,
+          thread?.focus_label ? `The user chose ${thread.focus_label} as today's focus.` : null,
+        ].filter(Boolean).join(" "),
+      },
+    });
+  };
 
   useEffect(() => {
     setActiveWordIndex((previousIndex) =>
-      getActiveWordIndex(timedTranscript, currentTime, previousIndex),
+      getActiveWordIndex(effectiveTranscript, currentTime, previousIndex),
     );
-  }, [timedTranscript, currentTime]);
+  }, [effectiveTranscript, currentTime]);
+
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    const updatePlaybackClock = () => {
+      const audio = audioRef.current;
+      if (audio && !audio.paused) {
+        setCurrentTime(audio.currentTime);
+        playbackRafRef.current = window.requestAnimationFrame(updatePlaybackClock);
+      }
+    };
+
+    playbackRafRef.current = window.requestAnimationFrame(updatePlaybackClock);
+    return () => {
+      if (playbackRafRef.current !== null) {
+        window.cancelAnimationFrame(playbackRafRef.current);
+        playbackRafRef.current = null;
+      }
+    };
+  }, [isPlaying]);
 
   useEffect(() => {
     return () => {
       if (transcriptScrollRafRef.current !== null) {
         window.cancelAnimationFrame(transcriptScrollRafRef.current);
+      }
+      if (playbackRafRef.current !== null) {
+        window.cancelAnimationFrame(playbackRafRef.current);
       }
       if (seekDebounceRef.current) {
         window.clearTimeout(seekDebounceRef.current);
@@ -739,6 +905,10 @@ export const TodaysPepTalk = memo(() => {
     const played = await safePlay(audio);
     if (played) {
       setIsPlaying(true);
+      setShowFullTranscript(true);
+      if (pepTalk?.id) {
+        void recordDailyEncouragementProgress(pepTalk.id, "started", currentTime / Math.max(duration, 1));
+      }
       return;
     }
 
@@ -746,6 +916,10 @@ export const TodaysPepTalk = memo(() => {
     const playedAfterReload = await safePlay(audio);
     if (playedAfterReload) {
       setIsPlaying(true);
+      setShowFullTranscript(true);
+      if (pepTalk?.id) {
+        void recordDailyEncouragementProgress(pepTalk.id, "started", currentTime / Math.max(duration, 1));
+      }
     }
   };
 
@@ -915,11 +1089,11 @@ export const TodaysPepTalk = memo(() => {
           <div className="flex items-center justify-center gap-2">
             <Sparkles className="h-5 w-5 text-muted-foreground" />
             <h2 className="text-lg font-semibold text-muted-foreground">
-              Daily Message
+              Daily Encouragement
             </h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            {error ? "Unable to load today's pep talk" : "No pep talk available today"}
+            {error ? "Unable to load today's encouragement" : "No daily encouragement is available yet"}
           </p>
           <div className="flex flex-col sm:flex-row gap-2 justify-center">
             <Button
@@ -938,7 +1112,7 @@ export const TodaysPepTalk = memo(() => {
               ) : (
                 <>
                   <Wand2 className="h-4 w-4 mr-2" />
-                  Prepare Today's Pep Talk
+                  Prepare Today&apos;s Encouragement
                 </>
               )}
             </Button>
@@ -946,9 +1120,9 @@ export const TodaysPepTalk = memo(() => {
               variant="outline"
               size="default"
               className="rounded-full"
-              onClick={() => navigate("/pep-talks")}
+              onClick={() => navigate("/profile#reminders")}
             >
-              Browse Library
+              Reminder Settings
             </Button>
           </div>
         </div>
@@ -968,20 +1142,37 @@ export const TodaysPepTalk = memo(() => {
     >
       {renderSectionBackdrop()}
       <div className="relative p-6 md:p-8 space-y-6">
-        <div className="flex items-center justify-center gap-2">
-          <div className="relative">
-            <Sparkles className="h-6 w-6 text-primary animate-pulse-slow" />
-            <div className="absolute inset-0 bg-primary/30 blur-md rounded-full" />
+        <div className="flex items-center justify-center gap-3 text-left">
+          {mentor ? (
+            <MentorAvatar
+              mentorSlug={mentor.slug}
+              mentorName={mentor.name}
+              primaryColor={mentor.primaryColor}
+              avatarUrl={mentor.avatarUrl ?? undefined}
+              size="xs"
+              className="shrink-0"
+              showGlow
+            />
+          ) : (
+            <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-primary/15">
+              <Sparkles className="h-5 w-5 text-primary animate-pulse-slow" />
+              <div className="absolute inset-0 rounded-full bg-primary/25 blur-md" />
+            </div>
+          )}
+          <div>
+            <h2 className="text-xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent animate-gradient-text">
+              A word from {mentor?.name ?? pepTalk.mentor_name ?? "your Guide"}
+            </h2>
+            <p className="mt-0.5 text-xs font-medium text-foreground/65">
+              Your primary Guide · prepared in their Guide voice for today
+            </p>
           </div>
-          <h2 className="text-xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent animate-gradient-text">
-            Daily Message
-          </h2>
         </div>
 
         <div className="space-y-6 p-6 rounded-2xl bg-gradient-to-br from-card/90 to-card/70 backdrop-blur-sm border-2 border-primary/30 shadow-glow">
           {isFallback && (
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-full px-3 py-1 mx-auto w-fit">
-              <span>From {new Date(pepTalk.for_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+              <span>Earlier encouragement · {new Date(pepTalk.for_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
               <Button
                 variant="ghost"
                 size="sm"
@@ -1008,6 +1199,65 @@ export const TodaysPepTalk = memo(() => {
             <p className="text-sm text-muted-foreground leading-relaxed">
               {pepTalk.summary}
             </p>
+          </div>
+
+          <div className="rounded-2xl border border-primary/25 bg-background/65 p-4 text-left shadow-soft backdrop-blur-sm">
+            {thread?.companion_answered_at && thread.focus_label ? (
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/12 text-primary">
+                  <Check className="h-4 w-4" aria-hidden="true" />
+                </span>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
+                    Your Guide receives the path
+                  </p>
+                  <p className="mt-1.5 text-sm font-semibold leading-6 text-foreground">
+                    {thread.focus_label}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-foreground/70">
+                    Your choice with your Companion now connects this encouragement, today’s quest, your next Guide conversation, and tonight’s reflection.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
+                  {mentor?.name ?? pepTalk.mentor_name ?? "Your Guide"} asks
+                </p>
+                <p className="mt-1.5 text-sm font-semibold leading-6 text-foreground">
+                  {dailyGuideQuestion.prompt}
+                </p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-3" role="group" aria-label="Choose today's focus">
+                  {dailyGuideQuestion.options.map((option) => {
+                    const selected = selectedFocusOption?.id === option.id;
+                    return (
+                      <Button
+                        key={option.id}
+                        type="button"
+                        variant={selected ? "default" : "outline"}
+                        size="sm"
+                        className="h-auto min-h-10 whitespace-normal rounded-xl px-3 py-2 leading-4 disabled:opacity-100"
+                        disabled={Boolean(thread?.focus_answered_at) || isThreadUpdating}
+                        aria-pressed={selected}
+                        onClick={() => void handleFocusSelection(option)}
+                      >
+                        {selected ? <Check className="mr-1.5 h-3.5 w-3.5 shrink-0" /> : null}
+                        {option.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+                {thread?.focus_label ? (
+                  <p className="mt-3 text-xs leading-5 text-foreground/70">
+                    Today’s thread is carrying <span className="font-semibold text-foreground">{thread.focus_label}</span> into your quest, Companion, and evening reflection.
+                  </p>
+                ) : (
+                  <p className="mt-3 text-xs leading-5 text-foreground/60">
+                    Choose once and Graceward will carry this focus through the rest of your day.
+                  </p>
+                )}
+              </>
+            )}
           </div>
 
           <audio
@@ -1040,7 +1290,7 @@ export const TodaysPepTalk = memo(() => {
                     ? "bg-gradient-to-br from-accent to-primary shadow-glow-lg scale-110"
                     : "bg-gradient-to-br from-primary to-accent shadow-glow hover:scale-110",
                 )}
-                aria-label={!isAudioReady ? "Loading audio" : isPlaying ? "Pause pep talk" : "Play pep talk"}
+                aria-label={!isAudioReady ? "Loading audio" : isPlaying ? "Pause daily encouragement" : "Play daily encouragement"}
               >
                 {!isAudioReady ? (
                   <Loader2 className="h-8 w-8 animate-spin" />
@@ -1092,6 +1342,16 @@ export const TodaysPepTalk = memo(() => {
             </div>
 
             <div className="space-y-2 p-4 rounded-2xl bg-background/60 backdrop-blur-sm border border-primary/20 shadow-soft">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-foreground/75">
+                  Follow along
+                </p>
+                {isEstimatedTranscript && (
+                  <span className="text-[10px] font-medium text-muted-foreground">
+                    Timing being refined
+                  </span>
+                )}
+              </div>
               {!showFullTranscript ? renderTranscriptPreview() : renderFullTranscript()}
 
               {pepTalk.script && (
@@ -1114,14 +1374,33 @@ export const TodaysPepTalk = memo(() => {
             </div>
           </div>
 
-          <Button
-            variant="outline"
-            size="lg"
-            className="w-full rounded-full border-2 hover:bg-primary/10 hover:scale-105 transition-all shadow-soft"
-            onClick={() => navigate("/pep-talks")}
-          >
-            Browse More Pep Talks
-          </Button>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Button
+              size="lg"
+              className="w-full rounded-full shadow-soft sm:col-span-2"
+              onClick={openGuideConversation}
+            >
+              <MessageCircle className="mr-2 h-4 w-4" />
+              Talk with {mentor?.name ?? pepTalk.mentor_name ?? "your Guide"} about this
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full rounded-full border-2 hover:bg-primary/10 transition-all shadow-soft"
+              onClick={() => navigate(`/pep-talk/${pepTalk.id}`)}
+            >
+              Open Full Player
+            </Button>
+            <Button
+              variant="ghost"
+              size="lg"
+              className="w-full rounded-full bg-background/45 hover:bg-background/70"
+              onClick={() => navigate("/encouragements")}
+            >
+              <History className="mr-2 h-4 w-4" />
+              Past Encouragements
+            </Button>
+          </div>
         </div>
       </div>
     </Card>

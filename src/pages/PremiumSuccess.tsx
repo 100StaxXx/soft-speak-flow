@@ -138,7 +138,7 @@ export default function PremiumSuccess() {
         <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
 
         <h1 className="font-display text-4xl text-foreground mb-3">
-          Welcome to Cosmiq!
+          Welcome to Graceward Plus!
         </h1>
 
         <p className="text-muted-foreground mb-6 text-lg">
@@ -159,7 +159,7 @@ export default function PremiumSuccess() {
             onClick={() => navigate("/")}
             className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground font-medium py-6 rounded-2xl shadow-soft"
           >
-            Start Exploring
+            Return to Today
           </Button>
 
           <Button

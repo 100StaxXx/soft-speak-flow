@@ -99,7 +99,7 @@ serve(async (req) => {
 
             if (!existingNudge) {
               const { data: mentor } = await supabase
-                .from('mentors')
+                .from('graceward_guides')
                 .select('name, tone_description')
                 .eq('id', profile.selected_mentor_id)
                 .maybeSingle()
@@ -206,7 +206,7 @@ IMPORTANT: Stay true to your mentor personality. Don't be preachy or use guilt t
           if (!checkIn) {
             // No morning check-in yet
             const { data: mentor } = await supabase
-              .from('mentors')
+              .from('graceward_guides')
               .select('name, tone_description')
               .eq('id', profile.selected_mentor_id)
               .maybeSingle()
@@ -268,7 +268,7 @@ The user hasn't completed their morning check-in yet (it's now mid-morning). Gen
 
             if (habits && habits.length > 0) {
               const { data: mentor } = await supabase
-                .from('mentors')
+                .from('graceward_guides')
                 .select('name, tone_description')
                 .eq('id', profile.selected_mentor_id)
                 .maybeSingle()
@@ -327,7 +327,7 @@ The user has active habits but hasn't completed any today (it's evening now). Ge
           
           if (!lastActivity || lastActivity < sixHoursAgo) {
             const { data: mentor } = await supabase
-              .from('mentors')
+              .from('graceward_guides')
               .select('name, tone_description')
               .eq('id', profile.selected_mentor_id)
               .maybeSingle()

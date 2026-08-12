@@ -984,7 +984,7 @@ export async function handleGenerateCompanionStatAnalysis(
     const selectedMentorId = (profile as ProfileRow | null)?.selected_mentor_id ?? null;
     if (selectedMentorId) {
       const { data: selectedMentor, error: mentorError } = await supabase
-        .from("mentors")
+        .from("graceward_guides")
         .select("id, name, tone_description, avatar_url, primary_color")
         .eq("id", selectedMentorId)
         .maybeSingle();
@@ -995,7 +995,7 @@ export async function handleGenerateCompanionStatAnalysis(
 
     if (!mentor) {
       const { data: fallbackMentor, error: fallbackMentorError } = await supabase
-        .from("mentors")
+        .from("graceward_guides")
         .select("id, name, tone_description, avatar_url, primary_color")
         .limit(1)
         .maybeSingle();

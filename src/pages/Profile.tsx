@@ -177,7 +177,7 @@ const Profile = () => {
     staleTime: 10 * 60 * 1000, // 10 minutes - mentors rarely change
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("mentors")
+        .from("graceward_guides")
         .select("id, name, slug, avatar_url, is_active")
         .eq("is_active", true)
         .order("name");
@@ -205,7 +205,7 @@ const Profile = () => {
       }
       
       const { data, error } = await supabase
-        .from("mentors")
+        .from("graceward_guides")
         .select("*")
         .eq("id", resolvedMentorId)
         .maybeSingle();

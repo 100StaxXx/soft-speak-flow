@@ -54,8 +54,8 @@ export const CompanionAccessibilitySettings = memo(() => {
       toast({
         title: "Preference Updated",
         description: checked
-          ? "Quest cards will use a clearer backing"
-          : "Quest cards will use the original style",
+          ? "Action cards will use a clearer backing"
+          : "Action cards will use the original style",
       });
     } catch (error) {
       console.error("Error updating readable quest cards preference:", error);
@@ -103,7 +103,7 @@ export const CompanionAccessibilitySettings = memo(() => {
               Readable quest cards
             </Label>
             <p className="text-xs text-muted-foreground">
-              Uses a clearer backing for today's agenda and the desktop week planner.
+              Uses a clearer backing for today’s quest and Companion story choices.
             </p>
           </div>
           <Switch

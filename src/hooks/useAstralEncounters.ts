@@ -396,7 +396,7 @@ export const useAstralEncounters = () => {
               });
               throwIfSupabaseError(rewardInsertError, 'Failed to award epic reward');
               
-              toast.success(`🎁 New Loot: ${selectedReward.name}!`, {
+              toast.success(`🎁 New Keepsake: ${selectedReward.name}!`, {
                 description: selectedReward.description,
               });
             }

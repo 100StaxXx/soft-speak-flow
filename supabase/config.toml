@@ -4,8 +4,12 @@ project_id = "opbfpbbqvuksuvmtmssd"
 project_id = "opbfpbbqvuksuvmtmssd"
 
 [remotes.production.auth]
-site_url = "https://app.cosmiq.quest"
+site_url = "https://graceward.app"
 additional_redirect_urls = [
+  "https://graceward.app",
+  "https://graceward.app/",
+  "https://graceward.app/auth",
+  "https://graceward.app/auth/reset-password",
   "https://app.cosmiq.quest",
   "https://app.cosmiq.quest/",
   "https://app.cosmiq.quest/auth",
@@ -254,6 +258,9 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.generate-evening-response]
+verify_jwt = true
+
+[functions.generate-daily-formation]
 verify_jwt = true
 
 [functions.generate-weekly-recap]

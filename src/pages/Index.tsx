@@ -82,8 +82,8 @@ const DesktopMentorStateCard = ({
     className={cn(
       "rounded-2xl border p-4 shadow-[0_10px_30px_rgba(0,0,0,0.16)] backdrop-blur-xl",
       variant === "destructive"
-        ? "border-destructive/45 bg-card/22"
-        : "border-primary/35 bg-card/18",
+        ? "border-destructive/45 bg-card/[0.22]"
+        : "border-primary/35 bg-card/[0.18]",
     )}
   >
     <div className="space-y-3">
@@ -112,7 +112,7 @@ const DesktopMentorQuoteCard = ({
   }
 
   return (
-    <div className="rounded-[28px] border border-border/60 bg-card/18 p-6 shadow-[0_18px_40px_rgba(0,0,0,0.18)] backdrop-blur-2xl">
+    <div className="rounded-[28px] border border-border/60 bg-card/[0.18] p-6 shadow-[0_18px_40px_rgba(0,0,0,0.18)] backdrop-blur-2xl">
       <div className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground/75">
         <Sparkles className="h-4 w-4 text-primary" />
         Quote of the day
@@ -222,7 +222,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
       if (!effectiveMentorId) return null;
 
       const { data: mentorData, error: mentorError } = await supabase
-        .from("mentors")
+        .from("graceward_guides")
         .select("avatar_url, name, slug")
         .eq("id", effectiveMentorId)
         .maybeSingle();
@@ -290,7 +290,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
       getOnboardingGateState({
         profile,
         hasCompanion: Boolean(companion),
-        hasPresetCompanion: Boolean(companion?.preset_id),
+        hasPresetCompanion: companion?.product_mode === "cosmiq" || Boolean(companion?.preset_id),
         companionStage: companion?.current_stage ?? null,
         hasCompanionImages: Boolean(companion?.current_image_url || companion?.initial_image_url),
       }),
@@ -393,7 +393,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     const patch = buildEstablishedProfileSelfHealPatch({
       profile,
       hasCompanion: Boolean(companion),
-      hasPresetCompanion: Boolean(companion?.preset_id),
+      hasPresetCompanion: companion?.product_mode === "cosmiq" || Boolean(companion?.preset_id),
       companionStage: companion?.current_stage ?? null,
       hasCompanionImages: Boolean(companion?.current_image_url || companion?.initial_image_url),
     });
@@ -529,7 +529,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
       data-testid="mentor-mobile-layout"
     >
       {mentorConnectionIssue && (
-        <div className="mx-4 sm:mx-6 rounded-2xl border border-destructive/45 bg-card/16 backdrop-blur-2xl p-4 sm:p-5 shadow-[0_8px_30px_rgba(0,0,0,0.18)]">
+        <div className="mx-4 sm:mx-6 rounded-2xl border border-destructive/45 bg-card/[0.16] backdrop-blur-2xl p-4 sm:p-5 shadow-[0_8px_30px_rgba(0,0,0,0.18)]">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h2 className="text-base sm:text-lg font-bold">Guide temporarily unavailable</h2>
@@ -549,7 +549,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
       )}
 
       {mentorConnectionMissing && (
-        <div className="mx-4 sm:mx-6 rounded-2xl border border-primary/35 bg-card/16 backdrop-blur-2xl p-4 sm:p-5 shadow-[0_8px_30px_rgba(0,0,0,0.18)]">
+        <div className="mx-4 sm:mx-6 rounded-2xl border border-primary/35 bg-card/[0.16] backdrop-blur-2xl p-4 sm:p-5 shadow-[0_8px_30px_rgba(0,0,0,0.18)]">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h2 className="text-base sm:text-lg font-bold">Guide connection lost</h2>
@@ -642,7 +642,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
           className="space-y-6 lg:sticky"
           style={{ top: "calc(env(safe-area-inset-top, 0px) + 96px)" }}
         >
-          <div className="overflow-hidden rounded-[30px] border border-border/60 bg-card/18 shadow-[0_24px_60px_rgba(0,0,0,0.22)] backdrop-blur-2xl">
+          <div className="overflow-hidden rounded-[30px] border border-border/60 bg-card/[0.18] shadow-[0_24px_60px_rgba(0,0,0,0.22)] backdrop-blur-2xl">
             <div className="relative aspect-[4/5] overflow-hidden border-b border-border/40">
               {mentorImage ? (
                 <>
@@ -653,7 +653,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
                     loading="eager"
                     decoding="async"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-background/38 via-background/12 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-background/38 via-background/[0.12] to-transparent" />
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.24),transparent_55%)]" />
                 </>
               ) : (
@@ -676,8 +676,8 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
             </div>
 
             <div className="space-y-4 p-6">
-              <div className="flex items-start gap-3 rounded-2xl border border-border/50 bg-background/22 p-4">
-                <div className="rounded-full bg-primary/12 p-2 text-primary">
+              <div className="flex items-start gap-3 rounded-2xl border border-border/50 bg-background/[0.22] p-4">
+                <div className="rounded-full bg-primary/[0.12] p-2 text-primary">
                   <Sparkles className="h-4 w-4" />
                 </div>
                 <div className="space-y-1">

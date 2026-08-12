@@ -30,12 +30,6 @@ const timeOptions = [
   { value: "08:00", label: "8:00 AM" },
   { value: "09:00", label: "9:00 AM" },
   { value: "10:00", label: "10:00 AM" },
-  { value: "12:00", label: "12:00 PM" },
-  { value: "14:00", label: "2:00 PM" },
-  { value: "16:00", label: "4:00 PM" },
-  { value: "18:00", label: "6:00 PM" },
-  { value: "19:00", label: "7:00 PM" },
-  { value: "20:00", label: "8:00 PM" },
 ];
 
 type QueueDebugRow = Pick<
@@ -55,14 +49,8 @@ type NotificationProfileUpdates = Partial<Pick<
   Profile,
   | "daily_push_enabled"
   | "daily_push_time"
-  | "daily_quote_push_enabled"
-  | "daily_quote_push_time"
-  | "habit_reminders_enabled"
-  | "task_reminders_enabled"
   | "checkin_reminders_enabled"
 >>;
-
-type NotificationTimeField = "daily_push_time" | "daily_quote_push_time";
 
 const RECENT_QUEUE_LIMIT = 12;
 const QUEST_NOTIFICATION_TYPES = new Set([
@@ -179,7 +167,6 @@ export const PushNotificationSettings = memo(() => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [pushEnabled, setPushEnabled] = useState(false);
-  const [pushStatusLoaded, setPushStatusLoaded] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
 
   // Check platform support after mount
@@ -188,14 +175,24 @@ export const PushNotificationSettings = memo(() => {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
     if (user) {
-      hasActiveNativePushSubscription(user.id).then((value) => {
-        setPushEnabled(value);
-        setPushStatusLoaded(true);
-      });
-    } else {
-      setPushStatusLoaded(true);
+      void hasActiveNativePushSubscription(user.id)
+        .then((value) => {
+          if (cancelled) return;
+          setPushEnabled(value);
+        })
+        .catch((error) => {
+          console.warn("Could not read the current push subscription:", error);
+          if (cancelled) return;
+          setPushEnabled(false);
+        });
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
   const persistProfileUpdates = async (updates: NotificationProfileUpdates) => {
@@ -252,7 +249,7 @@ export const PushNotificationSettings = memo(() => {
     if (enabled && !pushEnabled) {
       toast({ 
         title: "Enable push notifications first", 
-        description: "Please enable mobile push notifications before activating daily pep talks",
+        description: "Please enable mobile push notifications before activating daily encouragement",
         variant: "destructive" 
       });
       return;
@@ -260,73 +257,15 @@ export const PushNotificationSettings = memo(() => {
     
     try {
       await persistProfileUpdates({ daily_push_enabled: enabled });
-      toast({ title: enabled ? "Daily Push Enabled" : "Daily Push Disabled", description: "Settings updated successfully" });
-    } catch (error) {
-      console.error("Error toggling pep talk:", error);
-      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to toggle pep talk", variant: "destructive" });
-    }
-  };
-
-  const handleToggleQuote = async (enabled: boolean) => {
-    if (!user) return;
-    
-    if (enabled && !pushEnabled) {
-      toast({ 
-        title: "Enable push notifications first", 
-        description: "Please enable mobile push notifications before activating daily quotes",
-        variant: "destructive" 
+      toast({
+        title: enabled ? "Daily Encouragement Enabled" : "Daily Encouragement Disabled",
+        description: enabled
+          ? "Your Guide’s encouragement will arrive at the time you choose."
+          : "Daily encouragement reminders are now off.",
       });
-      return;
-    }
-    
-    try {
-      await persistProfileUpdates({ daily_quote_push_enabled: enabled });
-      toast({ title: enabled ? "Quote Push Enabled" : "Quote Push Disabled", description: "Settings updated successfully" });
     } catch (error) {
-      console.error("Error toggling quote push:", error);
-      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to toggle quote push", variant: "destructive" });
-    }
-  };
-
-  const handleToggleHabitReminders = async (enabled: boolean) => {
-    if (!user) return;
-    
-    if (enabled && !pushEnabled) {
-      toast({ 
-        title: "Enable push notifications first", 
-        description: "Please enable mobile push notifications before activating habit reminders",
-        variant: "destructive" 
-      });
-      return;
-    }
-    
-    try {
-      await persistProfileUpdates({ habit_reminders_enabled: enabled });
-      toast({ title: enabled ? "Habit Reminders Enabled" : "Habit Reminders Disabled", description: "Settings updated successfully" });
-    } catch (error) {
-      console.error("Error toggling habit reminders:", error);
-      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to toggle habit reminders", variant: "destructive" });
-    }
-  };
-
-  const handleToggleTaskReminders = async (enabled: boolean) => {
-    if (!user) return;
-    
-    if (enabled && !pushEnabled) {
-      toast({ 
-        title: "Enable push notifications first", 
-        description: "Please enable mobile push notifications before activating quest reminders",
-        variant: "destructive" 
-      });
-      return;
-    }
-    
-    try {
-      await persistProfileUpdates({ task_reminders_enabled: enabled });
-      toast({ title: enabled ? "Quest Reminders Enabled" : "Quest Reminders Disabled", description: "Settings updated successfully" });
-    } catch (error) {
-      console.error("Error toggling task reminders:", error);
-      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to toggle task reminders", variant: "destructive" });
+      console.error("Error toggling daily encouragement:", error);
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to update daily encouragement", variant: "destructive" });
     }
   };
 
@@ -344,21 +283,22 @@ export const PushNotificationSettings = memo(() => {
 
     try {
       await persistProfileUpdates({ checkin_reminders_enabled: enabled });
-      toast({ title: enabled ? "Check-In Reminders Enabled" : "Check-In Reminders Disabled", description: "Settings updated successfully" });
+      toast({
+        title: enabled ? "Evening Reflection Enabled" : "Evening Reflection Disabled",
+        description: enabled
+          ? "Graceward will invite you to reflect and release the day around 8 PM."
+          : "Evening Reflection reminders are now off.",
+      });
     } catch (error) {
       console.error("Error toggling check-in reminders:", error);
       toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to toggle check-in reminders", variant: "destructive" });
     }
   };
 
-  const handleUpdateTime = async (field: NotificationTimeField, value: string) => {
+  const handleUpdateTime = async (value: string) => {
     if (!user) return;
     try {
-      await persistProfileUpdates(
-        field === "daily_push_time"
-          ? { daily_push_time: value }
-          : { daily_quote_push_time: value },
-      );
+      await persistProfileUpdates({ daily_push_time: value });
       toast({ title: "Time Updated", description: "Your push notification time has been updated" });
     } catch (error) {
       console.error("Error updating time:", error);
@@ -372,10 +312,10 @@ export const PushNotificationSettings = memo(() => {
         <div className="bg-accent/20 p-2 rounded-xl">
           <Bell className="h-5 w-5 text-foreground" />
         </div>
-        <h2 className="font-display text-2xl text-foreground">Mobile Push Notifications</h2>
+        <h2 className="font-display text-2xl text-foreground">Daily Delivery</h2>
       </div>
       <p className="text-muted-foreground text-sm mb-6">
-        Get quest reminders, pep talks, and quotes delivered to your iPhone or iPad.
+        Let Graceward bring the day to you: one morning package and, if you want it, one evening invitation.
       </p>
 
       {!isSupported && (
@@ -393,7 +333,7 @@ export const PushNotificationSettings = memo(() => {
           <div className="space-y-3 pb-4 border-b border-border">
             <div className="flex items-center justify-between">
               <div>
-                <Label className="text-foreground font-medium">Mobile Push Access</Label>
+                <Label className="text-foreground font-medium">Allow Notifications</Label>
                 <p className="text-xs text-muted-foreground mt-1">
                   Allow this iPhone or iPad to receive push notifications
                 </p>
@@ -405,13 +345,13 @@ export const PushNotificationSettings = memo(() => {
             </div>
           </div>
         )}
-        {/* Daily Pep Talk */}
+        {/* Morning Daily Grace */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <Label className="text-foreground font-medium">Daily Pep Talk</Label>
+              <Label className="text-foreground font-medium">Morning Daily Grace</Label>
               <p className="text-xs text-muted-foreground mt-1">
-                Personalized motivation from your guide
+                Scripture, prayer, your Guide’s audio encouragement, and one ready-made daily practice
               </p>
             </div>
             <Switch
@@ -426,7 +366,7 @@ export const PushNotificationSettings = memo(() => {
               <Label className="text-sm text-muted-foreground">Delivery Time</Label>
               <Select
                 value={normalizeTimeSelectValue(profile.daily_push_time, "08:00")}
-                onValueChange={(value) => handleUpdateTime("daily_push_time", value)}
+                onValueChange={handleUpdateTime}
               >
                 <SelectTrigger className="w-full bg-background">
                   <SelectValue />
@@ -459,94 +399,13 @@ export const PushNotificationSettings = memo(() => {
           </div>
         )}
 
-        {/* Daily Quote */}
+        {/* Evening Reflection */}
         <div className="space-y-3 pt-4 border-t border-border">
           <div className="flex items-center justify-between">
             <div>
-              <Label className="text-foreground font-medium">Daily Quote</Label>
+              <Label className="text-foreground font-medium">Evening Reflection</Label>
               <p className="text-xs text-muted-foreground mt-1">
-                Inspiring quotes for your day
-              </p>
-            </div>
-            <Switch
-              checked={profile?.daily_quote_push_enabled ?? false}
-              onCheckedChange={handleToggleQuote}
-              disabled={!pushEnabled}
-            />
-          </div>
-          
-          {profile?.daily_quote_push_enabled && (
-            <div className="ml-0 space-y-2">
-              <Label className="text-sm text-muted-foreground">Delivery Time</Label>
-              <Select
-                value={normalizeTimeSelectValue(profile.daily_quote_push_time, "14:00")}
-                onValueChange={(value) => handleUpdateTime("daily_quote_push_time", value)}
-              >
-                <SelectTrigger className="w-full bg-background">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-card border-border">
-                  {timeOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-        </div>
-
-        {/* Star Path Habit Reminders */}
-        <div className="space-y-3 pt-4 border-t border-border">
-          <div className="flex items-center justify-between">
-            <div>
-              <Label className="text-foreground font-medium">Star Path Habit Reminders</Label>
-              <p className="text-xs text-muted-foreground mt-1">
-                Get notified when your habits are due
-              </p>
-            </div>
-            <Switch
-              checked={profile?.habit_reminders_enabled ?? true}
-              onCheckedChange={handleToggleHabitReminders}
-              disabled={!pushEnabled}
-            />
-          </div>
-        </div>
-
-        {/* Quest Reminders */}
-        <div className="space-y-3 pt-4 border-t border-border">
-          <div className="flex items-center justify-between">
-            <div>
-              <Label className="text-foreground font-medium">Quest Reminders</Label>
-              <p className="text-xs text-muted-foreground mt-1">
-                Get notified before scheduled quests, when they start, and if a
-                planned block goes past its time
-              </p>
-            </div>
-            <Switch
-              checked={profile?.task_reminders_enabled ?? true}
-              onCheckedChange={handleToggleTaskReminders}
-              disabled={!pushEnabled}
-            />
-          </div>
-          {pushStatusLoaded && (profile?.task_reminders_enabled ?? true) && !pushEnabled && (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                Quest reminders are enabled, but this device is not registered for mobile push yet. Turn on Mobile Push Access above, then use Test Registration below if a token still does not appear.
-              </AlertDescription>
-            </Alert>
-          )}
-        </div>
-
-        {/* Morning + Evening Check-In Reminders */}
-        <div className="space-y-3 pt-4 border-t border-border">
-          <div className="flex items-center justify-between">
-            <div>
-              <Label className="text-foreground font-medium">Check-In Reminders</Label>
-              <p className="text-xs text-muted-foreground mt-1">
-                Morning and evening reminders at variable times
+                One invitation around 8 PM to notice grace and release the day
               </p>
             </div>
             <Switch
@@ -558,14 +417,14 @@ export const PushNotificationSettings = memo(() => {
         </div>
 
         {/* Notification Preview */}
-        {pushEnabled && (profile?.daily_push_enabled || profile?.daily_quote_push_enabled) && (
+        {pushEnabled && profile?.daily_push_enabled && (
           <div className="pt-6 mt-6 border-t border-border">
             <NotificationPreview />
           </div>
         )}
 
         {/* Debug Panel */}
-        <PushDebugPanel userId={user?.id} />
+        {import.meta.env.DEV ? <PushDebugPanel userId={user?.id} /> : null}
       </div>
     </Card>
   );
@@ -940,7 +799,7 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
 
             <div className="space-y-2 pt-3 border-t border-border">
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Recent Quest Queue Rows</span>
+                <span className="text-muted-foreground">Recent action queue rows</span>
                 <span className="text-foreground">{debugInfo.recentQuestRows.length}</span>
               </div>
 

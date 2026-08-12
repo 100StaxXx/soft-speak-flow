@@ -32,7 +32,7 @@ describe("StoryPrologue", () => {
 
     render(<StoryPrologue onComplete={onComplete} />);
 
-    const button = screen.getByRole("button", { name: /begin my journey/i });
+    const button = screen.getByRole("button", { name: /begin my path/i });
     expect(button).toBeDisabled();
 
     fireEvent.change(screen.getByPlaceholderText(/enter your name/i), {
@@ -49,9 +49,9 @@ describe("StoryPrologue", () => {
     fireEvent.change(screen.getByPlaceholderText(/enter your name/i), {
       target: { value: "  Nova  " },
     });
-    expect(screen.getByRole("button", { name: /begin my journey/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /begin my path/i })).toBeEnabled();
 
-    fireEvent.click(screen.getByRole("button", { name: /begin my journey/i }));
+    fireEvent.click(screen.getByRole("button", { name: /begin my path/i }));
     expect(onComplete).toHaveBeenCalledWith("Nova");
   });
 });

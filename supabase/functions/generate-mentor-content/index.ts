@@ -58,7 +58,7 @@ serve(async (req) => {
 
     // Get mentor details
     const { data: mentor, error: mentorError } = await supabase
-      .from("mentors")
+      .from("graceward_guides")
       .select("*")
       .eq("id", mentorId)
       .single();

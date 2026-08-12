@@ -21,7 +21,7 @@ import { useCompanionModeSettings } from "./useCompanionModeSettings";
 
 const MIN_DIALOGUE_REFRESH_INTERVAL_MS = 90 * 1000;
 const PASSIVE_DIALOGUE_REFRESH_MS = 35 * 60 * 1000;
-const DEFAULT_GREETING = "Hot take from the voice in your ear: one focused move fixes half this mess, you beautiful little disaster.";
+const DEFAULT_GREETING = "I'm here. What's on your heart today?";
 
 type DialogueEventState = {
   greeting: string;

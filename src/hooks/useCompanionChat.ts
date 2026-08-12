@@ -24,6 +24,7 @@ import { isCompanionChatSetupError } from "@/utils/companionChatSetup";
 import { resolveCompanionChatError } from "@/utils/companionChatErrors";
 import { parseFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
 import { safeLocalStorage } from "@/utils/storage";
+import { formatCurrentDateTimeWithOffset } from "@/utils/currentDateTime";
 
 const SPOKEN_REPLY_COUNT_KEY = "companion-chat-spoken-replies-v1";
 const MAX_HISTORY_MESSAGES = 8;
@@ -287,6 +288,7 @@ export function useCompanionChat({ enabled = true }: UseCompanionChatOptions = {
     setMessages((previous) => [...previous, optimisticUserMessage]);
 
     try {
+      const currentDateTime = formatCurrentDateTimeWithOffset(new Date());
       const { data, error } = await supabase.functions.invoke("companion-chat", {
         body: {
           message,
@@ -297,6 +299,8 @@ export function useCompanionChat({ enabled = true }: UseCompanionChatOptions = {
           companionId: companion.id,
           inputMode,
           sessionId: sessionIdRef.current,
+          currentDate: currentDateTime.slice(0, 10),
+          currentDateTime,
         } satisfies CompanionChatRequest,
       });
 

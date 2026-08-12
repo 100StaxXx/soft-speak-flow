@@ -11,6 +11,14 @@ describe("parseDeepLink", () => {
     });
   });
 
+  it.each(["graceward://today", "cosmiq://today"])("parses Today widget deep links from %s", (url) => {
+    expect(parseDeepLink(url)).toEqual({
+      type: "today",
+      path: "/mentor",
+      rawUrl: url,
+    });
+  });
+
   it("parses calendar oauth callback deep links", () => {
     const parsed = parseDeepLink(
       "cosmiq://calendar/oauth/callback?provider=google&status=error&message=OAuth%20failed",

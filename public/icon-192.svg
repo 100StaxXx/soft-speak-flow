@@ -1,12 +1,7 @@
-<svg width="192" height="192" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cosmiq logo">
-  <defs>
-    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#7c3aed" />
-      <stop offset="100%" stop-color="#22d3ee" />
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="104" fill="#09090b" />
-  <circle cx="256" cy="256" r="168" fill="url(#g)" opacity="0.9" />
-  <path d="M256 152c-56 0-104 40-104 104 0 64 48 104 104 104 56 0 104-40 104-104 0-64-48-104-104-104zm0 64c24 0 40 16 40 40s-16 40-40 40-40-16-40-40 16-40 40-40z" fill="#0f172a" />
-  <path d="M240 232c0-24 16-40 40-40-24 0-40 16-40 40v48c0 24 16 40 40 40-24 0-40-16-40-40z" fill="#e2e8f0" opacity="0.9" />
+<svg width="192" height="192" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Graceward logo">
+  <rect width="512" height="512" fill="#2f5938"/>
+  <circle cx="256" cy="180" r="112" fill="#d7bd7b" opacity="0.2"/>
+  <path d="M151 512c38-88 75-143 111-188 18-23 28-48 30-75h54c-3 43-17 80-42 111-28 35-53 75-73 132H151Z" fill="#f8f4e8"/>
+  <rect x="235" y="82" width="42" height="176" rx="20" fill="#d7bd7b"/>
+  <rect x="177" y="133" width="158" height="42" rx="20" fill="#d7bd7b"/>
 </svg>

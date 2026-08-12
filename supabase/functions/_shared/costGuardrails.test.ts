@@ -76,6 +76,21 @@ Deno.test("getOpenAITextTokenRatesPerThousand routes GPT-5.5 to documented text 
   });
 });
 
+Deno.test("getOpenAITextTokenRatesPerThousand routes the GPT-5.6 family to documented text rates", () => {
+  assertEquals(getOpenAITextTokenRatesPerThousand("gpt-5.6-luna"), {
+    inputRate: 0.001,
+    outputRate: 0.006,
+  });
+  assertEquals(getOpenAITextTokenRatesPerThousand("gpt-5.6-terra"), {
+    inputRate: 0.0025,
+    outputRate: 0.015,
+  });
+  assertEquals(getOpenAITextTokenRatesPerThousand("gpt-5.6-sol"), {
+    inputRate: 0.005,
+    outputRate: 0.03,
+  });
+});
+
 Deno.test("getOpenAITextTokenRatesPerThousand routes GPT-5.5 pro before base GPT-5.5", () => {
   assertEquals(getOpenAITextTokenRatesPerThousand("gpt-5.5-pro"), {
     inputRate: 0.03,

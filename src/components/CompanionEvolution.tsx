@@ -81,17 +81,11 @@ const HATCH_FOREGROUND_STAGE_MAX_HEIGHT_PX = 700;
 const HATCH_FOREGROUND_STAGE_FALLBACK_ASPECT_RATIO = 1764 / 1172;
 const STROBE_BEAT_OFFSETS_MS = [
   0,
-  350,
-  685,
-  1005,
-  1305,
-  1585,
-  1845,
-  2085,
-  2305,
-  2495,
-  2660,
-  2800,
+  520,
+  1040,
+  1560,
+  2080,
+  2600,
 ] as const;
 const STROBE_PULSE_INTERVAL = 4;
 const LAST_STROBE_BEAT_INDEX = STROBE_BEAT_OFFSETS_MS.length - 1;
@@ -307,6 +301,86 @@ const HatchingOverlay = ({
           </div>
         </>
       )}
+    </div>
+  );
+};
+
+const EvolutionLightningStrike = ({
+  phase,
+  strobeBeatIndex,
+  flashCore,
+  flashGlow,
+}: {
+  phase: EvolutionPhase;
+  strobeBeatIndex: number | null;
+  flashCore: string;
+  flashGlow: string;
+}) => {
+  if (phase !== "apex") return null;
+
+  const beatIndex = strobeBeatIndex ?? 0;
+  const intensity = 1;
+
+  return (
+    <div
+      className="evo-lightning-strike evo-lightning-strike--apex absolute inset-0 z-[18] overflow-hidden pointer-events-none"
+      data-testid="evolution-lightning-strike"
+      data-apex="true"
+      data-strobe-beat={String(beatIndex)}
+      data-variant="apex"
+      style={{
+        ["--evo-lightning-core" as string]: flashCore,
+        ["--evo-lightning-glow" as string]: flashGlow,
+        ["--evo-lightning-strength" as string]: intensity.toFixed(3),
+        ["--evo-lightning-bolt-soft" as string]: (intensity * 0.28).toFixed(3),
+        ["--evo-lightning-branch-peak" as string]: (intensity * 0.82).toFixed(3),
+        ["--evo-lightning-flash-peak" as string]: (intensity * 0.74).toFixed(3),
+        ["--evo-lightning-flash-soft" as string]: (intensity * 0.08).toFixed(3),
+        ["--evo-lightning-vignette-peak" as string]: (intensity * 0.7).toFixed(3),
+        ["--evo-lightning-vignette-soft" as string]: (intensity * 0.28).toFixed(3),
+      }}
+      aria-hidden="true"
+    >
+      <div className="evo-lightning-strike__flash absolute inset-0" />
+      <div className="evo-lightning-strike__vignette absolute inset-0" />
+
+      <svg
+        className="evo-lightning-strike__svg absolute inset-0 h-full w-full"
+        viewBox="0 0 1000 1000"
+        preserveAspectRatio="none"
+      >
+        <path
+          className="evo-lightning-strike__bolt evo-lightning-strike__bolt--glow"
+          d="M528 -40 L475 126 L535 122 L446 278 L516 258 L425 446 L501 407 L438 601 L500 553 L468 818"
+          pathLength="1"
+        />
+        <path
+          className="evo-lightning-strike__bolt evo-lightning-strike__bolt--core"
+          d="M528 -40 L475 126 L535 122 L446 278 L516 258 L425 446 L501 407 L438 601 L500 553 L468 818"
+          pathLength="1"
+        />
+        <path
+          className="evo-lightning-strike__branch evo-lightning-strike__branch--left"
+          d="M467 279 L371 342 L414 354 L330 441"
+          pathLength="1"
+        />
+        <path
+          className="evo-lightning-strike__branch evo-lightning-strike__branch--right"
+          d="M453 448 L572 500 L536 528 L642 603"
+          pathLength="1"
+        />
+        <path
+          className="evo-lightning-strike__branch evo-lightning-strike__branch--crown"
+          d="M494 126 L390 176 L422 201 L344 267 M505 124 L603 176 L570 201 L655 266"
+          pathLength="1"
+        />
+      </svg>
+
+      <div className="evo-lightning-strike__impact absolute left-1/2 top-[80%]">
+        <span className="evo-lightning-strike__impact-core absolute" />
+        <span className="evo-lightning-strike__impact-ring absolute" />
+        <span className="evo-lightning-strike__impact-ring evo-lightning-strike__impact-ring--late absolute" />
+      </div>
     </div>
   );
 };
@@ -1009,6 +1083,15 @@ const CompanionEvolutionContent = ({
             </>
           )}
 
+          {silhouetteStrobeEnabled && phase === "apex" && (
+            <EvolutionLightningStrike
+              phase={phase}
+              strobeBeatIndex={strobeBeatIndex}
+              flashCore={theme.flashCore}
+              flashGlow={theme.flashGlow}
+            />
+          )}
+
           {!prefersReducedMotion && (phase === "reveal" || phase === "settle") && (
             <motion.div
               className="absolute inset-0 pointer-events-none evo-glow"
@@ -1068,7 +1151,7 @@ const CompanionEvolutionContent = ({
               />
               <div className="relative flex h-full w-full items-center justify-center px-4 py-10 sm:px-6">
                 <div
-                  className="relative overflow-hidden rounded-[2rem] border border-white/12 bg-black/20 shadow-[0_0_48px_rgba(0,0,0,0.45)] backdrop-blur-[2px]"
+                  className="relative overflow-hidden rounded-[2rem] border border-white/[0.12] bg-black/20 shadow-[0_0_48px_rgba(0,0,0,0.45)] backdrop-blur-[2px]"
                   data-testid="evolution-hatch-video-stage"
                   style={{
                     width: hatchVideoStageWidth,
@@ -1255,9 +1338,15 @@ const CompanionEvolutionContent = ({
                           ? 0.02
                         : phase === "strobe"
                             ? strobeTarget === "previous"
-                              ? 0.92
-                              : 0.18
+                              ? 0.98
+                              : 0.04
                             : 1,
+                      x: phase === "strobe"
+                        ? strobeTarget === "previous" ? -2 : -8
+                        : 0,
+                      rotate: phase === "strobe"
+                        ? strobeTarget === "previous" ? -0.35 : -1.1
+                        : 0,
                       scale: phase === "hold"
                         ? 1
                         : phase === "charge"
@@ -1275,8 +1364,8 @@ const CompanionEvolutionContent = ({
                         ? "brightness(0) saturate(0) contrast(1.48) blur(4px)"
                         : phase === "strobe"
                           ? strobeTarget === "previous"
-                            ? "brightness(0) saturate(0) contrast(1.62) blur(4px)"
-                            : "brightness(0) saturate(0) contrast(1.82) blur(8px)"
+                            ? `brightness(0) saturate(0) contrast(2.15) blur(0.6px) drop-shadow(0 0 10px ${theme.flashGlow})`
+                            : "brightness(0) saturate(0) contrast(1.9) blur(7px)"
                           : phase === "apex"
                             ? "brightness(0) saturate(0) contrast(2) blur(10px)"
                         : phase === "charge"
@@ -1319,9 +1408,15 @@ const CompanionEvolutionContent = ({
                             ? 0.28
                             : phase === "strobe"
                               ? strobeTarget === "next"
-                                ? 0.92
-                                : 0.18
+                                ? 0.98
+                                : 0.04
                               : 0,
+                        x: phase === "strobe"
+                          ? strobeTarget === "next" ? 2 : 8
+                          : 0,
+                        rotate: phase === "strobe"
+                          ? strobeTarget === "next" ? 0.35 : 1.1
+                          : 0,
                         scale: phase === "strobe"
                           ? strobeTarget === "next"
                             ? 1.11 + strobeProgress * 0.02
@@ -1341,8 +1436,8 @@ const CompanionEvolutionContent = ({
                               ? "brightness(0) saturate(0) contrast(1.8) blur(6px)"
                               : phase === "strobe"
                                 ? strobeTarget === "next"
-                                  ? "brightness(0) saturate(0) contrast(1.64) blur(4px)"
-                                  : "brightness(0) saturate(0) contrast(1.84) blur(8px)"
+                                  ? `brightness(0) saturate(0) contrast(2.15) blur(0.6px) drop-shadow(0 0 10px ${theme.flashGlow})`
+                                  : "brightness(0) saturate(0) contrast(1.9) blur(7px)"
                                 : "brightness(0) saturate(0) contrast(1.7) blur(10px)",
                       }
                       : {

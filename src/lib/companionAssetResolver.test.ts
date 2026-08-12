@@ -172,7 +172,7 @@ describe("companion asset resolver", () => {
     );
   });
 
-  it("keeps full-coverage presets on the shared egg art before hatch", () => {
+  it("keeps preset-backed companions on the shared egg art before hatch", () => {
     expect(
       getPresetCompanionAssetUrl({
         presetId: "dragon",
@@ -197,7 +197,7 @@ describe("companion asset resolver", () => {
     expect(getPublicUrlMock).not.toHaveBeenCalled();
   });
 
-  it("preserves higher-tier remote coverage for existing remote presets", () => {
+  it("does not invent higher-tier remote coverage before those files exist", () => {
     expect(
       getPresetCompanionAssetUrl({
         presetId: "dragon",
@@ -205,12 +205,42 @@ describe("companion asset resolver", () => {
         element: "storm",
         state: "dormant",
       }),
+    ).toBeNull();
+  });
+
+  it("keeps an unsupported legacy companion on its last approved later-stage portrait", () => {
+    expect(
+      resolveCompanionVisualAssetUrl({
+        preset_id: "dragon",
+        spirit_animal: "Dragon",
+        current_stage: 21,
+        core_element: "storm",
+        current_image_url: "https://example.com/approved-dragon-stage-5.png",
+      }),
+    ).toBe("https://example.com/approved-dragon-stage-5.png");
+  });
+
+  it("keeps bundled canonical later-stage URLs local when normalizing stored values", () => {
+    const url = "/companion-presets/phoenix/t6_mythic/normal/phoenix__t6_mythic__normal__nature.png";
+    expect(normalizeCompanionStoredImageUrl(url)).toBe(url);
+    expect(getPublicUrlMock).not.toHaveBeenCalled();
+  });
+
+  it("uses canonical Cosmiq stage art for a legacy Kitsune without a preset id", () => {
+    expect(
+      resolveCompanionVisualAssetUrl({
+        preset_id: null,
+        spirit_animal: "Kitsune",
+        current_stage: 36,
+        core_element: "nature",
+        current_image_url: "https://example.com/old-generated-kitsune.png",
+      }),
     ).toBe(
-      "https://example.supabase.co/storage/v1/object/public/companion-presets/dragon/t3_champion/dormant/dragon__t3_champion__dormant__storm.png",
+      "/companion-presets/fox/t5_champion/normal/fox__t5_champion__normal__nature.png",
     );
   });
 
-  it("resolves bundled hatchling expressive art from the public companion preset pack", () => {
+  it("does not resolve missing bundled hatchling expressive art", () => {
     expect(
       getPresetCompanionExpressiveAssetUrl({
         presetId: "griffin",
@@ -219,13 +249,11 @@ describe("companion asset resolver", () => {
         mood: "happy",
         variant: 3,
       }),
-    ).toBe(
-      "/companion-presets/griffin/t1_youth/happy/griffin__t1_youth__happy__v3__fire.png",
-    );
+    ).toBeNull();
     expect(getPublicUrlMock).not.toHaveBeenCalled();
   });
 
-  it("resolves remote initiate expressive art for active preset tiers", () => {
+  it("does not resolve missing remote initiate expressive art", () => {
     expect(
       getPresetCompanionExpressiveAssetUrl({
         presetId: "griffin",
@@ -234,9 +262,7 @@ describe("companion asset resolver", () => {
         mood: "excited",
         variant: 2,
       }),
-    ).toBe(
-      "https://example.supabase.co/storage/v1/object/public/companion-presets/griffin/t2_guardian/excited/griffin__t2_guardian__excited__v2__fire.png",
-    );
+    ).toBeNull();
   });
 
   it("falls back to normal portraits when expressive tiers are not covered yet", () => {
@@ -251,7 +277,7 @@ describe("companion asset resolver", () => {
     ).toBeNull();
   });
 
-  it("resolves expressive URLs from companion records only for post-hatch preset companions", () => {
+  it("falls back from expressive URLs for all current preset stages", () => {
     expect(
       resolveCompanionExpressiveAssetUrl(
         {
@@ -264,9 +290,7 @@ describe("companion asset resolver", () => {
           variant: 5,
         },
       ),
-    ).toBe(
-      "https://example.supabase.co/storage/v1/object/public/companion-presets/griffin/t2_guardian/sleepy/griffin__t2_guardian__sleepy__v5__fire.png",
-    );
+    ).toBeNull();
 
     expect(
       resolveCompanionExpressiveAssetUrl(

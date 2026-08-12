@@ -121,7 +121,7 @@ const getAppleErrorDescription = (error: unknown): string => {
   const normalized = message.toLowerCase();
 
   if (normalized.includes("apple_email_missing")) {
-    return "Apple did not share an email for this account. Remove Cosmiq from Sign in with Apple settings, then try again.";
+    return "Apple did not share an email for this account. Remove Graceward from Sign in with Apple settings, then try again.";
   }
 
   if (normalized.includes("nonce") || normalized.includes("security check")) {
@@ -887,12 +887,12 @@ const Auth = () => {
         
         console.log('[Apple OAuth] Hashed nonce:', hashedNonce.substring(0, 16) + '...');
 
-        console.log('[Apple OAuth] Calling SignInWithApple.authorize with clientId: com.darrylgraham.revolution');
+        console.log('[Apple OAuth] Calling SignInWithApple.authorize with clientId: com.darrylgraham.graceward');
         
         const authorizeStart = Date.now();
         const result: SignInWithAppleResponse = await SignInWithApple.authorize({
-          clientId: 'com.darrylgraham.revolution', // Use bundle ID for native iOS
-          redirectURI: 'com.darrylgraham.revolution://',
+          clientId: 'com.darrylgraham.graceward', // Use bundle ID for native iOS
+          redirectURI: 'com.darrylgraham.graceward://',
           scopes: 'email name',
           state: crypto.randomUUID(), // Random state for security
           nonce: hashedNonce, // Hashed nonce for Apple
@@ -942,7 +942,7 @@ const Auth = () => {
 
           if (functionErrorBody?.code === 'APPLE_EMAIL_MISSING') {
             console.warn('[Apple OAuth] Missing email for Apple ID, prompting user to re-register');
-            setInlineError("We couldn’t create an account with your Apple ID. Open Settings, remove Revolution from Sign in with Apple, then try again and share your email.");
+            setInlineError("We couldn’t create an account with your Apple ID. Open Settings, remove Graceward from Sign in with Apple, then try again and share your email.");
             setIsLogin(true);
             setIsForgotPassword(false);
             return;
@@ -1086,11 +1086,11 @@ const Auth = () => {
     }
   };
 
-  const fieldLabelClassName = "text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-white/[0.5]";
+  const fieldLabelClassName = "text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-[#3f5f46]";
   const fieldInputClassName =
-    "h-[3.35rem] rounded-[1.15rem] border border-[#2a1a49] bg-[#12091f] px-5 text-[0.98rem] font-medium text-white shadow-[0_0_0_1px_rgba(255,255,255,0.01),0_10px_28px_rgba(5,2,16,0.45),inset_0_1px_0_rgba(255,255,255,0.03)] placeholder:text-white/[0.34] focus-visible:border-[#4b2c7e] focus-visible:ring-[3px] focus-visible:ring-[#b86dff]/15 focus-visible:ring-offset-0";
+    "h-[3.35rem] rounded-[1.15rem] border border-[#2f5938]/20 bg-white/70 px-5 text-[0.98rem] font-medium text-[#203124] shadow-[0_12px_30px_rgba(32,49,36,0.08)] placeholder:text-[#617064] focus-visible:border-[#2f5938]/60 focus-visible:ring-[3px] focus-visible:ring-[#2f5938]/[0.12] focus-visible:ring-offset-0";
   const passwordToggleButtonClassName =
-    "absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-white/[0.58] transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b86dff]/35";
+    "absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-[#526456] transition-colors hover:text-[#203124] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2f5938]/35";
   const passwordInputClassName = isLogin ? fieldInputClassName : `${fieldInputClassName} pr-14`;
   const switchMode = () => {
     setInlineError(null);
@@ -1107,14 +1107,20 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-[#090311] text-pure-white">
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_82%,rgba(179,92,255,0.16),transparent_28%),radial-gradient(circle_at_50%_18%,rgba(39,18,71,0.3),transparent_38%),linear-gradient(180deg,#090311_0%,#0a0314_38%,#09020f_100%)]" />
-      <div className="absolute inset-x-0 bottom-0 -z-10 h-[30vh] bg-[radial-gradient(circle_at_50%_100%,rgba(209,100,255,0.12),transparent_52%)]" />
+    <div className="min-h-screen relative overflow-hidden bg-[#f4efe3] text-[#203124]">
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_75%_18%,rgba(195,162,93,0.22),transparent_34%),radial-gradient(circle_at_16%_86%,rgba(73,111,76,0.18),transparent_36%),linear-gradient(145deg,#f7f1e5_0%,#edf0e4_56%,#dfe8db_100%)]" />
       <section
         id="auth-form"
         className="min-h-screen relative flex items-center justify-center px-6 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(4.5rem,env(safe-area-inset-top)+2.75rem)]"
       >
         <div className="relative z-10 w-full max-w-[20.5rem] py-4 sm:max-w-[21.75rem]">
+          <div className="mb-8 text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] bg-[#2f5938] shadow-[0_16px_35px_rgba(47,89,56,0.22)]">
+              <span className="font-serif text-3xl text-[#f8f4e8]">†</span>
+            </div>
+            <p className="mt-4 text-xs font-semibold uppercase tracking-[0.26em] text-[#496f4c]">Graceward</p>
+            <p className="mt-2 text-sm text-[#5b685e]">Faith for the shape of your day.</p>
+          </div>
           <h1 className="sr-only">
             {isForgotPassword ? "Reset password" : isLogin ? "Sign in" : "Create account"}
           </h1>
@@ -1123,7 +1129,7 @@ const Auth = () => {
             {isForgotPassword ? (
               <form onSubmit={handleForgotPassword} className="space-y-5">
                 <div className="space-y-2 pb-1">
-                  <p className="text-sm leading-6 text-white/[0.72]">
+                  <p className="text-sm leading-6 text-[#5b685e]">
                     Enter your email and we&apos;ll send a reset link.
                   </p>
                 </div>
@@ -1148,7 +1154,7 @@ const Auth = () => {
                 </div>
                 <Button
                   type="submit"
-                  className="h-[3.35rem] w-full rounded-[1.1rem] bg-gradient-to-r from-[#b254ea] via-[#c45ff3] to-[#df67dc] text-[0.98rem] font-semibold text-pure-white shadow-[0_20px_38px_rgba(143,54,224,0.34)] hover:brightness-105"
+                  className="h-[3.35rem] w-full rounded-[1.1rem] bg-[#2f5938] text-[0.98rem] font-semibold text-white shadow-[0_20px_38px_rgba(47,89,56,0.24)] hover:bg-[#24482d]"
                   disabled={loading}
                 >
                   {loading ? "Sending..." : "Send Reset Link"}
@@ -1214,7 +1220,7 @@ const Auth = () => {
                         setInlineError(null);
                         setIsForgotPassword(true);
                       }}
-                      className="pl-1 pt-0.5 text-[0.74rem] font-medium text-white/[0.6] transition-colors hover:text-pure-white"
+                      className="pl-1 pt-0.5 text-[0.74rem] font-medium text-[#526456] transition-colors hover:text-[#203124]"
                     >
                       Forgot password?
                     </button>
@@ -1255,7 +1261,7 @@ const Auth = () => {
                 )}
                 <Button
                   type="submit"
-                  className="h-[3.35rem] w-full rounded-[1.1rem] bg-gradient-to-r from-[#b254ea] via-[#c45ff3] to-[#df67dc] text-[0.98rem] font-semibold text-pure-white shadow-[0_22px_42px_rgba(148,58,230,0.38)] hover:brightness-105"
+                  className="h-[3.35rem] w-full rounded-[1.1rem] bg-[#2f5938] text-[0.98rem] font-semibold text-white shadow-[0_22px_42px_rgba(47,89,56,0.25)] hover:bg-[#24482d]"
                   disabled={loading}
                 >
                   {loading ? "Loading..." : isLogin ? "Sign In" : "Get Started"}
@@ -1267,10 +1273,10 @@ const Auth = () => {
               <>
                 <div className="relative pt-1">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-white/[0.12]" />
+                    <div className="w-full border-t border-[#203124]/15" />
                   </div>
                   <div className="relative flex justify-center text-sm">
-                    <span className="rounded-[0.45rem] bg-[#171023] px-2.5 py-0.5 text-[0.72rem] text-white/[0.58] shadow-[0_10px_20px_rgba(0,0,0,0.3)]">
+                    <span className="rounded-[0.45rem] bg-[#edf0e4] px-2.5 py-0.5 text-[0.72rem] text-[#617064]">
                       or
                     </span>
                   </div>
@@ -1280,7 +1286,7 @@ const Auth = () => {
                   type="button"
                   onClick={() => handleOAuthSignIn('apple')}
                   disabled={loading || oauthLoading !== null}
-                  className="h-[3.15rem] w-full rounded-[1rem] bg-white text-[0.98rem] font-semibold text-black shadow-[0_16px_30px_rgba(0,0,0,0.26)] hover:bg-white/95"
+                  className="h-[3.15rem] w-full rounded-[1rem] border border-[#203124]/[0.12] bg-white text-[0.98rem] font-semibold text-black shadow-[0_16px_30px_rgba(32,49,36,0.1)] hover:bg-white/95"
                 >
                   {oauthLoading === 'apple' ? (
                     <div className="animate-spin h-5 w-5 border-2 border-black/20 border-t-black rounded-full" />
@@ -1310,7 +1316,7 @@ const Auth = () => {
               <button
                 type="button"
                 onClick={switchMode}
-                className="text-[0.93rem] font-medium text-white/[0.72] underline underline-offset-[3px] transition-colors hover:text-white"
+                className="text-[0.93rem] font-medium text-[#526456] underline underline-offset-[3px] transition-colors hover:text-[#203124]"
               >
                 {isForgotPassword 
                   ? "Back to Sign In" 

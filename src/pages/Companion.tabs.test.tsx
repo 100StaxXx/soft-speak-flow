@@ -343,7 +343,7 @@ describe("Companion tabs performance behavior", () => {
 
     expect(screen.getByTestId("cinematic-background")).toHaveAttribute("data-preset", "companion");
     expect(screen.getByTestId("companion-theme-shell")).toHaveStyle("--primary: 45 100% 65%; --accent: 40 96% 57%");
-    expect(screen.getByTestId("companion-tab-list")).toHaveClass("border-stardust-gold/16");
+    expect(screen.getByTestId("companion-tab-list")).toHaveClass("border-stardust-gold/[0.16]");
   });
 
   afterEach(() => {
@@ -533,7 +533,7 @@ describe("Companion tabs performance behavior", () => {
     expect(screen.getByTestId("next-evolution")).toHaveAttribute("data-next-evolution-xp", "10");
   });
 
-  it("does not fake a stage 0 overview once the tutorial reaches the post-evolution companion intro", () => {
+  it("does not render a duplicate evolution preview after the companion has hatched", () => {
     mocks.guidedStep = "post_evolution_companion_intro";
     mocks.companion = {
       id: "companion-1",
@@ -545,8 +545,8 @@ describe("Companion tabs performance behavior", () => {
 
     renderCompanion();
 
-    expect(screen.getByTestId("next-evolution")).toHaveAttribute("data-current-stage", "1");
-    expect(screen.getByTestId("next-evolution")).toHaveAttribute("data-next-evolution-xp", "200");
+    expect(screen.queryByTestId("next-evolution")).not.toBeInTheDocument();
+    expect(screen.getByTestId("companion-display")).toBeInTheDocument();
   });
 
   it("disables companion query and idle prefetch while tab is inactive", async () => {

@@ -93,6 +93,7 @@ export async function handleSyncDailyPepTalkTranscript(
     // Call existing transcribe-audio function to get authoritative text + timestamps
     const transcribeResp = await deps.invokeTranscribeAudio({
       audioUrl: pepTalk.audio_url,
+      text: pepTalk.script,
     });
 
     if (!transcribeResp.ok) {

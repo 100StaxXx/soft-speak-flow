@@ -157,7 +157,7 @@ const buildNativeRedirect = (args: {
     params.set('message', args.message);
   }
 
-  return `cosmiq://calendar/oauth/callback?${params.toString()}`;
+  return `graceward://calendar/oauth/callback?${params.toString()}`;
 };
 
 export default function CalendarOAuthCallback() {

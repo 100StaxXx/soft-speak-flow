@@ -101,8 +101,9 @@ describe("deterministic wallpaper recipes", () => {
       const prompt = wallpaperGenerationSpecs[pageKey].prompt;
 
       expect(prompt).toContain("Favor broad scenic variety");
-      expect(prompt).toContain("Do not default to mountain ridges");
-      expect(prompt).toContain("occasional elegant city-night environments");
+      expect(prompt).toContain("Graceward Christian formation app");
+      expect(prompt).toContain("No planets, galaxies, zodiac imagery");
+      expect(prompt).toContain("creation, light, shelter, paths, water, and cultivated gardens");
     }
   });
 

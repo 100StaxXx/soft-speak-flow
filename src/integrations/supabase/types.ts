@@ -1451,6 +1451,7 @@ export type Database = {
           requested_at: string
           retry_count: number
           source_image_url: string
+          start_image_url: string | null
           stage: number
           started_at: string | null
           status: string
@@ -1476,6 +1477,7 @@ export type Database = {
           requested_at?: string
           retry_count?: number
           source_image_url: string
+          start_image_url?: string | null
           stage: number
           started_at?: string | null
           status?: string
@@ -1501,6 +1503,7 @@ export type Database = {
           requested_at?: string
           retry_count?: number
           source_image_url?: string
+          start_image_url?: string | null
           stage?: number
           started_at?: string | null
           status?: string
@@ -2584,6 +2587,219 @@ export type Database = {
           },
         ]
       }
+      daily_formation_assignments: {
+        Row: {
+          action: string
+          benefit: string
+          category: string
+          completed_at: string | null
+          created_at: string
+          focus: string
+          generation_model: string | null
+          generation_prompt_version: string | null
+          id: string
+          minutes: number
+          practice_date: string
+          practice_key: string
+          practice_source: string
+          scripture_reference: string | null
+          selection_reason: string
+          task_id: string | null
+          title: string
+          updated_at: string
+          user_id: string
+          xp_reward: number
+        }
+        Insert: {
+          action: string
+          benefit: string
+          category: string
+          completed_at?: string | null
+          created_at?: string
+          focus: string
+          generation_model?: string | null
+          generation_prompt_version?: string | null
+          id?: string
+          minutes: number
+          practice_date: string
+          practice_key: string
+          practice_source?: string
+          scripture_reference?: string | null
+          selection_reason?: string
+          task_id?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+          xp_reward?: number
+        }
+        Update: {
+          action?: string
+          benefit?: string
+          category?: string
+          completed_at?: string | null
+          created_at?: string
+          focus?: string
+          generation_model?: string | null
+          generation_prompt_version?: string | null
+          id?: string
+          minutes?: number
+          practice_date?: string
+          practice_key?: string
+          practice_source?: string
+          scripture_reference?: string | null
+          selection_reason?: string
+          task_id?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+          xp_reward?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_formation_assignments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "daily_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_formation_assignments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_guide_threads: {
+        Row: {
+          companion_acknowledged_at: string | null
+          companion_answer_id: string | null
+          companion_answer_label: string | null
+          companion_answered_at: string | null
+          companion_question: string | null
+          companion_question_id: string | null
+          companion_response: string | null
+          created_at: string
+          daily_pep_talk_id: string | null
+          encouragement_completed_at: string | null
+          encouragement_title: string | null
+          evening_reflected_at: string | null
+          evening_reflection_id: string | null
+          focus_answered_at: string | null
+          focus_category: string | null
+          focus_label: string | null
+          focus_option_id: string | null
+          guide_question: string | null
+          guide_question_id: string | null
+          id: string
+          mentor_id: string | null
+          mentor_name: string | null
+          practice_assignment_id: string | null
+          practice_completed_at: string | null
+          practice_key: string | null
+          thread_date: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          companion_acknowledged_at?: string | null
+          companion_answer_id?: string | null
+          companion_answer_label?: string | null
+          companion_answered_at?: string | null
+          companion_question?: string | null
+          companion_question_id?: string | null
+          companion_response?: string | null
+          created_at?: string
+          daily_pep_talk_id?: string | null
+          encouragement_completed_at?: string | null
+          encouragement_title?: string | null
+          evening_reflected_at?: string | null
+          evening_reflection_id?: string | null
+          focus_answered_at?: string | null
+          focus_category?: string | null
+          focus_label?: string | null
+          focus_option_id?: string | null
+          guide_question?: string | null
+          guide_question_id?: string | null
+          id?: string
+          mentor_id?: string | null
+          mentor_name?: string | null
+          practice_assignment_id?: string | null
+          practice_completed_at?: string | null
+          practice_key?: string | null
+          thread_date: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          companion_acknowledged_at?: string | null
+          companion_answer_id?: string | null
+          companion_answer_label?: string | null
+          companion_answered_at?: string | null
+          companion_question?: string | null
+          companion_question_id?: string | null
+          companion_response?: string | null
+          created_at?: string
+          daily_pep_talk_id?: string | null
+          encouragement_completed_at?: string | null
+          encouragement_title?: string | null
+          evening_reflected_at?: string | null
+          evening_reflection_id?: string | null
+          focus_answered_at?: string | null
+          focus_category?: string | null
+          focus_label?: string | null
+          focus_option_id?: string | null
+          guide_question?: string | null
+          guide_question_id?: string | null
+          id?: string
+          mentor_id?: string | null
+          mentor_name?: string | null
+          practice_assignment_id?: string | null
+          practice_completed_at?: string | null
+          practice_key?: string | null
+          thread_date?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_guide_threads_daily_pep_talk_id_fkey"
+            columns: ["daily_pep_talk_id"]
+            isOneToOne: false
+            referencedRelation: "daily_pep_talks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_guide_threads_evening_reflection_id_fkey"
+            columns: ["evening_reflection_id"]
+            isOneToOne: false
+            referencedRelation: "evening_reflections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_guide_threads_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_guide_threads_practice_assignment_id_fkey"
+            columns: ["practice_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "daily_formation_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_guide_threads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_missions: {
         Row: {
           auto_complete: boolean | null
@@ -2645,6 +2861,56 @@ export type Database = {
             columns: ["chain_parent_id"]
             isOneToOne: false
             referencedRelation: "daily_missions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_encouragement_history: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          daily_pep_talk_id: string
+          first_opened_at: string
+          first_started_at: string | null
+          id: string
+          last_interaction_at: string
+          listen_count: number
+          max_progress: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          daily_pep_talk_id: string
+          first_opened_at?: string
+          first_started_at?: string | null
+          id?: string
+          last_interaction_at?: string
+          listen_count?: number
+          max_progress?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          daily_pep_talk_id?: string
+          first_opened_at?: string
+          first_started_at?: string | null
+          id?: string
+          last_interaction_at?: string
+          listen_count?: number
+          max_progress?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_encouragement_history_daily_pep_talk_id_fkey"
+            columns: ["daily_pep_talk_id"]
+            isOneToOne: false
+            referencedRelation: "daily_pep_talks"
             referencedColumns: ["id"]
           },
         ]
@@ -3879,6 +4145,74 @@ export type Database = {
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "daily_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      formation_progress: {
+        Row: {
+          practices_completed: number
+          total_xp: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          practices_completed?: number
+          total_xp?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          practices_completed?: number
+          total_xp?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "formation_progress_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      formation_xp_events: {
+        Row: {
+          assignment_id: string
+          created_at: string
+          id: string
+          user_id: string
+          xp_awarded: number
+        }
+        Insert: {
+          assignment_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+          xp_awarded: number
+        }
+        Update: {
+          assignment_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+          xp_awarded?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "formation_xp_events_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: true
+            referencedRelation: "daily_formation_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formation_xp_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -5924,6 +6258,47 @@ export type Database = {
           },
         ]
       }
+      product_experience_events: {
+        Row: {
+          created_at: string
+          event_name: string
+          id: string
+          occurred_at: string
+          properties: Json
+          session_id: string | null
+          surface: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_name: string
+          id?: string
+          occurred_at?: string
+          properties?: Json
+          session_id?: string | null
+          surface: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          event_name?: string
+          id?: string
+          occurred_at?: string
+          properties?: Json
+          session_id?: string | null
+          surface?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_experience_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       productivity_stats: {
         Row: {
           created_at: string
@@ -5993,6 +6368,7 @@ export type Database = {
           birth_time: string | null
           birthdate: string | null
           completed_tasks_stay_in_place: boolean | null
+          companion_memory_enabled: boolean
           cosmic_profile_generated_at: string | null
           created_at: string | null
           current_habit_streak: number | null
@@ -6049,6 +6425,7 @@ export type Database = {
           birth_time?: string | null
           birthdate?: string | null
           completed_tasks_stay_in_place?: boolean | null
+          companion_memory_enabled?: boolean
           cosmic_profile_generated_at?: string | null
           created_at?: string | null
           current_habit_streak?: number | null
@@ -6105,6 +6482,7 @@ export type Database = {
           birth_time?: string | null
           birthdate?: string | null
           completed_tasks_stay_in_place?: boolean | null
+          companion_memory_enabled?: boolean
           cosmic_profile_generated_at?: string | null
           created_at?: string | null
           current_habit_streak?: number | null
@@ -7778,6 +8156,7 @@ export type Database = {
           path_determination_date: string | null
           power: number | null
           preset_id: string | null
+          product_mode: string
           recovery_progress: number | null
           resolve: number | null
           scar_history: Json | null
@@ -7862,6 +8241,7 @@ export type Database = {
           path_determination_date?: string | null
           power?: number | null
           preset_id?: string | null
+          product_mode?: string
           recovery_progress?: number | null
           resolve?: number | null
           scar_history?: Json | null
@@ -7946,6 +8326,7 @@ export type Database = {
           path_determination_date?: string | null
           power?: number | null
           preset_id?: string | null
+          product_mode?: string
           recovery_progress?: number | null
           resolve?: number | null
           scar_history?: Json | null
@@ -8853,6 +9234,36 @@ export type Database = {
       }
     }
     Views: {
+      graceward_guides: {
+        Row: {
+          archetype: string | null
+          avatar_url: string | null
+          created_at: string | null
+          description: string | null
+          gender_energy: string | null
+          id: string | null
+          identity_description: string | null
+          intensity_level: string | null
+          is_active: boolean | null
+          mentor_type: string | null
+          name: string | null
+          primary_color: string | null
+          short_title: string | null
+          signature_line: string | null
+          slug: string | null
+          style: string | null
+          style_description: string | null
+          tags: string[] | null
+          target_user: string | null
+          target_user_type: string | null
+          theme_config: Json | null
+          themes: string[] | null
+          tone_description: string | null
+          voice_style: string | null
+          welcome_message: string | null
+        }
+        Relationships: []
+      }
       live_wallpaper_manifest_v: {
         Row: {
           assignment_source: string | null
@@ -8899,6 +9310,81 @@ export type Database = {
       }
     }
     Functions: {
+      align_daily_formation_practice: {
+        Args: {
+          p_action: string
+          p_assignment_id: string
+          p_benefit: string
+          p_category: string
+          p_minutes: number
+          p_practice_key: string
+          p_selection_reason: string
+          p_title: string
+        }
+        Returns: {
+          action: string
+          assignment_id: string
+          benefit: string
+          category: string
+          completed_at: string | null
+          minutes: number
+          practice_date: string
+          practice_key: string
+          practices_completed: number
+          selection_reason: string
+          task_id: string | null
+          title: string
+          total_xp: number
+          xp_reward: number
+        }[]
+      }
+      clear_personal_companion_memory: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      complete_daily_formation_practice: {
+        Args: { p_assignment_id: string }
+        Returns: {
+          assignment_id: string
+          completed_at: string
+          level_after: number
+          practices_completed: number
+          status: string
+          task_id: string
+          total_xp: number
+          xp_awarded: number
+          xp_into_level: number
+          xp_to_next_level: number
+        }[]
+      }
+      prepare_daily_formation_practice: {
+        Args: {
+          p_action: string
+          p_benefit: string
+          p_category: string
+          p_minutes: number
+          p_practice_date: string
+          p_practice_key: string
+          p_selection_reason?: string
+          p_title: string
+        }
+        Returns: {
+          action: string
+          assignment_id: string
+          benefit: string
+          category: string
+          completed_at: string | null
+          minutes: number
+          practice_date: string
+          practice_key: string
+          practices_completed: number
+          selection_reason: string
+          task_id: string
+          title: string
+          total_xp: number
+          xp_reward: number
+        }[]
+      }
       award_companion_attribute: {
         Args: {
           p_amount: number
@@ -9036,6 +9522,14 @@ export type Database = {
           updated_at: string
           user_agent: string | null
         }
+      }
+      record_daily_encouragement_progress: {
+        Args: {
+          p_daily_pep_talk_id: string
+          p_event?: string
+          p_progress?: number
+        }
+        Returns: Database["public"]["Tables"]["daily_encouragement_history"]["Row"]
       }
       apply_companion_preset_selection: {
         Args: {

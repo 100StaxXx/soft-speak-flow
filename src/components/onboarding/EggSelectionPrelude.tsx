@@ -15,17 +15,17 @@ interface EggSelectionPreludeProps {
 }
 
 const PRELUDE_LINES = [
-  "A second choice waits beyond the guide you have chosen...",
-  "Not a question of allegiance, but of resonance.",
-  "Somewhere ahead, your companion is waiting for your arrival.",
+  "Your Path has given today a direction...",
+  "Now choose a symbol to grow alongside your practice.",
+  "Your companion will make steady progress visible, one day at a time.",
 ] as const;
 
 const TONE_PRELUDE_COPY: Record<CompanionStoryTone, string> = {
-  soft_gentle: "A quieter glow is waiting in the chamber, ready to answer a kinder path.",
-  epic_adventure: "A heroic spark is waiting in the chamber, ready to answer a bolder path.",
-  emotional_heartfelt: "A bond-led spark is waiting in the chamber, ready to answer a more heartfelt path.",
-  dark_intense: "A sharper, storm-lit spark is waiting in the chamber, ready to answer a darker path.",
-  whimsical_playful: "A curious little miracle is waiting in the chamber, ready to answer a more playful path.",
+  soft_gentle: "A gentle presence can remind you to meet each day with patience.",
+  epic_adventure: "A brave presence can remind you to take the next faithful step.",
+  emotional_heartfelt: "A heartfelt presence can remind you to grow with honesty and compassion.",
+  dark_intense: "A resolute presence can remind you that difficult seasons do not define you.",
+  whimsical_playful: "A playful presence can remind you to notice joy along the way.",
 };
 
 export const EggSelectionPrelude = ({
@@ -128,7 +128,7 @@ export const EggSelectionPrelude = ({
               >
                 <div className="flex items-center justify-center gap-2 text-amber-200">
                   <Sparkles className="h-5 w-5" />
-                  <span className="text-xs font-medium uppercase tracking-[0.34em]">The Chamber Opens</span>
+                  <span className="text-xs font-medium uppercase tracking-[0.34em]">A Living Reminder</span>
                   <Sparkles className="h-5 w-5" />
                 </div>
 
@@ -137,8 +137,8 @@ export const EggSelectionPrelude = ({
                 </h1>
 
                 <p className="text-base leading-7 text-white/[0.74] md:text-lg">
-                  {TONE_PRELUDE_COPY[storyTone]} A <span className="font-semibold text-white">{speciesName}</span>{" "}
-                  already sleeps inside the shell waiting for your bond to wake it. Your story tone is set to{" "}
+                  {TONE_PRELUDE_COPY[storyTone]} Your <span className="font-semibold text-white">{speciesName}</span>{" "}
+                  will change as your daily practices become consistent. Its personality is{" "}
                   <span className="font-semibold text-white">{storyToneMeta.label}</span>.
                 </p>
               </motion.div>
@@ -163,7 +163,7 @@ export const EggSelectionPrelude = ({
                 Choose My Companion
               </Button>
               <p className="text-sm text-white/[0.48]">
-                Species, color, and name come next. Tone shapes the story ahead.
+                Form, color, and name come next. You can make it feel like yours.
               </p>
             </motion.div>
           ) : null}

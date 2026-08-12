@@ -63,7 +63,7 @@ describe("EggSelectionPrelude", () => {
       });
 
       expect(
-        screen.getByText("Somewhere ahead, your companion is waiting for your arrival."),
+        screen.getByText("Your companion will make steady progress visible, one day at a time."),
       ).toBeInTheDocument();
       expect(screen.getByRole("heading", { name: "Choose Your Companion" })).toBeInTheDocument();
 

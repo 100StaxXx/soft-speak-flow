@@ -555,7 +555,7 @@ const EvolutionMomentCard = ({
               <Sparkles className="h-7 w-7 text-muted-foreground/60" />
             </div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/76 via-black/10 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/[0.76] via-black/10 to-transparent" />
           <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-semibold text-white">
             Stage {moment.stage}
           </span>

@@ -4,6 +4,7 @@ import { useCompanionMemories } from "@/hooks/useCompanionMemories";
 import { useCompanionPresence } from "@/contexts/CompanionPresenceContext";
 import { useCompanionAuraColors } from "@/hooks/useCompanionAuraColors";
 import { cn } from "@/lib/utils";
+import { announceCompanionPresenceSpeech } from "@/lib/companionPresenceEvents";
 
 interface MemoryWhisperProps {
   className?: string;
@@ -49,6 +50,7 @@ export const MemoryWhisper = memo(({ className, chance = 0.15 }: MemoryWhisperPr
         if (dialogue) {
           setMemoryLine(dialogue);
           setIsVisible(true);
+          announceCompanionPresenceSpeech("memory");
           referenceMemory(memory.id);
           hasShownRef.current = true;
         }
@@ -73,7 +75,7 @@ export const MemoryWhisper = memo(({ className, chance = 0.15 }: MemoryWhisperPr
         transition={{ duration: 0.3 }}
         className={cn(
           "mt-2 p-2 rounded-lg",
-          "bg-primary/4 border border-primary/8",
+          "bg-primary/4 border border-primary/[0.08]",
           className
         )}
         style={{

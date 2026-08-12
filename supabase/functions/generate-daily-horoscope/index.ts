@@ -57,7 +57,7 @@ serve(async (req) => {
 
     // Fetch mentor info for personalization (optional - fallback to default if not found)
     const { data: mentor, error: mentorError } = await supabaseClient
-      .from('mentors')
+      .from('graceward_guides')
       .select('name, tone_description, style_description')
       .eq('id', profile.selected_mentor_id)
       .maybeSingle();

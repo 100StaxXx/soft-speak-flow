@@ -7,16 +7,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/components/ui/sonner";
 
-import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { StoryPrologue } from "./StoryPrologue";
-import { DestinyReveal } from "./DestinyReveal";
-import { FactionSelector, type FactionType } from "./FactionSelector";
+import type { FactionType } from "./FactionSelector";
 import { StoryQuestionnaire, type OnboardingAnswer } from "./StoryQuestionnaire";
 import { MentorCalculating } from "./MentorCalculating";
 import { OnboardingStoryToneSelection } from "./OnboardingStoryToneSelection";
 import type { OnboardingStoryToneSelectionValue } from "./OnboardingStoryToneSelection";
 import { EggSelectionPrelude } from "./EggSelectionPrelude";
-import { OnboardingCosmicBackdrop, type OnboardingBackdropStage } from "./OnboardingCosmicBackdrop";
+import type { OnboardingBackdropStage } from "./OnboardingCosmicBackdrop";
 import { CompanionPersonalization } from "@/components/CompanionPersonalization";
 import { CompanionCreationLoader } from "@/components/CompanionCreationLoader";
 import { AICompanionCreator } from "@/components/AICompanionCreator";
@@ -62,8 +60,6 @@ import { trackOnboardingTutorialEvent } from "@/utils/onboardingTutorialTelemetr
 
 type OnboardingStage = 
   | "prologue" 
-  | "destiny"
-  | "faction" 
   | "questionnaire" 
   | "calculating"
   | "mentor-result" 
@@ -76,7 +72,7 @@ type OnboardingStage =
 type MentorCatalogStatus = "loading" | "ready" | "unavailable";
 
 export const resolveOnboardingBackdropStage = (
-  stage: OnboardingStage,
+  stage: OnboardingStage | "destiny" | "faction",
 ): OnboardingBackdropStage | null => {
   if (
     stage === "prologue"
@@ -222,6 +218,15 @@ const isCompanionStoryTone = (value: unknown): value is CompanionStoryTone =>
 const isFactionType = (value: unknown): value is FactionType =>
   value === "starfall" || value === "void" || value === "stellar";
 
+const GRACEWARD_INTERNAL_FACTION: FactionType = "starfall";
+
+export const normalizeGracewardResumeStage = (
+  stage: OnboardingResumeStep | null,
+): OnboardingStage | null => {
+  if (stage === "destiny" || stage === "faction") return "questionnaire";
+  return stage;
+};
+
 const parseMentorExplanation = (value: unknown): MentorExplanation | null => {
   if (!value || typeof value !== "object") return null;
   const candidate = value as Record<string, unknown>;
@@ -275,7 +280,7 @@ const onboardingLog = logger.scope("StoryOnboarding");
 const JOURNEY_FINALIZATION_FAILURE_TOAST =
   "Your egg was created, but we couldn't finish setup. Please try again.";
 
-type StoryOnboardingMode = "standard" | "migration" | "reset";
+type StoryOnboardingMode = "standard" | "creation" | "migration" | "reset";
 
 export interface StoryOnboardingResumeState {
   stage: OnboardingResumeStep;
@@ -284,6 +289,8 @@ export interface StoryOnboardingResumeState {
   onboardingData?: Record<string, unknown> | null;
   faction?: string | null;
 }
+
+export type GracewardOnboardingResumeState = StoryOnboardingResumeState;
 
 interface StoryOnboardingProps {
   mode?: StoryOnboardingMode;
@@ -310,7 +317,7 @@ type CompanionSelectionPreferences = {
 
 type CompanionSetupStatus = "idle" | "pending" | "ready" | "failed";
 
-export const StoryOnboarding = ({
+export const GracewardOnboarding = ({
   mode = "standard",
   existingCompanion = null,
   resumeState = null,
@@ -321,11 +328,11 @@ export const StoryOnboarding = ({
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { createCompanion } = useCompanion();
+  const isCompanionCreationMode = mode === "creation";
   const isMigrationMode = mode === "migration";
   const isResetMode = mode === "reset";
-  const startsAtCompanion = isMigrationMode || isResetMode;
   const activeResumeState = useMemo<StoryOnboardingResumeState | null>(() => {
-    if (!resumeState || isMigrationMode || isResetMode) return resumeState;
+    if (!resumeState || isCompanionCreationMode || isMigrationMode || isResetMode) return resumeState;
 
     const trimmedUserName = typeof resumeState.userName === "string" ? resumeState.userName.trim() : "";
     const canResumeWithoutName = resumeState.stage === "prologue" || resumeState.stage === "journey-begins";
@@ -336,7 +343,7 @@ export const StoryOnboarding = ({
       stage: "prologue",
       userName: "",
     };
-  }, [isMigrationMode, isResetMode, resumeState]);
+  }, [isCompanionCreationMode, isMigrationMode, isResetMode, resumeState]);
   const resumesAtJourneyBegins = activeResumeState?.stage === "journey-begins";
   const resumeData = activeResumeState?.onboardingData ?? null;
   const resumeFaction = isFactionType(activeResumeState?.faction)
@@ -351,20 +358,21 @@ export const StoryOnboarding = ({
   const resumeStoryTone = isCompanionStoryTone(resumeData?.story_tone)
     ? resumeData.story_tone
     : "epic_adventure";
-  const resumeStage = !isMigrationMode && !isResetMode ? activeResumeState?.stage ?? null : null;
-  const initialResumeStage: OnboardingStage | null =
-    resumeStage === "questionnaire" && !resumeFaction
-      ? "faction"
-      : resumeStage;
+  const resumeStage = !isCompanionCreationMode && !isMigrationMode && !isResetMode
+    ? activeResumeState?.stage ?? null
+    : null;
+  const initialResumeStage = normalizeGracewardResumeStage(resumeStage);
 
   const [stage, setStage] = useState<OnboardingStage>(
     initialResumeStage
       ? initialResumeStage
-      : isMigrationMode
+      : isCompanionCreationMode
         ? "companion"
-        : isResetMode
-          ? "story-tone"
-          : "prologue",
+        : isMigrationMode
+          ? "companion"
+          : isResetMode
+            ? "story-tone"
+            : "prologue",
   );
   const [userName, setUserName] = useState(activeResumeState?.userName ?? "");
 
@@ -373,7 +381,10 @@ export const StoryOnboarding = ({
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [stage]);
 
-  const [faction, setFaction] = useState<FactionType | null>(resumeFaction);
+  // Factions are retained only as legacy data. Graceward no longer asks new
+  // users to choose a Cosmiq path, but the internal value keeps old mentor
+  // matching and persisted profiles compatible during the transition.
+  const faction = resumeFaction ?? GRACEWARD_INTERNAL_FACTION;
   const [answers, setAnswers] = useState<OnboardingAnswer[]>(resumeAnswers);
   const [mentors, setMentors] = useState<Mentor[]>([]);
   const [mentorCatalogStatus, setMentorCatalogStatus] = useState<MentorCatalogStatus>("loading");
@@ -395,7 +406,6 @@ export const StoryOnboarding = ({
   const journeyCinematicStartedRef = useRef(false);
   const persistStepInFlightRef = useRef(false);
   const mentorResultRecoveryNotifiedRef = useRef(false);
-  const backdropStage = resolveOnboardingBackdropStage(stage);
 
   useEffect(() => {
     trackOnboardingTutorialEvent("onboarding_stage_entered", {
@@ -422,14 +432,10 @@ export const StoryOnboarding = ({
   useEffect(() => {
     if (!activeResumeState || isMigrationMode || isResetMode) return;
 
-    const nextStage =
-      activeResumeState.stage === "questionnaire" && !resumeFaction
-        ? "faction"
-        : activeResumeState.stage;
+    const nextStage = normalizeGracewardResumeStage(activeResumeState.stage);
 
-    setStage(nextStage);
+    if (nextStage) setStage(nextStage);
     setUserName(activeResumeState.userName ?? "");
-    setFaction(resumeFaction);
     setAnswers(resumeAnswers);
     setSelectedStoryTone(resumeStoryTone);
 
@@ -536,7 +542,7 @@ export const StoryOnboarding = ({
 
   const fetchActiveMentors = useCallback(async (): Promise<Mentor[]> => {
     const { data, error } = await supabase
-      .from("mentors")
+      .from("graceward_guides")
       .select("*")
       .eq("is_active", true);
 
@@ -656,42 +662,10 @@ export const StoryOnboarding = ({
 
   const handlePrologueComplete = (name: string) => {
     setUserName(name);
-    void persistStageBeforeAdvance("destiny", { userName: name });
-  };
-
-  const handleDestinyComplete = () => {
-    void persistStageBeforeAdvance("faction", { userName });
-  };
-
-  const handleFactionComplete = async (selectedFaction: FactionType) => {
-    setFaction(selectedFaction);
-
-    if (user) {
-      const existingData = await loadExistingOnboardingData();
-      const { error } = await supabase.from("profiles").update({
-        faction: selectedFaction,
-        onboarding_step: "questionnaire",
-        onboarding_data: {
-          ...existingData,
-          faction: selectedFaction,
-        } as any,
-      }).eq("id", user.id);
-
-      if (error) {
-        onboardingLog.warn("Failed to save onboarding faction", {
-          userId: user.id,
-          error: error.message,
-        });
-        toast.error("We couldn't save that choice right now. Please try again.");
-        return;
-      }
-    }
-
-    trackOnboardingTutorialEvent("onboarding_faction_saved", {
-      userId: user?.id ?? null,
-      faction: selectedFaction,
+    void persistStageBeforeAdvance("questionnaire", {
+      userName: name,
+      product_mode: "graceward",
     });
-    setStage("questionnaire");
   };
 
   const persistQuestionnaireResponses = useCallback(async (questionAnswers: OnboardingAnswer[]) => {
@@ -1404,8 +1378,14 @@ export const StoryOnboarding = ({
         .update({
           onboarding_completed: true,
           onboarding_step: "complete",
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
           onboarding_data: {
             ...existingData,
+            product_mode: "graceward",
+            graceward_onboarding_version: 1,
+            // Retain the old version key for installed clients that still use
+            // it to identify the faith-specific onboarding generation.
+            christian_onboarding_version: 3,
             walkthrough_completed: true,
             story_tone:
               typeof existingData.story_tone === "string"
@@ -1435,8 +1415,8 @@ export const StoryOnboarding = ({
         userId: user.id,
         mode,
       });
-      toast.success("Welcome to Cosmiq! Your journey begins.");
-      safeNavigate(navigate, "/journeys");
+      toast.success("Welcome to Graceward. Your daily path is ready.");
+      safeNavigate(navigate, "/mentor");
       return true;
     } catch (error) {
       logger.error("Journey completion finalization failed", {
@@ -1531,9 +1511,11 @@ export const StoryOnboarding = ({
   }, [mentorCatalogStatus, mentors.length, user?.id]);
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-background">
-      <StarfieldBackground />
-      {backdropStage && <OnboardingCosmicBackdrop stage={backdropStage} faction={faction} motionLevel="balanced" />}
+    <div className="relative min-h-[100dvh] overflow-x-hidden bg-[#09110d]">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_10%,rgba(196,168,92,0.18),transparent_34%),radial-gradient(circle_at_10%_70%,rgba(62,110,79,0.20),transparent_38%),linear-gradient(180deg,#0d1812_0%,#09110d_58%,#07100c_100%)]"
+      />
 
       <AnimatePresence mode="wait">
         {stage === "prologue" && (
@@ -1548,32 +1530,7 @@ export const StoryOnboarding = ({
           </motion.div>
         )}
 
-        {stage === "destiny" && (
-          <motion.div
-            key="destiny"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="relative z-10"
-          >
-            <DestinyReveal userName={userName} onComplete={handleDestinyComplete} />
-          </motion.div>
-        )}
-
-        {stage === "faction" && (
-          <motion.div
-            key="faction"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="relative z-10"
-          >
-            <FactionSelector onComplete={handleFactionComplete} />
-          </motion.div>
-        )}
-
-
-        {stage === "questionnaire" && faction && (
+        {stage === "questionnaire" && (
           <motion.div
             key="questionnaire"
             initial={{ opacity: 0 }}
@@ -1717,7 +1674,7 @@ export const StoryOnboarding = ({
           </motion.div>
         )}
 
-        {stage === "companion" && (faction || startsAtCompanion || activeResumeState?.stage === "companion") && (
+        {stage === "companion" && (
           <motion.div
             key={isMigrationMode ? "companion-migration" : isResetMode ? "companion-reset" : "companion"}
             initial={{ opacity: 0 }}
@@ -1737,14 +1694,20 @@ export const StoryOnboarding = ({
                 onComplete={(data) => handleCompanionComplete({ presetId: null, ...data })}
                 storyTone={selectedStoryTone}
                 isLoading={isCreatingCompanion}
-                title={isResetMode ? "Shape Your New Companion Egg" : "Shape Your Companion Egg"}
+                title={isResetMode
+                  ? "Shape Your New Companion"
+                  : isCompanionCreationMode
+                    ? "Choose Your Faith Companion"
+                    : "Shape Your Companion"}
                 description={
                   isResetMode
-                    ? "Pick the color, element, and species for the new AI-generated egg that will carry your fresh start."
-                    : "Choose the color, element, and species that will define your AI-generated companion egg."
+                    ? "Choose the color, nature, and symbolic creature that will carry your fresh start."
+                    : isCompanionCreationMode
+                      ? "Choose a Christian symbolic creature that will grow alongside your prayer, daily encouragement, and faithful actions."
+                    : "Choose the color, nature, and symbolic creature that will grow beside your daily practice."
                 }
-                submitLabel="Continue"
-                onBack={handleCompanionBack}
+                submitLabel={isCompanionCreationMode ? "Create My Companion" : "Continue"}
+                onBack={isCompanionCreationMode ? undefined : handleCompanionBack}
               />
             )}
           </motion.div>
@@ -1792,3 +1755,6 @@ export const StoryOnboarding = ({
     </div>
   );
 };
+
+/** @deprecated Use GracewardOnboarding. Kept as a source-compatible alias. */
+export const StoryOnboarding = GracewardOnboarding;

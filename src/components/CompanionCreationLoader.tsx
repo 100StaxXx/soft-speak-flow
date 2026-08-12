@@ -4,18 +4,18 @@ import { Progress } from "@/components/ui/progress";
 import { Sparkles } from "lucide-react";
 
 const CREATION_MESSAGES = [
-  "Opening the hatchery...",
-  "Attuning your chosen egg...",
-  "Binding the creature spirit...",
-  "Sealing the element and story tone...",
-  "Preparing the first stage...",
+  "Preparing your companion...",
+  "Shaping its symbolic form...",
+  "Applying your chosen colors...",
+  "Setting its personality...",
+  "Preparing its first growth stage...",
   "Almost there...",
 ];
 
 const CREATION_TIPS = [
-  "Your chosen species, element, and story tone are being bound together now",
-  "Element shapes the visuals, while story tone shapes the narrative flavor",
-  "Your companion will keep growing as you complete quests",
+  "Your chosen form, colors, and personality are being brought together",
+  "Your companion is a symbol of consistency—not a measure of faith or God’s approval",
+  "Prayer, encouragement, faithful steps, and reflection all help it grow",
 ];
 
 const PROGRESS_UPDATE_INTERVAL_MS = 1_000;
@@ -180,7 +180,7 @@ export const CompanionCreationLoader = () => {
         {/* Time expectation */}
         <div className="space-y-1">
           <p className="text-sm text-muted-foreground">
-            Your companion egg is being prepared.
+            Your companion is being prepared.
           </p>
           <p className="text-sm text-muted-foreground">
             Usually ready within a few seconds.

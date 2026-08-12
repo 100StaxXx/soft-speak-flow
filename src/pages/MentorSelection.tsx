@@ -21,7 +21,7 @@ const MentorSelection = () => {
     try {
       // Fetch mentors
       const { data: mentorsData, error: mentorsError } = await supabase
-        .from("mentors")
+        .from("graceward_guides")
         .select("*")
         .eq("is_active", true)
         .order("created_at");

@@ -26,7 +26,7 @@ export const EveningReflectionBanner = memo(({
       >
         <button
           onClick={() => setIsDrawerOpen(true)}
-          className="relative w-full p-4 rounded-2xl bg-gradient-to-r from-primary/22 via-accent/18 to-primary/12 border border-primary/35 backdrop-blur-sm hover:border-primary/55 hover:shadow-[0_18px_34px_hsl(var(--primary)/0.18)] transition-all duration-300 group overflow-hidden"
+          className="relative w-full p-4 rounded-2xl bg-gradient-to-r from-primary/[0.22] via-accent/[0.18] to-primary/[0.12] border border-primary/35 backdrop-blur-sm hover:border-primary/55 hover:shadow-[0_18px_34px_hsl(var(--primary)/0.18)] transition-all duration-300 group overflow-hidden"
         >
           {/* Animated shimmer sweep */}
           <div className="absolute inset-0 overflow-hidden rounded-2xl">
@@ -58,12 +58,12 @@ export const EveningReflectionBanner = memo(({
           </div>
           
           {/* Glow effect on hover */}
-          <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-r from-primary/12 via-accent/10 to-primary/8" />
+          <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-r from-primary/[0.12] via-accent/10 to-primary/[0.08]" />
           
           <div className="relative flex items-center gap-3">
             {/* Animated moon icon */}
             <motion.div 
-              className="p-2.5 rounded-full bg-gradient-to-br from-primary/28 to-accent/22 border border-primary/35 group-hover:border-primary/55 transition-all duration-300"
+              className="p-2.5 rounded-full bg-gradient-to-br from-primary/[0.28] to-accent/[0.22] border border-primary/35 group-hover:border-primary/55 transition-all duration-300"
               animate={{ 
                 boxShadow: [
                   "0 0 0 0 rgba(var(--primary-rgb), 0)",
@@ -87,7 +87,7 @@ export const EveningReflectionBanner = memo(({
             
             {/* Animated XP badge */}
             <motion.div 
-              className="text-xs px-3 py-1.5 rounded-full bg-gradient-to-r from-primary/28 to-accent/24 text-primary font-bold border border-primary/35 group-hover:border-primary/55 transition-all"
+              className="text-xs px-3 py-1.5 rounded-full bg-gradient-to-r from-primary/[0.28] to-accent/[0.24] text-primary font-bold border border-primary/35 group-hover:border-primary/55 transition-all"
               animate={{ 
                 scale: [1, 1.05, 1]
               }}

@@ -23,7 +23,7 @@ import {
 } from "../_shared/appleSubscriptions.ts";
 import { normalizeAppAccountToken } from "../_shared/appleServerAPI.ts";
 
-const defaultAppleBundleId = "com.darrylgraham.revolution";
+const defaultAppleBundleIds = ["com.darrylgraham.graceward", "com.darrylgraham.revolution"];
 const GENESIS_SPECIAL_CODE = "GENESIS";
 const WEBHOOK_PROVIDER = "apple";
 const APPLE_ROOT_CA_G3_SHA256_FINGERPRINT =
@@ -35,7 +35,7 @@ const appleWebhookAudiences = [
 ].filter((value): value is string => Boolean(value));
 
 if (appleWebhookAudiences.length === 0) {
-  appleWebhookAudiences.push(defaultAppleBundleId);
+  appleWebhookAudiences.push(...defaultAppleBundleIds);
 }
 
 /**
